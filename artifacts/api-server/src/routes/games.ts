@@ -12,7 +12,7 @@ import {
   GetGameReplayParams,
 } from "@workspace/api-zod";
 import { fetchChessComGames, extractGameMetadata, parsePgnMoves } from "../lib/chesscom";
-import { analyzeMoves } from "../lib/openaiAnalysis";
+import { analyzeMoves, analyzeSingleMove } from "../lib/openaiAnalysis";
 
 const router: IRouter = Router();
 
@@ -203,6 +203,52 @@ router.post("/games/:id/analyze-moves", async (req, res): Promise<void> => {
   });
 
   res.json({ classifications });
+});
+
+router.post("/games/:id/analyze-move", async (req, res): Promise<void> => {
+  const params = GetGameReplayParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+
+  const { moveIndex } = req.body as { moveIndex?: number };
+  if (typeof moveIndex !== "number" || moveIndex < 0) {
+    res.status(400).json({ error: "moveIndex is required and must be a non-negative number" });
+    return;
+  }
+
+  const [game] = await db
+    .select()
+    .from(gamesTable)
+    .where(eq(gamesTable.id, params.data.id));
+
+  if (!game) {
+    res.status(404).json({ error: "Game not found" });
+    return;
+  }
+
+  const moves = parsePgnMoves(game.pgn);
+
+  if (moveIndex >= moves.length) {
+    res.status(400).json({ error: "moveIndex out of range" });
+    return;
+  }
+
+  try {
+    const analysis = await analyzeSingleMove({
+      moves,
+      moveIndex,
+      opening: game.opening,
+      result: game.result,
+      whiteUsername: game.whiteUsername,
+      blackUsername: game.blackUsername,
+    });
+    res.json(analysis);
+  } catch (err) {
+    req.log.error({ err }, "Failed to analyze single move");
+    res.status(500).json({ error: "Analysis failed" });
+  }
 });
 
 export default router;

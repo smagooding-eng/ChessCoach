@@ -159,6 +159,84 @@ Respond with valid JSON:
   }
 }
 
+export interface SingleMoveAnalysis {
+  classification: "brilliant" | "excellent" | "good" | "inaccuracy" | "mistake" | "blunder";
+  explanation: string;
+  betterMove: string | null;
+}
+
+interface AnalyzeSingleMoveInput {
+  moves: Array<{ moveNumber: number; san: string; color: string }>;
+  moveIndex: number;
+  opening: string | null;
+  result: string;
+  whiteUsername: string;
+  blackUsername: string;
+}
+
+export async function analyzeSingleMove(input: AnalyzeSingleMoveInput): Promise<SingleMoveAnalysis> {
+  const { moves, moveIndex, opening, result, whiteUsername, blackUsername } = input;
+
+  const target = moves[moveIndex];
+  if (!target) throw new Error("Move not found");
+
+  // Build context: up to 4 moves before and 2 after for reference
+  const contextStart = Math.max(0, moveIndex - 4);
+  const contextEnd = Math.min(moves.length - 1, moveIndex + 2);
+  const contextMoves = moves.slice(contextStart, contextEnd + 1).map((m, i) => {
+    const idx = contextStart + i;
+    const marker = idx === moveIndex ? ">>> " : "    ";
+    return `${marker}${m.moveNumber}${m.color === 'white' ? '.' : '...'} ${m.san}`;
+  }).join("\n");
+
+  const playerColor = target.color;
+  const player = playerColor === "white" ? whiteUsername : blackUsername;
+
+  const prompt = `You are an expert chess coach providing in-depth move analysis.
+
+Game: ${whiteUsername} (White) vs ${blackUsername} (Black)
+Opening: ${opening ?? "Unknown"}
+Game result: ${result}
+
+Move being analyzed (marked with >>>):
+${contextMoves}
+
+The player "${player}" (${playerColor}) played ${target.moveNumber}${playerColor === 'white' ? '.' : '...'} ${target.san}.
+
+Provide a thorough analysis of this specific move. Consider:
+1. What does this move accomplish? (tactical threats, positional goals, development)
+2. How good or bad is this move? (brilliant/excellent/good/inaccuracy/mistake/blunder)
+3. What are the consequences of this move?
+4. If it is an inaccuracy, mistake, or blunder — what was the better alternative and why?
+
+Respond with valid JSON:
+{
+  "classification": "good",
+  "explanation": "3-5 sentence detailed explanation of the move covering what it achieves, why it is classified this way, and its consequences.",
+  "betterMove": "Nf3 — brief reason why this was better (only include if classification is inaccuracy/mistake/blunder, otherwise null)"
+}`;
+
+  try {
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      max_completion_tokens: 512,
+      messages: [{ role: "user", content: prompt }],
+      response_format: { type: "json_object" },
+    });
+
+    const content = response.choices[0]?.message?.content ?? "{}";
+    const parsed = JSON.parse(content) as SingleMoveAnalysis;
+    return {
+      classification: parsed.classification ?? "good",
+      explanation: parsed.explanation ?? "",
+      betterMove: parsed.betterMove ?? null,
+    };
+  } catch (err) {
+    logger.error({ err }, "Failed to analyze single move with OpenAI");
+    throw err;
+  }
+}
+
 interface CourseLesson {
   title: string;
   content: string;

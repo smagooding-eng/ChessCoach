@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useParams, Link } from 'wouter';
 import { useGameViewer } from '@/hooks/use-games';
 import { ChessBoard } from '@/components/ChessBoard';
@@ -6,7 +6,7 @@ import { Chess } from 'chess.js';
 import {
   ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
   Play, Pause, ArrowLeft, BrainCircuit, FlipVertical2,
-  Swords, Clock, Zap, BookOpen, Cpu
+  Swords, Clock, Zap, BookOpen, Cpu, Lightbulb, AlertTriangle
 } from 'lucide-react';
 import { useUser } from '@/hooks/use-user';
 
@@ -18,6 +18,12 @@ type MoveAnnotation = {
   color: string;
   classification: Classification;
   explanation: string;
+};
+
+type MoveAnalysis = {
+  classification: Classification;
+  explanation: string;
+  betterMove: string | null;
 };
 
 const CLASS_CFG: Record<Classification, { badge: string; color: string; full: string }> = {
@@ -50,6 +56,11 @@ export function GameReplay() {
   const [activeAnnotation, setActiveAnnotation] = useState<MoveAnnotation | null>(null);
   const [bestMoveSan, setBestMoveSan] = useState<string | null>(null);
   const [fetchingBest, setFetchingBest] = useState(false);
+
+  // Per-move deep analysis
+  const analysisCache = useRef<Map<number, MoveAnalysis>>(new Map());
+  const [moveAnalysis, setMoveAnalysis] = useState<MoveAnalysis | null>(null);
+  const [loadingAnalysis, setLoadingAnalysis] = useState(false);
 
   const playRef = useRef<NodeJS.Timeout | null>(null);
   const moveListRef  = useRef<HTMLDivElement>(null);
@@ -101,6 +112,50 @@ export function GameReplay() {
       setActiveAnnotation(null);
     }
   }, [currentMove, annotations]);
+
+  // Auto-fetch deep move analysis with debounce + cache
+  useEffect(() => {
+    if (!game || currentMove === 0) {
+      setMoveAnalysis(null);
+      return;
+    }
+    const moveIdx = currentMove - 1;
+
+    // Serve from cache instantly
+    if (analysisCache.current.has(moveIdx)) {
+      setMoveAnalysis(analysisCache.current.get(moveIdx)!);
+      return;
+    }
+
+    setMoveAnalysis(null);
+    setLoadingAnalysis(true);
+
+    const timer = setTimeout(async () => {
+      // Double-check cache in case another request completed while waiting
+      if (analysisCache.current.has(moveIdx)) {
+        setMoveAnalysis(analysisCache.current.get(moveIdx)!);
+        setLoadingAnalysis(false);
+        return;
+      }
+      try {
+        const res = await fetch(`/api/games/${game.id}/analyze-move`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ moveIndex: moveIdx }),
+        });
+        if (!res.ok) throw new Error('fetch failed');
+        const data = await res.json() as MoveAnalysis;
+        analysisCache.current.set(moveIdx, data);
+        setMoveAnalysis(data);
+      } catch {
+        setMoveAnalysis(null);
+      } finally {
+        setLoadingAnalysis(false);
+      }
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [game, currentMove]);
 
   const currentFen = currentMove === 0 ? null : moves[currentMove - 1]?.fen;
 
@@ -305,20 +360,72 @@ export function GameReplay() {
             </div>
           )}
 
-          {/* Annotation panel for current move */}
-          {activeAnnotation && (
-            <div className={`glass-card rounded-xl p-4 border text-sm ${CLASS_CFG[activeAnnotation.classification].color}`}>
-              <div className="flex items-center gap-2 font-bold mb-1.5">
-                <BrainCircuit className="w-4 h-4" />
-                {CLASS_CFG[activeAnnotation.classification].full}
-                <span className="font-mono text-xs px-1.5 py-0.5 rounded bg-black/20">{activeAnnotation.san}</span>
+          {/* Per-move deep analysis panel */}
+          {currentMove > 0 && (() => {
+            const move = moves[currentMove - 1];
+            const cfg = moveAnalysis ? CLASS_CFG[moveAnalysis.classification] : null;
+            const isBad = moveAnalysis && ['inaccuracy', 'mistake', 'blunder'].includes(moveAnalysis.classification);
+
+            return (
+              <div className="glass-card rounded-2xl overflow-hidden border border-white/8">
+                {/* Header */}
+                <div className={`px-4 py-3 flex items-center gap-3 border-b border-white/5
+                  ${cfg ? cfg.color.replace('text-', 'bg-').split(' ')[0] + '/8' : 'bg-white/3'}`}>
+                  <BrainCircuit className={`w-4 h-4 shrink-0 ${cfg ? cfg.color.split(' ')[0] : 'text-primary'}`} />
+                  <span className={`font-bold text-sm ${cfg ? cfg.color.split(' ')[0] : 'text-primary'}`}>
+                    {cfg ? `${cfg.full} — ` : ''}<span className="font-mono">{move?.san}</span>
+                  </span>
+                  {cfg && (
+                    <span className={`ml-auto text-xs font-bold px-2 py-0.5 rounded border ${cfg.color}`}>
+                      {cfg.badge}
+                    </span>
+                  )}
+                  {loadingAnalysis && (
+                    <div className="ml-auto flex items-center gap-2 text-xs text-muted-foreground">
+                      <div className="w-3 h-3 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                      Analyzing…
+                    </div>
+                  )}
+                </div>
+
+                {/* Body */}
+                <div className="px-4 py-3 space-y-3">
+                  {loadingAnalysis && !moveAnalysis ? (
+                    <div className="flex items-center gap-3 py-2">
+                      <div className="w-4 h-4 border-2 border-primary/50 border-t-primary rounded-full animate-spin shrink-0" />
+                      <span className="text-sm text-muted-foreground">Getting AI analysis for this move…</span>
+                    </div>
+                  ) : moveAnalysis ? (
+                    <>
+                      <p className="text-sm leading-relaxed text-foreground/90">{moveAnalysis.explanation}</p>
+                      {isBad && moveAnalysis.betterMove && (
+                        <div className="flex items-start gap-2.5 rounded-xl bg-amber-500/8 border border-amber-500/20 px-3 py-2.5">
+                          <Lightbulb className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                          <div className="text-sm">
+                            <span className="text-amber-400 font-bold text-xs uppercase tracking-wide block mb-0.5">Better move</span>
+                            <span className="text-foreground/80">{moveAnalysis.betterMove}</span>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <p className="text-sm text-muted-foreground italic">Navigate to a move to see AI analysis.</p>
+                  )}
+                </div>
               </div>
-              <p className="leading-relaxed opacity-90">{activeAnnotation.explanation}</p>
+            );
+          })()}
+
+          {/* Start position prompt */}
+          {currentMove === 0 && (
+            <div className="glass-card rounded-xl px-4 py-3 border border-white/8 text-sm text-muted-foreground flex items-center gap-2">
+              <BrainCircuit className="w-4 h-4 shrink-0 text-primary/50" />
+              <span>Step through the moves to see AI analysis for each one.</span>
             </div>
           )}
 
-          {/* Coach notes */}
-          {game.analysisNotes && !activeAnnotation && (
+          {/* Coach notes (only if no per-move analysis loading) */}
+          {game.analysisNotes && currentMove === 0 && (
             <div className="glass-card rounded-xl p-4 border-l-4 border-l-primary bg-primary/5 text-sm">
               <div className="flex items-center gap-2 text-primary font-bold mb-1.5">
                 <BrainCircuit className="w-4 h-4" /> Coach Notes
