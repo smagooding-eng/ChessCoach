@@ -22,15 +22,22 @@ const queryClient = new QueryClient();
 // Protected Route Wrapper
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
   const { username, isLoaded } = useUser();
-  const [, setLocation] = useLocation();
+  const [, navigate] = useLocation();
 
   useEffect(() => {
     if (isLoaded && !username) {
-      setLocation('/setup');
+      // Replace so pressing Back doesn't loop back to a protected route
+      navigate('/setup', { replace: true } as never);
     }
-  }, [isLoaded, username, setLocation]);
+  }, [isLoaded, username, navigate]);
 
-  if (!isLoaded) return null;
+  if (!isLoaded) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
   if (!username) return null;
 
   return (

@@ -6,7 +6,7 @@ import { Search, ChevronRight, Play, Filter } from 'lucide-react';
 import { format } from 'date-fns';
 
 export function Games() {
-  const { data, isLoading } = useMyGames();
+  const { data, isLoading, isError, error } = useMyGames();
   const [filter, setFilter] = useState('all');
 
   const games = data?.games || [];
@@ -18,8 +18,26 @@ export function Games() {
 
   if (isLoading) {
     return (
-      <div className="flex justify-center py-20">
+      <div className="flex flex-col items-center justify-center py-20 gap-3">
         <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+        <p className="text-muted-foreground text-sm">Loading your games…</p>
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 gap-4">
+        <div className="w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center">
+          <Filter className="w-8 h-8 text-destructive" />
+        </div>
+        <h2 className="text-xl font-bold">Failed to load games</h2>
+        <p className="text-muted-foreground text-sm max-w-sm text-center">
+          {error instanceof Error ? error.message : 'An error occurred while fetching your games. Please try again.'}
+        </p>
+        <Link href="/import" className="px-4 py-2 bg-primary text-primary-foreground rounded-xl font-semibold hover:bg-primary/90 transition-colors">
+          Go to Import
+        </Link>
       </div>
     );
   }
@@ -70,7 +88,16 @@ export function Games() {
               {filteredGames.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="p-8 text-center text-muted-foreground">
-                    No games found. Try adjusting your filters or importing games.
+                    {games.length === 0 ? (
+                      <div className="flex flex-col items-center gap-3 py-4">
+                        <p>No games imported yet.</p>
+                        <Link href="/import" className="text-primary hover:underline font-medium">
+                          Import your games →
+                        </Link>
+                      </div>
+                    ) : (
+                      'No games match the selected filter.'
+                    )}
                   </td>
                 </tr>
               ) : (

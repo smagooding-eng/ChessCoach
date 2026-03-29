@@ -3,12 +3,13 @@ import { useUser } from './use-user';
 import { useQueryClient } from '@tanstack/react-query';
 
 export function useMyCourses() {
-  const { username } = useUser();
-  return useListCourses(
+  const { username, isLoaded } = useUser();
+  const result = useListCourses(
     { username: username || '' },
     // @ts-expect-error orval generates UseQueryOptions but we only need { enabled }
     { query: { enabled: !!username } }
   );
+  return { ...result, isLoading: !isLoaded || result.isLoading };
 }
 
 export function useCourseDetail(id: number) {

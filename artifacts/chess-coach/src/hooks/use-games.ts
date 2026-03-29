@@ -3,12 +3,16 @@ import { useUser } from './use-user';
 import { useQueryClient } from '@tanstack/react-query';
 
 export function useMyGames(limit?: number) {
-  const { username } = useUser();
-  return useListGames(
+  const { username, isLoaded } = useUser();
+  const result = useListGames(
     username ? { username, limit } : undefined,
     // @ts-expect-error orval generates UseQueryOptions but we only need { enabled }
     { query: { enabled: !!username } }
   );
+  return {
+    ...result,
+    isLoading: !isLoaded || result.isLoading,
+  };
 }
 
 export function useGameDetails(id: number) {

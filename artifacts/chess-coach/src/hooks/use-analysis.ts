@@ -3,21 +3,23 @@ import { useUser } from './use-user';
 import { useQueryClient } from '@tanstack/react-query';
 
 export function useMyAnalysisSummary() {
-  const { username } = useUser();
-  return useGetAnalysisSummary(
+  const { username, isLoaded } = useUser();
+  const result = useGetAnalysisSummary(
     { username: username || '' },
     // @ts-expect-error orval generates UseQueryOptions but we only need { enabled }
     { query: { enabled: !!username } }
   );
+  return { ...result, isLoading: !isLoaded || result.isLoading };
 }
 
 export function useMyWeaknesses() {
-  const { username } = useUser();
-  return useGetWeaknesses(
+  const { username, isLoaded } = useUser();
+  const result = useGetWeaknesses(
     { username: username || '' },
     // @ts-expect-error orval generates UseQueryOptions but we only need { enabled }
     { query: { enabled: !!username } }
   );
+  return { ...result, isLoading: !isLoaded || result.isLoading };
 }
 
 export function useRunAnalysis() {
