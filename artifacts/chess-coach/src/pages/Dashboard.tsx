@@ -3,7 +3,7 @@ import { useMyAnalysisSummary, useMyWeaknesses } from '@/hooks/use-analysis';
 import { useMyCourses } from '@/hooks/use-courses';
 import { useMyGames } from '@/hooks/use-games';
 import { Link } from 'wouter';
-import { ArrowRight, Swords, Trophy, Target, AlertTriangle, BookOpen, Clock } from 'lucide-react';
+import { ArrowRight, Swords, Trophy, Target, AlertTriangle, BookOpen, Clock, GraduationCap } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export function Dashboard() {
