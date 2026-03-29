@@ -1,4 +1,5 @@
 import { logger } from "./logger";
+import { Chess } from "chess.js";
 
 interface ChessComArchive {
   archives: string[];
@@ -108,60 +109,44 @@ export function parsePgnMoves(pgn: string): Array<{
   color: string;
   fen: string | null;
   comment: string | null;
+  clockSeconds: number | null;
+  classification: string | null;
 }> {
   if (!pgn) return [];
 
-  const moveSection = pgn.replace(/\[.*?\]\s*/gs, "").trim();
+  try {
+    const chess = new Chess();
+    chess.loadPgn(pgn);
+    const history = chess.history({ verbose: true });
 
-  const moves: Array<{
-    moveNumber: number;
-    san: string;
-    color: string;
-    fen: string | null;
-    comment: string | null;
-  }> = [];
+    // Extract comments in order from the PGN move section
+    const moveSection = pgn.replace(/\[.*?\]\n?/gs, "").trim();
+    const comments = [...moveSection.matchAll(/\{([^}]*)\}/g)].map((m) => m[1]);
 
-  const tokens = moveSection
-    .replace(/\{[^}]*\}/g, "")
-    .replace(/\d+\./g, " $& ")
-    .replace(/\s+/g, " ")
-    .trim()
-    .split(" ")
-    .filter(Boolean);
+    return history.map((move, idx) => {
+      const rawComment = comments[idx] ?? null;
 
-  let currentMoveNum = 0;
-  let isWhiteTurn = true;
-
-  for (const token of tokens) {
-    if (/^\d+\.$/.test(token)) {
-      currentMoveNum = parseInt(token);
-      isWhiteTurn = true;
-      continue;
-    }
-
-    if (/^\d+\.\.\.$/.test(token)) {
-      isWhiteTurn = false;
-      continue;
-    }
-
-    if (["1-0", "0-1", "1/2-1/2", "*"].includes(token)) continue;
-
-    if (/^[a-zA-Z]/.test(token) || token.startsWith("O")) {
-      moves.push({
-        moveNumber: currentMoveNum,
-        san: token,
-        color: isWhiteTurn ? "white" : "black",
-        fen: null,
-        comment: null,
-      });
-      if (!isWhiteTurn) {
-        // after black's move, next will be white
-        isWhiteTurn = true;
-      } else {
-        isWhiteTurn = false;
+      let clockSeconds: number | null = null;
+      if (rawComment) {
+        const m = rawComment.match(/\[%clk (\d+):(\d+):(\d+(?:\.\d+)?)\]/);
+        if (m) {
+          clockSeconds =
+            parseInt(m[1]) * 3600 + parseInt(m[2]) * 60 + parseFloat(m[3]);
+        }
       }
-    }
-  }
 
-  return moves;
+      return {
+        moveNumber: Math.ceil((idx + 1) / 2),
+        san: move.san,
+        color: move.color === "w" ? "white" : "black",
+        fen: move.after,
+        comment: rawComment,
+        clockSeconds,
+        classification: null,
+      };
+    });
+  } catch (err) {
+    logger.error({ err }, "Failed to parse PGN moves with chess.js");
+    return [];
+  }
 }

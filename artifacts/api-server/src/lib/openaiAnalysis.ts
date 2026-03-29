@@ -90,6 +90,75 @@ Respond with valid JSON in this exact format:
   }
 }
 
+export interface MoveClassification {
+  moveIndex: number;
+  san: string;
+  color: string;
+  classification: "brilliant" | "excellent" | "good" | "inaccuracy" | "mistake" | "blunder";
+  explanation: string;
+}
+
+interface AnalyzeMovesInput {
+  pgn: string;
+  moves: Array<{ moveNumber: number; san: string; color: string; fen: string | null }>;
+  opening: string | null;
+  result: string;
+  whiteUsername: string;
+  blackUsername: string;
+}
+
+export async function analyzeMoves(input: AnalyzeMovesInput): Promise<MoveClassification[]> {
+  const moveLine = input.moves
+    .map((m, i) => `${i + 1}. (${m.color[0]}) ${m.san}`)
+    .join(" ");
+
+  const prompt = `You are an expert chess coach. Analyze this game and identify the 8-10 most critical moves.
+
+Players: ${input.whiteUsername} (White) vs ${input.blackUsername} (Black)
+Opening: ${input.opening ?? "Unknown"}
+Result: ${input.result}
+Moves: ${moveLine}
+
+For each critical move, classify it as one of:
+- "brilliant": A stunning, non-obvious move that drastically improves the position
+- "excellent": A very strong move, likely the best or near-best
+- "good": A solid, correct move
+- "inaccuracy": A slightly suboptimal move that misses a better option
+- "mistake": A clear error that worsens the position noticeably
+- "blunder": A serious error that loses material or the game
+
+Focus on turning points and decisive moments. Only classify the 8-10 most important moves.
+
+Respond with valid JSON:
+{
+  "classifications": [
+    {
+      "moveIndex": 0,
+      "san": "e4",
+      "color": "white",
+      "classification": "excellent",
+      "explanation": "Controlling the center immediately..."
+    }
+  ]
+}`;
+
+  try {
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      max_completion_tokens: 2048,
+      messages: [{ role: "user", content: prompt }],
+      response_format: { type: "json_object" },
+    });
+
+    const content = response.choices[0]?.message?.content ?? "{}";
+    const parsed = JSON.parse(content) as { classifications: MoveClassification[] };
+    return parsed.classifications ?? [];
+  } catch (err) {
+    logger.error({ err }, "Failed to analyze moves with OpenAI");
+    return [];
+  }
+}
+
 interface CourseLesson {
   title: string;
   content: string;

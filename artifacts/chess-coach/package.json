@@ -73,5 +73,9 @@
     "vite": "catalog:",
     "wouter": "^3.3.5",
     "zod": "catalog:"
+  },
+  "dependencies": {
+    "chess.js": "^1.4.0",
+    "react-chessboard": "^5.10.0"
   }
 }

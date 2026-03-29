@@ -12,6 +12,7 @@ import {
   GetGameReplayParams,
 } from "@workspace/api-zod";
 import { fetchChessComGames, extractGameMetadata, parsePgnMoves } from "../lib/chesscom";
+import { analyzeMoves } from "../lib/openaiAnalysis";
 
 const router: IRouter = Router();
 
@@ -168,9 +169,40 @@ router.get("/games/:id/replay", async (req, res): Promise<void> => {
       blackRating: game.blackRating,
       result: game.result,
       opening: game.opening,
+      eco: game.eco,
       analysisNotes: game.analysisNotes,
     })
   );
+});
+
+router.post("/games/:id/analyze-moves", async (req, res): Promise<void> => {
+  const params = GetGameReplayParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+
+  const [game] = await db
+    .select()
+    .from(gamesTable)
+    .where(eq(gamesTable.id, params.data.id));
+
+  if (!game) {
+    res.status(404).json({ error: "Game not found" });
+    return;
+  }
+
+  const moves = parsePgnMoves(game.pgn);
+  const classifications = await analyzeMoves({
+    pgn: game.pgn,
+    moves,
+    opening: game.opening,
+    result: game.result,
+    whiteUsername: game.whiteUsername,
+    blackUsername: game.blackUsername,
+  });
+
+  res.json({ classifications });
 });
 
 export default router;

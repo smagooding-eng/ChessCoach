@@ -1,20 +1,27 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useMyGames } from '@/hooks/use-games';
 import { Link } from 'wouter';
 import { motion } from 'framer-motion';
-import { Search, ChevronRight, Play, Filter } from 'lucide-react';
+import { Search, Play, Filter, BookOpen } from 'lucide-react';
 import { format } from 'date-fns';
 
 export function Games() {
   const { data, isLoading, isError, error } = useMyGames();
   const [filter, setFilter] = useState('all');
+  const [search, setSearch] = useState('');
 
   const games = data?.games || [];
-  
-  const filteredGames = games.filter(game => {
-    if (filter === 'all') return true;
-    return game.result.toLowerCase() === filter.toLowerCase();
-  });
+
+  const filteredGames = useMemo(() => {
+    return games.filter(game => {
+      const matchesResult = filter === 'all' || game.result.toLowerCase() === filter.toLowerCase();
+      const q = search.toLowerCase();
+      const matchesSearch = !q || [
+        game.whiteUsername, game.blackUsername, game.opening ?? '',
+      ].some(s => s.toLowerCase().includes(q));
+      return matchesResult && matchesSearch;
+    });
+  }, [games, filter, search]);
 
   if (isLoading) {
     return (
@@ -54,8 +61,10 @@ export function Games() {
           <div className="relative flex-1 md:w-64">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <input 
-              type="text" 
-              placeholder="Search opponent or opening..." 
+              type="text"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search opponent or opening…"
               className="w-full pl-9 pr-4 py-2 bg-secondary/50 border border-border rounded-xl focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
             />
           </div>
@@ -124,9 +133,17 @@ export function Games() {
                         </div>
                       </div>
                     </td>
-                    <td className="p-4 text-sm max-w-[200px] truncate" title={game.opening || ''}>
-                      {game.opening || 'Unknown'}
-                      <div className="text-xs text-muted-foreground mt-0.5">{game.timeControl}</div>
+                    <td className="p-4 text-sm max-w-[220px]" title={game.opening || ''}>
+                      <div className="flex items-start gap-1.5">
+                        <BookOpen className="w-3.5 h-3.5 text-muted-foreground/60 mt-0.5 shrink-0" />
+                        <div>
+                          <div className="truncate leading-snug">
+                            {game.eco && <span className="text-xs font-bold text-primary/70 mr-1">{game.eco}</span>}
+                            {game.opening || 'Unknown Opening'}
+                          </div>
+                          <div className="text-xs text-muted-foreground mt-0.5">{game.timeControl}</div>
+                        </div>
+                      </div>
                     </td>
                     <td className="p-4">
                       <span className={`inline-flex px-2.5 py-1 rounded-md text-xs font-bold uppercase tracking-wide

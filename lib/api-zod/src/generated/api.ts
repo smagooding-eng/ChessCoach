@@ -108,6 +108,8 @@ export const GetGameReplayResponse = zod.object({
       color: zod.string(),
       fen: zod.string().nullish(),
       comment: zod.string().nullish(),
+      clockSeconds: zod.number().nullish(),
+      classification: zod.string().nullish(),
     }),
   ),
   whiteUsername: zod.string(),
@@ -116,6 +118,7 @@ export const GetGameReplayResponse = zod.object({
   blackRating: zod.number(),
   result: zod.string(),
   opening: zod.string().nullish(),
+  eco: zod.string().nullish(),
   analysisNotes: zod.string().nullish(),
 });
 

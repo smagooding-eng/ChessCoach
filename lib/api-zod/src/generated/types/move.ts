@@ -14,4 +14,8 @@ export interface Move {
   fen?: string | null;
   /** @nullable */
   comment?: string | null;
+  /** @nullable */
+  clockSeconds?: number | null;
+  /** @nullable */
+  classification?: string | null;
 }

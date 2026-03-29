@@ -52,6 +52,10 @@ export interface Move {
   fen?: string | null;
   /** @nullable */
   comment?: string | null;
+  /** @nullable */
+  clockSeconds?: number | null;
+  /** @nullable */
+  classification?: string | null;
 }
 
 export interface GameReplay {
@@ -65,6 +69,8 @@ export interface GameReplay {
   result: string;
   /** @nullable */
   opening?: string | null;
+  /** @nullable */
+  eco?: string | null;
   /** @nullable */
   analysisNotes?: string | null;
 }

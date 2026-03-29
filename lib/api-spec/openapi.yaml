@@ -376,6 +376,8 @@ components:
           type: string
         opening:
           type: ["string", "null"]
+        eco:
+          type: ["string", "null"]
         analysisNotes:
           type: ["string", "null"]
       required:
@@ -400,6 +402,10 @@ components:
         fen:
           type: ["string", "null"]
         comment:
+          type: ["string", "null"]
+        clockSeconds:
+          type: ["number", "null"]
+        classification:
           type: ["string", "null"]
       required:
         - moveNumber
