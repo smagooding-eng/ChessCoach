@@ -6,15 +6,18 @@ export function useMyGames(limit?: number) {
   const { username } = useUser();
   return useListGames(
     username ? { username, limit } : undefined,
+    // @ts-expect-error orval generates UseQueryOptions but we only need { enabled }
     { query: { enabled: !!username } }
   );
 }
 
 export function useGameDetails(id: number) {
+  // @ts-expect-error orval generates UseQueryOptions but we only need { enabled }
   return useGetGame(id, { query: { enabled: !!id } });
 }
 
 export function useGameViewer(id: number) {
+  // @ts-expect-error orval generates UseQueryOptions but we only need { enabled }
   return useGetGameReplay(id, { query: { enabled: !!id } });
 }
 
@@ -23,7 +26,6 @@ export function useImportChessGames() {
   const importMutation = useImportGames({
     mutation: {
       onSuccess: () => {
-        // Invalidate lists after import
         queryClient.invalidateQueries({ queryKey: ['/api/games'] });
         queryClient.invalidateQueries({ queryKey: ['/api/analysis/summary'] });
       }
@@ -31,7 +33,7 @@ export function useImportChessGames() {
   });
 
   return {
-    importGames: async (username: string, months: number = 1) => {
+    importGames: async (username: string, months: number = 3) => {
       return importMutation.mutateAsync({ data: { username, months } });
     },
     isImporting: importMutation.isPending,

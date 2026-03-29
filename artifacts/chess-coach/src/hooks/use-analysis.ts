@@ -6,6 +6,7 @@ export function useMyAnalysisSummary() {
   const { username } = useUser();
   return useGetAnalysisSummary(
     { username: username || '' },
+    // @ts-expect-error orval generates UseQueryOptions but we only need { enabled }
     { query: { enabled: !!username } }
   );
 }
@@ -14,6 +15,7 @@ export function useMyWeaknesses() {
   const { username } = useUser();
   return useGetWeaknesses(
     { username: username || '' },
+    // @ts-expect-error orval generates UseQueryOptions but we only need { enabled }
     { query: { enabled: !!username } }
   );
 }

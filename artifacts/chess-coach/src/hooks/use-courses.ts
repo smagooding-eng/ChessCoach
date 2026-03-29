@@ -6,11 +6,13 @@ export function useMyCourses() {
   const { username } = useUser();
   return useListCourses(
     { username: username || '' },
+    // @ts-expect-error orval generates UseQueryOptions but we only need { enabled }
     { query: { enabled: !!username } }
   );
 }
 
 export function useCourseDetail(id: number) {
+  // @ts-expect-error orval generates UseQueryOptions but we only need { enabled }
   return useGetCourse(id, { query: { enabled: !!id } });
 }
 
@@ -37,7 +39,7 @@ export function useMarkLessonComplete() {
   const queryClient = useQueryClient();
   const mutation = useUpdateCourseProgress({
     mutation: {
-      onSuccess: (_, variables) => {
+      onSuccess: (_: unknown, variables: { id: number; data: { lessonId: number; completed: boolean } }) => {
         queryClient.invalidateQueries({ queryKey: ['/api/courses', variables.id] });
         queryClient.invalidateQueries({ queryKey: ['/api/courses'] });
       }
