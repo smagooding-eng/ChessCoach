@@ -2,10 +2,11 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, Link } from 'wouter';
 import { useGameViewer } from '@/hooks/use-games';
 import { ChessBoard } from '@/components/ChessBoard';
+import { Chess } from 'chess.js';
 import {
   ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
   Play, Pause, ArrowLeft, BrainCircuit, FlipVertical2,
-  Swords, Clock, Zap, BookOpen
+  Swords, Clock, Zap, BookOpen, Cpu
 } from 'lucide-react';
 import { useUser } from '@/hooks/use-user';
 
@@ -47,6 +48,8 @@ export function GameReplay() {
   const [analysing, setAnalysing]     = useState(false);
   const [annotations, setAnnotations] = useState<MoveAnnotation[]>([]);
   const [activeAnnotation, setActiveAnnotation] = useState<MoveAnnotation | null>(null);
+  const [bestMoveSan, setBestMoveSan] = useState<string | null>(null);
+  const [fetchingBest, setFetchingBest] = useState(false);
 
   const playRef = useRef<NodeJS.Timeout | null>(null);
   const moveListRef  = useRef<HTMLDivElement>(null);
@@ -100,7 +103,55 @@ export function GameReplay() {
   }, [currentMove, annotations]);
 
   const currentFen = currentMove === 0 ? null : moves[currentMove - 1]?.fen;
-  const expectedMoveSan = practiceMode && currentMove < maxMoves ? moves[currentMove]?.san ?? null : null;
+
+  // Derive the lastMove squares from the SAN played at the current step
+  const lastMove = React.useMemo(() => {
+    if (currentMove === 0) return null;
+    const move = moves[currentMove - 1];
+    if (!move?.san) return null;
+    const prevFen = currentMove === 1 ? undefined : (moves[currentMove - 2]?.fen ?? undefined);
+    try {
+      const chess = new Chess(prevFen);
+      const result = chess.move(move.san);
+      return result ? { from: result.from, to: result.to } : null;
+    } catch { return null; }
+  }, [currentMove, moves]);
+
+  // Fetch best move from lichess cloud eval when in practice mode
+  useEffect(() => {
+    if (!practiceMode || currentMove >= maxMoves) {
+      setBestMoveSan(null);
+      return;
+    }
+    const fen = currentFen;
+    if (!fen) { setBestMoveSan(null); return; }
+
+    let cancelled = false;
+    setFetchingBest(true);
+    setBestMoveSan(null);
+
+    fetch(`https://lichess.org/api/cloud-eval?fen=${encodeURIComponent(fen)}&multiPv=1`)
+      .then(r => r.ok ? r.json() : null)
+      .then((data) => {
+        if (cancelled) return;
+        const uci = data?.pvs?.[0]?.moves?.split(' ')?.[0]; // e.g. "e2e4"
+        if (!uci || uci.length < 4) { setBestMoveSan(null); return; }
+        const from = uci.slice(0, 2);
+        const to = uci.slice(2, 4);
+        const promo = uci[4] || undefined;
+        try {
+          const chess = new Chess(fen);
+          const mv = chess.move({ from, to, promotion: promo });
+          setBestMoveSan(mv?.san ?? null);
+        } catch { setBestMoveSan(null); }
+      })
+      .catch(() => { if (!cancelled) setBestMoveSan(null); })
+      .finally(() => { if (!cancelled) setFetchingBest(false); });
+
+    return () => { cancelled = true; };
+  }, [practiceMode, currentFen, currentMove, maxMoves]);
+
+  const expectedMoveSan = practiceMode ? bestMoveSan : null;
 
   const handleAnalyze = useCallback(async () => {
     if (!game || analysing || annotations.length > 0) return;
@@ -180,6 +231,7 @@ export function GameReplay() {
             practiceMode={practiceMode}
             expectedMoveSan={expectedMoveSan}
             onMovePlayed={handleMovePlayed}
+            lastMove={lastMove}
           />
 
           {/* Playback controls */}
@@ -242,8 +294,14 @@ export function GameReplay() {
           {/* Practice hint */}
           {practiceMode && (
             <div className="glass-card rounded-xl px-4 py-3 border border-emerald-500/30 bg-emerald-500/5 text-sm text-emerald-300 flex items-center gap-2">
-              <Zap className="w-4 h-4 shrink-0" />
-              <span><strong>Practice Mode</strong> – drag a piece to play the next move and check your answer.</span>
+              {fetchingBest
+                ? <><div className="w-3.5 h-3.5 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin shrink-0" />
+                    <span>Finding engine's best move…</span></>
+                : bestMoveSan
+                ? <><Cpu className="w-4 h-4 shrink-0" />
+                    <span><strong>Practice Mode</strong> — click a piece then a square. Engine target: <span className="font-mono font-bold text-white">{bestMoveSan}</span></span></>
+                : <><Zap className="w-4 h-4 shrink-0" />
+                    <span><strong>Practice Mode</strong> — click a piece then a square to play. Any legal move accepted.</span></>}
             </div>
           )}
 
