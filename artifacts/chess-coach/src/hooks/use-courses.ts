@@ -1,0 +1,53 @@
+import { useListCourses, useGetCourse, useGenerateCourses, useUpdateCourseProgress } from '@workspace/api-client-react';
+import { useUser } from './use-user';
+import { useQueryClient } from '@tanstack/react-query';
+
+export function useMyCourses() {
+  const { username } = useUser();
+  return useListCourses(
+    { username: username || '' },
+    { query: { enabled: !!username } }
+  );
+}
+
+export function useCourseDetail(id: number) {
+  return useGetCourse(id, { query: { enabled: !!id } });
+}
+
+export function useCreateCourses() {
+  const queryClient = useQueryClient();
+  const mutation = useGenerateCourses({
+    mutation: {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ['/api/courses'] });
+      }
+    }
+  });
+
+  return {
+    generate: async (username: string) => {
+      return mutation.mutateAsync({ data: { username } });
+    },
+    isGenerating: mutation.isPending,
+    error: mutation.error
+  };
+}
+
+export function useMarkLessonComplete() {
+  const queryClient = useQueryClient();
+  const mutation = useUpdateCourseProgress({
+    mutation: {
+      onSuccess: (_, variables) => {
+        queryClient.invalidateQueries({ queryKey: ['/api/courses', variables.id] });
+        queryClient.invalidateQueries({ queryKey: ['/api/courses'] });
+      }
+    }
+  });
+
+  return {
+    markComplete: async (courseId: number, lessonId: number, completed: boolean) => {
+      return mutation.mutateAsync({ id: courseId, data: { lessonId, completed } });
+    },
+    isUpdating: mutation.isPending
+  };
+}

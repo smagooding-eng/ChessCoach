@@ -1,15 +1,20 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Chess Coach API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: games
+    description: Chess game operations
+  - name: analysis
+    description: Game analysis operations
+  - name: courses
+    description: Personalized course operations
 paths:
   /healthz:
     get:
@@ -24,6 +29,246 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /games/import:
+    post:
+      operationId: importGames
+      tags: [games]
+      summary: Import games from chess.com
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ImportGamesBody"
+      responses:
+        "200":
+          description: Games imported successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImportGamesResponse"
+        "400":
+          description: Bad request
+
+  /games:
+    get:
+      operationId: listGames
+      tags: [games]
+      summary: List all imported games
+      parameters:
+        - in: query
+          name: username
+          schema:
+            type: string
+          description: Filter by username
+        - in: query
+          name: limit
+          schema:
+            type: integer
+          description: Limit results
+        - in: query
+          name: offset
+          schema:
+            type: integer
+          description: Offset for pagination
+      responses:
+        "200":
+          description: List of games
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListGamesResponse"
+
+  /games/{id}:
+    get:
+      operationId: getGame
+      tags: [games]
+      summary: Get a single game by ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Game details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Game"
+        "404":
+          description: Not found
+
+  /games/{id}/replay:
+    get:
+      operationId: getGameReplay
+      tags: [games]
+      summary: Get game replay data (PGN + moves)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Game replay data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GameReplay"
+        "404":
+          description: Not found
+
+  /analysis/analyze:
+    post:
+      operationId: analyzeGames
+      tags: [analysis]
+      summary: Analyze all games and identify weaknesses
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AnalyzeGamesBody"
+      responses:
+        "200":
+          description: Analysis results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalysisResult"
+        "400":
+          description: Bad request
+
+  /analysis/weaknesses:
+    get:
+      operationId: getWeaknesses
+      tags: [analysis]
+      summary: Get identified weaknesses for a username
+      parameters:
+        - in: query
+          name: username
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Weakness data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WeaknessReport"
+
+  /analysis/summary:
+    get:
+      operationId: getAnalysisSummary
+      tags: [analysis]
+      summary: Get overall performance summary for a username
+      parameters:
+        - in: query
+          name: username
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Performance summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PerformanceSummary"
+
+  /courses:
+    get:
+      operationId: listCourses
+      tags: [courses]
+      summary: List personalized courses for a username
+      parameters:
+        - in: query
+          name: username
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of courses
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListCoursesResponse"
+
+  /courses/generate:
+    post:
+      operationId: generateCourses
+      tags: [courses]
+      summary: Generate personalized courses based on weaknesses
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GenerateCoursesBody"
+      responses:
+        "200":
+          description: Generated courses
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListCoursesResponse"
+        "400":
+          description: Bad request
+
+  /courses/{id}:
+    get:
+      operationId: getCourse
+      tags: [courses]
+      summary: Get a single course with its lessons
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Course with lessons
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CourseWithLessons"
+        "404":
+          description: Not found
+
+  /courses/{id}/progress:
+    patch:
+      operationId: updateCourseProgress
+      tags: [courses]
+      summary: Mark a lesson as complete and update progress
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProgressBody"
+      responses:
+        "200":
+          description: Updated course
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CourseWithLessons"
+        "404":
+          description: Not found
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +279,433 @@ components:
       required:
         - status
 
+    ImportGamesBody:
+      type: object
+      properties:
+        username:
+          type: string
+        months:
+          type: integer
+          description: Number of past months to fetch (1-12)
+      required:
+        - username
+
+    ImportGamesResponse:
+      type: object
+      properties:
+        imported:
+          type: integer
+        total:
+          type: integer
+        username:
+          type: string
+      required:
+        - imported
+        - total
+        - username
+
+    Game:
+      type: object
+      properties:
+        id:
+          type: integer
+        username:
+          type: string
+        pgn:
+          type: string
+        whiteUsername:
+          type: string
+        blackUsername:
+          type: string
+        whiteRating:
+          type: integer
+        blackRating:
+          type: integer
+        result:
+          type: string
+        timeControl:
+          type: string
+        opening:
+          type: ["string", "null"]
+        eco:
+          type: ["string", "null"]
+        playedAt:
+          type: string
+        url:
+          type: ["string", "null"]
+        analyzed:
+          type: boolean
+        analysisNotes:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+      required:
+        - id
+        - username
+        - pgn
+        - whiteUsername
+        - blackUsername
+        - whiteRating
+        - blackRating
+        - result
+        - timeControl
+        - playedAt
+        - analyzed
+        - createdAt
+
+    GameReplay:
+      type: object
+      properties:
+        id:
+          type: integer
+        pgn:
+          type: string
+        moves:
+          type: array
+          items:
+            $ref: "#/components/schemas/Move"
+        whiteUsername:
+          type: string
+        blackUsername:
+          type: string
+        whiteRating:
+          type: integer
+        blackRating:
+          type: integer
+        result:
+          type: string
+        opening:
+          type: ["string", "null"]
+        analysisNotes:
+          type: ["string", "null"]
+      required:
+        - id
+        - pgn
+        - moves
+        - whiteUsername
+        - blackUsername
+        - whiteRating
+        - blackRating
+        - result
+
+    Move:
+      type: object
+      properties:
+        moveNumber:
+          type: integer
+        san:
+          type: string
+        color:
+          type: string
+        fen:
+          type: ["string", "null"]
+        comment:
+          type: ["string", "null"]
+      required:
+        - moveNumber
+        - san
+        - color
+
+    ListGamesResponse:
+      type: object
+      properties:
+        games:
+          type: array
+          items:
+            $ref: "#/components/schemas/Game"
+        total:
+          type: integer
+      required:
+        - games
+        - total
+
+    AnalyzeGamesBody:
+      type: object
+      properties:
+        username:
+          type: string
+      required:
+        - username
+
+    AnalysisResult:
+      type: object
+      properties:
+        username:
+          type: string
+        gamesAnalyzed:
+          type: integer
+        weaknesses:
+          type: array
+          items:
+            $ref: "#/components/schemas/Weakness"
+        summary:
+          type: string
+      required:
+        - username
+        - gamesAnalyzed
+        - weaknesses
+        - summary
+
+    Weakness:
+      type: object
+      properties:
+        category:
+          type: string
+        severity:
+          type: string
+        description:
+          type: string
+        frequency:
+          type: number
+        examples:
+          type: array
+          items:
+            type: string
+      required:
+        - category
+        - severity
+        - description
+        - frequency
+        - examples
+
+    WeaknessReport:
+      type: object
+      properties:
+        username:
+          type: string
+        weaknesses:
+          type: array
+          items:
+            $ref: "#/components/schemas/WeaknessRecord"
+        lastUpdated:
+          type: ["string", "null"]
+      required:
+        - username
+        - weaknesses
+
+    WeaknessRecord:
+      type: object
+      properties:
+        id:
+          type: integer
+        username:
+          type: string
+        category:
+          type: string
+        severity:
+          type: string
+        description:
+          type: string
+        frequency:
+          type: number
+        examples:
+          type: array
+          items:
+            type: string
+        createdAt:
+          type: string
+      required:
+        - id
+        - username
+        - category
+        - severity
+        - description
+        - frequency
+        - examples
+        - createdAt
+
+    PerformanceSummary:
+      type: object
+      properties:
+        username:
+          type: string
+        totalGames:
+          type: integer
+        wins:
+          type: integer
+        losses:
+          type: integer
+        draws:
+          type: integer
+        winRate:
+          type: number
+        avgRating:
+          type: number
+        openingStats:
+          type: array
+          items:
+            $ref: "#/components/schemas/OpeningStat"
+        resultsByTimeControl:
+          type: array
+          items:
+            $ref: "#/components/schemas/TimeControlStat"
+      required:
+        - username
+        - totalGames
+        - wins
+        - losses
+        - draws
+        - winRate
+        - avgRating
+        - openingStats
+        - resultsByTimeControl
+
+    OpeningStat:
+      type: object
+      properties:
+        opening:
+          type: string
+        games:
+          type: integer
+        wins:
+          type: integer
+        losses:
+          type: integer
+        draws:
+          type: integer
+      required:
+        - opening
+        - games
+        - wins
+        - losses
+        - draws
+
+    TimeControlStat:
+      type: object
+      properties:
+        timeControl:
+          type: string
+        games:
+          type: integer
+        wins:
+          type: integer
+        losses:
+          type: integer
+      required:
+        - timeControl
+        - games
+        - wins
+        - losses
+
+    GenerateCoursesBody:
+      type: object
+      properties:
+        username:
+          type: string
+      required:
+        - username
+
+    Course:
+      type: object
+      properties:
+        id:
+          type: integer
+        username:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        category:
+          type: string
+        difficulty:
+          type: string
+        totalLessons:
+          type: integer
+        completedLessons:
+          type: integer
+        createdAt:
+          type: string
+      required:
+        - id
+        - username
+        - title
+        - description
+        - category
+        - difficulty
+        - totalLessons
+        - completedLessons
+        - createdAt
+
+    Lesson:
+      type: object
+      properties:
+        id:
+          type: integer
+        courseId:
+          type: integer
+        title:
+          type: string
+        content:
+          type: string
+        orderIndex:
+          type: integer
+        completed:
+          type: boolean
+        examplePgn:
+          type: ["string", "null"]
+      required:
+        - id
+        - courseId
+        - title
+        - content
+        - orderIndex
+        - completed
+
+    CourseWithLessons:
+      type: object
+      properties:
+        id:
+          type: integer
+        username:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        category:
+          type: string
+        difficulty:
+          type: string
+        totalLessons:
+          type: integer
+        completedLessons:
+          type: integer
+        createdAt:
+          type: string
+        lessons:
+          type: array
+          items:
+            $ref: "#/components/schemas/Lesson"
+      required:
+        - id
+        - username
+        - title
+        - description
+        - category
+        - difficulty
+        - totalLessons
+        - completedLessons
+        - createdAt
+        - lessons
+
+    ListCoursesResponse:
+      type: object
+      properties:
+        courses:
+          type: array
+          items:
+            $ref: "#/components/schemas/Course"
+      required:
+        - courses
+
+    UpdateProgressBody:
+      type: object
+      properties:
+        lessonId:
+          type: integer
+        completed:
+          type: boolean
+      required:
+        - lessonId
+        - completed

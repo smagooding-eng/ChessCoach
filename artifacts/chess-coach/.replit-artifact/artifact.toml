@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "Chess Coach"
+version = "1.0.0"
+id = "artifacts/chess-coach"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 20774
+
+[services.development]
+run = "pnpm --filter @workspace/chess-coach run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/chess-coach", "run", "build" ]
+publicDir = "artifacts/chess-coach/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "20774"
+BASE_PATH = "/"

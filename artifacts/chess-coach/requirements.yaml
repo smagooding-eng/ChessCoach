@@ -1,0 +1,19 @@
+packages:
+  "framer-motion": "For premium page transitions and staggered staggered animations"
+  "recharts": "For rendering beautiful performance and analysis charts"
+  "date-fns": "For formatting game played dates and course creation dates"
+  "lucide-react": "For beautiful consistent iconography"
+  "clsx": "For conditional tailwind classes"
+  "tailwind-merge": "For merging tailwind classes safely"
+
+images:
+  - path: "artifacts/chess-coach/public/images/hero-bg.png"
+    description: "Abstract premium chess background with deep slate and navy tones, subtle gold geometric lines, and soft atmospheric lighting"
+    aspect_ratio: "16:9"
+  - path: "artifacts/chess-coach/public/images/logo.png"
+    description: "Minimalist geometric chess knight logo in metallic gold on a transparent background"
+    aspect_ratio: "1:1"
+
+notes:
+  - Using @workspace/api-client-react for generated TanStack Query hooks.
+  - Using local storage for user session state.
