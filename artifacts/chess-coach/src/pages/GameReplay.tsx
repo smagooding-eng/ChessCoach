@@ -6,7 +6,7 @@ import { Chess } from 'chess.js';
 import {
   ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
   Play, Pause, ArrowLeft, BrainCircuit, FlipVertical2,
-  Swords, Clock, Zap, BookOpen, Cpu, Lightbulb, Sparkles
+  Swords, Clock, Zap, BookOpen, Cpu, Lightbulb, Sparkles, Trophy
 } from 'lucide-react';
 import { useUser } from '@/hooks/use-user';
 
@@ -30,6 +30,175 @@ const CLASS_CFG: Record<Classification, { badge: string; color: string; full: st
   mistake:    { badge: '?',   color: 'text-orange-400 bg-orange-400/15 border-orange-400/30',    full: 'Mistake' },
   blunder:    { badge: '??',  color: 'text-rose-400 bg-rose-400/15 border-rose-400/30',          full: 'Blunder' },
 };
+
+function GameRatingPanel({
+  reviewMoves,
+  game,
+}: {
+  reviewMoves: ReviewMove[];
+  game: { whiteUsername: string; blackUsername: string };
+}) {
+  const WEIGHTS: Record<Classification, number> = {
+    brilliant: 100, excellent: 98, book: 90, good: 85,
+    inaccuracy: 55, mistake: 25, blunder: 0,
+  };
+
+  const byColor = (c: 'white' | 'black') => reviewMoves.filter(m => m.color === c);
+
+  const calcAccuracy = (moves: ReviewMove[]) => {
+    if (moves.length === 0) return 0;
+    return moves.reduce((s, m) => s + WEIGHTS[m.classification], 0) / moves.length;
+  };
+
+  const toGameRating = (acc: number) => Math.max(0, Math.round((acc - 52.5) * 40));
+
+  const counts = (moves: ReviewMove[]) => ({
+    brilliant: moves.filter(m => m.classification === 'brilliant').length,
+    excellent: moves.filter(m => m.classification === 'excellent').length,
+    good: moves.filter(m => m.classification === 'good' || m.classification === 'book').length,
+    inaccuracy: moves.filter(m => m.classification === 'inaccuracy').length,
+    mistake: moves.filter(m => m.classification === 'mistake').length,
+    blunder: moves.filter(m => m.classification === 'blunder').length,
+  });
+
+  const phaseGrade = (moves: ReviewMove[], from: number, to: number) => {
+    const ph = moves.filter(m => m.moveIndex >= from && m.moveIndex < to);
+    if (ph.length === 0) return null;
+    if (ph.some(m => m.classification === 'blunder'))    return 'blunder';
+    if (ph.some(m => m.classification === 'mistake'))    return 'mistake';
+    if (ph.some(m => m.classification === 'inaccuracy')) return 'inaccuracy';
+    if (ph.some(m => m.classification === 'brilliant'))  return 'brilliant';
+    return 'good';
+  };
+
+  const PhaseIcon = ({ grade }: { grade: string | null }) => {
+    if (!grade) return <span className="text-muted-foreground">—</span>;
+    const map: Record<string, { bg: string; label: string }> = {
+      brilliant:  { bg: 'bg-cyan-500',    label: '!!' },
+      good:       { bg: 'bg-emerald-500', label: '✓'  },
+      inaccuracy: { bg: 'bg-yellow-500',  label: '?!' },
+      mistake:    { bg: 'bg-orange-500',  label: '?'  },
+      blunder:    { bg: 'bg-rose-500',    label: '??' },
+    };
+    const cfg = map[grade];
+    return (
+      <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full ${cfg.bg} text-white text-[10px] font-black`}>
+        {cfg.label}
+      </span>
+    );
+  };
+
+  const wArr = byColor('white');
+  const bArr = byColor('black');
+  const wAcc = calcAccuracy(wArr);
+  const bAcc = calcAccuracy(bArr);
+  const wc   = counts(wArr);
+  const bc   = counts(bArr);
+
+  const moveRows: { label: string; key: keyof ReturnType<typeof counts>; iconBg: string; icon: string; textColor: string }[] = [
+    { label: 'Brilliant',  key: 'brilliant',  iconBg: 'bg-cyan-500',    icon: '!!', textColor: 'text-cyan-400'    },
+    { label: 'Excellent',  key: 'excellent',  iconBg: 'bg-emerald-500', icon: '!',  textColor: 'text-emerald-400' },
+    { label: 'Good',       key: 'good',       iconBg: 'bg-green-600',   icon: '✓',  textColor: 'text-green-400'   },
+    { label: 'Inaccuracy', key: 'inaccuracy', iconBg: 'bg-yellow-500',  icon: '?!', textColor: 'text-yellow-400'  },
+    { label: 'Mistake',    key: 'mistake',    iconBg: 'bg-orange-500',  icon: '?',  textColor: 'text-orange-400'  },
+    { label: 'Blunder',    key: 'blunder',    iconBg: 'bg-rose-500',    icon: '??', textColor: 'text-rose-400'    },
+  ];
+
+  const phases = [
+    { label: 'Opening',    from: 0,   to: 20       },
+    { label: 'Middlegame', from: 20,  to: 60       },
+    { label: 'Endgame',    from: 60,  to: Infinity },
+  ];
+
+  const Avatar = ({ username, dark }: { username: string; dark: boolean }) => (
+    <div className={`w-12 h-12 rounded-full border-2 border-white/20 flex items-center justify-center font-black text-sm
+      ${dark ? 'bg-[#2d2d2d] text-[#f0d9b5]' : 'bg-[#f0d9b5] text-[#2d2d2d]'}`}>
+      {username[0]?.toUpperCase()}
+    </div>
+  );
+
+  return (
+    <div className="glass-card rounded-2xl overflow-hidden border border-white/8">
+      {/* Header */}
+      <div className="px-4 py-3 border-b border-white/5 flex items-center gap-2 bg-white/3">
+        <Trophy className="w-4 h-4 text-primary" />
+        <span className="font-bold text-sm">Game Rating</span>
+      </div>
+
+      {/* Player row */}
+      <div className="grid grid-cols-[1fr_60px_1fr] items-center border-b border-white/5">
+        <div className="flex flex-col items-center gap-1.5 py-4 px-2">
+          <Avatar username={game.whiteUsername} dark={false} />
+          <span className="font-bold text-xs text-center max-w-[90px] truncate">{game.whiteUsername}</span>
+        </div>
+        <div className="text-center text-xs text-muted-foreground font-bold">vs</div>
+        <div className="flex flex-col items-center gap-1.5 py-4 px-2">
+          <Avatar username={game.blackUsername} dark={true} />
+          <span className="font-bold text-xs text-center max-w-[90px] truncate">{game.blackUsername}</span>
+        </div>
+      </div>
+
+      {/* Accuracy */}
+      <div className="grid grid-cols-[1fr_60px_1fr] items-center py-4 border-b border-white/5">
+        <div className="text-center">
+          <div className="text-2xl font-black">{wAcc.toFixed(1)}</div>
+          <div className="text-[10px] text-muted-foreground uppercase tracking-wider mt-0.5">%</div>
+        </div>
+        <div className="text-center text-[10px] text-muted-foreground uppercase tracking-wide leading-tight font-bold">
+          Accu-<br />racy
+        </div>
+        <div className="text-center">
+          <div className="text-2xl font-black">{bAcc.toFixed(1)}</div>
+          <div className="text-[10px] text-muted-foreground uppercase tracking-wider mt-0.5">%</div>
+        </div>
+      </div>
+
+      {/* Move quality rows */}
+      {moveRows.map(row => (
+        <div key={row.label} className="grid grid-cols-[1fr_60px_1fr] items-center py-2.5 border-b border-white/5 last:border-0">
+          <div className={`text-center text-xl font-black ${row.textColor}`}>{wc[row.key]}</div>
+          <div className="flex flex-col items-center gap-0.5">
+            <div className={`w-7 h-7 rounded-full ${row.iconBg} flex items-center justify-center`}>
+              <span className="text-white font-black text-[9px]">{row.icon}</span>
+            </div>
+            <span className="text-[9px] text-muted-foreground leading-tight text-center">{row.label}</span>
+          </div>
+          <div className={`text-center text-xl font-black ${row.textColor}`}>{bc[row.key]}</div>
+        </div>
+      ))}
+
+      {/* Game Rating */}
+      <div className="grid grid-cols-[1fr_60px_1fr] items-center py-4 bg-white/3 border-t border-white/8">
+        <div className="flex justify-center">
+          <div className="px-4 py-2 rounded-xl bg-background border border-white/15 min-w-[60px] text-center">
+            <span className="text-xl font-black">{toGameRating(wAcc)}</span>
+          </div>
+        </div>
+        <div className="text-center text-[10px] text-muted-foreground uppercase tracking-wide leading-tight font-bold">
+          Game<br />Rating
+        </div>
+        <div className="flex justify-center">
+          <div className="px-4 py-2 rounded-xl bg-background border border-white/15 min-w-[60px] text-center">
+            <span className="text-xl font-black">{toGameRating(bAcc)}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Phase grades */}
+      {phases.map(ph => (
+        <div key={ph.label} className="grid grid-cols-[1fr_60px_1fr] items-center py-2.5 border-t border-white/5">
+          <div className="flex justify-center">
+            <PhaseIcon grade={phaseGrade(wArr, ph.from, ph.to)} />
+          </div>
+          <div className="text-center text-[11px] text-muted-foreground font-medium">{ph.label}</div>
+          <div className="flex justify-center">
+            <PhaseIcon grade={phaseGrade(bArr, ph.from, ph.to)} />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 function formatClock(s: number | null | undefined): string {
   if (s == null) return '';
@@ -452,6 +621,11 @@ export function GameReplay() {
               </div>
               <p className="text-foreground/80 leading-relaxed">{game.analysisNotes}</p>
             </div>
+          )}
+
+          {/* Game Rating Panel — shown after review completes */}
+          {reviewMoves.length > 0 && (
+            <GameRatingPanel reviewMoves={reviewMoves} game={game} />
           )}
         </div>
 
