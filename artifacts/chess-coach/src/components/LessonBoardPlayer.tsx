@@ -3,10 +3,13 @@ import { Chessboard } from 'react-chessboard';
 import { Chess } from 'chess.js';
 import {
   Play, Pause, SkipBack, SkipForward, ChevronLeft, ChevronRight,
-  MessageSquare, Swords, CheckCircle2, Lightbulb, Eye, RotateCcw
+  MessageSquare, Swords, CheckCircle2, Lightbulb, Eye, RotateCcw,
+  Trophy, Repeat2,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
+
+const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
 
 interface Step {
   fen: string;
@@ -62,6 +65,7 @@ function parsePgnSteps(pgn: string): Step[] | null {
 }
 
 type DrillState = 'idle' | 'correct' | 'wrong' | 'revealed';
+type Tab = 'lesson' | 'drill' | 'repeat';
 
 interface LessonBoardPlayerProps {
   pgn: string;
@@ -73,18 +77,29 @@ interface LessonBoardPlayerProps {
 
 export function LessonBoardPlayer({ pgn, title, drillFen, drillExpectedMove, drillHint }: LessonBoardPlayerProps) {
   const steps = parsePgnSteps(pgn);
-  const [tab, setTab] = useState<'lesson' | 'drill'>('lesson');
+  const [tab, setTab] = useState<Tab>('lesson');
   const [currentStep, setCurrentStep] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [prevFen, setPrevFen] = useState<string | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const moveListRef = useRef<HTMLDivElement>(null);
 
-  // Drill state
+  // ── Drill state ──────────────────────────────────────────────────────────────
   const [drillState, setDrillState] = useState<DrillState>('idle');
   const [drillAttempts, setDrillAttempts] = useState(0);
   const [showHint, setShowHint] = useState(false);
   const [drillPosition, setDrillPosition] = useState<string>(() => drillFen || '');
+
+  // ── Repeat drill state ───────────────────────────────────────────────────────
+  const totalRepeatMoves = Math.max((steps?.length ?? 1) - 1, 0);
+  const [repeatStep, setRepeatStep] = useState(0);
+  const [repeatPosition, setRepeatPosition] = useState(() => steps?.[0]?.fen ?? START_FEN);
+  const [repeatFeedback, setRepeatFeedback] = useState<'correct' | 'wrong' | null>(null);
+  const [repeatFirstTry, setRepeatFirstTry] = useState<boolean[]>(() => new Array(totalRepeatMoves).fill(true));
+  const [repeatAttempts, setRepeatAttempts] = useState(0);
+  const [repeatComplete, setRepeatComplete] = useState(false);
+
+  const repeatFirstTryScore = repeatFirstTry.filter(Boolean).length;
 
   const step = steps?.[currentStep];
   const totalSteps = steps?.length ?? 1;
@@ -108,14 +123,23 @@ export function LessonBoardPlayer({ pgn, title, drillFen, drillExpectedMove, dri
     return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
   }, [isPlaying, totalSteps]);
 
+  // Scroll move list — container-only, never the page
   useEffect(() => {
-    const el = moveListRef.current?.querySelector('[data-active="true"]');
-    el?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    const container = moveListRef.current;
+    const active = container?.querySelector<HTMLElement>('[data-active="true"]');
+    if (!container || !active) return;
+    const containerTop = container.scrollTop;
+    const containerBottom = containerTop + container.clientHeight;
+    const btnTop = active.offsetTop;
+    const btnBottom = btnTop + active.offsetHeight;
+    if (btnTop < containerTop) container.scrollTop = btnTop - 8;
+    else if (btnBottom > containerBottom) container.scrollTop = btnBottom - container.clientHeight + 8;
   }, [currentStep]);
 
   const hasDrill = !!(drillFen && drillExpectedMove);
+  const hasRepeat = (steps?.length ?? 0) > 1;
 
-  // Drill: handle piece drop
+  // ── Drill handlers ───────────────────────────────────────────────────────────
   const handleDrillDrop = useCallback((args: { sourceSquare: string; targetSquare: string | null; piece: unknown }) => {
     if (drillState === 'correct' || drillState === 'revealed') return false;
     if (!drillFen || !drillExpectedMove || !args.targetSquare) return false;
@@ -125,10 +149,9 @@ export function LessonBoardPlayer({ pgn, title, drillFen, drillExpectedMove, dri
       const move = chess.move({ from: args.sourceSquare, to: args.targetSquare, promotion: 'q' });
       if (!move) return false;
 
-      // Normalize comparison: strip trailing +/#, compare SAN
       const normalize = (s: string) => s.replace(/[+#!?]/g, '').trim();
       const isCorrect = normalize(move.san) === normalize(drillExpectedMove) ||
-        move.to === drillExpectedMove.slice(-2); // fallback to target square match
+        move.to === drillExpectedMove.slice(-2);
 
       setDrillAttempts(a => a + 1);
       if (isCorrect) {
@@ -143,7 +166,6 @@ export function LessonBoardPlayer({ pgn, title, drillFen, drillExpectedMove, dri
     } catch {
       return false;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [drillFen, drillExpectedMove, drillState]);
 
   const resetDrill = () => {
@@ -163,6 +185,70 @@ export function LessonBoardPlayer({ pgn, title, drillFen, drillExpectedMove, dri
     setDrillState('revealed');
   };
 
+  // ── Repeat drill handlers ────────────────────────────────────────────────────
+  const handleRepeatDrop = useCallback((args: { sourceSquare: string; targetSquare: string | null; piece: unknown }) => {
+    if (repeatComplete || !args.targetSquare || !steps) return false;
+    const expected = steps[repeatStep + 1]?.san;
+    if (!expected) return false;
+
+    try {
+      const chess = new Chess(steps[repeatStep].fen);
+      const move = chess.move({ from: args.sourceSquare, to: args.targetSquare, promotion: 'q' });
+      if (!move) return false;
+
+      const normalize = (s: string) => s.replace(/[+#!?]/g, '').trim();
+      const isCorrect = normalize(move.san) === normalize(expected) ||
+        move.to === expected.slice(-2);
+
+      const wasFirstTry = repeatAttempts === 0;
+
+      if (isCorrect) {
+        if (!wasFirstTry) {
+          setRepeatFirstTry(prev => { const n = [...prev]; n[repeatStep] = false; return n; });
+        }
+        setRepeatPosition(chess.fen());
+        setRepeatFeedback('correct');
+        setRepeatAttempts(0);
+
+        setTimeout(() => {
+          setRepeatFeedback(null);
+          const next = repeatStep + 1;
+          if (next >= (steps.length - 1)) {
+            setRepeatComplete(true);
+          } else {
+            setRepeatStep(next);
+          }
+        }, 700);
+        return true;
+      } else {
+        setRepeatFirstTry(prev => { const n = [...prev]; n[repeatStep] = false; return n; });
+        setRepeatAttempts(a => a + 1);
+        setRepeatFeedback('wrong');
+        setTimeout(() => setRepeatFeedback(null), 700);
+        return false;
+      }
+    } catch {
+      return false;
+    }
+  }, [repeatStep, repeatComplete, steps, repeatAttempts]);
+
+  const canRepeatDrag = useCallback(({ piece }: { piece: { pieceType: string } | null }) => {
+    if (repeatComplete || !piece) return false;
+    try {
+      const chess = new Chess(steps?.[repeatStep]?.fen ?? START_FEN);
+      return piece.pieceType[0].toLowerCase() === chess.turn();
+    } catch { return false; }
+  }, [repeatStep, repeatComplete, steps]);
+
+  const resetRepeat = () => {
+    setRepeatStep(0);
+    setRepeatPosition(steps?.[0]?.fen ?? START_FEN);
+    setRepeatFeedback(null);
+    setRepeatFirstTry(new Array(totalRepeatMoves).fill(true));
+    setRepeatAttempts(0);
+    setRepeatComplete(false);
+  };
+
   if (!steps) {
     return (
       <div className="rounded-xl bg-white/5 border border-white/10 p-6 text-center text-sm text-muted-foreground">
@@ -178,47 +264,65 @@ export function LessonBoardPlayer({ pgn, title, drillFen, drillExpectedMove, dri
 
   const hasComment = step && step.comment.trim().length > 0;
 
+  // Repeat progress display
+  const repeatExpectedSan = steps[repeatStep + 1]?.san ?? null;
+  const repeatColor = steps[repeatStep + 1]?.color ?? null;
+  const repeatFullMove = steps[repeatStep + 1]?.fullMoveNumber ?? null;
+
   return (
     <div className="rounded-2xl overflow-hidden border border-white/8 bg-[#0d1117]">
-      {/* Header with tabs */}
-      <div className="flex items-center px-4 py-0 bg-white/3 border-b border-white/5">
-        <div className="flex items-center gap-2 mr-4">
+      {/* ── Tab header ──────────────────────────────────────────────────────── */}
+      <div className="flex items-center px-4 py-0 bg-white/3 border-b border-white/5 overflow-x-auto">
+        <div className="flex items-center gap-2 mr-4 shrink-0">
           <div className="w-2 h-2 rounded-full bg-red-500/80" />
           <div className="w-2 h-2 rounded-full bg-yellow-500/80" />
           <div className="w-2 h-2 rounded-full bg-green-500/80" />
         </div>
+
         <button
-          onClick={() => setTab('lesson')}
+          onClick={() => { setIsPlaying(false); setTab('lesson'); }}
           className={cn(
-            'flex items-center gap-1.5 px-4 py-3 text-xs font-semibold border-b-2 transition-colors',
-            tab === 'lesson'
-              ? 'border-primary text-primary'
-              : 'border-transparent text-muted-foreground hover:text-foreground'
+            'flex items-center gap-1.5 px-4 py-3 text-xs font-semibold border-b-2 transition-colors whitespace-nowrap',
+            tab === 'lesson' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'
           )}
         >
           <Play className="w-3 h-3" /> Lesson
         </button>
+
+        {hasRepeat && (
+          <button
+            onClick={() => { setIsPlaying(false); setTab('repeat'); resetRepeat(); }}
+            className={cn(
+              'flex items-center gap-1.5 px-4 py-3 text-xs font-semibold border-b-2 transition-colors whitespace-nowrap',
+              tab === 'repeat' ? 'border-emerald-400 text-emerald-400' : 'border-transparent text-muted-foreground hover:text-foreground'
+            )}
+          >
+            <Repeat2 className="w-3 h-3" /> Repeat Drill
+          </button>
+        )}
+
         {hasDrill && (
           <button
-            onClick={() => { setTab('drill'); resetDrill(); }}
+            onClick={() => { setIsPlaying(false); setTab('drill'); resetDrill(); }}
             className={cn(
-              'flex items-center gap-1.5 px-4 py-3 text-xs font-semibold border-b-2 transition-colors',
-              tab === 'drill'
-                ? 'border-primary text-primary'
-                : 'border-transparent text-muted-foreground hover:text-foreground'
+              'flex items-center gap-1.5 px-4 py-3 text-xs font-semibold border-b-2 transition-colors whitespace-nowrap',
+              tab === 'drill' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'
             )}
           >
             <Swords className="w-3 h-3" /> Practice Drill
           </button>
         )}
-        <span className="ml-auto text-xs text-muted-foreground font-mono pr-2">
+
+        <span className="ml-auto text-xs text-muted-foreground font-mono pr-2 shrink-0">
           {tab === 'lesson'
             ? (currentStep > 0 ? `Move ${step?.fullMoveNumber}` : title ?? 'Interactive')
+            : tab === 'repeat'
+            ? (repeatComplete ? 'Complete!' : `${repeatStep}/${totalRepeatMoves} moves`)
             : 'Find the best move'}
         </span>
       </div>
 
-      {/* LESSON TAB */}
+      {/* ── LESSON TAB ──────────────────────────────────────────────────────── */}
       {tab === 'lesson' && (
         <div className="flex flex-col md:flex-row">
           <div className="flex-shrink-0 p-3 md:p-4">
@@ -302,8 +406,18 @@ export function LessonBoardPlayer({ pgn, title, drillFen, drillExpectedMove, dri
               <motion.div className="h-full bg-primary" animate={{ width: `${(currentStep / Math.max(totalSteps - 1, 1)) * 100}%` }} transition={{ duration: 0.3 }} />
             </div>
 
-            {/* CTA to drill if available */}
-            {hasDrill && isLast && (
+            {hasRepeat && isLast && (
+              <div className="px-4 py-3 border-t border-white/5 bg-emerald-500/5">
+                <button
+                  onClick={() => { setTab('repeat'); resetRepeat(); }}
+                  className="w-full flex items-center justify-center gap-2 py-2 rounded-xl text-sm font-bold text-emerald-400 hover:bg-emerald-500/10 transition-colors"
+                >
+                  <Repeat2 className="w-4 h-4" /> Practice this sequence from move 1 →
+                </button>
+              </div>
+            )}
+
+            {!hasRepeat && hasDrill && isLast && (
               <div className="px-4 py-3 border-t border-white/5 bg-primary/5">
                 <button
                   onClick={() => { setTab('drill'); resetDrill(); }}
@@ -317,7 +431,177 @@ export function LessonBoardPlayer({ pgn, title, drillFen, drillExpectedMove, dri
         </div>
       )}
 
-      {/* DRILL TAB */}
+      {/* ── REPEAT DRILL TAB ────────────────────────────────────────────────── */}
+      {tab === 'repeat' && hasRepeat && (
+        <div className="flex flex-col md:flex-row">
+          {/* Board */}
+          <div className="flex-shrink-0 p-3 md:p-4">
+            <div className="relative w-full max-w-[360px] mx-auto">
+              {repeatComplete ? (
+                <div className="aspect-square rounded-lg bg-gradient-to-br from-emerald-950/80 to-slate-900 border border-emerald-500/30 flex flex-col items-center justify-center gap-4 p-6">
+                  <Trophy className="w-14 h-14 text-amber-400 drop-shadow-lg" />
+                  <div className="text-center">
+                    <p className="text-lg font-black text-white mb-1">Sequence Complete!</p>
+                    <p className="text-sm text-muted-foreground">
+                      {repeatFirstTryScore} of {totalRepeatMoves} moves correct on first try
+                    </p>
+                  </div>
+                  <div className="w-full bg-white/5 rounded-full h-2 overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-emerald-500 to-emerald-300 rounded-full transition-all duration-700"
+                      style={{ width: `${(repeatFirstTryScore / totalRepeatMoves) * 100}%` }}
+                    />
+                  </div>
+                  <div className="flex gap-2 flex-wrap justify-center">
+                    {repeatFirstTry.map((ok, i) => (
+                      <div
+                        key={i}
+                        title={`Move ${i + 1}: ${steps[i + 1]?.san}`}
+                        className={cn('w-5 h-5 rounded text-[9px] font-bold flex items-center justify-center',
+                          ok ? 'bg-emerald-500/30 text-emerald-300 border border-emerald-500/50'
+                             : 'bg-red-500/20 text-red-400 border border-red-500/40')}
+                      >
+                        {ok ? '✓' : '✗'}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <Chessboard
+                    options={{
+                      position: repeatPosition,
+                      allowDragging: !repeatComplete,
+                      canDragPiece: canRepeatDrag,
+                      onPieceDrop: handleRepeatDrop,
+                      boardStyle: { borderRadius: '8px', overflow: 'hidden' },
+                      darkSquareStyle: { backgroundColor: '#2d4a3e' },
+                      lightSquareStyle: { backgroundColor: '#6dae7f' },
+                      animationDurationInMs: 180,
+                    }}
+                  />
+                  <AnimatePresence>
+                    {repeatFeedback === 'correct' && (
+                      <motion.div key="rc" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                        className="absolute inset-0 rounded-lg flex items-center justify-center bg-emerald-500/20 pointer-events-none">
+                        <div className="bg-emerald-500 text-white font-black text-2xl px-6 py-3 rounded-2xl shadow-lg">✓ Correct!</div>
+                      </motion.div>
+                    )}
+                    {repeatFeedback === 'wrong' && (
+                      <motion.div key="rw" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                        className="absolute inset-0 rounded-lg flex items-center justify-center bg-red-500/20 pointer-events-none">
+                        <div className="bg-red-500 text-white font-black text-xl px-6 py-3 rounded-2xl shadow-lg">✗ Try again</div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Side panel */}
+          <div className="flex-1 flex flex-col min-h-0 border-t md:border-t-0 md:border-l border-white/5 p-4 gap-4">
+            {/* Header */}
+            <div className="flex items-start gap-3">
+              <div className="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center shrink-0">
+                <Repeat2 className="w-4 h-4 text-emerald-400" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-foreground mb-0.5">
+                  {repeatComplete ? 'Round complete!' : 'Play the sequence from the start'}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {repeatComplete
+                    ? 'Repetition builds muscle memory. Go again to improve your score.'
+                    : repeatExpectedSan
+                    ? `Move ${repeatStep + 1} of ${totalRepeatMoves} — ${repeatColor === 'w' ? 'White' : 'Black'} to move${repeatFullMove ? ` (move ${repeatFullMove})` : ''}`
+                    : 'Drag a piece to make the correct move.'}
+                </p>
+                {repeatAttempts > 0 && !repeatComplete && (
+                  <p className="text-xs text-amber-400 mt-1">{repeatAttempts} wrong attempt{repeatAttempts !== 1 ? 's' : ''} on this move</p>
+                )}
+              </div>
+            </div>
+
+            {/* Progress bar + move dots */}
+            {!repeatComplete && (
+              <div className="space-y-2">
+                <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
+                  <motion.div
+                    className="h-full rounded-full bg-emerald-500"
+                    animate={{ width: `${(repeatStep / totalRepeatMoves) * 100}%` }}
+                    transition={{ duration: 0.3 }}
+                  />
+                </div>
+                <div className="flex gap-1 flex-wrap">
+                  {repeatFirstTry.map((ok, i) => (
+                    <div
+                      key={i}
+                      className={cn('h-1.5 flex-1 min-w-[8px] max-w-[20px] rounded-full transition-colors',
+                        i < repeatStep
+                          ? ok ? 'bg-emerald-500' : 'bg-red-400'
+                          : i === repeatStep
+                          ? 'bg-primary animate-pulse'
+                          : 'bg-white/10'
+                      )}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Score card after complete */}
+            {repeatComplete && (
+              <div className="flex items-center gap-3 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30">
+                <Trophy className="w-5 h-5 text-amber-400 shrink-0" />
+                <div>
+                  <p className="text-sm font-bold text-emerald-400">
+                    {repeatFirstTryScore}/{totalRepeatMoves} first-try correct
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {repeatFirstTryScore === totalRepeatMoves
+                      ? 'Perfect round! Keep repeating to build memory.'
+                      : 'Try again — aim to get them all on the first try.'}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* PGN move reference */}
+            {!repeatComplete && (
+              <div className="text-xs text-muted-foreground/60 font-mono space-y-0.5 max-h-24 overflow-y-auto">
+                {movePairs.map(({ num, white, black }) => (
+                  <div key={num} className="flex gap-1">
+                    <span className="w-6 shrink-0 text-right text-muted-foreground/40">{num}.</span>
+                    <span className={cn('px-1 rounded', repeatStep >= white - 0 && 'text-foreground/80')}>{steps[white]?.san}</span>
+                    {black != null && <span className={cn('px-1 rounded', repeatStep >= black - 0 && 'text-foreground/80')}>{steps[black]?.san}</span>}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Actions */}
+            <div className="mt-auto flex items-center gap-2 flex-wrap">
+              <button
+                onClick={resetRepeat}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-white/5 border border-border transition-all"
+              >
+                <RotateCcw className="w-3.5 h-3.5" /> {repeatComplete ? 'Go Again' : 'Reset'}
+              </button>
+              {repeatComplete && hasDrill && (
+                <button
+                  onClick={() => { setTab('drill'); resetDrill(); }}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold text-primary bg-primary/10 hover:bg-primary/20 border border-primary/30 transition-all"
+                >
+                  <Swords className="w-3.5 h-3.5" /> Practice Drill
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── DRILL TAB ───────────────────────────────────────────────────────── */}
       {tab === 'drill' && hasDrill && (
         <div className="flex flex-col md:flex-row">
           <div className="flex-shrink-0 p-3 md:p-4">
@@ -333,7 +617,6 @@ export function LessonBoardPlayer({ pgn, title, drillFen, drillExpectedMove, dri
                   animationDurationInMs: 180,
                 }}
               />
-              {/* Overlay feedback */}
               <AnimatePresence>
                 {drillState === 'correct' && (
                   <motion.div key="correct" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -352,7 +635,6 @@ export function LessonBoardPlayer({ pgn, title, drillFen, drillExpectedMove, dri
           </div>
 
           <div className="flex-1 flex flex-col min-h-0 border-t md:border-t-0 md:border-l border-white/5 p-4 gap-4">
-            {/* Drill prompt */}
             <div className="flex items-start gap-3">
               <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
                 <Swords className="w-4 h-4 text-primary" />
@@ -372,7 +654,6 @@ export function LessonBoardPlayer({ pgn, title, drillFen, drillExpectedMove, dri
               </div>
             </div>
 
-            {/* Feedback card */}
             <AnimatePresence mode="wait">
               {drillState === 'correct' && (
                 <motion.div key="correct-card" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="flex items-center gap-3 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30">
@@ -394,7 +675,6 @@ export function LessonBoardPlayer({ pgn, title, drillFen, drillExpectedMove, dri
               )}
             </AnimatePresence>
 
-            {/* Hint */}
             {drillHint && drillState === 'idle' && (
               <div>
                 {showHint ? (
@@ -410,7 +690,6 @@ export function LessonBoardPlayer({ pgn, title, drillFen, drillExpectedMove, dri
               </div>
             )}
 
-            {/* Action buttons */}
             <div className="mt-auto flex items-center gap-2 flex-wrap">
               <button onClick={resetDrill} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-white/5 border border-border transition-all">
                 <RotateCcw className="w-3.5 h-3.5" /> Reset

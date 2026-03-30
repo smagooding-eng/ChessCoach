@@ -130,7 +130,7 @@ export function OpeningDetail() {
   const handlePracticeMove = useCallback((san: string, isCorrect: boolean) => {
     if (isCorrect) {
       setFeedback('correct');
-      setMoveQuality('great');
+      setMoveQuality('excellent');
       setTimeout(() => {
         setFeedback(null);
         setMoveQuality(null);

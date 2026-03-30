@@ -1,16 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useParams, Link } from 'wouter';
 import { useCourseDetail, useMarkLessonComplete } from '@/hooks/use-courses';
 import { LessonBoardPlayer } from '@/components/LessonBoardPlayer';
 import {
   ArrowLeft, CheckCircle2, Circle, Target,
-  ChevronLeft, ChevronRight, Award, List, LayoutTemplate
+  ChevronLeft, ChevronRight, Award, List, LayoutTemplate,
+  Volume2, VolumeX, BookOpen,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
+// ── Markdown render helpers ────────────────────────────────────────────────────
 function renderInline(text: string): React.ReactNode {
-  // Render **bold** inline
   const parts = text.split(/(\*\*[^*]+\*\*)/g);
   if (parts.length === 1) return text;
   return parts.map((part, i) =>
@@ -20,32 +21,21 @@ function renderInline(text: string): React.ReactNode {
   );
 }
 
-function LessonContent({ content }: { content: string }) {
-  const paragraphs = content.split(/\n\n+/).filter(Boolean);
+function renderStep(text: string): React.ReactNode {
+  const paragraphs = text.split(/\n\n+/).filter(Boolean);
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {paragraphs.map((p, i) => {
         const trimmed = p.trim();
+        if (trimmed.startsWith('### ')) return <h4 key={i} className="text-sm font-bold text-muted-foreground uppercase tracking-wider mt-2">{trimmed.slice(4)}</h4>;
+        if (trimmed.startsWith('## ')) return <h4 key={i} className="text-base font-bold text-primary mt-1">{trimmed.slice(3)}</h4>;
+        if (trimmed.startsWith('# ')) return <h3 key={i} className="text-lg font-bold mt-2">{trimmed.slice(2)}</h3>;
 
-        // ### Heading (level 3)
-        if (trimmed.startsWith('### ')) {
-          return <h4 key={i} className="text-sm font-bold text-muted-foreground uppercase tracking-wider mt-3">{trimmed.slice(4)}</h4>;
-        }
-        // ## Heading (level 2)
-        if (trimmed.startsWith('## ')) {
-          return <h4 key={i} className="text-base font-bold text-primary mt-1">{trimmed.slice(3)}</h4>;
-        }
-        // # Heading (level 1)
-        if (trimmed.startsWith('# ')) {
-          return <h3 key={i} className="text-lg font-bold mt-2">{trimmed.slice(2)}</h3>;
-        }
-
-        // Bullet list — lines starting with -, *, or •
         const lines = trimmed.split('\n');
         const isList = lines.every(l => /^[-*•]\s/.test(l.trim()) || l.trim() === '');
         if (isList && lines.some(l => /^[-*•]\s/.test(l.trim()))) {
           return (
-            <ul key={i} className="space-y-2.5">
+            <ul key={i} className="space-y-2">
               {lines.filter(l => l.trim()).map((item, j) => (
                 <li key={j} className="flex items-start gap-2.5 text-foreground/80 text-sm leading-relaxed">
                   <span className="text-primary mt-1 shrink-0">▸</span>
@@ -56,16 +46,188 @@ function LessonContent({ content }: { content: string }) {
           );
         }
 
-        return (
-          <p key={i} className="text-foreground/80 text-sm leading-relaxed">
-            {renderInline(trimmed)}
-          </p>
-        );
+        return <p key={i} className="text-foreground/80 text-sm leading-relaxed">{renderInline(trimmed)}</p>;
       })}
     </div>
   );
 }
 
+/** Strip markdown for plain speech */
+function toPlainText(md: string): string {
+  return md
+    .replace(/^#{1,3}\s+/gm, '')
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/^[-*•]\s*/gm, '')
+    .replace(/\n+/g, ' ')
+    .trim();
+}
+
+/** Split lesson content into logical step groups */
+function splitIntoSteps(content: string): string[] {
+  const raw = content.split(/\n\n+/).filter(s => s.trim().length > 0);
+  const grouped: string[] = [];
+  for (let i = 0; i < raw.length; i++) {
+    const trimmed = raw[i].trim();
+    // Glue a heading to its immediately following paragraph (keeps them together as one step)
+    if (trimmed.startsWith('#') && i + 1 < raw.length && !raw[i + 1].trim().startsWith('#')) {
+      grouped.push(trimmed + '\n\n' + raw[i + 1].trim());
+      i++;
+    } else {
+      grouped.push(trimmed);
+    }
+  }
+  return grouped.length > 0 ? grouped : [''];
+}
+
+// ── Step-by-step lesson content component with TTS ────────────────────────────
+function LessonContentStepper({ content, lessonId }: { content: string; lessonId: number }) {
+  const steps = useMemo(() => splitIntoSteps(content), [content]);
+  const [step, setStep] = useState(0);
+  const [speaking, setSpeaking] = useState(false);
+  const [autoRead, setAutoRead] = useState(false);
+  const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+
+  const hasTTS = typeof window !== 'undefined' && 'speechSynthesis' in window;
+  const isFirst = step === 0;
+  const isLast = step === steps.length - 1;
+
+  // Reset when lesson changes
+  useEffect(() => {
+    setStep(0);
+    stopReading();
+  }, [lessonId]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => { if (hasTTS) window.speechSynthesis.cancel(); };
+  }, []);
+
+  function stopReading() {
+    if (hasTTS) window.speechSynthesis.cancel();
+    setSpeaking(false);
+  }
+
+  const readAloud = useCallback((text: string) => {
+    if (!hasTTS) return;
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(toPlainText(text));
+    utterance.rate = 0.92;
+    utterance.pitch = 1.0;
+    utterance.onstart = () => setSpeaking(true);
+    utterance.onend = () => setSpeaking(false);
+    utterance.onerror = () => setSpeaking(false);
+    utteranceRef.current = utterance;
+    window.speechSynthesis.speak(utterance);
+  }, [hasTTS]);
+
+  const goTo = useCallback((idx: number) => {
+    const clamped = Math.max(0, Math.min(idx, steps.length - 1));
+    stopReading();
+    setStep(clamped);
+    if (autoRead) {
+      // Tiny delay so state updates before speaking
+      setTimeout(() => readAloud(steps[clamped]), 80);
+    }
+  }, [steps, autoRead, readAloud]);
+
+  if (steps.length === 0) return null;
+
+  return (
+    <div className="space-y-4">
+      {/* Controls bar */}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-2">
+          <BookOpen className="w-3.5 h-3.5 text-primary shrink-0" />
+          <span className="text-xs text-muted-foreground">
+            Step <span className="font-bold text-foreground">{step + 1}</span> of {steps.length}
+          </span>
+          {steps.length > 1 && hasTTS && (
+            <button
+              onClick={() => setAutoRead(a => !a)}
+              title={autoRead ? 'Auto-read on (click to disable)' : 'Enable auto-read on step change'}
+              className={cn(
+                'ml-1 text-[10px] font-bold px-2 py-0.5 rounded border transition-colors',
+                autoRead
+                  ? 'bg-primary/15 text-primary border-primary/30'
+                  : 'text-muted-foreground border-border hover:text-foreground'
+              )}
+            >
+              AUTO
+            </button>
+          )}
+        </div>
+
+        {hasTTS && (
+          <button
+            onClick={() => speaking ? stopReading() : readAloud(steps[step])}
+            className={cn(
+              'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all',
+              speaking
+                ? 'bg-primary/15 text-primary border-primary/30 hover:bg-primary/20'
+                : 'text-muted-foreground border-border hover:text-foreground hover:bg-white/5'
+            )}
+          >
+            {speaking
+              ? <><VolumeX className="w-3.5 h-3.5" /> Stop</>
+              : <><Volume2 className="w-3.5 h-3.5" /> Read aloud</>}
+          </button>
+        )}
+      </div>
+
+      {/* Step content */}
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={step}
+          initial={{ opacity: 0, x: 10 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: -10 }}
+          transition={{ duration: 0.18 }}
+          className="min-h-[80px]"
+        >
+          {renderStep(steps[step])}
+        </motion.div>
+      </AnimatePresence>
+
+      {/* Navigation */}
+      {steps.length > 1 && (
+        <div className="flex items-center justify-between gap-3 pt-1 border-t border-white/5">
+          <button
+            onClick={() => goTo(step - 1)}
+            disabled={isFirst}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-border hover:bg-white/5 transition-all disabled:opacity-30 disabled:cursor-not-allowed text-muted-foreground hover:text-foreground"
+          >
+            <ChevronLeft className="w-3.5 h-3.5" /> Previous
+          </button>
+
+          {/* Progress dots */}
+          <div className="flex items-center gap-1 flex-wrap justify-center">
+            {steps.map((_, i) => (
+              <button
+                key={i}
+                onClick={() => goTo(i)}
+                className={cn(
+                  'rounded-full transition-all',
+                  i === step ? 'w-5 h-1.5 bg-primary' : 'w-1.5 h-1.5 bg-white/20 hover:bg-white/40'
+                )}
+                title={`Step ${i + 1}`}
+              />
+            ))}
+          </div>
+
+          <button
+            onClick={() => goTo(step + 1)}
+            disabled={isLast}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-border hover:bg-white/5 transition-all disabled:opacity-30 disabled:cursor-not-allowed text-muted-foreground hover:text-foreground"
+          >
+            Next <ChevronRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Main CourseDetail page ─────────────────────────────────────────────────────
 export function CourseDetail() {
   const { id } = useParams();
   const courseId = parseInt(id || '0');
@@ -80,7 +242,6 @@ export function CourseDetail() {
   const isFirst = currentIdx === 0;
   const isLast = currentIdx === sortedLessons.length - 1;
 
-  // Start on the first incomplete lesson
   useEffect(() => {
     if (!course) return;
     const sorted = [...(course.lessons ?? [])].sort((a, b) => a.orderIndex - b.orderIndex);
@@ -120,7 +281,6 @@ export function CourseDetail() {
 
   return (
     <div className="pb-20 max-w-5xl mx-auto space-y-6">
-      {/* Back + Header */}
       <Link href="/courses" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors text-sm">
         <ArrowLeft className="w-4 h-4" /> Back to Courses
       </Link>
@@ -270,13 +430,14 @@ export function CourseDetail() {
                   )}
                 </div>
 
-                {/* Lesson content — board first when PGN is available */}
+                {/* Lesson body */}
                 <div className="px-6 py-6 space-y-6">
+                  {/* Interactive board */}
                   {lesson?.examplePgn && (
                     <div>
                       <h4 className="font-bold mb-3 flex items-center gap-2 text-sm text-primary">
                         <Target className="w-4 h-4" />
-                        {lesson.drillExpectedMove ? 'Interactive Lesson + Practice Drill' : 'Interactive Lesson'}
+                        {lesson.drillExpectedMove ? 'Interactive Lesson + Practice' : 'Interactive Lesson'}
                       </h4>
                       <LessonBoardPlayer
                         pgn={lesson.examplePgn}
@@ -288,7 +449,16 @@ export function CourseDetail() {
                     </div>
                   )}
 
-                  {lesson && <LessonContent content={lesson.content} />}
+                  {/* Step-by-step lesson text with TTS */}
+                  {lesson && lesson.content && (
+                    <div className="glass-card rounded-xl p-4 border border-white/6 bg-white/2">
+                      <LessonContentStepper
+                        key={lesson.id}
+                        content={lesson.content}
+                        lessonId={lesson.id}
+                      />
+                    </div>
+                  )}
                 </div>
 
                 {/* Navigation footer */}
