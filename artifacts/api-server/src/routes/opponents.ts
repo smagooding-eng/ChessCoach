@@ -54,13 +54,11 @@ router.post("/opponents/analyze", async (req, res): Promise<void> => {
   const analysis = await analyzePlayerGames(target, gameSummaries);
 
   // Compute win/loss/draw and opening stats
+  // NOTE: g.result is already from the target player's perspective (extracted by extractGameMetadata)
   let wins = 0, losses = 0, draws = 0;
   const openingMap = new Map<string, { games: number; wins: number }>();
   for (const g of gameSummaries) {
-    const isWhite = g.whiteUsername.toLowerCase() === target;
-    const result = isWhite
-      ? g.result === "win" ? "win" : g.result === "loss" ? "loss" : "draw"
-      : g.result === "win" ? "loss" : g.result === "loss" ? "win" : "draw";
+    const result = g.result === "win" ? "win" : g.result === "loss" ? "loss" : "draw";
 
     if (result === "win") wins++;
     else if (result === "loss") losses++;
