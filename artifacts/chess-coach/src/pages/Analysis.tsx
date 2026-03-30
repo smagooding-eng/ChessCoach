@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link } from 'wouter';
+import { useLocation } from 'wouter';
 import { useRunAnalysis, useMyAnalysisSummary, useMyWeaknesses } from '@/hooks/use-analysis';
 import { useUser } from '@/hooks/use-user';
 import { BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
@@ -9,6 +9,7 @@ import { motion } from 'framer-motion';
 const PIE_COLORS = ['#10b981', '#ef4444', '#64748b'];
 
 export function Analysis() {
+  const [, navigate] = useLocation();
   const { username } = useUser();
   const { analyze, isAnalyzing } = useRunAnalysis();
   const { data: summary, isLoading: loadingSummary } = useMyAnalysisSummary();
@@ -133,14 +134,15 @@ export function Analysis() {
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {weaknessesData?.weaknesses?.map((weakness, i) => (
-              <Link key={weakness.id} href={`/analysis/${weakness.id}`}>
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: i * 0.1 }}
-                  className="glass-card p-6 rounded-2xl border-l-4 cursor-pointer hover:scale-[1.02] hover:shadow-lg hover:border-opacity-80 transition-all group"
-                  style={{ borderLeftColor: weakness.severity === 'Critical' ? '#ef4444' : weakness.severity === 'High' ? '#f59e0b' : '#3b82f6' }}
-                >
+              <motion.div
+                key={weakness.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.1 }}
+                onClick={() => navigate(`/analysis/${weakness.id}`)}
+                className="glass-card p-6 rounded-2xl border-l-4 cursor-pointer hover:scale-[1.02] hover:shadow-lg transition-all group"
+                style={{ borderLeftColor: weakness.severity === 'Critical' ? '#ef4444' : weakness.severity === 'High' ? '#f59e0b' : '#3b82f6' }}
+              >
                   <div className="flex justify-between items-start mb-4">
                     <h3 className="text-xl font-bold group-hover:text-primary transition-colors">{weakness.category}</h3>
                     <div className="flex items-center gap-2">
@@ -167,8 +169,7 @@ export function Analysis() {
                     <span>View examples, games & courses</span>
                     <ChevronRight className="w-3 h-3" />
                   </div>
-                </motion.div>
-              </Link>
+              </motion.div>
             ))}
             
             {!weaknessesData?.weaknesses?.length && (

@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'wouter';
 import { useCourseDetail, useMarkLessonComplete } from '@/hooks/use-courses';
-import { ChessBoard } from '@/components/ChessBoard';
+import { LessonBoardPlayer } from '@/components/LessonBoardPlayer';
 import {
-  ArrowLeft, CheckCircle2, Circle, BookOpen, Target,
+  ArrowLeft, CheckCircle2, Circle, Target,
   ChevronLeft, ChevronRight, Award, List, LayoutTemplate
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -239,15 +239,13 @@ export function CourseDetail() {
                 <div className="px-6 py-6">
                   {lesson && <LessonContent content={lesson.content} />}
 
-                  {/* Practice board */}
+                  {/* Interactive board player */}
                   {lesson?.examplePgn && (
                     <div className="mt-8 pt-6 border-t border-white/5">
                       <h4 className="font-bold mb-4 flex items-center gap-2 text-sm text-primary">
-                        <Target className="w-4 h-4" /> Practice Position
+                        <Target className="w-4 h-4" /> Interactive Lesson
                       </h4>
-                      <div className="max-w-sm mx-auto">
-                        <ChessBoard fen={lesson.examplePgn} />
-                      </div>
+                      <LessonBoardPlayer pgn={lesson.examplePgn} title={lesson.title} />
                     </div>
                   )}
                 </div>

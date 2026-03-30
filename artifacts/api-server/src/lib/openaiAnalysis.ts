@@ -390,7 +390,15 @@ Category: ${weakness.category}
 Severity: ${weakness.severity}
 Description: ${weakness.description}
 
-Create a course with 4-5 lessons. Each lesson should be educational and actionable.
+Create a course with 4-5 lessons. Each lesson MUST include an interactive PGN move sequence that illustrates the key concept.
+
+CRITICAL PGN rules:
+- examplePgn MUST be a valid PGN string with 4-8 instructive moves directly related to the lesson concept
+- Every move in the PGN must have a comment in {curly braces} explaining WHY that move matters
+- Use real, legal chess moves that a player at this level would encounter
+- Start from the initial position (no FEN header needed)
+- Format: "1. e4 {Control the center} e5 {Mirror strategy} 2. Nf3 {Develop with tempo} Nc6 {Defend the pawn}"
+- Do NOT use null for examplePgn — every lesson must have a move sequence
 
 Respond with valid JSON:
 {
@@ -403,7 +411,7 @@ Respond with valid JSON:
       "title": "Lesson title",
       "content": "Detailed lesson content (3-5 paragraphs with specific chess advice, patterns, and tips)",
       "orderIndex": 0,
-      "examplePgn": null
+      "examplePgn": "1. e4 {Comment explaining this move} e5 {Comment} 2. Nf3 {Comment} Nc6 {Comment}"
     }
   ]
 }`;
