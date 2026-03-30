@@ -2,6 +2,7 @@ import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { UserProvider } from "@/context/UserContext";
 import { useUser } from "@/hooks/use-user";
 import { useEffect } from "react";
 
@@ -15,6 +16,7 @@ import { Analysis } from "@/pages/Analysis";
 import { Courses } from "@/pages/Courses";
 import { CourseDetail } from "@/pages/CourseDetail";
 import { WeaknessDetail } from "@/pages/WeaknessDetail";
+import { OpponentAnalysis } from "@/pages/OpponentAnalysis";
 import NotFound from "@/pages/not-found";
 import { Layout } from "@/components/Layout";
 
@@ -62,6 +64,7 @@ function Router() {
       <Route path="/analysis/:id" component={() => <ProtectedRoute component={WeaknessDetail} />} />
       <Route path="/courses" component={() => <ProtectedRoute component={Courses} />} />
       <Route path="/courses/:id" component={() => <ProtectedRoute component={CourseDetail} />} />
+      <Route path="/opponents" component={() => <ProtectedRoute component={OpponentAnalysis} />} />
       
       <Route component={NotFound} />
     </Switch>
@@ -71,12 +74,14 @@ function Router() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-          <Router />
-        </WouterRouter>
-        <Toaster />
-      </TooltipProvider>
+      <UserProvider>
+        <TooltipProvider>
+          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+            <Router />
+          </WouterRouter>
+          <Toaster />
+        </TooltipProvider>
+      </UserProvider>
     </QueryClientProvider>
   );
 }

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'wouter';
 import { useUser } from '@/hooks/use-user';
-import { LayoutDashboard, Import, History, BrainCircuit, GraduationCap, LogOut, Menu, X } from 'lucide-react';
+import { LayoutDashboard, Import, History, BrainCircuit, GraduationCap, Swords, LogOut, Menu, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -16,6 +16,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
     { href: '/games', label: 'My Games', icon: History },
     { href: '/analysis', label: 'AI Analysis', icon: BrainCircuit },
     { href: '/courses', label: 'My Courses', icon: GraduationCap },
+    { href: '/opponents', label: 'Opponent Scout', icon: Swords },
   ];
 
   const NavContent = () => (

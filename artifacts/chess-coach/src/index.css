@@ -31,35 +31,46 @@
 }
 
 :root {
-  --background: 222 47% 7%;
-  --foreground: 210 40% 98%;
+  /* Chess.com-inspired warm dark palette */
+  --background: 26 14% 8%;
+  --foreground: 38 20% 96%;
   
-  --card: 222 47% 10%;
-  --card-foreground: 210 40% 98%;
+  --card: 24 12% 12%;
+  --card-foreground: 38 20% 96%;
   
-  --popover: 222 47% 10%;
-  --popover-foreground: 210 40% 98%;
+  --popover: 24 12% 12%;
+  --popover-foreground: 38 20% 96%;
   
+  /* Golden chess piece yellow */
   --primary: 43 74% 49%;
-  --primary-foreground: 222 47% 11%;
+  --primary-foreground: 24 20% 10%;
   
-  --secondary: 217 33% 17%;
-  --secondary-foreground: 210 40% 98%;
+  /* Warm mid-dark */
+  --secondary: 24 10% 18%;
+  --secondary-foreground: 38 20% 96%;
   
-  --muted: 217 33% 17%;
-  --muted-foreground: 215 20% 65%;
+  --muted: 24 10% 18%;
+  --muted-foreground: 30 8% 55%;
   
-  --accent: 217 91% 60%;
-  --accent-foreground: 210 40% 98%;
+  /* Chess board green */
+  --accent: 100 38% 42%;
+  --accent-foreground: 38 20% 96%;
   
-  --destructive: 0 62% 30%;
-  --destructive-foreground: 210 40% 98%;
+  --destructive: 4 72% 40%;
+  --destructive-foreground: 38 20% 96%;
   
-  --border: 217 33% 17%;
-  --input: 217 33% 17%;
+  --border: 24 10% 20%;
+  --input: 24 10% 18%;
   --ring: 43 74% 49%;
 
   --radius: 0.75rem;
+  
+  /* Chess-specific extras */
+  --chess-light-sq: 240 4% 78%;
+  --chess-dark-sq: 100 38% 42%;
+  --win-color: 142 71% 45%;
+  --loss-color: 4 72% 40%;
+  --draw-color: 30 8% 55%;
 }
 
 @layer base {
@@ -69,8 +80,8 @@
   body {
     @apply bg-background text-foreground antialiased font-sans;
     background-image: 
-      radial-gradient(circle at 50% 0%, hsl(222, 47%, 13%) 0%, transparent 50%),
-      radial-gradient(circle at 0% 100%, hsl(222, 47%, 10%) 0%, transparent 50%);
+      radial-gradient(ellipse at 60% 0%, hsl(26, 18%, 14%) 0%, transparent 55%),
+      radial-gradient(ellipse at 0% 80%, hsl(24, 14%, 11%) 0%, transparent 50%);
     background-attachment: fixed;
   }
 

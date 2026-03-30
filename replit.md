@@ -21,13 +21,14 @@ Chess Coach - A full-stack chess analysis platform that imports games from chess
 ## Features
 
 1. **Import Games**: Enter chess.com username and fetch games from the past N months
-2. **Game Replay**: Interactive chess board with move-by-move navigation (first/prev/next/last/auto-play)
-3. **AI Analysis**: Analyzes up to 50 games using GPT-5.2 to identify weaknesses across 6 categories
-4. **Weakness Report**: Clickable cards showing category, severity, description, frequency — click to open a Weakness Detail page
-5. **Weakness Detail Page** (`/analysis/:id`): Shows AI-identified patterns, related recent games (with links to replay), and direct links to matching courses
-6. **Performance Stats**: Win rate, opening stats (bar chart), time control breakdown, win/loss/draw pie chart
-7. **Personalized Courses**: AI-generated courses with 4-5 lessons each targeting specific weaknesses
-8. **Interactive Course Viewer**: Sequential lesson mode with sidebar navigation, Previous/Next buttons, dot progress indicators, and chess board for practice positions. "Complete & Next" auto-advances to the next lesson.
+2. **Game Replay**: Interactive chess board with move-by-move navigation (first/prev/next/last/auto-play), move quality badges, engine eval bar
+3. **AI Analysis**: Analyzes up to 50 games using GPT to identify weaknesses across 6 categories
+4. **Weakness Report**: Clickable cards → Weakness Detail page (`/analysis/:id`) with AI patterns, related games, related courses
+5. **Performance Stats**: Win rate, opening stats (bar chart), time control breakdown, win/loss/draw pie chart
+6. **Personalized Courses**: AI-generated courses with 4-5 annotated PGN lessons; generates by appending (not replacing) to preserve progress
+7. **Interactive Course Viewer**: Sequential lesson mode, LessonBoardPlayer component, "Complete & Next" auto-advance
+8. **Opponent Scout** (`/opponents`): Enter any chess.com username — fetches their recent games, runs full AI analysis, shows their weaknesses and favourite openings
+9. **Global UserContext**: `src/context/UserContext.tsx` — single source of truth for auth state, no per-component useState drift
 
 ## Structure
 

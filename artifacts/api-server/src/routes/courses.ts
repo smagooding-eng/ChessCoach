@@ -62,8 +62,6 @@ router.post("/courses/generate", async (req, res): Promise<void> => {
     return;
   }
 
-  await db.delete(coursesTable).where(eq(coursesTable.username, username.toLowerCase()));
-
   const generatedCourses = [];
 
   for (const weakness of weaknesses.slice(0, 4)) {
