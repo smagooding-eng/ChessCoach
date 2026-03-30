@@ -80,6 +80,7 @@ export function WeaknessDetail() {
   const [data, setData] = useState<WeaknessDetailData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
     if (!id) return;
@@ -90,7 +91,7 @@ export function WeaknessDetail() {
       .then(setData)
       .catch(() => setError('Could not load weakness details.'))
       .finally(() => setLoading(false));
-  }, [id]);
+  }, [id, retryCount]);
 
   if (loading) return (
     <div className="flex justify-center py-24">
@@ -99,7 +100,21 @@ export function WeaknessDetail() {
   );
 
   if (error || !data) return (
-    <div className="text-center py-24 text-muted-foreground">{error ?? 'Not found.'}</div>
+    <div className="space-y-8 pb-16 max-w-4xl mx-auto">
+      <Link href="/analysis" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors text-sm">
+        <ArrowLeft className="w-4 h-4" /> Back to Analysis
+      </Link>
+      <div className="flex flex-col items-center justify-center py-20 gap-4">
+        <AlertTriangle className="w-10 h-10 text-amber-400" />
+        <p className="text-muted-foreground">{error ?? 'Weakness not found.'}</p>
+        <button
+          onClick={() => setRetryCount(c => c + 1)}
+          className="px-5 py-2 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary text-sm font-semibold transition-colors border border-primary/20"
+        >
+          Try again
+        </button>
+      </div>
+    </div>
   );
 
   const { weakness, relatedGames, relatedCourses } = data;

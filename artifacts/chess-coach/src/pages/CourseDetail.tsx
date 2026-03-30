@@ -101,7 +101,20 @@ export function CourseDetail() {
       <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
     </div>
   );
-  if (!course) return <div className="text-center py-20 text-muted-foreground">Course not found.</div>;
+  if (!course) return (
+    <div className="space-y-8 pb-16 max-w-5xl mx-auto">
+      <Link href="/courses" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors text-sm">
+        <ArrowLeft className="w-4 h-4" /> Back to Courses
+      </Link>
+      <div className="flex flex-col items-center justify-center py-20 gap-4">
+        <Target className="w-10 h-10 text-muted-foreground" />
+        <p className="text-muted-foreground">This course could not be loaded.</p>
+        <Link href="/courses" className="px-5 py-2 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary text-sm font-semibold transition-colors border border-primary/20">
+          View all courses
+        </Link>
+      </div>
+    </div>
+  );
 
   const progress = Math.round((course.completedLessons / course.totalLessons) * 100) || 0;
 
