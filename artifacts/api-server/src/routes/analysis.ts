@@ -10,9 +10,110 @@ import {
   GetAnalysisSummaryResponse,
 } from "@workspace/api-zod";
 import { analyzePlayerGames } from "../lib/openaiAnalysis";
+import { randomUUID } from "crypto";
+import type { Logger } from "pino";
 
 const router: IRouter = Router();
 
+// In-memory job store for long-running analysis
+type AnalysisJobStatus = "pending" | "done" | "error";
+interface AnalysisJob {
+  status: AnalysisJobStatus;
+  error?: string;
+  createdAt: number;
+}
+const analysisJobs = new Map<string, AnalysisJob>();
+
+setInterval(() => {
+  const cutoff = Date.now() - 10 * 60 * 1000;
+  for (const [id, job] of analysisJobs) {
+    if (job.createdAt < cutoff) analysisJobs.delete(id);
+  }
+}, 5 * 60 * 1000);
+
+async function runAnalysisJob(username: string, jobId: string, log: Logger): Promise<void> {
+  try {
+    const games = await db
+      .select()
+      .from(gamesTable)
+      .where(eq(gamesTable.username, username.toLowerCase()))
+      .orderBy(desc(gamesTable.playedAt))
+      .limit(50);
+
+    if (games.length === 0) {
+      analysisJobs.set(jobId, { status: "error", error: "No games found. Import games first.", createdAt: Date.now() });
+      return;
+    }
+
+    const gameSummaries = games.map((g) => ({
+      pgn: g.pgn,
+      result: g.result,
+      opening: g.opening,
+      timeControl: g.timeControl,
+      whiteUsername: g.whiteUsername,
+      blackUsername: g.blackUsername,
+      whiteRating: g.whiteRating,
+      blackRating: g.blackRating,
+      gameId: g.id,
+    }));
+
+    const analysis = await analyzePlayerGames(username, gameSummaries);
+
+    await db.delete(weaknessesTable).where(eq(weaknessesTable.username, username.toLowerCase()));
+
+    for (const weakness of analysis.weaknesses) {
+      const relatedGameIds = (weakness.relatedGameIndices ?? [])
+        .filter((idx) => idx >= 0 && idx < games.length)
+        .map((idx) => games[idx].id)
+        .filter((id): id is number => typeof id === "number");
+
+      await db.insert(weaknessesTable).values({
+        username: username.toLowerCase(),
+        category: weakness.category,
+        severity: weakness.severity,
+        description: weakness.description,
+        frequency: weakness.frequency,
+        examples: weakness.examples,
+        relatedGameIds,
+      });
+    }
+
+    await db
+      .update(gamesTable)
+      .set({ analyzed: true })
+      .where(eq(gamesTable.username, username.toLowerCase()));
+
+    log.info({ jobId, username }, "Analysis job complete");
+    analysisJobs.set(jobId, { status: "done", createdAt: Date.now() });
+  } catch (err) {
+    log.error({ err, jobId }, "Analysis job failed");
+    const msg = err instanceof Error ? err.message : "Analysis failed";
+    analysisJobs.set(jobId, { status: "error", error: msg, createdAt: Date.now() });
+  }
+}
+
+// POST /api/analysis/start — kick off analysis, return jobId immediately
+router.post("/analysis/start", async (req, res): Promise<void> => {
+  const parsed = AnalyzeGamesBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+  const { username } = parsed.data;
+  const jobId = randomUUID();
+  analysisJobs.set(jobId, { status: "pending", createdAt: Date.now() });
+  res.json({ jobId });
+  runAnalysisJob(username.toLowerCase(), jobId, req.log).catch(() => {});
+});
+
+// GET /api/analysis/status/:jobId — poll for result
+router.get("/analysis/status/:jobId", (req, res): void => {
+  const job = analysisJobs.get(req.params.jobId as string);
+  if (!job) { res.status(404).json({ error: "Job not found" }); return; }
+  res.json({ status: job.status, error: job.error });
+});
+
+// POST /api/analysis/analyze — kept for backward compat (blocking, avoid in production)
 router.post("/analysis/analyze", async (req, res): Promise<void> => {
   const parsed = AnalyzeGamesBody.safeParse(req.body);
   if (!parsed.success) {
@@ -21,8 +122,7 @@ router.post("/analysis/analyze", async (req, res): Promise<void> => {
   }
 
   const { username } = parsed.data;
-
-  req.log.info({ username }, "Starting game analysis");
+  req.log.info({ username }, "Starting game analysis (blocking)");
 
   const games = await db
     .select()
@@ -53,7 +153,6 @@ router.post("/analysis/analyze", async (req, res): Promise<void> => {
   await db.delete(weaknessesTable).where(eq(weaknessesTable.username, username.toLowerCase()));
 
   for (const weakness of analysis.weaknesses) {
-    // Map relatedGameIndices back to real game IDs
     const relatedGameIds = (weakness.relatedGameIndices ?? [])
       .filter((idx) => idx >= 0 && idx < games.length)
       .map((idx) => games[idx].id)

@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useLocation } from 'wouter';
-import { useRunAnalysis, useMyAnalysisSummary, useMyWeaknesses } from '@/hooks/use-analysis';
+import { useMyAnalysisSummary, useMyWeaknesses } from '@/hooks/use-analysis';
 import { useUser } from '@/hooks/use-user';
+import { useQueryClient } from '@tanstack/react-query';
 import { BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { BrainCircuit, AlertTriangle, Activity, ChevronRight } from 'lucide-react';
+import { BrainCircuit, AlertTriangle, Activity, ChevronRight, Loader2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 const PIE_COLORS = ['#10b981', '#ef4444', '#64748b'];
@@ -11,12 +12,88 @@ const PIE_COLORS = ['#10b981', '#ef4444', '#64748b'];
 export function Analysis() {
   const [, navigate] = useLocation();
   const { username } = useUser();
-  const { analyze, isAnalyzing } = useRunAnalysis();
+  const queryClient = useQueryClient();
   const { data: summary, isLoading: loadingSummary } = useMyAnalysisSummary();
   const { data: weaknessesData, isLoading: loadingWeaknesses } = useMyWeaknesses();
 
-  const handleAnalyze = () => {
-    if (username) analyze(username);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [statusMsg, setStatusMsg] = useState('');
+  const [analyzeError, setAnalyzeError] = useState<string | null>(null);
+  const mountedRef = useRef(true);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, []);
+
+  const handleAnalyze = async () => {
+    if (!username || isAnalyzing) return;
+
+    setIsAnalyzing(true);
+    setAnalyzeError(null);
+    setStatusMsg('Starting AI analysis…');
+
+    try {
+      const startRes = await fetch('/api/analysis/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username }),
+      });
+      if (!startRes.ok) {
+        const j = await startRes.json().catch(() => ({})) as Record<string, unknown>;
+        throw new Error((j.error as string) || `Server error (${startRes.status})`);
+      }
+      const { jobId } = await startRes.json() as { jobId: string };
+
+      if (!mountedRef.current) return;
+      setStatusMsg('Analyzing your games with AI… this may take 30–60 seconds');
+
+      await new Promise<void>((resolve, reject) => {
+        intervalRef.current = setInterval(async () => {
+          if (!mountedRef.current) {
+            if (intervalRef.current) clearInterval(intervalRef.current);
+            resolve();
+            return;
+          }
+          try {
+            const pollRes = await fetch(`/api/analysis/status/${jobId}`);
+            if (!pollRes.ok) {
+              if (intervalRef.current) clearInterval(intervalRef.current);
+              reject(new Error(`Poll error (${pollRes.status})`));
+              return;
+            }
+            const job = await pollRes.json() as { status: string; error?: string };
+            if (job.status === 'done') {
+              if (intervalRef.current) clearInterval(intervalRef.current);
+              resolve();
+            } else if (job.status === 'error') {
+              if (intervalRef.current) clearInterval(intervalRef.current);
+              reject(new Error(job.error || 'Analysis failed. Please try again.'));
+            }
+          } catch (err) {
+            if (intervalRef.current) clearInterval(intervalRef.current);
+            reject(err);
+          }
+        }, 3000);
+      });
+
+      if (!mountedRef.current) return;
+      await queryClient.invalidateQueries({ queryKey: ['/api/analysis/weaknesses'] });
+      await queryClient.invalidateQueries({ queryKey: ['/api/analysis/summary'] });
+      setStatusMsg('');
+    } catch (err: unknown) {
+      if (!mountedRef.current) return;
+      setAnalyzeError(err instanceof Error ? err.message : 'Something went wrong. Please try again.');
+    } finally {
+      if (mountedRef.current) {
+        setIsAnalyzing(false);
+        setStatusMsg('');
+      }
+    }
   };
 
   const pieData = summary ? [
@@ -26,7 +103,6 @@ export function Analysis() {
   ] : [];
 
   const openingData = summary?.openingStats?.slice(0, 5).map(o => {
-    // Truncate long opening names to fit in chart labels
     const words = o.opening.split(' ');
     const short = words.length > 4 ? words.slice(0, 4).join(' ') + '…' : o.opening;
     return {
@@ -56,19 +132,40 @@ export function Analysis() {
           className="relative z-10 shrink-0 px-8 py-4 rounded-xl font-bold bg-primary text-primary-foreground shadow-[0_0_20px_rgba(202,138,4,0.3)] hover:shadow-[0_0_30px_rgba(202,138,4,0.5)] transition-all disabled:opacity-50 hover:-translate-y-1 active:translate-y-0 flex items-center gap-3"
         >
           {isAnalyzing ? (
-            <><div className="w-5 h-5 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin"></div> Processing...</>
+            <><Loader2 className="w-5 h-5 animate-spin" /> Processing...</>
           ) : (
             <><Activity className="w-5 h-5" /> Run Deep Analysis</>
           )}
         </button>
       </div>
 
+      {isAnalyzing && statusMsg && (
+        <motion.div
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="p-4 rounded-xl bg-primary/8 border border-primary/20 text-primary flex items-center gap-3"
+        >
+          <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+          <span className="text-sm">{statusMsg}</span>
+        </motion.div>
+      )}
+
+      {analyzeError && (
+        <motion.div
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="p-4 rounded-xl bg-destructive/15 border border-destructive/30 text-red-400 flex items-center gap-2"
+        >
+          <AlertTriangle className="w-4 h-4 shrink-0" />
+          {analyzeError}
+        </motion.div>
+      )}
+
       {(loadingSummary || loadingWeaknesses) && !isAnalyzing ? (
         <div className="flex justify-center py-20"><div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin"></div></div>
       ) : summary ? (
         <>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Charts */}
             <div className="glass-card p-6 rounded-2xl space-y-8">
               <h2 className="text-xl font-bold mb-6">Performance Breakdown</h2>
               

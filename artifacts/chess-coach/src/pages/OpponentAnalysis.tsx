@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Swords, Search, Target, AlertTriangle, TrendingUp, ChevronDown, ChevronUp, Loader2, User, Users, Zap, Clock, Star } from 'lucide-react';
 import { useUser } from '@/hooks/use-user';
@@ -70,6 +70,16 @@ export function OpponentAnalysis() {
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<OpponentResult | null>(null);
   const [expandedWeakness, setExpandedWeakness] = useState<number | null>(null);
+  const mountedRef = useRef(true);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, []);
 
   const handleAnalyze = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -82,7 +92,6 @@ export function OpponentAnalysis() {
     setStatusMsg('Starting analysis…');
 
     try {
-      // Step 1: start the job — returns immediately with a jobId
       const startRes = await fetch('/api/opponents/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-chess-username': username ?? '' },
@@ -93,35 +102,47 @@ export function OpponentAnalysis() {
         throw new Error((j.error as string) || `Server error (${startRes.status})`);
       }
       const { jobId } = await startRes.json() as { jobId: string };
+
+      if (!mountedRef.current) return;
       setStatusMsg('Fetching games & running AI analysis… this may take 30–60 seconds');
 
-      // Step 2: poll every 3 seconds until done
       await new Promise<void>((resolve, reject) => {
-        const interval = setInterval(async () => {
+        intervalRef.current = setInterval(async () => {
+          if (!mountedRef.current) {
+            if (intervalRef.current) clearInterval(intervalRef.current);
+            resolve();
+            return;
+          }
           try {
             const pollRes = await fetch(`/api/opponents/status/${jobId}`);
-            if (!pollRes.ok) { clearInterval(interval); reject(new Error(`Poll error (${pollRes.status})`)); return; }
+            if (!pollRes.ok) {
+              if (intervalRef.current) clearInterval(intervalRef.current);
+              reject(new Error(`Poll error (${pollRes.status})`));
+              return;
+            }
             const job = await pollRes.json() as { status: string; result?: OpponentResult; error?: string };
             if (job.status === 'done') {
-              clearInterval(interval);
-              setResult(job.result!);
-              setStatusMsg('');
+              if (intervalRef.current) clearInterval(intervalRef.current);
+              if (mountedRef.current) { setResult(job.result!); setStatusMsg(''); }
               resolve();
             } else if (job.status === 'error') {
-              clearInterval(interval);
+              if (intervalRef.current) clearInterval(intervalRef.current);
               reject(new Error(job.error || 'Analysis failed. Please try again.'));
             }
           } catch (err) {
-            clearInterval(interval);
+            if (intervalRef.current) clearInterval(intervalRef.current);
             reject(err);
           }
         }, 3000);
       });
     } catch (err: unknown) {
+      if (!mountedRef.current) return;
       setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.');
     } finally {
-      setLoading(false);
-      setStatusMsg('');
+      if (mountedRef.current) {
+        setLoading(false);
+        setStatusMsg('');
+      }
     }
   };
 
