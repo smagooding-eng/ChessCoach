@@ -1,6 +1,75 @@
 import { logger } from "./logger";
 import { Chess } from "chess.js";
 
+export interface ChessComProfile {
+  username: string;
+  name?: string;
+  title?: string;
+  avatar?: string;
+  country?: string;
+  followers?: number;
+  joined?: number;
+  lastOnline?: number;
+  url?: string;
+  ratings?: {
+    bullet?: number;
+    blitz?: number;
+    rapid?: number;
+  };
+}
+
+export async function fetchChessComProfile(username: string): Promise<ChessComProfile | null> {
+  const lower = username.toLowerCase();
+  try {
+    const [profileRes, statsRes] = await Promise.all([
+      fetch(`https://api.chess.com/pub/player/${lower}`, { headers: { "User-Agent": "ChessCoach/1.0" } }),
+      fetch(`https://api.chess.com/pub/player/${lower}/stats`, { headers: { "User-Agent": "ChessCoach/1.0" } }),
+    ]);
+
+    if (!profileRes.ok) return null;
+
+    const profile = (await profileRes.json()) as Record<string, unknown>;
+    let ratings: ChessComProfile["ratings"] = {};
+
+    if (statsRes.ok) {
+      const stats = (await statsRes.json()) as Record<string, unknown>;
+      const get = (key: string) => {
+        const section = stats[key] as Record<string, unknown> | undefined;
+        const last = section?.last as Record<string, unknown> | undefined;
+        return typeof last?.rating === "number" ? last.rating : undefined;
+      };
+      ratings = {
+        bullet: get("chess_bullet"),
+        blitz: get("chess_blitz"),
+        rapid: get("chess_rapid"),
+      };
+    }
+
+    // Extract country code from country URL
+    let country: string | undefined;
+    if (typeof profile.country === "string") {
+      const parts = profile.country.split("/");
+      country = parts[parts.length - 1];
+    }
+
+    return {
+      username: lower,
+      name: typeof profile.name === "string" ? profile.name : undefined,
+      title: typeof profile.title === "string" ? profile.title : undefined,
+      avatar: typeof profile.avatar === "string" ? profile.avatar : undefined,
+      country,
+      followers: typeof profile.followers === "number" ? profile.followers : undefined,
+      joined: typeof profile.joined === "number" ? profile.joined : undefined,
+      lastOnline: typeof profile.last_online === "number" ? profile.last_online : undefined,
+      url: typeof profile.url === "string" ? profile.url : undefined,
+      ratings,
+    };
+  } catch (err) {
+    logger.warn({ err, username }, "Failed to fetch chess.com profile");
+    return null;
+  }
+}
+
 interface ChessComArchive {
   archives: string[];
 }
@@ -91,16 +160,31 @@ export function extractGameMetadata(game: ChessComGame, username: string) {
   };
 }
 
-function extractOpeningFromPgn(pgn: string): { opening: string | null; eco: string | null } {
+export function extractOpeningFromPgn(pgn: string): { opening: string | null; eco: string | null } {
   if (!pgn) return { opening: null, eco: null };
 
   const ecoMatch = pgn.match(/\[ECO "([^"]+)"\]/);
-  const openingMatch = pgn.match(/\[Opening "([^"]+)"\]/);
 
-  return {
-    eco: ecoMatch ? ecoMatch[1] : null,
-    opening: openingMatch ? openingMatch[1] : null,
-  };
+  // Try explicit [Opening "..."] tag first
+  const openingMatch = pgn.match(/\[Opening "([^"]+)"\]/);
+  if (openingMatch) {
+    return { eco: ecoMatch ? ecoMatch[1] : null, opening: openingMatch[1] };
+  }
+
+  // Fall back to [ECOUrl "https://www.chess.com/openings/Opening-Name-Here"]
+  const ecoUrlMatch = pgn.match(/\[ECOUrl "https:\/\/www\.chess\.com\/openings\/([^"]+)"\]/);
+  if (ecoUrlMatch) {
+    // Convert URL slug to readable name: "Nimzo-Indian-Defense-Bishop-Attack" → "Nimzo Indian Defense Bishop Attack"
+    const opening = ecoUrlMatch[1]
+      .replace(/-%2B-/g, '+ ')
+      .replace(/%2B/g, '+')
+      .replace(/-/g, ' ')
+      .replace(/\s{2,}/g, ' ')
+      .trim();
+    return { eco: ecoMatch ? ecoMatch[1] : null, opening: opening || null };
+  }
+
+  return { eco: ecoMatch ? ecoMatch[1] : null, opening: null };
 }
 
 const START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";

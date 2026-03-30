@@ -9,34 +9,56 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
+function renderInline(text: string): React.ReactNode {
+  // Render **bold** inline
+  const parts = text.split(/(\*\*[^*]+\*\*)/g);
+  if (parts.length === 1) return text;
+  return parts.map((part, i) =>
+    part.startsWith('**') && part.endsWith('**')
+      ? <strong key={i} className="font-semibold text-foreground">{part.slice(2, -2)}</strong>
+      : part
+  );
+}
+
 function LessonContent({ content }: { content: string }) {
   const paragraphs = content.split(/\n\n+/).filter(Boolean);
   return (
     <div className="space-y-4">
       {paragraphs.map((p, i) => {
         const trimmed = p.trim();
-        if (trimmed.startsWith('- ') || trimmed.includes('\n- ')) {
-          const items = trimmed.split('\n').filter(l => l.trim());
+
+        // ### Heading (level 3)
+        if (trimmed.startsWith('### ')) {
+          return <h4 key={i} className="text-sm font-bold text-muted-foreground uppercase tracking-wider mt-3">{trimmed.slice(4)}</h4>;
+        }
+        // ## Heading (level 2)
+        if (trimmed.startsWith('## ')) {
+          return <h4 key={i} className="text-base font-bold text-primary mt-1">{trimmed.slice(3)}</h4>;
+        }
+        // # Heading (level 1)
+        if (trimmed.startsWith('# ')) {
+          return <h3 key={i} className="text-lg font-bold mt-2">{trimmed.slice(2)}</h3>;
+        }
+
+        // Bullet list — lines starting with -, *, or •
+        const lines = trimmed.split('\n');
+        const isList = lines.every(l => /^[-*•]\s/.test(l.trim()) || l.trim() === '');
+        if (isList && lines.some(l => /^[-*•]\s/.test(l.trim()))) {
           return (
             <ul key={i} className="space-y-2.5">
-              {items.map((item, j) => (
+              {lines.filter(l => l.trim()).map((item, j) => (
                 <li key={j} className="flex items-start gap-2.5 text-foreground/80 text-sm leading-relaxed">
                   <span className="text-primary mt-1 shrink-0">▸</span>
-                  <span>{item.replace(/^[-•]\s*/, '')}</span>
+                  <span>{renderInline(item.replace(/^[-*•]\s*/, ''))}</span>
                 </li>
               ))}
             </ul>
           );
         }
-        if (trimmed.startsWith('# ')) {
-          return <h3 key={i} className="text-lg font-bold mt-2">{trimmed.slice(2)}</h3>;
-        }
-        if (trimmed.startsWith('## ')) {
-          return <h4 key={i} className="text-base font-bold text-primary mt-1">{trimmed.slice(3)}</h4>;
-        }
+
         return (
           <p key={i} className="text-foreground/80 text-sm leading-relaxed">
-            {trimmed}
+            {renderInline(trimmed)}
           </p>
         );
       })}

@@ -429,9 +429,9 @@ export function GameReplay() {
                     <span>Finding engine's best move…</span></>
                 : bestMoveSan
                 ? <><Cpu className="w-4 h-4 shrink-0" />
-                    <span><strong>Practice Mode</strong> — click a piece then a square. Engine target: <span className="font-mono font-bold text-white">{bestMoveSan}</span></span></>
+                    <span><strong>Practice Mode</strong> — drag or click to move. Engine target: <span className="font-mono font-bold text-white">{bestMoveSan}</span></span></>
                 : <><Zap className="w-4 h-4 shrink-0" />
-                    <span><strong>Practice Mode</strong> — click a piece then a square to play. Any legal move accepted.</span></>}
+                    <span><strong>Practice Mode</strong> — drag or click a piece to try any legal move.</span></>}
             </div>
           )}
 
@@ -639,7 +639,7 @@ export function GameReplay() {
               };
 
               return (
-                <div key={i} className="flex items-center gap-0.5 text-sm">
+                <div key={i} className={`flex items-center gap-0.5 text-sm rounded-lg ${i % 2 === 0 ? '' : 'bg-white/[0.02]'}`}>
                   <span className="w-7 text-muted-foreground font-mono text-xs shrink-0 text-right pr-1">{i + 1}.</span>
                   <MoveBtn moveIndex={wi} move={wm} cls={wClass} />
                   <MoveBtn moveIndex={bi} move={bm} cls={bClass} />

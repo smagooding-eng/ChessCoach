@@ -30,7 +30,6 @@ function ProtectedRoute({ component: Component }: { component: React.ComponentTy
 
   useEffect(() => {
     if (isLoaded && !username) {
-      // Replace so pressing Back doesn't loop back to a protected route
       navigate('/setup', { replace: true } as never);
     }
   }, [isLoaded, username, navigate]);
@@ -51,23 +50,35 @@ function ProtectedRoute({ component: Component }: { component: React.ComponentTy
   );
 }
 
+// Define stable named wrappers outside of Router to prevent remounting on every render
+const PDashboard     = () => <ProtectedRoute component={Dashboard} />;
+const PImport        = () => <ProtectedRoute component={Import} />;
+const PGames         = () => <ProtectedRoute component={Games} />;
+const PGameReplay    = () => <ProtectedRoute component={GameReplay} />;
+const PAnalysis      = () => <ProtectedRoute component={Analysis} />;
+const PWeakness      = () => <ProtectedRoute component={WeaknessDetail} />;
+const PCourses       = () => <ProtectedRoute component={Courses} />;
+const PCourseDetail  = () => <ProtectedRoute component={CourseDetail} />;
+const POpenings      = () => <ProtectedRoute component={Openings} />;
+const POpponents     = () => <ProtectedRoute component={OpponentAnalysis} />;
+
 function Router() {
   return (
     <Switch>
       <Route path="/setup" component={Setup} />
-      
-      {/* Protected Routes */}
-      <Route path="/" component={() => <ProtectedRoute component={Dashboard} />} />
-      <Route path="/import" component={() => <ProtectedRoute component={Import} />} />
-      <Route path="/games" component={() => <ProtectedRoute component={Games} />} />
-      <Route path="/games/:id" component={() => <ProtectedRoute component={GameReplay} />} />
-      <Route path="/analysis" component={() => <ProtectedRoute component={Analysis} />} />
-      <Route path="/analysis/:id" component={() => <ProtectedRoute component={WeaknessDetail} />} />
-      <Route path="/courses" component={() => <ProtectedRoute component={Courses} />} />
-      <Route path="/courses/:id" component={() => <ProtectedRoute component={CourseDetail} />} />
-      <Route path="/openings" component={() => <ProtectedRoute component={Openings} />} />
-      <Route path="/opponents" component={() => <ProtectedRoute component={OpponentAnalysis} />} />
-      
+
+      {/* Protected Routes — stable named components prevent remounting on every render */}
+      <Route path="/"            component={PDashboard} />
+      <Route path="/import"      component={PImport} />
+      <Route path="/games"       component={PGames} />
+      <Route path="/games/:id"   component={PGameReplay} />
+      <Route path="/analysis"    component={PAnalysis} />
+      <Route path="/analysis/:id" component={PWeakness} />
+      <Route path="/courses"     component={PCourses} />
+      <Route path="/courses/:id" component={PCourseDetail} />
+      <Route path="/openings"    component={POpenings} />
+      <Route path="/opponents"   component={POpponents} />
+
       <Route component={NotFound} />
     </Switch>
   );

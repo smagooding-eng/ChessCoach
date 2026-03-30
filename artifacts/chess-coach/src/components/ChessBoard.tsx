@@ -69,7 +69,7 @@ export function ChessBoard({
     }
   }, [selectedSquare, position, practiceMode]);
 
-  const tryMove = useCallback((from: string, to: string) => {
+  const tryMove = useCallback((from: string, to: string): boolean => {
     try {
       const chess = new Chess(position);
       const move = chess.move({ from, to, promotion: 'q' });
@@ -84,6 +84,26 @@ export function ChessBoard({
       return false;
     }
   }, [position, expectedMoveSan, onMovePlayed]);
+
+  // Drag-and-drop handler for practice mode
+  const handlePieceDrop = useCallback(({ sourceSquare, targetSquare }: { piece: unknown; sourceSquare: string; targetSquare: string | null }) => {
+    if (!practiceMode || !targetSquare) return false;
+    setSelectedSquare(null);
+    return tryMove(sourceSquare, targetSquare);
+  }, [practiceMode, tryMove]);
+
+  // Determine which pieces can be dragged (only the side to move)
+  const canDragPiece = useCallback(({ piece }: { piece: { pieceType: string } | null }) => {
+    if (!practiceMode || !piece) return false;
+    try {
+      const chess = new Chess(position);
+      const turn = chess.turn(); // 'w' or 'b'
+      const pieceColor = piece.pieceType[0].toLowerCase();
+      return pieceColor === turn;
+    } catch {
+      return false;
+    }
+  }, [practiceMode, position]);
 
   const handleSquareClick = useCallback(({ square, piece }: { square: string; piece: { pieceType: string } | null }) => {
     if (!practiceMode) return;
@@ -170,7 +190,9 @@ export function ChessBoard({
         options={{
           position,
           boardOrientation: flipped ? 'black' : 'white',
-          allowDragging: false,
+          allowDragging: practiceMode,
+          canDragPiece,
+          onPieceDrop: handlePieceDrop,
           squareStyles,
           onSquareClick: handleSquareClick,
           boardStyle: {

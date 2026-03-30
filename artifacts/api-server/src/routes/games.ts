@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db, gamesTable } from "@workspace/db";
-import { eq, desc, count } from "drizzle-orm";
+import { eq, desc, count, isNull } from "drizzle-orm";
 import {
   ImportGamesBody,
   ImportGamesResponse,
@@ -11,7 +11,7 @@ import {
   GetGameParams,
   GetGameReplayParams,
 } from "@workspace/api-zod";
-import { fetchChessComGames, extractGameMetadata, parsePgnMoves } from "../lib/chesscom";
+import { fetchChessComGames, extractGameMetadata, parsePgnMoves, extractOpeningFromPgn } from "../lib/chesscom";
 import { analyzeMoves, analyzeSingleMove } from "../lib/openaiAnalysis";
 
 const router: IRouter = Router();
@@ -111,6 +111,28 @@ router.get("/games", async (req, res): Promise<void> => {
       total: Number(total),
     })
   );
+});
+
+// One-time utility: re-extract opening names from PGN for all games with null opening
+router.post("/games/fix-openings", async (req, res): Promise<void> => {
+  const nullOpeningGames = await db
+    .select({ id: gamesTable.id, pgn: gamesTable.pgn })
+    .from(gamesTable)
+    .where(isNull(gamesTable.opening));
+
+  let updated = 0;
+  for (const game of nullOpeningGames) {
+    const { opening, eco } = extractOpeningFromPgn(game.pgn);
+    if (opening) {
+      await db
+        .update(gamesTable)
+        .set({ opening, eco })
+        .where(eq(gamesTable.id, game.id));
+      updated++;
+    }
+  }
+
+  res.json({ total: nullOpeningGames.length, updated });
 });
 
 router.get("/games/openings", async (req, res): Promise<void> => {

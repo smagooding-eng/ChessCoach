@@ -25,11 +25,16 @@ export function Analysis() {
     { name: 'Draws', value: summary.draws },
   ] : [];
 
-  const openingData = summary?.openingStats?.slice(0, 5).map(o => ({
-    name: o.opening.split(':')[0], // Simplify long names
-    games: o.games,
-    winRate: Math.round((o.wins / o.games) * 100)
-  })) || [];
+  const openingData = summary?.openingStats?.slice(0, 5).map(o => {
+    // Truncate long opening names to fit in chart labels
+    const words = o.opening.split(' ');
+    const short = words.length > 4 ? words.slice(0, 4).join(' ') + '…' : o.opening;
+    return {
+      name: short,
+      games: o.games,
+      winRate: Math.round((o.wins / o.games) * 100),
+    };
+  }) || [];
 
   return (
     <div className="space-y-8 pb-10">
@@ -113,9 +118,9 @@ export function Analysis() {
               <h2 className="text-xl font-bold mb-6">Top Openings Win Rate</h2>
               <div className="h-64 w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={openingData} layout="vertical" margin={{ left: 0, right: 20 }}>
+                  <BarChart data={openingData} layout="vertical" margin={{ left: 0, right: 24 }}>
                     <XAxis type="number" domain={[0, 100]} hide />
-                    <YAxis dataKey="name" type="category" width={120} tick={{fill: '#94a3b8', fontSize: 12}} axisLine={false} tickLine={false} />
+                    <YAxis dataKey="name" type="category" width={150} tick={{fill: '#94a3b8', fontSize: 11}} axisLine={false} tickLine={false} />
                     <RechartsTooltip 
                       cursor={{fill: 'rgba(255,255,255,0.05)'}}
                       contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px', color: '#fff' }}

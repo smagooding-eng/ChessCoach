@@ -1,14 +1,36 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Swords, Search, Target, AlertTriangle, TrendingUp, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
+import { Swords, Search, Target, AlertTriangle, TrendingUp, ChevronDown, ChevronUp, Loader2, User, Users, Zap, Clock, Star } from 'lucide-react';
 import { useUser } from '@/hooks/use-user';
+
+interface Profile {
+  username: string;
+  name?: string;
+  title?: string;
+  avatar?: string;
+  country?: string;
+  followers?: number;
+  joined?: number;
+  lastOnline?: number;
+  url?: string;
+  ratings?: { bullet?: number; blitz?: number; rapid?: number };
+}
+
+interface HeadToHead {
+  wins: number;
+  losses: number;
+  draws: number;
+  total: number;
+}
 
 interface OpponentResult {
   username: string;
+  profile?: Profile | null;
   gamesAnalyzed: number;
   wins: number;
   losses: number;
   draws: number;
+  headToHead?: HeadToHead | null;
   weaknesses: Array<{
     category: string;
     severity: string;
@@ -25,9 +47,19 @@ interface OpponentResult {
 
 const SEV_STYLES: Record<string, string> = {
   Critical: 'bg-red-500/15 text-red-400 border-red-500/30',
-  High: 'bg-orange-500/15 text-orange-400 border-orange-500/30',
-  Medium: 'bg-amber-500/15 text-amber-400 border-amber-500/30',
-  Low: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
+  High:     'bg-orange-500/15 text-orange-400 border-orange-500/30',
+  Medium:   'bg-amber-500/15 text-amber-400 border-amber-500/30',
+  Low:      'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
+};
+
+const TITLE_COLORS: Record<string, string> = {
+  GM: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/40',
+  IM: 'bg-orange-500/20 text-orange-400 border-orange-500/40',
+  FM: 'bg-blue-500/20 text-blue-400 border-blue-500/40',
+  CM: 'bg-green-500/20 text-green-400 border-green-500/40',
+  NM: 'bg-purple-500/20 text-purple-400 border-purple-500/40',
+  WGM: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/40',
+  WIM: 'bg-orange-500/20 text-orange-400 border-orange-500/40',
 };
 
 export function OpponentAnalysis() {
@@ -67,7 +99,7 @@ export function OpponentAnalysis() {
   const winPct = totalGames > 0 ? Math.round((result!.wins / totalGames) * 100) : 0;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 pb-10">
       {/* Header */}
       <div>
         <div className="flex items-center gap-3 mb-1">
@@ -87,7 +119,7 @@ export function OpponentAnalysis() {
             type="text"
             value={inputUsername}
             onChange={e => setInputUsername(e.target.value)}
-            placeholder="chess.com username..."
+            placeholder="chess.com username…"
             className="w-full pl-10 pr-4 py-3 bg-secondary/70 border border-border rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/60 transition-all"
             disabled={loading}
           />
@@ -117,8 +149,9 @@ export function OpponentAnalysis() {
       {/* Loading skeleton */}
       {loading && (
         <div className="space-y-4">
+          <div className="h-32 rounded-2xl bg-secondary/40 animate-pulse" />
           {[1, 2, 3].map(i => (
-            <div key={i} className="h-24 rounded-2xl bg-secondary/40 animate-pulse" />
+            <div key={i} className="h-20 rounded-xl bg-secondary/30 animate-pulse" />
           ))}
           <p className="text-center text-muted-foreground text-sm animate-pulse">
             Fetching games and running AI analysis…
@@ -134,23 +167,106 @@ export function OpponentAnalysis() {
             animate={{ opacity: 1, y: 0 }}
             className="space-y-6"
           >
-            {/* Player header */}
-            <div className="glass-card rounded-2xl p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div>
-                <h2 className="text-2xl font-display font-bold flex items-center gap-2">
-                  <span className="text-primary">♟</span>
-                  {result.username}
-                </h2>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Analysis based on {result.gamesAnalyzed} recent games
-                </p>
+            {/* Profile + stats header */}
+            <div className="glass-card rounded-2xl p-6">
+              <div className="flex flex-col sm:flex-row gap-6">
+                {/* Avatar + identity */}
+                <div className="flex items-start gap-4">
+                  {result.profile?.avatar ? (
+                    <img
+                      src={result.profile.avatar}
+                      alt={result.username}
+                      className="w-16 h-16 rounded-full border-2 border-primary/30 object-cover"
+                    />
+                  ) : (
+                    <div className="w-16 h-16 rounded-full bg-secondary flex items-center justify-center border-2 border-border">
+                      <User className="w-8 h-8 text-muted-foreground" />
+                    </div>
+                  )}
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {result.profile?.title && (
+                        <span className={`px-2 py-0.5 rounded text-xs font-bold border ${TITLE_COLORS[result.profile.title] ?? TITLE_COLORS.NM}`}>
+                          {result.profile.title}
+                        </span>
+                      )}
+                      <h2 className="text-2xl font-display font-bold">
+                        {result.profile?.name || result.username}
+                      </h2>
+                    </div>
+                    {result.profile?.name && (
+                      <p className="text-sm text-muted-foreground mt-0.5">@{result.username}</p>
+                    )}
+                    <div className="flex items-center gap-3 mt-2 flex-wrap">
+                      {result.profile?.ratings?.blitz && (
+                        <span className="text-xs text-muted-foreground flex items-center gap-1">
+                          <Zap className="w-3 h-3 text-primary" /> {result.profile.ratings.blitz} Blitz
+                        </span>
+                      )}
+                      {result.profile?.ratings?.rapid && (
+                        <span className="text-xs text-muted-foreground flex items-center gap-1">
+                          <Clock className="w-3 h-3 text-blue-400" /> {result.profile.ratings.rapid} Rapid
+                        </span>
+                      )}
+                      {result.profile?.ratings?.bullet && (
+                        <span className="text-xs text-muted-foreground flex items-center gap-1">
+                          <Star className="w-3 h-3 text-amber-400" /> {result.profile.ratings.bullet} Bullet
+                        </span>
+                      )}
+                      {result.profile?.followers && (
+                        <span className="text-xs text-muted-foreground flex items-center gap-1">
+                          <Users className="w-3 h-3" /> {result.profile.followers.toLocaleString()} followers
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Win/loss stats */}
+                <div className="sm:ml-auto flex flex-col items-start sm:items-end justify-center gap-3">
+                  <p className="text-xs text-muted-foreground">Based on {result.gamesAnalyzed} recent games</p>
+                  <div className="flex gap-4">
+                    <Stat label="Wins"   value={result.wins}   color="text-emerald-400" />
+                    <Stat label="Losses" value={result.losses} color="text-red-400" />
+                    <Stat label="Draws"  value={result.draws}  color="text-muted-foreground" />
+                    <Stat label="Win %"  value={`${winPct}%`}  color="text-primary" />
+                  </div>
+                  {/* W/L/D bar */}
+                  <div className="flex w-full sm:w-48 h-2 rounded-full overflow-hidden gap-0.5">
+                    <div className="bg-emerald-500 rounded-l-full" style={{ width: `${(result.wins / totalGames) * 100}%` }} />
+                    <div className="bg-secondary" style={{ width: `${(result.draws / totalGames) * 100}%` }} />
+                    <div className="bg-red-500 rounded-r-full" style={{ width: `${(result.losses / totalGames) * 100}%` }} />
+                  </div>
+                </div>
               </div>
-              <div className="flex gap-6">
-                <Stat label="Wins" value={result.wins} color="text-emerald-400" />
-                <Stat label="Losses" value={result.losses} color="text-red-400" />
-                <Stat label="Draws" value={result.draws} color="text-muted-foreground" />
-                <Stat label="Win %" value={`${winPct}%`} color="text-primary" />
-              </div>
+
+              {/* Head-to-head section */}
+              {result.headToHead && result.headToHead.total > 0 && (
+                <div className="mt-5 pt-5 border-t border-border/50">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                    <Swords className="w-3.5 h-3.5 text-primary" /> Your Head-to-Head Record
+                  </p>
+                  <div className="flex items-center gap-6">
+                    <div className="flex gap-4">
+                      <div className="text-center">
+                        <div className="text-xl font-bold text-emerald-400">{result.headToHead.wins}</div>
+                        <div className="text-xs text-muted-foreground">Your Wins</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-xl font-bold text-muted-foreground">{result.headToHead.draws}</div>
+                        <div className="text-xs text-muted-foreground">Draws</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-xl font-bold text-red-400">{result.headToHead.losses}</div>
+                        <div className="text-xs text-muted-foreground">Your Losses</div>
+                      </div>
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {result.headToHead.total} game{result.headToHead.total !== 1 ? 's' : ''} played
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -225,48 +341,50 @@ export function OpponentAnalysis() {
                 ))}
               </div>
 
-              {/* Top Openings */}
-              <div>
-                <h3 className="text-lg font-bold flex items-center gap-2 mb-4">
-                  <TrendingUp className="w-5 h-5 text-accent" />
-                  Favourite Openings
-                </h3>
-                <div className="space-y-3">
-                  {result.topOpenings.map((o, i) => (
-                    <motion.div
-                      key={i}
-                      initial={{ opacity: 0, x: 10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: i * 0.07 }}
-                      className="glass-card rounded-xl p-4"
-                    >
-                      <div className="flex items-start justify-between gap-2 mb-2">
-                        <span className="text-sm font-medium leading-snug line-clamp-2">{o.opening || 'Unknown'}</span>
-                        <span className="text-xs text-muted-foreground shrink-0">{o.games}g</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <div className="flex-1 h-1.5 bg-secondary rounded-full overflow-hidden">
-                          <div
-                            className={`h-full rounded-full ${o.winRate >= 60 ? 'bg-emerald-500' : o.winRate >= 45 ? 'bg-amber-500' : 'bg-red-500'}`}
-                            style={{ width: `${o.winRate}%` }}
-                          />
+              {/* Right column: Top Openings + Scout Tip */}
+              <div className="space-y-6">
+                <div>
+                  <h3 className="text-lg font-bold flex items-center gap-2 mb-4">
+                    <TrendingUp className="w-5 h-5 text-accent" />
+                    Favourite Openings
+                  </h3>
+                  <div className="space-y-3">
+                    {result.topOpenings.map((o, i) => (
+                      <motion.div
+                        key={i}
+                        initial={{ opacity: 0, x: 10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: i * 0.07 }}
+                        className="glass-card rounded-xl p-4"
+                      >
+                        <div className="flex items-start justify-between gap-2 mb-2">
+                          <span className="text-sm font-medium leading-snug line-clamp-2">{o.opening || 'Unknown'}</span>
+                          <span className="text-xs text-muted-foreground shrink-0">{o.games}g</span>
                         </div>
-                        <span className={`text-xs font-bold ${o.winRate >= 60 ? 'text-emerald-400' : o.winRate >= 45 ? 'text-amber-400' : 'text-red-400'}`}>
-                          {o.winRate}%
-                        </span>
-                      </div>
-                    </motion.div>
-                  ))}
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 h-1.5 bg-secondary rounded-full overflow-hidden">
+                            <div
+                              className={`h-full rounded-full ${o.winRate >= 60 ? 'bg-emerald-500' : o.winRate >= 45 ? 'bg-amber-500' : 'bg-red-500'}`}
+                              style={{ width: `${o.winRate}%` }}
+                            />
+                          </div>
+                          <span className={`text-xs font-bold ${o.winRate >= 60 ? 'text-emerald-400' : o.winRate >= 45 ? 'text-amber-400' : 'text-red-400'}`}>
+                            {o.winRate}%
+                          </span>
+                        </div>
+                      </motion.div>
+                    ))}
+                  </div>
                 </div>
 
                 {/* Scout tip box */}
-                <div className="mt-6 p-4 rounded-xl bg-primary/10 border border-primary/20">
+                <div className="p-4 rounded-xl bg-primary/10 border border-primary/20">
                   <div className="flex gap-2">
                     <Target className="w-4 h-4 text-primary mt-0.5 shrink-0" />
                     <div>
-                      <p className="text-xs font-bold text-primary mb-1">Scout Tip</p>
+                      <p className="text-xs font-bold text-primary mb-1">Preparation Tip</p>
                       <p className="text-xs text-muted-foreground">
-                        Target their highest-severity weaknesses early. Check their opening win rates and steer towards lines where they score poorly.
+                        Target their highest-severity weaknesses early. Steer towards openings where they score poorly — that's your edge.
                       </p>
                     </div>
                   </div>

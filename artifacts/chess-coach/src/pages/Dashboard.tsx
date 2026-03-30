@@ -55,8 +55,8 @@ export function Dashboard() {
             backgroundSize: '40px 40px',
           }}
         />
-        <div className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
+        <div className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-6">
+          <div className="flex-1">
             <p className="text-muted-foreground text-sm mb-1">Welcome back,</p>
             <h1 className="text-3xl font-display font-bold text-gradient">{username}</h1>
             <p className="text-muted-foreground mt-1 text-sm">
@@ -64,8 +64,24 @@ export function Dashboard() {
                 ? `${summary.totalGames} games analysed · ${winRate}% win rate`
                 : 'Import your games to start coaching'}
             </p>
+
+            {/* W/L/D mini bar */}
+            {summary?.totalGames ? (
+              <div className="mt-3 max-w-xs">
+                <div className="flex h-2 rounded-full overflow-hidden gap-0.5">
+                  <div className="bg-emerald-500 rounded-l-full" style={{ width: `${(summary.wins / summary.totalGames) * 100}%` }} title={`${summary.wins} wins`} />
+                  <div className="bg-slate-500" style={{ width: `${(summary.draws / summary.totalGames) * 100}%` }} title={`${summary.draws} draws`} />
+                  <div className="bg-red-500 rounded-r-full" style={{ width: `${(summary.losses / summary.totalGames) * 100}%` }} title={`${summary.losses} losses`} />
+                </div>
+                <div className="flex gap-4 mt-1.5">
+                  <span className="text-xs text-emerald-400">{summary.wins}W</span>
+                  <span className="text-xs text-muted-foreground">{summary.draws}D</span>
+                  <span className="text-xs text-red-400">{summary.losses}L</span>
+                </div>
+              </div>
+            ) : null}
           </div>
-          <div className="flex gap-3">
+          <div className="flex gap-3 shrink-0">
             <Link href="/import">
               <button className="px-5 py-2.5 rounded-xl bg-primary text-primary-foreground font-bold text-sm hover:bg-primary/90 transition-colors flex items-center gap-2">
                 <ImportIcon /> Import Games
@@ -73,7 +89,7 @@ export function Dashboard() {
             </Link>
             <Link href="/opponents">
               <button className="px-5 py-2.5 rounded-xl bg-secondary border border-border text-foreground font-bold text-sm hover:bg-secondary/80 transition-colors flex items-center gap-2">
-                <Swords className="w-4 h-4 text-primary" /> Scout Opponent
+                <Swords className="w-4 h-4 text-primary" /> Scout
               </button>
             </Link>
           </div>

@@ -141,8 +141,8 @@ export function LessonBoardPlayer({ pgn, title }: LessonBoardPlayerProps) {
           <div className="relative w-full max-w-[340px] mx-auto">
             <Chessboard
               position={step?.fen}
-              arePiecesDraggable={false}
-              boardWidth={Math.min(340, 340)}
+              allowDragging={false}
+              boardWidth={340}
               customBoardStyle={{ borderRadius: '8px', overflow: 'hidden' }}
               customDarkSquareStyle={{ backgroundColor: '#2d4a3e' }}
               customLightSquareStyle={{ backgroundColor: '#6dae7f' }}
