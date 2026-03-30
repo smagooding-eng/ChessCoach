@@ -136,6 +136,7 @@ export function GameReplay() {
       return;
     }
 
+    // Show loading state immediately, clear stale analysis
     setMoveAnalysis(null);
     setLoadingAnalysis(true);
 
@@ -180,7 +181,8 @@ export function GameReplay() {
     return () => {
       cancelled = true;
       clearTimeout(timer);
-      setLoadingAnalysis(false);
+      // Do NOT set loadingAnalysis(false) here — the incoming effect sets it to true
+      // and calling false here could race and win over the new effect's true call.
     };
   }, [game, currentMove]);
 

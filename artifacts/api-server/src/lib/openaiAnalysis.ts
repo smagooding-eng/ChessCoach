@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import { logger } from "./logger";
+import { engineEvalMove } from "./engineAnalysis";
 
 const openai = new OpenAI({
   baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
@@ -190,7 +191,6 @@ export async function analyzeSingleMove(input: AnalyzeSingleMoveInput): Promise<
   const fenAfter = target.fen ?? "";
 
   // ── Step 1: Get engine evaluation from Lichess Cloud Eval ──────────────────
-  const { engineEvalMove } = await import("./engineAnalysis");
   const engineResult = await engineEvalMove({
     fenBefore,
     fenAfter,
