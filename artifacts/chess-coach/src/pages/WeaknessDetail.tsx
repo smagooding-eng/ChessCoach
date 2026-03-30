@@ -283,7 +283,7 @@ export function WeaknessDetail() {
                       <div className="shrink-0 w-[110px] h-[110px] rounded-lg overflow-hidden border border-white/10 group-hover:border-primary/30 transition-colors pointer-events-none">
                         <Chessboard
                           options={{
-                            position: game.midGameFen ?? 'start',
+                            position: game.midGameFen ?? 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
                             allowDragging: false,
                             boardStyle: { borderRadius: 0 },
                             darkSquareStyle: { backgroundColor: '#2d4a3e' },

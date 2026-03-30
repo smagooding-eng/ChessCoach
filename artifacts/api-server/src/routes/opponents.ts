@@ -51,7 +51,24 @@ router.post("/opponents/analyze", async (req, res): Promise<void> => {
     };
   });
 
-  const analysis = await analyzePlayerGames(target, gameSummaries);
+  let analysis: Awaited<ReturnType<typeof analyzePlayerGames>>;
+  try {
+    analysis = await analyzePlayerGames(target, gameSummaries);
+  } catch (err) {
+    req.log.error({ err }, "AI analysis failed for opponent scout");
+    res.status(502).json({
+      error: "AI analysis is temporarily unavailable. Please try again in a moment.",
+    });
+    return;
+  }
+
+  // Validate that analysis returned usable data
+  if (!analysis || !Array.isArray(analysis.weaknesses)) {
+    res.status(502).json({
+      error: "AI analysis returned an unexpected response. Please try again.",
+    });
+    return;
+  }
 
   // Compute win/loss/draw and opening stats
   // NOTE: g.result is already from the target player's perspective (extracted by extractGameMetadata)
