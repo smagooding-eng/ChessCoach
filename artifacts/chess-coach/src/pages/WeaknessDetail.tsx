@@ -6,6 +6,7 @@ import {
   ChevronRight, TrendingDown, Lightbulb, GraduationCap, Play
 } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { Chessboard } from 'react-chessboard';
 
 type Weakness = {
   id: number;
@@ -28,6 +29,7 @@ type RelatedGame = {
   playedAt: string | null;
   whiteRating: number;
   blackRating: number;
+  midGameFen: string | null;
 };
 
 type RelatedCourse = {
@@ -253,46 +255,65 @@ export function WeaknessDetail() {
         transition={{ delay: 0.2 }}
         className="glass-card rounded-2xl p-6"
       >
-        <h2 className="font-bold text-lg mb-4 flex items-center gap-2">
+        <h2 className="font-bold text-lg mb-1 flex items-center gap-2">
           <Swords className="w-5 h-5 text-muted-foreground" />
-          Recent Games — Practice & Review
+          Referenced Games
         </h2>
         <p className="text-xs text-muted-foreground mb-4">
-          Step through these games move by move to spot where this weakness shows up in your play.
+          These are the games your AI analysis identified as examples of this weakness. Step through them to see exactly where it occurred.
         </p>
         {relatedGames.length === 0 ? (
-          <p className="text-muted-foreground text-sm italic">No games imported yet.</p>
+          <p className="text-muted-foreground text-sm italic">No games linked to this weakness yet.</p>
         ) : (
-          <div className="space-y-2">
+          <div className="grid gap-3 sm:grid-cols-2">
             {relatedGames.map((game, i) => {
               const white = isWhite(game);
               const opponent = white ? game.blackUsername : game.whiteUsername;
-              const myRating = white ? game.whiteRating : game.blackRating;
               const oppRating = white ? game.blackRating : game.whiteRating;
               return (
                 <motion.div
                   key={game.id}
-                  initial={{ opacity: 0, x: -8 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.2 + i * 0.05 }}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.2 + i * 0.06 }}
                 >
                   <Link href={`/games/${game.id}`}>
-                    <div className="flex items-center gap-4 rounded-xl bg-white/3 border border-white/5 px-4 py-3.5 hover:bg-white/6 hover:border-primary/25 transition-all group cursor-pointer">
-                      <div className="flex-1 min-w-0">
-                        <div className="font-semibold text-sm truncate group-hover:text-primary transition-colors">
-                          vs {opponent}
-                          <span className="text-muted-foreground font-normal ml-2 text-xs">({oppRating})</span>
-                        </div>
-                        <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground flex-wrap">
-                          <span>{game.opening ?? 'Unknown opening'}</span>
-                          <span>·</span>
-                          <span>{game.timeControl}</span>
-                          {game.playedAt && <><span>·</span><span>{timeAgo(game.playedAt)}</span></>}
-                        </div>
+                    <div className="flex gap-3 rounded-xl bg-white/3 border border-white/5 p-3 hover:bg-white/6 hover:border-primary/30 transition-all group cursor-pointer overflow-hidden">
+                      {/* Mini board thumbnail */}
+                      <div className="shrink-0 w-[110px] h-[110px] rounded-lg overflow-hidden border border-white/10 group-hover:border-primary/30 transition-colors pointer-events-none">
+                        <Chessboard
+                          options={{
+                            position: game.midGameFen ?? 'start',
+                            allowDragging: false,
+                            boardStyle: { borderRadius: 0 },
+                            darkSquareStyle: { backgroundColor: '#2d4a3e' },
+                            lightSquareStyle: { backgroundColor: '#6dae7f' },
+                            showNotation: false,
+                            animationDurationInMs: 0,
+                          }}
+                        />
                       </div>
-                      <div className="flex items-center gap-3 shrink-0">
-                        <ResultIcon result={game.result} isWhite={white} />
-                        <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                      {/* Game info */}
+                      <div className="flex-1 min-w-0 flex flex-col justify-between py-0.5">
+                        <div>
+                          <div className="font-semibold text-sm truncate group-hover:text-primary transition-colors">
+                            vs {opponent}
+                            <span className="text-muted-foreground font-normal text-xs ml-1">({oppRating})</span>
+                          </div>
+                          <div className="text-xs text-muted-foreground mt-1 leading-relaxed line-clamp-2">
+                            {game.opening ?? 'Unknown opening'}
+                          </div>
+                          <div className="flex items-center gap-2 mt-1.5 text-xs text-muted-foreground">
+                            <span>{game.timeControl}</span>
+                            {game.playedAt && <><span>·</span><span>{timeAgo(game.playedAt)}</span></>}
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between mt-2">
+                          <ResultIcon result={game.result} isWhite={white} />
+                          <span className="flex items-center gap-1 text-xs text-muted-foreground group-hover:text-primary transition-colors">
+                            Review <ChevronRight className="w-3.5 h-3.5" />
+                          </span>
+                        </div>
                       </div>
                     </div>
                   </Link>

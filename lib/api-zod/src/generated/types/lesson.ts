@@ -15,4 +15,10 @@ export interface Lesson {
   completed: boolean;
   /** @nullable */
   examplePgn?: string | null;
+  /** @nullable */
+  drillFen?: string | null;
+  /** @nullable */
+  drillExpectedMove?: string | null;
+  /** @nullable */
+  drillHint?: string | null;
 }

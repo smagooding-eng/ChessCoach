@@ -274,6 +274,9 @@ export const GetCourseResponse = zod.object({
       orderIndex: zod.number(),
       completed: zod.boolean(),
       examplePgn: zod.string().nullish(),
+      drillFen: zod.string().nullish(),
+      drillExpectedMove: zod.string().nullish(),
+      drillHint: zod.string().nullish(),
     }),
   ),
 });
@@ -309,6 +312,9 @@ export const UpdateCourseProgressResponse = zod.object({
       orderIndex: zod.number(),
       completed: zod.boolean(),
       examplePgn: zod.string().nullish(),
+      drillFen: zod.string().nullish(),
+      drillExpectedMove: zod.string().nullish(),
+      drillHint: zod.string().nullish(),
     }),
   ),
 });

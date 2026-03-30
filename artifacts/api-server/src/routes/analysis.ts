@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db, gamesTable, weaknessesTable, coursesTable } from "@workspace/db";
-import { eq, desc, and } from "drizzle-orm";
+import { eq, desc, and, inArray } from "drizzle-orm";
 import {
   AnalyzeGamesBody,
   AnalyzeGamesResponse,
@@ -45,6 +45,7 @@ router.post("/analysis/analyze", async (req, res): Promise<void> => {
     blackUsername: g.blackUsername,
     whiteRating: g.whiteRating,
     blackRating: g.blackRating,
+    gameId: g.id,
   }));
 
   const analysis = await analyzePlayerGames(username, gameSummaries);
@@ -52,6 +53,12 @@ router.post("/analysis/analyze", async (req, res): Promise<void> => {
   await db.delete(weaknessesTable).where(eq(weaknessesTable.username, username.toLowerCase()));
 
   for (const weakness of analysis.weaknesses) {
+    // Map relatedGameIndices back to real game IDs
+    const relatedGameIds = (weakness.relatedGameIndices ?? [])
+      .filter((idx) => idx >= 0 && idx < games.length)
+      .map((idx) => games[idx].id)
+      .filter((id): id is number => typeof id === "number");
+
     await db.insert(weaknessesTable).values({
       username: username.toLowerCase(),
       category: weakness.category,
@@ -59,6 +66,7 @@ router.post("/analysis/analyze", async (req, res): Promise<void> => {
       description: weakness.description,
       frequency: weakness.frequency,
       examples: weakness.examples,
+      relatedGameIds,
     });
   }
 
@@ -199,22 +207,52 @@ router.get("/analysis/weaknesses/:id", async (req, res): Promise<void> => {
     return;
   }
 
-  const relatedGames = await db
-    .select({
-      id: gamesTable.id,
-      whiteUsername: gamesTable.whiteUsername,
-      blackUsername: gamesTable.blackUsername,
-      result: gamesTable.result,
-      opening: gamesTable.opening,
-      timeControl: gamesTable.timeControl,
-      playedAt: gamesTable.playedAt,
-      whiteRating: gamesTable.whiteRating,
-      blackRating: gamesTable.blackRating,
-    })
-    .from(gamesTable)
-    .where(eq(gamesTable.username, weakness.username))
-    .orderBy(desc(gamesTable.playedAt))
-    .limit(8);
+  // Prefer AI-selected specific game IDs; fall back to recent games
+  const gameSelectFields = {
+    id: gamesTable.id,
+    whiteUsername: gamesTable.whiteUsername,
+    blackUsername: gamesTable.blackUsername,
+    result: gamesTable.result,
+    opening: gamesTable.opening,
+    timeControl: gamesTable.timeControl,
+    playedAt: gamesTable.playedAt,
+    whiteRating: gamesTable.whiteRating,
+    blackRating: gamesTable.blackRating,
+    pgn: gamesTable.pgn,
+  };
+
+  let relatedGames;
+  if (weakness.relatedGameIds && weakness.relatedGameIds.length > 0) {
+    relatedGames = await db
+      .select(gameSelectFields)
+      .from(gamesTable)
+      .where(inArray(gamesTable.id, weakness.relatedGameIds));
+  } else {
+    relatedGames = await db
+      .select(gameSelectFields)
+      .from(gamesTable)
+      .where(eq(gamesTable.username, weakness.username))
+      .orderBy(desc(gamesTable.playedAt))
+      .limit(8);
+  }
+
+  // Extract a representative mid-game FEN from each related game
+  function extractMidGameFen(pgn: string | null): string | null {
+    if (!pgn) return null;
+    try {
+      const Chess = require("chess.js").Chess;
+      const chess = new Chess();
+      chess.loadPgn(pgn);
+      const history = chess.history({ verbose: true });
+      const midPoint = Math.min(Math.floor(history.length * 0.55), history.length);
+      if (midPoint === 0) return null;
+      const player = new Chess();
+      for (let i = 0; i < midPoint; i++) player.move(history[i].san);
+      return player.fen();
+    } catch {
+      return null;
+    }
+  }
 
   const relatedCourses = await db
     .select()
@@ -229,8 +267,16 @@ router.get("/analysis/weaknesses/:id", async (req, res): Promise<void> => {
   res.json({
     weakness: { ...weakness, createdAt: weakness.createdAt.toISOString() },
     relatedGames: relatedGames.map((g) => ({
-      ...g,
+      id: g.id,
+      whiteUsername: g.whiteUsername,
+      blackUsername: g.blackUsername,
+      result: g.result,
+      opening: g.opening,
+      timeControl: g.timeControl,
       playedAt: g.playedAt?.toISOString() ?? null,
+      whiteRating: g.whiteRating,
+      blackRating: g.blackRating,
+      midGameFen: extractMidGameFen(g.pgn),
     })),
     relatedCourses: relatedCourses.map((c) => ({
       ...c,

@@ -16,6 +16,7 @@ interface GameSummary {
   blackUsername: string;
   whiteRating: number;
   blackRating: number;
+  gameId?: number;
 }
 
 export interface WeaknessResult {
@@ -24,6 +25,7 @@ export interface WeaknessResult {
   description: string;
   frequency: number;
   examples: string[];
+  relatedGameIndices?: number[];
 }
 
 export interface AnalysisOutput {
@@ -31,36 +33,66 @@ export interface AnalysisOutput {
   summary: string;
 }
 
+/** Extract first N half-moves from PGN as a readable move-line string */
+function pgnMoveLine(pgn: string, maxHalfMoves = 30): string {
+  try {
+    const Chess = require("chess.js").Chess;
+    const chess = new Chess();
+    chess.loadPgn(pgn);
+    const hist = chess.history();
+    return hist
+      .slice(0, maxHalfMoves)
+      .map((san: string, i: number) => {
+        const moveNum = Math.floor(i / 2) + 1;
+        return i % 2 === 0 ? `${moveNum}.${san}` : san;
+      })
+      .join(" ");
+  } catch {
+    return "";
+  }
+}
+
 export async function analyzePlayerGames(
   username: string,
   games: GameSummary[]
 ): Promise<AnalysisOutput> {
-  const gamesText = games
-    .slice(0, 30)
+  const subset = games.slice(0, 30);
+
+  const gamesText = subset
     .map((g, i) => {
       const playerColor =
         g.whiteUsername.toLowerCase() === username.toLowerCase() ? "White" : "Black";
-      const opponentRating =
-        playerColor === "White" ? g.blackRating : g.whiteRating;
-      return `Game ${i + 1}: Playing as ${playerColor} | Result: ${g.result} | Opening: ${g.opening || "Unknown"} | Time Control: ${g.timeControl} | Opponent Rating: ${opponentRating}`;
+      const opponentRating = playerColor === "White" ? g.blackRating : g.whiteRating;
+      const moves = pgnMoveLine(g.pgn, 30);
+      return [
+        `--- Game ${i + 1} [index:${i}] ---`,
+        `Color: ${playerColor} | Result: ${g.result} | Opening: ${g.opening || "Unknown"} | Time: ${g.timeControl} | Opp Rating: ${opponentRating}`,
+        moves ? `Moves: ${moves}` : "",
+      ]
+        .filter(Boolean)
+        .join("\n");
     })
-    .join("\n");
+    .join("\n\n");
 
-  const prompt = `You are an expert chess coach analyzing a player's performance. Analyze the following ${games.length} games played by "${username}" and identify their key weaknesses.
+  const prompt = `You are a grandmaster-level chess coach performing a rigorous analysis of ${username}'s last ${subset.length} games.
 
-Game data:
+GAME DATA (with actual move sequences):
 ${gamesText}
 
-Analyze patterns across these games and identify 4-6 specific weaknesses. For each weakness provide:
-- category: One of ["Opening Preparation", "Tactical Awareness", "Endgame Technique", "Positional Play", "Time Management", "Defensive Play"]
-- severity: One of ["Critical", "High", "Medium", "Low"]
-- description: A specific, actionable description (2-3 sentences)
-- frequency: A number 0-1 representing how often this issue appears
-- examples: 2-3 specific example descriptions from the games
+---
+TASK: Identify 4-6 specific, concrete weaknesses. Base conclusions on the actual move sequences provided — cite real move numbers and patterns you observe.
 
-Also provide an overall summary paragraph.
+For each weakness output:
+- category: one of ["Opening Preparation", "Tactical Awareness", "Endgame Technique", "Positional Play", "Time Management", "Defensive Play"]
+- severity: one of ["Critical", "High", "Medium", "Low"]
+- description: 2-3 sentences that name SPECIFIC moves or move numbers you observed (e.g. "In Game 3, after 14.Nxd5 the player allowed 14...Qxd5 losing the initiative"). Be concrete — no vague generalities.
+- frequency: 0.0–1.0 (proportion of games this appears in)
+- examples: exactly 3 strings, each citing a specific game number, move, and what went wrong (e.g. "Game 7 (White, loss): After 21.Rfd1 the d-file was already contested; 21.Re1 keeping the e-file would have held equality")
+- relatedGameIndices: array of 2-4 game index numbers (0-based from the list above, matching [index:N]) where this weakness clearly shows up
 
-Respond with valid JSON in this exact format:
+Also output a summary paragraph that names concrete patterns and move references.
+
+Respond with VALID JSON only:
 {
   "weaknesses": [
     {
@@ -68,7 +100,8 @@ Respond with valid JSON in this exact format:
       "severity": "...",
       "description": "...",
       "frequency": 0.0,
-      "examples": ["...", "..."]
+      "examples": ["Game N (Color, result): move X — ...", "...", "..."],
+      "relatedGameIndices": [0, 3, 7]
     }
   ],
   "summary": "..."
@@ -371,6 +404,9 @@ interface CourseLesson {
   content: string;
   orderIndex: number;
   examplePgn: string | null;
+  drillFen?: string | null;
+  drillExpectedMove?: string | null;
+  drillHint?: string | null;
 }
 
 interface CourseOutput {
@@ -384,34 +420,48 @@ interface CourseOutput {
 export async function generateCourseForWeakness(
   weakness: WeaknessResult
 ): Promise<CourseOutput> {
-  const prompt = `You are an expert chess coach. Create a personalized chess course to address this weakness:
+  const prompt = `You are an expert chess coach. Create a personalized chess course to address this specific weakness:
 
 Category: ${weakness.category}
 Severity: ${weakness.severity}
 Description: ${weakness.description}
+Examples from player's games: ${weakness.examples.join("; ")}
 
-Create a course with 4-5 lessons. Each lesson MUST include an interactive PGN move sequence that illustrates the key concept.
+Create a course with 4-5 lessons. Each lesson MUST be tightly focused on a concrete sub-skill within this weakness — no generic advice.
 
-CRITICAL PGN rules:
-- examplePgn MUST be a valid PGN string with 4-8 instructive moves directly related to the lesson concept
-- Every move in the PGN must have a comment in {curly braces} explaining WHY that move matters
-- Use real, legal chess moves that a player at this level would encounter
-- Start from the initial position (no FEN header needed)
-- Format: "1. e4 {Control the center} e5 {Mirror strategy} 2. Nf3 {Develop with tempo} Nc6 {Defend the pawn}"
-- Do NOT use null for examplePgn — every lesson must have a move sequence
+RULES for each lesson:
+1. examplePgn: a valid PGN string, 5-10 instructive moves DIRECTLY illustrating the lesson concept.
+   - Every move must have a {comment in curly braces} explaining exactly WHY it matters
+   - Legal moves only. Start from initial position.
+   - Example format: "1. e4 {Controls d5/f5 immediately} e5 {Symmetrical — fights for center} 2. Nf3 {Develops knight to the best square, attacks e5} Nc6 {Defends the pawn and develops}"
+   - Do NOT use null for examplePgn — every lesson requires a move sequence
+
+2. drillFen: A FEN string representing a position where the student must find the right move.
+   Choose a critical position related to the lesson concept.
+   Example: "r1bq1rk1/ppp2ppp/2np1n2/4p3/2B1P3/2NP1N2/PPP2PPP/R1BQR1K1 w - - 0 9"
+
+3. drillExpectedMove: The best move in the drill position in SAN notation (e.g. "Ng5", "d4", "Bxf7+").
+   This must be a legal move from the drillFen position.
+
+4. drillHint: A one-sentence hint the player can reveal if stuck (e.g. "Look for a way to attack the f7 square").
+
+5. content: 3-5 paragraphs of specific chess coaching. Name concrete patterns, cite typical move orders, explain WHY certain moves fail.
 
 Respond with valid JSON:
 {
   "title": "Course title (max 60 chars)",
-  "description": "Course description (2-3 sentences)",
+  "description": "2-3 sentence course description",
   "category": "${weakness.category}",
   "difficulty": "Beginner|Intermediate|Advanced",
   "lessons": [
     {
       "title": "Lesson title",
-      "content": "Detailed lesson content (3-5 paragraphs with specific chess advice, patterns, and tips)",
+      "content": "3-5 paragraphs of specific chess coaching content...",
       "orderIndex": 0,
-      "examplePgn": "1. e4 {Comment explaining this move} e5 {Comment} 2. Nf3 {Comment} Nc6 {Comment}"
+      "examplePgn": "1. e4 {Comment} e5 {Comment} 2. Nf3 {Comment} Nc6 {Comment}",
+      "drillFen": "rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2",
+      "drillExpectedMove": "Nc6",
+      "drillHint": "Develop a piece that also defends the pawn"
     }
   ]
 }`;

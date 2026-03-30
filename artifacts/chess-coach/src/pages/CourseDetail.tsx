@@ -257,19 +257,25 @@ export function CourseDetail() {
                   )}
                 </div>
 
-                {/* Lesson content */}
-                <div className="px-6 py-6">
-                  {lesson && <LessonContent content={lesson.content} />}
-
-                  {/* Interactive board player */}
+                {/* Lesson content — board first when PGN is available */}
+                <div className="px-6 py-6 space-y-6">
                   {lesson?.examplePgn && (
-                    <div className="mt-8 pt-6 border-t border-white/5">
-                      <h4 className="font-bold mb-4 flex items-center gap-2 text-sm text-primary">
-                        <Target className="w-4 h-4" /> Interactive Lesson
+                    <div>
+                      <h4 className="font-bold mb-3 flex items-center gap-2 text-sm text-primary">
+                        <Target className="w-4 h-4" />
+                        {lesson.drillExpectedMove ? 'Interactive Lesson + Practice Drill' : 'Interactive Lesson'}
                       </h4>
-                      <LessonBoardPlayer pgn={lesson.examplePgn} title={lesson.title} />
+                      <LessonBoardPlayer
+                        pgn={lesson.examplePgn}
+                        title={lesson.title}
+                        drillFen={lesson.drillFen ?? null}
+                        drillExpectedMove={lesson.drillExpectedMove ?? null}
+                        drillHint={lesson.drillHint ?? null}
+                      />
                     </div>
                   )}
+
+                  {lesson && <LessonContent content={lesson.content} />}
                 </div>
 
                 {/* Navigation footer */}

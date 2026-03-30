@@ -95,6 +95,9 @@ router.post("/courses/generate", async (req, res): Promise<void> => {
           orderIndex: lesson.orderIndex,
           completed: "false",
           examplePgn: lesson.examplePgn,
+          drillFen: lesson.drillFen ?? null,
+          drillExpectedMove: lesson.drillExpectedMove ?? null,
+          drillHint: lesson.drillHint ?? null,
         });
       }
 

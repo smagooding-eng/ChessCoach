@@ -650,6 +650,12 @@ components:
           type: boolean
         examplePgn:
           type: ["string", "null"]
+        drillFen:
+          type: ["string", "null"]
+        drillExpectedMove:
+          type: ["string", "null"]
+        drillHint:
+          type: ["string", "null"]
       required:
         - id
         - courseId

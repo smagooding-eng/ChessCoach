@@ -1,4 +1,4 @@
-import { pgTable, text, serial, timestamp, real } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, timestamp, real, integer } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -10,6 +10,7 @@ export const weaknessesTable = pgTable("weaknesses", {
   description: text("description").notNull(),
   frequency: real("frequency").notNull().default(0),
   examples: text("examples").array().notNull().default([]),
+  relatedGameIds: integer("related_game_ids").array().notNull().default([]),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
