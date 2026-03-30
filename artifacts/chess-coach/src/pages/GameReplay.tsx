@@ -263,9 +263,22 @@ export function GameReplay() {
     return () => window.removeEventListener('keydown', h);
   }, [maxMoves]);
 
-  // Scroll move into view
+  // Scroll active move into view — scroll only the move-list container, never the page
   useEffect(() => {
-    activeRowRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    const container = moveListRef.current;
+    const btn = activeRowRef.current;
+    if (!container || !btn) return;
+
+    const containerTop = container.scrollTop;
+    const containerBottom = containerTop + container.clientHeight;
+    const btnTop = btn.offsetTop;
+    const btnBottom = btnTop + btn.offsetHeight;
+
+    if (btnTop < containerTop) {
+      container.scrollTop = btnTop - 8;
+    } else if (btnBottom > containerBottom) {
+      container.scrollTop = btnBottom - container.clientHeight + 8;
+    }
   }, [currentMove]);
 
   // ── Review Game — SSE stream that classifies every move ─────────────────────
