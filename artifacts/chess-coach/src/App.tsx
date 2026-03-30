@@ -17,6 +17,7 @@ import { Courses } from "@/pages/Courses";
 import { CourseDetail } from "@/pages/CourseDetail";
 import { WeaknessDetail } from "@/pages/WeaknessDetail";
 import { OpponentAnalysis } from "@/pages/OpponentAnalysis";
+import { Openings } from "@/pages/Openings";
 import NotFound from "@/pages/not-found";
 import { Layout } from "@/components/Layout";
 
@@ -64,6 +65,7 @@ function Router() {
       <Route path="/analysis/:id" component={() => <ProtectedRoute component={WeaknessDetail} />} />
       <Route path="/courses" component={() => <ProtectedRoute component={Courses} />} />
       <Route path="/courses/:id" component={() => <ProtectedRoute component={CourseDetail} />} />
+      <Route path="/openings" component={() => <ProtectedRoute component={Openings} />} />
       <Route path="/opponents" component={() => <ProtectedRoute component={OpponentAnalysis} />} />
       
       <Route component={NotFound} />

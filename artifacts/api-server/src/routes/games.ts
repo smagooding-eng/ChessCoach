@@ -113,6 +113,84 @@ router.get("/games", async (req, res): Promise<void> => {
   );
 });
 
+router.get("/games/openings", async (req, res): Promise<void> => {
+  const username = (req.query.username as string | undefined)?.toLowerCase();
+  if (!username) {
+    res.status(400).json({ error: "username is required" });
+    return;
+  }
+
+  const games = await db
+    .select({
+      result: gamesTable.result,
+      opening: gamesTable.opening,
+      eco: gamesTable.eco,
+      whiteUsername: gamesTable.whiteUsername,
+      blackUsername: gamesTable.blackUsername,
+    })
+    .from(gamesTable)
+    .where(eq(gamesTable.username, username));
+
+  const totalGames = games.length;
+
+  type Stat = { games: number; wins: number; losses: number; draws: number };
+  type OpeningStat = {
+    eco: string | null;
+    opening: string;
+    total: Stat;
+    white: Stat;
+    black: Stat;
+  };
+
+  const map = new Map<string, OpeningStat>();
+
+  for (const g of games) {
+    const key = g.opening || "Unknown Opening";
+    if (!map.has(key)) {
+      const empty = (): Stat => ({ games: 0, wins: 0, losses: 0, draws: 0 });
+      map.set(key, { eco: g.eco, opening: key, total: empty(), white: empty(), black: empty() });
+    }
+    const stat = map.get(key)!;
+    if (!stat.eco && g.eco) stat.eco = g.eco;
+
+    const isWhite = g.whiteUsername.toLowerCase() === username;
+    const colorStat = isWhite ? stat.white : stat.black;
+
+    stat.total.games++;
+    colorStat.games++;
+
+    if (g.result === "win") {
+      stat.total.wins++;
+      colorStat.wins++;
+    } else if (g.result === "loss") {
+      stat.total.losses++;
+      colorStat.losses++;
+    } else {
+      stat.total.draws++;
+      colorStat.draws++;
+    }
+  }
+
+  const wr = (s: Stat) => (s.games > 0 ? Math.round((s.wins / s.games) * 100) : 0);
+
+  const openings = Array.from(map.values())
+    .map((s) => ({
+      eco: s.eco,
+      opening: s.opening,
+      totalGames: s.total.games,
+      percentage: totalGames > 0 ? Math.round((s.total.games / totalGames) * 100) : 0,
+      wins: s.total.wins,
+      losses: s.total.losses,
+      draws: s.total.draws,
+      winRate: wr(s.total),
+      white: { games: s.white.games, wins: s.white.wins, losses: s.white.losses, draws: s.white.draws, winRate: wr(s.white) },
+      black: { games: s.black.games, wins: s.black.wins, losses: s.black.losses, draws: s.black.draws, winRate: wr(s.black) },
+    }))
+    .sort((a, b) => b.totalGames - a.totalGames);
+
+  res.json({ openings, totalGames });
+});
+
 router.get("/games/:id", async (req, res): Promise<void> => {
   const params = GetGameParams.safeParse(req.params);
   if (!params.success) {
