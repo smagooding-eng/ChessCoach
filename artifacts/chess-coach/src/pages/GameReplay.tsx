@@ -417,10 +417,14 @@ export function GameReplay() {
                       {moveAnalysis.cpLoss === 0 ? '±0' : `-${moveAnalysis.cpLoss}`}cp
                     </span>
                   )}
-                  {/* Engine source badge */}
-                  {moveAnalysis?.engineAvailable && (
-                    <span className="hidden sm:flex items-center gap-1 text-[10px] text-muted-foreground/60 ml-1">
-                      <Cpu className="w-2.5 h-2.5" />d{moveAnalysis.engineDepth}
+                  {/* Source badge */}
+                  {moveAnalysis && (
+                    <span className="hidden sm:flex items-center gap-1 text-[10px] text-muted-foreground/60 ml-1"
+                          title={moveAnalysis.engineAvailable
+                            ? `Stockfish engine at depth ${moveAnalysis.engineDepth}`
+                            : 'GPT-4o position analysis'}>
+                      <Cpu className="w-2.5 h-2.5" />
+                      {moveAnalysis.engineAvailable ? `d${moveAnalysis.engineDepth}` : 'AI'}
                     </span>
                   )}
                   {loadingAnalysis && (
