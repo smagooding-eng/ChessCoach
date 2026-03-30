@@ -1,8 +1,9 @@
 import React from 'react';
+import { Link } from 'wouter';
 import { useRunAnalysis, useMyAnalysisSummary, useMyWeaknesses } from '@/hooks/use-analysis';
 import { useUser } from '@/hooks/use-user';
 import { BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { BrainCircuit, AlertTriangle, Activity } from 'lucide-react';
+import { BrainCircuit, AlertTriangle, Activity, ChevronRight } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 const PIE_COLORS = ['#10b981', '#ef4444', '#64748b'];
@@ -132,33 +133,42 @@ export function Analysis() {
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {weaknessesData?.weaknesses?.map((weakness, i) => (
-              <motion.div 
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.1 }}
-                key={weakness.id} 
-                className="glass-card p-6 rounded-2xl border-l-4"
-                style={{ borderLeftColor: weakness.severity === 'Critical' ? '#ef4444' : weakness.severity === 'High' ? '#f59e0b' : '#3b82f6' }}
-              >
-                <div className="flex justify-between items-start mb-4">
-                  <h3 className="text-xl font-bold">{weakness.category}</h3>
-                  <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider
-                    ${weakness.severity === 'Critical' ? 'bg-red-500/20 text-red-400' : 
-                      weakness.severity === 'High' ? 'bg-amber-500/20 text-amber-400' : 
-                      'bg-blue-500/20 text-blue-400'}`}>
-                    {weakness.severity}
-                  </span>
-                </div>
-                
-                <p className="text-muted-foreground mb-6 line-clamp-3">{weakness.description}</p>
-                
-                <div className="flex items-center gap-4 text-sm font-medium">
-                  <div className="flex-1 bg-secondary rounded-full h-2 overflow-hidden">
-                    <div className="h-full bg-primary" style={{ width: `${weakness.frequency * 100}%` }} />
+              <Link key={weakness.id} href={`/analysis/${weakness.id}`}>
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.1 }}
+                  className="glass-card p-6 rounded-2xl border-l-4 cursor-pointer hover:scale-[1.02] hover:shadow-lg hover:border-opacity-80 transition-all group"
+                  style={{ borderLeftColor: weakness.severity === 'Critical' ? '#ef4444' : weakness.severity === 'High' ? '#f59e0b' : '#3b82f6' }}
+                >
+                  <div className="flex justify-between items-start mb-4">
+                    <h3 className="text-xl font-bold group-hover:text-primary transition-colors">{weakness.category}</h3>
+                    <div className="flex items-center gap-2">
+                      <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider
+                        ${weakness.severity === 'Critical' ? 'bg-red-500/20 text-red-400' : 
+                          weakness.severity === 'High' ? 'bg-amber-500/20 text-amber-400' : 
+                          'bg-blue-500/20 text-blue-400'}`}>
+                        {weakness.severity}
+                      </span>
+                      <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                    </div>
                   </div>
-                  <span className="text-primary">{Math.round(weakness.frequency * 100)}% impact</span>
-                </div>
-              </motion.div>
+
+                  <p className="text-muted-foreground mb-6 line-clamp-3">{weakness.description}</p>
+
+                  <div className="flex items-center gap-4 text-sm font-medium">
+                    <div className="flex-1 bg-secondary rounded-full h-2 overflow-hidden">
+                      <div className="h-full bg-primary" style={{ width: `${weakness.frequency * 100}%` }} />
+                    </div>
+                    <span className="text-primary">{Math.round(weakness.frequency * 100)}% impact</span>
+                  </div>
+
+                  <div className="mt-4 pt-4 border-t border-white/5 flex items-center gap-1.5 text-xs text-muted-foreground group-hover:text-primary transition-colors">
+                    <span>View examples, games & courses</span>
+                    <ChevronRight className="w-3 h-3" />
+                  </div>
+                </motion.div>
+              </Link>
             ))}
             
             {!weaknessesData?.weaknesses?.length && (

@@ -14,6 +14,7 @@ import { GameReplay } from "@/pages/GameReplay";
 import { Analysis } from "@/pages/Analysis";
 import { Courses } from "@/pages/Courses";
 import { CourseDetail } from "@/pages/CourseDetail";
+import { WeaknessDetail } from "@/pages/WeaknessDetail";
 import NotFound from "@/pages/not-found";
 import { Layout } from "@/components/Layout";
 
@@ -58,6 +59,7 @@ function Router() {
       <Route path="/games" component={() => <ProtectedRoute component={Games} />} />
       <Route path="/games/:id" component={() => <ProtectedRoute component={GameReplay} />} />
       <Route path="/analysis" component={() => <ProtectedRoute component={Analysis} />} />
+      <Route path="/analysis/:id" component={() => <ProtectedRoute component={WeaknessDetail} />} />
       <Route path="/courses" component={() => <ProtectedRoute component={Courses} />} />
       <Route path="/courses/:id" component={() => <ProtectedRoute component={CourseDetail} />} />
       

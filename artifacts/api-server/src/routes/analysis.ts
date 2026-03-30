@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
-import { db, gamesTable, weaknessesTable } from "@workspace/db";
-import { eq, desc } from "drizzle-orm";
+import { db, gamesTable, weaknessesTable, coursesTable } from "@workspace/db";
+import { eq, desc, and } from "drizzle-orm";
 import {
   AnalyzeGamesBody,
   AnalyzeGamesResponse,
@@ -179,6 +179,64 @@ router.get("/analysis/summary", async (req, res): Promise<void> => {
       resultsByTimeControl,
     })
   );
+});
+
+// GET /api/analysis/weaknesses/:id — weakness detail with related games + courses
+router.get("/analysis/weaknesses/:id", async (req, res): Promise<void> => {
+  const id = parseInt(req.params.id as string);
+  if (isNaN(id)) {
+    res.status(400).json({ error: "Invalid weakness id" });
+    return;
+  }
+
+  const [weakness] = await db
+    .select()
+    .from(weaknessesTable)
+    .where(eq(weaknessesTable.id, id));
+
+  if (!weakness) {
+    res.status(404).json({ error: "Weakness not found" });
+    return;
+  }
+
+  const relatedGames = await db
+    .select({
+      id: gamesTable.id,
+      whiteUsername: gamesTable.whiteUsername,
+      blackUsername: gamesTable.blackUsername,
+      result: gamesTable.result,
+      opening: gamesTable.opening,
+      timeControl: gamesTable.timeControl,
+      playedAt: gamesTable.playedAt,
+      whiteRating: gamesTable.whiteRating,
+      blackRating: gamesTable.blackRating,
+    })
+    .from(gamesTable)
+    .where(eq(gamesTable.username, weakness.username))
+    .orderBy(desc(gamesTable.playedAt))
+    .limit(8);
+
+  const relatedCourses = await db
+    .select()
+    .from(coursesTable)
+    .where(
+      and(
+        eq(coursesTable.username, weakness.username),
+        eq(coursesTable.category, weakness.category)
+      )
+    );
+
+  res.json({
+    weakness: { ...weakness, createdAt: weakness.createdAt.toISOString() },
+    relatedGames: relatedGames.map((g) => ({
+      ...g,
+      playedAt: g.playedAt?.toISOString() ?? null,
+    })),
+    relatedCourses: relatedCourses.map((c) => ({
+      ...c,
+      createdAt: c.createdAt.toISOString(),
+    })),
+  });
 });
 
 export default router;

@@ -23,10 +23,11 @@ Chess Coach - A full-stack chess analysis platform that imports games from chess
 1. **Import Games**: Enter chess.com username and fetch games from the past N months
 2. **Game Replay**: Interactive chess board with move-by-move navigation (first/prev/next/last/auto-play)
 3. **AI Analysis**: Analyzes up to 50 games using GPT-5.2 to identify weaknesses across 6 categories
-4. **Weakness Report**: Cards showing category, severity, description, frequency
-5. **Performance Stats**: Win rate, opening stats (bar chart), time control breakdown, win/loss/draw pie chart
-6. **Personalized Courses**: AI-generated courses with 4-5 lessons each targeting specific weaknesses
-7. **Course Progress**: Mark lessons complete, track progress per course
+4. **Weakness Report**: Clickable cards showing category, severity, description, frequency — click to open a Weakness Detail page
+5. **Weakness Detail Page** (`/analysis/:id`): Shows AI-identified patterns, related recent games (with links to replay), and direct links to matching courses
+6. **Performance Stats**: Win rate, opening stats (bar chart), time control breakdown, win/loss/draw pie chart
+7. **Personalized Courses**: AI-generated courses with 4-5 lessons each targeting specific weaknesses
+8. **Interactive Course Viewer**: Sequential lesson mode with sidebar navigation, Previous/Next buttons, dot progress indicators, and chess board for practice positions. "Complete & Next" auto-advances to the next lesson.
 
 ## Structure
 
@@ -55,6 +56,7 @@ artifacts-monorepo/
 - `POST /api/analysis/analyze` — Run AI analysis on all games
 - `GET /api/analysis/weaknesses` — Get weakness report
 - `GET /api/analysis/summary` — Get performance summary stats
+- `GET /api/analysis/weaknesses/:id` — Get weakness detail with related games + matching courses
 - `GET /api/courses` — List personalized courses
 - `POST /api/courses/generate` — Generate AI courses from weaknesses
 - `GET /api/courses/:id` — Get course with lessons
