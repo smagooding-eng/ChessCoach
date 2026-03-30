@@ -63,9 +63,11 @@ export function GameReplay() {
   const [fetchingBest, setFetchingBest] = useState(false);
 
   // Per-move deep analysis
-  const analysisCache = useRef<Map<number, MoveAnalysis>>(new Map());
+  const analysisCache    = useRef<Map<number, MoveAnalysis>>(new Map());
+  const inFlightPromises = useRef<Map<number, Promise<MoveAnalysis | null>>>(new Map());
   const [moveAnalysis, setMoveAnalysis] = useState<MoveAnalysis | null>(null);
   const [loadingAnalysis, setLoadingAnalysis] = useState(false);
+  const [prefetchedCount, setPrefetchedCount] = useState(0);
   // Map of moveIndex → classification for move-list badges
   const [moveClassifications, setMoveClassifications] = useState<Map<number, Classification>>(new Map());
 
@@ -120,7 +122,69 @@ export function GameReplay() {
     }
   }, [currentMove, annotations]);
 
-  // Auto-fetch deep move analysis — debounced 350ms, cached, stale-safe
+  // Shared fetch helper — deduplicates concurrent requests via in-flight promise map
+  const fetchMoveAnalysis = useCallback((gameId: number, moveIdx: number): Promise<MoveAnalysis | null> => {
+    // Serve instantly from completed cache
+    if (analysisCache.current.has(moveIdx)) {
+      return Promise.resolve(analysisCache.current.get(moveIdx)!);
+    }
+    // If already in flight, return the same promise (both callers share the result)
+    if (inFlightPromises.current.has(moveIdx)) {
+      return inFlightPromises.current.get(moveIdx)!;
+    }
+    // Start a new request
+    const promise = (async () => {
+      try {
+        const res = await fetch(`/api/games/${gameId}/analyze-move`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ moveIndex: moveIdx }),
+        });
+        if (!res.ok) return null;
+        const data = await res.json() as MoveAnalysis;
+        analysisCache.current.set(moveIdx, data);
+        setMoveClassifications(prev => {
+          const next = new Map(prev);
+          next.set(moveIdx, data.classification);
+          return next;
+        });
+        setPrefetchedCount(c => c + 1);
+        return data;
+      } catch {
+        return null;
+      } finally {
+        inFlightPromises.current.delete(moveIdx);
+      }
+    })();
+    inFlightPromises.current.set(moveIdx, promise);
+    return promise;
+  }, []);
+
+  // Background prefetch — as soon as game loads, queue all moves in batches of 3
+  useEffect(() => {
+    if (!game) return;
+    const totalMoves = game.moves.length;
+    if (totalMoves === 0) return;
+
+    let stopped = false;
+
+    async function prefetchAll() {
+      const CONCURRENCY = 3;
+      let i = 0;
+      while (!stopped && i < totalMoves) {
+        const batch = Array.from({ length: CONCURRENCY }, (_, k) => i + k)
+          .filter(idx => idx < totalMoves);
+        await Promise.all(batch.map(idx => fetchMoveAnalysis(game!.id, idx)));
+        i += CONCURRENCY;
+      }
+    }
+
+    // Small delay so UI renders first
+    const t = setTimeout(prefetchAll, 800);
+    return () => { stopped = true; clearTimeout(t); };
+  }, [game, fetchMoveAnalysis]);
+
+  // Auto-fetch deep move analysis — debounced 300ms, cache-first
   useEffect(() => {
     if (!game || currentMove === 0) {
       setMoveAnalysis(null);
@@ -145,7 +209,7 @@ export function GameReplay() {
     const timer = setTimeout(async () => {
       if (cancelled) return;
 
-      // Re-check cache (another tab/move might have populated it)
+      // Re-check cache (prefetch may have populated it during debounce)
       if (analysisCache.current.has(moveIdx)) {
         if (!cancelled) {
           setMoveAnalysis(analysisCache.current.get(moveIdx)!);
@@ -154,37 +218,18 @@ export function GameReplay() {
         return;
       }
 
-      try {
-        const res = await fetch(`/api/games/${game.id}/analyze-move`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ moveIndex: moveIdx }),
-        });
-        if (!res.ok) throw new Error('fetch failed');
-        const data = await res.json() as MoveAnalysis;
-        analysisCache.current.set(moveIdx, data);
-        if (!cancelled) {
-          setMoveAnalysis(data);
-          setMoveClassifications(prev => {
-            const next = new Map(prev);
-            next.set(moveIdx, data.classification);
-            return next;
-          });
-        }
-      } catch {
-        if (!cancelled) setMoveAnalysis(null);
-      } finally {
-        if (!cancelled) setLoadingAnalysis(false);
+      const data = await fetchMoveAnalysis(game.id, moveIdx);
+      if (!cancelled) {
+        setMoveAnalysis(data);
+        setLoadingAnalysis(false);
       }
-    }, 350);
+    }, 300);
 
     return () => {
       cancelled = true;
       clearTimeout(timer);
-      // Do NOT set loadingAnalysis(false) here — the incoming effect sets it to true
-      // and calling false here could race and win over the new effect's true call.
     };
-  }, [game, currentMove]);
+  }, [game, currentMove, fetchMoveAnalysis]);
 
   const currentFen = currentMove === 0 ? null : moves[currentMove - 1]?.fen;
 
@@ -438,9 +483,22 @@ export function GameReplay() {
                 {/* Body */}
                 <div className="px-4 py-3 space-y-3">
                   {loadingAnalysis && !moveAnalysis ? (
-                    <div className="flex items-center gap-3 py-3">
-                      <div className="w-4 h-4 border-2 border-primary/50 border-t-primary rounded-full animate-spin shrink-0" />
-                      <span className="text-sm text-muted-foreground">Analyzing this move…</span>
+                    <div className="flex flex-col gap-1.5 py-2">
+                      <div className="flex items-center gap-3">
+                        <div className="w-4 h-4 border-2 border-primary/50 border-t-primary rounded-full animate-spin shrink-0" />
+                        <span className="text-sm text-muted-foreground">Analyzing this move…</span>
+                      </div>
+                      {prefetchedCount < maxMoves && (
+                        <div className="flex items-center gap-2 mt-1">
+                          <div className="flex-1 h-1 rounded-full bg-white/5 overflow-hidden">
+                            <div className="h-full rounded-full bg-primary/40 transition-all duration-500"
+                                 style={{ width: `${Math.round((prefetchedCount / maxMoves) * 100)}%` }} />
+                          </div>
+                          <span className="text-[10px] text-muted-foreground/50 tabular-nums shrink-0">
+                            {prefetchedCount}/{maxMoves} cached
+                          </span>
+                        </div>
+                      )}
                     </div>
                   ) : moveAnalysis ? (
                     <div className="grid grid-cols-2 gap-3">
