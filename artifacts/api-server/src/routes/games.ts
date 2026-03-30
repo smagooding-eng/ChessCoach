@@ -12,7 +12,7 @@ import {
   GetGameReplayParams,
 } from "@workspace/api-zod";
 import { fetchChessComGames, extractGameMetadata, parsePgnMoves, extractOpeningFromPgn } from "../lib/chesscom";
-import { analyzeMoves, analyzeSingleMove } from "../lib/openaiAnalysis";
+import { analyzeMoves, analyzeSingleMove, reviewFullGame } from "../lib/openaiAnalysis";
 
 const router: IRouter = Router();
 
@@ -133,6 +133,107 @@ router.post("/games/fix-openings", async (req, res): Promise<void> => {
   }
 
   res.json({ total: nullOpeningGames.length, updated });
+});
+
+// Get sample games for a specific opening — used by the opening detail page
+router.get("/games/openings/detail", async (req, res): Promise<void> => {
+  const username = (req.query.username as string | undefined)?.toLowerCase();
+  const opening  = req.query.opening as string | undefined;
+  const eco      = req.query.eco as string | undefined;
+
+  if (!username || (!opening && !eco)) {
+    res.status(400).json({ error: "username and opening or eco are required" });
+    return;
+  }
+
+  // Find games matching this opening (by name or ECO code)
+  const allGames = await db
+    .select({
+      id: gamesTable.id,
+      pgn: gamesTable.pgn,
+      result: gamesTable.result,
+      opening: gamesTable.opening,
+      eco: gamesTable.eco,
+      whiteUsername: gamesTable.whiteUsername,
+      blackUsername: gamesTable.blackUsername,
+      whiteRating: gamesTable.whiteRating,
+      blackRating: gamesTable.blackRating,
+      playedAt: gamesTable.playedAt,
+    })
+    .from(gamesTable)
+    .where(eq(gamesTable.username, username))
+    .orderBy(desc(gamesTable.playedAt));
+
+  const matched = allGames.filter(g => {
+    if (eco && g.eco === eco) return true;
+    if (opening && g.opening === opening) return true;
+    return false;
+  });
+
+  // Extract opening moves by finding the most common prefix across all games
+  const Chess = require("chess.js").Chess;
+  const OPENING_HALF_MOVES = 14; // 7 full moves
+
+  // Build a frequency table of moves at each position
+  type MoveFreq = Map<string, number>;
+  const movesByDepth: MoveFreq[] = Array.from({ length: OPENING_HALF_MOVES }, () => new Map());
+  const fensByDepth: string[][] = Array.from({ length: OPENING_HALF_MOVES }, () => []);
+
+  for (const g of matched.slice(0, 30)) {
+    try {
+      const chess = new Chess();
+      chess.loadPgn(g.pgn);
+      const history = chess.history({ verbose: true });
+      const chess2 = new Chess();
+      for (let i = 0; i < Math.min(OPENING_HALF_MOVES, history.length); i++) {
+        const m = history[i];
+        const key = m.san;
+        movesByDepth[i].set(key, (movesByDepth[i].get(key) ?? 0) + 1);
+        const fenBefore = chess2.fen();
+        fensByDepth[i].push(fenBefore);
+        chess2.move(m.san);
+      }
+    } catch { /* ignore parse errors */ }
+  }
+
+  // Build the main line: at each depth, pick the most-played move
+  const mainLine: Array<{ san: string; fen: string; moveNumber: number; color: "white" | "black" }> = [];
+  const chess = new Chess();
+  for (let i = 0; i < OPENING_HALF_MOVES; i++) {
+    const freq = movesByDepth[i];
+    if (freq.size === 0) break;
+    const bestSan = [...freq.entries()].sort((a, b) => b[1] - a[1])[0][0];
+    try {
+      chess.move(bestSan);
+      mainLine.push({
+        san: bestSan,
+        fen: chess.fen(),
+        moveNumber: Math.floor(i / 2) + 1,
+        color: i % 2 === 0 ? "white" : "black",
+      });
+    } catch { break; }
+  }
+
+  // Return top 10 sample games + main line
+  const sampleGames = matched.slice(0, 10).map(g => ({
+    id: g.id,
+    result: g.result,
+    whiteUsername: g.whiteUsername,
+    blackUsername: g.blackUsername,
+    whiteRating: g.whiteRating,
+    blackRating: g.blackRating,
+    playedAt: g.playedAt,
+    opening: g.opening,
+    eco: g.eco,
+  }));
+
+  res.json({
+    totalGames: matched.length,
+    sampleGames,
+    mainLine,
+    openingName: matched[0]?.opening ?? opening ?? eco ?? "Unknown Opening",
+    eco: matched[0]?.eco ?? eco ?? null,
+  });
 });
 
 router.get("/games/openings", async (req, res): Promise<void> => {
@@ -348,6 +449,62 @@ router.post("/games/:id/analyze-move", async (req, res): Promise<void> => {
   } catch (err) {
     req.log.error({ err }, "Failed to analyze single move");
     res.status(500).json({ error: "Analysis failed" });
+  }
+});
+
+// Streams SSE events so the Replit 60s proxy timeout doesn't kill long reviews.
+// Events: "started", "heartbeat" (every 15s), "result" (JSON), "error", "done"
+router.post("/games/:id/review", async (req, res): Promise<void> => {
+  const params = GetGameReplayParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+
+  const [game] = await db
+    .select()
+    .from(gamesTable)
+    .where(eq(gamesTable.id, params.data.id));
+
+  if (!game) {
+    res.status(404).json({ error: "Game not found" });
+    return;
+  }
+
+  // Set up SSE
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  res.flushHeaders();
+
+  const sendEvent = (name: string, data: unknown) => {
+    res.write(`event: ${name}\ndata: ${JSON.stringify(data)}\n\n`);
+  };
+
+  sendEvent("started", { totalMoves: game.pgn ? parsePgnMoves(game.pgn).length : 0 });
+
+  // Heartbeat every 15 s to keep proxy connection alive
+  const heartbeat = setInterval(() => {
+    res.write(": heartbeat\n\n");
+  }, 15000);
+
+  try {
+    const moves = parsePgnMoves(game.pgn);
+    const review = await reviewFullGame({
+      moves,
+      opening: game.opening,
+      result: game.result,
+      whiteUsername: game.whiteUsername,
+      blackUsername: game.blackUsername,
+    });
+    sendEvent("result", { moves: review });
+    sendEvent("done", {});
+  } catch (err) {
+    req.log.error({ err }, "Failed to review game");
+    sendEvent("error", { message: "Review failed. Please try again." });
+  } finally {
+    clearInterval(heartbeat);
+    res.end();
   }
 });
 

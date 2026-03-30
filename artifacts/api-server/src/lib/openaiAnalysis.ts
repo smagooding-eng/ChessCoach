@@ -399,6 +399,94 @@ Respond with valid JSON:
   }
 }
 
+// ── Full-game review ─────────────────────────────────────────────────────────
+
+export interface MoveReview {
+  moveIndex: number;
+  san: string;
+  color: "white" | "black";
+  classification: "brilliant" | "excellent" | "good" | "book" | "inaccuracy" | "mistake" | "blunder";
+  explanation: string;
+  betterMove: string | null;
+}
+
+export async function reviewFullGame(input: {
+  moves: Array<{ moveNumber: number; san: string; color: string }>;
+  opening: string | null;
+  result: string;
+  whiteUsername: string;
+  blackUsername: string;
+}): Promise<MoveReview[]> {
+  const { moves, opening, result, whiteUsername, blackUsername } = input;
+
+  const moveList = moves
+    .map((m, i) => `${i}: ${m.moveNumber}${m.color === "white" ? "." : "..."} ${m.san}`)
+    .join("\n");
+
+  const prompt = `You are a master chess coach. Review this complete chess game and classify EVERY single move.
+
+Game: ${whiteUsername} (White) vs ${blackUsername} (Black)
+Opening: ${opening ?? "Unknown"} | Result: ${result}
+
+Move list (format: index: moveNum. san):
+${moveList}
+
+Classify each move as ONE of:
+- "brilliant": unexpected, deeply calculated, significantly improves position
+- "excellent": very strong, best or near-best move
+- "good": solid, reasonable move
+- "book": standard opening/endgame theory (typically first 10-12 moves)
+- "inaccuracy": suboptimal, a clearly better option was missed
+- "mistake": clear error, noticeably worsens the position
+- "blunder": serious error that loses material or the game
+
+For each move provide:
+1. classification (required)
+2. explanation: concise 1–2 sentence explanation of why this classification (required)
+3. betterMove: for inaccuracy/mistake/blunder only — the better move in SAN notation (e.g. "Nf6", "d4", "Bxd5+"). For good/excellent/brilliant/book set null.
+
+Respond with valid JSON covering ALL ${moves.length} moves in order:
+{
+  "moves": [
+    {
+      "moveIndex": 0,
+      "san": "e4",
+      "color": "white",
+      "classification": "book",
+      "explanation": "Standard central pawn opening move, controlling d5 and f5.",
+      "betterMove": null
+    }
+  ]
+}`;
+
+  try {
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      max_completion_tokens: 8000,
+      messages: [{ role: "user", content: prompt }],
+      response_format: { type: "json_object" },
+    });
+
+    const content = response.choices[0]?.message?.content ?? "{}";
+    const parsed = JSON.parse(content) as { moves?: Array<Partial<MoveReview>> };
+    const validClassifications = ["brilliant", "excellent", "good", "book", "inaccuracy", "mistake", "blunder"];
+
+    return (parsed.moves ?? []).map((m, i) => ({
+      moveIndex: typeof m.moveIndex === "number" ? m.moveIndex : i,
+      san: m.san ?? moves[i]?.san ?? "",
+      color: (m.color ?? moves[i]?.color ?? "white") as "white" | "black",
+      classification: (validClassifications.includes(m.classification ?? "")
+        ? m.classification
+        : "good") as MoveReview["classification"],
+      explanation: m.explanation ?? "",
+      betterMove: m.betterMove ?? null,
+    }));
+  } catch (err) {
+    logger.error({ err }, "Failed to review full game with OpenAI");
+    return [];
+  }
+}
+
 interface CourseLesson {
   title: string;
   content: string;

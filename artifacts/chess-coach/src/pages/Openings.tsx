@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
+import { Link, useLocation } from 'wouter';
 import { motion } from 'framer-motion';
-import { BookOpen, Search, TrendingUp, TrendingDown, ArrowUpDown, ChevronUp, ChevronDown } from 'lucide-react';
+import { BookOpen, Search, TrendingUp, TrendingDown, ArrowUpDown, ChevronUp, ChevronDown, ChevronRight } from 'lucide-react';
 import { useMyOpenings, type OpeningStat } from '@/hooks/use-openings';
 
 type SortKey = 'totalGames' | 'winRate' | 'opening' | 'whiteWinRate' | 'blackWinRate';
@@ -49,6 +50,7 @@ function ColorCell({ stat }: { stat: { games: number; wins: number; losses: numb
 
 export function Openings() {
   const { data, isLoading } = useMyOpenings();
+  const [, navigate] = useLocation();
   const [search, setSearch] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('totalGames');
   const [sortAsc, setSortAsc] = useState(false);
@@ -238,13 +240,16 @@ export function Openings() {
                         No openings match your search.
                       </td>
                     </tr>
-                  ) : filtered.map((o, i) => (
+                  ) : filtered.map((o, i) => {
+                    const linkParam = encodeURIComponent(o.eco ?? o.opening);
+                    return (
                     <motion.tr
                       key={o.opening}
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       transition={{ delay: Math.min(i * 0.03, 0.3) }}
-                      className="hover:bg-white/[0.025] transition-colors"
+                      className="hover:bg-white/[0.025] transition-colors group cursor-pointer"
+                      onClick={() => navigate(`/openings/${linkParam}`)}
                     >
                       {/* Opening name */}
                       <td className="p-4">
@@ -254,7 +259,7 @@ export function Openings() {
                               {o.eco}
                             </span>
                           )}
-                          <span className="font-medium leading-snug">{o.opening}</span>
+                          <span className="font-medium leading-snug group-hover:text-primary transition-colors">{o.opening}</span>
                         </div>
                       </td>
 
@@ -290,9 +295,15 @@ export function Openings() {
                       <td className="p-4"><ColorCell stat={o.white} /></td>
 
                       {/* Black */}
-                      <td className="p-4"><ColorCell stat={o.black} /></td>
+                      <td className="p-4 pr-2"><ColorCell stat={o.black} /></td>
+
+                      {/* Arrow */}
+                      <td className="p-4 pl-0">
+                        <ChevronRight className="w-4 h-4 text-muted-foreground/30 group-hover:text-primary transition-colors" />
+                      </td>
                     </motion.tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
