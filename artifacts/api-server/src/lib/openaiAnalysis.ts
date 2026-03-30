@@ -462,16 +462,22 @@ Respond with valid JSON covering ALL ${moves.length} moves in order:
   try {
     const response = await openai.chat.completions.create({
       model: "gpt-4o-mini",
-      max_completion_tokens: 8000,
+      max_completion_tokens: 16000,
       messages: [{ role: "user", content: prompt }],
       response_format: { type: "json_object" },
     });
 
+    const finishReason = response.choices[0]?.finish_reason;
     const content = response.choices[0]?.message?.content ?? "{}";
+
+    if (finishReason === "length") {
+      logger.warn({ moves: moves.length }, "Review response truncated by token limit — trying to parse partial result");
+    }
+
     const parsed = JSON.parse(content) as { moves?: Array<Partial<MoveReview>> };
     const validClassifications = ["brilliant", "excellent", "good", "book", "inaccuracy", "mistake", "blunder"];
 
-    return (parsed.moves ?? []).map((m, i) => ({
+    const result = (parsed.moves ?? []).map((m, i) => ({
       moveIndex: typeof m.moveIndex === "number" ? m.moveIndex : i,
       san: m.san ?? moves[i]?.san ?? "",
       color: (m.color ?? moves[i]?.color ?? "white") as "white" | "black",
@@ -481,9 +487,15 @@ Respond with valid JSON covering ALL ${moves.length} moves in order:
       explanation: m.explanation ?? "",
       betterMove: m.betterMove ?? null,
     }));
+
+    if (result.length === 0) {
+      throw new Error("OpenAI returned an empty move list — possibly a model error or format issue");
+    }
+
+    return result;
   } catch (err) {
     logger.error({ err }, "Failed to review full game with OpenAI");
-    return [];
+    throw err; // Re-throw so the SSE route handler sends an error event
   }
 }
 

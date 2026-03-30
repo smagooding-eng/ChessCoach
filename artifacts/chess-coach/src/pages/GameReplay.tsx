@@ -134,7 +134,12 @@ export function GameReplay() {
           try {
             const payload = JSON.parse(dataStr) as Record<string, unknown>;
             if (eventName === 'result') {
-              setReviewMoves((payload.moves as ReviewMove[]) ?? []);
+              const moves = (payload.moves as ReviewMove[]) ?? [];
+              if (moves.length === 0) {
+                setReviewError('Review returned no data. Please try again.');
+              } else {
+                setReviewMoves(moves);
+              }
             } else if (eventName === 'error') {
               setReviewError((payload.message as string) ?? 'Review failed. Please try again.');
             } else if (eventName === 'done') {
