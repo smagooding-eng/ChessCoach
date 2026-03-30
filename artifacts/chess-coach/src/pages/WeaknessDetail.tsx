@@ -42,8 +42,14 @@ type RelatedCourse = {
   completedLessons: number;
 };
 
+type ExampleWithLinks = {
+  text: string;
+  gameIds: number[];
+};
+
 type WeaknessDetailData = {
   weakness: Weakness;
+  examplesWithLinks: ExampleWithLinks[];
   relatedGames: RelatedGame[];
   relatedCourses: RelatedCourse[];
 };
@@ -117,7 +123,7 @@ export function WeaknessDetail() {
     </div>
   );
 
-  const { weakness, relatedGames, relatedCourses } = data;
+  const { weakness, examplesWithLinks, relatedGames, relatedCourses } = data;
   const sev = SEV_CFG[weakness.severity] ?? SEV_CFG.Medium;
   const isWhite = (g: RelatedGame) => g.whiteUsername.toLowerCase() === username?.toLowerCase();
 
@@ -174,7 +180,7 @@ export function WeaknessDetail() {
       </motion.div>
 
       {/* Examples from AI */}
-      {weakness.examples?.length > 0 && (
+      {(examplesWithLinks?.length > 0 || weakness.examples?.length > 0) && (
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
@@ -186,12 +192,28 @@ export function WeaknessDetail() {
             AI-Identified Patterns
           </h2>
           <div className="space-y-3">
-            {weakness.examples.map((ex, i) => (
-              <div key={i} className="flex items-start gap-3 rounded-xl bg-white/3 border border-white/5 px-4 py-3">
-                <span className="w-6 h-6 rounded-full bg-amber-500/20 text-amber-400 text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
-                  {i + 1}
-                </span>
-                <p className="text-sm text-foreground/80 leading-relaxed">{ex}</p>
+            {(examplesWithLinks ?? weakness.examples.map(text => ({ text, gameIds: [] }))).map((ex, i) => (
+              <div key={i} className="rounded-xl bg-white/3 border border-white/5 px-4 py-3">
+                <div className="flex items-start gap-3">
+                  <span className="w-6 h-6 rounded-full bg-amber-500/20 text-amber-400 text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
+                    {i + 1}
+                  </span>
+                  <p className="text-sm text-foreground/80 leading-relaxed">{ex.text}</p>
+                </div>
+                {ex.gameIds.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-3 ml-9">
+                    {ex.gameIds.map((gameId, gi) => (
+                      <Link
+                        key={gameId}
+                        href={`/games/${gameId}`}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary/10 hover:bg-primary/20 border border-primary/20 hover:border-primary/40 text-primary text-xs font-semibold transition-all"
+                      >
+                        <Play className="w-3 h-3" />
+                        View Game {gi + 1}
+                      </Link>
+                    ))}
+                  </div>
+                )}
               </div>
             ))}
           </div>

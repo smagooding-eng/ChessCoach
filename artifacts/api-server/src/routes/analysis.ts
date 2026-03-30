@@ -264,8 +264,47 @@ router.get("/analysis/weaknesses/:id", async (req, res): Promise<void> => {
       )
     );
 
+  // Resolve "Game N" ordinal references in AI-generated examples to actual game IDs.
+  // The analysis uses orderBy(desc(playedAt)).limit(50), so Game 1 = most recent.
+  const analysisGames = await db
+    .select({ id: gamesTable.id })
+    .from(gamesTable)
+    .where(eq(gamesTable.username, weakness.username))
+    .orderBy(desc(gamesTable.playedAt))
+    .limit(50);
+
+  const ordinalToId: Record<number, number> = {};
+  analysisGames.forEach((g, idx) => { ordinalToId[idx + 1] = g.id; });
+
+  function extractGameIdsFromText(text: string): number[] {
+    const ids: number[] = [];
+    // Matches: "Game 2", "Games 29-30", "Games 6 and 13", etc.
+    const re = /[Gg]ames?\s+(\d+)(?:\s*[-–]\s*(\d+))?(?:\s+and\s+(\d+))?/g;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(text)) !== null) {
+      const start = parseInt(m[1]);
+      if (m[2]) {
+        const end = parseInt(m[2]);
+        for (let i = start; i <= end; i++) if (ordinalToId[i]) ids.push(ordinalToId[i]);
+      } else {
+        if (ordinalToId[start]) ids.push(ordinalToId[start]);
+      }
+      if (m[3]) {
+        const extra = parseInt(m[3]);
+        if (ordinalToId[extra]) ids.push(ordinalToId[extra]);
+      }
+    }
+    return [...new Set(ids)];
+  }
+
+  const examplesWithLinks = (weakness.examples ?? []).map((text) => ({
+    text,
+    gameIds: extractGameIdsFromText(text),
+  }));
+
   res.json({
     weakness: { ...weakness, createdAt: weakness.createdAt.toISOString() },
+    examplesWithLinks,
     relatedGames: relatedGames.map((g) => ({
       id: g.id,
       whiteUsername: g.whiteUsername,
