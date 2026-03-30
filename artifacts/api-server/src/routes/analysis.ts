@@ -110,6 +110,7 @@ router.post("/analysis/start", async (req, res): Promise<void> => {
 router.get("/analysis/status/:jobId", (req, res): void => {
   const job = analysisJobs.get(req.params.jobId as string);
   if (!job) { res.status(404).json({ error: "Job not found" }); return; }
+  res.setHeader("Cache-Control", "no-store");
   res.json({ status: job.status, error: job.error });
 });
 

@@ -60,7 +60,9 @@ export function Analysis() {
             return;
           }
           try {
-            const pollRes = await fetch(`/api/analysis/status/${jobId}`);
+            const pollRes = await fetch(`/api/analysis/status/${jobId}`, { cache: 'no-store' });
+            // 304 means cached "pending" — treat as still in progress
+            if (pollRes.status === 304) return;
             if (!pollRes.ok) {
               if (intervalRef.current) clearInterval(intervalRef.current);
               reject(new Error(`Poll error (${pollRes.status})`));

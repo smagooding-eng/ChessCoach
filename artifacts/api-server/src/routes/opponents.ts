@@ -57,6 +57,7 @@ router.get("/opponents/status/:jobId", (req, res): void => {
     res.status(404).json({ error: "Job not found or expired" });
     return;
   }
+  res.setHeader("Cache-Control", "no-store");
   res.json(job);
 });
 
