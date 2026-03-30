@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { useUser } from '@/hooks/use-user';
 
-type Classification = 'brilliant' | 'excellent' | 'good' | 'inaccuracy' | 'mistake' | 'blunder';
+type Classification = 'brilliant' | 'excellent' | 'good' | 'book' | 'inaccuracy' | 'mistake' | 'blunder';
 
 type MoveAnnotation = {
   moveIndex: number;
@@ -22,17 +22,19 @@ type MoveAnnotation = {
 
 type MoveAnalysis = {
   classification: Classification;
-  explanation: string;
+  pros: string[];
+  cons: string[];
   betterMove: string | null;
 };
 
 const CLASS_CFG: Record<Classification, { badge: string; color: string; full: string }> = {
-  brilliant:  { badge: '!!', color: 'text-cyan-400 bg-cyan-400/15 border-cyan-400/30',   full: 'Brilliant' },
-  excellent:  { badge: '!',  color: 'text-emerald-400 bg-emerald-400/15 border-emerald-400/30', full: 'Excellent' },
-  good:       { badge: '⊕',  color: 'text-green-400 bg-green-400/15 border-green-400/30', full: 'Good' },
-  inaccuracy: { badge: '?!', color: 'text-yellow-400 bg-yellow-400/15 border-yellow-400/30', full: 'Inaccuracy' },
-  mistake:    { badge: '?',  color: 'text-orange-400 bg-orange-400/15 border-orange-400/30', full: 'Mistake' },
-  blunder:    { badge: '??', color: 'text-rose-400 bg-rose-400/15 border-rose-400/30',     full: 'Blunder' },
+  brilliant:  { badge: '!!',  color: 'text-cyan-400 bg-cyan-400/15 border-cyan-400/30',      full: 'Brilliant' },
+  excellent:  { badge: '!',   color: 'text-emerald-400 bg-emerald-400/15 border-emerald-400/30', full: 'Excellent' },
+  good:       { badge: '✓',   color: 'text-green-400 bg-green-400/15 border-green-400/30',    full: 'Good' },
+  book:       { badge: '📖',  color: 'text-blue-400 bg-blue-400/15 border-blue-400/30',       full: 'Book Move' },
+  inaccuracy: { badge: '?!',  color: 'text-yellow-400 bg-yellow-400/15 border-yellow-400/30', full: 'Inaccuracy' },
+  mistake:    { badge: '?',   color: 'text-orange-400 bg-orange-400/15 border-orange-400/30', full: 'Mistake' },
+  blunder:    { badge: '??',  color: 'text-rose-400 bg-rose-400/15 border-rose-400/30',       full: 'Blunder' },
 };
 
 function formatClock(s: number | null | undefined): string {
@@ -61,6 +63,8 @@ export function GameReplay() {
   const analysisCache = useRef<Map<number, MoveAnalysis>>(new Map());
   const [moveAnalysis, setMoveAnalysis] = useState<MoveAnalysis | null>(null);
   const [loadingAnalysis, setLoadingAnalysis] = useState(false);
+  // Map of moveIndex → classification for move-list badges
+  const [moveClassifications, setMoveClassifications] = useState<Map<number, Classification>>(new Map());
 
   const playRef = useRef<NodeJS.Timeout | null>(null);
   const moveListRef  = useRef<HTMLDivElement>(null);
@@ -113,30 +117,39 @@ export function GameReplay() {
     }
   }, [currentMove, annotations]);
 
-  // Auto-fetch deep move analysis with debounce + cache
+  // Auto-fetch deep move analysis — debounced 350ms, cached, stale-safe
   useEffect(() => {
     if (!game || currentMove === 0) {
       setMoveAnalysis(null);
+      setLoadingAnalysis(false);
       return;
     }
     const moveIdx = currentMove - 1;
 
-    // Serve from cache instantly
+    // Serve from cache instantly (no loading flash)
     if (analysisCache.current.has(moveIdx)) {
       setMoveAnalysis(analysisCache.current.get(moveIdx)!);
+      setLoadingAnalysis(false);
       return;
     }
 
     setMoveAnalysis(null);
     setLoadingAnalysis(true);
 
+    let cancelled = false;
+
     const timer = setTimeout(async () => {
-      // Double-check cache in case another request completed while waiting
+      if (cancelled) return;
+
+      // Re-check cache (another tab/move might have populated it)
       if (analysisCache.current.has(moveIdx)) {
-        setMoveAnalysis(analysisCache.current.get(moveIdx)!);
-        setLoadingAnalysis(false);
+        if (!cancelled) {
+          setMoveAnalysis(analysisCache.current.get(moveIdx)!);
+          setLoadingAnalysis(false);
+        }
         return;
       }
+
       try {
         const res = await fetch(`/api/games/${game.id}/analyze-move`, {
           method: 'POST',
@@ -146,15 +159,26 @@ export function GameReplay() {
         if (!res.ok) throw new Error('fetch failed');
         const data = await res.json() as MoveAnalysis;
         analysisCache.current.set(moveIdx, data);
-        setMoveAnalysis(data);
+        if (!cancelled) {
+          setMoveAnalysis(data);
+          setMoveClassifications(prev => {
+            const next = new Map(prev);
+            next.set(moveIdx, data.classification);
+            return next;
+          });
+        }
       } catch {
-        setMoveAnalysis(null);
+        if (!cancelled) setMoveAnalysis(null);
       } finally {
-        setLoadingAnalysis(false);
+        if (!cancelled) setLoadingAnalysis(false);
       }
-    }, 400);
+    }, 350);
 
-    return () => clearTimeout(timer);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+      setLoadingAnalysis(false);
+    };
   }, [game, currentMove]);
 
   const currentFen = currentMove === 0 ? null : moves[currentMove - 1]?.fen;
@@ -287,6 +311,7 @@ export function GameReplay() {
             expectedMoveSan={expectedMoveSan}
             onMovePlayed={handleMovePlayed}
             lastMove={lastMove}
+            moveQuality={moveAnalysis?.classification ?? null}
           />
 
           {/* Playback controls */}
@@ -391,25 +416,53 @@ export function GameReplay() {
                 {/* Body */}
                 <div className="px-4 py-3 space-y-3">
                   {loadingAnalysis && !moveAnalysis ? (
-                    <div className="flex items-center gap-3 py-2">
+                    <div className="flex items-center gap-3 py-3">
                       <div className="w-4 h-4 border-2 border-primary/50 border-t-primary rounded-full animate-spin shrink-0" />
-                      <span className="text-sm text-muted-foreground">Getting AI analysis for this move…</span>
+                      <span className="text-sm text-muted-foreground">Analyzing this move…</span>
                     </div>
                   ) : moveAnalysis ? (
-                    <>
-                      <p className="text-sm leading-relaxed text-foreground/90">{moveAnalysis.explanation}</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      {/* Pros */}
+                      <div className="space-y-1.5">
+                        <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-emerald-400 mb-2">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block" />
+                          Strengths
+                        </div>
+                        {moveAnalysis.pros.length > 0 ? moveAnalysis.pros.map((pro, i) => (
+                          <div key={i} className="flex items-start gap-2 text-xs text-foreground/85 leading-relaxed">
+                            <span className="text-emerald-400 shrink-0 mt-0.5 font-bold">+</span>
+                            <span>{pro}</span>
+                          </div>
+                        )) : <p className="text-xs text-muted-foreground italic">None noted</p>}
+                      </div>
+
+                      {/* Cons */}
+                      <div className="space-y-1.5">
+                        <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-rose-400 mb-2">
+                          <span className="w-1.5 h-1.5 rounded-full bg-rose-400 inline-block" />
+                          Weaknesses
+                        </div>
+                        {moveAnalysis.cons.length > 0 ? moveAnalysis.cons.map((con, i) => (
+                          <div key={i} className="flex items-start gap-2 text-xs text-foreground/85 leading-relaxed">
+                            <span className="text-rose-400 shrink-0 mt-0.5 font-bold">−</span>
+                            <span>{con}</span>
+                          </div>
+                        )) : <p className="text-xs text-muted-foreground italic">None noted</p>}
+                      </div>
+
+                      {/* Better move — full width */}
                       {isBad && moveAnalysis.betterMove && (
-                        <div className="flex items-start gap-2.5 rounded-xl bg-amber-500/8 border border-amber-500/20 px-3 py-2.5">
+                        <div className="col-span-2 flex items-start gap-2.5 rounded-xl bg-amber-500/8 border border-amber-500/20 px-3 py-2.5">
                           <Lightbulb className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-                          <div className="text-sm">
-                            <span className="text-amber-400 font-bold text-xs uppercase tracking-wide block mb-0.5">Better move</span>
-                            <span className="text-foreground/80">{moveAnalysis.betterMove}</span>
+                          <div className="text-xs">
+                            <span className="text-amber-400 font-bold text-[11px] uppercase tracking-wide block mb-0.5">Better move</span>
+                            <span className="text-foreground/80 leading-relaxed">{moveAnalysis.betterMove}</span>
                           </div>
                         </div>
                       )}
-                    </>
+                    </div>
                   ) : (
-                    <p className="text-sm text-muted-foreground italic">Navigate to a move to see AI analysis.</p>
+                    <p className="text-sm text-muted-foreground italic py-1">Navigate to a move to see analysis.</p>
                   )}
                 </div>
               </div>
@@ -467,49 +520,49 @@ export function GameReplay() {
               const wa = getAnnotation(wi);
               const ba = getAnnotation(bi);
 
+              // Prefer per-move AI classification over batch annotation
+              const wClass: Classification | null =
+                moveClassifications.get(wi) ?? wa?.classification ?? null;
+              const bClass: Classification | null =
+                moveClassifications.get(bi) ?? ba?.classification ?? null;
+
+              const MoveBtn = ({
+                moveIndex,
+                move,
+                cls,
+              }: {
+                moveIndex: number;
+                move: typeof wm;
+                cls: Classification | null;
+              }) => {
+                if (!move) return <div className="flex-1" />;
+                const isActive = currentMove === moveIndex + 1;
+                return (
+                  <button
+                    ref={isActive ? activeRowRef : null}
+                    onClick={() => { setCurrentMove(moveIndex + 1); setPracticeMode(false); }}
+                    className={`flex-1 flex items-center gap-1 py-1.5 px-2 rounded-lg font-mono text-xs text-left transition-colors
+                      ${isActive ? 'bg-primary text-primary-foreground font-bold' : 'hover:bg-white/5'}`}
+                  >
+                    <span className="truncate">{move.san}</span>
+                    {cls ? (
+                      <span className={`text-[9px] font-bold shrink-0 px-1 py-0.5 rounded border ${CLASS_CFG[cls].color}`}>
+                        {CLASS_CFG[cls].badge}
+                      </span>
+                    ) : move.clockSeconds != null ? (
+                      <span className="text-[9px] text-muted-foreground/50 shrink-0 ml-auto">
+                        {formatClock(move.clockSeconds)}
+                      </span>
+                    ) : null}
+                  </button>
+                );
+              };
+
               return (
                 <div key={i} className="flex items-center gap-0.5 text-sm">
                   <span className="w-7 text-muted-foreground font-mono text-xs shrink-0 text-right pr-1">{i + 1}.</span>
-
-                  <button
-                    ref={currentMove === wi + 1 ? activeRowRef : null}
-                    onClick={() => { setCurrentMove(wi + 1); setPracticeMode(false); }}
-                    className={`flex-1 flex items-center gap-1 py-1.5 px-2 rounded-lg font-mono text-xs text-left transition-colors
-                      ${currentMove === wi + 1 ? 'bg-primary text-primary-foreground font-bold' : 'hover:bg-white/5'}`}
-                  >
-                    <span className="truncate">{wm?.san}</span>
-                    {wa && (
-                      <span className={`text-[9px] font-bold shrink-0 px-1 py-0.5 rounded border ${CLASS_CFG[wa.classification].color}`}>
-                        {CLASS_CFG[wa.classification].badge}
-                      </span>
-                    )}
-                    {!wa && wm?.clockSeconds != null && (
-                      <span className="text-[9px] text-muted-foreground/50 shrink-0 ml-auto">
-                        {formatClock(wm.clockSeconds)}
-                      </span>
-                    )}
-                  </button>
-
-                  {bm ? (
-                    <button
-                      ref={currentMove === bi + 1 ? activeRowRef : null}
-                      onClick={() => { setCurrentMove(bi + 1); setPracticeMode(false); }}
-                      className={`flex-1 flex items-center gap-1 py-1.5 px-2 rounded-lg font-mono text-xs text-left transition-colors
-                        ${currentMove === bi + 1 ? 'bg-primary text-primary-foreground font-bold' : 'hover:bg-white/5'}`}
-                    >
-                      <span className="truncate">{bm.san}</span>
-                      {ba && (
-                        <span className={`text-[9px] font-bold shrink-0 px-1 py-0.5 rounded border ${CLASS_CFG[ba.classification].color}`}>
-                          {CLASS_CFG[ba.classification].badge}
-                        </span>
-                      )}
-                      {!ba && bm.clockSeconds != null && (
-                        <span className="text-[9px] text-muted-foreground/50 shrink-0 ml-auto">
-                          {formatClock(bm.clockSeconds)}
-                        </span>
-                      )}
-                    </button>
-                  ) : <div className="flex-1" />}
+                  <MoveBtn moveIndex={wi} move={wm} cls={wClass} />
+                  <MoveBtn moveIndex={bi} move={bm} cls={bClass} />
                 </div>
               );
             })}

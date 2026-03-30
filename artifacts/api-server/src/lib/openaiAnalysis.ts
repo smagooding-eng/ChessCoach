@@ -160,8 +160,9 @@ Respond with valid JSON:
 }
 
 export interface SingleMoveAnalysis {
-  classification: "brilliant" | "excellent" | "good" | "inaccuracy" | "mistake" | "blunder";
-  explanation: string;
+  classification: "brilliant" | "excellent" | "good" | "book" | "inaccuracy" | "mistake" | "blunder";
+  pros: string[];
+  cons: string[];
   betterMove: string | null;
 }
 
@@ -192,6 +193,8 @@ export async function analyzeSingleMove(input: AnalyzeSingleMoveInput): Promise<
   const playerColor = target.color;
   const player = playerColor === "white" ? whiteUsername : blackUsername;
 
+  const isEarlyMove = moveIndex < 20;
+
   const prompt = `You are an expert chess coach providing in-depth move analysis.
 
 Game: ${whiteUsername} (White) vs ${blackUsername} (Black)
@@ -203,17 +206,26 @@ ${contextMoves}
 
 The player "${player}" (${playerColor}) played ${target.moveNumber}${playerColor === 'white' ? '.' : '...'} ${target.san}.
 
-Provide a thorough analysis of this specific move. Consider:
-1. What does this move accomplish? (tactical threats, positional goals, development)
-2. How good or bad is this move? (brilliant/excellent/good/inaccuracy/mistake/blunder)
-3. What are the consequences of this move?
-4. If it is an inaccuracy, mistake, or blunder — what was the better alternative and why?
+Classify this move using exactly one of these labels:
+- "book": A well-known theoretical opening move found in standard chess books/databases${isEarlyMove ? ' (likely for early game moves)' : ''}
+- "brilliant": A stunning, non-obvious move — often a sacrifice — that is clearly the best
+- "excellent": A very strong move, near-best, shows deep understanding
+- "good": A solid, correct move that maintains or improves the position
+- "inaccuracy": A slightly suboptimal move that misses a better option
+- "mistake": A clear error that noticeably worsens the position
+- "blunder": A serious error that loses material or the game
+
+Then provide:
+- 2-3 specific PROS of this move (what it achieves, threats it creates, positional gains). Even bad moves have some logic.
+- 2-3 specific CONS of this move (weaknesses it creates, what it misses, downsides). Even great moves have some trade-offs.
+- If classification is inaccuracy/mistake/blunder: the better move and a brief reason why
 
 Respond with valid JSON:
 {
   "classification": "good",
-  "explanation": "3-5 sentence detailed explanation of the move covering what it achieves, why it is classified this way, and its consequences.",
-  "betterMove": "Nf3 — brief reason why this was better (only include if classification is inaccuracy/mistake/blunder, otherwise null)"
+  "pros": ["Controls the center with a pawn", "Opens diagonals for the bishop"],
+  "cons": ["Slightly weakens the d4 square", "Opponent can challenge with ...d5"],
+  "betterMove": "Nf3 — develops a piece and controls e5 without committing the pawn structure (only for inaccuracy/mistake/blunder, else null)"
 }`;
 
   try {
@@ -228,7 +240,8 @@ Respond with valid JSON:
     const parsed = JSON.parse(content) as SingleMoveAnalysis;
     return {
       classification: parsed.classification ?? "good",
-      explanation: parsed.explanation ?? "",
+      pros: Array.isArray(parsed.pros) ? parsed.pros : [],
+      cons: Array.isArray(parsed.cons) ? parsed.cons : [],
       betterMove: parsed.betterMove ?? null,
     };
   } catch (err) {
