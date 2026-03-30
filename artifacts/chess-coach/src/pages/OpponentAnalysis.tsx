@@ -79,53 +79,44 @@ export function OpponentAnalysis() {
     setLoading(true);
     setError(null);
     setResult(null);
-    setStatusMsg('Connecting…');
+    setStatusMsg('Starting analysis…');
 
     try {
-      const res = await fetch('/api/opponents/analyze', {
+      // Step 1: start the job — returns immediately with a jobId
+      const startRes = await fetch('/api/opponents/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-chess-username': username ?? '' },
         body: JSON.stringify({ username: target }),
       });
-      if (!res.ok || !res.body) throw new Error('Connection failed');
-
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-
-        const parts = buffer.split('\n\n');
-        buffer = parts.pop() ?? '';
-
-        for (const part of parts) {
-          let eventName = '';
-          let dataStr = '';
-          for (const line of part.split('\n')) {
-            if (line.startsWith('event: ')) eventName = line.slice(7).trim();
-            else if (line.startsWith('data: ')) dataStr = line.slice(6).trim();
-          }
-          if (!dataStr) continue;
-
-          try {
-            const payload = JSON.parse(dataStr) as Record<string, unknown>;
-            if (eventName === 'started') {
-              setStatusMsg('Fetching games & running AI analysis… this may take 30–60 seconds');
-            } else if (eventName === 'result') {
-              setResult(payload as unknown as OpponentResult);
-              setStatusMsg('');
-            } else if (eventName === 'error') {
-              setError((payload.message as string) ?? 'Analysis failed. Please try again.');
-              setStatusMsg('');
-            } else if (eventName === 'done') {
-              setLoading(false);
-            }
-          } catch { /* ignore parse errors in heartbeat/comment lines */ }
-        }
+      if (!startRes.ok) {
+        const j = await startRes.json().catch(() => ({})) as Record<string, unknown>;
+        throw new Error((j.error as string) || `Server error (${startRes.status})`);
       }
+      const { jobId } = await startRes.json() as { jobId: string };
+      setStatusMsg('Fetching games & running AI analysis… this may take 30–60 seconds');
+
+      // Step 2: poll every 3 seconds until done
+      await new Promise<void>((resolve, reject) => {
+        const interval = setInterval(async () => {
+          try {
+            const pollRes = await fetch(`/api/opponents/status/${jobId}`);
+            if (!pollRes.ok) { clearInterval(interval); reject(new Error(`Poll error (${pollRes.status})`)); return; }
+            const job = await pollRes.json() as { status: string; result?: OpponentResult; error?: string };
+            if (job.status === 'done') {
+              clearInterval(interval);
+              setResult(job.result!);
+              setStatusMsg('');
+              resolve();
+            } else if (job.status === 'error') {
+              clearInterval(interval);
+              reject(new Error(job.error || 'Analysis failed. Please try again.'));
+            }
+          } catch (err) {
+            clearInterval(interval);
+            reject(err);
+          }
+        }, 3000);
+      });
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.');
     } finally {

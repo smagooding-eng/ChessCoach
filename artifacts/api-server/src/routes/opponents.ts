@@ -3,12 +3,31 @@ import { db, gamesTable } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { fetchChessComGames, extractGameMetadata, fetchChessComProfile } from "../lib/chesscom";
 import { analyzePlayerGames } from "../lib/openaiAnalysis";
+import { randomUUID } from "crypto";
 
 const router: IRouter = Router();
 
-// SSE endpoint — keeps connection alive via heartbeats past proxy timeouts
-// Events: "started", heartbeat (comment), "result" (JSON payload), "error", "done"
-router.post("/opponents/analyze", async (req, res): Promise<void> => {
+// In-memory job store — simple and sufficient for this use case
+type JobStatus = "pending" | "done" | "error";
+interface Job {
+  status: JobStatus;
+  result?: Record<string, unknown>;
+  error?: string;
+  createdAt: number;
+}
+
+const jobs = new Map<string, Job>();
+
+// Prune jobs older than 10 minutes every 5 minutes
+setInterval(() => {
+  const cutoff = Date.now() - 10 * 60 * 1000;
+  for (const [id, job] of jobs) {
+    if (job.createdAt < cutoff) jobs.delete(id);
+  }
+}, 5 * 60 * 1000);
+
+// POST /api/opponents/start — kick off analysis, return jobId immediately
+router.post("/opponents/start", async (req, res): Promise<void> => {
   const { username } = req.body as { username?: string };
   const requestingUser = (req.headers["x-chess-username"] as string | undefined)?.toLowerCase() || null;
 
@@ -18,27 +37,36 @@ router.post("/opponents/analyze", async (req, res): Promise<void> => {
   }
 
   const target = username.trim().toLowerCase();
-  req.log.info({ target }, "Analyzing opponent");
+  const jobId = randomUUID();
 
-  // Set up SSE immediately so the proxy doesn't time out
-  res.setHeader("Content-Type", "text/event-stream");
-  res.setHeader("Cache-Control", "no-cache");
-  res.setHeader("Connection", "keep-alive");
-  res.flushHeaders();
+  jobs.set(jobId, { status: "pending", createdAt: Date.now() });
+  res.json({ jobId });
 
-  const sendEvent = (name: string, data: unknown) => {
-    res.write(`event: ${name}\ndata: ${JSON.stringify(data)}\n\n`);
-  };
+  req.log.info({ target, jobId }, "Analyzing opponent (background)");
 
-  sendEvent("started", { target });
+  // Run analysis in background — don't await
+  runAnalysis(target, requestingUser, jobId, req.log).catch((err) => {
+    req.log.error({ err, jobId }, "Background analysis failed");
+  });
+});
 
-  // Heartbeat every 15 s to keep the proxy connection alive
-  const heartbeat = setInterval(() => {
-    res.write(": heartbeat\n\n");
-  }, 15000);
+// GET /api/opponents/status/:jobId — poll for results
+router.get("/opponents/status/:jobId", (req, res): void => {
+  const job = jobs.get(req.params.jobId);
+  if (!job) {
+    res.status(404).json({ error: "Job not found or expired" });
+    return;
+  }
+  res.json(job);
+});
 
+async function runAnalysis(
+  target: string,
+  requestingUser: string | null,
+  jobId: string,
+  log: typeof import("pino").default.prototype,
+): Promise<void> {
   try {
-    // Fetch profile and games in parallel
     const [profileResult, gamesResult] = await Promise.allSettled([
       fetchChessComProfile(target),
       fetchChessComGames(target, 2),
@@ -46,10 +74,12 @@ router.post("/opponents/analyze", async (req, res): Promise<void> => {
 
     if (gamesResult.status === "rejected" || (gamesResult.status === "fulfilled" && gamesResult.value.length === 0)) {
       const noGames = gamesResult.status === "fulfilled" && gamesResult.value.length === 0;
-      sendEvent("error", {
-        message: noGames
+      jobs.set(jobId, {
+        status: "error",
+        error: noGames
           ? `No recent games found for "${target}".`
           : `Could not fetch games for "${target}". Check the username.`,
+        createdAt: jobs.get(jobId)!.createdAt,
       });
       return;
     }
@@ -71,15 +101,17 @@ router.post("/opponents/analyze", async (req, res): Promise<void> => {
       };
     });
 
-    // AI analysis
     const analysis = await analyzePlayerGames(target, gameSummaries);
 
     if (!analysis || !Array.isArray(analysis.weaknesses)) {
-      sendEvent("error", { message: "AI analysis returned an unexpected response. Please try again." });
+      jobs.set(jobId, {
+        status: "error",
+        error: "AI analysis returned an unexpected response. Please try again.",
+        createdAt: jobs.get(jobId)!.createdAt,
+      });
       return;
     }
 
-    // Win/loss/draw stats
     let wins = 0, losses = 0, draws = 0;
     const openingMap = new Map<string, { games: number; wins: number }>();
     for (const g of gameSummaries) {
@@ -99,7 +131,6 @@ router.post("/opponents/analyze", async (req, res): Promise<void> => {
       .sort((a, b) => b.games - a.games)
       .slice(0, 5);
 
-    // Head-to-head
     let headToHead: { wins: number; losses: number; draws: number; total: number } | null = null;
     if (requestingUser && requestingUser !== target) {
       try {
@@ -134,29 +165,35 @@ router.post("/opponents/analyze", async (req, res): Promise<void> => {
           headToHead = { wins: h2wWins, losses: h2hLosses, draws: h2hDraws, total: h2hRows.length };
         }
       } catch (err) {
-        req.log.warn({ err }, "Head-to-head query failed");
+        log.warn({ err }, "Head-to-head query failed");
       }
     }
 
-    sendEvent("result", {
-      username: target,
-      profile,
-      gamesAnalyzed: gameSummaries.length,
-      wins,
-      losses,
-      draws,
-      weaknesses: analysis.weaknesses,
-      topOpenings,
-      headToHead,
+    jobs.set(jobId, {
+      status: "done",
+      result: {
+        username: target,
+        profile,
+        gamesAnalyzed: gameSummaries.length,
+        wins,
+        losses,
+        draws,
+        weaknesses: analysis.weaknesses,
+        topOpenings,
+        headToHead,
+      },
+      createdAt: jobs.get(jobId)!.createdAt,
     });
-    sendEvent("done", {});
+
+    log.info({ jobId, target }, "Opponent analysis complete");
   } catch (err) {
-    req.log.error({ err }, "Opponent analysis failed");
-    sendEvent("error", { message: "Analysis failed. Please try again in a moment." });
-  } finally {
-    clearInterval(heartbeat);
-    res.end();
+    log.error({ err, jobId }, "Opponent analysis error");
+    jobs.set(jobId, {
+      status: "error",
+      error: "Analysis failed. Please try again in a moment.",
+      createdAt: jobs.get(jobId)!.createdAt,
+    });
   }
-});
+}
 
 export default router;
