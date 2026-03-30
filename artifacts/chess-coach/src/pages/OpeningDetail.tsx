@@ -1,15 +1,17 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { useParams, Link } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
 import { useUser } from '@/hooks/use-user';
 import { useMyOpenings } from '@/hooks/use-openings';
 import { ChessBoard } from '@/components/ChessBoard';
+import type { MoveQuality } from '@/components/ChessBoard';
 import { Chess } from 'chess.js';
 import {
   ArrowLeft, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
-  BookOpen, TrendingUp, TrendingDown, Play, Swords, Target, ChevronRight as ChevronRightIcon
+  BookOpen, TrendingUp, TrendingDown, Play, Swords, Target, ChevronRight as ChevronRightIcon,
+  GraduationCap, RotateCcw, CheckCircle2, XCircle
 } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 
 type OpeningMove = {
   san: string;
@@ -103,6 +105,75 @@ export function OpeningDetail() {
     } catch { return null; }
   }, [step, mainLine]);
 
+  // ── Practice Mode ────────────────────────────────────────────────────────────
+  const [practicing, setPracticing] = useState(false);
+  const [practiceStep, setPracticeStep] = useState(0);
+  const [feedback, setFeedback] = useState<'correct' | 'wrong' | null>(null);
+  const [moveQuality, setMoveQuality] = useState<MoveQuality | null>(null);
+  const [practiceComplete, setPracticeComplete] = useState(false);
+
+  const practiceFen = practiceStep === 0 ? null : mainLine[practiceStep - 1]?.fen ?? null;
+  const expectedMove = mainLine[practiceStep]?.san ?? null;
+
+  const practiceLastMove = useMemo(() => {
+    if (practiceStep === 0) return null;
+    const move = mainLine[practiceStep - 1];
+    if (!move?.san) return null;
+    const prevFen = practiceStep === 1 ? undefined : mainLine[practiceStep - 2]?.fen;
+    try {
+      const chess = new Chess(prevFen);
+      const result = chess.move(move.san);
+      return result ? { from: result.from, to: result.to } : null;
+    } catch { return null; }
+  }, [practiceStep, mainLine]);
+
+  const handlePracticeMove = useCallback((san: string, isCorrect: boolean) => {
+    if (isCorrect) {
+      setFeedback('correct');
+      setMoveQuality('great');
+      setTimeout(() => {
+        setFeedback(null);
+        setMoveQuality(null);
+        const nextStep = practiceStep + 1;
+        if (nextStep >= mainLine.length) {
+          setPracticeComplete(true);
+        } else {
+          setPracticeStep(nextStep);
+        }
+      }, 900);
+    } else {
+      setFeedback('wrong');
+      setMoveQuality('blunder');
+      setTimeout(() => {
+        setFeedback(null);
+        setMoveQuality(null);
+      }, 1200);
+    }
+  }, [practiceStep, mainLine.length]);
+
+  function startPractice() {
+    setPracticing(true);
+    setPracticeStep(0);
+    setFeedback(null);
+    setMoveQuality(null);
+    setPracticeComplete(false);
+  }
+
+  function resetPractice() {
+    setPracticeStep(0);
+    setFeedback(null);
+    setMoveQuality(null);
+    setPracticeComplete(false);
+  }
+
+  // Auto-play computer's moves (when it's not the user's expected move in practice mode)
+  useEffect(() => {
+    if (!practicing || practiceComplete || mainLine.length === 0) return;
+    // Determine whose turn it is: even step = white to move, odd = black to move
+    // The practice assumes user plays both sides following the main line
+    // No auto-play needed — user plays each move in sequence
+  }, [practicing, practiceStep, practiceComplete, mainLine]);
+
   // Other openings for sidebar (top 8 others)
   const otherOpenings = useMemo(() => {
     if (!openingsData?.openings) return [];
@@ -189,11 +260,34 @@ export function OpeningDetail() {
         {/* ── Left: Board walkthrough + games ── */}
         <div className="space-y-5">
 
-          {/* Section title */}
-          <div className="flex items-center gap-2">
-            <Target className="w-5 h-5 text-primary" />
-            <h2 className="text-lg font-bold">Opening Walkthrough</h2>
-            <span className="text-xs text-muted-foreground">— your most-played line</span>
+          {/* Section title + Practice toggle */}
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <div className="flex items-center gap-2">
+              <Target className="w-5 h-5 text-primary" />
+              <h2 className="text-lg font-bold">Opening {practicing ? 'Practice' : 'Walkthrough'}</h2>
+              {!practicing && <span className="text-xs text-muted-foreground">— your most-played line</span>}
+            </div>
+            {mainLine.length > 0 && (
+              <div className="flex gap-2">
+                {practicing ? (
+                  <>
+                    <button onClick={resetPractice}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-secondary text-muted-foreground hover:text-foreground text-sm font-medium transition-colors">
+                      <RotateCcw className="w-3.5 h-3.5" /> Restart
+                    </button>
+                    <button onClick={() => setPracticing(false)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-secondary text-muted-foreground hover:text-foreground text-sm font-medium transition-colors">
+                      <Target className="w-3.5 h-3.5" /> Walkthrough
+                    </button>
+                  </>
+                ) : (
+                  <button onClick={startPractice}
+                    className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-primary text-primary-foreground text-sm font-bold shadow shadow-primary/30 hover:bg-primary/90 transition-colors">
+                    <GraduationCap className="w-3.5 h-3.5" /> Practice
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
           {mainLine.length === 0 ? (
@@ -201,7 +295,91 @@ export function OpeningDetail() {
               <BookOpen className="w-10 h-10 mx-auto mb-3 opacity-30" />
               <p>No game data available for this opening.</p>
             </div>
+          ) : practicing ? (
+            /* ── Practice Mode ─────────────────────────────────────── */
+            <>
+              {practiceComplete ? (
+                <div className="glass-card rounded-2xl py-16 text-center space-y-4">
+                  <CheckCircle2 className="w-14 h-14 text-emerald-400 mx-auto" />
+                  <h3 className="text-2xl font-bold text-emerald-400">Line Complete!</h3>
+                  <p className="text-muted-foreground">You played all {mainLine.length} moves correctly.</p>
+                  <button onClick={resetPractice}
+                    className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-primary text-primary-foreground font-bold hover:bg-primary/90 transition-colors">
+                    <RotateCcw className="w-4 h-4" /> Practice Again
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <ChessBoard
+                    fen={practiceFen}
+                    flipped={false}
+                    practiceMode={true}
+                    expectedMoveSan={expectedMove}
+                    onMovePlayed={handlePracticeMove}
+                    lastMove={practiceLastMove}
+                    moveQuality={moveQuality}
+                  />
+
+                  {/* Feedback banner */}
+                  <AnimatePresence>
+                    {feedback && (
+                      <motion.div
+                        key={feedback}
+                        initial={{ opacity: 0, y: -8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0 }}
+                        className={`flex items-center gap-3 px-4 py-3 rounded-xl font-semibold text-sm
+                          ${feedback === 'correct' ? 'bg-emerald-500/15 border border-emerald-500/30 text-emerald-400' : 'bg-red-500/15 border border-red-500/30 text-red-400'}`}
+                      >
+                        {feedback === 'correct'
+                          ? <><CheckCircle2 className="w-4 h-4 shrink-0" /> Correct! Move {practiceStep} of {mainLine.length}</>
+                          : <><XCircle className="w-4 h-4 shrink-0" /> Not quite — the correct move is <span className="font-mono font-bold ml-1">{expectedMove}</span>. Try again!</>
+                        }
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  {/* Practice info */}
+                  <div className="glass-card rounded-xl px-4 py-3 flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-7 h-7 rounded-full shrink-0 flex items-center justify-center text-[10px] font-bold
+                        ${mainLine[practiceStep]?.color === 'white' ? 'bg-[#f0d9b5] text-black' : 'bg-[#2d2d2d] border border-white/20 text-white'}`}>
+                        {mainLine[practiceStep]?.moveNumber}
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold">Play move {practiceStep + 1} of {mainLine.length}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {mainLine[practiceStep]?.color === 'white' ? 'White' : 'Black'} to move
+                        </p>
+                      </div>
+                    </div>
+                    {/* Progress */}
+                    <div className="flex-1 max-w-[140px]">
+                      <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
+                        <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${(practiceStep / mainLine.length) * 100}%` }} />
+                      </div>
+                      <p className="text-[10px] text-muted-foreground text-right mt-0.5">{practiceStep}/{mainLine.length}</p>
+                    </div>
+                  </div>
+
+                  {/* Move list (shows played moves) */}
+                  <div className="flex flex-wrap gap-1">
+                    {mainLine.map((m, i) => (
+                      <span key={i}
+                        className={`px-2 py-0.5 rounded-lg font-mono text-xs
+                          ${i < practiceStep ? 'bg-emerald-500/20 text-emerald-400' :
+                            i === practiceStep ? 'bg-primary/20 text-primary ring-1 ring-primary/40 font-bold' :
+                            'bg-secondary/50 text-muted-foreground/40'}`}
+                      >
+                        {m.color === 'white' ? `${m.moveNumber}.` : ''}{i < practiceStep ? m.san : '?'}
+                      </span>
+                    ))}
+                  </div>
+                </>
+              )}
+            </>
           ) : (
+            /* ── Walkthrough Mode ──────────────────────────────────── */
             <>
               {/* Chess board */}
               <ChessBoard

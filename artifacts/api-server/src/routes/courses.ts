@@ -13,8 +13,97 @@ import {
   UpdateCourseProgressResponse,
 } from "@workspace/api-zod";
 import { generateCourseForWeakness } from "../lib/openaiAnalysis";
+import { randomUUID } from "crypto";
+import type { Logger } from "pino";
 
 const router: IRouter = Router();
+
+// ── Job store for long-running course generation ──────────────────────────────
+type CourseJobStatus = "pending" | "done" | "error";
+interface CourseJob { status: CourseJobStatus; error?: string; createdAt: number; }
+const courseJobs = new Map<string, CourseJob>();
+setInterval(() => {
+  const cutoff = Date.now() - 10 * 60 * 1000;
+  for (const [id, job] of courseJobs) if (job.createdAt < cutoff) courseJobs.delete(id);
+}, 5 * 60 * 1000);
+
+async function runCourseGenerationJob(username: string, jobId: string, log: Logger): Promise<void> {
+  try {
+    const weaknesses = await db
+      .select()
+      .from(weaknessesTable)
+      .where(eq(weaknessesTable.username, username.toLowerCase()));
+
+    if (weaknesses.length === 0) {
+      courseJobs.set(jobId, { status: "error", error: "No weaknesses found. Run analysis first.", createdAt: Date.now() });
+      return;
+    }
+
+    for (const weakness of weaknesses.slice(0, 4)) {
+      try {
+        const courseData = await generateCourseForWeakness({
+          category: weakness.category,
+          severity: weakness.severity,
+          description: weakness.description,
+          frequency: weakness.frequency,
+          examples: weakness.examples,
+        });
+
+        const [course] = await db.insert(coursesTable).values({
+          username: username.toLowerCase(),
+          title: courseData.title,
+          description: courseData.description,
+          category: courseData.category,
+          difficulty: courseData.difficulty,
+          totalLessons: courseData.lessons.length,
+          completedLessons: 0,
+        }).returning();
+
+        for (const lesson of courseData.lessons) {
+          await db.insert(lessonsTable).values({
+            courseId: course.id,
+            title: lesson.title,
+            content: lesson.content,
+            orderIndex: lesson.orderIndex,
+            completed: "false",
+            examplePgn: lesson.examplePgn,
+            drillFen: lesson.drillFen ?? null,
+            drillExpectedMove: lesson.drillExpectedMove ?? null,
+            drillHint: lesson.drillHint ?? null,
+          });
+        }
+      } catch (err) {
+        log.error({ err, weakness: weakness.category }, "Failed to generate course for weakness");
+      }
+    }
+
+    log.info({ jobId, username }, "Course generation job complete");
+    courseJobs.set(jobId, { status: "done", createdAt: Date.now() });
+  } catch (err) {
+    log.error({ err, jobId }, "Course generation job failed");
+    const msg = err instanceof Error ? err.message : "Course generation failed";
+    courseJobs.set(jobId, { status: "error", error: msg, createdAt: Date.now() });
+  }
+}
+
+// POST /api/courses/generate-start — kick off generation, return jobId immediately
+router.post("/courses/generate-start", async (req, res): Promise<void> => {
+  const parsed = GenerateCoursesBody.safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
+  const { username } = parsed.data;
+  const jobId = randomUUID();
+  courseJobs.set(jobId, { status: "pending", createdAt: Date.now() });
+  res.json({ jobId });
+  runCourseGenerationJob(username.toLowerCase(), jobId, req.log).catch(() => {});
+});
+
+// GET /api/courses/generate-status/:jobId — poll for completion
+router.get("/courses/generate-status/:jobId", (req, res): void => {
+  const job = courseJobs.get(req.params.jobId as string);
+  if (!job) { res.status(404).json({ error: "Job not found" }); return; }
+  res.setHeader("Cache-Control", "no-store");
+  res.json({ status: job.status, error: job.error });
+});
 
 router.get("/courses", async (req, res): Promise<void> => {
   const query = ListCoursesQueryParams.safeParse(req.query);

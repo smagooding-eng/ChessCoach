@@ -4,7 +4,7 @@ import { Chess } from 'chess.js';
 
 const START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
-type MoveQuality = 'brilliant' | 'excellent' | 'good' | 'book' | 'inaccuracy' | 'mistake' | 'blunder';
+export type MoveQuality = 'brilliant' | 'excellent' | 'good' | 'book' | 'inaccuracy' | 'mistake' | 'blunder';
 
 const QUALITY_COLOR: Record<MoveQuality, string> = {
   brilliant:  'rgba(0, 220, 240, 0.60)',
