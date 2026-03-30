@@ -66,6 +66,7 @@ export function OpponentAnalysis() {
   const { username } = useUser();
   const [inputUsername, setInputUsername] = useState('');
   const [loading, setLoading] = useState(false);
+  const [statusMsg, setStatusMsg] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<OpponentResult | null>(null);
   const [expandedWeakness, setExpandedWeakness] = useState<number | null>(null);
@@ -73,11 +74,12 @@ export function OpponentAnalysis() {
   const handleAnalyze = async (e: React.FormEvent) => {
     e.preventDefault();
     const target = inputUsername.trim();
-    if (!target) return;
+    if (!target || loading) return;
 
     setLoading(true);
     setError(null);
     setResult(null);
+    setStatusMsg('Connecting…');
 
     try {
       const res = await fetch('/api/opponents/analyze', {
@@ -85,13 +87,50 @@ export function OpponentAnalysis() {
         headers: { 'Content-Type': 'application/json', 'x-chess-username': username ?? '' },
         body: JSON.stringify({ username: target }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Analysis failed');
-      setResult(data as OpponentResult);
+      if (!res.ok || !res.body) throw new Error('Connection failed');
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        const parts = buffer.split('\n\n');
+        buffer = parts.pop() ?? '';
+
+        for (const part of parts) {
+          let eventName = '';
+          let dataStr = '';
+          for (const line of part.split('\n')) {
+            if (line.startsWith('event: ')) eventName = line.slice(7).trim();
+            else if (line.startsWith('data: ')) dataStr = line.slice(6).trim();
+          }
+          if (!dataStr) continue;
+
+          try {
+            const payload = JSON.parse(dataStr) as Record<string, unknown>;
+            if (eventName === 'started') {
+              setStatusMsg('Fetching games & running AI analysis… this may take 30–60 seconds');
+            } else if (eventName === 'result') {
+              setResult(payload as unknown as OpponentResult);
+              setStatusMsg('');
+            } else if (eventName === 'error') {
+              setError((payload.message as string) ?? 'Analysis failed. Please try again.');
+              setStatusMsg('');
+            } else if (eventName === 'done') {
+              setLoading(false);
+            }
+          } catch { /* ignore parse errors in heartbeat/comment lines */ }
+        }
+      }
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Something went wrong');
+      setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.');
     } finally {
       setLoading(false);
+      setStatusMsg('');
     }
   };
 
@@ -133,6 +172,18 @@ export function OpponentAnalysis() {
           {loading ? 'Scouting…' : 'Scout'}
         </button>
       </form>
+
+      {/* Status message during long-running analysis */}
+      {loading && statusMsg && (
+        <motion.div
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="p-4 rounded-xl bg-primary/8 border border-primary/20 text-primary flex items-center gap-3"
+        >
+          <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+          <span className="text-sm">{statusMsg}</span>
+        </motion.div>
+      )}
 
       {/* Error */}
       {error && (
