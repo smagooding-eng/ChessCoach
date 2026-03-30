@@ -25,6 +25,9 @@ type MoveAnalysis = {
   pros: string[];
   cons: string[];
   betterMove: string | null;
+  cpLoss: number | null;
+  engineDepth: number | null;
+  engineAvailable: boolean;
 };
 
 const CLASS_CFG: Record<Classification, { badge: string; color: string; full: string }> = {
@@ -394,15 +397,28 @@ export function GameReplay() {
             return (
               <div className="glass-card rounded-2xl overflow-hidden border border-white/8">
                 {/* Header */}
-                <div className={`px-4 py-3 flex items-center gap-3 border-b border-white/5
+                <div className={`px-4 py-3 flex items-center gap-2 border-b border-white/5
                   ${cfg ? cfg.color.replace('text-', 'bg-').split(' ')[0] + '/8' : 'bg-white/3'}`}>
                   <BrainCircuit className={`w-4 h-4 shrink-0 ${cfg ? cfg.color.split(' ')[0] : 'text-primary'}`} />
                   <span className={`font-bold text-sm ${cfg ? cfg.color.split(' ')[0] : 'text-primary'}`}>
                     {cfg ? `${cfg.full} — ` : ''}<span className="font-mono">{move?.san}</span>
                   </span>
                   {cfg && (
-                    <span className={`ml-auto text-xs font-bold px-2 py-0.5 rounded border ${cfg.color}`}>
+                    <span className={`text-xs font-bold px-2 py-0.5 rounded border ${cfg.color}`}>
                       {cfg.badge}
+                    </span>
+                  )}
+                  {/* Centipawn loss badge */}
+                  {moveAnalysis?.cpLoss != null && (
+                    <span className="text-[10px] font-mono text-muted-foreground bg-white/5 px-1.5 py-0.5 rounded ml-1"
+                          title={`Stockfish depth ${moveAnalysis.engineDepth} · ${moveAnalysis.cpLoss} centipawn loss`}>
+                      {moveAnalysis.cpLoss === 0 ? '±0' : `-${moveAnalysis.cpLoss}`}cp
+                    </span>
+                  )}
+                  {/* Engine source badge */}
+                  {moveAnalysis?.engineAvailable && (
+                    <span className="hidden sm:flex items-center gap-1 text-[10px] text-muted-foreground/60 ml-1">
+                      <Cpu className="w-2.5 h-2.5" />d{moveAnalysis.engineDepth}
                     </span>
                   )}
                   {loadingAnalysis && (

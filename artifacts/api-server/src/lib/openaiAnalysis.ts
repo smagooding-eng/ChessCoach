@@ -164,10 +164,13 @@ export interface SingleMoveAnalysis {
   pros: string[];
   cons: string[];
   betterMove: string | null;
+  cpLoss: number | null;
+  engineDepth: number | null;
+  engineAvailable: boolean;
 }
 
 interface AnalyzeSingleMoveInput {
-  moves: Array<{ moveNumber: number; san: string; color: string }>;
+  moves: Array<{ moveNumber: number; san: string; color: string; from: string; to: string; fenBefore: string; fen: string | null }>;
   moveIndex: number;
   opening: string | null;
   result: string;
@@ -181,19 +184,43 @@ export async function analyzeSingleMove(input: AnalyzeSingleMoveInput): Promise<
   const target = moves[moveIndex];
   if (!target) throw new Error("Move not found");
 
-  // Build context: up to 4 moves before and 2 after for reference
+  const playerColor = target.color as "white" | "black";
+  const player = playerColor === "white" ? whiteUsername : blackUsername;
+  const fenBefore = target.fenBefore;
+  const fenAfter = target.fen ?? "";
+
+  // ── Step 1: Get engine evaluation from Lichess Cloud Eval ──────────────────
+  const { engineEvalMove } = await import("./engineAnalysis");
+  const engineResult = await engineEvalMove({
+    fenBefore,
+    fenAfter,
+    playedFrom: target.from,
+    playedTo: target.to,
+    playerColor,
+    moveIndex,
+  });
+
+  const classification = engineResult.classification;
+  const isBad = ["inaccuracy", "mistake", "blunder"].includes(classification);
+
+  // ── Step 2: GPT generates pros/cons given the engine verdict ───────────────
   const contextStart = Math.max(0, moveIndex - 4);
   const contextEnd = Math.min(moves.length - 1, moveIndex + 2);
   const contextMoves = moves.slice(contextStart, contextEnd + 1).map((m, i) => {
     const idx = contextStart + i;
     const marker = idx === moveIndex ? ">>> " : "    ";
-    return `${marker}${m.moveNumber}${m.color === 'white' ? '.' : '...'} ${m.san}`;
+    return `${marker}${m.moveNumber}${m.color === "white" ? "." : "..."} ${m.san}`;
   }).join("\n");
 
-  const playerColor = target.color;
-  const player = playerColor === "white" ? whiteUsername : blackUsername;
+  const cpInfo = engineResult.available
+    ? `Engine (Stockfish depth ${engineResult.depth}) says: centipawn loss = ${engineResult.cpLoss}. ` +
+      `Evaluation before: ${engineResult.engineCpBefore} cp (from white's perspective). ` +
+      `Evaluation after: ${engineResult.engineCpAfter} cp.`
+    : "Engine evaluation not available for this position.";
 
-  const isEarlyMove = moveIndex < 20;
+  const betterMoveHint = engineResult.engineBestMoveSan
+    ? `The engine's recommended move was ${engineResult.engineBestMoveSan}.`
+    : "";
 
   const prompt = `You are an expert chess coach providing in-depth move analysis.
 
@@ -204,28 +231,21 @@ Game result: ${result}
 Move being analyzed (marked with >>>):
 ${contextMoves}
 
-The player "${player}" (${playerColor}) played ${target.moveNumber}${playerColor === 'white' ? '.' : '...'} ${target.san}.
+The player "${player}" (${playerColor}) played ${target.moveNumber}${playerColor === "white" ? "." : "..."} ${target.san}.
 
-Classify this move using exactly one of these labels:
-- "book": A well-known theoretical opening move found in standard chess books/databases${isEarlyMove ? ' (likely for early game moves)' : ''}
-- "brilliant": A stunning, non-obvious move — often a sacrifice — that is clearly the best
-- "excellent": A very strong move, near-best, shows deep understanding
-- "good": A solid, correct move that maintains or improves the position
-- "inaccuracy": A slightly suboptimal move that misses a better option
-- "mistake": A clear error that noticeably worsens the position
-- "blunder": A serious error that loses material or the game
+ENGINE VERDICT: This move is classified as "${classification}" (determined by Stockfish engine).
+${cpInfo}
+${betterMoveHint}
 
-Then provide:
-- 2-3 specific PROS of this move (what it achieves, threats it creates, positional gains). Even bad moves have some logic.
-- 2-3 specific CONS of this move (weaknesses it creates, what it misses, downsides). Even great moves have some trade-offs.
-- If classification is inaccuracy/mistake/blunder: the better move and a brief reason why
+Your task: Provide 2-3 specific PROS and 2-3 specific CONS for this move. Be concrete and chess-specific.
+- PROS: What does this move achieve? What threats does it create? What positional gains? Even blunders usually had a logical idea.
+- CONS: What weaknesses does it create? What does it miss? What are the downsides?
+${isBad && engineResult.engineBestMoveSan ? `- Also explain briefly why ${engineResult.engineBestMoveSan} would have been better.` : ""}
 
-Respond with valid JSON:
+Respond with valid JSON only:
 {
-  "classification": "good",
-  "pros": ["Controls the center with a pawn", "Opens diagonals for the bishop"],
-  "cons": ["Slightly weakens the d4 square", "Opponent can challenge with ...d5"],
-  "betterMove": "Nf3 — develops a piece and controls e5 without committing the pawn structure (only for inaccuracy/mistake/blunder, else null)"
+  "pros": ["...", "...", "..."],
+  "cons": ["...", "...", "..."]${isBad && engineResult.engineBestMoveSan ? `,\n  "betterMoveExplanation": "Brief explanation of why ${engineResult.engineBestMoveSan} is better"` : ""}
 }`;
 
   try {
@@ -237,16 +257,42 @@ Respond with valid JSON:
     });
 
     const content = response.choices[0]?.message?.content ?? "{}";
-    const parsed = JSON.parse(content) as SingleMoveAnalysis;
+    const parsed = JSON.parse(content) as {
+      pros?: string[];
+      cons?: string[];
+      betterMoveExplanation?: string;
+    };
+
+    // Build the betterMove string combining engine move + GPT explanation
+    let betterMove: string | null = null;
+    if (isBad && engineResult.engineBestMoveSan) {
+      betterMove = engineResult.engineBestMoveSan;
+      if (parsed.betterMoveExplanation) {
+        betterMove += ` — ${parsed.betterMoveExplanation}`;
+      }
+    }
+
     return {
-      classification: parsed.classification ?? "good",
+      classification,
       pros: Array.isArray(parsed.pros) ? parsed.pros : [],
       cons: Array.isArray(parsed.cons) ? parsed.cons : [],
-      betterMove: parsed.betterMove ?? null,
+      betterMove,
+      cpLoss: engineResult.available ? engineResult.cpLoss : null,
+      engineDepth: engineResult.available ? engineResult.depth : null,
+      engineAvailable: engineResult.available,
     };
   } catch (err) {
     logger.error({ err }, "Failed to analyze single move with OpenAI");
-    throw err;
+    // Return engine classification even if GPT fails
+    return {
+      classification,
+      pros: [],
+      cons: [],
+      betterMove: engineResult.engineBestMoveSan,
+      cpLoss: engineResult.available ? engineResult.cpLoss : null,
+      engineDepth: engineResult.available ? engineResult.depth : null,
+      engineAvailable: engineResult.available,
+    };
   }
 }
 

@@ -103,11 +103,16 @@ function extractOpeningFromPgn(pgn: string): { opening: string | null; eco: stri
   };
 }
 
+const START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+
 export function parsePgnMoves(pgn: string): Array<{
   moveNumber: number;
   san: string;
   color: string;
-  fen: string | null;
+  from: string;
+  to: string;
+  fenBefore: string;
+  fen: string | null;      // fenAfter (kept for backward compat)
   comment: string | null;
   clockSeconds: number | null;
   classification: string | null;
@@ -122,6 +127,14 @@ export function parsePgnMoves(pgn: string): Array<{
     // Extract comments in order from the PGN move section
     const moveSection = pgn.replace(/\[.*?\]\n?/gs, "").trim();
     const comments = [...moveSection.matchAll(/\{([^}]*)\}/g)].map((m) => m[1]);
+
+    // Replay from the start to collect fenBefore for each move
+    const replayChess = new Chess();
+    const fensBefore: string[] = [START_FEN];
+    for (const move of history) {
+      replayChess.move(move.san);
+      fensBefore.push(replayChess.fen());
+    }
 
     return history.map((move, idx) => {
       const rawComment = comments[idx] ?? null;
@@ -139,6 +152,9 @@ export function parsePgnMoves(pgn: string): Array<{
         moveNumber: Math.ceil((idx + 1) / 2),
         san: move.san,
         color: move.color === "w" ? "white" : "black",
+        from: move.from,
+        to: move.to,
+        fenBefore: fensBefore[idx] ?? START_FEN,
         fen: move.after,
         comment: rawComment,
         clockSeconds,
