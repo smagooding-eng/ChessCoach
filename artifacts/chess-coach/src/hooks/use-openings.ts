@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { useUser } from './use-user';
+import { apiFetch } from '@/lib/api';
 
 export interface OpeningStat {
   eco: string | null;
@@ -19,7 +20,7 @@ export function useMyOpenings() {
   return useQuery<{ openings: OpeningStat[]; totalGames: number }>({
     queryKey: ['/api/games/openings', username],
     queryFn: async () => {
-      const res = await fetch(`/api/games/openings?username=${encodeURIComponent(username ?? '')}`);
+      const res = await apiFetch(`/api/games/openings?username=${encodeURIComponent(username ?? '')}`);
       if (!res.ok) throw new Error('Failed to load openings');
       return res.json();
     },

@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
+import { apiFetch } from '@/lib/api';
 
 // ── Markdown render helpers ────────────────────────────────────────────────────
 function renderInline(text: string): React.ReactNode {
@@ -123,7 +124,7 @@ function LessonContentStepper({ content, lessonId }: { content: string; lessonId
     setLoading(true);
 
     try {
-      const res = await fetch('/api/tts/speak', {
+      const res = await apiFetch('/api/tts/speak', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text: plain, voice: 'nova' }),

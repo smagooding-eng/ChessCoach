@@ -100,3 +100,20 @@ Every package extends `tsconfig.base.json` which sets `composite: true`. The roo
 - `courses` + `lessons` tables: personalized course content
 
 Production migrations handled by Replit when publishing. In development: `pnpm --filter @workspace/db run push`.
+
+## Vercel Deployment
+
+The project includes `vercel.json` for deploying the frontend to Vercel as a static site.
+
+### Setup
+1. Connect your GitHub repo to Vercel
+2. The `vercel.json` configures the build command, output directory, and SPA rewrites automatically
+3. **Required env var**: Set `VITE_API_URL` in Vercel's environment variables to your Replit-published API URL (e.g. `https://your-app.replit.app`)
+4. The API server runs on Replit — publish the app on Replit first so the API is available
+5. CORS is enabled on the API server (allows all origins)
+
+### How API routing works
+- On Replit (dev): Vite proxy forwards `/api/*` to `localhost:8080`
+- On Replit (published): Platform routes `/api/*` to the API server
+- On Vercel: `VITE_API_URL` env var tells the frontend where to send API requests; the `apiFetch()` helper (`src/lib/api.ts`) prepends this base URL to all `/api/*` calls
+- The generated API client hooks (`@workspace/api-client-react`) use `setBaseUrl()` from `customFetch` for the same purpose

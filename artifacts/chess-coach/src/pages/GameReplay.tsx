@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { useUser } from '@/hooks/use-user';
 import { useChessPlayer } from '@/hooks/use-chess-player';
+import { apiFetch } from '@/lib/api';
 
 type Classification = 'brilliant' | 'excellent' | 'good' | 'book' | 'inaccuracy' | 'mistake' | 'blunder';
 
@@ -304,7 +305,7 @@ export function GameReplay() {
     setReviewError(null);
 
     try {
-      const res = await fetch(`/api/games/${game.id}/review`, { method: 'POST' });
+      const res = await apiFetch(`/api/games/${game.id}/review`, { method: 'POST' });
       if (!res.ok || !res.body) throw new Error('Connection failed');
 
       const reader = res.body.getReader();

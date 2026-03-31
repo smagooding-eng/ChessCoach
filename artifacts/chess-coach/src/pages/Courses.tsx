@@ -5,6 +5,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Link } from 'wouter';
 import { motion } from 'framer-motion';
 import { BookOpen, GraduationCap, CheckCircle2, PlayCircle, AlertCircle } from 'lucide-react';
+import { apiFetch } from '@/lib/api';
 
 export function Courses() {
   const { username } = useUser();
@@ -31,7 +32,7 @@ export function Courses() {
 
     let jobId: string;
     try {
-      const res = await fetch('/api/courses/generate-start', {
+      const res = await apiFetch('/api/courses/generate-start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username }),
@@ -56,7 +57,7 @@ export function Courses() {
         return;
       }
       try {
-        const pollRes = await fetch(`/api/courses/generate-status/${jobId}`, { cache: 'no-store' });
+        const pollRes = await apiFetch(`/api/courses/generate-status/${jobId}`, { cache: 'no-store' });
         if (pollRes.status === 304 || !pollRes.ok) return;
         const pollBody = await pollRes.json() as { status: string; error?: string };
 

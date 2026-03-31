@@ -3,6 +3,7 @@ import { useParams, Link } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
 import { useUser } from '@/hooks/use-user';
 import { useMyOpenings } from '@/hooks/use-openings';
+import { apiFetch } from '@/lib/api';
 import { ChessBoard } from '@/components/ChessBoard';
 import type { MoveQuality } from '@/components/ChessBoard';
 import { Chess } from 'chess.js';
@@ -78,7 +79,7 @@ export function OpeningDetail() {
       const params = new URLSearchParams({ username: username ?? '' });
       if (isEco) params.set('eco', decodedParam);
       else params.set('opening', decodedParam);
-      const res = await fetch(`/api/games/openings/detail?${params}`);
+      const res = await apiFetch(`/api/games/openings/detail?${params}`);
       if (!res.ok) throw new Error('Failed to load');
       return res.json();
     },

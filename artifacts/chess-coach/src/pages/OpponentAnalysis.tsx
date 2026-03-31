@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Swords, Search, Target, AlertTriangle, TrendingUp, ChevronDown, ChevronUp, ChevronRight, Loader2, User, Users, Zap, Clock, Star, BookOpen, CheckCircle2, GraduationCap } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
 import { useUser } from '@/hooks/use-user';
+import { apiFetch } from '@/lib/api';
 
 interface Profile {
   username: string;
@@ -106,7 +107,7 @@ export function OpponentAnalysis() {
     setCoursesCreated(0);
 
     try {
-      const startRes = await fetch('/api/opponents/start', {
+      const startRes = await apiFetch('/api/opponents/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-chess-username': username ?? '' },
         body: JSON.stringify({ username: target }),
@@ -128,7 +129,7 @@ export function OpponentAnalysis() {
             return;
           }
           try {
-            const pollRes = await fetch(`/api/opponents/status/${jobId}`, { cache: 'no-store' });
+            const pollRes = await apiFetch(`/api/opponents/status/${jobId}`, { cache: 'no-store' });
             // 304 means cached "pending" — treat as still in progress
             if (pollRes.status === 304) return;
             if (!pollRes.ok) {
@@ -168,7 +169,7 @@ export function OpponentAnalysis() {
     setCourseGenError(null);
 
     try {
-      const startRes = await fetch('/api/opponents/generate-courses', {
+      const startRes = await apiFetch('/api/opponents/generate-courses', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -184,7 +185,7 @@ export function OpponentAnalysis() {
         courseIntervalRef.current = setInterval(async () => {
           if (!mountedRef.current) { resolve(); return; }
           try {
-            const pollRes = await fetch(`/api/opponents/courses-job/${jobId}`, { cache: 'no-store' });
+            const pollRes = await apiFetch(`/api/opponents/courses-job/${jobId}`, { cache: 'no-store' });
             if (pollRes.status === 304) return;
             if (!pollRes.ok) { reject(new Error(`Poll error (${pollRes.status})`)); return; }
             const job = await pollRes.json() as { status: string; coursesCreated?: number; error?: string };

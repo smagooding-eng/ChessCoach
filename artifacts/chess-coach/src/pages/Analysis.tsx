@@ -7,6 +7,7 @@ import { Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell } 
 import { BrainCircuit, AlertTriangle, Activity, ChevronRight, Loader2, TrendingUp, CheckCircle2, ArrowUpRight } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { getTierForRating, ELO_TIERS } from '@/lib/elo-tips';
+import { apiFetch } from '@/lib/api';
 
 const PIE_COLORS = ['#10b981', '#ef4444', '#64748b'];
 
@@ -39,7 +40,7 @@ export function Analysis() {
     setStatusMsg('Starting AI analysis…');
 
     try {
-      const startRes = await fetch('/api/analysis/start', {
+      const startRes = await apiFetch('/api/analysis/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username }),
@@ -61,7 +62,7 @@ export function Analysis() {
             return;
           }
           try {
-            const pollRes = await fetch(`/api/analysis/status/${jobId}`, { cache: 'no-store' });
+            const pollRes = await apiFetch(`/api/analysis/status/${jobId}`, { cache: 'no-store' });
             // 304 means cached "pending" — treat as still in progress
             if (pollRes.status === 304) return;
             if (!pollRes.ok) {

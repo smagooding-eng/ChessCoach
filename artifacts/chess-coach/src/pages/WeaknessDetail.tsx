@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Chessboard } from 'react-chessboard';
+import { apiFetch } from '@/lib/api';
 
 type Weakness = {
   id: number;
@@ -130,7 +131,7 @@ export function WeaknessDetail() {
     if (!id) return;
     setLoading(true);
     setError(null);
-    fetch(`/api/analysis/weaknesses/${id}`)
+    apiFetch(`/api/analysis/weaknesses/${id}`)
       .then(r => r.ok ? r.json() : Promise.reject(r.status))
       .then(setData)
       .catch(() => setError('Could not load weakness details.'))
