@@ -88,7 +88,7 @@ export function Courses() {
   );
 
   return (
-    <div className="space-y-8 pb-20">
+    <div className="space-y-8 pb-20 px-4 pt-4 md:px-0 md:pt-0">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-3xl font-display font-bold">My Courses</h1>

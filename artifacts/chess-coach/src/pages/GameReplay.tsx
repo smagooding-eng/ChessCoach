@@ -9,6 +9,7 @@ import {
   Swords, Clock, Zap, BookOpen, Cpu, Lightbulb, Sparkles, Trophy
 } from 'lucide-react';
 import { useUser } from '@/hooks/use-user';
+import { useChessPlayer } from '@/hooks/use-chess-player';
 
 type Classification = 'brilliant' | 'excellent' | 'good' | 'book' | 'inaccuracy' | 'mistake' | 'blunder';
 
@@ -36,9 +37,13 @@ const CLASS_CFG: Record<Classification, { badge: string; color: string; full: st
 function GameRatingPanel({
   reviewMoves,
   game,
+  whiteAvatar,
+  blackAvatar,
 }: {
   reviewMoves: ReviewMove[];
-  game: { whiteUsername: string; blackUsername: string };
+  game: { whiteUsername: string; blackUsername: string; whiteRating?: number; blackRating?: number };
+  whiteAvatar?: string;
+  blackAvatar?: string;
 }) {
   const WEIGHTS: Record<Classification, number> = {
     brilliant: 100, excellent: 98, book: 90, good: 85,
@@ -112,12 +117,17 @@ function GameRatingPanel({
     { label: 'Endgame',    from: 60,  to: Infinity },
   ];
 
-  const Avatar = ({ username, dark }: { username: string; dark: boolean }) => (
-    <div className={`w-12 h-12 rounded-full border-2 border-white/20 flex items-center justify-center font-black text-sm
-      ${dark ? 'bg-[#2d2d2d] text-[#f0d9b5]' : 'bg-[#f0d9b5] text-[#2d2d2d]'}`}>
-      {username[0]?.toUpperCase()}
-    </div>
-  );
+  const PlayerAvatar = ({ username, dark, avatar }: { username: string; dark: boolean; avatar?: string }) => {
+    if (avatar) {
+      return <img src={avatar} alt={username} className="w-12 h-12 rounded-xl object-cover border-2 border-white/20" />;
+    }
+    return (
+      <div className={`w-12 h-12 rounded-xl border-2 border-white/20 flex items-center justify-center font-black text-sm
+        ${dark ? 'bg-[#2d2d2d] text-[#f0d9b5]' : 'bg-[#f0d9b5] text-[#2d2d2d]'}`}>
+        {username[0]?.toUpperCase()}
+      </div>
+    );
+  };
 
   return (
     <div className="glass-card rounded-2xl overflow-hidden border border-white/8">
@@ -128,15 +138,17 @@ function GameRatingPanel({
       </div>
 
       {/* Player row */}
-      <div className="grid grid-cols-[1fr_60px_1fr] items-center border-b border-white/5">
+      <div className="grid grid-cols-[1fr_40px_1fr] items-center border-b border-white/5">
         <div className="flex flex-col items-center gap-1.5 py-4 px-2">
-          <Avatar username={game.whiteUsername} dark={false} />
-          <span className="font-bold text-xs text-center max-w-[90px] truncate">{game.whiteUsername}</span>
+          <PlayerAvatar username={game.whiteUsername} dark={false} avatar={whiteAvatar} />
+          <span className="font-black text-xs text-center max-w-[90px] truncate">{game.whiteUsername}</span>
+          {game.whiteRating && <span className="text-[10px] text-primary font-bold">{game.whiteRating}</span>}
         </div>
-        <div className="text-center text-xs text-muted-foreground font-bold">vs</div>
+        <div className="text-center text-xs text-muted-foreground font-black">vs</div>
         <div className="flex flex-col items-center gap-1.5 py-4 px-2">
-          <Avatar username={game.blackUsername} dark={true} />
-          <span className="font-bold text-xs text-center max-w-[90px] truncate">{game.blackUsername}</span>
+          <PlayerAvatar username={game.blackUsername} dark={true} avatar={blackAvatar} />
+          <span className="font-black text-xs text-center max-w-[90px] truncate">{game.blackUsername}</span>
+          {game.blackRating && <span className="text-[10px] text-primary font-bold">{game.blackRating}</span>}
         </div>
       </div>
 
@@ -213,6 +225,8 @@ export function GameReplay() {
   const { id } = useParams();
   const { username } = useUser();
   const { data: game, isLoading, error } = useGameViewer(parseInt(id || '0'));
+  const { player: whitePlayer } = useChessPlayer(game?.whiteUsername);
+  const { player: blackPlayer } = useChessPlayer(game?.blackUsername);
 
   const [currentMove, setCurrentMove] = useState(0);
   const [isPlaying, setIsPlaying]     = useState(false);
@@ -408,7 +422,7 @@ export function GameReplay() {
   const isBad = currentReview && ['inaccuracy', 'mistake', 'blunder'].includes(currentReview.classification);
 
   return (
-    <div className="space-y-4 pb-20">
+    <div className="space-y-4 pb-20 px-4 pt-4 md:px-0 md:pt-0">
       <Link href="/games" className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors text-sm">
         <ArrowLeft className="w-4 h-4" /> Back to Games
       </Link>
@@ -427,27 +441,41 @@ export function GameReplay() {
         {/* ── Left col: board + controls ── */}
         <div className="space-y-4">
 
-          {/* Players */}
-          <div className="glass-card p-4 rounded-2xl flex flex-wrap items-center gap-4 justify-between">
-            <div className="flex items-center gap-2 flex-wrap">
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-[#f0d9b5] border border-black/20 shadow-sm" />
-                <span className="font-bold">{game.whiteUsername}</span>
-                <span className="text-xs text-muted-foreground">({game.whiteRating})</span>
+          {/* Players banner */}
+          <div className="glass-card rounded-2xl overflow-hidden">
+            <div className="flex items-stretch">
+              {/* White player */}
+              <div className="flex-1 flex items-center gap-2.5 px-3 py-3">
+                {whitePlayer?.avatar
+                  ? <img src={whitePlayer.avatar} alt={game.whiteUsername} className="w-9 h-9 rounded-xl object-cover border border-white/20 shrink-0" />
+                  : <div className="w-9 h-9 rounded-xl bg-[#eeeed2] flex items-center justify-center shrink-0"><span className="text-[#2d2d2d] font-black text-sm">{game.whiteUsername[0]?.toUpperCase()}</span></div>
+                }
+                <div className="min-w-0">
+                  <p className="font-black text-sm truncate leading-tight">{game.whiteUsername}</p>
+                  <p className="text-primary text-xs font-bold">{game.whiteRating}</p>
+                </div>
               </div>
-              <Swords className="w-4 h-4 text-muted-foreground" />
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-[#2d2d2d] border border-white/20 shadow-sm" />
-                <span className="font-bold">{game.blackUsername}</span>
-                <span className="text-xs text-muted-foreground">({game.blackRating})</span>
+              {/* Result badge center */}
+              <div className="flex flex-col items-center justify-center px-3 border-x border-white/5 shrink-0">
+                <span className={`px-2.5 py-1 rounded-lg text-[11px] font-black uppercase tracking-wider border
+                  ${game.result === 'win'  ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' :
+                    game.result === 'loss' ? 'bg-rose-500/15 text-rose-400 border-rose-500/30' :
+                                             'bg-slate-500/15 text-slate-400 border-slate-500/30'}`}>
+                  {game.result === 'win' ? 'Win' : game.result === 'loss' ? 'Loss' : 'Draw'}
+                </span>
+              </div>
+              {/* Black player */}
+              <div className="flex-1 flex items-center gap-2.5 px-3 py-3 justify-end">
+                <div className="min-w-0 text-right">
+                  <p className="font-black text-sm truncate leading-tight">{game.blackUsername}</p>
+                  <p className="text-primary text-xs font-bold">{game.blackRating}</p>
+                </div>
+                {blackPlayer?.avatar
+                  ? <img src={blackPlayer.avatar} alt={game.blackUsername} className="w-9 h-9 rounded-xl object-cover border border-white/20 shrink-0" />
+                  : <div className="w-9 h-9 rounded-xl bg-[#2d2d2d] border border-white/20 flex items-center justify-center shrink-0"><span className="text-[#eeeed2] font-black text-sm">{game.blackUsername[0]?.toUpperCase()}</span></div>
+                }
               </div>
             </div>
-            <span className={`px-3 py-1 rounded-lg text-xs font-bold uppercase tracking-wider border
-              ${game.result === 'win'  ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' :
-                game.result === 'loss' ? 'bg-rose-500/15 text-rose-400 border-rose-500/30' :
-                                         'bg-slate-500/15 text-slate-400 border-slate-500/30'}`}>
-              {game.result === 'win' ? '✓ Win' : game.result === 'loss' ? '✗ Loss' : '½ Draw'}
-            </span>
           </div>
 
           {/* Chess board */}
@@ -676,7 +704,12 @@ export function GameReplay() {
 
           {/* Game Rating Panel — shown after review completes */}
           {reviewMoves.length > 0 && (
-            <GameRatingPanel reviewMoves={reviewMoves} game={game} />
+            <GameRatingPanel
+              reviewMoves={reviewMoves}
+              game={game}
+              whiteAvatar={whitePlayer?.avatar}
+              blackAvatar={blackPlayer?.avatar}
+            />
           )}
         </div>
 

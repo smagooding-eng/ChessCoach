@@ -89,7 +89,7 @@ export function Openings() {
   );
 
   return (
-    <div className="space-y-6 pb-20">
+    <div className="space-y-6 pb-20 px-4 pt-4 md:px-0 md:pt-0">
       {/* Header */}
       <div>
         <div className="flex items-center gap-3 mb-1">

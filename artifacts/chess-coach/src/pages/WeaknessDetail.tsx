@@ -169,7 +169,7 @@ export function WeaknessDetail() {
     'text-rose-400 bg-rose-500/15 border-rose-500/30';
 
   return (
-    <div className="space-y-6 pb-20 max-w-4xl mx-auto">
+    <div className="space-y-6 pb-20 max-w-4xl mx-auto px-4 pt-4 md:px-0 md:pt-0">
       {/* Back */}
       <Link href="/analysis" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors text-sm font-medium">
         <ArrowLeft className="w-4 h-4" /> Back to Analysis

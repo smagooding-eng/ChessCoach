@@ -115,7 +115,7 @@ export function Analysis() {
   }) || [];
 
   return (
-    <div className="space-y-8 pb-10">
+    <div className="space-y-8 pb-10 px-4 pt-4 md:px-0 md:pt-0">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 glass-card p-6 rounded-3xl border-primary/20 relative overflow-hidden">
         <div className="absolute right-0 top-0 w-64 h-64 bg-primary/5 blur-3xl rounded-full pointer-events-none" />
         

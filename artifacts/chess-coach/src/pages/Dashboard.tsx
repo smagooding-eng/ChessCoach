@@ -5,6 +5,7 @@ import { useMyGames } from '@/hooks/use-games';
 import { Link } from 'wouter';
 import { Swords, Trophy, Target, AlertTriangle, BookOpen, Clock, GraduationCap, TrendingUp, ChevronRight } from 'lucide-react';
 import { useUser } from '@/hooks/use-user';
+import { useChessPlayer } from '@/hooks/use-chess-player';
 import { motion } from 'framer-motion';
 
 const RESULT_BADGE: Record<string, string> = {
@@ -22,6 +23,7 @@ const SEV_BADGE: Record<string, string> = {
 
 export function Dashboard() {
   const { username } = useUser();
+  const { player: chessPlayer } = useChessPlayer(username ?? undefined);
   const { data: summary, isLoading: loadingSummary } = useMyAnalysisSummary();
   const { data: weaknesses } = useMyWeaknesses();
   const { data: coursesData } = useMyCourses();
@@ -41,63 +43,82 @@ export function Dashboard() {
   const activeCourses = coursesData?.courses?.filter(c => c.completedLessons < c.totalLessons).length || 0;
 
   return (
-    <motion.div variants={container} initial="hidden" animate="show" className="space-y-7">
+    <motion.div variants={container} initial="hidden" animate="show" className="space-y-5 md:space-y-7">
 
-      {/* Hero header */}
+      {/* Hero header — native app profile card */}
       <motion.div
         variants={{ hidden: { opacity: 0, y: -12 }, show: { opacity: 1, y: 0 } }}
-        className="relative rounded-2xl overflow-hidden bg-gradient-to-br from-primary/20 via-card to-card border border-primary/15 p-6"
+        className="relative overflow-hidden bg-gradient-to-br from-[hsl(89,44%,18%)] via-card to-card border-b border-primary/10 md:rounded-2xl md:border p-5 md:p-6"
       >
-        {/* decorative board pattern */}
-        <div className="absolute inset-0 opacity-[0.04] pointer-events-none"
-          style={{
-            backgroundImage: 'repeating-conic-gradient(#fff 0% 25%, transparent 0% 50%)',
-            backgroundSize: '40px 40px',
-          }}
+        <div className="absolute inset-0 opacity-[0.035] pointer-events-none"
+          style={{ backgroundImage: 'repeating-conic-gradient(#fff 0% 25%, transparent 0% 50%)', backgroundSize: '36px 36px' }}
         />
-        <div className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-6">
-          <div className="flex-1">
-            <p className="text-muted-foreground text-sm mb-1">Welcome back,</p>
-            <h1 className="text-3xl font-display font-bold text-gradient">{username}</h1>
-            <p className="text-muted-foreground mt-1 text-sm">
-              {summary?.totalGames
-                ? `${summary.totalGames} games analysed · ${winRate}% win rate`
-                : 'Import your games to start coaching'}
-            </p>
-
-            {/* W/L/D mini bar */}
-            {summary?.totalGames ? (
-              <div className="mt-3 max-w-xs">
-                <div className="flex h-2 rounded-full overflow-hidden gap-0.5">
-                  <div className="bg-emerald-500 rounded-l-full" style={{ width: `${(summary.wins / summary.totalGames) * 100}%` }} title={`${summary.wins} wins`} />
-                  <div className="bg-slate-500" style={{ width: `${(summary.draws / summary.totalGames) * 100}%` }} title={`${summary.draws} draws`} />
-                  <div className="bg-red-500 rounded-r-full" style={{ width: `${(summary.losses / summary.totalGames) * 100}%` }} title={`${summary.losses} losses`} />
+        <div className="relative flex items-center gap-4">
+          {/* Avatar */}
+          <div className="shrink-0 relative">
+            {chessPlayer?.avatar
+              ? <img src={chessPlayer.avatar} alt={username ?? ''} className="w-16 h-16 rounded-2xl object-cover border-2 border-primary/40 shadow-lg shadow-primary/20" />
+              : <div className="w-16 h-16 rounded-2xl bg-primary/20 border-2 border-primary/30 flex items-center justify-center">
+                  <span className="text-2xl font-black text-primary">{username?.[0]?.toUpperCase()}</span>
                 </div>
-                <div className="flex gap-4 mt-1.5">
-                  <span className="text-xs text-emerald-400">{summary.wins}W</span>
-                  <span className="text-xs text-muted-foreground">{summary.draws}D</span>
-                  <span className="text-xs text-red-400">{summary.losses}L</span>
-                </div>
-              </div>
-            ) : null}
+            }
+            {chessPlayer?.title && (
+              <span className="absolute -bottom-1 -right-1 px-1.5 py-0.5 rounded-md bg-amber-500 text-[9px] font-black text-black leading-none">
+                {chessPlayer.title}
+              </span>
+            )}
           </div>
-          <div className="flex gap-3 shrink-0">
+
+          {/* Info */}
+          <div className="flex-1 min-w-0">
+            <h1 className="text-xl font-display font-black text-foreground truncate">{username}</h1>
+            {chessPlayer?.rating && (
+              <div className="flex items-center gap-2 mt-0.5">
+                <span className="text-2xl font-black text-primary leading-none">{chessPlayer.rating}</span>
+                <span className="text-xs text-muted-foreground font-semibold mt-1">ELO</span>
+              </div>
+            )}
+            {summary?.totalGames ? (
+              <p className="text-xs text-muted-foreground mt-1">{summary.totalGames} games · {winRate}% win rate</p>
+            ) : (
+              <p className="text-xs text-muted-foreground mt-1">Import games to start coaching</p>
+            )}
+          </div>
+
+          {/* Actions */}
+          <div className="flex flex-col gap-2 shrink-0">
             <Link href="/import">
-              <button className="px-5 py-2.5 rounded-xl bg-primary text-primary-foreground font-bold text-sm hover:bg-primary/90 transition-colors flex items-center gap-2">
-                <ImportIcon /> Import Games
+              <button className="px-4 py-2 rounded-xl bg-primary text-primary-foreground font-black text-xs hover:bg-primary/90 transition-colors flex items-center gap-1.5">
+                <ImportIcon /> Import
               </button>
             </Link>
             <Link href="/opponents">
-              <button className="px-5 py-2.5 rounded-xl bg-secondary border border-border text-foreground font-bold text-sm hover:bg-secondary/80 transition-colors flex items-center gap-2">
-                <Swords className="w-4 h-4 text-primary" /> Scout
+              <button className="px-4 py-2 rounded-xl bg-white/6 border border-white/10 text-foreground font-black text-xs hover:bg-white/10 transition-colors flex items-center gap-1.5">
+                <Swords className="w-3.5 h-3.5 text-primary" /> Scout
               </button>
             </Link>
           </div>
         </div>
+
+        {/* W/L/D bar */}
+        {summary?.totalGames ? (
+          <div className="relative mt-4">
+            <div className="flex h-1.5 rounded-full overflow-hidden gap-px">
+              <div className="bg-emerald-500" style={{ width: `${(summary.wins / summary.totalGames) * 100}%` }} />
+              <div className="bg-slate-500" style={{ width: `${(summary.draws / summary.totalGames) * 100}%` }} />
+              <div className="bg-red-500" style={{ width: `${(summary.losses / summary.totalGames) * 100}%` }} />
+            </div>
+            <div className="flex gap-4 mt-2">
+              <span className="text-xs text-emerald-400 font-bold">{summary.wins}W</span>
+              <span className="text-xs text-muted-foreground">{summary.draws}D</span>
+              <span className="text-xs text-red-400 font-bold">{summary.losses}L</span>
+            </div>
+          </div>
+        ) : null}
       </motion.div>
 
       {/* Stats Row */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 px-4 md:px-0">
         {[
           { label: 'Total Games', value: summary?.totalGames || 0, icon: <Swords className="w-5 h-5" />, accent: 'text-blue-400', border: 'border-blue-500/20', bg: 'bg-blue-500/8' },
           { label: 'Win Rate', value: `${winRate}%`, icon: <Trophy className="w-5 h-5" />, accent: 'text-emerald-400', border: 'border-emerald-500/20', bg: 'bg-emerald-500/8' },
@@ -118,7 +139,7 @@ export function Dashboard() {
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 md:gap-6 px-4 md:px-0">
         {/* Left: Weaknesses + Recent Games */}
         <div className="lg:col-span-2 space-y-6">
 
