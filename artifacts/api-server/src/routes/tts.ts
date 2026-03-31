@@ -9,12 +9,13 @@ const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
 });
 
-router.post("/tts/speak", async (req, res) => {
+router.post("/tts/speak", async (req, res): Promise<void> => {
   try {
     const { text, voice } = req.body as { text?: string; voice?: string };
 
     if (!text || text.trim().length === 0) {
-      return res.status(400).json({ error: "text is required" });
+      res.status(400).json({ error: "text is required" });
+      return;
     }
 
     const trimmed = text.slice(0, 4096);
@@ -42,7 +43,8 @@ router.post("/tts/speak", async (req, res) => {
     const audioData = (response.choices[0]?.message as any)?.audio?.data ?? "";
 
     if (!audioData) {
-      return res.status(500).json({ error: "No audio generated" });
+      res.status(500).json({ error: "No audio generated" });
+      return;
     }
 
     const buffer = Buffer.from(audioData, "base64");

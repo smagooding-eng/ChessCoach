@@ -65,7 +65,7 @@ async function runAnalysis(
   target: string,
   requestingUser: string | null,
   jobId: string,
-  log: typeof import("pino").default.prototype,
+  log: import("pino").Logger,
 ): Promise<void> {
   try {
     const [profileResult, gamesResult] = await Promise.allSettled([
@@ -260,7 +260,7 @@ async function runCourseGeneration(
   weaknesses: OpponentWeakness[],
   username: string,
   jobId: string,
-  log: typeof import("pino").default.prototype,
+  log: import("pino").Logger,
 ): Promise<void> {
   let coursesCreated = 0;
   // Take top 3 weaknesses by severity order
