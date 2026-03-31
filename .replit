@@ -1,29 +1,32 @@
 modules = ["nodejs-24", "system", "postgresql-16"]
 
-[[artifacts]]
-id = "artifacts/api-server"
+  [[artifacts]]
+  id = "artifacts/chess-coach"
 
-[[artifacts]]
-id = "artifacts/mockup-sandbox"
+  [[artifacts]]
+  id = "artifacts/api-server"
 
-[deployment]
-router = "application"
-deploymentTarget = "autoscale"
+  [[artifacts]]
+  id = "artifacts/mockup-sandbox"
 
-[deployment.postBuild]
-args = ["pnpm", "store", "prune"]
-env = { "CI" = "true" }
+  [deployment]
+  deploymentTarget = "autoscale"
 
-[workflows]
-runButton = "Project"
+  [deployment.postBuild]
+  args = ["pnpm", "store", "prune"]
+  env = { "CI" = "true" }
 
-[agent]
-stack = "PNPM_WORKSPACE"
-expertMode = true
+  [workflows]
+  runButton = "Project"
 
-[postMerge]
-path = "scripts/post-merge.sh"
-timeoutMs = 20000
+  [agent]
+  stack = "PNPM_WORKSPACE"
+  expertMode = true
 
-[nix]
-channel = "stable-25_05"
+  [postMerge]
+  path = "scripts/post-merge.sh"
+  timeoutMs = 20000
+
+  [nix]
+  channel = "stable-25_05"
+  
