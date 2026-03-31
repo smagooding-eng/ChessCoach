@@ -4,7 +4,6 @@
   "outputDirectory": "artifacts/chess-coach/dist/public",
   "framework": null,
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "https://chess-performance-analyzer.replit.app/api/$1" },
-    { "source": "/(.*)", "destination": "/index.html" }
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
   ]
 }
