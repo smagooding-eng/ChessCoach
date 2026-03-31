@@ -21,9 +21,8 @@
   --color-ring: hsl(var(--ring));
   --color-card: hsl(var(--card));
   --color-card-foreground: hsl(var(--card-foreground));
-  
-  /* Additional custom chart colors */
-  --color-chart-1: hsl(43, 74%, 49%);
+
+  --color-chart-1: hsl(89, 44%, 50%);
   --color-chart-2: hsl(217, 91%, 60%);
   --color-chart-3: hsl(142, 71%, 45%);
   --color-chart-4: hsl(346, 84%, 61%);
@@ -31,60 +30,56 @@
 }
 
 :root {
-  /* Chess.com-inspired warm dark palette */
-  --background: 26 14% 8%;
-  --foreground: 38 20% 96%;
-  
-  --card: 24 12% 12%;
-  --card-foreground: 38 20% 96%;
-  
-  --popover: 24 12% 12%;
-  --popover-foreground: 38 20% 96%;
-  
-  /* Golden chess piece yellow */
-  --primary: 43 74% 49%;
-  --primary-foreground: 24 20% 10%;
-  
-  /* Warm mid-dark */
-  --secondary: 24 10% 18%;
-  --secondary-foreground: 38 20% 96%;
-  
-  --muted: 24 10% 18%;
-  --muted-foreground: 30 8% 55%;
-  
-  /* Chess board green */
-  --accent: 100 38% 42%;
-  --accent-foreground: 38 20% 96%;
-  
+  /* Chess.com-inspired warm dark-brown palette */
+  --background: 22 8% 16%;
+  --foreground: 38 55% 83%;
+
+  --card: 25 7% 20%;
+  --card-foreground: 38 55% 83%;
+
+  --popover: 25 7% 20%;
+  --popover-foreground: 38 55% 83%;
+
+  /* Chess.com action green as primary */
+  --primary: 89 44% 50%;
+  --primary-foreground: 0 0% 100%;
+
+  --secondary: 28 6% 25%;
+  --secondary-foreground: 38 55% 83%;
+
+  --muted: 28 6% 25%;
+  --muted-foreground: 35 12% 60%;
+
+  --accent: 89 44% 50%;
+  --accent-foreground: 0 0% 100%;
+
   --destructive: 4 72% 40%;
-  --destructive-foreground: 38 20% 96%;
-  
-  --border: 24 10% 20%;
-  --input: 24 10% 18%;
-  --ring: 43 74% 49%;
+  --destructive-foreground: 38 55% 83%;
+
+  --border: 28 6% 28%;
+  --input: 28 6% 25%;
+  --ring: 89 44% 50%;
 
   --radius: 0.75rem;
-  
-  /* Chess-specific extras */
-  --chess-light-sq: 240 4% 78%;
-  --chess-dark-sq: 100 38% 42%;
+
+  --chess-light-sq: 60 47% 88%;
+  --chess-dark-sq: 89 20% 46%;
   --win-color: 142 71% 45%;
   --loss-color: 4 72% 40%;
-  --draw-color: 30 8% 55%;
+  --draw-color: 35 12% 55%;
 }
 
 @layer base {
-  * {
-    @apply border-border;
-  }
+  * { @apply border-border; }
+  html { -webkit-tap-highlight-color: transparent; }
   body {
     @apply bg-background text-foreground antialiased font-sans;
-    background-image: 
-      radial-gradient(ellipse at 60% 0%, hsl(26, 18%, 14%) 0%, transparent 55%),
-      radial-gradient(ellipse at 0% 80%, hsl(24, 14%, 11%) 0%, transparent 50%);
+    font-size: 16px;
+    background-image:
+      radial-gradient(ellipse at 70% 0%, hsl(89, 20%, 20%) 0%, transparent 45%),
+      radial-gradient(ellipse at 0% 90%, hsl(25, 10%, 14%) 0%, transparent 50%);
     background-attachment: fixed;
   }
-
   h1, h2, h3, h4, h5, h6 {
     font-family: var(--font-display);
     @apply font-bold tracking-tight;
@@ -93,22 +88,205 @@
 
 @layer utilities {
   .glass-panel {
-    @apply bg-card/60 backdrop-blur-xl border border-white/5 shadow-2xl shadow-black/20;
+    @apply bg-card/80 backdrop-blur-xl border border-white/5 shadow-2xl shadow-black/30;
   }
-  
   .glass-card {
-    @apply bg-card/40 backdrop-blur-md border border-white/10 shadow-lg shadow-black/10 hover:bg-card/60 hover:border-white/20 transition-all duration-300;
+    @apply bg-card/70 backdrop-blur-md border border-white/8 shadow-lg shadow-black/15
+           hover:bg-card/90 hover:border-white/15 transition-all duration-200;
   }
-  
   .text-gradient {
-    @apply bg-clip-text text-transparent bg-gradient-to-r from-primary to-amber-200;
+    @apply bg-clip-text text-transparent;
+    background-image: linear-gradient(135deg, hsl(89, 44%, 70%) 0%, hsl(89, 44%, 50%) 100%);
   }
-  
-  .hide-scrollbar::-webkit-scrollbar {
-    display: none;
-  }
+  .hide-scrollbar::-webkit-scrollbar { display: none; }
   .hide-scrollbar {
     -ms-overflow-style: none;
     scrollbar-width: none;
+  }
+  .bottom-nav-safe {
+    padding-bottom: max(env(safe-area-inset-bottom, 0px), 8px);
+  }
+}
+
+/* ── Button system ─────────────────────────────────────────────────────────── */
+/* Base shared styles — use .btn alone or combine with a variant */
+@layer components {
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.625rem;
+    font-weight: 600;
+    border-radius: 0.5rem;
+    padding: 0.625rem 1.25rem;
+    font-size: 0.875rem;
+    line-height: 1;
+    transition: all 0.15s;
+    cursor: pointer;
+    user-select: none;
+    min-height: 44px;
+    &:disabled { opacity: 0.5; cursor: not-allowed; pointer-events: none; }
+  }
+
+  .btn-sm {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    font-weight: 600;
+    border-radius: 0.5rem;
+    padding: 0.5rem 1rem;
+    font-size: 0.75rem;
+    line-height: 1;
+    transition: all 0.15s;
+    cursor: pointer;
+    user-select: none;
+    min-height: 36px;
+    &:disabled { opacity: 0.5; cursor: not-allowed; pointer-events: none; }
+  }
+
+  .btn-lg {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    font-weight: 600;
+    border-radius: 0.625rem;
+    padding: 1rem 1.75rem;
+    font-size: 1rem;
+    line-height: 1;
+    transition: all 0.15s;
+    cursor: pointer;
+    user-select: none;
+    min-height: 52px;
+    &:disabled { opacity: 0.5; cursor: not-allowed; pointer-events: none; }
+  }
+
+  .btn-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.625rem;
+    font-weight: 600;
+    border-radius: 0.5rem;
+    padding: 0.625rem 1.25rem;
+    font-size: 0.875rem;
+    line-height: 1;
+    transition: all 0.15s;
+    cursor: pointer;
+    user-select: none;
+    min-height: 44px;
+    background-color: hsl(var(--primary));
+    color: hsl(var(--primary-foreground));
+    box-shadow: 0 2px 8px hsl(var(--primary) / 0.25);
+    &:hover {
+      filter: brightness(1.1);
+      box-shadow: 0 4px 16px hsl(var(--primary) / 0.35);
+      transform: translateY(-1px);
+    }
+    &:active { transform: translateY(0); filter: brightness(0.95); }
+    &:disabled { opacity: 0.5; cursor: not-allowed; pointer-events: none; }
+  }
+
+  .btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.625rem;
+    font-weight: 600;
+    border-radius: 0.5rem;
+    padding: 0.625rem 1.25rem;
+    font-size: 0.875rem;
+    line-height: 1;
+    transition: all 0.15s;
+    cursor: pointer;
+    user-select: none;
+    min-height: 44px;
+    background-color: hsl(var(--secondary));
+    border: 1px solid hsl(var(--border));
+    color: hsl(var(--foreground));
+    &:hover { background-color: hsl(var(--secondary) / 0.8); border-color: rgb(255 255 255 / 0.2); }
+    &:disabled { opacity: 0.5; cursor: not-allowed; pointer-events: none; }
+  }
+
+  .btn-ghost {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.625rem;
+    font-weight: 600;
+    border-radius: 0.5rem;
+    padding: 0.625rem 1.25rem;
+    font-size: 0.875rem;
+    line-height: 1;
+    transition: all 0.15s;
+    cursor: pointer;
+    user-select: none;
+    min-height: 44px;
+    background-color: transparent;
+    color: hsl(var(--muted-foreground));
+    &:hover { background-color: hsl(var(--secondary)); color: hsl(var(--foreground)); }
+    &:disabled { opacity: 0.5; cursor: not-allowed; pointer-events: none; }
+  }
+
+  .btn-outline-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.625rem;
+    font-weight: 600;
+    border-radius: 0.5rem;
+    padding: 0.625rem 1.25rem;
+    font-size: 0.875rem;
+    line-height: 1;
+    transition: all 0.15s;
+    cursor: pointer;
+    user-select: none;
+    min-height: 44px;
+    background-color: hsl(var(--primary) / 0.1);
+    border: 1px solid hsl(var(--primary) / 0.4);
+    color: hsl(var(--primary));
+    &:hover {
+      background-color: hsl(var(--primary));
+      color: hsl(var(--primary-foreground));
+      border-color: hsl(var(--primary));
+    }
+    &:disabled { opacity: 0.5; cursor: not-allowed; pointer-events: none; }
+  }
+
+  .btn-danger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.625rem;
+    font-weight: 600;
+    border-radius: 0.5rem;
+    padding: 0.625rem 1.25rem;
+    font-size: 0.875rem;
+    line-height: 1;
+    transition: all 0.15s;
+    cursor: pointer;
+    user-select: none;
+    min-height: 44px;
+    background-color: hsl(var(--destructive) / 0.15);
+    border: 1px solid hsl(var(--destructive) / 0.3);
+    color: #f87171;
+    &:hover { background-color: hsl(var(--destructive)); color: white; border-color: hsl(var(--destructive)); }
+    &:disabled { opacity: 0.5; cursor: not-allowed; pointer-events: none; }
+  }
+
+  .list-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.875rem 1rem;
+    border-radius: 0.75rem;
+    border: 1px solid transparent;
+    transition: all 0.15s;
+    cursor: pointer;
+    &:hover {
+      background-color: hsl(var(--secondary) / 0.8);
+      border-color: hsl(var(--border) / 0.6);
+    }
   }
 }

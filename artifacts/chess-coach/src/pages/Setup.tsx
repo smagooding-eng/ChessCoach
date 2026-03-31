@@ -33,7 +33,7 @@ export function Setup() {
         animate={{ opacity: 1, y: 0 }}
         className="w-full max-w-md glass-panel p-8 md:p-10 rounded-3xl relative z-10 text-center"
       >
-        <div className="mx-auto w-20 h-20 mb-6 bg-primary/20 rounded-full flex items-center justify-center shadow-[0_0_30px_rgba(202,138,4,0.3)]">
+        <div className="mx-auto w-20 h-20 mb-6 bg-primary/20 rounded-full flex items-center justify-center shadow-[0_0_30px_hsl(89_44%_50%_/_0.3)]">
           <Trophy className="w-10 h-10 text-primary" />
         </div>
         
@@ -60,7 +60,7 @@ export function Setup() {
           </div>
           <button
             type="submit"
-            className="w-full group flex items-center justify-center gap-2 px-6 py-4 rounded-xl font-bold bg-gradient-to-r from-primary to-amber-500 text-primary-foreground shadow-lg shadow-primary/25 hover:shadow-primary/40 hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200"
+            className="w-full group flex items-center justify-center gap-2 btn-primary text-base"
           >
             Start Analyzing
             <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />

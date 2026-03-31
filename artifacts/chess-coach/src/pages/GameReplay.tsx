@@ -19,6 +19,8 @@ type ReviewMove = {
   classification: Classification;
   explanation: string;
   betterMove: string | null;
+  pros: string[];
+  cons: string[];
 };
 
 const CLASS_CFG: Record<Classification, { badge: string; color: string; full: string }> = {
@@ -587,6 +589,42 @@ export function GameReplay() {
                     <>
                       {/* Explanation */}
                       <p className="text-sm text-foreground/85 leading-relaxed">{currentReview.explanation}</p>
+
+                      {/* Pros & Cons */}
+                      {(currentReview.pros?.length > 0 || currentReview.cons?.length > 0) && (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                          {currentReview.pros?.length > 0 && (
+                            <div className="rounded-xl bg-emerald-500/8 border border-emerald-500/20 px-3 py-2.5">
+                              <p className="text-[11px] font-bold text-emerald-400 uppercase tracking-wide mb-1.5 flex items-center gap-1">
+                                <span>✓</span> Pros
+                              </p>
+                              <ul className="space-y-1">
+                                {currentReview.pros.map((p, i) => (
+                                  <li key={i} className="text-xs text-foreground/80 leading-snug flex items-start gap-1.5">
+                                    <span className="text-emerald-500 shrink-0 mt-0.5">•</span>
+                                    {p}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                          {currentReview.cons?.length > 0 && (
+                            <div className="rounded-xl bg-rose-500/8 border border-rose-500/20 px-3 py-2.5">
+                              <p className="text-[11px] font-bold text-rose-400 uppercase tracking-wide mb-1.5 flex items-center gap-1">
+                                <span>✗</span> Cons
+                              </p>
+                              <ul className="space-y-1">
+                                {currentReview.cons.map((c, i) => (
+                                  <li key={i} className="text-xs text-foreground/80 leading-snug flex items-start gap-1.5">
+                                    <span className="text-rose-500 shrink-0 mt-0.5">•</span>
+                                    {c}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                        </div>
+                      )}
 
                       {/* Better move suggestion */}
                       {isBad && currentReview.betterMove && (

@@ -408,6 +408,8 @@ export interface MoveReview {
   classification: "brilliant" | "excellent" | "good" | "book" | "inaccuracy" | "mistake" | "blunder";
   explanation: string;
   betterMove: string | null;
+  pros: string[];
+  cons: string[];
 }
 
 export async function reviewFullGame(input: {
@@ -442,8 +444,10 @@ Classify each move as ONE of:
 
 For each move provide:
 1. classification (required)
-2. explanation: concise 1–2 sentence explanation of why this classification (required)
-3. betterMove: for inaccuracy/mistake/blunder only — the better move in SAN notation (e.g. "Nf6", "d4", "Bxd5+"). For good/excellent/brilliant/book set null.
+2. explanation: concise 1-2 sentence explanation of why this classification (required)
+3. pros: array of 1-2 SHORT strengths of this move (max 12 words each). Even bad moves may have some upside.
+4. cons: array of 1-2 SHORT weaknesses or missed opportunities (max 12 words each). Even great moves can have minor downsides.
+5. betterMove: for inaccuracy/mistake/blunder only — the better move in SAN notation (e.g. "Nf6", "d4", "Bxd5+"). For good/excellent/brilliant/book set null.
 
 Respond with valid JSON covering ALL ${moves.length} moves in order:
 {
@@ -454,6 +458,8 @@ Respond with valid JSON covering ALL ${moves.length} moves in order:
       "color": "white",
       "classification": "book",
       "explanation": "Standard central pawn opening move, controlling d5 and f5.",
+      "pros": ["Controls key central squares d5 and f5", "Opens lines for bishop and queen"],
+      "cons": ["Slightly weakens d4 square"],
       "betterMove": null
     }
   ]
@@ -486,6 +492,8 @@ Respond with valid JSON covering ALL ${moves.length} moves in order:
         : "good") as MoveReview["classification"],
       explanation: m.explanation ?? "",
       betterMove: m.betterMove ?? null,
+      pros: Array.isArray(m.pros) ? m.pros : [],
+      cons: Array.isArray(m.cons) ? m.cons : [],
     }));
 
     if (result.length === 0) {
