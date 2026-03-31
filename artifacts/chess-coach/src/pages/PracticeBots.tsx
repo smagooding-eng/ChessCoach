@@ -24,6 +24,7 @@ const QUALITY_CFG: Record<string, { label: string; icon: string; bg: string; tex
   brilliant:  { label: 'Brilliant!!', icon: '✦', bg: 'bg-cyan-500/10', text: 'text-cyan-400', border: 'border-cyan-500/30', dot: 'bg-cyan-400' },
   excellent:  { label: 'Excellent!', icon: '!', bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/30', dot: 'bg-emerald-400' },
   good:       { label: 'Good', icon: '✓', bg: 'bg-green-500/10', text: 'text-green-400', border: 'border-green-500/30', dot: 'bg-green-400' },
+  book:       { label: 'Book Move', icon: '📖', bg: 'bg-blue-500/10', text: 'text-blue-400', border: 'border-blue-500/30', dot: 'bg-blue-400' },
   inaccuracy: { label: 'Inaccuracy', icon: '?!', bg: 'bg-yellow-500/10', text: 'text-yellow-400', border: 'border-yellow-500/30', dot: 'bg-yellow-400' },
   mistake:    { label: 'Mistake', icon: '?', bg: 'bg-orange-500/10', text: 'text-orange-400', border: 'border-orange-500/30', dot: 'bg-orange-400' },
   blunder:    { label: 'Blunder', icon: '??', bg: 'bg-red-500/10', text: 'text-red-400', border: 'border-red-500/30', dot: 'bg-red-400' },

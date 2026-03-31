@@ -267,7 +267,7 @@ export function evaluatePosition(fen: string): number {
 }
 
 export interface MoveAnalysisResult {
-  quality: 'brilliant' | 'excellent' | 'good' | 'inaccuracy' | 'mistake' | 'blunder';
+  quality: 'brilliant' | 'excellent' | 'good' | 'book' | 'inaccuracy' | 'mistake' | 'blunder';
   evalBefore: number;
   evalAfter: number;
   cpLoss: number;
@@ -277,11 +277,30 @@ export interface MoveAnalysisResult {
   summary: string;
 }
 
+function isStandardOpeningMove(moveResult: ReturnType<Chess['move']>, turn: string): boolean {
+  if (!moveResult) return false;
+  if (moveResult.san === 'O-O' || moveResult.san === 'O-O-O') return true;
+  if (moveResult.piece === 'p' && ['c4','c5','d4','d5','e4','e5','f4','b3','g3','b6','g6','a3','h3','a6','h6','c3','c6','e3','e6','d3','d6'].includes(moveResult.to)) return true;
+  if (['n', 'b'].includes(moveResult.piece)) {
+    const r = parseInt(moveResult.from[1]);
+    if ((turn === 'w' && r <= 2) || (turn === 'b' && r >= 7)) return true;
+  }
+  if (moveResult.piece === 'q') {
+    const r = parseInt(moveResult.from[1]);
+    if ((turn === 'w' && r === 1) || (turn === 'b' && r === 8)) return true;
+  }
+  return false;
+}
+
 export function analyzeMoveQuality(fenBefore: string, san: string): MoveAnalysisResult {
   const chess = new Chess(fenBefore);
   const turn = chess.turn();
   const maximizing = turn === 'w';
   const depth = 2;
+
+  const fenParts = fenBefore.split(' ');
+  const fullMoveNum = parseInt(fenParts[5] || '1');
+  const halfMoveCount = (fullMoveNum - 1) * 2 + (turn === 'b' ? 1 : 0);
 
   const evalBefore = evaluate(chess);
 
@@ -306,11 +325,13 @@ export function analyzeMoveQuality(fenBefore: string, san: string): MoveAnalysis
   let bestMove = moves[0];
   let bestSearchEval = maximizing ? -Infinity : Infinity;
   let actualSearchEval = 0;
+  const allEvals: number[] = [];
 
   for (const move of moves) {
     chess.move(move);
     const ev = minimax(chess, depth - 1, -Infinity, Infinity, !maximizing);
     chess.undo();
+    allEvals.push(ev);
     if (move === san) actualSearchEval = ev;
     if (maximizing ? ev > bestSearchEval : ev < bestSearchEval) {
       bestSearchEval = ev;
@@ -322,13 +343,33 @@ export function analyzeMoveQuality(fenBefore: string, san: string): MoveAnalysis
   cpLoss = Math.max(0, cpLoss);
 
   const isBest = san === bestMove;
+
+  const movesWithin10 = allEvals.filter(ev => Math.abs(ev - bestSearchEval) <= 10).length;
+  const movesWithin30 = allEvals.filter(ev => Math.abs(ev - bestSearchEval) <= 30).length;
+  const isComplexPosition = movesWithin10 <= 2 && moves.length > 5;
+
+  const isOpening = halfMoveCount <= 16;
+  const isBookMove = isOpening && cpLoss <= 30 && isStandardOpeningMove(moveResult, turn);
+
+  const evalSwing = maximizing ? (evalAfter - evalBefore) : (evalBefore - evalAfter);
+  const isSacrifice = moveResult.captured && PIECE_VALUES[moveResult.piece] > (PIECE_VALUES[moveResult.captured] || 0) + 100;
+
   let quality: MoveAnalysisResult['quality'];
-  if (isBest && cpLoss <= 5) quality = 'brilliant';
-  else if (isBest || cpLoss <= 15) quality = 'excellent';
-  else if (cpLoss <= 50) quality = 'good';
-  else if (cpLoss <= 120) quality = 'inaccuracy';
-  else if (cpLoss <= 280) quality = 'mistake';
-  else quality = 'blunder';
+  if (isBookMove) {
+    quality = 'book';
+  } else if (isBest && cpLoss === 0 && isComplexPosition && (isSacrifice || inCheck || evalSwing > 80)) {
+    quality = 'brilliant';
+  } else if (isBest && cpLoss === 0 && movesWithin30 <= 3 && !isOpening) {
+    quality = 'excellent';
+  } else if (cpLoss <= 15) {
+    quality = 'good';
+  } else if (cpLoss <= 60) {
+    quality = 'inaccuracy';
+  } else if (cpLoss <= 200) {
+    quality = 'mistake';
+  } else {
+    quality = 'blunder';
+  }
 
   const pros: string[] = [];
   const cons: string[] = [];
@@ -354,16 +395,18 @@ export function analyzeMoveQuality(fenBefore: string, san: string): MoveAnalysis
   else if (quality === 'blunder') { cons.push('Serious error losing advantage'); if (!isBest) cons.push(`${bestMove} was critical`); }
 
   if (pros.length === 0) {
-    if (quality === 'brilliant') pros.push('Best move in the position');
+    if (quality === 'brilliant') pros.push('Only strong move in a sharp position');
     else if (quality === 'excellent') pros.push('Strong continuation');
-    else if (quality === 'good') pros.push('Reasonable move');
+    else if (quality === 'good') pros.push('Solid move');
+    else if (quality === 'book') pros.push('Standard opening move');
   }
 
   let summary = '';
   switch (quality) {
-    case 'brilliant': summary = 'The best move! Maximum advantage maintained.'; break;
-    case 'excellent': summary = 'A strong choice in this position.'; break;
-    case 'good': summary = 'Decent move, though slightly better options exist.'; break;
+    case 'brilliant': summary = 'A difficult move to find — the best in a complex position!'; break;
+    case 'excellent': summary = 'A strong choice that keeps the advantage.'; break;
+    case 'good': summary = 'A solid move. Close to the best option.'; break;
+    case 'book': summary = 'A well-known opening move. Good theory.'; break;
     case 'inaccuracy': summary = `Small inaccuracy.${!isBest ? ` Consider ${bestMove}.` : ''}`; break;
     case 'mistake': summary = `This weakens your position.${!isBest ? ` ${bestMove} was better.` : ''}`; break;
     case 'blunder': summary = `A serious mistake.${!isBest ? ` ${bestMove} was essential.` : ''}`; break;

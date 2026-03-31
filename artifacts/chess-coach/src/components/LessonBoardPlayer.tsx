@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Chessboard } from 'react-chessboard';
 import { Chess } from 'chess.js';
 import {
@@ -139,6 +139,42 @@ export function LessonBoardPlayer({ pgn, title, drillFen, drillExpectedMove, dri
   const hasDrill = !!(drillFen && drillExpectedMove);
   const hasRepeat = (steps?.length ?? 0) > 1;
 
+  const [drillSelectedSq, setDrillSelectedSq] = useState<string | null>(null);
+  const [repeatSelectedSq, setRepeatSelectedSq] = useState<string | null>(null);
+
+  const getDrillLegalTargets = useCallback((sq: string | null): string[] => {
+    if (!sq || !drillFen) return [];
+    try {
+      const chess = new Chess(drillFen);
+      return chess.moves({ square: sq as any, verbose: true }).map(m => m.to);
+    } catch { return []; }
+  }, [drillFen]);
+
+  const getRepeatLegalTargets = useCallback((sq: string | null): string[] => {
+    if (!sq || !steps) return [];
+    try {
+      const chess = new Chess(steps[repeatStep]?.fen ?? START_FEN);
+      return chess.moves({ square: sq as any, verbose: true }).map(m => m.to);
+    } catch { return []; }
+  }, [steps, repeatStep]);
+
+  const drillLegalTargets = useMemo(() => getDrillLegalTargets(drillSelectedSq), [drillSelectedSq, getDrillLegalTargets]);
+  const repeatLegalTargets = useMemo(() => getRepeatLegalTargets(repeatSelectedSq), [repeatSelectedSq, getRepeatLegalTargets]);
+
+  const drillSquareStyles = useMemo(() => {
+    const styles: Record<string, React.CSSProperties> = {};
+    if (drillSelectedSq) styles[drillSelectedSq] = { background: 'rgba(100, 180, 255, 0.55)', borderRadius: '4px' };
+    for (const sq of drillLegalTargets) styles[sq] = { background: 'radial-gradient(circle, rgba(100,180,255,0.55) 28%, transparent 30%)' };
+    return styles;
+  }, [drillSelectedSq, drillLegalTargets]);
+
+  const repeatSquareStyles = useMemo(() => {
+    const styles: Record<string, React.CSSProperties> = {};
+    if (repeatSelectedSq) styles[repeatSelectedSq] = { background: 'rgba(100, 180, 255, 0.55)', borderRadius: '4px' };
+    for (const sq of repeatLegalTargets) styles[sq] = { background: 'radial-gradient(circle, rgba(100,180,255,0.55) 28%, transparent 30%)' };
+    return styles;
+  }, [repeatSelectedSq, repeatLegalTargets]);
+
   // ── Drill handlers ───────────────────────────────────────────────────────────
   const handleDrillDrop = useCallback((args: { sourceSquare: string; targetSquare: string | null; piece: unknown }) => {
     if (drillState === 'correct' || drillState === 'revealed') return false;
@@ -168,11 +204,32 @@ export function LessonBoardPlayer({ pgn, title, drillFen, drillExpectedMove, dri
     }
   }, [drillFen, drillExpectedMove, drillState]);
 
+  const handleDrillSquareClick = useCallback(({ square, piece }: { square: string; piece: { pieceType: string } | null }) => {
+    if (drillState === 'correct' || drillState === 'revealed' || !drillFen) return;
+    if (drillSelectedSq) {
+      if (square === drillSelectedSq) { setDrillSelectedSq(null); return; }
+      if (drillLegalTargets.includes(square)) {
+        handleDrillDrop({ sourceSquare: drillSelectedSq, targetSquare: square, piece: null });
+        setDrillSelectedSq(null);
+        return;
+      }
+      if (piece) { setDrillSelectedSq(square); } else { setDrillSelectedSq(null); }
+      return;
+    }
+    if (piece) {
+      try {
+        const chess = new Chess(drillFen);
+        if (piece.pieceType[0].toLowerCase() === chess.turn()) setDrillSelectedSq(square);
+      } catch { setDrillSelectedSq(square); }
+    }
+  }, [drillState, drillFen, drillSelectedSq, drillLegalTargets, handleDrillDrop]);
+
   const resetDrill = () => {
     setDrillState('idle');
     setDrillAttempts(0);
     setShowHint(false);
     setDrillPosition(drillFen || '');
+    setDrillSelectedSq(null);
   };
 
   const revealAnswer = () => {
@@ -234,6 +291,28 @@ export function LessonBoardPlayer({ pgn, title, drillFen, drillExpectedMove, dri
     }
   }, [repeatStep, repeatComplete, steps, repeatAttempts]);
 
+  const handleRepeatSquareClick = useCallback(({ square, piece }: { square: string; piece: { pieceType: string } | null }) => {
+    if (repeatComplete || !steps) return;
+    const nextMove = steps[repeatStep + 1];
+    if (!nextMove || nextMove.color !== repeatUserColor) return;
+    if (repeatSelectedSq) {
+      if (square === repeatSelectedSq) { setRepeatSelectedSq(null); return; }
+      if (repeatLegalTargets.includes(square)) {
+        handleRepeatDrop({ sourceSquare: repeatSelectedSq, targetSquare: square, piece: null });
+        setRepeatSelectedSq(null);
+        return;
+      }
+      if (piece) { setRepeatSelectedSq(square); } else { setRepeatSelectedSq(null); }
+      return;
+    }
+    if (piece) {
+      try {
+        const chess = new Chess(steps[repeatStep]?.fen ?? START_FEN);
+        if (piece.pieceType[0].toLowerCase() === chess.turn()) setRepeatSelectedSq(square);
+      } catch { setRepeatSelectedSq(square); }
+    }
+  }, [repeatComplete, steps, repeatStep, repeatUserColor, repeatSelectedSq, repeatLegalTargets, handleRepeatDrop]);
+
   useEffect(() => {
     if (tab !== 'repeat' || repeatComplete || !steps) return;
     const nextMove = steps[repeatStep + 1];
@@ -273,6 +352,7 @@ export function LessonBoardPlayer({ pgn, title, drillFen, drillExpectedMove, dri
     setRepeatFirstTry(new Array(totalRepeatMoves).fill(true));
     setRepeatAttempts(0);
     setRepeatComplete(false);
+    setRepeatSelectedSq(null);
   };
 
   if (!steps) {
@@ -500,7 +580,9 @@ export function LessonBoardPlayer({ pgn, title, drillFen, drillExpectedMove, dri
                       allowDragging: !repeatComplete,
                       canDragPiece: canRepeatDrag,
                       onPieceDrop: handleRepeatDrop,
-                      boardStyle: { borderRadius: '8px', overflow: 'hidden' },
+                      onSquareClick: handleRepeatSquareClick,
+                      squareStyles: repeatSquareStyles,
+                      boardStyle: { borderRadius: '8px', overflow: 'hidden', cursor: 'pointer' },
                       darkSquareStyle: { backgroundColor: '#2d4a3e' },
                       lightSquareStyle: { backgroundColor: '#6dae7f' },
                       animationDurationInMs: 180,
@@ -637,7 +719,9 @@ export function LessonBoardPlayer({ pgn, title, drillFen, drillExpectedMove, dri
                   position: drillState === 'idle' || drillState === 'wrong' ? drillFen! : drillPosition,
                   allowDragging: drillState !== 'correct' && drillState !== 'revealed',
                   onPieceDrop: drillState === 'correct' || drillState === 'revealed' ? () => false : handleDrillDrop,
-                  boardStyle: { borderRadius: '8px', overflow: 'hidden' },
+                  onSquareClick: handleDrillSquareClick,
+                  squareStyles: drillSquareStyles,
+                  boardStyle: { borderRadius: '8px', overflow: 'hidden', cursor: 'pointer' },
                   darkSquareStyle: { backgroundColor: '#2d4a3e' },
                   lightSquareStyle: { backgroundColor: '#6dae7f' },
                   animationDurationInMs: 180,
