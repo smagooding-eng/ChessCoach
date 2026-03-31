@@ -1,8 +1,8 @@
 import { Router, type IRouter } from "express";
-import { db, gamesTable } from "@workspace/db";
+import { db, gamesTable, coursesTable, lessonsTable } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { fetchChessComGames, extractGameMetadata, fetchChessComProfile } from "../lib/chesscom";
-import { analyzePlayerGames } from "../lib/openaiAnalysis";
+import { analyzePlayerGames, generateExploitCourseForOpponent } from "../lib/openaiAnalysis";
 import { randomUUID } from "crypto";
 
 const router: IRouter = Router();
@@ -195,6 +195,129 @@ async function runAnalysis(
       createdAt: jobs.get(jobId)!.createdAt,
     });
   }
+}
+
+// ── Opponent-based course generation ─────────────────────────────────────────
+
+type CourseJobStatus = "pending" | "done" | "error";
+interface CourseJob {
+  status: CourseJobStatus;
+  coursesCreated?: number;
+  error?: string;
+  createdAt: number;
+}
+const courseJobs = new Map<string, CourseJob>();
+setInterval(() => {
+  const cutoff = Date.now() - 10 * 60 * 1000;
+  for (const [id, job] of courseJobs) if (job.createdAt < cutoff) courseJobs.delete(id);
+}, 5 * 60 * 1000);
+
+interface OpponentWeakness {
+  category: string;
+  severity: string;
+  description: string;
+  frequency: number;
+  examples: string[];
+}
+
+// POST /api/opponents/generate-courses — generate exploit courses for a user
+router.post("/opponents/generate-courses", async (req, res): Promise<void> => {
+  const { opponentUsername, weaknesses, requestingUser } = req.body as {
+    opponentUsername?: string;
+    weaknesses?: OpponentWeakness[];
+    requestingUser?: string;
+  };
+
+  if (!opponentUsername || !weaknesses?.length || !requestingUser) {
+    res.status(400).json({ error: "opponentUsername, weaknesses, and requestingUser are required" });
+    return;
+  }
+
+  const jobId = randomUUID();
+  courseJobs.set(jobId, { status: "pending", createdAt: Date.now() });
+  res.json({ jobId });
+
+  req.log.info({ opponentUsername, requestingUser, jobId }, "Generating exploit courses (background)");
+
+  runCourseGeneration(opponentUsername, weaknesses, requestingUser.toLowerCase(), jobId, req.log).catch((err) => {
+    req.log.error({ err, jobId }, "Background course generation failed");
+  });
+});
+
+// GET /api/opponents/courses-job/:jobId — poll for course generation status
+router.get("/opponents/courses-job/:jobId", (req, res): void => {
+  const job = courseJobs.get(req.params.jobId);
+  if (!job) {
+    res.status(404).json({ error: "Job not found or expired" });
+    return;
+  }
+  res.setHeader("Cache-Control", "no-store");
+  res.json(job);
+});
+
+async function runCourseGeneration(
+  opponentUsername: string,
+  weaknesses: OpponentWeakness[],
+  username: string,
+  jobId: string,
+  log: typeof import("pino").default.prototype,
+): Promise<void> {
+  let coursesCreated = 0;
+  // Take top 3 weaknesses by severity order
+  const prioritized = [...weaknesses].sort((a, b) => {
+    const order = { Critical: 0, High: 1, Medium: 2, Low: 3 };
+    return (order[a.severity as keyof typeof order] ?? 4) - (order[b.severity as keyof typeof order] ?? 4);
+  }).slice(0, 3);
+
+  for (const weakness of prioritized) {
+    try {
+      const courseData = await generateExploitCourseForOpponent(opponentUsername, {
+        category: weakness.category,
+        severity: weakness.severity,
+        description: weakness.description,
+        frequency: weakness.frequency,
+        examples: weakness.examples,
+      });
+
+      const [course] = await db.insert(coursesTable).values({
+        username,
+        title: courseData.title,
+        description: courseData.description,
+        category: courseData.category,
+        difficulty: courseData.difficulty,
+        totalLessons: courseData.lessons.length,
+        completedLessons: 0,
+      }).returning();
+
+      for (const lesson of courseData.lessons) {
+        await db.insert(lessonsTable).values({
+          courseId: course.id,
+          title: lesson.title,
+          content: lesson.content,
+          orderIndex: lesson.orderIndex,
+          completed: "false",
+          examplePgn: lesson.examplePgn ?? null,
+          drillFen: lesson.drillFen ?? null,
+          drillExpectedMove: lesson.drillExpectedMove ?? null,
+          drillHint: lesson.drillHint ?? null,
+        });
+      }
+
+      coursesCreated++;
+      log.info({ jobId, opponentUsername, weakness: weakness.category }, "Exploit course created");
+    } catch (err) {
+      log.error({ err, weakness: weakness.category }, "Failed to generate exploit course");
+    }
+  }
+
+  courseJobs.set(jobId, {
+    status: coursesCreated > 0 ? "done" : "error",
+    coursesCreated,
+    error: coursesCreated === 0 ? "Failed to generate any courses. Please try again." : undefined,
+    createdAt: courseJobs.get(jobId)!.createdAt,
+  });
+
+  log.info({ jobId, opponentUsername, coursesCreated }, "Exploit course generation complete");
 }
 
 export default router;

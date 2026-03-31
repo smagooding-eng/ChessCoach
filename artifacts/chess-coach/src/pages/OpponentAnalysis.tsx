@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Swords, Search, Target, AlertTriangle, TrendingUp, ChevronDown, ChevronUp, Loader2, User, Users, Zap, Clock, Star } from 'lucide-react';
+import { Swords, Search, Target, AlertTriangle, TrendingUp, ChevronDown, ChevronUp, Loader2, User, Users, Zap, Clock, Star, BookOpen, CheckCircle2, GraduationCap } from 'lucide-react';
+import { Link } from 'wouter';
 import { useUser } from '@/hooks/use-user';
 
 interface Profile {
@@ -62,6 +63,8 @@ const TITLE_COLORS: Record<string, string> = {
   WIM: 'bg-orange-500/20 text-orange-400 border-orange-500/40',
 };
 
+type CourseGenState = 'idle' | 'generating' | 'done' | 'error';
+
 export function OpponentAnalysis() {
   const { username } = useUser();
   const [inputUsername, setInputUsername] = useState('');
@@ -73,11 +76,18 @@ export function OpponentAnalysis() {
   const mountedRef = useRef(true);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Course generation state
+  const [courseGenState, setCourseGenState] = useState<CourseGenState>('idle');
+  const [coursesCreated, setCoursesCreated] = useState(0);
+  const [courseGenError, setCourseGenError] = useState<string | null>(null);
+  const courseIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   useEffect(() => {
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
       if (intervalRef.current) clearInterval(intervalRef.current);
+      if (courseIntervalRef.current) clearInterval(courseIntervalRef.current);
     };
   }, []);
 
@@ -90,6 +100,9 @@ export function OpponentAnalysis() {
     setError(null);
     setResult(null);
     setStatusMsg('Starting analysis…');
+    setCourseGenState('idle');
+    setCourseGenError(null);
+    setCoursesCreated(0);
 
     try {
       const startRes = await fetch('/api/opponents/start', {
@@ -148,11 +161,58 @@ export function OpponentAnalysis() {
     }
   };
 
+  const handleGenerateCourses = async () => {
+    if (!result || !username || courseGenState === 'generating') return;
+    setCourseGenState('generating');
+    setCourseGenError(null);
+
+    try {
+      const startRes = await fetch('/api/opponents/generate-courses', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          opponentUsername: result.username,
+          weaknesses: result.weaknesses,
+          requestingUser: username,
+        }),
+      });
+      if (!startRes.ok) throw new Error('Failed to start course generation');
+      const { jobId } = await startRes.json() as { jobId: string };
+
+      await new Promise<void>((resolve, reject) => {
+        courseIntervalRef.current = setInterval(async () => {
+          if (!mountedRef.current) { resolve(); return; }
+          try {
+            const pollRes = await fetch(`/api/opponents/courses-job/${jobId}`, { cache: 'no-store' });
+            if (pollRes.status === 304) return;
+            if (!pollRes.ok) { reject(new Error(`Poll error (${pollRes.status})`)); return; }
+            const job = await pollRes.json() as { status: string; coursesCreated?: number; error?: string };
+            if (job.status === 'done') {
+              if (courseIntervalRef.current) clearInterval(courseIntervalRef.current);
+              if (mountedRef.current) { setCourseGenState('done'); setCoursesCreated(job.coursesCreated ?? 0); }
+              resolve();
+            } else if (job.status === 'error') {
+              if (courseIntervalRef.current) clearInterval(courseIntervalRef.current);
+              reject(new Error(job.error ?? 'Course generation failed'));
+            }
+          } catch (err) {
+            if (courseIntervalRef.current) clearInterval(courseIntervalRef.current);
+            reject(err);
+          }
+        }, 3000);
+      });
+    } catch (err: unknown) {
+      if (!mountedRef.current) return;
+      setCourseGenState('error');
+      setCourseGenError(err instanceof Error ? err.message : 'Something went wrong.');
+    }
+  };
+
   const totalGames = result ? result.wins + result.losses + result.draws : 0;
   const winPct = totalGames > 0 ? Math.round((result!.wins / totalGames) * 100) : 0;
 
   return (
-    <div className="space-y-8 pb-10">
+    <div className="space-y-8 pb-10 px-4 pt-4 md:px-0 md:pt-0">
       {/* Header */}
       <div>
         <div className="flex items-center gap-3 mb-1">
@@ -456,6 +516,90 @@ export function OpponentAnalysis() {
                 </div>
               </div>
             </div>
+
+            {/* ── Generate Exploit Courses ── */}
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
+              className="glass-card rounded-2xl overflow-hidden border border-primary/20"
+            >
+              <div className="p-5 flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center shrink-0">
+                    <GraduationCap className="w-5 h-5 text-primary" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-black text-sm">Generate Exploit Courses</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      AI builds {Math.min(result.weaknesses.length, 3)} courses teaching you how to punish{' '}
+                      <span className="text-foreground font-semibold">{result.username}</span>'s top weaknesses
+                    </p>
+                  </div>
+                </div>
+
+                {courseGenState === 'idle' && (
+                  <button
+                    onClick={handleGenerateCourses}
+                    className="shrink-0 px-5 py-2.5 rounded-xl bg-primary text-primary-foreground font-black text-sm hover:bg-primary/90 transition-colors flex items-center gap-2"
+                  >
+                    <BookOpen className="w-4 h-4" />
+                    Build Courses
+                  </button>
+                )}
+
+                {courseGenState === 'generating' && (
+                  <div className="shrink-0 flex items-center gap-2 text-primary text-sm font-semibold">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Generating… this takes 2–3 min
+                  </div>
+                )}
+
+                {courseGenState === 'done' && (
+                  <Link href="/courses">
+                    <div className="shrink-0 flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-black text-sm hover:bg-emerald-500/25 transition-colors cursor-pointer">
+                      <CheckCircle2 className="w-4 h-4" />
+                      {coursesCreated} course{coursesCreated !== 1 ? 's' : ''} ready → View
+                    </div>
+                  </Link>
+                )}
+
+                {courseGenState === 'error' && (
+                  <div className="shrink-0 flex flex-col items-end gap-2">
+                    <p className="text-xs text-red-400">{courseGenError}</p>
+                    <button
+                      onClick={handleGenerateCourses}
+                      className="px-4 py-2 rounded-xl bg-red-500/15 text-red-400 border border-red-500/30 font-bold text-xs hover:bg-red-500/25 transition-colors"
+                    >
+                      Retry
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {courseGenState === 'generating' && (
+                <div className="px-5 pb-4">
+                  <div className="h-1 bg-secondary rounded-full overflow-hidden">
+                    <div className="h-full bg-primary rounded-full animate-pulse" style={{ width: '60%' }} />
+                  </div>
+                  <p className="text-[11px] text-muted-foreground mt-2">
+                    Crafting personalised lessons to exploit each weakness…
+                  </p>
+                </div>
+              )}
+
+              {courseGenState === 'done' && (
+                <div className="px-5 pb-4 pt-0">
+                  <div className="flex flex-wrap gap-2">
+                    {result.weaknesses.slice(0, 3).map((w, i) => (
+                      <span key={i} className="px-2.5 py-1 rounded-lg bg-primary/10 text-primary text-xs font-semibold">
+                        vs {result.username}: Exploit {w.category}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>

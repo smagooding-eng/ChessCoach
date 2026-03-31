@@ -525,6 +525,70 @@ interface CourseOutput {
   lessons: CourseLesson[];
 }
 
+export async function generateExploitCourseForOpponent(
+  opponentUsername: string,
+  weakness: WeaknessResult
+): Promise<CourseOutput> {
+  const prompt = `You are an expert chess coach preparing a player to face a specific opponent.
+
+Opponent: ${opponentUsername}
+Opponent's Weakness: ${weakness.category}
+Severity: ${weakness.severity}
+Description: ${weakness.description}
+Examples from their games: ${weakness.examples.join("; ")}
+
+Create a course (4–5 lessons) that teaches the STUDENT how to recognize, steer toward, and EXPLOIT this specific weakness in their opponent. Frame everything from the student's perspective ("you should…", "to exploit this…"). Do NOT teach how to fix the weakness — teach how to punish it.
+
+RULES for each lesson:
+1. examplePgn: a valid PGN string, 5-10 instructive moves showing how a player can steer into positions that exploit this weakness.
+   - Every move must have a {comment in curly braces} explaining WHY it exploits the opponent's vulnerability
+   - Legal moves only. Start from initial position unless the weakness is endgame-specific.
+   - Do NOT use null for examplePgn — every lesson requires a move sequence
+
+2. drillFen: A FEN string representing a position where the student must find the move that best exploits this weakness.
+
+3. drillExpectedMove: The move in SAN notation that most effectively exploits the weakness (must be legal in drillFen).
+
+4. drillHint: A one-sentence hint guiding the student toward the exploitation.
+
+5. content: 3–5 paragraphs of concrete coaching on HOW to exploit this specific pattern. Name the tactical/positional motifs, the move orders that provoke mistakes, and the techniques that punish this weakness.
+
+Respond with valid JSON:
+{
+  "title": "vs ${opponentUsername}: [short title related to exploiting their ${weakness.category}] (max 60 chars)",
+  "description": "2-3 sentence description focused on exploiting ${opponentUsername}'s ${weakness.category}",
+  "category": "${weakness.category}",
+  "difficulty": "Beginner|Intermediate|Advanced",
+  "lessons": [
+    {
+      "title": "Lesson title",
+      "content": "3-5 paragraphs of exploitation-focused coaching...",
+      "orderIndex": 0,
+      "examplePgn": "1. e4 {Steers toward open positions where their weakness is exposed} e5 {Comment} ...",
+      "drillFen": "rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2",
+      "drillExpectedMove": "Nc6",
+      "drillHint": "Find the move that puts maximum pressure on their weak point"
+    }
+  ]
+}`;
+
+  try {
+    const response = await openai.chat.completions.create({
+      model: "gpt-5.2",
+      max_completion_tokens: 8192,
+      messages: [{ role: "user", content: prompt }],
+      response_format: { type: "json_object" },
+    });
+
+    const content = response.choices[0]?.message?.content ?? "{}";
+    const parsed = JSON.parse(content) as CourseOutput;
+    return parsed;
+  } catch (err) {
+    logger.error({ err }, "Failed to generate exploit course with OpenAI");
+    throw err;
+  }
+}
+
 export async function generateCourseForWeakness(
   weakness: WeaknessResult
 ): Promise<CourseOutput> {
