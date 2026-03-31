@@ -394,7 +394,7 @@ export function LessonBoardPlayer({ pgn, title, drillFen, drillExpectedMove, dri
             <div className="flex items-center justify-between gap-2 px-4 py-3 border-t border-white/5 bg-white/2">
               <button onClick={() => { setIsPlaying(false); go(0); }} disabled={isFirst} className="p-2 rounded-lg hover:bg-white/8 text-muted-foreground hover:text-foreground transition-colors disabled:opacity-30" title="Go to start"><SkipBack className="w-4 h-4" /></button>
               <button onClick={() => go(currentStep - 1)} disabled={isFirst} className="p-2 rounded-lg hover:bg-white/8 text-muted-foreground hover:text-foreground transition-colors disabled:opacity-30"><ChevronLeft className="w-4 h-4" /></button>
-              <button onClick={() => setIsPlaying(p => !p)} className="flex items-center gap-2 px-5 py-2 rounded-xl bg-primary text-primary-foreground font-bold text-sm hover:opacity-90 transition-opacity shadow-[0_0_16px_rgba(202,138,4,0.3)]">
+              <button onClick={() => setIsPlaying(p => !p)} className="flex items-center gap-2 px-5 py-2 rounded-xl bg-primary text-primary-foreground font-bold text-sm hover:opacity-90 transition-opacity shadow-[0_0_16px_hsl(89_44%_50%_/_0.3)]">
                 {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
                 {isPlaying ? 'Pause' : 'Play'}
               </button>

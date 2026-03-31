@@ -131,7 +131,7 @@ export function Analysis() {
         <button
           onClick={handleAnalyze}
           disabled={isAnalyzing}
-          className="relative z-10 shrink-0 px-8 py-4 rounded-xl font-bold bg-primary text-primary-foreground shadow-[0_0_20px_rgba(202,138,4,0.3)] hover:shadow-[0_0_30px_rgba(202,138,4,0.5)] transition-all disabled:opacity-50 hover:-translate-y-1 active:translate-y-0 flex items-center gap-3"
+          className="relative z-10 shrink-0 btn-primary btn-lg"
         >
           {isAnalyzing ? (
             <><Loader2 className="w-5 h-5 animate-spin" /> Processing...</>
