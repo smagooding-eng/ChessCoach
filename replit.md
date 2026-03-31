@@ -86,9 +86,12 @@ Every package extends `tsconfig.base.json` which sets `composite: true`. The roo
 
 ### `artifacts/chess-coach` (`@workspace/chess-coach`)
 
-- React frontend with pages: Setup, Dashboard, Import, Games, GameReplay, Analysis, Courses, CourseDetail
-- ChessBoard component renders positions from FEN strings with Unicode pieces
+- React frontend with pages: Setup, Dashboard, Import, Games, GameReplay, Analysis, Courses, CourseDetail, Openings, OpeningDetail, OpponentAnalysis, PracticeBots
+- ChessBoard component renders positions from FEN strings with Unicode pieces, supports drag-and-drop + click-to-move
 - Uses recharts for performance charts
+- QueryClient configured: retry=1, refetchOnWindowFocus=false, staleTime=30s
+- Per-route ErrorBoundary wraps each protected page (fallback navigates to parent route via SPA routing)
+- Global unhandledrejection handler suppresses transient errors (AbortError, network failures, 5xx ApiErrors) from triggering runtime error overlay
 
 ### `lib/db` (`@workspace/db`)
 
