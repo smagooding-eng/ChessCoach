@@ -28,7 +28,9 @@ Chess Coach - A full-stack chess analysis platform that imports games from chess
 6. **Personalized Courses**: AI-generated courses with 4-5 annotated PGN lessons; generates by appending (not replacing) to preserve progress
 7. **Interactive Course Viewer**: Sequential lesson mode, LessonBoardPlayer component, "Complete & Next" auto-advance
 8. **Opponent Scout** (`/opponents`): Enter any chess.com username — fetches their recent games, runs full AI analysis, shows their weaknesses and favourite openings
-9. **Global UserContext**: `src/context/UserContext.tsx` — single source of truth for auth state, no per-component useState drift
+9. **Practice Bots** (`/practice`): 8 AI bots from 400 to 2000 ELO with client-side minimax engine, piece-square tables, configurable depth/blunder rate
+10. **ELO-Based Improvement Tips**: Analysis page shows tier-specific tips based on average rating with progress bar to next tier
+11. **Global UserContext**: `src/context/UserContext.tsx` — single source of truth for auth state, no per-component useState drift
 
 ## Structure
 

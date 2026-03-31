@@ -4,8 +4,9 @@ import { useMyAnalysisSummary, useMyWeaknesses } from '@/hooks/use-analysis';
 import { useUser } from '@/hooks/use-user';
 import { useQueryClient } from '@tanstack/react-query';
 import { Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { BrainCircuit, AlertTriangle, Activity, ChevronRight, Loader2 } from 'lucide-react';
+import { BrainCircuit, AlertTriangle, Activity, ChevronRight, Loader2, TrendingUp, CheckCircle2, ArrowUpRight } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { getTierForRating, ELO_TIERS } from '@/lib/elo-tips';
 
 const PIE_COLORS = ['#10b981', '#ef4444', '#64748b'];
 
@@ -247,6 +248,84 @@ export function Analysis() {
               </div>
             </div>
           </div>
+
+          {/* ── ELO-Based Improvement Tips ─────────────────────────────────── */}
+          {summary.avgRating > 0 && (() => {
+            const tier = getTierForRating(summary.avgRating);
+            const tierIdx = ELO_TIERS.indexOf(tier);
+            const nextTier = ELO_TIERS[tierIdx + 1];
+            const progress = nextTier
+              ? Math.min(100, Math.round(((summary.avgRating - tier.min) / (tier.max - tier.min)) * 100))
+              : 100;
+            return (
+              <div className="glass-card rounded-2xl overflow-hidden border border-white/8 mt-4">
+                <div className="px-6 py-5 border-b border-white/5 flex flex-col sm:flex-row items-start sm:items-center gap-4 justify-between">
+                  <div className="flex items-center gap-3">
+                    <TrendingUp className="w-6 h-6 text-primary" />
+                    <div>
+                      <h2 className="text-xl font-bold">Level Up Tips</h2>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Based on your average rating of <span className="font-bold text-foreground">{summary.avgRating}</span>
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className={`px-3 py-1.5 rounded-xl text-sm font-bold ${tier.bgColor} ${tier.color} border ${tier.borderColor}`}>
+                      {tier.icon} {tier.label}
+                    </div>
+                    {nextTier && (
+                      <>
+                        <ArrowUpRight className="w-4 h-4 text-muted-foreground" />
+                        <div className={`px-3 py-1.5 rounded-xl text-sm font-bold ${nextTier.bgColor} ${nextTier.color} border ${nextTier.borderColor} opacity-60`}>
+                          {nextTier.icon} {nextTier.label}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {nextTier && (
+                  <div className="px-6 py-3 border-b border-white/5 bg-white/2">
+                    <div className="flex items-center justify-between text-xs text-muted-foreground mb-1.5">
+                      <span>{tier.range}</span>
+                      <span>{nextTier.range}</span>
+                    </div>
+                    <div className="h-2 bg-secondary rounded-full overflow-hidden">
+                      <motion.div
+                        className="h-full bg-primary rounded-full"
+                        initial={{ width: 0 }}
+                        animate={{ width: `${progress}%` }}
+                        transition={{ duration: 0.8, ease: 'easeOut' }}
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1.5">
+                      <span className="font-bold text-primary">{tier.max - summary.avgRating}</span> rating points to {nextTier.label}
+                    </p>
+                  </div>
+                )}
+
+                <div className="px-6 py-5">
+                  <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground/50 mb-4">
+                    Tips to reach {tier.nextTier}
+                  </p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {tier.tips.map((tip, i) => (
+                      <motion.div
+                        key={i}
+                        initial={{ opacity: 0, x: -8 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: i * 0.08 }}
+                        className="flex gap-3 p-3 rounded-xl bg-secondary/40 hover:bg-secondary/60 transition-colors"
+                      >
+                        <CheckCircle2 className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+                        <p className="text-sm text-foreground/80 leading-relaxed">{tip}</p>
+                      </motion.div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
 
           <h2 className="text-2xl font-display font-bold mt-12 mb-6 flex items-center gap-2">
             <AlertTriangle className="w-6 h-6 text-amber-500" /> Identified Weaknesses

@@ -47,6 +47,7 @@ import { WeaknessDetail } from "@/pages/WeaknessDetail";
 import { OpponentAnalysis } from "@/pages/OpponentAnalysis";
 import { Openings } from "@/pages/Openings";
 import { OpeningDetail } from "@/pages/OpeningDetail";
+import { PracticeBots } from "@/pages/PracticeBots";
 import NotFound from "@/pages/not-found";
 import { Layout } from "@/components/Layout";
 
@@ -91,6 +92,7 @@ const PCourseDetail  = () => <ProtectedRoute component={CourseDetail} />;
 const POpenings      = () => <ProtectedRoute component={Openings} />;
 const POpeningDetail = () => <ProtectedRoute component={OpeningDetail} />;
 const POpponents     = () => <ProtectedRoute component={OpponentAnalysis} />;
+const PPracticeBots  = () => <ProtectedRoute component={PracticeBots} />;
 
 function Router() {
   return (
@@ -109,6 +111,7 @@ function Router() {
       <Route path="/openings"        component={POpenings} />
       <Route path="/openings/:eco"   component={POpeningDetail} />
       <Route path="/opponents"       component={POpponents} />
+      <Route path="/practice"        component={PPracticeBots} />
 
       <Route component={NotFound} />
     </Switch>
