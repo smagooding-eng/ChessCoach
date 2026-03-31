@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useUser } from '@/hooks/use-user';
 import { useImportChessGames } from '@/hooks/use-games';
-import { getApiBase } from '@/lib/api';
 import { motion } from 'framer-motion';
 import { CloudDownload, CheckCircle2, AlertCircle, RefreshCw, ArrowRight } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
@@ -164,9 +163,6 @@ export function Import() {
                   <p className="font-semibold mb-1">Import failed</p>
                   <p className="text-destructive/80 break-words">
                     {apiError || (error?.message) || 'Failed to import games. Check that your username is correct and try again.'}
-                  </p>
-                  <p className="text-destructive/60 text-xs mt-1 break-all">
-                    API: {getApiBase() || '(relative)'}
                   </p>
                 </div>
               </div>
