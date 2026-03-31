@@ -111,9 +111,12 @@ export function OpeningDetail() {
   const [feedback, setFeedback] = useState<'correct' | 'wrong' | null>(null);
   const [moveQuality, setMoveQuality] = useState<MoveQuality | null>(null);
   const [practiceComplete, setPracticeComplete] = useState(false);
+  const [practiceColor, setPracticeColor] = useState<'white' | 'black'>('white');
 
   const practiceFen = practiceStep === 0 ? null : mainLine[practiceStep - 1]?.fen ?? null;
-  const expectedMove = mainLine[practiceStep]?.san ?? null;
+  const currentMoveColor = mainLine[practiceStep]?.color ?? 'white';
+  const isUserTurn = currentMoveColor === practiceColor;
+  const expectedMove = isUserTurn ? (mainLine[practiceStep]?.san ?? null) : null;
 
   const practiceLastMove = useMemo(() => {
     if (practiceStep === 0) return null;
@@ -166,13 +169,22 @@ export function OpeningDetail() {
     setPracticeComplete(false);
   }
 
-  // Auto-play computer's moves (when it's not the user's expected move in practice mode)
   useEffect(() => {
     if (!practicing || practiceComplete || mainLine.length === 0) return;
-    // Determine whose turn it is: even step = white to move, odd = black to move
-    // The practice assumes user plays both sides following the main line
-    // No auto-play needed — user plays each move in sequence
-  }, [practicing, practiceStep, practiceComplete, mainLine]);
+    const move = mainLine[practiceStep];
+    if (!move) return;
+    if (move.color === practiceColor) return;
+
+    const timer = setTimeout(() => {
+      const nextStep = practiceStep + 1;
+      if (nextStep >= mainLine.length) {
+        setPracticeComplete(true);
+      } else {
+        setPracticeStep(nextStep);
+      }
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [practicing, practiceStep, practiceComplete, mainLine, practiceColor]);
 
   // Other openings for sidebar (top 8 others)
   const otherOpenings = useMemo(() => {
@@ -271,6 +283,16 @@ export function OpeningDetail() {
               <div className="flex gap-2">
                 {practicing ? (
                   <>
+                    <div className="flex items-center gap-0.5 rounded-xl bg-secondary p-0.5">
+                      <button onClick={() => { setPracticeColor('white'); resetPractice(); }}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-colors ${practiceColor === 'white' ? 'bg-[#f0d9b5] text-[#2d2d2d]' : 'text-muted-foreground hover:text-foreground'}`}>
+                        White
+                      </button>
+                      <button onClick={() => { setPracticeColor('black'); resetPractice(); }}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-colors ${practiceColor === 'black' ? 'bg-[#2d2d2d] text-[#f0d9b5] border border-white/20' : 'text-muted-foreground hover:text-foreground'}`}>
+                        Black
+                      </button>
+                    </div>
                     <button onClick={resetPractice}
                       className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-secondary text-muted-foreground hover:text-foreground text-sm font-medium transition-colors">
                       <RotateCcw className="w-3.5 h-3.5" /> Restart
@@ -312,8 +334,8 @@ export function OpeningDetail() {
                 <>
                   <ChessBoard
                     fen={practiceFen}
-                    flipped={false}
-                    practiceMode={true}
+                    flipped={practiceColor === 'black'}
+                    practiceMode={isUserTurn}
                     expectedMoveSan={expectedMove}
                     onMovePlayed={handlePracticeMove}
                     lastMove={practiceLastMove}
@@ -347,7 +369,9 @@ export function OpeningDetail() {
                         {mainLine[practiceStep]?.moveNumber}
                       </div>
                       <div>
-                        <p className="text-sm font-semibold">Play move {practiceStep + 1} of {mainLine.length}</p>
+                        <p className="text-sm font-semibold">
+                          {isUserTurn ? `Your turn — move ${practiceStep + 1} of ${mainLine.length}` : 'Opponent playing…'}
+                        </p>
                         <p className="text-xs text-muted-foreground">
                           {mainLine[practiceStep]?.color === 'white' ? 'White' : 'Black'} to move
                         </p>

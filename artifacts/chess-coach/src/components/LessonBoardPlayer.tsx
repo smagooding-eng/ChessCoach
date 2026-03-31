@@ -186,6 +186,8 @@ export function LessonBoardPlayer({ pgn, title, drillFen, drillExpectedMove, dri
   };
 
   // ── Repeat drill handlers ────────────────────────────────────────────────────
+  const repeatUserColor = steps?.[1]?.color ?? 'w';
+
   const handleRepeatDrop = useCallback((args: { sourceSquare: string; targetSquare: string | null; piece: unknown }) => {
     if (repeatComplete || !args.targetSquare || !steps) return false;
     const expected = steps[repeatStep + 1]?.san;
@@ -232,13 +234,37 @@ export function LessonBoardPlayer({ pgn, title, drillFen, drillExpectedMove, dri
     }
   }, [repeatStep, repeatComplete, steps, repeatAttempts]);
 
+  useEffect(() => {
+    if (tab !== 'repeat' || repeatComplete || !steps) return;
+    const nextMove = steps[repeatStep + 1];
+    if (!nextMove || !nextMove.color) return;
+    if (nextMove.color === repeatUserColor) return;
+
+    const timer = setTimeout(() => {
+      try {
+        const chess = new Chess(steps[repeatStep].fen);
+        chess.move(nextMove.san!);
+        setRepeatPosition(chess.fen());
+        const next = repeatStep + 1;
+        if (next >= steps.length - 1) {
+          setRepeatComplete(true);
+        } else {
+          setRepeatStep(next);
+        }
+      } catch {}
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [tab, repeatStep, repeatComplete, steps, repeatUserColor]);
+
   const canRepeatDrag = useCallback(({ piece }: { piece: { pieceType: string } | null }) => {
-    if (repeatComplete || !piece) return false;
+    if (repeatComplete || !piece || !steps) return false;
+    const nextMove = steps[repeatStep + 1];
+    if (!nextMove || nextMove.color !== repeatUserColor) return false;
     try {
-      const chess = new Chess(steps?.[repeatStep]?.fen ?? START_FEN);
+      const chess = new Chess(steps[repeatStep]?.fen ?? START_FEN);
       return piece.pieceType[0].toLowerCase() === chess.turn();
     } catch { return false; }
-  }, [repeatStep, repeatComplete, steps]);
+  }, [repeatStep, repeatComplete, steps, repeatUserColor]);
 
   const resetRepeat = () => {
     setRepeatStep(0);

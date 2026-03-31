@@ -405,6 +405,18 @@ export function GameReplay() {
     if (correct) setTimeout(() => setCurrentMove(p => Math.min(maxMoves, p + 1)), 450);
   }, [maxMoves]);
 
+  useEffect(() => {
+    if (!practiceMode || currentMove >= maxMoves) return;
+    const nextMoveIsWhite = currentMove % 2 === 0;
+    const userPlaysWhite = !flipped;
+    if (nextMoveIsWhite === userPlaysWhite) return;
+
+    const timer = setTimeout(() => {
+      setCurrentMove(prev => Math.min(maxMoves, prev + 1));
+    }, currentMove === 0 ? 800 : 600);
+    return () => clearTimeout(timer);
+  }, [practiceMode, currentMove, maxMoves, flipped]);
+
   if (isLoading) return (
     <div className="flex flex-col items-center justify-center py-24 gap-3">
       <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
