@@ -3,7 +3,7 @@ import { useLocation } from 'wouter';
 import { useMyAnalysisSummary, useMyWeaknesses } from '@/hooks/use-analysis';
 import { useUser } from '@/hooks/use-user';
 import { useQueryClient } from '@tanstack/react-query';
-import { BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { BrainCircuit, AlertTriangle, Activity, ChevronRight, Loader2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 
@@ -109,6 +109,7 @@ export function Analysis() {
     const short = words.length > 4 ? words.slice(0, 4).join(' ') + '…' : o.opening;
     return {
       name: short,
+      fullName: o.opening,
       games: o.games,
       winRate: Math.round((o.wins / o.games) * 100),
     };
@@ -215,19 +216,34 @@ export function Analysis() {
 
             <div className="glass-card p-6 rounded-2xl">
               <h2 className="text-xl font-bold mb-6">Top Openings Win Rate</h2>
-              <div className="h-64 w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={openingData} layout="vertical" margin={{ left: 0, right: 24 }}>
-                    <XAxis type="number" domain={[0, 100]} hide />
-                    <YAxis dataKey="name" type="category" width={150} tick={{fill: '#94a3b8', fontSize: 11}} axisLine={false} tickLine={false} />
-                    <RechartsTooltip 
-                      cursor={{fill: 'rgba(255,255,255,0.05)'}}
-                      contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px', color: '#fff' }}
-                      formatter={(val) => [`${val}%`, 'Win Rate']}
-                    />
-                    <Bar dataKey="winRate" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} barSize={24} />
-                  </BarChart>
-                </ResponsiveContainer>
+              <div className="space-y-2.5">
+                {openingData.map((o, i) => (
+                  <motion.div
+                    key={i}
+                    initial={{ opacity: 0, x: 10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: i * 0.06 }}
+                    onClick={() => navigate(`/openings/${encodeURIComponent(o.fullName)}`)}
+                    className="flex items-center gap-3 p-3 rounded-xl bg-secondary/40 hover:bg-secondary/70 cursor-pointer group transition-all"
+                  >
+                    <span className="text-xs text-muted-foreground w-[120px] sm:w-[150px] shrink-0 truncate group-hover:text-foreground transition-colors font-medium">
+                      {o.name}
+                    </span>
+                    <div className="flex-1 h-5 bg-secondary rounded overflow-hidden relative">
+                      <div
+                        className="h-full rounded bg-primary/80 group-hover:bg-primary transition-colors"
+                        style={{ width: `${o.winRate}%` }}
+                      />
+                    </div>
+                    <span className={`text-xs font-bold w-10 text-right shrink-0 ${o.winRate >= 60 ? 'text-emerald-400' : o.winRate >= 45 ? 'text-amber-400' : 'text-red-400'}`}>
+                      {o.winRate}%
+                    </span>
+                    <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-primary shrink-0 transition-colors" />
+                  </motion.div>
+                ))}
+                {openingData.length === 0 && (
+                  <p className="text-sm text-muted-foreground text-center py-8">No opening data yet</p>
+                )}
               </div>
             </div>
           </div>

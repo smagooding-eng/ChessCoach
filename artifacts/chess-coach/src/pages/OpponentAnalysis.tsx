@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Swords, Search, Target, AlertTriangle, TrendingUp, ChevronDown, ChevronUp, Loader2, User, Users, Zap, Clock, Star, BookOpen, CheckCircle2, GraduationCap } from 'lucide-react';
-import { Link } from 'wouter';
+import { Swords, Search, Target, AlertTriangle, TrendingUp, ChevronDown, ChevronUp, ChevronRight, Loader2, User, Users, Zap, Clock, Star, BookOpen, CheckCircle2, GraduationCap } from 'lucide-react';
+import { Link, useLocation } from 'wouter';
 import { useUser } from '@/hooks/use-user';
 
 interface Profile {
@@ -66,6 +66,7 @@ const TITLE_COLORS: Record<string, string> = {
 type CourseGenState = 'idle' | 'generating' | 'done' | 'error';
 
 export function OpponentAnalysis() {
+  const [, navigate] = useLocation();
   const { username } = useUser();
   const [inputUsername, setInputUsername] = useState('');
   const [loading, setLoading] = useState(false);
@@ -480,11 +481,15 @@ export function OpponentAnalysis() {
                         initial={{ opacity: 0, x: 10 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: i * 0.07 }}
-                        className="glass-card rounded-xl p-4"
+                        onClick={() => o.opening && navigate(`/openings/${encodeURIComponent(o.opening)}`)}
+                        className="glass-card rounded-xl p-4 cursor-pointer hover:bg-white/[0.04] hover:border-primary/30 transition-all group"
                       >
                         <div className="flex items-start justify-between gap-2 mb-2">
-                          <span className="text-sm font-medium leading-snug line-clamp-2">{o.opening || 'Unknown'}</span>
-                          <span className="text-xs text-muted-foreground shrink-0">{o.games}g</span>
+                          <span className="text-sm font-medium leading-snug line-clamp-2 group-hover:text-primary transition-colors">{o.opening || 'Unknown'}</span>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <span className="text-xs text-muted-foreground">{o.games}g</span>
+                            <ChevronRight className="w-3.5 h-3.5 text-muted-foreground group-hover:text-primary transition-colors" />
+                          </div>
                         </div>
                         <div className="flex items-center gap-2">
                           <div className="flex-1 h-1.5 bg-secondary rounded-full overflow-hidden">
