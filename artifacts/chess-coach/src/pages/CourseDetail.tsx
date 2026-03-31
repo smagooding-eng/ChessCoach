@@ -5,7 +5,7 @@ import { LessonBoardPlayer } from '@/components/LessonBoardPlayer';
 import {
   ArrowLeft, CheckCircle2, Circle, Target,
   ChevronLeft, ChevronRight, Award, List, LayoutTemplate,
-  Volume2, VolumeX, BookOpen,
+  Volume2, VolumeX, BookOpen, Loader,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
@@ -84,48 +84,76 @@ function LessonContentStepper({ content, lessonId }: { content: string; lessonId
   const steps = useMemo(() => splitIntoSteps(content), [content]);
   const [step, setStep] = useState(0);
   const [speaking, setSpeaking] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [autoRead, setAutoRead] = useState(false);
-  const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
-  const hasTTS = typeof window !== 'undefined' && 'speechSynthesis' in window;
   const isFirst = step === 0;
   const isLast = step === steps.length - 1;
 
-  // Reset when lesson changes
   useEffect(() => {
     setStep(0);
     stopReading();
   }, [lessonId]);
 
-  // Cleanup on unmount
   useEffect(() => {
-    return () => { if (hasTTS) window.speechSynthesis.cancel(); };
+    return () => { stopReading(); };
   }, []);
 
   function stopReading() {
-    if (hasTTS) window.speechSynthesis.cancel();
+    abortRef.current?.abort();
+    abortRef.current = null;
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.src = '';
+      audioRef.current = null;
+    }
     setSpeaking(false);
+    setLoading(false);
   }
 
-  const readAloud = useCallback((text: string) => {
-    if (!hasTTS) return;
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(toPlainText(text));
-    utterance.rate = 0.92;
-    utterance.pitch = 1.0;
-    utterance.onstart = () => setSpeaking(true);
-    utterance.onend = () => setSpeaking(false);
-    utterance.onerror = () => setSpeaking(false);
-    utteranceRef.current = utterance;
-    window.speechSynthesis.speak(utterance);
-  }, [hasTTS]);
+  const readAloud = useCallback(async (text: string) => {
+    stopReading();
+    const plain = toPlainText(text);
+    if (!plain) return;
+
+    const controller = new AbortController();
+    abortRef.current = controller;
+    setLoading(true);
+
+    try {
+      const res = await fetch('/api/tts/speak', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: plain, voice: 'nova' }),
+        signal: controller.signal,
+      });
+
+      if (!res.ok) throw new Error('TTS failed');
+
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      audioRef.current = audio;
+
+      audio.onplay = () => { setLoading(false); setSpeaking(true); };
+      audio.onended = () => { setSpeaking(false); URL.revokeObjectURL(url); };
+      audio.onerror = () => { setSpeaking(false); setLoading(false); URL.revokeObjectURL(url); };
+
+      await audio.play();
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === 'AbortError') return;
+      setLoading(false);
+      setSpeaking(false);
+    }
+  }, []);
 
   const goTo = useCallback((idx: number) => {
     const clamped = Math.max(0, Math.min(idx, steps.length - 1));
     stopReading();
     setStep(clamped);
     if (autoRead) {
-      // Tiny delay so state updates before speaking
       setTimeout(() => readAloud(steps[clamped]), 80);
     }
   }, [steps, autoRead, readAloud]);
@@ -141,7 +169,7 @@ function LessonContentStepper({ content, lessonId }: { content: string; lessonId
           <span className="text-xs text-muted-foreground">
             Step <span className="font-bold text-foreground">{step + 1}</span> of {steps.length}
           </span>
-          {steps.length > 1 && hasTTS && (
+          {steps.length > 1 && (
             <button
               onClick={() => setAutoRead(a => !a)}
               title={autoRead ? 'Auto-read on (click to disable)' : 'Enable auto-read on step change'}
@@ -157,21 +185,21 @@ function LessonContentStepper({ content, lessonId }: { content: string; lessonId
           )}
         </div>
 
-        {hasTTS && (
-          <button
-            onClick={() => speaking ? stopReading() : readAloud(steps[step])}
-            className={cn(
-              'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all',
-              speaking
-                ? 'bg-primary/15 text-primary border-primary/30 hover:bg-primary/20'
-                : 'text-muted-foreground border-border hover:text-foreground hover:bg-white/5'
-            )}
-          >
-            {speaking
+        <button
+          onClick={() => (speaking || loading) ? stopReading() : readAloud(steps[step])}
+          className={cn(
+            'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all',
+            (speaking || loading)
+              ? 'bg-primary/15 text-primary border-primary/30 hover:bg-primary/20'
+              : 'text-muted-foreground border-border hover:text-foreground hover:bg-white/5'
+          )}
+        >
+          {loading
+            ? <><Loader className="w-3.5 h-3.5 animate-spin" /> Loading…</>
+            : speaking
               ? <><VolumeX className="w-3.5 h-3.5" /> Stop</>
               : <><Volume2 className="w-3.5 h-3.5" /> Read aloud</>}
-          </button>
-        )}
+        </button>
       </div>
 
       {/* Step content */}

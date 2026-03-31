@@ -4,6 +4,7 @@ import gamesRouter from "./games";
 import analysisRouter from "./analysis";
 import coursesRouter from "./courses";
 import opponentsRouter from "./opponents";
+import ttsRouter from "./tts";
 
 const router: IRouter = Router();
 
@@ -12,5 +13,6 @@ router.use(gamesRouter);
 router.use(analysisRouter);
 router.use(coursesRouter);
 router.use(opponentsRouter);
+router.use(ttsRouter);
 
 export default router;

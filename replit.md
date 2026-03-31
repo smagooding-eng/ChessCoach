@@ -15,7 +15,7 @@ Chess Coach - A full-stack chess analysis platform that imports games from chess
 - **Validation**: Zod (`zod/v4`), `drizzle-zod`
 - **API codegen**: Orval (from OpenAPI spec)
 - **Build**: esbuild (CJS bundle)
-- **AI**: OpenAI via Replit AI Integrations (gpt-5.2)
+- **AI**: OpenAI via Replit AI Integrations (gpt-5.2 for analysis, gpt-audio for TTS narration)
 - **Frontend**: React + Vite + Tailwind CSS + Recharts
 
 ## Features
@@ -78,7 +78,7 @@ Every package extends `tsconfig.base.json` which sets `composite: true`. The roo
 
 - Entry: `src/index.ts`
 - App setup: `src/app.ts`
-- Routes: `src/routes/` (games, analysis, courses, health)
+- Routes: `src/routes/` (games, analysis, courses, health, tts)
 - Libs: `src/lib/chesscom.ts` (chess.com API + PGN parser), `src/lib/openaiAnalysis.ts` (AI analysis + course generation)
 
 ### `artifacts/chess-coach` (`@workspace/chess-coach`)
