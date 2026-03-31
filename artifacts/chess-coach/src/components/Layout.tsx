@@ -1,10 +1,10 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'wouter';
 import { useUser } from '@/hooks/use-user';
 import { useChessPlayer } from '@/hooks/use-chess-player';
 import { LayoutDashboard, Import, History, BrainCircuit, GraduationCap, Swords, BookOpen, LogOut, MoreHorizontal, ChevronRight, Bot } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const PRIMARY_NAV = [
   { href: '/',          label: 'Home',      icon: LayoutDashboard },
@@ -60,13 +60,19 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const { username, logout } = useUser();
   const { player } = useChessPlayer(username ?? undefined);
+  const [moreOpen, setMoreOpen] = useState(false);
 
   const displayRating = player?.rating;
+
+  const moreItems = [PRIMARY_NAV[4], ...SECONDARY_NAV];
+  const activeMore = moreItems.find(i => location === i.href || location.startsWith(i.href + '/'));
+  const isMoreActive = !!activeMore;
+
+  useEffect(() => { setMoreOpen(false); }, [location]);
 
   return (
     <div className="min-h-screen flex flex-col md:flex-row bg-background">
 
-      {/* ── Desktop sidebar ── */}
       <aside className="hidden md:flex w-56 border-r border-border/60 bg-card/50 h-screen sticky top-0 z-40 flex-col">
         <div className="px-4 pt-5 pb-4 flex items-center gap-2.5 border-b border-border/40">
           <img src={`${import.meta.env.BASE_URL}images/logo.png`} alt="Chess Coach" className="w-8 h-8 object-contain" />
@@ -84,7 +90,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
           ))}
         </nav>
 
-        {/* Sidebar user footer */}
         <div className="p-3 border-t border-border/40">
           <div className="flex items-center justify-between px-2 py-2.5 rounded-xl bg-secondary/60">
             <div className="flex items-center gap-2.5 min-w-0">
@@ -103,7 +108,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
-      {/* ── Mobile native app header ── */}
       <header className="md:hidden flex items-center justify-between px-4 h-14 bg-card/95 backdrop-blur-xl border-b border-border/40 sticky top-0 z-50">
         <div className="flex items-center gap-2.5">
           <img src={`${import.meta.env.BASE_URL}images/logo.png`} alt="Chess Coach" className="w-7 h-7 object-contain" />
@@ -118,14 +122,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
         </Link>
       </header>
 
-      {/* ── Main content — full-bleed on mobile ── */}
       <main className="flex-1 min-h-screen overflow-x-hidden pb-24 md:pb-8 md:px-6 md:pt-6">
         <div className="md:max-w-5xl md:mx-auto">
           {children}
         </div>
       </main>
 
-      {/* ── Mobile bottom tab bar ── */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-card/98 backdrop-blur-xl border-t border-border/50 bottom-nav-safe">
         <div className="flex items-stretch">
           {PRIMARY_NAV.slice(0, 4).map(item => {
@@ -145,28 +147,73 @@ export function Layout({ children }: { children: React.ReactNode }) {
               </Link>
             );
           })}
-          {(() => {
-            const moreItems = [PRIMARY_NAV[4], ...SECONDARY_NAV];
-            const activeMore = moreItems.find(i => location === i.href);
-            const isActive = !!activeMore;
-            const DisplayIcon = activeMore?.icon ?? MoreHorizontal;
-            const label = activeMore?.label ?? 'More';
-            const href = activeMore?.href ?? '/openings';
-            return (
-              <Link href={href} className="flex-1">
-                <div className={cn(
-                  "relative flex flex-col items-center justify-center gap-1 pt-2.5 pb-2 min-h-[56px] transition-all active:scale-95",
-                  isActive ? "text-primary" : "text-muted-foreground"
-                )}>
-                  {isActive && <span className="absolute top-0 left-1/2 -translate-x-1/2 h-[2px] w-10 rounded-full bg-primary" />}
-                  <DisplayIcon className={cn("w-5 h-5 transition-transform", isActive && "scale-110")} />
-                  <span className={cn("text-[10px] leading-none font-bold", isActive ? "opacity-100" : "opacity-60")}>{label}</span>
-                </div>
-              </Link>
-            );
-          })()}
+          <button onClick={() => setMoreOpen(o => !o)} className="flex-1">
+            <div className={cn(
+              "relative flex flex-col items-center justify-center gap-1 pt-2.5 pb-2 min-h-[56px] transition-all active:scale-95",
+              isMoreActive ? "text-primary" : "text-muted-foreground"
+            )}>
+              {isMoreActive && <span className="absolute top-0 left-1/2 -translate-x-1/2 h-[2px] w-10 rounded-full bg-primary" />}
+              {React.createElement(activeMore?.icon ?? MoreHorizontal, {
+                className: cn("w-5 h-5 transition-transform", isMoreActive && "scale-110")
+              })}
+              <span className={cn("text-[10px] leading-none font-bold", isMoreActive ? "opacity-100" : "opacity-60")}>
+                {activeMore?.label ?? 'More'}
+              </span>
+            </div>
+          </button>
         </div>
       </nav>
+
+      <AnimatePresence>
+        {moreOpen && (
+          <>
+            <motion.div
+              key="more-backdrop"
+              className="md:hidden fixed inset-0 bg-black/60 z-[60]"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setMoreOpen(false)}
+            />
+            <motion.div
+              key="more-sheet"
+              className="md:hidden fixed bottom-0 left-0 right-0 z-[70] bg-card rounded-t-3xl border-t border-border/60"
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 28, stiffness: 300 }}
+            >
+              <div className="w-12 h-1 bg-border/60 rounded-full mx-auto mt-3" />
+              <nav className="px-4 pt-4 pb-10 space-y-1">
+                {moreItems.map(item => {
+                  const active = location === item.href || location.startsWith(item.href + '/');
+                  return (
+                    <Link key={item.href} href={item.href} className="block">
+                      <div className={cn(
+                        "flex items-center gap-3 px-4 py-3.5 rounded-xl transition-colors",
+                        active ? "bg-primary/15 text-primary" : "text-foreground/70 active:bg-secondary"
+                      )}>
+                        <item.icon className="w-5 h-5" />
+                        <span className="font-semibold text-sm">{item.label}</span>
+                        {active && <ChevronRight className="w-4 h-4 ml-auto" />}
+                      </div>
+                    </Link>
+                  );
+                })}
+                <div className="border-t border-border/40 mt-2 pt-2">
+                  <button
+                    onClick={() => { setMoreOpen(false); logout(); }}
+                    className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-red-400 active:bg-red-500/10 transition-colors"
+                  >
+                    <LogOut className="w-5 h-5" />
+                    <span className="font-semibold text-sm">Sign Out</span>
+                  </button>
+                </div>
+              </nav>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
 
     </div>
   );

@@ -261,3 +261,113 @@ export function getBotMove(fen: string, bot: BotConfig): string | null {
 
   return bestMove;
 }
+
+export function evaluatePosition(fen: string): number {
+  return evaluate(new Chess(fen));
+}
+
+export interface MoveAnalysisResult {
+  quality: 'brilliant' | 'excellent' | 'good' | 'inaccuracy' | 'mistake' | 'blunder';
+  evalBefore: number;
+  evalAfter: number;
+  cpLoss: number;
+  bestMoveSan: string | null;
+  pros: string[];
+  cons: string[];
+  summary: string;
+}
+
+export function analyzeMoveQuality(fenBefore: string, san: string): MoveAnalysisResult {
+  const chess = new Chess(fenBefore);
+  const turn = chess.turn();
+  const maximizing = turn === 'w';
+  const depth = 2;
+
+  const evalBefore = evaluate(chess);
+
+  const moveResult = chess.move(san);
+  if (!moveResult) {
+    return { quality: 'good', evalBefore, evalAfter: evalBefore, cpLoss: 0, bestMoveSan: null, pros: [], cons: [], summary: '' };
+  }
+
+  const evalAfter = evaluate(chess);
+  const inCheck = chess.inCheck();
+  const isMate = chess.isCheckmate();
+  chess.undo();
+
+  if (isMate) {
+    return {
+      quality: 'brilliant', evalBefore, evalAfter, cpLoss: 0, bestMoveSan: null,
+      pros: ['Checkmate!'], cons: [], summary: 'Checkmate! Game over.',
+    };
+  }
+
+  const moves = chess.moves();
+  let bestMove = moves[0];
+  let bestSearchEval = maximizing ? -Infinity : Infinity;
+  let actualSearchEval = 0;
+
+  for (const move of moves) {
+    chess.move(move);
+    const ev = minimax(chess, depth - 1, -Infinity, Infinity, !maximizing);
+    chess.undo();
+    if (move === san) actualSearchEval = ev;
+    if (maximizing ? ev > bestSearchEval : ev < bestSearchEval) {
+      bestSearchEval = ev;
+      bestMove = move;
+    }
+  }
+
+  let cpLoss = maximizing ? (bestSearchEval - actualSearchEval) : (actualSearchEval - bestSearchEval);
+  cpLoss = Math.max(0, cpLoss);
+
+  const isBest = san === bestMove;
+  let quality: MoveAnalysisResult['quality'];
+  if (isBest && cpLoss <= 5) quality = 'brilliant';
+  else if (isBest || cpLoss <= 15) quality = 'excellent';
+  else if (cpLoss <= 50) quality = 'good';
+  else if (cpLoss <= 120) quality = 'inaccuracy';
+  else if (cpLoss <= 280) quality = 'mistake';
+  else quality = 'blunder';
+
+  const pros: string[] = [];
+  const cons: string[] = [];
+
+  if (moveResult.captured) {
+    const names: Record<string, string> = { p: 'pawn', n: 'knight', b: 'bishop', r: 'rook', q: 'queen' };
+    pros.push(`Captures ${names[moveResult.captured] ?? 'piece'}`);
+  }
+  if (inCheck) pros.push('Delivers check');
+  if (moveResult.san === 'O-O' || moveResult.san === 'O-O-O') pros.push('Improves king safety');
+  if (['d4', 'd5', 'e4', 'e5'].includes(moveResult.to)) pros.push('Controls the center');
+  if (['n', 'b'].includes(moveResult.piece)) {
+    const r = parseInt(moveResult.from[1]);
+    if ((turn === 'w' && r <= 2) || (turn === 'b' && r >= 7)) pros.push('Develops a piece');
+  }
+  if (moveResult.piece === 'p') {
+    const r = parseInt(moveResult.to[1]);
+    if ((turn === 'w' && r >= 5) || (turn === 'b' && r <= 4)) pros.push('Advances pawn');
+  }
+
+  if (quality === 'inaccuracy') { cons.push('Slightly inaccurate'); if (!isBest) cons.push(`${bestMove} was better`); }
+  else if (quality === 'mistake') { cons.push('Misses a stronger continuation'); if (!isBest) cons.push(`${bestMove} was the right call`); }
+  else if (quality === 'blunder') { cons.push('Serious error losing advantage'); if (!isBest) cons.push(`${bestMove} was critical`); }
+
+  if (pros.length === 0) {
+    if (quality === 'brilliant') pros.push('Best move in the position');
+    else if (quality === 'excellent') pros.push('Strong continuation');
+    else if (quality === 'good') pros.push('Reasonable move');
+  }
+
+  let summary = '';
+  switch (quality) {
+    case 'brilliant': summary = 'The best move! Maximum advantage maintained.'; break;
+    case 'excellent': summary = 'A strong choice in this position.'; break;
+    case 'good': summary = 'Decent move, though slightly better options exist.'; break;
+    case 'inaccuracy': summary = `Small inaccuracy.${!isBest ? ` Consider ${bestMove}.` : ''}`; break;
+    case 'mistake': summary = `This weakens your position.${!isBest ? ` ${bestMove} was better.` : ''}`; break;
+    case 'blunder': summary = `A serious mistake.${!isBest ? ` ${bestMove} was essential.` : ''}`; break;
+  }
+
+  return { quality, evalBefore, evalAfter, cpLoss, bestMoveSan: isBest ? null : bestMove, pros, cons, summary };
+}

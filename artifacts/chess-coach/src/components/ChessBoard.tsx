@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { Chessboard } from 'react-chessboard';
 import { Chess } from 'chess.js';
 
@@ -48,8 +48,12 @@ export function ChessBoard({
   const position = fen || START_FEN;
   const [selectedSquare, setSelectedSquare] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<'correct' | 'wrong' | null>(null);
+  const feedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Clear selection when position changes (e.g. navigation)
+  useEffect(() => {
+    return () => { if (feedbackTimerRef.current) clearTimeout(feedbackTimerRef.current); };
+  }, []);
+
   const [prevPosition, setPrevPosition] = useState(position);
   if (position !== prevPosition) {
     setPrevPosition(position);
@@ -77,7 +81,8 @@ export function ChessBoard({
       const san = move.san;
       const isCorrect = !expectedMoveSan || san === expectedMoveSan;
       setFeedback(isCorrect ? 'correct' : 'wrong');
-      setTimeout(() => setFeedback(null), 900);
+      if (feedbackTimerRef.current) clearTimeout(feedbackTimerRef.current);
+      feedbackTimerRef.current = setTimeout(() => setFeedback(null), 900);
       onMovePlayed?.(san, isCorrect);
       return true;
     } catch {
