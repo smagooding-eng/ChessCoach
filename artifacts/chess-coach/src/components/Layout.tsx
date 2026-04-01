@@ -59,7 +59,7 @@ function SidebarLink({ item, isActive }: { item: typeof ALL_NAV[0]; isActive: bo
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
-  const { username, logout, isAuthenticated, authLogout, isPremium, subscription } = useUser();
+  const { username, logout, isAuthenticated, authLogout, isPremium, subscription, authUser } = useUser();
   const { player } = useChessPlayer(username ?? undefined);
   const [moreOpen, setMoreOpen] = useState(false);
   const handleLogout = isAuthenticated ? authLogout : logout;
@@ -126,7 +126,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
       <main className="flex-1 min-h-screen overflow-x-hidden pb-24 md:pb-8 md:px-6 md:pt-6">
         <div className="md:max-w-5xl md:mx-auto">
-          {subscription.status === 'free_trial' && subscription.trialDaysLeft != null && (
+          {subscription.status === 'free_trial' && subscription.trialDaysLeft != null && !authUser?.isAdmin && (
             <Link href="/subscription" className="block mb-4 mx-4 md:mx-0">
               <div className="flex items-center justify-between px-4 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-400 text-sm hover:bg-amber-500/15 transition-colors">
                 <span>
