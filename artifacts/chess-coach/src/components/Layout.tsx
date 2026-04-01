@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'wouter';
 import { useUser } from '@/hooks/use-user';
 import { useChessPlayer } from '@/hooks/use-chess-player';
-import { LayoutDashboard, Import, History, BrainCircuit, GraduationCap, Swords, BookOpen, LogOut, MoreHorizontal, ChevronRight, Bot } from 'lucide-react';
+import { LayoutDashboard, Import, History, BrainCircuit, GraduationCap, Swords, BookOpen, LogOut, MoreHorizontal, ChevronRight, Bot, Crown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -15,9 +15,10 @@ const PRIMARY_NAV = [
 ];
 
 const SECONDARY_NAV = [
-  { href: '/practice',  label: 'Practice Bots',   icon: Bot },
-  { href: '/import',    label: 'Import Games',    icon: Import },
-  { href: '/opponents', label: 'Opponent Scout',  icon: Swords },
+  { href: '/practice',     label: 'Practice Bots',   icon: Bot },
+  { href: '/import',       label: 'Import Games',    icon: Import },
+  { href: '/opponents',    label: 'Opponent Scout',  icon: Swords },
+  { href: '/subscription', label: 'Subscription',    icon: Crown },
 ];
 
 const ALL_NAV = [...PRIMARY_NAV, ...SECONDARY_NAV];
@@ -58,9 +59,10 @@ function SidebarLink({ item, isActive }: { item: typeof ALL_NAV[0]; isActive: bo
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
-  const { username, logout } = useUser();
+  const { username, logout, isReplit, authLogout, isPremium } = useUser();
   const { player } = useChessPlayer(username ?? undefined);
   const [moreOpen, setMoreOpen] = useState(false);
+  const handleLogout = isReplit ? authLogout : logout;
 
   const displayRating = player?.rating;
 
@@ -101,7 +103,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 )}
               </div>
             </div>
-            <button onClick={() => logout()} className="p-1.5 text-muted-foreground hover:text-red-400 hover:bg-red-400/10 rounded-md transition-colors shrink-0" title="Sign out">
+            <button onClick={() => handleLogout()} className="p-1.5 text-muted-foreground hover:text-red-400 hover:bg-red-400/10 rounded-md transition-colors shrink-0" title="Sign out">
               <LogOut className="w-3.5 h-3.5" />
             </button>
           </div>
@@ -202,7 +204,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 })}
                 <div className="border-t border-border/40 mt-2 pt-2">
                   <button
-                    onClick={() => { setMoreOpen(false); logout(); }}
+                    onClick={() => { setMoreOpen(false); handleLogout(); }}
                     className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-red-400 active:bg-red-500/10 transition-colors"
                   >
                     <LogOut className="w-5 h-5" />

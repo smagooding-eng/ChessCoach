@@ -6,6 +6,7 @@ import { Link } from 'wouter';
 import { motion } from 'framer-motion';
 import { BookOpen, GraduationCap, CheckCircle2, PlayCircle, AlertCircle } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
+import { PremiumGate } from '@/components/PremiumGate';
 
 export function Courses() {
   const { username } = useUser();
@@ -89,6 +90,7 @@ export function Courses() {
   );
 
   return (
+    <PremiumGate feature="Personalized Courses">
     <div className="space-y-8 pb-20 px-4 pt-4 md:px-0 md:pt-0">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
@@ -206,5 +208,6 @@ export function Courses() {
         )}
       </div>
     </div>
+    </PremiumGate>
   );
 }

@@ -23,10 +23,15 @@ export {
   UpdateCourseProgressParams,
   UpdateCourseProgressBody,
   UpdateCourseProgressResponse,
+  GetCurrentAuthUserResponse,
+  ExchangeMobileAuthorizationCodeBody,
+  ExchangeMobileAuthorizationCodeResponse,
+  LogoutMobileSessionResponse,
 } from "./generated/api";
 
 export type {
   AnalysisResult,
+  AuthUser,
   Course,
   CourseWithLessons,
   Game,

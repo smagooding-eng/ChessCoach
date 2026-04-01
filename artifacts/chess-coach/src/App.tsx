@@ -65,6 +65,7 @@ import { OpponentAnalysis } from "@/pages/OpponentAnalysis";
 import { Openings } from "@/pages/Openings";
 import { OpeningDetail } from "@/pages/OpeningDetail";
 import { PracticeBots } from "@/pages/PracticeBots";
+import { Subscription } from "@/pages/Subscription";
 import NotFound from "@/pages/not-found";
 import { Layout } from "@/components/Layout";
 
@@ -83,22 +84,27 @@ const queryClient = new QueryClient({
 
 // Protected Route Wrapper
 function ProtectedRoute({ component: Component, fallbackNav }: { component: React.ComponentType; fallbackNav?: string }) {
-  const { username, isLoaded } = useUser();
+  const { username, isLoaded, isReplit, isAuthenticated, isAuthLoading } = useUser();
   const [, navigate] = useLocation();
 
   useEffect(() => {
+    if (isReplit && !isAuthLoading && !isAuthenticated) {
+      navigate('/setup', { replace: true } as never);
+      return;
+    }
     if (isLoaded && !username) {
       navigate('/setup', { replace: true } as never);
     }
-  }, [isLoaded, username, navigate]);
+  }, [isLoaded, username, navigate, isReplit, isAuthenticated, isAuthLoading]);
 
-  if (!isLoaded) {
+  if (!isLoaded || (isReplit && isAuthLoading)) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
+  if (isReplit && !isAuthenticated) return null;
   if (!username) return null;
 
   return (
@@ -122,6 +128,7 @@ const POpenings      = () => <ProtectedRoute component={Openings} />;
 const POpeningDetail = () => <ProtectedRoute component={OpeningDetail} fallbackNav="/openings" />;
 const POpponents     = () => <ProtectedRoute component={OpponentAnalysis} />;
 const PPracticeBots  = () => <ProtectedRoute component={PracticeBots} />;
+const PSubscription  = () => <ProtectedRoute component={Subscription} />;
 
 function Router() {
   return (
@@ -141,6 +148,7 @@ function Router() {
       <Route path="/openings/:eco"   component={POpeningDetail} />
       <Route path="/opponents"       component={POpponents} />
       <Route path="/practice"        component={PPracticeBots} />
+      <Route path="/subscription"    component={PSubscription} />
 
       <Route component={NotFound} />
     </Switch>

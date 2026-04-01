@@ -4,6 +4,7 @@ import { Swords, Search, Target, AlertTriangle, TrendingUp, ChevronDown, Chevron
 import { Link, useLocation } from 'wouter';
 import { useUser } from '@/hooks/use-user';
 import { apiFetch } from '@/lib/api';
+import { PremiumGate } from '@/components/PremiumGate';
 
 interface Profile {
   username: string;
@@ -214,6 +215,7 @@ export function OpponentAnalysis() {
   const winPct = totalGames > 0 ? Math.round((result!.wins / totalGames) * 100) : 0;
 
   return (
+    <PremiumGate feature="Opponent Scouting">
     <div className="space-y-8 pb-10 px-4 pt-4 md:px-0 md:pt-0">
       {/* Header */}
       <div>
@@ -619,6 +621,7 @@ export function OpponentAnalysis() {
         </div>
       )}
     </div>
+    </PremiumGate>
   );
 }
 

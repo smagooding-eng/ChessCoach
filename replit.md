@@ -22,16 +22,19 @@ Chess Coach - A full-stack chess analysis platform that imports games from chess
 
 1. **Import Games**: Enter chess.com username and fetch games from the past N months
 2. **Game Replay**: Interactive chess board with move-by-move navigation (first/prev/next/last/auto-play), move quality badges, engine eval bar
-3. **AI Analysis**: Analyzes up to 50 games using GPT to identify weaknesses across 6 categories
+3. **AI Analysis** (Premium): Analyzes up to 50 games using GPT to identify weaknesses across 6 categories
 4. **Weakness Report**: Clickable cards → Weakness Detail page (`/analysis/:id`) with AI patterns, related games, related courses
 5. **Performance Stats**: Win rate, opening stats (bar chart), time control breakdown, win/loss/draw pie chart
-6. **Personalized Courses**: AI-generated courses with 4-5 annotated PGN lessons; generates by appending (not replacing) to preserve progress
+6. **Personalized Courses** (Premium): AI-generated courses with 4-5 annotated PGN lessons; generates by appending (not replacing) to preserve progress
 7. **Interactive Course Viewer**: Sequential lesson mode, LessonBoardPlayer component, "Complete & Next" auto-advance
-8. **Opponent Scout** (`/opponents`): Enter any chess.com username — fetches their recent games, runs full AI analysis, shows their weaknesses and favourite openings
+8. **Opponent Scout** (Premium) (`/opponents`): Enter any chess.com username — fetches their recent games, runs full AI analysis, shows their weaknesses and favourite openings
 9. **Practice Bots** (`/practice`): 8 AI bots from 400 to 2000 ELO with client-side minimax engine, piece-square tables, configurable depth/blunder rate. Live move analysis shows quality ratings (brilliant/excellent/good/inaccuracy/mistake/blunder), pros/cons, best move suggestion, and evaluation bar after every move.
 10. **ELO-Based Improvement Tips**: Analysis page shows tier-specific tips based on average rating with progress bar to next tier
 11. **Mobile Navigation**: Bottom tab bar with "More" drawer for secondary pages (Openings, Practice Bots, Import Games, Opponent Scout, Sign Out). All pages mobile-responsive.
-11. **Global UserContext**: `src/context/UserContext.tsx` — single source of truth for auth state, no per-component useState drift
+12. **Global UserContext**: `src/context/UserContext.tsx` — single source of truth for auth state, no per-component useState drift
+13. **Replit Auth**: OIDC-based authentication with Replit accounts (session cookies, `/api/login`, `/api/callback`, `/api/logout`)
+14. **Stripe Subscriptions**: Chess Coach Pro with $1/week and $4/month plans, 3-day free trial, Stripe Checkout + Customer Portal
+15. **Premium Gating**: AI Analysis, Courses, TTS, and Opponent Scout gated behind subscription via `<PremiumGate>` component
 
 ## Structure
 
@@ -44,11 +47,14 @@ artifacts-monorepo/
 │   ├── api-spec/           # OpenAPI spec + Orval codegen config
 │   ├── api-client-react/   # Generated React Query hooks
 │   ├── api-zod/            # Generated Zod schemas from OpenAPI
+│   ├── replit-auth-web/    # Replit Auth React hook (useAuth)
 │   └── db/                 # Drizzle ORM schema + DB connection
 │       └── src/schema/
 │           ├── games.ts    # Chess games table
 │           ├── weaknesses.ts # Identified weaknesses
-│           └── courses.ts  # Courses + lessons tables
+│           ├── courses.ts  # Courses + lessons tables
+│           └── auth.ts     # Users + sessions tables (Stripe fields)
+├── scripts/                # Utility scripts (seed-products.ts)
 ```
 
 ## API Routes
@@ -65,6 +71,15 @@ artifacts-monorepo/
 - `POST /api/courses/generate` — Generate AI courses from weaknesses
 - `GET /api/courses/:id` — Get course with lessons
 - `PATCH /api/courses/:id/progress` — Update lesson completion
+- `GET /api/login` — Initiate Replit OIDC login
+- `GET /api/callback` — OIDC callback handler
+- `GET /api/logout` — Logout and destroy session
+- `GET /api/auth/user` — Get current authenticated user
+- `GET /api/stripe/products` — List available subscription products
+- `GET /api/stripe/config` — Get Stripe publishable key
+- `POST /api/stripe/checkout` — Create Stripe Checkout session
+- `GET /api/stripe/subscription` — Get current user's subscription status
+- `POST /api/stripe/portal` — Create Stripe Customer Portal session
 
 ## TypeScript & Composite Projects
 
