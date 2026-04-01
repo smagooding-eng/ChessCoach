@@ -43,7 +43,22 @@ router.get('/stripe/subscription', async (req: Request, res: Response) => {
     const user = await storage.getUser(req.user.id);
 
     if (user?.stripeCustomerId) {
-      const subscription = await storage.getSubscriptionByCustomerId(user.stripeCustomerId);
+      let subscription: any = null;
+      try {
+        subscription = await storage.getSubscriptionByCustomerId(user.stripeCustomerId);
+      } catch {
+        try {
+          const stripe = await getUncachableStripeClient();
+          const subs = await stripe.subscriptions.list({
+            customer: user.stripeCustomerId,
+            status: 'all',
+            limit: 1,
+          });
+          if (subs.data.length > 0) {
+            subscription = subs.data[0];
+          }
+        } catch {}
+      }
       if (subscription && ['active', 'trialing'].includes(subscription.status as string)) {
         res.json({ subscription, status: subscription.status });
         return;

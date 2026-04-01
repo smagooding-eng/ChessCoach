@@ -81,7 +81,21 @@ export async function requirePremium(
     }
 
     if (user?.stripeCustomerId) {
-      const sub = await storage.getSubscriptionByCustomerId(user.stripeCustomerId);
+      let sub: any = null;
+      try {
+        sub = await storage.getSubscriptionByCustomerId(user.stripeCustomerId);
+      } catch {
+        try {
+          const { getUncachableStripeClient } = await import("../lib/stripeClient");
+          const stripe = await getUncachableStripeClient();
+          const subs = await stripe.subscriptions.list({
+            customer: user.stripeCustomerId,
+            status: 'all',
+            limit: 1,
+          });
+          if (subs.data.length > 0) sub = subs.data[0];
+        } catch {}
+      }
       if (sub && ["active", "trialing"].includes(sub.status as string)) {
         next();
         return;
