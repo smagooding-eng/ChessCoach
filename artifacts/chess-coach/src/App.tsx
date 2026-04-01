@@ -131,9 +131,22 @@ const PPracticeBots  = () => <ProtectedRoute component={PracticeBots} />;
 const PSubscription  = () => <ProtectedRoute component={Subscription} />;
 const PProfile       = () => <ProtectedRoute component={Profile} />;
 
+function PageTracker() {
+  const [location] = useLocation();
+  useEffect(() => {
+    fetch('/api/track', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ path: location }),
+    }).catch(() => {});
+  }, [location]);
+  return null;
+}
+
 function Router() {
   return (
-    <Switch>
+    <><PageTracker /><Switch>
       <Route path="/setup" component={Setup} />
 
       {/* Protected Routes — stable named components prevent remounting on every render */}
@@ -153,7 +166,7 @@ function Router() {
       <Route path="/profile"          component={PProfile} />
 
       <Route component={NotFound} />
-    </Switch>
+    </Switch></>
   );
 }
 

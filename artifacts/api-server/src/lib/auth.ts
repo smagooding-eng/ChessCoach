@@ -6,6 +6,8 @@ import { eq } from "drizzle-orm";
 export const SESSION_COOKIE = "sid";
 export const SESSION_TTL = 7 * 24 * 60 * 60 * 1000;
 
+export const ADMIN_EMAILS = ["smagooding@gmail.com"];
+
 export interface SessionUser {
   id: string;
   email: string | null;
@@ -13,6 +15,7 @@ export interface SessionUser {
   lastName: string | null;
   profileImageUrl: string | null;
   chesscomUsername: string | null;
+  isAdmin: boolean;
 }
 
 export interface SessionData {

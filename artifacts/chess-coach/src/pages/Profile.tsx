@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useUser } from '@/hooks/use-user';
 import { useChessPlayer } from '@/hooks/use-chess-player';
 import { useMyAnalysisSummary } from '@/hooks/use-analysis';
@@ -8,8 +8,65 @@ import { Link, useLocation } from 'wouter';
 import { motion } from 'framer-motion';
 import {
   User, Mail, Crown, LogOut, ChevronRight, Trophy, Swords, Target,
-  GraduationCap, Settings, Shield, Edit3, Check, X
+  GraduationCap, Settings, Shield, Edit3, Check, X, Eye, Users, CreditCard,
+  Activity
 } from 'lucide-react';
+
+interface AdminStats {
+  pageViews: { total: number; today: number };
+  users: { total: number; today: number };
+  subscriptions: { active: number };
+}
+
+function AdminTicker() {
+  const [stats, setStats] = useState<AdminStats | null>(null);
+
+  useEffect(() => {
+    const fetchStats = () => {
+      fetch('/api/admin/stats', { credentials: 'include' })
+        .then(r => r.ok ? r.json() : null)
+        .then(d => { if (d) setStats(d); })
+        .catch(() => {});
+    };
+    fetchStats();
+    const interval = setInterval(fetchStats, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  if (!stats) return null;
+
+  const items = [
+    { icon: Eye, label: 'Page Views', value: stats.pageViews.total, sub: `${stats.pageViews.today} today`, color: 'text-blue-400', bg: 'bg-blue-400/10' },
+    { icon: Users, label: 'Users', value: stats.users.total, sub: `${stats.users.today} today`, color: 'text-emerald-400', bg: 'bg-emerald-400/10' },
+    { icon: CreditCard, label: 'Subscriptions', value: stats.subscriptions.active, sub: 'active', color: 'text-primary', bg: 'bg-primary/10' },
+  ];
+
+  return (
+    <motion.div
+      variants={{ hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0 } }}
+      className="bg-card border border-amber-500/20 rounded-2xl overflow-hidden"
+    >
+      <div className="px-4 py-3 border-b border-amber-500/15 bg-amber-500/5">
+        <h2 className="text-sm font-bold text-amber-400 flex items-center gap-2">
+          <Activity className="w-4 h-4" /> Admin Dashboard
+          <span className="ml-auto text-[10px] font-normal text-muted-foreground">auto-refreshes every 30s</span>
+        </h2>
+      </div>
+      <div className="grid grid-cols-3 divide-x divide-border/30">
+        {items.map(item => (
+          <div key={item.label} className="p-4 text-center">
+            <div className={`w-8 h-8 ${item.bg} rounded-lg flex items-center justify-center mx-auto mb-2`}>
+              <item.icon className={`w-4 h-4 ${item.color}`} />
+            </div>
+            <p className="text-xl font-black text-foreground">{item.value.toLocaleString()}</p>
+            <p className="text-xs text-muted-foreground font-medium">{item.label}</p>
+            <p className="text-[10px] text-muted-foreground/60 mt-0.5">{item.sub}</p>
+          </div>
+        ))}
+      </div>
+    </motion.div>
+  );
+}
 
 export function Profile() {
   const { username, authUser, isPremium, subscription, authLogout, login, logout } = useUser();
@@ -83,7 +140,12 @@ export function Profile() {
               {player?.title && (
                 <span className="text-xs font-bold text-amber-400 bg-amber-400/15 px-1.5 py-0.5 rounded">{player.title}</span>
               )}
-              {isPremium && (
+              {authUser?.isAdmin && (
+                <span className="text-xs font-bold text-amber-400 bg-amber-500/15 px-1.5 py-0.5 rounded flex items-center gap-1">
+                  <Shield className="w-3 h-3" /> ADMIN
+                </span>
+              )}
+              {isPremium && !authUser?.isAdmin && (
                 <span className="text-xs font-bold text-primary bg-primary/15 px-1.5 py-0.5 rounded flex items-center gap-1">
                   <Crown className="w-3 h-3" /> PRO
                 </span>
@@ -125,6 +187,8 @@ export function Profile() {
           </div>
         </div>
       </motion.div>
+
+      {authUser?.isAdmin && <AdminTicker />}
 
       <motion.div variants={item} className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[

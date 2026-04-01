@@ -7,6 +7,7 @@ interface AuthUser {
   lastName: string | null;
   profileImageUrl: string | null;
   chesscomUsername: string | null;
+  isAdmin: boolean;
 }
 
 interface SubscriptionInfo {
@@ -122,7 +123,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     setSubscription({ status: 'none', subscription: null });
   }, []);
 
-  const isPremium = subscription.status === 'active' || subscription.status === 'trialing' || subscription.status === 'free_trial';
+  const isPremium = !!authUser?.isAdmin || subscription.status === 'active' || subscription.status === 'trialing' || subscription.status === 'free_trial';
 
   return (
     <UserContext.Provider value={{

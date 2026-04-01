@@ -75,6 +75,11 @@ export async function requirePremium(
     const { storage } = await import("../lib/storage");
     const user = await storage.getUser(req.user!.id);
 
+    if (user?.isAdmin) {
+      next();
+      return;
+    }
+
     if (user?.stripeCustomerId) {
       const sub = await storage.getSubscriptionByCustomerId(user.stripeCustomerId);
       if (sub && ["active", "trialing"].includes(sub.status)) {

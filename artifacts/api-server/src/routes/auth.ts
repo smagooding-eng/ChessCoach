@@ -7,6 +7,7 @@ import {
   getSessionId,
   createSession,
   setSessionCookie,
+  ADMIN_EMAILS,
   type SessionData,
   type SessionUser,
 } from "../lib/auth";
@@ -28,6 +29,7 @@ function toSessionUser(dbUser: any): SessionUser {
     lastName: dbUser.lastName,
     profileImageUrl: dbUser.profileImageUrl,
     chesscomUsername: dbUser.chesscomUsername,
+    isAdmin: dbUser.isAdmin || ADMIN_EMAILS.includes(dbUser.email?.toLowerCase?.() ?? ""),
   };
 }
 
@@ -71,6 +73,7 @@ router.post("/auth/register", async (req: Request, res: Response) => {
         authProvider: "local",
         firstName: firstName || null,
         chesscomUsername: chesscomUsername || null,
+        isAdmin: ADMIN_EMAILS.includes(email.toLowerCase()),
       })
       .returning();
 
