@@ -66,6 +66,7 @@ import { Openings } from "@/pages/Openings";
 import { OpeningDetail } from "@/pages/OpeningDetail";
 import { PracticeBots } from "@/pages/PracticeBots";
 import { Subscription } from "@/pages/Subscription";
+import { Profile } from "@/pages/Profile";
 import NotFound from "@/pages/not-found";
 import { Layout } from "@/components/Layout";
 
@@ -124,6 +125,7 @@ const POpeningDetail = () => <ProtectedRoute component={OpeningDetail} fallbackN
 const POpponents     = () => <ProtectedRoute component={OpponentAnalysis} />;
 const PPracticeBots  = () => <ProtectedRoute component={PracticeBots} />;
 const PSubscription  = () => <ProtectedRoute component={Subscription} />;
+const PProfile       = () => <ProtectedRoute component={Profile} />;
 
 function Router() {
   return (
@@ -144,6 +146,7 @@ function Router() {
       <Route path="/opponents"       component={POpponents} />
       <Route path="/practice"        component={PPracticeBots} />
       <Route path="/subscription"    component={PSubscription} />
+      <Route path="/profile"          component={PProfile} />
 
       <Route component={NotFound} />
     </Switch>

@@ -94,7 +94,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
         <div className="p-3 border-t border-border/40">
           <div className="flex items-center justify-between px-2 py-2.5 rounded-xl bg-secondary/60">
-            <div className="flex items-center gap-2.5 min-w-0">
+            <Link href="/profile" className="flex items-center gap-2.5 min-w-0 hover:opacity-80 transition-opacity">
               <PlayerAvatar avatar={player?.avatar} username={username ?? ''} size="sm" />
               <div className="min-w-0">
                 <p className="text-xs font-black text-foreground truncate leading-tight">{username}</p>
@@ -102,7 +102,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   <p className="text-[10px] text-primary font-bold leading-tight">{displayRating} ELO</p>
                 )}
               </div>
-            </div>
+            </Link>
             <button onClick={() => handleLogout()} className="p-1.5 text-muted-foreground hover:text-red-400 hover:bg-red-400/10 rounded-md transition-colors shrink-0" title="Sign out">
               <LogOut className="w-3.5 h-3.5" />
             </button>
