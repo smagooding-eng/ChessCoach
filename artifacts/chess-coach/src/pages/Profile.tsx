@@ -158,9 +158,11 @@ export function Profile() {
             <div>
               <p className="text-sm font-semibold text-foreground">Subscription</p>
               <p className="text-xs text-muted-foreground">
-                {isPremium
-                  ? `Pro — ${subscription.status === 'trialing' ? 'Free Trial' : 'Active'}`
-                  : 'Free Plan'}
+                {subscription.status === 'free_trial'
+                  ? `Free Trial — ${subscription.trialDaysLeft} day${subscription.trialDaysLeft === 1 ? '' : 's'} left`
+                  : isPremium
+                    ? `Pro — ${subscription.status === 'trialing' ? 'Stripe Trial' : 'Active'}`
+                    : 'Free Plan — Trial ended'}
               </p>
             </div>
           </div>

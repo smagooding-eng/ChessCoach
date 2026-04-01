@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useUser } from '@/hooks/use-user';
 import { useLocation } from 'wouter';
-import { Crown, Check, Zap, BrainCircuit, GraduationCap, Swords, Volume2, Loader2, ExternalLink } from 'lucide-react';
+import { Crown, Check, Zap, BrainCircuit, GraduationCap, Swords, Volume2, Loader2, ExternalLink, Clock } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 const PREMIUM_FEATURES = [
@@ -136,16 +136,31 @@ export function Subscription() {
       <div className="text-center mb-8">
         <Crown className="w-12 h-12 text-primary mx-auto mb-3" />
         <h1 className="text-3xl font-display font-bold mb-2">
-          {isPremium ? 'Your Premium Plan' : 'Upgrade to Pro'}
+          {subscription.status === 'free_trial'
+            ? 'Free Trial'
+            : isPremium ? 'Your Premium Plan' : 'Upgrade to Pro'}
         </h1>
         <p className="text-muted-foreground max-w-lg mx-auto">
-          {isPremium
-            ? 'You have access to all premium features.'
-            : 'Unlock AI-powered analysis, personalized courses, and more.'}
+          {subscription.status === 'free_trial'
+            ? `You have ${subscription.trialDaysLeft} day${subscription.trialDaysLeft === 1 ? '' : 's'} left in your free trial. Subscribe before it ends to keep all premium features.`
+            : isPremium
+              ? 'You have access to all premium features.'
+              : 'Your free trial has ended. Subscribe to Chess Coach Pro to unlock all premium features.'}
         </p>
       </div>
 
-      {isPremium ? (
+      {subscription.status === 'free_trial' && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-6 max-w-md mx-auto p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 text-center text-sm"
+        >
+          <Clock className="w-4 h-4 inline-block mr-1.5 -mt-0.5" />
+          {subscription.trialDaysLeft} day{subscription.trialDaysLeft === 1 ? '' : 's'} remaining in your free trial. Add your payment info below to continue after the trial.
+        </motion.div>
+      )}
+
+      {isPremium && subscription.status !== 'free_trial' ? (
         <div className="max-w-md mx-auto">
           <div className="glass-panel rounded-2xl p-6 mb-6">
             <div className="flex items-center gap-3 mb-4">

@@ -59,6 +59,8 @@ export function requireAuth(
   next();
 }
 
+const FREE_TRIAL_DAYS = 3;
+
 export async function requirePremium(
   req: Request,
   res: Response,
@@ -73,18 +75,24 @@ export async function requirePremium(
     const { storage } = await import("../lib/storage");
     const user = await storage.getUser(req.user!.id);
 
-    if (!user?.stripeCustomerId) {
-      res.status(403).json({ error: "Premium subscription required" });
-      return;
+    if (user?.stripeCustomerId) {
+      const sub = await storage.getSubscriptionByCustomerId(user.stripeCustomerId);
+      if (sub && ["active", "trialing"].includes(sub.status)) {
+        next();
+        return;
+      }
     }
 
-    const sub = await storage.getSubscriptionByCustomerId(user.stripeCustomerId);
-    if (!sub || !["active", "trialing"].includes(sub.status)) {
-      res.status(403).json({ error: "Premium subscription required" });
-      return;
+    if (user?.createdAt) {
+      const created = new Date(user.createdAt);
+      const elapsed = Date.now() - created.getTime();
+      if (elapsed < FREE_TRIAL_DAYS * 24 * 60 * 60 * 1000) {
+        next();
+        return;
+      }
     }
 
-    next();
+    res.status(403).json({ error: "Premium subscription required" });
   } catch {
     res.status(500).json({ error: "Failed to check subscription" });
   }

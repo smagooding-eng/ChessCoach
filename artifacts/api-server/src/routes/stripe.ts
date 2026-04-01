@@ -20,6 +20,18 @@ router.get('/stripe/config', async (_req: Request, res: Response) => {
   }
 });
 
+const FREE_TRIAL_DAYS = 3;
+
+function getTrialInfo(createdAt: Date | string) {
+  const created = new Date(createdAt);
+  const now = new Date();
+  const elapsed = now.getTime() - created.getTime();
+  const totalMs = FREE_TRIAL_DAYS * 24 * 60 * 60 * 1000;
+  const remaining = totalMs - elapsed;
+  const daysLeft = Math.max(0, Math.ceil(remaining / (24 * 60 * 60 * 1000)));
+  return { isActive: remaining > 0, daysLeft, endsAt: new Date(created.getTime() + totalMs).toISOString() };
+}
+
 router.get('/stripe/subscription', async (req: Request, res: Response) => {
   if (!req.isAuthenticated()) {
     res.status(401).json({ error: 'Not authenticated' });
@@ -28,21 +40,29 @@ router.get('/stripe/subscription', async (req: Request, res: Response) => {
 
   try {
     const user = await storage.getUser(req.user.id);
-    if (!user?.stripeCustomerId) {
-      res.json({ subscription: null, status: 'none' });
-      return;
+
+    if (user?.stripeCustomerId) {
+      const subscription = await storage.getSubscriptionByCustomerId(user.stripeCustomerId);
+      if (subscription && ['active', 'trialing'].includes(subscription.status)) {
+        res.json({ subscription, status: subscription.status });
+        return;
+      }
     }
 
-    const subscription = await storage.getSubscriptionByCustomerId(user.stripeCustomerId);
-    if (!subscription) {
-      res.json({ subscription: null, status: 'none' });
-      return;
+    if (user?.createdAt) {
+      const trial = getTrialInfo(user.createdAt);
+      if (trial.isActive) {
+        res.json({
+          subscription: null,
+          status: 'free_trial',
+          trialDaysLeft: trial.daysLeft,
+          trialEndsAt: trial.endsAt,
+        });
+        return;
+      }
     }
 
-    res.json({
-      subscription,
-      status: subscription.status,
-    });
+    res.json({ subscription: null, status: 'none' });
   } catch (err: any) {
     res.status(500).json({ error: 'Failed to get subscription' });
   }

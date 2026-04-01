@@ -10,8 +10,10 @@ interface AuthUser {
 }
 
 interface SubscriptionInfo {
-  status: 'none' | 'active' | 'trialing' | 'canceled' | 'past_due' | 'unpaid';
+  status: 'none' | 'active' | 'trialing' | 'canceled' | 'past_due' | 'unpaid' | 'free_trial';
   subscription: any | null;
+  trialDaysLeft?: number;
+  trialEndsAt?: string;
 }
 
 interface UserContextValue {
@@ -88,6 +90,8 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
           setSubscription({
             status: data.status || 'none',
             subscription: data.subscription,
+            trialDaysLeft: data.trialDaysLeft,
+            trialEndsAt: data.trialEndsAt,
           });
         }
       })
@@ -118,7 +122,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     setSubscription({ status: 'none', subscription: null });
   }, []);
 
-  const isPremium = subscription.status === 'active' || subscription.status === 'trialing';
+  const isPremium = subscription.status === 'active' || subscription.status === 'trialing' || subscription.status === 'free_trial';
 
   return (
     <UserContext.Provider value={{
