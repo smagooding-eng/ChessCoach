@@ -7,10 +7,113 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+      body { margin: 0; background: #141413; }
+      #splash {
+        position: fixed; inset: 0; z-index: 9999;
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        background: #141413;
+        font-family: Inter, system-ui, sans-serif;
+        transition: opacity 0.4s ease, visibility 0.4s ease;
+      }
+      #splash.hide { opacity: 0; visibility: hidden; pointer-events: none; }
+
+      .splash-board {
+        width: 200px; height: 200px;
+        display: grid; grid-template-columns: repeat(8, 1fr); grid-template-rows: repeat(8, 1fr);
+        border-radius: 12px; overflow: hidden;
+        box-shadow: 0 0 40px rgba(124,179,66,0.15), 0 20px 60px rgba(0,0,0,0.5);
+        border: 2px solid rgba(124,179,66,0.2);
+      }
+      .sq { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
+      .sq-l { background: #b8c68a; }
+      .sq-d { background: #6d8a3a; }
+      .sq .pc {
+        font-size: 18px; line-height: 1;
+        opacity: 0;
+        animation: pieceFade 3s ease-in-out infinite;
+      }
+
+      @keyframes pieceFade {
+        0%, 100% { opacity: 0; transform: scale(0.7); }
+        20%, 80% { opacity: 1; transform: scale(1); }
+      }
+
+      .splash-title {
+        margin-top: 28px;
+        font-size: 22px; font-weight: 900; letter-spacing: -0.5px;
+        color: #e5e5e0;
+      }
+      .splash-title span { color: #7cb342; }
+
+      .splash-bar-wrap {
+        margin-top: 20px;
+        width: 160px; height: 4px;
+        background: rgba(124,179,66,0.15);
+        border-radius: 4px; overflow: hidden;
+      }
+      .splash-bar {
+        height: 100%; width: 30%;
+        background: linear-gradient(90deg, #7cb342, #9ccc65);
+        border-radius: 4px;
+        animation: barSlide 1.4s ease-in-out infinite;
+      }
+      @keyframes barSlide {
+        0%   { transform: translateX(-100%); }
+        100% { transform: translateX(533%); }
+      }
+
+      .splash-sub {
+        margin-top: 12px; font-size: 12px; color: rgba(229,229,224,0.4);
+        letter-spacing: 2px; text-transform: uppercase; font-weight: 600;
+      }
+    </style>
   </head>
   <body>
+    <div id="splash">
+      <div class="splash-board" id="board"></div>
+      <div class="splash-title">Chess <span>Coach</span></div>
+      <div class="splash-bar-wrap"><div class="splash-bar"></div></div>
+      <div class="splash-sub">Loading</div>
+    </div>
     <div id="root"></div>
+    <script>
+      (function() {
+        var pieces = [
+          ['','','','','','','',''],
+          ['','','','','','','',''],
+          ['','','','','','','',''],
+          ['','','','','','','',''],
+          ['','','','','','','',''],
+          ['','','','','','','',''],
+          ['','','','','','','',''],
+          ['','','','','','','','']
+        ];
+        var whites = ['\u2656','\u2658','\u2657','\u2655','\u2654','\u2657','\u2658','\u2656'];
+        var blacks = ['\u265C','\u265E','\u265D','\u265B','\u265A','\u265D','\u265E','\u265C'];
+        var wPawn = '\u2659', bPawn = '\u265F';
+        pieces[0] = blacks; pieces[1] = Array(8).fill(bPawn);
+        pieces[6] = Array(8).fill(wPawn); pieces[7] = whites;
+
+        var board = document.getElementById('board');
+        for (var r = 0; r < 8; r++) {
+          for (var c = 0; c < 8; c++) {
+            var sq = document.createElement('div');
+            var isLight = (r + c) % 2 === 0;
+            sq.className = 'sq ' + (isLight ? 'sq-l' : 'sq-d');
+            if (pieces[r][c]) {
+              var pc = document.createElement('span');
+              pc.className = 'pc';
+              pc.textContent = pieces[r][c];
+              pc.style.animationDelay = (Math.random() * 2).toFixed(2) + 's';
+              sq.appendChild(pc);
+            }
+            board.appendChild(sq);
+          }
+        }
+      })();
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

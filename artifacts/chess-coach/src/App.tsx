@@ -96,8 +96,12 @@ function ProtectedRoute({ component: Component, fallbackNav }: { component: Reac
 
   if (!isLoaded || isAuthLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-background">
+        <div className="text-4xl animate-bounce">&#9820;</div>
+        <div className="w-32 h-1 bg-primary/15 rounded-full overflow-hidden">
+          <div className="h-full w-[30%] bg-primary rounded-full animate-[barSlide_1.4s_ease-in-out_infinite]"
+            style={{ animation: 'barSlide 1.4s ease-in-out infinite' }} />
+        </div>
       </div>
     );
   }

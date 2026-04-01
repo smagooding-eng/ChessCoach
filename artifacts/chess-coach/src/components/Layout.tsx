@@ -77,7 +77,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
       <aside className="hidden md:flex w-56 border-r border-border/60 bg-card/50 h-screen sticky top-0 z-40 flex-col">
         <div className="px-4 pt-5 pb-4 flex items-center gap-2.5 border-b border-border/40">
-          <img src={`${import.meta.env.BASE_URL}images/logo.png`} alt="Chess Coach" className="w-8 h-8 object-contain" />
+          <img src={`${import.meta.env.BASE_URL}images/logo.svg`} alt="Chess Coach" className="w-8 h-8 object-contain" />
           <h1 className="text-lg font-display font-black text-gradient">Chess Coach</h1>
         </div>
 
@@ -112,7 +112,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
       <header className="md:hidden flex items-center justify-between px-4 h-14 bg-card/95 backdrop-blur-xl border-b border-border/40 sticky top-0 z-50">
         <div className="flex items-center gap-2.5">
-          <img src={`${import.meta.env.BASE_URL}images/logo.png`} alt="Chess Coach" className="w-7 h-7 object-contain" />
+          <img src={`${import.meta.env.BASE_URL}images/logo.svg`} alt="Chess Coach" className="w-7 h-7 object-contain" />
           <span className="font-display font-black text-gradient text-base">Chess Coach</span>
         </div>
         <Link href="/profile" className="flex items-center gap-2 active:opacity-70 transition-opacity">
