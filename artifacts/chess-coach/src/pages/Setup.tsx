@@ -25,47 +25,6 @@ export function Setup() {
     );
   }
 
-  if (isReplit && !isAuthenticated) {
-    return (
-      <div className="min-h-screen relative flex items-center justify-center p-4">
-        <div className="absolute inset-0 z-0">
-          <img
-            src={`${import.meta.env.BASE_URL}images/hero-bg.png`}
-            alt="Hero background"
-            className="w-full h-full object-cover opacity-60 mix-blend-overlay"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-background via-background/80 to-transparent" />
-        </div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="w-full max-w-md glass-panel p-8 md:p-10 rounded-3xl relative z-10 text-center"
-        >
-          <div className="mx-auto w-20 h-20 mb-6 bg-primary/20 rounded-full flex items-center justify-center shadow-[0_0_30px_hsl(89_44%_50%_/_0.3)]">
-            <Trophy className="w-10 h-10 text-primary" />
-          </div>
-
-          <h1 className="text-3xl md:text-4xl font-display font-bold mb-3 text-white">
-            Welcome to <span className="text-gradient">Chess Coach</span>
-          </h1>
-          <p className="text-muted-foreground mb-8">
-            Sign in with your Replit account to start analyzing your chess games and improving your skills.
-          </p>
-
-          <button
-            onClick={authLogin}
-            className="w-full group flex items-center justify-center gap-2 btn-primary text-base"
-          >
-            <LogIn className="w-5 h-5" />
-            Sign In with Replit
-            <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-          </button>
-        </motion.div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen relative flex items-center justify-center p-4">
       <div className="absolute inset-0 z-0">
@@ -92,6 +51,24 @@ export function Setup() {
         <p className="text-muted-foreground mb-8">
           Enter your chess.com username to start importing games, discovering your weaknesses, and generating personalized courses.
         </p>
+
+        {isReplit && !isAuthenticated && (
+          <>
+            <button
+              onClick={authLogin}
+              className="w-full group flex items-center justify-center gap-2 btn-primary text-base mb-4"
+            >
+              <LogIn className="w-5 h-5" />
+              Sign In with Replit
+              <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+            </button>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex-1 h-px bg-border" />
+              <span className="text-xs text-muted-foreground uppercase">or continue without account</span>
+              <div className="flex-1 h-px bg-border" />
+            </div>
+          </>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-4 text-left">
           <div>

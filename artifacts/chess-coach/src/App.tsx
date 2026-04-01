@@ -88,12 +88,10 @@ function ProtectedRoute({ component: Component, fallbackNav }: { component: Reac
   const [, navigate] = useLocation();
 
   useEffect(() => {
-    if (isReplit && !isAuthLoading && !isAuthenticated) {
-      navigate('/setup', { replace: true } as never);
-      return;
-    }
-    if (isLoaded && !username) {
-      navigate('/setup', { replace: true } as never);
+    if (isLoaded && !username && !(isReplit && isAuthLoading)) {
+      if (!isReplit || !isAuthenticated) {
+        navigate('/setup', { replace: true } as never);
+      }
     }
   }, [isLoaded, username, navigate, isReplit, isAuthenticated, isAuthLoading]);
 
@@ -104,8 +102,7 @@ function ProtectedRoute({ component: Component, fallbackNav }: { component: Reac
       </div>
     );
   }
-  if (isReplit && !isAuthenticated) return null;
-  if (!username) return null;
+  if (!username && !(isReplit && isAuthenticated)) return null;
 
   return (
     <Layout>
