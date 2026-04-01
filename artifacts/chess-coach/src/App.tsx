@@ -84,25 +84,23 @@ const queryClient = new QueryClient({
 
 // Protected Route Wrapper
 function ProtectedRoute({ component: Component, fallbackNav }: { component: React.ComponentType; fallbackNav?: string }) {
-  const { username, isLoaded, isReplit, isAuthenticated, isAuthLoading } = useUser();
+  const { username, isLoaded, isAuthenticated, isAuthLoading } = useUser();
   const [, navigate] = useLocation();
 
   useEffect(() => {
-    if (isLoaded && !username && !(isReplit && isAuthLoading)) {
-      if (!isReplit || !isAuthenticated) {
-        navigate('/setup', { replace: true } as never);
-      }
+    if (isLoaded && !isAuthLoading && !username && !isAuthenticated) {
+      navigate('/setup', { replace: true } as never);
     }
-  }, [isLoaded, username, navigate, isReplit, isAuthenticated, isAuthLoading]);
+  }, [isLoaded, username, navigate, isAuthenticated, isAuthLoading]);
 
-  if (!isLoaded || (isReplit && isAuthLoading)) {
+  if (!isLoaded || isAuthLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
-  if (!username && !(isReplit && isAuthenticated)) return null;
+  if (!username && !isAuthenticated) return null;
 
   return (
     <Layout>

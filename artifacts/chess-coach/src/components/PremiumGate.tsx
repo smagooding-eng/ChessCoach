@@ -8,9 +8,9 @@ interface PremiumGateProps {
 }
 
 export function PremiumGate({ children, feature }: PremiumGateProps) {
-  const { isReplit, isPremium } = useUser();
+  const { isPremium, isAuthenticated } = useUser();
 
-  if (!isReplit || isPremium) {
+  if (!isAuthenticated || isPremium) {
     return <>{children}</>;
   }
 

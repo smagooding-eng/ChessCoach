@@ -1,25 +1,15 @@
-import * as oidc from "openid-client";
 import { Router, type IRouter, type Request, type Response } from "express";
-import {
-  GetCurrentAuthUserResponse,
-  ExchangeMobileAuthorizationCodeBody,
-  ExchangeMobileAuthorizationCodeResponse,
-  LogoutMobileSessionResponse,
-} from "@workspace/api-zod";
+import bcrypt from "bcryptjs";
 import { db, usersTable } from "@workspace/db";
+import { eq } from "drizzle-orm";
 import {
   clearSession,
-  getOidcConfig,
   getSessionId,
   createSession,
-  deleteSession,
-  SESSION_COOKIE,
-  SESSION_TTL,
-  ISSUER_URL,
+  setSessionCookie,
   type SessionData,
+  type SessionUser,
 } from "../lib/auth";
-
-const OIDC_COOKIE_TTL = 10 * 60 * 1000;
 
 const router: IRouter = Router();
 
@@ -30,243 +20,269 @@ function getOrigin(req: Request): string {
   return `${proto}://${host}`;
 }
 
-const isSecure = process.env.NODE_ENV !== "development" || !!process.env.REPLIT_DEPLOYMENT;
-
-function setSessionCookie(res: Response, sid: string) {
-  res.cookie(SESSION_COOKIE, sid, {
-    httpOnly: true,
-    secure: isSecure,
-    sameSite: "lax",
-    path: "/",
-    maxAge: SESSION_TTL,
-  });
-}
-
-function setOidcCookie(res: Response, name: string, value: string) {
-  res.cookie(name, value, {
-    httpOnly: true,
-    secure: isSecure,
-    sameSite: "lax",
-    path: "/",
-    maxAge: OIDC_COOKIE_TTL,
-  });
-}
-
-function getSafeReturnTo(value: unknown): string {
-  if (typeof value !== "string" || !value.startsWith("/") || value.startsWith("//")) {
-    return "/";
-  }
-  return value;
-}
-
-async function upsertUser(claims: Record<string, unknown>) {
-  const userData = {
-    id: claims.sub as string,
-    email: (claims.email as string) || null,
-    firstName: (claims.first_name as string) || null,
-    lastName: (claims.last_name as string) || null,
-    profileImageUrl: (claims.profile_image_url || claims.picture) as
-      | string
-      | null,
+function toSessionUser(dbUser: any): SessionUser {
+  return {
+    id: dbUser.id,
+    email: dbUser.email,
+    firstName: dbUser.firstName,
+    lastName: dbUser.lastName,
+    profileImageUrl: dbUser.profileImageUrl,
+    chesscomUsername: dbUser.chesscomUsername,
   };
-
-  const [user] = await db
-    .insert(usersTable)
-    .values(userData)
-    .onConflictDoUpdate({
-      target: usersTable.id,
-      set: {
-        ...userData,
-        updatedAt: new Date(),
-      },
-    })
-    .returning();
-  return user;
 }
 
 router.get("/auth/user", (req: Request, res: Response) => {
-  res.json(
-    GetCurrentAuthUserResponse.parse({
-      user: req.isAuthenticated() ? req.user : null,
-    }),
-  );
-});
-
-router.get("/login", async (req: Request, res: Response) => {
-  const config = await getOidcConfig();
-  const callbackUrl = `${getOrigin(req)}/api/callback`;
-
-  const returnTo = getSafeReturnTo(req.query.returnTo);
-
-  const state = oidc.randomState();
-  const nonce = oidc.randomNonce();
-  const codeVerifier = oidc.randomPKCECodeVerifier();
-  const codeChallenge = await oidc.calculatePKCECodeChallenge(codeVerifier);
-
-  const redirectTo = oidc.buildAuthorizationUrl(config, {
-    redirect_uri: callbackUrl,
-    scope: "openid email profile offline_access",
-    code_challenge: codeChallenge,
-    code_challenge_method: "S256",
-    prompt: "login consent",
-    state,
-    nonce,
+  res.json({
+    user: req.isAuthenticated() ? req.user : null,
   });
-
-  setOidcCookie(res, "code_verifier", codeVerifier);
-  setOidcCookie(res, "nonce", nonce);
-  setOidcCookie(res, "state", state);
-  setOidcCookie(res, "return_to", returnTo);
-
-  res.redirect(redirectTo.href);
 });
 
-router.get("/callback", async (req: Request, res: Response) => {
-  const config = await getOidcConfig();
-  const callbackUrl = `${getOrigin(req)}/api/callback`;
+router.post("/auth/register", async (req: Request, res: Response) => {
+  const { email, password, firstName, chesscomUsername } = req.body;
 
-  const codeVerifier = req.cookies?.code_verifier;
-  const nonce = req.cookies?.nonce;
-  const expectedState = req.cookies?.state;
-
-  if (!codeVerifier || !expectedState) {
-    res.redirect("/api/login");
+  if (!email || !password) {
+    res.status(400).json({ error: "Email and password are required" });
     return;
   }
 
-  const currentUrl = new URL(
-    `${callbackUrl}?${new URL(req.url, `http://${req.headers.host}`).searchParams}`,
-  );
+  if (password.length < 6) {
+    res.status(400).json({ error: "Password must be at least 6 characters" });
+    return;
+  }
 
-  let tokens: oidc.TokenEndpointResponse & oidc.TokenEndpointResponseHelpers;
   try {
-    tokens = await oidc.authorizationCodeGrant(config, currentUrl, {
-      pkceCodeVerifier: codeVerifier,
-      expectedNonce: nonce,
-      expectedState,
-      idTokenExpected: true,
-    });
-  } catch {
-    res.redirect("/api/login");
-    return;
-  }
+    const [existing] = await db
+      .select()
+      .from(usersTable)
+      .where(eq(usersTable.email, email));
 
-  const returnTo = getSafeReturnTo(req.cookies?.return_to);
-
-  res.clearCookie("code_verifier", { path: "/" });
-  res.clearCookie("nonce", { path: "/" });
-  res.clearCookie("state", { path: "/" });
-  res.clearCookie("return_to", { path: "/" });
-
-  const claims = tokens.claims();
-  if (!claims) {
-    res.redirect("/api/login");
-    return;
-  }
-
-  const dbUser = await upsertUser(
-    claims as unknown as Record<string, unknown>,
-  );
-
-  const now = Math.floor(Date.now() / 1000);
-  const sessionData: SessionData = {
-    user: {
-      id: dbUser.id,
-      email: dbUser.email,
-      firstName: dbUser.firstName,
-      lastName: dbUser.lastName,
-      profileImageUrl: dbUser.profileImageUrl,
-    },
-    access_token: tokens.access_token,
-    refresh_token: tokens.refresh_token,
-    expires_at: tokens.expiresIn() ? now + tokens.expiresIn()! : claims.exp,
-  };
-
-  const sid = await createSession(sessionData);
-  setSessionCookie(res, sid);
-  res.redirect(returnTo);
-});
-
-router.get("/logout", async (req: Request, res: Response) => {
-  const config = await getOidcConfig();
-  const origin = getOrigin(req);
-
-  const sid = getSessionId(req);
-  await clearSession(res, sid);
-
-  const endSessionUrl = oidc.buildEndSessionUrl(config, {
-    client_id: process.env.REPL_ID!,
-    post_logout_redirect_uri: origin,
-  });
-
-  res.redirect(endSessionUrl.href);
-});
-
-router.post(
-  "/mobile-auth/token-exchange",
-  async (req: Request, res: Response) => {
-    const parsed = ExchangeMobileAuthorizationCodeBody.safeParse(req.body);
-    if (!parsed.success) {
-      res.status(400).json({ error: "Missing or invalid required parameters" });
+    if (existing) {
+      res.status(409).json({ error: "An account with this email already exists" });
       return;
     }
 
-    const { code, code_verifier, redirect_uri, state, nonce } = parsed.data;
+    const passwordHash = await bcrypt.hash(password, 12);
 
-    try {
-      const config = await getOidcConfig();
+    const [user] = await db
+      .insert(usersTable)
+      .values({
+        email,
+        passwordHash,
+        authProvider: "local",
+        firstName: firstName || null,
+        chesscomUsername: chesscomUsername || null,
+      })
+      .returning();
 
-      const callbackUrl = new URL(redirect_uri);
-      callbackUrl.searchParams.set("code", code);
-      callbackUrl.searchParams.set("state", state);
-      callbackUrl.searchParams.set("iss", ISSUER_URL);
+    const sessionData: SessionData = { user: toSessionUser(user) };
+    const sid = await createSession(sessionData);
+    setSessionCookie(res, sid);
 
-      const tokens = await oidc.authorizationCodeGrant(config, callbackUrl, {
-        pkceCodeVerifier: code_verifier,
-        expectedNonce: nonce ?? undefined,
-        expectedState: state,
-        idTokenExpected: true,
-      });
-
-      const claims = tokens.claims();
-      if (!claims) {
-        res.status(401).json({ error: "No claims in ID token" });
-        return;
-      }
-
-      const dbUser = await upsertUser(
-        claims as unknown as Record<string, unknown>,
-      );
-
-      const now = Math.floor(Date.now() / 1000);
-      const sessionData: SessionData = {
-        user: {
-          id: dbUser.id,
-          email: dbUser.email,
-          firstName: dbUser.firstName,
-          lastName: dbUser.lastName,
-          profileImageUrl: dbUser.profileImageUrl,
-        },
-        access_token: tokens.access_token,
-        refresh_token: tokens.refresh_token,
-        expires_at: tokens.expiresIn() ? now + tokens.expiresIn()! : claims.exp,
-      };
-
-      const sid = await createSession(sessionData);
-      res.json(ExchangeMobileAuthorizationCodeResponse.parse({ token: sid }));
-    } catch (err) {
-      req.log.error({ err }, "Mobile token exchange error");
-      res.status(500).json({ error: "Token exchange failed" });
-    }
-  },
-);
-
-router.post("/mobile-auth/logout", async (req: Request, res: Response) => {
-  const sid = getSessionId(req);
-  if (sid) {
-    await deleteSession(sid);
+    res.json({ user: toSessionUser(user) });
+  } catch (err: any) {
+    req.log?.error?.({ err }, "Registration error");
+    res.status(500).json({ error: "Registration failed" });
   }
-  res.json(LogoutMobileSessionResponse.parse({ success: true }));
+});
+
+router.post("/auth/login", async (req: Request, res: Response) => {
+  const { email, password } = req.body;
+
+  if (!email || !password) {
+    res.status(400).json({ error: "Email and password are required" });
+    return;
+  }
+
+  try {
+    const [user] = await db
+      .select()
+      .from(usersTable)
+      .where(eq(usersTable.email, email));
+
+    if (!user || !user.passwordHash) {
+      res.status(401).json({ error: "Invalid email or password" });
+      return;
+    }
+
+    const valid = await bcrypt.compare(password, user.passwordHash);
+    if (!valid) {
+      res.status(401).json({ error: "Invalid email or password" });
+      return;
+    }
+
+    const sessionData: SessionData = { user: toSessionUser(user) };
+    const sid = await createSession(sessionData);
+    setSessionCookie(res, sid);
+
+    res.json({ user: toSessionUser(user) });
+  } catch (err: any) {
+    req.log?.error?.({ err }, "Login error");
+    res.status(500).json({ error: "Login failed" });
+  }
+});
+
+router.get("/auth/google", (req: Request, res: Response) => {
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  if (!clientId) {
+    res.status(503).json({ error: "Google login is not configured" });
+    return;
+  }
+
+  const origin = getOrigin(req);
+  const redirectUri = `${origin}/api/auth/google/callback`;
+
+  const params = new URLSearchParams({
+    client_id: clientId,
+    redirect_uri: redirectUri,
+    response_type: "code",
+    scope: "openid email profile",
+    access_type: "offline",
+    prompt: "select_account",
+  });
+
+  res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params}`);
+});
+
+router.get("/auth/google/callback", async (req: Request, res: Response) => {
+  const { code } = req.query;
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+
+  if (!code || !clientId || !clientSecret) {
+    res.redirect("/?error=google_auth_failed");
+    return;
+  }
+
+  try {
+    const origin = getOrigin(req);
+    const redirectUri = `${origin}/api/auth/google/callback`;
+
+    const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        code: code as string,
+        client_id: clientId,
+        client_secret: clientSecret,
+        redirect_uri: redirectUri,
+        grant_type: "authorization_code",
+      }),
+    });
+
+    if (!tokenRes.ok) {
+      res.redirect("/?error=google_auth_failed");
+      return;
+    }
+
+    const tokens = await tokenRes.json();
+
+    const userInfoRes = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
+      headers: { Authorization: `Bearer ${tokens.access_token}` },
+    });
+
+    if (!userInfoRes.ok) {
+      res.redirect("/?error=google_auth_failed");
+      return;
+    }
+
+    const profile = await userInfoRes.json();
+
+    let [user] = await db
+      .select()
+      .from(usersTable)
+      .where(eq(usersTable.googleId, profile.id));
+
+    if (!user) {
+      const [existingByEmail] = profile.email
+        ? await db.select().from(usersTable).where(eq(usersTable.email, profile.email))
+        : [null];
+
+      if (existingByEmail) {
+        [user] = await db
+          .update(usersTable)
+          .set({
+            googleId: profile.id,
+            authProvider: existingByEmail.authProvider === "local" ? "local+google" : "google",
+            profileImageUrl: profile.picture || existingByEmail.profileImageUrl,
+            firstName: existingByEmail.firstName || profile.given_name,
+            lastName: existingByEmail.lastName || profile.family_name,
+          })
+          .where(eq(usersTable.id, existingByEmail.id))
+          .returning();
+      } else {
+        [user] = await db
+          .insert(usersTable)
+          .values({
+            email: profile.email,
+            googleId: profile.id,
+            authProvider: "google",
+            firstName: profile.given_name || null,
+            lastName: profile.family_name || null,
+            profileImageUrl: profile.picture || null,
+          })
+          .returning();
+      }
+    }
+
+    const sessionData: SessionData = { user: toSessionUser(user) };
+    const sid = await createSession(sessionData);
+    setSessionCookie(res, sid);
+
+    res.redirect("/");
+  } catch (err: any) {
+    req.log?.error?.({ err }, "Google callback error");
+    res.redirect("/?error=google_auth_failed");
+  }
+});
+
+router.post("/auth/update-profile", async (req: Request, res: Response) => {
+  if (!req.isAuthenticated()) {
+    res.status(401).json({ error: "Not authenticated" });
+    return;
+  }
+
+  const { chesscomUsername, firstName } = req.body;
+
+  try {
+    const updates: Record<string, any> = {};
+    if (chesscomUsername !== undefined) updates.chesscomUsername = chesscomUsername;
+    if (firstName !== undefined) updates.firstName = firstName;
+
+    if (Object.keys(updates).length === 0) {
+      res.json({ user: req.user });
+      return;
+    }
+
+    const [updated] = await db
+      .update(usersTable)
+      .set(updates)
+      .where(eq(usersTable.id, req.user!.id))
+      .returning();
+
+    const sessionUser = toSessionUser(updated);
+    const sid = getSessionId(req);
+    if (sid) {
+      const { updateSession } = await import("../lib/auth");
+      await updateSession(sid, { user: sessionUser });
+    }
+    req.user = sessionUser as any;
+
+    res.json({ user: sessionUser });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to update profile" });
+  }
+});
+
+router.get("/logout", async (req: Request, res: Response) => {
+  const sid = getSessionId(req);
+  await clearSession(res, sid);
+  res.redirect("/");
+});
+
+router.post("/auth/logout", async (req: Request, res: Response) => {
+  const sid = getSessionId(req);
+  await clearSession(res, sid);
+  res.json({ success: true });
 });
 
 export default router;

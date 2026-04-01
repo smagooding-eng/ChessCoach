@@ -59,10 +59,10 @@ function SidebarLink({ item, isActive }: { item: typeof ALL_NAV[0]; isActive: bo
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
-  const { username, logout, isReplit, authLogout, isPremium } = useUser();
+  const { username, logout, isAuthenticated, authLogout, isPremium } = useUser();
   const { player } = useChessPlayer(username ?? undefined);
   const [moreOpen, setMoreOpen] = useState(false);
-  const handleLogout = isReplit ? authLogout : logout;
+  const handleLogout = isAuthenticated ? authLogout : logout;
 
   const displayRating = player?.rating;
 

@@ -32,7 +32,7 @@ Chess Coach - A full-stack chess analysis platform that imports games from chess
 10. **ELO-Based Improvement Tips**: Analysis page shows tier-specific tips based on average rating with progress bar to next tier
 11. **Mobile Navigation**: Bottom tab bar with "More" drawer for secondary pages (Openings, Practice Bots, Import Games, Opponent Scout, Sign Out). All pages mobile-responsive.
 12. **Global UserContext**: `src/context/UserContext.tsx` — single source of truth for auth state, no per-component useState drift
-13. **Replit Auth**: OIDC-based authentication with Replit accounts (session cookies, `/api/login`, `/api/callback`, `/api/logout`)
+13. **Authentication**: Email/password registration + Google OAuth login, session-based auth with cookies
 14. **Stripe Subscriptions**: Chess Coach Pro with $1/week and $4/month plans, 3-day free trial, Stripe Checkout + Customer Portal
 15. **Premium Gating**: AI Analysis, Courses, TTS, and Opponent Scout gated behind subscription via `<PremiumGate>` component
 
@@ -47,7 +47,7 @@ artifacts-monorepo/
 │   ├── api-spec/           # OpenAPI spec + Orval codegen config
 │   ├── api-client-react/   # Generated React Query hooks
 │   ├── api-zod/            # Generated Zod schemas from OpenAPI
-│   ├── replit-auth-web/    # Replit Auth React hook (useAuth)
+│   ├── replit-auth-web/    # (unused, kept for compatibility)
 │   └── db/                 # Drizzle ORM schema + DB connection
 │       └── src/schema/
 │           ├── games.ts    # Chess games table
@@ -71,10 +71,13 @@ artifacts-monorepo/
 - `POST /api/courses/generate` — Generate AI courses from weaknesses
 - `GET /api/courses/:id` — Get course with lessons
 - `PATCH /api/courses/:id/progress` — Update lesson completion
-- `GET /api/login` — Initiate Replit OIDC login
-- `GET /api/callback` — OIDC callback handler
-- `GET /api/logout` — Logout and destroy session
+- `POST /api/auth/register` — Register with email/password (+ optional firstName, chesscomUsername)
+- `POST /api/auth/login` — Login with email/password
+- `GET /api/auth/google` — Initiate Google OAuth login
+- `GET /api/auth/google/callback` — Google OAuth callback
+- `POST /api/auth/logout` — Logout and destroy session
 - `GET /api/auth/user` — Get current authenticated user
+- `POST /api/auth/update-profile` — Update user profile (chesscomUsername, firstName)
 - `GET /api/stripe/products` — List available subscription products
 - `GET /api/stripe/config` — Get Stripe publishable key
 - `POST /api/stripe/checkout` — Create Stripe Checkout session

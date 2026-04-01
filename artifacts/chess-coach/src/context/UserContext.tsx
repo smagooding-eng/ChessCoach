@@ -1,5 +1,4 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { getApiBase, apiFetch } from '@/lib/api';
 
 interface AuthUser {
   id: string;
@@ -7,6 +6,7 @@ interface AuthUser {
   firstName: string | null;
   lastName: string | null;
   profileImageUrl: string | null;
+  chesscomUsername: string | null;
 }
 
 interface SubscriptionInfo {
@@ -22,12 +22,11 @@ interface UserContextValue {
   authUser: AuthUser | null;
   isAuthenticated: boolean;
   isAuthLoading: boolean;
-  authLogin: () => void;
   authLogout: () => void;
-  isReplit: boolean;
   subscription: SubscriptionInfo;
   refreshSubscription: () => void;
   isPremium: boolean;
+  refreshAuth: () => Promise<void>;
 }
 
 const UserContext = createContext<UserContextValue>({
@@ -38,19 +37,12 @@ const UserContext = createContext<UserContextValue>({
   authUser: null,
   isAuthenticated: false,
   isAuthLoading: true,
-  authLogin: () => {},
   authLogout: () => {},
-  isReplit: false,
   subscription: { status: 'none', subscription: null },
   refreshSubscription: () => {},
   isPremium: false,
+  refreshAuth: async () => {},
 });
-
-function isReplitHost(): boolean {
-  if (typeof window === 'undefined') return false;
-  const host = window.location.hostname;
-  return host.includes('replit') || host === 'localhost';
-}
 
 export function UserProvider({ children }: { children: React.ReactNode }) {
   const [username, setUsername] = useState<string | null>(null);
@@ -58,7 +50,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [subscription, setSubscription] = useState<SubscriptionInfo>({ status: 'none', subscription: null });
-  const isReplit = isReplitHost();
 
   useEffect(() => {
     const stored = localStorage.getItem('chessCoachUsername');
@@ -66,37 +57,29 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     setIsLoaded(true);
   }, []);
 
-  useEffect(() => {
-    if (!isReplit) {
+  const refreshAuth = useCallback(async () => {
+    try {
+      const res = await fetch('/api/auth/user', { credentials: 'include' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json() as { user: AuthUser | null };
+      setAuthUser(data.user ?? null);
+      if (data.user?.chesscomUsername && !localStorage.getItem('chessCoachUsername')) {
+        localStorage.setItem('chessCoachUsername', data.user.chesscomUsername);
+        setUsername(data.user.chesscomUsername);
+      }
+    } catch {
+      setAuthUser(null);
+    } finally {
       setIsAuthLoading(false);
-      return;
     }
+  }, []);
 
-    let cancelled = false;
-
-    fetch('/api/auth/user', { credentials: 'include' })
-      .then((res) => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return res.json() as Promise<{ user: AuthUser | null }>;
-      })
-      .then((data) => {
-        if (!cancelled) {
-          setAuthUser(data.user ?? null);
-          setIsAuthLoading(false);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setAuthUser(null);
-          setIsAuthLoading(false);
-        }
-      });
-
-    return () => { cancelled = true; };
-  }, [isReplit]);
+  useEffect(() => {
+    refreshAuth();
+  }, [refreshAuth]);
 
   const refreshSubscription = useCallback(() => {
-    if (!isReplit || !authUser) return;
+    if (!authUser) return;
 
     fetch('/api/stripe/subscription', { credentials: 'include' })
       .then((res) => res.ok ? res.json() : null)
@@ -109,7 +92,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         }
       })
       .catch(() => {});
-  }, [isReplit, authUser]);
+  }, [authUser]);
 
   useEffect(() => {
     refreshSubscription();
@@ -125,15 +108,14 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     setUsername(null);
   };
 
-  const authLogin = useCallback(() => {
-    const base = import.meta.env.BASE_URL.replace(/\/+$/, '') || '/';
-    window.location.href = `/api/login?returnTo=${encodeURIComponent(base)}`;
-  }, []);
-
-  const authLogout = useCallback(() => {
+  const authLogout = useCallback(async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+    } catch {}
     localStorage.removeItem('chessCoachUsername');
     setUsername(null);
-    window.location.href = '/api/logout';
+    setAuthUser(null);
+    setSubscription({ status: 'none', subscription: null });
   }, []);
 
   const isPremium = subscription.status === 'active' || subscription.status === 'trialing';
@@ -147,12 +129,11 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       authUser,
       isAuthenticated: !!authUser,
       isAuthLoading,
-      authLogin,
       authLogout,
-      isReplit,
       subscription,
       refreshSubscription,
       isPremium,
+      refreshAuth,
     }}>
       {children}
     </UserContext.Provider>

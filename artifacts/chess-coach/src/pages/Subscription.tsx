@@ -35,7 +35,7 @@ interface ProductInfo {
 }
 
 export function Subscription() {
-  const { isReplit, isAuthenticated, authLogin, subscription, refreshSubscription, isPremium } = useUser();
+  const { isAuthenticated, subscription, refreshSubscription, isPremium } = useUser();
   const [, setLocation] = useLocation();
   const [products, setProducts] = useState<ProductInfo[]>([]);
   const [loading, setLoading] = useState(true);
@@ -53,11 +53,6 @@ export function Subscription() {
   }, [isSuccess, refreshSubscription]);
 
   useEffect(() => {
-    if (!isReplit) {
-      setLoading(false);
-      return;
-    }
-
     fetch('/api/stripe/products', { credentials: 'include' })
       .then(res => res.ok ? res.json() : null)
       .then(data => {
@@ -65,11 +60,11 @@ export function Subscription() {
         setLoading(false);
       })
       .catch(() => setLoading(false));
-  }, [isReplit]);
+  }, []);
 
   const handleCheckout = async (priceId: string) => {
     if (!isAuthenticated) {
-      authLogin();
+      setLocation('/setup');
       return;
     }
 
@@ -111,17 +106,6 @@ export function Subscription() {
     }
   };
 
-  if (!isReplit) {
-    return (
-      <div className="p-4 md:p-0">
-        <div className="text-center py-16">
-          <Crown className="w-12 h-12 text-primary mx-auto mb-4" />
-          <h1 className="text-2xl font-bold mb-2">Premium Features</h1>
-          <p className="text-muted-foreground">Subscriptions are available when using Chess Coach on Replit.</p>
-        </div>
-      </div>
-    );
-  }
 
   const product = products[0];
   const weeklyPrice = product?.prices?.find((p: PriceInfo) => p.recurring?.interval === 'week');
