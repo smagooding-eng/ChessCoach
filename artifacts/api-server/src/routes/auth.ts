@@ -121,10 +121,14 @@ router.post("/auth/login", async (req: Request, res: Response) => {
   }
 });
 
+router.get("/auth/google/status", (_req: Request, res: Response) => {
+  res.json({ available: !!process.env.GOOGLE_CLIENT_ID });
+});
+
 router.get("/auth/google", (req: Request, res: Response) => {
   const clientId = process.env.GOOGLE_CLIENT_ID;
   if (!clientId) {
-    res.status(503).json({ error: "Google login is not configured" });
+    res.redirect("/setup?error=google_not_configured");
     return;
   }
 
