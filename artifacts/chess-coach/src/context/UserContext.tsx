@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { apiFetch } from '@/lib/api';
 
 interface AuthUser {
   id: string;
@@ -62,7 +63,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
   const refreshAuth = useCallback(async () => {
     try {
-      const res = await fetch('/api/auth/user', { credentials: 'include' });
+      const res = await apiFetch('/api/auth/user', { credentials: 'include' });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json() as { user: AuthUser | null };
       setAuthUser(data.user ?? null);
@@ -84,7 +85,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const refreshSubscription = useCallback(() => {
     if (!authUser) return;
 
-    fetch('/api/stripe/subscription', { credentials: 'include' })
+    apiFetch('/api/stripe/subscription', { credentials: 'include' })
       .then((res) => res.ok ? res.json() : null)
       .then((data) => {
         if (data) {
@@ -115,7 +116,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
   const authLogout = useCallback(async () => {
     try {
-      await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+      await apiFetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
     } catch {}
     localStorage.removeItem('chessCoachUsername');
     setUsername(null);

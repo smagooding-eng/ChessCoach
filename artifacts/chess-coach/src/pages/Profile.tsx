@@ -5,6 +5,7 @@ import { useMyAnalysisSummary } from '@/hooks/use-analysis';
 import { useMyGames } from '@/hooks/use-games';
 import { useMyCourses } from '@/hooks/use-courses';
 import { Link, useLocation } from 'wouter';
+import { apiFetch } from '@/lib/api';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   User, Mail, Crown, LogOut, ChevronRight, Trophy, Swords, Target,
@@ -31,7 +32,7 @@ function UserListPanel({ onClose }: { onClose: () => void }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch('/api/admin/users', { credentials: 'include' })
+    apiFetch('/api/admin/users', { credentials: 'include' })
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (d?.users) setUsers(d.users); })
       .catch(() => {})
@@ -86,7 +87,7 @@ function AdminTicker() {
 
   useEffect(() => {
     const fetchStats = () => {
-      fetch('/api/admin/stats', { credentials: 'include' })
+      apiFetch('/api/admin/stats', { credentials: 'include' })
         .then(r => r.ok ? r.json() : null)
         .then(d => { if (d) setStats(d); })
         .catch(() => {});
@@ -172,7 +173,7 @@ export function Profile() {
     try {
       login(trimmed);
       if (authUser) {
-        await fetch('/api/auth/update-profile', {
+        await apiFetch('/api/auth/update-profile', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',

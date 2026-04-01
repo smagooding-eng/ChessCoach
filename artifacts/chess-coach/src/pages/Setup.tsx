@@ -3,6 +3,7 @@ import { useUser } from '@/hooks/use-user';
 import { useLocation } from 'wouter';
 import { ArrowRight, Trophy, Mail, Eye, EyeOff, UserPlus, LogIn } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { apiFetch, apiUrl } from '@/lib/api';
 
 export function Setup() {
   const [mode, setMode] = useState<'login' | 'register'>('login');
@@ -19,7 +20,7 @@ export function Setup() {
   const [, setLocation] = useLocation();
 
   useEffect(() => {
-    fetch('/api/auth/google/status', { credentials: 'include' })
+    apiFetch('/api/auth/google/status', { credentials: 'include' })
       .then(r => r.ok ? r.json() : { available: false })
       .then(d => setGoogleAvailable(!!d.available))
       .catch(() => setGoogleAvailable(false));
@@ -63,7 +64,7 @@ export function Setup() {
         if (chesscomUsername.trim()) body.chesscomUsername = chesscomUsername.trim();
       }
 
-      const res = await fetch(endpoint, {
+      const res = await apiFetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -91,7 +92,7 @@ export function Setup() {
   };
 
   const handleGoogleLogin = () => {
-    window.location.href = '/api/auth/google';
+    window.location.href = apiUrl('/api/auth/google');
   };
 
   return (

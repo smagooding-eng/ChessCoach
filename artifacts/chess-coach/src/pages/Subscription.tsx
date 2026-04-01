@@ -3,6 +3,7 @@ import { useUser } from '@/hooks/use-user';
 import { useLocation } from 'wouter';
 import { Crown, Check, Zap, BrainCircuit, GraduationCap, Swords, Volume2, Loader2, ExternalLink, Clock } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { apiFetch } from '@/lib/api';
 
 const PREMIUM_FEATURES = [
   { icon: BrainCircuit, label: 'AI Game Analysis', desc: 'Deep GPT-powered analysis of every game' },
@@ -53,7 +54,7 @@ export function Subscription() {
   }, [isSuccess, refreshSubscription]);
 
   useEffect(() => {
-    fetch('/api/stripe/products', { credentials: 'include' })
+    apiFetch('/api/stripe/products', { credentials: 'include' })
       .then(res => res.ok ? res.json() : null)
       .then(data => {
         if (data?.data) setProducts(data.data);
@@ -70,7 +71,7 @@ export function Subscription() {
 
     setCheckoutLoading(priceId);
     try {
-      const res = await fetch('/api/stripe/checkout', {
+      const res = await apiFetch('/api/stripe/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -90,7 +91,7 @@ export function Subscription() {
   const handlePortal = async () => {
     setPortalLoading(true);
     try {
-      const res = await fetch('/api/stripe/portal', {
+      const res = await apiFetch('/api/stripe/portal', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',

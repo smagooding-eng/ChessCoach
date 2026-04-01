@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { UserProvider } from "@/context/UserContext";
 import { useUser } from "@/hooks/use-user";
 import { useEffect, Component, type ReactNode } from "react";
+import { apiFetch } from "@/lib/api";
 
 function ErrorFallback({ error, fallbackNav, onReset }: { error: Error | null; fallbackNav: string; onReset: () => void }) {
   const [, navigate] = useLocation();
@@ -134,7 +135,7 @@ const PProfile       = () => <ProtectedRoute component={Profile} />;
 function PageTracker() {
   const [location] = useLocation();
   useEffect(() => {
-    fetch('/api/track', {
+    apiFetch('/api/track', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',

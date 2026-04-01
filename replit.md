@@ -83,6 +83,9 @@ artifacts-monorepo/
 - `POST /api/stripe/checkout` — Create Stripe Checkout session
 - `GET /api/stripe/subscription` — Get current user's subscription status
 - `POST /api/stripe/portal` — Create Stripe Customer Portal session
+- `POST /api/track` — Track page view (public, no auth required)
+- `GET /api/admin/stats` — Admin stats: page views, user count, active subscriptions
+- `GET /api/admin/users` — Admin: list all registered users
 
 ## TypeScript & Composite Projects
 
