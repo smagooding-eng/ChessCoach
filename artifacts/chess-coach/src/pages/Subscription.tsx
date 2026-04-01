@@ -110,7 +110,6 @@ export function Subscription() {
 
   const product = products[0];
   const weeklyPrice = product?.prices?.find((p: PriceInfo) => p.recurring?.interval === 'week');
-  const monthlyPrice = product?.prices?.find((p: PriceInfo) => p.recurring?.interval === 'month');
 
   return (
     <div className="p-4 md:p-0">
@@ -263,20 +262,7 @@ export function Subscription() {
                       )}
                     </button>
                   )}
-                  {monthlyPrice && (
-                    <button
-                      onClick={() => handleCheckout(monthlyPrice.id)}
-                      disabled={!!checkoutLoading}
-                      className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-secondary hover:bg-secondary/80 transition-colors font-semibold text-sm"
-                    >
-                      {checkoutLoading === monthlyPrice.id ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <>$4/month <span className="text-xs text-muted-foreground">(save ~$0.35/week)</span></>
-                      )}
-                    </button>
-                  )}
-                  {!weeklyPrice && !monthlyPrice && (
+                  {!weeklyPrice && (
                     <p className="text-sm text-muted-foreground text-center">Pricing plans coming soon.</p>
                   )}
                 </div>

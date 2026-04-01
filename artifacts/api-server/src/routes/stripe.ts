@@ -1,6 +1,7 @@
 import { Router, type IRouter, type Request, type Response } from 'express';
 import { storage } from '../lib/storage';
 import { stripeService } from '../lib/stripeService';
+import { getUncachableStripeClient } from '../lib/stripeClient';
 
 const router: IRouter = Router();
 
@@ -141,31 +142,57 @@ router.post('/stripe/portal', async (req: Request, res: Response) => {
 
 router.get('/stripe/products', async (_req: Request, res: Response) => {
   try {
-    const rows = await storage.listProductsWithPrices();
+    let rows: any[] = [];
+    try {
+      rows = await storage.listProductsWithPrices();
+    } catch {}
 
-    const productsMap = new Map<string, any>();
-    for (const row of rows) {
-      if (!productsMap.has(row.product_id as string)) {
-        productsMap.set(row.product_id as string, {
-          id: row.product_id,
-          name: row.product_name,
-          description: row.product_description,
-          active: row.product_active,
-          prices: []
-        });
+    if (rows.length > 0) {
+      const productsMap = new Map<string, any>();
+      for (const row of rows) {
+        if (!productsMap.has(row.product_id as string)) {
+          productsMap.set(row.product_id as string, {
+            id: row.product_id,
+            name: row.product_name,
+            description: row.product_description,
+            active: row.product_active,
+            prices: []
+          });
+        }
+        if (row.price_id) {
+          productsMap.get(row.product_id as string).prices.push({
+            id: row.price_id,
+            unit_amount: row.unit_amount,
+            currency: row.currency,
+            recurring: row.recurring,
+            active: row.price_active,
+          });
+        }
       }
-      if (row.price_id) {
-        productsMap.get(row.product_id as string).prices.push({
-          id: row.price_id,
-          unit_amount: row.unit_amount,
-          currency: row.currency,
-          recurring: row.recurring,
-          active: row.price_active,
-        });
-      }
+      res.json({ data: Array.from(productsMap.values()) });
+      return;
     }
 
-    res.json({ data: Array.from(productsMap.values()) });
+    const stripe = await getUncachableStripeClient();
+    const products = await stripe.products.list({ active: true, limit: 10 });
+    const result = [];
+    for (const product of products.data) {
+      const prices = await stripe.prices.list({ product: product.id, active: true, limit: 10 });
+      result.push({
+        id: product.id,
+        name: product.name,
+        description: product.description,
+        active: product.active,
+        prices: prices.data.map((p: any) => ({
+          id: p.id,
+          unit_amount: p.unit_amount,
+          currency: p.currency,
+          recurring: p.recurring,
+          active: p.active,
+        })),
+      });
+    }
+    res.json({ data: result });
   } catch (err: any) {
     res.status(500).json({ error: 'Failed to list products' });
   }
