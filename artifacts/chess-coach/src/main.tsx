@@ -38,9 +38,11 @@ createRoot(document.getElementById("root")!).render(<App />);
 requestAnimationFrame(() => {
   const splash = document.getElementById("splash");
   if (splash) {
+    const isLanding = window.location.pathname.endsWith("/setup") || window.location.pathname.endsWith("/setup/");
+    const delay = isLanding ? 0 : 1200;
     setTimeout(() => {
       splash.classList.add("hide");
       setTimeout(() => splash.remove(), 500);
-    }, 1200);
+    }, delay);
   }
 });

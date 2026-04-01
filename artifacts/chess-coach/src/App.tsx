@@ -54,6 +54,7 @@ class ErrorBoundary extends Component<
 
 // Pages
 import { Setup } from "@/pages/Setup";
+import { LandingPage } from "@/pages/LandingPage";
 import { Dashboard } from "@/pages/Dashboard";
 import { Import } from "@/pages/Import";
 import { Games } from "@/pages/Games";
@@ -148,7 +149,7 @@ function PageTracker() {
 function Router() {
   return (
     <><PageTracker /><Switch>
-      <Route path="/setup" component={Setup} />
+      <Route path="/setup" component={LandingPage} />
 
       {/* Protected Routes — stable named components prevent remounting on every render */}
       <Route path="/"            component={PDashboard} />
