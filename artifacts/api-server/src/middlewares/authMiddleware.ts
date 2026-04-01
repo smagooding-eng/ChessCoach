@@ -82,7 +82,7 @@ export async function requirePremium(
 
     if (user?.stripeCustomerId) {
       const sub = await storage.getSubscriptionByCustomerId(user.stripeCustomerId);
-      if (sub && ["active", "trialing"].includes(sub.status)) {
+      if (sub && ["active", "trialing"].includes(sub.status as string)) {
         next();
         return;
       }

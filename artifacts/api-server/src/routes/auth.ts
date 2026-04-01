@@ -181,7 +181,7 @@ router.get("/auth/google/callback", async (req: Request, res: Response) => {
       return;
     }
 
-    const tokens = await tokenRes.json();
+    const tokens = await tokenRes.json() as any;
 
     const userInfoRes = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
       headers: { Authorization: `Bearer ${tokens.access_token}` },
@@ -192,7 +192,7 @@ router.get("/auth/google/callback", async (req: Request, res: Response) => {
       return;
     }
 
-    const profile = await userInfoRes.json();
+    const profile = await userInfoRes.json() as any;
 
     let [user] = await db
       .select()

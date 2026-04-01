@@ -43,7 +43,7 @@ router.get('/stripe/subscription', async (req: Request, res: Response) => {
 
     if (user?.stripeCustomerId) {
       const subscription = await storage.getSubscriptionByCustomerId(user.stripeCustomerId);
-      if (subscription && ['active', 'trialing'].includes(subscription.status)) {
+      if (subscription && ['active', 'trialing'].includes(subscription.status as string)) {
         res.json({ subscription, status: subscription.status });
         return;
       }
