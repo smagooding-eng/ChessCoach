@@ -54,8 +54,23 @@ router.get("/admin/stats", requireAdmin, async (_req: Request, res: Response) =>
   }
 });
 
-router.post("/admin/pageview", requireAdmin, async (req: Request, res: Response) => {
-  res.status(405).json({ error: "Use GET /api/track endpoint" });
+router.get("/admin/users", requireAdmin, async (_req: Request, res: Response) => {
+  try {
+    const users = await db
+      .select({
+        id: usersTable.id,
+        email: usersTable.email,
+        chesscomUsername: usersTable.chesscomUsername,
+        firstName: usersTable.firstName,
+        createdAt: usersTable.createdAt,
+      })
+      .from(usersTable)
+      .orderBy(sql`${usersTable.createdAt} DESC`);
+
+    res.json({ users });
+  } catch {
+    res.status(500).json({ error: "Failed to fetch users" });
+  }
 });
 
 export default router;

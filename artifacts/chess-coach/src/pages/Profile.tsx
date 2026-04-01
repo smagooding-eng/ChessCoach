@@ -5,7 +5,7 @@ import { useMyAnalysisSummary } from '@/hooks/use-analysis';
 import { useMyGames } from '@/hooks/use-games';
 import { useMyCourses } from '@/hooks/use-courses';
 import { Link, useLocation } from 'wouter';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   User, Mail, Crown, LogOut, ChevronRight, Trophy, Swords, Target,
   GraduationCap, Settings, Shield, Edit3, Check, X, Eye, Users, CreditCard,
@@ -18,8 +18,71 @@ interface AdminStats {
   subscriptions: { active: number };
 }
 
+interface AdminUser {
+  id: string;
+  email: string | null;
+  chesscomUsername: string | null;
+  firstName: string | null;
+  createdAt: string;
+}
+
+function UserListPanel({ onClose }: { onClose: () => void }) {
+  const [users, setUsers] = useState<AdminUser[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch('/api/admin/users', { credentials: 'include' })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.users) setUsers(d.users); })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, height: 0 }}
+      animate={{ opacity: 1, height: 'auto' }}
+      exit={{ opacity: 0, height: 0 }}
+      className="border-t border-amber-500/15 overflow-hidden"
+    >
+      <div className="px-4 py-3 flex items-center justify-between bg-amber-500/5">
+        <span className="text-xs font-bold text-amber-400">Registered Users</span>
+        <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors">
+          <X className="w-3.5 h-3.5" />
+        </button>
+      </div>
+      <div className="max-h-64 overflow-y-auto">
+        {loading ? (
+          <p className="text-xs text-muted-foreground text-center py-4">Loading...</p>
+        ) : users.length === 0 ? (
+          <p className="text-xs text-muted-foreground text-center py-4">No users found</p>
+        ) : (
+          <div className="divide-y divide-border/20">
+            {users.map(u => (
+              <div key={u.id} className="px-4 py-2.5 flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-foreground truncate">
+                    {u.email || (u.chesscomUsername ? `♟ ${u.chesscomUsername}` : u.firstName || 'Unknown')}
+                  </p>
+                  {u.email && u.chesscomUsername && (
+                    <p className="text-[11px] text-muted-foreground/60 truncate">♟ {u.chesscomUsername}</p>
+                  )}
+                </div>
+                <span className="text-[10px] text-muted-foreground/50 whitespace-nowrap shrink-0">
+                  {new Date(u.createdAt).toLocaleDateString()}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </motion.div>
+  );
+}
+
 function AdminTicker() {
   const [stats, setStats] = useState<AdminStats | null>(null);
+  const [showUsers, setShowUsers] = useState(false);
 
   useEffect(() => {
     const fetchStats = () => {
@@ -35,12 +98,6 @@ function AdminTicker() {
 
   if (!stats) return null;
 
-  const items = [
-    { icon: Eye, label: 'Page Views', value: stats.pageViews.total, sub: `${stats.pageViews.today} today`, color: 'text-blue-400', bg: 'bg-blue-400/10' },
-    { icon: Users, label: 'Users', value: stats.users.total, sub: `${stats.users.today} today`, color: 'text-emerald-400', bg: 'bg-emerald-400/10' },
-    { icon: CreditCard, label: 'Subscriptions', value: stats.subscriptions.active, sub: 'active', color: 'text-primary', bg: 'bg-primary/10' },
-  ];
-
   return (
     <motion.div
       variants={{ hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0 } }}
@@ -53,17 +110,37 @@ function AdminTicker() {
         </h2>
       </div>
       <div className="grid grid-cols-3 divide-x divide-border/30">
-        {items.map(item => (
-          <div key={item.label} className="p-4 text-center">
-            <div className={`w-8 h-8 ${item.bg} rounded-lg flex items-center justify-center mx-auto mb-2`}>
-              <item.icon className={`w-4 h-4 ${item.color}`} />
-            </div>
-            <p className="text-xl font-black text-foreground">{item.value.toLocaleString()}</p>
-            <p className="text-xs text-muted-foreground font-medium">{item.label}</p>
-            <p className="text-[10px] text-muted-foreground/60 mt-0.5">{item.sub}</p>
+        <div className="p-4 text-center">
+          <div className="w-8 h-8 bg-blue-400/10 rounded-lg flex items-center justify-center mx-auto mb-2">
+            <Eye className="w-4 h-4 text-blue-400" />
           </div>
-        ))}
+          <p className="text-xl font-black text-foreground">{stats.pageViews.total.toLocaleString()}</p>
+          <p className="text-xs text-muted-foreground font-medium">Page Views</p>
+          <p className="text-[10px] text-muted-foreground/60 mt-0.5">{stats.pageViews.today} today</p>
+        </div>
+        <button
+          onClick={() => setShowUsers(v => !v)}
+          className="p-4 text-center hover:bg-emerald-400/5 transition-colors cursor-pointer"
+        >
+          <div className="w-8 h-8 bg-emerald-400/10 rounded-lg flex items-center justify-center mx-auto mb-2">
+            <Users className="w-4 h-4 text-emerald-400" />
+          </div>
+          <p className="text-xl font-black text-foreground">{stats.users.total.toLocaleString()}</p>
+          <p className="text-xs text-emerald-400 font-medium underline decoration-dotted underline-offset-2">Users</p>
+          <p className="text-[10px] text-muted-foreground/60 mt-0.5">{stats.users.today} today</p>
+        </button>
+        <div className="p-4 text-center">
+          <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center mx-auto mb-2">
+            <CreditCard className="w-4 h-4 text-primary" />
+          </div>
+          <p className="text-xl font-black text-foreground">{stats.subscriptions.active.toLocaleString()}</p>
+          <p className="text-xs text-muted-foreground font-medium">Subscriptions</p>
+          <p className="text-[10px] text-muted-foreground/60 mt-0.5">active</p>
+        </div>
       </div>
+      <AnimatePresence>
+        {showUsers && <UserListPanel onClose={() => setShowUsers(false)} />}
+      </AnimatePresence>
     </motion.div>
   );
 }
