@@ -82,8 +82,15 @@ router.post('/stripe/checkout', async (req: Request, res: Response) => {
   }
 
   try {
-    const price = await storage.getPrice(priceId);
-    if (!price || !price.active) {
+    let priceValid = false;
+    try {
+      const price = await storage.getPrice(priceId);
+      priceValid = !!(price && price.active);
+    } catch {
+      priceValid = priceId.startsWith('price_');
+    }
+
+    if (!priceValid) {
       res.status(400).json({ error: 'Invalid or inactive price' });
       return;
     }
@@ -100,12 +107,14 @@ router.post('/stripe/checkout', async (req: Request, res: Response) => {
       customerId = customer.id;
     }
 
-    const origin = getOrigin(req);
+    const frontendUrl = process.env.CORS_ORIGIN;
+    const origin = frontendUrl || getOrigin(req);
+    const basePath = frontendUrl ? '' : '/chess-coach';
     const session = await stripeService.createCheckoutSession(
       customerId,
       priceId,
-      `${origin}/chess-coach/subscription?success=true`,
-      `${origin}/chess-coach/subscription?canceled=true`,
+      `${origin}${basePath}/subscription?success=true`,
+      `${origin}${basePath}/subscription?canceled=true`,
     );
 
     res.json({ url: session.url });
@@ -128,10 +137,12 @@ router.post('/stripe/portal', async (req: Request, res: Response) => {
       return;
     }
 
-    const origin = getOrigin(req);
+    const frontendUrl = process.env.CORS_ORIGIN;
+    const origin = frontendUrl || getOrigin(req);
+    const basePath = frontendUrl ? '' : '/chess-coach';
     const session = await stripeService.createCustomerPortalSession(
       user.stripeCustomerId,
-      `${origin}/chess-coach/subscription`,
+      `${origin}${basePath}/subscription`,
     );
 
     res.json({ url: session.url });

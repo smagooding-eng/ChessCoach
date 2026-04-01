@@ -16,25 +16,32 @@ async function getCredentials() {
 
   const connectorName = 'stripe';
   const isProduction = process.env.REPLIT_DEPLOYMENT === '1';
-  const targetEnvironment = isProduction ? 'production' : 'development';
+  const environments = isProduction ? ['production', 'development'] : ['development'];
 
-  const url = new URL(`https://${hostname}/api/v2/connection`);
-  url.searchParams.set('include_secrets', 'true');
-  url.searchParams.set('connector_names', connectorName);
-  url.searchParams.set('environment', targetEnvironment);
+  for (const targetEnvironment of environments) {
+    const url = new URL(`https://${hostname}/api/v2/connection`);
+    url.searchParams.set('include_secrets', 'true');
+    url.searchParams.set('connector_names', connectorName);
+    url.searchParams.set('environment', targetEnvironment);
 
-  const response = await fetch(url.toString(), {
-    headers: {
-      'Accept': 'application/json',
-      'X-Replit-Token': xReplitToken
+    const response = await fetch(url.toString(), {
+      headers: {
+        'Accept': 'application/json',
+        'X-Replit-Token': xReplitToken
+      }
+    });
+
+    const data = await response.json() as any;
+    const conn = data.items?.[0];
+
+    if (conn?.settings?.publishable && conn?.settings?.secret) {
+      connectionSettings = conn;
+      break;
     }
-  });
-
-  const data = await response.json() as any;
-  connectionSettings = data.items?.[0];
+  }
 
   if (!connectionSettings || (!connectionSettings.settings.publishable || !connectionSettings.settings.secret)) {
-    throw new Error(`Stripe ${targetEnvironment} connection not found`);
+    throw new Error('Stripe connection not found');
   }
 
   return {
