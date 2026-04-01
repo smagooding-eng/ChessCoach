@@ -30,4 +30,9 @@ integrations = ["stripe:1.0.0"]
 
   [nix]
   channel = "stable-25_05"
+
+[userenv]
+
+[userenv.shared]
+CORS_ORIGIN = "https://chessscout.net"
   

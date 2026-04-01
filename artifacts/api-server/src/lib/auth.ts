@@ -68,7 +68,11 @@ export async function clearSession(
   sid?: string,
 ): Promise<void> {
   if (sid) await deleteSession(sid);
-  res.clearCookie(SESSION_COOKIE, { path: "/" });
+  res.clearCookie(SESSION_COOKIE, {
+    path: "/",
+    secure: isCrossOrigin ? true : isSecure,
+    sameSite: isCrossOrigin ? "none" : "lax",
+  });
 }
 
 export function getSessionId(req: Request): string | undefined {
@@ -81,11 +85,13 @@ export function getSessionId(req: Request): string | undefined {
 
 const isSecure = process.env.NODE_ENV !== "development" || !!process.env.REPLIT_DEPLOYMENT;
 
+const isCrossOrigin = !!process.env.CORS_ORIGIN;
+
 export function setSessionCookie(res: Response, sid: string) {
   res.cookie(SESSION_COOKIE, sid, {
     httpOnly: true,
-    secure: isSecure,
-    sameSite: "lax",
+    secure: isCrossOrigin ? true : isSecure,
+    sameSite: isCrossOrigin ? "none" : "lax",
     path: "/",
     maxAge: SESSION_TTL,
   });

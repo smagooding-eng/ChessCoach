@@ -12,6 +12,8 @@ import {
   type SessionUser,
 } from "../lib/auth";
 
+const FRONTEND_URL = process.env.CORS_ORIGIN || "";
+
 const router: IRouter = Router();
 
 function getOrigin(req: Request): string {
@@ -131,7 +133,7 @@ router.get("/auth/google/status", (_req: Request, res: Response) => {
 router.get("/auth/google", (req: Request, res: Response) => {
   const clientId = process.env.GOOGLE_CLIENT_ID;
   if (!clientId) {
-    res.redirect("/setup?error=google_not_configured");
+    res.redirect(FRONTEND_URL + "/setup?error=google_not_configured");
     return;
   }
 
@@ -156,7 +158,7 @@ router.get("/auth/google/callback", async (req: Request, res: Response) => {
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
 
   if (!code || !clientId || !clientSecret) {
-    res.redirect("/?error=google_auth_failed");
+    res.redirect(FRONTEND_URL + "/?error=google_auth_failed");
     return;
   }
 
@@ -177,7 +179,7 @@ router.get("/auth/google/callback", async (req: Request, res: Response) => {
     });
 
     if (!tokenRes.ok) {
-      res.redirect("/?error=google_auth_failed");
+      res.redirect(FRONTEND_URL + "/?error=google_auth_failed");
       return;
     }
 
@@ -188,7 +190,7 @@ router.get("/auth/google/callback", async (req: Request, res: Response) => {
     });
 
     if (!userInfoRes.ok) {
-      res.redirect("/?error=google_auth_failed");
+      res.redirect(FRONTEND_URL + "/?error=google_auth_failed");
       return;
     }
 
@@ -235,10 +237,10 @@ router.get("/auth/google/callback", async (req: Request, res: Response) => {
     const sid = await createSession(sessionData);
     setSessionCookie(res, sid);
 
-    res.redirect("/");
+    res.redirect(FRONTEND_URL + "/");
   } catch (err: any) {
     req.log?.error?.({ err }, "Google callback error");
-    res.redirect("/?error=google_auth_failed");
+    res.redirect(FRONTEND_URL + "/?error=google_auth_failed");
   }
 });
 
@@ -283,7 +285,7 @@ router.post("/auth/update-profile", async (req: Request, res: Response) => {
 router.get("/logout", async (req: Request, res: Response) => {
   const sid = getSessionId(req);
   await clearSession(res, sid);
-  res.redirect("/");
+  res.redirect(FRONTEND_URL + "/");
 });
 
 router.post("/auth/logout", async (req: Request, res: Response) => {
