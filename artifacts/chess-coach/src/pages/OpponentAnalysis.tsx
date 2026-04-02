@@ -85,8 +85,77 @@ export function OpponentAnalysis() {
   const [courseGenError, setCourseGenError] = useState<string | null>(null);
   const courseIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  const pollScoutJob = (jobId: string) => {
+    return new Promise<OpponentResult>((resolve, reject) => {
+      intervalRef.current = setInterval(async () => {
+        if (!mountedRef.current) {
+          if (intervalRef.current) clearInterval(intervalRef.current);
+          reject(new Error('unmounted'));
+          return;
+        }
+        try {
+          const pollRes = await apiFetch(`/api/opponents/status/${jobId}`, { cache: 'no-store' });
+          if (pollRes.status === 304) return;
+          if (!pollRes.ok) {
+            if (intervalRef.current) clearInterval(intervalRef.current);
+            reject(new Error(`Poll error (${pollRes.status})`));
+            return;
+          }
+          const job = await pollRes.json() as { status: string; result?: OpponentResult; error?: string };
+          if (job.status === 'done') {
+            if (intervalRef.current) clearInterval(intervalRef.current);
+            resolve(job.result!);
+          } else if (job.status === 'error') {
+            if (intervalRef.current) clearInterval(intervalRef.current);
+            reject(new Error(job.error || 'Analysis failed. Please try again.'));
+          }
+        } catch (err) {
+          if (intervalRef.current) clearInterval(intervalRef.current);
+          reject(err);
+        }
+      }, 3000);
+    });
+  };
+
+  const resumeScoutPolling = async (jobId: string, targetName?: string) => {
+    setLoading(true);
+    setError(null);
+    if (targetName) setInputUsername(targetName);
+    setStatusMsg('Scout in progress… this may take 30–60 seconds');
+    try {
+      const scoutResult = await pollScoutJob(jobId);
+      if (mountedRef.current) {
+        setResult(scoutResult);
+        setStatusMsg('');
+      }
+    } catch (err: unknown) {
+      if (!mountedRef.current) return;
+      const msg = err instanceof Error ? err.message : 'Something went wrong.';
+      if (msg !== 'unmounted') setError(msg);
+    } finally {
+      if (mountedRef.current) {
+        setLoading(false);
+        setStatusMsg('');
+      }
+    }
+  };
+
   useEffect(() => {
     mountedRef.current = true;
+
+    apiFetch('/api/opponents/active-job', { cache: 'no-store' })
+      .then(r => r.ok ? r.json() : { job: null })
+      .then((data: { job?: { id: string; status: string; targetUsername?: string; result?: OpponentResult; error?: string } | null }) => {
+        if (!mountedRef.current || !data.job) return;
+        if (data.job.status === 'pending') {
+          resumeScoutPolling(data.job.id, data.job.targetUsername);
+        } else if (data.job.status === 'done' && data.job.result) {
+          setResult(data.job.result as OpponentResult);
+          if (data.job.targetUsername) setInputUsername(data.job.targetUsername);
+        }
+      })
+      .catch(() => {});
+
     return () => {
       mountedRef.current = false;
       if (intervalRef.current) clearInterval(intervalRef.current);
@@ -122,37 +191,11 @@ export function OpponentAnalysis() {
       if (!mountedRef.current) return;
       setStatusMsg('Fetching games & running AI analysis… this may take 30–60 seconds');
 
-      await new Promise<void>((resolve, reject) => {
-        intervalRef.current = setInterval(async () => {
-          if (!mountedRef.current) {
-            if (intervalRef.current) clearInterval(intervalRef.current);
-            resolve();
-            return;
-          }
-          try {
-            const pollRes = await apiFetch(`/api/opponents/status/${jobId}`, { cache: 'no-store' });
-            // 304 means cached "pending" — treat as still in progress
-            if (pollRes.status === 304) return;
-            if (!pollRes.ok) {
-              if (intervalRef.current) clearInterval(intervalRef.current);
-              reject(new Error(`Poll error (${pollRes.status})`));
-              return;
-            }
-            const job = await pollRes.json() as { status: string; result?: OpponentResult; error?: string };
-            if (job.status === 'done') {
-              if (intervalRef.current) clearInterval(intervalRef.current);
-              if (mountedRef.current) { setResult(job.result!); setStatusMsg(''); }
-              resolve();
-            } else if (job.status === 'error') {
-              if (intervalRef.current) clearInterval(intervalRef.current);
-              reject(new Error(job.error || 'Analysis failed. Please try again.'));
-            }
-          } catch (err) {
-            if (intervalRef.current) clearInterval(intervalRef.current);
-            reject(err);
-          }
-        }, 3000);
-      });
+      const scoutResult = await pollScoutJob(jobId);
+      if (mountedRef.current) {
+        setResult(scoutResult);
+        setStatusMsg('');
+      }
     } catch (err: unknown) {
       if (!mountedRef.current) return;
       setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.');

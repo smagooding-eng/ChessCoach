@@ -1,64 +1,117 @@
 import { Router, type IRouter } from "express";
-import { db, gamesTable, coursesTable, lessonsTable } from "@workspace/db";
-import { sql } from "drizzle-orm";
+import { db, gamesTable, coursesTable, lessonsTable, backgroundJobsTable } from "@workspace/db";
+import { sql, eq, and, desc } from "drizzle-orm";
 import { fetchChessComGames, extractGameMetadata, fetchChessComProfile } from "../lib/chesscom";
 import { analyzePlayerGames, generateExploitCourseForOpponent } from "../lib/openaiAnalysis";
 import { randomUUID } from "crypto";
 
 const router: IRouter = Router();
 
-// In-memory job store — simple and sufficient for this use case
-type JobStatus = "pending" | "done" | "error";
-interface Job {
-  status: JobStatus;
-  result?: Record<string, unknown>;
+type CourseJobStatus = "pending" | "done" | "error";
+interface CourseJob {
+  status: CourseJobStatus;
+  coursesCreated?: number;
   error?: string;
   createdAt: number;
 }
-
-const jobs = new Map<string, Job>();
-
-// Prune jobs older than 10 minutes every 5 minutes
+const courseJobs = new Map<string, CourseJob>();
 setInterval(() => {
   const cutoff = Date.now() - 10 * 60 * 1000;
-  for (const [id, job] of jobs) {
-    if (job.createdAt < cutoff) jobs.delete(id);
-  }
+  for (const [id, job] of courseJobs) if (job.createdAt < cutoff) courseJobs.delete(id);
 }, 5 * 60 * 1000);
 
-// POST /api/opponents/start — kick off analysis, return jobId immediately
 router.post("/opponents/start", async (req, res): Promise<void> => {
   const { username } = req.body as { username?: string };
   const requestingUser = (req.headers["x-chess-username"] as string | undefined)?.toLowerCase() || null;
+  const userId = req.user?.id;
 
   if (!username || typeof username !== "string" || !username.trim()) {
     res.status(400).json({ error: "username is required" });
     return;
   }
 
-  const target = username.trim().toLowerCase();
-  const jobId = randomUUID();
+  if (!userId) {
+    res.status(401).json({ error: "Authentication required" });
+    return;
+  }
 
-  jobs.set(jobId, { status: "pending", createdAt: Date.now() });
+  const target = username.trim().toLowerCase();
+
+  const [pending] = await db.select().from(backgroundJobsTable).where(
+    and(
+      eq(backgroundJobsTable.userId, userId),
+      eq(backgroundJobsTable.type, "scout"),
+      eq(backgroundJobsTable.status, "pending"),
+    )
+  );
+
+  if (pending) {
+    res.json({ jobId: pending.id });
+    return;
+  }
+
+  const jobId = randomUUID();
+  await db.insert(backgroundJobsTable).values({
+    id: jobId,
+    userId,
+    type: "scout",
+    status: "pending",
+    targetUsername: target,
+  });
+
   res.json({ jobId });
 
   req.log.info({ target, jobId }, "Analyzing opponent (background)");
 
-  // Run analysis in background — don't await
   runAnalysis(target, requestingUser, jobId, req.log).catch((err) => {
     req.log.error({ err, jobId }, "Background analysis failed");
   });
 });
 
-// GET /api/opponents/status/:jobId — poll for results
-router.get("/opponents/status/:jobId", (req, res): void => {
-  const job = jobs.get(req.params.jobId);
+router.get("/opponents/status/:jobId", async (req, res): Promise<void> => {
+  const [job] = await db.select().from(backgroundJobsTable).where(eq(backgroundJobsTable.id, req.params.jobId));
   if (!job) {
     res.status(404).json({ error: "Job not found or expired" });
     return;
   }
   res.setHeader("Cache-Control", "no-store");
-  res.json(job);
+  res.json({
+    status: job.status,
+    result: job.result,
+    error: job.error,
+  });
+});
+
+router.get("/opponents/active-job", async (req, res): Promise<void> => {
+  const userId = req.user?.id;
+  if (!userId) { res.json({ job: null }); return; }
+
+  const [job] = await db.select().from(backgroundJobsTable).where(
+    and(
+      eq(backgroundJobsTable.userId, userId),
+      eq(backgroundJobsTable.type, "scout"),
+    )
+  ).orderBy(desc(backgroundJobsTable.createdAt)).limit(1);
+
+  if (!job) { res.json({ job: null }); return; }
+
+  const ageMs = Date.now() - job.createdAt.getTime();
+  if ((job.status === "done" || job.status === "error") && ageMs > 5 * 60_000) {
+    res.json({ job: null });
+    return;
+  }
+
+  res.setHeader("Cache-Control", "no-store");
+  res.json({
+    job: {
+      id: job.id,
+      status: job.status,
+      targetUsername: job.targetUsername,
+      result: job.result,
+      error: job.error,
+      createdAt: job.createdAt.toISOString(),
+    },
+  });
 });
 
 async function runAnalysis(
@@ -75,13 +128,13 @@ async function runAnalysis(
 
     if (gamesResult.status === "rejected" || (gamesResult.status === "fulfilled" && gamesResult.value.length === 0)) {
       const noGames = gamesResult.status === "fulfilled" && gamesResult.value.length === 0;
-      jobs.set(jobId, {
+      await db.update(backgroundJobsTable).set({
         status: "error",
         error: noGames
           ? `No recent games found for "${target}".`
           : `Could not fetch games for "${target}". Check the username.`,
-        createdAt: jobs.get(jobId)!.createdAt,
-      });
+        completedAt: new Date(),
+      }).where(eq(backgroundJobsTable.id, jobId));
       return;
     }
 
@@ -105,11 +158,11 @@ async function runAnalysis(
     const analysis = await analyzePlayerGames(target, gameSummaries);
 
     if (!analysis || !Array.isArray(analysis.weaknesses)) {
-      jobs.set(jobId, {
+      await db.update(backgroundJobsTable).set({
         status: "error",
         error: "AI analysis returned an unexpected response. Please try again.",
-        createdAt: jobs.get(jobId)!.createdAt,
-      });
+        completedAt: new Date(),
+      }).where(eq(backgroundJobsTable.id, jobId));
       return;
     }
 
@@ -170,47 +223,34 @@ async function runAnalysis(
       }
     }
 
-    jobs.set(jobId, {
+    const resultData = {
+      username: target,
+      profile,
+      gamesAnalyzed: gameSummaries.length,
+      wins,
+      losses,
+      draws,
+      weaknesses: analysis.weaknesses,
+      topOpenings,
+      headToHead,
+    };
+
+    await db.update(backgroundJobsTable).set({
       status: "done",
-      result: {
-        username: target,
-        profile,
-        gamesAnalyzed: gameSummaries.length,
-        wins,
-        losses,
-        draws,
-        weaknesses: analysis.weaknesses,
-        topOpenings,
-        headToHead,
-      },
-      createdAt: jobs.get(jobId)!.createdAt,
-    });
+      result: resultData as unknown as Record<string, unknown>,
+      completedAt: new Date(),
+    }).where(eq(backgroundJobsTable.id, jobId));
 
     log.info({ jobId, target }, "Opponent analysis complete");
   } catch (err) {
     log.error({ err, jobId }, "Opponent analysis error");
-    jobs.set(jobId, {
+    await db.update(backgroundJobsTable).set({
       status: "error",
       error: "Analysis failed. Please try again in a moment.",
-      createdAt: jobs.get(jobId)!.createdAt,
-    });
+      completedAt: new Date(),
+    }).where(eq(backgroundJobsTable.id, jobId));
   }
 }
-
-// ── Opponent-based course generation ─────────────────────────────────────────
-
-type CourseJobStatus = "pending" | "done" | "error";
-interface CourseJob {
-  status: CourseJobStatus;
-  coursesCreated?: number;
-  error?: string;
-  createdAt: number;
-}
-const courseJobs = new Map<string, CourseJob>();
-setInterval(() => {
-  const cutoff = Date.now() - 10 * 60 * 1000;
-  for (const [id, job] of courseJobs) if (job.createdAt < cutoff) courseJobs.delete(id);
-}, 5 * 60 * 1000);
 
 interface OpponentWeakness {
   category: string;
@@ -220,7 +260,6 @@ interface OpponentWeakness {
   examples: string[];
 }
 
-// POST /api/opponents/generate-courses — generate exploit courses for a user
 router.post("/opponents/generate-courses", async (req, res): Promise<void> => {
   const { opponentUsername, weaknesses, requestingUser } = req.body as {
     opponentUsername?: string;
@@ -244,7 +283,6 @@ router.post("/opponents/generate-courses", async (req, res): Promise<void> => {
   });
 });
 
-// GET /api/opponents/courses-job/:jobId — poll for course generation status
 router.get("/opponents/courses-job/:jobId", (req, res): void => {
   const job = courseJobs.get(req.params.jobId);
   if (!job) {
@@ -263,7 +301,6 @@ async function runCourseGeneration(
   log: import("pino").Logger,
 ): Promise<void> {
   let coursesCreated = 0;
-  // Take top 3 weaknesses by severity order
   const prioritized = [...weaknesses].sort((a, b) => {
     const order = { Critical: 0, High: 1, Medium: 2, Low: 3 };
     return (order[a.severity as keyof typeof order] ?? 4) - (order[b.severity as keyof typeof order] ?? 4);

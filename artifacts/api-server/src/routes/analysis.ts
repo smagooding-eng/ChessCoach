@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, gamesTable, weaknessesTable, coursesTable } from "@workspace/db";
+import { db, gamesTable, weaknessesTable, coursesTable, backgroundJobsTable } from "@workspace/db";
 import { eq, desc, and, inArray } from "drizzle-orm";
 import {
   AnalyzeGamesBody,
@@ -15,22 +15,6 @@ import type { Logger } from "pino";
 
 const router: IRouter = Router();
 
-// In-memory job store for long-running analysis
-type AnalysisJobStatus = "pending" | "done" | "error";
-interface AnalysisJob {
-  status: AnalysisJobStatus;
-  error?: string;
-  createdAt: number;
-}
-const analysisJobs = new Map<string, AnalysisJob>();
-
-setInterval(() => {
-  const cutoff = Date.now() - 10 * 60 * 1000;
-  for (const [id, job] of analysisJobs) {
-    if (job.createdAt < cutoff) analysisJobs.delete(id);
-  }
-}, 5 * 60 * 1000);
-
 async function runAnalysisJob(username: string, jobId: string, log: Logger): Promise<void> {
   try {
     const games = await db
@@ -41,7 +25,11 @@ async function runAnalysisJob(username: string, jobId: string, log: Logger): Pro
       .limit(50);
 
     if (games.length === 0) {
-      analysisJobs.set(jobId, { status: "error", error: "No games found. Import games first.", createdAt: Date.now() });
+      await db.update(backgroundJobsTable).set({
+        status: "error",
+        error: "No games found. Import games first.",
+        completedAt: new Date(),
+      }).where(eq(backgroundJobsTable.id, jobId));
       return;
     }
 
@@ -84,15 +72,21 @@ async function runAnalysisJob(username: string, jobId: string, log: Logger): Pro
       .where(eq(gamesTable.username, username.toLowerCase()));
 
     log.info({ jobId, username }, "Analysis job complete");
-    analysisJobs.set(jobId, { status: "done", createdAt: Date.now() });
+    await db.update(backgroundJobsTable).set({
+      status: "done",
+      completedAt: new Date(),
+    }).where(eq(backgroundJobsTable.id, jobId));
   } catch (err) {
     log.error({ err, jobId }, "Analysis job failed");
     const msg = err instanceof Error ? err.message : "Analysis failed";
-    analysisJobs.set(jobId, { status: "error", error: msg, createdAt: Date.now() });
+    await db.update(backgroundJobsTable).set({
+      status: "error",
+      error: msg,
+      completedAt: new Date(),
+    }).where(eq(backgroundJobsTable.id, jobId));
   }
 }
 
-// POST /api/analysis/start — kick off analysis, return jobId immediately
 router.post("/analysis/start", async (req, res): Promise<void> => {
   const parsed = AnalyzeGamesBody.safeParse(req.body);
   if (!parsed.success) {
@@ -100,21 +94,73 @@ router.post("/analysis/start", async (req, res): Promise<void> => {
     return;
   }
   const { username } = parsed.data;
+  const userId = req.user?.id;
+
+  if (!userId) {
+    res.status(401).json({ error: "Authentication required" });
+    return;
+  }
+
+  const [pending] = await db.select().from(backgroundJobsTable).where(
+    and(
+      eq(backgroundJobsTable.userId, userId),
+      eq(backgroundJobsTable.type, "analysis"),
+      eq(backgroundJobsTable.status, "pending"),
+    )
+  );
+
+  if (pending) {
+    res.json({ jobId: pending.id });
+    return;
+  }
+
   const jobId = randomUUID();
-  analysisJobs.set(jobId, { status: "pending", createdAt: Date.now() });
+  await db.insert(backgroundJobsTable).values({
+    id: jobId,
+    userId,
+    type: "analysis",
+    status: "pending",
+    targetUsername: username.toLowerCase(),
+  });
+
   res.json({ jobId });
   runAnalysisJob(username.toLowerCase(), jobId, req.log).catch(() => {});
 });
 
-// GET /api/analysis/status/:jobId — poll for result
-router.get("/analysis/status/:jobId", (req, res): void => {
-  const job = analysisJobs.get(req.params.jobId as string);
+router.get("/analysis/status/:jobId", async (req, res): Promise<void> => {
+  const [job] = await db.select().from(backgroundJobsTable).where(eq(backgroundJobsTable.id, req.params.jobId as string));
   if (!job) { res.status(404).json({ error: "Job not found" }); return; }
   res.setHeader("Cache-Control", "no-store");
   res.json({ status: job.status, error: job.error });
 });
 
-// POST /api/analysis/analyze — kept for backward compat (blocking, avoid in production)
+router.get("/analysis/active-job", async (req, res): Promise<void> => {
+  const userId = req.user?.id;
+  if (!userId) { res.json({ job: null }); return; }
+
+  const [job] = await db.select().from(backgroundJobsTable).where(
+    and(
+      eq(backgroundJobsTable.userId, userId),
+      eq(backgroundJobsTable.type, "analysis"),
+    )
+  ).orderBy(desc(backgroundJobsTable.createdAt)).limit(1);
+
+  if (!job) { res.json({ job: null }); return; }
+
+  const ageMs = Date.now() - job.createdAt.getTime();
+  if (job.status === "done" && ageMs > 60_000) {
+    res.json({ job: null });
+    return;
+  }
+  if (job.status === "error" && ageMs > 60_000) {
+    res.json({ job: null });
+    return;
+  }
+
+  res.setHeader("Cache-Control", "no-store");
+  res.json({ job: { id: job.id, status: job.status, error: job.error, createdAt: job.createdAt.toISOString() } });
+});
+
 router.post("/analysis/analyze", async (req, res): Promise<void> => {
   const parsed = AnalyzeGamesBody.safeParse(req.body);
   if (!parsed.success) {
@@ -289,7 +335,6 @@ router.get("/analysis/summary", async (req, res): Promise<void> => {
   );
 });
 
-// GET /api/analysis/weaknesses/:id — weakness detail with related games + courses
 router.get("/analysis/weaknesses/:id", async (req, res): Promise<void> => {
   const id = parseInt(req.params.id as string);
   if (isNaN(id)) {
@@ -307,7 +352,6 @@ router.get("/analysis/weaknesses/:id", async (req, res): Promise<void> => {
     return;
   }
 
-  // Prefer AI-selected specific game IDs; fall back to recent games
   const gameSelectFields = {
     id: gamesTable.id,
     whiteUsername: gamesTable.whiteUsername,
@@ -336,7 +380,6 @@ router.get("/analysis/weaknesses/:id", async (req, res): Promise<void> => {
       .limit(8);
   }
 
-  // Extract a representative mid-game FEN from each related game
   function extractMidGameFen(pgn: string | null): string | null {
     if (!pgn) return null;
     try {
@@ -364,8 +407,6 @@ router.get("/analysis/weaknesses/:id", async (req, res): Promise<void> => {
       )
     );
 
-  // Resolve "Game N" ordinal references in AI-generated examples to actual game IDs.
-  // The analysis uses orderBy(desc(playedAt)).limit(50), so Game 1 = most recent.
   const analysisGames = await db
     .select({ id: gamesTable.id })
     .from(gamesTable)
@@ -378,7 +419,6 @@ router.get("/analysis/weaknesses/:id", async (req, res): Promise<void> => {
 
   function extractGameIdsFromText(text: string): number[] {
     const ids: number[] = [];
-    // Matches: "Game 2", "Games 29-30", "Games 6 and 13", etc.
     const re = /[Gg]ames?\s+(\d+)(?:\s*[-–]\s*(\d+))?(?:\s+and\s+(\d+))?/g;
     let m: RegExpExecArray | null;
     while ((m = re.exec(text)) !== null) {

@@ -25,8 +25,75 @@ export function Analysis() {
   const mountedRef = useRef(true);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  const pollJob = (jobId: string) => {
+    return new Promise<void>((resolve, reject) => {
+      intervalRef.current = setInterval(async () => {
+        if (!mountedRef.current) {
+          if (intervalRef.current) clearInterval(intervalRef.current);
+          resolve();
+          return;
+        }
+        try {
+          const pollRes = await apiFetch(`/api/analysis/status/${jobId}`, { cache: 'no-store' });
+          if (pollRes.status === 304) return;
+          if (!pollRes.ok) {
+            if (intervalRef.current) clearInterval(intervalRef.current);
+            reject(new Error(`Poll error (${pollRes.status})`));
+            return;
+          }
+          const job = await pollRes.json() as { status: string; error?: string };
+          if (job.status === 'done') {
+            if (intervalRef.current) clearInterval(intervalRef.current);
+            resolve();
+          } else if (job.status === 'error') {
+            if (intervalRef.current) clearInterval(intervalRef.current);
+            reject(new Error(job.error || 'Analysis failed. Please try again.'));
+          }
+        } catch (err) {
+          if (intervalRef.current) clearInterval(intervalRef.current);
+          reject(err);
+        }
+      }, 3000);
+    });
+  };
+
+  const resumePolling = async (jobId: string) => {
+    setIsAnalyzing(true);
+    setAnalyzeError(null);
+    setStatusMsg('Analysis in progress… this may take 30–60 seconds');
+    try {
+      await pollJob(jobId);
+      if (!mountedRef.current) return;
+      await queryClient.invalidateQueries({ queryKey: ['/api/analysis/weaknesses'] });
+      await queryClient.invalidateQueries({ queryKey: ['/api/analysis/summary'] });
+      setStatusMsg('');
+    } catch (err: unknown) {
+      if (!mountedRef.current) return;
+      setAnalyzeError(err instanceof Error ? err.message : 'Something went wrong.');
+    } finally {
+      if (mountedRef.current) {
+        setIsAnalyzing(false);
+        setStatusMsg('');
+      }
+    }
+  };
+
   useEffect(() => {
     mountedRef.current = true;
+
+    apiFetch('/api/analysis/active-job', { cache: 'no-store' })
+      .then(r => r.ok ? r.json() : { job: null })
+      .then((data: { job?: { id: string; status: string; error?: string } | null }) => {
+        if (!mountedRef.current || !data.job) return;
+        if (data.job.status === 'pending') {
+          resumePolling(data.job.id);
+        } else if (data.job.status === 'done') {
+          queryClient.invalidateQueries({ queryKey: ['/api/analysis/weaknesses'] });
+          queryClient.invalidateQueries({ queryKey: ['/api/analysis/summary'] });
+        }
+      })
+      .catch(() => {});
+
     return () => {
       mountedRef.current = false;
       if (intervalRef.current) clearInterval(intervalRef.current);
@@ -55,36 +122,7 @@ export function Analysis() {
       if (!mountedRef.current) return;
       setStatusMsg('Analyzing your games with AI… this may take 30–60 seconds');
 
-      await new Promise<void>((resolve, reject) => {
-        intervalRef.current = setInterval(async () => {
-          if (!mountedRef.current) {
-            if (intervalRef.current) clearInterval(intervalRef.current);
-            resolve();
-            return;
-          }
-          try {
-            const pollRes = await apiFetch(`/api/analysis/status/${jobId}`, { cache: 'no-store' });
-            // 304 means cached "pending" — treat as still in progress
-            if (pollRes.status === 304) return;
-            if (!pollRes.ok) {
-              if (intervalRef.current) clearInterval(intervalRef.current);
-              reject(new Error(`Poll error (${pollRes.status})`));
-              return;
-            }
-            const job = await pollRes.json() as { status: string; error?: string };
-            if (job.status === 'done') {
-              if (intervalRef.current) clearInterval(intervalRef.current);
-              resolve();
-            } else if (job.status === 'error') {
-              if (intervalRef.current) clearInterval(intervalRef.current);
-              reject(new Error(job.error || 'Analysis failed. Please try again.'));
-            }
-          } catch (err) {
-            if (intervalRef.current) clearInterval(intervalRef.current);
-            reject(err);
-          }
-        }, 3000);
-      });
+      await pollJob(jobId);
 
       if (!mountedRef.current) return;
       await queryClient.invalidateQueries({ queryKey: ['/api/analysis/weaknesses'] });
