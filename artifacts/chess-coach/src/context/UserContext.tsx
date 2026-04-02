@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { apiFetch } from '@/lib/api';
+import { apiFetch, setAuthToken, getAuthToken } from '@/lib/api';
 
 interface AuthUser {
   id: string;
@@ -63,6 +63,15 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
   const refreshAuth = useCallback(async () => {
     try {
+      if (typeof window !== 'undefined' && window.location.hash) {
+        const hashParams = new URLSearchParams(window.location.hash.slice(1));
+        const hashToken = hashParams.get('token');
+        if (hashToken) {
+          setAuthToken(hashToken);
+          window.history.replaceState(null, '', window.location.pathname + window.location.search);
+        }
+      }
+
       const res = await apiFetch('/api/auth/user', { credentials: 'include' });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json() as { user: AuthUser | null };
@@ -118,6 +127,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     try {
       await apiFetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
     } catch {}
+    setAuthToken(null);
     localStorage.removeItem('chessCoachUsername');
     setUsername(null);
     setAuthUser(null);

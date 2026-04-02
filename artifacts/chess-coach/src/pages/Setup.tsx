@@ -3,7 +3,7 @@ import { useUser } from '@/hooks/use-user';
 import { useLocation } from 'wouter';
 import { ArrowRight, Trophy, Mail, Eye, EyeOff, UserPlus, LogIn } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { apiFetch, apiUrl } from '@/lib/api';
+import { apiFetch, apiUrl, setAuthToken } from '@/lib/api';
 
 export function Setup() {
   const [mode, setMode] = useState<'login' | 'register'>('login');
@@ -77,6 +77,8 @@ export function Setup() {
         setError(data.error || 'Something went wrong');
         return;
       }
+
+      if (data.token) setAuthToken(data.token);
 
       if (data.user?.chesscomUsername) {
         login(data.user.chesscomUsername);

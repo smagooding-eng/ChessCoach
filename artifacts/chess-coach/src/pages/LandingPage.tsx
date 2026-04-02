@@ -3,7 +3,7 @@ import { useUser } from '@/hooks/use-user';
 import { useLocation } from 'wouter';
 import { ArrowRight, Mail, Eye, EyeOff, UserPlus, LogIn, Search, BarChart3, Brain, TrendingUp, Check, X, ChevronRight, Zap, Target, Shield } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { apiFetch, apiUrl } from '@/lib/api';
+import { apiFetch, apiUrl, setAuthToken } from '@/lib/api';
 
 function AuthModal({ open, onClose, initialMode, externalError }: { open: boolean; onClose: () => void; initialMode: 'login' | 'register'; externalError?: string }) {
   const [mode, setMode] = useState<'login' | 'register'>(initialMode);
@@ -48,6 +48,7 @@ function AuthModal({ open, onClose, initialMode, externalError }: { open: boolea
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error || 'Something went wrong'); return; }
+      if (data.token) setAuthToken(data.token);
       if (data.user?.chesscomUsername) login(data.user.chesscomUsername);
       await refreshAuth();
       setLocation('/');

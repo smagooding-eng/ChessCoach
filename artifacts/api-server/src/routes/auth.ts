@@ -83,7 +83,7 @@ router.post("/auth/register", async (req: Request, res: Response) => {
     const sid = await createSession(sessionData);
     setSessionCookie(res, sid);
 
-    res.json({ user: toSessionUser(user) });
+    res.json({ user: toSessionUser(user), token: sid });
   } catch (err: any) {
     req.log?.error?.({ err }, "Registration error");
     res.status(500).json({ error: "Registration failed" });
@@ -119,7 +119,7 @@ router.post("/auth/login", async (req: Request, res: Response) => {
     const sid = await createSession(sessionData);
     setSessionCookie(res, sid);
 
-    res.json({ user: toSessionUser(user) });
+    res.json({ user: toSessionUser(user), token: sid });
   } catch (err: any) {
     req.log?.error?.({ err }, "Login error");
     res.status(500).json({ error: "Login failed" });
@@ -237,7 +237,7 @@ router.get("/auth/google/callback", async (req: Request, res: Response) => {
     const sid = await createSession(sessionData);
     setSessionCookie(res, sid);
 
-    res.redirect(FRONTEND_URL + "/");
+    res.redirect(FRONTEND_URL + "/#token=" + sid);
   } catch (err: any) {
     req.log?.error?.({ err }, "Google callback error");
     res.redirect(FRONTEND_URL + "/?error=google_auth_failed");
