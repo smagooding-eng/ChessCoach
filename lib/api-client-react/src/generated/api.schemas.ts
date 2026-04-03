@@ -171,6 +171,8 @@ export interface Lesson {
   /** @nullable */
   examplePgn?: string | null;
   /** @nullable */
+  fixExamplePgn?: string | null;
+  /** @nullable */
   drillFen?: string | null;
   /** @nullable */
   drillExpectedMove?: string | null;

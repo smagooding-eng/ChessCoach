@@ -24,7 +24,7 @@ export function PremiumGate({ children, feature }: PremiumGateProps) {
         {feature} is a premium feature. Your 3-day free trial is over.
       </p>
       <p className="text-muted-foreground mb-6 max-w-sm text-sm">
-        Subscribe to Chess Coach Pro to continue using all premium features.
+        Subscribe to ChessScout Pro to continue using all premium features.
       </p>
       <Link href="/subscription" className="flex items-center gap-2 btn-primary px-6 py-3">
         <CreditCard className="w-4 h-4" />

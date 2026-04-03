@@ -513,7 +513,7 @@ export function LandingPage() {
       <footer className="border-t border-border/30 py-8">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 text-center">
           <p className="text-xs text-muted-foreground">
-            Chess Coach &middot; Improve your game, one move at a time.
+            ChessScout.net &middot; Improve your game, one move at a time.
           </p>
         </div>
       </footer>

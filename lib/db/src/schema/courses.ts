@@ -22,6 +22,7 @@ export const lessonsTable = pgTable("lessons", {
   orderIndex: integer("order_index").notNull().default(0),
   completed: text("completed").notNull().default("false"),
   examplePgn: text("example_pgn"),
+  fixExamplePgn: text("fix_example_pgn"),
   drillFen: text("drill_fen"),
   drillExpectedMove: text("drill_expected_move"),
   drillHint: text("drill_hint"),

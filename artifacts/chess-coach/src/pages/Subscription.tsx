@@ -120,7 +120,7 @@ export function Subscription() {
           className="mb-6 p-4 rounded-xl bg-green-500/10 border border-green-500/30 text-green-400 text-center"
         >
           <Check className="w-5 h-5 inline-block mr-2" />
-          Welcome to Chess Coach Pro! Your subscription is now active.
+          Welcome to ChessScout Pro! Your subscription is now active.
         </motion.div>
       )}
       {isCanceled && (
@@ -145,7 +145,7 @@ export function Subscription() {
             ? `You have ${subscription.trialDaysLeft} day${subscription.trialDaysLeft === 1 ? '' : 's'} left in your free trial. Subscribe before it ends to keep all premium features.`
             : isPremium
               ? 'You have access to all premium features.'
-              : 'Your free trial has ended. Subscribe to Chess Coach Pro to unlock all premium features.'}
+              : 'Your free trial has ended. Subscribe to ChessScout Pro to unlock all premium features.'}
         </p>
       </div>
 
@@ -168,7 +168,7 @@ export function Subscription() {
                 <Crown className="w-5 h-5 text-primary" />
               </div>
               <div>
-                <h3 className="font-bold text-lg">Chess Coach Pro</h3>
+                <h3 className="font-bold text-lg">ChessScout Pro</h3>
                 <p className="text-sm text-muted-foreground capitalize">
                   Status: <span className="text-primary font-semibold">{subscription.status}</span>
                 </p>

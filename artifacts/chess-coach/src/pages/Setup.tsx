@@ -118,7 +118,7 @@ export function Setup() {
             <Trophy className="w-8 h-8 text-primary" />
           </div>
           <h1 className="text-3xl font-display font-bold text-white">
-            Welcome to <span className="text-gradient">Chess Coach</span>
+            Welcome to <span className="text-gradient">ChessScout.net</span>
           </h1>
           <p className="text-muted-foreground text-sm mt-2">
             {mode === 'login' ? 'Sign in to your account' : 'Create your account'}

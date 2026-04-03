@@ -117,7 +117,7 @@ function splitIntoSteps(content: string): string[] {
 }
 
 // ── Step-by-step lesson content component with TTS ────────────────────────────
-function LessonContentStepper({ content, lessonId }: { content: string; lessonId: number }) {
+function LessonContentStepper({ content, lessonId, onStepChange }: { content: string; lessonId: number; onStepChange?: (stepText: string) => void }) {
   const steps = useMemo(() => splitIntoSteps(content), [content]);
   const [step, setStep] = useState(0);
   const [speaking, setSpeaking] = useState(false);
@@ -132,6 +132,7 @@ function LessonContentStepper({ content, lessonId }: { content: string; lessonId
   useEffect(() => {
     setStep(0);
     stopReading();
+    onStepChange?.(steps[0] ?? '');
   }, [lessonId]);
 
   useEffect(() => {
@@ -190,10 +191,11 @@ function LessonContentStepper({ content, lessonId }: { content: string; lessonId
     const clamped = Math.max(0, Math.min(idx, steps.length - 1));
     stopReading();
     setStep(clamped);
+    onStepChange?.(steps[clamped] ?? '');
     if (autoRead) {
       setTimeout(() => readAloud(steps[clamped]), 80);
     }
-  }, [steps, autoRead, readAloud]);
+  }, [steps, autoRead, readAloud, onStepChange]);
 
   if (steps.length === 0) return null;
 
@@ -301,6 +303,7 @@ export function CourseDetail() {
 
   const [currentIdx, setCurrentIdx] = useState<number>(0);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [showFixLine, setShowFixLine] = useState(false);
 
   const sortedLessons = [...(course?.lessons ?? [])].sort((a, b) => a.orderIndex - b.orderIndex);
   const lesson = sortedLessons[currentIdx];
@@ -506,6 +509,8 @@ export function CourseDetail() {
                       </h4>
                       <LessonBoardPlayer
                         pgn={lesson.examplePgn || lesson.drillFen || 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'}
+                        fixPgn={lesson.fixExamplePgn ?? null}
+                        showFixLine={showFixLine}
                         title={lesson.title}
                         drillFen={lesson.drillFen ?? null}
                         drillExpectedMove={lesson.drillExpectedMove ?? null}
@@ -522,6 +527,7 @@ export function CourseDetail() {
                         key={lesson.id}
                         content={lesson.content}
                         lessonId={lesson.id}
+                        onStepChange={(stepText) => setShowFixLine(/##\s*The Fix/i.test(stepText))}
                       />
                     </div>
                   )}

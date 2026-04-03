@@ -225,7 +225,7 @@ router.get('/stripe/products', async (_req: Request, res: Response) => {
 
     res.json({ data: [{
       id: "prod_UFj7LxDpot4zcN",
-      name: "Chess Coach Pro",
+      name: "ChessScout Pro",
       description: "Premium chess coaching with AI analysis, personalized courses, TTS narration, and opponent scouting",
       active: true,
       prices: [{

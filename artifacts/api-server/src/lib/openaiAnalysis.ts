@@ -581,6 +581,7 @@ interface CourseLesson {
   content: string;
   orderIndex: number;
   examplePgn: string | null;
+  fixExamplePgn?: string | null;
   drillFen?: string | null;
   drillExpectedMove?: string | null;
   drillHint?: string | null;
@@ -594,7 +595,7 @@ interface CourseOutput {
   lessons: CourseLesson[];
 }
 
-function reconstructPgnFromGames(lesson: CourseLesson, gamePgns: string[]): { pgn: string; drillFen?: string } | null {
+function reconstructPgnFromGames(lesson: CourseLesson, gamePgns: string[]): { pgn: string; fixPgn?: string; drillFen?: string } | null {
   const Chess = require("chess.js").Chess;
   if (!lesson.content || !gamePgns.length) return null;
 
@@ -676,16 +677,51 @@ function reconstructPgnFromGames(lesson: CourseLesson, gamePgns: string[]): { pg
           const drillFen = preMistake.fen();
 
           let resolvedDrillFen = drillFen;
+          let fixPgn: string | undefined;
           if (fixSan) {
             try {
               const fixTest = new Chess(drillFen);
-              fixTest.move(fixSan);
+              const fixMove = fixTest.move(fixSan);
+              if (fixMove) {
+                const fixPgnParts: string[] = [];
+                const fixBuilder = new Chess(startFen);
+                for (let j = startIdx; j < i; j++) {
+                  const m = history[j];
+                  const gi = baseColorOffset + j;
+                  const mn = baseMoveNum + Math.floor(gi / 2);
+                  const black = gi % 2 === 1;
+                  try { fixBuilder.move(m.san); } catch { break; }
+                  if (!black) {
+                    fixPgnParts.push(`${mn}. ${m.san} {Leading up to the key moment.}`);
+                  } else if (j === startIdx) {
+                    fixPgnParts.push(`${mn}... ${m.san} {Leading up to the key moment.}`);
+                  } else {
+                    fixPgnParts.push(`${m.san} {Leading up to the key moment.}`);
+                  }
+                }
+                try { fixBuilder.move(fixSan); } catch {}
+                const fixGi = baseColorOffset + i;
+                const fixMn = baseMoveNum + Math.floor(fixGi / 2);
+                const fixBlack = fixGi % 2 === 1;
+                if (!fixBlack) {
+                  fixPgnParts.push(`${fixMn}. ${fixSan} {[FIX] The correct move — this avoids the mistake.}`);
+                } else {
+                  if (fixPgnParts.length === 0) {
+                    fixPgnParts.push(`${fixMn}... ${fixSan} {[FIX] The correct move — this avoids the mistake.}`);
+                  } else {
+                    fixPgnParts.push(`${fixSan} {[FIX] The correct move — this avoids the mistake.}`);
+                  }
+                }
+                if (fixPgnParts.length >= 2) {
+                  fixPgn = `[FEN "${startFen}"]\n\n${fixPgnParts.join(" ")}`;
+                }
+              }
             } catch {
               resolvedDrillFen = drillFen;
             }
           }
 
-          return { pgn: `[FEN "${startFen}"]\n\n${pgnParts.join(" ")}`, drillFen: resolvedDrillFen };
+          return { pgn: `[FEN "${startFen}"]\n\n${pgnParts.join(" ")}`, fixPgn, drillFen: resolvedDrillFen };
         }
       }
     } catch {
@@ -696,7 +732,7 @@ function reconstructPgnFromGames(lesson: CourseLesson, gamePgns: string[]): { pg
   return null;
 }
 
-function validateAndFixPgn(lesson: CourseLesson, gamePgns?: string[]): { pgn: string; drillFen?: string } {
+function validateAndFixPgn(lesson: CourseLesson, gamePgns?: string[]): { pgn: string; fixPgn?: string; drillFen?: string } {
   const Chess = require("chess.js").Chess;
 
   if (gamePgns && gamePgns.length > 0) {
@@ -800,6 +836,7 @@ function ensureAllLessonsHavePgn(course: CourseOutput, gamePgns?: string[]): Cou
       return {
         ...lesson,
         examplePgn: result.pgn,
+        ...(result.fixPgn ? { fixExamplePgn: result.fixPgn } : {}),
         ...(result.drillFen ? { drillFen: result.drillFen } : {}),
       };
     }),
@@ -840,7 +877,9 @@ RULES for each lesson:
 
 4. drillHint: A one-sentence hint guiding the student toward the exploitation.
 
-5. content: 3–5 paragraphs of concrete coaching on HOW to exploit this specific pattern. Reference specific moves from the opponent's actual games. Name the tactical/positional motifs, the move orders that provoke mistakes, and the techniques that punish this weakness.
+5. fixExamplePgn: A SECOND PGN showing the CORRECT exploitation line. Same starting position and context moves as examplePgn, but plays the optimal exploiting move (drillExpectedMove) instead. Then include 3-6 best continuation moves showing the advantage gained. The correct move's comment MUST start with [FIX].
+
+6. content: 3–5 paragraphs of concrete coaching on HOW to exploit this specific pattern. Reference specific moves from the opponent's actual games. Name the tactical/positional motifs, the move orders that provoke mistakes, and the techniques that punish this weakness.
 
 Respond with valid JSON:
 {
@@ -854,6 +893,7 @@ Respond with valid JSON:
       "content": "3-5 paragraphs of exploitation-focused coaching referencing actual game moves...",
       "orderIndex": 0,
       "examplePgn": "1. e4 {Comment on the actual game move} e5 {Comment} ...",
+      "fixExamplePgn": "1. e4 {Comment} e5 {Comment} 2. Nf3 {[FIX] The correct exploitation...} ...",
       "drillFen": "rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2",
       "drillExpectedMove": "Nc6",
       "drillHint": "Find the move that puts maximum pressure on their weak point"
@@ -871,7 +911,7 @@ Respond with valid JSON:
 
     const content = response.choices[0]?.message?.content ?? "{}";
     const parsed = JSON.parse(content) as CourseOutput;
-    return ensureAllLessonsHavePgn(parsed);
+    return ensureAllLessonsHavePgn(parsed, relatedGamePgns);
   } catch (err) {
     logger.error({ err }, "Failed to generate exploit course with OpenAI");
     throw err;
@@ -918,7 +958,14 @@ RULES for each lesson:
 
 4. drillHint: A one-sentence hint the player can reveal if stuck (e.g. "Look for a way to attack the f7 square").
 
-5. content: MUST follow this exact structure with these markdown headings:
+5. fixExamplePgn: MANDATORY — a SECOND PGN string showing the CORRECT continuation. This is what the board shows when the student views "The Fix".
+   - Use the SAME [FEN "..."] starting position and same context moves as examplePgn.
+   - Instead of the mistake move, play the CORRECT move (drillExpectedMove).
+   - After the correct move, include 3-6 moves of the BEST continuation showing why this is better.
+   - The correct move's comment MUST start with [FIX] (e.g. "{[FIX] This is better because...}").
+   - Every move must be LEGAL. Use standard algebraic notation.
+
+6. content: MUST follow this exact structure with these markdown headings:
 
    ## The Mistake
    1-2 paragraphs identifying the exact move(s) where the player went wrong. IMPORTANT: Write the mistake move in bold with exact move number, e.g. **14...Bxe4??** or **22. Rxd1??**. Explain WHY it was a mistake — what it allowed the opponent to do or what it gave up positionally.
@@ -937,9 +984,10 @@ Respond with valid JSON:
   "lessons": [
     {
       "title": "Lesson title",
-      "content": "## The Mistake\nIn your game you played 14...Bxe4, which drops a pawn because...\n\n## The Fix\nInstead, 14...Nf6 was the correct move because it...\n\n**Takeaway:** Always check for...",
+      "content": "## The Mistake\nIn your game you played **5. Bg5??**, which...\n\n## The Fix\nInstead, **5. O-O** was the correct move because it...\n\n**Takeaway:** Always check for...",
       "orderIndex": 0,
       "examplePgn": "[FEN \"r1bqkb1r/pppp1ppp/2n2n2/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 4 4\"]\n\n4. d3 {Setting up a quiet Italian structure} Be7 {Developing the bishop} 5. Bg5 {[MISTAKE] Pinning the knight prematurely — this allows a fork} d6 {Black calmly defends}",
+      "fixExamplePgn": "[FEN \"r1bqkb1r/pppp1ppp/2n2n2/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 4 4\"]\n\n4. d3 {Setting up a quiet Italian structure} Be7 {Developing the bishop} 5. O-O {[FIX] Castling first is safer — secures the king before any aggressive plans} d6 {A solid response} 6. Re1 {Preparing central play} O-O {Both sides have castled safely}",
       "drillFen": "rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2",
       "drillExpectedMove": "Nc6",
       "drillHint": "Develop a piece that also defends the pawn"
@@ -1026,13 +1074,15 @@ RULES for each lesson:
 
 4. drillHint: A one-sentence hint.
 
-5. content: MUST follow this structure:
+5. fixExamplePgn: MANDATORY — a SECOND PGN showing the CORRECT continuation. Same [FEN "..."] start and context moves as examplePgn, but plays the correct move (drillExpectedMove) instead of the mistake. Then include 3-6 moves of the best continuation showing the improved position. The correct move's comment MUST start with [FIX].
+
+6. content: MUST follow this structure:
 
    ## The Mistake
-   Quote the exact endgame move where the player went wrong. Explain why it was a mistake in the endgame context.
+   Quote the exact endgame move where the player went wrong, in bold with move number e.g. **29. Ke1??**. Explain why it was a mistake in the endgame context.
 
    ## The Fix
-   Explain the correct endgame technique. Name the correct move and the endgame principle behind it.
+   Explain the correct endgame technique. Name the correct move in bold e.g. **29. Kf1** and the endgame principle behind it.
 
 Respond with valid JSON:
 {
@@ -1046,6 +1096,7 @@ Respond with valid JSON:
       "content": "## The Mistake\\n...\\n\\n## The Fix\\n...",
       "orderIndex": 0,
       "examplePgn": "[FEN \\"...\\"]\\n\\n...",
+      "fixExamplePgn": "[FEN \\"...\\"]\\n\\n...",
       "drillFen": "...",
       "drillExpectedMove": "...",
       "drillHint": "..."
@@ -1082,7 +1133,9 @@ RULES for each lesson:
 
 4. drillHint: A one-sentence hint referencing the technique.
 
-5. content: MUST follow this structure:
+5. fixExamplePgn: MANDATORY — a SECOND PGN showing the CORRECT continuation. Same [FEN "..."] start and context moves as examplePgn, but plays the correct move instead of the mistake. Then include 3-6 moves of the best continuation. The correct move's comment MUST start with [FIX].
+
+6. content: MUST follow this structure:
 
    ## The Mistake
    Explain the common error players make in this type of position. Use a concrete example with the bold move notation like **28. Rxd1??**.
@@ -1102,6 +1155,7 @@ Respond with valid JSON:
       "content": "## The Mistake\\n...\\n\\n## The Fix\\n...",
       "orderIndex": 0,
       "examplePgn": "[FEN \\"...\\"]\\n\\n...",
+      "fixExamplePgn": "[FEN \\"...\\"]\\n\\n...",
       "drillFen": "...",
       "drillExpectedMove": "...",
       "drillHint": "..."

@@ -2,7 +2,7 @@
 
 ## Overview
 
-Chess Coach - A full-stack chess analysis platform that imports games from chess.com, analyzes patterns across all your games using AI to identify weaknesses, and generates personalized courses to help you improve.
+ChessScout.net - A full-stack chess analysis platform that imports games from chess.com, analyzes patterns across all your games using AI to identify weaknesses, and generates personalized courses to help you improve.
 
 ## Stack
 
@@ -25,7 +25,7 @@ Chess Coach - A full-stack chess analysis platform that imports games from chess
 3. **AI Analysis** (Premium): Analyzes up to 50 games using GPT to identify weaknesses across 6 categories. Jobs persist in `background_jobs` DB table — navigating away won't lose progress; page resumes polling or shows results on return.
 4. **Weakness Report**: Clickable cards → Weakness Detail page (`/analysis/:id`) with AI patterns, related games, related courses
 5. **Performance Stats**: Win rate, opening stats (bar chart), time control breakdown, win/loss/draw pie chart
-6. **Personalized Courses** (Premium): AI-generated courses with 4-5 annotated PGN lessons derived from the player's actual games (not generic openings); generates by appending (not replacing) to preserve progress. Lessons start 5 half-moves before the mistake using FEN headers, with [MISTAKE] markers for board/move-list highlighting. Server-side `reconstructPgnFromGames()` matches AI-described mistakes to actual game PGNs for legal-move validation. Frontend `parsePgnSteps()` injects a fix step from `drillExpectedMove` after the mistake when no explicit [FIX] marker exists. Fallback chain: `tryPartialPgnParse` → `buildStepsFromContent` (with target-square highlighting for illegal moves) → single FEN step.
+6. **Personalized Courses** (Premium): AI-generated courses with 4-5 annotated PGN lessons derived from the player's actual games (not generic openings); generates by appending (not replacing) to preserve progress. Lessons start 5 half-moves before the mistake using FEN headers, with [MISTAKE] markers for board/move-list highlighting. Server-side `reconstructPgnFromGames()` matches AI-described mistakes to actual game PGNs for legal-move validation and returns `{ pgn, fixPgn, drillFen }`. Each lesson also has a `fixExamplePgn` column — a second PGN showing context moves → correct move (`[FIX]` marker) → best continuation. Frontend `parsePgnSteps()` injects a fix step from `drillExpectedMove` after the mistake when no explicit [FIX] marker exists. When user navigates to "The Fix" step in LessonContentStepper, LessonBoardPlayer switches to display the fix PGN line (fixExamplePgn → frontend fallback `buildFrontendFixPgn` → regular pgn). Fallback chain: `tryPartialPgnParse` → `buildStepsFromContent` (with target-square highlighting for illegal moves) → single FEN step.
 7. **Endgame Training** (Premium) (`/endgames`): Three tabs — Checkmate Patterns (back rank, smothered, etc.), Essential Endgames (K+P, K+R, Lucena, Philidor, etc.), and Your Endgame Mistakes (personalized from actual games). Each generates a full course with interactive board, drills, and mistake highlighting.
 8. **Interactive Course Viewer**: Sequential lesson mode, LessonBoardPlayer component, "Complete & Next" auto-advance
 9. **Opponent Scout** (Premium) (`/opponents`): Enter any chess.com username — fetches their recent games, runs full AI analysis, shows their weaknesses and favourite openings. Results persist in `background_jobs` DB table — navigating away won't lose progress; page restores results or resumes polling on return.
@@ -34,7 +34,7 @@ Chess Coach - A full-stack chess analysis platform that imports games from chess
 11. **Mobile Navigation**: Bottom tab bar with "More" drawer for secondary pages (Openings, Practice Bots, Import Games, Opponent Scout, Sign Out). All pages mobile-responsive.
 12. **Global UserContext**: `src/context/UserContext.tsx` — single source of truth for auth state, no per-component useState drift
 13. **Authentication**: Email/password + Google OAuth login, dual auth: session cookies (SameSite=None for cross-origin) + Bearer token fallback (stored in localStorage as `chess_coach_token`). Token returned from login/register endpoints and via URL hash from Google OAuth callback. `getSessionId()` in auth.ts checks Authorization header first, then cookies.
-14. **Stripe Subscriptions**: Chess Coach Pro with $1/week and $4/month plans, 3-day free trial, Stripe Checkout + Customer Portal
+14. **Stripe Subscriptions**: ChessScout Pro with $1/week and $4/month plans, 3-day free trial, Stripe Checkout + Customer Portal
 15. **Premium Gating**: AI Analysis, Courses, TTS, and Opponent Scout gated behind subscription via `<PremiumGate>` component
 
 ## Structure

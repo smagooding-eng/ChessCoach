@@ -774,6 +774,8 @@ components:
           type: boolean
         examplePgn:
           type: ["string", "null"]
+        fixExamplePgn:
+          type: ["string", "null"]
         drillFen:
           type: ["string", "null"]
         drillExpectedMove:

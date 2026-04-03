@@ -332,6 +332,8 @@ type Tab = 'lesson' | 'drill' | 'repeat';
 
 interface LessonBoardPlayerProps {
   pgn: string;
+  fixPgn?: string | null;
+  showFixLine?: boolean;
   title?: string;
   drillFen?: string | null;
   drillExpectedMove?: string | null;
@@ -339,14 +341,93 @@ interface LessonBoardPlayerProps {
   content?: string | null;
 }
 
-export function LessonBoardPlayer({ pgn, title, drillFen, drillExpectedMove, drillHint, content }: LessonBoardPlayerProps) {
-  const steps = parsePgnSteps(pgn, content, drillExpectedMove);
+function buildFrontendFixPgn(mistakePgn: string, drillExpectedMove: string | null | undefined): string | null {
+  if (!drillExpectedMove) return null;
+  try {
+    const fenMatch = mistakePgn.match(/\[FEN\s+"([^"]+)"\]/i);
+    if (!fenMatch) return null;
+    const startFen = fenMatch[1];
+
+    const mistakeSteps = parsePgnSteps(mistakePgn, null, null);
+    if (!mistakeSteps || mistakeSteps.length < 3) return null;
+
+    const mistakeIdx = mistakeSteps.findIndex(s => s.isMistake);
+    if (mistakeIdx < 2) return null;
+
+    const preMistakeFen = mistakeSteps[mistakeIdx - 1].fen;
+    const chessInstance = new Chess(preMistakeFen);
+    const fixMove = chessInstance.move(drillExpectedMove);
+    if (!fixMove) return null;
+
+    const moveText = mistakePgn.replace(/\[.*?\]\s*/g, '').trim();
+    const moveRegex = /(\d+\.+\s*)?([KQRBN]?[a-h]?[1-8]?x?[a-h][1-8](?:=[QRBN])?[+#]?|O-O(?:-O)?)\s*(?:\{([^}]*)\})?/g;
+
+    const moves: { san: string; comment: string }[] = [];
+    let m;
+    while ((m = moveRegex.exec(moveText)) !== null) {
+      moves.push({ san: m[2], comment: m[3] || '' });
+    }
+
+    const contextMoves = moves.slice(0, mistakeIdx - 1);
+    let result = `[FEN "${startFen}"]\n\n`;
+    const parts: string[] = [];
+    const isBlack = startFen.split(' ')[1] === 'b';
+    const startFullMove = parseInt(startFen.split(' ')[5]) || 1;
+
+    for (let i = 0; i < contextMoves.length; i++) {
+      const gi = (isBlack ? 1 : 0) + i;
+      const mn = startFullMove + Math.floor(gi / 2);
+      const black = gi % 2 === 1;
+      if (!black) {
+        parts.push(`${mn}. ${contextMoves[i].san} {${contextMoves[i].comment || 'Leading up to the key moment.'}}`);
+      } else if (i === 0 && isBlack) {
+        parts.push(`${mn}... ${contextMoves[i].san} {${contextMoves[i].comment || 'Leading up to the key moment.'}}`);
+      } else {
+        parts.push(`${contextMoves[i].san} {${contextMoves[i].comment || 'Leading up to the key moment.'}}`);
+      }
+    }
+
+    const fixGi = (isBlack ? 1 : 0) + contextMoves.length;
+    const fixMn = startFullMove + Math.floor(fixGi / 2);
+    const fixBlack = fixGi % 2 === 1;
+    if (!fixBlack) {
+      parts.push(`${fixMn}. ${fixMove.san} {[FIX] The correct move.}`);
+    } else if (parts.length === 0) {
+      parts.push(`${fixMn}... ${fixMove.san} {[FIX] The correct move.}`);
+    } else {
+      parts.push(`${fixMove.san} {[FIX] The correct move.}`);
+    }
+
+    result += parts.join(' ');
+    return result;
+  } catch {
+    return null;
+  }
+}
+
+export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, drillExpectedMove, drillHint, content }: LessonBoardPlayerProps) {
+  const activePgn = useMemo(() => {
+    if (showFixLine) {
+      if (fixPgn) return fixPgn;
+      const fallback = buildFrontendFixPgn(pgn, drillExpectedMove);
+      if (fallback) return fallback;
+    }
+    return pgn;
+  }, [pgn, fixPgn, showFixLine, drillExpectedMove]);
+
+  const steps = parsePgnSteps(activePgn, content, showFixLine ? null : drillExpectedMove);
   const [tab, setTab] = useState<Tab>('lesson');
   const [currentStep, setCurrentStep] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [prevFen, setPrevFen] = useState<string | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const moveListRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setCurrentStep(0);
+    setIsPlaying(false);
+    setPrevFen(null);
+  }, [activePgn]);
 
   // ── Drill state ──────────────────────────────────────────────────────────────
   const [drillState, setDrillState] = useState<DrillState>('idle');
