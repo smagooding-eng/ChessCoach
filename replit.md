@@ -25,9 +25,10 @@ Chess Coach - A full-stack chess analysis platform that imports games from chess
 3. **AI Analysis** (Premium): Analyzes up to 50 games using GPT to identify weaknesses across 6 categories. Jobs persist in `background_jobs` DB table — navigating away won't lose progress; page resumes polling or shows results on return.
 4. **Weakness Report**: Clickable cards → Weakness Detail page (`/analysis/:id`) with AI patterns, related games, related courses
 5. **Performance Stats**: Win rate, opening stats (bar chart), time control breakdown, win/loss/draw pie chart
-6. **Personalized Courses** (Premium): AI-generated courses with 4-5 annotated PGN lessons derived from the player's actual games (not generic openings); generates by appending (not replacing) to preserve progress
-7. **Interactive Course Viewer**: Sequential lesson mode, LessonBoardPlayer component, "Complete & Next" auto-advance
-8. **Opponent Scout** (Premium) (`/opponents`): Enter any chess.com username — fetches their recent games, runs full AI analysis, shows their weaknesses and favourite openings. Results persist in `background_jobs` DB table — navigating away won't lose progress; page restores results or resumes polling on return.
+6. **Personalized Courses** (Premium): AI-generated courses with 4-5 annotated PGN lessons derived from the player's actual games (not generic openings); generates by appending (not replacing) to preserve progress. Lessons start 2 moves before the mistake using FEN headers, with [MISTAKE] markers for board/move-list highlighting.
+7. **Endgame Training** (Premium) (`/endgames`): Three tabs — Checkmate Patterns (back rank, smothered, etc.), Essential Endgames (K+P, K+R, Lucena, Philidor, etc.), and Your Endgame Mistakes (personalized from actual games). Each generates a full course with interactive board, drills, and mistake highlighting.
+8. **Interactive Course Viewer**: Sequential lesson mode, LessonBoardPlayer component, "Complete & Next" auto-advance
+9. **Opponent Scout** (Premium) (`/opponents`): Enter any chess.com username — fetches their recent games, runs full AI analysis, shows their weaknesses and favourite openings. Results persist in `background_jobs` DB table — navigating away won't lose progress; page restores results or resumes polling on return.
 9. **Practice Bots** (`/practice`): 8 AI bots from 400 to 2000 ELO with client-side minimax engine, piece-square tables, configurable depth/blunder rate. Live move analysis shows quality ratings (brilliant/excellent/good/inaccuracy/mistake/blunder), pros/cons, best move suggestion, and evaluation bar after every move.
 10. **ELO-Based Improvement Tips**: Analysis page shows tier-specific tips based on average rating with progress bar to next tier
 11. **Mobile Navigation**: Bottom tab bar with "More" drawer for secondary pages (Openings, Practice Bots, Import Games, Opponent Scout, Sign Out). All pages mobile-responsive.
@@ -71,6 +72,9 @@ artifacts-monorepo/
 - `POST /api/courses/generate` — Generate AI courses from weaknesses
 - `GET /api/courses/:id` — Get course with lessons
 - `PATCH /api/courses/:id/progress` — Update lesson completion
+- `POST /api/courses/endgame/generate-start` — Start endgame course generation (type: checkmate_patterns | essential_endgames | personal_endgames)
+- `GET /api/courses/endgame/generate-status/:jobId` — Poll endgame generation progress
+- `GET /api/courses/endgame` — List endgame courses for a user
 - `POST /api/auth/register` — Register with email/password (+ optional firstName, chesscomUsername)
 - `POST /api/auth/login` — Login with email/password
 - `GET /api/auth/google` — Initiate Google OAuth login
@@ -107,7 +111,7 @@ Every package extends `tsconfig.base.json` which sets `composite: true`. The roo
 
 ### `artifacts/chess-coach` (`@workspace/chess-coach`)
 
-- React frontend with pages: Setup, Dashboard, Import, Games, GameReplay, Analysis, Courses, CourseDetail, Openings, OpeningDetail, OpponentAnalysis, PracticeBots
+- React frontend with pages: Setup, Dashboard, Import, Games, GameReplay, Analysis, Courses, CourseDetail, Endgames, Openings, OpeningDetail, OpponentAnalysis, PracticeBots
 - ChessBoard component renders positions from FEN strings with Unicode pieces, supports drag-and-drop + click-to-move
 - Uses recharts for performance charts
 - QueryClient configured: retry=1, refetchOnWindowFocus=false, staleTime=30s

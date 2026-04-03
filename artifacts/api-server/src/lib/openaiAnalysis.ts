@@ -746,3 +746,159 @@ Respond with valid JSON:
     throw err;
   }
 }
+
+export type EndgameType = "checkmate_patterns" | "essential_endgames" | "personal_endgames";
+
+const ENDGAME_TOPICS: Record<Exclude<EndgameType, "personal_endgames">, { title: string; subtopics: string[] }> = {
+  checkmate_patterns: {
+    title: "Checkmate Patterns",
+    subtopics: [
+      "Back rank mate — recognizing when the king is trapped behind its own pawns",
+      "Smothered mate — using a knight when the king is boxed in by friendly pieces",
+      "Queen and rook battery checkmates — coordinating heavy pieces on open files",
+      "Bishop and queen diagonal mates — exploiting weakened kingside diagonals",
+      "Arabian mate — rook + knight coordination on the edge of the board",
+    ],
+  },
+  essential_endgames: {
+    title: "Essential Endgames",
+    subtopics: [
+      "King + pawn vs King — the rule of the square, opposition, and key squares",
+      "King + rook vs King — the staircase / box method for forcing checkmate",
+      "Rook endgames — Lucena position (winning with an extra pawn) and Philidor position (drawing technique)",
+      "Queen vs pawn on 7th — winning technique and when it's a draw",
+      "Bishop vs knight endgames — when each piece is stronger and how to convert",
+    ],
+  },
+};
+
+export async function generateEndgameCourse(
+  type: EndgameType,
+  playerRating?: number,
+  gamePgns?: string[],
+): Promise<CourseOutput> {
+  let prompt: string;
+
+  if (type === "personal_endgames") {
+    const gameSection = gamePgns?.length
+      ? `\n\nACTUAL ENDGAME POSITIONS FROM THE PLAYER'S GAMES:\n${gamePgns.map((pgn, i) => `--- Game ${i + 1} ---\n${pgn}`).join("\n\n")}\n\nAnalyze the endgame phase of each game (typically the last 15-25 moves). Identify specific endgame mistakes the player made.`
+      : "";
+
+    prompt = `You are an expert chess endgame coach. Create a personalized endgame improvement course based on this player's actual games.
+
+Player rating: ${playerRating ?? "unknown"}${gameSection}
+
+Create a course with 4-5 lessons focused ONLY on endgame mistakes from these actual games. Each lesson should address a specific endgame error the player made.
+
+RULES for each lesson:
+1. examplePgn: Show the critical endgame segment from their actual game.
+   - START the PGN 2 moves BEFORE the endgame mistake. Use a [FEN "..."] header with the board position.
+   - Every move must have a {comment in curly braces}
+   - The mistake move(s) MUST have [MISTAKE] at the START of their comment
+   - After the mistake, show the CORRECT continuation
+   - Legal moves only
+   - MUST use actual move sequences from the provided games
+
+2. drillFen: The exact position where the player went wrong — they must find the correct move.
+
+3. drillExpectedMove: The best move in SAN notation.
+
+4. drillHint: A one-sentence hint.
+
+5. content: MUST follow this structure:
+
+   ## The Mistake
+   Quote the exact endgame move where the player went wrong. Explain why it was a mistake in the endgame context.
+
+   ## The Fix
+   Explain the correct endgame technique. Name the correct move and the endgame principle behind it.
+
+Respond with valid JSON:
+{
+  "title": "Course title (max 60 chars)",
+  "description": "2-3 sentence course description focused on endgame improvement",
+  "category": "Endgame Technique",
+  "difficulty": "Beginner|Intermediate|Advanced",
+  "lessons": [
+    {
+      "title": "Lesson title",
+      "content": "## The Mistake\\n...\\n\\n## The Fix\\n...",
+      "orderIndex": 0,
+      "examplePgn": "[FEN \\"...\\"]\\n\\n...",
+      "drillFen": "...",
+      "drillExpectedMove": "...",
+      "drillHint": "..."
+    }
+  ]
+}`;
+  } else {
+    const topic = ENDGAME_TOPICS[type];
+    const difficultyGuide = playerRating
+      ? (playerRating < 1200 ? "Beginner" : playerRating < 1800 ? "Intermediate" : "Advanced")
+      : "Intermediate";
+
+    prompt = `You are an expert chess endgame coach. Create a structured training course on: ${topic.title}
+
+Target difficulty: ${difficultyGuide} (player rating: ${playerRating ?? "unknown"})
+
+Cover these subtopics, one lesson each:
+${topic.subtopics.map((s, i) => `${i + 1}. ${s}`).join("\n")}
+
+RULES for each lesson:
+1. examplePgn: A teaching sequence showing the pattern/technique.
+   - Use a [FEN "..."] header to start from the relevant position (NOT from the opening).
+   - Every move must have a {comment in curly braces} explaining the concept
+   - If demonstrating a common mistake, mark it with [MISTAKE] at the START of the comment
+   - Then show the CORRECT technique with explanatory comments
+   - Legal moves only
+
+2. drillFen: A position where the student must apply the technique just taught.
+
+3. drillExpectedMove: The correct move in SAN notation.
+
+4. drillHint: A one-sentence hint referencing the technique.
+
+5. content: MUST follow this structure:
+
+   ## The Mistake
+   Explain the common error players make in this type of position. Use a concrete example.
+
+   ## The Fix
+   Explain the correct technique step by step. Reference the key principle (opposition, Lucena, etc.).
+
+Respond with valid JSON:
+{
+  "title": "Course title (max 60 chars)",
+  "description": "2-3 sentence course description",
+  "category": "Endgame Technique",
+  "difficulty": "${difficultyGuide}",
+  "lessons": [
+    {
+      "title": "Lesson title",
+      "content": "## The Mistake\\n...\\n\\n## The Fix\\n...",
+      "orderIndex": 0,
+      "examplePgn": "[FEN \\"...\\"]\\n\\n...",
+      "drillFen": "...",
+      "drillExpectedMove": "...",
+      "drillHint": "..."
+    }
+  ]
+}`;
+  }
+
+  try {
+    const response = await openai.chat.completions.create({
+      model: "gpt-5.2",
+      max_completion_tokens: 8192,
+      messages: [{ role: "user", content: prompt }],
+      response_format: { type: "json_object" },
+    });
+
+    const content = response.choices[0]?.message?.content ?? "{}";
+    const parsed = JSON.parse(content) as CourseOutput;
+    return parsed;
+  } catch (err) {
+    logger.error({ err, type }, "Failed to generate endgame course");
+    throw err;
+  }
+}

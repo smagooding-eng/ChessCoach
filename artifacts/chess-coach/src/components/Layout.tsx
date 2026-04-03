@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'wouter';
 import { useUser } from '@/hooks/use-user';
 import { useChessPlayer } from '@/hooks/use-chess-player';
-import { LayoutDashboard, Import, History, BrainCircuit, GraduationCap, Swords, BookOpen, LogOut, MoreHorizontal, ChevronRight, Bot, Crown } from 'lucide-react';
+import { LayoutDashboard, Import, History, BrainCircuit, GraduationCap, Swords, BookOpen, LogOut, MoreHorizontal, ChevronRight, Bot, Crown, Trophy } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -11,6 +11,7 @@ const PRIMARY_NAV = [
   { href: '/games',     label: 'Games',     icon: History },
   { href: '/analysis',  label: 'Analysis',  icon: BrainCircuit },
   { href: '/courses',   label: 'Courses',   icon: GraduationCap },
+  { href: '/endgames',  label: 'Endgames',  icon: Trophy },
   { href: '/openings',  label: 'Openings',  icon: BookOpen },
 ];
 
@@ -66,7 +67,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
   const displayRating = player?.rating;
 
-  const moreItems = [PRIMARY_NAV[4], ...SECONDARY_NAV];
+  const moreItems = [...PRIMARY_NAV.slice(4), ...SECONDARY_NAV];
   const activeMore = moreItems.find(i => location === i.href || location.startsWith(i.href + '/'));
   const isMoreActive = !!activeMore;
 

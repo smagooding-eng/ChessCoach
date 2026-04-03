@@ -62,6 +62,7 @@ import { GameReplay } from "@/pages/GameReplay";
 import { Analysis } from "@/pages/Analysis";
 import { Courses } from "@/pages/Courses";
 import { CourseDetail } from "@/pages/CourseDetail";
+import { Endgames } from "@/pages/Endgames";
 import { WeaknessDetail } from "@/pages/WeaknessDetail";
 import { OpponentAnalysis } from "@/pages/OpponentAnalysis";
 import { Openings } from "@/pages/Openings";
@@ -126,6 +127,7 @@ const PAnalysis      = () => <ProtectedRoute component={Analysis} />;
 const PWeakness      = () => <ProtectedRoute component={WeaknessDetail} fallbackNav="/analysis" />;
 const PCourses       = () => <ProtectedRoute component={Courses} />;
 const PCourseDetail  = () => <ProtectedRoute component={CourseDetail} fallbackNav="/courses" />;
+const PEndgames      = () => <ProtectedRoute component={Endgames} />;
 const POpenings      = () => <ProtectedRoute component={Openings} />;
 const POpeningDetail = () => <ProtectedRoute component={OpeningDetail} fallbackNav="/openings" />;
 const POpponents     = () => <ProtectedRoute component={OpponentAnalysis} />;
@@ -170,6 +172,7 @@ function Router() {
       <Route path="/analysis/:id" component={PWeakness} />
       <Route path="/courses"     component={PCourses} />
       <Route path="/courses/:id" component={PCourseDetail} />
+      <Route path="/endgames"    component={PEndgames} />
       <Route path="/openings"        component={POpenings} />
       <Route path="/openings/:eco"   component={POpeningDetail} />
       <Route path="/opponents"       component={POpponents} />

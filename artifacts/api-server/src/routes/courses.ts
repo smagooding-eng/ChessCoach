@@ -12,7 +12,7 @@ import {
   UpdateCourseProgressBody,
   UpdateCourseProgressResponse,
 } from "@workspace/api-zod";
-import { generateCourseForWeakness } from "../lib/openaiAnalysis";
+import { generateCourseForWeakness, generateEndgameCourse, type EndgameType } from "../lib/openaiAnalysis";
 import { randomUUID } from "crypto";
 import type { Logger } from "pino";
 
@@ -238,6 +238,129 @@ router.post("/courses/generate", async (req, res): Promise<void> => {
   res.json(GenerateCoursesResponse.parse({ courses: generatedCourses }));
 });
 
+// ── Endgame training ─────────────────────────────────────────────────────────
+const endgameJobs = new Map<string, CourseJob>();
+setInterval(() => {
+  const cutoff = Date.now() - 10 * 60 * 1000;
+  for (const [id, job] of endgameJobs) if (job.createdAt < cutoff) endgameJobs.delete(id);
+}, 5 * 60 * 1000);
+
+async function runEndgameJob(
+  username: string,
+  type: EndgameType,
+  jobId: string,
+  log: Logger,
+): Promise<void> {
+  try {
+    let gamePgns: string[] = [];
+    let playerRating: number | undefined;
+
+    const userGames = await db
+      .select()
+      .from(gamesTable)
+      .where(eq(gamesTable.username, username))
+      .orderBy(desc(gamesTable.playedAt))
+      .limit(10);
+
+    if (userGames.length > 0) {
+      playerRating = userGames[0].userRating ?? undefined;
+    }
+
+    if (type === "personal_endgames") {
+      gamePgns = userGames.map(g => g.pgn).filter(Boolean) as string[];
+      if (gamePgns.length === 0) {
+        endgameJobs.set(jobId, { status: "error", error: "No games found. Import games first.", createdAt: Date.now() });
+        return;
+      }
+    }
+
+    const courseData = await generateEndgameCourse(type, playerRating, gamePgns);
+
+    const [course] = await db
+      .insert(coursesTable)
+      .values({
+        username,
+        title: courseData.title,
+        description: courseData.description,
+        category: courseData.category || "Endgame Technique",
+        difficulty: courseData.difficulty,
+        totalLessons: courseData.lessons.length,
+        completedLessons: 0,
+      })
+      .returning();
+
+    for (const lesson of courseData.lessons) {
+      await db.insert(lessonsTable).values({
+        courseId: course.id,
+        title: lesson.title,
+        content: lesson.content,
+        orderIndex: lesson.orderIndex,
+        completed: "false",
+        examplePgn: lesson.examplePgn,
+        drillFen: lesson.drillFen ?? null,
+        drillExpectedMove: lesson.drillExpectedMove ?? null,
+        drillHint: lesson.drillHint ?? null,
+      });
+    }
+
+    endgameJobs.set(jobId, { status: "done", createdAt: Date.now() });
+    log.info({ jobId, type, courseId: course.id }, "Endgame course generated");
+  } catch (err) {
+    log.error({ err, jobId, type }, "Endgame course generation failed");
+    const msg = err instanceof Error ? err.message : "Endgame course generation failed";
+    endgameJobs.set(jobId, { status: "error", error: msg, createdAt: Date.now() });
+  }
+}
+
+router.post("/courses/endgame/generate-start", async (req, res): Promise<void> => {
+  const { username, type } = req.body as { username?: string; type?: string };
+  if (!username || !type) {
+    res.status(400).json({ error: "username and type are required" });
+    return;
+  }
+  const validTypes: EndgameType[] = ["checkmate_patterns", "essential_endgames", "personal_endgames"];
+  if (!validTypes.includes(type as EndgameType)) {
+    res.status(400).json({ error: "Invalid type. Use: checkmate_patterns, essential_endgames, or personal_endgames" });
+    return;
+  }
+  const jobId = randomUUID();
+  endgameJobs.set(jobId, { status: "pending", createdAt: Date.now() });
+  res.json({ jobId });
+  runEndgameJob(username.toLowerCase(), type as EndgameType, jobId, req.log).catch(() => {});
+});
+
+router.get("/courses/endgame/generate-status/:jobId", (req, res): void => {
+  const job = endgameJobs.get(req.params.jobId as string);
+  if (!job) { res.status(404).json({ error: "Job not found" }); return; }
+  res.setHeader("Cache-Control", "no-store");
+  res.json({ status: job.status, error: job.error });
+});
+
+router.get("/courses/endgame", async (req, res): Promise<void> => {
+  const username = (req.query.username as string)?.toLowerCase();
+  if (!username) { res.status(400).json({ error: "username is required" }); return; }
+
+  const courses = await db
+    .select()
+    .from(coursesTable)
+    .where(eq(coursesTable.username, username))
+    .orderBy(desc(coursesTable.createdAt));
+
+  const endgameCourses = courses.filter(c =>
+    c.category === "Endgame Technique" ||
+    c.title.toLowerCase().includes("endgame") ||
+    c.title.toLowerCase().includes("checkmate")
+  );
+
+  res.json({
+    courses: endgameCourses.map(c => ({
+      ...c,
+      createdAt: c.createdAt.toISOString(),
+    })),
+  });
+});
+
+// ── Course detail (must be after /courses/endgame* to avoid route conflict) ──
 router.get("/courses/:id", async (req, res): Promise<void> => {
   const params = GetCourseParams.safeParse(req.params);
   if (!params.success) {
