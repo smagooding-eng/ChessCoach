@@ -498,7 +498,10 @@ router.post("/games/:id/review", async (req, res): Promise<void> => {
     res.setHeader("Cache-Control", "no-cache");
     res.setHeader("Connection", "keep-alive");
     res.flushHeaders();
-    res.write(`event: result\ndata: ${JSON.stringify({ moves: game.reviewData })}\n\n`);
+    const cached = game.reviewData as Record<string, unknown>;
+    const moves = cached.moves ?? cached;
+    const gameSummary = cached.gameSummary ?? null;
+    res.write(`event: result\ndata: ${JSON.stringify({ moves, gameSummary })}\n\n`);
     res.write(`event: done\ndata: {}\n\n`);
     res.end();
     return;
@@ -521,18 +524,18 @@ router.post("/games/:id/review", async (req, res): Promise<void> => {
 
   try {
     const moves = parsePgnMoves(game.pgn);
-    const review = await reviewFullGame({
+    const reviewResult = await reviewFullGame({
       moves,
       opening: game.opening,
       result: game.result,
       whiteUsername: game.whiteUsername,
       blackUsername: game.blackUsername,
     });
-    sendEvent("result", { moves: review });
+    sendEvent("result", { moves: reviewResult.moves, gameSummary: reviewResult.gameSummary });
     sendEvent("done", {});
 
     await db.update(gamesTable)
-      .set({ reviewData: review as unknown as Record<string, unknown> })
+      .set({ reviewData: reviewResult as unknown as Record<string, unknown> })
       .where(eq(gamesTable.id, params.data.id));
   } catch (err) {
     req.log.error({ err }, "Failed to review game");

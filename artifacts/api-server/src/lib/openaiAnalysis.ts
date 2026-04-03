@@ -420,13 +420,31 @@ export interface MoveReview {
   cons: string[];
 }
 
+export interface GameSummary {
+  overview: string;
+  keyMistakes: Array<{
+    moveIndex: number;
+    move: string;
+    whatWentWrong: string;
+    whatYouShouldHaveDone: string;
+    tip: string;
+  }>;
+  strengths: string[];
+  improvementAreas: string[];
+}
+
+export interface GameReviewResult {
+  moves: MoveReview[];
+  gameSummary: GameSummary | null;
+}
+
 export async function reviewFullGame(input: {
   moves: Array<{ moveNumber: number; san: string; color: string }>;
   opening: string | null;
   result: string;
   whiteUsername: string;
   blackUsername: string;
-}): Promise<MoveReview[]> {
+}): Promise<GameReviewResult> {
   const { moves, opening, result, whiteUsername, blackUsername } = input;
 
   const moveList = moves
@@ -457,6 +475,20 @@ For each move provide:
 4. cons: array of 1-2 SHORT weaknesses or missed opportunities (max 12 words each). Even great moves can have minor downsides.
 5. betterMove: for inaccuracy/mistake/blunder only — the better move in SAN notation (e.g. "Nf6", "d4", "Bxd5+"). For good/excellent/brilliant/book set null.
 
+ALSO provide a "gameSummary" object with an overall AI coaching analysis of the game:
+
+1. "overview": 2-3 sentences summarizing the game flow — who had the advantage and when, and what decided the outcome.
+2. "keyMistakes": an array of the most important mistakes/blunders (up to 4). Each entry:
+   - "moveIndex": the move index of the mistake
+   - "move": the move in SAN (e.g. "14...Bxe4")
+   - "whatWentWrong": 1-2 sentences explaining what was wrong with this move
+   - "whatYouShouldHaveDone": 1-2 sentences explaining the correct move and why
+   - "tip": A concise coaching takeaway (a pattern or rule to remember for next time)
+3. "strengths": array of 1-3 things the player did well (even in a loss)
+4. "improvementAreas": array of 2-3 specific areas to work on, phrased as actionable coaching advice
+
+If the game was a loss, be especially detailed in keyMistakes and improvementAreas. Focus on the turning points that cost the game.
+
 Respond with valid JSON covering ALL ${moves.length} moves in order:
 {
   "moves": [
@@ -470,7 +502,21 @@ Respond with valid JSON covering ALL ${moves.length} moves in order:
       "cons": ["Slightly weakens d4 square"],
       "betterMove": null
     }
-  ]
+  ],
+  "gameSummary": {
+    "overview": "White had a solid opening but lost the thread in the middlegame...",
+    "keyMistakes": [
+      {
+        "moveIndex": 14,
+        "move": "14...Bxe4",
+        "whatWentWrong": "This capture trades away a strong bishop and opens the e-file for White's rook.",
+        "whatYouShouldHaveDone": "14...Nf6 develops the knight while maintaining pressure on e4.",
+        "tip": "Before capturing, ask: does this trade help my opponent more than me?"
+      }
+    ],
+    "strengths": ["Solid opening preparation", "Good piece development"],
+    "improvementAreas": ["Practice calculating exchanges before capturing", "Work on endgame technique"]
+  }
 }`;
 
   try {
@@ -488,10 +534,10 @@ Respond with valid JSON covering ALL ${moves.length} moves in order:
       logger.warn({ moves: moves.length }, "Review response truncated by token limit — trying to parse partial result");
     }
 
-    const parsed = JSON.parse(content) as { moves?: Array<Partial<MoveReview>> };
+    const parsed = JSON.parse(content) as { moves?: Array<Partial<MoveReview>>; gameSummary?: Partial<GameSummary> };
     const validClassifications = ["brilliant", "excellent", "good", "book", "inaccuracy", "mistake", "blunder"];
 
-    const result = (parsed.moves ?? []).map((m, i) => ({
+    const reviewMoves = (parsed.moves ?? []).map((m, i) => ({
       moveIndex: typeof m.moveIndex === "number" ? m.moveIndex : i,
       san: m.san ?? moves[i]?.san ?? "",
       color: (m.color ?? moves[i]?.color ?? "white") as "white" | "black",
@@ -504,11 +550,26 @@ Respond with valid JSON covering ALL ${moves.length} moves in order:
       cons: Array.isArray(m.cons) ? m.cons : [],
     }));
 
-    if (result.length === 0) {
+    if (reviewMoves.length === 0) {
       throw new Error("OpenAI returned an empty move list — possibly a model error or format issue");
     }
 
-    return result;
+    const gameSummary: GameSummary | null = parsed.gameSummary ? {
+      overview: parsed.gameSummary.overview ?? "",
+      keyMistakes: Array.isArray(parsed.gameSummary.keyMistakes)
+        ? parsed.gameSummary.keyMistakes.map(km => ({
+            moveIndex: km.moveIndex ?? 0,
+            move: km.move ?? "",
+            whatWentWrong: km.whatWentWrong ?? "",
+            whatYouShouldHaveDone: km.whatYouShouldHaveDone ?? "",
+            tip: km.tip ?? "",
+          }))
+        : [],
+      strengths: Array.isArray(parsed.gameSummary.strengths) ? parsed.gameSummary.strengths : [],
+      improvementAreas: Array.isArray(parsed.gameSummary.improvementAreas) ? parsed.gameSummary.improvementAreas : [],
+    } : null;
+
+    return { moves: reviewMoves, gameSummary };
   } catch (err) {
     logger.error({ err }, "Failed to review full game with OpenAI");
     throw err; // Re-throw so the SSE route handler sends an error event

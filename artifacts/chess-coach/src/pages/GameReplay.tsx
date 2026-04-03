@@ -6,7 +6,7 @@ import { Chess } from 'chess.js';
 import {
   ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
   Play, Pause, ArrowLeft, BrainCircuit, FlipVertical2,
-  Swords, Clock, Zap, BookOpen, Cpu, Lightbulb, Sparkles, Trophy
+  Swords, Clock, Zap, BookOpen, Cpu, Lightbulb, Sparkles, Trophy, Target
 } from 'lucide-react';
 import { useUser } from '@/hooks/use-user';
 import { useChessPlayer } from '@/hooks/use-chess-player';
@@ -23,6 +23,21 @@ type ReviewMove = {
   betterMove: string | null;
   pros: string[];
   cons: string[];
+};
+
+type KeyMistake = {
+  moveIndex: number;
+  move: string;
+  whatWentWrong: string;
+  whatYouShouldHaveDone: string;
+  tip: string;
+};
+
+type GameSummary = {
+  overview: string;
+  keyMistakes: KeyMistake[];
+  strengths: string[];
+  improvementAreas: string[];
 };
 
 const CLASS_CFG: Record<Classification, { badge: string; color: string; full: string }> = {
@@ -238,15 +253,20 @@ export function GameReplay() {
   const [reviewing, setReviewing]       = useState(false);
   const [reviewMoves, setReviewMoves]   = useState<ReviewMove[]>([]);
   const [reviewError, setReviewError]   = useState<string | null>(null);
+  const [gameSummary, setGameSummary]   = useState<GameSummary | null>(null);
   const [loadingSavedReview, setLoadingSavedReview] = useState(true);
 
   useEffect(() => {
     if (!game) { setLoadingSavedReview(false); return; }
     apiFetch(`/api/games/${game.id}/review`)
       .then(r => r.ok ? r.json() : null)
-      .then((d: { reviewData?: ReviewMove[] } | null) => {
-        if (d?.reviewData && Array.isArray(d.reviewData) && d.reviewData.length > 0) {
-          setReviewMoves(d.reviewData);
+      .then((d: { reviewData?: ReviewMove[] | { moves: ReviewMove[]; gameSummary?: GameSummary } } | null) => {
+        if (!d?.reviewData) return;
+        if (Array.isArray(d.reviewData)) {
+          if (d.reviewData.length > 0) setReviewMoves(d.reviewData);
+        } else if (d.reviewData.moves && Array.isArray(d.reviewData.moves)) {
+          setReviewMoves(d.reviewData.moves);
+          if (d.reviewData.gameSummary) setGameSummary(d.reviewData.gameSummary);
         }
       })
       .catch(() => {})
@@ -352,6 +372,9 @@ export function GameReplay() {
                 setReviewError('Review returned no data. Please try again.');
               } else {
                 setReviewMoves(moves);
+              }
+              if (payload.gameSummary) {
+                setGameSummary(payload.gameSummary as GameSummary);
               }
             } else if (eventName === 'error') {
               setReviewError((payload.message as string) ?? 'Review failed. Please try again.');
@@ -737,6 +760,80 @@ export function GameReplay() {
               whiteAvatar={whitePlayer?.avatar}
               blackAvatar={blackPlayer?.avatar}
             />
+          )}
+
+          {/* AI Game Summary — shown after review completes */}
+          {gameSummary && reviewMoves.length > 0 && (
+            <div className="glass-card rounded-2xl overflow-hidden border border-white/8">
+              <div className="px-4 py-3 border-b border-white/5 flex items-center gap-2 bg-white/3">
+                <BrainCircuit className="w-4 h-4 text-primary" />
+                <span className="font-bold text-sm">AI Game Analysis</span>
+              </div>
+              <div className="p-4 space-y-4">
+                <p className="text-sm text-foreground/85 leading-relaxed">{gameSummary.overview}</p>
+
+                {gameSummary.keyMistakes.length > 0 && (
+                  <div className="space-y-2.5">
+                    <h4 className="text-xs font-bold text-red-400 uppercase tracking-wider flex items-center gap-1.5">
+                      <span className="text-base">✗</span> Key Mistakes
+                    </h4>
+                    {gameSummary.keyMistakes.map((km, i) => (
+                      <div key={i} className="rounded-xl border border-white/5 overflow-hidden">
+                        <button
+                          onClick={() => setCurrentMove(km.moveIndex)}
+                          className="w-full text-left px-3 py-2 bg-red-500/8 border-b border-red-500/15 hover:bg-red-500/12 transition-colors flex items-center gap-2"
+                        >
+                          <span className="text-red-400 font-mono text-xs font-bold shrink-0">{km.move}</span>
+                          <span className="text-xs text-foreground/70 truncate">{km.whatWentWrong}</span>
+                        </button>
+                        <div className="px-3 py-2.5 space-y-1.5">
+                          <div className="flex items-start gap-2">
+                            <span className="text-emerald-400 shrink-0 mt-0.5 text-sm">✓</span>
+                            <p className="text-xs text-foreground/80 leading-relaxed">{km.whatYouShouldHaveDone}</p>
+                          </div>
+                          <div className="flex items-start gap-2">
+                            <Lightbulb className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
+                            <p className="text-xs text-amber-300/80 leading-relaxed italic">{km.tip}</p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {gameSummary.strengths.length > 0 && (
+                  <div>
+                    <h4 className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5 mb-2">
+                      <span className="text-base">✓</span> What You Did Well
+                    </h4>
+                    <ul className="space-y-1.5">
+                      {gameSummary.strengths.map((s, i) => (
+                        <li key={i} className="flex items-start gap-2 text-xs text-foreground/80 leading-relaxed">
+                          <span className="text-emerald-500 shrink-0 mt-0.5">•</span>
+                          {s}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {gameSummary.improvementAreas.length > 0 && (
+                  <div>
+                    <h4 className="text-xs font-bold text-primary uppercase tracking-wider flex items-center gap-1.5 mb-2">
+                      <Target className="w-3.5 h-3.5" /> Areas to Improve
+                    </h4>
+                    <ul className="space-y-1.5">
+                      {gameSummary.improvementAreas.map((a, i) => (
+                        <li key={i} className="flex items-start gap-2 text-xs text-foreground/80 leading-relaxed">
+                          <span className="text-primary shrink-0 mt-0.5">▸</span>
+                          {a}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            </div>
           )}
         </div>
 
