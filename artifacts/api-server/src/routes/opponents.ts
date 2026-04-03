@@ -155,7 +155,7 @@ async function runAnalysis(
       };
     });
 
-    const analysis = await analyzePlayerGames(target, gameSummaries);
+    const analysis = await analyzePlayerGames(target, gameSummaries, { isOpponentScout: true });
 
     if (!analysis || !Array.isArray(analysis.weaknesses)) {
       await db.update(backgroundJobsTable).set({
@@ -223,6 +223,8 @@ async function runAnalysis(
       }
     }
 
+    const gamePgns = gameSummaries.map(g => g.pgn).filter(Boolean);
+
     const resultData = {
       username: target,
       profile,
@@ -233,6 +235,7 @@ async function runAnalysis(
       weaknesses: analysis.weaknesses,
       topOpenings,
       headToHead,
+      gamePgns,
     };
 
     await db.update(backgroundJobsTable).set({
@@ -258,6 +261,7 @@ interface OpponentWeakness {
   description: string;
   frequency: number;
   examples: string[];
+  relatedGameIndices?: number[];
 }
 
 router.post("/opponents/generate-courses", async (req, res): Promise<void> => {
@@ -272,13 +276,38 @@ router.post("/opponents/generate-courses", async (req, res): Promise<void> => {
     return;
   }
 
+  let storedGamePgns: string[] = [];
+  try {
+    const userId = req.user?.id;
+    if (userId) {
+      const [latestJob] = await db
+        .select({ result: backgroundJobsTable.result })
+        .from(backgroundJobsTable)
+        .where(
+          and(
+            eq(backgroundJobsTable.userId, userId),
+            eq(backgroundJobsTable.type, "scout"),
+            eq(backgroundJobsTable.status, "done"),
+            eq(backgroundJobsTable.targetUsername, opponentUsername.toLowerCase()),
+          )
+        )
+        .orderBy(desc(backgroundJobsTable.createdAt))
+        .limit(1);
+      if (latestJob?.result && (latestJob.result as any).gamePgns) {
+        storedGamePgns = (latestJob.result as any).gamePgns;
+      }
+    }
+  } catch (err) {
+    req.log.warn({ err }, "Failed to fetch stored game PGNs for course generation");
+  }
+
   const jobId = randomUUID();
   courseJobs.set(jobId, { status: "pending", createdAt: Date.now() });
   res.json({ jobId });
 
   req.log.info({ opponentUsername, requestingUser, jobId }, "Generating exploit courses (background)");
 
-  runCourseGeneration(opponentUsername, weaknesses, requestingUser.toLowerCase(), jobId, req.log).catch((err) => {
+  runCourseGeneration(opponentUsername, weaknesses, requestingUser.toLowerCase(), jobId, req.log, storedGamePgns).catch((err) => {
     req.log.error({ err, jobId }, "Background course generation failed");
   });
 });
@@ -299,6 +328,7 @@ async function runCourseGeneration(
   username: string,
   jobId: string,
   log: import("pino").Logger,
+  allGamePgns: string[] = [],
 ): Promise<void> {
   let coursesCreated = 0;
   const prioritized = [...weaknesses].sort((a, b) => {
@@ -308,13 +338,23 @@ async function runCourseGeneration(
 
   for (const weakness of prioritized) {
     try {
+      let relatedPgns: string[] = [];
+      if (allGamePgns.length > 0 && weakness.relatedGameIndices?.length) {
+        relatedPgns = weakness.relatedGameIndices
+          .filter(idx => idx >= 0 && idx < allGamePgns.length)
+          .map(idx => allGamePgns[idx]);
+      }
+      if (relatedPgns.length === 0 && allGamePgns.length > 0) {
+        relatedPgns = allGamePgns.slice(0, 6);
+      }
+
       const courseData = await generateExploitCourseForOpponent(opponentUsername, {
         category: weakness.category,
         severity: weakness.severity,
         description: weakness.description,
         frequency: weakness.frequency,
         examples: weakness.examples,
-      });
+      }, relatedPgns);
 
       const [course] = await db.insert(coursesTable).values({
         username,

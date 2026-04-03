@@ -25,7 +25,7 @@ Chess Coach - A full-stack chess analysis platform that imports games from chess
 3. **AI Analysis** (Premium): Analyzes up to 50 games using GPT to identify weaknesses across 6 categories. Jobs persist in `background_jobs` DB table — navigating away won't lose progress; page resumes polling or shows results on return.
 4. **Weakness Report**: Clickable cards → Weakness Detail page (`/analysis/:id`) with AI patterns, related games, related courses
 5. **Performance Stats**: Win rate, opening stats (bar chart), time control breakdown, win/loss/draw pie chart
-6. **Personalized Courses** (Premium): AI-generated courses with 4-5 annotated PGN lessons; generates by appending (not replacing) to preserve progress
+6. **Personalized Courses** (Premium): AI-generated courses with 4-5 annotated PGN lessons derived from the player's actual games (not generic openings); generates by appending (not replacing) to preserve progress
 7. **Interactive Course Viewer**: Sequential lesson mode, LessonBoardPlayer component, "Complete & Next" auto-advance
 8. **Opponent Scout** (Premium) (`/opponents`): Enter any chess.com username — fetches their recent games, runs full AI analysis, shows their weaknesses and favourite openings. Results persist in `background_jobs` DB table — navigating away won't lose progress; page restores results or resumes polling on return.
 9. **Practice Bots** (`/practice`): 8 AI bots from 400 to 2000 ELO with client-side minimax engine, piece-square tables, configurable depth/blunder rate. Live move analysis shows quality ratings (brilliant/excellent/good/inaccuracy/mistake/blunder), pros/cons, best move suggestion, and evaluation bar after every move.
@@ -83,8 +83,8 @@ artifacts-monorepo/
 - `POST /api/stripe/checkout` — Create Stripe Checkout session
 - `GET /api/stripe/subscription` — Get current user's subscription status
 - `POST /api/stripe/portal` — Create Stripe Customer Portal session
-- `POST /api/track` — Track page view (public, no auth required)
-- `GET /api/admin/stats` — Admin stats: page views, user count, active subscriptions
+- `POST /api/track` — Track page view with visitorId for unique visitor counting (public, no auth required)
+- `GET /api/admin/stats` — Admin stats: unique visitors, page views, user count, active subscriptions
 - `GET /api/admin/users` — Admin: list all registered users
 
 ## TypeScript & Composite Projects

@@ -54,7 +54,8 @@ function pgnMoveLine(pgn: string, maxHalfMoves = 30): string {
 
 export async function analyzePlayerGames(
   username: string,
-  games: GameSummary[]
+  games: GameSummary[],
+  options?: { isOpponentScout?: boolean }
 ): Promise<AnalysisOutput> {
   const subset = games.slice(0, 30);
 
@@ -74,7 +75,14 @@ export async function analyzePlayerGames(
     })
     .join("\n\n");
 
+  const isScout = options?.isOpponentScout === true;
+  const perspectiveInstruction = isScout
+    ? `IMPORTANT: You are scouting an OPPONENT named "${username}". Always refer to them by name ("${username}") or as "the opponent" — NEVER use "you" or "your". Write in third person about ${username}'s play. Example: "${username} repeatedly allows..." NOT "You repeatedly allow..."`
+    : `Address the player directly using "you" and "your" — this is the player's own self-analysis.`;
+
   const prompt = `You are a grandmaster-level chess coach performing a rigorous analysis of ${username}'s last ${subset.length} games.
+
+${perspectiveInstruction}
 
 GAME DATA (with actual move sequences):
 ${gamesText}
@@ -85,12 +93,12 @@ TASK: Identify 4-6 specific, concrete weaknesses. Base conclusions on the actual
 For each weakness output:
 - category: one of ["Opening Preparation", "Tactical Awareness", "Endgame Technique", "Positional Play", "Time Management", "Defensive Play"]
 - severity: one of ["Critical", "High", "Medium", "Low"]
-- description: 2-3 sentences that name SPECIFIC moves or move numbers you observed (e.g. "In Game 3, after 14.Nxd5 the player allowed 14...Qxd5 losing the initiative"). Be concrete — no vague generalities.
+- description: 2-3 sentences that name SPECIFIC moves or move numbers you observed.${isScout ? ` Always refer to the player as "${username}" (third person). Example: "In Game 3, ${username} allowed 14...Qxd5 losing the initiative."` : ` Example: "In Game 3, after 14.Nxd5 you allowed 14...Qxd5 losing the initiative."`} Be concrete — no vague generalities.
 - frequency: 0.0–1.0 (proportion of games this appears in)
 - examples: exactly 3 strings, each citing a specific game number, move, and what went wrong (e.g. "Game 7 (White, loss): After 21.Rfd1 the d-file was already contested; 21.Re1 keeping the e-file would have held equality")
 - relatedGameIndices: array of 2-4 game index numbers (0-based from the list above, matching [index:N]) where this weakness clearly shows up
 
-Also output a summary paragraph that names concrete patterns and move references.
+Also output a summary paragraph that names concrete patterns and move references.${isScout ? ` Use "${username}" or "the opponent" throughout — never "you".` : ""}
 
 Respond with VALID JSON only:
 {
@@ -527,31 +535,38 @@ interface CourseOutput {
 
 export async function generateExploitCourseForOpponent(
   opponentUsername: string,
-  weakness: WeaknessResult
+  weakness: WeaknessResult,
+  relatedGamePgns?: string[]
 ): Promise<CourseOutput> {
+  const gameSection = relatedGamePgns?.length
+    ? `\n\nACTUAL GAMES WHERE THIS WEAKNESS APPEARED:\n${relatedGamePgns.map((pgn, i) => `--- Game ${i + 1} ---\n${pgn}`).join("\n\n")}\n\nCRITICAL: Your lesson PGNs MUST be drawn from these actual games. Each lesson's examplePgn should replay a key segment from one of these games (the moves where the weakness is visible), with commentary. Use a [FEN "..."] tag if starting from a mid-game position. Do NOT invent generic opening sequences — use the real moves from the games above.`
+    : "";
+
   const prompt = `You are an expert chess coach preparing a player to face a specific opponent.
 
 Opponent: ${opponentUsername}
 Opponent's Weakness: ${weakness.category}
 Severity: ${weakness.severity}
 Description: ${weakness.description}
-Examples from their games: ${weakness.examples.join("; ")}
+Examples from their games: ${weakness.examples.join("; ")}${gameSection}
 
 Create a course (4–5 lessons) that teaches the STUDENT how to recognize, steer toward, and EXPLOIT this specific weakness in their opponent. Frame everything from the student's perspective ("you should…", "to exploit this…"). Do NOT teach how to fix the weakness — teach how to punish it.
 
 RULES for each lesson:
-1. examplePgn: a valid PGN string, 5-10 instructive moves showing how a player can steer into positions that exploit this weakness.
-   - Every move must have a {comment in curly braces} explaining WHY it exploits the opponent's vulnerability
-   - Legal moves only. Start from initial position unless the weakness is endgame-specific.
+1. examplePgn: a valid PGN string showing a key segment from the opponent's actual games where this weakness appeared.
+   - Every move must have a {comment in curly braces} explaining WHY it matters and how to exploit it
+   - Legal moves only
+   - ${relatedGamePgns?.length ? "MUST use actual move sequences from the provided games. If the relevant sequence starts mid-game, include a [FEN \"...\"] header with the starting position." : "Base the moves on the patterns described in the weakness examples. Start from the initial position unless the weakness is endgame-specific."}
    - Do NOT use null for examplePgn — every lesson requires a move sequence
+   - Do NOT invent generic textbook openings — every PGN must reflect the specific patterns and moves described in the weakness
 
-2. drillFen: A FEN string representing a position where the student must find the move that best exploits this weakness.
+2. drillFen: A FEN string representing a position from one of the actual games where the student must find the move that best exploits this weakness.
 
 3. drillExpectedMove: The move in SAN notation that most effectively exploits the weakness (must be legal in drillFen).
 
 4. drillHint: A one-sentence hint guiding the student toward the exploitation.
 
-5. content: 3–5 paragraphs of concrete coaching on HOW to exploit this specific pattern. Name the tactical/positional motifs, the move orders that provoke mistakes, and the techniques that punish this weakness.
+5. content: 3–5 paragraphs of concrete coaching on HOW to exploit this specific pattern. Reference specific moves from the opponent's actual games. Name the tactical/positional motifs, the move orders that provoke mistakes, and the techniques that punish this weakness.
 
 Respond with valid JSON:
 {
@@ -562,9 +577,9 @@ Respond with valid JSON:
   "lessons": [
     {
       "title": "Lesson title",
-      "content": "3-5 paragraphs of exploitation-focused coaching...",
+      "content": "3-5 paragraphs of exploitation-focused coaching referencing actual game moves...",
       "orderIndex": 0,
-      "examplePgn": "1. e4 {Steers toward open positions where their weakness is exposed} e5 {Comment} ...",
+      "examplePgn": "1. e4 {Comment on the actual game move} e5 {Comment} ...",
       "drillFen": "rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2",
       "drillExpectedMove": "Nc6",
       "drillHint": "Find the move that puts maximum pressure on their weak point"
@@ -590,34 +605,39 @@ Respond with valid JSON:
 }
 
 export async function generateCourseForWeakness(
-  weakness: WeaknessResult
+  weakness: WeaknessResult,
+  relatedGamePgns?: string[]
 ): Promise<CourseOutput> {
+  const gameSection = relatedGamePgns?.length
+    ? `\n\nACTUAL GAMES FROM THE PLAYER WHERE THIS WEAKNESS APPEARED:\n${relatedGamePgns.map((pgn, i) => `--- Game ${i + 1} ---\n${pgn}`).join("\n\n")}\n\nCRITICAL: Your lesson PGNs MUST be drawn from these actual games. Each lesson's examplePgn should replay a key segment from one of these games (the moves where the weakness/mistake occurs), with commentary explaining what went wrong and what should have been played instead. Use a [FEN "..."] tag if starting from a mid-game position. Do NOT invent generic opening sequences — use the real moves from the games above.`
+    : "";
+
   const prompt = `You are an expert chess coach. Create a personalized chess course to address this specific weakness:
 
 Category: ${weakness.category}
 Severity: ${weakness.severity}
 Description: ${weakness.description}
-Examples from player's games: ${weakness.examples.join("; ")}
+Examples from player's games: ${weakness.examples.join("; ")}${gameSection}
 
 Create a course with 4-5 lessons. Each lesson MUST be tightly focused on a concrete sub-skill within this weakness — no generic advice.
 
 RULES for each lesson:
-1. examplePgn: a valid PGN string, 5-10 instructive moves DIRECTLY illustrating the lesson concept.
+1. examplePgn: a valid PGN string showing a key segment from the player's actual games where this weakness appeared.
    - Every move must have a {comment in curly braces} explaining exactly WHY it matters
-   - Legal moves only. Start from initial position.
-   - Example format: "1. e4 {Controls d5/f5 immediately} e5 {Symmetrical — fights for center} 2. Nf3 {Develops knight to the best square, attacks e5} Nc6 {Defends the pawn and develops}"
+   - Legal moves only
+   - ${relatedGamePgns?.length ? "MUST use actual move sequences from the provided games. If the relevant sequence starts mid-game, include a [FEN \"...\"] header with the starting position." : "Base the moves on the patterns described in the weakness examples. Start from the initial position unless the weakness is endgame-specific."}
    - Do NOT use null for examplePgn — every lesson requires a move sequence
+   - Do NOT invent generic textbook openings — every PGN must reflect the specific patterns and moves described in the weakness
 
-2. drillFen: A FEN string representing a position where the student must find the right move.
-   Choose a critical position related to the lesson concept.
-   Example: "r1bq1rk1/ppp2ppp/2np1n2/4p3/2B1P3/2NP1N2/PPP2PPP/R1BQR1K1 w - - 0 9"
+2. drillFen: A FEN string representing a critical position from one of the actual games where the student must find the right move.
+   Choose the exact position where the mistake was made or could have been avoided.
 
 3. drillExpectedMove: The best move in the drill position in SAN notation (e.g. "Ng5", "d4", "Bxf7+").
    This must be a legal move from the drillFen position.
 
 4. drillHint: A one-sentence hint the player can reveal if stuck (e.g. "Look for a way to attack the f7 square").
 
-5. content: 3-5 paragraphs of specific chess coaching. Name concrete patterns, cite typical move orders, explain WHY certain moves fail.
+5. content: 3-5 paragraphs of specific chess coaching. Reference specific moves from the player's actual games. Explain what went wrong, what should have been played instead, and how to recognize similar patterns in the future.
 
 Respond with valid JSON:
 {
@@ -628,9 +648,9 @@ Respond with valid JSON:
   "lessons": [
     {
       "title": "Lesson title",
-      "content": "3-5 paragraphs of specific chess coaching content...",
+      "content": "3-5 paragraphs of specific chess coaching referencing actual game moves...",
       "orderIndex": 0,
-      "examplePgn": "1. e4 {Comment} e5 {Comment} 2. Nf3 {Comment} Nc6 {Comment}",
+      "examplePgn": "1. e4 {Comment on the actual game move} e5 {Comment} ...",
       "drillFen": "rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2",
       "drillExpectedMove": "Nc6",
       "drillHint": "Develop a piece that also defends the pawn"

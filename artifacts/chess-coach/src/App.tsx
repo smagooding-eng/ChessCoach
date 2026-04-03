@@ -133,6 +133,16 @@ const PPracticeBots  = () => <ProtectedRoute component={PracticeBots} />;
 const PSubscription  = () => <ProtectedRoute component={Subscription} />;
 const PProfile       = () => <ProtectedRoute component={Profile} />;
 
+function getVisitorId(): string {
+  const key = 'chess_coach_visitor_id';
+  let id = localStorage.getItem(key);
+  if (!id) {
+    id = crypto.randomUUID();
+    localStorage.setItem(key, id);
+  }
+  return id;
+}
+
 function PageTracker() {
   const [location] = useLocation();
   useEffect(() => {
@@ -140,7 +150,7 @@ function PageTracker() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({ path: location }),
+      body: JSON.stringify({ path: location, visitorId: getVisitorId() }),
     }).catch(() => {});
   }, [location]);
   return null;

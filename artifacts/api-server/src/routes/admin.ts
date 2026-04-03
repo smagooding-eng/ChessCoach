@@ -1,6 +1,6 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { db, usersTable, pageViewsTable } from "@workspace/db";
-import { sql, count, gte } from "drizzle-orm";
+import { sql, count, gte, countDistinct } from "drizzle-orm";
 
 const router: IRouter = Router();
 
@@ -35,6 +35,15 @@ router.get("/admin/stats", requireAdmin, async (_req: Request, res: Response) =>
       .from(pageViewsTable)
       .where(gte(pageViewsTable.createdAt, todayStart));
 
+    const [totalUniqueResult] = await db
+      .select({ count: countDistinct(pageViewsTable.visitorId) })
+      .from(pageViewsTable);
+
+    const [todayUniqueResult] = await db
+      .select({ count: countDistinct(pageViewsTable.visitorId) })
+      .from(pageViewsTable)
+      .where(gte(pageViewsTable.createdAt, todayStart));
+
     let activeSubscriptions = 0;
     try {
       const { storage } = await import("../lib/storage");
@@ -46,6 +55,7 @@ router.get("/admin/stats", requireAdmin, async (_req: Request, res: Response) =>
 
     res.json({
       pageViews: { total: totalViewsResult.count, today: todayViewsResult.count },
+      uniqueVisitors: { total: totalUniqueResult.count, today: todayUniqueResult.count },
       users: { total: totalUsersResult.count, today: todayUsersResult.count },
       subscriptions: { active: activeSubscriptions },
     });

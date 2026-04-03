@@ -21,11 +21,13 @@ router.use(adminRouter);
 
 router.post("/track", async (req: Request, res: Response) => {
   try {
-    const { path } = req.body;
+    const { path, visitorId } = req.body;
     if (!path) { res.status(400).json({ error: "path required" }); return; }
+    const ip = req.headers["x-forwarded-for"]?.toString().split(",")[0]?.trim() || req.ip || "unknown";
     await db.insert(pageViewsTable).values({
       path,
       userId: req.user?.id ?? null,
+      visitorId: visitorId || `ip_${ip}`,
     });
     res.json({ ok: true });
   } catch {

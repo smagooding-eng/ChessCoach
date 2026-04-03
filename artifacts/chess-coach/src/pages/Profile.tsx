@@ -15,6 +15,7 @@ import {
 
 interface AdminStats {
   pageViews: { total: number; today: number };
+  uniqueVisitors: { total: number; today: number };
   users: { total: number; today: number };
   subscriptions: { active: number };
 }
@@ -115,9 +116,9 @@ function AdminTicker() {
           <div className="w-8 h-8 bg-blue-400/10 rounded-lg flex items-center justify-center mx-auto mb-2">
             <Eye className="w-4 h-4 text-blue-400" />
           </div>
-          <p className="text-xl font-black text-foreground">{stats.pageViews.total.toLocaleString()}</p>
-          <p className="text-xs text-muted-foreground font-medium">Page Views</p>
-          <p className="text-[10px] text-muted-foreground/60 mt-0.5">{stats.pageViews.today} today</p>
+          <p className="text-xl font-black text-foreground">{(stats.uniqueVisitors?.total ?? stats.pageViews.total).toLocaleString()}</p>
+          <p className="text-xs text-muted-foreground font-medium">Unique Visitors</p>
+          <p className="text-[10px] text-muted-foreground/60 mt-0.5">{(stats.uniqueVisitors?.today ?? stats.pageViews.today)} today</p>
         </div>
         <button
           onClick={() => setShowUsers(v => !v)}

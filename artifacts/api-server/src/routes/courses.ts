@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
-import { db, coursesTable, lessonsTable, weaknessesTable } from "@workspace/db";
-import { eq, desc } from "drizzle-orm";
+import { db, coursesTable, lessonsTable, weaknessesTable, gamesTable } from "@workspace/db";
+import { eq, desc, inArray } from "drizzle-orm";
 import {
   ListCoursesQueryParams,
   ListCoursesResponse,
@@ -41,13 +41,31 @@ async function runCourseGenerationJob(username: string, jobId: string, log: Logg
 
     for (const weakness of weaknesses.slice(0, 4)) {
       try {
+        let relatedGamePgns: string[] = [];
+        if (weakness.relatedGameIds && weakness.relatedGameIds.length > 0) {
+          const relatedGames = await db
+            .select({ pgn: gamesTable.pgn })
+            .from(gamesTable)
+            .where(inArray(gamesTable.id, weakness.relatedGameIds));
+          relatedGamePgns = relatedGames.map(g => g.pgn).filter(Boolean) as string[];
+        }
+        if (relatedGamePgns.length === 0) {
+          const fallbackGames = await db
+            .select({ pgn: gamesTable.pgn })
+            .from(gamesTable)
+            .where(eq(gamesTable.username, username.toLowerCase()))
+            .orderBy(desc(gamesTable.playedAt))
+            .limit(6);
+          relatedGamePgns = fallbackGames.map(g => g.pgn).filter(Boolean) as string[];
+        }
+
         const courseData = await generateCourseForWeakness({
           category: weakness.category,
           severity: weakness.severity,
           description: weakness.description,
           frequency: weakness.frequency,
           examples: weakness.examples,
-        });
+        }, relatedGamePgns);
 
         const [course] = await db.insert(coursesTable).values({
           username: username.toLowerCase(),
@@ -155,13 +173,31 @@ router.post("/courses/generate", async (req, res): Promise<void> => {
 
   for (const weakness of weaknesses.slice(0, 4)) {
     try {
+      let relatedGamePgns: string[] = [];
+      if (weakness.relatedGameIds && weakness.relatedGameIds.length > 0) {
+        const relatedGames = await db
+          .select({ pgn: gamesTable.pgn })
+          .from(gamesTable)
+          .where(inArray(gamesTable.id, weakness.relatedGameIds));
+        relatedGamePgns = relatedGames.map(g => g.pgn).filter(Boolean) as string[];
+      }
+      if (relatedGamePgns.length === 0) {
+        const fallbackGames = await db
+          .select({ pgn: gamesTable.pgn })
+          .from(gamesTable)
+          .where(eq(gamesTable.username, username.toLowerCase()))
+          .orderBy(desc(gamesTable.playedAt))
+          .limit(6);
+        relatedGamePgns = fallbackGames.map(g => g.pgn).filter(Boolean) as string[];
+      }
+
       const courseData = await generateCourseForWeakness({
         category: weakness.category,
         severity: weakness.severity,
         description: weakness.description,
         frequency: weakness.frequency,
         examples: weakness.examples,
-      });
+      }, relatedGamePgns);
 
       const [course] = await db
         .insert(coursesTable)

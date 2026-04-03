@@ -32,6 +32,7 @@ export const pageViewsTable = pgTable("page_views", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   path: varchar("path").notNull(),
   userId: varchar("user_id"),
+  visitorId: varchar("visitor_id"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
