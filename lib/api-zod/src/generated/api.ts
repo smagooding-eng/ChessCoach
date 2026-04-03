@@ -59,6 +59,7 @@ export const ListGamesResponse = zod.object({
       url: zod.string().nullish(),
       analyzed: zod.boolean(),
       analysisNotes: zod.string().nullish(),
+      reviewed: zod.boolean(),
       createdAt: zod.string(),
     }),
   ),
@@ -88,6 +89,7 @@ export const GetGameResponse = zod.object({
   url: zod.string().nullish(),
   analyzed: zod.boolean(),
   analysisNotes: zod.string().nullish(),
+  reviewed: zod.boolean(),
   createdAt: zod.string(),
 });
 

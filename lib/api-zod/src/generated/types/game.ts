@@ -26,5 +26,6 @@ export interface Game {
   analyzed: boolean;
   /** @nullable */
   analysisNotes?: string | null;
+  reviewed: boolean;
   createdAt: string;
 }

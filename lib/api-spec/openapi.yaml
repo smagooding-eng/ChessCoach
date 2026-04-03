@@ -458,6 +458,8 @@ components:
           type: boolean
         analysisNotes:
           type: ["string", "null"]
+        reviewed:
+          type: boolean
         createdAt:
           type: string
       required:
@@ -472,6 +474,7 @@ components:
         - timeControl
         - playedAt
         - analyzed
+        - reviewed
         - createdAt
 
     GameReplay:

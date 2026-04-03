@@ -1,12 +1,14 @@
 import React, { useState, useMemo } from 'react';
 import { useMyGames } from '@/hooks/use-games';
+import { useUser } from '@/hooks/use-user';
 import { Link } from 'wouter';
 import { motion } from 'framer-motion';
-import { Search, Play, Filter, BookOpen } from 'lucide-react';
+import { Search, Play, Filter, BookOpen, Sparkles } from 'lucide-react';
 import { format } from 'date-fns';
 
 export function Games() {
   const { data, isLoading, isError, error } = useMyGames();
+  const { username } = useUser();
   const [filter, setFilter] = useState('all');
   const [search, setSearch] = useState('');
 
@@ -49,122 +51,161 @@ export function Games() {
     );
   }
 
+  const getPlayerColor = (game: typeof games[0]) => {
+    if (!username) return null;
+    const u = username.toLowerCase();
+    if (game.whiteUsername.toLowerCase() === u) return 'white';
+    if (game.blackUsername.toLowerCase() === u) return 'black';
+    return null;
+  };
+
+  const getOpponent = (game: typeof games[0]) => {
+    if (!username) return game.blackUsername;
+    const u = username.toLowerCase();
+    if (game.whiteUsername.toLowerCase() === u) return game.blackUsername;
+    return game.whiteUsername;
+  };
+
+  const getUserRating = (game: typeof games[0]) => {
+    if (!username) return game.whiteRating;
+    const u = username.toLowerCase();
+    if (game.whiteUsername.toLowerCase() === u) return game.whiteRating;
+    return game.blackRating;
+  };
+
+  const getOpponentRating = (game: typeof games[0]) => {
+    if (!username) return game.blackRating;
+    const u = username.toLowerCase();
+    if (game.whiteUsername.toLowerCase() === u) return game.blackRating;
+    return game.whiteRating;
+  };
+
   return (
-    <div className="space-y-6 px-4 pt-4 md:px-0 md:pt-0">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-display font-bold">My Games</h1>
-          <p className="text-muted-foreground">View and replay your imported chess games.</p>
-        </div>
-        
-        <div className="flex items-center gap-3 w-full md:w-auto">
-          <div className="relative flex-1 md:w-64">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <input 
-              type="text"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="Search opponent or opening…"
-              className="w-full pl-9 pr-4 py-2 bg-secondary/50 border border-border rounded-xl focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
-            />
-          </div>
-          <select 
-            value={filter} 
-            onChange={(e) => setFilter(e.target.value)}
-            className="px-4 py-2 bg-secondary/50 border border-border rounded-xl outline-none focus:border-primary appearance-none cursor-pointer"
-          >
-            <option value="all">All Results</option>
-            <option value="win">Wins</option>
-            <option value="loss">Losses</option>
-            <option value="draw">Draws</option>
-          </select>
-        </div>
+    <div className="space-y-5 px-4 pt-4 md:px-0 md:pt-0 pb-10">
+      <div>
+        <h1 className="text-2xl md:text-3xl font-display font-bold">My Games</h1>
+        <p className="text-muted-foreground text-sm">View and replay your imported chess games.</p>
       </div>
 
-      <div className="glass-card rounded-2xl overflow-hidden border border-white/5">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-secondary/50 border-b border-white/5">
-                <th className="p-4 font-semibold text-muted-foreground text-sm">Date</th>
-                <th className="p-4 font-semibold text-muted-foreground text-sm">Players</th>
-                <th className="p-4 font-semibold text-muted-foreground text-sm">Opening</th>
-                <th className="p-4 font-semibold text-muted-foreground text-sm">Result</th>
-                <th className="p-4 font-semibold text-muted-foreground text-sm text-right">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/5">
-              {filteredGames.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="p-8 text-center text-muted-foreground">
-                    {games.length === 0 ? (
-                      <div className="flex flex-col items-center gap-3 py-4">
-                        <p>No games imported yet.</p>
-                        <Link href="/import" className="text-primary hover:underline font-medium">
-                          Import your games →
-                        </Link>
-                      </div>
-                    ) : (
-                      'No games match the selected filter.'
-                    )}
-                  </td>
-                </tr>
-              ) : (
-                filteredGames.map((game, i) => (
-                  <motion.tr 
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: i * 0.05 }}
-                    key={game.id} 
-                    className="hover:bg-white/[0.02] transition-colors group"
-                  >
-                    <td className="p-4 text-sm whitespace-nowrap">
-                      {format(new Date(game.playedAt), 'MMM d, yyyy')}
-                    </td>
-                    <td className="p-4">
-                      <div className="flex flex-col gap-1">
-                        <div className="flex items-center gap-2">
-                          <span className="w-3 h-3 rounded bg-white shadow-sm border border-black/10"></span>
-                          <span className="font-medium text-sm">{game.whiteUsername} <span className="text-muted-foreground text-xs font-normal">({game.whiteRating})</span></span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="w-3 h-3 rounded bg-neutral-800 shadow-sm border border-white/10"></span>
-                          <span className="font-medium text-sm">{game.blackUsername} <span className="text-muted-foreground text-xs font-normal">({game.blackRating})</span></span>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="p-4 text-sm max-w-[220px]" title={game.opening || ''}>
-                      <div className="flex items-start gap-1.5">
-                        <BookOpen className="w-3.5 h-3.5 text-muted-foreground/60 mt-0.5 shrink-0" />
-                        <div>
-                          <div className="truncate leading-snug">
-                            {game.eco && <span className="text-xs font-bold text-primary/70 mr-1">{game.eco}</span>}
-                            {game.opening || 'Unknown Opening'}
-                          </div>
-                          <div className="text-xs text-muted-foreground mt-0.5">{game.timeControl}</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="p-4">
-                      <span className={`inline-flex px-2.5 py-1 rounded-md text-xs font-bold uppercase tracking-wide
-                        ${game.result === 'win' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/20' : 
-                          game.result === 'loss' ? 'bg-destructive/20 text-red-400 border border-destructive/20' : 
-                          'bg-slate-500/20 text-slate-400 border border-slate-500/20'}`}>
-                        {game.result}
-                      </span>
-                    </td>
-                    <td className="p-4 text-right">
-                      <Link href={`/games/${game.id}`} className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-secondary text-primary hover:bg-primary hover:text-primary-foreground transition-all duration-300">
-                        <Play className="w-4 h-4 ml-0.5" />
-                      </Link>
-                    </td>
-                  </motion.tr>
-                ))
-              )}
-            </tbody>
-          </table>
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <input
+            type="text"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search opponent or opening…"
+            className="w-full pl-9 pr-4 py-2.5 bg-secondary/50 border border-border rounded-xl focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all text-sm"
+          />
         </div>
+        <select
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+          className="px-4 py-2.5 bg-secondary/50 border border-border rounded-xl outline-none focus:border-primary appearance-none cursor-pointer text-sm"
+        >
+          <option value="all">All Results</option>
+          <option value="win">Wins</option>
+          <option value="loss">Losses</option>
+          <option value="draw">Draws</option>
+        </select>
       </div>
+
+      {filteredGames.length === 0 ? (
+        <div className="text-center py-12 text-muted-foreground">
+          {games.length === 0 ? (
+            <div className="flex flex-col items-center gap-3">
+              <p>No games imported yet.</p>
+              <Link href="/import" className="text-primary hover:underline font-medium">
+                Import your games →
+              </Link>
+            </div>
+          ) : (
+            'No games match the selected filter.'
+          )}
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {filteredGames.map((game, i) => {
+            const color = getPlayerColor(game);
+            const opponent = getOpponent(game);
+            const userRating = getUserRating(game);
+            const opponentRating = getOpponentRating(game);
+            const reviewed = game.reviewed;
+
+            const borderColor = color === 'white'
+              ? 'border-l-white/80'
+              : color === 'black'
+              ? 'border-l-neutral-500'
+              : 'border-l-border';
+
+            return (
+              <motion.div
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: Math.min(i * 0.03, 0.3) }}
+                key={game.id}
+              >
+                <Link href={`/games/${game.id}`}>
+                  <div className={`glass-card rounded-xl p-3.5 border border-white/5 border-l-[3px] ${borderColor} hover:bg-white/[0.03] transition-colors cursor-pointer group`}>
+                    <div className="flex items-center gap-3">
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+                        color === 'white' ? 'bg-white/90' : 'bg-neutral-700 border border-white/10'
+                      }`}>
+                        <span className={`text-xs font-bold ${color === 'white' ? 'text-neutral-900' : 'text-white'}`}>
+                          {color === 'white' ? 'W' : 'B'}
+                        </span>
+                      </div>
+
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-semibold text-sm truncate">vs {opponent}</span>
+                          <span className="text-xs text-muted-foreground">({opponentRating})</span>
+                          <span className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide
+                            ${game.result === 'win' ? 'bg-emerald-500/20 text-emerald-400' :
+                              game.result === 'loss' ? 'bg-red-500/20 text-red-400' :
+                              'bg-slate-500/20 text-slate-400'}`}>
+                            {game.result}
+                          </span>
+                          {reviewed && (
+                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-primary/15 text-primary text-[10px] font-bold">
+                              <Sparkles className="w-2.5 h-2.5" /> Reviewed
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
+                          <span>{format(new Date(game.playedAt), 'MMM d, yyyy')}</span>
+                          <span className="text-border">·</span>
+                          <span>{game.timeControl}</span>
+                          {game.eco && (
+                            <>
+                              <span className="text-border">·</span>
+                              <span className="text-primary/70 font-medium">{game.eco}</span>
+                            </>
+                          )}
+                          <span className="text-border">·</span>
+                          <span>You: {userRating}</span>
+                        </div>
+                        {game.opening && (
+                          <div className="flex items-center gap-1 mt-1">
+                            <BookOpen className="w-3 h-3 text-muted-foreground/50 shrink-0" />
+                            <span className="text-xs text-muted-foreground/70 truncate">{game.opening}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="shrink-0">
+                        <div className="w-8 h-8 rounded-lg bg-secondary flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-all">
+                          <Play className="w-3.5 h-3.5 ml-0.5" />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </Link>
+              </motion.div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

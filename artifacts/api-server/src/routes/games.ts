@@ -105,6 +105,7 @@ router.get("/games", async (req, res): Promise<void> => {
     ListGamesResponse.parse({
       games: games.map((g) => ({
         ...g,
+        reviewed: !!(g.reviewData && Array.isArray(g.reviewData) && (g.reviewData as unknown[]).length > 0),
         playedAt: g.playedAt.toISOString(),
         createdAt: g.createdAt.toISOString(),
       })),
@@ -334,6 +335,7 @@ router.get("/games/:id", async (req, res): Promise<void> => {
   res.json(
     GetGameResponse.parse({
       ...game,
+      reviewed: !!(game.reviewData && Array.isArray(game.reviewData) && (game.reviewData as unknown[]).length > 0),
       playedAt: game.playedAt.toISOString(),
       createdAt: game.createdAt.toISOString(),
     })
