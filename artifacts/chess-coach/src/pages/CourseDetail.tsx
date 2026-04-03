@@ -510,6 +510,7 @@ export function CourseDetail() {
                         drillFen={lesson.drillFen ?? null}
                         drillExpectedMove={lesson.drillExpectedMove ?? null}
                         drillHint={lesson.drillHint ?? null}
+                        content={lesson.content ?? null}
                       />
                     </div>
                   )}

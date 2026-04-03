@@ -27,27 +27,116 @@ interface Step {
 const BOARD_LIGHT = '#f0d9b5';
 const BOARD_DARK = '#b58863';
 
-function parsePgnSteps(pgn: string): Step[] | null {
-  if (!pgn || pgn.trim() === '') return null;
+const SAN_PATTERN = /\*\*(?:\d+\.+\s*)?([KQRBN]?[a-h]?[1-8]?x?[a-h][1-8](?:=[QRBN])?[+#]?|O-O(?:-O)?)[!?]*\*\*/;
 
+function extractFen(pgn: string): string | null {
+  const fenHeaderMatch = pgn.match(/\[FEN\s+"([^"]+)"\]/i);
+  if (fenHeaderMatch) {
+    try { new Chess(fenHeaderMatch[1]); return fenHeaderMatch[1]; } catch { return null; }
+  }
   const looksLikeFen = /^[rnbqkpRNBQKP1-8\/]+ [wb] [KQkq-]+ [a-h\d-]+/.test(pgn.trim());
   if (looksLikeFen) {
-    return [{ fen: pgn.trim(), san: null, comment: 'Study this position.', moveNum: 0, fullMoveNumber: 1, color: null }];
+    try { new Chess(pgn.trim()); return pgn.trim(); } catch { return null; }
+  }
+  return null;
+}
+
+function buildStepsFromContent(
+  fen: string,
+  content: string,
+  drillExpectedMove: string | null,
+): Step[] {
+  const fullMoveNumber = parseInt(fen.split(' ')[5]) || 1;
+  const turnColor: 'w' | 'b' = fen.split(' ')[1] === 'b' ? 'b' : 'w';
+
+  const steps: Step[] = [
+    { fen, san: null, comment: 'Study this position.', moveNum: 0, fullMoveNumber, color: null },
+  ];
+
+  const contentParts = content.split(/\n\n+/).filter(s => s.trim().length > 0);
+  const grouped: string[] = [];
+  for (let i = 0; i < contentParts.length; i++) {
+    const t = contentParts[i].trim();
+    if (t.startsWith('#') && i + 1 < contentParts.length && !contentParts[i + 1].trim().startsWith('#')) {
+      grouped.push(t + '\n\n' + contentParts[i + 1].trim());
+      i++;
+    } else {
+      grouped.push(t);
+    }
   }
 
-  const fenHeaderMatch = pgn.match(/\[FEN\s+"([^"]+)"\]/i);
+  for (const section of grouped) {
+    const moveMatch = section.match(SAN_PATTERN);
+    if (!moveMatch) continue;
+
+    const san = moveMatch[1];
+    const isMistakeSection = /mistake|error|wrong|bad|blunder|\?\?/i.test(section);
+    const isFixSection = /fix|correct|better|instead|should|improve|best/i.test(section);
+
+    try {
+      const testChess = new Chess(fen);
+      const move = testChess.move(san);
+      if (move) {
+        const cleanComment = section
+          .replace(/^#{1,3}\s+/gm, '')
+          .replace(/\*\*([^*]+)\*\*/g, '$1')
+          .trim();
+
+        steps.push({
+          fen: testChess.fen(),
+          san: move.san,
+          comment: cleanComment,
+          moveNum: steps.length,
+          fullMoveNumber,
+          color: turnColor,
+          isMistake: isMistakeSection && !isFixSection,
+          isFix: isFixSection && !isMistakeSection,
+          from: move.from,
+          to: move.to,
+        });
+      }
+    } catch {}
+  }
+
+  if (steps.length === 1 && drillExpectedMove) {
+    try {
+      const testChess = new Chess(fen);
+      const move = testChess.move(drillExpectedMove);
+      if (move) {
+        steps.push({
+          fen: testChess.fen(),
+          san: move.san,
+          comment: `The correct move is ${move.san}.`,
+          moveNum: 1,
+          fullMoveNumber,
+          color: turnColor,
+          isFix: true,
+          from: move.from,
+          to: move.to,
+        });
+      }
+    } catch {}
+  }
+
+  return steps;
+}
+
+function parsePgnSteps(pgn: string, content?: string | null, drillExpectedMove?: string | null): Step[] | null {
+  if (!pgn || pgn.trim() === '') return null;
+
+  const fen = extractFen(pgn);
 
   try {
     const chess = new Chess();
     chess.loadPgn(pgn);
     const history = chess.history({ verbose: true });
 
-    if (history.length === 0 && fenHeaderMatch) {
-      try {
-        const fen = fenHeaderMatch[1];
-        new Chess(fen);
-        return [{ fen, san: null, comment: 'Study this position.', moveNum: 0, fullMoveNumber: parseInt(fen.split(' ')[5]) || 1, color: null }];
-      } catch {}
+    if (history.length === 0 && fen) {
+      if (content) {
+        const contentSteps = buildStepsFromContent(fen, content, drillExpectedMove ?? null);
+        if (contentSteps.length > 1) return contentSteps;
+      }
+      return [{ fen, san: null, comment: 'Study this position.', moveNum: 0, fullMoveNumber: parseInt(fen.split(' ')[5]) || 1, color: null }];
     }
 
     if (history.length === 0) return null;
@@ -102,12 +191,12 @@ function parsePgnSteps(pgn: string): Step[] | null {
 
     return steps;
   } catch {
-    if (fenHeaderMatch) {
-      try {
-        const fen = fenHeaderMatch[1];
-        new Chess(fen);
-        return [{ fen, san: null, comment: 'Study this position.', moveNum: 0, fullMoveNumber: parseInt(fen.split(' ')[5]) || 1, color: null }];
-      } catch {}
+    if (fen) {
+      if (content) {
+        const contentSteps = buildStepsFromContent(fen, content, drillExpectedMove ?? null);
+        if (contentSteps.length > 1) return contentSteps;
+      }
+      return [{ fen, san: null, comment: 'Study this position.', moveNum: 0, fullMoveNumber: parseInt(fen.split(' ')[5]) || 1, color: null }];
     }
     return null;
   }
@@ -122,10 +211,11 @@ interface LessonBoardPlayerProps {
   drillFen?: string | null;
   drillExpectedMove?: string | null;
   drillHint?: string | null;
+  content?: string | null;
 }
 
-export function LessonBoardPlayer({ pgn, title, drillFen, drillExpectedMove, drillHint }: LessonBoardPlayerProps) {
-  const steps = parsePgnSteps(pgn);
+export function LessonBoardPlayer({ pgn, title, drillFen, drillExpectedMove, drillHint, content }: LessonBoardPlayerProps) {
+  const steps = parsePgnSteps(pgn, content, drillExpectedMove);
   const [tab, setTab] = useState<Tab>('lesson');
   const [currentStep, setCurrentStep] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
