@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { useMyCourses } from '@/hooks/use-courses';
 import { useUser } from '@/hooks/use-user';
 import { useQueryClient } from '@tanstack/react-query';
@@ -38,6 +38,12 @@ const TABS: { id: EndgameTab; label: string; icon: React.ElementType; desc: stri
   },
 ];
 
+const API_TYPE_TO_TAB: Record<string, EndgameTab> = {
+  checkmate_patterns: 'checkmate',
+  essential_endgames: 'essential',
+  personal_endgames: 'personal',
+};
+
 export function Endgames() {
   const { username } = useUser();
   const queryClient = useQueryClient();
@@ -49,13 +55,68 @@ export function Endgames() {
   const mountedRef = useRef(true);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  const startPolling = useCallback((jobId: string, apiType: string) => {
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    setGeneratingType(apiType);
+    setGenError(null);
+
+    intervalRef.current = setInterval(async () => {
+      if (!mountedRef.current) {
+        clearInterval(intervalRef.current!);
+        return;
+      }
+      try {
+        const pollRes = await apiFetch(`/api/courses/endgame/generate-status/${jobId}`, { cache: 'no-store' });
+        if (pollRes.status === 304) return;
+        if (!pollRes.ok) {
+          clearInterval(intervalRef.current!);
+          intervalRef.current = null;
+          setGenError('Generation job expired or failed');
+          setGeneratingType(null);
+          return;
+        }
+        const pollBody = await pollRes.json() as { status: string; error?: string };
+
+        if (!mountedRef.current) return;
+
+        if (pollBody.status === 'done') {
+          clearInterval(intervalRef.current!);
+          intervalRef.current = null;
+          setGeneratingType(null);
+          queryClient.invalidateQueries({ queryKey: ['/api/courses'] });
+          refetch();
+        } else if (pollBody.status === 'error') {
+          clearInterval(intervalRef.current!);
+          intervalRef.current = null;
+          setGenError(pollBody.error ?? 'Generation failed');
+          setGeneratingType(null);
+        }
+      } catch {}
+    }, 3000);
+  }, [queryClient, refetch]);
+
   useEffect(() => {
     mountedRef.current = true;
+
+    (async () => {
+      try {
+        const res = await apiFetch('/api/courses/endgame/active-job', { cache: 'no-store' });
+        if (!res.ok) return;
+        const body = await res.json() as { jobs: { jobId: string; endgameType: string; status: string }[] };
+        if (body.jobs.length > 0 && mountedRef.current) {
+          const activeJob = body.jobs[0];
+          const tab = API_TYPE_TO_TAB[activeJob.endgameType];
+          if (tab) setActiveTab(tab);
+          startPolling(activeJob.jobId, activeJob.endgameType);
+        }
+      } catch {}
+    })();
+
     return () => {
       mountedRef.current = false;
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, []);
+  }, [startPolling]);
 
   const allCourses = data?.courses || [];
   const endgameCourses = allCourses.filter(c =>
@@ -109,39 +170,7 @@ export function Endgames() {
       return;
     }
 
-    intervalRef.current = setInterval(async () => {
-      if (!mountedRef.current) {
-        clearInterval(intervalRef.current!);
-        return;
-      }
-      try {
-        const pollRes = await apiFetch(`/api/courses/endgame/generate-status/${jobId}`, { cache: 'no-store' });
-        if (pollRes.status === 304) return;
-        if (!pollRes.ok) {
-          clearInterval(intervalRef.current!);
-          intervalRef.current = null;
-          setGenError('Generation job expired or failed');
-          setGeneratingType(null);
-          return;
-        }
-        const pollBody = await pollRes.json() as { status: string; error?: string };
-
-        if (!mountedRef.current) return;
-
-        if (pollBody.status === 'done') {
-          clearInterval(intervalRef.current!);
-          intervalRef.current = null;
-          setGeneratingType(null);
-          queryClient.invalidateQueries({ queryKey: ['/api/courses'] });
-          refetch();
-        } else if (pollBody.status === 'error') {
-          clearInterval(intervalRef.current!);
-          intervalRef.current = null;
-          setGenError(pollBody.error ?? 'Generation failed');
-          setGeneratingType(null);
-        }
-      } catch {}
-    }, 3000);
+    startPolling(jobId, apiType);
   }
 
   const currentTab = TABS.find(t => t.id === activeTab)!;

@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { useMyCourses } from '@/hooks/use-courses';
 import { useUser } from '@/hooks/use-user';
 import { useQueryClient } from '@tanstack/react-query';
@@ -18,13 +18,65 @@ export function Courses() {
   const mountedRef = useRef(true);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  const startPolling = useCallback((jobId: string) => {
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    setIsGenerating(true);
+    setGenError(null);
+
+    intervalRef.current = setInterval(async () => {
+      if (!mountedRef.current) {
+        clearInterval(intervalRef.current!);
+        return;
+      }
+      try {
+        const pollRes = await apiFetch(`/api/courses/generate-status/${jobId}`, { cache: 'no-store' });
+        if (pollRes.status === 304) return;
+        if (!pollRes.ok) {
+          clearInterval(intervalRef.current!);
+          intervalRef.current = null;
+          setGenError('Generation job expired or failed');
+          setIsGenerating(false);
+          return;
+        }
+        const pollBody = await pollRes.json() as { status: string; error?: string };
+
+        if (!mountedRef.current) return;
+
+        if (pollBody.status === 'done') {
+          clearInterval(intervalRef.current!);
+          intervalRef.current = null;
+          setIsGenerating(false);
+          queryClient.invalidateQueries({ queryKey: ['/api/courses'] });
+          refetch();
+        } else if (pollBody.status === 'error') {
+          clearInterval(intervalRef.current!);
+          intervalRef.current = null;
+          setGenError(pollBody.error ?? 'Course generation failed');
+          setIsGenerating(false);
+        }
+      } catch {}
+    }, 3000);
+  }, [queryClient, refetch]);
+
   useEffect(() => {
     mountedRef.current = true;
+
+    (async () => {
+      try {
+        const res = await apiFetch('/api/courses/active-job', { cache: 'no-store' });
+        if (!res.ok) return;
+        const body = await res.json() as { job: { jobId: string; status: string } | null };
+        if (body.job && mountedRef.current) {
+          startPolling(body.job.jobId);
+        }
+      } catch {}
+    })();
+
     return () => {
       mountedRef.current = false;
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, []);
+  }, [startPolling]);
 
   async function handleGenerate() {
     if (!username || isGenerating) return;
@@ -52,33 +104,7 @@ export function Courses() {
       return;
     }
 
-    intervalRef.current = setInterval(async () => {
-      if (!mountedRef.current) {
-        clearInterval(intervalRef.current!);
-        return;
-      }
-      try {
-        const pollRes = await apiFetch(`/api/courses/generate-status/${jobId}`, { cache: 'no-store' });
-        if (pollRes.status === 304 || !pollRes.ok) return;
-        const pollBody = await pollRes.json() as { status: string; error?: string };
-
-        if (!mountedRef.current) return;
-
-        if (pollBody.status === 'done') {
-          clearInterval(intervalRef.current!);
-          intervalRef.current = null;
-          setIsGenerating(false);
-          queryClient.invalidateQueries({ queryKey: ['/api/courses'] });
-          refetch();
-        } else if (pollBody.status === 'error') {
-          clearInterval(intervalRef.current!);
-          intervalRef.current = null;
-          setGenError(pollBody.error ?? 'Course generation failed');
-          setIsGenerating(false);
-        }
-      } catch {
-      }
-    }, 3000);
+    startPolling(jobId);
   }
 
   const courses = data?.courses || [];

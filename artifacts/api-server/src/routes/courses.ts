@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
-import { db, coursesTable, lessonsTable, weaknessesTable, gamesTable } from "@workspace/db";
-import { eq, desc, inArray } from "drizzle-orm";
+import { db, coursesTable, lessonsTable, weaknessesTable, gamesTable, backgroundJobsTable } from "@workspace/db";
+import { eq, desc, inArray, and } from "drizzle-orm";
 import {
   ListCoursesQueryParams,
   ListCoursesResponse,
@@ -18,15 +18,6 @@ import type { Logger } from "pino";
 
 const router: IRouter = Router();
 
-// ── Job store for long-running course generation ──────────────────────────────
-type CourseJobStatus = "pending" | "done" | "error";
-interface CourseJob { status: CourseJobStatus; error?: string; createdAt: number; }
-const courseJobs = new Map<string, CourseJob>();
-setInterval(() => {
-  const cutoff = Date.now() - 10 * 60 * 1000;
-  for (const [id, job] of courseJobs) if (job.createdAt < cutoff) courseJobs.delete(id);
-}, 5 * 60 * 1000);
-
 async function runCourseGenerationJob(username: string, jobId: string, log: Logger): Promise<void> {
   try {
     const weaknesses = await db
@@ -35,7 +26,11 @@ async function runCourseGenerationJob(username: string, jobId: string, log: Logg
       .where(eq(weaknessesTable.username, username.toLowerCase()));
 
     if (weaknesses.length === 0) {
-      courseJobs.set(jobId, { status: "error", error: "No weaknesses found. Run analysis first.", createdAt: Date.now() });
+      await db.update(backgroundJobsTable).set({
+        status: "error",
+        error: "No weaknesses found. Run analysis first.",
+        completedAt: new Date(),
+      }).where(eq(backgroundJobsTable.id, jobId));
       return;
     }
 
@@ -96,31 +91,72 @@ async function runCourseGenerationJob(username: string, jobId: string, log: Logg
     }
 
     log.info({ jobId, username }, "Course generation job complete");
-    courseJobs.set(jobId, { status: "done", createdAt: Date.now() });
+    await db.update(backgroundJobsTable).set({
+      status: "done",
+      completedAt: new Date(),
+    }).where(eq(backgroundJobsTable.id, jobId));
   } catch (err) {
     log.error({ err, jobId }, "Course generation job failed");
     const msg = err instanceof Error ? err.message : "Course generation failed";
-    courseJobs.set(jobId, { status: "error", error: msg, createdAt: Date.now() });
+    await db.update(backgroundJobsTable).set({
+      status: "error",
+      error: msg,
+      completedAt: new Date(),
+    }).where(eq(backgroundJobsTable.id, jobId));
   }
 }
 
-// POST /api/courses/generate-start — kick off generation, return jobId immediately
 router.post("/courses/generate-start", async (req, res): Promise<void> => {
   const parsed = GenerateCoursesBody.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
   const { username } = parsed.data;
+  const userId = req.user?.id;
+  if (!userId) { res.status(401).json({ error: "Authentication required" }); return; }
+
+  const [pending] = await db.select().from(backgroundJobsTable).where(
+    and(
+      eq(backgroundJobsTable.userId, userId),
+      eq(backgroundJobsTable.type, "course_generation"),
+      eq(backgroundJobsTable.status, "pending"),
+    )
+  );
+  if (pending) {
+    res.json({ jobId: pending.id });
+    return;
+  }
+
   const jobId = randomUUID();
-  courseJobs.set(jobId, { status: "pending", createdAt: Date.now() });
+  await db.insert(backgroundJobsTable).values({
+    id: jobId,
+    userId,
+    type: "course_generation",
+    status: "pending",
+    targetUsername: username.toLowerCase(),
+  });
   res.json({ jobId });
   runCourseGenerationJob(username.toLowerCase(), jobId, req.log).catch(() => {});
 });
 
-// GET /api/courses/generate-status/:jobId — poll for completion
-router.get("/courses/generate-status/:jobId", (req, res): void => {
-  const job = courseJobs.get(req.params.jobId as string);
+router.get("/courses/generate-status/:jobId", async (req, res): Promise<void> => {
+  const [job] = await db.select().from(backgroundJobsTable).where(eq(backgroundJobsTable.id, req.params.jobId as string));
   if (!job) { res.status(404).json({ error: "Job not found" }); return; }
   res.setHeader("Cache-Control", "no-store");
   res.json({ status: job.status, error: job.error });
+});
+
+router.get("/courses/active-job", async (req, res): Promise<void> => {
+  const userId = req.user?.id;
+  if (!userId) { res.json({ job: null }); return; }
+
+  const [job] = await db.select().from(backgroundJobsTable).where(
+    and(
+      eq(backgroundJobsTable.userId, userId),
+      eq(backgroundJobsTable.type, "course_generation"),
+      eq(backgroundJobsTable.status, "pending"),
+    )
+  );
+  res.setHeader("Cache-Control", "no-store");
+  res.json({ job: job ? { jobId: job.id, status: job.status } : null });
 });
 
 router.get("/courses", async (req, res): Promise<void> => {
@@ -239,12 +275,6 @@ router.post("/courses/generate", async (req, res): Promise<void> => {
 });
 
 // ── Endgame training ─────────────────────────────────────────────────────────
-const endgameJobs = new Map<string, CourseJob>();
-setInterval(() => {
-  const cutoff = Date.now() - 10 * 60 * 1000;
-  for (const [id, job] of endgameJobs) if (job.createdAt < cutoff) endgameJobs.delete(id);
-}, 5 * 60 * 1000);
-
 async function runEndgameJob(
   username: string,
   type: EndgameType,
@@ -269,7 +299,11 @@ async function runEndgameJob(
     if (type === "personal_endgames") {
       gamePgns = userGames.map(g => g.pgn).filter(Boolean) as string[];
       if (gamePgns.length === 0) {
-        endgameJobs.set(jobId, { status: "error", error: "No games found. Import games first.", createdAt: Date.now() });
+        await db.update(backgroundJobsTable).set({
+          status: "error",
+          error: "No games found. Import games first.",
+          completedAt: new Date(),
+        }).where(eq(backgroundJobsTable.id, jobId));
         return;
       }
     }
@@ -303,12 +337,19 @@ async function runEndgameJob(
       });
     }
 
-    endgameJobs.set(jobId, { status: "done", createdAt: Date.now() });
+    await db.update(backgroundJobsTable).set({
+      status: "done",
+      completedAt: new Date(),
+    }).where(eq(backgroundJobsTable.id, jobId));
     log.info({ jobId, type, courseId: course.id }, "Endgame course generated");
   } catch (err) {
     log.error({ err, jobId, type }, "Endgame course generation failed");
     const msg = err instanceof Error ? err.message : "Endgame course generation failed";
-    endgameJobs.set(jobId, { status: "error", error: msg, createdAt: Date.now() });
+    await db.update(backgroundJobsTable).set({
+      status: "error",
+      error: msg,
+      completedAt: new Date(),
+    }).where(eq(backgroundJobsTable.id, jobId));
   }
 }
 
@@ -323,17 +364,65 @@ router.post("/courses/endgame/generate-start", async (req, res): Promise<void> =
     res.status(400).json({ error: "Invalid type. Use: checkmate_patterns, essential_endgames, or personal_endgames" });
     return;
   }
+  const userId = req.user?.id;
+  if (!userId) { res.status(401).json({ error: "Authentication required" }); return; }
+
+  const endgameJobType = `endgame_${type}`;
+  const [pending] = await db.select().from(backgroundJobsTable).where(
+    and(
+      eq(backgroundJobsTable.userId, userId),
+      eq(backgroundJobsTable.type, endgameJobType),
+      eq(backgroundJobsTable.status, "pending"),
+    )
+  );
+  if (pending) {
+    res.json({ jobId: pending.id });
+    return;
+  }
+
   const jobId = randomUUID();
-  endgameJobs.set(jobId, { status: "pending", createdAt: Date.now() });
+  await db.insert(backgroundJobsTable).values({
+    id: jobId,
+    userId,
+    type: endgameJobType,
+    status: "pending",
+    targetUsername: username.toLowerCase(),
+  });
   res.json({ jobId });
   runEndgameJob(username.toLowerCase(), type as EndgameType, jobId, req.log).catch(() => {});
 });
 
-router.get("/courses/endgame/generate-status/:jobId", (req, res): void => {
-  const job = endgameJobs.get(req.params.jobId as string);
+router.get("/courses/endgame/generate-status/:jobId", async (req, res): Promise<void> => {
+  const [job] = await db.select().from(backgroundJobsTable).where(eq(backgroundJobsTable.id, req.params.jobId as string));
   if (!job) { res.status(404).json({ error: "Job not found" }); return; }
   res.setHeader("Cache-Control", "no-store");
   res.json({ status: job.status, error: job.error });
+});
+
+router.get("/courses/endgame/active-job", async (req, res): Promise<void> => {
+  const userId = req.user?.id;
+  if (!userId) { res.json({ jobs: [] }); return; }
+
+  const jobs = await db.select({
+    id: backgroundJobsTable.id,
+    type: backgroundJobsTable.type,
+    status: backgroundJobsTable.status,
+  }).from(backgroundJobsTable).where(
+    and(
+      eq(backgroundJobsTable.userId, userId),
+      eq(backgroundJobsTable.status, "pending"),
+    )
+  );
+
+  const endgameJobs = jobs.filter(j => j.type.startsWith("endgame_"));
+  res.setHeader("Cache-Control", "no-store");
+  res.json({
+    jobs: endgameJobs.map(j => ({
+      jobId: j.id,
+      endgameType: j.type.replace("endgame_", ""),
+      status: j.status,
+    })),
+  });
 });
 
 router.get("/courses/endgame", async (req, res): Promise<void> => {
