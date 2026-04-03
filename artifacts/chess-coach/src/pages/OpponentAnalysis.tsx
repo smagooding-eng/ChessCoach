@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Swords, Search, Target, AlertTriangle, TrendingUp, ChevronDown, ChevronUp, ChevronRight, Loader2, User, Users, Zap, Clock, Star, BookOpen, CheckCircle2, GraduationCap } from 'lucide-react';
+import { Swords, Search, Target, AlertTriangle, TrendingUp, ChevronDown, ChevronUp, ChevronRight, Loader2, User, Users, Zap, Clock, Star, BookOpen, CheckCircle2, GraduationCap, History, RefreshCw } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
 import { useUser } from '@/hooks/use-user';
 import { apiFetch } from '@/lib/api';
@@ -85,6 +85,11 @@ export function OpponentAnalysis() {
   const [courseGenError, setCourseGenError] = useState<string | null>(null);
   const courseIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Scout history
+  interface ScoutHistoryItem { id: string; targetUsername: string; createdAt: string; }
+  const [scoutHistory, setScoutHistory] = useState<ScoutHistoryItem[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+
   const pollScoutJob = (jobId: string) => {
     return new Promise<OpponentResult>((resolve, reject) => {
       intervalRef.current = setInterval(async () => {
@@ -140,6 +145,32 @@ export function OpponentAnalysis() {
     }
   };
 
+  const fetchHistory = () => {
+    apiFetch('/api/opponents/history', { cache: 'no-store' })
+      .then(r => r.ok ? r.json() : { scouts: [] })
+      .then((d: { scouts: ScoutHistoryItem[] }) => {
+        if (mountedRef.current) setScoutHistory(d.scouts || []);
+      })
+      .catch(() => {});
+  };
+
+  const loadHistoricScout = async (jobId: string) => {
+    setLoadingHistory(true);
+    setError(null);
+    try {
+      const res = await apiFetch(`/api/opponents/history/${jobId}`, { cache: 'no-store' });
+      if (!res.ok) throw new Error('Failed to load scout');
+      const data = await res.json() as { job: { targetUsername: string; result: OpponentResult } };
+      setResult(data.job.result as OpponentResult);
+      setInputUsername(data.job.targetUsername || '');
+      setCourseGenState('idle');
+    } catch {
+      setError('Failed to load previous scout results.');
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+
   useEffect(() => {
     mountedRef.current = true;
 
@@ -155,6 +186,8 @@ export function OpponentAnalysis() {
         }
       })
       .catch(() => {});
+
+    fetchHistory();
 
     return () => {
       mountedRef.current = false;
@@ -195,6 +228,7 @@ export function OpponentAnalysis() {
       if (mountedRef.current) {
         setResult(scoutResult);
         setStatusMsg('');
+        fetchHistory();
       }
     } catch (err: unknown) {
       if (!mountedRef.current) return;
@@ -293,6 +327,32 @@ export function OpponentAnalysis() {
           {loading ? 'Scouting…' : 'Scout'}
         </button>
       </form>
+
+      {/* Scout History */}
+      {scoutHistory.length > 0 && !loading && (
+        <div className="glass-card rounded-2xl p-5">
+          <div className="flex items-center gap-2 mb-3">
+            <History className="w-4 h-4 text-muted-foreground" />
+            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Previous Scouts</h3>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {scoutHistory.map(s => (
+              <button
+                key={s.id}
+                onClick={() => loadHistoricScout(s.id)}
+                disabled={loadingHistory}
+                className="flex items-center gap-2 px-3 py-2 rounded-xl bg-secondary/70 border border-border hover:border-primary/40 hover:text-primary transition-colors text-sm disabled:opacity-50"
+              >
+                <User className="w-3.5 h-3.5" />
+                <span className="font-medium">{s.targetUsername}</span>
+                <span className="text-xs text-muted-foreground">
+                  {new Date(s.createdAt).toLocaleDateString()}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Status message during long-running analysis */}
       {loading && statusMsg && (
@@ -396,7 +456,16 @@ export function OpponentAnalysis() {
 
                 {/* Win/loss stats */}
                 <div className="sm:ml-auto flex flex-col items-start sm:items-end justify-center gap-3">
-                  <p className="text-xs text-muted-foreground">Based on {result.gamesAnalyzed} recent games</p>
+                  <div className="flex items-center gap-3">
+                    <p className="text-xs text-muted-foreground">Based on {result.gamesAnalyzed} recent games</p>
+                    <button
+                      onClick={() => { setResult(null); handleAnalyze({ preventDefault: () => {} } as React.FormEvent); }}
+                      disabled={loading}
+                      className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-secondary/70 border border-border hover:border-primary/40 hover:text-primary transition-colors text-xs disabled:opacity-50"
+                    >
+                      <RefreshCw className="w-3 h-3" /> Re-scout
+                    </button>
+                  </div>
                   <div className="flex gap-4">
                     <Stat label="Wins"   value={result.wins}   color="text-emerald-400" />
                     <Stat label="Losses" value={result.losses} color="text-red-400" />

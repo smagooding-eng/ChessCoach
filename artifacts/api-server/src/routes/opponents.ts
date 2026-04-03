@@ -82,6 +82,60 @@ router.get("/opponents/status/:jobId", async (req, res): Promise<void> => {
   });
 });
 
+router.get("/opponents/history", async (req, res): Promise<void> => {
+  const userId = req.user?.id;
+  if (!userId) { res.json({ scouts: [] }); return; }
+
+  const jobs = await db.select({
+    id: backgroundJobsTable.id,
+    targetUsername: backgroundJobsTable.targetUsername,
+    status: backgroundJobsTable.status,
+    createdAt: backgroundJobsTable.createdAt,
+    completedAt: backgroundJobsTable.completedAt,
+  }).from(backgroundJobsTable).where(
+    and(
+      eq(backgroundJobsTable.userId, userId),
+      eq(backgroundJobsTable.type, "scout"),
+      eq(backgroundJobsTable.status, "done"),
+    )
+  ).orderBy(desc(backgroundJobsTable.createdAt)).limit(20);
+
+  const seen = new Set<string>();
+  const uniqueScouts = jobs.filter(j => {
+    const key = (j.targetUsername || "").toLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  res.json({ scouts: uniqueScouts });
+});
+
+router.get("/opponents/history/:jobId", async (req, res): Promise<void> => {
+  const userId = req.user?.id;
+  if (!userId) { res.status(401).json({ error: "Not authenticated" }); return; }
+
+  const [job] = await db.select().from(backgroundJobsTable).where(
+    and(
+      eq(backgroundJobsTable.id, req.params.jobId as string),
+      eq(backgroundJobsTable.userId, userId),
+      eq(backgroundJobsTable.type, "scout"),
+    )
+  ).limit(1);
+
+  if (!job) { res.status(404).json({ error: "Scout not found" }); return; }
+
+  res.json({
+    job: {
+      id: job.id,
+      status: job.status,
+      targetUsername: job.targetUsername,
+      result: job.result,
+      createdAt: job.createdAt?.toISOString(),
+    },
+  });
+});
+
 router.get("/opponents/active-job", async (req, res): Promise<void> => {
   const userId = req.user?.id;
   if (!userId) { res.json({ job: null }); return; }
@@ -94,12 +148,6 @@ router.get("/opponents/active-job", async (req, res): Promise<void> => {
   ).orderBy(desc(backgroundJobsTable.createdAt)).limit(1);
 
   if (!job) { res.json({ job: null }); return; }
-
-  const ageMs = Date.now() - job.createdAt.getTime();
-  if ((job.status === "done" || job.status === "error") && ageMs > 5 * 60_000) {
-    res.json({ job: null });
-    return;
-  }
 
   res.setHeader("Cache-Control", "no-store");
   res.json({

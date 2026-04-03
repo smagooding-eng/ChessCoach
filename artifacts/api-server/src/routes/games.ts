@@ -454,6 +454,26 @@ router.post("/games/:id/analyze-move", async (req, res): Promise<void> => {
 
 // Streams SSE events so the Replit 60s proxy timeout doesn't kill long reviews.
 // Events: "started", "heartbeat" (every 15s), "result" (JSON), "error", "done"
+router.get("/games/:id/review", async (req, res): Promise<void> => {
+  const params = GetGameReplayParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+
+  const [game] = await db
+    .select({ reviewData: gamesTable.reviewData })
+    .from(gamesTable)
+    .where(eq(gamesTable.id, params.data.id));
+
+  if (!game) {
+    res.status(404).json({ error: "Game not found" });
+    return;
+  }
+
+  res.json({ reviewData: game.reviewData ?? null });
+});
+
 router.post("/games/:id/review", async (req, res): Promise<void> => {
   const params = GetGameReplayParams.safeParse(req.params);
   if (!params.success) {
@@ -471,7 +491,17 @@ router.post("/games/:id/review", async (req, res): Promise<void> => {
     return;
   }
 
-  // Set up SSE
+  if (game.reviewData) {
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.flushHeaders();
+    res.write(`event: result\ndata: ${JSON.stringify({ moves: game.reviewData })}\n\n`);
+    res.write(`event: done\ndata: {}\n\n`);
+    res.end();
+    return;
+  }
+
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
   res.setHeader("Connection", "keep-alive");
@@ -483,7 +513,6 @@ router.post("/games/:id/review", async (req, res): Promise<void> => {
 
   sendEvent("started", { totalMoves: game.pgn ? parsePgnMoves(game.pgn).length : 0 });
 
-  // Heartbeat every 15 s to keep proxy connection alive
   const heartbeat = setInterval(() => {
     res.write(": heartbeat\n\n");
   }, 15000);
@@ -499,6 +528,10 @@ router.post("/games/:id/review", async (req, res): Promise<void> => {
     });
     sendEvent("result", { moves: review });
     sendEvent("done", {});
+
+    await db.update(gamesTable)
+      .set({ reviewData: review as unknown as Record<string, unknown> })
+      .where(eq(gamesTable.id, params.data.id));
   } catch (err) {
     req.log.error({ err }, "Failed to review game");
     sendEvent("error", { message: "Review failed. Please try again." });

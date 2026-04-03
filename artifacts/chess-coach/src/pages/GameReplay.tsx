@@ -238,6 +238,20 @@ export function GameReplay() {
   const [reviewing, setReviewing]       = useState(false);
   const [reviewMoves, setReviewMoves]   = useState<ReviewMove[]>([]);
   const [reviewError, setReviewError]   = useState<string | null>(null);
+  const [loadingSavedReview, setLoadingSavedReview] = useState(true);
+
+  useEffect(() => {
+    if (!game) { setLoadingSavedReview(false); return; }
+    apiFetch(`/api/games/${game.id}/review`)
+      .then(r => r.ok ? r.json() : null)
+      .then((d: { reviewData?: ReviewMove[] } | null) => {
+        if (d?.reviewData && Array.isArray(d.reviewData) && d.reviewData.length > 0) {
+          setReviewMoves(d.reviewData);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoadingSavedReview(false));
+  }, [game?.id]);
 
   // Practice mode — Lichess best move
   const [bestMoveSan, setBestMoveSan]   = useState<string | null>(null);
