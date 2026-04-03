@@ -18,6 +18,9 @@ interface Step {
   moveNum: number;
   fullMoveNumber: number;
   color: 'w' | 'b' | null;
+  isMistake?: boolean;
+  from?: string;
+  to?: string;
 }
 
 function parsePgnSteps(pgn: string): Step[] | null {
@@ -40,21 +43,40 @@ function parsePgnSteps(pgn: string): Step[] | null {
       if (i > 0) chess.undo();
     }
 
-    const player = new Chess();
+    const fenHeader = chess.header()?.FEN;
+    const startFen = fenHeader || START_FEN;
+
+    const startFullMove = fenHeader
+      ? (parseInt(startFen.split(' ')[5]) || 1)
+      : 1;
+    const startColor = startFen.split(' ')[1] === 'b' ? 1 : 0;
+
+    const player = new Chess(startFen);
     const steps: Step[] = [
-      { fen: player.fen(), san: null, comment: comments[0], moveNum: 0, fullMoveNumber: 1, color: null },
+      { fen: startFen, san: null, comment: comments[0], moveNum: 0, fullMoveNumber: startFullMove, color: null },
     ];
 
     for (let i = 0; i < history.length; i++) {
       const move = history[i];
       player.move(move.san);
+      const rawComment = comments[i + 1];
+      const isMistake = /^\s*\[mistake\]\s*/i.test(rawComment);
+      const cleanComment = isMistake ? rawComment.replace(/^\s*\[mistake\]\s*/i, '') : rawComment;
+
+      const globalIdx = startColor + i;
+      const fullMoveNumber = startFullMove + Math.floor(globalIdx / 2);
+      const color: 'w' | 'b' = globalIdx % 2 === 0 ? 'w' : 'b';
+
       steps.push({
         fen: player.fen(),
         san: move.san,
-        comment: comments[i + 1],
+        comment: cleanComment,
         moveNum: i + 1,
-        fullMoveNumber: Math.floor(i / 2) + 1,
-        color: i % 2 === 0 ? 'w' : 'b',
+        fullMoveNumber,
+        color,
+        isMistake,
+        from: move.from,
+        to: move.to,
       });
     }
 
@@ -364,8 +386,16 @@ export function LessonBoardPlayer({ pgn, title, drillFen, drillExpectedMove, dri
   }
 
   const movePairs: { num: number; white: number; black: number | null }[] = [];
-  for (let i = 1; i < steps.length; i += 2) {
-    movePairs.push({ num: Math.ceil(i / 2), white: i, black: i + 1 < steps.length ? i + 1 : null });
+  const firstMoveColor = steps[1]?.color;
+  if (firstMoveColor === 'b') {
+    movePairs.push({ num: steps[1].fullMoveNumber, white: -1, black: 1 });
+    for (let i = 2; i < steps.length; i += 2) {
+      movePairs.push({ num: steps[i].fullMoveNumber, white: i, black: i + 1 < steps.length ? i + 1 : null });
+    }
+  } else {
+    for (let i = 1; i < steps.length; i += 2) {
+      movePairs.push({ num: steps[i].fullMoveNumber, white: i, black: i + 1 < steps.length ? i + 1 : null });
+    }
   }
 
   const hasComment = step && step.comment.trim().length > 0;
@@ -441,8 +471,27 @@ export function LessonBoardPlayer({ pgn, title, drillFen, drillExpectedMove, dri
                   darkSquareStyle: { backgroundColor: '#2d4a3e' },
                   lightSquareStyle: { backgroundColor: '#6dae7f' },
                   animationDurationInMs: 180,
+                  squareStyles: (() => {
+                    const styles: Record<string, React.CSSProperties> = {};
+                    if (step?.isMistake && step.from && step.to) {
+                      styles[step.from] = { background: 'rgba(220, 50, 50, 0.35)' };
+                      styles[step.to] = { background: 'rgba(220, 50, 50, 0.55)' };
+                    } else if (step?.from && step?.to && currentStep > 0) {
+                      styles[step.from] = { background: 'rgba(255, 240, 80, 0.25)' };
+                      styles[step.to] = { background: 'rgba(255, 240, 80, 0.45)' };
+                    }
+                    return styles;
+                  })(),
                 }}
               />
+              {step?.isMistake && (
+                <div className="absolute top-2 right-2 pointer-events-none z-10">
+                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold shadow-lg backdrop-blur-sm border bg-red-950/90 text-red-300 border-red-400/40">
+                    <span>?</span>
+                    <span>Mistake</span>
+                  </div>
+                </div>
+              )}
               <AnimatePresence>
                 {prevFen !== step?.fen && step?.san && (
                   <motion.div
@@ -450,7 +499,7 @@ export function LessonBoardPlayer({ pgn, title, drillFen, drillExpectedMove, dri
                     initial={{ opacity: 0.35 }}
                     animate={{ opacity: 0 }}
                     transition={{ duration: 0.6 }}
-                    className="absolute inset-0 bg-primary/20 rounded-lg pointer-events-none"
+                    className={`absolute inset-0 ${step?.isMistake ? 'bg-red-500/20' : 'bg-primary/20'} rounded-lg pointer-events-none`}
                   />
                 )}
               </AnimatePresence>
@@ -463,8 +512,14 @@ export function LessonBoardPlayer({ pgn, title, drillFen, drillExpectedMove, dri
                 <motion.div key={currentStep} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.2 }}>
                   {hasComment ? (
                     <div className="flex items-start gap-2.5">
-                      <MessageSquare className="w-4 h-4 text-primary shrink-0 mt-0.5" />
-                      <p className="text-sm text-foreground/85 leading-relaxed">{step.comment}</p>
+                      {step.isMistake ? (
+                        <div className="w-4 h-4 rounded-full bg-red-500/20 border border-red-500/40 flex items-center justify-center shrink-0 mt-0.5">
+                          <span className="text-red-400 text-[10px] font-bold">!</span>
+                        </div>
+                      ) : (
+                        <MessageSquare className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+                      )}
+                      <p className={cn('text-sm leading-relaxed', step.isMistake ? 'text-red-300/90' : 'text-foreground/85')}>{step.comment}</p>
                     </div>
                   ) : currentStep === 0 ? (
                     <p className="text-sm text-muted-foreground italic">Press play to walk through the lesson, or click any move below.</p>
@@ -478,21 +533,41 @@ export function LessonBoardPlayer({ pgn, title, drillFen, drillExpectedMove, dri
             {movePairs.length > 0 && (
               <div ref={moveListRef} className="flex-1 overflow-y-auto px-3 pb-3 max-h-[160px] md:max-h-[200px]">
                 <div className="grid grid-cols-[32px_1fr_1fr] gap-0.5 text-sm font-mono">
-                  {movePairs.map(({ num, white, black }) => (
-                    <React.Fragment key={num}>
+                  {movePairs.map(({ num, white, black }) => {
+                    const wStep = white >= 0 ? steps[white] : null;
+                    const bStep = black != null ? steps[black] : null;
+                    return (
+                    <React.Fragment key={`${num}-${white}`}>
                       <div className="flex items-center text-muted-foreground/50 text-xs px-1 py-1">{num}.</div>
-                      <button data-active={currentStep === white} onClick={() => go(white)}
-                        className={cn('text-left px-2 py-1 rounded transition-colors text-xs', currentStep === white ? 'bg-primary text-primary-foreground font-bold' : 'text-foreground/70 hover:bg-white/5')}>
-                        {steps[white]?.san}
-                      </button>
-                      {black != null ? (
-                        <button data-active={currentStep === black} onClick={() => go(black)}
-                          className={cn('text-left px-2 py-1 rounded transition-colors text-xs', currentStep === black ? 'bg-primary text-primary-foreground font-bold' : 'text-foreground/70 hover:bg-white/5')}>
-                          {steps[black]?.san}
+                      {wStep ? (
+                        <button data-active={currentStep === white} onClick={() => go(white)}
+                          className={cn(
+                            'text-left px-2 py-1 rounded transition-colors text-xs',
+                            currentStep === white
+                              ? (wStep.isMistake ? 'bg-red-500 text-white font-bold' : 'bg-primary text-primary-foreground font-bold')
+                              : wStep.isMistake
+                                ? 'text-red-400 bg-red-500/10 border border-red-500/20 font-semibold hover:bg-red-500/20'
+                                : 'text-foreground/70 hover:bg-white/5'
+                          )}>
+                          {wStep.isMistake && <span className="mr-0.5">?</span>}{wStep.san}
+                        </button>
+                      ) : <div className="px-2 py-1 text-xs text-muted-foreground/30">...</div>}
+                      {bStep ? (
+                        <button data-active={currentStep === black} onClick={() => go(black!)}
+                          className={cn(
+                            'text-left px-2 py-1 rounded transition-colors text-xs',
+                            currentStep === black
+                              ? (bStep.isMistake ? 'bg-red-500 text-white font-bold' : 'bg-primary text-primary-foreground font-bold')
+                              : bStep.isMistake
+                                ? 'text-red-400 bg-red-500/10 border border-red-500/20 font-semibold hover:bg-red-500/20'
+                                : 'text-foreground/70 hover:bg-white/5'
+                          )}>
+                          {bStep.isMistake && <span className="mr-0.5">?</span>}{bStep.san}
                         </button>
                       ) : <div />}
                     </React.Fragment>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}

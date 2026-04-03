@@ -684,9 +684,12 @@ Create a course with 4-5 lessons. Each lesson MUST be tightly focused on a concr
 
 RULES for each lesson:
 1. examplePgn: a valid PGN string showing a key segment from the player's actual games where this weakness appeared.
+   - START the PGN 2 moves BEFORE the actual mistake/problem move. Use a [FEN "..."] header with the board position at that point so the board starts right before the critical moment, NOT from the opening (unless the opening IS the problem).
    - Every move must have a {comment in curly braces} explaining exactly WHY it matters
+   - The move(s) where the actual mistake was made MUST have the marker [MISTAKE] at the START of their comment (e.g. "12...Bxe4 {[MISTAKE] This trades away the bishop...}"). This tells the UI to highlight these moves.
+   - After showing the mistake move(s), show the CORRECT continuation with comments explaining why it's better
    - Legal moves only
-   - ${relatedGamePgns?.length ? "MUST use actual move sequences from the provided games. If the relevant sequence starts mid-game, include a [FEN \"...\"] header with the starting position." : "Base the moves on the patterns described in the weakness examples. Start from the initial position unless the weakness is endgame-specific."}
+   - ${relatedGamePgns?.length ? "MUST use actual move sequences from the provided games." : "Base the moves on the patterns described in the weakness examples."}
    - Do NOT use null for examplePgn — every lesson requires a move sequence
    - Do NOT invent generic textbook openings — every PGN must reflect the specific patterns and moves described in the weakness
 
@@ -719,7 +722,7 @@ Respond with valid JSON:
       "title": "Lesson title",
       "content": "## The Mistake\nIn your game you played 14...Bxe4, which drops a pawn because...\n\n## The Fix\nInstead, 14...Nf6 was the correct move because it...\n\n**Takeaway:** Always check for...",
       "orderIndex": 0,
-      "examplePgn": "1. e4 {Comment on the actual game move} e5 {Comment} ...",
+      "examplePgn": "[FEN \"r1bqkb1r/pppp1ppp/2n2n2/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 4 4\"]\n\n4. d3 {Setting up a quiet Italian structure} Be7 {Developing the bishop} 5. Bg5 {[MISTAKE] Pinning the knight prematurely — this allows a fork} d6 {Black calmly defends}",
       "drillFen": "rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2",
       "drillExpectedMove": "Nc6",
       "drillHint": "Develop a piece that also defends the pawn"
