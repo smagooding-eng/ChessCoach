@@ -637,7 +637,15 @@ RULES for each lesson:
 
 4. drillHint: A one-sentence hint the player can reveal if stuck (e.g. "Look for a way to attack the f7 square").
 
-5. content: 3-5 paragraphs of specific chess coaching. Reference specific moves from the player's actual games. Explain what went wrong, what should have been played instead, and how to recognize similar patterns in the future.
+5. content: MUST follow this exact structure with these markdown headings:
+
+   ## The Mistake
+   1-2 paragraphs identifying the exact move(s) where the player went wrong. Quote the specific move from their game (e.g. "In your game, you played 14...Bxe4 here"). Explain WHY it was a mistake — what it allowed the opponent to do or what it gave up positionally.
+
+   ## The Fix
+   1-2 paragraphs explaining what the player SHOULD have done instead. Name the correct move and explain WHY it's better — what it achieves tactically or positionally. End with a takeaway the player can apply to future games (a pattern to watch for, a rule of thumb, etc.).
+
+   This two-part structure ("The Mistake" then "The Fix") is mandatory for every lesson. Reference actual moves from the player's games — no generic advice.
 
 Respond with valid JSON:
 {
@@ -648,7 +656,7 @@ Respond with valid JSON:
   "lessons": [
     {
       "title": "Lesson title",
-      "content": "3-5 paragraphs of specific chess coaching referencing actual game moves...",
+      "content": "## The Mistake\nIn your game you played 14...Bxe4, which drops a pawn because...\n\n## The Fix\nInstead, 14...Nf6 was the correct move because it...\n\n**Takeaway:** Always check for...",
       "orderIndex": 0,
       "examplePgn": "1. e4 {Comment on the actual game move} e5 {Comment} ...",
       "drillFen": "rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2",

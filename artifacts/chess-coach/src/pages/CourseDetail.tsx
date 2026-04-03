@@ -22,33 +22,69 @@ function renderInline(text: string): React.ReactNode {
   );
 }
 
+function renderParagraph(trimmed: string, key: number): React.ReactNode {
+  if (trimmed.startsWith('### ')) return <h4 key={key} className="text-sm font-bold text-muted-foreground uppercase tracking-wider mt-2">{trimmed.slice(4)}</h4>;
+  if (trimmed.startsWith('## ')) return <h4 key={key} className="text-base font-bold text-primary mt-1">{trimmed.slice(3)}</h4>;
+  if (trimmed.startsWith('# ')) return <h3 key={key} className="text-lg font-bold mt-2">{trimmed.slice(2)}</h3>;
+
+  const lines = trimmed.split('\n');
+  const isList = lines.every(l => /^[-*•]\s/.test(l.trim()) || l.trim() === '');
+  if (isList && lines.some(l => /^[-*•]\s/.test(l.trim()))) {
+    return (
+      <ul key={key} className="space-y-2">
+        {lines.filter(l => l.trim()).map((item, j) => (
+          <li key={j} className="flex items-start gap-2.5 text-foreground/80 text-sm leading-relaxed">
+            <span className="text-primary mt-1 shrink-0">▸</span>
+            <span>{renderInline(item.replace(/^[-*•]\s*/, ''))}</span>
+          </li>
+        ))}
+      </ul>
+    );
+  }
+
+  return <p key={key} className="text-foreground/80 text-sm leading-relaxed">{renderInline(trimmed)}</p>;
+}
+
 function renderStep(text: string): React.ReactNode {
+  const mistakeMatch = text.match(/##\s*The Mistake/i);
+  const fixMatch = text.match(/##\s*The Fix/i);
+
+  if (mistakeMatch && fixMatch) {
+    const mistakeIdx = text.indexOf(mistakeMatch[0]);
+    const fixIdx = text.indexOf(fixMatch[0]);
+    const mistakeBody = text.slice(mistakeIdx + mistakeMatch[0].length, fixIdx).trim();
+    const fixBody = text.slice(fixIdx + fixMatch[0].length).trim();
+    const before = text.slice(0, mistakeIdx).trim();
+
+    const mistakeParagraphs = mistakeBody.split(/\n\n+/).filter(Boolean);
+    const fixParagraphs = fixBody.split(/\n\n+/).filter(Boolean);
+    const beforeParagraphs = before ? before.split(/\n\n+/).filter(Boolean) : [];
+
+    return (
+      <div className="space-y-4">
+        {beforeParagraphs.map((p, i) => renderParagraph(p.trim(), i))}
+        <div className="rounded-xl border border-red-500/30 bg-red-500/8 p-4 space-y-2">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-red-400 text-lg">✗</span>
+            <h4 className="text-sm font-bold text-red-400 uppercase tracking-wider">Where You Went Wrong</h4>
+          </div>
+          {mistakeParagraphs.map((p, i) => renderParagraph(p.trim(), 100 + i))}
+        </div>
+        <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/8 p-4 space-y-2">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-emerald-400 text-lg">✓</span>
+            <h4 className="text-sm font-bold text-emerald-400 uppercase tracking-wider">What You Should Have Done</h4>
+          </div>
+          {fixParagraphs.map((p, i) => renderParagraph(p.trim(), 200 + i))}
+        </div>
+      </div>
+    );
+  }
+
   const paragraphs = text.split(/\n\n+/).filter(Boolean);
   return (
     <div className="space-y-3">
-      {paragraphs.map((p, i) => {
-        const trimmed = p.trim();
-        if (trimmed.startsWith('### ')) return <h4 key={i} className="text-sm font-bold text-muted-foreground uppercase tracking-wider mt-2">{trimmed.slice(4)}</h4>;
-        if (trimmed.startsWith('## ')) return <h4 key={i} className="text-base font-bold text-primary mt-1">{trimmed.slice(3)}</h4>;
-        if (trimmed.startsWith('# ')) return <h3 key={i} className="text-lg font-bold mt-2">{trimmed.slice(2)}</h3>;
-
-        const lines = trimmed.split('\n');
-        const isList = lines.every(l => /^[-*•]\s/.test(l.trim()) || l.trim() === '');
-        if (isList && lines.some(l => /^[-*•]\s/.test(l.trim()))) {
-          return (
-            <ul key={i} className="space-y-2">
-              {lines.filter(l => l.trim()).map((item, j) => (
-                <li key={j} className="flex items-start gap-2.5 text-foreground/80 text-sm leading-relaxed">
-                  <span className="text-primary mt-1 shrink-0">▸</span>
-                  <span>{renderInline(item.replace(/^[-*•]\s*/, ''))}</span>
-                </li>
-              ))}
-            </ul>
-          );
-        }
-
-        return <p key={i} className="text-foreground/80 text-sm leading-relaxed">{renderInline(trimmed)}</p>;
-      })}
+      {paragraphs.map((p, i) => renderParagraph(p.trim(), i))}
     </div>
   );
 }
