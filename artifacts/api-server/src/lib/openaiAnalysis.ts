@@ -420,7 +420,7 @@ export interface MoveReview {
   cons: string[];
 }
 
-export interface GameSummary {
+export interface GameReviewSummary {
   overview: string;
   keyMistakes: Array<{
     moveIndex: number;
@@ -435,7 +435,7 @@ export interface GameSummary {
 
 export interface GameReviewResult {
   moves: MoveReview[];
-  gameSummary: GameSummary | null;
+  gameSummary: GameReviewSummary | null;
 }
 
 export async function reviewFullGame(input: {
@@ -534,7 +534,7 @@ Respond with valid JSON covering ALL ${moves.length} moves in order:
       logger.warn({ moves: moves.length }, "Review response truncated by token limit — trying to parse partial result");
     }
 
-    const parsed = JSON.parse(content) as { moves?: Array<Partial<MoveReview>>; gameSummary?: Partial<GameSummary> };
+    const parsed = JSON.parse(content) as { moves?: Array<Partial<MoveReview>>; gameSummary?: Partial<GameReviewSummary> };
     const validClassifications = ["brilliant", "excellent", "good", "book", "inaccuracy", "mistake", "blunder"];
 
     const reviewMoves = (parsed.moves ?? []).map((m, i) => ({
@@ -554,7 +554,7 @@ Respond with valid JSON covering ALL ${moves.length} moves in order:
       throw new Error("OpenAI returned an empty move list — possibly a model error or format issue");
     }
 
-    const gameSummary: GameSummary | null = parsed.gameSummary ? {
+    const gameSummary: GameReviewSummary | null = parsed.gameSummary ? {
       overview: parsed.gameSummary.overview ?? "",
       keyMistakes: Array.isArray(parsed.gameSummary.keyMistakes)
         ? parsed.gameSummary.keyMistakes.map(km => ({

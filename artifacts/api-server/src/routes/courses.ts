@@ -295,7 +295,10 @@ async function runEndgameJob(
       .limit(10);
 
     if (userGames.length > 0) {
-      playerRating = userGames[0].userRating ?? undefined;
+      const g = userGames[0];
+      playerRating = g.whiteUsername.toLowerCase() === username.toLowerCase()
+        ? g.whiteRating
+        : g.blackRating;
     }
 
     if (type === "personal_endgames") {
