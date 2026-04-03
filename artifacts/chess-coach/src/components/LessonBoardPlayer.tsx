@@ -31,10 +31,21 @@ function parsePgnSteps(pgn: string): Step[] | null {
     return [{ fen: pgn.trim(), san: null, comment: 'Study this position.', moveNum: 0, fullMoveNumber: 1, color: null }];
   }
 
+  const fenHeaderMatch = pgn.match(/\[FEN\s+"([^"]+)"\]/i);
+
   try {
     const chess = new Chess();
     chess.loadPgn(pgn);
     const history = chess.history({ verbose: true });
+
+    if (history.length === 0 && fenHeaderMatch) {
+      try {
+        const fen = fenHeaderMatch[1];
+        new Chess(fen);
+        return [{ fen, san: null, comment: 'Study this position.', moveNum: 0, fullMoveNumber: parseInt(fen.split(' ')[5]) || 1, color: null }];
+      } catch {}
+    }
+
     if (history.length === 0) return null;
 
     const comments: string[] = new Array(history.length + 1).fill('');
@@ -82,6 +93,13 @@ function parsePgnSteps(pgn: string): Step[] | null {
 
     return steps;
   } catch {
+    if (fenHeaderMatch) {
+      try {
+        const fen = fenHeaderMatch[1];
+        new Chess(fen);
+        return [{ fen, san: null, comment: 'Study this position.', moveNum: 0, fullMoveNumber: parseInt(fen.split(' ')[5]) || 1, color: null }];
+      } catch {}
+    }
     return null;
   }
 }

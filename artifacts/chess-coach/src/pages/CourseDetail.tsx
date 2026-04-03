@@ -498,14 +498,14 @@ export function CourseDetail() {
                 {/* Lesson body */}
                 <div className="px-6 py-6 space-y-6">
                   {/* Interactive board */}
-                  {lesson?.examplePgn && (
+                  {lesson && (
                     <div>
                       <h4 className="font-bold mb-3 flex items-center gap-2 text-sm text-primary">
                         <Target className="w-4 h-4" />
                         {lesson.drillExpectedMove ? 'Interactive Lesson + Practice' : 'Interactive Lesson'}
                       </h4>
                       <LessonBoardPlayer
-                        pgn={lesson.examplePgn}
+                        pgn={lesson.examplePgn || lesson.drillFen || 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'}
                         title={lesson.title}
                         drillFen={lesson.drillFen ?? null}
                         drillExpectedMove={lesson.drillExpectedMove ?? null}

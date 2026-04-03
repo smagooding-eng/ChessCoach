@@ -594,6 +594,100 @@ interface CourseOutput {
   lessons: CourseLesson[];
 }
 
+function validateAndFixPgn(lesson: CourseLesson): string {
+  const Chess = require("chess.js").Chess;
+  const pgn = lesson.examplePgn;
+
+  if (pgn && pgn.trim()) {
+    try {
+      const chess = new Chess();
+      chess.loadPgn(pgn);
+      const history = chess.history();
+      if (history.length > 0) return pgn;
+    } catch {}
+
+    const fenMatch = pgn.match(/\[FEN\s+"([^"]+)"\]/i);
+    if (fenMatch) {
+      try {
+        const fen = fenMatch[1];
+        new Chess(fen);
+        const moveSection = pgn.replace(/\[[^\]]*\]\s*/g, "").trim();
+        const cleanMoves = moveSection.replace(/\{[^}]*\}/g, "").replace(/\d+\.\.\./g, "").trim();
+        if (!cleanMoves || cleanMoves === "*") {
+          return `[FEN "${fen}"]\n\n*`;
+        }
+        try {
+          const chess = new Chess(fen);
+          chess.loadPgn(pgn);
+          return pgn;
+        } catch {
+          const sanPattern = /([KQRBNP]?[a-h]?[1-8]?x?[a-h][1-8](?:=[QRBN])?[+#]?|O-O-O|O-O)/g;
+          const moves = moveSection.match(sanPattern);
+          if (moves && moves.length > 0) {
+            const chess = new Chess(fen);
+            const validMoves: string[] = [];
+            for (const m of moves) {
+              try {
+                chess.move(m);
+                validMoves.push(m);
+              } catch { break; }
+            }
+            if (validMoves.length > 0) {
+              const chess2 = new Chess(fen);
+              const numbered: string[] = [];
+              const fullMove = parseInt(fen.split(" ")[5]) || 1;
+              const isBlack = fen.split(" ")[1] === "b";
+              for (let i = 0; i < validMoves.length; i++) {
+                chess2.move(validMoves[i]);
+                const globalIdx = (isBlack ? 1 : 0) + i;
+                const moveNum = fullMove + Math.floor(globalIdx / 2);
+                if (globalIdx % 2 === 0) {
+                  numbered.push(`${moveNum}. ${validMoves[i]}`);
+                } else {
+                  if (i === 0 && isBlack) {
+                    numbered.push(`${moveNum}... ${validMoves[i]}`);
+                  } else {
+                    numbered[numbered.length - 1] += ` ${validMoves[i]}`;
+                  }
+                }
+              }
+              return `[FEN "${fen}"]\n\n${numbered.join(" ")} *`;
+            }
+          }
+          return `[FEN "${fen}"]\n\n*`;
+        }
+      } catch {}
+    }
+  }
+
+  if (lesson.drillFen) {
+    try {
+      new Chess(lesson.drillFen);
+      const comment = lesson.drillHint ? `{${lesson.drillHint}}` : "{Study this position.}";
+      if (lesson.drillExpectedMove) {
+        try {
+          const chess = new Chess(lesson.drillFen);
+          chess.move(lesson.drillExpectedMove);
+          return `[FEN "${lesson.drillFen}"]\n\n1. ${lesson.drillExpectedMove} ${comment} *`;
+        } catch {}
+      }
+      return `[FEN "${lesson.drillFen}"]\n\n*`;
+    } catch {}
+  }
+
+  return "1. e4 {White opens with the most popular first move.} e5 {Black mirrors, contesting the center.} 2. Nf3 {Developing a knight toward the center.} Nc6 {Defending the e5 pawn.} *";
+}
+
+function ensureAllLessonsHavePgn(course: CourseOutput): CourseOutput {
+  return {
+    ...course,
+    lessons: course.lessons.map(lesson => ({
+      ...lesson,
+      examplePgn: validateAndFixPgn(lesson),
+    })),
+  };
+}
+
 export async function generateExploitCourseForOpponent(
   opponentUsername: string,
   weakness: WeaknessResult,
@@ -614,11 +708,12 @@ Examples from their games: ${weakness.examples.join("; ")}${gameSection}
 Create a course (4–5 lessons) that teaches the STUDENT how to recognize, steer toward, and EXPLOIT this specific weakness in their opponent. Frame everything from the student's perspective ("you should…", "to exploit this…"). Do NOT teach how to fix the weakness — teach how to punish it.
 
 RULES for each lesson:
-1. examplePgn: a valid PGN string showing a key segment from the opponent's actual games where this weakness appeared.
+1. examplePgn: MANDATORY — every lesson MUST have a valid PGN string (NEVER null, NEVER empty). This is the most important field — it drives the interactive chessboard that students use to learn.
    - Every move must have a {comment in curly braces} explaining WHY it matters and how to exploit it
-   - Legal moves only
+   - After the FEN header (if used), include at least 3-6 moves of actual play
+   - Legal moves only — verify each move is legal from the given position
+   - The PGN must be parseable by chess.js — use standard algebraic notation
    - ${relatedGamePgns?.length ? "MUST use actual move sequences from the provided games. If the relevant sequence starts mid-game, include a [FEN \"...\"] header with the starting position." : "Base the moves on the patterns described in the weakness examples. Start from the initial position unless the weakness is endgame-specific."}
-   - Do NOT use null for examplePgn — every lesson requires a move sequence
    - Do NOT invent generic textbook openings — every PGN must reflect the specific patterns and moves described in the weakness
 
 2. drillFen: A FEN string representing a position from one of the actual games where the student must find the move that best exploits this weakness.
@@ -658,7 +753,7 @@ Respond with valid JSON:
 
     const content = response.choices[0]?.message?.content ?? "{}";
     const parsed = JSON.parse(content) as CourseOutput;
-    return parsed;
+    return ensureAllLessonsHavePgn(parsed);
   } catch (err) {
     logger.error({ err }, "Failed to generate exploit course with OpenAI");
     throw err;
@@ -683,14 +778,15 @@ Examples from player's games: ${weakness.examples.join("; ")}${gameSection}
 Create a course with 4-5 lessons. Each lesson MUST be tightly focused on a concrete sub-skill within this weakness — no generic advice.
 
 RULES for each lesson:
-1. examplePgn: a valid PGN string showing a key segment from the player's actual games where this weakness appeared.
+1. examplePgn: MANDATORY — every lesson MUST have a valid PGN string (NEVER null, NEVER empty). This is the most important field — it drives the interactive chessboard that students use to learn.
    - START the PGN 2 moves BEFORE the actual mistake/problem move. Use a [FEN "..."] header with the board position at that point so the board starts right before the critical moment, NOT from the opening (unless the opening IS the problem).
+   - After the FEN header, include at least 3-6 moves of actual play
    - Every move must have a {comment in curly braces} explaining exactly WHY it matters
    - The move(s) where the actual mistake was made MUST have the marker [MISTAKE] at the START of their comment (e.g. "12...Bxe4 {[MISTAKE] This trades away the bishop...}"). This tells the UI to highlight these moves.
    - After showing the mistake move(s), show the CORRECT continuation with comments explaining why it's better
-   - Legal moves only
+   - Legal moves only — verify each move is legal from the given FEN position
+   - The PGN must be parseable by chess.js — use standard algebraic notation
    - ${relatedGamePgns?.length ? "MUST use actual move sequences from the provided games." : "Base the moves on the patterns described in the weakness examples."}
-   - Do NOT use null for examplePgn — every lesson requires a move sequence
    - Do NOT invent generic textbook openings — every PGN must reflect the specific patterns and moves described in the weakness
 
 2. drillFen: A FEN string representing a critical position from one of the actual games where the student must find the right move.
@@ -740,7 +836,7 @@ Respond with valid JSON:
 
     const content = response.choices[0]?.message?.content ?? "{}";
     const parsed = JSON.parse(content) as CourseOutput;
-    return parsed;
+    return ensureAllLessonsHavePgn(parsed);
   } catch (err) {
     logger.error({ err }, "Failed to generate course with OpenAI");
     throw err;
@@ -791,12 +887,14 @@ Player rating: ${playerRating ?? "unknown"}${gameSection}
 Create a course with 4-5 lessons focused ONLY on endgame mistakes from these actual games. Each lesson should address a specific endgame error the player made.
 
 RULES for each lesson:
-1. examplePgn: Show the critical endgame segment from their actual game.
+1. examplePgn: MANDATORY — every lesson MUST have a valid PGN string (NEVER null, NEVER empty). This is the most important field — it drives the interactive chessboard that students use to learn.
    - START the PGN 2 moves BEFORE the endgame mistake. Use a [FEN "..."] header with the board position.
+   - After the FEN header, include at least 3-6 moves of actual play
    - Every move must have a {comment in curly braces}
    - The mistake move(s) MUST have [MISTAKE] at the START of their comment
    - After the mistake, show the CORRECT continuation
-   - Legal moves only
+   - Legal moves only — verify each move is legal from the given FEN position
+   - The PGN must be parseable by chess.js — use standard algebraic notation
    - MUST use actual move sequences from the provided games
 
 2. drillFen: The exact position where the player went wrong — they must find the correct move.
@@ -845,12 +943,14 @@ Cover these subtopics, one lesson each:
 ${topic.subtopics.map((s, i) => `${i + 1}. ${s}`).join("\n")}
 
 RULES for each lesson:
-1. examplePgn: A teaching sequence showing the pattern/technique.
+1. examplePgn: MANDATORY — every lesson MUST have a valid PGN string (NEVER null, NEVER empty). This is the most important field — it drives the interactive chessboard that students use to learn.
    - Use a [FEN "..."] header to start from the relevant position (NOT from the opening).
+   - After the FEN header, include at least 3-6 moves of actual play
    - Every move must have a {comment in curly braces} explaining the concept
    - If demonstrating a common mistake, mark it with [MISTAKE] at the START of the comment
    - Then show the CORRECT technique with explanatory comments
-   - Legal moves only
+   - Legal moves only — verify each move is legal from the given FEN position
+   - The PGN must be parseable by chess.js — use standard algebraic notation
 
 2. drillFen: A position where the student must apply the technique just taught.
 
@@ -896,7 +996,7 @@ Respond with valid JSON:
 
     const content = response.choices[0]?.message?.content ?? "{}";
     const parsed = JSON.parse(content) as CourseOutput;
-    return parsed;
+    return ensureAllLessonsHavePgn(parsed);
   } catch (err) {
     logger.error({ err, type }, "Failed to generate endgame course");
     throw err;
