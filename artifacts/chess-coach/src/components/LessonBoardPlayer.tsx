@@ -175,21 +175,18 @@ function tryPartialPgnParse(pgn: string, fen: string): Step[] {
   const moveRegex = /(\d+\.+\s*)?([KQRBN]?[a-h]?[1-8]?x?[a-h][1-8](?:=[QRBN])?[+#]?|O-O(?:-O)?)\s*(?:\{([^}]*)\})?/g;
 
   const player = new Chess(fen);
-  let sawMistake = false;
   let match;
 
   while ((match = moveRegex.exec(moveText)) !== null) {
     const san = match[2];
     const rawComment = match[3] || '';
     const isMistake = /^\s*\[mistake\]\s*/i.test(rawComment);
-    const cleanComment = isMistake ? rawComment.replace(/^\s*\[mistake\]\s*/i, '') : rawComment;
+    const isFix = /^\s*\[fix\]\s*/i.test(rawComment);
+    const cleanComment = rawComment.replace(/^\s*\[(mistake|fix)\]\s*/i, '');
 
     try {
       const move = player.move(san);
       if (!move) break;
-
-      const isFix = sawMistake && !isMistake;
-      if (isMistake) sawMistake = true;
 
       const idx = steps.length - 1;
       const startColor2 = fen.split(' ')[1] === 'b' ? 1 : 0;
@@ -256,20 +253,17 @@ function parsePgnSteps(pgn: string, content?: string | null, drillExpectedMove?:
       { fen: startFen, san: null, comment: comments[0], moveNum: 0, fullMoveNumber: startFullMove, color: null },
     ];
 
-    let sawMistake = false;
     for (let i = 0; i < history.length; i++) {
       const move = history[i];
       player.move(move.san);
       const rawComment = comments[i + 1];
       const isMistake = /^\s*\[mistake\]\s*/i.test(rawComment);
-      const cleanComment = isMistake ? rawComment.replace(/^\s*\[mistake\]\s*/i, '') : rawComment;
+      const isFix = /^\s*\[fix\]\s*/i.test(rawComment);
+      const cleanComment = rawComment.replace(/^\s*\[(mistake|fix)\]\s*/i, '');
 
       const globalIdx = startColor + i;
       const fullMoveNumber = startFullMove + Math.floor(globalIdx / 2);
       const color: 'w' | 'b' = globalIdx % 2 === 0 ? 'w' : 'b';
-
-      const isFix = sawMistake && !isMistake;
-      if (isMistake) sawMistake = true;
 
       steps.push({
         fen: player.fen(),
@@ -283,6 +277,38 @@ function parsePgnSteps(pgn: string, content?: string | null, drillExpectedMove?:
         from: move.from,
         to: move.to,
       });
+    }
+
+    if (drillExpectedMove) {
+      const mistakeIdx = steps.findIndex(s => s.isMistake);
+      if (mistakeIdx > 0) {
+        const hasFixAlready = steps.some(s => s.isFix);
+        if (!hasFixAlready) {
+          const preMistakeFen = steps[mistakeIdx - 1].fen;
+          try {
+            const fixChess = new Chess(preMistakeFen);
+            const fixMove = fixChess.move(drillExpectedMove);
+            if (fixMove) {
+              const preMistakeStep = steps[mistakeIdx - 1];
+              const insertAt = mistakeIdx + 1;
+              steps.splice(insertAt, 0, {
+                fen: fixChess.fen(),
+                san: fixMove.san,
+                comment: `The correct move is ${fixMove.san}.`,
+                moveNum: insertAt,
+                fullMoveNumber: preMistakeStep.fullMoveNumber,
+                color: steps[mistakeIdx].color,
+                isFix: true,
+                from: fixMove.from,
+                to: fixMove.to,
+              });
+              for (let k = insertAt + 1; k < steps.length; k++) {
+                steps[k].moveNum = k;
+              }
+            }
+          } catch {}
+        }
+      }
     }
 
     return steps;
