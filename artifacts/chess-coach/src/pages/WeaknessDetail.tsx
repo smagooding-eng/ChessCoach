@@ -380,8 +380,8 @@ export function WeaknessDetail() {
                             position: game.midGameFen ?? 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
                             allowDragging: false,
                             boardStyle: { borderRadius: 0 },
-                            darkSquareStyle: { backgroundColor: '#769656' },
-                            lightSquareStyle: { backgroundColor: '#eeeed2' },
+                            darkSquareStyle: { backgroundColor: '#b58863' },
+                            lightSquareStyle: { backgroundColor: '#f0d9b5' },
                             showNotation: false,
                             animationDurationInMs: 0,
                           }}

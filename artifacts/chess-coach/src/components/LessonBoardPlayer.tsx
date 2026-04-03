@@ -4,7 +4,7 @@ import { Chess } from 'chess.js';
 import {
   Play, Pause, SkipBack, SkipForward, ChevronLeft, ChevronRight,
   MessageSquare, Swords, CheckCircle2, Lightbulb, Eye, RotateCcw,
-  Trophy, Repeat2,
+  Trophy, Repeat2, Check,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
@@ -19,9 +19,13 @@ interface Step {
   fullMoveNumber: number;
   color: 'w' | 'b' | null;
   isMistake?: boolean;
+  isFix?: boolean;
   from?: string;
   to?: string;
 }
+
+const BOARD_LIGHT = '#f0d9b5';
+const BOARD_DARK = '#b58863';
 
 function parsePgnSteps(pgn: string): Step[] | null {
   if (!pgn || pgn.trim() === '') return null;
@@ -67,6 +71,7 @@ function parsePgnSteps(pgn: string): Step[] | null {
       { fen: startFen, san: null, comment: comments[0], moveNum: 0, fullMoveNumber: startFullMove, color: null },
     ];
 
+    let sawMistake = false;
     for (let i = 0; i < history.length; i++) {
       const move = history[i];
       player.move(move.san);
@@ -78,6 +83,9 @@ function parsePgnSteps(pgn: string): Step[] | null {
       const fullMoveNumber = startFullMove + Math.floor(globalIdx / 2);
       const color: 'w' | 'b' = globalIdx % 2 === 0 ? 'w' : 'b';
 
+      const isFix = sawMistake && !isMistake;
+      if (isMistake) sawMistake = true;
+
       steps.push({
         fen: player.fen(),
         san: move.san,
@@ -86,6 +94,7 @@ function parsePgnSteps(pgn: string): Step[] | null {
         fullMoveNumber,
         color,
         isMistake,
+        isFix,
         from: move.from,
         to: move.to,
       });
@@ -486,14 +495,17 @@ export function LessonBoardPlayer({ pgn, title, drillFen, drillExpectedMove, dri
                   position: step?.fen,
                   allowDragging: false,
                   boardStyle: { borderRadius: '8px', overflow: 'hidden' },
-                  darkSquareStyle: { backgroundColor: '#2d4a3e' },
-                  lightSquareStyle: { backgroundColor: '#6dae7f' },
+                  darkSquareStyle: { backgroundColor: BOARD_DARK },
+                  lightSquareStyle: { backgroundColor: BOARD_LIGHT },
                   animationDurationInMs: 180,
                   squareStyles: (() => {
                     const styles: Record<string, React.CSSProperties> = {};
                     if (step?.isMistake && step.from && step.to) {
-                      styles[step.from] = { background: 'rgba(220, 50, 50, 0.35)' };
-                      styles[step.to] = { background: 'rgba(220, 50, 50, 0.55)' };
+                      styles[step.from] = { background: 'rgba(220, 50, 50, 0.45)', boxShadow: 'inset 0 0 0 2px rgba(220,50,50,0.7)' };
+                      styles[step.to] = { background: 'rgba(220, 50, 50, 0.6)', boxShadow: 'inset 0 0 0 2px rgba(220,50,50,0.8)' };
+                    } else if (step?.isFix && step.from && step.to) {
+                      styles[step.from] = { background: 'rgba(34, 197, 94, 0.35)', boxShadow: 'inset 0 0 0 2px rgba(34,197,94,0.5)' };
+                      styles[step.to] = { background: 'rgba(34, 197, 94, 0.55)', boxShadow: 'inset 0 0 0 2px rgba(34,197,94,0.7)' };
                     } else if (step?.from && step?.to && currentStep > 0) {
                       styles[step.from] = { background: 'rgba(255, 240, 80, 0.25)' };
                       styles[step.to] = { background: 'rgba(255, 240, 80, 0.45)' };
@@ -510,6 +522,14 @@ export function LessonBoardPlayer({ pgn, title, drillFen, drillExpectedMove, dri
                   </div>
                 </div>
               )}
+              {step?.isFix && (
+                <div className="absolute top-2 right-2 pointer-events-none z-10">
+                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold shadow-lg backdrop-blur-sm border bg-emerald-950/90 text-emerald-300 border-emerald-400/40">
+                    <Check className="w-3 h-3" />
+                    <span>Correct</span>
+                  </div>
+                </div>
+              )}
               <AnimatePresence>
                 {prevFen !== step?.fen && step?.san && (
                   <motion.div
@@ -517,7 +537,7 @@ export function LessonBoardPlayer({ pgn, title, drillFen, drillExpectedMove, dri
                     initial={{ opacity: 0.35 }}
                     animate={{ opacity: 0 }}
                     transition={{ duration: 0.6 }}
-                    className={`absolute inset-0 ${step?.isMistake ? 'bg-red-500/20' : 'bg-primary/20'} rounded-lg pointer-events-none`}
+                    className={`absolute inset-0 ${step?.isMistake ? 'bg-red-500/20' : step?.isFix ? 'bg-emerald-500/20' : 'bg-primary/20'} rounded-lg pointer-events-none`}
                   />
                 )}
               </AnimatePresence>
@@ -534,10 +554,14 @@ export function LessonBoardPlayer({ pgn, title, drillFen, drillExpectedMove, dri
                         <div className="w-4 h-4 rounded-full bg-red-500/20 border border-red-500/40 flex items-center justify-center shrink-0 mt-0.5">
                           <span className="text-red-400 text-[10px] font-bold">!</span>
                         </div>
+                      ) : step.isFix ? (
+                        <div className="w-4 h-4 rounded-full bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center shrink-0 mt-0.5">
+                          <Check className="w-2.5 h-2.5 text-emerald-400" />
+                        </div>
                       ) : (
                         <MessageSquare className="w-4 h-4 text-primary shrink-0 mt-0.5" />
                       )}
-                      <p className={cn('text-sm leading-relaxed', step.isMistake ? 'text-red-300/90' : 'text-foreground/85')}>{step.comment}</p>
+                      <p className={cn('text-sm leading-relaxed', step.isMistake ? 'text-red-300/90' : step.isFix ? 'text-emerald-300/90' : 'text-foreground/85')}>{step.comment}</p>
                     </div>
                   ) : currentStep === 0 ? (
                     <p className="text-sm text-muted-foreground italic">Press play to walk through the lesson, or click any move below.</p>
@@ -562,12 +586,14 @@ export function LessonBoardPlayer({ pgn, title, drillFen, drillExpectedMove, dri
                           className={cn(
                             'text-left px-2 py-1 rounded transition-colors text-xs',
                             currentStep === white
-                              ? (wStep.isMistake ? 'bg-red-500 text-white font-bold' : 'bg-primary text-primary-foreground font-bold')
+                              ? (wStep.isMistake ? 'bg-red-500 text-white font-bold' : wStep.isFix ? 'bg-emerald-500 text-white font-bold' : 'bg-primary text-primary-foreground font-bold')
                               : wStep.isMistake
                                 ? 'text-red-400 bg-red-500/10 border border-red-500/20 font-semibold hover:bg-red-500/20'
-                                : 'text-foreground/70 hover:bg-white/5'
+                                : wStep.isFix
+                                  ? 'text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 font-semibold hover:bg-emerald-500/20'
+                                  : 'text-foreground/70 hover:bg-white/5'
                           )}>
-                          {wStep.isMistake && <span className="mr-0.5">?</span>}{wStep.san}
+                          {wStep.isMistake && <span className="mr-0.5">?</span>}{wStep.isFix && <span className="mr-0.5">✓</span>}{wStep.san}
                         </button>
                       ) : <div className="px-2 py-1 text-xs text-muted-foreground/30">...</div>}
                       {bStep ? (
@@ -575,12 +601,14 @@ export function LessonBoardPlayer({ pgn, title, drillFen, drillExpectedMove, dri
                           className={cn(
                             'text-left px-2 py-1 rounded transition-colors text-xs',
                             currentStep === black
-                              ? (bStep.isMistake ? 'bg-red-500 text-white font-bold' : 'bg-primary text-primary-foreground font-bold')
+                              ? (bStep.isMistake ? 'bg-red-500 text-white font-bold' : bStep.isFix ? 'bg-emerald-500 text-white font-bold' : 'bg-primary text-primary-foreground font-bold')
                               : bStep.isMistake
                                 ? 'text-red-400 bg-red-500/10 border border-red-500/20 font-semibold hover:bg-red-500/20'
-                                : 'text-foreground/70 hover:bg-white/5'
+                                : bStep.isFix
+                                  ? 'text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 font-semibold hover:bg-emerald-500/20'
+                                  : 'text-foreground/70 hover:bg-white/5'
                           )}>
-                          {bStep.isMistake && <span className="mr-0.5">?</span>}{bStep.san}
+                          {bStep.isMistake && <span className="mr-0.5">?</span>}{bStep.isFix && <span className="mr-0.5">✓</span>}{bStep.san}
                         </button>
                       ) : <div />}
                     </React.Fragment>
@@ -676,8 +704,8 @@ export function LessonBoardPlayer({ pgn, title, drillFen, drillExpectedMove, dri
                       onSquareClick: handleRepeatSquareClick,
                       squareStyles: repeatSquareStyles,
                       boardStyle: { borderRadius: '8px', overflow: 'hidden', cursor: 'pointer' },
-                      darkSquareStyle: { backgroundColor: '#2d4a3e' },
-                      lightSquareStyle: { backgroundColor: '#6dae7f' },
+                      darkSquareStyle: { backgroundColor: BOARD_DARK },
+                      lightSquareStyle: { backgroundColor: BOARD_LIGHT },
                       animationDurationInMs: 180,
                     }}
                   />
@@ -815,8 +843,8 @@ export function LessonBoardPlayer({ pgn, title, drillFen, drillExpectedMove, dri
                   onSquareClick: handleDrillSquareClick,
                   squareStyles: drillSquareStyles,
                   boardStyle: { borderRadius: '8px', overflow: 'hidden', cursor: 'pointer' },
-                  darkSquareStyle: { backgroundColor: '#2d4a3e' },
-                  lightSquareStyle: { backgroundColor: '#6dae7f' },
+                  darkSquareStyle: { backgroundColor: BOARD_DARK },
+                  lightSquareStyle: { backgroundColor: BOARD_LIGHT },
                   animationDurationInMs: 180,
                 }}
               />
