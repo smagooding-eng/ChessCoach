@@ -41,6 +41,12 @@ function extractFen(pgn: string): string | null {
   return null;
 }
 
+function extractTargetSquare(san: string): string | null {
+  if (san === 'O-O' || san === 'O-O-O') return null;
+  const m = san.match(/([a-h][1-8])/);
+  return m ? m[1] : null;
+}
+
 function buildStepsFromContent(
   fen: string,
   content: string,
@@ -72,16 +78,16 @@ function buildStepsFromContent(
     const san = moveMatch[1];
     const isMistakeSection = /mistake|error|wrong|bad|blunder|\?\?/i.test(section);
     const isFixSection = /fix|correct|better|instead|should|improve|best/i.test(section);
+    const cleanComment = section
+      .replace(/^#{1,3}\s+/gm, '')
+      .replace(/\*\*([^*]+)\*\*/g, '$1')
+      .trim();
 
+    let added = false;
     try {
       const testChess = new Chess(fen);
       const move = testChess.move(san);
       if (move) {
-        const cleanComment = section
-          .replace(/^#{1,3}\s+/gm, '')
-          .replace(/\*\*([^*]+)\*\*/g, '$1')
-          .trim();
-
         steps.push({
           fen: testChess.fen(),
           san: move.san,
@@ -94,11 +100,30 @@ function buildStepsFromContent(
           from: move.from,
           to: move.to,
         });
+        added = true;
       }
     } catch {}
+
+    if (!added) {
+      const targetSq = extractTargetSquare(san);
+      if (targetSq) {
+        steps.push({
+          fen,
+          san,
+          comment: cleanComment,
+          moveNum: steps.length,
+          fullMoveNumber,
+          color: turnColor,
+          isMistake: isMistakeSection && !isFixSection,
+          isFix: isFixSection && !isMistakeSection,
+          to: targetSq,
+        });
+      }
+    }
   }
 
   if (steps.length === 1 && drillExpectedMove) {
+    let added = false;
     try {
       const testChess = new Chess(fen);
       const move = testChess.move(drillExpectedMove);
@@ -114,8 +139,79 @@ function buildStepsFromContent(
           from: move.from,
           to: move.to,
         });
+        added = true;
       }
     } catch {}
+
+    if (!added) {
+      const targetSq = extractTargetSquare(drillExpectedMove);
+      if (targetSq) {
+        steps.push({
+          fen,
+          san: drillExpectedMove,
+          comment: `The correct move is ${drillExpectedMove}.`,
+          moveNum: 1,
+          fullMoveNumber,
+          color: turnColor,
+          isFix: true,
+          to: targetSq,
+        });
+      }
+    }
+  }
+
+  return steps;
+}
+
+function tryPartialPgnParse(pgn: string, fen: string): Step[] {
+  const fullMoveNumber = parseInt(fen.split(' ')[5]) || 1;
+  const turnColor: 'w' | 'b' = fen.split(' ')[1] === 'b' ? 'b' : 'w';
+
+  const steps: Step[] = [
+    { fen, san: null, comment: '', moveNum: 0, fullMoveNumber, color: null },
+  ];
+
+  const moveText = pgn.replace(/\[.*?\]\s*/g, '').trim();
+  const moveRegex = /(\d+\.+\s*)?([KQRBN]?[a-h]?[1-8]?x?[a-h][1-8](?:=[QRBN])?[+#]?|O-O(?:-O)?)\s*(?:\{([^}]*)\})?/g;
+
+  const player = new Chess(fen);
+  let sawMistake = false;
+  let match;
+
+  while ((match = moveRegex.exec(moveText)) !== null) {
+    const san = match[2];
+    const rawComment = match[3] || '';
+    const isMistake = /^\s*\[mistake\]\s*/i.test(rawComment);
+    const cleanComment = isMistake ? rawComment.replace(/^\s*\[mistake\]\s*/i, '') : rawComment;
+
+    try {
+      const move = player.move(san);
+      if (!move) break;
+
+      const isFix = sawMistake && !isMistake;
+      if (isMistake) sawMistake = true;
+
+      const idx = steps.length - 1;
+      const startColor2 = fen.split(' ')[1] === 'b' ? 1 : 0;
+      const globalIdx = startColor2 + idx;
+      const fmn = fullMoveNumber + Math.floor(globalIdx / 2);
+      const color: 'w' | 'b' = globalIdx % 2 === 0 ? 'w' : 'b';
+
+      steps.push({
+        fen: player.fen(),
+        san: move.san,
+        comment: cleanComment,
+        moveNum: steps.length,
+        fullMoveNumber: fmn,
+        color,
+        isMistake,
+        isFix,
+        from: move.from,
+        to: move.to,
+      });
+    } catch {
+      break;
+    }
   }
 
   return steps;
@@ -192,6 +288,9 @@ function parsePgnSteps(pgn: string, content?: string | null, drillExpectedMove?:
     return steps;
   } catch {
     if (fen) {
+      const partialSteps = tryPartialPgnParse(pgn, fen);
+      if (partialSteps.length > 1) return partialSteps;
+
       if (content) {
         const contentSteps = buildStepsFromContent(fen, content, drillExpectedMove ?? null);
         if (contentSteps.length > 1) return contentSteps;
@@ -590,14 +689,14 @@ export function LessonBoardPlayer({ pgn, title, drillFen, drillExpectedMove, dri
                   animationDurationInMs: 180,
                   squareStyles: (() => {
                     const styles: Record<string, React.CSSProperties> = {};
-                    if (step?.isMistake && step.from && step.to) {
-                      styles[step.from] = { background: 'rgba(220, 50, 50, 0.45)', boxShadow: 'inset 0 0 0 2px rgba(220,50,50,0.7)' };
+                    if (step?.isMistake && step.to) {
+                      if (step.from) styles[step.from] = { background: 'rgba(220, 50, 50, 0.45)', boxShadow: 'inset 0 0 0 2px rgba(220,50,50,0.7)' };
                       styles[step.to] = { background: 'rgba(220, 50, 50, 0.6)', boxShadow: 'inset 0 0 0 2px rgba(220,50,50,0.8)' };
-                    } else if (step?.isFix && step.from && step.to) {
-                      styles[step.from] = { background: 'rgba(34, 197, 94, 0.35)', boxShadow: 'inset 0 0 0 2px rgba(34,197,94,0.5)' };
+                    } else if (step?.isFix && step.to) {
+                      if (step.from) styles[step.from] = { background: 'rgba(34, 197, 94, 0.35)', boxShadow: 'inset 0 0 0 2px rgba(34,197,94,0.5)' };
                       styles[step.to] = { background: 'rgba(34, 197, 94, 0.55)', boxShadow: 'inset 0 0 0 2px rgba(34,197,94,0.7)' };
-                    } else if (step?.from && step?.to && currentStep > 0) {
-                      styles[step.from] = { background: 'rgba(255, 240, 80, 0.25)' };
+                    } else if (step?.to && currentStep > 0) {
+                      if (step.from) styles[step.from] = { background: 'rgba(255, 240, 80, 0.25)' };
                       styles[step.to] = { background: 'rgba(255, 240, 80, 0.45)' };
                     }
                     return styles;
