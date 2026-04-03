@@ -323,7 +323,12 @@ function parsePgnSteps(pgn: string, content?: string | null, drillExpectedMove?:
       }
       return [{ fen, san: null, comment: 'Study this position.', moveNum: 0, fullMoveNumber: parseInt(fen.split(' ')[5]) || 1, color: null }];
     }
-    return null;
+    try {
+      const fallbackFen = pgn.trim();
+      new Chess(fallbackFen);
+      return [{ fen: fallbackFen, san: null, comment: 'Study this position.', moveNum: 0, fullMoveNumber: parseInt(fallbackFen.split(' ')[5]) || 1, color: null }];
+    } catch {}
+    return [{ fen: START_FEN, san: null, comment: '', moveNum: 0, fullMoveNumber: 1, color: null }];
   }
 }
 
@@ -701,9 +706,39 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
   };
 
   if (!steps) {
+    const fallbackFen = extractFen(activePgn) ?? START_FEN;
     return (
-      <div className="rounded-xl bg-white/5 border border-white/10 p-6 text-center text-sm text-muted-foreground">
-        No board position available for this lesson.
+      <div className="rounded-2xl overflow-hidden border border-white/8 bg-[#0d1117]">
+        <div className="flex items-center px-4 py-0 bg-white/3 border-b border-white/5">
+          <div className="flex items-center gap-2 mr-4 shrink-0">
+            <div className="w-2 h-2 rounded-full bg-red-500/80" />
+            <div className="w-2 h-2 rounded-full bg-yellow-500/80" />
+            <div className="w-2 h-2 rounded-full bg-green-500/80" />
+          </div>
+          <span className="px-4 py-3 text-xs font-semibold text-primary border-b-2 border-primary flex items-center gap-1.5">
+            <Play className="w-3 h-3" /> Lesson
+          </span>
+        </div>
+        <div className="flex flex-col md:flex-row">
+          <div className="flex-shrink-0 p-3 md:p-4">
+            <div className="relative w-full max-w-[360px] mx-auto">
+              <Chessboard
+                options={{
+                  position: fallbackFen,
+                  allowDragging: false,
+                  boardStyle: { borderRadius: '8px', overflow: 'hidden' },
+                  darkSquareStyle: { backgroundColor: BOARD_DARK },
+                  lightSquareStyle: { backgroundColor: BOARD_LIGHT },
+                }}
+              />
+            </div>
+          </div>
+          <div className="flex-1 flex flex-col min-h-0 border-t md:border-t-0 md:border-l border-white/5">
+            <div className="px-4 py-4 min-h-[90px] flex flex-col justify-center">
+              <p className="text-sm text-muted-foreground italic">Study this position.</p>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
