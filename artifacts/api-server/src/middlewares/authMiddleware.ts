@@ -1,6 +1,7 @@
 import { type Request, type Response, type NextFunction } from "express";
 import type { SessionUser } from "../lib/auth";
 import {
+  ADMIN_EMAILS,
   clearSession,
   getSessionId,
   getSession,
@@ -75,7 +76,7 @@ export async function requirePremium(
     const { storage } = await import("../lib/storage");
     const user = await storage.getUser(req.user!.id);
 
-    if (user?.isAdmin) {
+    if (user?.isAdmin || ADMIN_EMAILS.includes(user?.email?.toLowerCase?.() ?? "")) {
       next();
       return;
     }
