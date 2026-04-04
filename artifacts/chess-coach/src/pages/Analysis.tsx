@@ -10,7 +10,13 @@ import { getTierForRating, ELO_TIERS } from '@/lib/elo-tips';
 import { apiFetch } from '@/lib/api';
 import { PremiumGate } from '@/components/PremiumGate';
 
-const PIE_COLORS = ['#10b981', '#ef4444', '#64748b'];
+const CHESSCOM_GREEN = '#81b64c';
+const BG_CARD = '#302e2b';
+const BG_CARD_HOVER = '#3a3733';
+const BG_DARK = '#262421';
+const TEXT_LIGHT = '#e8e6e3';
+const TEXT_MUTED = '#9e9b98';
+const PIE_COLORS = [CHESSCOM_GREEN, '#dc4343', '#6b6966'];
 
 export function Analysis() {
   const [, navigate] = useLocation();
@@ -158,40 +164,42 @@ export function Analysis() {
 
   return (
     <PremiumGate feature="AI Game Analysis">
-    <div className="space-y-8 pb-10 px-4 pt-4 md:px-0 md:pt-0">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 glass-card p-6 rounded-3xl border-primary/20 relative overflow-hidden">
-        <div className="absolute right-0 top-0 w-64 h-64 bg-primary/5 blur-3xl rounded-full pointer-events-none" />
-        
-        <div className="relative z-10">
-          <h1 className="text-3xl font-display font-bold flex items-center gap-3">
-            <BrainCircuit className="w-8 h-8 text-primary" /> AI Analysis
-          </h1>
-          <p className="text-muted-foreground mt-2 max-w-lg">
-            Our coach engine processes all your games to detect recurring patterns, blunders, and strategic leaks.
-          </p>
+    <div className="space-y-5 pb-10 px-3 pt-3 md:px-0 md:pt-0">
+      <div className="rounded-xl p-5 md:p-6" style={{ background: BG_CARD }}>
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
+            <h1 className="text-2xl font-black flex items-center gap-2.5" style={{ color: TEXT_LIGHT }}>
+              <BrainCircuit className="w-6 h-6" style={{ color: CHESSCOM_GREEN }} /> AI Analysis
+            </h1>
+            <p className="mt-1.5 max-w-lg text-sm" style={{ color: TEXT_MUTED }}>
+              Our coach engine processes all your games to detect recurring patterns, blunders, and strategic leaks.
+            </p>
+          </div>
+
+          <button
+            onClick={handleAnalyze}
+            disabled={isAnalyzing}
+            className="shrink-0 px-5 py-2.5 rounded-lg font-bold text-sm text-white flex items-center gap-2 transition-opacity hover:opacity-90 disabled:opacity-50"
+            style={{ background: CHESSCOM_GREEN }}
+          >
+            {isAnalyzing ? (
+              <><Loader2 className="w-4 h-4 animate-spin" /> Processing...</>
+            ) : (
+              <><Activity className="w-4 h-4" /> Run Deep Analysis</>
+            )}
+          </button>
         </div>
-        
-        <button
-          onClick={handleAnalyze}
-          disabled={isAnalyzing}
-          className="relative z-10 shrink-0 btn-primary btn-lg"
-        >
-          {isAnalyzing ? (
-            <><Loader2 className="w-5 h-5 animate-spin" /> Processing...</>
-          ) : (
-            <><Activity className="w-5 h-5" /> Run Deep Analysis</>
-          )}
-        </button>
       </div>
 
       {isAnalyzing && statusMsg && (
         <motion.div
           initial={{ opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}
-          className="p-4 rounded-xl bg-primary/8 border border-primary/20 text-primary flex items-center gap-3"
+          className="p-3.5 rounded-lg flex items-center gap-3 text-sm"
+          style={{ background: 'rgba(129,182,76,0.08)', border: '1px solid rgba(129,182,76,0.2)', color: CHESSCOM_GREEN }}
         >
           <Loader2 className="w-4 h-4 animate-spin shrink-0" />
-          <span className="text-sm">{statusMsg}</span>
+          <span>{statusMsg}</span>
         </motion.div>
       )}
 
@@ -199,7 +207,8 @@ export function Analysis() {
         <motion.div
           initial={{ opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}
-          className="p-4 rounded-xl bg-destructive/15 border border-destructive/30 text-red-400 flex items-center gap-2"
+          className="p-3.5 rounded-lg flex items-center gap-2 text-sm"
+          style={{ background: 'rgba(220,67,67,0.1)', border: '1px solid rgba(220,67,67,0.25)', color: '#dc4343' }}
         >
           <AlertTriangle className="w-4 h-4 shrink-0" />
           {analyzeError}
@@ -207,24 +216,26 @@ export function Analysis() {
       )}
 
       {(loadingSummary || loadingWeaknesses) && !isAnalyzing ? (
-        <div className="flex justify-center py-20"><div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin"></div></div>
+        <div className="flex justify-center py-20">
+          <div className="w-10 h-10 border-4 rounded-full animate-spin" style={{ borderColor: CHESSCOM_GREEN, borderTopColor: 'transparent' }} />
+        </div>
       ) : summary ? (
         <>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <div className="glass-card p-6 rounded-2xl space-y-8">
-              <h2 className="text-xl font-bold mb-6">Performance Breakdown</h2>
-              
-              <div className="flex flex-col sm:flex-row items-center justify-around gap-8">
-                <div className="w-48 h-48">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div className="rounded-xl p-5 space-y-6" style={{ background: BG_CARD }}>
+              <h2 className="text-lg font-bold" style={{ color: TEXT_LIGHT }}>Performance Breakdown</h2>
+
+              <div className="flex flex-col sm:flex-row items-center justify-around gap-6">
+                <div className="w-44 h-44">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                       <Pie
                         data={pieData}
                         cx="50%"
                         cy="50%"
-                        innerRadius={60}
-                        outerRadius={80}
-                        paddingAngle={5}
+                        innerRadius={55}
+                        outerRadius={75}
+                        paddingAngle={4}
                         dataKey="value"
                         stroke="none"
                       >
@@ -232,33 +243,33 @@ export function Analysis() {
                           <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
                         ))}
                       </Pie>
-                      <RechartsTooltip 
-                        contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px', color: '#fff' }}
-                        itemStyle={{ color: '#fff' }}
+                      <RechartsTooltip
+                        contentStyle={{ backgroundColor: BG_DARK, border: 'none', borderRadius: '8px', color: TEXT_LIGHT }}
+                        itemStyle={{ color: TEXT_LIGHT }}
                       />
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
-                <div className="space-y-3 w-full sm:w-auto">
+                <div className="space-y-2.5 w-full sm:w-auto">
                   <div className="flex items-center justify-between gap-6">
-                    <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-emerald-500"/> Wins</div>
-                    <div className="font-bold">{summary.wins}</div>
+                    <div className="flex items-center gap-2 text-sm" style={{ color: TEXT_LIGHT }}><div className="w-3 h-3 rounded-full" style={{ background: CHESSCOM_GREEN }}/> Wins</div>
+                    <div className="font-bold text-sm" style={{ color: TEXT_LIGHT }}>{summary.wins}</div>
                   </div>
                   <div className="flex items-center justify-between gap-6">
-                    <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-red-500"/> Losses</div>
-                    <div className="font-bold">{summary.losses}</div>
+                    <div className="flex items-center gap-2 text-sm" style={{ color: TEXT_LIGHT }}><div className="w-3 h-3 rounded-full" style={{ background: '#dc4343' }}/> Losses</div>
+                    <div className="font-bold text-sm" style={{ color: TEXT_LIGHT }}>{summary.losses}</div>
                   </div>
                   <div className="flex items-center justify-between gap-6">
-                    <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-slate-500"/> Draws</div>
-                    <div className="font-bold">{summary.draws}</div>
+                    <div className="flex items-center gap-2 text-sm" style={{ color: TEXT_LIGHT }}><div className="w-3 h-3 rounded-full" style={{ background: '#6b6966' }}/> Draws</div>
+                    <div className="font-bold text-sm" style={{ color: TEXT_LIGHT }}>{summary.draws}</div>
                   </div>
                 </div>
               </div>
             </div>
 
-            <div className="glass-card p-6 rounded-2xl">
-              <h2 className="text-xl font-bold mb-6">Top Openings Win Rate</h2>
-              <div className="space-y-2.5">
+            <div className="rounded-xl p-5" style={{ background: BG_CARD }}>
+              <h2 className="text-lg font-bold mb-4" style={{ color: TEXT_LIGHT }}>Top Openings Win Rate</h2>
+              <div className="space-y-2">
                 {openingData.map((o, i) => (
                   <motion.div
                     key={i}
@@ -266,31 +277,33 @@ export function Analysis() {
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: i * 0.06 }}
                     onClick={() => navigate(`/openings/${encodeURIComponent(o.fullName)}`)}
-                    className="flex items-center gap-3 p-3 rounded-xl bg-secondary/40 hover:bg-secondary/70 cursor-pointer group transition-all"
+                    className="flex items-center gap-3 p-2.5 rounded-lg cursor-pointer group transition-colors"
+                    style={{ background: 'transparent' }}
+                    onMouseEnter={e => (e.currentTarget.style.background = BG_CARD_HOVER)}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                   >
-                    <span className="text-xs text-muted-foreground w-[120px] sm:w-[150px] shrink-0 truncate group-hover:text-foreground transition-colors font-medium">
+                    <span className="text-xs w-[110px] sm:w-[140px] shrink-0 truncate font-medium" style={{ color: TEXT_MUTED }}>
                       {o.name}
                     </span>
-                    <div className="flex-1 h-5 bg-secondary rounded overflow-hidden relative">
+                    <div className="flex-1 h-4 rounded overflow-hidden relative" style={{ background: BG_DARK }}>
                       <div
-                        className="h-full rounded bg-primary/80 group-hover:bg-primary transition-colors"
-                        style={{ width: `${o.winRate}%` }}
+                        className="h-full rounded transition-all"
+                        style={{ width: `${o.winRate}%`, background: CHESSCOM_GREEN, opacity: 0.8 }}
                       />
                     </div>
-                    <span className={`text-xs font-bold w-10 text-right shrink-0 ${o.winRate >= 60 ? 'text-emerald-400' : o.winRate >= 45 ? 'text-amber-400' : 'text-red-400'}`}>
+                    <span className="text-xs font-bold w-10 text-right shrink-0" style={{ color: o.winRate >= 60 ? CHESSCOM_GREEN : o.winRate >= 45 ? '#eac133' : '#dc4343' }}>
                       {o.winRate}%
                     </span>
-                    <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-primary shrink-0 transition-colors" />
+                    <ChevronRight className="w-3.5 h-3.5 shrink-0 opacity-0 group-hover:opacity-60 transition-opacity" style={{ color: TEXT_MUTED }} />
                   </motion.div>
                 ))}
                 {openingData.length === 0 && (
-                  <p className="text-sm text-muted-foreground text-center py-8">No opening data yet</p>
+                  <p className="text-sm text-center py-8" style={{ color: TEXT_MUTED }}>No opening data yet</p>
                 )}
               </div>
             </div>
           </div>
 
-          {/* ── ELO-Based Improvement Tips ─────────────────────────────────── */}
           {summary.avgRating > 0 && (() => {
             const tier = getTierForRating(summary.avgRating);
             const tierIdx = ELO_TIERS.indexOf(tier);
@@ -299,25 +312,25 @@ export function Analysis() {
               ? Math.min(100, Math.round(((summary.avgRating - tier.min) / (tier.max - tier.min)) * 100))
               : 100;
             return (
-              <div className="glass-card rounded-2xl overflow-hidden border border-white/8 mt-4">
-                <div className="px-6 py-5 border-b border-white/5 flex flex-col sm:flex-row items-start sm:items-center gap-4 justify-between">
-                  <div className="flex items-center gap-3">
-                    <TrendingUp className="w-6 h-6 text-primary" />
+              <div className="rounded-xl overflow-hidden" style={{ background: BG_CARD }}>
+                <div className="px-5 py-4 flex flex-col sm:flex-row items-start sm:items-center gap-3 justify-between" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                  <div className="flex items-center gap-2.5">
+                    <TrendingUp className="w-5 h-5" style={{ color: CHESSCOM_GREEN }} />
                     <div>
-                      <h2 className="text-xl font-bold">Level Up Tips</h2>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        Based on your average rating of <span className="font-bold text-foreground">{summary.avgRating}</span>
+                      <h2 className="text-lg font-bold" style={{ color: TEXT_LIGHT }}>Level Up Tips</h2>
+                      <p className="text-xs mt-0.5" style={{ color: TEXT_MUTED }}>
+                        Based on your average rating of <span className="font-bold" style={{ color: TEXT_LIGHT }}>{summary.avgRating}</span>
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <div className={`px-3 py-1.5 rounded-xl text-sm font-bold ${tier.bgColor} ${tier.color} border ${tier.borderColor}`}>
+                  <div className="flex items-center gap-2.5">
+                    <div className={`px-2.5 py-1 rounded-lg text-xs font-bold ${tier.bgColor} ${tier.color} border ${tier.borderColor}`}>
                       {tier.icon} {tier.label}
                     </div>
                     {nextTier && (
                       <>
-                        <ArrowUpRight className="w-4 h-4 text-muted-foreground" />
-                        <div className={`px-3 py-1.5 rounded-xl text-sm font-bold ${nextTier.bgColor} ${nextTier.color} border ${nextTier.borderColor} opacity-60`}>
+                        <ArrowUpRight className="w-3.5 h-3.5" style={{ color: TEXT_MUTED }} />
+                        <div className={`px-2.5 py-1 rounded-lg text-xs font-bold ${nextTier.bgColor} ${nextTier.color} border ${nextTier.borderColor} opacity-60`}>
                           {nextTier.icon} {nextTier.label}
                         </div>
                       </>
@@ -326,40 +339,44 @@ export function Analysis() {
                 </div>
 
                 {nextTier && (
-                  <div className="px-6 py-3 border-b border-white/5 bg-white/2">
-                    <div className="flex items-center justify-between text-xs text-muted-foreground mb-1.5">
+                  <div className="px-5 py-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', background: 'rgba(255,255,255,0.015)' }}>
+                    <div className="flex items-center justify-between text-xs mb-1.5" style={{ color: TEXT_MUTED }}>
                       <span>{tier.range}</span>
                       <span>{nextTier.range}</span>
                     </div>
-                    <div className="h-2 bg-secondary rounded-full overflow-hidden">
+                    <div className="h-1.5 rounded-full overflow-hidden" style={{ background: BG_DARK }}>
                       <motion.div
-                        className="h-full bg-primary rounded-full"
+                        className="h-full rounded-full"
+                        style={{ background: CHESSCOM_GREEN }}
                         initial={{ width: 0 }}
                         animate={{ width: `${progress}%` }}
                         transition={{ duration: 0.8, ease: 'easeOut' }}
                       />
                     </div>
-                    <p className="text-xs text-muted-foreground mt-1.5">
-                      <span className="font-bold text-primary">{tier.max - summary.avgRating}</span> rating points to {nextTier.label}
+                    <p className="text-xs mt-1.5" style={{ color: TEXT_MUTED }}>
+                      <span className="font-bold" style={{ color: CHESSCOM_GREEN }}>{tier.max - summary.avgRating}</span> rating points to {nextTier.label}
                     </p>
                   </div>
                 )}
 
-                <div className="px-6 py-5">
-                  <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground/50 mb-4">
+                <div className="px-5 py-4">
+                  <p className="text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: 'rgba(158,155,152,0.5)' }}>
                     Tips to reach {tier.nextTier}
                   </p>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
                     {tier.tips.map((tip, i) => (
                       <motion.div
                         key={i}
                         initial={{ opacity: 0, x: -8 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: i * 0.08 }}
-                        className="flex gap-3 p-3 rounded-xl bg-secondary/40 hover:bg-secondary/60 transition-colors"
+                        className="flex gap-2.5 p-3 rounded-lg transition-colors"
+                        style={{ background: 'rgba(255,255,255,0.03)' }}
+                        onMouseEnter={e => (e.currentTarget.style.background = BG_CARD_HOVER)}
+                        onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.03)')}
                       >
-                        <CheckCircle2 className="w-4 h-4 text-primary shrink-0 mt-0.5" />
-                        <p className="text-sm text-foreground/80 leading-relaxed">{tip}</p>
+                        <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" style={{ color: CHESSCOM_GREEN }} />
+                        <p className="text-sm leading-relaxed" style={{ color: 'rgba(232,230,227,0.8)' }}>{tip}</p>
                       </motion.div>
                     ))}
                   </div>
@@ -368,11 +385,11 @@ export function Analysis() {
             );
           })()}
 
-          <h2 className="text-2xl font-display font-bold mt-12 mb-6 flex items-center gap-2">
-            <AlertTriangle className="w-6 h-6 text-amber-500" /> Identified Weaknesses
+          <h2 className="text-xl font-black mt-8 mb-4 flex items-center gap-2" style={{ color: TEXT_LIGHT }}>
+            <AlertTriangle className="w-5 h-5" style={{ color: '#ea9733' }} /> Identified Weaknesses
           </h2>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {weaknessesData?.weaknesses?.map((weakness, i) => (
               <motion.div
                 key={weakness.id}
@@ -380,40 +397,46 @@ export function Analysis() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.1 }}
                 onClick={() => navigate(`/analysis/${weakness.id}`)}
-                className="glass-card p-6 rounded-2xl border-l-4 cursor-pointer hover:scale-[1.02] hover:shadow-lg transition-all group"
-                style={{ borderLeftColor: weakness.severity === 'Critical' ? '#ef4444' : weakness.severity === 'High' ? '#f59e0b' : '#3b82f6' }}
+                className="rounded-xl p-5 cursor-pointer group transition-all"
+                style={{
+                  background: BG_CARD,
+                  borderLeft: `3px solid ${weakness.severity === 'Critical' ? '#dc4343' : weakness.severity === 'High' ? '#ea9733' : '#6da5d8'}`,
+                }}
+                onMouseEnter={e => (e.currentTarget.style.background = BG_CARD_HOVER)}
+                onMouseLeave={e => (e.currentTarget.style.background = BG_CARD)}
               >
-                  <div className="flex justify-between items-start mb-4">
-                    <h3 className="text-xl font-bold group-hover:text-primary transition-colors">{weakness.category}</h3>
-                    <div className="flex items-center gap-2">
-                      <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider
-                        ${weakness.severity === 'Critical' ? 'bg-red-500/20 text-red-400' : 
-                          weakness.severity === 'High' ? 'bg-amber-500/20 text-amber-400' : 
-                          'bg-blue-500/20 text-blue-400'}`}>
-                        {weakness.severity}
-                      </span>
-                      <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
-                    </div>
+                <div className="flex justify-between items-start mb-3">
+                  <h3 className="text-base font-bold transition-colors" style={{ color: TEXT_LIGHT }}>{weakness.category}</h3>
+                  <div className="flex items-center gap-2">
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase"
+                      style={{
+                        background: weakness.severity === 'Critical' ? 'rgba(220,67,67,0.15)' : weakness.severity === 'High' ? 'rgba(234,151,51,0.15)' : 'rgba(109,165,216,0.15)',
+                        color: weakness.severity === 'Critical' ? '#dc4343' : weakness.severity === 'High' ? '#ea9733' : '#6da5d8',
+                      }}>
+                      {weakness.severity}
+                    </span>
+                    <ChevronRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-60 transition-opacity" style={{ color: TEXT_MUTED }} />
                   </div>
+                </div>
 
-                  <p className="text-muted-foreground mb-6 line-clamp-3">{weakness.description}</p>
+                <p className="text-sm mb-4 line-clamp-2" style={{ color: TEXT_MUTED }}>{weakness.description}</p>
 
-                  <div className="flex items-center gap-4 text-sm font-medium">
-                    <div className="flex-1 bg-secondary rounded-full h-2 overflow-hidden">
-                      <div className="h-full bg-primary" style={{ width: `${weakness.frequency * 100}%` }} />
-                    </div>
-                    <span className="text-primary">{Math.round(weakness.frequency * 100)}% impact</span>
+                <div className="flex items-center gap-3 text-sm">
+                  <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: BG_DARK }}>
+                    <div className="h-full rounded-full" style={{ width: `${weakness.frequency * 100}%`, background: CHESSCOM_GREEN }} />
                   </div>
+                  <span className="text-xs font-bold" style={{ color: CHESSCOM_GREEN }}>{Math.round(weakness.frequency * 100)}%</span>
+                </div>
 
-                  <div className="mt-4 pt-4 border-t border-white/5 flex items-center gap-1.5 text-xs text-muted-foreground group-hover:text-primary transition-colors">
-                    <span>View examples, games & courses</span>
-                    <ChevronRight className="w-3 h-3" />
-                  </div>
+                <div className="mt-3 pt-3 flex items-center gap-1 text-xs opacity-0 group-hover:opacity-100 transition-opacity" style={{ borderTop: '1px solid rgba(255,255,255,0.05)', color: CHESSCOM_GREEN }}>
+                  <span>View examples & courses</span>
+                  <ChevronRight className="w-3 h-3" />
+                </div>
               </motion.div>
             ))}
-            
+
             {!weaknessesData?.weaknesses?.length && (
-              <div className="col-span-full text-center py-12 border-2 border-dashed border-border rounded-2xl text-muted-foreground">
+              <div className="col-span-full text-center py-10 rounded-xl text-sm" style={{ border: '1px dashed rgba(255,255,255,0.1)', color: TEXT_MUTED }}>
                 Run an analysis to discover your weaknesses and build a personalized plan.
               </div>
             )}
