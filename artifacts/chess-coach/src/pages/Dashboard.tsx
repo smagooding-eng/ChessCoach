@@ -6,19 +6,25 @@ import { Link } from 'wouter';
 import { Swords, Trophy, Target, AlertTriangle, BookOpen, Clock, GraduationCap, TrendingUp, ChevronRight } from 'lucide-react';
 import { useUser } from '@/hooks/use-user';
 import { useChessPlayer } from '@/hooks/use-chess-player';
-import { motion } from 'framer-motion';
 
-const RESULT_BADGE: Record<string, string> = {
-  win: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
-  loss: 'bg-red-500/15 text-red-400 border-red-500/30',
-  draw: 'bg-secondary text-muted-foreground border-border',
+const CHESSCOM_GREEN = '#81b64c';
+const BG_DARK = '#262421';
+const BG_CARD = '#302e2b';
+const BG_CARD_HOVER = '#3a3733';
+const TEXT_LIGHT = '#e8e6e3';
+const TEXT_MUTED = '#9e9b98';
+
+const RESULT_COLORS: Record<string, { bg: string; text: string }> = {
+  win: { bg: 'rgba(129,182,76,0.15)', text: CHESSCOM_GREEN },
+  loss: { bg: 'rgba(220,67,67,0.15)', text: '#dc4343' },
+  draw: { bg: 'rgba(158,155,152,0.1)', text: TEXT_MUTED },
 };
 
-const SEV_BADGE: Record<string, string> = {
-  Critical: 'bg-red-500/15 text-red-400 border-red-500/30',
-  High: 'bg-orange-500/15 text-orange-400 border-orange-500/30',
-  Medium: 'bg-amber-500/15 text-amber-400 border-amber-500/30',
-  Low: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
+const SEV_COLORS: Record<string, { bg: string; text: string }> = {
+  Critical: { bg: 'rgba(220,67,67,0.15)', text: '#dc4343' },
+  High: { bg: 'rgba(234,151,51,0.15)', text: '#ea9733' },
+  Medium: { bg: 'rgba(234,193,51,0.15)', text: '#eac133' },
+  Low: { bg: 'rgba(129,182,76,0.15)', text: CHESSCOM_GREEN },
 };
 
 export function Dashboard() {
@@ -29,12 +35,10 @@ export function Dashboard() {
   const { data: coursesData } = useMyCourses();
   const { data: gamesData } = useMyGames(5);
 
-  const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.07 } } };
-
   if (loadingSummary) {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
-        <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+        <div className="w-10 h-10 border-4 rounded-full animate-spin" style={{ borderColor: CHESSCOM_GREEN, borderTopColor: 'transparent' }} />
       </div>
     );
   }
@@ -43,209 +47,176 @@ export function Dashboard() {
   const activeCourses = coursesData?.courses?.filter(c => c.completedLessons < c.totalLessons).length || 0;
 
   return (
-    <motion.div variants={container} initial="hidden" animate="show" className="space-y-5 md:space-y-7">
+    <div className="space-y-4 md:space-y-5">
 
-      {/* Hero header — native app profile card */}
-      <motion.div
-        variants={{ hidden: { opacity: 0, y: -12 }, show: { opacity: 1, y: 0 } }}
-        className="relative overflow-hidden bg-gradient-to-br from-[hsl(89,44%,18%)] via-card to-card border-b border-primary/10 md:rounded-2xl md:border p-5 md:p-6"
-      >
-        <div className="absolute inset-0 opacity-[0.035] pointer-events-none"
-          style={{ backgroundImage: 'repeating-conic-gradient(#fff 0% 25%, transparent 0% 50%)', backgroundSize: '36px 36px' }}
-        />
-        <div className="relative flex items-center gap-4">
-          {/* Avatar */}
+      <div style={{ background: BG_CARD, borderBottom: `1px solid rgba(255,255,255,0.06)` }}
+        className="p-4 md:p-5 md:rounded-xl">
+        <div className="flex items-center gap-3">
           <div className="shrink-0 relative">
             {chessPlayer?.avatar
-              ? <img src={chessPlayer.avatar} alt={username ?? ''} className="w-16 h-16 rounded-2xl object-cover border-2 border-primary/40 shadow-lg shadow-primary/20" />
-              : <div className="w-16 h-16 rounded-2xl bg-primary/20 border-2 border-primary/30 flex items-center justify-center">
-                  <span className="text-2xl font-black text-primary">{username?.[0]?.toUpperCase()}</span>
+              ? <img src={chessPlayer.avatar} alt={username ?? ''} className="w-14 h-14 rounded-lg object-cover" style={{ border: `2px solid ${CHESSCOM_GREEN}` }} />
+              : <div className="w-14 h-14 rounded-lg flex items-center justify-center" style={{ background: 'rgba(129,182,76,0.15)', border: `2px solid rgba(129,182,76,0.3)` }}>
+                  <span className="text-xl font-black" style={{ color: CHESSCOM_GREEN }}>{username?.[0]?.toUpperCase()}</span>
                 </div>
             }
             {chessPlayer?.title && (
-              <span className="absolute -bottom-1 -right-1 px-1.5 py-0.5 rounded-md bg-amber-500 text-[9px] font-black text-black leading-none">
+              <span className="absolute -bottom-1 -right-1 px-1 py-px rounded text-[9px] font-black text-black leading-none" style={{ background: '#e5a631' }}>
                 {chessPlayer.title}
               </span>
             )}
           </div>
 
-          {/* Info */}
           <div className="flex-1 min-w-0">
-            <h1 className="text-xl font-display font-black text-foreground truncate">{username}</h1>
+            <h1 className="text-lg font-black truncate" style={{ color: TEXT_LIGHT }}>{username}</h1>
             {chessPlayer?.rating && (
-              <div className="flex items-center gap-2 mt-0.5">
-                <span className="text-2xl font-black text-primary leading-none">{chessPlayer.rating}</span>
-                <span className="text-xs text-muted-foreground font-semibold mt-1">ELO</span>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <span className="text-xl font-black leading-none" style={{ color: CHESSCOM_GREEN }}>{chessPlayer.rating}</span>
+                <span className="text-[11px] font-semibold mt-0.5" style={{ color: TEXT_MUTED }}>ELO</span>
               </div>
             )}
             {summary?.totalGames ? (
-              <p className="text-xs text-muted-foreground mt-1">{summary.totalGames} games · {winRate}% win rate</p>
+              <p className="text-xs mt-0.5" style={{ color: TEXT_MUTED }}>{summary.totalGames} games · {winRate}% win rate</p>
             ) : (
-              <p className="text-xs text-muted-foreground mt-1">Import games to start coaching</p>
+              <p className="text-xs mt-0.5" style={{ color: TEXT_MUTED }}>Import games to start coaching</p>
             )}
           </div>
 
-          {/* Actions */}
-          <div className="flex flex-col gap-2 shrink-0">
-            <Link href="/import">
-              <button className="px-4 py-2 rounded-xl bg-primary text-primary-foreground font-black text-xs hover:bg-primary/90 transition-colors flex items-center gap-1.5">
-                <ImportIcon /> Import
-              </button>
+          <div className="hidden sm:flex flex-col gap-1.5 shrink-0">
+            <Link href="/import" className="px-3 py-2 rounded-lg font-bold text-xs text-white flex items-center gap-1.5 transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-white/30" style={{ background: CHESSCOM_GREEN }}>
+              <ImportIcon /> Import
             </Link>
-            <Link href="/opponents">
-              <button className="px-4 py-2 rounded-xl bg-white/6 border border-white/10 text-foreground font-black text-xs hover:bg-white/10 transition-colors flex items-center gap-1.5">
-                <Swords className="w-3.5 h-3.5 text-primary" /> Scout
-              </button>
+            <Link href="/opponents" className="px-3 py-2 rounded-lg font-bold text-xs flex items-center gap-1.5 transition-colors hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-white/30" style={{ background: 'rgba(255,255,255,0.06)', color: TEXT_LIGHT }}>
+              <Swords className="w-3.5 h-3.5" style={{ color: CHESSCOM_GREEN }} /> Scout
             </Link>
           </div>
         </div>
+        <div className="flex sm:hidden gap-2 mt-3">
+          <Link href="/import" className="flex-1 px-3 py-2 rounded-lg font-bold text-xs text-white flex items-center justify-center gap-1.5 transition-opacity hover:opacity-90" style={{ background: CHESSCOM_GREEN }}>
+            <ImportIcon /> Import Games
+          </Link>
+          <Link href="/opponents" className="flex-1 px-3 py-2 rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 transition-colors hover:bg-white/10" style={{ background: 'rgba(255,255,255,0.06)', color: TEXT_LIGHT }}>
+            <Swords className="w-3.5 h-3.5" style={{ color: CHESSCOM_GREEN }} /> Scout
+          </Link>
+        </div>
 
-        {/* W/L/D bar */}
         {summary?.totalGames ? (
-          <div className="relative mt-4">
-            <div className="flex h-1.5 rounded-full overflow-hidden gap-px">
-              <div className="bg-emerald-500" style={{ width: `${(summary.wins / summary.totalGames) * 100}%` }} />
-              <div className="bg-slate-500" style={{ width: `${(summary.draws / summary.totalGames) * 100}%` }} />
-              <div className="bg-red-500" style={{ width: `${(summary.losses / summary.totalGames) * 100}%` }} />
+          <div className="mt-3">
+            <div className="flex h-1 rounded-full overflow-hidden gap-px">
+              <div style={{ width: `${(summary.wins / summary.totalGames) * 100}%`, background: CHESSCOM_GREEN }} />
+              <div style={{ width: `${(summary.draws / summary.totalGames) * 100}%`, background: TEXT_MUTED }} />
+              <div style={{ width: `${(summary.losses / summary.totalGames) * 100}%`, background: '#dc4343' }} />
             </div>
-            <div className="flex gap-4 mt-2">
-              <span className="text-xs text-emerald-400 font-bold">{summary.wins}W</span>
-              <span className="text-xs text-muted-foreground">{summary.draws}D</span>
-              <span className="text-xs text-red-400 font-bold">{summary.losses}L</span>
+            <div className="flex gap-3 mt-1.5">
+              <span className="text-[11px] font-bold" style={{ color: CHESSCOM_GREEN }}>{summary.wins}W</span>
+              <span className="text-[11px]" style={{ color: TEXT_MUTED }}>{summary.draws}D</span>
+              <span className="text-[11px] font-bold" style={{ color: '#dc4343' }}>{summary.losses}L</span>
             </div>
           </div>
         ) : null}
-      </motion.div>
+      </div>
 
-      {/* Stats Row */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 px-4 md:px-0">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 md:gap-3 px-3 md:px-0">
         {[
-          { label: 'Total Games', value: summary?.totalGames || 0, icon: <Swords className="w-5 h-5" />, accent: 'text-blue-400', border: 'border-blue-500/20', bg: 'bg-blue-500/8' },
-          { label: 'Win Rate', value: `${winRate}%`, icon: <Trophy className="w-5 h-5" />, accent: 'text-emerald-400', border: 'border-emerald-500/20', bg: 'bg-emerald-500/8' },
-          { label: 'Avg Rating', value: Math.round(summary?.avgRating || 0) || '—', icon: <TrendingUp className="w-5 h-5" />, accent: 'text-primary', border: 'border-primary/20', bg: 'bg-primary/8' },
-          { label: 'Active Courses', value: activeCourses, icon: <BookOpen className="w-5 h-5" />, accent: 'text-purple-400', border: 'border-purple-500/20', bg: 'bg-purple-500/8' },
+          { label: 'Total Games', value: summary?.totalGames || 0, icon: <Swords className="w-4 h-4" /> },
+          { label: 'Win Rate', value: `${winRate}%`, icon: <Trophy className="w-4 h-4" /> },
+          { label: 'Avg Rating', value: Math.round(summary?.avgRating || 0) || '—', icon: <TrendingUp className="w-4 h-4" /> },
+          { label: 'Active Courses', value: activeCourses, icon: <BookOpen className="w-4 h-4" /> },
         ].map((s) => (
-          <motion.div
-            key={s.label}
-            variants={{ hidden: { opacity: 0, y: 16 }, show: { opacity: 1, y: 0 } }}
-            className={`rounded-2xl border ${s.border} ${s.bg} p-5 backdrop-blur-md`}
-          >
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">{s.label}</p>
-              <span className={s.accent}>{s.icon}</span>
+          <div key={s.label} className="rounded-lg p-3.5" style={{ background: BG_CARD }}>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: TEXT_MUTED }}>{s.label}</p>
+              <span style={{ color: CHESSCOM_GREEN }}>{s.icon}</span>
             </div>
-            <div className={`text-3xl font-display font-bold ${s.accent}`}>{s.value}</div>
-          </motion.div>
+            <div className="text-2xl font-black" style={{ color: TEXT_LIGHT }}>{s.value}</div>
+          </div>
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 md:gap-6 px-4 md:px-0">
-        {/* Left: Weaknesses + Recent Games */}
-        <div className="lg:col-span-2 space-y-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 md:gap-4 px-3 md:px-0">
+        <div className="lg:col-span-2 space-y-3 md:space-y-4">
 
-          {/* Weaknesses */}
-          <div className="glass-card rounded-2xl p-6">
-            <div className="flex items-center justify-between mb-5">
-              <h2 className="text-lg font-bold flex items-center gap-2">
-                <AlertTriangle className="w-5 h-5 text-amber-400" /> Key Weaknesses
-              </h2>
-              <Link href="/analysis" className="text-xs text-primary hover:underline flex items-center gap-1 font-medium">
-                Full Analysis <ChevronRight className="w-3.5 h-3.5" />
-              </Link>
-            </div>
+          <DashCard title="Key Weaknesses" icon={<AlertTriangle className="w-4 h-4" style={{ color: '#ea9733' }} />} linkHref="/analysis" linkText="Full Analysis">
             {weaknesses?.weaknesses?.length ? (
-              <div className="space-y-3">
-                {weaknesses.weaknesses.slice(0, 3).map((w) => (
-                  <Link key={w.id} href={`/analysis/${w.id}`}>
-                    <div className="group flex items-start gap-3 p-3.5 rounded-xl bg-secondary/40 hover:bg-secondary/80 border border-transparent hover:border-border transition-all cursor-pointer">
-                      <span className={`mt-0.5 px-2 py-0.5 rounded-full text-[11px] font-bold border shrink-0 ${SEV_BADGE[w.severity] ?? SEV_BADGE.Low}`}>
-                        {w.severity}
-                      </span>
-                      <div className="min-w-0">
-                        <p className="font-semibold text-sm group-hover:text-primary transition-colors">{w.category}</p>
-                        <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">{w.description}</p>
+              <div className="space-y-1.5">
+                {weaknesses.weaknesses.slice(0, 3).map((w) => {
+                  const sev = SEV_COLORS[w.severity] ?? SEV_COLORS.Low;
+                  return (
+                    <Link key={w.id} href={`/analysis/${w.id}`}>
+                      <div className="group flex items-start gap-2.5 p-3 rounded-lg transition-colors cursor-pointer" style={{ background: 'transparent' }}
+                        onMouseEnter={e => (e.currentTarget.style.background = BG_CARD_HOVER)}
+                        onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                        <span className="mt-px px-1.5 py-px rounded text-[10px] font-bold shrink-0" style={{ background: sev.bg, color: sev.text }}>
+                          {w.severity}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-semibold text-sm" style={{ color: TEXT_LIGHT }}>{w.category}</p>
+                          <p className="text-xs line-clamp-1 mt-0.5" style={{ color: TEXT_MUTED }}>{w.description}</p>
+                        </div>
+                        <ChevronRight className="w-3.5 h-3.5 shrink-0 mt-1 opacity-0 group-hover:opacity-60 transition-opacity" style={{ color: TEXT_MUTED }} />
                       </div>
-                      <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0 mt-1 opacity-0 group-hover:opacity-100 transition-opacity" />
-                    </div>
-                  </Link>
-                ))}
+                    </Link>
+                  );
+                })}
               </div>
             ) : (
-              <div className="text-center py-10 text-muted-foreground border-2 border-dashed border-border rounded-xl">
-                <Target className="w-8 h-8 mx-auto mb-2 opacity-30" />
-                <p className="text-sm">No weaknesses found yet.</p>
-                <Link href="/analysis" className="text-primary hover:underline mt-2 inline-block text-sm">Run AI Analysis →</Link>
-              </div>
+              <EmptyState icon={<Target className="w-7 h-7" />} text="No weaknesses found yet." linkHref="/analysis" linkText="Run AI Analysis →" />
             )}
-          </div>
+          </DashCard>
 
-          {/* Recent Games */}
-          <div className="glass-card rounded-2xl p-6">
-            <div className="flex items-center justify-between mb-5">
-              <h2 className="text-lg font-bold flex items-center gap-2">
-                <Clock className="w-5 h-5 text-blue-400" /> Recent Games
-              </h2>
-              <Link href="/games" className="text-xs text-primary hover:underline flex items-center gap-1 font-medium">
-                All Games <ChevronRight className="w-3.5 h-3.5" />
-              </Link>
-            </div>
-            <div className="space-y-2">
-              {gamesData?.games?.slice(0, 5).map(game => (
-                <Link key={game.id} href={`/games/${game.id}`} className="block">
-                  <div className="group flex items-center gap-3 p-3 rounded-xl hover:bg-secondary/60 transition-all">
-                    <span className={`px-2 py-0.5 rounded text-[11px] font-bold border uppercase ${RESULT_BADGE[game.result] ?? RESULT_BADGE.draw}`}>
-                      {game.result === 'win' ? 'W' : game.result === 'loss' ? 'L' : 'D'}
-                    </span>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">
-                        {game.whiteUsername} vs {game.blackUsername}
-                      </p>
-                      <p className="text-xs text-muted-foreground truncate">
-                        {game.opening || 'Unknown Opening'} · {new Date(game.playedAt).toLocaleDateString()}
-                      </p>
+          <DashCard title="Recent Games" icon={<Clock className="w-4 h-4" style={{ color: '#6da5d8' }} />} linkHref="/games" linkText="All Games">
+            <div className="space-y-0.5">
+              {gamesData?.games?.slice(0, 5).map(game => {
+                const res = RESULT_COLORS[game.result] ?? RESULT_COLORS.draw;
+                return (
+                  <Link key={game.id} href={`/games/${game.id}`} className="block">
+                    <div className="group flex items-center gap-2.5 p-2.5 rounded-lg transition-colors"
+                      onMouseEnter={e => (e.currentTarget.style.background = BG_CARD_HOVER)}
+                      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                      <span className="w-6 text-center py-0.5 rounded text-[10px] font-black shrink-0" style={{ background: res.bg, color: res.text }}>
+                        {game.result === 'win' ? 'W' : game.result === 'loss' ? 'L' : 'D'}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate" style={{ color: TEXT_LIGHT }}>
+                          {game.whiteUsername} vs {game.blackUsername}
+                        </p>
+                        <p className="text-xs truncate" style={{ color: TEXT_MUTED }}>
+                          {game.opening || 'Unknown Opening'} · {new Date(game.playedAt).toLocaleDateString()}
+                        </p>
+                      </div>
+                      <ChevronRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-60 transition-opacity shrink-0" style={{ color: TEXT_MUTED }} />
                     </div>
-                    <ChevronRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
-                  </div>
-                </Link>
-              ))}
+                  </Link>
+                );
+              })}
               {!gamesData?.games?.length && (
-                <div className="text-center py-10 text-muted-foreground border-2 border-dashed border-border rounded-xl">
-                  <Swords className="w-8 h-8 mx-auto mb-2 opacity-30" />
-                  <p className="text-sm">No games imported yet.</p>
-                  <Link href="/import" className="text-primary hover:underline mt-2 inline-block text-sm">Import Games →</Link>
-                </div>
+                <EmptyState icon={<Swords className="w-7 h-7" />} text="No games imported yet." linkHref="/import" linkText="Import Games →" />
               )}
             </div>
-          </div>
+          </DashCard>
         </div>
 
-        {/* Right: Courses + Quick Actions */}
-        <div className="space-y-6">
-          {/* Courses */}
-          <div className="glass-card rounded-2xl p-6">
-            <div className="flex items-center justify-between mb-5">
-              <h2 className="text-lg font-bold flex items-center gap-2">
-                <GraduationCap className="w-5 h-5 text-purple-400" /> Courses
-              </h2>
-              <Link href="/courses" className="text-xs text-primary hover:underline font-medium">All</Link>
-            </div>
+        <div className="space-y-3 md:space-y-4">
+          <DashCard title="Courses" icon={<GraduationCap className="w-4 h-4" style={{ color: '#b583e0' }} />} linkHref="/courses" linkText="All">
             {coursesData?.courses?.length ? (
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {coursesData.courses.slice(0, 4).map(course => {
                   const progress = Math.round((course.completedLessons / course.totalLessons) * 100) || 0;
                   const isDone = progress === 100;
                   return (
                     <Link key={course.id} href={`/courses/${course.id}`} className="block">
-                      <div className={`group p-3.5 rounded-xl border transition-all ${isDone ? 'bg-emerald-500/8 border-emerald-500/20' : 'bg-secondary/40 border-transparent hover:border-border hover:bg-secondary/70'}`}>
+                      <div className="group p-3 rounded-lg transition-colors"
+                        style={{ background: isDone ? 'rgba(129,182,76,0.08)' : 'transparent' }}
+                        onMouseEnter={e => { if (!isDone) e.currentTarget.style.background = BG_CARD_HOVER; }}
+                        onMouseLeave={e => { if (!isDone) e.currentTarget.style.background = 'transparent'; }}>
                         <div className="flex items-start justify-between gap-2 mb-2">
-                          <p className="font-semibold text-sm group-hover:text-primary transition-colors line-clamp-1">{course.title}</p>
-                          {isDone && <span className="text-[10px] text-emerald-400 font-bold shrink-0">DONE</span>}
+                          <p className="font-semibold text-sm line-clamp-1" style={{ color: TEXT_LIGHT }}>{course.title}</p>
+                          {isDone && <span className="text-[10px] font-bold shrink-0" style={{ color: CHESSCOM_GREEN }}>DONE</span>}
                         </div>
                         <div className="flex items-center gap-2">
-                          <div className="flex-1 h-1.5 bg-background rounded-full overflow-hidden">
-                            <div className={`h-full rounded-full transition-all ${isDone ? 'bg-emerald-500' : 'bg-primary'}`} style={{ width: `${progress}%` }} />
+                          <div className="flex-1 h-1 rounded-full overflow-hidden" style={{ background: BG_DARK }}>
+                            <div className="h-full rounded-full transition-all" style={{ width: `${progress}%`, background: isDone ? CHESSCOM_GREEN : CHESSCOM_GREEN }} />
                           </div>
-                          <span className="text-[11px] text-muted-foreground shrink-0">{progress}%</span>
+                          <span className="text-[10px] shrink-0" style={{ color: TEXT_MUTED }}>{progress}%</span>
                         </div>
                       </div>
                     </Link>
@@ -253,47 +224,61 @@ export function Dashboard() {
                 })}
               </div>
             ) : (
-              <div className="text-center py-8 text-muted-foreground border-2 border-dashed border-border rounded-xl">
-                <GraduationCap className="w-8 h-8 mx-auto mb-2 opacity-30" />
-                <p className="text-sm">No courses yet.</p>
-                <Link href="/courses" className="text-primary hover:underline mt-2 inline-block text-sm">Generate Courses →</Link>
-              </div>
+              <EmptyState icon={<GraduationCap className="w-7 h-7" />} text="No courses yet." linkHref="/courses" linkText="Generate Courses →" />
             )}
-          </div>
+          </DashCard>
 
-          {/* Quick actions */}
-          <div className="glass-card rounded-2xl p-5 space-y-2">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Quick Actions</p>
+          <div className="rounded-lg p-4 space-y-1" style={{ background: BG_CARD }}>
+            <p className="text-[10px] font-bold uppercase tracking-wider mb-2.5" style={{ color: TEXT_MUTED }}>Quick Actions</p>
             {[
               { href: '/import', label: 'Import New Games', icon: <ImportIcon /> },
               { href: '/analysis', label: 'Run AI Analysis', icon: <Target className="w-4 h-4" /> },
               { href: '/opponents', label: 'Scout an Opponent', icon: <Swords className="w-4 h-4" /> },
             ].map(action => (
               <Link key={action.href} href={action.href} className="block">
-                <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-primary/10 hover:text-primary transition-colors text-sm font-medium text-muted-foreground group">
-                  <span className="group-hover:text-primary transition-colors">{action.icon}</span>
+                <div className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg transition-colors text-sm font-medium group"
+                  style={{ color: TEXT_MUTED }}
+                  onMouseEnter={e => { e.currentTarget.style.color = CHESSCOM_GREEN; e.currentTarget.style.background = 'rgba(129,182,76,0.08)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.color = TEXT_MUTED; e.currentTarget.style.background = 'transparent'; }}>
+                  <span>{action.icon}</span>
                   {action.label}
-                  <ChevronRight className="w-3.5 h-3.5 ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <ChevronRight className="w-3 h-3 ml-auto opacity-0 group-hover:opacity-60 transition-opacity" />
                 </div>
               </Link>
             ))}
           </div>
         </div>
       </div>
-    </motion.div>
+    </div>
   );
 }
 
-function StatCard({ title, value, icon, color }: { title: string, value: string | number, icon: React.ReactNode, color: string }) {
+function DashCard({ title, icon, linkHref, linkText, children }: {
+  title: string; icon: React.ReactNode; linkHref: string; linkText: string; children: React.ReactNode;
+}) {
   return (
-    <motion.div variants={{ hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 }}} className={`p-5 rounded-2xl border ${color} backdrop-blur-md`}>
-      <div className="flex items-center justify-between mb-2">
-        <h3 className="text-sm font-medium text-muted-foreground">{title}</h3>
-        {icon}
+    <div className="rounded-lg p-4 md:p-5" style={{ background: BG_CARD }}>
+      <div className="flex items-center justify-between mb-3.5">
+        <h2 className="text-sm font-bold flex items-center gap-2" style={{ color: TEXT_LIGHT }}>
+          {icon} {title}
+        </h2>
+        <Link href={linkHref} className="text-[11px] font-semibold flex items-center gap-0.5 hover:underline" style={{ color: CHESSCOM_GREEN }}>
+          {linkText} <ChevronRight className="w-3 h-3" />
+        </Link>
       </div>
-      <div className="text-3xl font-display font-bold text-foreground">{value}</div>
-    </motion.div>
+      {children}
+    </div>
   );
 }
 
-const ImportIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>;
+function EmptyState({ icon, text, linkHref, linkText }: { icon: React.ReactNode; text: string; linkHref: string; linkText: string }) {
+  return (
+    <div className="text-center py-8 rounded-lg" style={{ border: `1px dashed rgba(255,255,255,0.1)` }}>
+      <div className="mx-auto mb-2 opacity-25" style={{ color: TEXT_MUTED }}>{icon}</div>
+      <p className="text-sm" style={{ color: TEXT_MUTED }}>{text}</p>
+      <Link href={linkHref} className="mt-2 inline-block text-sm font-semibold hover:underline" style={{ color: CHESSCOM_GREEN }}>{linkText}</Link>
+    </div>
+  );
+}
+
+const ImportIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>;
