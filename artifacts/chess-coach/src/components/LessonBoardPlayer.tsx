@@ -12,8 +12,55 @@ import { cn } from '@/lib/utils';
 const CHESSCOM_GREEN = '#81b64c';
 const BG_DARK = '#262421';
 const BG_CARD = '#302e2b';
+const MISTAKE_RED = '#dc4343';
 
 const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+
+function FormatComment({ text, isMistake, isFix }: { text: string; isMistake?: boolean; isFix?: boolean }) {
+  const baseColor = isMistake ? '#e8c4c4' : isFix ? '#c4e8d4' : '#c8c5c1';
+
+  const parts: React.ReactNode[] = [];
+  const regex = /(\*\*[^*]+\*\*)|(The Mistake)|(The Fix)/gi;
+  let last = 0;
+  let key = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = regex.exec(text)) !== null) {
+    if (match.index > last) {
+      parts.push(<span key={key++}>{text.slice(last, match.index)}</span>);
+    }
+
+    const full = match[0];
+
+    if (full.startsWith('**') && full.endsWith('**')) {
+      parts.push(
+        <strong key={key++} style={{ fontWeight: 700 }}>
+          {full.slice(2, -2)}
+        </strong>
+      );
+    } else if (/the mistake/i.test(full)) {
+      parts.push(
+        <span key={key++} style={{ color: MISTAKE_RED, fontWeight: 700 }}>
+          {full}
+        </span>
+      );
+    } else if (/the fix/i.test(full)) {
+      parts.push(
+        <span key={key++} style={{ color: CHESSCOM_GREEN, fontWeight: 700 }}>
+          {full}
+        </span>
+      );
+    }
+
+    last = match.index + full.length;
+  }
+
+  if (last < text.length) {
+    parts.push(<span key={key++}>{text.slice(last)}</span>);
+  }
+
+  return <span style={{ color: baseColor }}>{parts}</span>;
+}
 
 interface Step {
   fen: string;
@@ -836,14 +883,18 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
                 exit={{ opacity: 0, y: -4 }}
                 transition={{ duration: 0.15 }}
               >
-                <div className={cn(
-                  'rounded-xl px-4 py-3 shadow-sm',
-                  step?.isMistake
-                    ? 'bg-red-50 border border-red-200'
+                <div className="rounded-xl px-4 py-3 shadow-sm" style={{
+                  background: step?.isMistake
+                    ? 'rgba(220,67,67,0.12)'
                     : step?.isFix
-                    ? 'bg-emerald-50 border border-emerald-200'
-                    : 'bg-white/95'
-                )}>
+                    ? 'rgba(129,182,76,0.12)'
+                    : BG_CARD,
+                  border: step?.isMistake
+                    ? '1px solid rgba(220,67,67,0.3)'
+                    : step?.isFix
+                    ? `1px solid rgba(129,182,76,0.3)`
+                    : '1px solid rgba(255,255,255,0.06)',
+                }}>
                   <div className="flex items-start gap-3">
                     {step?.isMistake ? (
                       <div className="w-7 h-7 rounded-full bg-red-500 flex items-center justify-center shrink-0 mt-0.5">
@@ -857,25 +908,21 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
                     <div className="flex-1 min-w-0">
                       {step?.san && currentStep > 0 && (
                         <div className="flex items-center gap-2 mb-1">
-                          <span className={cn(
-                            'text-sm font-bold',
-                            step.isMistake ? 'text-red-700' : step.isFix ? 'text-emerald-700' : 'text-gray-900'
-                          )}>
+                          <span className="text-sm font-bold" style={{
+                            color: step.isMistake ? MISTAKE_RED : step.isFix ? CHESSCOM_GREEN : '#e8e6e3'
+                          }}>
                             {step.color === 'w' ? '' : ''}{step.fullMoveNumber}.{step.color === 'b' ? '..' : ''} {step.san}
                             {step.isMistake ? ' — Mistake' : step.isFix ? ' — Best Move' : ''}
                           </span>
                         </div>
                       )}
-                      <p className={cn(
-                        'text-sm leading-relaxed',
-                        step?.isMistake ? 'text-red-800' : step?.isFix ? 'text-emerald-800' : 'text-gray-700'
-                      )}>
+                      <p className="text-sm leading-relaxed">
                         {hasComment
-                          ? step!.comment
+                          ? <FormatComment text={step!.comment} isMistake={step!.isMistake} isFix={step!.isFix} />
                           : currentStep === 0
-                          ? 'Press play or click a move to begin.'
+                          ? <span style={{ color: '#9e9b98' }}>Press play or click a move to begin.</span>
                           : step?.san
-                          ? `${step.color === 'w' ? 'White' : 'Black'} plays ${step.san}.`
+                          ? <span style={{ color: '#9e9b98' }}>{step.color === 'w' ? 'White' : 'Black'} plays {step.san}.</span>
                           : ''}
                       </p>
                     </div>
