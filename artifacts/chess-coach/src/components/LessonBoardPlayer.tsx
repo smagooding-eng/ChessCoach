@@ -4,10 +4,14 @@ import { Chess } from 'chess.js';
 import {
   Play, Pause, SkipBack, SkipForward, ChevronLeft, ChevronRight,
   MessageSquare, Swords, CheckCircle2, Lightbulb, Eye, RotateCcw,
-  Trophy, Repeat2, Check,
+  Trophy, Repeat2, Check, AlertTriangle,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
+
+const CHESSCOM_GREEN = '#81b64c';
+const BG_DARK = '#262421';
+const BG_CARD = '#302e2b';
 
 const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
 
@@ -708,36 +712,22 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
   if (!steps) {
     const fallbackFen = extractFen(activePgn) ?? START_FEN;
     return (
-      <div className="rounded-2xl overflow-hidden border border-white/8 bg-[#0d1117]">
-        <div className="flex items-center px-4 py-0 bg-white/3 border-b border-white/5">
-          <div className="flex items-center gap-2 mr-4 shrink-0">
-            <div className="w-2 h-2 rounded-full bg-red-500/80" />
-            <div className="w-2 h-2 rounded-full bg-yellow-500/80" />
-            <div className="w-2 h-2 rounded-full bg-green-500/80" />
+      <div className="rounded-xl overflow-hidden" style={{ backgroundColor: BG_DARK }}>
+        <div className="px-4 py-3">
+          <div className="bg-white/95 rounded-xl px-4 py-3 shadow-sm">
+            <p className="text-sm text-gray-700">Study this position.</p>
           </div>
-          <span className="px-4 py-3 text-xs font-semibold text-primary border-b-2 border-primary flex items-center gap-1.5">
-            <Play className="w-3 h-3" /> Lesson
-          </span>
         </div>
-        <div className="flex flex-col md:flex-row">
-          <div className="flex-shrink-0 p-3 md:p-4">
-            <div className="relative w-full max-w-[360px] mx-auto">
-              <Chessboard
-                options={{
-                  position: fallbackFen,
-                  allowDragging: false,
-                  boardStyle: { borderRadius: '8px', overflow: 'hidden' },
-                  darkSquareStyle: { backgroundColor: BOARD_DARK },
-                  lightSquareStyle: { backgroundColor: BOARD_LIGHT },
-                }}
-              />
-            </div>
-          </div>
-          <div className="flex-1 flex flex-col min-h-0 border-t md:border-t-0 md:border-l border-white/5">
-            <div className="px-4 py-4 min-h-[90px] flex flex-col justify-center">
-              <p className="text-sm text-muted-foreground italic">Study this position.</p>
-            </div>
-          </div>
+        <div className="px-2 pb-3 max-w-[480px] mx-auto">
+          <Chessboard
+            options={{
+              position: fallbackFen,
+              allowDragging: false,
+              boardStyle: { borderRadius: '6px', overflow: 'hidden' },
+              darkSquareStyle: { backgroundColor: BOARD_DARK },
+              lightSquareStyle: { backgroundColor: BOARD_LIGHT },
+            }}
+          />
         </div>
       </div>
     );
@@ -758,27 +748,38 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
 
   const hasComment = step && step.comment.trim().length > 0;
 
-  // Repeat progress display
   const repeatExpectedSan = steps[repeatStep + 1]?.san ?? null;
   const repeatColor = steps[repeatStep + 1]?.color ?? null;
   const repeatFullMove = steps[repeatStep + 1]?.fullMoveNumber ?? null;
 
-  return (
-    <div className="rounded-2xl overflow-hidden border border-white/8 bg-[#0d1117]">
-      {/* ── Tab header ──────────────────────────────────────────────────────── */}
-      <div className="flex items-center px-4 py-0 bg-white/3 border-b border-white/5 overflow-x-auto">
-        <div className="flex items-center gap-2 mr-4 shrink-0">
-          <div className="w-2 h-2 rounded-full bg-red-500/80" />
-          <div className="w-2 h-2 rounded-full bg-yellow-500/80" />
-          <div className="w-2 h-2 rounded-full bg-green-500/80" />
-        </div>
+  const boardSquareStyles = (() => {
+    const styles: Record<string, React.CSSProperties> = {};
+    if (step?.isMistake && step.to) {
+      if (step.from) styles[step.from] = { background: 'rgba(220, 50, 50, 0.45)', boxShadow: 'inset 0 0 0 2px rgba(220,50,50,0.7)' };
+      styles[step.to] = { background: 'rgba(220, 50, 50, 0.6)', boxShadow: 'inset 0 0 0 2px rgba(220,50,50,0.8)' };
+    } else if (step?.isFix && step.to) {
+      if (step.from) styles[step.from] = { background: 'rgba(34, 197, 94, 0.35)', boxShadow: 'inset 0 0 0 2px rgba(34,197,94,0.5)' };
+      styles[step.to] = { background: 'rgba(34, 197, 94, 0.55)', boxShadow: 'inset 0 0 0 2px rgba(34,197,94,0.7)' };
+    } else if (step?.to && currentStep > 0) {
+      if (step.from) styles[step.from] = { background: 'rgba(255, 240, 80, 0.25)' };
+      styles[step.to] = { background: 'rgba(255, 240, 80, 0.45)' };
+    }
+    return styles;
+  })();
 
+  return (
+    <div className="rounded-xl overflow-hidden shadow-xl" style={{ backgroundColor: BG_DARK }}>
+      {/* ── Tab pills ─────────────────────────────────────────────────────── */}
+      <div className="flex items-center gap-1.5 px-3 py-2.5 overflow-x-auto" style={{ backgroundColor: BG_CARD }}>
         <button
           onClick={() => { setIsPlaying(false); setTab('lesson'); }}
           className={cn(
-            'flex items-center gap-1.5 px-4 py-3 text-xs font-semibold border-b-2 transition-colors whitespace-nowrap',
-            tab === 'lesson' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'
+            'flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap',
+            tab === 'lesson'
+              ? 'text-white shadow-md'
+              : 'text-white/50 hover:text-white/80 hover:bg-white/5'
           )}
+          style={tab === 'lesson' ? { backgroundColor: CHESSCOM_GREEN } : undefined}
         >
           <Play className="w-3 h-3" /> Lesson
         </button>
@@ -787,11 +788,14 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
           <button
             onClick={() => { setIsPlaying(false); setTab('repeat'); resetRepeat(); }}
             className={cn(
-              'flex items-center gap-1.5 px-4 py-3 text-xs font-semibold border-b-2 transition-colors whitespace-nowrap',
-              tab === 'repeat' ? 'border-emerald-400 text-emerald-400' : 'border-transparent text-muted-foreground hover:text-foreground'
+              'flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap',
+              tab === 'repeat'
+                ? 'text-white shadow-md'
+                : 'text-white/50 hover:text-white/80 hover:bg-white/5'
             )}
+            style={tab === 'repeat' ? { backgroundColor: CHESSCOM_GREEN } : undefined}
           >
-            <Repeat2 className="w-3 h-3" /> Repeat Drill
+            <Repeat2 className="w-3 h-3" /> Repeat
           </button>
         )}
 
@@ -799,65 +803,113 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
           <button
             onClick={() => { setIsPlaying(false); setTab('drill'); resetDrill(); }}
             className={cn(
-              'flex items-center gap-1.5 px-4 py-3 text-xs font-semibold border-b-2 transition-colors whitespace-nowrap',
-              tab === 'drill' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'
+              'flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap',
+              tab === 'drill'
+                ? 'text-white shadow-md'
+                : 'text-white/50 hover:text-white/80 hover:bg-white/5'
             )}
+            style={tab === 'drill' ? { backgroundColor: CHESSCOM_GREEN } : undefined}
           >
-            <Swords className="w-3 h-3" /> Practice Drill
+            <Swords className="w-3 h-3" /> Drill
           </button>
         )}
 
-        <span className="ml-auto text-xs text-muted-foreground font-mono pr-2 shrink-0">
+        <span className="ml-auto text-[11px] text-white/40 font-mono pr-1 shrink-0">
           {tab === 'lesson'
-            ? (currentStep > 0 ? `Move ${step?.fullMoveNumber}` : title ?? 'Interactive')
+            ? (currentStep > 0 ? `Move ${step?.fullMoveNumber}` : title ?? '')
             : tab === 'repeat'
-            ? (repeatComplete ? 'Complete!' : `${repeatStep}/${totalRepeatMoves} moves`)
-            : 'Find the best move'}
+            ? (repeatComplete ? '✓ Complete' : `${repeatStep}/${totalRepeatMoves}`)
+            : 'Find best move'}
         </span>
       </div>
 
-      {/* ── LESSON TAB ──────────────────────────────────────────────────────── */}
+      {/* ── LESSON TAB ────────────────────────────────────────────────────── */}
       {tab === 'lesson' && (
-        <div className="flex flex-col md:flex-row">
-          <div className="flex-shrink-0 p-3 md:p-4">
-            <div className="relative w-full max-w-[360px] mx-auto">
+        <div className="flex flex-col">
+          {/* Commentary bubble */}
+          <div className="px-3 pt-3 pb-1">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={currentStep}
+                initial={{ opacity: 0, y: 4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }}
+                transition={{ duration: 0.15 }}
+              >
+                <div className={cn(
+                  'rounded-xl px-4 py-3 shadow-sm',
+                  step?.isMistake
+                    ? 'bg-red-50 border border-red-200'
+                    : step?.isFix
+                    ? 'bg-emerald-50 border border-emerald-200'
+                    : 'bg-white/95'
+                )}>
+                  <div className="flex items-start gap-3">
+                    {step?.isMistake ? (
+                      <div className="w-7 h-7 rounded-full bg-red-500 flex items-center justify-center shrink-0 mt-0.5">
+                        <AlertTriangle className="w-3.5 h-3.5 text-white" />
+                      </div>
+                    ) : step?.isFix ? (
+                      <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 mt-0.5" style={{ backgroundColor: CHESSCOM_GREEN }}>
+                        <Check className="w-3.5 h-3.5 text-white" />
+                      </div>
+                    ) : null}
+                    <div className="flex-1 min-w-0">
+                      {step?.san && currentStep > 0 && (
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className={cn(
+                            'text-sm font-bold',
+                            step.isMistake ? 'text-red-700' : step.isFix ? 'text-emerald-700' : 'text-gray-900'
+                          )}>
+                            {step.color === 'w' ? '' : ''}{step.fullMoveNumber}.{step.color === 'b' ? '..' : ''} {step.san}
+                            {step.isMistake ? ' — Mistake' : step.isFix ? ' — Best Move' : ''}
+                          </span>
+                        </div>
+                      )}
+                      <p className={cn(
+                        'text-sm leading-relaxed',
+                        step?.isMistake ? 'text-red-800' : step?.isFix ? 'text-emerald-800' : 'text-gray-700'
+                      )}>
+                        {hasComment
+                          ? step!.comment
+                          : currentStep === 0
+                          ? 'Press play or click a move to begin.'
+                          : step?.san
+                          ? `${step.color === 'w' ? 'White' : 'Black'} plays ${step.san}.`
+                          : ''}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            </AnimatePresence>
+          </div>
+
+          {/* Board */}
+          <div className="px-2 pb-1 max-w-[480px] mx-auto w-full">
+            <div className="relative">
               <Chessboard
                 options={{
                   position: step?.fen,
                   allowDragging: false,
-                  boardStyle: { borderRadius: '8px', overflow: 'hidden' },
+                  boardStyle: { borderRadius: '6px', overflow: 'hidden' },
                   darkSquareStyle: { backgroundColor: BOARD_DARK },
                   lightSquareStyle: { backgroundColor: BOARD_LIGHT },
                   animationDurationInMs: 180,
-                  squareStyles: (() => {
-                    const styles: Record<string, React.CSSProperties> = {};
-                    if (step?.isMistake && step.to) {
-                      if (step.from) styles[step.from] = { background: 'rgba(220, 50, 50, 0.45)', boxShadow: 'inset 0 0 0 2px rgba(220,50,50,0.7)' };
-                      styles[step.to] = { background: 'rgba(220, 50, 50, 0.6)', boxShadow: 'inset 0 0 0 2px rgba(220,50,50,0.8)' };
-                    } else if (step?.isFix && step.to) {
-                      if (step.from) styles[step.from] = { background: 'rgba(34, 197, 94, 0.35)', boxShadow: 'inset 0 0 0 2px rgba(34,197,94,0.5)' };
-                      styles[step.to] = { background: 'rgba(34, 197, 94, 0.55)', boxShadow: 'inset 0 0 0 2px rgba(34,197,94,0.7)' };
-                    } else if (step?.to && currentStep > 0) {
-                      if (step.from) styles[step.from] = { background: 'rgba(255, 240, 80, 0.25)' };
-                      styles[step.to] = { background: 'rgba(255, 240, 80, 0.45)' };
-                    }
-                    return styles;
-                  })(),
+                  squareStyles: boardSquareStyles,
                 }}
               />
               {step?.isMistake && (
                 <div className="absolute top-2 right-2 pointer-events-none z-10">
-                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold shadow-lg backdrop-blur-sm border bg-red-950/90 text-red-300 border-red-400/40">
-                    <span>?</span>
-                    <span>Mistake</span>
+                  <div className="flex items-center gap-1 px-2 py-1 rounded-md text-xs font-bold bg-red-600 text-white shadow-lg">
+                    <AlertTriangle className="w-3 h-3" /> Mistake
                   </div>
                 </div>
               )}
               {step?.isFix && (
                 <div className="absolute top-2 right-2 pointer-events-none z-10">
-                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold shadow-lg backdrop-blur-sm border bg-emerald-950/90 text-emerald-300 border-emerald-400/40">
-                    <Check className="w-3 h-3" />
-                    <span>Correct</span>
+                  <div className="flex items-center gap-1 px-2 py-1 rounded-md text-xs font-bold text-white shadow-lg" style={{ backgroundColor: CHESSCOM_GREEN }}>
+                    <Check className="w-3 h-3" /> Best Move
                   </div>
                 </div>
               )}
@@ -865,159 +917,238 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
                 {prevFen !== step?.fen && step?.san && (
                   <motion.div
                     key={currentStep}
-                    initial={{ opacity: 0.35 }}
+                    initial={{ opacity: 0.3 }}
                     animate={{ opacity: 0 }}
-                    transition={{ duration: 0.6 }}
-                    className={`absolute inset-0 ${step?.isMistake ? 'bg-red-500/20' : step?.isFix ? 'bg-emerald-500/20' : 'bg-primary/20'} rounded-lg pointer-events-none`}
+                    transition={{ duration: 0.5 }}
+                    className={cn(
+                      'absolute inset-0 rounded-md pointer-events-none',
+                      step?.isMistake ? 'bg-red-500/15' : step?.isFix ? 'bg-emerald-500/15' : 'bg-yellow-400/10'
+                    )}
                   />
                 )}
               </AnimatePresence>
             </div>
           </div>
 
-          <div className="flex-1 flex flex-col min-h-0 border-t md:border-t-0 md:border-l border-white/5">
-            <div className="px-4 py-4 min-h-[90px] flex flex-col justify-center">
-              <AnimatePresence mode="wait">
-                <motion.div key={currentStep} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.2 }}>
-                  {hasComment ? (
-                    <div className="flex items-start gap-2.5">
-                      {step.isMistake ? (
-                        <div className="w-4 h-4 rounded-full bg-red-500/20 border border-red-500/40 flex items-center justify-center shrink-0 mt-0.5">
-                          <span className="text-red-400 text-[10px] font-bold">!</span>
-                        </div>
-                      ) : step.isFix ? (
-                        <div className="w-4 h-4 rounded-full bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center shrink-0 mt-0.5">
-                          <Check className="w-2.5 h-2.5 text-emerald-400" />
-                        </div>
-                      ) : (
-                        <MessageSquare className="w-4 h-4 text-primary shrink-0 mt-0.5" />
-                      )}
-                      <p className={cn('text-sm leading-relaxed', step.isMistake ? 'text-red-300/90' : step.isFix ? 'text-emerald-300/90' : 'text-foreground/85')}>{step.comment}</p>
-                    </div>
-                  ) : currentStep === 0 ? (
-                    <p className="text-sm text-muted-foreground italic">Press play to walk through the lesson, or click any move below.</p>
-                  ) : (
-                    <p className="text-sm text-muted-foreground italic">{step?.san ? `${step.color === 'w' ? 'White' : 'Black'} plays ${step.san}.` : ''}</p>
-                  )}
-                </motion.div>
-              </AnimatePresence>
-            </div>
-
-            {movePairs.length > 0 && (
-              <div ref={moveListRef} className="flex-1 overflow-y-auto px-3 pb-3 max-h-[160px] md:max-h-[200px]">
-                <div className="grid grid-cols-[32px_1fr_1fr] gap-0.5 text-sm font-mono">
-                  {movePairs.map(({ num, white, black }) => {
-                    const wStep = white >= 0 ? steps[white] : null;
-                    const bStep = black != null ? steps[black] : null;
-                    return (
-                    <React.Fragment key={`${num}-${white}`}>
-                      <div className="flex items-center text-muted-foreground/50 text-xs px-1 py-1">{num}.</div>
-                      {wStep ? (
-                        <button data-active={currentStep === white} onClick={() => go(white)}
-                          className={cn(
-                            'text-left px-2 py-1 rounded transition-colors text-xs',
-                            currentStep === white
-                              ? (wStep.isMistake ? 'bg-red-500 text-white font-bold' : wStep.isFix ? 'bg-emerald-500 text-white font-bold' : 'bg-primary text-primary-foreground font-bold')
-                              : wStep.isMistake
-                                ? 'text-red-400 bg-red-500/10 border border-red-500/20 font-semibold hover:bg-red-500/20'
-                                : wStep.isFix
-                                  ? 'text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 font-semibold hover:bg-emerald-500/20'
-                                  : 'text-foreground/70 hover:bg-white/5'
-                          )}>
-                          {wStep.isMistake && <span className="mr-0.5">?</span>}{wStep.isFix && <span className="mr-0.5">✓</span>}{wStep.san}
-                        </button>
-                      ) : <div className="px-2 py-1 text-xs text-muted-foreground/30">...</div>}
-                      {bStep ? (
-                        <button data-active={currentStep === black} onClick={() => go(black!)}
-                          className={cn(
-                            'text-left px-2 py-1 rounded transition-colors text-xs',
-                            currentStep === black
-                              ? (bStep.isMistake ? 'bg-red-500 text-white font-bold' : bStep.isFix ? 'bg-emerald-500 text-white font-bold' : 'bg-primary text-primary-foreground font-bold')
-                              : bStep.isMistake
-                                ? 'text-red-400 bg-red-500/10 border border-red-500/20 font-semibold hover:bg-red-500/20'
-                                : bStep.isFix
-                                  ? 'text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 font-semibold hover:bg-emerald-500/20'
-                                  : 'text-foreground/70 hover:bg-white/5'
-                          )}>
-                          {bStep.isMistake && <span className="mr-0.5">?</span>}{bStep.isFix && <span className="mr-0.5">✓</span>}{bStep.san}
-                        </button>
-                      ) : <div />}
-                    </React.Fragment>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            <div className="flex items-center justify-between gap-2 px-4 py-3 border-t border-white/5 bg-white/2">
-              <button onClick={() => { setIsPlaying(false); go(0); }} disabled={isFirst} className="p-2 rounded-lg hover:bg-white/8 text-muted-foreground hover:text-foreground transition-colors disabled:opacity-30" title="Go to start"><SkipBack className="w-4 h-4" /></button>
-              <button onClick={() => go(currentStep - 1)} disabled={isFirst} className="p-2 rounded-lg hover:bg-white/8 text-muted-foreground hover:text-foreground transition-colors disabled:opacity-30"><ChevronLeft className="w-4 h-4" /></button>
-              <button onClick={() => setIsPlaying(p => !p)} className="flex items-center gap-2 px-5 py-2 rounded-xl bg-primary text-primary-foreground font-bold text-sm hover:opacity-90 transition-opacity shadow-[0_0_16px_hsl(89_44%_50%_/_0.3)]">
-                {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-                {isPlaying ? 'Pause' : 'Play'}
+          {/* Horizontal move strip */}
+          {movePairs.length > 0 && (
+            <div
+              ref={moveListRef}
+              className="flex items-center gap-0.5 px-3 py-2 overflow-x-auto hide-scrollbar"
+              style={{ backgroundColor: BG_CARD }}
+            >
+              <button
+                onClick={() => go(0)}
+                disabled={isFirst}
+                className="p-1 text-white/40 hover:text-white disabled:opacity-20 shrink-0"
+              >
+                <ChevronLeft className="w-4 h-4" />
               </button>
-              <button onClick={() => go(currentStep + 1)} disabled={isLast} className="p-2 rounded-lg hover:bg-white/8 text-muted-foreground hover:text-foreground transition-colors disabled:opacity-30"><ChevronRight className="w-4 h-4" /></button>
-              <button onClick={() => { setIsPlaying(false); go(totalSteps - 1); }} disabled={isLast} className="p-2 rounded-lg hover:bg-white/8 text-muted-foreground hover:text-foreground transition-colors disabled:opacity-30" title="Go to end"><SkipForward className="w-4 h-4" /></button>
-            </div>
-
-            <div className="h-1 bg-white/5">
-              <motion.div className="h-full bg-primary" animate={{ width: `${(currentStep / Math.max(totalSteps - 1, 1)) * 100}%` }} transition={{ duration: 0.3 }} />
-            </div>
-
-            {hasRepeat && isLast && (
-              <div className="px-4 py-3 border-t border-white/5 bg-emerald-500/5">
-                <button
-                  onClick={() => { setTab('repeat'); resetRepeat(); }}
-                  className="w-full flex items-center justify-center gap-2 py-2 rounded-xl text-sm font-bold text-emerald-400 hover:bg-emerald-500/10 transition-colors"
-                >
-                  <Repeat2 className="w-4 h-4" /> Practice this sequence from move 1 →
-                </button>
+              <div className="flex items-center gap-[2px] overflow-x-auto hide-scrollbar">
+                {movePairs.map(({ num, white, black }) => {
+                  const wStep2 = white >= 0 ? steps[white] : null;
+                  const bStep2 = black != null ? steps[black] : null;
+                  return (
+                    <React.Fragment key={`${num}-${white}`}>
+                      <span className="text-[10px] text-white/30 font-mono px-0.5 shrink-0">{num}.</span>
+                      {wStep2 ? (
+                        <button
+                          data-active={currentStep === white}
+                          onClick={() => go(white)}
+                          className={cn(
+                            'px-1.5 py-0.5 rounded text-xs font-semibold transition-all shrink-0 whitespace-nowrap',
+                            currentStep === white
+                              ? 'text-white shadow-sm'
+                              : wStep2.isMistake
+                              ? 'text-red-400 hover:bg-red-500/20'
+                              : wStep2.isFix
+                              ? 'text-emerald-400 hover:bg-emerald-500/20'
+                              : 'text-white/70 hover:bg-white/10'
+                          )}
+                          style={currentStep === white ? {
+                            backgroundColor: wStep2.isMistake ? '#ef4444' : wStep2.isFix ? '#22c55e' : CHESSCOM_GREEN
+                          } : undefined}
+                        >
+                          {wStep2.isMistake ? '?!' : wStep2.isFix ? '✓' : ''}{wStep2.san}
+                        </button>
+                      ) : (
+                        <span className="text-xs text-white/20 px-1 shrink-0">…</span>
+                      )}
+                      {bStep2 ? (
+                        <button
+                          data-active={currentStep === black}
+                          onClick={() => go(black!)}
+                          className={cn(
+                            'px-1.5 py-0.5 rounded text-xs font-semibold transition-all shrink-0 whitespace-nowrap',
+                            currentStep === black
+                              ? 'text-white shadow-sm'
+                              : bStep2.isMistake
+                              ? 'text-red-400 hover:bg-red-500/20'
+                              : bStep2.isFix
+                              ? 'text-emerald-400 hover:bg-emerald-500/20'
+                              : 'text-white/70 hover:bg-white/10'
+                          )}
+                          style={currentStep === black ? {
+                            backgroundColor: bStep2.isMistake ? '#ef4444' : bStep2.isFix ? '#22c55e' : CHESSCOM_GREEN
+                          } : undefined}
+                        >
+                          {bStep2.isMistake ? '?!' : bStep2.isFix ? '✓' : ''}{bStep2.san}
+                        </button>
+                      ) : null}
+                    </React.Fragment>
+                  );
+                })}
               </div>
-            )}
+              <button
+                onClick={() => go(totalSteps - 1)}
+                disabled={isLast}
+                className="p-1 text-white/40 hover:text-white disabled:opacity-20 shrink-0"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          )}
 
-            {!hasRepeat && hasDrill && isLast && (
-              <div className="px-4 py-3 border-t border-white/5 bg-primary/5">
-                <button
-                  onClick={() => { setTab('drill'); resetDrill(); }}
-                  className="w-full flex items-center justify-center gap-2 py-2 rounded-xl text-sm font-bold text-primary hover:bg-primary/10 transition-colors"
-                >
-                  <Swords className="w-4 h-4" /> Test your knowledge → Practice Drill
-                </button>
-              </div>
-            )}
+          {/* Controls */}
+          <div className="flex items-center justify-center gap-1 px-4 py-3">
+            <button
+              onClick={() => { setIsPlaying(false); go(0); }}
+              disabled={isFirst}
+              className="p-2.5 rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition-all disabled:opacity-20"
+            >
+              <SkipBack className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => go(currentStep - 1)}
+              disabled={isFirst}
+              className="p-2.5 rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition-all disabled:opacity-20"
+            >
+              <ChevronLeft className="w-5 h-5" />
+            </button>
+            <button
+              onClick={() => {
+                if (isPlaying) { setIsPlaying(false); }
+                else if (isLast) { go(currentStep + 1); }
+                else { setIsPlaying(true); }
+              }}
+              className="flex items-center gap-2 px-8 py-2.5 rounded-lg text-white font-bold text-sm transition-all hover:brightness-110 shadow-lg mx-2"
+              style={{ backgroundColor: CHESSCOM_GREEN }}
+            >
+              {isPlaying ? (
+                <><Pause className="w-4 h-4" /> Pause</>
+              ) : isLast ? (
+                <><CheckCircle2 className="w-4 h-4" /> Done</>
+              ) : (
+                <><Play className="w-4 h-4" /> {currentStep === 0 ? 'Play' : 'Next'}</>
+              )}
+            </button>
+            <button
+              onClick={() => go(currentStep + 1)}
+              disabled={isLast}
+              className="p-2.5 rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition-all disabled:opacity-20"
+            >
+              <ChevronRight className="w-5 h-5" />
+            </button>
+            <button
+              onClick={() => { setIsPlaying(false); go(totalSteps - 1); }}
+              disabled={isLast}
+              className="p-2.5 rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition-all disabled:opacity-20"
+            >
+              <SkipForward className="w-4 h-4" />
+            </button>
           </div>
+
+          {/* Progress bar */}
+          <div className="h-1" style={{ backgroundColor: 'rgba(255,255,255,0.05)' }}>
+            <motion.div
+              className="h-full"
+              style={{ backgroundColor: CHESSCOM_GREEN }}
+              animate={{ width: `${(currentStep / Math.max(totalSteps - 1, 1)) * 100}%` }}
+              transition={{ duration: 0.3 }}
+            />
+          </div>
+
+          {/* CTA: Repeat drill */}
+          {hasRepeat && isLast && (
+            <div className="px-4 py-3" style={{ backgroundColor: BG_CARD }}>
+              <button
+                onClick={() => { setTab('repeat'); resetRepeat(); }}
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-bold text-white hover:brightness-110 transition-all"
+                style={{ backgroundColor: CHESSCOM_GREEN }}
+              >
+                <Repeat2 className="w-4 h-4" /> Practice This Sequence
+              </button>
+            </div>
+          )}
+
+          {!hasRepeat && hasDrill && isLast && (
+            <div className="px-4 py-3" style={{ backgroundColor: BG_CARD }}>
+              <button
+                onClick={() => { setTab('drill'); resetDrill(); }}
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-bold text-white hover:brightness-110 transition-all"
+                style={{ backgroundColor: CHESSCOM_GREEN }}
+              >
+                <Swords className="w-4 h-4" /> Practice Drill
+              </button>
+            </div>
+          )}
         </div>
       )}
 
-      {/* ── REPEAT DRILL TAB ────────────────────────────────────────────────── */}
+      {/* ── REPEAT DRILL TAB ──────────────────────────────────────────────── */}
       {tab === 'repeat' && hasRepeat && (
-        <div className="flex flex-col md:flex-row">
+        <div className="flex flex-col">
+          {/* Commentary */}
+          <div className="px-3 pt-3 pb-1">
+            <div className="rounded-xl px-4 py-3 bg-white/95 shadow-sm">
+              <div className="flex items-start gap-3">
+                <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 mt-0.5" style={{ backgroundColor: CHESSCOM_GREEN }}>
+                  <Repeat2 className="w-3.5 h-3.5 text-white" />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-gray-900 mb-0.5">
+                    {repeatComplete ? 'Sequence Complete!' : 'Play the moves from memory'}
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    {repeatComplete
+                      ? `${repeatFirstTryScore} of ${totalRepeatMoves} correct on first try`
+                      : repeatExpectedSan
+                      ? `Move ${repeatStep + 1} of ${totalRepeatMoves} — ${repeatColor === 'w' ? 'White' : 'Black'} to play`
+                      : 'Drag a piece to make the correct move.'}
+                  </p>
+                  {repeatAttempts > 0 && !repeatComplete && (
+                    <p className="text-xs text-orange-600 mt-1 font-medium">{repeatAttempts} wrong attempt{repeatAttempts !== 1 ? 's' : ''}</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Board */}
-          <div className="flex-shrink-0 p-3 md:p-4">
-            <div className="relative w-full max-w-[360px] mx-auto">
+          <div className="px-2 pb-1 max-w-[480px] mx-auto w-full">
+            <div className="relative">
               {repeatComplete ? (
-                <div className="aspect-square rounded-lg bg-gradient-to-br from-emerald-950/80 to-slate-900 border border-emerald-500/30 flex flex-col items-center justify-center gap-4 p-6">
-                  <Trophy className="w-14 h-14 text-amber-400 drop-shadow-lg" />
+                <div className="aspect-square rounded-md flex flex-col items-center justify-center gap-4 p-6" style={{ background: 'linear-gradient(135deg, #1a4731, #1e293b)' }}>
+                  <Trophy className="w-16 h-16 text-amber-400 drop-shadow-lg" />
                   <div className="text-center">
-                    <p className="text-lg font-black text-white mb-1">Sequence Complete!</p>
-                    <p className="text-sm text-muted-foreground">
-                      {repeatFirstTryScore} of {totalRepeatMoves} moves correct on first try
+                    <p className="text-xl font-black text-white mb-1">Well Done!</p>
+                    <p className="text-sm text-white/60">
+                      {repeatFirstTryScore}/{totalRepeatMoves} first-try correct
                     </p>
                   </div>
-                  <div className="w-full bg-white/5 rounded-full h-2 overflow-hidden">
+                  <div className="w-full max-w-[200px] bg-white/10 rounded-full h-2 overflow-hidden">
                     <div
-                      className="h-full bg-gradient-to-r from-emerald-500 to-emerald-300 rounded-full transition-all duration-700"
-                      style={{ width: `${(repeatFirstTryScore / totalRepeatMoves) * 100}%` }}
+                      className="h-full rounded-full transition-all duration-700"
+                      style={{ width: `${(repeatFirstTryScore / totalRepeatMoves) * 100}%`, backgroundColor: CHESSCOM_GREEN }}
                     />
                   </div>
-                  <div className="flex gap-2 flex-wrap justify-center">
+                  <div className="flex gap-1.5 flex-wrap justify-center">
                     {repeatFirstTry.map((ok, i) => (
                       <div
                         key={i}
                         title={`Move ${i + 1}: ${steps[i + 1]?.san}`}
                         className={cn('w-5 h-5 rounded text-[9px] font-bold flex items-center justify-center',
-                          ok ? 'bg-emerald-500/30 text-emerald-300 border border-emerald-500/50'
-                             : 'bg-red-500/20 text-red-400 border border-red-500/40')}
+                          ok ? 'bg-emerald-500/40 text-emerald-200' : 'bg-red-500/30 text-red-300')}
                       >
                         {ok ? '✓' : '✗'}
                       </div>
@@ -1034,7 +1165,7 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
                       onPieceDrop: handleRepeatDrop,
                       onSquareClick: handleRepeatSquareClick,
                       squareStyles: repeatSquareStyles,
-                      boardStyle: { borderRadius: '8px', overflow: 'hidden', cursor: 'pointer' },
+                      boardStyle: { borderRadius: '6px', overflow: 'hidden', cursor: 'pointer' },
                       darkSquareStyle: { backgroundColor: BOARD_DARK },
                       lightSquareStyle: { backgroundColor: BOARD_LIGHT },
                       animationDurationInMs: 180,
@@ -1043,14 +1174,14 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
                   <AnimatePresence>
                     {repeatFeedback === 'correct' && (
                       <motion.div key="rc" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                        className="absolute inset-0 rounded-lg flex items-center justify-center bg-emerald-500/20 pointer-events-none">
-                        <div className="bg-emerald-500 text-white font-black text-2xl px-6 py-3 rounded-2xl shadow-lg">✓ Correct!</div>
+                        className="absolute inset-0 rounded-md flex items-center justify-center pointer-events-none" style={{ backgroundColor: 'rgba(34,197,94,0.2)' }}>
+                        <div className="text-white font-black text-2xl px-6 py-3 rounded-xl shadow-lg" style={{ backgroundColor: CHESSCOM_GREEN }}>✓ Correct!</div>
                       </motion.div>
                     )}
                     {repeatFeedback === 'wrong' && (
                       <motion.div key="rw" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                        className="absolute inset-0 rounded-lg flex items-center justify-center bg-red-500/20 pointer-events-none">
-                        <div className="bg-red-500 text-white font-black text-xl px-6 py-3 rounded-2xl shadow-lg">✗ Try again</div>
+                        className="absolute inset-0 rounded-md flex items-center justify-center bg-red-500/20 pointer-events-none">
+                        <div className="bg-red-500 text-white font-black text-xl px-6 py-3 rounded-xl shadow-lg">✗ Try again</div>
                       </motion.div>
                     )}
                   </AnimatePresence>
@@ -1059,113 +1190,106 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
             </div>
           </div>
 
-          {/* Side panel */}
-          <div className="flex-1 flex flex-col min-h-0 border-t md:border-t-0 md:border-l border-white/5 p-4 gap-4">
-            {/* Header */}
-            <div className="flex items-start gap-3">
-              <div className="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center shrink-0">
-                <Repeat2 className="w-4 h-4 text-emerald-400" />
+          {/* Progress */}
+          {!repeatComplete && (
+            <div className="px-3 py-2">
+              <div className="h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: 'rgba(255,255,255,0.08)' }}>
+                <motion.div
+                  className="h-full rounded-full"
+                  style={{ backgroundColor: CHESSCOM_GREEN }}
+                  animate={{ width: `${(repeatStep / totalRepeatMoves) * 100}%` }}
+                  transition={{ duration: 0.3 }}
+                />
               </div>
-              <div>
-                <p className="text-sm font-bold text-foreground mb-0.5">
-                  {repeatComplete ? 'Round complete!' : 'Play the sequence from the start'}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {repeatComplete
-                    ? 'Repetition builds muscle memory. Go again to improve your score.'
-                    : repeatExpectedSan
-                    ? `Move ${repeatStep + 1} of ${totalRepeatMoves} — ${repeatColor === 'w' ? 'White' : 'Black'} to move${repeatFullMove ? ` (move ${repeatFullMove})` : ''}`
-                    : 'Drag a piece to make the correct move.'}
-                </p>
-                {repeatAttempts > 0 && !repeatComplete && (
-                  <p className="text-xs text-amber-400 mt-1">{repeatAttempts} wrong attempt{repeatAttempts !== 1 ? 's' : ''} on this move</p>
-                )}
-              </div>
-            </div>
-
-            {/* Progress bar + move dots */}
-            {!repeatComplete && (
-              <div className="space-y-2">
-                <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
-                  <motion.div
-                    className="h-full rounded-full bg-emerald-500"
-                    animate={{ width: `${(repeatStep / totalRepeatMoves) * 100}%` }}
-                    transition={{ duration: 0.3 }}
+              <div className="flex gap-1 flex-wrap mt-2">
+                {repeatFirstTry.map((ok, i) => (
+                  <div
+                    key={i}
+                    className={cn('h-1.5 flex-1 min-w-[8px] max-w-[20px] rounded-full transition-colors',
+                      i < repeatStep
+                        ? ok ? 'bg-emerald-500' : 'bg-red-400'
+                        : i === repeatStep
+                        ? 'animate-pulse'
+                        : 'bg-white/10'
+                    )}
+                    style={i === repeatStep ? { backgroundColor: CHESSCOM_GREEN } : undefined}
                   />
-                </div>
-                <div className="flex gap-1 flex-wrap">
-                  {repeatFirstTry.map((ok, i) => (
-                    <div
-                      key={i}
-                      className={cn('h-1.5 flex-1 min-w-[8px] max-w-[20px] rounded-full transition-colors',
-                        i < repeatStep
-                          ? ok ? 'bg-emerald-500' : 'bg-red-400'
-                          : i === repeatStep
-                          ? 'bg-primary animate-pulse'
-                          : 'bg-white/10'
-                      )}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Score card after complete */}
-            {repeatComplete && (
-              <div className="flex items-center gap-3 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30">
-                <Trophy className="w-5 h-5 text-amber-400 shrink-0" />
-                <div>
-                  <p className="text-sm font-bold text-emerald-400">
-                    {repeatFirstTryScore}/{totalRepeatMoves} first-try correct
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {repeatFirstTryScore === totalRepeatMoves
-                      ? 'Perfect round! Keep repeating to build memory.'
-                      : 'Try again — aim to get them all on the first try.'}
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {/* PGN move reference */}
-            {!repeatComplete && (
-              <div className="text-xs text-muted-foreground/60 font-mono space-y-0.5 max-h-24 overflow-y-auto">
-                {movePairs.map(({ num, white, black }) => (
-                  <div key={num} className="flex gap-1">
-                    <span className="w-6 shrink-0 text-right text-muted-foreground/40">{num}.</span>
-                    <span className={cn('px-1 rounded', repeatStep >= white - 0 && 'text-foreground/80')}>{steps[white]?.san}</span>
-                    {black != null && <span className={cn('px-1 rounded', repeatStep >= black - 0 && 'text-foreground/80')}>{steps[black]?.san}</span>}
-                  </div>
                 ))}
               </div>
-            )}
-
-            {/* Actions */}
-            <div className="mt-auto flex items-center gap-2 flex-wrap">
-              <button
-                onClick={resetRepeat}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-white/5 border border-border transition-all"
-              >
-                <RotateCcw className="w-3.5 h-3.5" /> {repeatComplete ? 'Go Again' : 'Reset'}
-              </button>
-              {repeatComplete && hasDrill && (
-                <button
-                  onClick={() => { setTab('drill'); resetDrill(); }}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold text-primary bg-primary/10 hover:bg-primary/20 border border-primary/30 transition-all"
-                >
-                  <Swords className="w-3.5 h-3.5" /> Practice Drill
-                </button>
-              )}
             </div>
+          )}
+
+          {/* Move reference */}
+          {!repeatComplete && (
+            <div className="px-3 py-2 overflow-x-auto" style={{ backgroundColor: BG_CARD }}>
+              <div className="flex items-center gap-[2px] text-xs font-mono">
+                {movePairs.map(({ num, white, black }) => (
+                  <React.Fragment key={num}>
+                    <span className="text-[10px] text-white/30 px-0.5">{num}.</span>
+                    <span className={cn('px-1 rounded', repeatStep >= white ? 'text-white/80' : 'text-white/30')}>{steps[white]?.san}</span>
+                    {black != null && <span className={cn('px-1 rounded', repeatStep >= black ? 'text-white/80' : 'text-white/30')}>{steps[black]?.san}</span>}
+                  </React.Fragment>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Actions */}
+          <div className="flex items-center gap-2 px-4 py-3">
+            <button
+              onClick={resetRepeat}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold text-white/60 hover:text-white hover:bg-white/10 transition-all"
+            >
+              <RotateCcw className="w-3.5 h-3.5" /> {repeatComplete ? 'Go Again' : 'Reset'}
+            </button>
+            {repeatComplete && hasDrill && (
+              <button
+                onClick={() => { setTab('drill'); resetDrill(); }}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold text-white hover:brightness-110 transition-all"
+                style={{ backgroundColor: CHESSCOM_GREEN }}
+              >
+                <Swords className="w-3.5 h-3.5" /> Practice Drill
+              </button>
+            )}
           </div>
         </div>
       )}
 
-      {/* ── DRILL TAB ───────────────────────────────────────────────────────── */}
+      {/* ── DRILL TAB ─────────────────────────────────────────────────────── */}
       {tab === 'drill' && hasDrill && (
-        <div className="flex flex-col md:flex-row">
-          <div className="flex-shrink-0 p-3 md:p-4">
-            <div className="relative w-full max-w-[360px] mx-auto">
+        <div className="flex flex-col">
+          {/* Commentary */}
+          <div className="px-3 pt-3 pb-1">
+            <div className={cn(
+              'rounded-xl px-4 py-3 shadow-sm',
+              drillState === 'correct' ? 'bg-emerald-50 border border-emerald-200'
+                : drillState === 'revealed' ? 'bg-amber-50 border border-amber-200'
+                : 'bg-white/95'
+            )}>
+              <div className="flex items-start gap-3">
+                <div className="w-7 h-7 rounded-full bg-blue-500 flex items-center justify-center shrink-0 mt-0.5">
+                  <Swords className="w-3.5 h-3.5 text-white" />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-gray-900 mb-0.5">Find the best move</p>
+                  <p className="text-xs text-gray-500">
+                    {drillState === 'correct'
+                      ? `Excellent! ${drillExpectedMove} is correct!`
+                      : drillState === 'revealed'
+                      ? `The answer was ${drillExpectedMove}.`
+                      : 'Drag a piece on the board to make your move.'}
+                  </p>
+                  {drillAttempts > 0 && drillState !== 'correct' && drillState !== 'revealed' && (
+                    <p className="text-xs text-orange-600 mt-1 font-medium">{drillAttempts} attempt{drillAttempts > 1 ? 's' : ''} so far</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Board */}
+          <div className="px-2 pb-1 max-w-[480px] mx-auto w-full">
+            <div className="relative">
               <Chessboard
                 options={{
                   position: drillState === 'idle' || drillState === 'wrong' ? drillFen! : drillPosition,
@@ -1173,7 +1297,7 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
                   onPieceDrop: drillState === 'correct' || drillState === 'revealed' ? () => false : handleDrillDrop,
                   onSquareClick: handleDrillSquareClick,
                   squareStyles: drillSquareStyles,
-                  boardStyle: { borderRadius: '8px', overflow: 'hidden', cursor: 'pointer' },
+                  boardStyle: { borderRadius: '6px', overflow: 'hidden', cursor: 'pointer' },
                   darkSquareStyle: { backgroundColor: BOARD_DARK },
                   lightSquareStyle: { backgroundColor: BOARD_LIGHT },
                   animationDurationInMs: 180,
@@ -1182,91 +1306,90 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
               <AnimatePresence>
                 {drillState === 'correct' && (
                   <motion.div key="correct" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                    className="absolute inset-0 rounded-lg flex items-center justify-center bg-emerald-500/20 pointer-events-none">
-                    <div className="bg-emerald-500 text-white font-black text-2xl px-6 py-3 rounded-2xl shadow-lg">✓ Correct!</div>
+                    className="absolute inset-0 rounded-md flex items-center justify-center pointer-events-none" style={{ backgroundColor: 'rgba(34,197,94,0.2)' }}>
+                    <div className="text-white font-black text-2xl px-6 py-3 rounded-xl shadow-lg" style={{ backgroundColor: CHESSCOM_GREEN }}>✓ Correct!</div>
                   </motion.div>
                 )}
                 {drillState === 'wrong' && (
                   <motion.div key="wrong" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                    className="absolute inset-0 rounded-lg flex items-center justify-center bg-red-500/20 pointer-events-none">
-                    <div className="bg-red-500 text-white font-black text-xl px-6 py-3 rounded-2xl shadow-lg">✗ Try again</div>
+                    className="absolute inset-0 rounded-md flex items-center justify-center bg-red-500/20 pointer-events-none">
+                    <div className="bg-red-500 text-white font-black text-xl px-6 py-3 rounded-xl shadow-lg">✗ Try again</div>
                   </motion.div>
                 )}
               </AnimatePresence>
             </div>
           </div>
 
-          <div className="flex-1 flex flex-col min-h-0 border-t md:border-t-0 md:border-l border-white/5 p-4 gap-4">
-            <div className="flex items-start gap-3">
-              <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
-                <Swords className="w-4 h-4 text-primary" />
-              </div>
-              <div>
-                <p className="text-sm font-bold text-foreground mb-1">Find the best move</p>
-                <p className="text-xs text-muted-foreground">
-                  {drillState === 'correct'
-                    ? `Excellent! ${drillExpectedMove} was the right move.`
-                    : drillState === 'revealed'
-                    ? `The answer was ${drillExpectedMove}.`
-                    : 'Drag a piece on the board to make your move.'}
-                </p>
-                {drillAttempts > 0 && drillState !== 'correct' && drillState !== 'revealed' && (
-                  <p className="text-xs text-amber-400 mt-1">{drillAttempts} attempt{drillAttempts > 1 ? 's' : ''} so far</p>
-                )}
-              </div>
-            </div>
-
+          {/* Result cards */}
+          <div className="px-3 py-2">
             <AnimatePresence mode="wait">
               {drillState === 'correct' && (
-                <motion.div key="correct-card" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="flex items-center gap-3 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30">
+                <motion.div key="ok" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+                  className="flex items-center gap-3 p-3 rounded-xl bg-emerald-500/15 border border-emerald-500/30">
                   <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
                   <div>
                     <p className="text-sm font-bold text-emerald-400">Correct — {drillExpectedMove}!</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">You solved it{drillAttempts > 1 ? ` in ${drillAttempts} attempts` : ' on the first try'}.</p>
+                    <p className="text-xs text-white/50 mt-0.5">Solved{drillAttempts > 1 ? ` in ${drillAttempts} attempts` : ' on first try'}.</p>
                   </div>
                 </motion.div>
               )}
               {drillState === 'revealed' && (
-                <motion.div key="revealed-card" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="flex items-center gap-3 p-4 rounded-xl bg-amber-500/10 border border-amber-500/30">
+                <motion.div key="rev" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+                  className="flex items-center gap-3 p-3 rounded-xl bg-amber-500/15 border border-amber-500/30">
                   <Eye className="w-5 h-5 text-amber-400 shrink-0" />
                   <div>
                     <p className="text-sm font-bold text-amber-400">Answer: {drillExpectedMove}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">Study why this move is best, then try again.</p>
+                    <p className="text-xs text-white/50 mt-0.5">Study this move, then try again.</p>
                   </div>
                 </motion.div>
               )}
             </AnimatePresence>
 
             {drillHint && drillState === 'idle' && (
-              <div>
+              <div className="mt-2">
                 {showHint ? (
-                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-start gap-2.5 p-3 rounded-xl bg-blue-500/10 border border-blue-500/20">
+                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                    className="flex items-start gap-2 p-3 rounded-xl bg-blue-500/10 border border-blue-500/20">
                     <Lightbulb className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
                     <p className="text-xs text-blue-300">{drillHint}</p>
                   </motion.div>
                 ) : (
-                  <button onClick={() => setShowHint(true)} className="text-xs text-muted-foreground hover:text-blue-400 flex items-center gap-1.5 transition-colors">
+                  <button
+                    onClick={() => setShowHint(true)}
+                    className="text-xs text-white/40 hover:text-blue-400 flex items-center gap-1.5 transition-colors"
+                  >
                     <Lightbulb className="w-3.5 h-3.5" /> Show hint
                   </button>
                 )}
               </div>
             )}
+          </div>
 
-            <div className="mt-auto flex items-center gap-2 flex-wrap">
-              <button onClick={resetDrill} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-white/5 border border-border transition-all">
-                <RotateCcw className="w-3.5 h-3.5" /> Reset
+          {/* Actions */}
+          <div className="flex items-center gap-2 px-4 py-3">
+            <button
+              onClick={resetDrill}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold text-white/60 hover:text-white hover:bg-white/10 transition-all"
+            >
+              <RotateCcw className="w-3.5 h-3.5" /> Reset
+            </button>
+            {drillState === 'idle' && drillAttempts >= 2 && (
+              <button
+                onClick={revealAnswer}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold text-amber-400 hover:bg-amber-500/10 border border-amber-500/30 transition-all"
+              >
+                <Eye className="w-3.5 h-3.5" /> Reveal answer
               </button>
-              {drillState === 'idle' && drillAttempts >= 2 && (
-                <button onClick={revealAnswer} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold text-amber-400 hover:bg-amber-500/10 border border-amber-500/30 transition-all">
-                  <Eye className="w-3.5 h-3.5" /> Reveal answer
-                </button>
-              )}
-              {(drillState === 'correct' || drillState === 'revealed') && (
-                <button onClick={() => setTab('lesson')} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold text-primary bg-primary/10 hover:bg-primary/20 border border-primary/30 transition-all">
-                  <ChevronLeft className="w-3.5 h-3.5" /> Back to lesson
-                </button>
-              )}
-            </div>
+            )}
+            {(drillState === 'correct' || drillState === 'revealed') && (
+              <button
+                onClick={() => setTab('lesson')}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold text-white hover:brightness-110 transition-all"
+                style={{ backgroundColor: CHESSCOM_GREEN }}
+              >
+                <ChevronLeft className="w-3.5 h-3.5" /> Back to Lesson
+              </button>
+            )}
           </div>
         </div>
       )}
