@@ -16,20 +16,41 @@ import { cn } from '@/lib/utils';
 import { apiFetch } from '@/lib/api';
 
 // ── Markdown render helpers ────────────────────────────────────────────────────
+const MISTAKE_RED = '#dc4343';
+
 function renderInline(text: string): React.ReactNode {
   const parts = text.split(/(\*\*[^*]+\*\*)/g);
   if (parts.length === 1) return text;
   return parts.map((part, i) =>
     part.startsWith('**') && part.endsWith('**')
-      ? <strong key={i} className="font-semibold text-foreground">{part.slice(2, -2)}</strong>
-      : part
+      ? <strong key={i} className="font-bold" style={{ color: '#e8e6e3' }}>{part.slice(2, -2)}</strong>
+      : <span key={i}>{part}</span>
   );
 }
 
 function renderParagraph(trimmed: string, key: number): React.ReactNode {
-  if (trimmed.startsWith('### ')) return <h4 key={key} className="text-sm font-bold text-muted-foreground uppercase tracking-wider mt-2">{trimmed.slice(4)}</h4>;
-  if (trimmed.startsWith('## ')) return <h4 key={key} className="text-base font-bold text-primary mt-1">{trimmed.slice(3)}</h4>;
-  if (trimmed.startsWith('# ')) return <h3 key={key} className="text-lg font-bold mt-2">{trimmed.slice(2)}</h3>;
+  const headingBody = trimmed.match(/^(#{1,3})\s+(.*)/s);
+  if (headingBody) {
+    const level = headingBody[1].length;
+    const rest = headingBody[2];
+    const lines = rest.split('\n');
+    const heading = lines[0];
+    const body = lines.slice(1).join('\n').trim();
+    const nodes: React.ReactNode[] = [];
+
+    if (level === 3) {
+      nodes.push(<h4 key={`${key}-h`} className="text-sm font-bold uppercase tracking-wider mt-2" style={{ color: '#9e9b98' }}>{renderInline(heading)}</h4>);
+    } else if (level === 2) {
+      nodes.push(<h4 key={`${key}-h`} className="text-base font-bold mt-1" style={{ color: CHESSCOM_GREEN }}>{renderInline(heading)}</h4>);
+    } else {
+      nodes.push(<h3 key={`${key}-h`} className="text-lg font-bold mt-2" style={{ color: '#e8e6e3' }}>{renderInline(heading)}</h3>);
+    }
+
+    if (body) {
+      nodes.push(<p key={`${key}-b`} className="text-sm leading-relaxed mt-1.5" style={{ color: '#c8c5c1' }}>{renderInline(body)}</p>);
+    }
+    return <React.Fragment key={key}>{nodes}</React.Fragment>;
+  }
 
   const lines = trimmed.split('\n');
   const isList = lines.every(l => /^[-*•]\s/.test(l.trim()) || l.trim() === '');
@@ -37,8 +58,8 @@ function renderParagraph(trimmed: string, key: number): React.ReactNode {
     return (
       <ul key={key} className="space-y-2">
         {lines.filter(l => l.trim()).map((item, j) => (
-          <li key={j} className="flex items-start gap-2.5 text-foreground/80 text-sm leading-relaxed">
-            <span className="text-primary mt-1 shrink-0">▸</span>
+          <li key={j} className="flex items-start gap-2.5 text-sm leading-relaxed" style={{ color: '#c8c5c1' }}>
+            <span className="mt-1 shrink-0" style={{ color: CHESSCOM_GREEN }}>▸</span>
             <span>{renderInline(item.replace(/^[-*•]\s*/, ''))}</span>
           </li>
         ))}
@@ -46,40 +67,40 @@ function renderParagraph(trimmed: string, key: number): React.ReactNode {
     );
   }
 
-  return <p key={key} className="text-foreground/80 text-sm leading-relaxed">{renderInline(trimmed)}</p>;
+  return <p key={key} className="text-sm leading-relaxed" style={{ color: '#c8c5c1' }}>{renderInline(trimmed)}</p>;
 }
 
 function renderStep(text: string): React.ReactNode {
-  const mistakeMatch = text.match(/##\s*The Mistake/i);
-  const fixMatch = text.match(/##\s*The Fix/i);
+  const isMistake = /^##?\s*The Mistake/im.test(text);
+  const isFix = /^##?\s*The Fix/im.test(text);
 
-  if (mistakeMatch && fixMatch) {
-    const mistakeIdx = text.indexOf(mistakeMatch[0]);
-    const fixIdx = text.indexOf(fixMatch[0]);
-    const mistakeBody = text.slice(mistakeIdx + mistakeMatch[0].length, fixIdx).trim();
-    const fixBody = text.slice(fixIdx + fixMatch[0].length).trim();
-    const before = text.slice(0, mistakeIdx).trim();
-
-    const mistakeParagraphs = mistakeBody.split(/\n\n+/).filter(Boolean);
-    const fixParagraphs = fixBody.split(/\n\n+/).filter(Boolean);
-    const beforeParagraphs = before ? before.split(/\n\n+/).filter(Boolean) : [];
-
+  if (isMistake) {
+    const body = text.replace(/^#{1,3}\s*The Mistake\s*/im, '').trim();
+    const paragraphs = body.split(/\n\n+/).filter(Boolean);
     return (
-      <div className="space-y-4">
-        {beforeParagraphs.map((p, i) => renderParagraph(p.trim(), i))}
-        <div className="rounded-xl border border-red-500/30 bg-red-500/8 p-4 space-y-2">
+      <div className="space-y-3">
+        <div className="rounded-xl p-4 space-y-2" style={{ background: 'rgba(220,67,67,0.1)', border: '1px solid rgba(220,67,67,0.25)' }}>
           <div className="flex items-center gap-2 mb-1">
-            <span className="text-red-400 text-lg">✗</span>
-            <h4 className="text-sm font-bold text-red-400 uppercase tracking-wider">Where You Went Wrong</h4>
+            <span className="text-lg" style={{ color: MISTAKE_RED }}>✗</span>
+            <h4 className="text-sm font-bold uppercase tracking-wider" style={{ color: MISTAKE_RED }}>The Mistake</h4>
           </div>
-          {mistakeParagraphs.map((p, i) => renderParagraph(p.trim(), 100 + i))}
+          {paragraphs.map((p, i) => renderParagraph(p.trim(), 100 + i))}
         </div>
-        <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/8 p-4 space-y-2">
+      </div>
+    );
+  }
+
+  if (isFix) {
+    const body = text.replace(/^#{1,3}\s*The Fix\s*/im, '').trim();
+    const paragraphs = body.split(/\n\n+/).filter(Boolean);
+    return (
+      <div className="space-y-3">
+        <div className="rounded-xl p-4 space-y-2" style={{ background: 'rgba(129,182,76,0.1)', border: `1px solid rgba(129,182,76,0.25)` }}>
           <div className="flex items-center gap-2 mb-1">
-            <span className="text-emerald-400 text-lg">✓</span>
-            <h4 className="text-sm font-bold text-emerald-400 uppercase tracking-wider">What You Should Have Done</h4>
+            <span className="text-lg" style={{ color: CHESSCOM_GREEN }}>✓</span>
+            <h4 className="text-sm font-bold uppercase tracking-wider" style={{ color: CHESSCOM_GREEN }}>The Fix</h4>
           </div>
-          {fixParagraphs.map((p, i) => renderParagraph(p.trim(), 200 + i))}
+          {paragraphs.map((p, i) => renderParagraph(p.trim(), 200 + i))}
         </div>
       </div>
     );
