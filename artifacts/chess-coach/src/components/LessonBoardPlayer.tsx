@@ -580,6 +580,7 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
   const handleDrillDrop = useCallback((args: { sourceSquare: string; targetSquare: string | null; piece: unknown }) => {
     if (drillState === 'correct' || drillState === 'revealed') return false;
     if (!drillFen || !drillExpectedMove || !args.targetSquare) return false;
+    if (args.sourceSquare === args.targetSquare) return false;
 
     try {
       const chess = new Chess(drillFen);
@@ -648,6 +649,7 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
 
   const handleRepeatDrop = useCallback((args: { sourceSquare: string; targetSquare: string | null; piece: unknown }) => {
     if (repeatComplete || !args.targetSquare || !steps) return false;
+    if (args.sourceSquare === args.targetSquare) return false;
     const expected = steps[repeatStep + 1]?.san;
     if (!expected) return false;
 
@@ -1208,6 +1210,7 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
                     options={{
                       position: repeatPosition,
                       allowDragging: !repeatComplete,
+                      dragActivationDistance: 8,
                       canDragPiece: canRepeatDrag,
                       onPieceDrop: handleRepeatDrop,
                       onSquareClick: handleRepeatSquareClick,
@@ -1341,6 +1344,7 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
                 options={{
                   position: drillState === 'idle' || drillState === 'wrong' ? drillFen! : drillPosition,
                   allowDragging: drillState !== 'correct' && drillState !== 'revealed',
+                  dragActivationDistance: 8,
                   onPieceDrop: drillState === 'correct' || drillState === 'revealed' ? () => false : handleDrillDrop,
                   onSquareClick: handleDrillSquareClick,
                   squareStyles: drillSquareStyles,

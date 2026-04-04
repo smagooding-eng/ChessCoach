@@ -196,6 +196,7 @@ export function ChessBoard({
           position,
           boardOrientation: flipped ? 'black' : 'white',
           allowDragging: practiceMode,
+          dragActivationDistance: 8,
           canDragPiece,
           onPieceDrop: handlePieceDrop,
           squareStyles,
