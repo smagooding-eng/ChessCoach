@@ -63,6 +63,8 @@ export function Subscription() {
       .catch(() => setLoading(false));
   }, []);
 
+  const [checkoutError, setCheckoutError] = useState('');
+
   const handleCheckout = async (priceId: string) => {
     if (!isAuthenticated) {
       setLocation('/setup');
@@ -70,6 +72,7 @@ export function Subscription() {
     }
 
     setCheckoutLoading(priceId);
+    setCheckoutError('');
     try {
       const res = await apiFetch('/api/stripe/checkout', {
         method: 'POST',
@@ -80,9 +83,12 @@ export function Subscription() {
       const data = await res.json();
       if (data.url) {
         window.location.href = data.url;
+      } else {
+        setCheckoutError(data.error || 'Could not start checkout. Please try again.');
       }
     } catch (err) {
       console.error('Checkout error:', err);
+      setCheckoutError('Connection error. Please try again.');
     } finally {
       setCheckoutLoading(null);
     }
@@ -291,6 +297,9 @@ export function Subscription() {
                     <p className="text-sm text-muted-foreground text-center">Pricing plans coming soon.</p>
                   )}
                   <p className="text-[10px] text-center text-muted-foreground mt-1">3-day free trial included · Cancel anytime</p>
+                  {checkoutError && (
+                    <p className="text-xs text-red-400 text-center mt-2">{checkoutError}</p>
+                  )}
                 </div>
               )}
             </div>

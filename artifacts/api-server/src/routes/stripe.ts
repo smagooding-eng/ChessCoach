@@ -97,16 +97,8 @@ router.post('/stripe/checkout', async (req: Request, res: Response) => {
   }
 
   try {
-    let priceValid = false;
-    try {
-      const price = await storage.getPrice(priceId);
-      priceValid = !!(price && price.active);
-    } catch {
-      priceValid = priceId.startsWith('price_');
-    }
-
-    if (!priceValid) {
-      res.status(400).json({ error: 'Invalid or inactive price' });
+    if (!priceId.startsWith('price_')) {
+      res.status(400).json({ error: 'Invalid price ID' });
       return;
     }
 
@@ -169,6 +161,34 @@ router.post('/stripe/portal', async (req: Request, res: Response) => {
 
 router.get('/stripe/products', async (_req: Request, res: Response) => {
   try {
+    try {
+      const stripe = await getUncachableStripeClient();
+      const products = await stripe.products.list({ active: true, limit: 10 });
+      if (products.data.length > 0) {
+        const result = [];
+        for (const product of products.data) {
+          const prices = await stripe.prices.list({ product: product.id, active: true, limit: 10 });
+          result.push({
+            id: product.id,
+            name: product.name,
+            description: product.description,
+            active: product.active,
+            prices: prices.data.map((p: any) => ({
+              id: p.id,
+              unit_amount: p.unit_amount,
+              currency: p.currency,
+              recurring: p.recurring,
+              active: p.active,
+            })),
+          });
+        }
+        res.json({ data: result });
+        return;
+      }
+    } catch (stripeErr: any) {
+      console.error('Live Stripe products fetch failed, using cache:', stripeErr.message);
+    }
+
     let rows: any[] = [];
     try {
       rows = await storage.listProductsWithPrices();
@@ -200,44 +220,9 @@ router.get('/stripe/products', async (_req: Request, res: Response) => {
       return;
     }
 
-    try {
-      const stripe = await getUncachableStripeClient();
-      const products = await stripe.products.list({ active: true, limit: 10 });
-      const result = [];
-      for (const product of products.data) {
-        const prices = await stripe.prices.list({ product: product.id, active: true, limit: 10 });
-        result.push({
-          id: product.id,
-          name: product.name,
-          description: product.description,
-          active: product.active,
-          prices: prices.data.map((p: any) => ({
-            id: p.id,
-            unit_amount: p.unit_amount,
-            currency: p.currency,
-            recurring: p.recurring,
-            active: p.active,
-          })),
-        });
-      }
-      res.json({ data: result });
-      return;
-    } catch {}
-
-    res.json({ data: [{
-      id: "prod_UFj7LxDpot4zcN",
-      name: "ChessScout Pro",
-      description: "Premium chess coaching with AI analysis, personalized courses, TTS narration, and opponent scouting",
-      active: true,
-      prices: [{
-        id: "price_1THDfGPIg6Zf7ksP5PF0Krc4",
-        unit_amount: 100,
-        currency: "usd",
-        recurring: { interval: "week", interval_count: 1 },
-        active: true,
-      }],
-    }] });
+    res.json({ data: [] });
   } catch (err: any) {
+    console.error('Products list error:', err.message);
     res.status(500).json({ error: 'Failed to list products' });
   }
 });
