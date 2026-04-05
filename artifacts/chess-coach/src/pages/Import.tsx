@@ -127,7 +127,7 @@ export function Import() {
               </div>
               <p className="text-xs text-muted-foreground mt-1 ml-1 flex items-center gap-1">
                 Connected account ·{' '}
-                <Link href="/setup" className="text-primary hover:underline">
+                <Link href="/profile" className="text-primary hover:underline">
                   Change
                 </Link>
               </p>
