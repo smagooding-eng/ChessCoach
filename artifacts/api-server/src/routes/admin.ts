@@ -73,11 +73,42 @@ router.get("/admin/users", requireAdmin, async (_req: Request, res: Response) =>
         chesscomUsername: usersTable.chesscomUsername,
         firstName: usersTable.firstName,
         createdAt: usersTable.createdAt,
+        stripeCustomerId: usersTable.stripeCustomerId,
       })
       .from(usersTable)
       .orderBy(sql`${usersTable.createdAt} DESC`);
 
-    res.json({ users });
+    let subMap: Record<string, { status: string; trialEnd: number | null; currentPeriodStart: number | null; currentPeriodEnd: number | null }> = {};
+    try {
+      const subRows = await db.execute(
+        sql`SELECT customer, status, trial_end, current_period_start, current_period_end FROM stripe.subscriptions WHERE customer IS NOT NULL`
+      );
+      for (const row of (subRows as any).rows ?? []) {
+        const existing = subMap[row.customer];
+        if (!existing || (row.status === 'active' && existing.status !== 'active') || (row.status === 'trialing' && existing.status !== 'active')) {
+          subMap[row.customer] = {
+            status: row.status,
+            trialEnd: row.trial_end ? Number(row.trial_end) : null,
+            currentPeriodStart: row.current_period_start ? Number(row.current_period_start) : null,
+            currentPeriodEnd: row.current_period_end ? Number(row.current_period_end) : null,
+          };
+        }
+      }
+    } catch {}
+
+    const enrichedUsers = users.map(u => {
+      const sub = u.stripeCustomerId ? subMap[u.stripeCustomerId] : null;
+      return {
+        id: u.id,
+        email: u.email,
+        chesscomUsername: u.chesscomUsername,
+        firstName: u.firstName,
+        createdAt: u.createdAt,
+        subscription: sub ?? null,
+      };
+    });
+
+    res.json({ users: enrichedUsers });
   } catch {
     res.status(500).json({ error: "Failed to fetch users" });
   }

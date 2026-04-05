@@ -801,6 +801,9 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
   const repeatColor = steps[repeatStep + 1]?.color ?? null;
   const repeatFullMove = steps[repeatStep + 1]?.fullMoveNumber ?? null;
 
+  const userColor = steps?.[1]?.color ?? (steps?.[0]?.fen?.includes(' b ') ? 'b' : 'w');
+  const boardOrientation: 'white' | 'black' = userColor === 'b' ? 'black' : 'white';
+
   const boardSquareStyles = (() => {
     const styles: Record<string, React.CSSProperties> = {};
     if (step?.isMistake && step.to) {
@@ -941,6 +944,7 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
                 options={{
                   position: step?.fen,
                   allowDragging: false,
+                  boardOrientation: boardOrientation,
                   boardStyle: { borderRadius: '6px', overflow: 'hidden' },
                   darkSquareStyle: { backgroundColor: BOARD_DARK },
                   lightSquareStyle: { backgroundColor: BOARD_LIGHT },
@@ -1210,6 +1214,7 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
                     options={{
                       position: repeatPosition,
                       allowDragging: !repeatComplete,
+                      boardOrientation: boardOrientation,
                       dragActivationDistance: 8,
                       canDragPiece: canRepeatDrag,
                       onPieceDrop: handleRepeatDrop,
@@ -1344,6 +1349,7 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
                 options={{
                   position: drillState === 'idle' || drillState === 'wrong' ? drillFen! : drillPosition,
                   allowDragging: drillState !== 'correct' && drillState !== 'revealed',
+                  boardOrientation: boardOrientation,
                   dragActivationDistance: 8,
                   onPieceDrop: drillState === 'correct' || drillState === 'revealed' ? () => false : handleDrillDrop,
                   onSquareClick: handleDrillSquareClick,

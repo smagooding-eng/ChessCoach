@@ -481,6 +481,18 @@ export function OpponentAnalysis() {
                 </div>
               </div>
 
+              <div className="mt-5 pt-5 border-t border-border/50">
+                <a
+                  href={`https://www.chess.com/play/online/new?opponent=${result.username}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#81b64c] hover:bg-[#6fa03e] text-white font-bold rounded-xl transition-colors text-sm shadow-lg"
+                >
+                  <Swords className="w-4 h-4" />
+                  Challenge {result.username} on Chess.com
+                </a>
+              </div>
+
               {/* Head-to-head section */}
               {result.headToHead && result.headToHead.total > 0 && (
                 <div className="mt-5 pt-5 border-t border-border/50">

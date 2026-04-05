@@ -1,0 +1,275 @@
+import React, { useState, useCallback, useRef, useEffect } from 'react';
+import { Chess } from 'chess.js';
+import { ChessBoard } from '@/components/ChessBoard';
+import { motion, AnimatePresence } from 'framer-motion';
+import { RotateCcw, Flag, Clock, Play, ArrowLeft, Trophy, Handshake } from 'lucide-react';
+import { cn } from '@/lib/utils';
+
+type TimeControl = { label: string; seconds: number } | { label: string; seconds: null };
+
+const TIME_OPTIONS: TimeControl[] = [
+  { label: 'No Timer', seconds: null },
+  { label: '1 min', seconds: 60 },
+  { label: '3 min', seconds: 180 },
+  { label: '5 min', seconds: 300 },
+  { label: '10 min', seconds: 600 },
+  { label: '15 min', seconds: 900 },
+  { label: '30 min', seconds: 1800 },
+];
+
+function formatClock(sec: number): string {
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+type GameResult = 'playing' | 'white' | 'black' | 'draw';
+
+interface MoveRecord {
+  san: string;
+  fen: string;
+  color: 'w' | 'b';
+}
+
+export function LocalPlay() {
+  const [timeControl, setTimeControl] = useState<TimeControl | null>(null);
+  const [gameStarted, setGameStarted] = useState(false);
+  const [chess] = useState(() => new Chess());
+  const [fen, setFen] = useState(chess.fen());
+  const [result, setResult] = useState<GameResult>('playing');
+  const [moves, setMoves] = useState<MoveRecord[]>([]);
+  const [whiteTime, setWhiteTime] = useState(300);
+  const [blackTime, setBlackTime] = useState(300);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const moveListRef = useRef<HTMLDivElement>(null);
+
+  const startGame = (tc: TimeControl) => {
+    setTimeControl(tc);
+    chess.reset();
+    setFen(chess.fen());
+    setResult('playing');
+    setMoves([]);
+    setWhiteTime(tc.seconds ?? 0);
+    setBlackTime(tc.seconds ?? 0);
+    setGameStarted(true);
+  };
+
+  const resetGame = () => {
+    if (timerRef.current) clearInterval(timerRef.current);
+    setGameStarted(false);
+    setTimeControl(null);
+    chess.reset();
+    setFen(chess.fen());
+    setResult('playing');
+    setMoves([]);
+  };
+
+  useEffect(() => {
+    if (!gameStarted || result !== 'playing' || !timeControl || timeControl.seconds === null) return;
+
+    timerRef.current = setInterval(() => {
+      const turn = chess.turn();
+      if (turn === 'w') {
+        setWhiteTime(prev => {
+          if (prev <= 1) {
+            setResult('black');
+            if (timerRef.current) clearInterval(timerRef.current);
+            return 0;
+          }
+          return prev - 1;
+        });
+      } else {
+        setBlackTime(prev => {
+          if (prev <= 1) {
+            setResult('white');
+            if (timerRef.current) clearInterval(timerRef.current);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }
+    }, 1000);
+
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, [gameStarted, result, fen, timeControl]);
+
+  useEffect(() => {
+    if (moveListRef.current) {
+      moveListRef.current.scrollTop = moveListRef.current.scrollHeight;
+    }
+  }, [moves]);
+
+  const handleMove = useCallback((san: string) => {
+    const moveResult = chess.move(san);
+    if (!moveResult) return;
+
+    setMoves(prev => [...prev, { san: moveResult.san, fen: chess.fen(), color: moveResult.color }]);
+    setFen(chess.fen());
+
+    if (chess.isGameOver()) {
+      if (timerRef.current) clearInterval(timerRef.current);
+      if (chess.isCheckmate()) {
+        setResult(chess.turn() === 'w' ? 'black' : 'white');
+      } else {
+        setResult('draw');
+      }
+    }
+  }, [chess]);
+
+  const resign = (color: 'w' | 'b') => {
+    if (timerRef.current) clearInterval(timerRef.current);
+    setResult(color === 'w' ? 'black' : 'white');
+  };
+
+  if (!gameStarted) {
+    return (
+      <div className="space-y-6 px-4 pt-4 md:px-0 md:pt-0 pb-10">
+        <div>
+          <div className="flex items-center gap-3 mb-1">
+            <Play className="w-7 h-7 text-primary" />
+            <h1 className="text-2xl md:text-3xl font-display font-bold">Play</h1>
+          </div>
+          <p className="text-muted-foreground ml-10">Play chess locally against a friend on this device.</p>
+        </div>
+
+        <div className="max-w-md mx-auto space-y-4">
+          <h2 className="text-lg font-bold text-center">Choose Time Control</h2>
+          <div className="grid grid-cols-2 gap-3">
+            {TIME_OPTIONS.map(tc => (
+              <motion.button
+                key={tc.label}
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.97 }}
+                onClick={() => startGame(tc)}
+                className="glass-card rounded-xl p-4 text-center border border-border hover:border-primary/40 transition-colors"
+              >
+                <Clock className="w-5 h-5 mx-auto mb-2 text-primary" />
+                <span className="font-bold">{tc.label}</span>
+              </motion.button>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const movePairs: { num: number; white: MoveRecord | null; black: MoveRecord | null }[] = [];
+  for (let i = 0; i < moves.length; i += 2) {
+    movePairs.push({
+      num: Math.floor(i / 2) + 1,
+      white: moves[i] ?? null,
+      black: moves[i + 1] ?? null,
+    });
+  }
+
+  return (
+    <div className="space-y-3 pb-20 px-4 pt-4 md:px-0 md:pt-0">
+      <button onClick={resetGame}
+        className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors text-sm">
+        <ArrowLeft className="w-4 h-4" /> New Game
+      </button>
+
+      <div className="grid grid-cols-1 xl:grid-cols-[1fr_300px] gap-4">
+        <div className="space-y-2">
+          {timeControl && timeControl.seconds !== null && (
+            <div className="glass-card rounded-xl p-2 flex items-center justify-between">
+              <div className={cn(
+                'px-3 py-1.5 rounded-lg font-mono font-bold text-lg',
+                chess.turn() === 'b' && result === 'playing' ? 'bg-primary/20 text-primary' : 'text-muted-foreground'
+              )}>
+                <span className="text-xs font-normal mr-2">Black</span>
+                {formatClock(blackTime)}
+              </div>
+              <div className={cn(
+                'px-3 py-1.5 rounded-lg font-mono font-bold text-lg',
+                chess.turn() === 'w' && result === 'playing' ? 'bg-primary/20 text-primary' : 'text-muted-foreground'
+              )}>
+                <span className="text-xs font-normal mr-2">White</span>
+                {formatClock(whiteTime)}
+              </div>
+            </div>
+          )}
+
+          <ChessBoard
+            fen={fen}
+            practiceMode={result === 'playing'}
+            onMovePlayed={handleMove}
+          />
+
+          <AnimatePresence>
+            {result !== 'playing' && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="glass-card rounded-xl p-5 text-center space-y-3"
+              >
+                <div className="flex items-center justify-center gap-2 text-lg font-bold">
+                  {result === 'draw' ? (
+                    <><Handshake className="w-5 h-5 text-muted-foreground" /> Draw!</>
+                  ) : (
+                    <><Trophy className="w-5 h-5 text-amber-400" /> {result === 'white' ? 'White' : 'Black'} Wins!</>
+                  )}
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  {chess.isCheckmate() ? 'Checkmate' : chess.isStalemate() ? 'Stalemate' : chess.isThreefoldRepetition() ? 'Threefold Repetition' : chess.isInsufficientMaterial() ? 'Insufficient Material' : whiteTime === 0 ? 'White ran out of time' : blackTime === 0 ? 'Black ran out of time' : 'Resignation'}
+                </p>
+                <button
+                  onClick={resetGame}
+                  className="px-4 py-2 bg-primary text-primary-foreground font-bold rounded-xl text-sm"
+                >
+                  <RotateCcw className="w-4 h-4 inline mr-1.5" /> New Game
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
+        <div className="space-y-3">
+          {result === 'playing' && (
+            <div className="glass-card rounded-xl p-3 space-y-2">
+              <p className="text-xs text-muted-foreground text-center font-medium">
+                {chess.turn() === 'w' ? "White's" : "Black's"} turn
+                {chess.inCheck() ? ' (Check!)' : ''}
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => resign('w')}
+                  className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-medium hover:bg-red-500/20 transition-colors"
+                >
+                  <Flag className="w-3.5 h-3.5" /> White Resigns
+                </button>
+                <button
+                  onClick={() => resign('b')}
+                  className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-medium hover:bg-red-500/20 transition-colors"
+                >
+                  <Flag className="w-3.5 h-3.5" /> Black Resigns
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div className="glass-card rounded-xl overflow-hidden">
+            <div className="px-3 py-2 border-b border-border/30">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Moves</p>
+            </div>
+            <div ref={moveListRef} className="max-h-64 overflow-y-auto hide-scrollbar p-2">
+              {movePairs.length === 0 ? (
+                <p className="text-xs text-muted-foreground/50 text-center py-3">No moves yet</p>
+              ) : (
+                <div className="space-y-0.5">
+                  {movePairs.map(pair => (
+                    <div key={pair.num} className="flex items-center gap-1 text-xs">
+                      <span className="text-muted-foreground/50 w-6 text-right shrink-0">{pair.num}.</span>
+                      <span className="font-medium w-16 text-foreground">{pair.white?.san ?? ''}</span>
+                      <span className="font-medium w-16 text-foreground">{pair.black?.san ?? ''}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

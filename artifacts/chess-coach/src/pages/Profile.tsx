@@ -26,6 +26,56 @@ interface AdminUser {
   chesscomUsername: string | null;
   firstName: string | null;
   createdAt: string;
+  subscription: {
+    status: string;
+    trialEnd: number | null;
+    currentPeriodStart: number | null;
+    currentPeriodEnd: number | null;
+  } | null;
+}
+
+function SubBadge({ user }: { user: AdminUser }) {
+  const now = Date.now() / 1000;
+  const sub = user.subscription;
+
+  if (!sub) {
+    return <span className="text-[10px] px-1.5 py-0.5 rounded bg-neutral-500/20 text-neutral-400">Free</span>;
+  }
+
+  if (sub.status === 'trialing' && sub.trialEnd) {
+    const daysLeft = Math.max(0, Math.ceil((sub.trialEnd - now) / 86400));
+    return (
+      <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400">
+        Trial · {daysLeft}d left
+      </span>
+    );
+  }
+
+  if (sub.status === 'active') {
+    const daysSinceStart = sub.currentPeriodStart
+      ? Math.floor((now - sub.currentPeriodStart) / 86400)
+      : null;
+    return (
+      <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400">
+        Pro{daysSinceStart !== null ? ` · ${daysSinceStart}d` : ''}
+      </span>
+    );
+  }
+
+  if (sub.status === 'canceled' || sub.status === 'past_due' || sub.status === 'unpaid') {
+    const endTs = sub.currentPeriodEnd ?? sub.trialEnd;
+    const daysSinceEnd = endTs
+      ? Math.max(0, Math.floor((now - endTs) / 86400))
+      : null;
+    return (
+      <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-500/20 text-red-400">
+        {sub.status === 'canceled' ? 'Canceled' : sub.status === 'past_due' ? 'Past Due' : 'Unpaid'}
+        {daysSinceEnd !== null ? ` · ${daysSinceEnd}d ago` : ''}
+      </span>
+    );
+  }
+
+  return <span className="text-[10px] px-1.5 py-0.5 rounded bg-neutral-500/20 text-neutral-400">{sub.status}</span>;
 }
 
 function UserListPanel({ onClose }: { onClose: () => void }) {
@@ -70,9 +120,12 @@ function UserListPanel({ onClose }: { onClose: () => void }) {
                     <p className="text-[11px] text-muted-foreground/60 truncate">♟ {u.chesscomUsername}</p>
                   )}
                 </div>
-                <span className="text-[10px] text-muted-foreground/50 whitespace-nowrap shrink-0">
-                  {new Date(u.createdAt).toLocaleDateString()}
-                </span>
+                <div className="flex items-center gap-2 shrink-0">
+                  <SubBadge user={u} />
+                  <span className="text-[10px] text-muted-foreground/50 whitespace-nowrap">
+                    {new Date(u.createdAt).toLocaleDateString()}
+                  </span>
+                </div>
               </div>
             ))}
           </div>

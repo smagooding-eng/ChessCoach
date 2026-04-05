@@ -68,6 +68,7 @@ import { OpponentAnalysis } from "@/pages/OpponentAnalysis";
 import { Openings } from "@/pages/Openings";
 import { OpeningDetail } from "@/pages/OpeningDetail";
 import { PracticeBots } from "@/pages/PracticeBots";
+import { LocalPlay } from "@/pages/LocalPlay";
 import { Subscription } from "@/pages/Subscription";
 import { Profile } from "@/pages/Profile";
 import NotFound from "@/pages/not-found";
@@ -132,6 +133,7 @@ const POpenings      = () => <ProtectedRoute component={Openings} />;
 const POpeningDetail = () => <ProtectedRoute component={OpeningDetail} fallbackNav="/openings" />;
 const POpponents     = () => <ProtectedRoute component={OpponentAnalysis} />;
 const PPracticeBots  = () => <ProtectedRoute component={PracticeBots} />;
+const PLocalPlay     = () => <ProtectedRoute component={LocalPlay} />;
 const PSubscription  = () => <ProtectedRoute component={Subscription} />;
 const PProfile       = () => <ProtectedRoute component={Profile} />;
 
@@ -177,6 +179,7 @@ function Router() {
       <Route path="/openings/:eco"   component={POpeningDetail} />
       <Route path="/opponents"       component={POpponents} />
       <Route path="/practice"        component={PPracticeBots} />
+      <Route path="/play"            component={PLocalPlay} />
       <Route path="/subscription"    component={PSubscription} />
       <Route path="/profile"          component={PProfile} />
 

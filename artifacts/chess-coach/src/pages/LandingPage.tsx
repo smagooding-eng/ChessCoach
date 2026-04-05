@@ -102,6 +102,11 @@ function AuthModal({ open, onClose, initialMode, externalError }: { open: boolea
             <p className="text-muted-foreground text-sm mt-1">
               {mode === 'login' ? 'Sign in to your account' : '3 days free, then $4/month'}
             </p>
+            {mode === 'register' && (
+              <p className="text-emerald-400 text-xs font-semibold mt-1.5 flex items-center justify-center gap-1">
+                <Check className="w-3.5 h-3.5" /> No credit card required
+              </p>
+            )}
           </div>
 
           {googleAvailable && (

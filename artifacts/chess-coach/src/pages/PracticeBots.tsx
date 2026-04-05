@@ -117,7 +117,7 @@ function BotCard({ bot, onSelect }: { bot: BotConfig; onSelect: (b: BotConfig) =
       )}
     >
       <div className="flex items-center justify-between">
-        <span className="text-3xl">{bot.avatar}</span>
+        <img src={bot.avatar} alt={bot.name} className="w-10 h-10 rounded-full border-2 border-white/20 shadow-md" />
         <span className="text-xs font-bold px-2.5 py-1 rounded-lg bg-black/30 border border-white/10 text-white/80">
           {bot.rating} ELO
         </span>
@@ -270,7 +270,8 @@ function GameView({ bot, onBack }: { bot: BotConfig; onBack: () => void }) {
     if (moves.length === 0) return null;
     const last = moves[moves.length - 1];
     try {
-      const prevFen = moves.length === 1 ? undefined : moves[moves.length - 2]?.fen;
+      const prevFen = last.fenBefore;
+      if (!prevFen) return null;
       const temp = new Chess(prevFen);
       const r = temp.move(last.san);
       return r ? { from: r.from, to: r.to } : null;
@@ -312,7 +313,7 @@ function GameView({ bot, onBack }: { bot: BotConfig; onBack: () => void }) {
       </button>
 
       <div className="glass-card rounded-2xl px-4 py-2.5 flex items-center gap-3 border border-primary/20 bg-primary/5">
-        <span className="text-2xl">{bot.avatar}</span>
+        <img src={bot.avatar} alt={bot.name} className="w-9 h-9 rounded-full border-2 border-primary/30 shadow" />
         <div className="flex-1 min-w-0">
           <h2 className="font-black text-base sm:text-lg leading-tight">{bot.name}</h2>
           <p className="text-[11px] text-muted-foreground">{bot.personality} · {bot.rating} ELO</p>
@@ -327,7 +328,7 @@ function GameView({ bot, onBack }: { bot: BotConfig; onBack: () => void }) {
         <div className="space-y-2.5">
           <div className="glass-card rounded-xl p-2.5 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span className="text-xl">{bot.avatar}</span>
+              <img src={bot.avatar} alt={bot.name} className="w-8 h-8 rounded-full border border-white/20 shadow" />
               <div>
                 <p className="font-bold text-sm">{bot.name}</p>
                 <p className="text-[10px] text-muted-foreground">{bot.rating} ELO</p>

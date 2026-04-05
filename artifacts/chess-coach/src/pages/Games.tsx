@@ -3,27 +3,38 @@ import { useMyGames } from '@/hooks/use-games';
 import { useUser } from '@/hooks/use-user';
 import { Link } from 'wouter';
 import { motion } from 'framer-motion';
-import { Search, Play, Filter, BookOpen, Sparkles } from 'lucide-react';
+import { Search, Play, Filter, BookOpen, Sparkles, Users } from 'lucide-react';
 import { format } from 'date-fns';
+import { cn } from '@/lib/utils';
 
 export function Games() {
   const { data, isLoading, isError, error } = useMyGames();
   const { username } = useUser();
   const [filter, setFilter] = useState('all');
   const [search, setSearch] = useState('');
+  const [h2hMode, setH2hMode] = useState(false);
+  const [h2hOpponent, setH2hOpponent] = useState('');
 
   const games = data?.games || [];
 
   const filteredGames = useMemo(() => {
     return games.filter(game => {
       const matchesResult = filter === 'all' || game.result.toLowerCase() === filter.toLowerCase();
+
+      if (h2hMode && h2hOpponent.trim()) {
+        const opp = h2hOpponent.trim().toLowerCase();
+        const isH2h =
+          (game.whiteUsername.toLowerCase() === opp || game.blackUsername.toLowerCase() === opp);
+        if (!isH2h) return false;
+      }
+
       const q = search.toLowerCase();
       const matchesSearch = !q || [
         game.whiteUsername, game.blackUsername, game.opening ?? '',
       ].some(s => s.toLowerCase().includes(q));
       return matchesResult && matchesSearch;
     });
-  }, [games, filter, search]);
+  }, [games, filter, search, h2hMode, h2hOpponent]);
 
   if (isLoading) {
     return (
@@ -98,6 +109,16 @@ export function Games() {
             className="w-full pl-9 pr-4 py-2.5 bg-secondary/50 border border-border rounded-xl focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all text-sm"
           />
         </div>
+        <button
+          onClick={() => { setH2hMode(!h2hMode); setH2hOpponent(''); }}
+          className={cn(
+            'flex items-center gap-1.5 px-3 py-2.5 rounded-xl border text-sm font-medium transition-colors shrink-0',
+            h2hMode ? 'bg-primary/15 border-primary/40 text-primary' : 'bg-secondary/50 border-border text-muted-foreground hover:text-foreground'
+          )}
+        >
+          <Users className="w-4 h-4" />
+          H2H
+        </button>
         <select
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
@@ -109,6 +130,33 @@ export function Games() {
           <option value="draw">Draws</option>
         </select>
       </div>
+
+      {h2hMode && (
+        <div className="glass-card rounded-xl p-3 flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+          <Users className="w-4 h-4 text-primary shrink-0 hidden sm:block" />
+          <span className="text-xs text-muted-foreground shrink-0">Head-to-Head vs:</span>
+          <input
+            type="text"
+            value={h2hOpponent}
+            onChange={e => setH2hOpponent(e.target.value)}
+            placeholder="Opponent username…"
+            className="flex-1 px-3 py-2 bg-secondary/70 border border-border rounded-lg focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all text-sm"
+          />
+          {h2hOpponent.trim() && (
+            <div className="flex items-center gap-3 text-xs">
+              <span className="text-emerald-400 font-bold">
+                W: {filteredGames.filter(g => g.result === 'win').length}
+              </span>
+              <span className="text-muted-foreground font-bold">
+                D: {filteredGames.filter(g => g.result === 'draw').length}
+              </span>
+              <span className="text-red-400 font-bold">
+                L: {filteredGames.filter(g => g.result === 'loss').length}
+              </span>
+            </div>
+          )}
+        </div>
+      )}
 
       {filteredGames.length === 0 ? (
         <div className="text-center py-12 text-muted-foreground">
