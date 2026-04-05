@@ -2,16 +2,21 @@ import React, { useState } from 'react';
 import { useUser } from '@/hooks/use-user';
 import { useImportChessGames } from '@/hooks/use-games';
 import { motion } from 'framer-motion';
-import { CloudDownload, CheckCircle2, AlertCircle, RefreshCw, ArrowRight } from 'lucide-react';
+import { CloudDownload, CheckCircle2, AlertCircle, RefreshCw, ArrowRight, Edit3, Check, X } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
+import { apiFetch } from '@/lib/api';
 
 export function Import() {
-  const { username, isLoaded } = useUser();
+  const { username, isLoaded, login, authUser } = useUser();
   const [months, setMonths] = useState(3);
   const { importGames, isImporting, error } = useImportChessGames();
   const [result, setResult] = useState<{ imported: number; total: number } | null>(null);
   const [apiError, setApiError] = useState<string | null>(null);
   const [, setLocation] = useLocation();
+
+  const [editing, setEditing] = useState(false);
+  const [editValue, setEditValue] = useState(username ?? '');
+  const [saving, setSaving] = useState(false);
 
   const handleImport = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,6 +38,40 @@ export function Import() {
   const handleReset = () => {
     setResult(null);
     setApiError(null);
+  };
+
+  const handleStartEdit = () => {
+    setEditValue(username ?? '');
+    setEditing(true);
+  };
+
+  const handleCancelEdit = () => {
+    setEditValue(username ?? '');
+    setEditing(false);
+  };
+
+  const handleSaveUsername = async () => {
+    const trimmed = editValue.trim();
+    if (!trimmed) return;
+    if (trimmed === username) {
+      setEditing(false);
+      return;
+    }
+    setSaving(true);
+    try {
+      login(trimmed);
+      if (authUser) {
+        await apiFetch('/api/auth/update-profile', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ chesscomUsername: trimmed }),
+        });
+      }
+      setEditing(false);
+    } finally {
+      setSaving(false);
+    }
   };
 
   if (!isLoaded) {
@@ -117,20 +156,63 @@ export function Import() {
               <label className="block text-sm font-medium text-foreground mb-2 ml-1">
                 Chess.com Username
               </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  value={username || ''}
-                  disabled
-                  className="w-full px-4 py-3 rounded-xl bg-secondary/50 border border-border text-muted-foreground cursor-not-allowed"
-                />
-              </div>
-              <p className="text-xs text-muted-foreground mt-1 ml-1 flex items-center gap-1">
-                Connected account ·{' '}
-                <Link href="/profile" className="text-primary hover:underline">
-                  Change
-                </Link>
-              </p>
+              {editing ? (
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={editValue}
+                    onChange={e => setEditValue(e.target.value)}
+                    autoFocus
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') { e.preventDefault(); handleSaveUsername(); }
+                      if (e.key === 'Escape') handleCancelEdit();
+                    }}
+                    placeholder="Your chess.com username"
+                    className="flex-1 px-4 py-3 rounded-xl bg-secondary/80 border-2 border-primary text-foreground focus:outline-none focus:ring-4 focus:ring-primary/20 transition-all"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleSaveUsername}
+                    disabled={saving || !editValue.trim()}
+                    className="p-3 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
+                  >
+                    {saving ? (
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <Check className="w-5 h-5" />
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCancelEdit}
+                    className="p-3 rounded-xl bg-secondary text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-colors"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={username || ''}
+                      disabled
+                      className="w-full px-4 py-3 rounded-xl bg-secondary/50 border border-border text-muted-foreground cursor-not-allowed"
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1 ml-1 flex items-center gap-1">
+                    Connected account ·{' '}
+                    <button
+                      type="button"
+                      onClick={handleStartEdit}
+                      className="text-primary hover:underline inline-flex items-center gap-1"
+                    >
+                      <Edit3 className="w-3 h-3" />
+                      Change
+                    </button>
+                  </p>
+                </>
+              )}
             </div>
 
             <div>
