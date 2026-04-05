@@ -33,6 +33,7 @@ ChessScout.net - A full-stack chess analysis platform that imports games from ch
 11. **Local PvP** (`/play`): Pass-and-play chess against a friend on the same device with optional timer (1/3/5/10/15/30 min or untimed), move list, resign buttons, and game result display.
 12. **ELO-Based Improvement Tips**: Analysis page shows tier-specific tips based on average rating with progress bar to next tier
 13. **Head-to-Head Search**: Games page has H2H toggle to filter games against a specific opponent with W/D/L summary
+14. **Game Lookup** (`/lookup`): Look up games between any two Chess.com players. Fetches last 6 months of games from Chess.com public API, filters for H2H games, shows game list with results/ratings/openings. Click any game to open full replay viewer with board, move-by-move navigation, and client-side analysis (move quality classification, accuracy scores, turning point detection). No login to Chess.com required — uses public API.
 11. **Mobile Navigation**: Bottom tab bar with "More" drawer for secondary pages (Openings, Practice Bots, Import Games, Opponent Scout, Sign Out). All pages mobile-responsive.
 16. **Chess.com-Inspired Theme**: Full dark brown/green palette (`#262421` bg, `#302e2b` cards, `#81b64c` green accents). Dashboard, Layout sidebar, bottom nav, and course viewer all use consistent chess.com styling with inline style constants rather than Tailwind theme vars for precise color control.
 12. **Global UserContext**: `src/context/UserContext.tsx` — single source of truth for auth state, no per-component useState drift

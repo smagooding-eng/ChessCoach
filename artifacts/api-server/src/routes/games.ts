@@ -315,6 +315,65 @@ router.get("/games/openings", async (req, res): Promise<void> => {
   res.json({ openings, totalGames });
 });
 
+router.get("/games/h2h-lookup", async (req, res): Promise<void> => {
+  const player1 = (req.query.player1 as string || "").trim().toLowerCase();
+  const player2 = (req.query.player2 as string || "").trim().toLowerCase();
+
+  if (!player1 || !player2) {
+    res.status(400).json({ error: "Both player1 and player2 are required" });
+    return;
+  }
+
+  if (player1 === player2) {
+    res.status(400).json({ error: "Players must be different" });
+    return;
+  }
+
+  try {
+    req.log.info({ player1, player2 }, "H2H lookup: fetching games from chess.com");
+    const games = await fetchChessComGames(player1, 6);
+
+    const h2hGames = games
+      .filter(g => {
+        const w = g.white.username.toLowerCase();
+        const b = g.black.username.toLowerCase();
+        return (w === player1 && b === player2) || (w === player2 && b === player1);
+      })
+      .sort((a, b) => b.end_time - a.end_time)
+      .slice(0, 50);
+
+    const results = h2hGames.map(g => {
+      const { opening, eco } = extractOpeningFromPgn(g.pgn);
+      const moves = parsePgnMoves(g.pgn);
+      return {
+        id: g.url?.split("/").pop() || String(g.end_time),
+        whiteUsername: g.white.username,
+        blackUsername: g.black.username,
+        whiteRating: g.white.rating,
+        blackRating: g.black.rating,
+        whiteResult: g.white.result,
+        blackResult: g.black.result,
+        timeControl: g.time_control,
+        playedAt: new Date(g.end_time * 1000).toISOString(),
+        opening,
+        eco,
+        pgn: g.pgn,
+        moves,
+      };
+    });
+
+    res.json({
+      player1,
+      player2,
+      totalGames: results.length,
+      games: results,
+    });
+  } catch (err: any) {
+    req.log.error({ err, player1, player2 }, "H2H lookup failed");
+    res.status(500).json({ error: err.message || "Failed to fetch games" });
+  }
+});
+
 router.get("/games/:id", async (req, res): Promise<void> => {
   const params = GetGameParams.safeParse(req.params);
   if (!params.success) {

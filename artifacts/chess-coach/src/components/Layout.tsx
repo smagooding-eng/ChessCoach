@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'wouter';
 import { useUser } from '@/hooks/use-user';
 import { useChessPlayer } from '@/hooks/use-chess-player';
-import { LayoutDashboard, Import, History, BrainCircuit, GraduationCap, Swords, BookOpen, LogOut, MoreHorizontal, ChevronRight, Bot, Crown, Trophy, Play } from 'lucide-react';
+import { LayoutDashboard, Import, History, BrainCircuit, GraduationCap, Swords, BookOpen, LogOut, MoreHorizontal, ChevronRight, Bot, Crown, Trophy, Play, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { AnimatePresence, motion } from 'framer-motion';
 
@@ -27,6 +27,7 @@ const SECONDARY_NAV = [
   { href: '/practice',     label: 'Practice Bots',   icon: Bot },
   { href: '/play',         label: 'Play Local',      icon: Play },
   { href: '/import',       label: 'Import Games',    icon: Import },
+  { href: '/lookup',       label: 'Game Lookup',     icon: Search },
   { href: '/opponents',    label: 'Opponent Scout',  icon: Swords },
   { href: '/subscription', label: 'Subscription',    icon: Crown },
 ];

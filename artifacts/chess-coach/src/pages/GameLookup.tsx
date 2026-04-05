@@ -1,0 +1,757 @@
+import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import { ChessBoard } from '@/components/ChessBoard';
+import { Chess } from 'chess.js';
+import { analyzeMoveQuality, type MoveAnalysisResult } from '@/lib/chess-bot';
+import { apiFetch } from '@/lib/api';
+import {
+  Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
+  Play, Pause, ArrowLeft, FlipVertical2, Swords, Clock,
+  BookOpen, Lightbulb, Target, AlertTriangle, Trophy, TrendingDown, TrendingUp, X
+} from 'lucide-react';
+
+const BG_DARK = '#262421';
+const BG_CARD = '#302e2b';
+const TEXT_LIGHT = '#e8e6e3';
+const TEXT_MUTED = '#9e9b98';
+const CHESSCOM_GREEN = '#81b64c';
+const MISTAKE_RED = '#dc4343';
+
+type Classification = 'brilliant' | 'excellent' | 'good' | 'book' | 'inaccuracy' | 'mistake' | 'blunder';
+
+type GameMove = {
+  san: string;
+  fen: string;
+  moveNumber: number;
+  color: 'white' | 'black';
+};
+
+type H2HGame = {
+  id: string;
+  whiteUsername: string;
+  blackUsername: string;
+  whiteRating: number;
+  blackRating: number;
+  whiteResult: string;
+  blackResult: string;
+  timeControl: string;
+  playedAt: string;
+  opening: string;
+  eco: string;
+  pgn: string;
+  moves: GameMove[];
+};
+
+type MoveAnalysis = {
+  moveIndex: number;
+  san: string;
+  color: 'white' | 'black';
+  classification: Classification;
+  evalBefore: number;
+  evalAfter: number;
+  cpLoss: number;
+  bestMoveSan: string | null;
+  summary: string;
+};
+
+type TurningPoint = {
+  moveIndex: number;
+  san: string;
+  color: 'white' | 'black';
+  evalSwing: number;
+  description: string;
+};
+
+const CLASS_CFG: Record<Classification, { badge: string; color: string; full: string }> = {
+  brilliant:  { badge: '!!',  color: 'text-cyan-400 bg-cyan-400/15 border-cyan-400/30',          full: 'Brilliant' },
+  excellent:  { badge: '!',   color: 'text-emerald-400 bg-emerald-400/15 border-emerald-400/30', full: 'Excellent' },
+  good:       { badge: '✓',   color: 'text-green-400 bg-green-400/15 border-green-400/30',       full: 'Good' },
+  book:       { badge: '📖',  color: 'text-blue-400 bg-blue-400/15 border-blue-400/30',          full: 'Book Move' },
+  inaccuracy: { badge: '?!',  color: 'text-yellow-400 bg-yellow-400/15 border-yellow-400/30',    full: 'Inaccuracy' },
+  mistake:    { badge: '?',   color: 'text-orange-400 bg-orange-400/15 border-orange-400/30',    full: 'Mistake' },
+  blunder:    { badge: '??',  color: 'text-rose-400 bg-rose-400/15 border-rose-400/30',          full: 'Blunder' },
+};
+
+function formatTimeControl(tc: string): string {
+  const parts = tc.split('/');
+  const base = parseInt(parts[parts.length - 1]);
+  if (isNaN(base)) return tc;
+  const mins = Math.floor(base / 60);
+  if (mins >= 30) return `${mins} min (Classical)`;
+  if (mins >= 10) return `${mins} min (Rapid)`;
+  if (mins >= 3) return `${mins} min (Blitz)`;
+  return `${mins} min (Bullet)`;
+}
+
+function resultLabel(r: string): string {
+  if (r === 'win') return 'Won';
+  if (r === 'checkmated' || r === 'resigned' || r === 'timeout' || r === 'abandoned') return 'Lost';
+  return 'Draw';
+}
+
+function resultColor(r: string): string {
+  if (r === 'win') return CHESSCOM_GREEN;
+  if (r === 'checkmated' || r === 'resigned' || r === 'timeout' || r === 'abandoned') return MISTAKE_RED;
+  return TEXT_MUTED;
+}
+
+function EvalBar({ evalCp, flipped }: { evalCp: number; flipped: boolean }) {
+  const whitePercent = Math.max(5, Math.min(95, 50 + (evalCp / 20)));
+  const wp = flipped ? (100 - whitePercent) : whitePercent;
+  return (
+    <div className="w-4 rounded-sm overflow-hidden flex flex-col" style={{ height: '100%', background: '#1a1917' }}>
+      <div style={{ height: `${100 - wp}%`, background: '#444' }} className="transition-all duration-300" />
+      <div style={{ height: `${wp}%`, background: '#f0f0f0' }} className="transition-all duration-300" />
+    </div>
+  );
+}
+
+function AnalysisSummaryPanel({
+  analysis,
+  turningPoints,
+  game,
+}: {
+  analysis: MoveAnalysis[];
+  turningPoints: TurningPoint[];
+  game: H2HGame;
+}) {
+  const WEIGHTS: Record<Classification, number> = {
+    brilliant: 100, excellent: 98, book: 90, good: 85,
+    inaccuracy: 55, mistake: 25, blunder: 0,
+  };
+
+  const byColor = (c: 'white' | 'black') => analysis.filter(m => m.color === c);
+
+  const calcAccuracy = (moves: MoveAnalysis[]) => {
+    if (moves.length === 0) return 0;
+    return moves.reduce((s, m) => s + WEIGHTS[m.classification], 0) / moves.length;
+  };
+
+  const counts = (moves: MoveAnalysis[]) => ({
+    brilliant: moves.filter(m => m.classification === 'brilliant').length,
+    excellent: moves.filter(m => m.classification === 'excellent').length,
+    good: moves.filter(m => m.classification === 'good').length,
+    book: moves.filter(m => m.classification === 'book').length,
+    inaccuracy: moves.filter(m => m.classification === 'inaccuracy').length,
+    mistake: moves.filter(m => m.classification === 'mistake').length,
+    blunder: moves.filter(m => m.classification === 'blunder').length,
+  });
+
+  const wMoves = byColor('white');
+  const bMoves = byColor('black');
+  const wAcc = calcAccuracy(wMoves);
+  const bAcc = calcAccuracy(bMoves);
+  const wCounts = counts(wMoves);
+  const bCounts = counts(bMoves);
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-lg p-4 border" style={{ background: BG_CARD, borderColor: 'rgba(255,255,255,0.06)' }}>
+        <h3 className="font-bold text-sm mb-3 flex items-center gap-2" style={{ color: TEXT_LIGHT }}>
+          <Target size={14} style={{ color: CHESSCOM_GREEN }} /> Accuracy
+        </h3>
+        <div className="grid grid-cols-2 gap-4">
+          {[
+            { name: game.whiteUsername, acc: wAcc, c: wCounts, rating: game.whiteRating },
+            { name: game.blackUsername, acc: bAcc, c: bCounts, rating: game.blackRating },
+          ].map((p, i) => (
+            <div key={i} className="text-center">
+              <div className="text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>{p.name} ({p.rating})</div>
+              <div className="text-2xl font-bold" style={{ color: CHESSCOM_GREEN }}>{p.acc.toFixed(1)}%</div>
+              <div className="flex flex-wrap gap-1 justify-center mt-2">
+                {(['brilliant','excellent','good','book','inaccuracy','mistake','blunder'] as Classification[]).map(cls => {
+                  const cnt = p.c[cls];
+                  if (cnt === 0) return null;
+                  const cfg = CLASS_CFG[cls];
+                  return (
+                    <span key={cls} className={`text-[10px] px-1.5 py-0.5 rounded border ${cfg.color}`}>
+                      {cfg.badge} {cnt}
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {turningPoints.length > 0 && (
+        <div className="rounded-lg p-4 border" style={{ background: BG_CARD, borderColor: 'rgba(255,255,255,0.06)' }}>
+          <h3 className="font-bold text-sm mb-3 flex items-center gap-2" style={{ color: TEXT_LIGHT }}>
+            <AlertTriangle size={14} style={{ color: '#f59e0b' }} /> Turning Points
+          </h3>
+          <div className="space-y-2">
+            {turningPoints.map((tp, i) => (
+              <div key={i} className="rounded p-2 text-xs" style={{ background: 'rgba(255,255,255,0.03)' }}>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="font-mono font-bold" style={{ color: tp.evalSwing > 0 ? CHESSCOM_GREEN : MISTAKE_RED }}>
+                    {tp.evalSwing > 0 ? <TrendingUp size={12} className="inline" /> : <TrendingDown size={12} className="inline" />}
+                    {' '}{tp.evalSwing > 0 ? '+' : ''}{(tp.evalSwing / 100).toFixed(1)}
+                  </span>
+                  <span style={{ color: TEXT_MUTED }}>Move {Math.ceil((tp.moveIndex + 1) / 2)}</span>
+                  <span className="font-mono font-bold" style={{ color: TEXT_LIGHT }}>{tp.san}</span>
+                  <span className="capitalize" style={{ color: TEXT_MUTED }}>({tp.color})</span>
+                </div>
+                <div style={{ color: TEXT_MUTED }}>{tp.description}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function GameLookup() {
+  const [player1, setPlayer1] = useState('');
+  const [player2, setPlayer2] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [games, setGames] = useState<H2HGame[]>([]);
+  const [totalGames, setTotalGames] = useState(0);
+  const [hasSearched, setHasSearched] = useState(false);
+
+  const [selectedGame, setSelectedGame] = useState<H2HGame | null>(null);
+  const [moveIndex, setMoveIndex] = useState(0);
+  const [flipped, setFlipped] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const playRef = useRef(false);
+
+  const [analysis, setAnalysis] = useState<MoveAnalysis[]>([]);
+  const [turningPoints, setTurningPoints] = useState<TurningPoint[]>([]);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisProgress, setAnalysisProgress] = useState(0);
+
+  const handleSearch = useCallback(async () => {
+    if (!player1.trim() || !player2.trim()) return;
+    setLoading(true);
+    setError('');
+    setHasSearched(true);
+    setSelectedGame(null);
+    setAnalysis([]);
+    setTurningPoints([]);
+    try {
+      const res = await apiFetch(`/api/games/h2h-lookup?player1=${encodeURIComponent(player1.trim())}&player2=${encodeURIComponent(player2.trim())}`);
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({ error: 'Request failed' }));
+        throw new Error(data.error || `Error ${res.status}`);
+      }
+      const data = await res.json();
+      setGames(data.games);
+      setTotalGames(data.totalGames);
+    } catch (err: any) {
+      setError(err.message || 'Failed to fetch games');
+      setGames([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [player1, player2]);
+
+  const selectGame = useCallback((game: H2HGame) => {
+    setSelectedGame(game);
+    setMoveIndex(0);
+    setFlipped(false);
+    setAnalysis([]);
+    setTurningPoints([]);
+    setIsPlaying(false);
+    playRef.current = false;
+  }, []);
+
+  const moves = selectedGame?.moves ?? [];
+  const totalMoves = moves.length;
+
+  const currentFen = useMemo(() => {
+    if (!selectedGame || moveIndex === 0) return 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+    return moves[moveIndex - 1]?.fen ?? 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+  }, [selectedGame, moveIndex, moves]);
+
+  const lastMovePair = useMemo(() => {
+    if (moveIndex === 0 || !selectedGame) return undefined;
+    const m = moves[moveIndex - 1];
+    if (!m) return undefined;
+    try {
+      const prevFen = moveIndex >= 2 ? moves[moveIndex - 2].fen : 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+      const chess = new Chess(prevFen);
+      const result = chess.move(m.san);
+      if (result) return { from: result.from, to: result.to };
+    } catch {}
+    return undefined;
+  }, [moveIndex, moves, selectedGame]);
+
+  const currentMoveAnalysis = useMemo(() => {
+    if (moveIndex === 0 || analysis.length === 0) return null;
+    return analysis.find(a => a.moveIndex === moveIndex - 1) ?? null;
+  }, [moveIndex, analysis]);
+
+  const currentEval = useMemo(() => {
+    if (moveIndex === 0 || analysis.length === 0) return 0;
+    const ma = analysis.find(a => a.moveIndex === moveIndex - 1);
+    return ma ? ma.evalAfter : 0;
+  }, [moveIndex, analysis]);
+
+  const moveQuality = useMemo(() => {
+    if (!currentMoveAnalysis) return undefined;
+    return currentMoveAnalysis.classification;
+  }, [currentMoveAnalysis]);
+
+  const goFirst = useCallback(() => { setMoveIndex(0); setIsPlaying(false); playRef.current = false; }, []);
+  const goLast = useCallback(() => { setMoveIndex(totalMoves); setIsPlaying(false); playRef.current = false; }, [totalMoves]);
+  const goNext = useCallback(() => setMoveIndex(i => Math.min(i + 1, totalMoves)), [totalMoves]);
+  const goPrev = useCallback(() => setMoveIndex(i => Math.max(i - 1, 0)), []);
+
+  const togglePlay = useCallback(() => {
+    setIsPlaying(prev => {
+      const next = !prev;
+      playRef.current = next;
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!isPlaying) return;
+    const id = setInterval(() => {
+      if (!playRef.current) return;
+      setMoveIndex(i => {
+        if (i >= totalMoves) {
+          setIsPlaying(false);
+          playRef.current = false;
+          return i;
+        }
+        return i + 1;
+      });
+    }, 800);
+    return () => clearInterval(id);
+  }, [isPlaying, totalMoves]);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (!selectedGame) return;
+      if (e.key === 'ArrowRight') { e.preventDefault(); goNext(); }
+      if (e.key === 'ArrowLeft') { e.preventDefault(); goPrev(); }
+      if (e.key === 'Home') { e.preventDefault(); goFirst(); }
+      if (e.key === 'End') { e.preventDefault(); goLast(); }
+      if (e.key === ' ') { e.preventDefault(); togglePlay(); }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [selectedGame, goNext, goPrev, goFirst, goLast, togglePlay]);
+
+  const runAnalysis = useCallback(async () => {
+    if (!selectedGame || moves.length === 0) return;
+    setIsAnalyzing(true);
+    setAnalysisProgress(0);
+    setAnalysis([]);
+    setTurningPoints([]);
+
+    const results: MoveAnalysis[] = [];
+    const startFen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+
+    for (let i = 0; i < moves.length; i++) {
+      const fenBefore = i === 0 ? startFen : moves[i - 1].fen;
+      try {
+        const result: MoveAnalysisResult = analyzeMoveQuality(fenBefore, moves[i].san);
+        results.push({
+          moveIndex: i,
+          san: moves[i].san,
+          color: moves[i].color,
+          classification: result.quality,
+          evalBefore: result.evalBefore,
+          evalAfter: result.evalAfter,
+          cpLoss: result.cpLoss,
+          bestMoveSan: result.bestMoveSan,
+          summary: result.summary,
+        });
+      } catch {
+        results.push({
+          moveIndex: i,
+          san: moves[i].san,
+          color: moves[i].color,
+          classification: 'good',
+          evalBefore: 0,
+          evalAfter: 0,
+          cpLoss: 0,
+          bestMoveSan: null,
+          summary: '',
+        });
+      }
+
+      if (i % 5 === 0 || i === moves.length - 1) {
+        setAnalysisProgress(Math.round(((i + 1) / moves.length) * 100));
+        setAnalysis([...results]);
+        await new Promise(r => setTimeout(r, 0));
+      }
+    }
+
+    const tps: TurningPoint[] = [];
+    for (let i = 1; i < results.length; i++) {
+      const swing = results[i].evalAfter - results[i].evalBefore;
+      const absSwing = Math.abs(swing);
+      if (absSwing >= 150) {
+        const color = results[i].color;
+        const isGoodForMover = (color === 'white' && swing > 0) || (color === 'black' && swing < 0);
+        tps.push({
+          moveIndex: results[i].moveIndex,
+          san: results[i].san,
+          color,
+          evalSwing: swing,
+          description: isGoodForMover
+            ? `Strong move that shifted the position significantly`
+            : `Weak move that gave away a ${absSwing >= 300 ? 'major' : 'significant'} advantage`,
+        });
+      }
+    }
+    tps.sort((a, b) => Math.abs(b.evalSwing) - Math.abs(a.evalSwing));
+    setTurningPoints(tps.slice(0, 6));
+    setAnalysis(results);
+    setIsAnalyzing(false);
+  }, [selectedGame, moves]);
+
+  const movePairs = useMemo(() => {
+    if (!selectedGame) return [];
+    const pairs: { number: number; white?: { san: string; index: number }; black?: { san: string; index: number } }[] = [];
+    for (let i = 0; i < moves.length; i++) {
+      const m = moves[i];
+      if (m.color === 'white') {
+        pairs.push({ number: m.moveNumber, white: { san: m.san, index: i } });
+      } else {
+        if (pairs.length === 0 || pairs[pairs.length - 1].black) {
+          pairs.push({ number: m.moveNumber, black: { san: m.san, index: i } });
+        } else {
+          pairs[pairs.length - 1].black = { san: m.san, index: i };
+        }
+      }
+    }
+    return pairs;
+  }, [selectedGame, moves]);
+
+  const moveListRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (moveListRef.current) {
+      const active = moveListRef.current.querySelector('[data-active="true"]');
+      if (active) active.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+  }, [moveIndex]);
+
+  const getAnalysisForIndex = (idx: number) => analysis.find(a => a.moveIndex === idx);
+
+  if (selectedGame) {
+    return (
+      <div className="min-h-screen p-3 md:p-6" style={{ background: BG_DARK }}>
+        <div className="max-w-7xl mx-auto">
+          <button
+            onClick={() => { setSelectedGame(null); setAnalysis([]); setTurningPoints([]); }}
+            className="flex items-center gap-2 mb-4 text-sm font-medium hover:opacity-80 transition-opacity"
+            style={{ color: CHESSCOM_GREEN }}
+          >
+            <ArrowLeft size={16} /> Back to Games
+          </button>
+
+          <div className="rounded-xl border overflow-hidden" style={{ background: BG_CARD, borderColor: 'rgba(255,255,255,0.06)' }}>
+            <div className="p-4 border-b flex flex-wrap items-center gap-4" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
+              <div className="flex items-center gap-3">
+                <div className="text-center">
+                  <div className="text-sm font-bold" style={{ color: TEXT_LIGHT }}>{selectedGame.whiteUsername}</div>
+                  <div className="text-[10px]" style={{ color: TEXT_MUTED }}>{selectedGame.whiteRating} · ♔</div>
+                  <div className="text-xs font-bold" style={{ color: resultColor(selectedGame.whiteResult) }}>{resultLabel(selectedGame.whiteResult)}</div>
+                </div>
+                <Swords size={18} style={{ color: TEXT_MUTED }} />
+                <div className="text-center">
+                  <div className="text-sm font-bold" style={{ color: TEXT_LIGHT }}>{selectedGame.blackUsername}</div>
+                  <div className="text-[10px]" style={{ color: TEXT_MUTED }}>{selectedGame.blackRating} · ♚</div>
+                  <div className="text-xs font-bold" style={{ color: resultColor(selectedGame.blackResult) }}>{resultLabel(selectedGame.blackResult)}</div>
+                </div>
+              </div>
+              <div className="flex items-center gap-3 text-xs" style={{ color: TEXT_MUTED }}>
+                <span className="flex items-center gap-1"><Clock size={12} />{formatTimeControl(selectedGame.timeControl)}</span>
+                <span className="flex items-center gap-1"><BookOpen size={12} />{selectedGame.opening || selectedGame.eco || 'Unknown'}</span>
+                <span>{new Date(selectedGame.playedAt).toLocaleDateString()}</span>
+              </div>
+              <div className="ml-auto flex items-center gap-2">
+                {!isAnalyzing && analysis.length === 0 && (
+                  <button
+                    onClick={runAnalysis}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all hover:opacity-90"
+                    style={{ background: CHESSCOM_GREEN, color: '#fff' }}
+                  >
+                    <Lightbulb size={13} /> Analyze Game
+                  </button>
+                )}
+                {isAnalyzing && (
+                  <div className="flex items-center gap-2 text-xs" style={{ color: CHESSCOM_GREEN }}>
+                    <div className="w-20 h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(129,182,76,0.2)' }}>
+                      <div className="h-full rounded-full transition-all" style={{ width: `${analysisProgress}%`, background: CHESSCOM_GREEN }} />
+                    </div>
+                    Analyzing... {analysisProgress}%
+                  </div>
+                )}
+                <button
+                  onClick={() => setFlipped(!flipped)}
+                  className="p-1.5 rounded hover:bg-white/10 transition-colors"
+                  style={{ color: TEXT_MUTED }}
+                  title="Flip board"
+                >
+                  <FlipVertical2 size={16} />
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-[auto_1fr_1fr] gap-0">
+              <div className="flex items-stretch p-4">
+                <div className="flex gap-2">
+                  {analysis.length > 0 && (
+                    <EvalBar evalCp={currentEval} flipped={flipped} />
+                  )}
+                  <div style={{ width: 'min(calc(100vw - 80px), 440px)', aspectRatio: '1' }}>
+                    <ChessBoard
+                      fen={currentFen}
+                      flipped={flipped}
+                      lastMove={lastMovePair}
+                      moveQuality={moveQuality}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-col border-l" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
+                <div className="flex items-center justify-center gap-2 p-2 border-b" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
+                  <button onClick={goFirst} className="p-1.5 rounded hover:bg-white/10" style={{ color: TEXT_MUTED }}><ChevronsLeft size={18} /></button>
+                  <button onClick={goPrev} className="p-1.5 rounded hover:bg-white/10" style={{ color: TEXT_MUTED }}><ChevronLeft size={18} /></button>
+                  <button onClick={togglePlay} className="p-1.5 rounded hover:bg-white/10" style={{ color: CHESSCOM_GREEN }}>
+                    {isPlaying ? <Pause size={18} /> : <Play size={18} />}
+                  </button>
+                  <button onClick={goNext} className="p-1.5 rounded hover:bg-white/10" style={{ color: TEXT_MUTED }}><ChevronRight size={18} /></button>
+                  <button onClick={goLast} className="p-1.5 rounded hover:bg-white/10" style={{ color: TEXT_MUTED }}><ChevronsRight size={18} /></button>
+                  <span className="text-[10px] ml-2" style={{ color: TEXT_MUTED }}>
+                    {moveIndex}/{totalMoves}
+                  </span>
+                </div>
+
+                <div ref={moveListRef} className="flex-1 overflow-y-auto hide-scrollbar p-2" style={{ maxHeight: 340 }}>
+                  {movePairs.map(pair => (
+                    <div key={pair.number} className="flex items-center gap-0.5 text-xs mb-0.5">
+                      <span className="w-7 text-right font-mono shrink-0" style={{ color: TEXT_MUTED, fontSize: 10 }}>{pair.number}.</span>
+                      {pair.white && (
+                        <button
+                          data-active={moveIndex === pair.white.index + 1}
+                          onClick={() => setMoveIndex(pair.white!.index + 1)}
+                          className="flex-1 py-0.5 px-1.5 rounded text-left font-mono transition-colors hover:bg-white/10"
+                          style={{
+                            color: moveIndex === pair.white.index + 1 ? '#fff' : TEXT_LIGHT,
+                            background: moveIndex === pair.white.index + 1 ? 'rgba(129,182,76,0.25)' : 'transparent',
+                          }}
+                        >
+                          {pair.white.san}
+                          {(() => {
+                            const a = getAnalysisForIndex(pair.white!.index);
+                            if (!a) return null;
+                            const cfg = CLASS_CFG[a.classification];
+                            return <span className={`ml-1 text-[9px] ${cfg.color} px-1 rounded`}>{cfg.badge}</span>;
+                          })()}
+                        </button>
+                      )}
+                      {pair.black && (
+                        <button
+                          data-active={moveIndex === pair.black.index + 1}
+                          onClick={() => setMoveIndex(pair.black!.index + 1)}
+                          className="flex-1 py-0.5 px-1.5 rounded text-left font-mono transition-colors hover:bg-white/10"
+                          style={{
+                            color: moveIndex === pair.black.index + 1 ? '#fff' : TEXT_LIGHT,
+                            background: moveIndex === pair.black.index + 1 ? 'rgba(129,182,76,0.25)' : 'transparent',
+                          }}
+                        >
+                          {pair.black.san}
+                          {(() => {
+                            const a = getAnalysisForIndex(pair.black!.index);
+                            if (!a) return null;
+                            const cfg = CLASS_CFG[a.classification];
+                            return <span className={`ml-1 text-[9px] ${cfg.color} px-1 rounded`}>{cfg.badge}</span>;
+                          })()}
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {currentMoveAnalysis && (
+                  <div className="border-t p-3" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className={`text-xs px-1.5 py-0.5 rounded border font-bold ${CLASS_CFG[currentMoveAnalysis.classification].color}`}>
+                        {CLASS_CFG[currentMoveAnalysis.classification].badge} {CLASS_CFG[currentMoveAnalysis.classification].full}
+                      </span>
+                      <span className="font-mono text-sm font-bold" style={{ color: TEXT_LIGHT }}>{currentMoveAnalysis.san}</span>
+                    </div>
+                    {currentMoveAnalysis.cpLoss > 0 && (
+                      <div className="text-[10px] mb-1" style={{ color: TEXT_MUTED }}>
+                        CP loss: {currentMoveAnalysis.cpLoss} · Eval: {(currentMoveAnalysis.evalAfter / 100).toFixed(1)}
+                      </div>
+                    )}
+                    {currentMoveAnalysis.bestMoveSan && currentMoveAnalysis.bestMoveSan !== currentMoveAnalysis.san && (
+                      <div className="text-[10px]" style={{ color: CHESSCOM_GREEN }}>
+                        Best: {currentMoveAnalysis.bestMoveSan}
+                      </div>
+                    )}
+                    {currentMoveAnalysis.summary && (
+                      <div className="text-[10px] mt-1" style={{ color: TEXT_MUTED }}>{currentMoveAnalysis.summary}</div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {analysis.length > 0 && (
+                <div className="border-l p-4 overflow-y-auto hide-scrollbar" style={{ borderColor: 'rgba(255,255,255,0.06)', maxHeight: 500 }}>
+                  <AnalysisSummaryPanel analysis={analysis} turningPoints={turningPoints} game={selectedGame} />
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen p-3 md:p-6" style={{ background: BG_DARK }}>
+      <div className="max-w-4xl mx-auto space-y-6">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-3" style={{ color: TEXT_LIGHT }}>
+            <Search size={28} style={{ color: CHESSCOM_GREEN }} />
+            Game Lookup
+          </h1>
+          <p className="text-sm mt-1" style={{ color: TEXT_MUTED }}>
+            Find and analyze games between any two Chess.com players
+          </p>
+        </div>
+
+        <div className="rounded-xl border p-5" style={{ background: BG_CARD, borderColor: 'rgba(255,255,255,0.06)' }}>
+          <div className="flex flex-col sm:flex-row gap-3 items-end">
+            <div className="flex-1 w-full">
+              <label className="text-xs font-medium mb-1 block" style={{ color: TEXT_MUTED }}>Player 1</label>
+              <input
+                type="text"
+                value={player1}
+                onChange={e => setPlayer1(e.target.value)}
+                placeholder="Chess.com username"
+                className="w-full px-3 py-2.5 rounded-lg text-sm border outline-none focus:ring-1 transition-all"
+                style={{
+                  background: BG_DARK,
+                  borderColor: 'rgba(255,255,255,0.1)',
+                  color: TEXT_LIGHT,
+                }}
+                onKeyDown={e => { if (e.key === 'Enter') handleSearch(); }}
+              />
+            </div>
+            <div className="flex items-center justify-center" style={{ color: TEXT_MUTED }}>
+              <Swords size={20} />
+            </div>
+            <div className="flex-1 w-full">
+              <label className="text-xs font-medium mb-1 block" style={{ color: TEXT_MUTED }}>Player 2</label>
+              <input
+                type="text"
+                value={player2}
+                onChange={e => setPlayer2(e.target.value)}
+                placeholder="Chess.com username"
+                className="w-full px-3 py-2.5 rounded-lg text-sm border outline-none focus:ring-1 transition-all"
+                style={{
+                  background: BG_DARK,
+                  borderColor: 'rgba(255,255,255,0.1)',
+                  color: TEXT_LIGHT,
+                }}
+                onKeyDown={e => { if (e.key === 'Enter') handleSearch(); }}
+              />
+            </div>
+            <button
+              onClick={handleSearch}
+              disabled={loading || !player1.trim() || !player2.trim()}
+              className="px-5 py-2.5 rounded-lg font-bold text-sm transition-all hover:opacity-90 disabled:opacity-40 shrink-0"
+              style={{ background: CHESSCOM_GREEN, color: '#fff' }}
+            >
+              {loading ? (
+                <span className="flex items-center gap-2">
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  Searching...
+                </span>
+              ) : (
+                <span className="flex items-center gap-2"><Search size={15} /> Search</span>
+              )}
+            </button>
+          </div>
+        </div>
+
+        {error && (
+          <div className="rounded-lg p-3 text-sm border" style={{ background: 'rgba(220,67,67,0.1)', borderColor: 'rgba(220,67,67,0.3)', color: MISTAKE_RED }}>
+            {error}
+          </div>
+        )}
+
+        {hasSearched && !loading && games.length === 0 && !error && (
+          <div className="text-center py-12 rounded-xl border" style={{ background: BG_CARD, borderColor: 'rgba(255,255,255,0.06)' }}>
+            <Swords size={40} className="mx-auto mb-3" style={{ color: TEXT_MUTED, opacity: 0.4 }} />
+            <p className="text-sm font-medium" style={{ color: TEXT_MUTED }}>No games found between these players</p>
+            <p className="text-xs mt-1" style={{ color: TEXT_MUTED, opacity: 0.7 }}>Games from the last 6 months are searched</p>
+          </div>
+        )}
+
+        {games.length > 0 && (
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <h2 className="text-sm font-bold" style={{ color: TEXT_LIGHT }}>
+                {totalGames} game{totalGames !== 1 ? 's' : ''} found
+              </h2>
+              <span className="text-xs" style={{ color: TEXT_MUTED }}>(last 6 months)</span>
+            </div>
+            <div className="space-y-2">
+              {games.map(game => {
+                const wWon = game.whiteResult === 'win';
+                const bWon = game.blackResult === 'win';
+                const draw = !wWon && !bWon;
+                return (
+                  <button
+                    key={game.id}
+                    onClick={() => selectGame(game)}
+                    className="w-full text-left rounded-lg border p-3 transition-all hover:border-[rgba(129,182,76,0.4)] group"
+                    style={{ background: BG_CARD, borderColor: 'rgba(255,255,255,0.06)' }}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 text-sm">
+                          <span className="font-bold truncate" style={{ color: wWon ? CHESSCOM_GREEN : TEXT_LIGHT }}>
+                            ♔ {game.whiteUsername}
+                          </span>
+                          <span className="text-xs" style={{ color: TEXT_MUTED }}>({game.whiteRating})</span>
+                          {wWon && <Trophy size={12} style={{ color: CHESSCOM_GREEN }} />}
+                        </div>
+                        <div className="flex items-center gap-2 text-sm mt-0.5">
+                          <span className="font-bold truncate" style={{ color: bWon ? CHESSCOM_GREEN : TEXT_LIGHT }}>
+                            ♚ {game.blackUsername}
+                          </span>
+                          <span className="text-xs" style={{ color: TEXT_MUTED }}>({game.blackRating})</span>
+                          {bWon && <Trophy size={12} style={{ color: CHESSCOM_GREEN }} />}
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <div className="text-xs font-medium" style={{ color: draw ? TEXT_MUTED : (wWon ? CHESSCOM_GREEN : MISTAKE_RED) }}>
+                          {draw ? '½-½' : wWon ? '1-0' : '0-1'}
+                        </div>
+                        <div className="text-[10px] mt-0.5" style={{ color: TEXT_MUTED }}>
+                          {formatTimeControl(game.timeControl)}
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <div className="text-[10px]" style={{ color: TEXT_MUTED }}>
+                          {new Date(game.playedAt).toLocaleDateString()}
+                        </div>
+                        <div className="text-[10px] mt-0.5 truncate max-w-[120px]" style={{ color: TEXT_MUTED }}>
+                          {game.opening || game.eco}
+                        </div>
+                      </div>
+                      <ChevronRight size={16} className="shrink-0 opacity-40 group-hover:opacity-100 transition-opacity" style={{ color: CHESSCOM_GREEN }} />
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
