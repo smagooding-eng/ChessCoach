@@ -88,8 +88,11 @@ export function Subscription() {
     }
   };
 
+  const [portalError, setPortalError] = useState('');
+
   const handlePortal = async () => {
     setPortalLoading(true);
+    setPortalError('');
     try {
       const res = await apiFetch('/api/stripe/portal', {
         method: 'POST',
@@ -99,9 +102,12 @@ export function Subscription() {
       const data = await res.json();
       if (data.url) {
         window.location.href = data.url;
+      } else {
+        setPortalError(data.error || 'Could not open subscription management. Please try again.');
       }
     } catch (err) {
       console.error('Portal error:', err);
+      setPortalError('Connection error. Please try again.');
     } finally {
       setPortalLoading(false);
     }
@@ -110,6 +116,7 @@ export function Subscription() {
 
   const product = products[0];
   const weeklyPrice = product?.prices?.find((p: PriceInfo) => p.recurring?.interval === 'week');
+  const monthlyPrice = product?.prices?.find((p: PriceInfo) => p.recurring?.interval === 'month');
 
   return (
     <div className="p-4 md:p-0">
@@ -198,6 +205,9 @@ export function Subscription() {
                 </>
               )}
             </button>
+            {portalError && (
+              <p className="mt-2 text-xs text-red-400 text-center">{portalError}</p>
+            )}
           </div>
         </div>
       ) : (
@@ -246,25 +256,41 @@ export function Subscription() {
                 </div>
               ) : (
                 <div className="space-y-2">
+                  {monthlyPrice && (
+                    <button
+                      onClick={() => handleCheckout(monthlyPrice.id)}
+                      disabled={!!checkoutLoading}
+                      className="w-full flex items-center justify-center gap-2 btn-primary text-sm py-3"
+                    >
+                      {checkoutLoading === monthlyPrice.id ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <>
+                          <Zap className="w-4 h-4" />
+                          ${(monthlyPrice.unit_amount / 100).toFixed(0)}/month
+                        </>
+                      )}
+                    </button>
+                  )}
                   {weeklyPrice && (
                     <button
                       onClick={() => handleCheckout(weeklyPrice.id)}
                       disabled={!!checkoutLoading}
-                      className="w-full flex items-center justify-center gap-2 btn-primary text-sm py-3"
+                      className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-secondary hover:bg-secondary/80 transition-colors font-semibold text-sm"
                     >
                       {checkoutLoading === weeklyPrice.id ? (
                         <Loader2 className="w-4 h-4 animate-spin" />
                       ) : (
                         <>
-                          <Zap className="w-4 h-4" />
                           $1/week
                         </>
                       )}
                     </button>
                   )}
-                  {!weeklyPrice && (
+                  {!weeklyPrice && !monthlyPrice && (
                     <p className="text-sm text-muted-foreground text-center">Pricing plans coming soon.</p>
                   )}
+                  <p className="text-[10px] text-center text-muted-foreground mt-1">3-day free trial included · Cancel anytime</p>
                 </div>
               )}
             </div>

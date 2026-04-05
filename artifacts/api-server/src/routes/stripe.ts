@@ -162,7 +162,8 @@ router.post('/stripe/portal', async (req: Request, res: Response) => {
 
     res.json({ url: session.url });
   } catch (err: any) {
-    res.status(500).json({ error: 'Failed to create portal session' });
+    console.error('Portal session error:', err.message, err.code);
+    res.status(500).json({ error: err.message || 'Failed to create portal session' });
   }
 });
 

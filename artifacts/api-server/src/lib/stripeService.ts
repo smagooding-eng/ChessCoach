@@ -27,10 +27,34 @@ export class StripeService {
 
   async createCustomerPortalSession(customerId: string, returnUrl: string) {
     const stripe = await getUncachableStripeClient();
-    return await stripe.billingPortal.sessions.create({
-      customer: customerId,
-      return_url: returnUrl,
-    });
+    try {
+      return await stripe.billingPortal.sessions.create({
+        customer: customerId,
+        return_url: returnUrl,
+      });
+    } catch (err: any) {
+      if (err.message?.includes('portal configuration') || err.message?.includes('no portal') || err.code === 'resource_missing') {
+        await stripe.billingPortal.configurations.create({
+          business_profile: {
+            headline: 'Manage your ChessScout Pro subscription',
+          },
+          features: {
+            subscription_cancel: { enabled: true },
+            subscription_update: {
+              enabled: true,
+              default_allowed_updates: ['price', 'promotion_code'],
+            },
+            payment_method_update: { enabled: true },
+            invoice_history: { enabled: true },
+          },
+        });
+        return await stripe.billingPortal.sessions.create({
+          customer: customerId,
+          return_url: returnUrl,
+        });
+      }
+      throw err;
+    }
   }
 
   async getPublishableKey() {

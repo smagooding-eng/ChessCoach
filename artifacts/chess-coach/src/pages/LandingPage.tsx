@@ -317,10 +317,13 @@ export function LandingPage() {
               <p className="mt-5 text-lg text-muted-foreground leading-relaxed max-w-lg">
                 See your opponent's biggest weaknesses, get a simple game plan, and improve your own play at the same time.
               </p>
-              <p className="mt-2 text-sm text-primary font-medium">
-                Start with a 3-day free trial
-              </p>
-              <div className="mt-8 flex flex-col sm:flex-row gap-3">
+              <div className="mt-4 flex items-center gap-2">
+                <Shield className="w-4 h-4 text-primary" />
+                <p className="text-sm text-primary font-semibold">
+                  3-day free trial · No credit card required to sign up
+                </p>
+              </div>
+              <div className="mt-6 flex flex-col sm:flex-row gap-3">
                 <button onClick={openSignup} className="btn-primary btn-lg group">
                   <Search className="w-5 h-5" />
                   Scout Your Opponent Free
