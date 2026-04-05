@@ -1,0 +1,6 @@
+<svg xmlns='http://www.w3.org/2000/svg' width='512' height='512' viewBox='0 0 512 512'>
+  <rect width='512' height='512' rx='76' fill='#1e1c1a'/>
+  <circle cx='256' cy='210' r='145' fill='#81b64c'/>
+  <text x='256' y='250' text-anchor='middle' font-size='192' font-family='serif' fill='#1e1c1a'>&#9822;</text>
+  <text x='256' y='410' text-anchor='middle' font-size='48' font-weight='bold' font-family='sans-serif' fill='#e8e6e3'>CHESSSCOUT</text>
+</svg>

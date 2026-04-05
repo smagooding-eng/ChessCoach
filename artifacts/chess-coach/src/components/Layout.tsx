@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'wouter';
 import { useUser } from '@/hooks/use-user';
 import { useChessPlayer } from '@/hooks/use-chess-player';
-import { LayoutDashboard, Import, History, BrainCircuit, GraduationCap, Swords, BookOpen, LogOut, MoreHorizontal, ChevronRight, Bot, Crown, Trophy, Play, Search } from 'lucide-react';
+import { LayoutDashboard, Import, History, BrainCircuit, GraduationCap, Swords, BookOpen, LogOut, MoreHorizontal, ChevronRight, Bot, Crown, Trophy, Play, Search, Download } from 'lucide-react';
+import { usePwaInstall } from '@/hooks/use-pwa-install';
 import { cn } from '@/lib/utils';
 import { AnimatePresence, motion } from 'framer-motion';
 
@@ -74,6 +75,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const { player } = useChessPlayer(username ?? undefined);
   const [moreOpen, setMoreOpen] = useState(false);
   const handleLogout = isAuthenticated ? authLogout : logout;
+  const { canInstall, install } = usePwaInstall();
 
   const displayRating = player?.rating;
 
@@ -114,6 +116,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 )}
               </div>
             </Link>
+            {canInstall && (
+              <button onClick={install} className="p-1.5 rounded transition-colors shrink-0 hover:bg-green-400/10" style={{ color: CHESSCOM_GREEN }} title="Install App">
+                <Download className="w-3.5 h-3.5" />
+              </button>
+            )}
             <button onClick={() => handleLogout()} className="p-1.5 rounded transition-colors shrink-0 hover:bg-red-400/10" style={{ color: TEXT_MUTED }} title="Sign out"
               onMouseEnter={e => (e.currentTarget.style.color = '#dc4343')}
               onMouseLeave={e => (e.currentTarget.style.color = TEXT_MUTED)}>
@@ -128,13 +135,20 @@ export function Layout({ children }: { children: React.ReactNode }) {
           <img src={`${import.meta.env.BASE_URL}images/logo.svg`} alt="ChessScout.net" className="w-6 h-6 object-contain" />
           <span className="font-black text-gradient text-sm">ChessScout.net</span>
         </div>
-        <Link href="/profile" className="flex items-center gap-2 active:opacity-70 transition-opacity">
-          <div className="flex flex-col items-end">
-            <span className="text-xs font-bold leading-tight" style={{ color: TEXT_LIGHT }}>{username}</span>
-            {displayRating && <span className="text-[10px] font-bold leading-tight" style={{ color: CHESSCOM_GREEN }}>{displayRating}</span>}
-          </div>
-          <PlayerAvatar avatar={player?.avatar} username={username ?? ''} size="sm" />
-        </Link>
+        <div className="flex items-center gap-2">
+          {canInstall && (
+            <button onClick={install} className="p-1.5 rounded active:scale-95 transition-all" style={{ color: CHESSCOM_GREEN }} title="Install App">
+              <Download className="w-5 h-5" />
+            </button>
+          )}
+          <Link href="/profile" className="flex items-center gap-2 active:opacity-70 transition-opacity">
+            <div className="flex flex-col items-end">
+              <span className="text-xs font-bold leading-tight" style={{ color: TEXT_LIGHT }}>{username}</span>
+              {displayRating && <span className="text-[10px] font-bold leading-tight" style={{ color: CHESSCOM_GREEN }}>{displayRating}</span>}
+            </div>
+            <PlayerAvatar avatar={player?.avatar} username={username ?? ''} size="sm" />
+          </Link>
+        </div>
       </header>
 
       <main className="flex-1 min-h-screen overflow-x-hidden pb-20 md:pb-6 md:px-5 md:pt-5">
@@ -226,6 +240,16 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   );
                 })}
                 <div className="mt-2 pt-2" style={{ borderTop: `1px solid ${BORDER_COLOR}` }}>
+                  {canInstall && (
+                    <button
+                      onClick={() => { setMoreOpen(false); install(); }}
+                      className="w-full flex items-center gap-3 px-3.5 py-3 rounded-lg active:bg-green-500/10 transition-colors"
+                      style={{ color: CHESSCOM_GREEN }}
+                    >
+                      <Download className="w-5 h-5" />
+                      <span className="font-semibold text-sm">Install App</span>
+                    </button>
+                  )}
                   <button
                     onClick={() => { setMoreOpen(false); handleLogout(); }}
                     className="w-full flex items-center gap-3 px-3.5 py-3 rounded-lg active:bg-red-500/10 transition-colors"

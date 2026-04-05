@@ -40,6 +40,7 @@ ChessScout.net - A full-stack chess analysis platform that imports games from ch
 13. **Authentication**: Email/password + Google OAuth login, dual auth: session cookies (SameSite=None for cross-origin) + Bearer token fallback (stored in localStorage as `chess_coach_token`). Token returned from login/register endpoints and via URL hash from Google OAuth callback. `getSessionId()` in auth.ts checks Authorization header first, then cookies.
 14. **Stripe Subscriptions**: ChessScout Pro with $1/week and $4/month plans, 3-day free trial, Stripe Checkout + Customer Portal
 15. **Premium Gating**: AI Analysis, Courses, TTS, and Opponent Scout gated behind subscription via `<PremiumGate>` component
+17. **PWA Support**: Installable as a Progressive Web App. manifest.json, service worker (sw.js) with network-first caching, 192/512px PNG icons, install button in sidebar/toolbar (desktop + mobile). Uses `usePwaInstall` hook to capture `beforeinstallprompt` and show a green download icon that triggers the native install prompt. Apple meta tags for iOS Add to Home Screen.
 
 ## Structure
 
