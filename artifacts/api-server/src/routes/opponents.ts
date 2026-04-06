@@ -189,7 +189,7 @@ async function runAnalysis(
     const games = gamesResult.value;
     const profile = profileResult.status === "fulfilled" ? profileResult.value : null;
 
-    const gameSummaries = games.slice(0, 40).map((g) => {
+    const gameSummaries = games.slice(0, 100).map((g) => {
       const meta = extractGameMetadata(g, target);
       return {
         pgn: g.pgn ?? "",
