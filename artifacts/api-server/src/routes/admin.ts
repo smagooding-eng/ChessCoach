@@ -2,8 +2,10 @@ import { Router, type IRouter, type Request, type Response } from "express";
 import { db, usersTable, pageViewsTable } from "@workspace/db";
 import { sql, count, gte, countDistinct } from "drizzle-orm";
 import { getUncachableStripeClient } from "../lib/stripeClient";
+import { ADMIN_EMAILS } from "../lib/auth";
 
 const router: IRouter = Router();
+const FREE_TRIAL_DAYS = 3;
 
 function requireAdmin(req: Request, res: Response, next: Function) {
   if (!req.isAuthenticated() || !req.user?.isAdmin) {
@@ -11,6 +13,31 @@ function requireAdmin(req: Request, res: Response, next: Function) {
     return;
   }
   next();
+}
+
+function computeUserStatus(email: string | null, createdAt: string | Date, stripeSub: { status: string; created: number } | null) {
+  const isAdmin = email && ADMIN_EMAILS.includes(email.toLowerCase());
+  if (isAdmin) return { tier: 'admin' as const, detail: null };
+
+  if (stripeSub && stripeSub.status === 'active') {
+    const daysSince = Math.floor((Date.now() / 1000 - stripeSub.created) / 86400);
+    return { tier: 'pro' as const, detail: daysSince };
+  }
+
+  if (stripeSub && stripeSub.status === 'canceled') {
+    return { tier: 'free' as const, detail: Math.floor((Date.now() - new Date(createdAt).getTime()) / 86400000) };
+  }
+
+  const created = new Date(createdAt);
+  const elapsed = Date.now() - created.getTime();
+  const trialMs = FREE_TRIAL_DAYS * 86400000;
+  if (elapsed < trialMs) {
+    const daysLeft = Math.max(1, Math.ceil((trialMs - elapsed) / 86400000));
+    return { tier: 'trial' as const, detail: daysLeft };
+  }
+
+  const daysSinceCreated = Math.floor(elapsed / 86400000);
+  return { tier: 'free' as const, detail: daysSinceCreated };
 }
 
 router.get("/admin/stats", requireAdmin, async (_req: Request, res: Response) => {
@@ -48,34 +75,19 @@ router.get("/admin/stats", requireAdmin, async (_req: Request, res: Response) =>
     let subBreakdown = { active: 0, trialing: 0, canceled: 0, pastDue: 0, total: 0 };
     try {
       const stripe = await getUncachableStripeClient();
-      const [activeSubs, trialingSubs, canceledSubs, pastDueSubs] = await Promise.all([
+      const [activeSubs, canceledSubs, pastDueSubs] = await Promise.all([
         stripe.subscriptions.list({ status: 'active', limit: 100 }),
-        stripe.subscriptions.list({ status: 'trialing', limit: 100 }),
         stripe.subscriptions.list({ status: 'canceled', limit: 100 }),
         stripe.subscriptions.list({ status: 'past_due', limit: 100 }),
       ]);
       subBreakdown = {
         active: activeSubs.data.length,
-        trialing: trialingSubs.data.length,
+        trialing: 0,
         canceled: canceledSubs.data.length,
         pastDue: pastDueSubs.data.length,
-        total: activeSubs.data.length + trialingSubs.data.length + canceledSubs.data.length + pastDueSubs.data.length,
+        total: activeSubs.data.length + canceledSubs.data.length + pastDueSubs.data.length,
       };
-    } catch {
-      try {
-        const subResult = await db.execute(
-          sql`SELECT status, COUNT(*)::int as count FROM stripe.subscriptions GROUP BY status`
-        );
-        for (const row of (subResult as any).rows ?? []) {
-          const c = Number(row.count);
-          if (row.status === 'active') subBreakdown.active = c;
-          else if (row.status === 'trialing') subBreakdown.trialing = c;
-          else if (row.status === 'canceled') subBreakdown.canceled = c;
-          else if (row.status === 'past_due') subBreakdown.pastDue = c;
-          subBreakdown.total += c;
-        }
-      } catch {}
-    }
+    } catch {}
 
     res.json({
       pageViews: { total: totalViewsResult.count, today: todayViewsResult.count },
@@ -102,10 +114,10 @@ router.get("/admin/users", requireAdmin, async (_req: Request, res: Response) =>
       .from(usersTable)
       .orderBy(sql`${usersTable.createdAt} DESC`);
 
-    let subMap: Record<string, { status: string; trialEnd: number | null; currentPeriodStart: number | null; currentPeriodEnd: number | null; planInterval: string | null; canceledAt: number | null }> = {};
+    let subMap: Record<string, { status: string; created: number; planInterval: string | null }> = {};
     try {
       const stripe = await getUncachableStripeClient();
-      const allStatuses: Array<'active' | 'trialing' | 'canceled' | 'past_due' | 'unpaid' | 'incomplete' | 'incomplete_expired'> = ['active', 'trialing', 'canceled', 'past_due', 'unpaid'];
+      const allStatuses: Array<'active' | 'canceled' | 'past_due' | 'unpaid'> = ['active', 'canceled', 'past_due', 'unpaid'];
       const results = await Promise.all(
         allStatuses.map(status => stripe.subscriptions.list({ status, limit: 100 }))
       );
@@ -114,51 +126,31 @@ router.get("/admin/users", requireAdmin, async (_req: Request, res: Response) =>
           const custId = typeof sub.customer === 'string' ? sub.customer : (sub.customer as any)?.id;
           if (!custId) continue;
           const existing = subMap[custId];
-          const priority = ['active', 'trialing', 'past_due', 'canceled', 'unpaid'];
+          const priority = ['active', 'past_due', 'canceled', 'unpaid'];
           if (!existing || priority.indexOf(sub.status) < priority.indexOf(existing.status)) {
             const item = sub.items?.data?.[0];
-            const s = sub as any;
             subMap[custId] = {
               status: sub.status,
-              trialEnd: sub.trial_end ?? null,
-              currentPeriodStart: s.current_period_start ?? null,
-              currentPeriodEnd: s.current_period_end ?? null,
+              created: sub.created,
               planInterval: item?.price?.recurring?.interval ?? null,
-              canceledAt: sub.canceled_at ?? null,
             };
           }
         }
       }
-    } catch {
-      try {
-        const subRows = await db.execute(
-          sql`SELECT customer, status, trial_end, current_period_start, current_period_end FROM stripe.subscriptions WHERE customer IS NOT NULL`
-        );
-        for (const row of (subRows as any).rows ?? []) {
-          const existing = subMap[row.customer];
-          if (!existing || (row.status === 'active' && existing.status !== 'active') || (row.status === 'trialing' && existing.status !== 'active')) {
-            subMap[row.customer] = {
-              status: row.status,
-              trialEnd: row.trial_end ? Number(row.trial_end) : null,
-              currentPeriodStart: row.current_period_start ? Number(row.current_period_start) : null,
-              currentPeriodEnd: row.current_period_end ? Number(row.current_period_end) : null,
-              planInterval: null,
-              canceledAt: null,
-            };
-          }
-        }
-      } catch {}
-    }
+    } catch {}
 
     const enrichedUsers = users.map(u => {
-      const sub = u.stripeCustomerId ? subMap[u.stripeCustomerId] : null;
+      const stripeSub = u.stripeCustomerId ? subMap[u.stripeCustomerId] ?? null : null;
+      const status = computeUserStatus(u.email, u.createdAt, stripeSub);
       return {
         id: u.id,
         email: u.email,
         chesscomUsername: u.chesscomUsername,
         firstName: u.firstName,
         createdAt: u.createdAt,
-        subscription: sub ?? null,
+        tier: status.tier,
+        tierDetail: status.detail,
+        planInterval: stripeSub?.planInterval ?? null,
       };
     });
 

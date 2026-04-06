@@ -26,88 +26,52 @@ interface AdminUser {
   chesscomUsername: string | null;
   firstName: string | null;
   createdAt: string;
-  subscription: {
-    status: string;
-    trialEnd: number | null;
-    currentPeriodStart: number | null;
-    currentPeriodEnd: number | null;
-    planInterval: string | null;
-    canceledAt: number | null;
-  } | null;
+  tier: 'admin' | 'pro' | 'trial' | 'free';
+  tierDetail: number | null;
+  planInterval: string | null;
 }
 
-type UserFilter = 'all' | 'paying' | 'trialing' | 'expired' | 'free';
+type UserFilter = 'all' | 'admin' | 'pro' | 'trial' | 'free';
 
-function SubBadge({ user }: { user: AdminUser }) {
-  const now = Date.now() / 1000;
-  const sub = user.subscription;
+function TierBadge({ user }: { user: AdminUser }) {
+  const interval = user.planInterval === 'week' ? '/wk' : user.planInterval === 'month' ? '/mo' : '';
 
-  if (!sub) {
-    return <span className="text-[10px] px-1.5 py-0.5 rounded bg-neutral-500/20 text-neutral-400">Free</span>;
-  }
-
-  const interval = sub.planInterval === 'week' ? '/wk' : sub.planInterval === 'month' ? '/mo' : '';
-
-  if (sub.status === 'trialing' && sub.trialEnd) {
-    const daysLeft = Math.max(0, Math.ceil((sub.trialEnd - now) / 86400));
+  if (user.tier === 'admin') {
     return (
-      <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400">
-        Trial · {daysLeft}d left
+      <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 font-bold">
+        Admin
       </span>
     );
   }
 
-  if (sub.status === 'active') {
+  if (user.tier === 'pro') {
     return (
       <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400">
-        💳 Pro{interval ? ` ${interval}` : ''}
+        Pro{interval ? ` ${interval}` : ''} {user.tierDetail !== null ? `${user.tierDetail}d` : ''}
       </span>
     );
   }
 
-  if (sub.status === 'canceled') {
-    const endTs = sub.currentPeriodEnd ?? sub.trialEnd;
-    const canceledTs = sub.canceledAt;
-    let detail = '';
-    if (endTs && endTs > now) {
-      const daysLeft = Math.ceil((endTs - now) / 86400);
-      detail = ` · ends ${daysLeft}d`;
-    } else if (canceledTs) {
-      const daysAgo = Math.floor((now - canceledTs) / 86400);
-      detail = ` · ${daysAgo}d ago`;
-    }
+  if (user.tier === 'trial') {
     return (
-      <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-500/20 text-red-400">
-        Canceled{detail}
+      <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400">
+        Trial {user.tierDetail !== null ? `${user.tierDetail}d left` : ''}
       </span>
     );
   }
 
-  if (sub.status === 'past_due' || sub.status === 'unpaid') {
-    return (
-      <span className="text-[10px] px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-400">
-        {sub.status === 'past_due' ? 'Past Due' : 'Unpaid'}
-      </span>
-    );
-  }
-
-  return <span className="text-[10px] px-1.5 py-0.5 rounded bg-neutral-500/20 text-neutral-400">{sub.status}</span>;
-}
-
-function getUserFilterCategory(user: AdminUser): UserFilter {
-  const sub = user.subscription;
-  if (!sub) return 'free';
-  if (sub.status === 'active') return 'paying';
-  if (sub.status === 'trialing') return 'trialing';
-  if (sub.status === 'canceled' || sub.status === 'past_due' || sub.status === 'unpaid') return 'expired';
-  return 'free';
+  return (
+    <span className="text-[10px] px-1.5 py-0.5 rounded bg-neutral-500/20 text-neutral-400">
+      Free {user.tierDetail !== null ? `${user.tierDetail}d` : ''}
+    </span>
+  );
 }
 
 const FILTER_TABS: { key: UserFilter; label: string; color: string }[] = [
   { key: 'all', label: 'All', color: 'text-amber-400' },
-  { key: 'paying', label: 'Paid', color: 'text-emerald-400' },
-  { key: 'trialing', label: 'Trial', color: 'text-blue-400' },
-  { key: 'expired', label: 'Expired', color: 'text-red-400' },
+  { key: 'admin', label: 'Admin', color: 'text-amber-400' },
+  { key: 'pro', label: 'Pro', color: 'text-emerald-400' },
+  { key: 'trial', label: 'Trial', color: 'text-blue-400' },
   { key: 'free', label: 'Free', color: 'text-neutral-400' },
 ];
 
@@ -124,12 +88,11 @@ function UserListPanel({ onClose }: { onClose: () => void }) {
       .finally(() => setLoading(false));
   }, []);
 
-  const filtered = filter === 'all' ? users : users.filter(u => getUserFilterCategory(u) === filter);
+  const filtered = filter === 'all' ? users : users.filter(u => u.tier === filter);
   const counts = users.reduce((acc, u) => {
-    const cat = getUserFilterCategory(u);
-    acc[cat] = (acc[cat] || 0) + 1;
+    acc[u.tier] = (acc[u.tier] || 0) + 1;
     return acc;
-  }, {} as Record<UserFilter, number>);
+  }, {} as Record<string, number>);
 
   return (
     <motion.div
@@ -182,7 +145,7 @@ function UserListPanel({ onClose }: { onClose: () => void }) {
                   )}
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                  <SubBadge user={u} />
+                  <TierBadge user={u} />
                   <span className="text-[10px] text-muted-foreground/50 whitespace-nowrap">
                     {new Date(u.createdAt).toLocaleDateString()}
                   </span>
