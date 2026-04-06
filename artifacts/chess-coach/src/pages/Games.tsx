@@ -8,7 +8,8 @@ import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 
 export function Games() {
-  const { data, isLoading, isError, error } = useMyGames();
+  const [pageSize, setPageSize] = useState(500);
+  const { data, isLoading, isError, error } = useMyGames(pageSize);
   const { username } = useUser();
   const [filter, setFilter] = useState('all');
   const [search, setSearch] = useState('');
@@ -16,6 +17,8 @@ export function Games() {
   const [h2hOpponent, setH2hOpponent] = useState('');
 
   const games = data?.games || [];
+  const total = data?.total ?? 0;
+  const hasMore = games.length < total;
 
   const filteredGames = useMemo(() => {
     return games.filter(game => {
@@ -172,6 +175,10 @@ export function Games() {
           )}
         </div>
       ) : (
+        <>
+        <div className="text-xs text-muted-foreground text-right">
+          Showing {games.length} of {total} games
+        </div>
         <div className="space-y-2">
           {filteredGames.map((game, i) => {
             const color = getPlayerColor(game);
@@ -253,6 +260,15 @@ export function Games() {
             );
           })}
         </div>
+        {hasMore && (
+          <button
+            onClick={() => setPageSize(p => p + 500)}
+            className="w-full py-3 text-sm font-medium text-primary hover:text-primary/80 bg-secondary/50 hover:bg-secondary/70 rounded-xl border border-border transition-colors"
+          >
+            Load more games ({total - games.length} remaining)
+          </button>
+        )}
+        </>
       )}
     </div>
   );
