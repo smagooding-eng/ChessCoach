@@ -111,17 +111,18 @@ router.get("/admin/users", requireAdmin, async (_req: Request, res: Response) =>
       );
       for (const result of results) {
         for (const sub of result.data) {
-          const custId = typeof sub.customer === 'string' ? sub.customer : sub.customer?.id;
+          const custId = typeof sub.customer === 'string' ? sub.customer : (sub.customer as any)?.id;
           if (!custId) continue;
           const existing = subMap[custId];
           const priority = ['active', 'trialing', 'past_due', 'canceled', 'unpaid'];
           if (!existing || priority.indexOf(sub.status) < priority.indexOf(existing.status)) {
             const item = sub.items?.data?.[0];
+            const s = sub as any;
             subMap[custId] = {
               status: sub.status,
               trialEnd: sub.trial_end ?? null,
-              currentPeriodStart: sub.current_period_start ?? null,
-              currentPeriodEnd: sub.current_period_end ?? null,
+              currentPeriodStart: s.current_period_start ?? null,
+              currentPeriodEnd: s.current_period_end ?? null,
               planInterval: item?.price?.recurring?.interval ?? null,
               canceledAt: sub.canceled_at ?? null,
             };
