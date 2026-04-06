@@ -246,11 +246,15 @@ export function getBotMove(fen: string, bot: BotConfig): string | null {
   let bestMove = moves[0];
   let bestEval = maximizing ? -Infinity : Infinity;
 
+  let effectiveDepth = bot.depth;
+  if (moves.length > 40) effectiveDepth = Math.min(effectiveDepth, 2);
+  else if (moves.length > 30 && effectiveDepth > 3) effectiveDepth = 3;
+
   const shuffled = [...moves].sort(() => Math.random() - 0.5);
 
   for (const move of shuffled) {
     chess.move(move);
-    const eval_ = minimax(chess, bot.depth - 1, -Infinity, Infinity, !maximizing);
+    const eval_ = minimax(chess, effectiveDepth - 1, -Infinity, Infinity, !maximizing);
     chess.undo();
 
     if (maximizing ? eval_ > bestEval : eval_ < bestEval) {
@@ -322,6 +326,16 @@ export function analyzeMoveQuality(fenBefore: string, san: string): MoveAnalysis
   }
 
   const moves = chess.moves();
+
+  if (moves.length > 50) {
+    return {
+      quality: 'good', evalBefore, evalAfter, cpLoss: 0, bestMoveSan: null,
+      pros: ['Solid move'], cons: [], summary: 'A solid move.',
+    };
+  }
+
+  const searchDepth = moves.length > 35 ? 1 : depth;
+
   let bestMove = moves[0];
   let bestSearchEval = maximizing ? -Infinity : Infinity;
   let actualSearchEval = 0;
@@ -329,7 +343,7 @@ export function analyzeMoveQuality(fenBefore: string, san: string): MoveAnalysis
 
   for (const move of moves) {
     chess.move(move);
-    const ev = minimax(chess, depth - 1, -Infinity, Infinity, !maximizing);
+    const ev = minimax(chess, searchDepth - 1, -Infinity, Infinity, !maximizing);
     chess.undo();
     allEvals.push(ev);
     if (move === san) actualSearchEval = ev;

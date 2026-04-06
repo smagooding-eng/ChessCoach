@@ -1,12 +1,13 @@
-import React, { useRef, useState, useEffect, useCallback } from 'react';
+import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import { useMyCourses } from '@/hooks/use-courses';
 import { useUser } from '@/hooks/use-user';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link } from 'wouter';
 import { motion } from 'framer-motion';
-import { BookOpen, GraduationCap, CheckCircle2, PlayCircle, AlertCircle } from 'lucide-react';
+import { BookOpen, GraduationCap, CheckCircle2, PlayCircle, AlertCircle, Filter, X } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { PremiumGate } from '@/components/PremiumGate';
+import { cn } from '@/lib/utils';
 
 export function Courses() {
   const { username } = useUser();
@@ -109,6 +110,42 @@ export function Courses() {
 
   const courses = data?.courses || [];
 
+  const [filterCategory, setFilterCategory] = useState<string>('all');
+  const [filterDifficulty, setFilterDifficulty] = useState<string>('all');
+  const [filterStatus, setFilterStatus] = useState<string>('all');
+
+  const categories = useMemo(() => {
+    const cats = new Set(courses.map(c => c.category));
+    return Array.from(cats).sort();
+  }, [courses]);
+
+  const difficulties = useMemo(() => {
+    const diffs = new Set(courses.map(c => c.difficulty));
+    return Array.from(diffs).sort();
+  }, [courses]);
+
+  const filteredCourses = useMemo(() => {
+    return courses.filter(c => {
+      if (filterCategory !== 'all' && c.category !== filterCategory) return false;
+      if (filterDifficulty !== 'all' && c.difficulty !== filterDifficulty) return false;
+      if (filterStatus === 'completed' && Math.round((c.completedLessons / c.totalLessons) * 100) !== 100) return false;
+      if (filterStatus === 'in-progress') {
+        const p = Math.round((c.completedLessons / c.totalLessons) * 100);
+        if (p === 0 || p === 100) return false;
+      }
+      if (filterStatus === 'not-started' && c.completedLessons > 0) return false;
+      return true;
+    });
+  }, [courses, filterCategory, filterDifficulty, filterStatus]);
+
+  const hasActiveFilters = filterCategory !== 'all' || filterDifficulty !== 'all' || filterStatus !== 'all';
+
+  const clearFilters = () => {
+    setFilterCategory('all');
+    setFilterDifficulty('all');
+    setFilterStatus('all');
+  };
+
   if (isLoading) return (
     <div className="flex justify-center py-20">
       <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
@@ -156,8 +193,53 @@ export function Courses() {
         </div>
       </div>
 
+      {courses.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <Filter className="w-4 h-4 text-muted-foreground shrink-0" />
+          <select
+            value={filterCategory}
+            onChange={e => setFilterCategory(e.target.value)}
+            className="px-3 py-1.5 rounded-lg text-sm bg-secondary text-foreground border border-border cursor-pointer"
+          >
+            <option value="all">All Categories</option>
+            {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+          </select>
+          <select
+            value={filterDifficulty}
+            onChange={e => setFilterDifficulty(e.target.value)}
+            className="px-3 py-1.5 rounded-lg text-sm bg-secondary text-foreground border border-border cursor-pointer"
+          >
+            <option value="all">All Levels</option>
+            {difficulties.map(d => <option key={d} value={d}>{d}</option>)}
+          </select>
+          <select
+            value={filterStatus}
+            onChange={e => setFilterStatus(e.target.value)}
+            className="px-3 py-1.5 rounded-lg text-sm bg-secondary text-foreground border border-border cursor-pointer"
+          >
+            <option value="all">All Progress</option>
+            <option value="not-started">Not Started</option>
+            <option value="in-progress">In Progress</option>
+            <option value="completed">Completed</option>
+          </select>
+          {hasActiveFilters && (
+            <button
+              onClick={clearFilters}
+              className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-colors"
+            >
+              <X className="w-3.5 h-3.5" /> Clear
+            </button>
+          )}
+          {hasActiveFilters && (
+            <span className="text-xs text-muted-foreground ml-auto">
+              {filteredCourses.length} of {courses.length} courses
+            </span>
+          )}
+        </div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {courses.map((course, i) => {
+        {filteredCourses.map((course, i) => {
           const progress = Math.round((course.completedLessons / course.totalLessons) * 100) || 0;
           const isComplete = progress === 100;
 
@@ -209,6 +291,20 @@ export function Courses() {
             </motion.div>
           );
         })}
+
+        {filteredCourses.length === 0 && courses.length > 0 && !isGenerating && (
+          <div className="col-span-full text-center py-16 border-2 border-dashed border-border rounded-3xl">
+            <Filter className="w-10 h-10 text-muted-foreground mx-auto mb-4 opacity-50" />
+            <h3 className="text-lg font-bold mb-2">No Matching Courses</h3>
+            <p className="text-muted-foreground mb-4">Try adjusting your filters to find courses.</p>
+            <button
+              onClick={clearFilters}
+              className="px-5 py-2.5 rounded-xl bg-primary/10 text-primary font-bold hover:bg-primary/20 transition-all"
+            >
+              Clear Filters
+            </button>
+          </div>
+        )}
 
         {courses.length === 0 && !isGenerating && (
           <div className="col-span-full text-center py-20 border-2 border-dashed border-border rounded-3xl">

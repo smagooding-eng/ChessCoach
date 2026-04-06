@@ -479,11 +479,21 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const moveListRef = useRef<HTMLDivElement>(null);
 
+  const mistakeIdx = useMemo(() => {
+    if (!steps || steps.length <= 1) return -1;
+    return steps.findIndex(s => s.isMistake);
+  }, [steps]);
+
+  const autoJumpTarget = useMemo(() => {
+    if (mistakeIdx <= 0) return 0;
+    return Math.max(0, mistakeIdx - 2);
+  }, [mistakeIdx]);
+
   useEffect(() => {
-    setCurrentStep(0);
+    setCurrentStep(autoJumpTarget);
     setIsPlaying(false);
     setPrevFen(null);
-  }, [activePgn]);
+  }, [activePgn, autoJumpTarget]);
 
   // ── Drill state ──────────────────────────────────────────────────────────────
   const [drillState, setDrillState] = useState<DrillState>('idle');
@@ -822,7 +832,7 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
   return (
     <div className="rounded-xl overflow-hidden shadow-xl" style={{ backgroundColor: BG_DARK }}>
       {/* ── Tab pills ─────────────────────────────────────────────────────── */}
-      <div className="flex items-center gap-1.5 px-3 py-2.5 overflow-x-auto" style={{ backgroundColor: BG_CARD }}>
+      <div className="flex items-center gap-1.5 px-3 py-2 md:py-2.5 overflow-x-auto" style={{ backgroundColor: BG_CARD }}>
         <button
           onClick={() => { setIsPlaying(false); setTab('lesson'); }}
           className={cn(
@@ -879,7 +889,7 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
       {tab === 'lesson' && (
         <div className="flex flex-col">
           {/* Commentary bubble */}
-          <div className="px-3 pt-3 pb-1">
+          <div className="px-2 pt-2 pb-0.5 md:px-3 md:pt-3 md:pb-1">
             <AnimatePresence mode="wait">
               <motion.div
                 key={currentStep}
@@ -888,7 +898,7 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
                 exit={{ opacity: 0, y: -4 }}
                 transition={{ duration: 0.15 }}
               >
-                <div className="rounded-xl px-4 py-3 shadow-sm" style={{
+                <div className="rounded-xl px-3 py-2 md:px-4 md:py-3 shadow-sm" style={{
                   background: step?.isMistake
                     ? 'rgba(220,67,67,0.12)'
                     : step?.isFix
@@ -1063,20 +1073,20 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
           )}
 
           {/* Controls */}
-          <div className="flex items-center justify-center gap-1 px-4 py-3">
+          <div className="flex items-center justify-center gap-0.5 md:gap-1 px-2 py-2 md:px-4 md:py-3">
             <button
               onClick={() => { setIsPlaying(false); go(0); }}
               disabled={isFirst}
-              className="p-2.5 rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition-all disabled:opacity-20"
+              className="p-2 md:p-2.5 rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition-all disabled:opacity-20"
             >
-              <SkipBack className="w-4 h-4" />
+              <SkipBack className="w-3.5 h-3.5 md:w-4 md:h-4" />
             </button>
             <button
               onClick={() => go(currentStep - 1)}
               disabled={isFirst}
-              className="p-2.5 rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition-all disabled:opacity-20"
+              className="p-2 md:p-2.5 rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition-all disabled:opacity-20"
             >
-              <ChevronLeft className="w-5 h-5" />
+              <ChevronLeft className="w-4 h-4 md:w-5 md:h-5" />
             </button>
             <button
               onClick={() => {
@@ -1084,30 +1094,41 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
                 else if (isLast) { go(currentStep + 1); }
                 else { setIsPlaying(true); }
               }}
-              className="flex items-center gap-2 px-8 py-2.5 rounded-lg text-white font-bold text-sm transition-all hover:brightness-110 shadow-lg mx-2"
+              className="flex items-center gap-1.5 md:gap-2 px-5 md:px-8 py-2 md:py-2.5 rounded-lg text-white font-bold text-sm transition-all hover:brightness-110 shadow-lg mx-1 md:mx-2"
               style={{ backgroundColor: CHESSCOM_GREEN }}
             >
               {isPlaying ? (
-                <><Pause className="w-4 h-4" /> Pause</>
+                <><Pause className="w-4 h-4" /> <span className="hidden md:inline">Pause</span></>
               ) : isLast ? (
-                <><CheckCircle2 className="w-4 h-4" /> Done</>
+                <><CheckCircle2 className="w-4 h-4" /> <span className="hidden md:inline">Done</span></>
               ) : (
-                <><Play className="w-4 h-4" /> {currentStep === 0 ? 'Play' : 'Next'}</>
+                <><Play className="w-4 h-4" /> <span className="hidden md:inline">{currentStep === 0 ? 'Play' : 'Next'}</span></>
               )}
             </button>
+            {mistakeIdx > 0 && currentStep < mistakeIdx && (
+              <button
+                onClick={() => go(mistakeIdx)}
+                className="flex items-center gap-1 px-2 md:px-3 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap"
+                style={{ color: MISTAKE_RED, backgroundColor: 'rgba(220,67,67,0.12)' }}
+                title="Jump to mistake"
+              >
+                <AlertTriangle className="w-3.5 h-3.5" />
+                <span className="hidden md:inline">Key Moment</span>
+              </button>
+            )}
             <button
               onClick={() => go(currentStep + 1)}
               disabled={isLast}
-              className="p-2.5 rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition-all disabled:opacity-20"
+              className="p-2 md:p-2.5 rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition-all disabled:opacity-20"
             >
-              <ChevronRight className="w-5 h-5" />
+              <ChevronRight className="w-4 h-4 md:w-5 md:h-5" />
             </button>
             <button
               onClick={() => { setIsPlaying(false); go(totalSteps - 1); }}
               disabled={isLast}
-              className="p-2.5 rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition-all disabled:opacity-20"
+              className="p-2 md:p-2.5 rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition-all disabled:opacity-20"
             >
-              <SkipForward className="w-4 h-4" />
+              <SkipForward className="w-3.5 h-3.5 md:w-4 md:h-4" />
             </button>
           </div>
 
@@ -1152,8 +1173,8 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
       {tab === 'repeat' && hasRepeat && (
         <div className="flex flex-col">
           {/* Commentary */}
-          <div className="px-3 pt-3 pb-1">
-            <div className="rounded-xl px-4 py-3 bg-white/95 shadow-sm">
+          <div className="px-2 pt-2 pb-0.5 md:px-3 md:pt-3 md:pb-1">
+            <div className="rounded-xl px-3 py-2 md:px-4 md:py-3 bg-white/95 shadow-sm">
               <div className="flex items-start gap-3">
                 <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 mt-0.5" style={{ backgroundColor: CHESSCOM_GREEN }}>
                   <Repeat2 className="w-3.5 h-3.5 text-white" />
@@ -1314,9 +1335,9 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
       {tab === 'drill' && hasDrill && (
         <div className="flex flex-col">
           {/* Commentary */}
-          <div className="px-3 pt-3 pb-1">
+          <div className="px-2 pt-2 pb-0.5 md:px-3 md:pt-3 md:pb-1">
             <div className={cn(
-              'rounded-xl px-4 py-3 shadow-sm',
+              'rounded-xl px-3 py-2 md:px-4 md:py-3 shadow-sm',
               drillState === 'correct' ? 'bg-emerald-50 border border-emerald-200'
                 : drillState === 'revealed' ? 'bg-amber-50 border border-amber-200'
                 : 'bg-white/95'

@@ -376,9 +376,9 @@ export function CourseDetail() {
   const progress = Math.round((course.completedLessons / course.totalLessons) * 100) || 0;
 
   return (
-    <div className="pb-20 max-w-4xl mx-auto space-y-4">
+    <div className="pb-20 max-w-4xl mx-auto space-y-2 md:space-y-4 px-3 md:px-0">
       {/* Compact back + course info header */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2 md:gap-3">
         <Link href="/courses" className="p-2 rounded-lg hover:bg-white/10 transition-colors text-white/50 hover:text-white">
           <ArrowLeft className="w-5 h-5" />
         </Link>
@@ -498,7 +498,7 @@ export function CourseDetail() {
           </AnimatePresence>
 
           {/* Lesson viewer */}
-          <div className="flex-1 min-w-0 space-y-3">
+          <div className="flex-1 min-w-0 space-y-2 md:space-y-3">
             <AnimatePresence mode="wait">
               <motion.div
                 key={lesson?.id}
@@ -538,7 +538,7 @@ export function CourseDetail() {
 
                 {/* Step-by-step lesson text with TTS */}
                 {lesson && lesson.content && (
-                  <div className="rounded-xl p-4 mt-3" style={{ backgroundColor: BG_DARK }}>
+                  <div className="rounded-xl p-3 md:p-4 mt-2 md:mt-3" style={{ backgroundColor: BG_DARK }}>
                     <LessonContentStepper
                       key={lesson.id}
                       content={lesson.content}

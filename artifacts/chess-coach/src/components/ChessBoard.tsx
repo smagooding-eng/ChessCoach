@@ -1,6 +1,51 @@
-import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useMemo, useRef, useEffect, Component, type ReactNode } from 'react';
 import { Chessboard } from 'react-chessboard';
 import { Chess } from 'chess.js';
+
+class BoardErrorBoundary extends Component<
+  { children: ReactNode; position: string; renderKey: number },
+  { hasError: boolean; retryCount: number }
+> {
+  private retryTimer: ReturnType<typeof setTimeout> | null = null;
+  private static MAX_RETRIES = 5;
+
+  constructor(props: { children: ReactNode; position: string; renderKey: number }) {
+    super(props);
+    this.state = { hasError: false, retryCount: 0 };
+  }
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error) {
+    if (!error.message?.includes('Square width not found')) {
+      throw error;
+    }
+    if (this.state.retryCount < BoardErrorBoundary.MAX_RETRIES) {
+      this.retryTimer = setTimeout(() => {
+        this.setState(s => ({ hasError: false, retryCount: s.retryCount + 1 }));
+      }, 80);
+    }
+  }
+
+  componentDidUpdate(prevProps: { position: string; renderKey: number }) {
+    if (this.state.hasError && prevProps.position !== this.props.position) {
+      this.setState({ hasError: false, retryCount: 0 });
+    }
+  }
+
+  componentWillUnmount() {
+    if (this.retryTimer) clearTimeout(this.retryTimer);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return <div style={{ aspectRatio: '1', width: '100%' }} />;
+    }
+    return this.props.children;
+  }
+}
 
 const START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
@@ -189,28 +234,35 @@ export function ChessBoard({
     return styles;
   }, [lastMove, selectedSquare, legalTargets, feedback, moveQuality]);
 
+  const [boardKey, setBoardKey] = useState(0);
+  useEffect(() => {
+    setBoardKey(k => k + 1);
+  }, [position]);
+
   return (
     <div className="relative w-full max-w-[580px] mx-auto">
-      <Chessboard
-        options={{
-          position,
-          boardOrientation: flipped ? 'black' : 'white',
-          allowDragging: practiceMode,
-          dragActivationDistance: 8,
-          canDragPiece,
-          onPieceDrop: handlePieceDrop,
-          squareStyles,
-          onSquareClick: handleSquareClick,
-          boardStyle: {
-            borderRadius: '10px',
-            boxShadow: '0 30px 60px rgba(0,0,0,0.6)',
-            cursor: practiceMode ? 'pointer' : 'default',
-          },
-          lightSquareStyle: { backgroundColor: '#f0d9b5' },
-          darkSquareStyle: { backgroundColor: '#b58863' },
-          animationDurationInMs: 180,
-        }}
-      />
+      <BoardErrorBoundary position={position} renderKey={boardKey}>
+        <Chessboard
+          options={{
+            position,
+            boardOrientation: flipped ? 'black' : 'white',
+            allowDragging: practiceMode,
+            dragActivationDistance: 8,
+            canDragPiece,
+            onPieceDrop: handlePieceDrop,
+            squareStyles,
+            onSquareClick: handleSquareClick,
+            boardStyle: {
+              borderRadius: '10px',
+              boxShadow: '0 30px 60px rgba(0,0,0,0.6)',
+              cursor: practiceMode ? 'pointer' : 'default',
+            },
+            lightSquareStyle: { backgroundColor: '#f0d9b5' },
+            darkSquareStyle: { backgroundColor: '#b58863' },
+            animationDurationInMs: 180,
+          }}
+        />
+      </BoardErrorBoundary>
       {/* Practice feedback overlay */}
       {feedback && (
         <div className={`absolute inset-0 rounded-[10px] pointer-events-none flex items-center justify-center
