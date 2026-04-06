@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 import { logger } from "./logger";
-import { engineEvalMove } from "./engineAnalysis";
+import { engineEvalMove, fetchLichessEval, pvToWhiteCp, classifyFromCpLoss, uciToSan } from "./engineAnalysis";
 
 const openai = new OpenAI({
   baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
@@ -409,17 +409,66 @@ Respond with valid JSON:
 
 // ── Post-process GPT review using chess.js to fix hallucinations ─────────────
 
-function postProcessReview(
+async function postProcessReview(
   reviewMoves: MoveReview[],
   originalMoves: Array<{ moveNumber: number; san: string; color: string }>,
-): MoveReview[] {
+): Promise<MoveReview[]> {
   const Chess = require("chess.js").Chess;
   const chess = new Chess();
   const fens: string[] = [chess.fen()];
+  const uciMoves: Array<{ from: string; to: string } | null> = [];
 
   for (const m of originalMoves) {
-    try { chess.move(m.san); } catch { break; }
-    fens.push(chess.fen());
+    try {
+      const result = chess.move(m.san);
+      fens.push(chess.fen());
+      uciMoves.push(result ? { from: result.from, to: result.to } : null);
+    } catch {
+      fens.push(chess.fen());
+      uciMoves.push(null);
+      break;
+    }
+  }
+
+  const BATCH_SIZE = 8;
+  const engineEvals: Array<{
+    cpBefore: number; cpAfter: number;
+    topUci: string; secondUci: string;
+    available: boolean; depth: number;
+    bestMoveSan: string | null;
+  } | null> = new Array(fens.length).fill(null);
+
+  for (let batchStart = 0; batchStart < fens.length - 1; batchStart += BATCH_SIZE) {
+    const batchEnd = Math.min(batchStart + BATCH_SIZE, fens.length - 1);
+    const fetches: Array<Promise<void>> = [];
+
+    for (let i = batchStart; i < batchEnd; i++) {
+      fetches.push((async () => {
+        const fenBefore = fens[i];
+        const fenAfter = fens[i + 1];
+        if (!fenBefore || !fenAfter) return;
+
+        const [evalBefore, evalAfter] = await Promise.all([
+          fetchLichessEval(fenBefore, 2),
+          fetchLichessEval(fenAfter, 1),
+        ]);
+
+        if (!evalBefore || evalBefore.pvs.length === 0) return;
+
+        const cpBefore = pvToWhiteCp(evalBefore.pvs[0]);
+        const cpAfter = evalAfter?.pvs.length ? pvToWhiteCp(evalAfter.pvs[0]) : cpBefore;
+        const topUci = evalBefore.pvs[0]?.moves?.split(" ")[0] ?? "";
+        const secondUci = evalBefore.pvs[1]?.moves?.split(" ")[0] ?? "";
+        const bestMoveSan = topUci ? uciToSan(fenBefore, topUci) : null;
+
+        engineEvals[i] = {
+          cpBefore, cpAfter, topUci, secondUci,
+          available: true, depth: evalBefore.depth,
+          bestMoveSan,
+        };
+      })());
+    }
+    await Promise.all(fetches);
   }
 
   return reviewMoves.map((rm) => {
@@ -444,6 +493,31 @@ function postProcessReview(
         explanation = "Forced move — the only legal option." + (explanation ? ` ${explanation}` : "");
       }
       cons = [];
+      return { ...rm, classification, betterMove, explanation, pros, cons };
+    }
+
+    const eng = engineEvals[idx];
+    if (eng && eng.available) {
+      const playerColor = originalMoves[idx]?.color as "white" | "black";
+      const cpLossRaw = playerColor === "white"
+        ? eng.cpBefore - eng.cpAfter
+        : eng.cpAfter - eng.cpBefore;
+
+      const moveUci = uciMoves[idx];
+      const playedUci = moveUci ? `${moveUci.from}${moveUci.to}` : "";
+      const isTopEngineMove = eng.topUci.startsWith(playedUci) && playedUci.length > 0;
+      const isSecondEngineMove = eng.secondUci.startsWith(playedUci) && playedUci.length > 0;
+      const isOpeningRange = idx < 30;
+      const wasBalanced = Math.abs(eng.cpBefore) < 150;
+
+      classification = classifyFromCpLoss(cpLossRaw, isTopEngineMove, isSecondEngineMove, isOpeningRange, wasBalanced);
+
+      const isBad = ["inaccuracy", "mistake", "blunder"].includes(classification);
+      if (isBad && eng.bestMoveSan && !isTopEngineMove) {
+        betterMove = eng.bestMoveSan;
+      } else if (!isBad) {
+        betterMove = null;
+      }
     }
 
     if (betterMove) {
@@ -648,7 +722,7 @@ Respond with valid JSON covering ALL ${moves.length} moves in order:
       throw new Error("OpenAI returned an empty move list — possibly a model error or format issue");
     }
 
-    const reviewMoves = postProcessReview(rawMoves, moves);
+    const reviewMoves = await postProcessReview(rawMoves, moves);
 
     const gameSummary: GameReviewSummary | null = parsed.gameSummary ? {
       overview: parsed.gameSummary.overview ?? "",

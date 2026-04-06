@@ -20,7 +20,7 @@ interface LichessCloudEval {
 
 /** Fetch Stockfish evaluation from Lichess Cloud Eval API.
  *  Returns null if the position isn't in the cache (no local engine runs here). */
-async function fetchLichessEval(fen: string, multiPv = 2): Promise<LichessCloudEval | null> {
+export async function fetchLichessEval(fen: string, multiPv = 2): Promise<LichessCloudEval | null> {
   try {
     const url = `https://lichess.org/api/cloud-eval?fen=${encodeURIComponent(fen)}&multiPv=${multiPv}`;
     const res = await fetch(url, {
@@ -41,7 +41,7 @@ async function fetchLichessEval(fen: string, multiPv = 2): Promise<LichessCloudE
 
 /** Convert a Lichess PV centipawn/mate value to a normalized number from WHITE's perspective.
  *  Mate in N for white → +10000 − N; mate in N for black → −10000 + N. */
-function pvToWhiteCp(pv: LichessPv): number {
+export function pvToWhiteCp(pv: LichessPv): number {
   if (pv.mate !== undefined) {
     return pv.mate > 0 ? 10000 - pv.mate : -10000 - pv.mate;
   }
@@ -49,7 +49,7 @@ function pvToWhiteCp(pv: LichessPv): number {
 }
 
 /** Convert a UCI move string (e.g. "e2e4" or "e7e8q") to SAN using a given FEN. */
-function uciToSan(fen: string, uci: string): string | null {
+export function uciToSan(fen: string, uci: string): string | null {
   try {
     const chess = new Chess(fen);
     const from = uci.slice(0, 2);
@@ -76,7 +76,7 @@ export type EngineClassification =
 /** Classify a move from centipawn loss (always ≥ 0, from the PLAYER'S perspective).
  *  Also needs to know if the move was the engine's top choice (for brilliant detection),
  *  and whether we're still in the opening (for book detection). */
-function classifyFromCpLoss(
+export function classifyFromCpLoss(
   cpLoss: number,
   isTopEngineMove: boolean,
   isSecondEngineMove: boolean,
