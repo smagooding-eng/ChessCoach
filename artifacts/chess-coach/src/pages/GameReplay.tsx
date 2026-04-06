@@ -12,7 +12,7 @@ import { useUser } from '@/hooks/use-user';
 import { useChessPlayer } from '@/hooks/use-chess-player';
 import { apiFetch } from '@/lib/api';
 
-type Classification = 'brilliant' | 'excellent' | 'good' | 'book' | 'inaccuracy' | 'mistake' | 'blunder';
+type Classification = 'checkmate' | 'brilliant' | 'excellent' | 'good' | 'book' | 'inaccuracy' | 'mistake' | 'blunder';
 
 type ReviewMove = {
   moveIndex: number;
@@ -41,6 +41,7 @@ type GameSummary = {
 };
 
 const CLASS_CFG: Record<Classification, { badge: string; color: string; full: string }> = {
+  checkmate:  { badge: '♚',  color: 'text-amber-400 bg-amber-400/15 border-amber-400/30',        full: 'Checkmate' },
   brilliant:  { badge: '!!',  color: 'text-cyan-400 bg-cyan-400/15 border-cyan-400/30',          full: 'Brilliant' },
   excellent:  { badge: '!',   color: 'text-emerald-400 bg-emerald-400/15 border-emerald-400/30', full: 'Excellent' },
   good:       { badge: '✓',   color: 'text-green-400 bg-green-400/15 border-green-400/30',       full: 'Good' },
@@ -62,7 +63,7 @@ function GameRatingPanel({
   blackAvatar?: string;
 }) {
   const WEIGHTS: Record<Classification, number> = {
-    brilliant: 100, excellent: 98, book: 90, good: 85,
+    checkmate: 100, brilliant: 100, excellent: 98, book: 90, good: 85,
     inaccuracy: 55, mistake: 25, blunder: 0,
   };
 
@@ -927,7 +928,7 @@ export function GameReplay() {
           {/* Review summary — per-player accuracy */}
           {reviewMoves.length > 0 && (() => {
             const WEIGHTS: Record<Classification, number> = {
-              brilliant: 100, excellent: 98, good: 85, book: 90,
+              checkmate: 100, brilliant: 100, excellent: 98, good: 85, book: 90,
               inaccuracy: 55, mistake: 25, blunder: 0,
             };
 
@@ -939,7 +940,7 @@ export function GameReplay() {
 
             function countFor(moves: ReviewMove[]) {
               const c: Record<Classification, number> = {
-                brilliant: 0, excellent: 0, good: 0, book: 0,
+                checkmate: 0, brilliant: 0, excellent: 0, good: 0, book: 0,
                 inaccuracy: 0, mistake: 0, blunder: 0,
               };
               moves.forEach(m => c[m.classification]++);

@@ -16,7 +16,7 @@ const TEXT_MUTED = '#9e9b98';
 const CHESSCOM_GREEN = '#81b64c';
 const MISTAKE_RED = '#dc4343';
 
-type Classification = 'brilliant' | 'excellent' | 'good' | 'book' | 'inaccuracy' | 'mistake' | 'blunder';
+type Classification = 'checkmate' | 'brilliant' | 'excellent' | 'good' | 'book' | 'inaccuracy' | 'mistake' | 'blunder';
 
 type GameMove = {
   san: string;
@@ -62,6 +62,7 @@ type TurningPoint = {
 };
 
 const CLASS_CFG: Record<Classification, { badge: string; color: string; full: string }> = {
+  checkmate:  { badge: '♚',  color: 'text-amber-400 bg-amber-400/15 border-amber-400/30',        full: 'Checkmate' },
   brilliant:  { badge: '!!',  color: 'text-cyan-400 bg-cyan-400/15 border-cyan-400/30',          full: 'Brilliant' },
   excellent:  { badge: '!',   color: 'text-emerald-400 bg-emerald-400/15 border-emerald-400/30', full: 'Excellent' },
   good:       { badge: '✓',   color: 'text-green-400 bg-green-400/15 border-green-400/30',       full: 'Good' },
@@ -115,7 +116,7 @@ function AnalysisSummaryPanel({
   game: H2HGame;
 }) {
   const WEIGHTS: Record<Classification, number> = {
-    brilliant: 100, excellent: 98, book: 90, good: 85,
+    checkmate: 100, brilliant: 100, excellent: 98, book: 90, good: 85,
     inaccuracy: 55, mistake: 25, blunder: 0,
   };
 
@@ -127,6 +128,7 @@ function AnalysisSummaryPanel({
   };
 
   const counts = (moves: MoveAnalysis[]) => ({
+    checkmate: moves.filter(m => m.classification === 'checkmate').length,
     brilliant: moves.filter(m => m.classification === 'brilliant').length,
     excellent: moves.filter(m => m.classification === 'excellent').length,
     good: moves.filter(m => m.classification === 'good').length,
