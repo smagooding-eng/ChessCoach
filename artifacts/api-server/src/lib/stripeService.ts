@@ -17,9 +17,6 @@ export class StripeService {
       payment_method_types: ['card'],
       line_items: [{ price: priceId, quantity: 1 }],
       mode: 'subscription',
-      subscription_data: {
-        trial_period_days: 3,
-      },
       success_url: successUrl,
       cancel_url: cancelUrl,
     });
