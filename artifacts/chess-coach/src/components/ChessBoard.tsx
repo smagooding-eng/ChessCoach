@@ -4,34 +4,38 @@ import { Chess } from 'chess.js';
 
 class BoardErrorBoundary extends Component<
   { children: ReactNode; position: string; renderKey: number },
-  { hasError: boolean; retryCount: number }
+  { hasError: boolean; retryCount: number; lastError: string | null }
 > {
   private retryTimer: ReturnType<typeof setTimeout> | null = null;
-  private static MAX_RETRIES = 5;
+  private static MAX_RETRIES = 8;
 
   constructor(props: { children: ReactNode; position: string; renderKey: number }) {
     super(props);
-    this.state = { hasError: false, retryCount: 0 };
+    this.state = { hasError: false, retryCount: 0, lastError: null };
   }
 
-  static getDerivedStateFromError() {
-    return { hasError: true };
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, lastError: error?.message ?? '' };
   }
 
   componentDidCatch(error: Error) {
-    if (!error.message?.includes('Square width not found')) {
-      throw error;
+    const isKnown = error.message?.includes('Square width') ||
+                    error.message?.includes('Cannot read properties of undefined');
+    if (!isKnown) {
+      console.error('[ChessBoard] Unexpected error:', error.message);
     }
     if (this.state.retryCount < BoardErrorBoundary.MAX_RETRIES) {
+      const delay = 100 + this.state.retryCount * 50;
       this.retryTimer = setTimeout(() => {
         this.setState(s => ({ hasError: false, retryCount: s.retryCount + 1 }));
-      }, 80);
+      }, delay);
     }
   }
 
   componentDidUpdate(prevProps: { position: string; renderKey: number }) {
     if (this.state.hasError && prevProps.position !== this.props.position) {
-      this.setState({ hasError: false, retryCount: 0 });
+      if (this.retryTimer) clearTimeout(this.retryTimer);
+      this.setState({ hasError: false, retryCount: 0, lastError: null });
     }
   }
 
@@ -41,7 +45,7 @@ class BoardErrorBoundary extends Component<
 
   render() {
     if (this.state.hasError) {
-      return <div style={{ aspectRatio: '1', width: '100%' }} />;
+      return <div style={{ aspectRatio: '1', width: '100%', background: 'transparent' }} />;
     }
     return this.props.children;
   }
@@ -236,14 +240,11 @@ export function ChessBoard({
     return styles;
   }, [lastMove, selectedSquare, legalTargets, feedback, moveQuality]);
 
-  const [boardKey, setBoardKey] = useState(0);
-  useEffect(() => {
-    setBoardKey(k => k + 1);
-  }, [position]);
+  const boardKeyRef = useRef(0);
 
   return (
     <div className="relative w-full max-w-[580px] mx-auto">
-      <BoardErrorBoundary position={position} renderKey={boardKey}>
+      <BoardErrorBoundary position={position} renderKey={boardKeyRef.current}>
         <Chessboard
           options={{
             position,
@@ -261,7 +262,7 @@ export function ChessBoard({
             },
             lightSquareStyle: { backgroundColor: '#f0d9b5' },
             darkSquareStyle: { backgroundColor: '#b58863' },
-            animationDurationInMs: 180,
+            animationDurationInMs: 150,
           }}
         />
       </BoardErrorBoundary>

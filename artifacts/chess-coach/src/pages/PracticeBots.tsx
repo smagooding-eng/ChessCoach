@@ -198,19 +198,26 @@ function GameView({ bot, onBack }: { bot: BotConfig; onBack: () => void }) {
       if (move) {
         const r = chess.move(move);
         if (r) {
-          const newMove: MoveRecord = { san: r.san, fen: chess.fen(), fenBefore, color: r.color, analysis: null };
+          const newFen = chess.fen();
+          const newMove: MoveRecord = { san: r.san, fen: newFen, fenBefore, color: r.color, analysis: null };
           setMoves(prev => {
             const next = [...prev, newMove];
             setSelectedMoveIdx(next.length - 1);
             deferAnalysis(fenBefore, r.san, next.length - 1);
             return next;
           });
+          requestAnimationFrame(() => {
+            setFen(newFen);
+            setThinking(false);
+            checkGameEnd(chess);
+          });
+          return;
         }
       }
       setFen(chess.fen());
       setThinking(false);
       checkGameEnd(chess);
-    }, 300 + Math.random() * 500);
+    }, 400 + Math.random() * 400);
   }, [chess, bot, checkGameEnd, clearBotTimeout, deferAnalysis]);
 
   useEffect(() => {
@@ -229,19 +236,20 @@ function GameView({ bot, onBack }: { bot: BotConfig; onBack: () => void }) {
     const fenBefore = chess.fen();
     const moveResult = chess.move(san);
     if (!moveResult) return;
-    const newMove: MoveRecord = { san: moveResult.san, fen: chess.fen(), fenBefore, color: moveResult.color, analysis: null };
+    const newFen = chess.fen();
+    const newMove: MoveRecord = { san: moveResult.san, fen: newFen, fenBefore, color: moveResult.color, analysis: null };
     setMoves(prev => {
       const next = [...prev, newMove];
       setSelectedMoveIdx(next.length - 1);
       deferAnalysis(fenBefore, moveResult.san, next.length - 1);
       return next;
     });
-    setFen(chess.fen());
+    setFen(newFen);
     checkGameEnd(chess);
 
     if (!chess.isGameOver()) {
       clearBotTimeout();
-      botTimeoutRef.current = setTimeout(() => makeBotMove(), 200);
+      botTimeoutRef.current = setTimeout(() => makeBotMove(), 250);
     }
   }, [chess, checkGameEnd, makeBotMove, clearBotTimeout, deferAnalysis]);
 
