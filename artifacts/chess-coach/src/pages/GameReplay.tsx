@@ -601,46 +601,7 @@ export function GameReplay() {
             </div>
           </div>
 
-          {/* Practice mode hint */}
-          {practiceMode && (
-            <div className="glass-card rounded-xl px-4 py-3 border border-emerald-500/30 bg-emerald-500/5 text-sm text-emerald-300 flex items-center gap-2">
-              {fetchingBest
-                ? <><div className="w-3.5 h-3.5 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin shrink-0" />
-                    <span>Finding engine's best move…</span></>
-                : bestMoveSan
-                ? <><Cpu className="w-4 h-4 shrink-0" />
-                    <span><strong>Practice Mode</strong> — Engine target: <span className="font-mono font-bold text-white">{bestMoveSan}</span></span></>
-                : <><Zap className="w-4 h-4 shrink-0" />
-                    <span><strong>Practice Mode</strong> — Drag or click a piece to try any legal move.</span></>}
-            </div>
-          )}
-
-          {/* Review loading banner */}
-          {reviewing && (
-            <div className="glass-card rounded-xl px-4 py-4 border border-primary/30 bg-primary/5 flex flex-col gap-3">
-              <div className="flex items-center gap-3">
-                <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin shrink-0" />
-                <div>
-                  <p className="text-sm font-bold text-primary">Reviewing game…</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">AI is analyzing all {maxMoves} moves. This takes about 15–30 seconds.</p>
-                </div>
-              </div>
-              <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
-                <div className="h-full rounded-full bg-primary/60 animate-pulse" style={{ width: '60%' }} />
-              </div>
-            </div>
-          )}
-
-          {/* Review error */}
-          {reviewError && (
-            <div className="glass-card rounded-xl px-4 py-3 border border-rose-500/30 bg-rose-500/5 text-sm text-rose-400 flex items-center justify-between gap-3">
-              <span>{reviewError}</span>
-              <button onClick={() => { setReviewError(null); handleReview(); }}
-                className="text-xs font-bold underline underline-offset-2 hover:no-underline">Retry</button>
-            </div>
-          )}
-
-          {/* Per-move analysis panel */}
+          {/* Per-move analysis panel — positioned right below controls for easy follow-along */}
           {currentMove > 0 && reviewMoves.length > 0 && (() => {
             const move = moves[currentMove - 1];
             return (
@@ -722,6 +683,45 @@ export function GameReplay() {
               </div>
             );
           })()}
+
+          {/* Review loading banner */}
+          {reviewing && (
+            <div className="glass-card rounded-xl px-4 py-4 border border-primary/30 bg-primary/5 flex flex-col gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin shrink-0" />
+                <div>
+                  <p className="text-sm font-bold text-primary">Reviewing game…</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">AI is analyzing all {maxMoves} moves. This takes about 15–30 seconds.</p>
+                </div>
+              </div>
+              <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
+                <div className="h-full rounded-full bg-primary/60 animate-pulse" style={{ width: '60%' }} />
+              </div>
+            </div>
+          )}
+
+          {/* Review error */}
+          {reviewError && (
+            <div className="glass-card rounded-xl px-4 py-3 border border-rose-500/30 bg-rose-500/5 text-sm text-rose-400 flex items-center justify-between gap-3">
+              <span>{reviewError}</span>
+              <button onClick={() => { setReviewError(null); handleReview(); }}
+                className="text-xs font-bold underline underline-offset-2 hover:no-underline">Retry</button>
+            </div>
+          )}
+
+          {/* Practice mode hint */}
+          {practiceMode && (
+            <div className="glass-card rounded-xl px-4 py-3 border border-emerald-500/30 bg-emerald-500/5 text-sm text-emerald-300 flex items-center gap-2">
+              {fetchingBest
+                ? <><div className="w-3.5 h-3.5 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin shrink-0" />
+                    <span>Finding engine's best move…</span></>
+                : bestMoveSan
+                ? <><Cpu className="w-4 h-4 shrink-0" />
+                    <span><strong>Practice Mode</strong> — Engine target: <span className="font-mono font-bold text-white">{bestMoveSan}</span></span></>
+                : <><Zap className="w-4 h-4 shrink-0" />
+                    <span><strong>Practice Mode</strong> — Drag or click a piece to try any legal move.</span></>}
+            </div>
+          )}
 
           {/* Start position prompt / Review Game CTA */}
           {currentMove === 0 && reviewMoves.length === 0 && !reviewing && (
