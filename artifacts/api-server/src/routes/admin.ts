@@ -46,9 +46,8 @@ router.get("/admin/stats", requireAdmin, async (_req: Request, res: Response) =>
 
     let activeSubscriptions = 0;
     try {
-      const { storage } = await import("../lib/storage");
       const subResult = await db.execute(
-        sql`SELECT COUNT(*) as count FROM subscriptions WHERE status IN ('active', 'trialing')`
+        sql`SELECT COUNT(*) as count FROM stripe.subscriptions WHERE status IN ('active', 'trialing')`
       );
       activeSubscriptions = Number((subResult as any).rows?.[0]?.count ?? 0);
     } catch {}
