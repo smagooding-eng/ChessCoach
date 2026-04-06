@@ -3,7 +3,7 @@ import { useMyAnalysisSummary, useMyWeaknesses } from '@/hooks/use-analysis';
 import { useMyCourses } from '@/hooks/use-courses';
 import { useMyGames } from '@/hooks/use-games';
 import { Link } from 'wouter';
-import { Swords, Trophy, Target, AlertTriangle, BookOpen, Clock, GraduationCap, TrendingUp, ChevronRight } from 'lucide-react';
+import { Swords, Trophy, Target, AlertTriangle, BookOpen, Clock, GraduationCap, TrendingUp, ChevronRight, Search, Play, Bot } from 'lucide-react';
 import { useUser } from '@/hooks/use-user';
 import { useChessPlayer } from '@/hooks/use-chess-player';
 
@@ -34,6 +34,7 @@ export function Dashboard() {
   const { data: weaknesses } = useMyWeaknesses();
   const { data: coursesData } = useMyCourses();
   const { data: gamesData } = useMyGames(5);
+  const { data: allGamesData } = useMyGames();
 
   if (loadingSummary) {
     return (
@@ -44,7 +45,6 @@ export function Dashboard() {
   }
 
   const winRate = summary ? ((summary.winRate || 0) * 100).toFixed(1) : '—';
-  const activeCourses = coursesData?.courses?.filter(c => c.completedLessons < c.totalLessons).length || 0;
 
   return (
     <div className="space-y-4 md:space-y-5">
@@ -120,7 +120,7 @@ export function Dashboard() {
           { label: 'Total Games', value: summary?.totalGames || 0, icon: <Swords className="w-4 h-4" /> },
           { label: 'Win Rate', value: `${winRate}%`, icon: <Trophy className="w-4 h-4" /> },
           { label: 'Avg Rating', value: Math.round(summary?.avgRating || 0) || '—', icon: <TrendingUp className="w-4 h-4" /> },
-          { label: 'Active Courses', value: activeCourses, icon: <BookOpen className="w-4 h-4" /> },
+          { label: 'Games Reviewed', value: allGamesData?.games?.filter(g => g.reviewed).length ?? 0, icon: <Target className="w-4 h-4" /> },
         ].map((s) => (
           <div key={s.label} className="rounded-lg p-3.5" style={{ background: BG_CARD }}>
             <div className="flex items-center justify-between mb-2">
@@ -196,44 +196,36 @@ export function Dashboard() {
         </div>
 
         <div className="space-y-3 md:space-y-4">
-          <DashCard title="Courses" icon={<GraduationCap className="w-4 h-4" style={{ color: '#b583e0' }} />} linkHref="/courses" linkText="All">
-            {coursesData?.courses?.length ? (
-              <div className="space-y-2">
-                {coursesData.courses.slice(0, 4).map(course => {
-                  const progress = Math.round((course.completedLessons / course.totalLessons) * 100) || 0;
-                  const isDone = progress === 100;
-                  return (
-                    <Link key={course.id} href={`/courses/${course.id}`} className="block">
-                      <div className="group p-3 rounded-lg transition-colors"
-                        style={{ background: isDone ? 'rgba(129,182,76,0.08)' : 'transparent' }}
-                        onMouseEnter={e => { if (!isDone) e.currentTarget.style.background = BG_CARD_HOVER; }}
-                        onMouseLeave={e => { if (!isDone) e.currentTarget.style.background = 'transparent'; }}>
-                        <div className="flex items-start justify-between gap-2 mb-2">
-                          <p className="font-semibold text-sm line-clamp-1" style={{ color: TEXT_LIGHT }}>{course.title}</p>
-                          {isDone && <span className="text-[10px] font-bold shrink-0" style={{ color: CHESSCOM_GREEN }}>DONE</span>}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <div className="flex-1 h-1 rounded-full overflow-hidden" style={{ background: BG_DARK }}>
-                            <div className="h-full rounded-full transition-all" style={{ width: `${progress}%`, background: isDone ? CHESSCOM_GREEN : CHESSCOM_GREEN }} />
-                          </div>
-                          <span className="text-[10px] shrink-0" style={{ color: TEXT_MUTED }}>{progress}%</span>
-                        </div>
-                      </div>
-                    </Link>
-                  );
-                })}
+          <Link href="/opponents" className="block">
+            <div className="rounded-lg p-4 md:p-5 transition-colors group cursor-pointer"
+              style={{ background: 'linear-gradient(135deg, rgba(129,182,76,0.12) 0%, rgba(129,182,76,0.04) 100%)', border: `1px solid rgba(129,182,76,0.2)` }}
+              onMouseEnter={e => (e.currentTarget.style.borderColor = 'rgba(129,182,76,0.4)')}
+              onMouseLeave={e => (e.currentTarget.style.borderColor = 'rgba(129,182,76,0.2)')}>
+              <div className="flex items-center gap-3 mb-2">
+                <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ background: 'rgba(129,182,76,0.15)' }}>
+                  <Swords className="w-5 h-5" style={{ color: CHESSCOM_GREEN }} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-black text-sm" style={{ color: TEXT_LIGHT }}>Opponent Scout</h3>
+                  <p className="text-[11px]" style={{ color: TEXT_MUTED }}>Our #1 feature</p>
+                </div>
+                <ChevronRight className="w-4 h-4 shrink-0 opacity-40 group-hover:opacity-80 transition-opacity" style={{ color: CHESSCOM_GREEN }} />
               </div>
-            ) : (
-              <EmptyState icon={<GraduationCap className="w-7 h-7" />} text="No courses yet." linkHref="/courses" linkText="Generate Courses →" />
-            )}
-          </DashCard>
+              <p className="text-xs leading-relaxed" style={{ color: TEXT_MUTED }}>
+                AI-powered scouting report on any Chess.com player. Find weaknesses, tendencies, and prep lines before your next match.
+              </p>
+            </div>
+          </Link>
 
           <div className="rounded-lg p-4 space-y-1" style={{ background: BG_CARD }}>
             <p className="text-[10px] font-bold uppercase tracking-wider mb-2.5" style={{ color: TEXT_MUTED }}>Quick Actions</p>
             {[
-              { href: '/import', label: 'Import New Games', icon: <ImportIcon /> },
-              { href: '/analysis', label: 'Run AI Analysis', icon: <Target className="w-4 h-4" /> },
               { href: '/opponents', label: 'Scout an Opponent', icon: <Swords className="w-4 h-4" /> },
+              { href: '/lookup', label: 'Game Lookup', icon: <Search className="w-4 h-4" /> },
+              { href: '/play', label: 'Play Local', icon: <Play className="w-4 h-4" /> },
+              { href: '/practice', label: 'Practice vs Bots', icon: <Bot className="w-4 h-4" /> },
+              { href: '/import', label: 'Import Games', icon: <ImportIcon /> },
+              { href: '/analysis', label: 'Run AI Analysis', icon: <Target className="w-4 h-4" /> },
             ].map(action => (
               <Link key={action.href} href={action.href} className="block">
                 <div className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg transition-colors text-sm font-medium group"
@@ -247,6 +239,37 @@ export function Dashboard() {
               </Link>
             ))}
           </div>
+
+          {coursesData?.courses?.length ? (
+            <div className="rounded-lg p-4" style={{ background: BG_CARD }}>
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-sm font-bold flex items-center gap-2" style={{ color: TEXT_LIGHT }}>
+                  <GraduationCap className="w-4 h-4" style={{ color: '#b583e0' }} /> Courses
+                  <span className="px-1.5 py-px rounded text-[8px] font-black tracking-wider" style={{ background: 'rgba(234,166,49,0.15)', color: '#eaa631' }}>BETA</span>
+                </h2>
+                <Link href="/courses" className="text-[11px] font-semibold flex items-center gap-0.5 hover:underline" style={{ color: CHESSCOM_GREEN }}>
+                  All <ChevronRight className="w-3 h-3" />
+                </Link>
+              </div>
+              <div className="space-y-2">
+                {coursesData.courses.slice(0, 3).map(course => {
+                  const progress = Math.round((course.completedLessons / course.totalLessons) * 100) || 0;
+                  return (
+                    <Link key={course.id} href={`/courses/${course.id}`} className="block">
+                      <div className="group flex items-center gap-2.5 p-2 rounded-lg transition-colors"
+                        onMouseEnter={e => (e.currentTarget.style.background = BG_CARD_HOVER)}
+                        onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-xs line-clamp-1" style={{ color: TEXT_LIGHT }}>{course.title}</p>
+                        </div>
+                        <span className="text-[10px] shrink-0" style={{ color: TEXT_MUTED }}>{progress}%</span>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
         </div>
       </div>
     </div>

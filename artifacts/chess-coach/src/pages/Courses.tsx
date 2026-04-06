@@ -157,7 +157,7 @@ export function Courses() {
     <div className="space-y-8 pb-20 px-4 pt-4 md:px-0 md:pt-0">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-display font-bold">My Courses</h1>
+          <h1 className="text-3xl font-display font-bold flex items-center gap-3">My Courses <span className="px-2 py-0.5 rounded text-[10px] font-black tracking-wider bg-amber-500/15 text-amber-400 border border-amber-500/20">BETA</span></h1>
           <p className="text-muted-foreground">Personalized lesson plans based on your AI analysis.</p>
         </div>
 

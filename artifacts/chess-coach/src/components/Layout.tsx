@@ -16,20 +16,20 @@ const TEXT_MUTED = '#9e9b98';
 const BORDER_COLOR = 'rgba(255,255,255,0.06)';
 
 const PRIMARY_NAV = [
-  { href: '/',          label: 'Home',      icon: LayoutDashboard },
-  { href: '/games',     label: 'Games',     icon: History },
-  { href: '/analysis',  label: 'Analysis',  icon: BrainCircuit },
-  { href: '/courses',   label: 'Courses',   icon: GraduationCap },
-  { href: '/endgames',  label: 'Endgames',  icon: Trophy },
-  { href: '/openings',  label: 'Openings',  icon: BookOpen },
+  { href: '/',          label: 'Home',            icon: LayoutDashboard },
+  { href: '/opponents', label: 'Opponent Scout',  icon: Swords },
+  { href: '/games',     label: 'Games',           icon: History },
+  { href: '/analysis',  label: 'Analysis',        icon: BrainCircuit },
+  { href: '/lookup',    label: 'Game Lookup',     icon: Search },
+  { href: '/play',      label: 'Play Local',      icon: Play },
 ];
 
 const SECONDARY_NAV = [
   { href: '/practice',     label: 'Practice Bots',   icon: Bot },
-  { href: '/play',         label: 'Play Local',      icon: Play },
   { href: '/import',       label: 'Import Games',    icon: Import },
-  { href: '/lookup',       label: 'Game Lookup',     icon: Search },
-  { href: '/opponents',    label: 'Opponent Scout',  icon: Swords },
+  { href: '/courses',      label: 'Courses',         icon: GraduationCap, badge: 'BETA' },
+  { href: '/endgames',     label: 'Endgames',        icon: Trophy,        badge: 'BETA' },
+  { href: '/openings',     label: 'Openings',        icon: BookOpen,      badge: 'BETA' },
   { href: '/subscription', label: 'Subscription',    icon: Crown },
 ];
 
@@ -49,6 +49,7 @@ function PlayerAvatar({ avatar, username, size = 'md' }: { avatar?: string; user
 }
 
 function SidebarLink({ item, isActive }: { item: typeof ALL_NAV[0]; isActive: boolean }) {
+  const badge = (item as any).badge as string | undefined;
   return (
     <Link href={item.href} className="block">
       <div className={cn(
@@ -64,6 +65,11 @@ function SidebarLink({ item, isActive }: { item: typeof ALL_NAV[0]; isActive: bo
         )}
         <item.icon className="w-4 h-4 shrink-0" />
         {item.label}
+        {badge && (
+          <span className="ml-auto px-1.5 py-px rounded text-[8px] font-black tracking-wider" style={{ background: 'rgba(234,166,49,0.15)', color: '#eaa631' }}>
+            {badge}
+          </span>
+        )}
       </div>
     </Link>
   );
@@ -225,6 +231,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
               <nav className="px-3 pt-3 pb-8 space-y-0.5">
                 {moreItems.map(item => {
                   const active = location === item.href || location.startsWith(item.href + '/');
+                  const badge = (item as any).badge as string | undefined;
                   return (
                     <Link key={item.href} href={item.href} className="block">
                       <div className="flex items-center gap-3 px-3.5 py-3 rounded-lg transition-colors"
@@ -234,6 +241,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
                         }}>
                         <item.icon className="w-5 h-5" />
                         <span className="font-semibold text-sm">{item.label}</span>
+                        {badge && (
+                          <span className="px-1.5 py-px rounded text-[9px] font-black tracking-wider" style={{ background: 'rgba(234,166,49,0.15)', color: '#eaa631' }}>
+                            {badge}
+                          </span>
+                        )}
                         {active && <ChevronRight className="w-4 h-4 ml-auto" />}
                       </div>
                     </Link>
