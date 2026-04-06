@@ -110,6 +110,7 @@ router.get("/admin/users", requireAdmin, async (_req: Request, res: Response) =>
         firstName: usersTable.firstName,
         createdAt: usersTable.createdAt,
         stripeCustomerId: usersTable.stripeCustomerId,
+        lastLoginAt: usersTable.lastLoginAt,
       })
       .from(usersTable)
       .orderBy(sql`${usersTable.createdAt} DESC`);
@@ -142,6 +143,8 @@ router.get("/admin/users", requireAdmin, async (_req: Request, res: Response) =>
     const enrichedUsers = users.map(u => {
       const stripeSub = u.stripeCustomerId ? subMap[u.stripeCustomerId] ?? null : null;
       const status = computeUserStatus(u.email, u.createdAt, stripeSub);
+      const lastLogin = u.lastLoginAt;
+      const daysSinceLogin = lastLogin ? Math.floor((Date.now() - new Date(lastLogin).getTime()) / 86400000) : null;
       return {
         id: u.id,
         email: u.email,
@@ -151,6 +154,7 @@ router.get("/admin/users", requireAdmin, async (_req: Request, res: Response) =>
         tier: status.tier,
         tierDetail: status.detail,
         planInterval: stripeSub?.planInterval ?? null,
+        daysSinceLogin,
       };
     });
 

@@ -76,6 +76,7 @@ router.post("/auth/register", async (req: Request, res: Response) => {
         firstName: firstName || null,
         chesscomUsername: chesscomUsername || null,
         isAdmin: ADMIN_EMAILS.includes(email.toLowerCase()),
+        lastLoginAt: new Date(),
       })
       .returning();
 
@@ -114,6 +115,8 @@ router.post("/auth/login", async (req: Request, res: Response) => {
       res.status(401).json({ error: "Invalid email or password" });
       return;
     }
+
+    await db.update(usersTable).set({ lastLoginAt: new Date() }).where(eq(usersTable.id, user.id));
 
     const sessionData: SessionData = { user: toSessionUser(user) };
     const sid = await createSession(sessionData);
@@ -215,6 +218,7 @@ router.get("/auth/google/callback", async (req: Request, res: Response) => {
             profileImageUrl: profile.picture || existingByEmail.profileImageUrl,
             firstName: existingByEmail.firstName || profile.given_name,
             lastName: existingByEmail.lastName || profile.family_name,
+            lastLoginAt: new Date(),
           })
           .where(eq(usersTable.id, existingByEmail.id))
           .returning();
@@ -228,9 +232,12 @@ router.get("/auth/google/callback", async (req: Request, res: Response) => {
             firstName: profile.given_name || null,
             lastName: profile.family_name || null,
             profileImageUrl: profile.picture || null,
+            lastLoginAt: new Date(),
           })
           .returning();
       }
+    } else {
+      await db.update(usersTable).set({ lastLoginAt: new Date() }).where(eq(usersTable.id, user.id));
     }
 
     const sessionData: SessionData = { user: toSessionUser(user) };

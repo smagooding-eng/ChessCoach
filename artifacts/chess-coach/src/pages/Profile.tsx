@@ -29,6 +29,7 @@ interface AdminUser {
   tier: 'admin' | 'pro' | 'trial' | 'free';
   tierDetail: number | null;
   planInterval: string | null;
+  daysSinceLogin: number | null;
 }
 
 type UserFilter = 'all' | 'admin' | 'pro' | 'trial' | 'free';
@@ -146,8 +147,10 @@ function UserListPanel({ onClose }: { onClose: () => void }) {
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   <TierBadge user={u} />
-                  <span className="text-[10px] text-muted-foreground/50 whitespace-nowrap">
-                    {new Date(u.createdAt).toLocaleDateString()}
+                  <span className="text-[10px] text-muted-foreground/50 whitespace-nowrap leading-tight text-right">
+                    {u.daysSinceLogin !== null ? (
+                      u.daysSinceLogin === 0 ? 'today' : `${u.daysSinceLogin}d ago`
+                    ) : 'never'}
                   </span>
                 </div>
               </div>
