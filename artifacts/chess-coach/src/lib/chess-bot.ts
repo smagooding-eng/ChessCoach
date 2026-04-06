@@ -271,7 +271,7 @@ export function evaluatePosition(fen: string): number {
 }
 
 export interface MoveAnalysisResult {
-  quality: 'brilliant' | 'excellent' | 'good' | 'book' | 'inaccuracy' | 'mistake' | 'blunder';
+  quality: 'checkmate' | 'brilliant' | 'excellent' | 'good' | 'book' | 'inaccuracy' | 'mistake' | 'blunder';
   evalBefore: number;
   evalAfter: number;
   cpLoss: number;
@@ -320,7 +320,7 @@ export function analyzeMoveQuality(fenBefore: string, san: string): MoveAnalysis
 
   if (isMate) {
     return {
-      quality: 'brilliant', evalBefore, evalAfter, cpLoss: 0, bestMoveSan: null,
+      quality: 'checkmate', evalBefore, evalAfter, cpLoss: 0, bestMoveSan: null,
       pros: ['Checkmate!'], cons: [], summary: 'Checkmate! Game over.',
     };
   }

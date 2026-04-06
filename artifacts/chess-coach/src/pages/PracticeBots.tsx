@@ -21,6 +21,7 @@ const TIER_COLORS: Record<string, string> = {
 };
 
 const QUALITY_CFG: Record<string, { label: string; icon: string; bg: string; text: string; border: string; dot: string }> = {
+  checkmate:  { label: 'Checkmate!', icon: '♚', bg: 'bg-amber-500/10', text: 'text-amber-400', border: 'border-amber-500/30', dot: 'bg-amber-400' },
   brilliant:  { label: 'Brilliant!!', icon: '✦', bg: 'bg-cyan-500/10', text: 'text-cyan-400', border: 'border-cyan-500/30', dot: 'bg-cyan-400' },
   excellent:  { label: 'Excellent!', icon: '!', bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/30', dot: 'bg-emerald-400' },
   good:       { label: 'Good', icon: '✓', bg: 'bg-green-500/10', text: 'text-green-400', border: 'border-green-500/30', dot: 'bg-green-400' },

@@ -49,9 +49,10 @@ class BoardErrorBoundary extends Component<
 
 const START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
-export type MoveQuality = 'brilliant' | 'excellent' | 'good' | 'book' | 'inaccuracy' | 'mistake' | 'blunder';
+export type MoveQuality = 'checkmate' | 'brilliant' | 'excellent' | 'good' | 'book' | 'inaccuracy' | 'mistake' | 'blunder';
 
 const QUALITY_COLOR: Record<MoveQuality, string> = {
+  checkmate:  'rgba(255, 215, 0, 0.70)',
   brilliant:  'rgba(0, 220, 240, 0.60)',
   excellent:  'rgba(50, 210, 110, 0.60)',
   good:       'rgba(100, 200, 80, 0.50)',
@@ -62,6 +63,7 @@ const QUALITY_COLOR: Record<MoveQuality, string> = {
 };
 
 const QUALITY_LABEL: Record<MoveQuality, { text: string; icon: string }> = {
+  checkmate:  { text: 'Checkmate!',  icon: '♚' },
   brilliant:  { text: 'Brilliant!!', icon: '✦' },
   excellent:  { text: 'Excellent!',  icon: '!' },
   good:       { text: 'Good',        icon: '✓' },
@@ -277,7 +279,8 @@ export function ChessBoard({
       {moveQuality && !practiceMode && !feedback && (
         <div className="absolute top-2 right-2 pointer-events-none z-10">
           <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold shadow-lg backdrop-blur-sm border
-            ${moveQuality === 'brilliant'  ? 'bg-cyan-950/90 text-cyan-300 border-cyan-400/40' :
+            ${moveQuality === 'checkmate'  ? 'bg-amber-950/90 text-amber-300 border-amber-400/40' :
+              moveQuality === 'brilliant'  ? 'bg-cyan-950/90 text-cyan-300 border-cyan-400/40' :
               moveQuality === 'excellent'  ? 'bg-emerald-950/90 text-emerald-300 border-emerald-400/40' :
               moveQuality === 'good'       ? 'bg-green-950/90 text-green-300 border-green-400/40' :
               moveQuality === 'book'       ? 'bg-blue-950/90 text-blue-300 border-blue-400/40' :
