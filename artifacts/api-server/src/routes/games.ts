@@ -552,7 +552,9 @@ router.post("/games/:id/review", async (req, res): Promise<void> => {
     return;
   }
 
-  if (game.reviewData) {
+  const forceReview = req.query.force === "true";
+
+  if (game.reviewData && !forceReview) {
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
     res.setHeader("Connection", "keep-alive");

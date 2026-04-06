@@ -333,13 +333,19 @@ export function GameReplay() {
   }, [currentMove]);
 
   // ── Review Game — SSE stream that classifies every move ─────────────────────
-  const handleReview = useCallback(async () => {
-    if (!game || reviewing || reviewMoves.length > 0) return;
+  const handleReview = useCallback(async (force = false) => {
+    if (!game || reviewing) return;
+    if (!force && reviewMoves.length > 0) return;
     setReviewing(true);
     setReviewError(null);
+    if (force) {
+      setReviewMoves([]);
+      setGameSummary(null);
+    }
 
     try {
-      const res = await apiFetch(`/api/games/${game.id}/review`, { method: 'POST' });
+      const url = force ? `/api/games/${game.id}/review?force=true` : `/api/games/${game.id}/review`;
+      const res = await apiFetch(url, { method: 'POST' });
       if (!res.ok || !res.body) throw new Error('Connection failed');
 
       const reader = res.body.getReader();
@@ -582,7 +588,7 @@ export function GameReplay() {
               </button>
 
               <button
-                onClick={handleReview}
+                onClick={() => handleReview(false)}
                 disabled={reviewing || reviewMoves.length > 0}
                 className={`p-2 md:px-3 md:py-2 rounded-xl text-xs font-bold transition-colors border flex items-center gap-1 md:gap-1.5
                   ${reviewMoves.length > 0
@@ -597,6 +603,14 @@ export function GameReplay() {
                   {reviewing ? 'Reviewing…' : reviewMoves.length > 0 ? 'Reviewed' : 'Review Game'}
                 </span>
               </button>
+              {reviewMoves.length > 0 && !reviewing && (
+                <button
+                  onClick={() => handleReview(true)}
+                  className="p-2 rounded-xl text-xs font-bold transition-colors border bg-secondary border-border hover:border-primary/40 hover:text-primary"
+                  title="Re-analyze with improved engine">
+                  <BrainCircuit className="w-3.5 h-3.5" />
+                </button>
+              )}
             </div>
           </div>
 
@@ -703,7 +717,7 @@ export function GameReplay() {
           {reviewError && (
             <div className="glass-card rounded-xl px-4 py-3 border border-rose-500/30 bg-rose-500/5 text-sm text-rose-400 flex items-center justify-between gap-3">
               <span>{reviewError}</span>
-              <button onClick={() => { setReviewError(null); handleReview(); }}
+              <button onClick={() => { setReviewError(null); handleReview(true); }}
                 className="text-xs font-bold underline underline-offset-2 hover:no-underline">Retry</button>
             </div>
           )}
@@ -733,7 +747,7 @@ export function GameReplay() {
                 </div>
               </div>
               <button
-                onClick={handleReview}
+                onClick={() => handleReview(false)}
                 className="shrink-0 flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-bold hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20">
                 <Sparkles className="w-4 h-4" />
                 Review Game

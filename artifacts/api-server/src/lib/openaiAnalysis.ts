@@ -407,6 +407,101 @@ Respond with valid JSON:
   }
 }
 
+// ── Post-process GPT review using chess.js to fix hallucinations ─────────────
+
+function postProcessReview(
+  reviewMoves: MoveReview[],
+  originalMoves: Array<{ moveNumber: number; san: string; color: string }>,
+): MoveReview[] {
+  const Chess = require("chess.js").Chess;
+  const chess = new Chess();
+  const fens: string[] = [chess.fen()];
+
+  for (const m of originalMoves) {
+    try { chess.move(m.san); } catch { break; }
+    fens.push(chess.fen());
+  }
+
+  return reviewMoves.map((rm) => {
+    const idx = rm.moveIndex;
+    const fenBefore = fens[idx];
+    if (!fenBefore) return rm;
+
+    let legalMoves: string[];
+    try {
+      const pos = new Chess(fenBefore);
+      legalMoves = pos.moves();
+    } catch {
+      return rm;
+    }
+
+    let { classification, betterMove, explanation, pros, cons } = rm;
+
+    if (legalMoves.length <= 1) {
+      classification = "book";
+      betterMove = null;
+      if (explanation && !explanation.includes("forced")) {
+        explanation = "Forced move — the only legal option." + (explanation ? ` ${explanation}` : "");
+      }
+      cons = [];
+    }
+
+    if (betterMove) {
+      const sanOnly = betterMove.split(/\s*[—–-]\s*/)[0].trim();
+      try {
+        const pos = new Chess(fenBefore);
+        pos.move(sanOnly);
+      } catch {
+        const isBad = ["inaccuracy", "mistake", "blunder"].includes(classification);
+        if (isBad && legalMoves.length > 1) {
+          const played = originalMoves[idx]?.san;
+          const alternatives = legalMoves.filter(m => m !== played);
+          if (alternatives.length > 0) {
+            betterMove = alternatives[0];
+          } else {
+            betterMove = null;
+            if (classification === "inaccuracy") classification = "good";
+          }
+        } else {
+          betterMove = null;
+        }
+      }
+    }
+
+    if (classification === "brilliant") {
+      if (legalMoves.length <= 5) {
+        classification = "excellent";
+      } else {
+        const m = originalMoves[idx];
+        if (m) {
+          try {
+            const pos = new Chess(fenBefore);
+            const result = pos.move(m.san);
+            const isCapture = !!result?.captured;
+            const givesCheck = result ? pos.inCheck() : false;
+            const isMate = result ? pos.isCheckmate() : false;
+            if (!isCapture && !givesCheck && !isMate) {
+              classification = "excellent";
+            }
+          } catch {
+            classification = "excellent";
+          }
+        }
+      }
+    }
+
+    if (["inaccuracy", "mistake", "blunder"].includes(classification) && !betterMove && legalMoves.length > 1) {
+      const played = originalMoves[idx]?.san;
+      const alternatives = legalMoves.filter(m => m !== played);
+      if (alternatives.length > 0) {
+        betterMove = alternatives[0];
+      }
+    }
+
+    return { ...rm, classification, betterMove, explanation, pros, cons };
+  });
+}
+
 // ── Full-game review ─────────────────────────────────────────────────────────
 
 export interface MoveReview {
@@ -447,47 +542,54 @@ export async function reviewFullGame(input: {
 }): Promise<GameReviewResult> {
   const { moves, opening, result, whiteUsername, blackUsername } = input;
 
-  const moveList = moves
-    .map((m, i) => `${i}: ${m.moveNumber}${m.color === "white" ? "." : "..."} ${m.san}`)
-    .join("\n");
+  const Chess = require("chess.js").Chess;
+  const chess = new Chess();
+  const moveDetails: string[] = [];
+  for (let i = 0; i < moves.length; i++) {
+    const m = moves[i];
+    const fenBefore = chess.fen();
+    const legalCount = chess.moves().length;
+    try { chess.move(m.san); } catch { break; }
+    moveDetails.push(`${i}: ${m.moveNumber}${m.color === "white" ? "." : "..."} ${m.san} [fen:${fenBefore}] [legal:${legalCount}]`);
+  }
+  const moveList = moveDetails.join("\n");
 
   const prompt = `You are a master chess coach. Review this complete chess game and classify EVERY single move.
 
 Game: ${whiteUsername} (White) vs ${blackUsername} (Black)
 Opening: ${opening ?? "Unknown"} | Result: ${result}
 
-Move list (format: index: moveNum. san):
+Move list (format: index: moveNum. san [fen:position_before_move] [legal:number_of_legal_moves]):
 ${moveList}
 
+IMPORTANT RULES:
+- If [legal:1] — this is a FORCED move (only legal option). Classify as "book" and set betterMove to null.
+- "brilliant" should be RARE — only for deeply calculated sacrifices, non-obvious winning moves, or moves that are hard to find. Standard captures, checks, and routine development are NOT brilliant.
+- "betterMove" MUST be a legal move in the given FEN position. If unsure, set to null.
+- Use the FEN positions to verify your analysis. Do not guess — check that suggested moves are actually possible in the position.
+
 Classify each move as ONE of:
-- "brilliant": unexpected, deeply calculated, significantly improves position
+- "brilliant": unexpected sacrifice or deeply calculated move that is hard to find (RARE — max 1-2 per game at most)
 - "excellent": very strong, best or near-best move
 - "good": solid, reasonable move
-- "book": standard opening/endgame theory (typically first 10-12 moves)
+- "book": standard opening theory OR forced moves (only 1 legal option)
 - "inaccuracy": suboptimal, a clearly better option was missed
 - "mistake": clear error, noticeably worsens the position
 - "blunder": serious error that loses material or the game
 
 For each move provide:
 1. classification (required)
-2. explanation: concise 1-2 sentence explanation of why this classification (required)
-3. pros: array of 1-2 SHORT strengths of this move (max 12 words each). Even bad moves may have some upside.
-4. cons: array of 1-2 SHORT weaknesses or missed opportunities (max 12 words each). Even great moves can have minor downsides.
-5. betterMove: for inaccuracy/mistake/blunder only — the better move in SAN notation (e.g. "Nf6", "d4", "Bxd5+"). For good/excellent/brilliant/book set null.
+2. explanation: concise 1-2 sentence explanation (required)
+3. pros: array of 1-2 SHORT strengths of this move (max 12 words each)
+4. cons: array of 1-2 SHORT weaknesses or missed opportunities (max 12 words each)
+5. betterMove: for inaccuracy/mistake/blunder only — a LEGAL alternative move in SAN notation that exists in the position's FEN. For good/excellent/brilliant/book set null.
 
-ALSO provide a "gameSummary" object with an overall AI coaching analysis of the game:
-
-1. "overview": 2-3 sentences summarizing the game flow — who had the advantage and when, and what decided the outcome.
-2. "keyMistakes": an array of the most important mistakes/blunders (up to 4). Each entry:
-   - "moveIndex": the move index of the mistake
-   - "move": the move in SAN (e.g. "14...Bxe4")
-   - "whatWentWrong": 1-2 sentences explaining what was wrong with this move
-   - "whatYouShouldHaveDone": 1-2 sentences explaining the correct move and why
-   - "tip": A concise coaching takeaway (a pattern or rule to remember for next time)
-3. "strengths": array of 1-3 things the player did well (even in a loss)
-4. "improvementAreas": array of 2-3 specific areas to work on, phrased as actionable coaching advice
-
-If the game was a loss, be especially detailed in keyMistakes and improvementAreas. Focus on the turning points that cost the game.
+ALSO provide a "gameSummary" object:
+1. "overview": 2-3 sentences summarizing the game flow
+2. "keyMistakes": array of up to 4 most important mistakes/blunders:
+   - "moveIndex", "move" (SAN), "whatWentWrong", "whatYouShouldHaveDone", "tip"
+3. "strengths": array of 1-3 things done well
+4. "improvementAreas": array of 2-3 actionable coaching advice items
 
 Respond with valid JSON covering ALL ${moves.length} moves in order:
 {
@@ -497,25 +599,17 @@ Respond with valid JSON covering ALL ${moves.length} moves in order:
       "san": "e4",
       "color": "white",
       "classification": "book",
-      "explanation": "Standard central pawn opening move, controlling d5 and f5.",
-      "pros": ["Controls key central squares d5 and f5", "Opens lines for bishop and queen"],
-      "cons": ["Slightly weakens d4 square"],
+      "explanation": "Standard central pawn opening move.",
+      "pros": ["Controls d5 and f5"],
+      "cons": ["Slightly weakens d4"],
       "betterMove": null
     }
   ],
   "gameSummary": {
-    "overview": "White had a solid opening but lost the thread in the middlegame...",
-    "keyMistakes": [
-      {
-        "moveIndex": 14,
-        "move": "14...Bxe4",
-        "whatWentWrong": "This capture trades away a strong bishop and opens the e-file for White's rook.",
-        "whatYouShouldHaveDone": "14...Nf6 develops the knight while maintaining pressure on e4.",
-        "tip": "Before capturing, ask: does this trade help my opponent more than me?"
-      }
-    ],
-    "strengths": ["Solid opening preparation", "Good piece development"],
-    "improvementAreas": ["Practice calculating exchanges before capturing", "Work on endgame technique"]
+    "overview": "...",
+    "keyMistakes": [],
+    "strengths": [],
+    "improvementAreas": []
   }
 }`;
 
@@ -537,7 +631,7 @@ Respond with valid JSON covering ALL ${moves.length} moves in order:
     const parsed = JSON.parse(content) as { moves?: Array<Partial<MoveReview>>; gameSummary?: Partial<GameReviewSummary> };
     const validClassifications = ["brilliant", "excellent", "good", "book", "inaccuracy", "mistake", "blunder"];
 
-    const reviewMoves = (parsed.moves ?? []).map((m, i) => ({
+    const rawMoves = (parsed.moves ?? []).map((m, i) => ({
       moveIndex: typeof m.moveIndex === "number" ? m.moveIndex : i,
       san: m.san ?? moves[i]?.san ?? "",
       color: (m.color ?? moves[i]?.color ?? "white") as "white" | "black",
@@ -550,9 +644,11 @@ Respond with valid JSON covering ALL ${moves.length} moves in order:
       cons: Array.isArray(m.cons) ? m.cons : [],
     }));
 
-    if (reviewMoves.length === 0) {
+    if (rawMoves.length === 0) {
       throw new Error("OpenAI returned an empty move list — possibly a model error or format issue");
     }
+
+    const reviewMoves = postProcessReview(rawMoves, moves);
 
     const gameSummary: GameReviewSummary | null = parsed.gameSummary ? {
       overview: parsed.gameSummary.overview ?? "",
