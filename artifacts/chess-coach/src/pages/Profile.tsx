@@ -17,7 +17,7 @@ interface AdminStats {
   pageViews: { total: number; today: number };
   uniqueVisitors: { total: number; today: number };
   users: { total: number; today: number };
-  subscriptions: { active: number };
+  subscriptions: { active: number; trialing: number; canceled: number; pastDue: number; total: number };
 }
 
 interface AdminUser {
@@ -31,8 +31,12 @@ interface AdminUser {
     trialEnd: number | null;
     currentPeriodStart: number | null;
     currentPeriodEnd: number | null;
+    planInterval: string | null;
+    canceledAt: number | null;
   } | null;
 }
+
+type UserFilter = 'all' | 'paying' | 'trialing' | 'expired' | 'free';
 
 function SubBadge({ user }: { user: AdminUser }) {
   const now = Date.now() / 1000;
@@ -41,6 +45,8 @@ function SubBadge({ user }: { user: AdminUser }) {
   if (!sub) {
     return <span className="text-[10px] px-1.5 py-0.5 rounded bg-neutral-500/20 text-neutral-400">Free</span>;
   }
+
+  const interval = sub.planInterval === 'week' ? '/wk' : sub.planInterval === 'month' ? '/mo' : '';
 
   if (sub.status === 'trialing' && sub.trialEnd) {
     const daysLeft = Math.max(0, Math.ceil((sub.trialEnd - now) / 86400));
@@ -52,25 +58,35 @@ function SubBadge({ user }: { user: AdminUser }) {
   }
 
   if (sub.status === 'active') {
-    const daysSinceStart = sub.currentPeriodStart
-      ? Math.floor((now - sub.currentPeriodStart) / 86400)
-      : null;
     return (
       <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400">
-        Pro{daysSinceStart !== null ? ` · ${daysSinceStart}d` : ''}
+        💳 Pro{interval ? ` ${interval}` : ''}
       </span>
     );
   }
 
-  if (sub.status === 'canceled' || sub.status === 'past_due' || sub.status === 'unpaid') {
+  if (sub.status === 'canceled') {
     const endTs = sub.currentPeriodEnd ?? sub.trialEnd;
-    const daysSinceEnd = endTs
-      ? Math.max(0, Math.floor((now - endTs) / 86400))
-      : null;
+    const canceledTs = sub.canceledAt;
+    let detail = '';
+    if (endTs && endTs > now) {
+      const daysLeft = Math.ceil((endTs - now) / 86400);
+      detail = ` · ends ${daysLeft}d`;
+    } else if (canceledTs) {
+      const daysAgo = Math.floor((now - canceledTs) / 86400);
+      detail = ` · ${daysAgo}d ago`;
+    }
     return (
       <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-500/20 text-red-400">
-        {sub.status === 'canceled' ? 'Canceled' : sub.status === 'past_due' ? 'Past Due' : 'Unpaid'}
-        {daysSinceEnd !== null ? ` · ${daysSinceEnd}d ago` : ''}
+        Canceled{detail}
+      </span>
+    );
+  }
+
+  if (sub.status === 'past_due' || sub.status === 'unpaid') {
+    return (
+      <span className="text-[10px] px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-400">
+        {sub.status === 'past_due' ? 'Past Due' : 'Unpaid'}
       </span>
     );
   }
@@ -78,9 +94,27 @@ function SubBadge({ user }: { user: AdminUser }) {
   return <span className="text-[10px] px-1.5 py-0.5 rounded bg-neutral-500/20 text-neutral-400">{sub.status}</span>;
 }
 
+function getUserFilterCategory(user: AdminUser): UserFilter {
+  const sub = user.subscription;
+  if (!sub) return 'free';
+  if (sub.status === 'active') return 'paying';
+  if (sub.status === 'trialing') return 'trialing';
+  if (sub.status === 'canceled' || sub.status === 'past_due' || sub.status === 'unpaid') return 'expired';
+  return 'free';
+}
+
+const FILTER_TABS: { key: UserFilter; label: string; color: string }[] = [
+  { key: 'all', label: 'All', color: 'text-amber-400' },
+  { key: 'paying', label: 'Paid', color: 'text-emerald-400' },
+  { key: 'trialing', label: 'Trial', color: 'text-blue-400' },
+  { key: 'expired', label: 'Expired', color: 'text-red-400' },
+  { key: 'free', label: 'Free', color: 'text-neutral-400' },
+];
+
 function UserListPanel({ onClose }: { onClose: () => void }) {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState<UserFilter>('all');
 
   useEffect(() => {
     apiFetch('/api/admin/users', { credentials: 'include' })
@@ -89,6 +123,13 @@ function UserListPanel({ onClose }: { onClose: () => void }) {
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
+
+  const filtered = filter === 'all' ? users : users.filter(u => getUserFilterCategory(u) === filter);
+  const counts = users.reduce((acc, u) => {
+    const cat = getUserFilterCategory(u);
+    acc[cat] = (acc[cat] || 0) + 1;
+    return acc;
+  }, {} as Record<UserFilter, number>);
 
   return (
     <motion.div
@@ -103,14 +144,34 @@ function UserListPanel({ onClose }: { onClose: () => void }) {
           <X className="w-3.5 h-3.5" />
         </button>
       </div>
-      <div className="max-h-64 overflow-y-auto">
+      {!loading && users.length > 0 && (
+        <div className="px-3 py-2 flex gap-1 overflow-x-auto border-b border-border/20">
+          {FILTER_TABS.map(tab => {
+            const c = tab.key === 'all' ? users.length : (counts[tab.key] || 0);
+            if (tab.key !== 'all' && c === 0) return null;
+            const active = filter === tab.key;
+            return (
+              <button
+                key={tab.key}
+                onClick={() => setFilter(tab.key)}
+                className={`text-[11px] font-semibold px-2.5 py-1 rounded-full transition-colors whitespace-nowrap ${active ? 'bg-amber-500/15' : 'hover:bg-secondary/50'}`}
+                style={{ color: active ? undefined : 'var(--muted-foreground)' }}
+              >
+                <span className={active ? tab.color : ''}>{tab.label}</span>
+                <span className="ml-1 opacity-60">{c}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+      <div className="max-h-72 overflow-y-auto">
         {loading ? (
           <p className="text-xs text-muted-foreground text-center py-4">Loading...</p>
-        ) : users.length === 0 ? (
+        ) : filtered.length === 0 ? (
           <p className="text-xs text-muted-foreground text-center py-4">No users found</p>
         ) : (
           <div className="divide-y divide-border/20">
-            {users.map(u => (
+            {filtered.map(u => (
               <div key={u.id} className="px-4 py-2.5 flex items-center justify-between gap-3">
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-foreground truncate">
@@ -188,9 +249,14 @@ function AdminTicker() {
           <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center mx-auto mb-2">
             <CreditCard className="w-4 h-4 text-primary" />
           </div>
-          <p className="text-xl font-black text-foreground">{stats.subscriptions.active.toLocaleString()}</p>
+          <p className="text-xl font-black text-foreground">{stats.subscriptions.total.toLocaleString()}</p>
           <p className="text-xs text-muted-foreground font-medium">Subscriptions</p>
-          <p className="text-[10px] text-muted-foreground/60 mt-0.5">active</p>
+          <div className="text-[10px] text-muted-foreground/60 mt-0.5 space-y-0.5">
+            {stats.subscriptions.active > 0 && <p className="text-emerald-400">{stats.subscriptions.active} paid</p>}
+            {stats.subscriptions.trialing > 0 && <p className="text-blue-400">{stats.subscriptions.trialing} trial</p>}
+            {stats.subscriptions.canceled > 0 && <p className="text-red-400">{stats.subscriptions.canceled} expired</p>}
+            {stats.subscriptions.pastDue > 0 && <p className="text-orange-400">{stats.subscriptions.pastDue} past due</p>}
+          </div>
         </div>
       </div>
       <AnimatePresence>
