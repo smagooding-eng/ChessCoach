@@ -10,7 +10,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   User, Mail, Crown, LogOut, ChevronRight, Trophy, Swords, Target,
   GraduationCap, Settings, Shield, Edit3, Check, X, Eye, Users, CreditCard,
-  Activity
+  Activity, Send, AlertCircle, CheckCircle2
 } from 'lucide-react';
 
 interface AdminStats {
@@ -162,9 +162,195 @@ function UserListPanel({ onClose }: { onClose: () => void }) {
   );
 }
 
+function EmailComposePanel({ onClose }: { onClose: () => void }) {
+  const [mode, setMode] = useState<'single' | 'broadcast'>('single');
+  const [to, setTo] = useState('');
+  const [subject, setSubject] = useState('');
+  const [body, setBody] = useState('');
+  const [sending, setSending] = useState(false);
+  const [result, setResult] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [recipientFilter, setRecipientFilter] = useState<'all' | 'specific'>('all');
+
+  const handleSend = async () => {
+    if (!subject.trim() || !body.trim()) {
+      setResult({ type: 'error', message: 'Subject and body are required' });
+      return;
+    }
+    if (mode === 'single' && !to.trim()) {
+      setResult({ type: 'error', message: 'Recipient email is required' });
+      return;
+    }
+
+    setSending(true);
+    setResult(null);
+
+    try {
+      const endpoint = mode === 'single' ? '/api/admin/email/send' : '/api/admin/email/broadcast';
+      const payload = mode === 'single'
+        ? { to: to.trim(), subject: subject.trim(), html: body.trim() }
+        : {
+            subject: subject.trim(),
+            html: body.trim(),
+            recipientFilter,
+            ...(recipientFilter === 'specific' ? { emails: to.split(',').map(e => e.trim()).filter(Boolean) } : {}),
+          };
+
+      const res = await apiFetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        const msg = mode === 'broadcast'
+          ? `Sent to ${data.sent} recipient${data.sent !== 1 ? 's' : ''}${data.failed ? `, ${data.failed} failed` : ''}`
+          : 'Email sent successfully!';
+        setResult({ type: 'success', message: msg });
+        setTo('');
+        setSubject('');
+        setBody('');
+      } else {
+        setResult({ type: 'error', message: data.error || 'Failed to send' });
+      }
+    } catch {
+      setResult({ type: 'error', message: 'Network error' });
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const handleTestEmail = async () => {
+    setSending(true);
+    setResult(null);
+    try {
+      const res = await apiFetch('/api/admin/email/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({}),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setResult({ type: 'success', message: `Test email sent to ${data.sentTo}` });
+      } else {
+        setResult({ type: 'error', message: data.error || 'Failed to send test' });
+      }
+    } catch {
+      setResult({ type: 'error', message: 'Network error' });
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, height: 0 }}
+      animate={{ opacity: 1, height: 'auto' }}
+      exit={{ opacity: 0, height: 0 }}
+      className="border-t border-amber-500/15 overflow-hidden"
+    >
+      <div className="px-4 py-3 flex items-center justify-between bg-amber-500/5 border-b border-amber-500/10">
+        <span className="text-xs font-bold text-amber-400 flex items-center gap-1.5">
+          <Send className="w-3.5 h-3.5" /> Compose Email
+        </span>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleTestEmail}
+            disabled={sending}
+            className="text-[10px] px-2 py-1 rounded bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 transition-colors disabled:opacity-50"
+          >
+            Send Test
+          </button>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors">
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      </div>
+
+      <div className="p-4 space-y-3">
+        <div className="flex gap-1 p-0.5 bg-secondary/30 rounded-lg w-fit">
+          {(['single', 'broadcast'] as const).map(m => (
+            <button
+              key={m}
+              onClick={() => { setMode(m); setTo(''); }}
+              className={`text-[11px] font-semibold px-3 py-1.5 rounded-md transition-colors ${mode === m ? 'bg-amber-500/15 text-amber-400' : 'text-muted-foreground hover:text-foreground'}`}
+            >
+              {m === 'single' ? 'Single' : 'Broadcast'}
+            </button>
+          ))}
+        </div>
+
+        {mode === 'single' ? (
+          <input
+            value={to}
+            onChange={e => setTo(e.target.value)}
+            placeholder="Recipient email"
+            className="w-full bg-background/60 border border-border/50 rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-amber-500/40"
+          />
+        ) : (
+          <div className="flex gap-2">
+            {(['all', 'specific'] as const).map(f => (
+              <button
+                key={f}
+                onClick={() => setRecipientFilter(f)}
+                className={`text-[11px] px-2.5 py-1 rounded-full transition-colors ${recipientFilter === f ? 'bg-amber-500/15 text-amber-400' : 'bg-secondary/30 text-muted-foreground hover:text-foreground'}`}
+              >
+                {f === 'all' ? 'All Users' : 'Specific Emails'}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {mode === 'broadcast' && recipientFilter === 'specific' && (
+          <input
+            value={to}
+            onChange={e => setTo(e.target.value)}
+            placeholder="Comma-separated emails"
+            className="w-full bg-background/60 border border-border/50 rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-amber-500/40"
+          />
+        )}
+
+        <input
+          value={subject}
+          onChange={e => setSubject(e.target.value)}
+          placeholder="Subject"
+          className="w-full bg-background/60 border border-border/50 rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-amber-500/40"
+        />
+
+        <textarea
+          value={body}
+          onChange={e => setBody(e.target.value)}
+          placeholder="Email body (HTML supported)"
+          rows={5}
+          className="w-full bg-background/60 border border-border/50 rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-amber-500/40 resize-none"
+        />
+
+        {result && (
+          <div className={`flex items-center gap-2 text-xs px-3 py-2 rounded-lg ${result.type === 'success' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>
+            {result.type === 'success' ? <CheckCircle2 className="w-3.5 h-3.5 shrink-0" /> : <AlertCircle className="w-3.5 h-3.5 shrink-0" />}
+            {result.message}
+          </div>
+        )}
+
+        <button
+          onClick={handleSend}
+          disabled={sending}
+          className="w-full bg-amber-500/15 text-amber-400 hover:bg-amber-500/25 disabled:opacity-50 text-sm font-semibold py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2"
+        >
+          <Send className="w-4 h-4" />
+          {sending ? 'Sending...' : mode === 'broadcast' ? 'Send Broadcast' : 'Send Email'}
+        </button>
+      </div>
+    </motion.div>
+  );
+}
+
 function AdminTicker() {
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [showUsers, setShowUsers] = useState(false);
+  const [showEmail, setShowEmail] = useState(false);
 
   useEffect(() => {
     const fetchStats = () => {
@@ -188,7 +374,15 @@ function AdminTicker() {
       <div className="px-4 py-3 border-b border-amber-500/15 bg-amber-500/5">
         <h2 className="text-sm font-bold text-amber-400 flex items-center gap-2">
           <Activity className="w-4 h-4" /> Admin Dashboard
-          <span className="ml-auto text-[10px] font-normal text-muted-foreground">auto-refreshes every 30s</span>
+          <span className="ml-auto flex items-center gap-2">
+            <button
+              onClick={() => setShowEmail(v => !v)}
+              className={`text-[10px] font-semibold px-2 py-1 rounded transition-colors flex items-center gap-1 ${showEmail ? 'bg-amber-500/20 text-amber-400' : 'bg-amber-500/10 text-amber-400/70 hover:bg-amber-500/15 hover:text-amber-400'}`}
+            >
+              <Mail className="w-3 h-3" /> Email
+            </button>
+            <span className="text-[10px] font-normal text-muted-foreground">auto-refreshes every 30s</span>
+          </span>
         </h2>
       </div>
       <div className="grid grid-cols-3 divide-x divide-border/30">
@@ -227,6 +421,9 @@ function AdminTicker() {
       </div>
       <AnimatePresence>
         {showUsers && <UserListPanel onClose={() => setShowUsers(false)} />}
+      </AnimatePresence>
+      <AnimatePresence>
+        {showEmail && <EmailComposePanel onClose={() => setShowEmail(false)} />}
       </AnimatePresence>
     </motion.div>
   );

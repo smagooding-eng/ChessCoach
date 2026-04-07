@@ -40,6 +40,7 @@ ChessScout.net - A full-stack chess analysis platform that imports games from ch
 13. **Authentication**: Email/password + Google OAuth login, dual auth: session cookies (SameSite=None for cross-origin) + Bearer token fallback (stored in localStorage as `chess_coach_token`). Token returned from login/register endpoints and via URL hash from Google OAuth callback. `getSessionId()` in auth.ts checks Authorization header first, then cookies.
 14. **Stripe Subscriptions**: ChessScout Pro with $1/week and $4/month plans, 3-day free trial, Stripe Checkout + Customer Portal
 15. **Premium Gating**: AI Analysis, Courses, TTS, and Opponent Scout gated behind subscription via `<PremiumGate>` component
+18. **Email Integration**: Resend-powered email service (`src/lib/email.ts`). Admin can send single emails, broadcast to all users, or send test emails. Admin email compose panel in Profile page AdminTicker. Welcome email HTML template included. Uses `RESEND_API_KEY` env var (lazy-initialized). From address configurable via `RESEND_FROM_EMAIL` env var (defaults to `onboarding@resend.dev`).
 17. **PWA Support**: Installable as a Progressive Web App. manifest.json, service worker (sw.js) with network-first caching, 192/512px PNG icons, install button in sidebar/toolbar (desktop + mobile). Uses `usePwaInstall` hook to capture `beforeinstallprompt` and show a green download icon that triggers the native install prompt. Apple meta tags for iOS Add to Home Screen.
 
 ## Structure
@@ -95,6 +96,9 @@ artifacts-monorepo/
 - `POST /api/track` — Track page view with visitorId for unique visitor counting (public, no auth required)
 - `GET /api/admin/stats` — Admin stats: unique visitors, page views, user count, active subscriptions
 - `GET /api/admin/users` — Admin: list all registered users
+- `POST /api/admin/email/send` — Admin: send email to a single recipient
+- `POST /api/admin/email/broadcast` — Admin: broadcast email to all users or specific list
+- `POST /api/admin/email/test` — Admin: send test email to yourself
 
 ## TypeScript & Composite Projects
 
