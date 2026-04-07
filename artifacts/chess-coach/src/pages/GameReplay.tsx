@@ -64,23 +64,23 @@ function GameRatingPanel({
   whiteAvatar?: string;
   blackAvatar?: string;
 }) {
-  const CP_LOSS_BY_CLASS: Record<Classification, number> = {
-    checkmate: 0, brilliant: 0, excellent: 2, book: 3, good: 10,
-    inaccuracy: 40, mistake: 90, blunder: 200,
+  const WIN_PCT_LOSS_BY_CLASS: Record<Classification, number> = {
+    checkmate: 0, brilliant: 0, excellent: 0.5, book: 0.7, good: 2,
+    inaccuracy: 8, mistake: 16, blunder: 33,
   };
 
   const byColor = (c: 'white' | 'black') => reviewMoves.filter(m => m.color === c);
 
   const calcAccuracy = (moves: ReviewMove[]) => {
     if (moves.length === 0) return 0;
-    const totalCpLoss = moves.reduce((s, m) => {
+    const totalWinPctLoss = moves.reduce((s, m) => {
       if (m.cpLoss != null && m.engineAvailable) return s + m.cpLoss;
-      const baseCp = CP_LOSS_BY_CLASS[m.classification];
-      const unverifiedFloor = 15;
-      return s + Math.max(baseCp, ['good', 'book', 'excellent'].includes(m.classification) && !m.engineAvailable ? unverifiedFloor : baseCp);
+      const base = WIN_PCT_LOSS_BY_CLASS[m.classification];
+      const unverifiedFloor = 3;
+      return s + Math.max(base, ['good', 'book', 'excellent'].includes(m.classification) && !m.engineAvailable ? unverifiedFloor : base);
     }, 0);
-    const acpl = totalCpLoss / moves.length;
-    return Math.min(100, Math.max(0, 103.1668 * Math.exp(-0.04354 * acpl) - 3.1668));
+    const avgWinPctLoss = totalWinPctLoss / moves.length;
+    return Math.min(100, Math.max(0, 103.1668 * Math.exp(-0.04354 * avgWinPctLoss) - 3.1668));
   };
 
   const toGameRating = (acc: number) => {
@@ -963,21 +963,21 @@ export function GameReplay() {
 
           {/* Review summary — per-player accuracy */}
           {reviewMoves.length > 0 && (() => {
-            const CP_LOSS_MAP: Record<Classification, number> = {
-              checkmate: 0, brilliant: 0, excellent: 2, book: 3, good: 10,
-              inaccuracy: 40, mistake: 90, blunder: 200,
+            const WIN_PCT_MAP: Record<Classification, number> = {
+              checkmate: 0, brilliant: 0, excellent: 0.5, book: 0.7, good: 2,
+              inaccuracy: 8, mistake: 16, blunder: 33,
             };
 
             function calcAccuracy(moves: ReviewMove[]) {
               if (moves.length === 0) return null;
-              const totalCpLoss = moves.reduce((s, m) => {
+              const totalWinPctLoss = moves.reduce((s, m) => {
                 if (m.cpLoss != null && m.engineAvailable) return s + m.cpLoss;
-                const baseCp = CP_LOSS_MAP[m.classification];
-                const unverifiedFloor = 15;
-                return s + Math.max(baseCp, ['good', 'book', 'excellent'].includes(m.classification) && !m.engineAvailable ? unverifiedFloor : baseCp);
+                const base = WIN_PCT_MAP[m.classification];
+                const unverifiedFloor = 3;
+                return s + Math.max(base, ['good', 'book', 'excellent'].includes(m.classification) && !m.engineAvailable ? unverifiedFloor : base);
               }, 0);
-              const acpl = totalCpLoss / moves.length;
-              return Math.round(Math.min(100, Math.max(0, 103.1668 * Math.exp(-0.04354 * acpl) - 3.1668)));
+              const avgWinPctLoss = totalWinPctLoss / moves.length;
+              return Math.round(Math.min(100, Math.max(0, 103.1668 * Math.exp(-0.04354 * avgWinPctLoss) - 3.1668)));
             }
 
             function countFor(moves: ReviewMove[]) {

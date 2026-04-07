@@ -498,6 +498,8 @@ async function postProcessReview(
     let moveCpLoss = 0;
     let moveEngineAvailable = false;
 
+    const winPct = (cp: number) => 50 + 50 * (2 / (1 + Math.exp(-0.00368208 * cp)) - 1);
+
     const eng = engineEvals[idx];
     if (eng) {
       const moveUci = uciMoves[idx];
@@ -513,7 +515,11 @@ async function postProcessReview(
           ? eng.cpBefore - eng.cpAfter
           : eng.cpAfter - eng.cpBefore;
 
-        moveCpLoss = Math.max(0, cpLossRaw);
+        if (playerColor === "white") {
+          moveCpLoss = Math.max(0, winPct(eng.cpBefore) - winPct(eng.cpAfter));
+        } else {
+          moveCpLoss = Math.max(0, (100 - winPct(eng.cpBefore)) - (100 - winPct(eng.cpAfter)));
+        }
         moveEngineAvailable = true;
 
         classification = classifyFromCpLoss(cpLossRaw, isTopEngineMove, isSecondEngineMove, isOpeningRange, wasBalanced);
@@ -534,7 +540,7 @@ async function postProcessReview(
         classification = "good";
         betterMove = null;
         moveEngineAvailable = true;
-        moveCpLoss = 5;
+        moveCpLoss = 1;
       }
     }
 
