@@ -3,6 +3,7 @@ import { db, usersTable } from "@workspace/db";
 import { isNotNull, inArray, eq } from "drizzle-orm";
 import { sendEmail, sendBulkEmail } from "../lib/email";
 import { ADMIN_EMAILS } from "../lib/auth";
+import { ObjectStorageService } from "../lib/objectStorage";
 
 const router: IRouter = Router();
 
@@ -103,6 +104,51 @@ router.post("/admin/email/test", requireAdmin, async (req: Request, res: Respons
   } catch (err: any) {
     console.error("Test email error:", err.message);
     res.status(500).json({ error: err.message });
+  }
+});
+
+const objectStorage = new ObjectStorageService();
+
+router.post("/admin/email/upload-image", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const { dataUrl } = req.body;
+    if (!dataUrl || !dataUrl.startsWith('data:image/')) {
+      res.status(400).json({ error: "Valid image data URL required" });
+      return;
+    }
+
+    const mimeMatch = dataUrl.match(/^data:(image\/\w+);base64,/);
+    if (!mimeMatch) {
+      res.status(400).json({ error: "Invalid image format" });
+      return;
+    }
+    const contentType = mimeMatch[1];
+    const base64Data = dataUrl.replace(/^data:image\/\w+;base64,/, '');
+    const buffer = Buffer.from(base64Data, 'base64');
+
+    if (buffer.length > 5 * 1024 * 1024) {
+      res.status(400).json({ error: "Image must be under 5MB" });
+      return;
+    }
+
+    const uploadUrl = await objectStorage.getObjectEntityUploadURL();
+    const objectPath = objectStorage.normalizeObjectEntityPath(uploadUrl);
+
+    await fetch(uploadUrl, {
+      method: 'PUT',
+      headers: { 'Content-Type': contentType },
+      body: buffer,
+    });
+
+    const domain = process.env.REPLIT_DEPLOYMENT === '1'
+      ? process.env.REPLIT_DOMAINS?.split(',')[0]
+      : process.env.REPLIT_DEV_DOMAIN;
+    const publicUrl = `https://${domain}/api/storage${objectPath}`;
+
+    res.json({ success: true, url: publicUrl });
+  } catch (err: any) {
+    console.error("Image upload error:", err.message);
+    res.status(500).json({ error: "Failed to upload image" });
   }
 });
 

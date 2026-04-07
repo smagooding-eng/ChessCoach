@@ -430,7 +430,8 @@ ${sanitized}
     }
 
     const hasDataImages = html.includes('src="data:');
-    if (hasDataImages && !window.confirm('This email contains pasted images that won\'t show up in the recipient\'s inbox. They\'ll be replaced with a notice. For images, use the toolbar image button with a hosted URL.\n\nSend anyway?')) {
+    if (hasDataImages) {
+      setResult({ type: 'error', message: 'Some images are still uploading. Wait for "Uploading image..." to finish, then try again.' });
       return;
     }
 
@@ -701,11 +702,37 @@ ${sanitized}
                           e.preventDefault();
                           const file = items[i].getAsFile();
                           if (file) {
+                            const placeholderId = `img-upload-${Date.now()}`;
+                            document.execCommand('insertHTML', false,
+                              `<span id="${placeholderId}" style="display:inline-block;background:#302e2b;color:#9e9b98;padding:8px 14px;border-radius:6px;font-size:13px;margin:4px 0;">Uploading image...</span>`);
                             const reader = new FileReader();
-                            reader.onload = (ev) => {
+                            reader.onload = async (ev) => {
                               const dataUrl = ev.target?.result as string;
-                              document.execCommand('insertHTML', false,
-                                `<img src="${dataUrl}" style="max-width:100%;height:auto;border-radius:8px;margin:8px 0;" />`);
+                              try {
+                                const res = await apiFetch('/api/admin/email/upload-image', {
+                                  method: 'POST',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  credentials: 'include',
+                                  body: JSON.stringify({ dataUrl }),
+                                });
+                                const data = await res.json();
+                                const placeholder = document.getElementById(placeholderId);
+                                if (data.success && data.url && placeholder) {
+                                  const img = document.createElement('img');
+                                  img.src = data.url;
+                                  img.style.cssText = 'max-width:100%;height:auto;border-radius:8px;margin:8px 0;';
+                                  placeholder.replaceWith(img);
+                                } else if (placeholder) {
+                                  placeholder.textContent = `Image upload failed: ${data.error || 'Unknown error'}`;
+                                  placeholder.style.color = '#ff6b6b';
+                                }
+                              } catch {
+                                const placeholder = document.getElementById(placeholderId);
+                                if (placeholder) {
+                                  placeholder.textContent = 'Image upload failed — check connection';
+                                  placeholder.style.color = '#ff6b6b';
+                                }
+                              }
                             };
                             reader.readAsDataURL(file);
                           }
@@ -718,6 +745,44 @@ ${sanitized}
                         const tmp = document.createElement('div');
                         tmp.innerHTML = clipHtml;
                         tmp.querySelectorAll('script,style,link,meta,svg').forEach(el => el.remove());
+                        tmp.querySelectorAll('img').forEach(img => {
+                          const src = img.getAttribute('src') || '';
+                          if (src.startsWith('data:')) {
+                            const placeholderId = `img-upload-${Date.now()}-${Math.random().toString(36).slice(2,6)}`;
+                            const span = document.createElement('span');
+                            span.id = placeholderId;
+                            span.setAttribute('style', 'display:inline-block;background:#302e2b;color:#9e9b98;padding:8px 14px;border-radius:6px;font-size:13px;margin:4px 0;');
+                            span.textContent = 'Uploading image...';
+                            img.replaceWith(span);
+                            (async () => {
+                              try {
+                                const res = await apiFetch('/api/admin/email/upload-image', {
+                                  method: 'POST',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  credentials: 'include',
+                                  body: JSON.stringify({ dataUrl: src }),
+                                });
+                                const data = await res.json();
+                                const el = document.getElementById(placeholderId);
+                                if (data.success && data.url && el) {
+                                  const newImg = document.createElement('img');
+                                  newImg.src = data.url;
+                                  newImg.style.cssText = 'max-width:100%;height:auto;border-radius:8px;margin:8px 0;';
+                                  el.replaceWith(newImg);
+                                } else if (el) {
+                                  el.textContent = `Image upload failed`;
+                                  el.style.color = '#ff6b6b';
+                                }
+                              } catch {
+                                const el = document.getElementById(placeholderId);
+                                if (el) {
+                                  el.textContent = 'Image upload failed';
+                                  el.style.color = '#ff6b6b';
+                                }
+                              }
+                            })();
+                          }
+                        });
                         tmp.querySelectorAll('*').forEach(el => el.removeAttribute('class'));
                         document.execCommand('insertHTML', false, tmp.innerHTML);
                       }
