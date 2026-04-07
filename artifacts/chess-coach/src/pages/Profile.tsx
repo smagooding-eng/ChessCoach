@@ -326,7 +326,7 @@ function EmailComposerModal({ onClose, initialRecipients }: { onClose: () => voi
     return editorRef.current?.innerHTML || '';
   };
 
-  const sanitizeForEmail = (html: string): string => {
+  const sanitizeForEmail = (html: string, forPreview = false): string => {
     const div = document.createElement('div');
     div.innerHTML = html;
 
@@ -335,7 +335,14 @@ function EmailComposerModal({ onClose, initialRecipients }: { onClose: () => voi
     div.querySelectorAll('img').forEach(img => {
       const src = img.getAttribute('src') || '';
       if (src.startsWith('data:')) {
-        img.remove();
+        if (forPreview) {
+          const notice = document.createElement('div');
+          notice.setAttribute('style', 'color:#ff6b6b;font-size:13px;font-style:italic;margin:8px 0;padding:8px 12px;border:1px dashed #ff6b6b;border-radius:6px;background:rgba(255,107,107,0.08);');
+          notice.textContent = '\u26a0 This pasted image won\'t appear in the email. Use the image button (\ud83d\uddbc) to insert a hosted URL.';
+          img.replaceWith(notice);
+        } else {
+          img.remove();
+        }
         return;
       }
       img.setAttribute('style', 'max-width:100%;height:auto;border-radius:8px;margin:8px 0;display:block;');
@@ -419,6 +426,11 @@ ${sanitized}
     }
     if (!broadcastAll && recipients.length === 0) {
       setResult({ type: 'error', message: 'Add at least one recipient or select "All Users"' });
+      return;
+    }
+
+    const hasDataImages = html.includes('src="data:');
+    if (hasDataImages && !window.confirm('This email contains pasted images that won\'t show up in the recipient\'s inbox. They\'ll be replaced with a notice. For images, use the toolbar image button with a hosted URL.\n\nSend anyway?')) {
       return;
     }
 
@@ -683,21 +695,31 @@ ${sanitized}
                     className="bg-[#262421] border border-border/40 rounded-b-lg px-4 py-3 min-h-[200px] max-h-[350px] overflow-y-auto text-sm text-[#e8e6e3] focus:outline-none focus:border-amber-500/40 [&_h2]:text-lg [&_h2]:font-bold [&_h2]:text-[#81b64c] [&_h2]:mb-2 [&_h3]:text-base [&_h3]:font-semibold [&_h3]:text-[#e8e6e3] [&_h3]:mb-1 [&_p]:mb-2 [&_a]:text-[#81b64c] [&_a]:underline [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:mb-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:mb-2 [&_li]:mb-1 [&_img]:max-w-full [&_img]:rounded-lg [&_img]:my-2 [&_hr]:border-border/30 [&_hr]:my-3"
                     data-placeholder="Start typing your email..."
                     onPaste={(e) => {
-                      e.preventDefault();
+                      const items = e.clipboardData.items;
+                      for (let i = 0; i < items.length; i++) {
+                        if (items[i].type.startsWith('image/')) {
+                          e.preventDefault();
+                          const file = items[i].getAsFile();
+                          if (file) {
+                            const reader = new FileReader();
+                            reader.onload = (ev) => {
+                              const dataUrl = ev.target?.result as string;
+                              document.execCommand('insertHTML', false,
+                                `<img src="${dataUrl}" style="max-width:100%;height:auto;border-radius:8px;margin:8px 0;" />`);
+                            };
+                            reader.readAsDataURL(file);
+                          }
+                          return;
+                        }
+                      }
                       const clipHtml = e.clipboardData.getData('text/html');
-                      const clipText = e.clipboardData.getData('text/plain');
                       if (clipHtml) {
+                        e.preventDefault();
                         const tmp = document.createElement('div');
                         tmp.innerHTML = clipHtml;
                         tmp.querySelectorAll('script,style,link,meta,svg').forEach(el => el.remove());
-                        tmp.querySelectorAll('img').forEach(img => {
-                          const src = img.getAttribute('src') || '';
-                          if (src.startsWith('data:')) img.remove();
-                        });
                         tmp.querySelectorAll('*').forEach(el => el.removeAttribute('class'));
                         document.execCommand('insertHTML', false, tmp.innerHTML);
-                      } else if (clipText) {
-                        document.execCommand('insertText', false, clipText);
                       }
                     }}
                     suppressContentEditableWarning
@@ -715,7 +737,7 @@ ${sanitized}
                       </div>
                       <div
                         style={{ backgroundColor: '#302e2b', borderRadius: '12px', padding: '24px', color: '#e8e6e3', fontSize: '15px', lineHeight: '1.7' }}
-                        dangerouslySetInnerHTML={{ __html: (() => { const raw = getEditorHtml(); return raw.trim() ? sanitizeForEmail(raw) : '<p style="color:#9e9b98;">Your email content will appear here...</p>'; })() }}
+                        dangerouslySetInnerHTML={{ __html: (() => { const raw = getEditorHtml(); return raw.trim() ? sanitizeForEmail(raw, true) : '<p style="color:#9e9b98;">Your email content will appear here...</p>'; })() }}
                       />
                       <p style={{ color: '#666', fontSize: '12px', textAlign: 'center', marginTop: '16px' }}>
                         ChessScout.net — Know your opponent's weaknesses.
