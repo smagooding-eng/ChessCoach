@@ -75,6 +75,7 @@ router.post("/admin/email/broadcast", requireAdmin, async (req: Request, res: Re
       success: true,
       totalRecipients: recipients.length,
       ...results,
+      failedEmails: results.errors.length > 0 ? results.errors : undefined,
     });
   } catch (err: any) {
     console.error("Broadcast email error:", err.message);

@@ -471,10 +471,19 @@ ${sanitized}
         let data: any;
         try { data = await res.json(); } catch { data = {}; }
         if (res.ok) {
-          const msg = broadcastAll || recipients.length > 1
-            ? `Sent to ${data.sent ?? 0} recipient${(data.sent ?? 0) !== 1 ? 's' : ''}${data.failed ? `, ${data.failed} failed` : ''}`
-            : 'Email sent successfully!';
-          setResult({ type: 'success', message: msg });
+          const isBulk = broadcastAll || recipients.length > 1;
+          if (isBulk) {
+            let msg = `Sent to ${data.sent ?? 0} recipient${(data.sent ?? 0) !== 1 ? 's' : ''}`;
+            if (data.failed) {
+              msg += `, ${data.failed} failed`;
+              if (data.failedEmails?.length) {
+                msg += ':\n' + data.failedEmails.join('\n');
+              }
+            }
+            setResult({ type: data.failed ? 'error' : 'success', message: msg });
+          } else {
+            setResult({ type: 'success', message: 'Email sent successfully!' });
+          }
         } else {
           setResult({ type: 'error', message: data.error || `Server error (${res.status})` });
         }

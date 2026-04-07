@@ -39,6 +39,8 @@ export async function sendEmail(options: SendEmailOptions) {
   return data;
 }
 
+const delay = (ms: number) => new Promise(r => setTimeout(r, ms));
+
 export async function sendBulkEmail(recipients: string[], subject: string, html: string, text?: string) {
   const results = {
     sent: 0,
@@ -46,19 +48,28 @@ export async function sendBulkEmail(recipients: string[], subject: string, html:
     errors: [] as string[],
   };
 
-  const batchSize = 10;
-  for (let i = 0; i < recipients.length; i += batchSize) {
-    const batch = recipients.slice(i, i + batchSize);
-    const promises = batch.map(async (to) => {
-      try {
-        await sendEmail({ to, subject, html, text });
-        results.sent++;
-      } catch (err: any) {
-        results.failed++;
-        results.errors.push(`${to}: ${err.message}`);
+  for (const to of recipients) {
+    try {
+      await sendEmail({ to, subject, html, text });
+      results.sent++;
+      await delay(600);
+    } catch (err: any) {
+      results.failed++;
+      results.errors.push(`${to}: ${err.message}`);
+      console.error(`Email failed for ${to}:`, err.message);
+      if (err.message?.includes('rate') || err.message?.includes('429')) {
+        console.log('Rate limited, waiting 5s...');
+        await delay(5000);
+        try {
+          await sendEmail({ to, subject, html, text });
+          results.failed--;
+          results.sent++;
+          results.errors.pop();
+        } catch (retryErr: any) {
+          console.error(`Retry also failed for ${to}:`, retryErr.message);
+        }
       }
-    });
-    await Promise.all(promises);
+    }
   }
 
   return results;
