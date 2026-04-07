@@ -326,7 +326,70 @@ function EmailComposerModal({ onClose, initialRecipients }: { onClose: () => voi
     return editorRef.current?.innerHTML || '';
   };
 
+  const sanitizeForEmail = (html: string): string => {
+    const div = document.createElement('div');
+    div.innerHTML = html;
+
+    div.querySelectorAll('script,style,link,meta').forEach(el => el.remove());
+
+    div.querySelectorAll('img').forEach(img => {
+      const src = img.getAttribute('src') || '';
+      if (src.startsWith('data:')) {
+        img.remove();
+        return;
+      }
+      img.setAttribute('style', 'max-width:100%;height:auto;border-radius:8px;margin:8px 0;display:block;');
+      img.removeAttribute('class');
+    });
+
+    const inlineStyles: Record<string, string> = {
+      'h1': 'color:#81b64c;font-size:24px;font-weight:bold;margin:0 0 12px;line-height:1.3;',
+      'h2': 'color:#81b64c;font-size:20px;font-weight:bold;margin:0 0 10px;line-height:1.3;',
+      'h3': 'color:#e8e6e3;font-size:17px;font-weight:600;margin:0 0 8px;line-height:1.4;',
+      'h4': 'color:#e8e6e3;font-size:15px;font-weight:600;margin:0 0 6px;line-height:1.4;',
+      'p': 'color:#e8e6e3;font-size:15px;line-height:1.7;margin:0 0 12px;',
+      'ul': 'color:#e8e6e3;font-size:15px;line-height:1.7;margin:0 0 12px;padding-left:20px;',
+      'ol': 'color:#e8e6e3;font-size:15px;line-height:1.7;margin:0 0 12px;padding-left:20px;',
+      'li': 'color:#e8e6e3;margin-bottom:4px;',
+      'strong': 'color:#e8e6e3;font-weight:bold;',
+      'b': 'color:#e8e6e3;font-weight:bold;',
+      'em': 'color:#e8e6e3;font-style:italic;',
+      'i': 'color:#e8e6e3;font-style:italic;',
+      'hr': 'border:none;border-top:1px solid #444;margin:16px 0;',
+      'blockquote': 'border-left:3px solid #81b64c;padding-left:12px;margin:12px 0;color:#9e9b98;font-style:italic;',
+    };
+
+    Object.entries(inlineStyles).forEach(([tag, style]) => {
+      div.querySelectorAll(tag).forEach(el => {
+        const existing = el.getAttribute('style') || '';
+        if (tag === 'a') return;
+        el.setAttribute('style', style + existing);
+        el.removeAttribute('class');
+      });
+    });
+
+    div.querySelectorAll('a').forEach(a => {
+      const existing = a.getAttribute('style') || '';
+      if (existing.includes('background')) {
+        a.setAttribute('style', existing);
+      } else {
+        a.setAttribute('style', 'color:#81b64c;text-decoration:underline;' + existing);
+      }
+      a.removeAttribute('class');
+    });
+
+    div.querySelectorAll('div,span,section,article,header,footer,main,figure,figcaption').forEach(el => {
+      if (!el.getAttribute('style')) {
+        el.setAttribute('style', 'color:#e8e6e3;');
+      }
+      el.removeAttribute('class');
+    });
+
+    return div.innerHTML;
+  };
+
   const wrapInEmailTemplate = (bodyHtml: string): string => {
+    const sanitized = sanitizeForEmail(bodyHtml);
     return `<!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
@@ -336,7 +399,7 @@ function EmailComposerModal({ onClose, initialRecipients }: { onClose: () => voi
 <h1 style="color:#81b64c;font-size:24px;margin:0;">♜ ChessScout.net</h1>
 </div>
 <div style="background-color:#302e2b;border-radius:12px;padding:32px;color:#e8e6e3;font-size:15px;line-height:1.7;">
-${bodyHtml}
+${sanitized}
 </div>
 <p style="color:#666;font-size:12px;text-align:center;margin-top:24px;">ChessScout.net — Know your opponent's weaknesses.</p>
 </div>
@@ -619,6 +682,24 @@ ${bodyHtml}
                     contentEditable
                     className="bg-[#262421] border border-border/40 rounded-b-lg px-4 py-3 min-h-[200px] max-h-[350px] overflow-y-auto text-sm text-[#e8e6e3] focus:outline-none focus:border-amber-500/40 [&_h2]:text-lg [&_h2]:font-bold [&_h2]:text-[#81b64c] [&_h2]:mb-2 [&_h3]:text-base [&_h3]:font-semibold [&_h3]:text-[#e8e6e3] [&_h3]:mb-1 [&_p]:mb-2 [&_a]:text-[#81b64c] [&_a]:underline [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:mb-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:mb-2 [&_li]:mb-1 [&_img]:max-w-full [&_img]:rounded-lg [&_img]:my-2 [&_hr]:border-border/30 [&_hr]:my-3"
                     data-placeholder="Start typing your email..."
+                    onPaste={(e) => {
+                      e.preventDefault();
+                      const clipHtml = e.clipboardData.getData('text/html');
+                      const clipText = e.clipboardData.getData('text/plain');
+                      if (clipHtml) {
+                        const tmp = document.createElement('div');
+                        tmp.innerHTML = clipHtml;
+                        tmp.querySelectorAll('script,style,link,meta,svg').forEach(el => el.remove());
+                        tmp.querySelectorAll('img').forEach(img => {
+                          const src = img.getAttribute('src') || '';
+                          if (src.startsWith('data:')) img.remove();
+                        });
+                        tmp.querySelectorAll('*').forEach(el => el.removeAttribute('class'));
+                        document.execCommand('insertHTML', false, tmp.innerHTML);
+                      } else if (clipText) {
+                        document.execCommand('insertText', false, clipText);
+                      }
+                    }}
                     suppressContentEditableWarning
                   />
                 </>
@@ -634,7 +715,7 @@ ${bodyHtml}
                       </div>
                       <div
                         style={{ backgroundColor: '#302e2b', borderRadius: '12px', padding: '24px', color: '#e8e6e3', fontSize: '15px', lineHeight: '1.7' }}
-                        dangerouslySetInnerHTML={{ __html: getEditorHtml() || '<p style="color:#9e9b98;">Your email content will appear here...</p>' }}
+                        dangerouslySetInnerHTML={{ __html: (() => { const raw = getEditorHtml(); return raw.trim() ? sanitizeForEmail(raw) : '<p style="color:#9e9b98;">Your email content will appear here...</p>'; })() }}
                       />
                       <p style={{ color: '#666', fontSize: '12px', textAlign: 'center', marginTop: '16px' }}>
                         ChessScout.net — Know your opponent's weaknesses.
