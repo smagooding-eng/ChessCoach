@@ -365,48 +365,46 @@ ${bodyHtml}
     const wrappedHtml = wrapInEmailTemplate(html);
 
     try {
+      let res: Response;
       if (broadcastAll) {
-        const res = await apiFetch('/api/admin/email/broadcast', {
+        res = await apiFetch('/api/admin/email/broadcast', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
           body: JSON.stringify({ subject: subject.trim(), html: wrappedHtml, recipientFilter: 'all' }),
         });
-        const data = await res.json();
-        if (res.ok) {
-          setResult({ type: 'success', message: `Broadcast sent to ${data.sent} user${data.sent !== 1 ? 's' : ''}${data.failed ? `, ${data.failed} failed` : ''}` });
-        } else {
-          setResult({ type: 'error', message: data.error || 'Failed to send' });
-        }
       } else if (recipients.length === 1) {
-        const res = await apiFetch('/api/admin/email/send', {
+        res = await apiFetch('/api/admin/email/send', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
           body: JSON.stringify({ to: recipients[0], subject: subject.trim(), html: wrappedHtml }),
         });
-        const data = await res.json();
-        if (res.ok) {
-          setResult({ type: 'success', message: 'Email sent successfully!' });
-        } else {
-          setResult({ type: 'error', message: data.error || 'Failed to send' });
-        }
       } else {
-        const res = await apiFetch('/api/admin/email/broadcast', {
+        res = await apiFetch('/api/admin/email/broadcast', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
           body: JSON.stringify({ subject: subject.trim(), html: wrappedHtml, recipientFilter: 'specific', emails: recipients }),
         });
-        const data = await res.json();
+      }
+
+      if (res.status === 413) {
+        setResult({ type: 'error', message: 'Email content is too large. Try removing images or shortening the content.' });
+      } else {
+        let data: any;
+        try { data = await res.json(); } catch { data = {}; }
         if (res.ok) {
-          setResult({ type: 'success', message: `Sent to ${data.sent} recipient${data.sent !== 1 ? 's' : ''}${data.failed ? `, ${data.failed} failed` : ''}` });
+          const msg = broadcastAll || recipients.length > 1
+            ? `Sent to ${data.sent ?? 0} recipient${(data.sent ?? 0) !== 1 ? 's' : ''}${data.failed ? `, ${data.failed} failed` : ''}`
+            : 'Email sent successfully!';
+          setResult({ type: 'success', message: msg });
         } else {
-          setResult({ type: 'error', message: data.error || 'Failed to send' });
+          setResult({ type: 'error', message: data.error || `Server error (${res.status})` });
         }
       }
-    } catch {
-      setResult({ type: 'error', message: 'Network error' });
+    } catch (err: any) {
+      setResult({ type: 'error', message: err?.message || 'Network error — check your connection' });
     } finally {
       setSending(false);
     }
@@ -427,14 +425,19 @@ ${bodyHtml}
           html: wrappedHtml,
         }),
       });
-      const data = await res.json();
-      if (res.ok) {
-        setResult({ type: 'success', message: `Test sent to ${data.sentTo}` });
+      if (res.status === 413) {
+        setResult({ type: 'error', message: 'Email content is too large. Try removing images or shortening the content.' });
       } else {
-        setResult({ type: 'error', message: data.error || 'Failed to send test' });
+        let data: any;
+        try { data = await res.json(); } catch { data = {}; }
+        if (res.ok) {
+          setResult({ type: 'success', message: `Test sent to ${data.sentTo}` });
+        } else {
+          setResult({ type: 'error', message: data.error || `Server error (${res.status})` });
+        }
       }
-    } catch {
-      setResult({ type: 'error', message: 'Network error' });
+    } catch (err: any) {
+      setResult({ type: 'error', message: err?.message || 'Network error — check your connection' });
     } finally {
       setSending(false);
     }
