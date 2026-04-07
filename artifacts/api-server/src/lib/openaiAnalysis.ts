@@ -430,7 +430,6 @@ async function postProcessReview(
     }
   }
 
-  const BATCH_SIZE = 8;
   const engineEvals: Array<{
     cpBefore: number; cpAfter: number;
     topUci: string; secondUci: string;
@@ -438,47 +437,37 @@ async function postProcessReview(
     bestMoveSan: string | null;
   } | null> = new Array(fens.length).fill(null);
 
-  for (let batchStart = 0; batchStart < fens.length - 1; batchStart += BATCH_SIZE) {
-    const batchEnd = Math.min(batchStart + BATCH_SIZE, fens.length - 1);
-    const fetches: Array<Promise<void>> = [];
+  for (let i = 0; i < fens.length - 1; i++) {
+    const fenBefore = fens[i];
+    const fenAfter = fens[i + 1];
+    if (!fenBefore || !fenAfter) continue;
 
-    for (let i = batchStart; i < batchEnd; i++) {
-      fetches.push((async () => {
-        const fenBefore = fens[i];
-        const fenAfter = fens[i + 1];
-        if (!fenBefore || !fenAfter) return;
+    const evalBefore = await fetchLichessEval(fenBefore, 2);
+    if (!evalBefore || evalBefore.pvs.length === 0) continue;
 
-        const [evalBefore, evalAfter] = await Promise.all([
-          fetchLichessEval(fenBefore, 2),
-          fetchLichessEval(fenAfter, 1),
-        ]);
+    const cpBefore = pvToWhiteCp(evalBefore.pvs[0]);
+    const topUci = evalBefore.pvs[0]?.moves?.split(" ")[0] ?? "";
+    const secondUci = evalBefore.pvs[1]?.moves?.split(" ")[0] ?? "";
+    const bestMoveSan = topUci ? uciToSan(fenBefore, topUci) : null;
 
-        if (!evalBefore || evalBefore.pvs.length === 0) return;
+    const evalAfter = await fetchLichessEval(fenAfter, 1);
 
-        const cpBefore = pvToWhiteCp(evalBefore.pvs[0]);
-        const topUci = evalBefore.pvs[0]?.moves?.split(" ")[0] ?? "";
-        const secondUci = evalBefore.pvs[1]?.moves?.split(" ")[0] ?? "";
-        const bestMoveSan = topUci ? uciToSan(fenBefore, topUci) : null;
-
-        if (!evalAfter || evalAfter.pvs.length === 0) {
-          engineEvals[i] = {
-            cpBefore, cpAfter: cpBefore, topUci, secondUci,
-            available: false, depth: evalBefore.depth,
-            bestMoveSan,
-          };
-          return;
-        }
-
-        const cpAfter = pvToWhiteCp(evalAfter.pvs[0]);
-
-        engineEvals[i] = {
-          cpBefore, cpAfter, topUci, secondUci,
-          available: true, depth: evalBefore.depth,
-          bestMoveSan,
-        };
-      })());
+    if (!evalAfter || evalAfter.pvs.length === 0) {
+      engineEvals[i] = {
+        cpBefore, cpAfter: cpBefore, topUci, secondUci,
+        available: false, depth: evalBefore.depth,
+        bestMoveSan,
+      };
+      continue;
     }
-    await Promise.all(fetches);
+
+    const cpAfter = pvToWhiteCp(evalAfter.pvs[0]);
+
+    engineEvals[i] = {
+      cpBefore, cpAfter, topUci, secondUci,
+      available: true, depth: evalBefore.depth,
+      bestMoveSan,
+    };
   }
 
   return reviewMoves.map((rm) => {

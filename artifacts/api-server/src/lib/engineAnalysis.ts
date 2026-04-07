@@ -1,15 +1,14 @@
 import { Chess } from "chess.js";
 import { logger } from "./logger";
-import { evalPosition } from "./stockfishLocal";
 
 const START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
 // ─── Lichess Cloud Eval ───────────────────────────────────────────────────────
 
 interface LichessPv {
-  moves: string;   // space-separated UCI moves
-  cp?: number;     // centipawns from WHITE's perspective (positive = white winning)
-  mate?: number;   // moves to mate (positive = white wins)
+  moves: string;
+  cp?: number;
+  mate?: number;
 }
 
 interface LichessCloudEval {
@@ -19,54 +18,79 @@ interface LichessCloudEval {
   pvs: LichessPv[];
 }
 
-/** Fetch Stockfish evaluation from Lichess Cloud Eval API,
- *  falling back to the local Stockfish 18 WASM engine for positions not in the cache. */
+const LICHESS_MIN_DELAY_MS = 350;
+let lastLichessCallTime = 0;
+
+const evalCache = new Map<string, LichessCloudEval | null>();
+const MAX_CACHE_SIZE = 500;
+
+async function rateLimitedDelay(): Promise<void> {
+  const now = Date.now();
+  const elapsed = now - lastLichessCallTime;
+  if (elapsed < LICHESS_MIN_DELAY_MS) {
+    await new Promise(resolve => setTimeout(resolve, LICHESS_MIN_DELAY_MS - elapsed));
+  }
+  lastLichessCallTime = Date.now();
+}
+
 export async function fetchLichessEval(fen: string, multiPv = 2): Promise<LichessCloudEval | null> {
-  try {
-    const url = `https://lichess.org/api/cloud-eval?fen=${encodeURIComponent(fen)}&multiPv=${multiPv}`;
-    const res = await fetch(url, {
-      headers: { Accept: "application/json", "User-Agent": "ChessCoach/1.0" },
-      signal: AbortSignal.timeout(6000),
-    });
-    if (res.status === 404) {
-      return localStockfishFallback(fen, multiPv);
-    }
-    if (!res.ok) {
-      logger.warn({ status: res.status, fen }, "Lichess cloud eval non-OK");
-      return localStockfishFallback(fen, multiPv);
-    }
-    return (await res.json()) as LichessCloudEval;
-  } catch (err) {
-    logger.warn({ err }, "Lichess cloud eval fetch failed, using local Stockfish");
-    return localStockfishFallback(fen, multiPv);
+  const cacheKey = `${fen}:${multiPv}`;
+  if (evalCache.has(cacheKey)) {
+    return evalCache.get(cacheKey) ?? null;
   }
+  const MAX_RETRIES = 3;
+
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    await rateLimitedDelay();
+
+    try {
+      const url = `https://lichess.org/api/cloud-eval?fen=${encodeURIComponent(fen)}&multiPv=${multiPv}`;
+      const res = await fetch(url, {
+        headers: { Accept: "application/json", "User-Agent": "ChessCoach/1.0" },
+        signal: AbortSignal.timeout(8000),
+      });
+
+      if (res.status === 404) {
+        cacheResult(cacheKey, null);
+        return null;
+      }
+
+      if (res.status === 429) {
+        const backoff = Math.min(2000 * (attempt + 1), 8000);
+        logger.warn({ attempt, fen, backoff }, "Lichess 429 rate limit, backing off");
+        await new Promise(resolve => setTimeout(resolve, backoff));
+        continue;
+      }
+
+      if (!res.ok) {
+        logger.warn({ status: res.status, fen }, "Lichess cloud eval non-OK");
+        return null;
+      }
+
+      const result = (await res.json()) as LichessCloudEval;
+      cacheResult(cacheKey, result);
+      return result;
+    } catch (err) {
+      logger.warn({ err, attempt }, "Lichess cloud eval fetch failed");
+      if (attempt < MAX_RETRIES - 1) {
+        await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
+        continue;
+      }
+      return null;
+    }
+  }
+
+  return null;
 }
 
-async function localStockfishFallback(fen: string, multiPv: number): Promise<LichessCloudEval | null> {
-  try {
-    const result = await evalPosition(fen, 18, multiPv);
-    if (!result) return null;
-
-    const pvs: LichessPv[] = (result.multiPv || [{ cp: result.cp, mate: result.mate, moves: result.pv }])
-      .map(pv => ({
-        moves: pv.moves,
-        ...(pv.mate !== null ? { mate: pv.mate } : { cp: pv.cp }),
-      }));
-
-    return {
-      fen,
-      knodes: 0,
-      depth: result.depth,
-      pvs,
-    };
-  } catch (err) {
-    logger.warn({ err }, "Local Stockfish fallback also failed");
-    return null;
+function cacheResult(key: string, value: LichessCloudEval | null): void {
+  if (evalCache.size >= MAX_CACHE_SIZE) {
+    const firstKey = evalCache.keys().next().value;
+    if (firstKey) evalCache.delete(firstKey);
   }
+  evalCache.set(key, value);
 }
 
-/** Convert a Lichess PV centipawn/mate value to a normalized number from WHITE's perspective.
- *  Mate in N for white → +10000 − N; mate in N for black → −10000 + N. */
 export function pvToWhiteCp(pv: LichessPv): number {
   if (pv.mate !== undefined) {
     return pv.mate > 0 ? 10000 - pv.mate : -10000 - pv.mate;
@@ -74,7 +98,6 @@ export function pvToWhiteCp(pv: LichessPv): number {
   return pv.cp ?? 0;
 }
 
-/** Convert a UCI move string (e.g. "e2e4" or "e7e8q") to SAN using a given FEN. */
 export function uciToSan(fen: string, uci: string): string | null {
   try {
     const chess = new Chess(fen);
@@ -99,24 +122,18 @@ export type EngineClassification =
   | "mistake"
   | "blunder";
 
-/** Classify a move from centipawn loss (always ≥ 0, from the PLAYER'S perspective).
- *  Also needs to know if the move was the engine's top choice (for brilliant detection),
- *  and whether we're still in the opening (for book detection). */
 export function classifyFromCpLoss(
   cpLoss: number,
   isTopEngineMove: boolean,
   isSecondEngineMove: boolean,
   isOpeningRange: boolean,
-  wasBalanced: boolean, // |evalBefore| < 150
+  wasBalanced: boolean,
 ): EngineClassification {
-  // Book: early game, balanced position, move matches engine's top or second choice
   if (isOpeningRange && wasBalanced && (isTopEngineMove || isSecondEngineMove) && cpLoss <= 15) {
     return "book";
   }
 
   if (cpLoss < 0) {
-    // The move actually improved the engine evaluation
-    // Brilliant: not the engine's first choice, yet the position improved significantly
     if (!isTopEngineMove && cpLoss < -20) return "brilliant";
     return "excellent";
   }
@@ -132,36 +149,33 @@ export function classifyFromCpLoss(
 
 export interface EngineEvalResult {
   classification: EngineClassification;
-  cpLoss: number;              // centipawns lost by the player (clamped to 0 if position improved)
-  cpLossRaw: number;           // unclamped (negative = improved)
+  cpLoss: number;
+  cpLossRaw: number;
   engineCpBefore: number | null;
   engineCpAfter: number | null;
-  engineBestMoveSan: string | null;  // engine's top move BEFORE the position (for "better move" hints)
+  engineBestMoveSan: string | null;
   isEngineTopChoice: boolean;
   depth: number;
-  available: boolean;          // false if cloud eval had no data
+  available: boolean;
 }
 
 export async function engineEvalMove(params: {
   fenBefore: string;
   fenAfter: string;
-  playedFrom: string;          // e.g. "e2"
-  playedTo: string;            // e.g. "e4"
+  playedFrom: string;
+  playedTo: string;
   playerColor: "white" | "black";
-  moveIndex: number;           // 0-based half-move index
+  moveIndex: number;
 }): Promise<EngineEvalResult> {
   const { fenBefore, fenAfter, playedFrom, playedTo, playerColor, moveIndex } = params;
 
-  const isOpeningRange = moveIndex < 30; // first 15 full moves
+  const isOpeningRange = moveIndex < 30;
 
-  // Parallel fetch for both positions
-  const [evalBefore, evalAfter] = await Promise.all([
-    fetchLichessEval(fenBefore, 2),
-    fetchLichessEval(fenAfter, 1),
-  ]);
+  const evalBefore = await fetchLichessEval(fenBefore, 2);
+  const evalAfter = await fetchLichessEval(fenAfter, 1);
 
   if (!evalBefore || evalBefore.pvs.length === 0) {
-    logger.debug({ fen: fenBefore }, "No engine eval available (cloud + local Stockfish both failed)");
+    logger.debug({ fen: fenBefore }, "No engine eval for position before move");
     return {
       classification: isOpeningRange ? "book" : "good",
       cpLoss: 0,
@@ -178,7 +192,40 @@ export async function engineEvalMove(params: {
   const cpBefore = pvToWhiteCp(evalBefore.pvs[0]);
 
   if (!evalAfter || evalAfter.pvs.length === 0) {
-    logger.debug({ fen: fenAfter }, "No engine eval for position after move (cloud + local both failed)");
+    const topUci = evalBefore.pvs[0]?.moves?.split(" ")[0] ?? "";
+    const secondUci = evalBefore.pvs[1]?.moves?.split(" ")[0] ?? "";
+    const playedUci = `${playedFrom}${playedTo}`;
+    const isTopEngineMove = topUci.startsWith(playedUci);
+    const isSecondEngineMove = secondUci.startsWith(playedUci);
+    const engineBestMoveSan = topUci ? uciToSan(fenBefore, topUci) : null;
+
+    if (isTopEngineMove) {
+      return {
+        classification: isOpeningRange ? "book" : "excellent",
+        cpLoss: 0,
+        cpLossRaw: 0,
+        engineCpBefore: cpBefore,
+        engineCpAfter: null,
+        engineBestMoveSan: null,
+        isEngineTopChoice: true,
+        depth: evalBefore.depth,
+        available: true,
+      };
+    }
+    if (isSecondEngineMove) {
+      return {
+        classification: isOpeningRange ? "book" : "good",
+        cpLoss: 0,
+        cpLossRaw: 0,
+        engineCpBefore: cpBefore,
+        engineCpAfter: null,
+        engineBestMoveSan: engineBestMoveSan,
+        isEngineTopChoice: false,
+        depth: evalBefore.depth,
+        available: true,
+      };
+    }
+
     return {
       classification: isOpeningRange ? "book" : "good",
       cpLoss: 0,
@@ -194,20 +241,17 @@ export async function engineEvalMove(params: {
 
   const cpAfter = pvToWhiteCp(evalAfter.pvs[0]);
 
-  // cpLossRaw: positive = player lost centipawns, negative = player gained
   const cpLossRaw =
     playerColor === "white" ? cpBefore - cpAfter : cpAfter - cpBefore;
 
   const cpLoss = Math.max(0, cpLossRaw);
 
-  // Determine if played move matches engine top or second choice
   const playedUci = `${playedFrom}${playedTo}`;
   const topUci = evalBefore.pvs[0]?.moves?.split(" ")[0] ?? "";
   const secondUci = evalBefore.pvs[1]?.moves?.split(" ")[0] ?? "";
   const isTopEngineMove = topUci.startsWith(playedUci);
   const isSecondEngineMove = secondUci.startsWith(playedUci);
 
-  // Engine best move SAN (top choice BEFORE the move, useful for showing "better was X")
   const engineBestMoveSan = topUci ? uciToSan(fenBefore, topUci) : null;
 
   const wasBalanced = Math.abs(cpBefore) < 150;

@@ -16,7 +16,7 @@ ChessScout.net - A full-stack chess analysis platform that imports games from ch
 - **API codegen**: Orval (from OpenAPI spec)
 - **Build**: esbuild (CJS bundle)
 - **AI**: OpenAI via Replit AI Integrations (gpt-5.2 for player analysis, gpt-4o for game review, gpt-audio for TTS narration)
-- **Engine**: Lichess Cloud Eval API (Stockfish) for move classification + centipawn loss, with local Stockfish 18 WASM fallback for positions not in the cloud cache. postProcessReview correction pass
+- **Engine**: Lichess Cloud Eval API (Stockfish) for move classification + centipawn loss. Rate-limited sequential requests (350ms min delay) with retry/backoff on 429s and in-memory FEN cache. postProcessReview correction pass
 - **Object Storage**: Google Cloud Storage via Replit sidecar (email image uploads)
 - **Frontend**: React + Vite + Tailwind CSS + Recharts
 

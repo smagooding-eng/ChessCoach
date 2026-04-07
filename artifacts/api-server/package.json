@@ -25,8 +25,7 @@
     "openid-client": "^6.8.2",
     "pino": "^9",
     "pino-http": "^10",
-    "resend": "^6.10.0",
-    "stockfish": "^18.0.7"
+    "resend": "^6.10.0"
   },
   "devDependencies": {
     "@types/cookie-parser": "^1.4.10",
