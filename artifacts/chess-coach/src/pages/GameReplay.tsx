@@ -282,8 +282,15 @@ export function GameReplay() {
     if (!game) { setLoadingSavedReview(false); return; }
     apiFetch(`/api/games/${game.id}/review`)
       .then(r => r.ok ? r.json() : null)
-      .then((d: { reviewData?: ReviewMove[] | { moves: ReviewMove[]; gameSummary?: GameSummary } } | null) => {
-        if (!d?.reviewData) return;
+      .then((d: { status?: string; jobId?: string; reviewData?: ReviewMove[] | { moves: ReviewMove[]; gameSummary?: GameSummary } } | null) => {
+        if (!d) return;
+        if (d.status === 'pending' && d.jobId) {
+          setReviewing(true);
+          reviewJobIdRef.current = d.jobId;
+          pollReviewStatus(d.jobId);
+          return;
+        }
+        if (!d.reviewData) return;
         if (Array.isArray(d.reviewData)) {
           if (d.reviewData.length > 0) setReviewMoves(d.reviewData);
         } else if (d.reviewData.moves && Array.isArray(d.reviewData.moves)) {
@@ -354,7 +361,44 @@ export function GameReplay() {
     }
   }, [currentMove]);
 
-  // ── Review Game — SSE stream that classifies every move ─────────────────────
+  const reviewJobIdRef = useRef<string | null>(null);
+  const reviewPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const stopPolling = useCallback(() => {
+    if (reviewPollRef.current) {
+      clearInterval(reviewPollRef.current);
+      reviewPollRef.current = null;
+    }
+  }, []);
+
+  const pollReviewStatus = useCallback((jobId: string) => {
+    stopPolling();
+    reviewPollRef.current = setInterval(async () => {
+      try {
+        const res = await apiFetch(`/api/games/review-status/${jobId}`);
+        if (!res.ok) return;
+        const data = await res.json() as { status: string; reviewData?: { moves: ReviewMove[]; gameSummary?: GameSummary }; error?: string };
+
+        if (data.status === 'done' && data.reviewData) {
+          const moves = data.reviewData.moves ?? [];
+          if (moves.length > 0) setReviewMoves(moves);
+          else setReviewError('Review returned no data. Please try again.');
+          if (data.reviewData.gameSummary) setGameSummary(data.reviewData.gameSummary);
+          setReviewing(false);
+          reviewJobIdRef.current = null;
+          stopPolling();
+        } else if (data.status === 'error') {
+          setReviewError(data.error ?? 'Review failed. Please try again.');
+          setReviewing(false);
+          reviewJobIdRef.current = null;
+          stopPolling();
+        }
+      } catch { /* retry on next poll */ }
+    }, 3000);
+  }, [stopPolling]);
+
+  useEffect(() => () => stopPolling(), [stopPolling]);
+
   const handleReview = useCallback(async (force = false) => {
     if (!game || reviewing) return;
     if (!force && reviewMoves.length > 0) return;
@@ -368,56 +412,27 @@ export function GameReplay() {
     try {
       const url = force ? `/api/games/${game.id}/review?force=true` : `/api/games/${game.id}/review`;
       const res = await apiFetch(url, { method: 'POST' });
-      if (!res.ok || !res.body) throw new Error('Connection failed');
+      if (!res.ok) throw new Error('Failed to start review');
+      const data = await res.json() as { status: string; jobId?: string; reviewData?: { moves: ReviewMove[]; gameSummary?: GameSummary } };
 
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-
-        // Parse complete SSE events (separated by double newlines)
-        const parts = buffer.split('\n\n');
-        buffer = parts.pop() ?? '';
-
-        for (const part of parts) {
-          let eventName = '';
-          let dataStr = '';
-          for (const line of part.split('\n')) {
-            if (line.startsWith('event: ')) eventName = line.slice(7).trim();
-            else if (line.startsWith('data: ')) dataStr = line.slice(6).trim();
-          }
-          if (!dataStr || dataStr === '') continue;
-
-          try {
-            const payload = JSON.parse(dataStr) as Record<string, unknown>;
-            if (eventName === 'result') {
-              const moves = (payload.moves as ReviewMove[]) ?? [];
-              if (moves.length === 0) {
-                setReviewError('Review returned no data. Please try again.');
-              } else {
-                setReviewMoves(moves);
-              }
-              if (payload.gameSummary) {
-                setGameSummary(payload.gameSummary as GameSummary);
-              }
-            } else if (eventName === 'error') {
-              setReviewError((payload.message as string) ?? 'Review failed. Please try again.');
-            } else if (eventName === 'done') {
-              setReviewing(false);
-            }
-          } catch { /* ignore parse errors */ }
-        }
+      if (data.status === 'done' && data.reviewData) {
+        const moves = data.reviewData.moves ?? [];
+        if (moves.length > 0) setReviewMoves(moves);
+        else setReviewError('Review returned no data. Please try again.');
+        if (data.reviewData.gameSummary) setGameSummary(data.reviewData.gameSummary);
+        setReviewing(false);
+      } else if (data.status === 'pending' && data.jobId) {
+        reviewJobIdRef.current = data.jobId;
+        pollReviewStatus(data.jobId);
+      } else {
+        setReviewError('Failed to start review.');
+        setReviewing(false);
       }
     } catch {
       setReviewError('Review failed. Please try again.');
-    } finally {
       setReviewing(false);
     }
-  }, [game, reviewing, reviewMoves.length]);
+  }, [game, reviewing, reviewMoves.length, pollReviewStatus]);
 
   // Current FEN & lastMove
   const currentFen = currentMove === 0 ? null : moves[currentMove - 1]?.fen;

@@ -23,7 +23,7 @@ ChessScout.net - A full-stack chess analysis platform that imports games from ch
 ## Features
 
 1. **Import Games**: Enter chess.com username and fetch games from the past N months
-2. **Game Replay**: Interactive chess board with move-by-move navigation (first/prev/next/last/auto-play), move quality badges, engine eval bar
+2. **Game Replay**: Interactive chess board with move-by-move navigation (first/prev/next/last/auto-play), move quality badges, engine eval bar. Game reviews run as background jobs (type="review" in `background_jobs` table, `targetUsername` stores game ID) — navigating away won't lose progress; page resumes polling on return.
 3. **AI Analysis** (Premium): Analyzes up to 50 games using GPT to identify weaknesses across 6 categories. Jobs persist in `background_jobs` DB table — navigating away won't lose progress; page resumes polling or shows results on return.
 4. **Weakness Report**: Clickable cards → Weakness Detail page (`/analysis/:id`) with AI patterns, related games, related courses
 5. **Performance Stats**: Win rate, opening stats (bar chart), time control breakdown, win/loss/draw pie chart

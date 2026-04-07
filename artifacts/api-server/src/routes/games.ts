@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
-import { db, gamesTable } from "@workspace/db";
-import { eq, desc, count, isNull } from "drizzle-orm";
+import { db, gamesTable, backgroundJobsTable } from "@workspace/db";
+import { eq, desc, count, isNull, and } from "drizzle-orm";
 import {
   ImportGamesBody,
   ImportGamesResponse,
@@ -13,6 +13,8 @@ import {
 } from "@workspace/api-zod";
 import { fetchChessComGames, extractGameMetadata, parsePgnMoves, extractOpeningFromPgn } from "../lib/chesscom";
 import { analyzeMoves, analyzeSingleMove, reviewFullGame } from "../lib/openaiAnalysis";
+import { randomUUID } from "crypto";
+import type { Logger } from "pino";
 
 const router: IRouter = Router();
 
@@ -374,6 +376,26 @@ router.get("/games/h2h-lookup", async (req, res): Promise<void> => {
   }
 });
 
+router.get("/games/review-status/:jobId", async (req, res): Promise<void> => {
+  const [job] = await db.select().from(backgroundJobsTable).where(eq(backgroundJobsTable.id, req.params.jobId as string));
+  if (!job) { res.status(404).json({ error: "Job not found" }); return; }
+  res.setHeader("Cache-Control", "no-store");
+
+  if (job.status === "done") {
+    const gameId = parseInt(job.targetUsername ?? "0", 10);
+    const [game] = await db.select({ reviewData: gamesTable.reviewData }).from(gamesTable).where(eq(gamesTable.id, gameId));
+    if (game?.reviewData) {
+      const cached = game.reviewData as Record<string, unknown>;
+      const moves = cached.moves ?? cached;
+      const gameSummary = cached.gameSummary ?? null;
+      res.json({ status: "done", reviewData: { moves, gameSummary } });
+      return;
+    }
+  }
+
+  res.json({ status: job.status, error: job.error ?? null });
+});
+
 router.get("/games/:id", async (req, res): Promise<void> => {
   const params = GetGameParams.safeParse(req.params);
   if (!params.success) {
@@ -513,8 +535,48 @@ router.post("/games/:id/analyze-move", async (req, res): Promise<void> => {
   }
 });
 
-// Streams SSE events so the Replit 60s proxy timeout doesn't kill long reviews.
-// Events: "started", "heartbeat" (every 15s), "result" (JSON), "error", "done"
+async function runReviewJob(gameId: number, jobId: string, log: Logger): Promise<void> {
+  try {
+    const [game] = await db.select().from(gamesTable).where(eq(gamesTable.id, gameId));
+    if (!game) {
+      await db.update(backgroundJobsTable).set({
+        status: "error",
+        error: "Game not found",
+        completedAt: new Date(),
+      }).where(eq(backgroundJobsTable.id, jobId));
+      return;
+    }
+
+    const moves = parsePgnMoves(game.pgn);
+    const reviewResult = await reviewFullGame({
+      moves,
+      opening: game.opening,
+      result: game.result,
+      whiteUsername: game.whiteUsername,
+      blackUsername: game.blackUsername,
+    });
+
+    await db.update(gamesTable)
+      .set({ reviewData: reviewResult as unknown as Record<string, unknown> })
+      .where(eq(gamesTable.id, gameId));
+
+    await db.update(backgroundJobsTable).set({
+      status: "done",
+      completedAt: new Date(),
+    }).where(eq(backgroundJobsTable.id, jobId));
+
+    log.info({ jobId, gameId }, "Review job complete");
+  } catch (err) {
+    log.error({ err, jobId, gameId }, "Review job failed");
+    const msg = err instanceof Error ? err.message : "Review failed";
+    await db.update(backgroundJobsTable).set({
+      status: "error",
+      error: msg,
+      completedAt: new Date(),
+    }).where(eq(backgroundJobsTable.id, jobId));
+  }
+}
+
 router.get("/games/:id/review", async (req, res): Promise<void> => {
   const params = GetGameReplayParams.safeParse(req.params);
   if (!params.success) {
@@ -532,7 +594,28 @@ router.get("/games/:id/review", async (req, res): Promise<void> => {
     return;
   }
 
-  res.json({ reviewData: game.reviewData ?? null });
+  if (game.reviewData) {
+    const cached = game.reviewData as Record<string, unknown>;
+    const moves = cached.moves ?? cached;
+    const gameSummary = cached.gameSummary ?? null;
+    res.json({ status: "done", reviewData: { moves, gameSummary } });
+    return;
+  }
+
+  const [activeJob] = await db.select().from(backgroundJobsTable).where(
+    and(
+      eq(backgroundJobsTable.type, "review"),
+      eq(backgroundJobsTable.targetUsername, String(params.data.id)),
+      eq(backgroundJobsTable.status, "pending"),
+    )
+  );
+
+  if (activeJob) {
+    res.json({ status: "pending", jobId: activeJob.id });
+    return;
+  }
+
+  res.json({ status: "none", reviewData: null });
 });
 
 router.post("/games/:id/review", async (req, res): Promise<void> => {
@@ -555,56 +638,44 @@ router.post("/games/:id/review", async (req, res): Promise<void> => {
   const forceReview = req.query.force === "true";
 
   if (game.reviewData && !forceReview) {
-    res.setHeader("Content-Type", "text/event-stream");
-    res.setHeader("Cache-Control", "no-cache");
-    res.setHeader("Connection", "keep-alive");
-    res.flushHeaders();
     const cached = game.reviewData as Record<string, unknown>;
     const moves = cached.moves ?? cached;
     const gameSummary = cached.gameSummary ?? null;
-    res.write(`event: result\ndata: ${JSON.stringify({ moves, gameSummary })}\n\n`);
-    res.write(`event: done\ndata: {}\n\n`);
-    res.end();
+    res.json({ status: "done", reviewData: { moves, gameSummary } });
     return;
   }
 
-  res.setHeader("Content-Type", "text/event-stream");
-  res.setHeader("Cache-Control", "no-cache");
-  res.setHeader("Connection", "keep-alive");
-  res.flushHeaders();
+  const [existingJob] = await db.select().from(backgroundJobsTable).where(
+    and(
+      eq(backgroundJobsTable.type, "review"),
+      eq(backgroundJobsTable.targetUsername, String(params.data.id)),
+      eq(backgroundJobsTable.status, "pending"),
+    )
+  );
 
-  const sendEvent = (name: string, data: unknown) => {
-    res.write(`event: ${name}\ndata: ${JSON.stringify(data)}\n\n`);
-  };
-
-  sendEvent("started", { totalMoves: game.pgn ? parsePgnMoves(game.pgn).length : 0 });
-
-  const heartbeat = setInterval(() => {
-    res.write(": heartbeat\n\n");
-  }, 15000);
-
-  try {
-    const moves = parsePgnMoves(game.pgn);
-    const reviewResult = await reviewFullGame({
-      moves,
-      opening: game.opening,
-      result: game.result,
-      whiteUsername: game.whiteUsername,
-      blackUsername: game.blackUsername,
-    });
-    sendEvent("result", { moves: reviewResult.moves, gameSummary: reviewResult.gameSummary });
-    sendEvent("done", {});
-
-    await db.update(gamesTable)
-      .set({ reviewData: reviewResult as unknown as Record<string, unknown> })
-      .where(eq(gamesTable.id, params.data.id));
-  } catch (err) {
-    req.log.error({ err }, "Failed to review game");
-    sendEvent("error", { message: "Review failed. Please try again." });
-  } finally {
-    clearInterval(heartbeat);
-    res.end();
+  if (existingJob) {
+    res.json({ status: "pending", jobId: existingJob.id });
+    return;
   }
+
+  if (forceReview) {
+    await db.update(gamesTable)
+      .set({ reviewData: null })
+      .where(eq(gamesTable.id, params.data.id));
+  }
+
+  const userId = req.user?.id ?? "anonymous";
+  const jobId = randomUUID();
+  await db.insert(backgroundJobsTable).values({
+    id: jobId,
+    userId,
+    type: "review",
+    status: "pending",
+    targetUsername: String(params.data.id),
+  });
+
+  res.json({ status: "pending", jobId });
+  runReviewJob(params.data.id, jobId, req.log).catch(() => {});
 });
 
 export default router;
