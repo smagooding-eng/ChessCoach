@@ -198,48 +198,67 @@ function AuthModal({ open, onClose, initialMode, externalError }: { open: boolea
   );
 }
 
-function OpponentScoutPreview() {
+const BOARD_PIECES = [
+  ['\u265C','\u265E','\u265D','\u265B','\u265A','\u265D','\u265E','\u265C'],
+  ['\u265F','\u265F','\u265F','\u265F','\u265F','\u265F','\u265F','\u265F'],
+  ['','','','','','','',''],
+  ['','','','','','','',''],
+  ['','','','','','','',''],
+  ['','','','','','','',''],
+  ['\u2659','\u2659','\u2659','\u2659','\u2659','\u2659','\u2659','\u2659'],
+  ['\u2656','\u2658','\u2657','\u2655','\u2654','\u2657','\u2658','\u2656'],
+];
+
+function LandingChessBoard() {
   return (
-    <div className="w-full max-w-sm mx-auto">
-      <div className="glass-panel rounded-2xl p-5 space-y-3">
+    <div className="w-full max-w-md mx-auto">
+      <div className="rounded-xl overflow-hidden shadow-[0_0_60px_rgba(124,179,66,0.12),0_20px_60px_rgba(0,0,0,0.4)] border border-[#7cb342]/20">
+        <div className="grid grid-cols-8">
+          {BOARD_PIECES.flatMap((row, r) =>
+            row.map((piece, c) => {
+              const isLight = (r + c) % 2 === 0;
+              return (
+                <div
+                  key={`${r}-${c}`}
+                  className="aspect-square flex items-center justify-center select-none"
+                  style={{ background: isLight ? '#b8c68a' : '#6d8a3a' }}
+                >
+                  {piece && (
+                    <span className="text-[clamp(16px,4vw,28px)] leading-none drop-shadow-sm">{piece}</span>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+
+      <div className="mt-4 glass-panel rounded-xl p-4 space-y-2">
         <div className="flex items-center gap-2 mb-1">
-          <Search className="w-4 h-4 text-primary" />
-          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Opponent Scout</span>
+          <Search className="w-3.5 h-3.5 text-primary" />
+          <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Opponent Scout</span>
         </div>
-
-        <div className="space-y-2.5">
-          <div className="flex items-center justify-between p-3 rounded-xl bg-red-500/8 border border-red-500/20">
-            <div className="flex items-center gap-2.5">
-              <div className="w-2 h-2 rounded-full bg-red-500" />
-              <span className="text-sm text-foreground">Weak Endgames</span>
-            </div>
-            <span className="text-xs font-bold text-red-400 bg-red-500/15 px-2 py-0.5 rounded-full">Critical</span>
+        <div className="flex items-center justify-between p-2.5 rounded-lg bg-red-500/8 border border-red-500/20">
+          <div className="flex items-center gap-2">
+            <div className="w-1.5 h-1.5 rounded-full bg-red-500" />
+            <span className="text-xs text-foreground">Weak Endgames</span>
           </div>
-
-          <div className="flex items-center justify-between p-3 rounded-xl bg-orange-500/8 border border-orange-500/20">
-            <div className="flex items-center gap-2.5">
-              <div className="w-2 h-2 rounded-full bg-orange-500" />
-              <span className="text-sm text-foreground">Blunders Under Pressure</span>
-            </div>
-            <span className="text-xs font-bold text-orange-400 bg-orange-500/15 px-2 py-0.5 rounded-full">High</span>
-          </div>
-
-          <div className="flex items-center justify-between p-3 rounded-xl bg-yellow-500/8 border border-yellow-500/20">
-            <div className="flex items-center gap-2.5">
-              <div className="w-2 h-2 rounded-full bg-yellow-500" />
-              <span className="text-sm text-foreground">Struggles vs d4</span>
-            </div>
-            <span className="text-xs font-bold text-yellow-400 bg-yellow-500/15 px-2 py-0.5 rounded-full">Medium</span>
-          </div>
+          <span className="text-[10px] font-bold text-red-400 bg-red-500/15 px-1.5 py-px rounded-full">Critical</span>
         </div>
-
-        <div className="mt-3 p-3 rounded-xl bg-primary/8 border border-primary/20">
-          <div className="flex items-center gap-2 mb-1">
-            <Zap className="w-3.5 h-3.5 text-primary" />
-            <span className="text-xs font-semibold text-primary">Game Plan</span>
+        <div className="flex items-center justify-between p-2.5 rounded-lg bg-orange-500/8 border border-orange-500/20">
+          <div className="flex items-center gap-2">
+            <div className="w-1.5 h-1.5 rounded-full bg-orange-500" />
+            <span className="text-xs text-foreground">Blunders Under Pressure</span>
           </div>
-          <p className="text-xs text-muted-foreground leading-relaxed">
-            Play 1.d4 and aim for endgames. They collapse under time pressure in longer games.
+          <span className="text-[10px] font-bold text-orange-400 bg-orange-500/15 px-1.5 py-px rounded-full">High</span>
+        </div>
+        <div className="p-2.5 rounded-lg bg-primary/8 border border-primary/20">
+          <div className="flex items-center gap-1.5 mb-0.5">
+            <Zap className="w-3 h-3 text-primary" />
+            <span className="text-[10px] font-semibold text-primary">Game Plan</span>
+          </div>
+          <p className="text-[11px] text-muted-foreground leading-relaxed">
+            Play 1.d4 and aim for endgames. They collapse under time pressure.
           </p>
         </div>
       </div>
@@ -285,7 +304,7 @@ export function LandingPage() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="text-xl font-display font-bold text-white">Chess</span>
-            <span className="text-xl font-display font-bold text-gradient">Coach</span>
+            <span className="text-xl font-display font-bold text-gradient">Scout.net</span>
           </div>
           <div className="flex items-center gap-3">
             <button onClick={openLogin} className="text-sm text-muted-foreground hover:text-foreground transition-colors font-medium">
@@ -342,7 +361,7 @@ export function LandingPage() {
               transition={{ duration: 0.6, delay: 0.2 }}
               className="hidden lg:block"
             >
-              <OpponentScoutPreview />
+              <LandingChessBoard />
             </motion.div>
           </div>
         </div>
@@ -351,7 +370,7 @@ export function LandingPage() {
       {/* Mobile preview (shown below hero on small screens) */}
       <section className="lg:hidden pb-16 px-4">
         <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}>
-          <OpponentScoutPreview />
+          <LandingChessBoard />
         </motion.div>
       </section>
 
