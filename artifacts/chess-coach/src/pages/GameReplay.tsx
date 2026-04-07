@@ -23,6 +23,8 @@ type ReviewMove = {
   betterMove: string | null;
   pros: string[];
   cons: string[];
+  cpLoss?: number;
+  engineAvailable?: boolean;
 };
 
 type KeyMistake = {
@@ -62,19 +64,38 @@ function GameRatingPanel({
   whiteAvatar?: string;
   blackAvatar?: string;
 }) {
-  const WEIGHTS: Record<Classification, number> = {
-    checkmate: 100, brilliant: 100, excellent: 98, book: 90, good: 85,
-    inaccuracy: 55, mistake: 25, blunder: 0,
+  const CP_LOSS_BY_CLASS: Record<Classification, number> = {
+    checkmate: 0, brilliant: 0, excellent: 2, book: 3, good: 10,
+    inaccuracy: 40, mistake: 90, blunder: 200,
   };
 
   const byColor = (c: 'white' | 'black') => reviewMoves.filter(m => m.color === c);
 
   const calcAccuracy = (moves: ReviewMove[]) => {
     if (moves.length === 0) return 0;
-    return moves.reduce((s, m) => s + WEIGHTS[m.classification], 0) / moves.length;
+    const totalCpLoss = moves.reduce((s, m) => {
+      if (m.cpLoss != null && m.engineAvailable) return s + m.cpLoss;
+      const baseCp = CP_LOSS_BY_CLASS[m.classification];
+      const unverifiedFloor = 15;
+      return s + Math.max(baseCp, ['good', 'book', 'excellent'].includes(m.classification) && !m.engineAvailable ? unverifiedFloor : baseCp);
+    }, 0);
+    const acpl = totalCpLoss / moves.length;
+    return Math.min(100, Math.max(0, 103.1668 * Math.exp(-0.04354 * acpl) - 3.1668));
   };
 
-  const toGameRating = (acc: number) => Math.max(0, Math.round((acc - 52.5) * 40));
+  const toGameRating = (acc: number) => {
+    if (acc <= 10) return 0;
+    if (acc >= 99.5) return 3200;
+    const anchors = [[20,0],[40,100],[50,250],[55,350],[60,500],[65,700],[70,950],[75,1200],[80,1500],[85,1850],[90,2200],[95,2700],[99,3150]];
+    for (let i = 1; i < anchors.length; i++) {
+      if (acc <= anchors[i][0]) {
+        const [x0,y0] = anchors[i-1];
+        const [x1,y1] = anchors[i];
+        return Math.round(y0 + (y1 - y0) * (acc - x0) / (x1 - x0));
+      }
+    }
+    return 3200;
+  };
 
   const counts = (moves: ReviewMove[]) => ({
     brilliant: moves.filter(m => m.classification === 'brilliant').length,
@@ -927,15 +948,21 @@ export function GameReplay() {
 
           {/* Review summary — per-player accuracy */}
           {reviewMoves.length > 0 && (() => {
-            const WEIGHTS: Record<Classification, number> = {
-              checkmate: 100, brilliant: 100, excellent: 98, good: 85, book: 90,
-              inaccuracy: 55, mistake: 25, blunder: 0,
+            const CP_LOSS_MAP: Record<Classification, number> = {
+              checkmate: 0, brilliant: 0, excellent: 2, book: 3, good: 10,
+              inaccuracy: 40, mistake: 90, blunder: 200,
             };
 
             function calcAccuracy(moves: ReviewMove[]) {
               if (moves.length === 0) return null;
-              const total = moves.reduce((sum, m) => sum + WEIGHTS[m.classification], 0);
-              return Math.round(total / moves.length);
+              const totalCpLoss = moves.reduce((s, m) => {
+                if (m.cpLoss != null && m.engineAvailable) return s + m.cpLoss;
+                const baseCp = CP_LOSS_MAP[m.classification];
+                const unverifiedFloor = 15;
+                return s + Math.max(baseCp, ['good', 'book', 'excellent'].includes(m.classification) && !m.engineAvailable ? unverifiedFloor : baseCp);
+              }, 0);
+              const acpl = totalCpLoss / moves.length;
+              return Math.round(Math.min(100, Math.max(0, 103.1668 * Math.exp(-0.04354 * acpl) - 3.1668)));
             }
 
             function countFor(moves: ReviewMove[]) {

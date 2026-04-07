@@ -492,8 +492,11 @@ async function postProcessReview(
         explanation = "Forced move — the only legal option." + (explanation ? ` ${explanation}` : "");
       }
       cons = [];
-      return { ...rm, classification, betterMove, explanation, pros, cons };
+      return { ...rm, classification, betterMove, explanation, pros, cons, cpLoss: 0, engineAvailable: true };
     }
+
+    let moveCpLoss = 0;
+    let moveEngineAvailable = false;
 
     const eng = engineEvals[idx];
     if (eng) {
@@ -510,6 +513,9 @@ async function postProcessReview(
           ? eng.cpBefore - eng.cpAfter
           : eng.cpAfter - eng.cpBefore;
 
+        moveCpLoss = Math.max(0, cpLossRaw);
+        moveEngineAvailable = true;
+
         classification = classifyFromCpLoss(cpLossRaw, isTopEngineMove, isSecondEngineMove, isOpeningRange, wasBalanced);
 
         const isBad = ["inaccuracy", "mistake", "blunder"].includes(classification);
@@ -522,9 +528,13 @@ async function postProcessReview(
         if (isOpeningRange && wasBalanced) classification = "book";
         else classification = "excellent";
         betterMove = null;
+        moveEngineAvailable = true;
+        moveCpLoss = 0;
       } else if (isSecondEngineMove) {
         classification = "good";
         betterMove = null;
+        moveEngineAvailable = true;
+        moveCpLoss = 5;
       }
     }
 
@@ -564,7 +574,7 @@ async function postProcessReview(
       betterMove = eng.bestMoveSan;
     }
 
-    return { ...rm, classification, betterMove, explanation, pros, cons };
+    return { ...rm, classification, betterMove, explanation, pros, cons, cpLoss: moveCpLoss, engineAvailable: moveEngineAvailable };
   });
 }
 
@@ -579,6 +589,8 @@ export interface MoveReview {
   betterMove: string | null;
   pros: string[];
   cons: string[];
+  cpLoss?: number;
+  engineAvailable?: boolean;
 }
 
 export interface GameReviewSummary {
