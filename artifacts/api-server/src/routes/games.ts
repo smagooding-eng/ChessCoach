@@ -557,7 +557,7 @@ async function runReviewJob(gameId: number, jobId: string, log: Logger): Promise
     });
 
     await db.update(gamesTable)
-      .set({ reviewData: reviewResult as unknown as Record<string, unknown> })
+      .set({ reviewData: { ...reviewResult, _v2: true } as unknown as Record<string, unknown> })
       .where(eq(gamesTable.id, gameId));
 
     await db.update(backgroundJobsTable).set({
@@ -596,8 +596,14 @@ router.get("/games/:id/review", async (req, res): Promise<void> => {
 
   if (game.reviewData) {
     const cached = game.reviewData as Record<string, unknown>;
-    const moves = cached.moves ?? cached;
+    let moves = cached.moves ?? cached;
     const gameSummary = cached.gameSummary ?? null;
+    if (Array.isArray(moves) && moves.length > 0 && !cached._v2) {
+      moves = (moves as Record<string, unknown>[]).map(m => {
+        const { cpLoss, engineAvailable, ...rest } = m;
+        return rest;
+      });
+    }
     res.json({ status: "done", reviewData: { moves, gameSummary } });
     return;
   }
@@ -639,8 +645,14 @@ router.post("/games/:id/review", async (req, res): Promise<void> => {
 
   if (game.reviewData && !forceReview) {
     const cached = game.reviewData as Record<string, unknown>;
-    const moves = cached.moves ?? cached;
+    let moves = cached.moves ?? cached;
     const gameSummary = cached.gameSummary ?? null;
+    if (Array.isArray(moves) && moves.length > 0 && !cached._v2) {
+      moves = (moves as Record<string, unknown>[]).map(m => {
+        const { cpLoss, engineAvailable, ...rest } = m;
+        return rest;
+      });
+    }
     res.json({ status: "done", reviewData: { moves, gameSummary } });
     return;
   }
