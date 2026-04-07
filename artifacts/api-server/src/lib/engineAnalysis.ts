@@ -1,5 +1,6 @@
 import { Chess } from "chess.js";
 import { logger } from "./logger";
+import { evalPosition } from "./stockfishLocal";
 
 const START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
@@ -18,8 +19,8 @@ interface LichessCloudEval {
   pvs: LichessPv[];
 }
 
-/** Fetch Stockfish evaluation from Lichess Cloud Eval API.
- *  Returns null if the position isn't in the cache (no local engine runs here). */
+/** Fetch Stockfish evaluation from Lichess Cloud Eval API,
+ *  falling back to the local Stockfish 18 WASM engine for positions not in the cache. */
 export async function fetchLichessEval(fen: string, multiPv = 2): Promise<LichessCloudEval | null> {
   try {
     const url = `https://lichess.org/api/cloud-eval?fen=${encodeURIComponent(fen)}&multiPv=${multiPv}`;
@@ -27,14 +28,39 @@ export async function fetchLichessEval(fen: string, multiPv = 2): Promise<Liches
       headers: { Accept: "application/json", "User-Agent": "ChessCoach/1.0" },
       signal: AbortSignal.timeout(6000),
     });
-    if (res.status === 404) return null; // position not in cloud cache
+    if (res.status === 404) {
+      return localStockfishFallback(fen, multiPv);
+    }
     if (!res.ok) {
       logger.warn({ status: res.status, fen }, "Lichess cloud eval non-OK");
-      return null;
+      return localStockfishFallback(fen, multiPv);
     }
     return (await res.json()) as LichessCloudEval;
   } catch (err) {
-    logger.warn({ err }, "Lichess cloud eval fetch failed");
+    logger.warn({ err }, "Lichess cloud eval fetch failed, using local Stockfish");
+    return localStockfishFallback(fen, multiPv);
+  }
+}
+
+async function localStockfishFallback(fen: string, multiPv: number): Promise<LichessCloudEval | null> {
+  try {
+    const result = await evalPosition(fen, 18, multiPv);
+    if (!result) return null;
+
+    const pvs: LichessPv[] = (result.multiPv || [{ cp: result.cp, mate: result.mate, moves: result.pv }])
+      .map(pv => ({
+        moves: pv.moves,
+        ...(pv.mate !== null ? { mate: pv.mate } : { cp: pv.cp }),
+      }));
+
+    return {
+      fen,
+      knodes: 0,
+      depth: result.depth,
+      pvs,
+    };
+  } catch (err) {
+    logger.warn({ err }, "Local Stockfish fallback also failed");
     return null;
   }
 }
@@ -134,9 +160,8 @@ export async function engineEvalMove(params: {
     fetchLichessEval(fenAfter, 1),
   ]);
 
-  // If cloud eval has no data for the pre-move position, return a sensible fallback
   if (!evalBefore || evalBefore.pvs.length === 0) {
-    logger.debug({ fen: fenBefore }, "No Lichess cloud eval for position");
+    logger.debug({ fen: fenBefore }, "No engine eval available (cloud + local Stockfish both failed)");
     return {
       classification: isOpeningRange ? "book" : "good",
       cpLoss: 0,
@@ -153,7 +178,7 @@ export async function engineEvalMove(params: {
   const cpBefore = pvToWhiteCp(evalBefore.pvs[0]);
 
   if (!evalAfter || evalAfter.pvs.length === 0) {
-    logger.debug({ fen: fenAfter }, "No Lichess cloud eval for position after move");
+    logger.debug({ fen: fenAfter }, "No engine eval for position after move (cloud + local both failed)");
     return {
       classification: isOpeningRange ? "book" : "good",
       cpLoss: 0,
