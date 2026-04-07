@@ -534,19 +534,7 @@ async function postProcessReview(
         const pos = new Chess(fenBefore);
         pos.move(sanOnly);
       } catch {
-        const isBad = ["inaccuracy", "mistake", "blunder"].includes(classification);
-        if (isBad && legalMoves.length > 1) {
-          const played = originalMoves[idx]?.san;
-          const alternatives = legalMoves.filter(m => m !== played);
-          if (alternatives.length > 0) {
-            betterMove = alternatives[0];
-          } else {
-            betterMove = null;
-            if (classification === "inaccuracy") classification = "good";
-          }
-        } else {
-          betterMove = null;
-        }
+        betterMove = null;
       }
     }
 
@@ -572,12 +560,8 @@ async function postProcessReview(
       }
     }
 
-    if (["inaccuracy", "mistake", "blunder"].includes(classification) && !betterMove && legalMoves.length > 1) {
-      const played = originalMoves[idx]?.san;
-      const alternatives = legalMoves.filter(m => m !== played);
-      if (alternatives.length > 0) {
-        betterMove = alternatives[0];
-      }
+    if (["inaccuracy", "mistake", "blunder"].includes(classification) && !betterMove && eng?.bestMoveSan && eng.available) {
+      betterMove = eng.bestMoveSan;
     }
 
     return { ...rm, classification, betterMove, explanation, pros, cons };
