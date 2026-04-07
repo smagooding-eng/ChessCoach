@@ -470,35 +470,51 @@ async function postProcessReview(
     };
   }
 
-  return reviewMoves.map((rm) => {
-    const idx = rm.moveIndex;
+  const gptByIndex = new Map<number, MoveReview>();
+  for (const rm of reviewMoves) {
+    gptByIndex.set(rm.moveIndex, rm);
+  }
+
+  const winPct = (cp: number) => 50 + 50 * (2 / (1 + Math.exp(-0.00368208 * cp)) - 1);
+
+  return originalMoves.map((om, idx) => {
+    const gpt = gptByIndex.get(idx);
+
+    let classification: MoveReview["classification"] = gpt?.classification ?? "good";
+    let betterMove: string | null = gpt?.betterMove ?? null;
+    let explanation: string = gpt?.explanation ?? "";
+    let pros: string[] = gpt?.pros ?? [];
+    let cons: string[] = gpt?.cons ?? [];
+
     const fenBefore = fens[idx];
-    if (!fenBefore) return rm;
+    if (!fenBefore) {
+      return {
+        moveIndex: idx, san: om.san, color: om.color as "white" | "black",
+        classification, explanation, betterMove, pros, cons, cpLoss: 0, engineAvailable: false,
+      };
+    }
 
     let legalMoves: string[];
     try {
       const pos = new Chess(fenBefore);
       legalMoves = pos.moves();
     } catch {
-      return rm;
+      return {
+        moveIndex: idx, san: om.san, color: om.color as "white" | "black",
+        classification, explanation, betterMove, pros, cons, cpLoss: 0, engineAvailable: false,
+      };
     }
 
-    let { classification, betterMove, explanation, pros, cons } = rm;
-
     if (legalMoves.length <= 1) {
-      classification = "book";
-      betterMove = null;
-      if (explanation && !explanation.includes("forced")) {
-        explanation = "Forced move — the only legal option." + (explanation ? ` ${explanation}` : "");
-      }
-      cons = [];
-      return { ...rm, classification, betterMove, explanation, pros, cons, cpLoss: 0, engineAvailable: true };
+      return {
+        moveIndex: idx, san: om.san, color: om.color as "white" | "black",
+        classification: "book" as const, explanation: explanation || "Forced move — the only legal option.",
+        betterMove: null, pros, cons: [], cpLoss: 0, engineAvailable: true,
+      };
     }
 
     let moveCpLoss = 0;
     let moveEngineAvailable = false;
-
-    const winPct = (cp: number) => 50 + 50 * (2 / (1 + Math.exp(-0.00368208 * cp)) - 1);
 
     const eng = engineEvals[idx];
     if (eng) {
@@ -510,7 +526,7 @@ async function postProcessReview(
       const wasBalanced = Math.abs(eng.cpBefore) < 150;
 
       if (eng.available) {
-        const playerColor = originalMoves[idx]?.color as "white" | "black";
+        const playerColor = om.color as "white" | "black";
         const cpLossRaw = playerColor === "white"
           ? eng.cpBefore - eng.cpAfter
           : eng.cpAfter - eng.cpBefore;
@@ -558,20 +574,17 @@ async function postProcessReview(
       if (legalMoves.length <= 5) {
         classification = "excellent";
       } else {
-        const m = originalMoves[idx];
-        if (m) {
-          try {
-            const pos = new Chess(fenBefore);
-            const result = pos.move(m.san);
-            const isCapture = !!result?.captured;
-            const givesCheck = result ? pos.inCheck() : false;
-            const isMate = result ? pos.isCheckmate() : false;
-            if (!isCapture && !givesCheck && !isMate) {
-              classification = "excellent";
-            }
-          } catch {
+        try {
+          const pos = new Chess(fenBefore);
+          const result = pos.move(om.san);
+          const isCapture = !!result?.captured;
+          const givesCheck = result ? pos.inCheck() : false;
+          const isMate = result ? pos.isCheckmate() : false;
+          if (!isCapture && !givesCheck && !isMate) {
             classification = "excellent";
           }
+        } catch {
+          classification = "excellent";
         }
       }
     }
@@ -580,7 +593,11 @@ async function postProcessReview(
       betterMove = eng.bestMoveSan;
     }
 
-    return { ...rm, classification, betterMove, explanation, pros, cons, cpLoss: moveCpLoss, engineAvailable: moveEngineAvailable };
+    return {
+      moveIndex: idx, san: om.san, color: om.color as "white" | "black",
+      classification, explanation, betterMove, pros, cons,
+      cpLoss: moveCpLoss, engineAvailable: moveEngineAvailable,
+    };
   });
 }
 
