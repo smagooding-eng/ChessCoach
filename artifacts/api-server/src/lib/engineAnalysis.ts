@@ -151,7 +151,23 @@ export async function engineEvalMove(params: {
   }
 
   const cpBefore = pvToWhiteCp(evalBefore.pvs[0]);
-  const cpAfter = evalAfter?.pvs.length ? pvToWhiteCp(evalAfter.pvs[0]) : cpBefore;
+
+  if (!evalAfter || evalAfter.pvs.length === 0) {
+    logger.debug({ fen: fenAfter }, "No Lichess cloud eval for position after move");
+    return {
+      classification: isOpeningRange ? "book" : "good",
+      cpLoss: 0,
+      cpLossRaw: 0,
+      engineCpBefore: cpBefore,
+      engineCpAfter: null,
+      engineBestMoveSan: null,
+      isEngineTopChoice: false,
+      depth: evalBefore.depth,
+      available: false,
+    };
+  }
+
+  const cpAfter = pvToWhiteCp(evalAfter.pvs[0]);
 
   // cpLossRaw: positive = player lost centipawns, negative = player gained
   const cpLossRaw =

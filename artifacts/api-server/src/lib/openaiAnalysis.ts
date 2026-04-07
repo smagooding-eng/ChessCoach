@@ -456,10 +456,20 @@ async function postProcessReview(
         if (!evalBefore || evalBefore.pvs.length === 0) return;
 
         const cpBefore = pvToWhiteCp(evalBefore.pvs[0]);
-        const cpAfter = evalAfter?.pvs.length ? pvToWhiteCp(evalAfter.pvs[0]) : cpBefore;
         const topUci = evalBefore.pvs[0]?.moves?.split(" ")[0] ?? "";
         const secondUci = evalBefore.pvs[1]?.moves?.split(" ")[0] ?? "";
         const bestMoveSan = topUci ? uciToSan(fenBefore, topUci) : null;
+
+        if (!evalAfter || evalAfter.pvs.length === 0) {
+          engineEvals[i] = {
+            cpBefore, cpAfter: cpBefore, topUci, secondUci,
+            available: false, depth: evalBefore.depth,
+            bestMoveSan,
+          };
+          return;
+        }
+
+        const cpAfter = pvToWhiteCp(evalAfter.pvs[0]);
 
         engineEvals[i] = {
           cpBefore, cpAfter, topUci, secondUci,
@@ -497,12 +507,7 @@ async function postProcessReview(
     }
 
     const eng = engineEvals[idx];
-    if (eng && eng.available) {
-      const playerColor = originalMoves[idx]?.color as "white" | "black";
-      const cpLossRaw = playerColor === "white"
-        ? eng.cpBefore - eng.cpAfter
-        : eng.cpAfter - eng.cpBefore;
-
+    if (eng) {
       const moveUci = uciMoves[idx];
       const playedUci = moveUci ? `${moveUci.from}${moveUci.to}` : "";
       const isTopEngineMove = eng.topUci.startsWith(playedUci) && playedUci.length > 0;
@@ -510,12 +515,26 @@ async function postProcessReview(
       const isOpeningRange = idx < 30;
       const wasBalanced = Math.abs(eng.cpBefore) < 150;
 
-      classification = classifyFromCpLoss(cpLossRaw, isTopEngineMove, isSecondEngineMove, isOpeningRange, wasBalanced);
+      if (eng.available) {
+        const playerColor = originalMoves[idx]?.color as "white" | "black";
+        const cpLossRaw = playerColor === "white"
+          ? eng.cpBefore - eng.cpAfter
+          : eng.cpAfter - eng.cpBefore;
 
-      const isBad = ["inaccuracy", "mistake", "blunder"].includes(classification);
-      if (isBad && eng.bestMoveSan && !isTopEngineMove) {
-        betterMove = eng.bestMoveSan;
-      } else if (!isBad) {
+        classification = classifyFromCpLoss(cpLossRaw, isTopEngineMove, isSecondEngineMove, isOpeningRange, wasBalanced);
+
+        const isBad = ["inaccuracy", "mistake", "blunder"].includes(classification);
+        if (isBad && eng.bestMoveSan && !isTopEngineMove) {
+          betterMove = eng.bestMoveSan;
+        } else if (!isBad) {
+          betterMove = null;
+        }
+      } else if (isTopEngineMove) {
+        if (isOpeningRange && wasBalanced) classification = "book";
+        else classification = "excellent";
+        betterMove = null;
+      } else if (isSecondEngineMove) {
+        classification = "good";
         betterMove = null;
       }
     }
@@ -628,7 +647,7 @@ export async function reviewFullGame(input: {
   }
   const moveList = moveDetails.join("\n");
 
-  const prompt = `You are a master chess coach. Review this complete chess game and classify EVERY single move.
+  const prompt = `You are a Stockfish-caliber chess engine and coach. Review this complete chess game and classify EVERY single move with engine-level accuracy.
 
 Game: ${whiteUsername} (White) vs ${blackUsername} (Black)
 Opening: ${opening ?? "Unknown"} | Result: ${result}
@@ -636,20 +655,23 @@ Opening: ${opening ?? "Unknown"} | Result: ${result}
 Move list (format: index: moveNum. san [fen:position_before_move] [legal:number_of_legal_moves]):
 ${moveList}
 
-IMPORTANT RULES:
+CRITICAL ACCURACY RULES:
+- You MUST evaluate each FEN position to determine the best move BEFORE classifying. Compare the played move against what a 3000+ Elo engine would play.
 - If [legal:1] — this is a FORCED move (only legal option). Classify as "book" and set betterMove to null.
-- "brilliant" should be RARE — only for deeply calculated sacrifices, non-obvious winning moves, or moves that are hard to find. Standard captures, checks, and routine development are NOT brilliant.
-- "betterMove" MUST be a legal move in the given FEN position. If unsure, set to null.
-- Use the FEN positions to verify your analysis. Do not guess — check that suggested moves are actually possible in the position.
+- "brilliant" should be EXTREMELY RARE (0-1 per game) — only for deeply calculated sacrifices or quiet moves that are very hard to find.
+- "betterMove" MUST be a legal move in the given FEN position. Use the FEN to verify. If unsure, set to null.
+- Most moves should be classified as "good" or "book". Do NOT inflate — most amateur moves are "good" at best, not "excellent".
+- A move that loses 25-50 centipawns of evaluation is an "inaccuracy", 50-100 is a "mistake", and >100 is a "blunder". Apply these thresholds strictly.
+- Pay careful attention to tactics: missed forks, pins, skewers, hanging pieces, and back-rank threats should be flagged as mistakes or blunders.
 
 Classify each move as ONE of:
-- "brilliant": unexpected sacrifice or deeply calculated move that is hard to find (RARE — max 1-2 per game at most)
-- "excellent": very strong, best or near-best move
-- "good": solid, reasonable move
+- "brilliant": deeply calculated sacrifice or non-obvious winning move that is extremely hard to find (RARE)
+- "excellent": the best or near-best engine move, no meaningful improvement exists
+- "good": solid move, maintains position adequately
 - "book": standard opening theory OR forced moves (only 1 legal option)
-- "inaccuracy": suboptimal, a clearly better option was missed
-- "mistake": clear error, noticeably worsens the position
-- "blunder": serious error that loses material or the game
+- "inaccuracy": suboptimal, a clearly better move exists (roughly 25-50cp swing)
+- "mistake": clear error that worsens the position noticeably (roughly 50-100cp swing)
+- "blunder": serious error that loses material, decisive advantage, or the game (>100cp swing)
 
 For each move provide:
 1. classification (required)
@@ -689,7 +711,7 @@ Respond with valid JSON covering ALL ${moves.length} moves in order:
 
   try {
     const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: "gpt-4o",
       max_completion_tokens: 16000,
       messages: [{ role: "user", content: prompt }],
       response_format: { type: "json_object" },

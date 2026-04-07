@@ -15,7 +15,9 @@ ChessScout.net - A full-stack chess analysis platform that imports games from ch
 - **Validation**: Zod (`zod/v4`), `drizzle-zod`
 - **API codegen**: Orval (from OpenAPI spec)
 - **Build**: esbuild (CJS bundle)
-- **AI**: OpenAI via Replit AI Integrations (gpt-5.2 for analysis, gpt-audio for TTS narration)
+- **AI**: OpenAI via Replit AI Integrations (gpt-5.2 for player analysis, gpt-4o for game review, gpt-audio for TTS narration)
+- **Engine**: Lichess Cloud Eval API (Stockfish) for move classification + centipawn loss, with postProcessReview correction pass
+- **Object Storage**: Google Cloud Storage via Replit sidecar (email image uploads)
 - **Frontend**: React + Vite + Tailwind CSS + Recharts
 
 ## Features
