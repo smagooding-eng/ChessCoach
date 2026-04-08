@@ -316,7 +316,6 @@ export function OnboardingWizard({ onComplete }: Props) {
   };
 
   const finish = useCallback(() => {
-    localStorage.setItem(ONBOARDING_KEY, 'done');
     if (reviewPollRef.current) { clearInterval(reviewPollRef.current); reviewPollRef.current = null; }
     if (scoutPollRef.current) { clearInterval(scoutPollRef.current); scoutPollRef.current = null; }
     onComplete();
@@ -1026,14 +1025,20 @@ export function OnboardingWizard({ onComplete }: Props) {
 }
 
 export function useOnboardingCheck() {
-  const { isAuthenticated, isAuthLoading, username } = useUser();
+  const { isAuthenticated, isAuthLoading, authUser } = useUser();
   const [show, setShow] = useState(false);
+  const userKey = authUser?.id ? `${ONBOARDING_KEY}_${authUser.id}` : null;
 
   useEffect(() => {
-    if (isAuthLoading || !isAuthenticated) return;
-    const done = localStorage.getItem(ONBOARDING_KEY);
+    if (isAuthLoading || !isAuthenticated || !userKey) return;
+    const done = localStorage.getItem(userKey);
     if (!done) setShow(true);
-  }, [isAuthenticated, isAuthLoading]);
+  }, [isAuthenticated, isAuthLoading, userKey]);
 
-  return { showOnboarding: show, dismissOnboarding: () => setShow(false) };
+  const dismissOnboarding = useCallback(() => {
+    if (userKey) localStorage.setItem(userKey, 'done');
+    setShow(false);
+  }, [userKey]);
+
+  return { showOnboarding: show, dismissOnboarding };
 }
