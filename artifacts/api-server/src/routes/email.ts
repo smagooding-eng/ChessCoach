@@ -69,7 +69,9 @@ router.post("/admin/email/broadcast", requireAdmin, async (req: Request, res: Re
       return;
     }
 
+    req.log.info({ recipientCount: recipients.length, recipientFilter }, "Starting email broadcast");
     const results = await sendBulkEmail(recipients, subject, html, text);
+    req.log.info({ sent: results.sent, failed: results.failed, errors: results.errors }, "Email broadcast complete");
 
     res.json({
       success: true,
@@ -78,7 +80,7 @@ router.post("/admin/email/broadcast", requireAdmin, async (req: Request, res: Re
       failedEmails: results.errors.length > 0 ? results.errors : undefined,
     });
   } catch (err: any) {
-    console.error("Broadcast email error:", err.message);
+    req.log.error({ error: err.message }, "Broadcast email error");
     res.status(500).json({ error: err.message });
   }
 });

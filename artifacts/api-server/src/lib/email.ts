@@ -48,17 +48,20 @@ export async function sendBulkEmail(recipients: string[], subject: string, html:
     errors: [] as string[],
   };
 
+  console.log(`[email] Starting bulk send to ${recipients.length} recipients, from: ${FROM_EMAIL}`);
+
   for (const to of recipients) {
     try {
-      await sendEmail({ to, subject, html, text });
+      const data = await sendEmail({ to, subject, html, text });
       results.sent++;
+      console.log(`[email] Sent to ${to}, id: ${data?.id}`);
       await delay(600);
     } catch (err: any) {
       results.failed++;
       results.errors.push(`${to}: ${err.message}`);
-      console.error(`Email failed for ${to}:`, err.message);
+      console.error(`[email] FAILED for ${to}:`, err.message);
       if (err.message?.includes('rate') || err.message?.includes('429')) {
-        console.log('Rate limited, waiting 5s...');
+        console.log('[email] Rate limited, waiting 5s...');
         await delay(5000);
         try {
           await sendEmail({ to, subject, html, text });
@@ -66,12 +69,13 @@ export async function sendBulkEmail(recipients: string[], subject: string, html:
           results.sent++;
           results.errors.pop();
         } catch (retryErr: any) {
-          console.error(`Retry also failed for ${to}:`, retryErr.message);
+          console.error(`[email] Retry also failed for ${to}:`, retryErr.message);
         }
       }
     }
   }
 
+  console.log(`[email] Bulk send complete: ${results.sent} sent, ${results.failed} failed`);
   return results;
 }
 
