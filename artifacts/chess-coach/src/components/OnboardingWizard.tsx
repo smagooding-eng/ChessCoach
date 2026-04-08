@@ -55,6 +55,29 @@ const SCOUT_FACTS = [
   "Building a complete scouting report...",
 ];
 
+const CHESS_DID_YOU_KNOW = [
+  "The number of possible chess games exceeds the number of atoms in the observable universe.",
+  "The longest official chess game lasted 269 moves and ended in a draw.",
+  "The word 'checkmate' comes from the Persian phrase 'Shah Mat' — the king is helpless.",
+  "A knight can visit every square on the board exactly once — it's called the Knight's Tour.",
+  "The shortest possible checkmate is just two moves — Scholar's Mate isn't even the fastest!",
+  "Magnus Carlsen's peak rating of 2882 is the highest in chess history.",
+  "There are 400 different possible positions after each player makes one move.",
+  "The record for most simultaneous games is 604, set by Ehsan Ghaem-Maghami.",
+  "Garry Kasparov was the youngest undisputed World Champion at age 22.",
+  "A pawn that reaches the 8th rank can become any piece — even a second queen.",
+  "The longest chess game theoretically possible is 5,949 moves.",
+  "In speed chess, the average game lasts about 75 moves total.",
+];
+
+const SCOUT_STAGES = [
+  { icon: '📡', label: 'Fetching game history', duration: 4000 },
+  { icon: '📊', label: 'Analyzing opening repertoire', duration: 6000 },
+  { icon: '🔍', label: 'Scanning for patterns', duration: 5000 },
+  { icon: '⚔️', label: 'Identifying weaknesses', duration: 5000 },
+  { icon: '📝', label: 'Compiling scouting report', duration: 4000 },
+];
+
 type Step = 'welcome' | 'import' | 'review' | 'scout' | 'upgrade';
 
 const CLASS_COLORS: Record<string, string> = {
@@ -106,6 +129,142 @@ function PulseRing({ color = '#81b64c' }: { color?: string }) {
           transition={{ duration: 2, repeat: Infinity, delay: i * 0.5 }}
         />
       ))}
+    </div>
+  );
+}
+
+function ScoutLoadingVisual({ scoutName }: { scoutName: string }) {
+  const [stageIdx, setStageIdx] = useState(0);
+  const [factIdx, setFactIdx] = useState(() => Math.floor(Math.random() * CHESS_DID_YOU_KNOW.length));
+  const [elapsed, setElapsed] = useState(0);
+
+  useEffect(() => {
+    const t = setInterval(() => setElapsed(e => e + 100), 100);
+    return () => clearInterval(t);
+  }, []);
+
+  useEffect(() => {
+    let cumulative = 0;
+    for (let i = 0; i < SCOUT_STAGES.length; i++) {
+      cumulative += SCOUT_STAGES[i].duration;
+      if (elapsed < cumulative) { setStageIdx(i); return; }
+    }
+    setStageIdx(SCOUT_STAGES.length - 1);
+  }, [elapsed]);
+
+  useEffect(() => {
+    const t = setInterval(() => setFactIdx(i => (i + 1) % CHESS_DID_YOU_KNOW.length), 6000);
+    return () => clearInterval(t);
+  }, []);
+
+  const overallProgress = Math.min(95, (elapsed / (SCOUT_STAGES.reduce((s, st) => s + st.duration, 0))) * 95);
+
+  const miniBoard = useMemo(() => {
+    const cells: { light: boolean; piece: string }[] = [];
+    const pieces = ['♜','♞','♝','♛','♚','♝','♞','♜'];
+    const wPieces = ['♖','♘','♗','♕','♔','♗','♘','♖'];
+    for (let r = 0; r < 8; r++) {
+      for (let c = 0; c < 8; c++) {
+        const light = (r + c) % 2 === 0;
+        let piece = '';
+        if (r === 0) piece = pieces[c];
+        else if (r === 1) piece = '♟';
+        else if (r === 6) piece = '♙';
+        else if (r === 7) piece = wPieces[c];
+        cells.push({ light, piece });
+      }
+    }
+    return cells;
+  }, []);
+
+  const scanRow = Math.floor((elapsed % 4000) / 500);
+
+  return (
+    <div className="py-2">
+      <div className="relative w-[160px] h-[160px] mx-auto mb-5">
+        <div className="absolute inset-0 grid grid-cols-8 grid-rows-8 rounded-xl overflow-hidden border border-white/10 shadow-lg shadow-black/30">
+          {miniBoard.map((cell, i) => {
+            const row = Math.floor(i / 8);
+            const isScanning = row === scanRow;
+            return (
+              <div key={i} className="relative flex items-center justify-center"
+                style={{ background: cell.light ? '#b8c68a' : '#6d8a3a' }}
+              >
+                {cell.piece && (
+                  <motion.span className="text-[14px] leading-none select-none"
+                    style={{ opacity: 0.8 }}
+                    animate={isScanning ? { scale: [1, 1.2, 1], opacity: [0.8, 1, 0.8] } : {}}
+                    transition={{ duration: 0.3 }}
+                  >{cell.piece}</motion.span>
+                )}
+                {isScanning && (
+                  <motion.div className="absolute inset-0"
+                    style={{ background: 'rgba(129,182,76,0.25)' }}
+                    initial={{ opacity: 0 }} animate={{ opacity: [0, 0.4, 0] }}
+                    transition={{ duration: 0.5 }}
+                  />
+                )}
+              </div>
+            );
+          })}
+        </div>
+        <motion.div className="absolute -inset-2 rounded-2xl border-2 border-[#81b64c]/30"
+          animate={{ opacity: [0.3, 0.6, 0.3] }}
+          transition={{ duration: 2, repeat: Infinity }}
+        />
+        <motion.div className="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-red-500 flex items-center justify-center shadow-lg"
+          animate={{ scale: [1, 1.2, 1] }} transition={{ duration: 1.5, repeat: Infinity }}
+        >
+          <Target className="w-3.5 h-3.5 text-white" />
+        </motion.div>
+      </div>
+
+      <p className="text-white font-semibold text-center mb-4">
+        Scouting <span className="text-[#81b64c]">{scoutName}</span>
+      </p>
+
+      <div className="space-y-1.5 mb-5">
+        {SCOUT_STAGES.map((stage, i) => (
+          <motion.div key={i} className="flex items-center gap-2.5 px-3 py-1.5 rounded-lg"
+            style={{ background: i === stageIdx ? 'rgba(255,255,255,0.05)' : 'transparent' }}
+            animate={i === stageIdx ? { backgroundColor: ['rgba(255,255,255,0.03)', 'rgba(255,255,255,0.07)', 'rgba(255,255,255,0.03)'] } : {}}
+            transition={{ duration: 2, repeat: Infinity }}
+          >
+            <span className="text-sm w-5 text-center">
+              {i < stageIdx ? '✅' : i === stageIdx ? stage.icon : '⬜'}
+            </span>
+            <span className={`text-xs ${i < stageIdx ? 'text-green-400/70 line-through' : i === stageIdx ? 'text-white/80 font-medium' : 'text-white/20'}`}>
+              {stage.label}
+            </span>
+            {i === stageIdx && (
+              <Loader2 className="w-3 h-3 text-[#81b64c] animate-spin ml-auto" />
+            )}
+          </motion.div>
+        ))}
+      </div>
+
+      <div className="mb-5 px-3">
+        <div className="flex items-center justify-between mb-1.5">
+          <span className="text-white/30 text-[10px] uppercase tracking-wider">Progress</span>
+          <span className="text-[#81b64c] text-xs font-mono">{Math.round(overallProgress)}%</span>
+        </div>
+        <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
+          <motion.div className="h-full rounded-full"
+            style={{ background: 'linear-gradient(90deg, #81b64c, #a3d465)' }}
+            animate={{ width: `${overallProgress}%` }}
+            transition={{ duration: 0.3 }}
+          />
+        </div>
+      </div>
+
+      <motion.div className="mx-3 p-3 rounded-xl bg-white/[0.03] border border-white/[0.06]"
+        key={factIdx}
+        initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.5 }}
+      >
+        <p className="text-[#81b64c]/60 text-[9px] uppercase tracking-widest font-bold mb-1">♟ Did you know?</p>
+        <p className="text-white/45 text-xs leading-relaxed">{CHESS_DID_YOU_KNOW[factIdx]}</p>
+      </motion.div>
     </div>
   );
 }
@@ -669,29 +828,7 @@ export function OnboardingWizard({ onComplete }: Props) {
                 )}
 
                 {scoutStatus === 'loading' && (
-                  <div className="text-center py-6">
-                    <div className="relative w-28 h-28 mx-auto mb-5">
-                      <motion.div className="absolute inset-0 rounded-full border-2 border-dashed border-red-500/30"
-                        animate={{ rotate: 360 }} transition={{ duration: 8, repeat: Infinity, ease: 'linear' }} />
-                      <motion.div className="absolute inset-3 rounded-full border-2 border-dashed border-orange-500/20"
-                        animate={{ rotate: -360 }} transition={{ duration: 12, repeat: Infinity, ease: 'linear' }} />
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <motion.div animate={{ scale: [1, 1.15, 1] }} transition={{ duration: 1.5, repeat: Infinity }}>
-                          <Target className="w-8 h-8 text-red-400" />
-                        </motion.div>
-                      </div>
-                    </div>
-                    <p className="text-white font-semibold mb-1">Scouting <span className="text-[#81b64c]">{scoutName}</span>...</p>
-                    <RotatingTip tips={SCOUT_FACTS} />
-                    <div className="mt-4 flex justify-center gap-1">
-                      {[0,1,2,3,4].map(i => (
-                        <motion.div key={i} className="w-2 h-2 rounded-full bg-red-400"
-                          animate={{ opacity: [0.2, 1, 0.2], scale: [0.8, 1.2, 0.8] }}
-                          transition={{ duration: 1.2, repeat: Infinity, delay: i * 0.2 }}
-                        />
-                      ))}
-                    </div>
-                  </div>
+                  <ScoutLoadingVisual scoutName={scoutName} />
                 )}
 
                 {scoutStatus === 'done' && scoutResult && !showFullReport && (
