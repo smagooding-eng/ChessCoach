@@ -790,7 +790,30 @@ Respond with valid JSON covering ALL ${moves.length} moves in order:
       logger.warn({ moves: moves.length }, "Review response truncated by token limit — trying to parse partial result");
     }
 
-    const parsed = JSON.parse(content) as { moves?: Array<Partial<MoveReview>>; gameSummary?: Partial<GameReviewSummary> };
+    let parsed: { moves?: Array<Partial<MoveReview>>; gameSummary?: Partial<GameReviewSummary> };
+    try {
+      parsed = JSON.parse(content);
+    } catch (parseErr) {
+      logger.warn({ parseErr, contentLen: content.length }, "GPT returned malformed JSON — attempting repair");
+      let repaired = content;
+      const lastBrace = repaired.lastIndexOf("}");
+      if (lastBrace > 0) repaired = repaired.slice(0, lastBrace + 1);
+      const lastBracket = repaired.lastIndexOf("]");
+      const openBrackets = (repaired.match(/\[/g) || []).length;
+      const closeBrackets = (repaired.match(/\]/g) || []).length;
+      if (openBrackets > closeBrackets) {
+        repaired = repaired.slice(0, lastBracket > 0 ? lastBracket + 1 : repaired.length);
+        for (let i = 0; i < openBrackets - closeBrackets; i++) repaired += "]";
+        repaired += "}";
+      }
+      try {
+        parsed = JSON.parse(repaired);
+        logger.info("JSON repair successful");
+      } catch {
+        logger.warn("JSON repair failed — building engine-only review");
+        parsed = { moves: [] };
+      }
+    }
     const validClassifications = ["brilliant", "excellent", "good", "book", "inaccuracy", "mistake", "blunder"];
 
     const rawMoves = (parsed.moves ?? []).map((m, i) => ({
@@ -805,10 +828,6 @@ Respond with valid JSON covering ALL ${moves.length} moves in order:
       pros: Array.isArray(m.pros) ? m.pros : [],
       cons: Array.isArray(m.cons) ? m.cons : [],
     }));
-
-    if (rawMoves.length === 0) {
-      throw new Error("OpenAI returned an empty move list — possibly a model error or format issue");
-    }
 
     const reviewMoves = mergeReviewWithEngine(rawMoves, moves, fens, evals, uciMoves);
 
