@@ -46,8 +46,17 @@ router.post("/opponents/start", async (req, res): Promise<void> => {
   );
 
   if (pending) {
-    res.json({ jobId: pending.id });
-    return;
+    const age = Date.now() - new Date(pending.createdAt).getTime();
+    if (age > 10 * 60 * 1000) {
+      await db.update(backgroundJobsTable).set({
+        status: "error",
+        error: "Timed out (server restart or crash)",
+        completedAt: new Date(),
+      }).where(eq(backgroundJobsTable.id, pending.id));
+    } else {
+      res.json({ jobId: pending.id });
+      return;
+    }
   }
 
   const jobId = randomUUID();
@@ -69,7 +78,11 @@ router.post("/opponents/start", async (req, res): Promise<void> => {
 });
 
 router.get("/opponents/status/:jobId", async (req, res): Promise<void> => {
-  const [job] = await db.select().from(backgroundJobsTable).where(eq(backgroundJobsTable.id, req.params.jobId));
+  const userId = req.user?.id;
+  if (!userId) { res.status(401).json({ error: "Not authenticated" }); return; }
+  const [job] = await db.select().from(backgroundJobsTable).where(
+    and(eq(backgroundJobsTable.id, req.params.jobId), eq(backgroundJobsTable.userId, userId))
+  );
   if (!job) {
     res.status(404).json({ error: "Job not found or expired" });
     return;
@@ -148,6 +161,17 @@ router.get("/opponents/active-job", async (req, res): Promise<void> => {
   ).orderBy(desc(backgroundJobsTable.createdAt)).limit(1);
 
   if (!job) { res.json({ job: null }); return; }
+
+  const ageMs = Date.now() - job.createdAt.getTime();
+  if (job.status === "pending" && ageMs > 10 * 60 * 1000) {
+    await db.update(backgroundJobsTable).set({
+      status: "error",
+      error: "Timed out (server restart or crash)",
+      completedAt: new Date(),
+    }).where(eq(backgroundJobsTable.id, job.id));
+    res.json({ job: null });
+    return;
+  }
 
   res.setHeader("Cache-Control", "no-store");
   res.json({
