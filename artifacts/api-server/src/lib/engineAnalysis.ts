@@ -50,9 +50,11 @@ class StockfishProcess {
   private proc: ChildProcessWithoutNullStreams | null = null;
   private buffer = "";
   private resolveFunc: ((lines: string[]) => void) | null = null;
+  private rejectFunc: ((err: Error) => void) | null = null;
   private collectedLines: string[] = [];
   private waitForToken = "";
   private pendingTimers: ReturnType<typeof setTimeout>[] = [];
+  private dead = false;
 
   private clearTimers(): void {
     for (const t of this.pendingTimers) clearTimeout(t);
@@ -64,12 +66,46 @@ class StockfishProcess {
       this.clearTimers();
       this.resolveFunc(this.collectedLines);
       this.resolveFunc = null;
+      this.rejectFunc = null;
+      this.collectedLines = [];
+    }
+  }
+
+  private doReject(err: Error): void {
+    if (this.rejectFunc) {
+      this.clearTimers();
+      this.rejectFunc(err);
+      this.resolveFunc = null;
+      this.rejectFunc = null;
       this.collectedLines = [];
     }
   }
 
   async init(): Promise<void> {
+    const isProd = process.env.NODE_ENV === "production";
+    const hashMB = isProd ? 64 : 256;
+    const threads = isProd ? 1 : 2;
+
     this.proc = spawn("stockfish", [], { stdio: ["pipe", "pipe", "pipe"] });
+
+    this.proc.on("exit", (code, signal) => {
+      logger.warn({ code, signal }, "Stockfish process exited");
+      this.dead = true;
+      this.proc = null;
+      globalEngine = null;
+      engineInitPromise = null;
+      this.doReject(new Error(`Stockfish exited: code=${code} signal=${signal}`));
+    });
+
+    this.proc.on("error", (err) => {
+      logger.error({ err }, "Stockfish process error");
+      this.dead = true;
+      this.proc = null;
+      globalEngine = null;
+      engineInitPromise = null;
+      this.doReject(err);
+    });
+
     this.proc.stdout.on("data", (data: Buffer) => {
       this.buffer += data.toString();
       const lines = this.buffer.split("\n");
@@ -86,11 +122,11 @@ class StockfishProcess {
     });
 
     await this.sendAndWait("uci", "uciok");
-    await this.sendAndWait("setoption name Hash value 256", "");
-    await this.sendAndWait("setoption name Threads value 2", "");
+    await this.sendAndWait(`setoption name Hash value ${hashMB}`, "");
+    await this.sendAndWait(`setoption name Threads value ${threads}`, "");
     await this.sendAndWait("setoption name MultiPV value 2", "");
     await this.sendAndWait("isready", "readyok");
-    logger.info("Stockfish 17 engine initialized (hash=256MB, threads=2, depth=20)");
+    logger.info({ hashMB, threads, depth: ANALYSIS_DEPTH, env: isProd ? "production" : "development" }, "Stockfish engine initialized");
   }
 
   async newGame(): Promise<void> {
@@ -100,22 +136,26 @@ class StockfishProcess {
 
   private sendAndWait(command: string, token: string): Promise<string[]> {
     return new Promise((resolve, reject) => {
-      if (!this.proc) { reject(new Error("Stockfish not started")); return; }
+      if (!this.proc || this.dead) { reject(new Error("Stockfish not started or dead")); return; }
       this.collectedLines = [];
       this.waitForToken = token;
       this.resolveFunc = resolve;
+      this.rejectFunc = reject;
       this.proc.stdin.write(command + "\n");
 
       if (!token) {
         this.pendingTimers.push(setTimeout(() => this.doResolve(), 50));
       }
 
-      this.pendingTimers.push(setTimeout(() => this.doResolve(), ENGINE_TIMEOUT_MS));
+      this.pendingTimers.push(setTimeout(() => {
+        logger.warn({ command, token }, "Stockfish command timed out");
+        this.doResolve();
+      }, ENGINE_TIMEOUT_MS));
     });
   }
 
   async evaluate(fen: string, depth: number = ANALYSIS_DEPTH): Promise<PositionEval> {
-    if (!this.proc) throw new Error("Stockfish not started");
+    if (!this.proc || this.dead) throw new Error("Stockfish not started or dead");
 
     await this.sendAndWait(`position fen ${fen}`, "");
     await this.sendAndWait("isready", "readyok");
@@ -188,11 +228,20 @@ let globalEngine: StockfishProcess | null = null;
 let engineInitPromise: Promise<void> | null = null;
 
 async function getEngine(): Promise<StockfishProcess> {
-  if (globalEngine) return globalEngine;
+  if (globalEngine && !globalEngine["dead"]) return globalEngine;
+  if (globalEngine?.["dead"]) {
+    globalEngine = null;
+    engineInitPromise = null;
+  }
   if (engineInitPromise) { await engineInitPromise; return globalEngine!; }
 
   globalEngine = new StockfishProcess();
-  engineInitPromise = globalEngine.init();
+  engineInitPromise = globalEngine.init().catch((err) => {
+    logger.error({ err }, "Failed to initialize Stockfish");
+    globalEngine = null;
+    engineInitPromise = null;
+    throw err;
+  });
   await engineInitPromise;
   return globalEngine!;
 }
@@ -202,10 +251,18 @@ export async function evaluateAllPositions(
   depth: number = ANALYSIS_DEPTH,
   onProgress?: (done: number, total: number) => void,
 ): Promise<PositionEval[]> {
-  const engine = await getEngine();
+  let engine = await getEngine();
   const results: PositionEval[] = [];
 
-  await engine.newGame();
+  try {
+    await engine.newGame();
+  } catch (err) {
+    logger.warn({ err }, "Engine newGame failed, reinitializing");
+    globalEngine = null;
+    engineInitPromise = null;
+    engine = await getEngine();
+    await engine.newGame();
+  }
 
   for (let i = 0; i < fens.length; i++) {
     try {
