@@ -74,6 +74,7 @@ import { Subscription } from "@/pages/Subscription";
 import { Profile } from "@/pages/Profile";
 import NotFound from "@/pages/not-found";
 import { Layout } from "@/components/Layout";
+import { OnboardingWizard, useOnboardingCheck } from "@/components/OnboardingWizard";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -162,9 +163,15 @@ function PageTracker() {
   return null;
 }
 
+function OnboardingOverlay() {
+  const { showOnboarding, dismissOnboarding } = useOnboardingCheck();
+  if (!showOnboarding) return null;
+  return <OnboardingWizard onComplete={dismissOnboarding} />;
+}
+
 function Router() {
   return (
-    <><PageTracker /><Switch>
+    <><PageTracker /><OnboardingOverlay /><Switch>
       <Route path="/setup" component={LandingPage} />
 
       {/* Protected Routes — stable named components prevent remounting on every render */}
