@@ -703,96 +703,38 @@ export async function reviewFullGame(input: {
     }
     moveDetails.push(`${i}: ${m.moveNumber}${m.color === "white" ? "." : "..."} ${m.san} [fen:${fenBefore}] [legal:${legalCount}]`);
   }
-  const moveList = moveDetails.join("\n");
+  const CHUNK_SIZE = 25;
+  const needsChunking = moves.length > CHUNK_SIZE;
 
-  const prompt = `You are a Stockfish-caliber chess engine and coach. Review this complete chess game and classify EVERY single move with engine-level accuracy.
+  function buildChunkPrompt(chunkMoveDetails: string[], chunkStart: number, chunkEnd: number, includeSummary: boolean): string {
+    const chunkList = chunkMoveDetails.join("\n");
+    const concise = moves.length > 30 ? " BE CONCISE — 1 short sentence per explanation, pros/cons max 8 words each." : "";
+    return `You are a chess coach. Analyze moves ${chunkStart}-${chunkEnd} of this game.${concise}
 
-Game: ${whiteUsername} (White) vs ${blackUsername} (Black)
-Opening: ${opening ?? "Unknown"} | Result: ${result}
+Game: ${whiteUsername} vs ${blackUsername} | ${opening ?? "Unknown"} | ${result}
 
-Move list (format: index: moveNum. san [fen:position_before_move] [legal:number_of_legal_moves]):
-${moveList}
+Moves to analyze:
+${chunkList}
 
-CRITICAL ACCURACY RULES:
-- You MUST evaluate each FEN position to determine the best move BEFORE classifying. Compare the played move against what a 3000+ Elo engine would play.
-- If [legal:1] — this is a FORCED move (only legal option). Classify as "book" and set betterMove to null.
-- "brilliant" should be EXTREMELY RARE (0-1 per game) — only for deeply calculated sacrifices or quiet moves that are very hard to find.
-- "betterMove" MUST be a legal move in the given FEN position. Use the FEN to verify. If unsure, set to null.
-- Most moves should be classified as "good" or "book". Do NOT inflate — most amateur moves are "good" at best, not "excellent".
-- A move that loses 25-50 centipawns of evaluation is an "inaccuracy", 50-100 is a "mistake", and >100 is a "blunder". Apply these thresholds strictly.
-- Pay careful attention to tactics: missed forks, pins, skewers, hanging pieces, and back-rank threats should be flagged as mistakes or blunders.
+Rules:
+- Classify each move: "brilliant"|"excellent"|"good"|"book"|"inaccuracy"|"mistake"|"blunder"
+- If [legal:1] → "book" (forced move)
+- "brilliant" = extremely rare (0-1 per game)
+- betterMove: only for inaccuracy/mistake/blunder, must be legal in the FEN. null otherwise.
 
-Classify each move as ONE of:
-- "brilliant": deeply calculated sacrifice or non-obvious winning move that is extremely hard to find (RARE)
-- "excellent": the best or near-best engine move, no meaningful improvement exists
-- "good": solid move, maintains position adequately
-- "book": standard opening theory OR forced moves (only 1 legal option)
-- "inaccuracy": suboptimal, a clearly better move exists (roughly 25-50cp swing)
-- "mistake": clear error that worsens the position noticeably (roughly 50-100cp swing)
-- "blunder": serious error that loses material, decisive advantage, or the game (>100cp swing)
+Per move: classification, explanation (1 sentence), pros (1-2 items), cons (1-2 items), betterMove.
+${includeSummary ? `
+Also provide "gameSummary": overview (2 sentences), keyMistakes (up to 3: moveIndex, move, whatWentWrong, whatYouShouldHaveDone, tip), strengths (1-3), improvementAreas (2-3).` : ""}
 
-For each move provide:
-1. classification (required)
-2. explanation: concise 1-2 sentence explanation (required)
-3. pros: array of 1-2 SHORT strengths of this move (max 12 words each)
-4. cons: array of 1-2 SHORT weaknesses or missed opportunities (max 12 words each)
-5. betterMove: for inaccuracy/mistake/blunder only — a LEGAL alternative move in SAN notation that exists in the position's FEN. For good/excellent/brilliant/book set null.
+You MUST cover ALL ${chunkEnd - chunkStart + 1} moves listed above. Do not skip any.
 
-ALSO provide a "gameSummary" object:
-1. "overview": 2-3 sentences summarizing the game flow
-2. "keyMistakes": array of up to 4 most important mistakes/blunders:
-   - "moveIndex", "move" (SAN), "whatWentWrong", "whatYouShouldHaveDone", "tip"
-3. "strengths": array of 1-3 things done well
-4. "improvementAreas": array of 2-3 actionable coaching advice items
-
-Respond with valid JSON covering ALL ${moves.length} moves in order:
-{
-  "moves": [
-    {
-      "moveIndex": 0,
-      "san": "e4",
-      "color": "white",
-      "classification": "book",
-      "explanation": "Standard central pawn opening move.",
-      "pros": ["Controls d5 and f5"],
-      "cons": ["Slightly weakens d4"],
-      "betterMove": null
-    }
-  ],
-  "gameSummary": {
-    "overview": "...",
-    "keyMistakes": [],
-    "strengths": [],
-    "improvementAreas": []
+JSON format:
+{"moves":[{"moveIndex":${chunkStart},"san":"...","color":"white","classification":"...","explanation":"...","pros":["..."],"cons":["..."],"betterMove":null}]${includeSummary ? ',"gameSummary":{"overview":"...","keyMistakes":[],"strengths":[],"improvementAreas":[]}' : ""}}`;
   }
-}`;
 
-  try {
-    logger.info({ positions: fens.length, moves: moves.length }, "Starting parallel GPT + Stockfish analysis");
-
-    const [gptResponse, evals] = await Promise.all([
-      openai.chat.completions.create({
-        model: "gpt-4o",
-        max_completion_tokens: 16000,
-        messages: [{ role: "user", content: prompt }],
-        response_format: { type: "json_object" },
-      }),
-      evaluateAllPositions(fens, undefined, onProgress),
-    ]);
-
-    const gptTime = Date.now() - startTime;
-    logger.info({ gptTimeMs: gptTime, evaluated: evals.length }, "Parallel GPT + Stockfish complete");
-
-    const finishReason = gptResponse.choices[0]?.finish_reason;
-    const content = gptResponse.choices[0]?.message?.content ?? "{}";
-
-    if (finishReason === "length") {
-      logger.warn({ moves: moves.length }, "Review response truncated by token limit — trying to parse partial result");
-    }
-
-    let parsed: { moves?: Array<Partial<MoveReview>>; gameSummary?: Partial<GameReviewSummary> };
+  function parseGptResponse(content: string): { moves?: Array<Partial<MoveReview>>; gameSummary?: Partial<GameReviewSummary> } {
     try {
-      parsed = JSON.parse(content);
+      return JSON.parse(content);
     } catch (parseErr) {
       logger.warn({ parseErr, contentLen: content.length }, "GPT returned malformed JSON — attempting repair");
       let repaired = content;
@@ -807,16 +749,71 @@ Respond with valid JSON covering ALL ${moves.length} moves in order:
         repaired += "}";
       }
       try {
-        parsed = JSON.parse(repaired);
+        const result = JSON.parse(repaired);
         logger.info("JSON repair successful");
+        return result;
       } catch {
-        logger.warn("JSON repair failed — building engine-only review");
-        parsed = { moves: [] };
+        logger.warn("JSON repair failed — returning empty");
+        return { moves: [] };
       }
     }
+  }
+
+  try {
+    logger.info({ positions: fens.length, moves: moves.length, chunked: needsChunking }, "Starting parallel GPT + Stockfish analysis");
+
+    const chunks: Array<{ start: number; end: number; details: string[] }> = [];
+    for (let i = 0; i < moveDetails.length; i += CHUNK_SIZE) {
+      const end = Math.min(i + CHUNK_SIZE - 1, moveDetails.length - 1);
+      chunks.push({ start: i, end, details: moveDetails.slice(i, end + 1) });
+    }
+
+    const gptPromises = chunks.map((chunk, ci) => {
+      const includeSummary = ci === 0;
+      const chunkMoveCount = chunk.end - chunk.start + 1;
+      const chunkTokens = Math.min(16384, Math.max(4096, chunkMoveCount * 350 + (includeSummary ? 1500 : 0)));
+      const prompt = buildChunkPrompt(chunk.details, chunk.start, chunk.end, includeSummary);
+      return openai.chat.completions.create({
+        model: "gpt-4o",
+        max_completion_tokens: chunkTokens,
+        messages: [{ role: "user", content: prompt }],
+        response_format: { type: "json_object" },
+      });
+    });
+
+    const [gptResponses, evals] = await Promise.all([
+      Promise.all(gptPromises),
+      evaluateAllPositions(fens, undefined, onProgress),
+    ]);
+
+    const gptTime = Date.now() - startTime;
+    const totalTokens = gptResponses.reduce((s, r) => s + (r.usage?.completion_tokens ?? 0), 0);
+    logger.info({ gptTimeMs: gptTime, evaluated: evals.length, chunks: chunks.length, totalTokensUsed: totalTokens }, "Parallel GPT + Stockfish complete");
+
+    let allParsedMoves: Array<Partial<MoveReview>> = [];
+    let gameSummaryRaw: Partial<GameReviewSummary> | undefined;
+
+    for (let ci = 0; ci < gptResponses.length; ci++) {
+      const resp = gptResponses[ci];
+      const content = resp.choices[0]?.message?.content ?? "{}";
+      const finishReason = resp.choices[0]?.finish_reason;
+      if (finishReason === "length") {
+        logger.warn({ chunk: ci, finishReason }, "GPT chunk truncated");
+      }
+      const parsed = parseGptResponse(content);
+      const chunkMoves = parsed.moves ?? [];
+      logger.info({ chunk: ci, expected: chunks[ci].end - chunks[ci].start + 1, received: chunkMoves.length }, "GPT chunk parsed");
+      allParsedMoves.push(...chunkMoves);
+      if (parsed.gameSummary) gameSummaryRaw = parsed.gameSummary;
+    }
+
     const validClassifications = ["brilliant", "excellent", "good", "book", "inaccuracy", "mistake", "blunder"];
 
-    const rawMoves = (parsed.moves ?? []).map((m, i) => ({
+    if (allParsedMoves.length < moves.length) {
+      logger.warn({ expected: moves.length, received: allParsedMoves.length }, "GPT returned fewer moves than expected — remaining use engine-only data");
+    }
+
+    const rawMoves = allParsedMoves.map((m, i) => ({
       moveIndex: typeof m.moveIndex === "number" ? m.moveIndex : i,
       san: m.san ?? moves[i]?.san ?? "",
       color: (m.color ?? moves[i]?.color ?? "white") as "white" | "black",
@@ -831,10 +828,10 @@ Respond with valid JSON covering ALL ${moves.length} moves in order:
 
     const reviewMoves = mergeReviewWithEngine(rawMoves, moves, fens, evals, uciMoves);
 
-    const gameSummary: GameReviewSummary | null = parsed.gameSummary ? {
-      overview: parsed.gameSummary.overview ?? "",
-      keyMistakes: Array.isArray(parsed.gameSummary.keyMistakes)
-        ? parsed.gameSummary.keyMistakes.map(km => ({
+    const gameSummary: GameReviewSummary | null = gameSummaryRaw ? {
+      overview: gameSummaryRaw.overview ?? "",
+      keyMistakes: Array.isArray(gameSummaryRaw.keyMistakes)
+        ? gameSummaryRaw.keyMistakes.map(km => ({
             moveIndex: km.moveIndex ?? 0,
             move: km.move ?? "",
             whatWentWrong: km.whatWentWrong ?? "",
@@ -842,12 +839,12 @@ Respond with valid JSON covering ALL ${moves.length} moves in order:
             tip: km.tip ?? "",
           }))
         : [],
-      strengths: Array.isArray(parsed.gameSummary.strengths) ? parsed.gameSummary.strengths : [],
-      improvementAreas: Array.isArray(parsed.gameSummary.improvementAreas) ? parsed.gameSummary.improvementAreas : [],
+      strengths: Array.isArray(gameSummaryRaw.strengths) ? gameSummaryRaw.strengths : [],
+      improvementAreas: Array.isArray(gameSummaryRaw.improvementAreas) ? gameSummaryRaw.improvementAreas : [],
     } : null;
 
     const totalTime = Date.now() - startTime;
-    logger.info({ totalTimeMs: totalTime, moves: moves.length }, "Game review complete");
+    logger.info({ totalTimeMs: totalTime, moves: moves.length, gptMovesCovered: allParsedMoves.length }, "Game review complete");
 
     return { moves: reviewMoves, gameSummary };
   } catch (err) {
