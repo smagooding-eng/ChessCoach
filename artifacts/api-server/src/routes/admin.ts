@@ -176,7 +176,7 @@ router.post("/admin/clear-ai-cache", requireAdmin, async (_req: Request, res: Re
 
     const jobsResult = await db.update(backgroundJobsTable)
       .set({ result: null, status: "cleared", error: null })
-      .where(inArray(backgroundJobsTable.type, ["scout", "analysis", "review"]));
+      .where(inArray(backgroundJobsTable.type, ["analysis", "review"]));
 
     res.json({
       success: true,
@@ -185,7 +185,7 @@ router.post("/admin/clear-ai-cache", requireAdmin, async (_req: Request, res: Re
         weaknesses: "deleted",
         lessons: "deleted",
         courses: "deleted",
-        jobs: "scout/analysis/review results cleared",
+        jobs: "analysis/review results cleared (scouts preserved)",
       },
     });
   } catch (err: any) {
