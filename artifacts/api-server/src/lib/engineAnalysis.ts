@@ -2,8 +2,9 @@ import { Chess } from "chess.js";
 import { logger } from "./logger";
 import { spawn, ChildProcessWithoutNullStreams } from "child_process";
 
-const ANALYSIS_DEPTH = 20;
-const ENGINE_TIMEOUT_MS = 30000;
+const IS_PROD = process.env.NODE_ENV === "production";
+const ANALYSIS_DEPTH = IS_PROD ? 15 : 20;
+const ENGINE_TIMEOUT_MS = IS_PROD ? 15000 : 30000;
 
 export type EngineClassification =
   | "brilliant"
@@ -82,9 +83,8 @@ class StockfishProcess {
   }
 
   async init(): Promise<void> {
-    const isProd = process.env.NODE_ENV === "production";
-    const hashMB = isProd ? 64 : 256;
-    const threads = isProd ? 1 : 2;
+    const hashMB = IS_PROD ? 64 : 256;
+    const threads = IS_PROD ? 1 : 2;
 
     this.proc = spawn("stockfish", [], { stdio: ["pipe", "pipe", "pipe"] });
 
@@ -126,7 +126,7 @@ class StockfishProcess {
     await this.sendAndWait(`setoption name Threads value ${threads}`, "");
     await this.sendAndWait("setoption name MultiPV value 2", "");
     await this.sendAndWait("isready", "readyok");
-    logger.info({ hashMB, threads, depth: ANALYSIS_DEPTH, env: isProd ? "production" : "development" }, "Stockfish engine initialized");
+    logger.info({ hashMB, threads, depth: ANALYSIS_DEPTH, env: IS_PROD ? "production" : "development" }, "Stockfish engine initialized");
   }
 
   async newGame(): Promise<void> {
@@ -149,7 +149,12 @@ class StockfishProcess {
 
       this.pendingTimers.push(setTimeout(() => {
         logger.warn({ command, token }, "Stockfish command timed out");
-        this.doResolve();
+        if (token === "bestmove" && this.proc) {
+          this.proc.stdin.write("stop\n");
+          setTimeout(() => this.doResolve(), 500);
+        } else {
+          this.doResolve();
+        }
       }, ENGINE_TIMEOUT_MS));
     });
   }
