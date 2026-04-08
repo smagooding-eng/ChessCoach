@@ -513,14 +513,14 @@ export function GameLookup() {
               </div>
 
               <div className="flex flex-col border-l" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
-                <div className="flex items-center justify-center gap-2 p-2 border-b" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
-                  <button onClick={goFirst} className="p-1.5 rounded hover:bg-white/10" style={{ color: TEXT_MUTED }}><ChevronsLeft size={18} /></button>
-                  <button onClick={goPrev} className="p-1.5 rounded hover:bg-white/10" style={{ color: TEXT_MUTED }}><ChevronLeft size={18} /></button>
-                  <button onClick={togglePlay} className="p-1.5 rounded hover:bg-white/10" style={{ color: CHESSCOM_GREEN }}>
-                    {isPlaying ? <Pause size={18} /> : <Play size={18} />}
+                <div className="flex items-center justify-center gap-1 md:gap-2 p-2 border-b" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
+                  <button onClick={goFirst} className="p-3 md:p-2 rounded-lg hover:bg-white/10 active:scale-90 transition-transform" style={{ color: TEXT_MUTED }}><ChevronsLeft className="w-5 h-5 md:w-[18px] md:h-[18px]" /></button>
+                  <button onClick={goPrev} className="p-3 md:p-2 rounded-lg hover:bg-white/10 active:scale-90 transition-transform" style={{ color: TEXT_MUTED }}><ChevronLeft className="w-5 h-5 md:w-[18px] md:h-[18px]" /></button>
+                  <button onClick={togglePlay} className="p-3 md:p-2 rounded-lg hover:bg-white/10 active:scale-90 transition-transform" style={{ color: CHESSCOM_GREEN }}>
+                    {isPlaying ? <Pause className="w-5 h-5 md:w-[18px] md:h-[18px]" /> : <Play className="w-5 h-5 md:w-[18px] md:h-[18px]" />}
                   </button>
-                  <button onClick={goNext} className="p-1.5 rounded hover:bg-white/10" style={{ color: TEXT_MUTED }}><ChevronRight size={18} /></button>
-                  <button onClick={goLast} className="p-1.5 rounded hover:bg-white/10" style={{ color: TEXT_MUTED }}><ChevronsRight size={18} /></button>
+                  <button onClick={goNext} className="p-3 md:p-2 rounded-lg hover:bg-white/10 active:scale-90 transition-transform" style={{ color: TEXT_MUTED }}><ChevronRight className="w-5 h-5 md:w-[18px] md:h-[18px]" /></button>
+                  <button onClick={goLast} className="p-3 md:p-2 rounded-lg hover:bg-white/10 active:scale-90 transition-transform" style={{ color: TEXT_MUTED }}><ChevronsRight className="w-5 h-5 md:w-[18px] md:h-[18px]" /></button>
                   <span className="text-[10px] ml-2" style={{ color: TEXT_MUTED }}>
                     {moveIndex}/{totalMoves}
                   </span>

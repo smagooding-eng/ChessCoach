@@ -584,47 +584,47 @@ export function GameReplay() {
             moveQuality={currentReview?.classification ?? null}
           />
 
-          {/* Playback controls — single compact row on mobile */}
-          <div className="glass-card rounded-2xl px-2 py-2 md:p-3 flex items-center justify-between gap-1 md:gap-3">
-            <div className="flex items-center gap-0.5 md:gap-1">
+          {/* Playback controls */}
+          <div className="glass-card rounded-2xl px-2 py-2 md:p-3 flex items-center justify-between gap-2 md:gap-3 flex-wrap">
+            <div className="flex items-center gap-1 md:gap-1.5">
               <button onClick={() => { setCurrentMove(0); setIsPlaying(false); }} disabled={currentMove === 0}
-                className="p-2 md:p-2.5 rounded-xl bg-secondary hover:bg-primary/20 hover:text-primary transition-colors disabled:opacity-40">
-                <ChevronsLeft className="w-4 h-4" />
+                className="p-3 md:p-2.5 rounded-xl bg-secondary hover:bg-primary/20 hover:text-primary transition-colors disabled:opacity-40 active:scale-90">
+                <ChevronsLeft className="w-5 h-5 md:w-4 md:h-4" />
               </button>
               <button onClick={() => setCurrentMove(p => Math.max(0, p - 1))} disabled={currentMove === 0}
-                className="p-2 md:p-2.5 rounded-xl bg-secondary hover:bg-primary/20 hover:text-primary transition-colors disabled:opacity-40">
-                <ChevronLeft className="w-4 h-4" />
+                className="p-3 md:p-2.5 rounded-xl bg-secondary hover:bg-primary/20 hover:text-primary transition-colors disabled:opacity-40 active:scale-90">
+                <ChevronLeft className="w-5 h-5 md:w-4 md:h-4" />
               </button>
               <button onClick={() => setIsPlaying(p => !p)}
-                className="px-3 py-2 md:px-4 md:py-2.5 rounded-xl bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground transition-colors">
-                {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+                className="px-4 py-3 md:px-4 md:py-2.5 rounded-xl bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground transition-colors active:scale-90">
+                {isPlaying ? <Pause className="w-5 h-5 md:w-4 md:h-4" /> : <Play className="w-5 h-5 md:w-4 md:h-4" />}
               </button>
               <button onClick={() => setCurrentMove(p => Math.min(maxMoves, p + 1))} disabled={currentMove >= maxMoves}
-                className="p-2 md:p-2.5 rounded-xl bg-secondary hover:bg-primary/20 hover:text-primary transition-colors disabled:opacity-40">
-                <ChevronRight className="w-4 h-4" />
+                className="p-3 md:p-2.5 rounded-xl bg-secondary hover:bg-primary/20 hover:text-primary transition-colors disabled:opacity-40 active:scale-90">
+                <ChevronRight className="w-5 h-5 md:w-4 md:h-4" />
               </button>
               <button onClick={() => { setCurrentMove(maxMoves); setIsPlaying(false); }} disabled={currentMove >= maxMoves}
-                className="p-2 md:p-2.5 rounded-xl bg-secondary hover:bg-primary/20 hover:text-primary transition-colors disabled:opacity-40">
-                <ChevronsRight className="w-4 h-4" />
+                className="p-3 md:p-2.5 rounded-xl bg-secondary hover:bg-primary/20 hover:text-primary transition-colors disabled:opacity-40 active:scale-90">
+                <ChevronsRight className="w-5 h-5 md:w-4 md:h-4" />
               </button>
             </div>
 
-            <div className="flex items-center gap-1 md:gap-2">
+            <div className="flex items-center gap-1.5 md:gap-2">
               <span className="text-[10px] md:text-xs text-muted-foreground font-mono">{currentMove}/{maxMoves}</span>
 
               <button onClick={() => setFlipped(f => !f)} title="Flip board"
-                className="p-2 md:p-2.5 rounded-xl bg-secondary hover:bg-primary/20 hover:text-primary transition-colors">
-                <FlipVertical2 className="w-3.5 h-3.5 md:w-4 md:h-4" />
+                className="p-3 md:p-2.5 rounded-xl bg-secondary hover:bg-primary/20 hover:text-primary transition-colors active:scale-90">
+                <FlipVertical2 className="w-5 h-5 md:w-4 md:h-4" />
               </button>
 
               <button
                 onClick={() => { setPracticeMode(p => !p); setIsPlaying(false); }}
-                className={`p-2 md:px-3 md:py-2 rounded-xl text-xs font-bold transition-colors border
+                className={`p-3 md:px-3 md:py-2 rounded-xl text-xs font-bold transition-colors border active:scale-90
                   ${practiceMode
                     ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
                     : 'bg-secondary border-border hover:border-primary/40 hover:text-primary'}`}>
                 <span className="flex items-center gap-1">
-                  <Zap className="w-3.5 h-3.5" />
+                  <Zap className="w-4 h-4 md:w-3.5 md:h-3.5" />
                   <span className="hidden md:inline">{practiceMode ? 'Practice ON' : 'Practice'}</span>
                 </span>
               </button>
@@ -632,15 +632,15 @@ export function GameReplay() {
               <button
                 onClick={() => handleReview(false)}
                 disabled={reviewing || reviewMoves.length > 0}
-                className={`p-2 md:px-3 md:py-2 rounded-xl text-xs font-bold transition-colors border flex items-center gap-1 md:gap-1.5
+                className={`p-3 md:px-3 md:py-2 rounded-xl text-xs font-bold transition-colors border flex items-center gap-1 md:gap-1.5 active:scale-90
                   ${reviewMoves.length > 0
                     ? 'bg-primary/15 text-primary border-primary/30'
                     : 'bg-secondary border-border hover:border-primary/40 hover:text-primary disabled:opacity-50'}`}>
                 {reviewing
-                  ? <div className="w-3.5 h-3.5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                  ? <div className="w-4 h-4 md:w-3.5 md:h-3.5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
                   : reviewMoves.length > 0
-                  ? <Sparkles className="w-3.5 h-3.5" />
-                  : <BrainCircuit className="w-3.5 h-3.5" />}
+                  ? <Sparkles className="w-4 h-4 md:w-3.5 md:h-3.5" />
+                  : <BrainCircuit className="w-4 h-4 md:w-3.5 md:h-3.5" />}
                 <span className="hidden md:inline">
                   {reviewing ? 'Reviewing…' : reviewMoves.length > 0 ? 'Reviewed' : 'Review Game'}
                 </span>

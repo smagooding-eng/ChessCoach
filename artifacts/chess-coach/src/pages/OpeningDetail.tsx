@@ -435,22 +435,22 @@ export function OpeningDetail() {
 
               {/* Controls */}
               <div className="glass-card rounded-xl p-3 flex items-center justify-between gap-3">
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1 md:gap-1.5">
                   <button onClick={() => setStep(0)} disabled={step === 0}
-                    className="p-2.5 rounded-xl bg-secondary hover:bg-primary/20 hover:text-primary disabled:opacity-40 transition-colors">
-                    <ChevronsLeft className="w-4 h-4" />
+                    className="p-3 md:p-2.5 rounded-xl bg-secondary hover:bg-primary/20 hover:text-primary disabled:opacity-40 transition-colors active:scale-90">
+                    <ChevronsLeft className="w-5 h-5 md:w-4 md:h-4" />
                   </button>
                   <button onClick={() => setStep(s => Math.max(0, s - 1))} disabled={step === 0}
-                    className="p-2.5 rounded-xl bg-secondary hover:bg-primary/20 hover:text-primary disabled:opacity-40 transition-colors">
-                    <ChevronLeft className="w-4 h-4" />
+                    className="p-3 md:p-2.5 rounded-xl bg-secondary hover:bg-primary/20 hover:text-primary disabled:opacity-40 transition-colors active:scale-90">
+                    <ChevronLeft className="w-5 h-5 md:w-4 md:h-4" />
                   </button>
                   <button onClick={() => setStep(s => Math.min(maxStep, s + 1))} disabled={step >= maxStep}
-                    className="p-2.5 rounded-xl bg-secondary hover:bg-primary/20 hover:text-primary disabled:opacity-40 transition-colors">
-                    <ChevronRight className="w-4 h-4" />
+                    className="p-3 md:p-2.5 rounded-xl bg-secondary hover:bg-primary/20 hover:text-primary disabled:opacity-40 transition-colors active:scale-90">
+                    <ChevronRight className="w-5 h-5 md:w-4 md:h-4" />
                   </button>
                   <button onClick={() => setStep(maxStep)} disabled={step >= maxStep}
-                    className="p-2.5 rounded-xl bg-secondary hover:bg-primary/20 hover:text-primary disabled:opacity-40 transition-colors">
-                    <ChevronsRight className="w-4 h-4" />
+                    className="p-3 md:p-2.5 rounded-xl bg-secondary hover:bg-primary/20 hover:text-primary disabled:opacity-40 transition-colors active:scale-90">
+                    <ChevronsRight className="w-5 h-5 md:w-4 md:h-4" />
                   </button>
                 </div>
 
