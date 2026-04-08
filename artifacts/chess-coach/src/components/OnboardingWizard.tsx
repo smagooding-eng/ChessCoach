@@ -216,23 +216,30 @@ export function OnboardingWizard({ onComplete }: Props) {
     } catch {} finally { setSavingUsername(false); }
   };
 
+  const importRef = useRef(false);
   const handleImport = async () => {
     const uname = effectiveUsername;
-    if (!uname) return;
+    if (!uname || importRef.current) return;
+    importRef.current = true;
     setImportStatus('loading');
-    try {
-      const res = await apiFetch('/api/games/import', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
-        body: JSON.stringify({ username: uname, months: 1 }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Import failed');
-      setImportCount(data.imported ?? 0);
-      const gamesRes = await apiFetch(`/api/games?username=${encodeURIComponent(uname)}&limit=5`, { credentials: 'include' });
-      const gamesData = await gamesRes.json();
-      setGames(gamesData.games ?? gamesData ?? []);
-      setImportStatus('done');
-    } catch { setImportStatus('error'); }
+    setStep('review');
+
+    apiFetch('/api/games/import', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+      body: JSON.stringify({ username: uname, months: 3 }),
+    })
+      .then(r => r.json())
+      .then(data => {
+        if (data.error) throw new Error(data.error);
+        setImportCount(data.imported ?? 0);
+        return apiFetch(`/api/games?username=${encodeURIComponent(uname)}&limit=5`, { credentials: 'include' });
+      })
+      .then(r => r.json())
+      .then(gamesData => {
+        setGames(gamesData.games ?? gamesData ?? []);
+        setImportStatus('done');
+      })
+      .catch(() => { setImportStatus('error'); });
   };
 
   const handleReview = async (gameId: number) => {
@@ -315,11 +322,12 @@ export function OnboardingWizard({ onComplete }: Props) {
     } catch {} finally { setCheckoutLoading(null); }
   };
 
-  const finish = useCallback(() => {
+  const finish = useCallback((goToScout = false) => {
     if (reviewPollRef.current) { clearInterval(reviewPollRef.current); reviewPollRef.current = null; }
     if (scoutPollRef.current) { clearInterval(scoutPollRef.current); scoutPollRef.current = null; }
     onComplete();
-  }, [onComplete]);
+    if (goToScout) navigate('/opponents');
+  }, [onComplete, navigate]);
 
   const product = products[0];
   const weeklyPrice = product?.prices?.find((p: any) => p.recurring?.interval === 'week');
@@ -361,7 +369,7 @@ export function OnboardingWizard({ onComplete }: Props) {
               }} transition={{ duration: 0.3 }} />
             ))}
           </div>
-          <button onClick={finish} className="text-white/30 hover:text-white/60 transition-colors p-1"><X className="w-4 h-4" /></button>
+          <button onClick={() => finish(!!scoutResult)} className="text-white/30 hover:text-white/60 transition-colors p-1"><X className="w-4 h-4" /></button>
         </div>
       </div>
 
@@ -445,107 +453,57 @@ export function OnboardingWizard({ onComplete }: Props) {
                     <p className="text-white/40 text-xs">Step 1 of 4</p>
                   </div>
                 </div>
-                <p className="text-white/50 text-sm mb-5 ml-[52px]">Pull your recent games so we can analyze them.</p>
+                <p className="text-white/50 text-sm mb-5 ml-[52px]">
+                  We'll pull your last 3 months of games in the background while you continue.
+                </p>
 
-                {importStatus === 'idle' && (
-                  <div>
-                    <div className="p-4 rounded-xl bg-white/5 border border-white/10 mb-4">
-                      {!effectiveUsername || editingUsername ? (
-                        <div>
-                          <p className="text-white/40 text-xs mb-2">Enter your Chess.com username</p>
-                          <div className="flex gap-2">
-                            <input
-                              value={localUsername}
-                              onChange={e => setLocalUsername(e.target.value)}
-                              onKeyDown={e => e.key === 'Enter' && saveUsername()}
-                              placeholder="e.g. MagnusCarlsen"
-                              className="flex-1 px-3 py-2.5 rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-white/25 focus:outline-none focus:border-[#81b64c]/50 text-sm"
-                              autoFocus
-                            />
-                            <motion.button onClick={saveUsername} disabled={!localUsername.trim() || savingUsername}
-                              className="px-4 py-2.5 rounded-lg bg-[#81b64c] text-white font-medium text-sm disabled:opacity-40 flex items-center gap-1"
-                              whileTap={{ scale: 0.95 }}
-                            >
-                              {savingUsername ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-                            </motion.button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-[#81b64c]/20 flex items-center justify-center text-lg">♟</div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-white/40 text-xs">Chess.com</p>
-                            <p className="text-white font-semibold truncate">{effectiveUsername}</p>
-                          </div>
-                          <button onClick={() => setEditingUsername(true)}
-                            className="p-2 rounded-lg hover:bg-white/10 text-white/30 hover:text-white/60 transition-colors"
-                          >
-                            <Edit3 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                    {effectiveUsername && !editingUsername && (
-                      <motion.button onClick={handleImport}
-                        className="w-full py-3.5 rounded-xl bg-[#81b64c] text-white font-semibold hover:bg-[#6da03e] transition-all"
-                        whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }}
-                      >
-                        Import Last Month's Games
-                      </motion.button>
-                    )}
-                  </div>
-                )}
-
-                {importStatus === 'loading' && (
-                  <div className="text-center py-10">
-                    <div className="relative w-20 h-20 mx-auto mb-4">
-                      <PulseRing color="#3b82f6" />
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <motion.span className="text-3xl" animate={{ rotate: 360 }} transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}>♟</motion.span>
+                <div className="p-4 rounded-xl bg-white/5 border border-white/10 mb-4">
+                  {!effectiveUsername || editingUsername ? (
+                    <div>
+                      <p className="text-white/40 text-xs mb-2">Enter your Chess.com username</p>
+                      <div className="flex gap-2">
+                        <input
+                          value={localUsername}
+                          onChange={e => setLocalUsername(e.target.value)}
+                          onKeyDown={e => e.key === 'Enter' && saveUsername()}
+                          placeholder="e.g. MagnusCarlsen"
+                          className="flex-1 px-3 py-2.5 rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-white/25 focus:outline-none focus:border-[#81b64c]/50 text-sm"
+                          autoFocus
+                        />
+                        <motion.button onClick={saveUsername} disabled={!localUsername.trim() || savingUsername}
+                          className="px-4 py-2.5 rounded-lg bg-[#81b64c] text-white font-medium text-sm disabled:opacity-40 flex items-center gap-1"
+                          whileTap={{ scale: 0.95 }}
+                        >
+                          {savingUsername ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                        </motion.button>
                       </div>
                     </div>
-                    <p className="text-white/70 font-medium mb-1">Importing from Chess.com...</p>
-                    <RotatingTip tips={CHESS_TIPS} />
-                  </div>
-                )}
-
-                {importStatus === 'done' && (
-                  <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}>
-                    <div className="p-5 rounded-xl bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-500/20 mb-4 text-center">
-                      <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', damping: 10 }}>
-                        <CheckCircle2 className="w-10 h-10 text-green-400 mx-auto mb-2" />
-                      </motion.div>
-                      <p className="text-green-400 font-bold text-lg">{importCount} games imported!</p>
-                      <p className="text-green-400/50 text-xs mt-1">Ready for AI analysis</p>
-                    </div>
-                    <motion.button onClick={() => setStep('review')}
-                      className="w-full py-3.5 rounded-xl bg-[#81b64c] text-white font-semibold hover:bg-[#6da03e] transition-all flex items-center justify-center gap-2"
-                      whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }}
-                    >
-                      Now Let's Review a Game <ChevronRight className="w-4 h-4" />
-                    </motion.button>
-                  </motion.div>
-                )}
-
-                {importStatus === 'error' && (
-                  <div>
-                    <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 mb-4 text-red-400 text-sm text-center">
-                      Import failed — make sure your Chess.com username is correct.
-                    </div>
-                    <div className="flex gap-2">
-                      <button onClick={() => { setImportStatus('idle'); setEditingUsername(true); }}
-                        className="flex-1 py-3 rounded-xl bg-white/10 text-white font-semibold hover:bg-white/15 transition-colors text-sm"
+                  ) : (
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-[#81b64c]/20 flex items-center justify-center text-lg">♟</div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-white/40 text-xs">Chess.com</p>
+                        <p className="text-white font-semibold truncate">{effectiveUsername}</p>
+                      </div>
+                      <button onClick={() => setEditingUsername(true)}
+                        className="p-2 rounded-lg hover:bg-white/10 text-white/30 hover:text-white/60 transition-colors"
                       >
-                        Change Username
-                      </button>
-                      <button onClick={() => setImportStatus('idle')}
-                        className="flex-1 py-3 rounded-xl bg-white/10 text-white font-semibold hover:bg-white/15 transition-colors text-sm"
-                      >
-                        Try Again
+                        <Edit3 className="w-4 h-4" />
                       </button>
                     </div>
-                  </div>
+                  )}
+                </div>
+                {effectiveUsername && !editingUsername && (
+                  <motion.button onClick={handleImport}
+                    className="w-full py-3.5 rounded-xl bg-[#81b64c] text-white font-semibold hover:bg-[#6da03e] transition-all flex items-center justify-center gap-2"
+                    whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }}
+                  >
+                    Import & Continue <ChevronRight className="w-4 h-4" />
+                  </motion.button>
                 )}
+                <button onClick={() => setStep('review')} className="w-full mt-3 py-2 text-white/30 hover:text-white/50 text-xs transition-colors">
+                  Skip — I'll import later
+                </button>
               </motion.div>
             )}
 
@@ -566,16 +524,54 @@ export function OnboardingWizard({ onComplete }: Props) {
                   Pick a game — we'll start the review and you can continue while it runs.
                 </p>
 
+                {importStatus === 'loading' && (
+                  <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
+                    className="mb-4 p-3 rounded-xl border border-blue-500/20 bg-blue-500/5"
+                  >
+                    <div className="flex items-center gap-3">
+                      <Loader2 className="w-4 h-4 text-blue-400 animate-spin shrink-0" />
+                      <p className="text-blue-400/80 text-xs font-medium flex-1">Importing 3 months of games in the background...</p>
+                    </div>
+                  </motion.div>
+                )}
+                {importStatus === 'done' && (
+                  <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
+                    className="mb-4 p-3 rounded-xl border border-green-500/20 bg-green-500/5"
+                  >
+                    <div className="flex items-center gap-3">
+                      <CheckCircle2 className="w-4 h-4 text-green-400 shrink-0" />
+                      <p className="text-green-400/80 text-xs font-medium flex-1">{importCount} games imported!</p>
+                    </div>
+                  </motion.div>
+                )}
+                {importStatus === 'error' && (
+                  <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
+                    className="mb-4 p-3 rounded-xl border border-red-500/20 bg-red-500/5"
+                  >
+                    <div className="flex items-center gap-3">
+                      <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
+                      <p className="text-red-400/80 text-xs flex-1">Import failed — check your username on the Import page later.</p>
+                    </div>
+                  </motion.div>
+                )}
+
                 {reviewStatus === 'idle' && (
                   <div>
                     {games.length === 0 ? (
-                      <div className="text-center py-8">
-                        <p className="text-white/40 text-sm mb-3">No games found — let's skip to scouting!</p>
+                      <div className="text-center py-6">
+                        {importStatus === 'loading' ? (
+                          <>
+                            <p className="text-white/40 text-sm mb-1">Games are still importing...</p>
+                            <p className="text-white/25 text-xs mb-4">You can skip ahead and review games later.</p>
+                          </>
+                        ) : (
+                          <p className="text-white/40 text-sm mb-4">No games found — let's skip to scouting!</p>
+                        )}
                         <motion.button onClick={() => setStep('scout')}
-                          className="px-8 py-3 rounded-xl bg-[#81b64c] text-white font-semibold"
+                          className="px-8 py-3 rounded-xl bg-[#81b64c] text-white font-semibold flex items-center justify-center gap-2 mx-auto"
                           whileTap={{ scale: 0.98 }}
                         >
-                          Scout an Opponent
+                          Scout an Opponent <ChevronRight className="w-4 h-4" />
                         </motion.button>
                       </div>
                     ) : (
@@ -1009,11 +1005,11 @@ export function OnboardingWizard({ onComplete }: Props) {
                   <span>🔒 Stripe-powered</span>
                 </div>
 
-                <motion.button onClick={finish}
+                <motion.button onClick={() => finish(!!scoutResult)}
                   className="w-full py-3 text-white/30 hover:text-white/50 text-sm transition-colors"
                   whileTap={{ scale: 0.98 }}
                 >
-                  Maybe later — continue with free trial
+                  Maybe later — {scoutResult ? 'see your scout report' : 'continue with free trial'}
                 </motion.button>
               </motion.div>
             )}
