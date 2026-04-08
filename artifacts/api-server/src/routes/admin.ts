@@ -1,6 +1,6 @@
 import { Router, type IRouter, type Request, type Response } from "express";
-import { db, usersTable, pageViewsTable } from "@workspace/db";
-import { sql, count, gte, countDistinct } from "drizzle-orm";
+import { db, usersTable, pageViewsTable, gamesTable, weaknessesTable, coursesTable, lessonsTable, backgroundJobsTable } from "@workspace/db";
+import { sql, count, gte, countDistinct, inArray } from "drizzle-orm";
 import { getUncachableStripeClient } from "../lib/stripeClient";
 import { ADMIN_EMAILS } from "../lib/auth";
 
@@ -161,6 +161,35 @@ router.get("/admin/users", requireAdmin, async (_req: Request, res: Response) =>
     res.json({ users: enrichedUsers });
   } catch {
     res.status(500).json({ error: "Failed to fetch users" });
+  }
+});
+
+router.post("/admin/clear-ai-cache", requireAdmin, async (_req: Request, res: Response) => {
+  try {
+    const gamesResult = await db.update(gamesTable)
+      .set({ reviewData: null, analysisNotes: null, analyzed: false });
+
+    const weaknessesResult = await db.delete(weaknessesTable);
+
+    const lessonsResult = await db.delete(lessonsTable);
+    const coursesResult = await db.delete(coursesTable);
+
+    const jobsResult = await db.update(backgroundJobsTable)
+      .set({ result: null, status: "cleared", error: null })
+      .where(inArray(backgroundJobsTable.type, ["scout", "analysis", "review"]));
+
+    res.json({
+      success: true,
+      cleared: {
+        games: "review_data, analysis_notes, analyzed reset",
+        weaknesses: "deleted",
+        lessons: "deleted",
+        courses: "deleted",
+        jobs: "scout/analysis/review results cleared",
+      },
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to clear AI cache", details: err.message });
   }
 });
 
