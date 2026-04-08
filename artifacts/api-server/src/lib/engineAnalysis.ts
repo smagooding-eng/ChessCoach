@@ -52,6 +52,21 @@ class StockfishProcess {
   private resolveFunc: ((lines: string[]) => void) | null = null;
   private collectedLines: string[] = [];
   private waitForToken = "";
+  private pendingTimers: ReturnType<typeof setTimeout>[] = [];
+
+  private clearTimers(): void {
+    for (const t of this.pendingTimers) clearTimeout(t);
+    this.pendingTimers = [];
+  }
+
+  private doResolve(): void {
+    if (this.resolveFunc) {
+      this.clearTimers();
+      this.resolveFunc(this.collectedLines);
+      this.resolveFunc = null;
+      this.collectedLines = [];
+    }
+  }
 
   async init(): Promise<void> {
     this.proc = spawn("stockfish", [], { stdio: ["pipe", "pipe", "pipe"] });
@@ -62,11 +77,7 @@ class StockfishProcess {
       for (const line of lines) {
         this.collectedLines.push(line);
         if (this.waitForToken && line.includes(this.waitForToken)) {
-          if (this.resolveFunc) {
-            this.resolveFunc(this.collectedLines);
-            this.resolveFunc = null;
-            this.collectedLines = [];
-          }
+          this.doResolve();
         }
       }
     });
@@ -96,22 +107,10 @@ class StockfishProcess {
       this.proc.stdin.write(command + "\n");
 
       if (!token) {
-        setTimeout(() => {
-          if (this.resolveFunc) {
-            this.resolveFunc(this.collectedLines);
-            this.resolveFunc = null;
-            this.collectedLines = [];
-          }
-        }, 50);
+        this.pendingTimers.push(setTimeout(() => this.doResolve(), 50));
       }
 
-      setTimeout(() => {
-        if (this.resolveFunc) {
-          this.resolveFunc(this.collectedLines);
-          this.resolveFunc = null;
-          this.collectedLines = [];
-        }
-      }, ENGINE_TIMEOUT_MS);
+      this.pendingTimers.push(setTimeout(() => this.doResolve(), ENGINE_TIMEOUT_MS));
     });
   }
 
@@ -226,19 +225,36 @@ export function classifyFromWinPctLoss(
   isSecondEngineMove: boolean,
   isOpeningRange: boolean,
   wasBalanced: boolean,
+  playerWinPctBefore: number = 50,
 ): EngineClassification {
   if (isOpeningRange && wasBalanced && (isTopEngineMove || isSecondEngineMove) && winPctLoss <= 1) {
     return "book";
   }
 
   if (winPctLoss < 0) {
-    if (!isTopEngineMove && winPctLoss < -2) return "brilliant";
+    if (
+      !isTopEngineMove &&
+      !isSecondEngineMove &&
+      winPctLoss < -5 &&
+      playerWinPctBefore >= 25 &&
+      playerWinPctBefore <= 55
+    ) {
+      return "brilliant";
+    }
     return "excellent";
   }
 
-  if (winPctLoss <= 1) return "excellent";
-  if (winPctLoss <= 4) return "good";
-  if (winPctLoss <= 10) return "inaccuracy";
-  if (winPctLoss <= 20) return "mistake";
+  if (winPctLoss <= 2) return "excellent";
+  if (winPctLoss <= 5) return "good";
+  if (winPctLoss <= 12) return "inaccuracy";
+
+  const alreadyDecided = playerWinPctBefore < 10 || playerWinPctBefore > 90;
+
+  if (winPctLoss <= 35) {
+    if (alreadyDecided) return "inaccuracy";
+    return "mistake";
+  }
+
+  if (alreadyDecided) return "mistake";
   return "blunder";
 }

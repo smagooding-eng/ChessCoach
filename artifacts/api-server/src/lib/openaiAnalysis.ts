@@ -205,7 +205,9 @@ export async function analyzeMoves(input: AnalyzeMovesInput): Promise<MoveClassi
     }
     const moveCpLoss = Math.max(0, winPctLossRaw);
 
-    let classification = classifyFromWinPctLoss(winPctLossRaw, isTopEngineMove, isSecondEngineMove, isOpeningRange, wasBalanced);
+    const playerWinBefore = playerColor === "white" ? winPct(cpBefore) : (100 - winPct(cpBefore));
+
+    let classification = classifyFromWinPctLoss(winPctLossRaw, isTopEngineMove, isSecondEngineMove, isOpeningRange, wasBalanced, playerWinBefore);
 
     let legalMoves: string[] = [];
     try {
@@ -218,21 +220,14 @@ export async function analyzeMoves(input: AnalyzeMovesInput): Promise<MoveClassi
     }
 
     if (classification === "brilliant") {
-      if (legalMoves.length <= 5) {
+      let dominated = false;
+      try {
+        const pos = new Chess(fens[idx]);
+        const result = pos.move(m.san);
+        if (result?.captured) dominated = true;
+      } catch {}
+      if (dominated || legalMoves.length <= 8) {
         classification = "excellent";
-      } else {
-        try {
-          const pos = new Chess(fens[idx]);
-          const result = pos.move(m.san);
-          const isCapture = !!result?.captured;
-          const givesCheck = result ? pos.inCheck() : false;
-          const isMate = result ? pos.isCheckmate() : false;
-          if (!isCapture && !givesCheck && !isMate) {
-            classification = "excellent";
-          }
-        } catch {
-          classification = "excellent";
-        }
       }
     }
 
@@ -329,7 +324,9 @@ export async function analyzeGamePgn(pgn: string): Promise<PgnAnalysisResult> {
     if (m.color === "white") whiteLosses.push(moveCpLoss);
     else blackLosses.push(moveCpLoss);
 
-    let classification = classifyFromWinPctLoss(winPctLossRaw, isTopEngineMove, isSecondEngineMove, isOpeningRange, wasBalanced);
+    const playerWinBefore = m.color === "white" ? winPct(cpBefore) : (100 - winPct(cpBefore));
+
+    let classification = classifyFromWinPctLoss(winPctLossRaw, isTopEngineMove, isSecondEngineMove, isOpeningRange, wasBalanced, playerWinBefore);
 
     let legalMoves: string[] = [];
     try {
@@ -340,19 +337,14 @@ export async function analyzeGamePgn(pgn: string): Promise<PgnAnalysisResult> {
     if (legalMoves.length <= 1) classification = "book";
 
     if (classification === "brilliant") {
-      if (legalMoves.length <= 5) {
+      let dominated = false;
+      try {
+        const pos = new Chess(fens[idx]);
+        const result = pos.move(m.san);
+        if (result?.captured) dominated = true;
+      } catch {}
+      if (dominated || legalMoves.length <= 8) {
         classification = "excellent";
-      } else {
-        try {
-          const pos = new Chess(fens[idx]);
-          const result = pos.move(m.san);
-          const isCapture = !!result?.captured;
-          const givesCheck = result ? pos.inCheck() : false;
-          const isMate = result ? pos.isCheckmate() : false;
-          if (!isCapture && !givesCheck && !isMate) classification = "excellent";
-        } catch {
-          classification = "excellent";
-        }
       }
     }
 
@@ -375,7 +367,7 @@ export async function analyzeGamePgn(pgn: string): Promise<PgnAnalysisResult> {
     ? blackLosses.reduce((a, b) => a + b, 0) / blackLosses.length : 0;
 
   const toAccuracy = (avgLoss: number) =>
-    Math.max(0, Math.min(100, 103.1668 * Math.exp(-0.04354 * avgLoss) - 3.1668));
+    Math.max(0, Math.min(100, 103.1668 * Math.exp(-0.065 * avgLoss) - 3.1668));
 
   return {
     moves,
@@ -442,8 +434,9 @@ export async function analyzeSingleMove(input: AnalyzeSingleMoveInput): Promise<
   const isSecondEngineMove = evalBefore.secondBestUci.startsWith(playedUci);
   const isOpeningRange = moveIndex < 30;
   const wasBalanced = Math.abs(cpBefore) < 150;
+  const playerWinBefore = playerColor === "white" ? winPct(cpBefore) : (100 - winPct(cpBefore));
 
-  const classification = classifyFromWinPctLoss(winPctLossRaw, isTopEngineMove, isSecondEngineMove, isOpeningRange, wasBalanced);
+  const classification = classifyFromWinPctLoss(winPctLossRaw, isTopEngineMove, isSecondEngineMove, isOpeningRange, wasBalanced, playerWinBefore);
   const isBad = ["inaccuracy", "mistake", "blunder"].includes(classification);
 
   const cpInfo =
@@ -617,7 +610,8 @@ async function postProcessReview(
     }
     const moveCpLoss = Math.max(0, winPctLossRaw);
 
-    classification = classifyFromWinPctLoss(winPctLossRaw, isTopEngineMove, isSecondEngineMove, isOpeningRange, wasBalanced);
+    const playerWinBefore = playerColor === "white" ? winPct(cpBefore) : (100 - winPct(cpBefore));
+    classification = classifyFromWinPctLoss(winPctLossRaw, isTopEngineMove, isSecondEngineMove, isOpeningRange, wasBalanced, playerWinBefore);
 
     const isBad = ["inaccuracy", "mistake", "blunder"].includes(classification);
     if (isBad && evalBefore.bestMoveSan && !isTopEngineMove) {
@@ -637,21 +631,14 @@ async function postProcessReview(
     }
 
     if (classification === "brilliant") {
-      if (legalMoves.length <= 5) {
+      let dominated = false;
+      try {
+        const pos = new Chess(fenBefore);
+        const result = pos.move(om.san);
+        if (result?.captured) dominated = true;
+      } catch {}
+      if (dominated || legalMoves.length <= 8) {
         classification = "excellent";
-      } else {
-        try {
-          const pos = new Chess(fenBefore);
-          const result = pos.move(om.san);
-          const isCapture = !!result?.captured;
-          const givesCheck = result ? pos.inCheck() : false;
-          const isMate = result ? pos.isCheckmate() : false;
-          if (!isCapture && !givesCheck && !isMate) {
-            classification = "excellent";
-          }
-        } catch {
-          classification = "excellent";
-        }
       }
     }
 

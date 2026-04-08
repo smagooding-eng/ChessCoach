@@ -80,7 +80,7 @@ function GameRatingPanel({
       return s + Math.max(base, ['good', 'book', 'excellent'].includes(m.classification) && !m.engineAvailable ? unverifiedFloor : base);
     }, 0);
     const avgWinPctLoss = totalWinPctLoss / moves.length;
-    return Math.min(100, Math.max(0, 103.1668 * Math.exp(-0.04354 * avgWinPctLoss) - 3.1668));
+    return Math.min(100, Math.max(0, 103.1668 * Math.exp(-0.065 * avgWinPctLoss) - 3.1668));
   };
 
   const toGameRating = (acc: number) => {
@@ -977,7 +977,7 @@ export function GameReplay() {
                 return s + Math.max(base, ['good', 'book', 'excellent'].includes(m.classification) && !m.engineAvailable ? unverifiedFloor : base);
               }, 0);
               const avgWinPctLoss = totalWinPctLoss / moves.length;
-              return Math.round(Math.min(100, Math.max(0, 103.1668 * Math.exp(-0.04354 * avgWinPctLoss) - 3.1668)));
+              return Math.round(Math.min(100, Math.max(0, 103.1668 * Math.exp(-0.065 * avgWinPctLoss) - 3.1668)));
             }
 
             function countFor(moves: ReviewMove[]) {
