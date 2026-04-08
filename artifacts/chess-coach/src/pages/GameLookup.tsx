@@ -1,7 +1,6 @@
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { ChessBoard } from '@/components/ChessBoard';
 import { Chess } from 'chess.js';
-import { analyzeMoveQuality, type MoveAnalysisResult } from '@/lib/chess-bot';
 import { apiFetch } from '@/lib/api';
 import {
   Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,

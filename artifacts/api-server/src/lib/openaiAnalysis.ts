@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 import { logger } from "./logger";
-import { evaluateAllPositions, classifyFromCpLoss, uciToSan } from "./engineAnalysis";
+import { evaluateAllPositions, classifyFromWinPctLoss, uciToSan, winPct } from "./engineAnalysis";
 
 const openai = new OpenAI({
   baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
@@ -136,8 +136,11 @@ export interface MoveClassification {
   moveIndex: number;
   san: string;
   color: string;
-  classification: "brilliant" | "excellent" | "good" | "inaccuracy" | "mistake" | "blunder";
+  classification: "brilliant" | "excellent" | "good" | "book" | "inaccuracy" | "mistake" | "blunder";
   explanation: string;
+  cpLoss: number;
+  engineAvailable: boolean;
+  bestMove: string | null;
 }
 
 interface AnalyzeMovesInput {
@@ -150,55 +153,235 @@ interface AnalyzeMovesInput {
 }
 
 export async function analyzeMoves(input: AnalyzeMovesInput): Promise<MoveClassification[]> {
-  const moveLine = input.moves
-    .map((m, i) => `${i + 1}. (${m.color[0]}) ${m.san}`)
-    .join(" ");
+  const Chess = require("chess.js").Chess;
+  const chess = new Chess();
+  const fens: string[] = [chess.fen()];
+  const uciMoves: Array<{ from: string; to: string } | null> = [];
 
-  const prompt = `You are an expert chess coach. Analyze this game and identify the 8-10 most critical moves.
-
-Players: ${input.whiteUsername} (White) vs ${input.blackUsername} (Black)
-Opening: ${input.opening ?? "Unknown"}
-Result: ${input.result}
-Moves: ${moveLine}
-
-For each critical move, classify it as one of:
-- "brilliant": A stunning, non-obvious move that drastically improves the position
-- "excellent": A very strong move, likely the best or near-best
-- "good": A solid, correct move
-- "inaccuracy": A slightly suboptimal move that misses a better option
-- "mistake": A clear error that worsens the position noticeably
-- "blunder": A serious error that loses material or the game
-
-Focus on turning points and decisive moments. Only classify the 8-10 most important moves.
-
-Respond with valid JSON:
-{
-  "classifications": [
-    {
-      "moveIndex": 0,
-      "san": "e4",
-      "color": "white",
-      "classification": "excellent",
-      "explanation": "Controlling the center immediately..."
+  for (const m of input.moves) {
+    try {
+      const result = chess.move(m.san);
+      fens.push(chess.fen());
+      uciMoves.push(result ? { from: result.from, to: result.to } : null);
+    } catch {
+      fens.push(chess.fen());
+      uciMoves.push(null);
+      break;
     }
-  ]
-}`;
+  }
+
+  logger.info({ positions: fens.length }, "analyzeMoves: Running Stockfish on all positions");
+  const evals = await evaluateAllPositions(fens);
+  logger.info({ evaluated: evals.length }, "analyzeMoves: Stockfish complete");
+
+  return input.moves.map((m, idx) => {
+    const evalBefore = evals[idx];
+    const evalAfter = evals[idx + 1];
+
+    if (!evalBefore || !evalAfter) {
+      return {
+        moveIndex: idx, san: m.san, color: m.color,
+        classification: "good" as const, explanation: "", cpLoss: 0,
+        engineAvailable: false, bestMove: null,
+      };
+    }
+
+    const cpBefore = evalBefore.cpWhite;
+    const cpAfter = evalAfter.cpWhite;
+    const playerColor = m.color as "white" | "black";
+
+    const moveUci = uciMoves[idx];
+    const playedUci = moveUci ? `${moveUci.from}${moveUci.to}` : "";
+    const isTopEngineMove = evalBefore.bestMoveUci.startsWith(playedUci) && playedUci.length > 0;
+    const isSecondEngineMove = evalBefore.secondBestUci.startsWith(playedUci) && playedUci.length > 0;
+    const isOpeningRange = idx < 30;
+    const wasBalanced = Math.abs(cpBefore) < 150;
+
+    let winPctLossRaw: number;
+    if (playerColor === "white") {
+      winPctLossRaw = winPct(cpBefore) - winPct(cpAfter);
+    } else {
+      winPctLossRaw = (100 - winPct(cpBefore)) - (100 - winPct(cpAfter));
+    }
+    const moveCpLoss = Math.max(0, winPctLossRaw);
+
+    let classification = classifyFromWinPctLoss(winPctLossRaw, isTopEngineMove, isSecondEngineMove, isOpeningRange, wasBalanced);
+
+    let legalMoves: string[] = [];
+    try {
+      const pos = new Chess(fens[idx]);
+      legalMoves = pos.moves();
+    } catch {}
+
+    if (legalMoves.length <= 1) {
+      classification = "book";
+    }
+
+    if (classification === "brilliant") {
+      if (legalMoves.length <= 5) {
+        classification = "excellent";
+      } else {
+        try {
+          const pos = new Chess(fens[idx]);
+          const result = pos.move(m.san);
+          const isCapture = !!result?.captured;
+          const givesCheck = result ? pos.inCheck() : false;
+          const isMate = result ? pos.isCheckmate() : false;
+          if (!isCapture && !givesCheck && !isMate) {
+            classification = "excellent";
+          }
+        } catch {
+          classification = "excellent";
+        }
+      }
+    }
+
+    const isBad = ["inaccuracy", "mistake", "blunder"].includes(classification);
+    let bestMove: string | null = null;
+    if (isBad && evalBefore.bestMoveSan && !isTopEngineMove) {
+      bestMove = evalBefore.bestMoveSan;
+    }
+
+    return {
+      moveIndex: idx, san: m.san, color: m.color,
+      classification, explanation: "",
+      cpLoss: moveCpLoss, engineAvailable: true, bestMove,
+    };
+  });
+}
+
+export interface PgnAnalysisResult {
+  moves: Array<{
+    moveIndex: number;
+    san: string;
+    color: "white" | "black";
+    classification: "brilliant" | "excellent" | "good" | "book" | "inaccuracy" | "mistake" | "blunder";
+    cpLoss: number;
+    bestMove: string | null;
+    evalBefore: number;
+    evalAfter: number;
+  }>;
+  whiteAccuracy: number;
+  blackAccuracy: number;
+}
+
+export async function analyzeGamePgn(pgn: string): Promise<PgnAnalysisResult> {
+  const Chess = require("chess.js").Chess;
+  const chess = new Chess();
 
   try {
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      max_completion_tokens: 2048,
-      messages: [{ role: "user", content: prompt }],
-      response_format: { type: "json_object" },
-    });
-
-    const content = response.choices[0]?.message?.content ?? "{}";
-    const parsed = JSON.parse(content) as { classifications: MoveClassification[] };
-    return parsed.classifications ?? [];
-  } catch (err) {
-    logger.error({ err }, "Failed to analyze moves with OpenAI");
-    return [];
+    chess.loadPgn(pgn);
+  } catch {
+    throw new Error("Invalid PGN");
   }
+
+  const history = chess.history();
+  chess.reset();
+
+  const fens: string[] = [chess.fen()];
+  const moveMeta: Array<{ san: string; color: "white" | "black"; from: string; to: string }> = [];
+
+  for (const san of history) {
+    const color: "white" | "black" = chess.turn() === "w" ? "white" : "black";
+    const result = chess.move(san);
+    if (!result) break;
+    fens.push(chess.fen());
+    moveMeta.push({ san, color, from: result.from, to: result.to });
+  }
+
+  logger.info({ positions: fens.length }, "analyzeGamePgn: Running Stockfish on all positions");
+  const evals = await evaluateAllPositions(fens);
+
+  const moves: PgnAnalysisResult["moves"] = [];
+  const whiteLosses: number[] = [];
+  const blackLosses: number[] = [];
+
+  for (let idx = 0; idx < moveMeta.length; idx++) {
+    const m = moveMeta[idx];
+    const evalBefore = evals[idx];
+    const evalAfter = evals[idx + 1];
+
+    if (!evalBefore || !evalAfter) {
+      moves.push({
+        moveIndex: idx, san: m.san, color: m.color,
+        classification: "good", cpLoss: 0, bestMove: null,
+        evalBefore: 0, evalAfter: 0,
+      });
+      continue;
+    }
+
+    const cpBefore = evalBefore.cpWhite;
+    const cpAfter = evalAfter.cpWhite;
+    const playedUci = `${m.from}${m.to}`;
+    const isTopEngineMove = evalBefore.bestMoveUci.startsWith(playedUci);
+    const isSecondEngineMove = evalBefore.secondBestUci.startsWith(playedUci);
+    const isOpeningRange = idx < 30;
+    const wasBalanced = Math.abs(cpBefore) < 150;
+
+    let winPctLossRaw: number;
+    if (m.color === "white") {
+      winPctLossRaw = winPct(cpBefore) - winPct(cpAfter);
+    } else {
+      winPctLossRaw = (100 - winPct(cpBefore)) - (100 - winPct(cpAfter));
+    }
+    const moveCpLoss = Math.max(0, winPctLossRaw);
+
+    if (m.color === "white") whiteLosses.push(moveCpLoss);
+    else blackLosses.push(moveCpLoss);
+
+    let classification = classifyFromWinPctLoss(winPctLossRaw, isTopEngineMove, isSecondEngineMove, isOpeningRange, wasBalanced);
+
+    let legalMoves: string[] = [];
+    try {
+      const pos = new Chess(fens[idx]);
+      legalMoves = pos.moves();
+    } catch {}
+
+    if (legalMoves.length <= 1) classification = "book";
+
+    if (classification === "brilliant") {
+      if (legalMoves.length <= 5) {
+        classification = "excellent";
+      } else {
+        try {
+          const pos = new Chess(fens[idx]);
+          const result = pos.move(m.san);
+          const isCapture = !!result?.captured;
+          const givesCheck = result ? pos.inCheck() : false;
+          const isMate = result ? pos.isCheckmate() : false;
+          if (!isCapture && !givesCheck && !isMate) classification = "excellent";
+        } catch {
+          classification = "excellent";
+        }
+      }
+    }
+
+    const isBad = ["inaccuracy", "mistake", "blunder"].includes(classification);
+    let bestMove: string | null = null;
+    if (isBad && evalBefore.bestMoveSan && !isTopEngineMove) {
+      bestMove = evalBefore.bestMoveSan;
+    }
+
+    moves.push({
+      moveIndex: idx, san: m.san, color: m.color,
+      classification, cpLoss: moveCpLoss, bestMove,
+      evalBefore: cpBefore, evalAfter: cpAfter,
+    });
+  }
+
+  const avgWhiteLoss = whiteLosses.length > 0
+    ? whiteLosses.reduce((a, b) => a + b, 0) / whiteLosses.length : 0;
+  const avgBlackLoss = blackLosses.length > 0
+    ? blackLosses.reduce((a, b) => a + b, 0) / blackLosses.length : 0;
+
+  const toAccuracy = (avgLoss: number) =>
+    Math.max(0, Math.min(100, 103.1668 * Math.exp(-0.04354 * avgLoss) - 3.1668));
+
+  return {
+    moves,
+    whiteAccuracy: Math.round(toAccuracy(avgWhiteLoss) * 10) / 10,
+    blackAccuracy: Math.round(toAccuracy(avgBlackLoss) * 10) / 10,
+  };
 }
 
 export interface SingleMoveAnalysis {
@@ -245,8 +428,14 @@ export async function analyzeSingleMove(input: AnalyzeSingleMoveInput): Promise<
 
   const cpBefore = evalBefore.cpWhite;
   const cpAfter = evalAfter.cpWhite;
-  const cpLossRaw = playerColor === "white" ? cpBefore - cpAfter : cpAfter - cpBefore;
-  const cpLoss = Math.max(0, cpLossRaw);
+
+  let winPctLossRaw: number;
+  if (playerColor === "white") {
+    winPctLossRaw = winPct(cpBefore) - winPct(cpAfter);
+  } else {
+    winPctLossRaw = (100 - winPct(cpBefore)) - (100 - winPct(cpAfter));
+  }
+  const cpLoss = Math.max(0, winPctLossRaw);
 
   const playedUci = `${target.from}${target.to}`;
   const isTopEngineMove = evalBefore.bestMoveUci.startsWith(playedUci);
@@ -254,11 +443,11 @@ export async function analyzeSingleMove(input: AnalyzeSingleMoveInput): Promise<
   const isOpeningRange = moveIndex < 30;
   const wasBalanced = Math.abs(cpBefore) < 150;
 
-  const classification = classifyFromCpLoss(cpLossRaw, isTopEngineMove, isSecondEngineMove, isOpeningRange, wasBalanced);
+  const classification = classifyFromWinPctLoss(winPctLossRaw, isTopEngineMove, isSecondEngineMove, isOpeningRange, wasBalanced);
   const isBad = ["inaccuracy", "mistake", "blunder"].includes(classification);
 
   const cpInfo =
-    `Stockfish 17 (depth ${evalBefore.depth}) reports centipawn loss = ${cpLoss}. ` +
+    `Stockfish 17 (depth ${evalBefore.depth}) reports win% loss = ${cpLoss.toFixed(1)}%. ` +
     `Eval before: ${cpBefore}cp, after: ${cpAfter}cp (white's perspective).`;
 
   const betterMoveHint = evalBefore.bestMoveSan && !isTopEngineMove
@@ -362,8 +551,6 @@ async function postProcessReview(
     gptByIndex.set(rm.moveIndex, rm);
   }
 
-  const winPct = (cp: number) => 50 + 50 * (2 / (1 + Math.exp(-0.00368208 * cp)) - 1);
-
   return originalMoves.map((om, idx) => {
     const gpt = gptByIndex.get(idx);
 
@@ -421,18 +608,16 @@ async function postProcessReview(
     const wasBalanced = Math.abs(cpBefore) < 150;
 
     const playerColor = om.color as "white" | "black";
-    const cpLossRaw = playerColor === "white"
-      ? cpBefore - cpAfter
-      : cpAfter - cpBefore;
 
-    let moveCpLoss: number;
+    let winPctLossRaw: number;
     if (playerColor === "white") {
-      moveCpLoss = Math.max(0, winPct(cpBefore) - winPct(cpAfter));
+      winPctLossRaw = winPct(cpBefore) - winPct(cpAfter);
     } else {
-      moveCpLoss = Math.max(0, (100 - winPct(cpBefore)) - (100 - winPct(cpAfter)));
+      winPctLossRaw = (100 - winPct(cpBefore)) - (100 - winPct(cpAfter));
     }
+    const moveCpLoss = Math.max(0, winPctLossRaw);
 
-    classification = classifyFromCpLoss(cpLossRaw, isTopEngineMove, isSecondEngineMove, isOpeningRange, wasBalanced);
+    classification = classifyFromWinPctLoss(winPctLossRaw, isTopEngineMove, isSecondEngineMove, isOpeningRange, wasBalanced);
 
     const isBad = ["inaccuracy", "mistake", "blunder"].includes(classification);
     if (isBad && evalBefore.bestMoveSan && !isTopEngineMove) {

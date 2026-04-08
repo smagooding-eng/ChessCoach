@@ -12,7 +12,7 @@ import {
   GetGameReplayParams,
 } from "@workspace/api-zod";
 import { fetchChessComGames, extractGameMetadata, parsePgnMoves, extractOpeningFromPgn } from "../lib/chesscom";
-import { analyzeMoves, analyzeSingleMove, reviewFullGame } from "../lib/openaiAnalysis";
+import { analyzeMoves, analyzeSingleMove, reviewFullGame, analyzeGamePgn } from "../lib/openaiAnalysis";
 import { randomUUID } from "crypto";
 import type { Logger } from "pino";
 
@@ -394,6 +394,22 @@ router.get("/games/review-status/:jobId", async (req, res): Promise<void> => {
   }
 
   res.json({ status: job.status, error: job.error ?? null });
+});
+
+router.post("/games/analyze-pgn", async (req, res): Promise<void> => {
+  const { pgn } = req.body as { pgn?: string };
+  if (!pgn || typeof pgn !== "string") {
+    res.status(400).json({ error: "pgn is required" });
+    return;
+  }
+
+  try {
+    const result = await analyzeGamePgn(pgn);
+    res.json(result);
+  } catch (err: any) {
+    req.log.error({ err }, "Failed to analyze PGN");
+    res.status(400).json({ error: err?.message ?? "Analysis failed" });
+  }
 });
 
 router.get("/games/:id", async (req, res): Promise<void> => {

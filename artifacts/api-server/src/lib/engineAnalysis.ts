@@ -2,8 +2,8 @@ import { Chess } from "chess.js";
 import { logger } from "./logger";
 import { spawn, ChildProcessWithoutNullStreams } from "child_process";
 
-const ANALYSIS_DEPTH = 16;
-const ENGINE_TIMEOUT_MS = 10000;
+const ANALYSIS_DEPTH = 20;
+const ENGINE_TIMEOUT_MS = 30000;
 
 export type EngineClassification =
   | "brilliant"
@@ -44,6 +44,8 @@ function uciToSan(fen: string, uci: string): string | null {
 
 export { uciToSan };
 
+export const winPct = (cp: number) => 50 + 50 * (2 / (1 + Math.exp(-0.00368208 * cp)) - 1);
+
 class StockfishProcess {
   private proc: ChildProcessWithoutNullStreams | null = null;
   private buffer = "";
@@ -73,10 +75,16 @@ class StockfishProcess {
     });
 
     await this.sendAndWait("uci", "uciok");
-    await this.sendAndWait("setoption name Hash value 64", "");
-    await this.sendAndWait("setoption name Threads value 1", "");
+    await this.sendAndWait("setoption name Hash value 256", "");
+    await this.sendAndWait("setoption name Threads value 2", "");
+    await this.sendAndWait("setoption name MultiPV value 2", "");
     await this.sendAndWait("isready", "readyok");
-    logger.info("Stockfish 17 engine initialized");
+    logger.info("Stockfish 17 engine initialized (hash=256MB, threads=2, depth=20)");
+  }
+
+  async newGame(): Promise<void> {
+    await this.sendAndWait("ucinewgame", "");
+    await this.sendAndWait("isready", "readyok");
   }
 
   private sendAndWait(command: string, token: string): Promise<string[]> {
@@ -107,20 +115,19 @@ class StockfishProcess {
     });
   }
 
-  async evaluate(fen: string, depth: number = ANALYSIS_DEPTH, multiPv: number = 2): Promise<PositionEval> {
+  async evaluate(fen: string, depth: number = ANALYSIS_DEPTH): Promise<PositionEval> {
     if (!this.proc) throw new Error("Stockfish not started");
 
-    await this.sendAndWait("ucinewgame", "");
     await this.sendAndWait(`position fen ${fen}`, "");
     await this.sendAndWait("isready", "readyok");
 
-    await this.sendAndWait(`setoption name MultiPV value ${multiPv}`, "");
     const lines = await this.sendAndWait(`go depth ${depth}`, "bestmove");
 
     let bestCp = 0;
     let bestMoveUci = "";
     let secondBestUci = "";
     let bestDepth = 0;
+    let secondBestDepth = 0;
 
     const isBlackToMove = fen.includes(" b ");
 
@@ -153,8 +160,9 @@ class StockfishProcess {
         bestCp = isBlackToMove ? -cpValue : cpValue;
         bestMoveUci = firstMove;
         bestDepth = lineDepth;
-      } else if (pvNum === 2 && lineDepth >= bestDepth - 1) {
+      } else if (pvNum === 2 && lineDepth >= secondBestDepth) {
         secondBestUci = firstMove;
+        secondBestDepth = lineDepth;
       }
     }
 
@@ -192,13 +200,16 @@ async function getEngine(): Promise<StockfishProcess> {
 
 export async function evaluateAllPositions(
   fens: string[],
+  depth: number = ANALYSIS_DEPTH,
 ): Promise<PositionEval[]> {
   const engine = await getEngine();
   const results: PositionEval[] = [];
 
+  await engine.newGame();
+
   for (let i = 0; i < fens.length; i++) {
     try {
-      const ev = await engine.evaluate(fens[i], ANALYSIS_DEPTH, 2);
+      const ev = await engine.evaluate(fens[i], depth);
       results.push(ev);
     } catch (err) {
       logger.warn({ err, fen: fens[i], idx: i }, "Engine eval failed for position");
@@ -209,25 +220,25 @@ export async function evaluateAllPositions(
   return results;
 }
 
-export function classifyFromCpLoss(
-  cpLoss: number,
+export function classifyFromWinPctLoss(
+  winPctLoss: number,
   isTopEngineMove: boolean,
   isSecondEngineMove: boolean,
   isOpeningRange: boolean,
   wasBalanced: boolean,
 ): EngineClassification {
-  if (isOpeningRange && wasBalanced && (isTopEngineMove || isSecondEngineMove) && cpLoss <= 15) {
+  if (isOpeningRange && wasBalanced && (isTopEngineMove || isSecondEngineMove) && winPctLoss <= 1) {
     return "book";
   }
 
-  if (cpLoss < 0) {
-    if (!isTopEngineMove && cpLoss < -20) return "brilliant";
+  if (winPctLoss < 0) {
+    if (!isTopEngineMove && winPctLoss < -2) return "brilliant";
     return "excellent";
   }
 
-  if (cpLoss <= 10) return "excellent";
-  if (cpLoss <= 25) return "good";
-  if (cpLoss <= 50) return "inaccuracy";
-  if (cpLoss <= 100) return "mistake";
+  if (winPctLoss <= 1) return "excellent";
+  if (winPctLoss <= 4) return "good";
+  if (winPctLoss <= 10) return "inaccuracy";
+  if (winPctLoss <= 20) return "mistake";
   return "blunder";
 }
