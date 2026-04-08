@@ -593,6 +593,29 @@ async function runReviewJob(gameId: number, jobId: string, log: Logger): Promise
   }
 }
 
+const STALE_JOB_MS = 5 * 60 * 1000;
+
+async function findActiveReviewJob(gameId: number) {
+  const [job] = await db.select().from(backgroundJobsTable).where(
+    and(
+      eq(backgroundJobsTable.type, "review"),
+      eq(backgroundJobsTable.targetUsername, String(gameId)),
+      eq(backgroundJobsTable.status, "pending"),
+    )
+  );
+  if (!job) return null;
+  const age = Date.now() - new Date(job.createdAt!).getTime();
+  if (age > STALE_JOB_MS) {
+    await db.update(backgroundJobsTable).set({
+      status: "error",
+      error: "Timed out (server restart or crash)",
+      completedAt: new Date(),
+    }).where(eq(backgroundJobsTable.id, job.id));
+    return null;
+  }
+  return job;
+}
+
 router.get("/games/:id/review", async (req, res): Promise<void> => {
   const params = GetGameReplayParams.safeParse(req.params);
   if (!params.success) {
@@ -624,13 +647,7 @@ router.get("/games/:id/review", async (req, res): Promise<void> => {
     return;
   }
 
-  const [activeJob] = await db.select().from(backgroundJobsTable).where(
-    and(
-      eq(backgroundJobsTable.type, "review"),
-      eq(backgroundJobsTable.targetUsername, String(params.data.id)),
-      eq(backgroundJobsTable.status, "pending"),
-    )
-  );
+  const activeJob = await findActiveReviewJob(params.data.id);
 
   if (activeJob) {
     res.json({ status: "pending", jobId: activeJob.id });
@@ -673,13 +690,7 @@ router.post("/games/:id/review", async (req, res): Promise<void> => {
     return;
   }
 
-  const [existingJob] = await db.select().from(backgroundJobsTable).where(
-    and(
-      eq(backgroundJobsTable.type, "review"),
-      eq(backgroundJobsTable.targetUsername, String(params.data.id)),
-      eq(backgroundJobsTable.status, "pending"),
-    )
-  );
+  const existingJob = await findActiveReviewJob(params.data.id);
 
   if (existingJob) {
     res.json({ status: "pending", jobId: existingJob.id });
