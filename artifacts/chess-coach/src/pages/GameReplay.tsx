@@ -277,6 +277,7 @@ export function GameReplay() {
   const [reviewError, setReviewError]   = useState<string | null>(null);
   const [gameSummary, setGameSummary]   = useState<GameSummary | null>(null);
   const [loadingSavedReview, setLoadingSavedReview] = useState(true);
+  const [reviewProgress, setReviewProgress] = useState<{ done: number; total: number } | null>(null);
 
   useEffect(() => {
     if (!game) { setLoadingSavedReview(false); return; }
@@ -377,7 +378,7 @@ export function GameReplay() {
       try {
         const res = await apiFetch(`/api/games/review-status/${jobId}`);
         if (!res.ok) return;
-        const data = await res.json() as { status: string; reviewData?: { moves: ReviewMove[]; gameSummary?: GameSummary }; error?: string };
+        const data = await res.json() as { status: string; reviewData?: { moves: ReviewMove[]; gameSummary?: GameSummary }; error?: string; progress?: number | null; total?: number | null };
 
         if (data.status === 'done' && data.reviewData) {
           const moves = data.reviewData.moves ?? [];
@@ -385,13 +386,17 @@ export function GameReplay() {
           else setReviewError('Review returned no data. Please try again.');
           if (data.reviewData.gameSummary) setGameSummary(data.reviewData.gameSummary);
           setReviewing(false);
+          setReviewProgress(null);
           reviewJobIdRef.current = null;
           stopPolling();
         } else if (data.status === 'error') {
           setReviewError(data.error ?? 'Review failed. Please try again.');
           setReviewing(false);
+          setReviewProgress(null);
           reviewJobIdRef.current = null;
           stopPolling();
+        } else if (data.progress != null && data.total != null) {
+          setReviewProgress({ done: data.progress as number, total: data.total as number });
         }
       } catch { /* retry on next poll */ }
     }, 3000);
@@ -741,11 +746,23 @@ export function GameReplay() {
                 <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin shrink-0" />
                 <div>
                   <p className="text-sm font-bold text-primary">Reviewing game…</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">AI is analyzing all {maxMoves} moves. This takes about 15–30 seconds.</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {reviewProgress
+                      ? `Analyzing position ${reviewProgress.done} of ${reviewProgress.total}`
+                      : 'Starting engine analysis…'}
+                  </p>
                 </div>
+                {reviewProgress && (
+                  <span className="ml-auto text-xs font-mono text-primary/80">
+                    {Math.round((reviewProgress.done / reviewProgress.total) * 100)}%
+                  </span>
+                )}
               </div>
               <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
-                <div className="h-full rounded-full bg-primary/60 animate-pulse" style={{ width: '60%' }} />
+                <div
+                  className="h-full rounded-full bg-primary/60 transition-all duration-500"
+                  style={{ width: reviewProgress ? `${(reviewProgress.done / reviewProgress.total) * 100}%` : '5%' }}
+                />
               </div>
             </div>
           )}

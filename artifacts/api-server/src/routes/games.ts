@@ -393,7 +393,13 @@ router.get("/games/review-status/:jobId", async (req, res): Promise<void> => {
     }
   }
 
-  res.json({ status: job.status, error: job.error ?? null });
+  const progress = job.result as Record<string, unknown> | null;
+  res.json({
+    status: job.status,
+    error: job.error ?? null,
+    progress: progress?.progress ?? null,
+    total: progress?.total ?? null,
+  });
 });
 
 router.post("/games/analyze-pgn", async (req, res): Promise<void> => {
@@ -570,6 +576,11 @@ async function runReviewJob(gameId: number, jobId: string, log: Logger): Promise
       result: game.result,
       whiteUsername: game.whiteUsername,
       blackUsername: game.blackUsername,
+      onProgress: (done, total) => {
+        db.update(backgroundJobsTable).set({
+          result: { progress: done, total } as unknown as Record<string, unknown>,
+        }).where(eq(backgroundJobsTable.id, jobId)).catch(() => {});
+      },
     });
 
     await db.update(gamesTable)

@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 import { logger } from "./logger";
-import { evaluateAllPositions, classifyFromWinPctLoss, uciToSan, winPct } from "./engineAnalysis";
+import { evaluateAllPositions, classifyFromWinPctLoss, uciToSan, winPct, type PositionEval } from "./engineAnalysis";
 
 const openai = new OpenAI({
   baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
@@ -514,30 +514,14 @@ Respond with valid JSON:
 
 // ── Post-process GPT review using chess.js to fix hallucinations ─────────────
 
-async function postProcessReview(
+function mergeReviewWithEngine(
   reviewMoves: MoveReview[],
   originalMoves: Array<{ moveNumber: number; san: string; color: string }>,
-): Promise<MoveReview[]> {
+  fens: string[],
+  evals: PositionEval[],
+  uciMoves: Array<{ from: string; to: string } | null>,
+): MoveReview[] {
   const Chess = require("chess.js").Chess;
-  const chess = new Chess();
-  const fens: string[] = [chess.fen()];
-  const uciMoves: Array<{ from: string; to: string } | null> = [];
-
-  for (const m of originalMoves) {
-    try {
-      const result = chess.move(m.san);
-      fens.push(chess.fen());
-      uciMoves.push(result ? { from: result.from, to: result.to } : null);
-    } catch {
-      fens.push(chess.fen());
-      uciMoves.push(null);
-      break;
-    }
-  }
-
-  logger.info({ positions: fens.length }, "Running Stockfish 17 analysis on all positions");
-  const evals = await evaluateAllPositions(fens);
-  logger.info({ evaluated: evals.length }, "Stockfish analysis complete");
 
   const gptByIndex = new Map<number, MoveReview>();
   for (const rm of reviewMoves) {
@@ -693,17 +677,30 @@ export async function reviewFullGame(input: {
   result: string;
   whiteUsername: string;
   blackUsername: string;
+  onProgress?: (done: number, total: number) => void;
 }): Promise<GameReviewResult> {
-  const { moves, opening, result, whiteUsername, blackUsername } = input;
+  const { moves, opening, result, whiteUsername, blackUsername, onProgress } = input;
+  const startTime = Date.now();
 
   const Chess = require("chess.js").Chess;
   const chess = new Chess();
   const moveDetails: string[] = [];
+  const fens: string[] = [chess.fen()];
+  const uciMoves: Array<{ from: string; to: string } | null> = [];
+
   for (let i = 0; i < moves.length; i++) {
     const m = moves[i];
     const fenBefore = chess.fen();
     const legalCount = chess.moves().length;
-    try { chess.move(m.san); } catch { break; }
+    try {
+      const result = chess.move(m.san);
+      fens.push(chess.fen());
+      uciMoves.push(result ? { from: result.from, to: result.to } : null);
+    } catch {
+      fens.push(chess.fen());
+      uciMoves.push(null);
+      break;
+    }
     moveDetails.push(`${i}: ${m.moveNumber}${m.color === "white" ? "." : "..."} ${m.san} [fen:${fenBefore}] [legal:${legalCount}]`);
   }
   const moveList = moveDetails.join("\n");
@@ -771,15 +768,23 @@ Respond with valid JSON covering ALL ${moves.length} moves in order:
 }`;
 
   try {
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o",
-      max_completion_tokens: 16000,
-      messages: [{ role: "user", content: prompt }],
-      response_format: { type: "json_object" },
-    });
+    logger.info({ positions: fens.length, moves: moves.length }, "Starting parallel GPT + Stockfish analysis");
 
-    const finishReason = response.choices[0]?.finish_reason;
-    const content = response.choices[0]?.message?.content ?? "{}";
+    const [gptResponse, evals] = await Promise.all([
+      openai.chat.completions.create({
+        model: "gpt-4o",
+        max_completion_tokens: 16000,
+        messages: [{ role: "user", content: prompt }],
+        response_format: { type: "json_object" },
+      }),
+      evaluateAllPositions(fens, undefined, onProgress),
+    ]);
+
+    const gptTime = Date.now() - startTime;
+    logger.info({ gptTimeMs: gptTime, evaluated: evals.length }, "Parallel GPT + Stockfish complete");
+
+    const finishReason = gptResponse.choices[0]?.finish_reason;
+    const content = gptResponse.choices[0]?.message?.content ?? "{}";
 
     if (finishReason === "length") {
       logger.warn({ moves: moves.length }, "Review response truncated by token limit — trying to parse partial result");
@@ -805,7 +810,7 @@ Respond with valid JSON covering ALL ${moves.length} moves in order:
       throw new Error("OpenAI returned an empty move list — possibly a model error or format issue");
     }
 
-    const reviewMoves = await postProcessReview(rawMoves, moves);
+    const reviewMoves = mergeReviewWithEngine(rawMoves, moves, fens, evals, uciMoves);
 
     const gameSummary: GameReviewSummary | null = parsed.gameSummary ? {
       overview: parsed.gameSummary.overview ?? "",
@@ -822,10 +827,13 @@ Respond with valid JSON covering ALL ${moves.length} moves in order:
       improvementAreas: Array.isArray(parsed.gameSummary.improvementAreas) ? parsed.gameSummary.improvementAreas : [],
     } : null;
 
+    const totalTime = Date.now() - startTime;
+    logger.info({ totalTimeMs: totalTime, moves: moves.length }, "Game review complete");
+
     return { moves: reviewMoves, gameSummary };
   } catch (err) {
     logger.error({ err }, "Failed to review full game with OpenAI");
-    throw err; // Re-throw so the SSE route handler sends an error event
+    throw err;
   }
 }
 

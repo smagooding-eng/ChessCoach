@@ -200,6 +200,7 @@ async function getEngine(): Promise<StockfishProcess> {
 export async function evaluateAllPositions(
   fens: string[],
   depth: number = ANALYSIS_DEPTH,
+  onProgress?: (done: number, total: number) => void,
 ): Promise<PositionEval[]> {
   const engine = await getEngine();
   const results: PositionEval[] = [];
@@ -214,7 +215,9 @@ export async function evaluateAllPositions(
       logger.warn({ err, fen: fens[i], idx: i }, "Engine eval failed for position");
       results.push({ cpWhite: 0, bestMoveUci: "", secondBestUci: "", bestMoveSan: null, depth: 0 });
     }
+    if (onProgress && i % 5 === 0) onProgress(i + 1, fens.length);
   }
+  if (onProgress) onProgress(fens.length, fens.length);
 
   return results;
 }
