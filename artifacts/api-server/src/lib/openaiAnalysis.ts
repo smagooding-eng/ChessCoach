@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 import { logger } from "./logger";
-import { engineEvalMove, fetchLichessEval, pvToWhiteCp, classifyFromCpLoss, uciToSan } from "./engineAnalysis";
+import { evaluateAllPositions, classifyFromCpLoss, uciToSan } from "./engineAnalysis";
 
 const openai = new OpenAI({
   baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
@@ -231,17 +231,10 @@ export async function analyzeSingleMove(input: AnalyzeSingleMoveInput): Promise<
   const fenBefore = target.fenBefore;
   const fenAfter = target.fen ?? "";
 
-  // ── Step 1: Get engine evaluation from Lichess Cloud Eval ──────────────────
-  const engineResult = await engineEvalMove({
-    fenBefore,
-    fenAfter,
-    playedFrom: target.from,
-    playedTo: target.to,
-    playerColor,
-    moveIndex,
-  });
+  const sfEvals = await evaluateAllPositions([fenBefore, fenAfter]);
+  const evalBefore = sfEvals[0];
+  const evalAfter = sfEvals[1];
 
-  // ── Step 2: GPT analysis — behavior changes based on whether engine eval is available ──
   const contextStart = Math.max(0, moveIndex - 5);
   const contextEnd = Math.min(moves.length - 1, moveIndex + 2);
   const contextMoves = moves.slice(contextStart, contextEnd + 1).map((m, i) => {
@@ -250,19 +243,28 @@ export async function analyzeSingleMove(input: AnalyzeSingleMoveInput): Promise<
     return `${marker}${m.moveNumber}${m.color === "white" ? "." : "..."} ${m.san}`;
   }).join("\n");
 
-  // ── Path A: Lichess/Stockfish had the position — GPT only writes pros/cons ──
-  if (engineResult.available) {
-    const classification = engineResult.classification;
-    const isBad = ["inaccuracy", "mistake", "blunder"].includes(classification);
+  const cpBefore = evalBefore.cpWhite;
+  const cpAfter = evalAfter.cpWhite;
+  const cpLossRaw = playerColor === "white" ? cpBefore - cpAfter : cpAfter - cpBefore;
+  const cpLoss = Math.max(0, cpLossRaw);
 
-    const cpInfo =
-      `Stockfish (depth ${engineResult.depth}) reports centipawn loss = ${engineResult.cpLoss}. ` +
-      `Eval before: ${engineResult.engineCpBefore}cp, after: ${engineResult.engineCpAfter}cp (white's perspective).`;
+  const playedUci = `${target.from}${target.to}`;
+  const isTopEngineMove = evalBefore.bestMoveUci.startsWith(playedUci);
+  const isSecondEngineMove = evalBefore.secondBestUci.startsWith(playedUci);
+  const isOpeningRange = moveIndex < 30;
+  const wasBalanced = Math.abs(cpBefore) < 150;
 
-    const betterMoveHint = engineResult.engineBestMoveSan
-      ? `The engine's recommended move was ${engineResult.engineBestMoveSan}.` : "";
+  const classification = classifyFromCpLoss(cpLossRaw, isTopEngineMove, isSecondEngineMove, isOpeningRange, wasBalanced);
+  const isBad = ["inaccuracy", "mistake", "blunder"].includes(classification);
 
-    const prompt = `You are an expert chess coach providing in-depth move analysis.
+  const cpInfo =
+    `Stockfish 17 (depth ${evalBefore.depth}) reports centipawn loss = ${cpLoss}. ` +
+    `Eval before: ${cpBefore}cp, after: ${cpAfter}cp (white's perspective).`;
+
+  const betterMoveHint = evalBefore.bestMoveSan && !isTopEngineMove
+    ? `The engine's recommended move was ${evalBefore.bestMoveSan}.` : "";
+
+  const prompt = `You are an expert chess coach providing in-depth move analysis.
 
 Game: ${whiteUsername} (White) vs ${blackUsername} (Black)
 Opening: ${opening ?? "Unknown"} | Result: ${result}
@@ -277,132 +279,53 @@ ${cpInfo}
 ${betterMoveHint}
 
 Provide 2-3 concrete PROS and 2-3 concrete CONS for this specific move.
-${isBad && engineResult.engineBestMoveSan ? `Also explain briefly why ${engineResult.engineBestMoveSan} would have been better.` : ""}
+${isBad && evalBefore.bestMoveSan ? `Also explain briefly why ${evalBefore.bestMoveSan} would have been better.` : ""}
 
 Respond with valid JSON:
 {
   "pros": ["...", "...", "..."],
-  "cons": ["...", "...", "..."]${isBad && engineResult.engineBestMoveSan ? ',\n  "betterMoveExplanation": "..."' : ""}
-}`;
-
-    try {
-      const response = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
-        max_completion_tokens: 512,
-        messages: [{ role: "user", content: prompt }],
-        response_format: { type: "json_object" },
-      });
-      const content = response.choices[0]?.message?.content ?? "{}";
-      const parsed = JSON.parse(content) as {
-        pros?: string[];
-        cons?: string[];
-        betterMoveExplanation?: string;
-      };
-
-      let betterMove: string | null = null;
-      if (isBad && engineResult.engineBestMoveSan) {
-        betterMove = engineResult.engineBestMoveSan;
-        if (parsed.betterMoveExplanation) betterMove += ` — ${parsed.betterMoveExplanation}`;
-      }
-
-      return {
-        classification,
-        pros: Array.isArray(parsed.pros) ? parsed.pros : [],
-        cons: Array.isArray(parsed.cons) ? parsed.cons : [],
-        betterMove,
-        cpLoss: engineResult.cpLoss,
-        engineDepth: engineResult.depth,
-        engineAvailable: true,
-      };
-    } catch (err) {
-      logger.error({ err }, "GPT pros/cons failed (engine path)");
-      return {
-        classification,
-        pros: [],
-        cons: [],
-        betterMove: engineResult.engineBestMoveSan,
-        cpLoss: engineResult.cpLoss,
-        engineDepth: engineResult.depth,
-        engineAvailable: true,
-      };
-    }
-  }
-
-  // ── Path B: No engine data — GPT evaluates the full position from FEN ──────
-  const prompt = `You are a chess grandmaster and coach. Analyze this specific chess move precisely.
-
-Game: ${whiteUsername} (White) vs ${blackUsername} (Black)
-Opening: ${opening ?? "Unknown"} | Result: ${result}
-
-Move sequence (>>> = analyzed move):
-${contextMoves}
-
-Position FEN before the move: ${fenBefore}
-Position FEN after the move:  ${fenAfter}
-
-Player "${player}" (${playerColor}) played ${target.moveNumber}${playerColor === "white" ? "." : "..."} ${target.san}.
-
-Analyze this move as a strong chess engine would. Determine:
-1. CLASSIFICATION — pick exactly one:
-   - "brilliant": stunning sacrifice or non-obvious winning move
-   - "excellent": best or near-best move, no better option missed
-   - "good": solid move, maintains or slightly improves position
-   - "book": well-known theoretical move from opening/endgame databases
-   - "inaccuracy": suboptimal, a clearly better move exists (+25–50cp swing)
-   - "mistake": clear error, noticeably worsens the position (+51–100cp swing)
-   - "blunder": serious error, loses material or the game (>100cp swing)
-
-2. PROS — 2-3 specific strengths of this move (threats created, pieces activated, structure improved, etc.)
-3. CONS — 2-3 specific weaknesses (what it misses, weaknesses created, opponent's best response)
-4. BETTER MOVE — if inaccuracy/mistake/blunder, name the best alternative move and explain why in 1 sentence
-
-Respond with valid JSON:
-{
-  "classification": "good",
-  "pros": ["...", "..."],
-  "cons": ["...", "..."],
-  "betterMove": "Nf6 — develops a piece with tempo and controls the center (only for inaccuracy/mistake/blunder, else null)"
+  "cons": ["...", "...", "..."]${isBad && evalBefore.bestMoveSan ? ',\n  "betterMoveExplanation": "..."' : ""}
 }`;
 
   try {
     const response = await openai.chat.completions.create({
-      model: "gpt-4o",
-      max_completion_tokens: 600,
+      model: "gpt-4o-mini",
+      max_completion_tokens: 512,
       messages: [{ role: "user", content: prompt }],
       response_format: { type: "json_object" },
     });
     const content = response.choices[0]?.message?.content ?? "{}";
     const parsed = JSON.parse(content) as {
-      classification?: string;
       pros?: string[];
       cons?: string[];
-      betterMove?: string | null;
+      betterMoveExplanation?: string;
     };
 
-    const validClassifications = ["brilliant", "excellent", "good", "book", "inaccuracy", "mistake", "blunder"];
-    const classification = (
-      validClassifications.includes(parsed.classification ?? "") ? parsed.classification : "good"
-    ) as SingleMoveAnalysis["classification"];
+    let betterMove: string | null = null;
+    if (isBad && evalBefore.bestMoveSan) {
+      betterMove = evalBefore.bestMoveSan;
+      if (parsed.betterMoveExplanation) betterMove += ` — ${parsed.betterMoveExplanation}`;
+    }
 
     return {
       classification,
       pros: Array.isArray(parsed.pros) ? parsed.pros : [],
       cons: Array.isArray(parsed.cons) ? parsed.cons : [],
-      betterMove: parsed.betterMove ?? null,
-      cpLoss: null,
-      engineDepth: null,
-      engineAvailable: false,
+      betterMove,
+      cpLoss,
+      engineDepth: evalBefore.depth,
+      engineAvailable: true,
     };
   } catch (err) {
-    logger.error({ err }, "GPT full-position analysis failed");
+    logger.error({ err }, "GPT pros/cons failed");
     return {
-      classification: "good",
+      classification,
       pros: [],
       cons: [],
-      betterMove: null,
-      cpLoss: null,
-      engineDepth: null,
-      engineAvailable: false,
+      betterMove: evalBefore.bestMoveSan,
+      cpLoss,
+      engineDepth: evalBefore.depth,
+      engineAvailable: true,
     };
   }
 }
@@ -430,45 +353,9 @@ async function postProcessReview(
     }
   }
 
-  const engineEvals: Array<{
-    cpBefore: number; cpAfter: number;
-    topUci: string; secondUci: string;
-    available: boolean; depth: number;
-    bestMoveSan: string | null;
-  } | null> = new Array(fens.length).fill(null);
-
-  for (let i = 0; i < fens.length - 1; i++) {
-    const fenBefore = fens[i];
-    const fenAfter = fens[i + 1];
-    if (!fenBefore || !fenAfter) continue;
-
-    const evalBefore = await fetchLichessEval(fenBefore, 2);
-    if (!evalBefore || evalBefore.pvs.length === 0) continue;
-
-    const cpBefore = pvToWhiteCp(evalBefore.pvs[0]);
-    const topUci = evalBefore.pvs[0]?.moves?.split(" ")[0] ?? "";
-    const secondUci = evalBefore.pvs[1]?.moves?.split(" ")[0] ?? "";
-    const bestMoveSan = topUci ? uciToSan(fenBefore, topUci) : null;
-
-    const evalAfter = await fetchLichessEval(fenAfter, 1);
-
-    if (!evalAfter || evalAfter.pvs.length === 0) {
-      engineEvals[i] = {
-        cpBefore, cpAfter: cpBefore, topUci, secondUci,
-        available: false, depth: evalBefore.depth,
-        bestMoveSan,
-      };
-      continue;
-    }
-
-    const cpAfter = pvToWhiteCp(evalAfter.pvs[0]);
-
-    engineEvals[i] = {
-      cpBefore, cpAfter, topUci, secondUci,
-      available: true, depth: evalBefore.depth,
-      bestMoveSan,
-    };
-  }
+  logger.info({ positions: fens.length }, "Running Stockfish 17 analysis on all positions");
+  const evals = await evaluateAllPositions(fens);
+  logger.info({ evaluated: evals.length }, "Stockfish analysis complete");
 
   const gptByIndex = new Map<number, MoveReview>();
   for (const rm of reviewMoves) {
@@ -513,51 +400,45 @@ async function postProcessReview(
       };
     }
 
-    let moveCpLoss = 0;
-    let moveEngineAvailable = false;
+    const evalBefore = evals[idx];
+    const evalAfter = evals[idx + 1];
 
-    const eng = engineEvals[idx];
-    if (eng) {
-      const moveUci = uciMoves[idx];
-      const playedUci = moveUci ? `${moveUci.from}${moveUci.to}` : "";
-      const isTopEngineMove = eng.topUci.startsWith(playedUci) && playedUci.length > 0;
-      const isSecondEngineMove = eng.secondUci.startsWith(playedUci) && playedUci.length > 0;
-      const isOpeningRange = idx < 30;
-      const wasBalanced = Math.abs(eng.cpBefore) < 150;
+    if (!evalBefore || !evalAfter) {
+      return {
+        moveIndex: idx, san: om.san, color: om.color as "white" | "black",
+        classification, explanation, betterMove, pros, cons, cpLoss: 0, engineAvailable: false,
+      };
+    }
 
-      if (eng.available) {
-        const playerColor = om.color as "white" | "black";
-        const cpLossRaw = playerColor === "white"
-          ? eng.cpBefore - eng.cpAfter
-          : eng.cpAfter - eng.cpBefore;
+    const cpBefore = evalBefore.cpWhite;
+    const cpAfter = evalAfter.cpWhite;
 
-        if (playerColor === "white") {
-          moveCpLoss = Math.max(0, winPct(eng.cpBefore) - winPct(eng.cpAfter));
-        } else {
-          moveCpLoss = Math.max(0, (100 - winPct(eng.cpBefore)) - (100 - winPct(eng.cpAfter)));
-        }
-        moveEngineAvailable = true;
+    const moveUci = uciMoves[idx];
+    const playedUci = moveUci ? `${moveUci.from}${moveUci.to}` : "";
+    const isTopEngineMove = evalBefore.bestMoveUci.startsWith(playedUci) && playedUci.length > 0;
+    const isSecondEngineMove = evalBefore.secondBestUci.startsWith(playedUci) && playedUci.length > 0;
+    const isOpeningRange = idx < 30;
+    const wasBalanced = Math.abs(cpBefore) < 150;
 
-        classification = classifyFromCpLoss(cpLossRaw, isTopEngineMove, isSecondEngineMove, isOpeningRange, wasBalanced);
+    const playerColor = om.color as "white" | "black";
+    const cpLossRaw = playerColor === "white"
+      ? cpBefore - cpAfter
+      : cpAfter - cpBefore;
 
-        const isBad = ["inaccuracy", "mistake", "blunder"].includes(classification);
-        if (isBad && eng.bestMoveSan && !isTopEngineMove) {
-          betterMove = eng.bestMoveSan;
-        } else if (!isBad) {
-          betterMove = null;
-        }
-      } else if (isTopEngineMove) {
-        if (isOpeningRange && wasBalanced) classification = "book";
-        else classification = "excellent";
-        betterMove = null;
-        moveEngineAvailable = true;
-        moveCpLoss = 0;
-      } else if (isSecondEngineMove) {
-        classification = "good";
-        betterMove = null;
-        moveEngineAvailable = true;
-        moveCpLoss = 1;
-      }
+    let moveCpLoss: number;
+    if (playerColor === "white") {
+      moveCpLoss = Math.max(0, winPct(cpBefore) - winPct(cpAfter));
+    } else {
+      moveCpLoss = Math.max(0, (100 - winPct(cpBefore)) - (100 - winPct(cpAfter)));
+    }
+
+    classification = classifyFromCpLoss(cpLossRaw, isTopEngineMove, isSecondEngineMove, isOpeningRange, wasBalanced);
+
+    const isBad = ["inaccuracy", "mistake", "blunder"].includes(classification);
+    if (isBad && evalBefore.bestMoveSan && !isTopEngineMove) {
+      betterMove = evalBefore.bestMoveSan;
+    } else if (!isBad) {
+      betterMove = null;
     }
 
     if (betterMove) {
@@ -589,14 +470,14 @@ async function postProcessReview(
       }
     }
 
-    if (["inaccuracy", "mistake", "blunder"].includes(classification) && !betterMove && eng?.bestMoveSan && eng.available) {
-      betterMove = eng.bestMoveSan;
+    if (isBad && !betterMove && evalBefore.bestMoveSan) {
+      betterMove = evalBefore.bestMoveSan;
     }
 
     return {
       moveIndex: idx, san: om.san, color: om.color as "white" | "black",
       classification, explanation, betterMove, pros, cons,
-      cpLoss: moveCpLoss, engineAvailable: moveEngineAvailable,
+      cpLoss: moveCpLoss, engineAvailable: true,
     };
   });
 }

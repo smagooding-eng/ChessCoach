@@ -1,104 +1,35 @@
 import { Chess } from "chess.js";
 import { logger } from "./logger";
+import { spawn, ChildProcessWithoutNullStreams } from "child_process";
 
-const START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+const ANALYSIS_DEPTH = 16;
+const ENGINE_TIMEOUT_MS = 10000;
 
-// ─── Lichess Cloud Eval ───────────────────────────────────────────────────────
+export type EngineClassification =
+  | "brilliant"
+  | "excellent"
+  | "good"
+  | "book"
+  | "inaccuracy"
+  | "mistake"
+  | "blunder";
 
-interface LichessPv {
-  moves: string;
-  cp?: number;
-  mate?: number;
-}
-
-interface LichessCloudEval {
-  fen: string;
-  knodes: number;
+export interface StockfishEval {
+  cp: number;
+  bestMoveUci: string;
+  secondBestUci: string;
   depth: number;
-  pvs: LichessPv[];
 }
 
-const LICHESS_MIN_DELAY_MS = 350;
-let lastLichessCallTime = 0;
-
-const evalCache = new Map<string, LichessCloudEval | null>();
-const MAX_CACHE_SIZE = 500;
-
-async function rateLimitedDelay(): Promise<void> {
-  const now = Date.now();
-  const elapsed = now - lastLichessCallTime;
-  if (elapsed < LICHESS_MIN_DELAY_MS) {
-    await new Promise(resolve => setTimeout(resolve, LICHESS_MIN_DELAY_MS - elapsed));
-  }
-  lastLichessCallTime = Date.now();
+export interface PositionEval {
+  cpWhite: number;
+  bestMoveUci: string;
+  secondBestUci: string;
+  bestMoveSan: string | null;
+  depth: number;
 }
 
-export async function fetchLichessEval(fen: string, multiPv = 2): Promise<LichessCloudEval | null> {
-  const cacheKey = `${fen}:${multiPv}`;
-  if (evalCache.has(cacheKey)) {
-    return evalCache.get(cacheKey) ?? null;
-  }
-  const MAX_RETRIES = 3;
-
-  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-    await rateLimitedDelay();
-
-    try {
-      const url = `https://lichess.org/api/cloud-eval?fen=${encodeURIComponent(fen)}&multiPv=${multiPv}`;
-      const res = await fetch(url, {
-        headers: { Accept: "application/json", "User-Agent": "ChessCoach/1.0" },
-        signal: AbortSignal.timeout(8000),
-      });
-
-      if (res.status === 404) {
-        cacheResult(cacheKey, null);
-        return null;
-      }
-
-      if (res.status === 429) {
-        const backoff = Math.min(2000 * (attempt + 1), 8000);
-        logger.warn({ attempt, fen, backoff }, "Lichess 429 rate limit, backing off");
-        await new Promise(resolve => setTimeout(resolve, backoff));
-        continue;
-      }
-
-      if (!res.ok) {
-        logger.warn({ status: res.status, fen }, "Lichess cloud eval non-OK");
-        return null;
-      }
-
-      const result = (await res.json()) as LichessCloudEval;
-      cacheResult(cacheKey, result);
-      return result;
-    } catch (err) {
-      logger.warn({ err, attempt }, "Lichess cloud eval fetch failed");
-      if (attempt < MAX_RETRIES - 1) {
-        await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
-        continue;
-      }
-      return null;
-    }
-  }
-
-  return null;
-}
-
-function cacheResult(key: string, value: LichessCloudEval | null): void {
-  if (evalCache.size >= MAX_CACHE_SIZE) {
-    const firstKey = evalCache.keys().next().value;
-    if (firstKey) evalCache.delete(firstKey);
-  }
-  evalCache.set(key, value);
-}
-
-export function pvToWhiteCp(pv: LichessPv): number {
-  if (pv.mate !== undefined) {
-    return pv.mate > 0 ? 10000 - pv.mate : -10000 - pv.mate;
-  }
-  return pv.cp ?? 0;
-}
-
-export function uciToSan(fen: string, uci: string): string | null {
+function uciToSan(fen: string, uci: string): string | null {
   try {
     const chess = new Chess(fen);
     const from = uci.slice(0, 2);
@@ -111,16 +42,172 @@ export function uciToSan(fen: string, uci: string): string | null {
   }
 }
 
-// ─── Classification thresholds ────────────────────────────────────────────────
+export { uciToSan };
 
-export type EngineClassification =
-  | "brilliant"
-  | "excellent"
-  | "good"
-  | "book"
-  | "inaccuracy"
-  | "mistake"
-  | "blunder";
+class StockfishProcess {
+  private proc: ChildProcessWithoutNullStreams | null = null;
+  private buffer = "";
+  private resolveFunc: ((lines: string[]) => void) | null = null;
+  private collectedLines: string[] = [];
+  private waitForToken = "";
+
+  async init(): Promise<void> {
+    this.proc = spawn("stockfish", [], { stdio: ["pipe", "pipe", "pipe"] });
+    this.proc.stdout.on("data", (data: Buffer) => {
+      this.buffer += data.toString();
+      const lines = this.buffer.split("\n");
+      this.buffer = lines.pop() ?? "";
+      for (const line of lines) {
+        this.collectedLines.push(line);
+        if (this.waitForToken && line.includes(this.waitForToken)) {
+          if (this.resolveFunc) {
+            this.resolveFunc(this.collectedLines);
+            this.resolveFunc = null;
+            this.collectedLines = [];
+          }
+        }
+      }
+    });
+    this.proc.stderr.on("data", (data: Buffer) => {
+      logger.debug({ stderr: data.toString() }, "Stockfish stderr");
+    });
+
+    await this.sendAndWait("uci", "uciok");
+    await this.sendAndWait("setoption name Hash value 64", "");
+    await this.sendAndWait("setoption name Threads value 1", "");
+    await this.sendAndWait("isready", "readyok");
+    logger.info("Stockfish 17 engine initialized");
+  }
+
+  private sendAndWait(command: string, token: string): Promise<string[]> {
+    return new Promise((resolve, reject) => {
+      if (!this.proc) { reject(new Error("Stockfish not started")); return; }
+      this.collectedLines = [];
+      this.waitForToken = token;
+      this.resolveFunc = resolve;
+      this.proc.stdin.write(command + "\n");
+
+      if (!token) {
+        setTimeout(() => {
+          if (this.resolveFunc) {
+            this.resolveFunc(this.collectedLines);
+            this.resolveFunc = null;
+            this.collectedLines = [];
+          }
+        }, 50);
+      }
+
+      setTimeout(() => {
+        if (this.resolveFunc) {
+          this.resolveFunc(this.collectedLines);
+          this.resolveFunc = null;
+          this.collectedLines = [];
+        }
+      }, ENGINE_TIMEOUT_MS);
+    });
+  }
+
+  async evaluate(fen: string, depth: number = ANALYSIS_DEPTH, multiPv: number = 2): Promise<PositionEval> {
+    if (!this.proc) throw new Error("Stockfish not started");
+
+    await this.sendAndWait("ucinewgame", "");
+    await this.sendAndWait(`position fen ${fen}`, "");
+    await this.sendAndWait("isready", "readyok");
+
+    await this.sendAndWait(`setoption name MultiPV value ${multiPv}`, "");
+    const lines = await this.sendAndWait(`go depth ${depth}`, "bestmove");
+
+    let bestCp = 0;
+    let bestMoveUci = "";
+    let secondBestUci = "";
+    let bestDepth = 0;
+
+    const isBlackToMove = fen.includes(" b ");
+
+    for (const line of lines) {
+      if (!line.startsWith("info") || !line.includes("score")) continue;
+      if (line.includes("upperbound") || line.includes("lowerbound")) continue;
+
+      const depthMatch = line.match(/\bdepth (\d+)/);
+      const pvMatch = line.match(/\bmultipv (\d+)/);
+      const pvNum = pvMatch ? parseInt(pvMatch[1]) : 1;
+      const lineDepth = depthMatch ? parseInt(depthMatch[1]) : 0;
+
+      const cpMatch = line.match(/\bscore cp (-?\d+)/);
+      const mateMatch = line.match(/\bscore mate (-?\d+)/);
+
+      let cpValue = 0;
+      if (cpMatch) {
+        cpValue = parseInt(cpMatch[1]);
+      } else if (mateMatch) {
+        const mateIn = parseInt(mateMatch[1]);
+        cpValue = mateIn > 0 ? 10000 - mateIn : -10000 - mateIn;
+      } else {
+        continue;
+      }
+
+      const pvLine = line.match(/ pv (.+)$/);
+      const firstMove = pvLine ? pvLine[1].split(" ")[0] : "";
+
+      if (pvNum === 1 && lineDepth >= bestDepth) {
+        bestCp = isBlackToMove ? -cpValue : cpValue;
+        bestMoveUci = firstMove;
+        bestDepth = lineDepth;
+      } else if (pvNum === 2 && lineDepth >= bestDepth - 1) {
+        secondBestUci = firstMove;
+      }
+    }
+
+    const bestmoveLine = lines.find(l => l.startsWith("bestmove"));
+    if (bestmoveLine && !bestMoveUci) {
+      bestMoveUci = bestmoveLine.split(" ")[1] ?? "";
+    }
+
+    const bestMoveSan = bestMoveUci ? uciToSan(fen, bestMoveUci) : null;
+
+    return { cpWhite: bestCp, bestMoveUci, secondBestUci, bestMoveSan, depth: bestDepth };
+  }
+
+  destroy(): void {
+    if (this.proc) {
+      this.proc.stdin.write("quit\n");
+      this.proc.kill();
+      this.proc = null;
+    }
+  }
+}
+
+let globalEngine: StockfishProcess | null = null;
+let engineInitPromise: Promise<void> | null = null;
+
+async function getEngine(): Promise<StockfishProcess> {
+  if (globalEngine) return globalEngine;
+  if (engineInitPromise) { await engineInitPromise; return globalEngine!; }
+
+  globalEngine = new StockfishProcess();
+  engineInitPromise = globalEngine.init();
+  await engineInitPromise;
+  return globalEngine!;
+}
+
+export async function evaluateAllPositions(
+  fens: string[],
+): Promise<PositionEval[]> {
+  const engine = await getEngine();
+  const results: PositionEval[] = [];
+
+  for (let i = 0; i < fens.length; i++) {
+    try {
+      const ev = await engine.evaluate(fens[i], ANALYSIS_DEPTH, 2);
+      results.push(ev);
+    } catch (err) {
+      logger.warn({ err, fen: fens[i], idx: i }, "Engine eval failed for position");
+      results.push({ cpWhite: 0, bestMoveUci: "", secondBestUci: "", bestMoveSan: null, depth: 0 });
+    }
+  }
+
+  return results;
+}
 
 export function classifyFromCpLoss(
   cpLoss: number,
@@ -143,136 +230,4 @@ export function classifyFromCpLoss(
   if (cpLoss <= 50) return "inaccuracy";
   if (cpLoss <= 100) return "mistake";
   return "blunder";
-}
-
-// ─── Public API ───────────────────────────────────────────────────────────────
-
-export interface EngineEvalResult {
-  classification: EngineClassification;
-  cpLoss: number;
-  cpLossRaw: number;
-  engineCpBefore: number | null;
-  engineCpAfter: number | null;
-  engineBestMoveSan: string | null;
-  isEngineTopChoice: boolean;
-  depth: number;
-  available: boolean;
-}
-
-export async function engineEvalMove(params: {
-  fenBefore: string;
-  fenAfter: string;
-  playedFrom: string;
-  playedTo: string;
-  playerColor: "white" | "black";
-  moveIndex: number;
-}): Promise<EngineEvalResult> {
-  const { fenBefore, fenAfter, playedFrom, playedTo, playerColor, moveIndex } = params;
-
-  const isOpeningRange = moveIndex < 30;
-
-  const evalBefore = await fetchLichessEval(fenBefore, 2);
-  const evalAfter = await fetchLichessEval(fenAfter, 1);
-
-  if (!evalBefore || evalBefore.pvs.length === 0) {
-    logger.debug({ fen: fenBefore }, "No engine eval for position before move");
-    return {
-      classification: isOpeningRange ? "book" : "good",
-      cpLoss: 0,
-      cpLossRaw: 0,
-      engineCpBefore: null,
-      engineCpAfter: null,
-      engineBestMoveSan: null,
-      isEngineTopChoice: false,
-      depth: 0,
-      available: false,
-    };
-  }
-
-  const cpBefore = pvToWhiteCp(evalBefore.pvs[0]);
-
-  if (!evalAfter || evalAfter.pvs.length === 0) {
-    const topUci = evalBefore.pvs[0]?.moves?.split(" ")[0] ?? "";
-    const secondUci = evalBefore.pvs[1]?.moves?.split(" ")[0] ?? "";
-    const playedUci = `${playedFrom}${playedTo}`;
-    const isTopEngineMove = topUci.startsWith(playedUci);
-    const isSecondEngineMove = secondUci.startsWith(playedUci);
-    const engineBestMoveSan = topUci ? uciToSan(fenBefore, topUci) : null;
-
-    if (isTopEngineMove) {
-      return {
-        classification: isOpeningRange ? "book" : "excellent",
-        cpLoss: 0,
-        cpLossRaw: 0,
-        engineCpBefore: cpBefore,
-        engineCpAfter: null,
-        engineBestMoveSan: null,
-        isEngineTopChoice: true,
-        depth: evalBefore.depth,
-        available: true,
-      };
-    }
-    if (isSecondEngineMove) {
-      return {
-        classification: isOpeningRange ? "book" : "good",
-        cpLoss: 0,
-        cpLossRaw: 0,
-        engineCpBefore: cpBefore,
-        engineCpAfter: null,
-        engineBestMoveSan: engineBestMoveSan,
-        isEngineTopChoice: false,
-        depth: evalBefore.depth,
-        available: true,
-      };
-    }
-
-    return {
-      classification: isOpeningRange ? "book" : "good",
-      cpLoss: 0,
-      cpLossRaw: 0,
-      engineCpBefore: cpBefore,
-      engineCpAfter: null,
-      engineBestMoveSan: null,
-      isEngineTopChoice: false,
-      depth: evalBefore.depth,
-      available: false,
-    };
-  }
-
-  const cpAfter = pvToWhiteCp(evalAfter.pvs[0]);
-
-  const cpLossRaw =
-    playerColor === "white" ? cpBefore - cpAfter : cpAfter - cpBefore;
-
-  const cpLoss = Math.max(0, cpLossRaw);
-
-  const playedUci = `${playedFrom}${playedTo}`;
-  const topUci = evalBefore.pvs[0]?.moves?.split(" ")[0] ?? "";
-  const secondUci = evalBefore.pvs[1]?.moves?.split(" ")[0] ?? "";
-  const isTopEngineMove = topUci.startsWith(playedUci);
-  const isSecondEngineMove = secondUci.startsWith(playedUci);
-
-  const engineBestMoveSan = topUci ? uciToSan(fenBefore, topUci) : null;
-
-  const wasBalanced = Math.abs(cpBefore) < 150;
-
-  const classification = classifyFromCpLoss(
-    cpLossRaw,
-    isTopEngineMove,
-    isSecondEngineMove,
-    isOpeningRange,
-    wasBalanced,
-  );
-
-  return {
-    classification,
-    cpLoss,
-    cpLossRaw,
-    engineCpBefore: cpBefore,
-    engineCpAfter: cpAfter,
-    engineBestMoveSan: !isTopEngineMove && cpLoss > 25 ? engineBestMoveSan : null,
-    isEngineTopChoice: isTopEngineMove,
-    depth: evalBefore.depth,
-    available: true,
-  };
 }
