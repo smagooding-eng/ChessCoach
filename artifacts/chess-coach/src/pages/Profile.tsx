@@ -11,7 +11,8 @@ import {
   User, Mail, Crown, LogOut, ChevronRight, Trophy, Swords, Target,
   GraduationCap, Settings, Shield, Edit3, Check, X, Eye, Users, CreditCard,
   Activity, Send, AlertCircle, CheckCircle2, Bold, Italic, Heading1, Heading2,
-  Link as LinkIcon, Image, Type, Palette, List, ListOrdered, Minus, Undo2, Redo2, FileText, Sparkles
+  Link as LinkIcon, Image, Type, Palette, List, ListOrdered, Minus, Undo2, Redo2, FileText, Sparkles,
+  Trash2, Loader2
 } from 'lucide-react';
 
 interface AdminStats {
@@ -859,6 +860,8 @@ function AdminTicker() {
   const [showUsers, setShowUsers] = useState(false);
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [emailRecipients, setEmailRecipients] = useState<string[]>([]);
+  const [clearing, setClearing] = useState(false);
+  const [clearResult, setClearResult] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchStats = () => {
@@ -883,6 +886,19 @@ function AdminTicker() {
     setShowEmailModal(true);
   };
 
+  const handleClearCache = async () => {
+    if (!confirm('Clear ALL courses, reviews, and weaknesses for every user? Scout reports will be preserved.')) return;
+    setClearing(true);
+    setClearResult(null);
+    try {
+      const res = await apiFetch('/api/admin/clear-ai-cache', { method: 'POST', credentials: 'include' });
+      const data = await res.json();
+      if (res.ok) setClearResult('Cache cleared successfully');
+      else setClearResult(data.error || 'Failed');
+    } catch { setClearResult('Request failed'); }
+    finally { setClearing(false); setTimeout(() => setClearResult(null), 4000); }
+  };
+
   if (!stats) return null;
 
   return (
@@ -895,6 +911,17 @@ function AdminTicker() {
           <h2 className="text-sm font-bold text-amber-400 flex items-center gap-2">
             <Activity className="w-4 h-4" /> Admin Dashboard
             <span className="ml-auto flex items-center gap-2">
+              <button
+                onClick={handleClearCache}
+                disabled={clearing}
+                className="text-[10px] font-semibold px-2 py-1 rounded transition-colors flex items-center gap-1 bg-red-500/10 text-red-400/70 hover:bg-red-500/15 hover:text-red-400 disabled:opacity-50"
+              >
+                {clearing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
+                {clearing ? 'Clearing...' : 'Clear Cache'}
+              </button>
+              {clearResult && (
+                <span className="text-[10px] font-medium text-emerald-400">{clearResult}</span>
+              )}
               <button
                 onClick={openComposer}
                 className="text-[10px] font-semibold px-2 py-1 rounded transition-colors flex items-center gap-1 bg-amber-500/10 text-amber-400/70 hover:bg-amber-500/15 hover:text-amber-400"
