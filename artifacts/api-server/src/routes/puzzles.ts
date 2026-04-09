@@ -509,16 +509,22 @@ async function fetchAndStoreLichessPuzzle() {
     if (!res.ok) return null;
     const data = await res.json();
 
-    const chess = new Chess();
-    const moves = data.game.pgn.split(/\s+/).filter((m: string) => !m.match(/^\d+\./) && m.length > 0);
-    for (let i = 0; i < data.puzzle.initialPly && i < moves.length; i++) {
-      chess.move(moves[i]);
-    }
-    const fen = chess.fen();
+    if (!data.puzzle?.fen || !data.puzzle?.solution?.length) return null;
+
+    const fen = data.puzzle.fen;
     const solutionUci = data.puzzle.solution.join(" ");
 
+    const validationChess = new Chess(fen);
+    const firstMove = data.puzzle.solution[0];
+    const testResult = validationChess.move({
+      from: firstMove.slice(0, 2),
+      to: firstMove.slice(2, 4),
+      promotion: firstMove.length > 4 ? firstMove[4] : undefined,
+    });
+    if (!testResult) return null;
+
     const [existing] = await db
-      .select({ id: puzzlesTable.id })
+      .select()
       .from(puzzlesTable)
       .where(eq(puzzlesTable.lichessId, data.puzzle.id))
       .limit(1);

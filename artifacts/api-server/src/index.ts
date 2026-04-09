@@ -63,3 +63,9 @@ app.listen(port, (err) => {
 initStripe().catch((err) => {
   logger.error({ err }, 'Stripe init failed after server start');
 });
+
+import("./lib/puzzleSeed").then(({ seedPuzzlesIfNeeded }) => {
+  seedPuzzlesIfNeeded().catch((err) => {
+    logger.error({ err }, "Puzzle seed failed");
+  });
+}).catch(() => {});
