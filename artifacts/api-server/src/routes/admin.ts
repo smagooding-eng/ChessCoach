@@ -75,17 +75,16 @@ router.get("/admin/stats", requireAdmin, async (_req: Request, res: Response) =>
     let subBreakdown = { active: 0, trialing: 0, canceled: 0, pastDue: 0, total: 0 };
     try {
       const stripe = await getUncachableStripeClient();
-      const [activeSubs, canceledSubs, pastDueSubs] = await Promise.all([
+      const [activeSubs, pastDueSubs] = await Promise.all([
         stripe.subscriptions.list({ status: 'active', limit: 100 }),
-        stripe.subscriptions.list({ status: 'canceled', limit: 100 }),
         stripe.subscriptions.list({ status: 'past_due', limit: 100 }),
       ]);
       subBreakdown = {
         active: activeSubs.data.length,
         trialing: 0,
-        canceled: canceledSubs.data.length,
+        canceled: 0,
         pastDue: pastDueSubs.data.length,
-        total: activeSubs.data.length + canceledSubs.data.length + pastDueSubs.data.length,
+        total: activeSubs.data.length + pastDueSubs.data.length,
       };
     } catch {}
 

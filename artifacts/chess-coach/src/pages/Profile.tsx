@@ -961,7 +961,6 @@ function AdminTicker() {
             <div className="text-[10px] text-muted-foreground/60 mt-0.5 space-y-0.5">
               {stats.subscriptions.active > 0 && <p className="text-emerald-400">{stats.subscriptions.active} paid</p>}
               {stats.subscriptions.trialing > 0 && <p className="text-blue-400">{stats.subscriptions.trialing} trial</p>}
-              {stats.subscriptions.canceled > 0 && <p className="text-red-400">{stats.subscriptions.canceled} expired</p>}
               {stats.subscriptions.pastDue > 0 && <p className="text-orange-400">{stats.subscriptions.pastDue} past due</p>}
             </div>
           </div>
