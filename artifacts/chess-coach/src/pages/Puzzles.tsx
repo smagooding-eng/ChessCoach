@@ -230,8 +230,12 @@ export function Puzzles() {
           }
         } else {
           setFeedback('wrong');
-          setState('wrong');
-          fetchStats();
+          const resetFen = game.fen();
+          setTimeout(() => {
+            setGame(new Chess(resetFen));
+            setLastMove(null);
+            setFeedback(null);
+          }, 1200);
         }
       }).catch(() => {});
 

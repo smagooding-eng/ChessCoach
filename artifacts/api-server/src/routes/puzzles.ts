@@ -312,11 +312,11 @@ router.post("/puzzles/:id/solve", requireAuth, async (req: Request, res: Respons
       opponentMove = solutionMoves[idx + 1];
     }
 
-    if (!isCorrect || puzzleSolved) {
+    if (puzzleSolved) {
       await db.insert(puzzleAttemptsTable).values({
         userId: req.user!.id,
         puzzleId,
-        solved: isCorrect && puzzleSolved,
+        solved: true,
         timeMs: timeMs ?? null,
       });
     }
