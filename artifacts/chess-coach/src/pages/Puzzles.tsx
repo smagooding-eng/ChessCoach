@@ -62,6 +62,7 @@ export function Puzzles() {
   const feedbackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [explanation, setExplanation] = useState<string | null>(null);
   const [loadingExplanation, setLoadingExplanation] = useState(false);
+  const seenPuzzleIds = useRef<number[]>([]);
 
   const fetchStats = useCallback(async () => {
     try {
@@ -85,7 +86,8 @@ export function Puzzles() {
     setLoadingExplanation(false);
 
     try {
-      const res = await apiFetch('/api/puzzles/next');
+      const excludeParam = seenPuzzleIds.current.length > 0 ? `?exclude=${seenPuzzleIds.current.join(',')}` : '';
+      const res = await apiFetch(`/api/puzzles/next${excludeParam}`);
       if (res.status === 403) {
         const data = await res.json();
         if (data.error === 'daily_limit') {
@@ -102,6 +104,7 @@ export function Puzzles() {
       setPuzzle(data.puzzle);
       setDaily(data.daily);
       setSolutionMoves(data.puzzle.moves ? data.puzzle.moves.split(' ') : []);
+      seenPuzzleIds.current.push(data.puzzle.id);
 
       const chess = new Chess(data.puzzle.fen);
       setGame(chess);

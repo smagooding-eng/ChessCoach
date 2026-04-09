@@ -76,12 +76,20 @@ router.get("/puzzles/next", requireAuth, async (req: Request, res: Response) => 
 
     const attemptedIds = attempted.map(a => a.puzzleId);
 
+    const excludeParam = typeof req.query.exclude === "string" ? req.query.exclude : "";
+    const sessionExclude = excludeParam
+      .split(",")
+      .map(s => parseInt(s.trim()))
+      .filter(n => !isNaN(n));
+
+    const allExcluded = [...new Set([...attemptedIds, ...sessionExclude])];
+
     let puzzle;
-    if (attemptedIds.length > 0) {
+    if (allExcluded.length > 0) {
       const result = await db
         .select()
         .from(puzzlesTable)
-        .where(sql`${puzzlesTable.id} NOT IN (${sql.join(attemptedIds.map(id => sql`${id}`), sql`, `)})`)
+        .where(sql`${puzzlesTable.id} NOT IN (${sql.join(allExcluded.map(id => sql`${id}`), sql`, `)})`)
         .orderBy(sql`RANDOM()`)
         .limit(1);
       puzzle = result[0];
