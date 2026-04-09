@@ -20,7 +20,7 @@ const PRIMARY_NAV = [
   { href: '/opponents', label: 'Opponent Scout',  icon: Swords },
   { href: '/games',     label: 'Games',           icon: History },
   { href: '/analysis',  label: 'Analysis',        icon: BrainCircuit },
-  { href: '/puzzles',   label: 'Puzzles',         icon: Puzzle },
+  { href: '/puzzles',   label: 'Puzzles',         icon: Puzzle, badge: 'BETA' },
   { href: '/lookup',    label: 'Game Lookup',     icon: Search },
   { href: '/play',      label: 'Play Local',      icon: Play },
 ];
