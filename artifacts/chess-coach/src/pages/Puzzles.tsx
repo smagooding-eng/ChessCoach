@@ -54,6 +54,7 @@ export function Puzzles() {
   const [lastMove, setLastMove] = useState<{ from: string; to: string } | null>(null);
   const [feedback, setFeedback] = useState<'correct' | 'wrong' | null>(null);
   const [showHint, setShowHint] = useState(false);
+  const [selectedSquare, setSelectedSquare] = useState<string | null>(null);
   const startTimeRef = useRef<number>(0);
   const [tab, setTab] = useState<'daily' | 'games'>('daily');
   const [gamePuzzles, setGamePuzzles] = useState<any[]>([]);
@@ -77,6 +78,7 @@ export function Puzzles() {
     setLastMove(null);
     setSolutionMoves([]);
     setCurrentMoveIndex(0);
+    setSelectedSquare(null);
 
     try {
       const res = await apiFetch('/api/puzzles/next');
@@ -180,17 +182,32 @@ export function Puzzles() {
   }, [puzzle?.fen]);
 
   const handlePieceDrop = useCallback(({ sourceSquare, targetSquare }: { piece: unknown; sourceSquare: string; targetSquare: string | null }): boolean => {
-    if (!game || !puzzle || state !== 'ready' || !targetSquare) return false;
+    if (!targetSquare) return false;
+    setSelectedSquare(null);
+    return tryMoveFromTo(sourceSquare, targetSquare);
+  }, [tryMoveFromTo]);
 
+  const legalTargets = useMemo(() => {
+    if (!selectedSquare || !game || state !== 'ready') return [];
+    try {
+      return game.moves({ square: selectedSquare as any, verbose: true }).map(m => m.to);
+    } catch {
+      return [];
+    }
+  }, [selectedSquare, game, state]);
+
+  const tryMoveFromTo = useCallback((from: string, to: string): boolean => {
+    if (!game || !puzzle || state !== 'ready') return false;
     try {
       const gameCopy = new Chess(game.fen());
-      const move = gameCopy.move({ from: sourceSquare, to: targetSquare, promotion: 'q' });
+      const move = gameCopy.move({ from, to, promotion: 'q' });
       if (!move) return false;
 
-      const uciMove = sourceSquare + targetSquare + (move.flags.includes('p') ? 'q' : '');
+      const uciMove = from + to + (move.flags.includes('p') ? 'q' : '');
 
       setGame(gameCopy);
-      setLastMove({ from: sourceSquare, to: targetSquare });
+      setLastMove({ from, to });
+      setSelectedSquare(null);
 
       apiFetch(`/api/puzzles/${puzzle.id}/solve`, {
         method: 'POST',
@@ -212,13 +229,13 @@ export function Puzzles() {
             setTimeout(() => {
               try {
                 const om = data.opponentMove;
-                const from = om.slice(0, 2);
-                const to = om.slice(2, 4);
+                const omFrom = om.slice(0, 2);
+                const omTo = om.slice(2, 4);
                 const promo = om.length > 4 ? om[4] : undefined;
                 const nextGame = new Chess(gameCopy.fen());
-                nextGame.move({ from, to, promotion: promo });
+                nextGame.move({ from: omFrom, to: omTo, promotion: promo });
                 setGame(nextGame);
-                setLastMove({ from, to });
+                setLastMove({ from: omFrom, to: omTo });
                 setCurrentMoveIndex(data.nextMoveIndex);
                 setFeedback(null);
               } catch {}
@@ -239,8 +256,38 @@ export function Puzzles() {
     }
   }, [game, puzzle, state, currentMoveIndex, fetchStats]);
 
-  const handleSquareClick = useCallback((_args: { square: string; piece: { pieceType: string } | null }) => {
-  }, []);
+  const handleSquareClick = useCallback(({ square, piece }: { square: string; piece: { pieceType: string } | null }) => {
+    if (state !== 'ready' || !game) return;
+
+    if (selectedSquare) {
+      if (square === selectedSquare) {
+        setSelectedSquare(null);
+        return;
+      }
+      if (legalTargets.includes(square)) {
+        tryMoveFromTo(selectedSquare, square);
+        return;
+      }
+      if (piece) {
+        const turn = game.turn();
+        const pieceColor = piece.pieceType[0].toLowerCase();
+        if (pieceColor === turn) {
+          setSelectedSquare(square);
+          return;
+        }
+      }
+      setSelectedSquare(null);
+      return;
+    }
+
+    if (piece) {
+      const turn = game.turn();
+      const pieceColor = piece.pieceType[0].toLowerCase();
+      if (pieceColor === turn) {
+        setSelectedSquare(square);
+      }
+    }
+  }, [state, game, selectedSquare, legalTargets, tryMoveFromTo]);
 
   const canDragPiece = useCallback(({ piece }: { piece: { pieceType: string } | null }) => {
     if (state !== 'ready' || !game || !piece) return false;
@@ -255,6 +302,15 @@ export function Puzzles() {
       styles[lastMove.from] = { background: 'rgba(255, 240, 80, 0.30)' };
       styles[lastMove.to] = { background: feedback === 'correct' ? 'rgba(80, 220, 100, 0.55)' : feedback === 'wrong' ? 'rgba(220, 80, 80, 0.55)' : 'rgba(255, 240, 80, 0.55)' };
     }
+    if (selectedSquare) {
+      styles[selectedSquare] = { background: 'rgba(100, 180, 255, 0.55)', borderRadius: '4px' };
+    }
+    for (const sq of legalTargets) {
+      styles[sq] = {
+        background: 'radial-gradient(circle, rgba(100,180,255,0.55) 28%, transparent 30%)',
+        ...(styles[sq] || {}),
+      };
+    }
     if (showHint && solutionMoves.length > currentMoveIndex) {
       const hintMove = solutionMoves[currentMoveIndex];
       const hintFrom = hintMove?.slice(0, 2);
@@ -263,7 +319,7 @@ export function Puzzles() {
       }
     }
     return styles;
-  }, [lastMove, feedback, showHint, solutionMoves, currentMoveIndex]);
+  }, [lastMove, feedback, selectedSquare, legalTargets, showHint, solutionMoves, currentMoveIndex]);
 
   const themeLabels: Record<string, string> = {
     'fork': 'Fork',
