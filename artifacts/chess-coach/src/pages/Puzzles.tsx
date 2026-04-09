@@ -20,6 +20,7 @@ interface PuzzleData {
   themes: string[];
   source: string;
   lichessId?: string;
+  explanation?: string | null;
 }
 
 interface DailyInfo {
@@ -215,7 +216,9 @@ export function Puzzles() {
           setFeedback('correct');
           setState('correct');
           fetchStats();
-          if (puzzle) {
+          if (puzzle?.explanation) {
+            setExplanation(puzzle.explanation);
+          } else if (puzzle) {
             setLoadingExplanation(true);
             apiFetch(`/api/puzzles/${puzzle.id}/explain`, { method: 'POST' })
               .then(async (er) => {

@@ -64,8 +64,12 @@ initStripe().catch((err) => {
   logger.error({ err }, 'Stripe init failed after server start');
 });
 
-import("./lib/puzzleSeed").then(({ seedPuzzlesIfNeeded }) => {
-  seedPuzzlesIfNeeded().catch((err) => {
+import("./lib/puzzleSeed").then(({ seedPuzzlesIfNeeded, preGenerateExplanations }) => {
+  seedPuzzlesIfNeeded().then(() => {
+    preGenerateExplanations().catch((err: any) => {
+      logger.error({ err }, "Puzzle explanation pre-generation failed");
+    });
+  }).catch((err: any) => {
     logger.error({ err }, "Puzzle seed failed");
   });
 }).catch(() => {});

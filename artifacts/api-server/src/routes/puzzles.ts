@@ -143,6 +143,7 @@ router.get("/puzzles/next", requireAuth, async (req: Request, res: Response) => 
         themes: puzzle.themes?.split(",").filter(Boolean) ?? [],
         source: puzzle.source,
         lichessId: puzzle.lichessId,
+        explanation: puzzle.explanation ?? null,
       },
       daily: {
         used: todayCount,
@@ -376,44 +377,17 @@ router.post("/puzzles/:id/explain", requireAuth, async (req: Request, res: Respo
       return;
     }
 
-    const OpenAI = (await import("openai")).default;
-    const openai = new OpenAI({
-      baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
-      apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-    });
-
-    const solutionMoves = puzzle.moves.split(" ");
-    const themes = puzzle.themes?.split(",").filter(Boolean) ?? [];
-
-    const chess = new Chess(puzzle.fen);
-    const sanMoves: string[] = [];
-    for (const uci of solutionMoves) {
-      try {
-        const from = uci.slice(0, 2);
-        const to = uci.slice(2, 4);
-        const promo = uci.length > 4 ? uci[4] : undefined;
-        const m = chess.move({ from, to, promotion: promo });
-        if (m) sanMoves.push(m.san);
-      } catch { break; }
+    if (puzzle.explanation) {
+      res.json({ explanation: puzzle.explanation });
+      return;
     }
 
-    const completion = await openai.chat.completions.create({
-      model: "gpt-5-mini",
-      max_completion_tokens: 200,
-      messages: [
-        {
-          role: "system",
-          content: "You are a chess coach. Give a brief, clear explanation (2-3 sentences max) of why the puzzle solution moves are the best. Focus on the tactical or strategic idea. Use plain language suitable for intermediate players. Do not repeat the moves, just explain the idea.",
-        },
-        {
-          role: "user",
-          content: `Position (FEN): ${puzzle.fen}\nSolution moves: ${sanMoves.join(", ")}\nThemes: ${themes.join(", ")}\nRating: ${puzzle.rating}\n\nExplain briefly why these moves are best.`,
-        },
-      ],
-    });
-
-    const explanation = completion.choices[0]?.message?.content?.trim() ?? "";
-    res.json({ explanation });
+    const { generatePuzzleExplanation } = await import("../lib/puzzleSeed");
+    const explanation = await generatePuzzleExplanation(puzzle);
+    if (explanation) {
+      await db.update(puzzlesTable).set({ explanation }).where(eq(puzzlesTable.id, puzzleId));
+    }
+    res.json({ explanation: explanation ?? "" });
   } catch (err: any) {
     req.log.error({ error: err.message }, "Failed to generate puzzle explanation");
     res.status(500).json({ error: "Failed to generate explanation" });

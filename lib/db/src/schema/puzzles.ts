@@ -10,6 +10,7 @@ export const puzzlesTable = pgTable("puzzles", {
   source: text("source").notNull().default("lichess"),
   gameId: integer("game_id"),
   moveNumber: integer("move_number"),
+  explanation: text("explanation"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
