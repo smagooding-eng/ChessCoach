@@ -230,7 +230,7 @@ export async function seedPuzzlesIfNeeded(minCount = 15) {
       headers: { Accept: "application/json" },
     });
     if (res.ok) {
-      const data = await res.json();
+      const data: any = await res.json();
       if (data.puzzle?.fen && data.puzzle?.solution?.length) {
         const fen = data.puzzle.fen;
         const chess = new Chess(fen);

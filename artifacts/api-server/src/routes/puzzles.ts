@@ -272,7 +272,7 @@ router.get("/puzzles/my-puzzles", requireAuth, async (req: Request, res: Respons
 
 router.get("/puzzles/:id", requireAuth, async (req: Request, res: Response) => {
   try {
-    const puzzleId = parseInt(req.params.id);
+    const puzzleId = parseInt(req.params.id as string);
     if (isNaN(puzzleId)) {
       res.status(400).json({ error: "Invalid puzzle ID" });
       return;
@@ -304,7 +304,7 @@ router.get("/puzzles/:id", requireAuth, async (req: Request, res: Response) => {
 
 router.post("/puzzles/:id/solve", requireAuth, async (req: Request, res: Response) => {
   try {
-    const puzzleId = parseInt(req.params.id);
+    const puzzleId = parseInt(req.params.id as string);
     const { move, moveIndex, timeMs } = req.body;
 
     if (!move || typeof move !== "string") {
@@ -365,7 +365,7 @@ router.post("/puzzles/:id/solve", requireAuth, async (req: Request, res: Respons
 
 router.post("/puzzles/:id/explain", requireAuth, async (req: Request, res: Response) => {
   try {
-    const puzzleId = parseInt(req.params.id);
+    const puzzleId = parseInt(req.params.id as string);
     const [puzzle] = await db
       .select()
       .from(puzzlesTable)
@@ -481,7 +481,7 @@ async function fetchAndStoreLichessPuzzle() {
       headers: { Accept: "application/json" },
     });
     if (!res.ok) return null;
-    const data = await res.json();
+    const data: any = await res.json();
 
     if (!data.puzzle?.fen || !data.puzzle?.solution?.length) return null;
 
