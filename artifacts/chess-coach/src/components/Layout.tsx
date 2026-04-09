@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'wouter';
 import { useUser } from '@/hooks/use-user';
 import { useChessPlayer } from '@/hooks/use-chess-player';
-import { LayoutDashboard, Import, History, BrainCircuit, GraduationCap, Swords, BookOpen, LogOut, MoreHorizontal, ChevronRight, Bot, Crown, Trophy, Play, Search, Download } from 'lucide-react';
+import { LayoutDashboard, Import, History, BrainCircuit, GraduationCap, Swords, BookOpen, LogOut, MoreHorizontal, ChevronRight, Bot, Crown, Trophy, Play, Search, Download, Puzzle } from 'lucide-react';
 import { usePwaInstall } from '@/hooks/use-pwa-install';
 import { cn } from '@/lib/utils';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -20,6 +20,7 @@ const PRIMARY_NAV = [
   { href: '/opponents', label: 'Opponent Scout',  icon: Swords },
   { href: '/games',     label: 'Games',           icon: History },
   { href: '/analysis',  label: 'Analysis',        icon: BrainCircuit },
+  { href: '/puzzles',   label: 'Puzzles',         icon: Puzzle },
   { href: '/lookup',    label: 'Game Lookup',     icon: Search },
   { href: '/play',      label: 'Play Local',      icon: Play },
 ];

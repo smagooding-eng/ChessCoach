@@ -10,6 +10,7 @@ import stripeRouter from "./stripe";
 import adminRouter from "./admin";
 import emailRouter from "./email";
 import storageRouter from "./storage";
+import puzzlesRouter from "./puzzles";
 import { requirePremium } from "../middlewares/authMiddleware";
 import { db, pageViewsTable } from "@workspace/db";
 
@@ -22,6 +23,7 @@ router.use(stripeRouter);
 router.use(adminRouter);
 router.use(emailRouter);
 router.use("/storage", storageRouter);
+router.use(puzzlesRouter);
 
 router.post("/track", async (req: Request, res: Response) => {
   try {

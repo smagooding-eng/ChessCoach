@@ -1,155 +1,58 @@
-# Workspace
+# Overview
 
-## Overview
+ChessScout.net is a full-stack chess analysis platform designed to help players improve by leveraging AI. It imports games from chess.com, identifies patterns and weaknesses across a user's entire game history using AI, and generates personalized courses. The platform aims to provide a comprehensive and interactive learning experience, making advanced chess analysis accessible to a wide audience.
 
-ChessScout.net - A full-stack chess analysis platform that imports games from chess.com, analyzes patterns across all your games using AI to identify weaknesses, and generates personalized courses to help you improve.
+# User Preferences
 
-## Stack
+I want iterative development.
+I prefer detailed explanations.
+I want to be asked before making major changes.
+I prefer to use simple language.
+I like functional programming.
+I do not want changes to the folder `artifacts/replit-auth-web/`.
+I want to ensure all background job types (review, analysis, scout) have stale-job recovery: pending jobs older than 5-10 minutes should be auto-expired to prevent stuck polling after server crashes.
+All status endpoints must enforce user ownership for IDOR protection.
 
-- **Monorepo tool**: pnpm workspaces
-- **Node.js version**: 24
-- **Package manager**: pnpm
-- **TypeScript version**: 5.9
-- **API framework**: Express 5
-- **Database**: PostgreSQL + Drizzle ORM
-- **Validation**: Zod (`zod/v4`), `drizzle-zod`
-- **API codegen**: Orval (from OpenAPI spec)
-- **Build**: esbuild (CJS bundle)
-- **AI**: OpenAI via Replit AI Integrations (gpt-5.2 for player analysis, gpt-4o for game review, gpt-audio for TTS narration)
-- **Engine**: Local Stockfish 17 binary (installed via nix) for move evaluation. Spawned as persistent child process via UCI protocol (hash=256MB, threads=2), evaluates ALL positions at depth 20 with MultiPV 2. `evaluateAllPositions()` in `engineAnalysis.ts` runs sequential evals with single `ucinewgame` per batch. `sendAndWait` tracks all pending timers in `pendingTimers[]` and cancels them via `doResolve()`/`clearTimers()` to prevent stale timeouts from corrupting later evaluations. Classification uses `classifyFromWinPctLoss()` with win% loss thresholds (not raw centipawn) aligned to chess.com: ≤2% excellent, ≤5% good, ≤12% inaccuracy, ≤35% mistake, >35% blunder. "Already decided" filter (playerWinPctBefore <10% or >90%) caps blunders→mistakes, mistakes→inaccuracies. `postProcessReview` iterates over ALL original moves (not just GPT output). Accuracy uses depth-20-adjusted CAPS formula: `103.1668 * exp(-0.065 * avgWinPctLoss) - 3.1668` (constant 0.065 calibrated for depth 20 vs original 0.04354 for depth 25+). Backend converts centipawn evals to win% via `winPct(cp) = 50 + 50*(2/(1+exp(-0.00368208*cp))-1)`, sends per-move win% loss (0-50 scale) in `cpLoss` field. Game Rating uses piecewise-linear anchor table matching chess.com's scale. Every move gets `engineAvailable: true`. New `analyzeGamePgn()` endpoint for public PGN analysis (Game Lookup).
-- **Object Storage**: Google Cloud Storage via Replit sidecar (email image uploads)
-- **Frontend**: React + Vite + Tailwind CSS + Recharts
+# System Architecture
 
-## Features
+## UI/UX Decisions
 
-1. **Import Games**: Enter chess.com username and fetch games from the past N months
-2. **Game Replay**: Interactive chess board with move-by-move navigation (first/prev/next/last/auto-play), move quality badges, engine eval bar. Game reviews run as background jobs (type="review" in `background_jobs` table, `targetUsername` stores game ID) — navigating away won't lose progress; page resumes polling on return. All background job types (review, analysis, scout) have stale-job recovery: pending jobs older than 5-10 minutes are auto-expired to prevent stuck polling after server crashes. Status endpoints enforce user ownership (IDOR protection).
-3. **AI Analysis** (Premium): Analyzes up to 50 games using GPT to identify weaknesses across 6 categories. Jobs persist in `background_jobs` DB table — navigating away won't lose progress; page resumes polling or shows results on return.
-4. **Weakness Report**: Clickable cards → Weakness Detail page (`/analysis/:id`) with AI patterns, related games, related courses
-5. **Performance Stats**: Win rate, opening stats (bar chart), time control breakdown, win/loss/draw pie chart
-6. **Personalized Courses** (Premium): AI-generated courses with 4-5 annotated PGN lessons derived from the player's actual games (not generic openings); generates by appending (not replacing) to preserve progress. Lessons start 5 half-moves before the mistake using FEN headers, with [MISTAKE] markers for board/move-list highlighting. Server-side `reconstructPgnFromGames()` matches AI-described mistakes to actual game PGNs for legal-move validation and returns `{ pgn, fixPgn, drillFen }`. Each lesson also has a `fixExamplePgn` column — a second PGN showing context moves → correct move (`[FIX]` marker) → best continuation. Frontend `parsePgnSteps()` injects a fix step from `drillExpectedMove` after the mistake when no explicit [FIX] marker exists. When user navigates to "The Fix" step in LessonContentStepper, LessonBoardPlayer switches to display the fix PGN line (fixExamplePgn → frontend fallback `buildFrontendFixPgn` → regular pgn). Fallback chain: `tryPartialPgnParse` → `buildStepsFromContent` (with target-square highlighting for illegal moves) → single FEN step.
-7. **Endgame Training** (Premium) (`/endgames`): Three tabs — Checkmate Patterns (back rank, smothered, etc.), Essential Endgames (K+P, K+R, Lucena, Philidor, etc.), and Your Endgame Mistakes (personalized from actual games). Each generates a full course with interactive board, drills, and mistake highlighting.
-8. **Interactive Course Viewer**: Sequential lesson mode, LessonBoardPlayer component, "Complete & Next" auto-advance. Chess.com-inspired redesign with commentary bubble above board, horizontal scrollable move strip, green pill tabs, big green Play/Next button.
-9. **Opponent Scout** (Premium) (`/opponents`): Enter any chess.com username — fetches their recent games, runs full AI analysis, shows their weaknesses and favourite openings. Results persist in `background_jobs` DB table — navigating away won't lose progress; page restores results or resumes polling on return. Includes "Challenge on Chess.com" button linking to `chess.com/play/online/new?opponent=`.
-10. **Practice Bots** (`/practice`): 8 AI bots (Tommy 400 → Dr. Fischer 2000) with human names/avatars, client-side minimax engine, piece-square tables, configurable depth/blunder rate. Live move analysis shows quality ratings (brilliant/excellent/good/inaccuracy/mistake/blunder), pros/cons, best move suggestion, and evaluation bar after every move.
-11. **Local PvP** (`/play`): Pass-and-play chess against a friend on the same device with optional timer (1/3/5/10/15/30 min or untimed), move list, resign buttons, and game result display.
-12. **ELO-Based Improvement Tips**: Analysis page shows tier-specific tips based on average rating with progress bar to next tier
-13. **Head-to-Head Search**: Games page has H2H toggle to filter games against a specific opponent with W/D/L summary
-14. **Game Lookup** (`/lookup`): Look up games between any two Chess.com players. Fetches last 6 months of games from Chess.com public API, filters for H2H games, shows game list with results/ratings/openings. Click any game to open full replay viewer with board, move-by-move navigation, and client-side analysis (move quality classification, accuracy scores, turning point detection). No login to Chess.com required — uses public API.
-11. **Navigation Hierarchy**: Primary nav (sidebar + mobile bottom bar): Home, Opponent Scout, Games, Analysis, Game Lookup, Play Local, Practice Bots, Import. Secondary nav (with BETA badges): Courses, Endgames, Openings. Mobile bottom bar shows first 4 primary items + "More" sheet for the rest. Dashboard features prominent Opponent Scout card, expanded Quick Actions (Scout, Lookup, Play, Bots, Import, Analysis), and "Games Reviewed" stat.
-16. **Chess.com-Inspired Theme**: Full dark brown/green palette (`#262421` bg, `#302e2b` cards, `#81b64c` green accents). Dashboard, Layout sidebar, bottom nav, and course viewer all use consistent chess.com styling with inline style constants rather than Tailwind theme vars for precise color control.
-12. **Global UserContext**: `src/context/UserContext.tsx` — single source of truth for auth state, no per-component useState drift
-13. **Authentication**: Email/password + Google OAuth login, dual auth: session cookies (SameSite=None for cross-origin) + Bearer token fallback (stored in localStorage as `chess_coach_token`). Token returned from login/register endpoints and via URL hash from Google OAuth callback. `getSessionId()` in auth.ts checks Authorization header first, then cookies.
-14. **Stripe Subscriptions**: ChessScout Pro with $1/week and $4/month plans, 3-day free trial, Stripe Checkout + Customer Portal
-15. **Premium Gating**: AI Analysis, Courses, TTS, and Opponent Scout gated behind subscription via `<PremiumGate>` component
-18. **Email Integration**: Resend-powered email service (`src/lib/email.ts`). Admin can send single emails, broadcast to all users, or send test emails. Admin email compose panel in Profile page AdminTicker. Welcome email HTML template included. Uses `RESEND_API_KEY` env var (lazy-initialized). From address configurable via `RESEND_FROM_EMAIL` env var (defaults to `onboarding@resend.dev`).
-17. **PWA Support**: Installable as a Progressive Web App. manifest.json, service worker (sw.js) with network-first caching, 192/512px PNG icons, install button in sidebar/toolbar (desktop + mobile). Uses `usePwaInstall` hook to capture `beforeinstallprompt` and show a green download icon that triggers the native install prompt. Apple meta tags for iOS Add to Home Screen.
+The platform features a Chess.com-inspired theme with a dark brown/green palette (`#262421` background, `#302e2b` cards, `#81b64c` green accents). Consistent styling is applied across the dashboard, sidebar, bottom navigation, and course viewer using inline style constants for precise color control. The interface includes interactive chess boards with drag-and-drop functionality, move quality badges, engine evaluation bars, and a sequential lesson mode with a "Complete & Next" auto-advance feature. Commentary bubbles above the board and a horizontal scrollable move strip enhance the learning experience.
 
-## Structure
+## Technical Implementations
 
-```text
-artifacts-monorepo/
-├── artifacts/
-│   ├── api-server/         # Express API server
-│   └── chess-coach/        # React + Vite frontend
-├── lib/
-│   ├── api-spec/           # OpenAPI spec + Orval codegen config
-│   ├── api-client-react/   # Generated React Query hooks
-│   ├── api-zod/            # Generated Zod schemas from OpenAPI
-│   ├── replit-auth-web/    # (unused, kept for compatibility)
-│   └── db/                 # Drizzle ORM schema + DB connection
-│       └── src/schema/
-│           ├── games.ts    # Chess games table
-│           ├── weaknesses.ts # Identified weaknesses
-│           ├── courses.ts  # Courses + lessons tables
-│           └── auth.ts     # Users + sessions tables (Stripe fields)
-├── scripts/                # Utility scripts (seed-products.ts)
-```
+The project is structured as a monorepo using pnpm workspaces, targeting Node.js 24 and TypeScript 5.9. The backend is built with Express 5, utilizing PostgreSQL and Drizzle ORM for data persistence. Zod is used for validation. API codegen is handled by Orval from an OpenAPI specification. The frontend is a React application built with Vite and styled using Tailwind CSS, with Recharts for data visualization.
 
-## API Routes
+## Feature Specifications
 
-- `POST /api/games/import` — Import games from chess.com
-- `GET /api/games` — List all imported games
-- `GET /api/games/:id` — Get single game
-- `GET /api/games/:id/replay` — Get game replay data with parsed moves
-- `POST /api/analysis/analyze` — Run AI analysis on all games
-- `GET /api/analysis/weaknesses` — Get weakness report
-- `GET /api/analysis/summary` — Get performance summary stats
-- `GET /api/analysis/weaknesses/:id` — Get weakness detail with related games + matching courses
-- `GET /api/courses` — List personalized courses
-- `POST /api/courses/generate` — Generate AI courses from weaknesses
-- `GET /api/courses/:id` — Get course with lessons
-- `PATCH /api/courses/:id/progress` — Update lesson completion
-- `POST /api/courses/endgame/generate-start` — Start endgame course generation (type: checkmate_patterns | essential_endgames | personal_endgames)
-- `GET /api/courses/endgame/generate-status/:jobId` — Poll endgame generation progress
-- `GET /api/courses/endgame` — List endgame courses for a user
-- `POST /api/auth/register` — Register with email/password (+ optional firstName, chesscomUsername)
-- `POST /api/auth/login` — Login with email/password
-- `GET /api/auth/google` — Initiate Google OAuth login
-- `GET /api/auth/google/callback` — Google OAuth callback
-- `POST /api/auth/logout` — Logout and destroy session
-- `GET /api/auth/user` — Get current authenticated user
-- `POST /api/auth/update-profile` — Update user profile (chesscomUsername, firstName)
-- `GET /api/stripe/products` — List available subscription products
-- `GET /api/stripe/config` — Get Stripe publishable key
-- `POST /api/stripe/checkout` — Create Stripe Checkout session
-- `GET /api/stripe/subscription` — Get current user's subscription status
-- `POST /api/stripe/portal` — Create Stripe Customer Portal session
-- `POST /api/track` — Track page view with visitorId for unique visitor counting (public, no auth required)
-- `GET /api/admin/stats` — Admin stats: unique visitors, page views, user count, active subscriptions
-- `GET /api/admin/users` — Admin: list all registered users
-- `POST /api/admin/email/send` — Admin: send email to a single recipient
-- `POST /api/admin/email/broadcast` — Admin: broadcast email to all users or specific list
-- `POST /api/admin/email/test` — Admin: send test email to yourself
+**Core Features:**
+- **Game Import & Replay**: Users can import games from chess.com, which are then available for interactive replay with move-by-move navigation and engine evaluations. Game reviews run as background jobs.
+- **AI Analysis (Premium)**: GPT-powered analysis identifies weaknesses across games, generating a weakness report linked to specific game patterns and related courses.
+- **Personalized Courses (Premium)**: AI-generated courses with annotated PGN lessons derived from the player's actual games, focusing on identified weaknesses. Lessons include fix examples and interactive drills.
+- **Endgame Training (Premium)**: Comprehensive endgame courses covering checkmate patterns, essential endgames, and personalized lessons from user mistakes.
+- **Opponent Scout (Premium)**: Analyze any chess.com username to identify their weaknesses and opening preferences.
+- **Practice Bots**: Eight AI bots with configurable difficulty, offering live move analysis and quality ratings.
+- **Local PvP**: Pass-and-play chess on the same device with optional timers.
+- **Game Lookup**: Search and replay games between any two Chess.com players using the public API.
+- **Puzzles**: Interactive puzzle trainer with Lichess database puzzles and puzzles generated from user's analyzed games. Features daily limit (5/day free, unlimited Pro), stepwise move validation, rating/theme display, streak tracking, and accuracy stats. DB tables: `puzzles` (id, lichessId, fen, moves, rating, themes, source, gameId) and `puzzle_attempts` (id, userId varchar, puzzleId, solved, timeMs). API: GET /api/puzzles/next, POST /api/puzzles/:id/solve (stepwise with moveIndex), GET /api/puzzles/stats, GET /api/puzzles/my-puzzles, POST /api/puzzles/generate-from-games.
+- **Performance Stats**: Track win rates, opening statistics, and time control breakdowns.
 
-## TypeScript & Composite Projects
+**System Design Choices:**
+- **Authentication**: Supports email/password and Google OAuth, using session cookies and Bearer tokens.
+- **Subscription Management**: Integrates Stripe for ChessScout Pro subscriptions, including a free trial and premium feature gating.
+- **Email Service**: Uses Resend for transactional and broadcast emails, including welcome emails.
+- **PWA Support**: The application is installable as a Progressive Web App, featuring a manifest, service worker for caching, and install prompts.
+- **Global State Management**: `UserContext.tsx` serves as a single source of truth for authentication state.
+- **Error Handling**: Per-route `ErrorBoundary` for protected pages, with a global unhandled rejection handler to suppress transient errors.
+- **API Design**: RESTful API with clear endpoints for games, analysis, courses, authentication, and administrative tasks.
 
-Every package extends `tsconfig.base.json` which sets `composite: true`. The root `tsconfig.json` lists all packages as project references.
+# External Dependencies
 
-## Root Scripts
-
-- `pnpm run build` — runs `typecheck` first, then recursively runs `build` in all packages
-- `pnpm run typecheck` — runs `tsc --build --emitDeclarationOnly` using project references
-
-## Key Packages
-
-### `artifacts/api-server` (`@workspace/api-server`)
-
-- Entry: `src/index.ts`
-- App setup: `src/app.ts`
-- Routes: `src/routes/` (games, analysis, courses, health, tts)
-- Libs: `src/lib/chesscom.ts` (chess.com API + PGN parser), `src/lib/openaiAnalysis.ts` (AI analysis + course generation)
-
-### `artifacts/chess-coach` (`@workspace/chess-coach`)
-
-- React frontend with pages: Setup, Dashboard, Import, Games, GameReplay, Analysis, Courses, CourseDetail, Endgames, Openings, OpeningDetail, OpponentAnalysis, PracticeBots
-- ChessBoard component renders positions from FEN strings with Unicode pieces, supports drag-and-drop + click-to-move
-- Uses recharts for performance charts
-- QueryClient configured: retry=1, refetchOnWindowFocus=false, staleTime=30s
-- Per-route ErrorBoundary wraps each protected page (fallback navigates to parent route via SPA routing)
-- Global unhandledrejection handler suppresses transient errors (AbortError, network failures, 5xx ApiErrors) from triggering runtime error overlay
-
-### `lib/db` (`@workspace/db`)
-
-- `games` table: stores PGN, metadata, result, opening, rating
-- `weaknesses` table: AI-identified weaknesses per username
-- `courses` + `lessons` tables: personalized course content
-
-Production migrations handled by Replit when publishing. In development: `pnpm --filter @workspace/db run push`.
-
-## Vercel Deployment
-
-The project includes `vercel.json` for deploying the frontend to Vercel as a static site.
-
-### Setup
-1. Connect your GitHub repo to Vercel
-2. The `vercel.json` configures the build command, output directory, and SPA rewrites automatically
-3. **Required env var**: Set `VITE_API_URL` in Vercel's environment variables to your Replit-published API URL (e.g. `https://your-app.replit.app`)
-4. The API server runs on Replit — publish the app on Replit first so the API is available
-5. CORS is enabled on the API server (allows all origins)
-
-### How API routing works
-- On Replit (dev): Vite proxy forwards `/api/*` to `localhost:8080`
-- On Replit (published): Platform routes `/api/*` to the API server
-- On Vercel: `VITE_API_URL` env var tells the frontend where to send API requests; the `apiFetch()` helper (`src/lib/api.ts`) prepends this base URL to all `/api/*` calls
-- The generated API client hooks (`@workspace/api-client-react`) use `setBaseUrl()` from `customFetch` for the same purpose
+- **AI**: OpenAI (gpt-5.2 for player analysis, gpt-4o for game review, gpt-audio for TTS narration)
+- **Chess Engine**: Local Stockfish 17 binary (via nix) for move evaluation.
+- **Object Storage**: Google Cloud Storage via Replit sidecar for email image uploads.
+- **Database**: PostgreSQL (managed by Replit for production).
+- **Payment Gateway**: Stripe for subscriptions and customer portal.
+- **Email Service**: Resend for email delivery.
+- **Chess.com API**: For importing games and looking up player data.
+- **Replit AI Integrations**: For accessing OpenAI services.

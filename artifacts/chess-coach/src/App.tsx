@@ -72,6 +72,7 @@ import { LocalPlay } from "@/pages/LocalPlay";
 import { GameLookup } from "@/pages/GameLookup";
 import { Subscription } from "@/pages/Subscription";
 import { Profile } from "@/pages/Profile";
+import { Puzzles } from "@/pages/Puzzles";
 import NotFound from "@/pages/not-found";
 import { Layout } from "@/components/Layout";
 import { OnboardingWizard, useOnboardingCheck } from "@/components/OnboardingWizard";
@@ -139,6 +140,7 @@ const PLocalPlay     = () => <ProtectedRoute component={LocalPlay} />;
 const PGameLookup    = () => <ProtectedRoute component={GameLookup} />;
 const PSubscription  = () => <ProtectedRoute component={Subscription} />;
 const PProfile       = () => <ProtectedRoute component={Profile} />;
+const PPuzzles       = () => <ProtectedRoute component={Puzzles} />;
 
 function getVisitorId(): string {
   const key = 'chess_coach_visitor_id';
@@ -190,6 +192,7 @@ function Router() {
       <Route path="/practice"        component={PPracticeBots} />
       <Route path="/play"            component={PLocalPlay} />
       <Route path="/lookup"          component={PGameLookup} />
+      <Route path="/puzzles"          component={PPuzzles} />
       <Route path="/subscription"    component={PSubscription} />
       <Route path="/profile"          component={PProfile} />
 
