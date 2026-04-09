@@ -181,21 +181,6 @@ export function Puzzles() {
     }
   }, [puzzle?.fen]);
 
-  const handlePieceDrop = useCallback(({ sourceSquare, targetSquare }: { piece: unknown; sourceSquare: string; targetSquare: string | null }): boolean => {
-    if (!targetSquare) return false;
-    setSelectedSquare(null);
-    return tryMoveFromTo(sourceSquare, targetSquare);
-  }, [tryMoveFromTo]);
-
-  const legalTargets = useMemo(() => {
-    if (!selectedSquare || !game || state !== 'ready') return [];
-    try {
-      return game.moves({ square: selectedSquare as any, verbose: true }).map(m => m.to);
-    } catch {
-      return [];
-    }
-  }, [selectedSquare, game, state]);
-
   const tryMoveFromTo = useCallback((from: string, to: string): boolean => {
     if (!game || !puzzle || state !== 'ready') return false;
     try {
@@ -255,6 +240,21 @@ export function Puzzles() {
       return false;
     }
   }, [game, puzzle, state, currentMoveIndex, fetchStats]);
+
+  const handlePieceDrop = useCallback(({ sourceSquare, targetSquare }: { piece: unknown; sourceSquare: string; targetSquare: string | null }): boolean => {
+    if (!targetSquare) return false;
+    setSelectedSquare(null);
+    return tryMoveFromTo(sourceSquare, targetSquare);
+  }, [tryMoveFromTo]);
+
+  const legalTargets = useMemo(() => {
+    if (!selectedSquare || !game || state !== 'ready') return [];
+    try {
+      return game.moves({ square: selectedSquare as any, verbose: true }).map(m => m.to);
+    } catch {
+      return [];
+    }
+  }, [selectedSquare, game, state]);
 
   const handleSquareClick = useCallback(({ square, piece }: { square: string; piece: { pieceType: string } | null }) => {
     if (state !== 'ready' || !game) return;
