@@ -112,17 +112,20 @@ export function ChessBoard({
     setFeedback(null);
   }
 
-  // Compute legal target squares for selected piece
-  const legalTargets = useMemo(() => {
-    if (!selectedSquare || !practiceMode) return [];
+  const legalMoveInfo = useMemo(() => {
+    if (!selectedSquare || !practiceMode) return { targets: [] as string[], captures: new Set<string>() };
     try {
       const chess = new Chess(position);
-      return chess.moves({ square: selectedSquare as Parameters<typeof chess.moves>[0]['square'], verbose: true })
-        .map((m) => m.to as string);
+      const moves = chess.moves({ square: selectedSquare as Parameters<typeof chess.moves>[0]['square'], verbose: true });
+      const targets = moves.map((m) => m.to as string);
+      const captures = new Set(moves.filter(m => m.captured).map(m => m.to as string));
+      return { targets, captures };
     } catch {
-      return [];
+      return { targets: [] as string[], captures: new Set<string>() };
     }
   }, [selectedSquare, position, practiceMode]);
+
+  const legalTargets = legalMoveInfo.targets;
 
   const tryMove = useCallback((from: string, to: string): boolean => {
     try {
@@ -222,12 +225,19 @@ export function ChessBoard({
       styles[selectedSquare] = { background: 'rgba(100, 180, 255, 0.55)', borderRadius: '4px' };
     }
 
-    // Legal move dots
     for (const sq of legalTargets) {
-      styles[sq] = {
-        background: 'radial-gradient(circle, rgba(100,180,255,0.55) 28%, transparent 30%)',
-        ...(styles[sq] || {}),
-      };
+      if (legalMoveInfo.captures.has(sq)) {
+        styles[sq] = {
+          background: 'radial-gradient(circle, transparent 55%, rgba(100,180,255,0.55) 56%)',
+          borderRadius: '50%',
+          ...(styles[sq] || {}),
+        };
+      } else {
+        styles[sq] = {
+          background: 'radial-gradient(circle, rgba(100,180,255,0.55) 28%, transparent 30%)',
+          ...(styles[sq] || {}),
+        };
+      }
     }
 
     // Practice feedback overrides
@@ -238,7 +248,7 @@ export function ChessBoard({
     }
 
     return styles;
-  }, [lastMove, selectedSquare, legalTargets, feedback, moveQuality]);
+  }, [lastMove, selectedSquare, legalTargets, legalMoveInfo, feedback, moveQuality]);
 
   const boardKeyRef = useRef(0);
 

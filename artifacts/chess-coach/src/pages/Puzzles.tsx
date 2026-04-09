@@ -60,6 +60,8 @@ export function Puzzles() {
   const [gamePuzzles, setGamePuzzles] = useState<any[]>([]);
   const [generatingFromGames, setGeneratingFromGames] = useState(false);
   const feedbackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [explanation, setExplanation] = useState<string | null>(null);
+  const [loadingExplanation, setLoadingExplanation] = useState(false);
 
   const fetchStats = useCallback(async () => {
     try {
@@ -79,6 +81,8 @@ export function Puzzles() {
     setSolutionMoves([]);
     setCurrentMoveIndex(0);
     setSelectedSquare(null);
+    setExplanation(null);
+    setLoadingExplanation(false);
 
     try {
       const res = await apiFetch('/api/puzzles/next');
@@ -208,6 +212,18 @@ export function Puzzles() {
           setFeedback('correct');
           setState('correct');
           fetchStats();
+          if (puzzle) {
+            setLoadingExplanation(true);
+            apiFetch(`/api/puzzles/${puzzle.id}/explain`, { method: 'POST' })
+              .then(async (er) => {
+                if (er.ok) {
+                  const ed = await er.json();
+                  setExplanation(ed.explanation);
+                }
+              })
+              .catch(() => {})
+              .finally(() => setLoadingExplanation(false));
+          }
         } else if (data.correct) {
           setFeedback('correct');
           if (data.opponentMove) {
@@ -251,14 +267,19 @@ export function Puzzles() {
     return tryMoveFromTo(sourceSquare, targetSquare);
   }, [tryMoveFromTo]);
 
-  const legalTargets = useMemo(() => {
-    if (!selectedSquare || !game || state !== 'ready') return [];
+  const legalMoveInfo = useMemo(() => {
+    if (!selectedSquare || !game || state !== 'ready') return { targets: [] as string[], captures: new Set<string>() };
     try {
-      return game.moves({ square: selectedSquare as any, verbose: true }).map(m => m.to);
+      const moves = game.moves({ square: selectedSquare as any, verbose: true });
+      const targets = moves.map(m => m.to);
+      const captures = new Set(moves.filter(m => m.captured).map(m => m.to));
+      return { targets, captures };
     } catch {
-      return [];
+      return { targets: [] as string[], captures: new Set<string>() };
     }
   }, [selectedSquare, game, state]);
+
+  const legalTargets = legalMoveInfo.targets;
 
   const handleSquareClick = useCallback(({ square, piece }: { square: string; piece: { pieceType: string } | null }) => {
     if (state !== 'ready' || !game) return;
@@ -310,10 +331,18 @@ export function Puzzles() {
       styles[selectedSquare] = { background: 'rgba(100, 180, 255, 0.55)', borderRadius: '4px' };
     }
     for (const sq of legalTargets) {
-      styles[sq] = {
-        background: 'radial-gradient(circle, rgba(100,180,255,0.55) 28%, transparent 30%)',
-        ...(styles[sq] || {}),
-      };
+      if (legalMoveInfo.captures.has(sq)) {
+        styles[sq] = {
+          background: 'radial-gradient(circle, transparent 55%, rgba(100,180,255,0.55) 56%)',
+          borderRadius: '50%',
+          ...(styles[sq] || {}),
+        };
+      } else {
+        styles[sq] = {
+          background: 'radial-gradient(circle, rgba(100,180,255,0.55) 28%, transparent 30%)',
+          ...(styles[sq] || {}),
+        };
+      }
     }
     if (showHint && solutionMoves.length > currentMoveIndex) {
       const hintMove = solutionMoves[currentMoveIndex];
@@ -323,7 +352,7 @@ export function Puzzles() {
       }
     }
     return styles;
-  }, [lastMove, feedback, selectedSquare, legalTargets, showHint, solutionMoves, currentMoveIndex]);
+  }, [lastMove, feedback, selectedSquare, legalTargets, legalMoveInfo, showHint, solutionMoves, currentMoveIndex]);
 
   const themeLabels: Record<string, string> = {
     'fork': 'Fork',
@@ -588,6 +617,23 @@ export function Puzzles() {
                     </button>
                   )}
                 </div>
+
+                {state === 'correct' && (
+                  <div className="mt-4 rounded-xl p-4" style={{ background: BG_CARD, border: '1px solid rgba(129,182,76,0.2)' }}>
+                    <div className="flex items-center gap-2 mb-2">
+                      <Lightbulb size={16} style={{ color: '#fbbf24' }} />
+                      <span className="text-sm font-bold" style={{ color: TEXT_LIGHT }}>Why this works</span>
+                    </div>
+                    {loadingExplanation ? (
+                      <div className="flex items-center gap-2">
+                        <Loader2 className="animate-spin" size={14} style={{ color: TEXT_MUTED }} />
+                        <span className="text-xs" style={{ color: TEXT_MUTED }}>Analyzing position...</span>
+                      </div>
+                    ) : explanation ? (
+                      <p className="text-sm leading-relaxed" style={{ color: TEXT_MUTED }}>{explanation}</p>
+                    ) : null}
+                  </div>
+                )}
               </>
             )}
 
