@@ -101,9 +101,23 @@ export function Puzzles() {
       const data = await res.json();
       setPuzzle(data.puzzle);
       setDaily(data.daily);
-      setSolutionMoves(data.puzzle.moves ? data.puzzle.moves.split(' ') : []);
+      const allMoves = data.puzzle.moves ? data.puzzle.moves.split(' ') : [];
+      setSolutionMoves(allMoves);
 
       const chess = new Chess(data.puzzle.fen);
+
+      if (allMoves.length > 0) {
+        const setupMove = allMoves[0];
+        const from = setupMove.slice(0, 2);
+        const to = setupMove.slice(2, 4);
+        const promo = setupMove.length > 4 ? setupMove[4] : undefined;
+        try {
+          chess.move({ from, to, promotion: promo });
+        } catch {}
+        setLastMove({ from, to });
+        setCurrentMoveIndex(1);
+      }
+
       setGame(chess);
       setState('ready');
       startTimeRef.current = Date.now();
@@ -179,7 +193,7 @@ export function Puzzles() {
     if (!puzzle?.fen) return 'white';
     try {
       const chess = new Chess(puzzle.fen);
-      return chess.turn() === 'w' ? 'white' : 'black';
+      return chess.turn() === 'w' ? 'black' : 'white';
     } catch {
       return 'white';
     }

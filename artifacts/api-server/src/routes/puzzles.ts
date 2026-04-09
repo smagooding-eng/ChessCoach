@@ -371,7 +371,7 @@ router.post("/puzzles/:id/explain", requireAuth, async (req: Request, res: Respo
 
     const completion = await openai.chat.completions.create({
       model: "gpt-5-mini",
-      max_tokens: 200,
+      max_completion_tokens: 200,
       messages: [
         {
           role: "system",
