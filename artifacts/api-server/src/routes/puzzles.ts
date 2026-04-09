@@ -114,6 +114,26 @@ router.get("/puzzles/next", requireAuth, async (req: Request, res: Response) => 
       return;
     }
 
+    try {
+      const validationChess = new Chess(puzzle.fen);
+      const firstMove = puzzle.moves.split(" ")[0];
+      const from = firstMove.slice(0, 2);
+      const to = firstMove.slice(2, 4);
+      const promo = firstMove.length > 4 ? firstMove[4] : undefined;
+      const result = validationChess.move({ from, to, promotion: promo });
+      if (!result) {
+        req.log.warn({ puzzleId: puzzle.id }, "Skipping invalid puzzle - first move illegal");
+        await db.delete(puzzlesTable).where(eq(puzzlesTable.id, puzzle.id));
+        res.redirect(307, `/api/puzzles/next${req.url.includes("?") ? "&" + req.url.split("?")[1] : ""}`);
+        return;
+      }
+    } catch (e) {
+      req.log.warn({ puzzleId: puzzle.id }, "Skipping invalid puzzle - validation error");
+      await db.delete(puzzlesTable).where(eq(puzzlesTable.id, puzzle.id));
+      res.redirect(307, `/api/puzzles/next${req.url.includes("?") ? "&" + req.url.split("?")[1] : ""}`);
+      return;
+    }
+
     res.json({
       puzzle: {
         id: puzzle.id,

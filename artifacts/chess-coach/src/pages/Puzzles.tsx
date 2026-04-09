@@ -347,15 +347,25 @@ export function Puzzles() {
         };
       }
     }
-    if (showHint && solutionMoves.length > currentMoveIndex) {
+    if (showHint && solutionMoves.length > currentMoveIndex && game) {
       const hintMove = solutionMoves[currentMoveIndex];
       const hintFrom = hintMove?.slice(0, 2);
+      const hintTo = hintMove?.slice(2, 4);
       if (hintFrom) {
-        styles[hintFrom] = { background: 'rgba(129, 182, 76, 0.6)', borderRadius: '50%' };
+        const piece = game.get(hintFrom as any);
+        if (piece && ((piece.color === 'w' && game.turn() === 'w') || (piece.color === 'b' && game.turn() === 'b'))) {
+          styles[hintFrom] = { background: 'rgba(129, 182, 76, 0.6)', borderRadius: '50%' };
+          if (hintTo) {
+            styles[hintTo] = {
+              background: 'radial-gradient(circle, rgba(129,182,76,0.5) 28%, transparent 30%)',
+              ...(styles[hintTo] || {}),
+            };
+          }
+        }
       }
     }
     return styles;
-  }, [lastMove, feedback, selectedSquare, legalTargets, legalMoveInfo, showHint, solutionMoves, currentMoveIndex]);
+  }, [lastMove, feedback, selectedSquare, legalTargets, legalMoveInfo, showHint, solutionMoves, currentMoveIndex, game]);
 
   const themeLabels: Record<string, string> = {
     'fork': 'Fork',
