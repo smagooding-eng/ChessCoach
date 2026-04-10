@@ -8,10 +8,12 @@ import { useLocation } from 'wouter';
 import { AnimatePresence, motion } from 'framer-motion';
 
 const BG_DARK = '#262421';
-const BG_CARD = '#302e2b';
+const BG_CARD = 'linear-gradient(180deg, #353230 0%, #2d2b28 100%)';
 const CHESSCOM_GREEN = '#81b64c';
 const TEXT_LIGHT = '#e8e6e3';
 const TEXT_MUTED = '#9e9b98';
+const CARD_SHADOW = '0 4px 16px rgba(0,0,0,0.25), 0 1px 4px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.05)';
+const CARD_BORDER = '1px solid rgba(255,255,255,0.08)';
 
 interface PuzzleData {
   id: number;
@@ -661,7 +663,7 @@ export function Puzzles() {
                   { label: 'Streak', value: stats.streak, icon: <Flame size={14} /> },
                   { label: 'Today', value: stats.todayCount, icon: <Zap size={14} /> },
                 ].map(s => (
-                  <div key={s.label} className="rounded-xl p-3 text-center" style={{ background: BG_CARD }}>
+                  <div key={s.label} className="rounded-xl p-3 text-center" style={{ background: BG_CARD, border: CARD_BORDER, boxShadow: CARD_SHADOW }}>
                     <div className="flex items-center justify-center gap-1 mb-1" style={{ color: CHESSCOM_GREEN }}>
                       {s.icon}
                     </div>

@@ -9,10 +9,13 @@ import { useChessPlayer } from '@/hooks/use-chess-player';
 
 const CHESSCOM_GREEN = '#81b64c';
 const BG_DARK = '#262421';
-const BG_CARD = '#302e2b';
+const BG_CARD = 'linear-gradient(180deg, #353230 0%, #2d2b28 100%)';
+const BG_CARD_FLAT = '#302e2b';
 const BG_CARD_HOVER = '#3a3733';
 const TEXT_LIGHT = '#e8e6e3';
 const TEXT_MUTED = '#9e9b98';
+const CARD_SHADOW = '0 4px 16px rgba(0,0,0,0.25), 0 1px 4px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.05)';
+const CARD_BORDER = '1px solid rgba(255,255,255,0.08)';
 
 const RESULT_COLORS: Record<string, { bg: string; text: string }> = {
   win: { bg: 'rgba(129,182,76,0.15)', text: CHESSCOM_GREEN },
@@ -49,8 +52,8 @@ export function Dashboard() {
   return (
     <div className="space-y-4 md:space-y-5">
 
-      <div style={{ background: BG_CARD, borderBottom: `1px solid rgba(255,255,255,0.06)` }}
-        className="p-4 md:p-5 md:rounded-xl">
+      <div style={{ background: BG_CARD, border: CARD_BORDER, boxShadow: CARD_SHADOW }}
+        className="p-4 md:p-5 rounded-xl">
         <div className="flex items-center gap-3">
           <div className="shrink-0 relative">
             {chessPlayer?.avatar
@@ -122,7 +125,7 @@ export function Dashboard() {
           { label: 'Avg Rating', value: Math.round(summary?.avgRating || 0) || '—', icon: <TrendingUp className="w-4 h-4" /> },
           { label: 'Games Reviewed', value: allGamesData?.games?.filter(g => g.reviewed).length ?? 0, icon: <Target className="w-4 h-4" /> },
         ].map((s) => (
-          <div key={s.label} className="rounded-lg p-3.5" style={{ background: BG_CARD }}>
+          <div key={s.label} className="rounded-lg p-3.5" style={{ background: BG_CARD, border: CARD_BORDER, boxShadow: CARD_SHADOW }}>
             <div className="flex items-center justify-between mb-2">
               <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: TEXT_MUTED }}>{s.label}</p>
               <span style={{ color: CHESSCOM_GREEN }}>{s.icon}</span>
@@ -217,7 +220,7 @@ export function Dashboard() {
             </div>
           </Link>
 
-          <div className="rounded-lg p-4 space-y-1" style={{ background: BG_CARD }}>
+          <div className="rounded-lg p-4 space-y-1" style={{ background: BG_CARD, border: CARD_BORDER, boxShadow: CARD_SHADOW }}>
             <p className="text-[10px] font-bold uppercase tracking-wider mb-2.5" style={{ color: TEXT_MUTED }}>Quick Actions</p>
             {[
               { href: '/opponents', label: 'Scout an Opponent', icon: <Swords className="w-4 h-4" /> },
@@ -241,7 +244,7 @@ export function Dashboard() {
           </div>
 
           {coursesData?.courses?.length ? (
-            <div className="rounded-lg p-4" style={{ background: BG_CARD }}>
+            <div className="rounded-lg p-4" style={{ background: BG_CARD, border: CARD_BORDER, boxShadow: CARD_SHADOW }}>
               <div className="flex items-center justify-between mb-3">
                 <h2 className="text-sm font-bold flex items-center gap-2" style={{ color: TEXT_LIGHT }}>
                   <GraduationCap className="w-4 h-4" style={{ color: '#b583e0' }} /> Courses
@@ -280,7 +283,7 @@ function DashCard({ title, icon, linkHref, linkText, children }: {
   title: string; icon: React.ReactNode; linkHref: string; linkText: string; children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-lg p-4 md:p-5" style={{ background: BG_CARD }}>
+    <div className="rounded-lg p-4 md:p-5" style={{ background: BG_CARD, border: CARD_BORDER, boxShadow: CARD_SHADOW }}>
       <div className="flex items-center justify-between mb-3.5">
         <h2 className="text-sm font-bold flex items-center gap-2" style={{ color: TEXT_LIGHT }}>
           {icon} {title}

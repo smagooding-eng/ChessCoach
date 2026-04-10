@@ -9,11 +9,13 @@ import {
 } from 'lucide-react';
 
 const BG_DARK = '#262421';
-const BG_CARD = '#302e2b';
+const BG_CARD = 'linear-gradient(180deg, #353230 0%, #2d2b28 100%)';
 const TEXT_LIGHT = '#e8e6e3';
 const TEXT_MUTED = '#9e9b98';
 const CHESSCOM_GREEN = '#81b64c';
 const MISTAKE_RED = '#dc4343';
+const CARD_SHADOW = '0 4px 16px rgba(0,0,0,0.25), 0 1px 4px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.05)';
+const CARD_BORDER = '1px solid rgba(255,255,255,0.08)';
 
 type Classification = 'checkmate' | 'brilliant' | 'excellent' | 'good' | 'book' | 'inaccuracy' | 'mistake' | 'blunder';
 
@@ -146,7 +148,7 @@ function AnalysisSummaryPanel({
 
   return (
     <div className="space-y-4">
-      <div className="rounded-lg p-4 border" style={{ background: BG_CARD, borderColor: 'rgba(255,255,255,0.06)' }}>
+      <div className="rounded-lg p-4 border" style={{ background: BG_CARD, border: CARD_BORDER, boxShadow: CARD_SHADOW }}>
         <h3 className="font-bold text-sm mb-3 flex items-center gap-2" style={{ color: TEXT_LIGHT }}>
           <Target size={14} style={{ color: CHESSCOM_GREEN }} /> Accuracy
         </h3>
@@ -176,7 +178,7 @@ function AnalysisSummaryPanel({
       </div>
 
       {turningPoints.length > 0 && (
-        <div className="rounded-lg p-4 border" style={{ background: BG_CARD, borderColor: 'rgba(255,255,255,0.06)' }}>
+        <div className="rounded-lg p-4 border" style={{ background: BG_CARD, border: CARD_BORDER, boxShadow: CARD_SHADOW }}>
           <h3 className="font-bold text-sm mb-3 flex items-center gap-2" style={{ color: TEXT_LIGHT }}>
             <AlertTriangle size={14} style={{ color: '#f59e0b' }} /> Turning Points
           </h3>
@@ -446,7 +448,7 @@ export function GameLookup() {
             <ArrowLeft size={16} /> Back to Games
           </button>
 
-          <div className="rounded-xl border overflow-hidden" style={{ background: BG_CARD, borderColor: 'rgba(255,255,255,0.06)' }}>
+          <div className="rounded-xl border overflow-hidden" style={{ background: BG_CARD, border: CARD_BORDER, boxShadow: CARD_SHADOW }}>
             <div className="p-4 border-b flex flex-wrap items-center gap-4" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
               <div className="flex items-center gap-3">
                 <div className="text-center">
@@ -622,7 +624,7 @@ export function GameLookup() {
           </p>
         </div>
 
-        <div className="rounded-xl border p-5" style={{ background: BG_CARD, borderColor: 'rgba(255,255,255,0.06)' }}>
+        <div className="rounded-xl border p-5" style={{ background: BG_CARD, border: CARD_BORDER, boxShadow: CARD_SHADOW }}>
           <div className="flex flex-col sm:flex-row gap-3 items-end">
             <div className="flex-1 w-full">
               <label className="text-xs font-medium mb-1 block" style={{ color: TEXT_MUTED }}>Player 1</label>
@@ -684,7 +686,7 @@ export function GameLookup() {
         )}
 
         {hasSearched && !loading && games.length === 0 && !error && (
-          <div className="text-center py-12 rounded-xl border" style={{ background: BG_CARD, borderColor: 'rgba(255,255,255,0.06)' }}>
+          <div className="text-center py-12 rounded-xl border" style={{ background: BG_CARD, border: CARD_BORDER, boxShadow: CARD_SHADOW }}>
             <Swords size={40} className="mx-auto mb-3" style={{ color: TEXT_MUTED, opacity: 0.4 }} />
             <p className="text-sm font-medium" style={{ color: TEXT_MUTED }}>No games found between these players</p>
             <p className="text-xs mt-1" style={{ color: TEXT_MUTED, opacity: 0.7 }}>Games from the last 6 months are searched</p>
@@ -709,7 +711,7 @@ export function GameLookup() {
                     key={game.id}
                     onClick={() => selectGame(game)}
                     className="w-full text-left rounded-lg border p-3 transition-all hover:border-[rgba(129,182,76,0.4)] group"
-                    style={{ background: BG_CARD, borderColor: 'rgba(255,255,255,0.06)' }}
+                    style={{ background: BG_CARD, border: CARD_BORDER, boxShadow: CARD_SHADOW }}
                   >
                     <div className="flex items-center gap-3">
                       <div className="flex-1 min-w-0">
