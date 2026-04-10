@@ -509,29 +509,23 @@ function findBotByRating(rating: number): BotConfig {
   return closest;
 }
 
-export function PracticeBots() {
-  const [jumpInFen, setJumpInFen] = useState<string | undefined>(undefined);
-  const [selectedBot, setSelectedBot] = useState<BotConfig | null>(() => {
-    const params = new URLSearchParams(window.location.search);
-    const fen = params.get('fen');
-    const rating = params.get('rating');
-    if (fen) {
-      return findBotByRating(rating ? parseInt(rating, 10) : 1200);
-    }
-    return null;
-  });
+function getJumpInParams(): { fen: string; rating: number } | null {
+  const params = new URLSearchParams(window.location.search);
+  const fen = params.get('fen');
+  if (!fen) return null;
+  const rating = params.get('rating');
+  window.history.replaceState({}, '', window.location.pathname);
+  return { fen, rating: rating ? parseInt(rating, 10) : 1200 };
+}
 
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const fen = params.get('fen');
-    if (fen) {
-      setJumpInFen(fen);
-      window.history.replaceState({}, '', window.location.pathname);
-    }
-  }, []);
+export function PracticeBots() {
+  const [jumpIn] = useState(getJumpInParams);
+  const [selectedBot, setSelectedBot] = useState<BotConfig | null>(() =>
+    jumpIn ? findBotByRating(jumpIn.rating) : null
+  );
 
   if (selectedBot) {
-    return <GameView bot={selectedBot} onBack={() => { setSelectedBot(null); setJumpInFen(undefined); }} startFen={jumpInFen} />;
+    return <GameView bot={selectedBot} onBack={() => setSelectedBot(null)} startFen={jumpIn?.fen} />;
   }
 
   return (
