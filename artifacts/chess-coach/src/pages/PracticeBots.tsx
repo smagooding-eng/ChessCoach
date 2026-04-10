@@ -499,14 +499,12 @@ function GameView({ bot, onBack, startFen }: { bot: BotConfig; onBack: () => voi
   );
 }
 
-function findBotByRating(rating: number): BotConfig {
-  let closest = BOTS[0];
-  let minDiff = Math.abs(BOTS[0].rating - rating);
-  for (const bot of BOTS) {
-    const diff = Math.abs(bot.rating - rating);
-    if (diff < minDiff) { closest = bot; minDiff = diff; }
+function findBotAboveRating(rating: number): BotConfig {
+  const sorted = [...BOTS].sort((a, b) => a.rating - b.rating);
+  for (const bot of sorted) {
+    if (bot.rating > rating) return bot;
   }
-  return closest;
+  return sorted[sorted.length - 1];
 }
 
 function getJumpInParams(): { fen: string; rating: number } | null {
@@ -521,7 +519,7 @@ function getJumpInParams(): { fen: string; rating: number } | null {
 export function PracticeBots() {
   const [jumpIn] = useState(getJumpInParams);
   const [selectedBot, setSelectedBot] = useState<BotConfig | null>(() =>
-    jumpIn ? findBotByRating(jumpIn.rating) : null
+    jumpIn ? findBotAboveRating(jumpIn.rating) : null
   );
 
   if (selectedBot) {

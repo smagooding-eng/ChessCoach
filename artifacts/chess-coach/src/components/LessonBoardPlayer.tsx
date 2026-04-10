@@ -1138,8 +1138,10 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
             <div className="px-3 pb-2 md:px-4">
               <button
                 onClick={() => {
-                  const fen = steps[currentStep].fen;
-                  navigate(`/practice?fen=${encodeURIComponent(fen)}&rating=1200`);
+                  const prevFen = currentStep <= 1
+                    ? 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
+                    : (steps[currentStep - 1]?.fen ?? steps[currentStep].fen);
+                  navigate(`/practice?fen=${encodeURIComponent(prevFen)}&rating=1200`);
                 }}
                 className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all active:scale-95 border border-primary/30 hover:border-primary/50"
                 style={{ background: 'rgba(129,182,76,0.1)', color: CHESSCOM_GREEN }}
