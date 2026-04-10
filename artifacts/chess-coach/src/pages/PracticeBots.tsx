@@ -331,18 +331,6 @@ function GameView({ bot, onBack, startFen }: { bot: BotConfig; onBack: () => voi
         <ArrowLeft className="w-4 h-4" /> All Bots
       </button>
 
-      <div className="glass-card rounded-2xl px-4 py-2.5 flex items-center gap-3 border border-primary/20 bg-primary/5">
-        <img src={bot.avatar} alt={bot.name} className="w-9 h-9 rounded-full border-2 border-primary/30 shadow" />
-        <div className="flex-1 min-w-0">
-          <h2 className="font-black text-base sm:text-lg leading-tight">{bot.name}</h2>
-          <p className="text-[11px] text-muted-foreground">{bot.personality} · {bot.rating} ELO</p>
-        </div>
-        <div className="flex items-center gap-1.5 text-xs text-muted-foreground shrink-0">
-          <Clock className="w-3.5 h-3.5" />
-          {formatTime(elapsedSec)}
-        </div>
-      </div>
-
       <div className="grid grid-cols-1 xl:grid-cols-[1fr_340px] gap-4">
         <div className="space-y-2.5">
           <div className="glass-card rounded-xl p-2.5 flex items-center justify-between">
@@ -350,8 +338,12 @@ function GameView({ bot, onBack, startFen }: { bot: BotConfig; onBack: () => voi
               <img src={bot.avatar} alt={bot.name} className="w-8 h-8 rounded-full border border-white/20 shadow" />
               <div>
                 <p className="font-bold text-sm">{bot.name}</p>
-                <p className="text-[10px] text-muted-foreground">{bot.rating} ELO</p>
+                <p className="text-[10px] text-muted-foreground">{bot.personality} · {bot.rating} ELO</p>
               </div>
+            </div>
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground shrink-0">
+              <Clock className="w-3.5 h-3.5" />
+              {formatTime(elapsedSec)}
             </div>
             {thinking && (
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
