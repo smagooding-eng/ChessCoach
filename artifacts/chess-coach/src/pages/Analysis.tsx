@@ -17,8 +17,8 @@ const BG_CARD_HOVER = '#3a3733';
 const BG_DARK = '#262421';
 const TEXT_LIGHT = '#e8e6e3';
 const TEXT_MUTED = '#9e9b98';
-const CARD_SHADOW = '0 4px 16px rgba(0,0,0,0.25), 0 1px 4px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.05)';
-const CARD_BORDER = '1px solid rgba(255,255,255,0.08)';
+const CARD_SHADOW = '0 4px 16px rgba(0,0,0,0.25), 0 1px 4px rgba(0,0,0,0.15), inset 0 1px 0 rgba(129,182,76,0.04)';
+const CARD_BORDER = '1px solid rgba(129,182,76,0.08)';
 const PIE_COLORS = [CHESSCOM_GREEN, '#dc4343', '#6b6966'];
 
 export function Analysis() {

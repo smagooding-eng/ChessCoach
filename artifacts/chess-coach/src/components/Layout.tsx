@@ -13,7 +13,7 @@ const BG_SIDEBAR = '#1e1c1a';
 const BG_CARD = '#302e2b';
 const TEXT_LIGHT = '#e8e6e3';
 const TEXT_MUTED = '#9e9b98';
-const BORDER_COLOR = 'rgba(255,255,255,0.06)';
+const BORDER_COLOR = 'rgba(129,182,76,0.06)';
 
 const PRIMARY_NAV = [
   { href: '/',          label: 'Home',            icon: LayoutDashboard },
