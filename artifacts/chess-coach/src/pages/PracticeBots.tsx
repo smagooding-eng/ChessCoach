@@ -135,9 +135,15 @@ function BotCard({ bot, onSelect }: { bot: BotConfig; onSelect: (b: BotConfig) =
   );
 }
 
-function GameView({ bot, onBack }: { bot: BotConfig; onBack: () => void }) {
-  const [playerColor, setPlayerColor] = useState<'w' | 'b'>('w');
-  const [chess] = useState(() => new Chess());
+function GameView({ bot, onBack, startFen }: { bot: BotConfig; onBack: () => void; startFen?: string }) {
+  const [playerColor, setPlayerColor] = useState<'w' | 'b'>(() => {
+    if (startFen) {
+      const turn = startFen.split(' ')[1];
+      return (turn === 'b' ? 'b' : 'w');
+    }
+    return 'w';
+  });
+  const [chess] = useState(() => startFen ? new Chess(startFen) : new Chess());
   const [fen, setFen] = useState(chess.fen());
   const [result, setResult] = useState<GameResult>('playing');
   const [moves, setMoves] = useState<MoveRecord[]>([]);
@@ -263,7 +269,11 @@ function GameView({ bot, onBack }: { bot: BotConfig; onBack: () => void }) {
   const handleNewGame = (color: 'w' | 'b') => {
     clearBotTimeout();
     gameIdRef.current++;
-    chess.reset();
+    if (startFen) {
+      chess.load(startFen);
+    } else {
+      chess.reset();
+    }
     setFen(chess.fen());
     setMoves([]);
     setResult('playing');
@@ -489,11 +499,39 @@ function GameView({ bot, onBack }: { bot: BotConfig; onBack: () => void }) {
   );
 }
 
+function findBotByRating(rating: number): BotConfig {
+  let closest = BOTS[0];
+  let minDiff = Math.abs(BOTS[0].rating - rating);
+  for (const bot of BOTS) {
+    const diff = Math.abs(bot.rating - rating);
+    if (diff < minDiff) { closest = bot; minDiff = diff; }
+  }
+  return closest;
+}
+
 export function PracticeBots() {
-  const [selectedBot, setSelectedBot] = useState<BotConfig | null>(null);
+  const [jumpInFen, setJumpInFen] = useState<string | undefined>(undefined);
+  const [selectedBot, setSelectedBot] = useState<BotConfig | null>(() => {
+    const params = new URLSearchParams(window.location.search);
+    const fen = params.get('fen');
+    const rating = params.get('rating');
+    if (fen) {
+      return findBotByRating(rating ? parseInt(rating, 10) : 1200);
+    }
+    return null;
+  });
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const fen = params.get('fen');
+    if (fen) {
+      setJumpInFen(fen);
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, []);
 
   if (selectedBot) {
-    return <GameView bot={selectedBot} onBack={() => setSelectedBot(null)} />;
+    return <GameView bot={selectedBot} onBack={() => { setSelectedBot(null); setJumpInFen(undefined); }} startFen={jumpInFen} />;
   }
 
   return (

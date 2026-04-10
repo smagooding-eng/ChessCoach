@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { useParams, Link } from 'wouter';
+import { useParams, Link, useLocation } from 'wouter';
 import { useGameViewer } from '@/hooks/use-games';
 import { ChessBoard } from '@/components/ChessBoard';
 import { Chess } from 'chess.js';
@@ -262,6 +262,7 @@ function formatClock(s: number | null | undefined): string {
 export function GameReplay() {
   const { id } = useParams();
   const { username } = useUser();
+  const [, navigate] = useLocation();
   const { data: game, isLoading, error } = useGameViewer(parseInt(id || '0'));
   const { player: whitePlayer } = useChessPlayer(game?.whiteUsername);
   const { player: blackPlayer } = useChessPlayer(game?.blackUsername);
@@ -733,6 +734,22 @@ export function GameReplay() {
                     </>
                   ) : (
                     <p className="text-sm text-muted-foreground italic py-1">This move wasn't included in the review.</p>
+                  )}
+
+                  {currentFen && (
+                    <button
+                      onClick={() => {
+                        const opponentRating = game
+                          ? (game.blackUsername.toLowerCase() === username?.toLowerCase() ? game.whiteRating : game.blackRating) || 1200
+                          : 1200;
+                        navigate(`/practice?fen=${encodeURIComponent(currentFen)}&rating=${opponentRating}`);
+                      }}
+                      className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all active:scale-95 border border-primary/30 hover:border-primary/50 mt-1"
+                      style={{ background: 'rgba(129,182,76,0.1)', color: '#81b64c' }}
+                    >
+                      <Swords className="w-4 h-4" />
+                      Jump in from here
+                    </button>
                   )}
                 </div>
               </div>
