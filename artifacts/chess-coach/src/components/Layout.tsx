@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'wouter';
 import { useUser } from '@/hooks/use-user';
 import { useChessPlayer } from '@/hooks/use-chess-player';
-import { LayoutDashboard, Import, History, BrainCircuit, GraduationCap, Swords, BookOpen, LogOut, MoreHorizontal, ChevronRight, Bot, Crown, Trophy, Play, Search, Download, Puzzle } from 'lucide-react';
+import { LayoutDashboard, Import, History, BrainCircuit, GraduationCap, Swords, BookOpen, LogOut, MoreHorizontal, ChevronRight, Bot, Crown, Trophy, Play, Search, Download, Puzzle, User, Settings, CreditCard } from 'lucide-react';
 import { usePwaInstall } from '@/hooks/use-pwa-install';
 import { cn } from '@/lib/utils';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -81,6 +81,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const { username, logout, isAuthenticated, authLogout, isPremium, subscription, authUser } = useUser();
   const { player } = useChessPlayer(username ?? undefined);
   const [moreOpen, setMoreOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
   const handleLogout = isAuthenticated ? authLogout : logout;
   const { canInstall, install } = usePwaInstall();
 
@@ -90,7 +91,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const activeMore = moreItems.find(i => location === i.href || location.startsWith(i.href + '/'));
   const isMoreActive = !!activeMore;
 
-  useEffect(() => { setMoreOpen(false); }, [location]);
+  useEffect(() => { setMoreOpen(false); setProfileOpen(false); }, [location]);
 
   return (
     <div className="min-h-screen flex flex-col md:flex-row" style={{ background: BG_DARK }}>
@@ -137,25 +138,65 @@ export function Layout({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
-      <header className="md:hidden flex items-center justify-between px-4 h-12 sticky top-0 z-50" style={{ background: `${BG_SIDEBAR}f5`, borderBottom: `1px solid ${BORDER_COLOR}`, backdropFilter: 'blur(16px)' }}>
-        <div className="flex items-center gap-2">
-          <img src={`${import.meta.env.BASE_URL}images/logo.svg`} alt="ChessScout.net" className="w-6 h-6 object-contain" />
-          <span className="font-black text-gradient text-sm">ChessScout.net</span>
-        </div>
-        <div className="flex items-center gap-2">
-          {canInstall && (
-            <button onClick={install} className="p-1.5 rounded active:scale-95 transition-all" style={{ color: CHESSCOM_GREEN }} title="Install App">
-              <Download className="w-5 h-5" />
-            </button>
-          )}
-          <Link href="/profile" className="flex items-center gap-2 active:opacity-70 transition-opacity">
-            <div className="flex flex-col items-end">
-              <span className="text-xs font-bold leading-tight" style={{ color: TEXT_LIGHT }}>{username}</span>
-              {displayRating && <span className="text-[10px] font-bold leading-tight" style={{ color: CHESSCOM_GREEN }}>{displayRating}</span>}
-            </div>
-            <PlayerAvatar avatar={player?.avatar} username={username ?? ''} size="sm" />
+      <header className="md:hidden sticky top-0 z-50">
+        <div className="flex items-center justify-between px-4 h-12" style={{ background: `${BG_SIDEBAR}f5`, borderBottom: `1px solid ${BORDER_COLOR}`, backdropFilter: 'blur(16px)' }}>
+          <Link href="/" className="flex items-center gap-2 active:opacity-70 transition-opacity">
+            <img src={`${import.meta.env.BASE_URL}images/logo.svg`} alt="ChessScout.net" className="w-6 h-6 object-contain" />
+            <span className="font-black text-gradient text-sm">ChessScout.net</span>
           </Link>
+          <div className="flex items-center gap-2">
+            {canInstall && (
+              <button onClick={install} className="p-1.5 rounded active:scale-95 transition-all" style={{ color: CHESSCOM_GREEN }} title="Install App">
+                <Download className="w-5 h-5" />
+              </button>
+            )}
+            <button onClick={() => setProfileOpen(o => !o)} className="flex items-center gap-2 active:opacity-70 transition-opacity">
+              <div className="flex flex-col items-end">
+                <span className="text-xs font-bold leading-tight" style={{ color: TEXT_LIGHT }}>{username}</span>
+                {displayRating && <span className="text-[10px] font-bold leading-tight" style={{ color: CHESSCOM_GREEN }}>{displayRating}</span>}
+              </div>
+              <PlayerAvatar avatar={player?.avatar} username={username ?? ''} size="sm" />
+            </button>
+          </div>
         </div>
+        <AnimatePresence>
+          {profileOpen && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.2 }}
+              className="overflow-hidden"
+              style={{ background: BG_CARD, borderBottom: `1px solid ${BORDER_COLOR}` }}
+            >
+              <div className="px-3 py-2 space-y-0.5">
+                <Link href="/profile" className="block">
+                  <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors active:bg-white/5" style={{ color: TEXT_LIGHT }}>
+                    <User className="w-4.5 h-4.5" style={{ color: TEXT_MUTED }} />
+                    <span className="font-semibold text-sm">Profile</span>
+                  </div>
+                </Link>
+                <Link href="/subscription" className="block">
+                  <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors active:bg-white/5" style={{ color: TEXT_LIGHT }}>
+                    <Crown className="w-4.5 h-4.5" style={{ color: '#eaa631' }} />
+                    <span className="font-semibold text-sm">Subscription</span>
+                    {isPremium && <span className="ml-auto text-[9px] font-black px-1.5 py-px rounded" style={{ background: 'rgba(129,182,76,0.15)', color: CHESSCOM_GREEN }}>PRO</span>}
+                  </div>
+                </Link>
+                <div className="pt-1 mt-1" style={{ borderTop: `1px solid ${BORDER_COLOR}` }}>
+                  <button
+                    onClick={() => { setProfileOpen(false); handleLogout(); }}
+                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg active:bg-red-500/10 transition-colors"
+                    style={{ color: '#dc4343' }}
+                  >
+                    <LogOut className="w-4.5 h-4.5" />
+                    <span className="font-semibold text-sm">Sign Out</span>
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </header>
 
       <main className="flex-1 min-h-screen overflow-x-hidden pb-20 md:pb-6 md:px-5 md:pt-5">
