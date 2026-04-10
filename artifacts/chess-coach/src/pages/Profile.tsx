@@ -83,6 +83,8 @@ function UserListPanel({ onClose, onEmailUsers }: { onClose: () => void; onEmail
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<UserFilter>('all');
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [deleting, setDeleting] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
 
   useEffect(() => {
     apiFetch('/api/admin/users', { credentials: 'include' })
@@ -125,6 +127,35 @@ function UserListPanel({ onClose, onEmailUsers }: { onClose: () => void; onEmail
     }
   };
 
+  const handleDeleteSelected = async () => {
+    if (!deleteConfirm) {
+      setDeleteConfirm(true);
+      return;
+    }
+    setDeleting(true);
+    try {
+      const ids = Array.from(selected);
+      const r = await apiFetch('/api/admin/users/delete', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userIds: ids }),
+      });
+      const d = await r.json();
+      if (r.ok && d.success) {
+        setUsers(prev => prev.filter(u => !selected.has(u.id)));
+        setSelected(new Set());
+      } else {
+        alert(d.error || 'Failed to delete users');
+      }
+    } catch {
+      alert('Failed to delete users');
+    } finally {
+      setDeleting(false);
+      setDeleteConfirm(false);
+    }
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, height: 0 }}
@@ -136,12 +167,30 @@ function UserListPanel({ onClose, onEmailUsers }: { onClose: () => void; onEmail
         <span className="text-xs font-bold text-amber-400">Registered Users</span>
         <div className="flex items-center gap-2">
           {selected.size > 0 && (
-            <button
-              onClick={handleEmailSelected}
-              className="text-[10px] font-semibold px-2.5 py-1 rounded bg-amber-500/15 text-amber-400 hover:bg-amber-500/25 transition-colors flex items-center gap-1"
-            >
-              <Mail className="w-3 h-3" /> Email {selected.size} user{selected.size !== 1 ? 's' : ''}
-            </button>
+            <>
+              <button
+                onClick={handleEmailSelected}
+                className="text-[10px] font-semibold px-2.5 py-1 rounded bg-amber-500/15 text-amber-400 hover:bg-amber-500/25 transition-colors flex items-center gap-1"
+              >
+                <Mail className="w-3 h-3" /> Email {selected.size}
+              </button>
+              <button
+                onClick={handleDeleteSelected}
+                disabled={deleting}
+                className={`text-[10px] font-semibold px-2.5 py-1 rounded flex items-center gap-1 transition-colors ${deleteConfirm ? 'bg-red-500/30 text-red-300 hover:bg-red-500/40' : 'bg-red-500/15 text-red-400 hover:bg-red-500/25'}`}
+              >
+                {deleting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
+                {deleteConfirm ? 'Confirm Delete?' : `Delete ${selected.size}`}
+              </button>
+              {deleteConfirm && (
+                <button
+                  onClick={() => setDeleteConfirm(false)}
+                  className="text-[10px] font-semibold px-1.5 py-1 rounded bg-neutral-500/15 text-neutral-400 hover:bg-neutral-500/25 transition-colors"
+                >
+                  Cancel
+                </button>
+              )}
+            </>
           )}
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors">
             <X className="w-3.5 h-3.5" />

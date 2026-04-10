@@ -1,6 +1,8 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { db, usersTable, pageViewsTable, gamesTable, weaknessesTable, coursesTable, lessonsTable, backgroundJobsTable } from "@workspace/db";
-import { sql, count, gte, countDistinct, inArray } from "drizzle-orm";
+import { sql, count, gte, countDistinct, inArray, eq } from "drizzle-orm";
+import { puzzleAttemptsTable } from "@workspace/db";
+import { sessionsTable } from "@workspace/db";
 import { getUncachableStripeClient } from "../lib/stripeClient";
 import { ADMIN_EMAILS } from "../lib/auth";
 
@@ -189,6 +191,59 @@ router.post("/admin/clear-ai-cache", requireAdmin, async (_req: Request, res: Re
     });
   } catch (err: any) {
     res.status(500).json({ error: "Failed to clear AI cache", details: err.message });
+  }
+});
+
+router.post("/admin/users/delete", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const { userIds } = req.body as { userIds: string[] };
+    if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
+      res.status(400).json({ error: "userIds array required" });
+      return;
+    }
+
+    const usersToDelete = await db
+      .select({ id: usersTable.id, email: usersTable.email, stripeCustomerId: usersTable.stripeCustomerId })
+      .from(usersTable)
+      .where(inArray(usersTable.id, userIds));
+
+    const adminEmails = usersToDelete
+      .filter(u => u.email && ADMIN_EMAILS.includes(u.email.toLowerCase()))
+      .map(u => u.email);
+    if (adminEmails.length > 0) {
+      res.status(403).json({ error: `Cannot delete admin accounts: ${adminEmails.join(", ")}` });
+      return;
+    }
+
+    const ids = usersToDelete.map(u => u.id);
+    if (ids.length === 0) {
+      res.status(404).json({ error: "No matching users found" });
+      return;
+    }
+
+    try {
+      const stripe = await getUncachableStripeClient();
+      for (const u of usersToDelete) {
+        if (u.stripeCustomerId) {
+          try {
+            const subs = await stripe.subscriptions.list({ customer: u.stripeCustomerId, status: 'active', limit: 10 });
+            for (const sub of subs.data) {
+              await stripe.subscriptions.cancel(sub.id);
+            }
+          } catch {}
+        }
+      }
+    } catch {}
+
+    await db.delete(puzzleAttemptsTable).where(inArray(puzzleAttemptsTable.userId, ids));
+    await db.delete(backgroundJobsTable).where(inArray(backgroundJobsTable.userId, ids));
+    await db.delete(pageViewsTable).where(inArray(pageViewsTable.userId, ids));
+
+    const deletedResult = await db.delete(usersTable).where(inArray(usersTable.id, ids));
+
+    res.json({ success: true, deleted: ids.length });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to delete users", details: err.message });
   }
 });
 
