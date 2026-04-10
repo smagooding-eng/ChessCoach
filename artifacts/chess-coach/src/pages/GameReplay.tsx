@@ -739,11 +739,13 @@ export function GameReplay() {
                   {currentFen && (
                     <button
                       onClick={() => {
+                        const isBlack = game?.blackUsername.toLowerCase() === username?.toLowerCase();
                         const opponentRating = game
-                          ? (game.blackUsername.toLowerCase() === username?.toLowerCase() ? game.whiteRating : game.blackRating) || 1200
+                          ? (isBlack ? game.whiteRating : game.blackRating) || 1200
                           : 1200;
+                        const playerColor = isBlack ? 'b' : 'w';
                         const prevFen = currentMove <= 1 ? 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1' : (moves[currentMove - 2]?.fen ?? currentFen);
-                        navigate(`/practice?fen=${encodeURIComponent(prevFen)}&rating=${opponentRating}`);
+                        navigate(`/practice?fen=${encodeURIComponent(prevFen)}&rating=${opponentRating}&color=${playerColor}`);
                       }}
                       className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all active:scale-95 border border-primary/30 hover:border-primary/50 mt-1"
                       style={{ background: 'rgba(129,182,76,0.1)', color: '#81b64c' }}

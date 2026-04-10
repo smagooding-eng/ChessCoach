@@ -135,8 +135,9 @@ function BotCard({ bot, onSelect }: { bot: BotConfig; onSelect: (b: BotConfig) =
   );
 }
 
-function GameView({ bot, onBack, startFen }: { bot: BotConfig; onBack: () => void; startFen?: string }) {
+function GameView({ bot, onBack, startFen, startColor }: { bot: BotConfig; onBack: () => void; startFen?: string; startColor?: 'w' | 'b' }) {
   const [playerColor, setPlayerColor] = useState<'w' | 'b'>(() => {
+    if (startColor) return startColor;
     if (startFen) {
       const turn = startFen.split(' ')[1];
       return (turn === 'b' ? 'b' : 'w');
@@ -227,10 +228,10 @@ function GameView({ bot, onBack, startFen }: { bot: BotConfig; onBack: () => voi
   }, [chess, bot, checkGameEnd, clearBotTimeout, deferAnalysis]);
 
   useEffect(() => {
-    if (playerColor === 'b' && moves.length === 0 && result === 'playing') {
+    if (moves.length === 0 && result === 'playing' && chess.turn() !== playerColor) {
       makeBotMove();
     }
-  }, [playerColor, moves.length, result, makeBotMove]);
+  }, [playerColor, moves.length, result, makeBotMove, chess]);
 
   useEffect(() => {
     if (moveListRef.current) {
@@ -370,12 +371,21 @@ function GameView({ bot, onBack, startFen }: { bot: BotConfig; onBack: () => voi
               </div>
               <p className="font-bold text-sm">You ({playerColor === 'w' ? 'White' : 'Black'})</p>
             </div>
-            {result === 'playing' && (
-              <button onClick={handleResign}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-bold hover:bg-red-500/20 transition-colors">
-                <Flag className="w-3 h-3" /> Resign
-              </button>
-            )}
+            <div className="flex items-center gap-2">
+              {result === 'playing' && (
+                <button onClick={() => handleNewGame(playerColor === 'w' ? 'b' : 'w')}
+                  title="Switch color"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 text-muted-foreground text-xs font-bold hover:bg-white/10 transition-colors">
+                  <RotateCcw className="w-3 h-3" /> Switch
+                </button>
+              )}
+              {result === 'playing' && (
+                <button onClick={handleResign}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-bold hover:bg-red-500/20 transition-colors">
+                  <Flag className="w-3 h-3" /> Resign
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
@@ -499,13 +509,14 @@ function findBotAboveRating(rating: number): BotConfig {
   return sorted[sorted.length - 1];
 }
 
-function getJumpInParams(): { fen: string; rating: number } | null {
+function getJumpInParams(): { fen: string; rating: number; color?: 'w' | 'b' } | null {
   const params = new URLSearchParams(window.location.search);
   const fen = params.get('fen');
   if (!fen) return null;
   const rating = params.get('rating');
+  const color = params.get('color');
   window.history.replaceState({}, '', window.location.pathname);
-  return { fen, rating: rating ? parseInt(rating, 10) : 1200 };
+  return { fen, rating: rating ? parseInt(rating, 10) : 1200, color: color === 'w' || color === 'b' ? color : undefined };
 }
 
 export function PracticeBots() {
@@ -515,7 +526,7 @@ export function PracticeBots() {
   );
 
   if (selectedBot) {
-    return <GameView bot={selectedBot} onBack={() => setSelectedBot(null)} startFen={jumpIn?.fen} />;
+    return <GameView bot={selectedBot} onBack={() => setSelectedBot(null)} startFen={jumpIn?.fen} startColor={jumpIn?.color} />;
   }
 
   return (
