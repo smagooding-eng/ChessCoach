@@ -2,6 +2,8 @@ import { runMigrations } from 'stripe-replit-sync';
 import { getStripeSync } from "./lib/stripeClient";
 import app from "./app";
 import { logger } from "./lib/logger";
+import { db } from "@workspace/db";
+import { sql } from "drizzle-orm";
 
 async function initStripe() {
   const databaseUrl = process.env.DATABASE_URL;
@@ -51,6 +53,16 @@ if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
 }
 
+async function runSchemaMigrations() {
+  try {
+    await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_premium_override BOOLEAN NOT NULL DEFAULT false`);
+    await db.execute(sql`UPDATE users SET is_premium_override = true WHERE email = 'lukakhvedelidze97@gmail.com' AND is_premium_override = false`);
+    logger.info('Schema migrations complete');
+  } catch (err) {
+    logger.error({ err }, 'Schema migration failed');
+  }
+}
+
 app.listen(port, (err) => {
   if (err) {
     logger.error({ err }, "Error listening on port");
@@ -58,6 +70,10 @@ app.listen(port, (err) => {
   }
 
   logger.info({ port }, "Server listening");
+});
+
+runSchemaMigrations().catch((err) => {
+  logger.error({ err }, 'Schema migration error');
 });
 
 initStripe().catch((err) => {

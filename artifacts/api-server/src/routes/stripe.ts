@@ -42,6 +42,11 @@ router.get('/stripe/subscription', async (req: Request, res: Response) => {
   try {
     const user = await storage.getUser(req.user.id);
 
+    if (user?.isPremiumOverride) {
+      res.json({ subscription: null, status: 'active', premiumOverride: true });
+      return;
+    }
+
     if (user?.stripeCustomerId) {
       let subscription: any = null;
       try {
