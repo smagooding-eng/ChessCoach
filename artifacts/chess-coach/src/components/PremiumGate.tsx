@@ -3,7 +3,6 @@ import { Lock, CreditCard } from 'lucide-react';
 import { Link } from 'wouter';
 
 const CHESSCOM_GREEN = '#81b64c';
-const BG_CARD = '#302e2b';
 const TEXT_LIGHT = '#e8e6e3';
 const TEXT_MUTED = '#9e9b98';
 
@@ -13,10 +12,22 @@ interface PremiumGateProps {
 }
 
 export function PremiumGate({ children, feature }: PremiumGateProps) {
-  const { isPremium, isAuthenticated, subscription } = useUser();
+  const { isPremium, isAuthenticated, isAuthLoading, isSubscriptionLoaded } = useUser();
 
-  if (!isAuthenticated || isPremium) {
+  if (!isAuthenticated && !isAuthLoading) {
     return <>{children}</>;
+  }
+
+  if (isPremium) {
+    return <>{children}</>;
+  }
+
+  if (isAuthLoading || !isSubscriptionLoaded) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <div className="w-8 h-8 border-3 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
   }
 
   return (

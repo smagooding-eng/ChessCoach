@@ -28,6 +28,7 @@ interface UserContextValue {
   isAuthLoading: boolean;
   authLogout: () => void;
   subscription: SubscriptionInfo;
+  isSubscriptionLoaded: boolean;
   refreshSubscription: () => void;
   isPremium: boolean;
   refreshAuth: () => Promise<void>;
@@ -43,6 +44,7 @@ const UserContext = createContext<UserContextValue>({
   isAuthLoading: true,
   authLogout: () => {},
   subscription: { status: 'none', subscription: null },
+  isSubscriptionLoaded: false,
   refreshSubscription: () => {},
   isPremium: false,
   refreshAuth: async () => {},
@@ -54,6 +56,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [subscription, setSubscription] = useState<SubscriptionInfo>({ status: 'none', subscription: null });
+  const [isSubscriptionLoaded, setIsSubscriptionLoaded] = useState(false);
 
   useEffect(() => {
     const stored = localStorage.getItem('chessCoachUsername');
@@ -92,7 +95,10 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   }, [refreshAuth]);
 
   const refreshSubscription = useCallback(() => {
-    if (!authUser) return;
+    if (!authUser) {
+      setIsSubscriptionLoaded(true);
+      return;
+    }
 
     apiFetch('/api/stripe/subscription', { credentials: 'include' })
       .then((res) => res.ok ? res.json() : null)
@@ -106,7 +112,10 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
           });
         }
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => {
+        setIsSubscriptionLoaded(true);
+      });
   }, [authUser]);
 
   useEffect(() => {
@@ -147,6 +156,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       isAuthLoading,
       authLogout,
       subscription,
+      isSubscriptionLoaded,
       refreshSubscription,
       isPremium,
       refreshAuth,
