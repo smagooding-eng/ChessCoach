@@ -94,24 +94,27 @@ export function welcomeEmailHtml(firstName: string | null): string {
       <h1 style="color:#81b64c;font-size:28px;margin:0;">♜ ChessScout.net</h1>
     </div>
     <div style="background-color:#302e2b;border-radius:12px;padding:32px;margin-bottom:24px;">
-      <h2 style="color:#e8e6e3;font-size:22px;margin:0 0 16px;">Welcome, ${name}!</h2>
-      <p style="color:#9e9b98;font-size:16px;line-height:1.6;margin:0 0 16px;">
-        Thanks for joining ChessScout — the #1 chess scouting tool. You now have access to powerful opponent analysis to gain an edge in every game.
+      <img src="https://images.unsplash.com/photo-1529699211952-734e80c4d42b?w=600&h=300&fit=crop&q=80" alt="Chess board" style="width:100%;height:auto;border-radius:8px;margin-bottom:24px;display:block;" />
+      <h2 style="color:#e8e6e3;font-size:22px;margin:0 0 4px;">Welcome, ${name}!</h2>
+      <p style="color:#9e9b98;font-size:13px;margin:0 0 20px;">The smartest way to prepare for your opponents</p>
+      <p style="color:#9e9b98;font-size:15px;line-height:1.6;margin:0 0 20px;">
+        You've just joined the chess tool that top players use to gain an edge before every game. ChessScout analyzes your opponents so you don't have to.
       </p>
-      <p style="color:#9e9b98;font-size:16px;line-height:1.6;margin:0 0 24px;">
-        Here's what you can do right away:
-      </p>
-      <ul style="color:#e8e6e3;font-size:15px;line-height:2;margin:0 0 24px;padding-left:20px;">
-        <li><strong>Opponent Scout</strong> — Analyze any player's weaknesses</li>
-        <li><strong>Game Lookup</strong> — Review any Chess.com game with AI</li>
-        <li><strong>Play Local</strong> — Practice over the board</li>
-        <li><strong>Practice Bots</strong> — Train against different playing styles</li>
-      </ul>
+      <div style="border-top:1px solid rgba(129,182,76,0.15);margin:20px 0;"></div>
+      <h3 style="color:#81b64c;font-size:16px;margin:0 0 12px;">Here's what you can do right now:</h3>
+      <table style="width:100%;border-collapse:collapse;">
+        <tr><td style="padding:8px 0;vertical-align:top;width:30px;color:#81b64c;font-size:18px;">🔍</td><td style="padding:8px 0;color:#e8e6e3;font-size:14px;"><strong>Opponent Scout</strong><br/><span style="color:#9e9b98;font-size:13px;">Deep analysis of any player's openings, weaknesses &amp; tendencies</span></td></tr>
+        <tr><td style="padding:8px 0;vertical-align:top;width:30px;color:#81b64c;font-size:18px;">♟️</td><td style="padding:8px 0;color:#e8e6e3;font-size:14px;"><strong>Game Lookup</strong><br/><span style="color:#9e9b98;font-size:13px;">Review any Chess.com game with AI-powered move analysis</span></td></tr>
+        <tr><td style="padding:8px 0;vertical-align:top;width:30px;color:#81b64c;font-size:18px;">🧩</td><td style="padding:8px 0;color:#e8e6e3;font-size:14px;"><strong>Daily Puzzles</strong><br/><span style="color:#9e9b98;font-size:13px;">Sharpen your tactics with curated puzzle sets</span></td></tr>
+        <tr><td style="padding:8px 0;vertical-align:top;width:30px;color:#81b64c;font-size:18px;">🤖</td><td style="padding:8px 0;color:#e8e6e3;font-size:14px;"><strong>Practice Bots</strong><br/><span style="color:#9e9b98;font-size:13px;">Train against bots calibrated to different rating levels</span></td></tr>
+      </table>
+      <div style="border-top:1px solid rgba(129,182,76,0.15);margin:20px 0;"></div>
       <div style="text-align:center;">
-        <a href="https://chessscout.net" style="display:inline-block;background-color:#81b64c;color:#fff;text-decoration:none;padding:14px 32px;border-radius:8px;font-size:16px;font-weight:600;">Start Scouting</a>
+        <a href="https://chessscout.net" style="display:inline-block;background-color:#81b64c;color:#fff;text-decoration:none;padding:14px 32px;border-radius:8px;font-size:16px;font-weight:600;">Start Scouting Your Opponents →</a>
       </div>
+      <p style="text-align:center;margin-top:12px;color:#9e9b98;font-size:12px;">Free account includes 5 puzzles/day &amp; full game lookup</p>
     </div>
-    <p style="color:#666;font-size:13px;text-align:center;margin:0;">
+    <p style="color:#666;font-size:12px;text-align:center;margin:0;">
       ChessScout.net — Know your opponent's weaknesses.
     </p>
   </div>
