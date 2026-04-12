@@ -23,6 +23,7 @@ type Classification = 'checkmate' | 'brilliant' | 'excellent' | 'good' | 'book' 
 type GameMove = {
   san: string;
   fen: string;
+  fenBefore?: string;
   moveNumber: number;
   color: 'white' | 'black';
 };
@@ -287,18 +288,6 @@ export function GameLookup() {
     doSearch(player1, player2);
   }, [player1, player2, doSearch]);
 
-  const selectGame = useCallback((game: H2HGame) => {
-    stopPolling();
-    setSelectedGame(game);
-    setMoveIndex(0);
-    setFlipped(false);
-    setAnalysis([]);
-    setTurningPoints([]);
-    setIsAnalyzing(false);
-    setIsPlaying(false);
-    playRef.current = false;
-  }, [stopPolling]);
-
   const moves = selectedGame?.moves ?? [];
   const totalMoves = moves.length;
 
@@ -444,6 +433,18 @@ export function GameLookup() {
     }
     analysisJobRef.current = null;
   }, []);
+
+  const selectGame = useCallback((game: H2HGame) => {
+    stopPolling();
+    setSelectedGame(game);
+    setMoveIndex(0);
+    setFlipped(false);
+    setAnalysis([]);
+    setTurningPoints([]);
+    setIsAnalyzing(false);
+    setIsPlaying(false);
+    playRef.current = false;
+  }, [stopPolling]);
 
   const startPolling = useCallback((jobId: string) => {
     analysisJobRef.current = jobId;
