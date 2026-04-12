@@ -190,9 +190,49 @@ export function extractOpeningFromPgn(pgn: string): { opening: string | null; ec
 
 const START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
+export function normalizeFen(fen: string): string {
+  if (!fen) return fen;
+  const parts = fen.split(' ');
+  if (parts.length < 3) return fen;
+  const castling = parts[2];
+  if (!castling || castling === '-' || /^[KQkq]+$/.test(castling)) return fen;
+  if (!/^[A-Ha-h]+$/.test(castling)) return fen;
+
+  const ranks = parts[0].split('/');
+  const whiteBack = ranks[7] || '';
+  const blackBack = ranks[0] || '';
+
+  function findKingFile(rank: string): number {
+    let file = 0;
+    for (const ch of rank) {
+      if (ch >= '1' && ch <= '8') { file += parseInt(ch); }
+      else { if (ch === 'K' || ch === 'k') return file; file++; }
+    }
+    return -1;
+  }
+
+  const wKingFile = findKingFile(whiteBack);
+  const bKingFile = findKingFile(blackBack);
+
+  let result = '';
+  for (const ch of castling) {
+    const file = ch.toLowerCase().charCodeAt(0) - 97;
+    if (ch >= 'A' && ch <= 'H') {
+      result += file > wKingFile ? 'K' : 'Q';
+    } else {
+      result += file > bKingFile ? 'k' : 'q';
+    }
+  }
+
+  const arr = result.split('');
+  arr.sort((a, b) => 'KQkq'.indexOf(a) - 'KQkq'.indexOf(b));
+  parts[2] = arr.join('');
+  return parts.join(' ');
+}
+
 export function extractStartFen(pgn: string): string {
   const fenMatch = pgn.match(/\[FEN "([^"]+)"\]/);
-  return fenMatch ? fenMatch[1] : START_FEN;
+  return fenMatch ? normalizeFen(fenMatch[1]) : START_FEN;
 }
 
 export function parsePgnMoves(pgn: string): Array<{
@@ -211,8 +251,9 @@ export function parsePgnMoves(pgn: string): Array<{
 
   try {
     const startFen = extractStartFen(pgn);
+    const normalizedPgn = pgn.replace(/\[FEN "([^"]+)"\]/, (_, fen) => `[FEN "${normalizeFen(fen)}"]`);
     const chess = new Chess(startFen);
-    chess.loadPgn(pgn);
+    chess.loadPgn(normalizedPgn);
     const history = chess.history({ verbose: true });
 
     const moveSection = pgn.replace(/\[.*?\]\n?/gs, "").trim();

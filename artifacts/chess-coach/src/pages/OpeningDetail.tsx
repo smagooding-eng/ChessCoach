@@ -7,6 +7,7 @@ import { apiFetch } from '@/lib/api';
 import { ChessBoard } from '@/components/ChessBoard';
 import type { MoveQuality } from '@/components/ChessBoard';
 import { Chess } from 'chess.js';
+import { normalizeFen } from '@/lib/utils';
 import {
   ArrowLeft, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
   BookOpen, TrendingUp, TrendingDown, Play, Swords, Target, ChevronRight as ChevronRightIcon,
@@ -100,7 +101,7 @@ export function OpeningDetail() {
     if (!move?.san) return null;
     const prevFen = step === 1 ? undefined : mainLine[step - 2]?.fen;
     try {
-      const chess = new Chess(prevFen);
+      const chess = new Chess(prevFen ? normalizeFen(prevFen) : undefined);
       const result = chess.move(move.san);
       return result ? { from: result.from, to: result.to } : null;
     } catch { return null; }
@@ -125,7 +126,7 @@ export function OpeningDetail() {
     if (!move?.san) return null;
     const prevFen = practiceStep === 1 ? undefined : mainLine[practiceStep - 2]?.fen;
     try {
-      const chess = new Chess(prevFen);
+      const chess = new Chess(prevFen ? normalizeFen(prevFen) : undefined);
       const result = chess.move(move.san);
       return result ? { from: result.from, to: result.to } : null;
     } catch { return null; }

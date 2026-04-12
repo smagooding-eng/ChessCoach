@@ -1,7 +1,7 @@
 import OpenAI from "openai";
 import { logger } from "./logger";
 import { evaluateAllPositions, classifyFromWinPctLoss, uciToSan, winPct, type PositionEval } from "./engineAnalysis";
-import { extractStartFen } from "./chesscom";
+import { extractStartFen, normalizeFen } from "./chesscom";
 
 const openai = new OpenAI({
   baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
@@ -264,10 +264,11 @@ export interface PgnAnalysisResult {
 export async function analyzeGamePgn(pgn: string, onProgress?: (done: number, total: number) => void): Promise<PgnAnalysisResult> {
   const Chess = require("chess.js").Chess;
   const startFen = extractStartFen(pgn);
+  const normalizedPgn = pgn.replace(/\[FEN "([^"]+)"\]/, (_: string, fen: string) => `[FEN "${normalizeFen(fen)}"]`);
   const chess = new Chess(startFen);
 
   try {
-    chess.loadPgn(pgn);
+    chess.loadPgn(normalizedPgn);
   } catch {
     throw new Error("Invalid PGN");
   }

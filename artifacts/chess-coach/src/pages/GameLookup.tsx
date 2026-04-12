@@ -2,6 +2,7 @@ import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import { ChessBoard } from '@/components/ChessBoard';
 import { Chess } from 'chess.js';
 import { apiFetch } from '@/lib/api';
+import { normalizeFen } from '@/lib/utils';
 import {
   Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
   Play, Pause, ArrowLeft, FlipVertical2, Swords, Clock,
@@ -317,7 +318,7 @@ export function GameLookup() {
     if (!m) return undefined;
     try {
       const prevFen = moveIndex >= 2 ? moves[moveIndex - 2].fen : startFen;
-      const chess = new Chess(prevFen);
+      const chess = new Chess(normalizeFen(prevFen));
       const result = chess.move(m.san);
       if (result) return { from: result.from, to: result.to };
     } catch {}

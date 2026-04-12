@@ -3,6 +3,7 @@ import { useParams, Link, useLocation } from 'wouter';
 import { useGameViewer } from '@/hooks/use-games';
 import { ChessBoard } from '@/components/ChessBoard';
 import { Chess } from 'chess.js';
+import { normalizeFen } from '@/lib/utils';
 import {
   ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
   Play, Pause, ArrowLeft, BrainCircuit, FlipVertical2,
@@ -449,7 +450,7 @@ export function GameReplay() {
     if (!move?.san) return null;
     const prevFen = currentMove === 1 ? undefined : (moves[currentMove - 2]?.fen ?? undefined);
     try {
-      const chess = new Chess(prevFen);
+      const chess = new Chess(prevFen ? normalizeFen(prevFen) : undefined);
       const result = chess.move(move.san);
       return result ? { from: result.from, to: result.to } : null;
     } catch { return null; }
@@ -477,7 +478,7 @@ export function GameReplay() {
         const uci = data?.pvs?.[0]?.moves?.split(' ')?.[0];
         if (!uci || uci.length < 4) { setBestMoveSan(null); return; }
         try {
-          const chess = new Chess(fen);
+          const chess = new Chess(normalizeFen(fen));
           const mv = chess.move({ from: uci.slice(0, 2), to: uci.slice(2, 4), promotion: uci[4] || undefined });
           setBestMoveSan(mv?.san ?? null);
         } catch { setBestMoveSan(null); }

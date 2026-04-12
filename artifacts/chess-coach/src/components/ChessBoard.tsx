@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useMemo, useRef, useEffect, Component, type ReactNode } from 'react';
 import { Chessboard } from 'react-chessboard';
 import { Chess } from 'chess.js';
+import { normalizeFen } from '@/lib/utils';
 
 class BoardErrorBoundary extends Component<
   { children: ReactNode; position: string; renderKey: number },
@@ -96,7 +97,7 @@ export function ChessBoard({
   lastMove,
   moveQuality,
 }: ChessBoardProps) {
-  const position = fen || START_FEN;
+  const position = normalizeFen(fen || START_FEN);
   const [selectedSquare, setSelectedSquare] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<'correct' | 'wrong' | null>(null);
   const feedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
