@@ -261,7 +261,7 @@ export interface PgnAnalysisResult {
   blackAccuracy: number;
 }
 
-export async function analyzeGamePgn(pgn: string): Promise<PgnAnalysisResult> {
+export async function analyzeGamePgn(pgn: string, onProgress?: (done: number, total: number) => void): Promise<PgnAnalysisResult> {
   const Chess = require("chess.js").Chess;
   const startFen = extractStartFen(pgn);
   const chess = new Chess(startFen);
@@ -287,7 +287,7 @@ export async function analyzeGamePgn(pgn: string): Promise<PgnAnalysisResult> {
   }
 
   logger.info({ positions: fens.length }, "analyzeGamePgn: Running Stockfish on all positions");
-  const evals = await evaluateAllPositions(fens);
+  const evals = await evaluateAllPositions(fens, undefined, onProgress);
 
   const moves: PgnAnalysisResult["moves"] = [];
   const whiteLosses: number[] = [];

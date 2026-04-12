@@ -250,14 +250,16 @@ export function GameLookup() {
   }, [player1, player2]);
 
   const selectGame = useCallback((game: H2HGame) => {
+    stopPolling();
     setSelectedGame(game);
     setMoveIndex(0);
     setFlipped(false);
     setAnalysis([]);
     setTurningPoints([]);
+    setIsAnalyzing(false);
     setIsPlaying(false);
     playRef.current = false;
-  }, []);
+  }, [stopPolling]);
 
   const moves = selectedGame?.moves ?? [];
   const totalMoves = moves.length;
@@ -343,16 +345,117 @@ export function GameLookup() {
     return () => window.removeEventListener('keydown', handler);
   }, [selectedGame, goNext, goPrev, goFirst, goLast, togglePlay]);
 
+  const analysisJobRef = useRef<string | null>(null);
+  const analysisPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const processAnalysisResult = useCallback((data: {
+    moves: Array<{
+      moveIndex: number;
+      san: string;
+      color: 'white' | 'black';
+      classification: Classification;
+      cpLoss: number;
+      bestMove: string | null;
+      evalBefore: number;
+      evalAfter: number;
+    }>;
+    whiteAccuracy: number;
+    blackAccuracy: number;
+  }) => {
+    const results: MoveAnalysis[] = data.moves.map(m => ({
+      moveIndex: m.moveIndex,
+      san: m.san,
+      color: m.color,
+      classification: m.classification,
+      evalBefore: m.evalBefore,
+      evalAfter: m.evalAfter,
+      cpLoss: m.cpLoss,
+      bestMoveSan: m.bestMove,
+      summary: '',
+    }));
+
+    const tps: TurningPoint[] = [];
+    for (let i = 1; i < results.length; i++) {
+      const swing = results[i].evalAfter - results[i].evalBefore;
+      const absSwing = Math.abs(swing);
+      if (absSwing >= 150) {
+        const color = results[i].color;
+        const isGoodForMover = (color === 'white' && swing > 0) || (color === 'black' && swing < 0);
+        tps.push({
+          moveIndex: results[i].moveIndex,
+          san: results[i].san,
+          color,
+          evalSwing: swing,
+          description: isGoodForMover
+            ? `Strong move that shifted the position significantly`
+            : `Weak move that gave away a ${absSwing >= 300 ? 'major' : 'significant'} advantage`,
+        });
+      }
+    }
+    tps.sort((a, b) => Math.abs(b.evalSwing) - Math.abs(a.evalSwing));
+    setTurningPoints(tps.slice(0, 6));
+    setAnalysisProgress(100);
+    setAnalysis(results);
+    setIsAnalyzing(false);
+  }, []);
+
+  const stopPolling = useCallback(() => {
+    if (analysisPollRef.current) {
+      clearInterval(analysisPollRef.current);
+      analysisPollRef.current = null;
+    }
+    analysisJobRef.current = null;
+  }, []);
+
+  const startPolling = useCallback((jobId: string) => {
+    analysisJobRef.current = jobId;
+    if (analysisPollRef.current) clearInterval(analysisPollRef.current);
+
+    analysisPollRef.current = setInterval(async () => {
+      try {
+        const res = await apiFetch(`/api/games/analyze-pgn-status/${jobId}`);
+        if (!res.ok) {
+          stopPolling();
+          setIsAnalyzing(false);
+          return;
+        }
+        const data = await res.json() as Record<string, unknown>;
+
+        if (data.status === 'done' && data.result) {
+          stopPolling();
+          processAnalysisResult(data.result as Parameters<typeof processAnalysisResult>[0]);
+          return;
+        }
+
+        if (data.status === 'error') {
+          stopPolling();
+          setIsAnalyzing(false);
+          console.error('Analysis job failed:', data.error);
+          return;
+        }
+
+        if (typeof data.progress === 'number' && typeof data.total === 'number' && (data.total as number) > 0) {
+          setAnalysisProgress(Math.round(((data.progress as number) / (data.total as number)) * 90) + 5);
+        }
+      } catch {
+        stopPolling();
+        setIsAnalyzing(false);
+      }
+    }, 2000);
+  }, [stopPolling, processAnalysisResult]);
+
+  useEffect(() => {
+    return () => { stopPolling(); };
+  }, [stopPolling]);
+
   const runAnalysis = useCallback(async () => {
     if (!selectedGame || !selectedGame.pgn) return;
     setIsAnalyzing(true);
-    setAnalysisProgress(0);
+    setAnalysisProgress(5);
     setAnalysis([]);
     setTurningPoints([]);
 
     try {
-      setAnalysisProgress(10);
-
       const res = await apiFetch('/api/games/analyze-pgn', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -360,67 +463,28 @@ export function GameLookup() {
       });
 
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error((data as Record<string, string>).error || `Analysis failed (${res.status})`);
+        const errData = await res.json().catch(() => ({}));
+        throw new Error((errData as Record<string, string>).error || `Analysis failed (${res.status})`);
       }
 
-      setAnalysisProgress(80);
+      const data = await res.json() as Record<string, unknown>;
 
-      const data = await res.json() as {
-        moves: Array<{
-          moveIndex: number;
-          san: string;
-          color: 'white' | 'black';
-          classification: Classification;
-          cpLoss: number;
-          bestMove: string | null;
-          evalBefore: number;
-          evalAfter: number;
-        }>;
-        whiteAccuracy: number;
-        blackAccuracy: number;
-      };
-
-      const results: MoveAnalysis[] = data.moves.map(m => ({
-        moveIndex: m.moveIndex,
-        san: m.san,
-        color: m.color,
-        classification: m.classification,
-        evalBefore: m.evalBefore,
-        evalAfter: m.evalAfter,
-        cpLoss: m.cpLoss,
-        bestMoveSan: m.bestMove,
-        summary: '',
-      }));
-
-      const tps: TurningPoint[] = [];
-      for (let i = 1; i < results.length; i++) {
-        const swing = results[i].evalAfter - results[i].evalBefore;
-        const absSwing = Math.abs(swing);
-        if (absSwing >= 150) {
-          const color = results[i].color;
-          const isGoodForMover = (color === 'white' && swing > 0) || (color === 'black' && swing < 0);
-          tps.push({
-            moveIndex: results[i].moveIndex,
-            san: results[i].san,
-            color,
-            evalSwing: swing,
-            description: isGoodForMover
-              ? `Strong move that shifted the position significantly`
-              : `Weak move that gave away a ${absSwing >= 300 ? 'major' : 'significant'} advantage`,
-          });
-        }
+      if (data.status === 'done' && data.result) {
+        processAnalysisResult(data.result as Parameters<typeof processAnalysisResult>[0]);
+        return;
       }
-      tps.sort((a, b) => Math.abs(b.evalSwing) - Math.abs(a.evalSwing));
-      setTurningPoints(tps.slice(0, 6));
-      setAnalysisProgress(100);
-      setAnalysis(results);
+
+      if (data.jobId) {
+        startPolling(data.jobId as string);
+        return;
+      }
+
+      throw new Error('Unexpected response from analysis');
     } catch (err: unknown) {
       console.error('Analysis failed:', err);
-    } finally {
       setIsAnalyzing(false);
     }
-  }, [selectedGame]);
+  }, [selectedGame, processAnalysisResult, startPolling]);
 
   const movePairs = useMemo(() => {
     if (!selectedGame) return [];
@@ -455,7 +519,7 @@ export function GameLookup() {
       <div className="min-h-screen p-3 md:p-6" style={{ background: BG_DARK }}>
         <div className="max-w-7xl mx-auto">
           <button
-            onClick={() => { setSelectedGame(null); setAnalysis([]); setTurningPoints([]); }}
+            onClick={() => { stopPolling(); setSelectedGame(null); setAnalysis([]); setTurningPoints([]); setIsAnalyzing(false); }}
             className="flex items-center gap-2 mb-4 text-sm font-medium hover:opacity-80 transition-opacity"
             style={{ color: CHESSCOM_GREEN }}
           >

@@ -409,13 +409,61 @@ router.post("/games/analyze-pgn", async (req, res): Promise<void> => {
     return;
   }
 
-  try {
-    const result = await analyzeGamePgn(pgn);
-    res.json(result);
-  } catch (err: any) {
-    req.log.error({ err }, "Failed to analyze PGN");
-    res.status(400).json({ error: err?.message ?? "Analysis failed" });
+  const crypto = await import("crypto");
+  const pgnHash = crypto.createHash("sha256").update(pgn.trim()).digest("hex").slice(0, 32);
+
+  const existing = await db.select().from(backgroundJobsTable).where(
+    and(
+      eq(backgroundJobsTable.type, "analyze-pgn"),
+      eq(backgroundJobsTable.targetUsername, pgnHash),
+    )
+  );
+  const activeJob = existing.find(j => j.status === "pending" || j.status === "done");
+  if (activeJob) {
+    if (activeJob.status === "done" && activeJob.result) {
+      res.json({ status: "done", jobId: activeJob.id, result: activeJob.result });
+    } else {
+      const progress = activeJob.result as Record<string, unknown> | null;
+      res.json({ status: "pending", jobId: activeJob.id, progress: progress?.progress ?? null, total: progress?.total ?? null });
+    }
+    return;
   }
+
+  const userId = req.user?.id ?? "anonymous";
+  const jobId = randomUUID();
+  await db.insert(backgroundJobsTable).values({
+    id: jobId,
+    userId,
+    type: "analyze-pgn",
+    status: "pending",
+    targetUsername: pgnHash,
+  });
+
+  res.json({ status: "pending", jobId });
+
+  runAnalyzePgnJob(pgn, jobId, req.log).catch(() => {});
+});
+
+router.get("/games/analyze-pgn-status/:jobId", async (req, res): Promise<void> => {
+  const [job] = await db.select().from(backgroundJobsTable).where(eq(backgroundJobsTable.id, req.params.jobId as string));
+  if (!job) { res.status(404).json({ error: "Job not found" }); return; }
+  res.setHeader("Cache-Control", "no-store");
+
+  if (job.status === "done" && job.result) {
+    res.json({ status: "done", result: job.result });
+    return;
+  }
+  if (job.status === "error") {
+    res.json({ status: "error", error: job.error ?? "Analysis failed" });
+    return;
+  }
+
+  const progress = job.result as Record<string, unknown> | null;
+  res.json({
+    status: job.status,
+    progress: progress?.progress ?? null,
+    total: progress?.total ?? null,
+  });
 });
 
 router.get("/games/:id", async (req, res): Promise<void> => {
@@ -556,6 +604,37 @@ router.post("/games/:id/analyze-move", async (req, res): Promise<void> => {
     res.status(500).json({ error: "Analysis failed" });
   }
 });
+
+async function runAnalyzePgnJob(pgn: string, jobId: string, log: Logger): Promise<void> {
+  try {
+    log.info({ jobId }, "Starting PGN analysis background job");
+
+    await db.update(backgroundJobsTable).set({
+      result: { progress: 0, total: 0 } as unknown as Record<string, unknown>,
+    }).where(eq(backgroundJobsTable.id, jobId));
+
+    const result = await analyzeGamePgn(pgn, (done, total) => {
+      db.update(backgroundJobsTable).set({
+        result: { progress: done, total } as unknown as Record<string, unknown>,
+      }).where(eq(backgroundJobsTable.id, jobId)).catch(() => {});
+    });
+
+    await db.update(backgroundJobsTable).set({
+      status: "done",
+      result: result as unknown as Record<string, unknown>,
+      completedAt: new Date(),
+    }).where(eq(backgroundJobsTable.id, jobId));
+
+    log.info({ jobId }, "PGN analysis background job complete");
+  } catch (err: any) {
+    log.error({ err, jobId }, "PGN analysis background job failed");
+    await db.update(backgroundJobsTable).set({
+      status: "error",
+      error: err?.message ?? "Analysis failed",
+      completedAt: new Date(),
+    }).where(eq(backgroundJobsTable.id, jobId));
+  }
+}
 
 async function runReviewJob(gameId: number, jobId: string, log: Logger): Promise<void> {
   try {
