@@ -457,7 +457,7 @@ export function OpponentAnalysis() {
                 {/* Win/loss stats */}
                 <div className="sm:ml-auto flex flex-col items-start sm:items-end justify-center gap-3">
                   <div className="flex items-center gap-3">
-                    <p className="text-xs text-muted-foreground">Based on {result.gamesAnalyzed} recent games</p>
+                    <p className="text-xs text-muted-foreground">{result.username}'s record across {result.gamesAnalyzed} recent games</p>
                     <button
                       onClick={() => { setResult(null); handleAnalyze({ preventDefault: () => {} } as React.FormEvent); }}
                       disabled={loading}
@@ -467,10 +467,10 @@ export function OpponentAnalysis() {
                     </button>
                   </div>
                   <div className="flex gap-4">
-                    <Stat label="Wins"   value={result.wins}   color="text-emerald-400" />
-                    <Stat label="Losses" value={result.losses} color="text-red-400" />
+                    <Stat label="Their Wins"   value={result.wins}   color="text-emerald-400" />
+                    <Stat label="Their Losses" value={result.losses} color="text-red-400" />
                     <Stat label="Draws"  value={result.draws}  color="text-muted-foreground" />
-                    <Stat label="Win %"  value={`${winPct}%`}  color="text-primary" />
+                    <Stat label="Their Win %"  value={`${winPct}%`}  color="text-primary" />
                   </div>
                   {/* W/L/D bar */}
                   <div className="flex w-full sm:w-48 h-2 rounded-full overflow-hidden gap-0.5">

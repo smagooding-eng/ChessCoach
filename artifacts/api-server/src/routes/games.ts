@@ -11,7 +11,7 @@ import {
   GetGameParams,
   GetGameReplayParams,
 } from "@workspace/api-zod";
-import { fetchChessComGames, extractGameMetadata, parsePgnMoves, extractOpeningFromPgn } from "../lib/chesscom";
+import { fetchChessComGames, extractGameMetadata, parsePgnMoves, extractOpeningFromPgn, extractStartFen } from "../lib/chesscom";
 import { analyzeMoves, analyzeSingleMove, reviewFullGame, analyzeGamePgn } from "../lib/openaiAnalysis";
 import { randomUUID } from "crypto";
 import type { Logger } from "pino";
@@ -570,12 +570,14 @@ async function runReviewJob(gameId: number, jobId: string, log: Logger): Promise
     }
 
     const moves = parsePgnMoves(game.pgn);
+    const startFen = extractStartFen(game.pgn);
     const reviewResult = await reviewFullGame({
       moves,
       opening: game.opening,
       result: game.result,
       whiteUsername: game.whiteUsername,
       blackUsername: game.blackUsername,
+      startFen: startFen !== "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1" ? startFen : undefined,
       onProgress: (done, total) => {
         db.update(backgroundJobsTable).set({
           result: { progress: done, total } as unknown as Record<string, unknown>,

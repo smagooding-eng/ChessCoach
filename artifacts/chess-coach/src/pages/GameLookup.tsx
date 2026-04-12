@@ -262,23 +262,28 @@ export function GameLookup() {
   const moves = selectedGame?.moves ?? [];
   const totalMoves = moves.length;
 
+  const startFen = useMemo(() => {
+    if (!selectedGame || !moves.length) return 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+    return moves[0]?.fenBefore ?? 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+  }, [selectedGame, moves]);
+
   const currentFen = useMemo(() => {
-    if (!selectedGame || moveIndex === 0) return 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
-    return moves[moveIndex - 1]?.fen ?? 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
-  }, [selectedGame, moveIndex, moves]);
+    if (!selectedGame || moveIndex === 0) return startFen;
+    return moves[moveIndex - 1]?.fen ?? startFen;
+  }, [selectedGame, moveIndex, moves, startFen]);
 
   const lastMovePair = useMemo(() => {
     if (moveIndex === 0 || !selectedGame) return undefined;
     const m = moves[moveIndex - 1];
     if (!m) return undefined;
     try {
-      const prevFen = moveIndex >= 2 ? moves[moveIndex - 2].fen : 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+      const prevFen = moveIndex >= 2 ? moves[moveIndex - 2].fen : startFen;
       const chess = new Chess(prevFen);
       const result = chess.move(m.san);
       if (result) return { from: result.from, to: result.to };
     } catch {}
     return undefined;
-  }, [moveIndex, moves, selectedGame]);
+  }, [moveIndex, moves, selectedGame, startFen]);
 
   const currentMoveAnalysis = useMemo(() => {
     if (moveIndex === 0 || analysis.length === 0) return null;
@@ -339,74 +344,83 @@ export function GameLookup() {
   }, [selectedGame, goNext, goPrev, goFirst, goLast, togglePlay]);
 
   const runAnalysis = useCallback(async () => {
-    if (!selectedGame || moves.length === 0) return;
+    if (!selectedGame || !selectedGame.pgn) return;
     setIsAnalyzing(true);
     setAnalysisProgress(0);
     setAnalysis([]);
     setTurningPoints([]);
 
-    const results: MoveAnalysis[] = [];
-    const startFen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+    try {
+      setAnalysisProgress(10);
 
-    for (let i = 0; i < moves.length; i++) {
-      const fenBefore = i === 0 ? startFen : moves[i - 1].fen;
-      try {
-        void fenBefore;
-        results.push({
-          moveIndex: i,
-          san: moves[i].san,
-          color: moves[i].color,
-          classification: 'good' as Classification,
-          evalBefore: 0,
-          evalAfter: 0,
-          cpLoss: 0,
-          bestMoveSan: null,
-          summary: '',
-        });
-      } catch {
-        results.push({
-          moveIndex: i,
-          san: moves[i].san,
-          color: moves[i].color,
-          classification: 'good',
-          evalBefore: 0,
-          evalAfter: 0,
-          cpLoss: 0,
-          bestMoveSan: null,
-          summary: '',
-        });
+      const res = await apiFetch('/api/games/analyze-pgn', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pgn: selectedGame.pgn }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error((data as Record<string, string>).error || `Analysis failed (${res.status})`);
       }
 
-      if (i % 5 === 0 || i === moves.length - 1) {
-        setAnalysisProgress(Math.round(((i + 1) / moves.length) * 100));
-        setAnalysis([...results]);
-        await new Promise(r => setTimeout(r, 0));
+      setAnalysisProgress(80);
+
+      const data = await res.json() as {
+        moves: Array<{
+          moveIndex: number;
+          san: string;
+          color: 'white' | 'black';
+          classification: Classification;
+          cpLoss: number;
+          bestMove: string | null;
+          evalBefore: number;
+          evalAfter: number;
+        }>;
+        whiteAccuracy: number;
+        blackAccuracy: number;
+      };
+
+      const results: MoveAnalysis[] = data.moves.map(m => ({
+        moveIndex: m.moveIndex,
+        san: m.san,
+        color: m.color,
+        classification: m.classification,
+        evalBefore: m.evalBefore,
+        evalAfter: m.evalAfter,
+        cpLoss: m.cpLoss,
+        bestMoveSan: m.bestMove,
+        summary: '',
+      }));
+
+      const tps: TurningPoint[] = [];
+      for (let i = 1; i < results.length; i++) {
+        const swing = results[i].evalAfter - results[i].evalBefore;
+        const absSwing = Math.abs(swing);
+        if (absSwing >= 150) {
+          const color = results[i].color;
+          const isGoodForMover = (color === 'white' && swing > 0) || (color === 'black' && swing < 0);
+          tps.push({
+            moveIndex: results[i].moveIndex,
+            san: results[i].san,
+            color,
+            evalSwing: swing,
+            description: isGoodForMover
+              ? `Strong move that shifted the position significantly`
+              : `Weak move that gave away a ${absSwing >= 300 ? 'major' : 'significant'} advantage`,
+          });
+        }
       }
+      tps.sort((a, b) => Math.abs(b.evalSwing) - Math.abs(a.evalSwing));
+      setTurningPoints(tps.slice(0, 6));
+      setAnalysisProgress(100);
+      setAnalysis(results);
+    } catch (err: unknown) {
+      console.error('Analysis failed:', err);
+    } finally {
+      setIsAnalyzing(false);
     }
-
-    const tps: TurningPoint[] = [];
-    for (let i = 1; i < results.length; i++) {
-      const swing = results[i].evalAfter - results[i].evalBefore;
-      const absSwing = Math.abs(swing);
-      if (absSwing >= 150) {
-        const color = results[i].color;
-        const isGoodForMover = (color === 'white' && swing > 0) || (color === 'black' && swing < 0);
-        tps.push({
-          moveIndex: results[i].moveIndex,
-          san: results[i].san,
-          color,
-          evalSwing: swing,
-          description: isGoodForMover
-            ? `Strong move that shifted the position significantly`
-            : `Weak move that gave away a ${absSwing >= 300 ? 'major' : 'significant'} advantage`,
-        });
-      }
-    }
-    tps.sort((a, b) => Math.abs(b.evalSwing) - Math.abs(a.evalSwing));
-    setTurningPoints(tps.slice(0, 6));
-    setAnalysis(results);
-    setIsAnalyzing(false);
-  }, [selectedGame, moves]);
+  }, [selectedGame]);
 
   const movePairs = useMemo(() => {
     if (!selectedGame) return [];

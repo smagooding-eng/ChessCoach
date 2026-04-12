@@ -79,6 +79,7 @@ interface ChessComGame {
   pgn: string;
   time_control: string;
   end_time: number;
+  rules: string;
   white: { username: string; rating: number; result: string };
   black: { username: string; rating: number; result: string };
 }
@@ -189,6 +190,11 @@ export function extractOpeningFromPgn(pgn: string): { opening: string | null; ec
 
 const START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
+export function extractStartFen(pgn: string): string {
+  const fenMatch = pgn.match(/\[FEN "([^"]+)"\]/);
+  return fenMatch ? fenMatch[1] : START_FEN;
+}
+
 export function parsePgnMoves(pgn: string): Array<{
   moveNumber: number;
   san: string;
@@ -204,17 +210,16 @@ export function parsePgnMoves(pgn: string): Array<{
   if (!pgn) return [];
 
   try {
-    const chess = new Chess();
+    const startFen = extractStartFen(pgn);
+    const chess = new Chess(startFen);
     chess.loadPgn(pgn);
     const history = chess.history({ verbose: true });
 
-    // Extract comments in order from the PGN move section
     const moveSection = pgn.replace(/\[.*?\]\n?/gs, "").trim();
     const comments = [...moveSection.matchAll(/\{([^}]*)\}/g)].map((m) => m[1]);
 
-    // Replay from the start to collect fenBefore for each move
-    const replayChess = new Chess();
-    const fensBefore: string[] = [START_FEN];
+    const replayChess = new Chess(startFen);
+    const fensBefore: string[] = [startFen];
     for (const move of history) {
       replayChess.move(move.san);
       fensBefore.push(replayChess.fen());

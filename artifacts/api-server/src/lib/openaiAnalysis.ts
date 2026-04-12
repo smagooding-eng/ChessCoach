@@ -1,6 +1,7 @@
 import OpenAI from "openai";
 import { logger } from "./logger";
 import { evaluateAllPositions, classifyFromWinPctLoss, uciToSan, winPct, type PositionEval } from "./engineAnalysis";
+import { extractStartFen } from "./chesscom";
 
 const openai = new OpenAI({
   baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
@@ -262,7 +263,8 @@ export interface PgnAnalysisResult {
 
 export async function analyzeGamePgn(pgn: string): Promise<PgnAnalysisResult> {
   const Chess = require("chess.js").Chess;
-  const chess = new Chess();
+  const startFen = extractStartFen(pgn);
+  const chess = new Chess(startFen);
 
   try {
     chess.loadPgn(pgn);
@@ -271,16 +273,16 @@ export async function analyzeGamePgn(pgn: string): Promise<PgnAnalysisResult> {
   }
 
   const history = chess.history();
-  chess.reset();
+  const replayChess = new Chess(startFen);
 
-  const fens: string[] = [chess.fen()];
+  const fens: string[] = [replayChess.fen()];
   const moveMeta: Array<{ san: string; color: "white" | "black"; from: string; to: string }> = [];
 
   for (const san of history) {
-    const color: "white" | "black" = chess.turn() === "w" ? "white" : "black";
-    const result = chess.move(san);
+    const color: "white" | "black" = replayChess.turn() === "w" ? "white" : "black";
+    const result = replayChess.move(san);
     if (!result) break;
-    fens.push(chess.fen());
+    fens.push(replayChess.fen());
     moveMeta.push({ san, color, from: result.from, to: result.to });
   }
 
@@ -677,13 +679,14 @@ export async function reviewFullGame(input: {
   result: string;
   whiteUsername: string;
   blackUsername: string;
+  startFen?: string;
   onProgress?: (done: number, total: number) => void;
 }): Promise<GameReviewResult> {
-  const { moves, opening, result, whiteUsername, blackUsername, onProgress } = input;
+  const { moves, opening, result, whiteUsername, blackUsername, startFen, onProgress } = input;
   const startTime = Date.now();
 
   const Chess = require("chess.js").Chess;
-  const chess = new Chess();
+  const chess = startFen ? new Chess(startFen) : new Chess();
   const moveDetails: string[] = [];
   const fens: string[] = [chess.fen()];
   const uciMoves: Array<{ from: string; to: string } | null> = [];
