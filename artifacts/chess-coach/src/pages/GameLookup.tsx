@@ -204,6 +204,34 @@ function AnalysisSummaryPanel({
   );
 }
 
+type SearchHistoryItem = {
+  player1: string;
+  player2: string;
+  searchedAt: string;
+};
+
+const SEARCH_HISTORY_KEY = 'chessscout_game_lookup_history';
+const MAX_HISTORY = 10;
+
+function getSearchHistory(): SearchHistoryItem[] {
+  try {
+    const raw = localStorage.getItem(SEARCH_HISTORY_KEY);
+    if (!raw) return [];
+    return JSON.parse(raw) as SearchHistoryItem[];
+  } catch { return []; }
+}
+
+function saveSearchToHistory(p1: string, p2: string) {
+  const history = getSearchHistory();
+  const key = [p1.toLowerCase(), p2.toLowerCase()].sort().join('|');
+  const filtered = history.filter(h => {
+    const hKey = [h.player1.toLowerCase(), h.player2.toLowerCase()].sort().join('|');
+    return hKey !== key;
+  });
+  filtered.unshift({ player1: p1, player2: p2, searchedAt: new Date().toISOString() });
+  localStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(filtered.slice(0, MAX_HISTORY)));
+}
+
 export function GameLookup() {
   const [player1, setPlayer1] = useState('');
   const [player2, setPlayer2] = useState('');
@@ -212,6 +240,7 @@ export function GameLookup() {
   const [games, setGames] = useState<H2HGame[]>([]);
   const [totalGames, setTotalGames] = useState(0);
   const [hasSearched, setHasSearched] = useState(false);
+  const [searchHistory, setSearchHistory] = useState<SearchHistoryItem[]>(() => getSearchHistory());
 
   const [selectedGame, setSelectedGame] = useState<H2HGame | null>(null);
   const [moveIndex, setMoveIndex] = useState(0);
@@ -224,8 +253,8 @@ export function GameLookup() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisProgress, setAnalysisProgress] = useState(0);
 
-  const handleSearch = useCallback(async () => {
-    if (!player1.trim() || !player2.trim()) return;
+  const doSearch = useCallback(async (p1: string, p2: string) => {
+    if (!p1.trim() || !p2.trim()) return;
     setLoading(true);
     setError('');
     setHasSearched(true);
@@ -233,7 +262,7 @@ export function GameLookup() {
     setAnalysis([]);
     setTurningPoints([]);
     try {
-      const res = await apiFetch(`/api/games/h2h-lookup?player1=${encodeURIComponent(player1.trim())}&player2=${encodeURIComponent(player2.trim())}`);
+      const res = await apiFetch(`/api/games/h2h-lookup?player1=${encodeURIComponent(p1.trim())}&player2=${encodeURIComponent(p2.trim())}`);
       if (!res.ok) {
         const data = await res.json().catch(() => ({ error: 'Request failed' }));
         throw new Error(data.error || `Error ${res.status}`);
@@ -241,13 +270,21 @@ export function GameLookup() {
       const data = await res.json();
       setGames(data.games);
       setTotalGames(data.totalGames);
+      if (data.games?.length > 0) {
+        saveSearchToHistory(p1.trim(), p2.trim());
+        setSearchHistory(getSearchHistory());
+      }
     } catch (err: any) {
       setError(err.message || 'Failed to fetch games');
       setGames([]);
     } finally {
       setLoading(false);
     }
-  }, [player1, player2]);
+  }, []);
+
+  const handleSearch = useCallback(() => {
+    doSearch(player1, player2);
+  }, [player1, player2, doSearch]);
 
   const selectGame = useCallback((game: H2HGame) => {
     stopPolling();
@@ -756,6 +793,37 @@ export function GameLookup() {
             </button>
           </div>
         </div>
+
+        {searchHistory.length > 0 && !loading && games.length === 0 && (
+          <div className="rounded-xl border p-4" style={{ background: BG_CARD, border: CARD_BORDER, boxShadow: CARD_SHADOW }}>
+            <div className="flex items-center gap-2 mb-3">
+              <Clock size={14} style={{ color: TEXT_MUTED }} />
+              <h3 className="text-xs font-bold uppercase tracking-wider" style={{ color: TEXT_MUTED }}>Previous Searches</h3>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {searchHistory.map((h, i) => (
+                <button
+                  key={i}
+                  onClick={() => {
+                    setPlayer1(h.player1);
+                    setPlayer2(h.player2);
+                    doSearch(h.player1, h.player2);
+                  }}
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all hover:opacity-80"
+                  style={{ background: 'rgba(129,182,76,0.08)', border: '1px solid rgba(129,182,76,0.15)', color: TEXT_LIGHT }}
+                >
+                  <Swords size={12} style={{ color: CHESSCOM_GREEN }} />
+                  <span className="font-medium">{h.player1}</span>
+                  <span style={{ color: TEXT_MUTED }}>vs</span>
+                  <span className="font-medium">{h.player2}</span>
+                  <span className="text-[10px]" style={{ color: TEXT_MUTED }}>
+                    {new Date(h.searchedAt).toLocaleDateString()}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {error && (
           <div className="rounded-lg p-3 text-sm border" style={{ background: 'rgba(220,67,67,0.1)', borderColor: 'rgba(220,67,67,0.3)', color: MISTAKE_RED }}>
