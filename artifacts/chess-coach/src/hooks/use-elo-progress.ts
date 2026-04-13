@@ -10,6 +10,7 @@ export interface EloProgress {
   low: number;
   sparkline: number[];
   totalGames: number;
+  signedUpAt: string | null;
   firstGameAt: string;
   lastGameAt: string;
 }

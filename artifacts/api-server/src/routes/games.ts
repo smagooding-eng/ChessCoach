@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
-import { db, gamesTable, backgroundJobsTable } from "@workspace/db";
-import { eq, desc, count, isNull, and, asc, sql } from "drizzle-orm";
+import { db, gamesTable, backgroundJobsTable, usersTable } from "@workspace/db";
+import { eq, desc, count, isNull, and, asc, sql, gte } from "drizzle-orm";
 import {
   ImportGamesBody,
   ImportGamesResponse,
@@ -100,6 +100,19 @@ router.get("/games/elo-progress", async (req, res): Promise<void> => {
   const username = rawUsername.toLowerCase();
 
   try {
+    const [user] = await db
+      .select({ createdAt: usersTable.createdAt })
+      .from(usersTable)
+      .where(eq(sql`lower(${usersTable.chesscomUsername})`, username))
+      .limit(1);
+
+    const signupDate = user?.createdAt ?? null;
+
+    const conditions = [eq(gamesTable.username, username)];
+    if (signupDate) {
+      conditions.push(gte(gamesTable.playedAt, signupDate));
+    }
+
     const allRatings = await db
       .select({
         playedAt: gamesTable.playedAt,
@@ -108,7 +121,7 @@ router.get("/games/elo-progress", async (req, res): Promise<void> => {
         blackRating: gamesTable.blackRating,
       })
       .from(gamesTable)
-      .where(eq(gamesTable.username, username))
+      .where(and(...conditions))
       .orderBy(asc(gamesTable.playedAt));
 
     if (allRatings.length === 0) {
@@ -146,6 +159,7 @@ router.get("/games/elo-progress", async (req, res): Promise<void> => {
       low,
       sparkline,
       totalGames,
+      signedUpAt: signupDate?.toISOString() ?? null,
       firstGameAt: allRatings[0].playedAt.toISOString(),
       lastGameAt: allRatings[allRatings.length - 1].playedAt.toISOString(),
     });
