@@ -15,7 +15,33 @@ export interface EloProgress {
   lastGameAt: string;
 }
 
+export interface MultiEloProgress {
+  combined: EloProgress | null;
+  chesscom: EloProgress | null;
+  lichess: EloProgress | null;
+}
+
 const cache = new Map<string, EloProgress>();
+
+async function fetchElo(username: string, platform?: string): Promise<EloProgress | null> {
+  const key = platform ? `${username}:${platform}` : username;
+  if (cache.has(key)) return cache.get(key)!;
+
+  try {
+    let url = `/api/games/elo-progress?username=${encodeURIComponent(username)}`;
+    if (platform) url += `&platform=${platform}`;
+    const r = await apiFetch(url);
+    if (!r.ok) return null;
+    const d = await r.json();
+    if (d && d.hasData) {
+      cache.set(key, d);
+      return d;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
 
 export function useEloProgress(username: string | undefined) {
   const [data, setData] = useState<EloProgress | null>(() => {
@@ -41,24 +67,42 @@ export function useEloProgress(username: string | undefined) {
     const id = ++requestId.current;
     setLoading(true);
 
-    apiFetch(`/api/games/elo-progress?username=${encodeURIComponent(key)}`)
-      .then(r => r.ok ? r.json() : null)
-      .then(d => {
-        if (id !== requestId.current) return;
-        if (d && d.hasData) {
-          cache.set(key, d);
-          setData(d);
-        } else {
-          setData(null);
-        }
-      })
-      .catch(() => {
-        if (id !== requestId.current) return;
-        setData(null);
-      })
-      .finally(() => {
-        if (id === requestId.current) setLoading(false);
-      });
+    fetchElo(key).then(d => {
+      if (id !== requestId.current) return;
+      setData(d);
+    }).finally(() => {
+      if (id === requestId.current) setLoading(false);
+    });
+  }, [username]);
+
+  return { data, loading };
+}
+
+export function useMultiEloProgress(username: string | undefined) {
+  const [data, setData] = useState<MultiEloProgress>({ combined: null, chesscom: null, lichess: null });
+  const [loading, setLoading] = useState(!!username);
+  const requestId = useRef(0);
+
+  useEffect(() => {
+    if (!username) {
+      setData({ combined: null, chesscom: null, lichess: null });
+      setLoading(false);
+      return;
+    }
+    const key = username.toLowerCase();
+    const id = ++requestId.current;
+    setLoading(true);
+
+    Promise.all([
+      fetchElo(key),
+      fetchElo(key, 'chesscom'),
+      fetchElo(key, 'lichess'),
+    ]).then(([combined, chesscom, lichess]) => {
+      if (id !== requestId.current) return;
+      setData({ combined, chesscom, lichess });
+    }).finally(() => {
+      if (id === requestId.current) setLoading(false);
+    });
   }, [username]);
 
   return { data, loading };

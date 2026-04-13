@@ -151,6 +151,7 @@ router.post("/games/import", async (req, res): Promise<void> => {
 
 router.get("/games/elo-progress", async (req, res): Promise<void> => {
   const rawUsername = req.query.username;
+  const platformFilter = req.query.platform as string | undefined;
   if (!rawUsername || typeof rawUsername !== "string") {
     res.status(400).json({ error: "username is required" });
     return;
@@ -159,16 +160,24 @@ router.get("/games/elo-progress", async (req, res): Promise<void> => {
 
   try {
     const [user] = await db
-      .select({ createdAt: usersTable.createdAt })
+      .select({
+        createdAt: usersTable.createdAt,
+        chesscomUsername: usersTable.chesscomUsername,
+        lichessUsername: usersTable.lichessUsername,
+      })
       .from(usersTable)
       .where(eq(sql`lower(${usersTable.chesscomUsername})`, username))
       .limit(1);
 
     const signupDate = user?.createdAt ?? null;
+    const lichessUser = user?.lichessUsername?.toLowerCase() ?? null;
 
     const conditions = [eq(gamesTable.username, username)];
     if (signupDate) {
       conditions.push(gte(gamesTable.playedAt, signupDate));
+    }
+    if (platformFilter && (platformFilter === "chesscom" || platformFilter === "lichess")) {
+      conditions.push(eq(gamesTable.platform, platformFilter));
     }
 
     const allRatings = await db
@@ -177,6 +186,7 @@ router.get("/games/elo-progress", async (req, res): Promise<void> => {
         whiteUsername: gamesTable.whiteUsername,
         whiteRating: gamesTable.whiteRating,
         blackRating: gamesTable.blackRating,
+        platform: gamesTable.platform,
       })
       .from(gamesTable)
       .where(and(...conditions))
@@ -187,8 +197,11 @@ router.get("/games/elo-progress", async (req, res): Promise<void> => {
       return;
     }
 
-    const getRating = (g: typeof allRatings[0]) =>
-      g.whiteUsername.toLowerCase() === username ? g.whiteRating : g.blackRating;
+    const getRating = (g: typeof allRatings[0]) => {
+      const wu = g.whiteUsername.toLowerCase();
+      if (wu === username || (lichessUser && wu === lichessUser)) return g.whiteRating;
+      return g.blackRating;
+    };
 
     const firstRating = getRating(allRatings[0]);
     const currentRating = getRating(allRatings[allRatings.length - 1]);

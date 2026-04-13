@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'wouter';
 import { useUser } from '@/hooks/use-user';
 import { useChessPlayer } from '@/hooks/use-chess-player';
-import { useEloProgress } from '@/hooks/use-elo-progress';
-import { EloTrackerBadge, EloTrackerInline } from '@/components/EloTracker';
+import { useMultiEloProgress } from '@/hooks/use-elo-progress';
+import { MultiEloTrackerBadge, MultiEloInline } from '@/components/EloTracker';
 import { LayoutDashboard, Import, History, BrainCircuit, GraduationCap, Swords, BookOpen, LogOut, MoreHorizontal, ChevronRight, Bot, Crown, Trophy, Play, Search, Download, Puzzle, User, Settings, CreditCard } from 'lucide-react';
 import { usePwaInstall } from '@/hooks/use-pwa-install';
 import { InstallGuide } from '@/components/InstallGuide';
@@ -83,7 +83,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const { username, logout, isAuthenticated, authLogout, isPremium, subscription, authUser } = useUser();
   const { player } = useChessPlayer(username ?? undefined);
-  const { data: eloProgress } = useEloProgress(username ?? undefined);
+  const { data: multiElo } = useMultiEloProgress(username ?? undefined);
   const [moreOpen, setMoreOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const handleLogout = isAuthenticated ? authLogout : logout;
@@ -127,13 +127,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   {displayRating && (
                     <span className="text-[10px] font-bold leading-tight" style={{ color: CHESSCOM_GREEN }}>{displayRating}</span>
                   )}
-                  {eloProgress?.hasData && <EloTrackerInline elo={eloProgress} />}
+                  {(multiElo.chesscom?.hasData || multiElo.lichess?.hasData) && <MultiEloInline multi={multiElo} />}
                 </div>
               </div>
             </Link>
-            {eloProgress?.hasData && (
+            {(multiElo.chesscom?.hasData || multiElo.lichess?.hasData) && (
               <div className="shrink-0">
-                <EloTrackerBadge elo={eloProgress} />
+                <MultiEloTrackerBadge multi={multiElo} />
               </div>
             )}
             {canInstall && (
@@ -167,7 +167,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 <span className="text-xs font-bold leading-tight" style={{ color: TEXT_LIGHT }}>{username}</span>
                 <div className="flex items-center gap-1">
                   {displayRating && <span className="text-[10px] font-bold leading-tight" style={{ color: CHESSCOM_GREEN }}>{displayRating}</span>}
-                  {eloProgress?.hasData && <EloTrackerInline elo={eloProgress} />}
+                  {(multiElo.chesscom?.hasData || multiElo.lichess?.hasData) && <MultiEloInline multi={multiElo} />}
                 </div>
               </div>
               <PlayerAvatar avatar={player?.avatar} username={username ?? ''} size="sm" />
