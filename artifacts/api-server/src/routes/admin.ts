@@ -264,7 +264,7 @@ router.get("/admin/users/:userId/usage", requireAdmin, async (req: Request, res:
   try {
     const { userId } = req.params;
 
-    const [user] = await db.select().from(usersTable).where(eq(usersTable.id, userId));
+    const [user] = await db.select().from(usersTable).where(sql`${usersTable.id} = ${userId}`);
     if (!user) { res.status(404).json({ error: "User not found" }); return; }
 
     const username = user.chesscomUsername;

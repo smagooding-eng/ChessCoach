@@ -39,6 +39,7 @@ The project is structured as a monorepo using pnpm workspaces, targeting Node.js
 
 **System Design Choices:**
 - **Authentication**: Supports email/password and Google OAuth, using session cookies and Bearer tokens.
+- **Referral System**: Paid Pro subscribers get a unique 8-char hex invite code and shareable referral link (`?ref=CODE`). Referral codes are stored in `invite_code` on users table, generated only upon first active Stripe subscription. `referral_conversions` table tracks signups (`signed_up`) and Pro conversions (`converted`). Frontend persists referral codes via `localStorage('chessscout_ref')` across registration flows (email + Google OAuth). Profile page shows referral card with copy link, stats, and referral list. Non-Pro users see an "Unlock Referrals" prompt. API: `GET /api/auth/referrals`.
 - **Subscription Management**: Integrates Stripe for ChessScout Pro subscriptions, including a free trial and premium feature gating.
 - **Email Service**: Uses Resend for transactional and broadcast emails, including welcome emails.
 - **PWA Support**: The application is installable as a Progressive Web App, featuring a manifest, service worker for caching, and install prompts.

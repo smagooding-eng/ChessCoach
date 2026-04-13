@@ -32,6 +32,12 @@ function AuthModal({ open, onClose, initialMode, externalError }: { open: boolea
   const [, setLocation] = useLocation();
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const ref = params.get('ref');
+    if (ref) localStorage.setItem('chessscout_ref', ref);
+  }, []);
+
+  useEffect(() => {
     apiFetch('/api/auth/google/status', { credentials: 'include' })
       .then(r => r.ok ? r.json() : { available: false })
       .then(d => setGoogleAvailable(!!d.available))
@@ -48,6 +54,8 @@ function AuthModal({ open, onClose, initialMode, externalError }: { open: boolea
       if (mode === 'register') {
         if (firstName.trim()) body.firstName = firstName.trim();
         if (chesscomUsername.trim()) body.chesscomUsername = chesscomUsername.trim();
+        const ref = localStorage.getItem('chessscout_ref') || '';
+        if (ref) body.referralCode = ref;
       }
       const res = await apiFetch(endpoint, {
         method: 'POST',
@@ -58,6 +66,7 @@ function AuthModal({ open, onClose, initialMode, externalError }: { open: boolea
       const data = await res.json();
       if (!res.ok) { setError(data.error || 'Something went wrong'); return; }
       if (data.token) setAuthToken(data.token);
+      localStorage.removeItem('chessscout_ref');
       if (data.user?.chesscomUsername) login(data.user.chesscomUsername);
       await refreshAuth();
       setLocation('/');
@@ -69,7 +78,9 @@ function AuthModal({ open, onClose, initialMode, externalError }: { open: boolea
   };
 
   const handleGoogleLogin = () => {
-    window.location.href = apiUrl('/api/auth/google');
+    const ref = localStorage.getItem('chessscout_ref') || '';
+    const url = ref ? apiUrl(`/api/auth/google?ref=${encodeURIComponent(ref)}`) : apiUrl('/api/auth/google');
+    window.location.href = url;
   };
 
   useEffect(() => {
@@ -344,6 +355,8 @@ export function LandingPage() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+    const ref = params.get('ref');
+    if (ref) localStorage.setItem('chessscout_ref', ref);
     const urlError = params.get('error');
     if (urlError === 'google_not_configured') {
       setOauthError('Google sign-in is not available yet. Please use email and password.');
@@ -352,7 +365,7 @@ export function LandingPage() {
       setOauthError('Google sign-in failed. Please try again or use email and password.');
       setAuthOpen(true);
     }
-    if (urlError) {
+    if (urlError || ref) {
       window.history.replaceState({}, '', window.location.pathname);
     }
   }, []);

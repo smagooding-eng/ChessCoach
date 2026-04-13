@@ -1,7 +1,8 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import bcrypt from "bcryptjs";
 import { db, usersTable, referralConversionsTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
+import { storage } from "../lib/storage";
 import crypto from "crypto";
 import {
   clearSession,
@@ -90,7 +91,6 @@ router.post("/auth/register", async (req: Request, res: Response) => {
         firstName: firstName || null,
         chesscomUsername: chesscomUsername || null,
         isAdmin: ADMIN_EMAILS.includes(email.toLowerCase()),
-        inviteCode: generateInviteCode(),
         referredByUserId: referrerUserId,
         lastLoginAt: new Date(),
       })
@@ -166,6 +166,7 @@ router.get("/auth/google", (req: Request, res: Response) => {
 
   const origin = getOrigin(req);
   const redirectUri = `${origin}/api/auth/google/callback`;
+  const refCode = (req.query.ref as string) || '';
 
   const params = new URLSearchParams({
     client_id: clientId,
@@ -174,6 +175,7 @@ router.get("/auth/google", (req: Request, res: Response) => {
     scope: "openid email profile",
     access_type: "offline",
     prompt: "select_account",
+    state: refCode ? `ref:${refCode}` : 'none',
   });
 
   res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params}`);
@@ -192,6 +194,8 @@ router.get("/auth/google/callback", async (req: Request, res: Response) => {
   try {
     const origin = getOrigin(req);
     const redirectUri = `${origin}/api/auth/google/callback`;
+    const stateParam = (req.query.state as string) || '';
+    const googleRefCode = stateParam.startsWith('ref:') ? stateParam.slice(4) : '';
 
     const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
       method: "POST",
@@ -247,6 +251,13 @@ router.get("/auth/google/callback", async (req: Request, res: Response) => {
           .where(eq(usersTable.id, existingByEmail.id))
           .returning();
       } else {
+        let googleReferrerUserId: string | null = null;
+        if (googleRefCode) {
+          const [referrer] = await db.select({ id: usersTable.id })
+            .from(usersTable)
+            .where(eq(usersTable.inviteCode, googleRefCode.toUpperCase().trim()));
+          if (referrer) googleReferrerUserId = referrer.id;
+        }
         [user] = await db
           .insert(usersTable)
           .values({
@@ -256,10 +267,17 @@ router.get("/auth/google/callback", async (req: Request, res: Response) => {
             firstName: profile.given_name || null,
             lastName: profile.family_name || null,
             profileImageUrl: profile.picture || null,
-            inviteCode: generateInviteCode(),
+            referredByUserId: googleReferrerUserId,
             lastLoginAt: new Date(),
           })
           .returning();
+        if (googleReferrerUserId) {
+          await db.insert(referralConversionsTable).values({
+            referrerUserId: googleReferrerUserId,
+            referredUserId: user.id,
+            status: "signed_up",
+          });
+        }
       }
     } else {
       await db.update(usersTable).set({ lastLoginAt: new Date() }).where(eq(usersTable.id, user.id));
@@ -311,6 +329,68 @@ router.post("/auth/update-profile", async (req: Request, res: Response) => {
     res.json({ user: sessionUser });
   } catch (err: any) {
     res.status(500).json({ error: "Failed to update profile" });
+  }
+});
+
+router.get("/auth/referrals", async (req: Request, res: Response) => {
+  if (!req.isAuthenticated()) {
+    res.status(401).json({ error: "Not authenticated" });
+    return;
+  }
+  try {
+    const userId = req.user.id;
+    const [user] = await db.select({ inviteCode: usersTable.inviteCode, stripeCustomerId: usersTable.stripeCustomerId, isPremiumOverride: usersTable.isPremiumOverride }).from(usersTable).where(eq(usersTable.id, userId));
+
+    let isPaid = !!user?.isPremiumOverride;
+    if (!isPaid && user?.stripeCustomerId) {
+      try {
+        const sub = await storage.getSubscriptionByCustomerId(user.stripeCustomerId);
+        if (sub && sub.status === 'active') isPaid = true;
+      } catch {
+        try {
+          const { getUncachableStripeClient } = await import('../lib/stripeClient');
+          const stripe = await getUncachableStripeClient();
+          const subs = await stripe.subscriptions.list({ customer: user.stripeCustomerId, status: 'active', limit: 1 });
+          if (subs.data.length > 0) isPaid = true;
+        } catch {}
+      }
+    }
+
+    const referrals = await db.select({
+      id: referralConversionsTable.id,
+      referredUserId: referralConversionsTable.referredUserId,
+      status: referralConversionsTable.status,
+      createdAt: referralConversionsTable.createdAt,
+      convertedAt: referralConversionsTable.convertedAt,
+    }).from(referralConversionsTable)
+      .where(sql`${referralConversionsTable.referrerUserId} = ${userId}`);
+
+    const referredUsers = referrals.length > 0
+      ? await db.select({ id: usersTable.id, firstName: usersTable.firstName, chesscomUsername: usersTable.chesscomUsername })
+        .from(usersTable)
+        .where(sql`${usersTable.id} IN (${sql.join(referrals.map(r => sql`${r.referredUserId}`), sql`, `)})`)
+      : [];
+
+    const referralDetails = referrals.map(r => {
+      const referred = referredUsers.find(u => u.id === r.referredUserId);
+      return {
+        id: r.id,
+        status: r.status,
+        createdAt: r.createdAt,
+        convertedAt: r.convertedAt,
+        referredName: referred?.firstName ?? referred?.chesscomUsername ?? "A friend",
+      };
+    });
+
+    res.json({
+      inviteCode: isPaid ? (user?.inviteCode ?? null) : null,
+      isPaid,
+      totalReferred: referrals.length,
+      totalConverted: referrals.filter(r => r.status === "converted").length,
+      referrals: referralDetails,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to get referral data" });
   }
 });
 

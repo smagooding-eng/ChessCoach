@@ -2,8 +2,13 @@ import { Router, type IRouter, type Request, type Response } from 'express';
 import { storage } from '../lib/storage';
 import { stripeService } from '../lib/stripeService';
 import { getUncachableStripeClient } from '../lib/stripeClient';
-import { db, referralConversionsTable } from '@workspace/db';
-import { eq, and } from 'drizzle-orm';
+import { db, referralConversionsTable, usersTable } from '@workspace/db';
+import { eq, and, sql } from 'drizzle-orm';
+import crypto from 'crypto';
+
+function generateInviteCode(): string {
+  return crypto.randomBytes(4).toString('hex').toUpperCase();
+}
 
 const router: IRouter = Router();
 
@@ -67,18 +72,27 @@ router.get('/stripe/subscription', async (req: Request, res: Response) => {
         } catch {}
       }
       if (subscription && ['active', 'trialing'].includes(subscription.status as string)) {
-        try {
-          const [pending] = await db.select().from(referralConversionsTable)
-            .where(and(
-              eq(referralConversionsTable.referredUserId, req.user.id),
-              eq(referralConversionsTable.status, 'signed_up')
-            ));
-          if (pending) {
-            await db.update(referralConversionsTable)
-              .set({ status: 'converted', convertedAt: new Date() })
-              .where(eq(referralConversionsTable.id, pending.id));
-          }
-        } catch {}
+        if (subscription.status === 'active') {
+          try {
+            const [pending] = await db.select().from(referralConversionsTable)
+              .where(and(
+                eq(referralConversionsTable.referredUserId, req.user.id),
+                eq(referralConversionsTable.status, 'signed_up')
+              ));
+            if (pending) {
+              await db.update(referralConversionsTable)
+                .set({ status: 'converted', convertedAt: new Date() })
+                .where(eq(referralConversionsTable.id, pending.id));
+            }
+          } catch {}
+        }
+        if (subscription.status === 'active' && !user?.inviteCode) {
+          try {
+            await db.update(usersTable)
+              .set({ inviteCode: generateInviteCode() })
+              .where(eq(usersTable.id, req.user.id));
+          } catch {}
+        }
         res.json({ subscription, status: subscription.status });
         return;
       }

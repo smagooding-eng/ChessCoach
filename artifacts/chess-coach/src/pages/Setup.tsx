@@ -15,9 +15,17 @@ export function Setup() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [googleAvailable, setGoogleAvailable] = useState(false);
+  const [referralCode] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('ref') || localStorage.getItem('chessscout_ref') || '';
+  });
 
   const { login, refreshAuth, isAuthenticated, isAuthLoading } = useUser();
   const [, setLocation] = useLocation();
+
+  useEffect(() => {
+    if (referralCode) localStorage.setItem('chessscout_ref', referralCode);
+  }, [referralCode]);
 
   useEffect(() => {
     apiFetch('/api/auth/google/status', { credentials: 'include' })
@@ -62,6 +70,8 @@ export function Setup() {
       if (mode === 'register') {
         if (firstName.trim()) body.firstName = firstName.trim();
         if (chesscomUsername.trim()) body.chesscomUsername = chesscomUsername.trim();
+        const ref = referralCode || localStorage.getItem('chessscout_ref') || '';
+        if (ref) body.referralCode = ref;
       }
 
       const res = await apiFetch(endpoint, {
@@ -79,6 +89,7 @@ export function Setup() {
       }
 
       if (data.token) setAuthToken(data.token);
+      localStorage.removeItem('chessscout_ref');
 
       if (data.user?.chesscomUsername) {
         login(data.user.chesscomUsername);
@@ -94,7 +105,9 @@ export function Setup() {
   };
 
   const handleGoogleLogin = () => {
-    window.location.href = apiUrl('/api/auth/google');
+    const ref = referralCode || localStorage.getItem('chessscout_ref') || '';
+    const url = ref ? apiUrl(`/api/auth/google?ref=${encodeURIComponent(ref)}`) : apiUrl('/api/auth/google');
+    window.location.href = url;
   };
 
   return (

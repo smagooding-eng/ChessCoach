@@ -12,7 +12,7 @@ import {
   GraduationCap, Settings, Shield, Edit3, Check, X, Eye, Users, CreditCard,
   Activity, Send, AlertCircle, CheckCircle2, Bold, Italic, Heading1, Heading2,
   Link as LinkIcon, Image, Type, Palette, List, ListOrdered, Minus, Undo2, Redo2, FileText, Sparkles,
-  Trash2, Loader2, Zap
+  Trash2, Loader2, Zap, Gift, Copy, UserPlus
 } from 'lucide-react';
 
 interface AdminStats {
@@ -1320,6 +1320,131 @@ function AdminTicker() {
   );
 }
 
+interface ReferralData {
+  inviteCode: string | null;
+  isPaid: boolean;
+  totalReferred: number;
+  totalConverted: number;
+  referrals: { id: string; status: string; createdAt: string; convertedAt: string | null; referredName: string }[];
+}
+
+function ReferralCard({ isPremium }: { isPremium: boolean }) {
+  const [data, setData] = useState<ReferralData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    apiFetch('/api/auth/referrals', { credentials: 'include' })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d) setData(d); })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) return null;
+
+  const siteUrl = window.location.origin;
+  const referralLink = data?.inviteCode ? `${siteUrl}?ref=${data.inviteCode}` : null;
+
+  const handleCopy = () => {
+    if (referralLink) {
+      navigator.clipboard.writeText(referralLink);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  return (
+    <motion.div
+      variants={{ hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0 } }}
+      className="bg-card border border-border/50 rounded-2xl overflow-hidden"
+    >
+      <div className="px-4 py-3 border-b border-border/30">
+        <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
+          <Gift className="w-4 h-4 text-primary" /> Refer a Friend
+        </h2>
+      </div>
+      <div className="p-4">
+        {!isPremium || !data?.isPaid ? (
+          <div className="text-center py-4">
+            <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center mx-auto mb-3">
+              <Crown className="w-6 h-6 text-primary" />
+            </div>
+            <p className="text-sm font-semibold text-foreground mb-1">Unlock Referrals</p>
+            <p className="text-xs text-muted-foreground mb-3">
+              Become a Pro subscriber to get your personal referral link and invite friends to ChessScout.
+            </p>
+            <Link href="/subscription" className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:text-primary/80 transition-colors">
+              Upgrade to Pro <ChevronRight className="w-3 h-3" />
+            </Link>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {referralLink && (
+              <div>
+                <p className="text-xs text-muted-foreground mb-2">Your referral link</p>
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 bg-background/60 border border-border/40 rounded-lg px-3 py-2 text-xs text-foreground font-mono truncate">
+                    {referralLink}
+                  </div>
+                  <button
+                    onClick={handleCopy}
+                    className={`shrink-0 px-3 py-2 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                      copied
+                        ? 'bg-emerald-500/15 text-emerald-400'
+                        : 'bg-primary/10 text-primary hover:bg-primary/20'
+                    }`}
+                  >
+                    {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                    {copied ? 'Copied!' : 'Copy'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-background/40 border border-border/30 rounded-xl p-3 text-center">
+                <div className="w-7 h-7 bg-blue-400/10 rounded-lg flex items-center justify-center mx-auto mb-1.5">
+                  <UserPlus className="w-3.5 h-3.5 text-blue-400" />
+                </div>
+                <p className="text-lg font-black text-foreground">{data?.totalReferred ?? 0}</p>
+                <p className="text-[11px] text-muted-foreground">Signed Up</p>
+              </div>
+              <div className="bg-background/40 border border-border/30 rounded-xl p-3 text-center">
+                <div className="w-7 h-7 bg-emerald-400/10 rounded-lg flex items-center justify-center mx-auto mb-1.5">
+                  <Crown className="w-3.5 h-3.5 text-emerald-400" />
+                </div>
+                <p className="text-lg font-black text-foreground">{data?.totalConverted ?? 0}</p>
+                <p className="text-[11px] text-muted-foreground">Went Pro</p>
+              </div>
+            </div>
+
+            {data && data.referrals.length > 0 && (
+              <div>
+                <p className="text-xs text-muted-foreground mb-2">Your referrals</p>
+                <div className="space-y-1.5">
+                  {data.referrals.map(r => (
+                    <div key={r.id} className="flex items-center justify-between bg-background/30 border border-border/20 rounded-lg px-3 py-2">
+                      <span className="text-xs text-foreground font-medium">{r.referredName}</span>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${
+                        r.status === 'converted'
+                          ? 'bg-emerald-500/15 text-emerald-400'
+                          : 'bg-blue-500/15 text-blue-400'
+                      }`}>
+                        {r.status === 'converted' ? 'Pro' : 'Free'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </motion.div>
+  );
+}
+
 export function Profile() {
   const { username, authUser, isPremium, subscription, authLogout, login, logout } = useUser();
   const { player } = useChessPlayer(username ?? undefined);
@@ -1458,6 +1583,8 @@ export function Profile() {
           </div>
         ))}
       </motion.div>
+
+      {authUser && <ReferralCard isPremium={isPremium} />}
 
       <motion.div variants={item} className="bg-card border border-border/50 rounded-2xl overflow-hidden">
         <div className="px-4 py-3 border-b border-border/30">
