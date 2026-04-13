@@ -1,6 +1,6 @@
 import { Router, type IRouter, type Request, type Response } from "express";
-import { db, usersTable, pageViewsTable, gamesTable, weaknessesTable, coursesTable, lessonsTable, backgroundJobsTable } from "@workspace/db";
-import { sql, count, gte, countDistinct, inArray, eq } from "drizzle-orm";
+import { db, usersTable, pageViewsTable, gamesTable, weaknessesTable, coursesTable, lessonsTable, backgroundJobsTable, referralConversionsTable } from "@workspace/db";
+import { sql, count, gte, countDistinct, inArray, eq, and, isNotNull } from "drizzle-orm";
 import { puzzleAttemptsTable } from "@workspace/db";
 import { sessionsTable } from "@workspace/db";
 import { getUncachableStripeClient } from "../lib/stripeClient";
@@ -112,6 +112,8 @@ router.get("/admin/users", requireAdmin, async (_req: Request, res: Response) =>
         createdAt: usersTable.createdAt,
         stripeCustomerId: usersTable.stripeCustomerId,
         lastLoginAt: usersTable.lastLoginAt,
+        inviteCode: usersTable.inviteCode,
+        referredByUserId: usersTable.referredByUserId,
       })
       .from(usersTable)
       .orderBy(sql`${usersTable.createdAt} DESC`);
@@ -141,6 +143,14 @@ router.get("/admin/users", requireAdmin, async (_req: Request, res: Response) =>
       }
     } catch {}
 
+    const referralCounts = await db.select({
+      referrerUserId: referralConversionsTable.referrerUserId,
+      total: count(),
+    }).from(referralConversionsTable).groupBy(referralConversionsTable.referrerUserId);
+
+    const refCountMap: Record<string, number> = {};
+    for (const r of referralCounts) refCountMap[r.referrerUserId] = r.total;
+
     const enrichedUsers = users.map(u => {
       const stripeSub = u.stripeCustomerId ? subMap[u.stripeCustomerId] ?? null : null;
       const status = computeUserStatus(u.email, u.createdAt, stripeSub);
@@ -156,6 +166,9 @@ router.get("/admin/users", requireAdmin, async (_req: Request, res: Response) =>
         tierDetail: status.detail,
         planInterval: stripeSub?.planInterval ?? null,
         daysSinceLogin,
+        inviteCode: u.inviteCode,
+        referredByUserId: u.referredByUserId,
+        referralCount: refCountMap[u.id] ?? 0,
       };
     });
 
@@ -244,6 +257,101 @@ router.post("/admin/users/delete", requireAdmin, async (req: Request, res: Respo
     res.json({ success: true, deleted: ids.length });
   } catch (err: any) {
     res.status(500).json({ error: "Failed to delete users", details: err.message });
+  }
+});
+
+router.get("/admin/users/:userId/usage", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.params;
+
+    const [user] = await db.select().from(usersTable).where(eq(usersTable.id, userId));
+    if (!user) { res.status(404).json({ error: "User not found" }); return; }
+
+    const username = user.chesscomUsername;
+
+    const [gamesImported] = await db.select({ count: count() }).from(gamesTable)
+      .where(username ? eq(gamesTable.username, username) : sql`false`);
+
+    const [gamesReviewed] = await db.select({ count: count() }).from(gamesTable)
+      .where(and(
+        username ? eq(gamesTable.username, username) : sql`false`,
+        isNotNull(gamesTable.reviewData)
+      ));
+
+    const [scoutJobs] = await db.select({ count: count() }).from(backgroundJobsTable)
+      .where(sql`${backgroundJobsTable.userId} = ${userId} AND ${backgroundJobsTable.type} = 'analysis'`);
+
+    const [puzzlesSolved] = await db.select({ count: count() }).from(puzzleAttemptsTable)
+      .where(sql`${puzzleAttemptsTable.userId} = ${userId} AND ${puzzleAttemptsTable.solved} = true`);
+
+    const [puzzlesFailed] = await db.select({ count: count() }).from(puzzleAttemptsTable)
+      .where(sql`${puzzleAttemptsTable.userId} = ${userId} AND ${puzzleAttemptsTable.solved} = false`);
+
+    const [coursesGenerated] = await db.select({ count: count() }).from(coursesTable)
+      .where(username ? eq(coursesTable.username, username) : sql`false`);
+
+    const [lessonsCompleted] = await db.select({ count: count() }).from(lessonsTable)
+      .where(eq(lessonsTable.completed, "true"));
+
+    const [pageViewCount] = await db.select({ count: count() }).from(pageViewsTable)
+      .where(sql`${pageViewsTable.userId} = ${userId}`);
+
+    const recentPages = await db.select({ path: pageViewsTable.path, createdAt: pageViewsTable.createdAt })
+      .from(pageViewsTable)
+      .where(sql`${pageViewsTable.userId} = ${userId}`)
+      .orderBy(sql`${pageViewsTable.createdAt} DESC`)
+      .limit(20);
+
+    const referrals = await db.select({
+      id: referralConversionsTable.id,
+      referredUserId: referralConversionsTable.referredUserId,
+      status: referralConversionsTable.status,
+      createdAt: referralConversionsTable.createdAt,
+      convertedAt: referralConversionsTable.convertedAt,
+    }).from(referralConversionsTable)
+      .where(sql`${referralConversionsTable.referrerUserId} = ${userId}`);
+
+    const referredUsers = referrals.length > 0
+      ? await db.select({ id: usersTable.id, email: usersTable.email, firstName: usersTable.firstName, chesscomUsername: usersTable.chesscomUsername })
+        .from(usersTable)
+        .where(inArray(usersTable.id, referrals.map(r => r.referredUserId)))
+      : [];
+
+    const referralDetails = referrals.map(r => {
+      const referred = referredUsers.find(u => u.id === r.referredUserId);
+      return {
+        ...r,
+        referredEmail: referred?.email ?? null,
+        referredName: referred?.firstName ?? referred?.chesscomUsername ?? null,
+      };
+    });
+
+    res.json({
+      user: {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        chesscomUsername: user.chesscomUsername,
+        inviteCode: user.inviteCode,
+        referredByUserId: user.referredByUserId,
+        createdAt: user.createdAt,
+        lastLoginAt: user.lastLoginAt,
+      },
+      usage: {
+        gamesImported: gamesImported.count,
+        gamesReviewed: gamesReviewed.count,
+        opponentsScouted: scoutJobs.count,
+        puzzlesSolved: puzzlesSolved.count,
+        puzzlesFailed: puzzlesFailed.count,
+        coursesGenerated: coursesGenerated.count,
+        lessonsCompleted: lessonsCompleted.count,
+        pageViews: pageViewCount.count,
+      },
+      recentPages,
+      referrals: referralDetails,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to fetch user usage", details: err.message });
   }
 });
 

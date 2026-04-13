@@ -1,7 +1,8 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import bcrypt from "bcryptjs";
-import { db, usersTable } from "@workspace/db";
+import { db, usersTable, referralConversionsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
+import crypto from "crypto";
 import {
   clearSession,
   getSessionId,
@@ -32,6 +33,7 @@ function toSessionUser(dbUser: any): SessionUser {
     profileImageUrl: dbUser.profileImageUrl,
     chesscomUsername: dbUser.chesscomUsername,
     isAdmin: dbUser.isAdmin || ADMIN_EMAILS.includes(dbUser.email?.toLowerCase?.() ?? ""),
+    inviteCode: dbUser.inviteCode || null,
   };
 }
 
@@ -41,8 +43,12 @@ router.get("/auth/user", (req: Request, res: Response) => {
   });
 });
 
+function generateInviteCode(): string {
+  return crypto.randomBytes(4).toString('hex').toUpperCase();
+}
+
 router.post("/auth/register", async (req: Request, res: Response) => {
-  const { email, password, firstName, chesscomUsername } = req.body;
+  const { email, password, firstName, chesscomUsername, referralCode } = req.body;
 
   if (!email || !password) {
     res.status(400).json({ error: "Email and password are required" });
@@ -65,6 +71,14 @@ router.post("/auth/register", async (req: Request, res: Response) => {
       return;
     }
 
+    let referrerUserId: string | null = null;
+    if (referralCode) {
+      const [referrer] = await db.select({ id: usersTable.id })
+        .from(usersTable)
+        .where(eq(usersTable.inviteCode, referralCode.toUpperCase().trim()));
+      if (referrer) referrerUserId = referrer.id;
+    }
+
     const passwordHash = await bcrypt.hash(password, 12);
 
     const [user] = await db
@@ -76,9 +90,19 @@ router.post("/auth/register", async (req: Request, res: Response) => {
         firstName: firstName || null,
         chesscomUsername: chesscomUsername || null,
         isAdmin: ADMIN_EMAILS.includes(email.toLowerCase()),
+        inviteCode: generateInviteCode(),
+        referredByUserId: referrerUserId,
         lastLoginAt: new Date(),
       })
       .returning();
+
+    if (referrerUserId) {
+      await db.insert(referralConversionsTable).values({
+        referrerUserId,
+        referredUserId: user.id,
+        status: "signed_up",
+      });
+    }
 
     const sessionData: SessionData = { user: toSessionUser(user) };
     const sid = await createSession(sessionData);
@@ -232,6 +256,7 @@ router.get("/auth/google/callback", async (req: Request, res: Response) => {
             firstName: profile.given_name || null,
             lastName: profile.family_name || null,
             profileImageUrl: profile.picture || null,
+            inviteCode: generateInviteCode(),
             lastLoginAt: new Date(),
           })
           .returning();

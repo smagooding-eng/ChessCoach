@@ -16,6 +16,7 @@ export interface SessionUser {
   profileImageUrl: string | null;
   chesscomUsername: string | null;
   isAdmin: boolean;
+  inviteCode: string | null;
 }
 
 export interface SessionData {

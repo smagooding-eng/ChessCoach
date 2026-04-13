@@ -2,6 +2,8 @@ import { Router, type IRouter, type Request, type Response } from 'express';
 import { storage } from '../lib/storage';
 import { stripeService } from '../lib/stripeService';
 import { getUncachableStripeClient } from '../lib/stripeClient';
+import { db, referralConversionsTable } from '@workspace/db';
+import { eq, and } from 'drizzle-orm';
 
 const router: IRouter = Router();
 
@@ -65,6 +67,18 @@ router.get('/stripe/subscription', async (req: Request, res: Response) => {
         } catch {}
       }
       if (subscription && ['active', 'trialing'].includes(subscription.status as string)) {
+        try {
+          const [pending] = await db.select().from(referralConversionsTable)
+            .where(and(
+              eq(referralConversionsTable.referredUserId, req.user.id),
+              eq(referralConversionsTable.status, 'signed_up')
+            ));
+          if (pending) {
+            await db.update(referralConversionsTable)
+              .set({ status: 'converted', convertedAt: new Date() })
+              .where(eq(referralConversionsTable.id, pending.id));
+          }
+        } catch {}
         res.json({ subscription, status: subscription.status });
         return;
       }

@@ -25,10 +25,24 @@ export const usersTable = pgTable("users", {
   chesscomUsername: varchar("chesscom_username"),
   isAdmin: boolean("is_admin").notNull().default(false),
   isPremiumOverride: boolean("is_premium_override").notNull().default(false),
+  inviteCode: varchar("invite_code").unique(),
+  referredByUserId: varchar("referred_by_user_id"),
   lastLoginAt: timestamp("last_login_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });
+
+export const referralConversionsTable = pgTable("referral_conversions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  referrerUserId: varchar("referrer_user_id").notNull(),
+  referredUserId: varchar("referred_user_id").notNull(),
+  status: varchar("status").notNull().default("signed_up"),
+  convertedAt: timestamp("converted_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index("idx_referral_referrer").on(table.referrerUserId),
+  index("idx_referral_referred").on(table.referredUserId),
+]);
 
 export const pageViewsTable = pgTable("page_views", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -40,3 +54,4 @@ export const pageViewsTable = pgTable("page_views", {
 
 export type UpsertUser = typeof usersTable.$inferInsert;
 export type User = typeof usersTable.$inferSelect;
+export type ReferralConversion = typeof referralConversionsTable.$inferSelect;
