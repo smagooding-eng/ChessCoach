@@ -26,7 +26,7 @@ The project is structured as a monorepo using pnpm workspaces, targeting Node.js
 ## Feature Specifications
 
 **Core Features:**
-- **Game Import & Replay**: Users can import games from chess.com, which are then available for interactive replay with move-by-move navigation and engine evaluations. Game reviews run as background jobs.
+- **Game Import & Replay**: Users can import games from chess.com, which are then available for interactive replay with move-by-move navigation and engine evaluations. Game reviews run as background jobs. Supports Chess960 games with a fallback parser that handles non-standard castling (O-O/O-O-O) manually when chess.js fails. Import includes a "Re-sync" option (`forceUpdate`) to refresh PGN data for existing games (scoped by username). Admin panel includes per-user usage stats (games, puzzles, scouts, courses, page views, referrals) via `GET /api/admin/users/:userId/usage`.
 - **AI Analysis (Premium)**: GPT-powered analysis identifies weaknesses across games, generating a weakness report linked to specific game patterns and related courses.
 - **Personalized Courses (Premium)**: AI-generated courses with annotated PGN lessons derived from the player's actual games, focusing on identified weaknesses. Lessons include fix examples and interactive drills.
 - **Endgame Training (Premium)**: Comprehensive endgame courses covering checkmate patterns, essential endgames, and personalized lessons from user mistakes.

@@ -10,28 +10,44 @@ export function Import() {
   const { username, isLoaded, login, authUser } = useUser();
   const [months, setMonths] = useState(3);
   const { importGames, isImporting, error } = useImportChessGames();
-  const [result, setResult] = useState<{ imported: number; total: number } | null>(null);
+  const [result, setResult] = useState<{ imported: number; updated?: number; total: number } | null>(null);
   const [apiError, setApiError] = useState<string | null>(null);
   const [, setLocation] = useLocation();
+  const [isSyncing, setIsSyncing] = useState(false);
 
   const [editing, setEditing] = useState(false);
   const [editValue, setEditValue] = useState(username ?? '');
   const [saving, setSaving] = useState(false);
 
-  const handleImport = async (e: React.FormEvent) => {
+  const handleImport = async (e: React.FormEvent, forceUpdate = false) => {
     e.preventDefault();
     if (!username) {
       setLocation('/setup');
       return;
     }
     setApiError(null);
+    if (forceUpdate) setIsSyncing(true);
     try {
-      const res = await importGames(username, months);
-      setResult(res);
+      if (forceUpdate) {
+        const r = await apiFetch('/api/games/import', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ username, months, forceUpdate: true }),
+        });
+        if (!r.ok) throw new Error('Sync failed');
+        const data = await r.json();
+        setResult(data);
+      } else {
+        const res = await importGames(username, months);
+        setResult(res);
+      }
     } catch (err: unknown) {
       const msg =
         err instanceof Error ? err.message : 'Failed to import games. Please try again.';
       setApiError(msg);
+    } finally {
+      setIsSyncing(false);
     }
   };
 
@@ -113,15 +129,34 @@ export function Import() {
                   Try increasing the time range, or check that <strong>{username}</strong> is your correct chess.com username.
                 </p>
               </div>
-            ) : result.imported === 0 ? (
+            ) : result.imported === 0 && !result.updated ? (
               <div className="space-y-2 mb-6">
                 <p className="text-emerald-200/80">All {result.total} games are already imported — you&apos;re up to date!</p>
+                <p className="text-emerald-200/50 text-sm">
+                  Having issues with Chess960 or missing moves?{' '}
+                  <button
+                    onClick={(e) => handleImport(e, true)}
+                    disabled={isSyncing}
+                    className="text-amber-400 hover:text-amber-300 underline underline-offset-2"
+                  >
+                    {isSyncing ? 'Re-syncing...' : 'Re-sync games from chess.com'}
+                  </button>
+                </p>
               </div>
             ) : (
-              <p className="text-emerald-200/80 mb-6">
-                Successfully imported <strong>{result.imported}</strong> new game{result.imported !== 1 ? 's' : ''} (
-                {result.total} total in your library).
-              </p>
+              <div className="space-y-1 mb-6">
+                {result.imported > 0 && (
+                  <p className="text-emerald-200/80">
+                    Imported <strong>{result.imported}</strong> new game{result.imported !== 1 ? 's' : ''}
+                  </p>
+                )}
+                {(result.updated ?? 0) > 0 && (
+                  <p className="text-amber-300/80">
+                    Updated <strong>{result.updated}</strong> existing game{result.updated !== 1 ? 's' : ''} with latest data
+                  </p>
+                )}
+                <p className="text-emerald-200/60 text-sm">{result.total} total in your library</p>
+              </div>
             )}
 
             <div className="flex flex-wrap gap-4 justify-center">

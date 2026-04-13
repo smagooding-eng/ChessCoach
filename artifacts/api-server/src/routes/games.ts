@@ -26,8 +26,9 @@ router.post("/games/import", async (req, res): Promise<void> => {
   }
 
   const { username, months = 3 } = parsed.data;
+  const forceUpdate = req.body?.forceUpdate === true;
 
-  req.log.info({ username, months }, "Importing games from chess.com");
+  req.log.info({ username, months, forceUpdate }, "Importing games from chess.com");
 
   let games;
   try {
@@ -39,6 +40,7 @@ router.post("/games/import", async (req, res): Promise<void> => {
   }
 
   let imported = 0;
+  let updated = 0;
 
   for (const game of games) {
     try {
@@ -46,12 +48,23 @@ router.post("/games/import", async (req, res): Promise<void> => {
 
       if (meta.chesscomGameId) {
         const existing = await db
-          .select({ id: gamesTable.id })
+          .select({ id: gamesTable.id, pgn: gamesTable.pgn })
           .from(gamesTable)
-          .where(eq(gamesTable.chesscomGameId, meta.chesscomGameId))
+          .where(and(
+            eq(gamesTable.chesscomGameId, meta.chesscomGameId),
+            eq(gamesTable.username, username.toLowerCase())
+          ))
           .limit(1);
 
-        if (existing.length > 0) continue;
+        if (existing.length > 0) {
+          if (forceUpdate && existing[0].pgn !== game.pgn) {
+            await db.update(gamesTable)
+              .set({ pgn: game.pgn, reviewData: null, ...meta })
+              .where(eq(gamesTable.id, existing[0].id));
+            updated++;
+          }
+          continue;
+        }
       }
 
       await db.insert(gamesTable).values({
@@ -70,13 +83,12 @@ router.post("/games/import", async (req, res): Promise<void> => {
     .from(gamesTable)
     .where(eq(gamesTable.username, username.toLowerCase()));
 
-  res.json(
-    ImportGamesResponse.parse({
-      imported,
-      total: Number(total),
-      username,
-    })
-  );
+  res.json({
+    imported,
+    updated,
+    total: Number(total),
+    username,
+  });
 });
 
 router.get("/games", async (req, res): Promise<void> => {

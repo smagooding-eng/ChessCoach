@@ -235,6 +235,110 @@ export function extractStartFen(pgn: string): string {
   return fenMatch ? normalizeFen(fenMatch[1]) : START_FEN;
 }
 
+function isChess960Pgn(pgn: string): boolean {
+  return /\[Variant\s+"Chess960"\]/i.test(pgn) || /\[Event\s+"[^"]*960[^"]*"\]/i.test(pgn);
+}
+
+function extractSanTokens(pgn: string): { san: string; comment: string | null }[] {
+  const moveSection = pgn.replace(/\[.*?\]\n?/gs, "").trim();
+  const tokens: { san: string; comment: string | null }[] = [];
+  const regex = /(\d+\.+\s*)?([A-Za-z0-9+#=\-]+(?:\s*\{[^}]*\})?)/g;
+  let m;
+  while ((m = regex.exec(moveSection)) !== null) {
+    const raw = m[2];
+    const sanPart = raw.replace(/\s*\{[^}]*\}/, "").trim();
+    if (!sanPart || /^(1-0|0-1|1\/2-1\/2|\*)$/.test(sanPart)) continue;
+    const commentMatch = raw.match(/\{([^}]*)\}/);
+    tokens.push({ san: sanPart, comment: commentMatch ? commentMatch[1] : null });
+  }
+  return tokens;
+}
+
+function findPieceSquares(fen: string, piece: string): string[] {
+  const board = fen.split(" ")[0];
+  const ranks = board.split("/");
+  const squares: string[] = [];
+  for (let r = 0; r < 8; r++) {
+    let file = 0;
+    for (const ch of ranks[r]) {
+      if (ch >= "1" && ch <= "8") { file += parseInt(ch); }
+      else {
+        if (ch === piece) squares.push(String.fromCharCode(97 + file) + (8 - r));
+        file++;
+      }
+    }
+  }
+  return squares;
+}
+
+function applyManualCastle(fen: string, isKingside: boolean): { newFen: string; from: string; to: string } | null {
+  const parts = fen.split(" ");
+  const color = parts[1];
+  const rank = color === "w" ? "1" : "8";
+  const kingPiece = color === "w" ? "K" : "k";
+  const rookPiece = color === "w" ? "R" : "r";
+
+  const kingSquares = findPieceSquares(fen, kingPiece);
+  const rookSquares = findPieceSquares(fen, rookPiece).filter(s => s[1] === rank);
+
+  if (kingSquares.length !== 1) return null;
+  const kingSq = kingSquares[0];
+  const kingFile = kingSq.charCodeAt(0) - 97;
+
+  const targetRook = isKingside
+    ? rookSquares.filter(s => (s.charCodeAt(0) - 97) > kingFile).sort()[0]
+    : rookSquares.filter(s => (s.charCodeAt(0) - 97) < kingFile).sort().reverse()[0];
+
+  if (!targetRook) return null;
+
+  const kingDest = isKingside ? `g${rank}` : `c${rank}`;
+  const rookDest = isKingside ? `f${rank}` : `d${rank}`;
+
+  const board = parts[0].split("/");
+  const rankIdx = color === "w" ? 7 : 0;
+  let rankChars: string[] = [];
+  for (const ch of board[rankIdx]) {
+    if (ch >= "1" && ch <= "8") {
+      for (let i = 0; i < parseInt(ch); i++) rankChars.push(".");
+    } else {
+      rankChars.push(ch);
+    }
+  }
+
+  const rookFile = targetRook.charCodeAt(0) - 97;
+  rankChars[kingFile] = ".";
+  rankChars[rookFile] = ".";
+  const kDestFile = kingDest.charCodeAt(0) - 97;
+  const rDestFile = rookDest.charCodeAt(0) - 97;
+  rankChars[kDestFile] = kingPiece;
+  rankChars[rDestFile] = rookPiece;
+
+  let compacted = "";
+  let empties = 0;
+  for (const ch of rankChars) {
+    if (ch === ".") { empties++; }
+    else { if (empties > 0) { compacted += empties; empties = 0; } compacted += ch; }
+  }
+  if (empties > 0) compacted += empties;
+  board[rankIdx] = compacted;
+
+  let castling = parts[2];
+  if (color === "w") {
+    castling = castling.replace(/[KQ]/g, "");
+  } else {
+    castling = castling.replace(/[kq]/g, "");
+  }
+  if (!castling) castling = "-";
+  parts[2] = castling;
+
+  parts[3] = "-";
+  parts[0] = board.join("/");
+  if (color === "w") { parts[1] = "b"; } else { parts[1] = "w"; parts[5] = String(parseInt(parts[5]) + 1); }
+  parts[4] = "0";
+
+  return { newFen: parts.join(" "), from: kingSq, to: kingDest };
+}
+
 export function parsePgnMoves(pgn: string): Array<{
   moveNumber: number;
   san: string;
@@ -242,7 +346,7 @@ export function parsePgnMoves(pgn: string): Array<{
   from: string;
   to: string;
   fenBefore: string;
-  fen: string | null;      // fenAfter (kept for backward compat)
+  fen: string | null;
   comment: string | null;
   clockSeconds: number | null;
   classification: string | null;
@@ -251,7 +355,7 @@ export function parsePgnMoves(pgn: string): Array<{
 
   try {
     const startFen = extractStartFen(pgn);
-    const normalizedPgn = pgn.replace(/\[FEN "([^"]+)"\]/, (_, fen) => `[FEN "${normalizeFen(fen)}"]`);
+    const normalizedPgn = pgn.replace(/\[FEN "([^"]+)"\]/, (_, fen: string) => `[FEN "${normalizeFen(fen)}"]`);
     const chess = new Chess(startFen);
     chess.loadPgn(normalizedPgn);
     const history = chess.history({ verbose: true });
@@ -291,8 +395,83 @@ export function parsePgnMoves(pgn: string): Array<{
         classification: null,
       };
     });
+  } catch {
+    if (!isChess960Pgn(pgn)) {
+      logger.error("Failed to parse PGN moves with chess.js (non-960)");
+      return [];
+    }
+  }
+
+  try {
+    const startFen = extractStartFen(pgn);
+    const tokens = extractSanTokens(pgn);
+    const results: Array<{
+      moveNumber: number; san: string; color: string; from: string; to: string;
+      fenBefore: string; fen: string | null; comment: string | null;
+      clockSeconds: number | null; classification: string | null;
+    }> = [];
+
+    let currentFen = startFen;
+    let moveIdx = 0;
+
+    for (const token of tokens) {
+      const fenBefore = currentFen;
+      const color = currentFen.split(" ")[1] === "w" ? "white" : "black";
+
+      let from = "", to = "", fenAfter = "";
+
+      const sanBase = token.san.replace(/[+#?!]+$/, "");
+      if (sanBase === "O-O" || sanBase === "O-O-O") {
+        const isKingside = sanBase === "O-O";
+        const castleResult = applyManualCastle(currentFen, isKingside);
+        if (!castleResult) {
+          logger.warn({ san: token.san, fen: currentFen }, "Chess960 castling failed");
+          break;
+        }
+        from = castleResult.from;
+        to = castleResult.to;
+        fenAfter = castleResult.newFen;
+      } else {
+        try {
+          const chess = new Chess(currentFen);
+          const move = chess.move(token.san);
+          if (!move) break;
+          from = move.from;
+          to = move.to;
+          fenAfter = chess.fen();
+        } catch {
+          logger.warn({ san: token.san, fen: currentFen }, "Chess960 move failed");
+          break;
+        }
+      }
+
+      let clockSeconds: number | null = null;
+      if (token.comment) {
+        const m = token.comment.match(/\[%clk (\d+):(\d+):(\d+(?:\.\d+)?)\]/);
+        if (m) clockSeconds = parseInt(m[1]) * 3600 + parseInt(m[2]) * 60 + parseFloat(m[3]);
+      }
+
+      results.push({
+        moveNumber: Math.ceil((moveIdx + 1) / 2),
+        san: token.san,
+        color,
+        from,
+        to,
+        fenBefore,
+        fen: fenAfter,
+        comment: token.comment,
+        clockSeconds,
+        classification: null,
+      });
+
+      currentFen = fenAfter;
+      moveIdx++;
+    }
+
+    logger.info({ moveCount: results.length }, "Parsed Chess960 PGN with fallback parser");
+    return results;
   } catch (err) {
-    logger.error({ err }, "Failed to parse PGN moves with chess.js");
+    logger.error({ err }, "Failed to parse Chess960 PGN with fallback parser");
     return [];
   }
 }
