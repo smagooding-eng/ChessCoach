@@ -6,6 +6,7 @@ import { useEloProgress } from '@/hooks/use-elo-progress';
 import { EloTrackerBadge, EloTrackerInline } from '@/components/EloTracker';
 import { LayoutDashboard, Import, History, BrainCircuit, GraduationCap, Swords, BookOpen, LogOut, MoreHorizontal, ChevronRight, Bot, Crown, Trophy, Play, Search, Download, Puzzle, User, Settings, CreditCard } from 'lucide-react';
 import { usePwaInstall } from '@/hooks/use-pwa-install';
+import { InstallGuide } from '@/components/InstallGuide';
 import { cn } from '@/lib/utils';
 import { AnimatePresence, motion } from 'framer-motion';
 
@@ -86,7 +87,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const [moreOpen, setMoreOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const handleLogout = isAuthenticated ? authLogout : logout;
-  const { canInstall, install } = usePwaInstall();
+  const { canInstall, install, showGuide, setShowGuide, dismissInstall, platform } = usePwaInstall();
 
   const displayRating = player?.rating;
 
@@ -332,6 +333,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </>
         )}
       </AnimatePresence>
+
+      {showGuide && (
+        <InstallGuide
+          platform={platform}
+          onClose={() => setShowGuide(false)}
+          onDismiss={dismissInstall}
+        />
+      )}
 
     </div>
   );
