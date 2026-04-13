@@ -4,8 +4,8 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
     <title>ChessScout.net</title>
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="manifest" href="/manifest.json" />
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <link rel="manifest" href="manifest.json" />
     <meta name="theme-color" content="#81b64c" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -129,9 +129,13 @@
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', function() {
-          var base = document.querySelector('base');
-          var basePath = base ? base.getAttribute('href') : '/';
-          navigator.serviceWorker.register(basePath + 'sw.js').catch(function() {});
+          var manifestEl = document.querySelector('link[rel="manifest"]');
+          var base = '/';
+          if (manifestEl) {
+            var href = new URL(manifestEl.getAttribute('href'), window.location.href).pathname;
+            base = href.substring(0, href.lastIndexOf('/') + 1);
+          }
+          navigator.serviceWorker.register(base + 'sw.js', { scope: base }).catch(function() {});
         });
       }
     </script>
