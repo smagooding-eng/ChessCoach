@@ -285,22 +285,50 @@ export function Import() {
               </div>
             )}
 
-            <button
-              type="submit"
-              disabled={isImporting || !username}
-              className="w-full flex justify-center items-center gap-2 px-6 py-4 rounded-xl font-bold bg-primary text-primary-foreground shadow-lg shadow-primary/25 hover:shadow-primary/40 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none hover:-translate-y-0.5 active:translate-y-0"
-            >
-              {isImporting ? (
-                <>
-                  <div className="w-5 h-5 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />
-                  Fetching Games...
-                </>
-              ) : (
-                <>
-                  <CloudDownload className="w-5 h-5" /> Import Games
-                </>
+            <div className="space-y-3">
+              <button
+                type="submit"
+                disabled={isImporting || isSyncing || !username}
+                className="w-full flex justify-center items-center gap-2 px-6 py-4 rounded-xl font-bold bg-primary text-primary-foreground shadow-lg shadow-primary/25 hover:shadow-primary/40 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none hover:-translate-y-0.5 active:translate-y-0"
+              >
+                {isImporting ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />
+                    Fetching Games...
+                  </>
+                ) : (
+                  <>
+                    <CloudDownload className="w-5 h-5" /> Import New Games
+                  </>
+                )}
+              </button>
+
+              {username && (
+                <button
+                  type="button"
+                  onClick={(e) => handleImport(e, true)}
+                  disabled={isImporting || isSyncing}
+                  className="w-full flex justify-center items-center gap-2 px-5 py-3 rounded-xl font-semibold bg-secondary/80 text-foreground/80 border border-border/30 hover:bg-secondary hover:text-foreground transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isSyncing ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-foreground border-t-transparent rounded-full animate-spin" />
+                      Re-syncing...
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="w-4 h-4" /> Re-sync Existing Games
+                    </>
+                  )}
+                </button>
               )}
-            </button>
+            </div>
+
+            {username && (
+              <p className="text-center text-xs text-muted-foreground/60">
+                Re-sync refreshes game data from chess.com, fixing Chess960 and other issues.
+              </p>
+            )}
 
             {!username && isLoaded && (
               <p className="text-center text-sm text-muted-foreground">
