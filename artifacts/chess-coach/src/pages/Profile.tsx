@@ -12,7 +12,7 @@ import {
   GraduationCap, Settings, Shield, Edit3, Check, X, Eye, Users, CreditCard,
   Activity, Send, AlertCircle, CheckCircle2, Bold, Italic, Heading1, Heading2,
   Link as LinkIcon, Image, Type, Palette, List, ListOrdered, Minus, Undo2, Redo2, FileText, Sparkles,
-  Trash2, Loader2
+  Trash2, Loader2, Zap
 } from 'lucide-react';
 
 interface AdminStats {
@@ -1274,6 +1274,38 @@ function AdminTicker() {
         <AnimatePresence>
           {showUsers && <UserListPanel onClose={() => setShowUsers(false)} onEmailUsers={handleEmailUsers} />}
         </AnimatePresence>
+      </motion.div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="rounded-2xl border border-border/40 bg-card overflow-hidden"
+      >
+        <div className="px-5 py-3 border-b border-border/30 bg-orange-500/5">
+          <h3 className="text-sm font-bold text-orange-400 flex items-center gap-2">
+            <Zap className="w-4 h-4" /> Admin Tools
+          </h3>
+        </div>
+        <div className="p-4 space-y-2">
+          <button
+            onClick={async () => {
+              if (!confirm('This will normalize all Chess960 game FENs in the database and clear their cached reviews. Continue?')) return;
+              try {
+                const res = await apiFetch('/api/admin/fix-chess960', { method: 'POST' });
+                const data = await res.json() as { fixedPgns?: number; totalGames?: number; error?: string };
+                if (res.ok) alert(`Fixed ${data.fixedPgns} Chess960 games out of ${data.totalGames} total.`);
+                else alert(`Error: ${data.error || 'Unknown error'}`);
+              } catch { alert('Failed to run fix'); }
+            }}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all hover:bg-orange-500/10 text-left border border-orange-500/20"
+          >
+            <span className="text-lg">♜</span>
+            <div>
+              <p className="text-foreground font-semibold">Fix Chess960 Games</p>
+              <p className="text-xs text-muted-foreground">Normalize FENs for old imported Chess960 games &amp; clear stale reviews</p>
+            </div>
+          </button>
+        </div>
       </motion.div>
 
       <AnimatePresence>

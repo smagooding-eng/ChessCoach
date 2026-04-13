@@ -50,6 +50,12 @@ export interface Move {
   san: string;
   color: string;
   /** @nullable */
+  from?: string | null;
+  /** @nullable */
+  to?: string | null;
+  /** @nullable */
+  fenBefore?: string | null;
+  /** @nullable */
   fen?: string | null;
   /** @nullable */
   comment?: string | null;
@@ -62,6 +68,8 @@ export interface Move {
 export interface GameReplay {
   id: number;
   pgn: string;
+  /** @nullable */
+  startFen?: string | null;
   moves: Move[];
   whiteUsername: string;
   blackUsername: string;

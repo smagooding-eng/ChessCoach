@@ -247,4 +247,84 @@ router.post("/admin/users/delete", requireAdmin, async (req: Request, res: Respo
   }
 });
 
+router.post("/admin/fix-chess960", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const allGames = await db.select({ id: gamesTable.id, pgn: gamesTable.pgn }).from(gamesTable);
+
+    let fixed = 0;
+    let cleared = 0;
+
+    for (const game of allGames) {
+      const fenMatch = game.pgn.match(/\[FEN "([^"]+)"\]/);
+      if (!fenMatch) continue;
+
+      const originalFen = fenMatch[1];
+      const parts = originalFen.split(' ');
+      if (parts.length < 3) continue;
+
+      const castling = parts[2];
+      if (!castling || castling === '-' || /^[KQkq]+$/.test(castling)) continue;
+      if (!/^[A-Ha-h]+$/.test(castling)) continue;
+
+      const ranks = parts[0].split('/');
+      const whiteBack = ranks[7] || '';
+      const blackBack = ranks[0] || '';
+
+      function findKingFile(rank: string): number {
+        let file = 0;
+        for (const ch of rank) {
+          if (ch >= '1' && ch <= '8') file += parseInt(ch);
+          else { if (ch === 'K' || ch === 'k') return file; file++; }
+        }
+        return -1;
+      }
+      function findPieceFile(rank: string, piece: string): number[] {
+        const files: number[] = [];
+        let file = 0;
+        for (const ch of rank) {
+          if (ch >= '1' && ch <= '8') file += parseInt(ch);
+          else { if (ch === piece) files.push(file); file++; }
+        }
+        return files;
+      }
+
+      let newCastling = '';
+      const whiteKing = findKingFile(whiteBack);
+      const blackKing = findKingFile(blackBack);
+      const whiteRooks = findPieceFile(whiteBack, 'R');
+      const blackRooks = findPieceFile(blackBack, 'r');
+
+      for (const c of castling) {
+        const upper = c.toUpperCase();
+        const fileIdx = upper.charCodeAt(0) - 65;
+        if (c === upper) {
+          if (whiteRooks.includes(fileIdx)) {
+            newCastling += fileIdx > whiteKing ? 'K' : 'Q';
+          }
+        } else {
+          if (blackRooks.includes(fileIdx)) {
+            newCastling += fileIdx > blackKing ? 'k' : 'q';
+          }
+        }
+      }
+
+      parts[2] = newCastling || '-';
+      const normalizedFen = parts.join(' ');
+      const newPgn = game.pgn.replace(`[FEN "${originalFen}"]`, `[FEN "${normalizedFen}"]`);
+
+      if (newPgn !== game.pgn) {
+        await db.update(gamesTable)
+          .set({ pgn: newPgn, reviewData: null })
+          .where(eq(gamesTable.id, game.id));
+        fixed++;
+        cleared++;
+      }
+    }
+
+    res.json({ success: true, totalGames: allGames.length, fixedPgns: fixed, clearedReviews: cleared });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to fix Chess960 games", details: err.message });
+  }
+});
+
 export default router;

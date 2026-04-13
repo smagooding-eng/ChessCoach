@@ -441,20 +441,23 @@ export function GameReplay() {
     }
   }, [game, reviewing, reviewMoves.length, pollReviewStatus]);
 
-  // Current FEN & lastMove
-  const currentFen = currentMove === 0 ? null : moves[currentMove - 1]?.fen;
+  const DEFAULT_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+  const gameStartFen = game?.startFen || DEFAULT_FEN;
+
+  const currentFen = currentMove === 0 ? gameStartFen : (moves[currentMove - 1]?.fen ?? gameStartFen);
 
   const lastMove = useMemo(() => {
     if (currentMove === 0) return null;
     const move = moves[currentMove - 1];
     if (!move?.san) return null;
-    const prevFen = currentMove === 1 ? undefined : (moves[currentMove - 2]?.fen ?? undefined);
+    if (move.from && move.to) return { from: move.from, to: move.to };
+    const prevFen = move.fenBefore || (currentMove === 1 ? gameStartFen : (moves[currentMove - 2]?.fen ?? gameStartFen));
     try {
-      const chess = new Chess(prevFen ? normalizeFen(prevFen) : undefined);
+      const chess = new Chess(normalizeFen(prevFen));
       const result = chess.move(move.san);
       return result ? { from: result.from, to: result.to } : null;
     } catch { return null; }
-  }, [currentMove, moves]);
+  }, [currentMove, moves, gameStartFen]);
 
   // Current move's review data
   const currentReview: ReviewMove | null = currentMove > 0
@@ -745,7 +748,7 @@ export function GameReplay() {
                           ? (isBlack ? game.whiteRating : game.blackRating) || 1200
                           : 1200;
                         const playerColor = isBlack ? 'b' : 'w';
-                        const prevFen = currentMove <= 1 ? 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1' : (moves[currentMove - 2]?.fen ?? currentFen);
+                        const prevFen = currentMove <= 1 ? gameStartFen : (moves[currentMove - 2]?.fen ?? currentFen);
                         navigate(`/practice?fen=${encodeURIComponent(prevFen)}&rating=${opponentRating}&color=${playerColor}`);
                       }}
                       className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all active:scale-95 border border-primary/30 hover:border-primary/50 mt-1"

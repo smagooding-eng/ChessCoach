@@ -103,11 +103,15 @@ export const GetGameReplayParams = zod.object({
 export const GetGameReplayResponse = zod.object({
   id: zod.number(),
   pgn: zod.string(),
+  startFen: zod.string().nullish(),
   moves: zod.array(
     zod.object({
       moveNumber: zod.number(),
       san: zod.string(),
       color: zod.string(),
+      from: zod.string().nullish(),
+      to: zod.string().nullish(),
+      fenBefore: zod.string().nullish(),
       fen: zod.string().nullish(),
       comment: zod.string().nullish(),
       clockSeconds: zod.number().nullish(),
