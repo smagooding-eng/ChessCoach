@@ -24,12 +24,14 @@ export const ImportGamesBody = zod.object({
     .number()
     .optional()
     .describe("Number of past months to fetch (1-12)"),
+  platform: zod.enum(["chesscom", "lichess"]).optional().describe("Platform to import from"),
 });
 
 export const ImportGamesResponse = zod.object({
   imported: zod.number(),
   total: zod.number(),
   username: zod.string(),
+  platform: zod.string().optional(),
 });
 
 /**
@@ -39,6 +41,7 @@ export const ListGamesQueryParams = zod.object({
   username: zod.coerce.string().optional().describe("Filter by username"),
   limit: zod.coerce.number().optional().describe("Limit results"),
   offset: zod.coerce.number().optional().describe("Offset for pagination"),
+  platform: zod.coerce.string().optional().describe("Filter by platform (chesscom, lichess)"),
 });
 
 export const ListGamesResponse = zod.object({
@@ -59,6 +62,7 @@ export const ListGamesResponse = zod.object({
       url: zod.string().nullish(),
       analyzed: zod.boolean(),
       analysisNotes: zod.string().nullish(),
+      platform: zod.string().optional(),
       reviewed: zod.boolean(),
       createdAt: zod.string(),
     }),

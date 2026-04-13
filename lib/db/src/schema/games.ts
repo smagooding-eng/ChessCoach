@@ -19,6 +19,8 @@ export const gamesTable = pgTable("games", {
   analyzed: boolean("analyzed").notNull().default(false),
   analysisNotes: text("analysis_notes"),
   chesscomGameId: text("chesscom_game_id"),
+  lichessGameId: text("lichess_game_id"),
+  platform: text("platform").notNull().default("chesscom"),
   reviewData: jsonb("review_data"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });

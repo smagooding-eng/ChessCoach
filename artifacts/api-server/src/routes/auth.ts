@@ -33,6 +33,7 @@ function toSessionUser(dbUser: any): SessionUser {
     lastName: dbUser.lastName,
     profileImageUrl: dbUser.profileImageUrl,
     chesscomUsername: dbUser.chesscomUsername,
+    lichessUsername: dbUser.lichessUsername || null,
     isAdmin: dbUser.isAdmin || ADMIN_EMAILS.includes(dbUser.email?.toLowerCase?.() ?? ""),
     inviteCode: dbUser.inviteCode || null,
   };
@@ -300,11 +301,12 @@ router.post("/auth/update-profile", async (req: Request, res: Response) => {
     return;
   }
 
-  const { chesscomUsername, firstName } = req.body;
+  const { chesscomUsername, firstName, lichessUsername } = req.body;
 
   try {
     const updates: Record<string, any> = {};
     if (chesscomUsername !== undefined) updates.chesscomUsername = chesscomUsername;
+    if (lichessUsername !== undefined) updates.lichessUsername = lichessUsername;
     if (firstName !== undefined) updates.firstName = firstName;
 
     if (Object.keys(updates).length === 0) {

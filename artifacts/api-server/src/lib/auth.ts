@@ -15,6 +15,7 @@ export interface SessionUser {
   lastName: string | null;
   profileImageUrl: string | null;
   chesscomUsername: string | null;
+  lichessUsername: string | null;
   isAdmin: boolean;
   inviteCode: string | null;
 }

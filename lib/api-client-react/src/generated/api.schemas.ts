@@ -13,12 +13,14 @@ export interface ImportGamesBody {
   username: string;
   /** Number of past months to fetch (1-12) */
   months?: number;
+  platform?: 'chesscom' | 'lichess';
 }
 
 export interface ImportGamesResponse {
   imported: number;
   total: number;
   username: string;
+  platform?: string;
 }
 
 export interface Game {
@@ -36,6 +38,7 @@ export interface Game {
   /** @nullable */
   eco?: string | null;
   playedAt: string;
+  platform?: string;
   /** @nullable */
   url?: string | null;
   analyzed: boolean;
@@ -270,6 +273,10 @@ export type ListGamesParams = {
    * Offset for pagination
    */
   offset?: number;
+  /**
+   * Filter by platform
+   */
+  platform?: string;
 };
 
 export type GetWeaknessesParams = {

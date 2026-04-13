@@ -8,6 +8,7 @@ interface AuthUser {
   lastName: string | null;
   profileImageUrl: string | null;
   chesscomUsername: string | null;
+  lichessUsername: string | null;
   isAdmin: boolean;
 }
 

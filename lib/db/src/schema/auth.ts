@@ -23,6 +23,7 @@ export const usersTable = pgTable("users", {
   stripeCustomerId: varchar("stripe_customer_id"),
   stripeSubscriptionId: varchar("stripe_subscription_id"),
   chesscomUsername: varchar("chesscom_username"),
+  lichessUsername: varchar("lichess_username"),
   isAdmin: boolean("is_admin").notNull().default(false),
   isPremiumOverride: boolean("is_premium_override").notNull().default(false),
   inviteCode: varchar("invite_code").unique(),

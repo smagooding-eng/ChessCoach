@@ -19,4 +19,8 @@ export type ListGamesParams = {
    * Offset for pagination
    */
   offset?: number;
+  /**
+   * Filter by platform
+   */
+  platform?: string;
 };

@@ -12,6 +12,7 @@ import {
   GetGameReplayParams,
 } from "@workspace/api-zod";
 import { fetchChessComGames, extractGameMetadata, parsePgnMoves, extractOpeningFromPgn, extractStartFen } from "../lib/chesscom";
+import { fetchLichessGames, extractLichessGameMetadata } from "../lib/lichess";
 import { analyzeMoves, analyzeSingleMove, reviewFullGame, analyzeGamePgn } from "../lib/openaiAnalysis";
 import { randomUUID } from "crypto";
 import type { Logger } from "pino";
@@ -25,69 +26,126 @@ router.post("/games/import", async (req, res): Promise<void> => {
     return;
   }
 
-  const { username, months = 3 } = parsed.data;
+  const { username: platformUsername, months = 3 } = parsed.data;
   const forceUpdate = req.body?.forceUpdate === true;
+  const platform: string = req.body?.platform || "chesscom";
+  const ownerUsername = req.body?.ownerUsername || platformUsername;
 
-  req.log.info({ username, months, forceUpdate }, "Importing games from chess.com");
-
-  let games;
-  try {
-    games = await fetchChessComGames(username, months);
-  } catch (err) {
-    req.log.error({ err }, "Failed to fetch games from chess.com");
-    res.status(400).json({ error: "Failed to fetch games from chess.com. Check the username and try again." });
+  if (platform !== "chesscom" && platform !== "lichess") {
+    res.status(400).json({ error: "platform must be 'chesscom' or 'lichess'" });
     return;
   }
+
+  req.log.info({ platformUsername, ownerUsername, months, forceUpdate, platform }, `Importing games from ${platform}`);
 
   let imported = 0;
   let updated = 0;
 
-  for (const game of games) {
+  if (platform === "lichess") {
+    let lichessGames;
     try {
-      const meta = extractGameMetadata(game, username);
-
-      if (meta.chesscomGameId) {
-        const existing = await db
-          .select({ id: gamesTable.id, pgn: gamesTable.pgn })
-          .from(gamesTable)
-          .where(and(
-            eq(gamesTable.chesscomGameId, meta.chesscomGameId),
-            eq(gamesTable.username, username.toLowerCase())
-          ))
-          .limit(1);
-
-        if (existing.length > 0) {
-          if (forceUpdate && existing[0].pgn !== game.pgn) {
-            await db.update(gamesTable)
-              .set({ pgn: game.pgn, reviewData: null, ...meta })
-              .where(eq(gamesTable.id, existing[0].id));
-            updated++;
-          }
-          continue;
-        }
-      }
-
-      await db.insert(gamesTable).values({
-        username: username.toLowerCase(),
-        pgn: game.pgn,
-        ...meta,
-      });
-      imported++;
+      lichessGames = await fetchLichessGames(platformUsername, months);
     } catch (err) {
-      req.log.warn({ err }, "Failed to insert game");
+      req.log.error({ err }, "Failed to fetch games from Lichess");
+      res.status(400).json({ error: "Failed to fetch games from Lichess. Check the username and try again." });
+      return;
+    }
+
+    for (const game of lichessGames) {
+      try {
+        if (!game.pgn) continue;
+        const meta = extractLichessGameMetadata(game, platformUsername);
+
+        if (meta.lichessGameId) {
+          const existing = await db
+            .select({ id: gamesTable.id, pgn: gamesTable.pgn })
+            .from(gamesTable)
+            .where(and(
+              eq(gamesTable.lichessGameId, meta.lichessGameId),
+              eq(gamesTable.username, ownerUsername.toLowerCase())
+            ))
+            .limit(1);
+
+          if (existing.length > 0) {
+            if (forceUpdate && existing[0].pgn !== game.pgn) {
+              await db.update(gamesTable)
+                .set({ pgn: game.pgn!, reviewData: null, ...meta })
+                .where(eq(gamesTable.id, existing[0].id));
+              updated++;
+            }
+            continue;
+          }
+        }
+
+        await db.insert(gamesTable).values({
+          username: ownerUsername.toLowerCase(),
+          pgn: game.pgn!,
+          ...meta,
+        });
+        imported++;
+      } catch (err) {
+        req.log.warn({ err }, "Failed to insert Lichess game");
+      }
+    }
+  } else {
+    let games;
+    try {
+      games = await fetchChessComGames(platformUsername, months);
+    } catch (err) {
+      req.log.error({ err }, "Failed to fetch games from chess.com");
+      res.status(400).json({ error: "Failed to fetch games from chess.com. Check the username and try again." });
+      return;
+    }
+
+    for (const game of games) {
+      try {
+        const meta = extractGameMetadata(game, platformUsername);
+
+        if (meta.chesscomGameId) {
+          const existing = await db
+            .select({ id: gamesTable.id, pgn: gamesTable.pgn })
+            .from(gamesTable)
+            .where(and(
+              eq(gamesTable.chesscomGameId, meta.chesscomGameId),
+              eq(gamesTable.username, ownerUsername.toLowerCase())
+            ))
+            .limit(1);
+
+          if (existing.length > 0) {
+            if (forceUpdate && existing[0].pgn !== game.pgn) {
+              await db.update(gamesTable)
+                .set({ pgn: game.pgn, reviewData: null, ...meta })
+                .where(eq(gamesTable.id, existing[0].id));
+              updated++;
+            }
+            continue;
+          }
+        }
+
+        await db.insert(gamesTable).values({
+          username: ownerUsername.toLowerCase(),
+          pgn: game.pgn,
+          platform: "chesscom",
+          ...meta,
+        });
+        imported++;
+      } catch (err) {
+        req.log.warn({ err }, "Failed to insert game");
+      }
     }
   }
 
   const [{ value: total }] = await db
     .select({ value: count() })
     .from(gamesTable)
-    .where(eq(gamesTable.username, username.toLowerCase()));
+    .where(eq(gamesTable.username, ownerUsername.toLowerCase()));
 
   res.json({
     imported,
     updated,
     total: Number(total),
-    username,
+    username: platformUsername,
+    platform,
   });
 });
 
@@ -174,6 +232,15 @@ router.get("/games", async (req, res): Promise<void> => {
   const username = query.success ? query.data.username : undefined;
   const limit = query.success ? (query.data.limit ?? 50) : 50;
   const offset = query.success ? (query.data.offset ?? 0) : 0;
+  const platform = query.success ? query.data.platform : undefined;
+
+  const conditions = [];
+  if (username) {
+    conditions.push(eq(gamesTable.username, username.toLowerCase()));
+  }
+  if (platform && (platform === "chesscom" || platform === "lichess")) {
+    conditions.push(eq(gamesTable.platform, platform));
+  }
 
   let dbQuery = db
     .select()
@@ -184,11 +251,11 @@ router.get("/games", async (req, res): Promise<void> => {
 
   let countQuery = db.select({ value: count() }).from(gamesTable);
 
-  if (username) {
+  if (conditions.length > 0) {
     // @ts-ignore
-    dbQuery = dbQuery.where(eq(gamesTable.username, username.toLowerCase()));
+    dbQuery = dbQuery.where(and(...conditions));
     // @ts-ignore
-    countQuery = countQuery.where(eq(gamesTable.username, username.toLowerCase()));
+    countQuery = countQuery.where(and(...conditions));
   }
 
   const [games, [{ value: total }]] = await Promise.all([dbQuery, countQuery]);
@@ -200,6 +267,7 @@ router.get("/games", async (req, res): Promise<void> => {
         reviewed: !!(g.reviewData && Array.isArray(g.reviewData) && (g.reviewData as unknown[]).length > 0),
         playedAt: g.playedAt.toISOString(),
         createdAt: g.createdAt.toISOString(),
+        platform: g.platform || "chesscom",
       })),
       total: Number(total),
     })

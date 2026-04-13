@@ -12,6 +12,7 @@ export function Games() {
   const { data, isLoading, isError, error } = useMyGames(pageSize);
   const { username } = useUser();
   const [filter, setFilter] = useState('all');
+  const [platformFilter, setPlatformFilter] = useState<'all' | 'chesscom' | 'lichess'>('all');
   const [search, setSearch] = useState('');
   const [h2hMode, setH2hMode] = useState(false);
   const [h2hOpponent, setH2hOpponent] = useState('');
@@ -23,6 +24,7 @@ export function Games() {
   const filteredGames = useMemo(() => {
     return games.filter(game => {
       const matchesResult = filter === 'all' || game.result.toLowerCase() === filter.toLowerCase();
+      const matchesPlatform = platformFilter === 'all' || (game.platform || 'chesscom') === platformFilter;
 
       if (h2hMode && h2hOpponent.trim()) {
         const opp = h2hOpponent.trim().toLowerCase();
@@ -35,9 +37,9 @@ export function Games() {
       const matchesSearch = !q || [
         game.whiteUsername, game.blackUsername, game.opening ?? '',
       ].some(s => s.toLowerCase().includes(q));
-      return matchesResult && matchesSearch;
+      return matchesResult && matchesSearch && matchesPlatform;
     });
-  }, [games, filter, search, h2hMode, h2hOpponent]);
+  }, [games, filter, platformFilter, search, h2hMode, h2hOpponent]);
 
   if (isLoading) {
     return (
@@ -122,6 +124,15 @@ export function Games() {
           <Users className="w-4 h-4" />
           H2H
         </button>
+        <select
+          value={platformFilter}
+          onChange={(e) => setPlatformFilter(e.target.value as 'all' | 'chesscom' | 'lichess')}
+          className="px-4 py-2.5 bg-secondary/50 border border-border rounded-xl outline-none focus:border-primary appearance-none cursor-pointer text-sm"
+        >
+          <option value="all">All Platforms</option>
+          <option value="chesscom">Chess.com</option>
+          <option value="lichess">Lichess</option>
+        </select>
         <select
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
@@ -228,6 +239,14 @@ export function Games() {
                           )}
                         </div>
                         <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
+                          <span className={cn(
+                            'inline-flex items-center gap-0.5 px-1 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider',
+                            (game.platform || 'chesscom') === 'lichess'
+                              ? 'bg-white/10 text-white/70'
+                              : 'bg-emerald-500/10 text-emerald-400/70'
+                          )}>
+                            {(game.platform || 'chesscom') === 'lichess' ? 'LC' : 'CC'}
+                          </span>
                           <span>{format(new Date(game.playedAt), 'MMM d, yyyy')}</span>
                           <span className="text-border">·</span>
                           <span>{game.timeControl}</span>
