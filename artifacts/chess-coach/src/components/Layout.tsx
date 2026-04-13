@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'wouter';
 import { useUser } from '@/hooks/use-user';
 import { useChessPlayer } from '@/hooks/use-chess-player';
+import { useEloProgress } from '@/hooks/use-elo-progress';
+import { EloTrackerBadge, EloTrackerInline } from '@/components/EloTracker';
 import { LayoutDashboard, Import, History, BrainCircuit, GraduationCap, Swords, BookOpen, LogOut, MoreHorizontal, ChevronRight, Bot, Crown, Trophy, Play, Search, Download, Puzzle, User, Settings, CreditCard } from 'lucide-react';
 import { usePwaInstall } from '@/hooks/use-pwa-install';
 import { cn } from '@/lib/utils';
@@ -80,6 +82,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const { username, logout, isAuthenticated, authLogout, isPremium, subscription, authUser } = useUser();
   const { player } = useChessPlayer(username ?? undefined);
+  const { data: eloProgress } = useEloProgress(username ?? undefined);
   const [moreOpen, setMoreOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const handleLogout = isAuthenticated ? authLogout : logout;
@@ -119,11 +122,19 @@ export function Layout({ children }: { children: React.ReactNode }) {
               <PlayerAvatar avatar={player?.avatar} username={username ?? ''} size="sm" />
               <div className="min-w-0">
                 <p className="text-xs font-bold truncate leading-tight" style={{ color: TEXT_LIGHT }}>{username}</p>
-                {displayRating && (
-                  <p className="text-[10px] font-bold leading-tight" style={{ color: CHESSCOM_GREEN }}>{displayRating} ELO</p>
-                )}
+                <div className="flex items-center gap-1">
+                  {displayRating && (
+                    <span className="text-[10px] font-bold leading-tight" style={{ color: CHESSCOM_GREEN }}>{displayRating}</span>
+                  )}
+                  {eloProgress?.hasData && <EloTrackerInline elo={eloProgress} />}
+                </div>
               </div>
             </Link>
+            {eloProgress?.hasData && (
+              <div className="shrink-0">
+                <EloTrackerBadge elo={eloProgress} />
+              </div>
+            )}
             {canInstall && (
               <button onClick={install} className="p-1.5 rounded transition-colors shrink-0 hover:bg-green-400/10" style={{ color: CHESSCOM_GREEN }} title="Install App">
                 <Download className="w-3.5 h-3.5" />
@@ -153,7 +164,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <button onClick={() => setProfileOpen(o => !o)} className="flex items-center gap-2 active:opacity-70 transition-opacity">
               <div className="flex flex-col items-end">
                 <span className="text-xs font-bold leading-tight" style={{ color: TEXT_LIGHT }}>{username}</span>
-                {displayRating && <span className="text-[10px] font-bold leading-tight" style={{ color: CHESSCOM_GREEN }}>{displayRating}</span>}
+                <div className="flex items-center gap-1">
+                  {displayRating && <span className="text-[10px] font-bold leading-tight" style={{ color: CHESSCOM_GREEN }}>{displayRating}</span>}
+                  {eloProgress?.hasData && <EloTrackerInline elo={eloProgress} />}
+                </div>
               </div>
               <PlayerAvatar avatar={player?.avatar} username={username ?? ''} size="sm" />
             </button>

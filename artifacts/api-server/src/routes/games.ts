@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db, gamesTable, backgroundJobsTable } from "@workspace/db";
-import { eq, desc, count, isNull, and } from "drizzle-orm";
+import { eq, desc, count, isNull, and, asc, sql } from "drizzle-orm";
 import {
   ImportGamesBody,
   ImportGamesResponse,
@@ -89,6 +89,70 @@ router.post("/games/import", async (req, res): Promise<void> => {
     total: Number(total),
     username,
   });
+});
+
+router.get("/games/elo-progress", async (req, res): Promise<void> => {
+  const rawUsername = req.query.username;
+  if (!rawUsername || typeof rawUsername !== "string") {
+    res.status(400).json({ error: "username is required" });
+    return;
+  }
+  const username = rawUsername.toLowerCase();
+
+  try {
+    const allRatings = await db
+      .select({
+        playedAt: gamesTable.playedAt,
+        whiteUsername: gamesTable.whiteUsername,
+        whiteRating: gamesTable.whiteRating,
+        blackRating: gamesTable.blackRating,
+      })
+      .from(gamesTable)
+      .where(eq(gamesTable.username, username))
+      .orderBy(asc(gamesTable.playedAt));
+
+    if (allRatings.length === 0) {
+      res.json({ hasData: false });
+      return;
+    }
+
+    const getRating = (g: typeof allRatings[0]) =>
+      g.whiteUsername.toLowerCase() === username ? g.whiteRating : g.blackRating;
+
+    const firstRating = getRating(allRatings[0]);
+    const currentRating = getRating(allRatings[allRatings.length - 1]);
+    const delta = currentRating - firstRating;
+
+    const totalGames = allRatings.length;
+    const sampleSize = Math.min(totalGames, 30);
+    const step = Math.max(1, Math.floor(totalGames / sampleSize));
+    const sparkline: number[] = [];
+    for (let i = 0; i < totalGames; i += step) {
+      sparkline.push(getRating(allRatings[i]));
+    }
+    if (sparkline[sparkline.length - 1] !== currentRating) {
+      sparkline.push(currentRating);
+    }
+
+    const peak = Math.max(...sparkline);
+    const low = Math.min(...sparkline);
+
+    res.json({
+      hasData: true,
+      firstRating,
+      currentRating,
+      delta,
+      peak,
+      low,
+      sparkline,
+      totalGames,
+      firstGameAt: allRatings[0].playedAt.toISOString(),
+      lastGameAt: allRatings[allRatings.length - 1].playedAt.toISOString(),
+    });
+  } catch (err: any) {
+    req.log.error({ err }, "Failed to fetch ELO progress");
+    res.status(500).json({ error: "Failed to fetch ELO progress" });
+  }
 });
 
 router.get("/games", async (req, res): Promise<void> => {
