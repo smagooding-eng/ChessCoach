@@ -78,6 +78,134 @@ const FILTER_TABS: { key: UserFilter; label: string; color: string }[] = [
   { key: 'free', label: 'Free', color: 'text-neutral-400' },
 ];
 
+interface UserUsage {
+  user: { id: string; email: string | null; firstName: string | null; chesscomUsername: string | null; inviteCode: string | null; referredByUserId: string | null; createdAt: string; lastLoginAt: string | null };
+  usage: { gamesImported: number; gamesReviewed: number; opponentsScouted: number; puzzlesSolved: number; puzzlesFailed: number; coursesGenerated: number; lessonsCompleted: number; pageViews: number };
+  recentPages: { path: string; createdAt: string }[];
+  referrals: { id: string; referredEmail: string | null; referredName: string | null; status: string; createdAt: string; convertedAt: string | null }[];
+}
+
+function UserDetailPanel({ userId, onBack }: { userId: string; onBack: () => void }) {
+  const [data, setData] = useState<UserUsage | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    setLoading(true);
+    setError('');
+    apiFetch(`/api/admin/users/${userId}/usage`, { credentials: 'include' })
+      .then(r => {
+        if (!r.ok) throw new Error('Failed to load');
+        return r.json();
+      })
+      .then(d => setData(d))
+      .catch(() => setError('Failed to load user stats'))
+      .finally(() => setLoading(false));
+  }, [userId]);
+
+  if (loading) {
+    return (
+      <div className="p-6 text-center">
+        <Loader2 className="w-5 h-5 animate-spin mx-auto text-amber-400" />
+        <p className="text-xs text-muted-foreground mt-2">Loading stats...</p>
+      </div>
+    );
+  }
+
+  if (error || !data) {
+    return (
+      <div className="p-4">
+        <button onClick={onBack} className="text-xs text-amber-400 hover:text-amber-300 mb-3 flex items-center gap-1">
+          <ChevronRight className="w-3 h-3 rotate-180" /> Back to users
+        </button>
+        <p className="text-xs text-red-400 text-center">{error || 'No data'}</p>
+      </div>
+    );
+  }
+
+  const { user, usage, recentPages, referrals } = data;
+  const statItems = [
+    { label: 'Games Imported', value: usage.gamesImported, color: 'text-blue-400', bg: 'bg-blue-400/10', icon: Swords },
+    { label: 'Games Reviewed', value: usage.gamesReviewed, color: 'text-emerald-400', bg: 'bg-emerald-400/10', icon: Eye },
+    { label: 'Opponents Scouted', value: usage.opponentsScouted, color: 'text-purple-400', bg: 'bg-purple-400/10', icon: Target },
+    { label: 'Puzzles Solved', value: usage.puzzlesSolved, color: 'text-primary', bg: 'bg-primary/10', icon: Trophy },
+    { label: 'Puzzles Failed', value: usage.puzzlesFailed, color: 'text-red-400', bg: 'bg-red-400/10', icon: X },
+    { label: 'Courses Generated', value: usage.coursesGenerated, color: 'text-amber-400', bg: 'bg-amber-400/10', icon: GraduationCap },
+    { label: 'Lessons Done', value: usage.lessonsCompleted, color: 'text-cyan-400', bg: 'bg-cyan-400/10', icon: Check },
+    { label: 'Page Views', value: usage.pageViews, color: 'text-indigo-400', bg: 'bg-indigo-400/10', icon: Activity },
+  ];
+
+  const daysSinceCreated = user.createdAt ? Math.floor((Date.now() - new Date(user.createdAt).getTime()) / 86400000) : null;
+
+  return (
+    <div className="max-h-[400px] overflow-y-auto">
+      <div className="px-4 py-3 bg-amber-500/5 border-b border-amber-500/15 flex items-center justify-between sticky top-0 z-10">
+        <button onClick={onBack} className="text-xs text-amber-400 hover:text-amber-300 flex items-center gap-1 font-semibold">
+          <ChevronRight className="w-3 h-3 rotate-180" /> Back
+        </button>
+        <span className="text-xs font-bold text-foreground truncate ml-2">
+          {user.email || user.chesscomUsername || user.firstName || 'Unknown User'}
+        </span>
+      </div>
+
+      <div className="px-4 py-3 border-b border-border/20 space-y-1">
+        {user.email && <p className="text-xs text-muted-foreground flex items-center gap-1.5"><Mail className="w-3 h-3" /> {user.email}</p>}
+        {user.chesscomUsername && <p className="text-xs text-muted-foreground flex items-center gap-1.5">♟ {user.chesscomUsername}</p>}
+        <div className="flex items-center gap-3 text-[10px] text-muted-foreground/60 mt-1">
+          {user.createdAt && <span>Joined {daysSinceCreated === 0 ? 'today' : `${daysSinceCreated}d ago`}</span>}
+          {user.lastLoginAt && <span>Last login {new Date(user.lastLoginAt).toLocaleDateString()}</span>}
+        </div>
+        {user.inviteCode && <p className="text-[10px] text-amber-400/70 mt-1">Invite code: {user.inviteCode}</p>}
+        {user.referredByUserId && <p className="text-[10px] text-emerald-400/70 mt-1">Referred by: {user.referredByUserId.slice(0, 8)}...</p>}
+      </div>
+
+      <div className="grid grid-cols-4 gap-px bg-border/10 border-b border-border/20">
+        {statItems.map(s => (
+          <div key={s.label} className="bg-card p-2.5 text-center">
+            <div className={`w-6 h-6 ${s.bg} rounded-md flex items-center justify-center mx-auto mb-1`}>
+              <s.icon className={`w-3 h-3 ${s.color}`} />
+            </div>
+            <p className="text-sm font-black text-foreground">{s.value}</p>
+            <p className="text-[9px] text-muted-foreground leading-tight">{s.label}</p>
+          </div>
+        ))}
+      </div>
+
+      {recentPages.length > 0 && (
+        <div className="px-4 py-3 border-b border-border/20">
+          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2">Recent Pages</p>
+          <div className="space-y-1 max-h-28 overflow-y-auto">
+            {recentPages.slice(0, 10).map((p, i) => (
+              <div key={i} className="flex items-center justify-between text-[11px]">
+                <span className="text-foreground/80 font-mono truncate mr-2">{p.path}</span>
+                <span className="text-muted-foreground/50 whitespace-nowrap">{new Date(p.createdAt).toLocaleDateString()}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {referrals.length > 0 && (
+        <div className="px-4 py-3">
+          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2">Referrals ({referrals.length})</p>
+          <div className="space-y-1.5">
+            {referrals.map(r => (
+              <div key={r.id} className="flex items-center justify-between text-[11px] bg-background/30 rounded px-2 py-1.5">
+                <span className="text-foreground/80">{r.referredEmail || r.referredName || 'Unknown'}</span>
+                <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${
+                  r.status === 'converted' ? 'bg-emerald-500/15 text-emerald-400' : 'bg-blue-500/15 text-blue-400'
+                }`}>
+                  {r.status === 'converted' ? 'Pro' : 'Signed Up'}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function UserListPanel({ onClose, onEmailUsers }: { onClose: () => void; onEmailUsers: (emails: string[]) => void }) {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);
@@ -85,6 +213,7 @@ function UserListPanel({ onClose, onEmailUsers }: { onClose: () => void; onEmail
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [deleting, setDeleting] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const [viewingUserId, setViewingUserId] = useState<string | null>(null);
 
   useEffect(() => {
     apiFetch('/api/admin/users', { credentials: 'include' })
@@ -224,50 +353,66 @@ function UserListPanel({ onClose, onEmailUsers }: { onClose: () => void; onEmail
           })}
         </div>
       )}
-      <div className="max-h-72 overflow-y-auto">
-        {loading ? (
-          <p className="text-xs text-muted-foreground text-center py-4">Loading...</p>
-        ) : filtered.length === 0 ? (
-          <p className="text-xs text-muted-foreground text-center py-4">No users found</p>
-        ) : (
-          <div className="divide-y divide-border/20">
-            {filtered.map(u => {
-              const isSelected = selected.has(u.id);
-              const hasEmail = !!u.email;
-              return (
-                <button
-                  key={u.id}
-                  onClick={() => hasEmail && toggleUser(u.id)}
-                  disabled={!hasEmail}
-                  className={`w-full px-4 py-2.5 flex items-center justify-between gap-3 text-left transition-colors ${hasEmail ? 'hover:bg-amber-500/5 cursor-pointer' : 'opacity-50 cursor-default'} ${isSelected ? 'bg-amber-500/8' : ''}`}
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${isSelected ? 'border-amber-400 bg-amber-400' : 'border-border/50'}`}>
-                      {isSelected && <Check className="w-3 h-3 text-black" />}
+      {viewingUserId ? (
+        <UserDetailPanel userId={viewingUserId} onBack={() => setViewingUserId(null)} />
+      ) : (
+        <div className="max-h-72 overflow-y-auto">
+          {loading ? (
+            <p className="text-xs text-muted-foreground text-center py-4">Loading...</p>
+          ) : filtered.length === 0 ? (
+            <p className="text-xs text-muted-foreground text-center py-4">No users found</p>
+          ) : (
+            <div className="divide-y divide-border/20">
+              {filtered.map(u => {
+                const isSelected = selected.has(u.id);
+                const hasEmail = !!u.email;
+                return (
+                  <div
+                    key={u.id}
+                    className={`w-full px-4 py-2.5 flex items-center justify-between gap-3 text-left transition-colors ${isSelected ? 'bg-amber-500/8' : ''}`}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); if (hasEmail) toggleUser(u.id); }}
+                        disabled={!hasEmail}
+                        className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${!hasEmail ? 'opacity-30 cursor-default' : 'cursor-pointer'} ${isSelected ? 'border-amber-400 bg-amber-400' : 'border-border/50 hover:border-amber-400/50'}`}
+                      >
+                        {isSelected && <Check className="w-3 h-3 text-black" />}
+                      </button>
+                      <button
+                        onClick={() => setViewingUserId(u.id)}
+                        className="min-w-0 text-left hover:underline decoration-dotted underline-offset-2"
+                      >
+                        <p className="text-sm font-medium text-foreground truncate">
+                          {u.email || (u.chesscomUsername ? `♟ ${u.chesscomUsername}` : u.firstName || 'Unknown')}
+                        </p>
+                        {u.email && u.chesscomUsername && (
+                          <p className="text-[11px] text-muted-foreground/60 truncate">♟ {u.chesscomUsername}</p>
+                        )}
+                      </button>
                     </div>
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-foreground truncate">
-                        {u.email || (u.chesscomUsername ? `♟ ${u.chesscomUsername}` : u.firstName || 'Unknown')}
-                      </p>
-                      {u.email && u.chesscomUsername && (
-                        <p className="text-[11px] text-muted-foreground/60 truncate">♟ {u.chesscomUsername}</p>
-                      )}
+                    <div className="flex items-center gap-2 shrink-0">
+                      <TierBadge user={u} />
+                      <span className="text-[10px] text-muted-foreground/50 whitespace-nowrap leading-tight text-right">
+                        {u.daysSinceLogin !== null ? (
+                          u.daysSinceLogin === 0 ? 'today' : `${u.daysSinceLogin}d ago`
+                        ) : 'never'}
+                      </span>
+                      <button
+                        onClick={() => setViewingUserId(u.id)}
+                        className="p-0.5 text-muted-foreground/40 hover:text-amber-400 transition-colors"
+                        title="View stats"
+                      >
+                        <ChevronRight className="w-3.5 h-3.5" />
+                      </button>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <TierBadge user={u} />
-                    <span className="text-[10px] text-muted-foreground/50 whitespace-nowrap leading-tight text-right">
-                      {u.daysSinceLogin !== null ? (
-                        u.daysSinceLogin === 0 ? 'today' : `${u.daysSinceLogin}d ago`
-                      ) : 'never'}
-                    </span>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        )}
-      </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
     </motion.div>
   );
 }
