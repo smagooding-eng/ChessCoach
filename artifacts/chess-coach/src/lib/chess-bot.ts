@@ -271,7 +271,7 @@ export function evaluatePosition(fen: string): number {
 }
 
 export interface MoveAnalysisResult {
-  quality: 'checkmate' | 'brilliant' | 'excellent' | 'good' | 'book' | 'inaccuracy' | 'mistake' | 'blunder';
+  quality: 'checkmate' | 'brilliant' | 'great' | 'best' | 'excellent' | 'good' | 'book' | 'inaccuracy' | 'mistake' | 'blunder' | 'missed_win';
   evalBefore: number;
   evalAfter: number;
   cpLoss: number;

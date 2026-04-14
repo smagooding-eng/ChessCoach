@@ -13,7 +13,7 @@ import { useUser } from '@/hooks/use-user';
 import { useChessPlayer } from '@/hooks/use-chess-player';
 import { apiFetch } from '@/lib/api';
 
-type Classification = 'checkmate' | 'brilliant' | 'excellent' | 'good' | 'book' | 'inaccuracy' | 'mistake' | 'blunder';
+type Classification = 'checkmate' | 'brilliant' | 'great' | 'best' | 'excellent' | 'good' | 'book' | 'inaccuracy' | 'mistake' | 'blunder' | 'missed_win';
 
 type ReviewMove = {
   moveIndex: number;
@@ -44,14 +44,17 @@ type GameSummary = {
 };
 
 const CLASS_CFG: Record<Classification, { badge: string; color: string; full: string }> = {
-  checkmate:  { badge: '♚',  color: 'text-amber-400 bg-amber-400/15 border-amber-400/30',        full: 'Checkmate' },
-  brilliant:  { badge: '!!',  color: 'text-cyan-400 bg-cyan-400/15 border-cyan-400/30',          full: 'Brilliant' },
-  excellent:  { badge: '!',   color: 'text-emerald-400 bg-emerald-400/15 border-emerald-400/30', full: 'Excellent' },
-  good:       { badge: '✓',   color: 'text-green-400 bg-green-400/15 border-green-400/30',       full: 'Good' },
-  book:       { badge: '📖',  color: 'text-blue-400 bg-blue-400/15 border-blue-400/30',          full: 'Book Move' },
-  inaccuracy: { badge: '?!',  color: 'text-yellow-400 bg-yellow-400/15 border-yellow-400/30',    full: 'Inaccuracy' },
-  mistake:    { badge: '?',   color: 'text-orange-400 bg-orange-400/15 border-orange-400/30',    full: 'Mistake' },
-  blunder:    { badge: '??',  color: 'text-rose-400 bg-rose-400/15 border-rose-400/30',          full: 'Blunder' },
+  checkmate:   { badge: '♚',  color: 'text-amber-400 bg-amber-400/15 border-amber-400/30',        full: 'Checkmate' },
+  brilliant:   { badge: '!!', color: 'text-cyan-400 bg-cyan-400/15 border-cyan-400/30',           full: 'Brilliant Move' },
+  great:       { badge: '!',  color: 'text-sky-400 bg-sky-400/15 border-sky-400/30',              full: 'Great Move' },
+  best:        { badge: '!',  color: 'text-emerald-400 bg-emerald-400/15 border-emerald-400/30',  full: 'Best Move' },
+  excellent:   { badge: '!',  color: 'text-teal-400 bg-teal-400/15 border-teal-400/30',           full: 'Excellent Move' },
+  good:        { badge: '!',  color: 'text-green-400 bg-green-400/15 border-green-400/30',        full: 'Good Move' },
+  book:        { badge: '📖', color: 'text-blue-400 bg-blue-400/15 border-blue-400/30',           full: 'Book Move' },
+  inaccuracy:  { badge: '?!', color: 'text-yellow-400 bg-yellow-400/15 border-yellow-400/30',     full: 'Inaccuracy' },
+  mistake:     { badge: '?',  color: 'text-orange-400 bg-orange-400/15 border-orange-400/30',     full: 'Mistake' },
+  blunder:     { badge: '??', color: 'text-rose-400 bg-rose-400/15 border-rose-400/30',           full: 'Blunder' },
+  missed_win:  { badge: '✗',  color: 'text-red-400 bg-red-400/15 border-red-400/30',             full: 'Missed Win' },
 };
 
 function GameRatingPanel({
@@ -66,8 +69,8 @@ function GameRatingPanel({
   blackAvatar?: string;
 }) {
   const WIN_PCT_LOSS_BY_CLASS: Record<Classification, number> = {
-    checkmate: 0, brilliant: 0, excellent: 0.5, book: 0.7, good: 2,
-    inaccuracy: 8, mistake: 16, blunder: 33,
+    checkmate: 0, brilliant: 0, great: 0, best: 0, excellent: 0.5, book: 0.7, good: 2,
+    inaccuracy: 8, mistake: 16, blunder: 33, missed_win: 25,
   };
 
   const byColor = (c: 'white' | 'black') => reviewMoves.filter(m => m.color === c);
@@ -78,7 +81,7 @@ function GameRatingPanel({
       if (m.cpLoss != null && m.engineAvailable) return s + m.cpLoss;
       const base = WIN_PCT_LOSS_BY_CLASS[m.classification];
       const unverifiedFloor = 3;
-      return s + Math.max(base, ['good', 'book', 'excellent'].includes(m.classification) && !m.engineAvailable ? unverifiedFloor : base);
+      return s + Math.max(base, ['good', 'book', 'excellent', 'best', 'great'].includes(m.classification) && !m.engineAvailable ? unverifiedFloor : base);
     }, 0);
     const avgWinPctLoss = totalWinPctLoss / moves.length;
     return Math.min(100, Math.max(0, 103.1668 * Math.exp(-0.065 * avgWinPctLoss) - 3.1668));
@@ -100,31 +103,38 @@ function GameRatingPanel({
 
   const counts = (moves: ReviewMove[]) => ({
     brilliant: moves.filter(m => m.classification === 'brilliant').length,
+    great: moves.filter(m => m.classification === 'great').length,
+    best: moves.filter(m => m.classification === 'best').length,
     excellent: moves.filter(m => m.classification === 'excellent').length,
     good: moves.filter(m => m.classification === 'good' || m.classification === 'book').length,
     inaccuracy: moves.filter(m => m.classification === 'inaccuracy').length,
     mistake: moves.filter(m => m.classification === 'mistake').length,
     blunder: moves.filter(m => m.classification === 'blunder').length,
+    missed_win: moves.filter(m => m.classification === 'missed_win').length,
   });
 
   const phaseGrade = (moves: ReviewMove[], from: number, to: number) => {
     const ph = moves.filter(m => m.moveIndex >= from && m.moveIndex < to);
     if (ph.length === 0) return null;
     if (ph.some(m => m.classification === 'blunder'))    return 'blunder';
+    if (ph.some(m => m.classification === 'missed_win')) return 'missed_win';
     if (ph.some(m => m.classification === 'mistake'))    return 'mistake';
     if (ph.some(m => m.classification === 'inaccuracy')) return 'inaccuracy';
     if (ph.some(m => m.classification === 'brilliant'))  return 'brilliant';
+    if (ph.some(m => m.classification === 'great'))      return 'great';
     return 'good';
   };
 
   const PhaseIcon = ({ grade }: { grade: string | null }) => {
     if (!grade) return <span className="text-muted-foreground">—</span>;
     const map: Record<string, { bg: string; label: string }> = {
-      brilliant:  { bg: 'bg-cyan-500',    label: '!!' },
-      good:       { bg: 'bg-emerald-500', label: '✓'  },
-      inaccuracy: { bg: 'bg-yellow-500',  label: '?!' },
-      mistake:    { bg: 'bg-orange-500',  label: '?'  },
-      blunder:    { bg: 'bg-rose-500',    label: '??' },
+      brilliant:   { bg: 'bg-cyan-500',    label: '!!' },
+      great:       { bg: 'bg-sky-500',     label: '!'  },
+      good:        { bg: 'bg-emerald-500', label: '✓'  },
+      inaccuracy:  { bg: 'bg-yellow-500',  label: '?!' },
+      mistake:     { bg: 'bg-orange-500',  label: '?'  },
+      blunder:     { bg: 'bg-rose-500',    label: '??' },
+      missed_win:  { bg: 'bg-red-500',     label: '✗'  },
     };
     const cfg = map[grade];
     return (
@@ -142,12 +152,15 @@ function GameRatingPanel({
   const bc   = counts(bArr);
 
   const moveRows: { label: string; key: keyof ReturnType<typeof counts>; iconBg: string; icon: string; textColor: string }[] = [
-    { label: 'Brilliant',  key: 'brilliant',  iconBg: 'bg-cyan-500',    icon: '!!', textColor: 'text-cyan-400'    },
-    { label: 'Excellent',  key: 'excellent',  iconBg: 'bg-emerald-500', icon: '!',  textColor: 'text-emerald-400' },
-    { label: 'Good',       key: 'good',       iconBg: 'bg-green-600',   icon: '✓',  textColor: 'text-green-400'   },
-    { label: 'Inaccuracy', key: 'inaccuracy', iconBg: 'bg-yellow-500',  icon: '?!', textColor: 'text-yellow-400'  },
-    { label: 'Mistake',    key: 'mistake',    iconBg: 'bg-orange-500',  icon: '?',  textColor: 'text-orange-400'  },
-    { label: 'Blunder',    key: 'blunder',    iconBg: 'bg-rose-500',    icon: '??', textColor: 'text-rose-400'    },
+    { label: 'Brilliant',   key: 'brilliant',   iconBg: 'bg-cyan-500',    icon: '!!', textColor: 'text-cyan-400'    },
+    { label: 'Great',       key: 'great',       iconBg: 'bg-sky-500',     icon: '!',  textColor: 'text-sky-400'     },
+    { label: 'Best',        key: 'best',        iconBg: 'bg-emerald-500', icon: '!',  textColor: 'text-emerald-400' },
+    { label: 'Excellent',   key: 'excellent',   iconBg: 'bg-teal-500',    icon: '!',  textColor: 'text-teal-400'    },
+    { label: 'Good',        key: 'good',        iconBg: 'bg-green-600',   icon: '!',  textColor: 'text-green-400'   },
+    { label: 'Inaccuracy',  key: 'inaccuracy',  iconBg: 'bg-yellow-500',  icon: '?!', textColor: 'text-yellow-400'  },
+    { label: 'Mistake',     key: 'mistake',     iconBg: 'bg-orange-500',  icon: '?',  textColor: 'text-orange-400'  },
+    { label: 'Blunder',     key: 'blunder',     iconBg: 'bg-rose-500',    icon: '??', textColor: 'text-rose-400'    },
+    { label: 'Missed Win',  key: 'missed_win',  iconBg: 'bg-red-500',     icon: '✗',  textColor: 'text-red-400'     },
   ];
 
   const phases = [
@@ -522,7 +535,7 @@ export function GameReplay() {
   );
 
   const cfg = currentReview ? CLASS_CFG[currentReview.classification] : null;
-  const isBad = currentReview && ['inaccuracy', 'mistake', 'blunder'].includes(currentReview.classification);
+  const isBad = currentReview && ['inaccuracy', 'mistake', 'blunder', 'missed_win'].includes(currentReview.classification);
 
   return (
     <div className="space-y-2 md:space-y-4 pb-20 px-3 pt-3 md:px-0 md:pt-0">
@@ -934,7 +947,7 @@ export function GameReplay() {
             <div className="flex items-center gap-2">
               {reviewMoves.length > 0 && (
                 <span className="text-[10px] text-primary font-bold px-2 py-0.5 bg-primary/10 rounded-full border border-primary/20">
-                  {reviewMoves.filter(m => ['blunder', 'mistake', 'inaccuracy'].includes(m.classification)).length} errors
+                  {reviewMoves.filter(m => ['blunder', 'mistake', 'inaccuracy', 'missed_win'].includes(m.classification)).length} errors
                 </span>
               )}
               <Clock className="w-3.5 h-3.5 text-muted-foreground" />
@@ -1004,8 +1017,8 @@ export function GameReplay() {
           {/* Review summary — per-player accuracy */}
           {reviewMoves.length > 0 && (() => {
             const WIN_PCT_MAP: Record<Classification, number> = {
-              checkmate: 0, brilliant: 0, excellent: 0.5, book: 0.7, good: 2,
-              inaccuracy: 8, mistake: 16, blunder: 33,
+              checkmate: 0, brilliant: 0, great: 0, best: 0, excellent: 0.5, book: 0.7, good: 2,
+              inaccuracy: 8, mistake: 16, blunder: 33, missed_win: 25,
             };
 
             function calcAccuracy(moves: ReviewMove[]) {
@@ -1014,7 +1027,7 @@ export function GameReplay() {
                 if (m.cpLoss != null && m.engineAvailable) return s + m.cpLoss;
                 const base = WIN_PCT_MAP[m.classification];
                 const unverifiedFloor = 3;
-                return s + Math.max(base, ['good', 'book', 'excellent'].includes(m.classification) && !m.engineAvailable ? unverifiedFloor : base);
+                return s + Math.max(base, ['good', 'book', 'excellent', 'best', 'great'].includes(m.classification) && !m.engineAvailable ? unverifiedFloor : base);
               }, 0);
               const avgWinPctLoss = totalWinPctLoss / moves.length;
               return Math.round(Math.min(100, Math.max(0, 103.1668 * Math.exp(-0.065 * avgWinPctLoss) - 3.1668)));
@@ -1022,8 +1035,8 @@ export function GameReplay() {
 
             function countFor(moves: ReviewMove[]) {
               const c: Record<Classification, number> = {
-                checkmate: 0, brilliant: 0, excellent: 0, good: 0, book: 0,
-                inaccuracy: 0, mistake: 0, blunder: 0,
+                checkmate: 0, brilliant: 0, great: 0, best: 0, excellent: 0, good: 0, book: 0,
+                inaccuracy: 0, mistake: 0, blunder: 0, missed_win: 0,
               };
               moves.forEach(m => c[m.classification]++);
               return c;
@@ -1043,9 +1056,9 @@ export function GameReplay() {
               acc >= 40 ? 'text-orange-400' : 'text-rose-400';
 
             const MiniBar = ({ c }: { c: Record<Classification, number> }) => {
-              const good = c.brilliant + c.excellent + c.good + c.book;
+              const good = c.brilliant + c.great + c.best + c.excellent + c.good + c.book;
               const inac = c.inaccuracy;
-              const bad  = c.mistake + c.blunder;
+              const bad  = c.mistake + c.blunder + c.missed_win;
               const tot  = good + inac + bad;
               if (tot === 0) return null;
               return (
@@ -1066,10 +1079,10 @@ export function GameReplay() {
                   <div className="flex items-center justify-between gap-1">
                     <span className="text-[10px] text-muted-foreground truncate max-w-[80px]">{label}</span>
                     <div className="flex gap-1.5 text-[9px] text-muted-foreground shrink-0">
-                      {(counts.brilliant + counts.excellent) > 0 && <span className="text-cyan-400">+{counts.brilliant + counts.excellent}</span>}
+                      {(counts.brilliant + counts.great + counts.best + counts.excellent) > 0 && <span className="text-cyan-400">+{counts.brilliant + counts.great + counts.best + counts.excellent}</span>}
                       {counts.good > 0 && <span className="text-green-400">{counts.good}✓</span>}
                       {(counts.inaccuracy) > 0 && <span className="text-yellow-400">{counts.inaccuracy}?!</span>}
-                      {(counts.mistake + counts.blunder) > 0 && <span className="text-rose-400">{counts.mistake + counts.blunder}✗</span>}
+                      {(counts.mistake + counts.blunder + counts.missed_win) > 0 && <span className="text-rose-400">{counts.mistake + counts.blunder + counts.missed_win}✗</span>}
                     </div>
                   </div>
                   <MiniBar c={counts} />

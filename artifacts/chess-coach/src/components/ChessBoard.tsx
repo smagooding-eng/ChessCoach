@@ -54,28 +54,34 @@ class BoardErrorBoundary extends Component<
 
 const START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
-export type MoveQuality = 'checkmate' | 'brilliant' | 'excellent' | 'good' | 'book' | 'inaccuracy' | 'mistake' | 'blunder';
+export type MoveQuality = 'checkmate' | 'brilliant' | 'great' | 'best' | 'excellent' | 'good' | 'book' | 'inaccuracy' | 'mistake' | 'blunder' | 'missed_win';
 
 const QUALITY_COLOR: Record<MoveQuality, string> = {
-  checkmate:  'rgba(255, 215, 0, 0.70)',
-  brilliant:  'rgba(0, 220, 240, 0.60)',
-  excellent:  'rgba(50, 210, 110, 0.60)',
-  good:       'rgba(100, 200, 80, 0.50)',
-  book:       'rgba(90, 140, 255, 0.55)',
-  inaccuracy: 'rgba(255, 215, 40, 0.60)',
-  mistake:    'rgba(255, 130, 20, 0.65)',
-  blunder:    'rgba(220, 50, 50, 0.70)',
+  checkmate:   'rgba(255, 215, 0, 0.70)',
+  brilliant:   'rgba(0, 220, 240, 0.60)',
+  great:       'rgba(56, 189, 248, 0.60)',
+  best:        'rgba(50, 210, 110, 0.60)',
+  excellent:   'rgba(45, 212, 191, 0.55)',
+  good:        'rgba(100, 200, 80, 0.50)',
+  book:        'rgba(90, 140, 255, 0.55)',
+  inaccuracy:  'rgba(255, 215, 40, 0.60)',
+  mistake:     'rgba(255, 130, 20, 0.65)',
+  blunder:     'rgba(220, 50, 50, 0.70)',
+  missed_win:  'rgba(239, 68, 68, 0.65)',
 };
 
 const QUALITY_LABEL: Record<MoveQuality, { text: string; icon: string }> = {
-  checkmate:  { text: 'Checkmate!',  icon: '♚' },
-  brilliant:  { text: 'Brilliant!!', icon: '✦' },
-  excellent:  { text: 'Excellent!',  icon: '!' },
-  good:       { text: 'Good',        icon: '✓' },
-  book:       { text: 'Book Move',   icon: '📖' },
-  inaccuracy: { text: 'Inaccuracy',  icon: '?!' },
-  mistake:    { text: 'Mistake',     icon: '?' },
-  blunder:    { text: 'Blunder??',   icon: '??' },
+  checkmate:   { text: 'Checkmate!',    icon: '♚' },
+  brilliant:   { text: 'Brilliant!!',   icon: '✦' },
+  great:       { text: 'Great Move!',   icon: '!' },
+  best:        { text: 'Best Move!',    icon: '!' },
+  excellent:   { text: 'Excellent!',    icon: '!' },
+  good:        { text: 'Good Move',     icon: '!' },
+  book:        { text: 'Book Move',     icon: '📖' },
+  inaccuracy:  { text: 'Inaccuracy',    icon: '?!' },
+  mistake:     { text: 'Mistake',       icon: '?' },
+  blunder:     { text: 'Blunder??',     icon: '??' },
+  missed_win:  { text: 'Missed Win',    icon: '✗' },
 };
 
 interface ChessBoardProps {
@@ -291,14 +297,16 @@ export function ChessBoard({
       {moveQuality && !practiceMode && !feedback && (
         <div className="absolute top-2 right-2 pointer-events-none z-10">
           <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold shadow-lg backdrop-blur-sm border
-            ${moveQuality === 'checkmate'  ? 'bg-amber-950/90 text-amber-300 border-amber-400/40' :
-              moveQuality === 'brilliant'  ? 'bg-cyan-950/90 text-cyan-300 border-cyan-400/40' :
-              moveQuality === 'excellent'  ? 'bg-emerald-950/90 text-emerald-300 border-emerald-400/40' :
-              moveQuality === 'good'       ? 'bg-green-950/90 text-green-300 border-green-400/40' :
-              moveQuality === 'book'       ? 'bg-blue-950/90 text-blue-300 border-blue-400/40' :
-              moveQuality === 'inaccuracy' ? 'bg-yellow-950/90 text-yellow-300 border-yellow-400/40' :
-              moveQuality === 'mistake'    ? 'bg-orange-950/90 text-orange-300 border-orange-400/40' :
-                                            'bg-red-950/90 text-red-300 border-red-400/40'}`}>
+            ${moveQuality === 'checkmate'   ? 'bg-amber-950/90 text-amber-300 border-amber-400/40' :
+              moveQuality === 'brilliant'   ? 'bg-cyan-950/90 text-cyan-300 border-cyan-400/40' :
+              moveQuality === 'great'       ? 'bg-sky-950/90 text-sky-300 border-sky-400/40' :
+              moveQuality === 'best'        ? 'bg-emerald-950/90 text-emerald-300 border-emerald-400/40' :
+              moveQuality === 'excellent'   ? 'bg-teal-950/90 text-teal-300 border-teal-400/40' :
+              moveQuality === 'good'        ? 'bg-green-950/90 text-green-300 border-green-400/40' :
+              moveQuality === 'book'        ? 'bg-blue-950/90 text-blue-300 border-blue-400/40' :
+              moveQuality === 'inaccuracy'  ? 'bg-yellow-950/90 text-yellow-300 border-yellow-400/40' :
+              moveQuality === 'mistake'     ? 'bg-orange-950/90 text-orange-300 border-orange-400/40' :
+                                              'bg-red-950/90 text-red-300 border-red-400/40'}`}>
             <span>{QUALITY_LABEL[moveQuality].icon}</span>
             <span>{QUALITY_LABEL[moveQuality].text}</span>
           </div>

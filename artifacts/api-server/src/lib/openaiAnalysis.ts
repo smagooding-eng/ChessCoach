@@ -138,7 +138,7 @@ export interface MoveClassification {
   moveIndex: number;
   san: string;
   color: string;
-  classification: "brilliant" | "excellent" | "good" | "book" | "inaccuracy" | "mistake" | "blunder";
+  classification: "brilliant" | "great" | "best" | "excellent" | "good" | "book" | "inaccuracy" | "mistake" | "blunder" | "missed_win";
   explanation: string;
   cpLoss: number;
   engineAvailable: boolean;
@@ -230,8 +230,7 @@ export async function analyzeMoves(input: AnalyzeMovesInput): Promise<MoveClassi
     const moveCpLoss = Math.max(0, winPctLossRaw);
 
     const playerWinBefore = playerColor === "white" ? winPct(cpBefore) : (100 - winPct(cpBefore));
-
-    let classification = classifyFromWinPctLoss(winPctLossRaw, isTopEngineMove, isSecondEngineMove, isOpeningRange, wasBalanced, playerWinBefore, stillInBook);
+    const playerWinAfter = playerColor === "white" ? winPct(cpAfter) : (100 - winPct(cpAfter));
 
     let legalMoves: string[] = [];
     try {
@@ -239,17 +238,19 @@ export async function analyzeMoves(input: AnalyzeMovesInput): Promise<MoveClassi
       legalMoves = pos.moves();
     } catch {}
 
+    let classification = classifyFromWinPctLoss(winPctLossRaw, isTopEngineMove, isSecondEngineMove, isOpeningRange, wasBalanced, playerWinBefore, stillInBook, playerWinAfter, legalMoves.length);
+
     if (legalMoves.length <= 1 && stillInBook) {
       classification = "book";
     }
 
     if (classification === "brilliant") {
       if (!isSacrificialMove(fens[idx], m.san)) {
-        classification = "excellent";
+        classification = isTopEngineMove ? "best" : "excellent";
       }
     }
 
-    const isBad = ["inaccuracy", "mistake", "blunder"].includes(classification);
+    const isBad = ["inaccuracy", "mistake", "blunder", "missed_win"].includes(classification);
     let bestMove: string | null = null;
     if (isBad && evalBefore.bestMoveSan && !isTopEngineMove) {
       bestMove = evalBefore.bestMoveSan;
@@ -268,7 +269,7 @@ export interface PgnAnalysisResult {
     moveIndex: number;
     san: string;
     color: "white" | "black";
-    classification: "brilliant" | "excellent" | "good" | "book" | "inaccuracy" | "mistake" | "blunder";
+    classification: "brilliant" | "great" | "best" | "excellent" | "good" | "book" | "inaccuracy" | "mistake" | "blunder" | "missed_win";
     cpLoss: number;
     bestMove: string | null;
     evalBefore: number;
@@ -358,8 +359,7 @@ export async function analyzeGamePgn(pgn: string, onProgress?: (done: number, to
     else blackLosses.push(moveCpLoss);
 
     const playerWinBefore = m.color === "white" ? winPct(cpBefore) : (100 - winPct(cpBefore));
-
-    let classification = classifyFromWinPctLoss(winPctLossRaw, isTopEngineMove, isSecondEngineMove, isOpeningRange, wasBalanced, playerWinBefore, stillInBook);
+    const playerWinAfter = m.color === "white" ? winPct(cpAfter) : (100 - winPct(cpAfter));
 
     let legalMoves: string[] = [];
     try {
@@ -367,15 +367,17 @@ export async function analyzeGamePgn(pgn: string, onProgress?: (done: number, to
       legalMoves = pos.moves();
     } catch {}
 
+    let classification = classifyFromWinPctLoss(winPctLossRaw, isTopEngineMove, isSecondEngineMove, isOpeningRange, wasBalanced, playerWinBefore, stillInBook, playerWinAfter, legalMoves.length);
+
     if (legalMoves.length <= 1 && stillInBook) classification = "book";
 
     if (classification === "brilliant") {
       if (!isSacrificialMove(fens[idx], m.san)) {
-        classification = "excellent";
+        classification = isTopEngineMove ? "best" : "excellent";
       }
     }
 
-    const isBad = ["inaccuracy", "mistake", "blunder"].includes(classification);
+    const isBad = ["inaccuracy", "mistake", "blunder", "missed_win"].includes(classification);
     let bestMove: string | null = null;
     if (isBad && evalBefore.bestMoveSan && !isTopEngineMove) {
       bestMove = evalBefore.bestMoveSan;
@@ -404,7 +406,7 @@ export async function analyzeGamePgn(pgn: string, onProgress?: (done: number, to
 }
 
 export interface SingleMoveAnalysis {
-  classification: "brilliant" | "excellent" | "good" | "book" | "inaccuracy" | "mistake" | "blunder";
+  classification: "brilliant" | "great" | "best" | "excellent" | "good" | "book" | "inaccuracy" | "mistake" | "blunder" | "missed_win";
   pros: string[];
   cons: string[];
   betterMove: string | null;
@@ -464,6 +466,7 @@ export async function analyzeSingleMove(input: AnalyzeSingleMoveInput): Promise<
   const isOpeningRange = moveIndex < 30;
   const wasBalanced = Math.abs(cpBefore) < 150;
   const playerWinBefore = playerColor === "white" ? winPct(cpBefore) : (100 - winPct(cpBefore));
+  const playerWinAfter = playerColor === "white" ? winPct(cpAfter) : (100 - winPct(cpAfter));
 
   let isInBook = false;
   if (fenAfter) {
@@ -473,8 +476,19 @@ export async function analyzeSingleMove(input: AnalyzeSingleMoveInput): Promise<
     }
   }
 
-  const classification = classifyFromWinPctLoss(winPctLossRaw, isTopEngineMove, isSecondEngineMove, isOpeningRange, wasBalanced, playerWinBefore, isInBook);
-  const isBad = ["inaccuracy", "mistake", "blunder"].includes(classification);
+  const Chess = require("chess.js").Chess;
+  let legalMoveCount = 20;
+  try { legalMoveCount = new Chess(fenBefore).moves().length; } catch {}
+
+  let classification = classifyFromWinPctLoss(winPctLossRaw, isTopEngineMove, isSecondEngineMove, isOpeningRange, wasBalanced, playerWinBefore, isInBook, playerWinAfter, legalMoveCount);
+
+  if (classification === "brilliant") {
+    if (!isSacrificialMove(fenBefore, target.san)) {
+      classification = isTopEngineMove ? "best" : "excellent";
+    }
+  }
+
+  const isBad = ["inaccuracy", "mistake", "blunder", "missed_win"].includes(classification);
 
   const cpInfo =
     `Stockfish 17 (depth ${evalBefore.depth}) reports win% loss = ${cpLoss.toFixed(1)}%. ` +
@@ -651,9 +665,14 @@ function mergeReviewWithEngine(
     const moveCpLoss = Math.max(0, winPctLossRaw);
 
     const playerWinBefore = playerColor === "white" ? winPct(cpBefore) : (100 - winPct(cpBefore));
-    classification = classifyFromWinPctLoss(winPctLossRaw, isTopEngineMove, isSecondEngineMove, isOpeningRange, wasBalanced, playerWinBefore, stillInBook);
+    const playerWinAfter = playerColor === "white" ? winPct(cpAfter) : (100 - winPct(cpAfter));
 
-    const isBad = ["inaccuracy", "mistake", "blunder"].includes(classification);
+    let legalMoveCount = 20;
+    try { legalMoveCount = new Chess(fenBefore).moves().length; } catch {}
+
+    classification = classifyFromWinPctLoss(winPctLossRaw, isTopEngineMove, isSecondEngineMove, isOpeningRange, wasBalanced, playerWinBefore, stillInBook, playerWinAfter, legalMoveCount);
+
+    const isBad = ["inaccuracy", "mistake", "blunder", "missed_win"].includes(classification);
     if (isBad && evalBefore.bestMoveSan && !isTopEngineMove) {
       betterMove = evalBefore.bestMoveSan;
     } else if (!isBad) {
@@ -672,7 +691,7 @@ function mergeReviewWithEngine(
 
     if (classification === "brilliant") {
       if (!isSacrificialMove(fenBefore, om.san)) {
-        classification = "excellent";
+        classification = isTopEngineMove ? "best" : "excellent";
       }
     }
 
@@ -695,7 +714,7 @@ export interface MoveReview {
   moveIndex: number;
   san: string;
   color: "white" | "black";
-  classification: "brilliant" | "excellent" | "good" | "book" | "inaccuracy" | "mistake" | "blunder";
+  classification: "brilliant" | "great" | "best" | "excellent" | "good" | "book" | "inaccuracy" | "mistake" | "blunder" | "missed_win";
   explanation: string;
   betterMove: string | null;
   pros: string[];
@@ -771,10 +790,18 @@ Moves to analyze:
 ${chunkList}
 
 Rules:
-- Classify each move: "brilliant"|"excellent"|"good"|"book"|"inaccuracy"|"mistake"|"blunder"
-- If [legal:1] → "book" (forced move)
-- "brilliant" = extremely rare (0-1 per game)
-- betterMove: only for inaccuracy/mistake/blunder, must be legal in the FEN. null otherwise.
+- Classify each move: "brilliant"|"great"|"best"|"excellent"|"good"|"book"|"inaccuracy"|"mistake"|"blunder"|"missed_win"
+- "brilliant" = piece sacrifice that significantly improves position, extremely rare (0-1 per game)
+- "great" = shifts momentum or one of very few good moves available
+- "best" = the engine's top choice
+- "excellent" = very close to the best move
+- "good" = solid move that maintains position but not optimal
+- "book" = opening theory move or forced move [legal:1]
+- "inaccuracy" = slightly worsens position
+- "mistake" = bad move that instantly worsens position
+- "blunder" = critical mistake causing massive disadvantage
+- "missed_win" = fails to capitalize on a winning opportunity
+- betterMove: only for inaccuracy/mistake/blunder/missed_win, must be legal in the FEN. null otherwise.
 
 Per move: classification, explanation (1 sentence), pros (1-2 items), cons (1-2 items), betterMove.
 ${includeSummary ? `
@@ -861,7 +888,7 @@ JSON format:
       if (parsed.gameSummary) gameSummaryRaw = parsed.gameSummary;
     }
 
-    const validClassifications = ["brilliant", "excellent", "good", "book", "inaccuracy", "mistake", "blunder"];
+    const validClassifications = ["brilliant", "great", "best", "excellent", "good", "book", "inaccuracy", "mistake", "blunder", "missed_win"];
 
     if (allParsedMoves.length < moves.length) {
       logger.warn({ expected: moves.length, received: allParsedMoves.length }, "GPT returned fewer moves than expected — remaining use engine-only data");

@@ -8,12 +8,15 @@ const ENGINE_TIMEOUT_MS = IS_PROD ? 15000 : 30000;
 
 export type EngineClassification =
   | "brilliant"
+  | "great"
+  | "best"
   | "excellent"
   | "good"
   | "book"
   | "inaccuracy"
   | "mistake"
-  | "blunder";
+  | "blunder"
+  | "missed_win";
 
 export interface StockfishEval {
   cp: number;
@@ -292,35 +295,59 @@ export function classifyFromWinPctLoss(
   _wasBalanced: boolean,
   playerWinPctBefore: number = 50,
   isInBook: boolean = false,
+  playerWinPctAfter: number = 50,
+  legalMoveCount: number = 20,
 ): EngineClassification {
   if (isInBook) {
     return "book";
   }
 
-  if (winPctLoss < 0) {
-    if (
-      winPctLoss < -5 &&
-      playerWinPctBefore >= 15 &&
-      playerWinPctBefore <= 65
-    ) {
-      return "brilliant";
-    }
-    return "excellent";
-  }
+  const wasWinning = playerWinPctBefore >= 70;
+  const isNowLosing = playerWinPctAfter <= 40;
+  const hadMateOrCrush = playerWinPctBefore >= 90;
 
-  if (winPctLoss <= 2) return "excellent";
-  if (winPctLoss <= 5) return "good";
-  if (winPctLoss <= 12) return "inaccuracy";
+  if (wasWinning && isNowLosing && winPctLoss > 25) {
+    return "missed_win";
+  }
+  if (hadMateOrCrush && winPctLoss > 15) {
+    return "missed_win";
+  }
 
   const alreadyDecided = playerWinPctBefore < 10 || playerWinPctBefore > 90;
 
-  if (winPctLoss <= 35) {
+  if (winPctLoss > 25) {
+    if (alreadyDecided) return "mistake";
+    return "blunder";
+  }
+  if (winPctLoss > 12) {
     if (alreadyDecided) return "inaccuracy";
     return "mistake";
   }
+  if (winPctLoss > 5) {
+    return "inaccuracy";
+  }
 
-  if (alreadyDecided) return "mistake";
-  return "blunder";
+  if (isTopEngineMove) {
+    if (winPctLoss < -5 && playerWinPctBefore >= 15 && playerWinPctBefore <= 70) {
+      return "brilliant";
+    }
+
+    if (legalMoveCount <= 5 && winPctLoss <= 0) {
+      return "great";
+    }
+
+    const evalSwing = playerWinPctAfter - playerWinPctBefore;
+    if (evalSwing > 15 && playerWinPctBefore <= 55) {
+      return "great";
+    }
+
+    return "best";
+  }
+
+  if (winPctLoss <= 1) return "excellent";
+  if (winPctLoss <= 5) return "good";
+
+  return "good";
 }
 
 const PIECE_VALUES: Record<string, number> = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };

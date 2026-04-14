@@ -18,7 +18,7 @@ const MISTAKE_RED = '#dc4343';
 const CARD_SHADOW = '0 4px 16px rgba(0,0,0,0.25), 0 1px 4px rgba(0,0,0,0.15), inset 0 1px 0 rgba(129,182,76,0.04)';
 const CARD_BORDER = '1px solid rgba(129,182,76,0.08)';
 
-type Classification = 'checkmate' | 'brilliant' | 'excellent' | 'good' | 'book' | 'inaccuracy' | 'mistake' | 'blunder';
+type Classification = 'checkmate' | 'brilliant' | 'great' | 'best' | 'excellent' | 'good' | 'book' | 'inaccuracy' | 'mistake' | 'blunder' | 'missed_win';
 
 type GameMove = {
   san: string;
@@ -65,14 +65,17 @@ type TurningPoint = {
 };
 
 const CLASS_CFG: Record<Classification, { badge: string; color: string; full: string }> = {
-  checkmate:  { badge: '♚',  color: 'text-amber-400 bg-amber-400/15 border-amber-400/30',        full: 'Checkmate' },
-  brilliant:  { badge: '!!',  color: 'text-cyan-400 bg-cyan-400/15 border-cyan-400/30',          full: 'Brilliant' },
-  excellent:  { badge: '!',   color: 'text-emerald-400 bg-emerald-400/15 border-emerald-400/30', full: 'Excellent' },
-  good:       { badge: '✓',   color: 'text-green-400 bg-green-400/15 border-green-400/30',       full: 'Good' },
-  book:       { badge: '📖',  color: 'text-blue-400 bg-blue-400/15 border-blue-400/30',          full: 'Book Move' },
-  inaccuracy: { badge: '?!',  color: 'text-yellow-400 bg-yellow-400/15 border-yellow-400/30',    full: 'Inaccuracy' },
-  mistake:    { badge: '?',   color: 'text-orange-400 bg-orange-400/15 border-orange-400/30',    full: 'Mistake' },
-  blunder:    { badge: '??',  color: 'text-rose-400 bg-rose-400/15 border-rose-400/30',          full: 'Blunder' },
+  checkmate:   { badge: '♚',  color: 'text-amber-400 bg-amber-400/15 border-amber-400/30',        full: 'Checkmate' },
+  brilliant:   { badge: '!!', color: 'text-cyan-400 bg-cyan-400/15 border-cyan-400/30',           full: 'Brilliant Move' },
+  great:       { badge: '!',  color: 'text-sky-400 bg-sky-400/15 border-sky-400/30',              full: 'Great Move' },
+  best:        { badge: '!',  color: 'text-emerald-400 bg-emerald-400/15 border-emerald-400/30',  full: 'Best Move' },
+  excellent:   { badge: '!',  color: 'text-teal-400 bg-teal-400/15 border-teal-400/30',           full: 'Excellent Move' },
+  good:        { badge: '!',  color: 'text-green-400 bg-green-400/15 border-green-400/30',        full: 'Good Move' },
+  book:        { badge: '📖', color: 'text-blue-400 bg-blue-400/15 border-blue-400/30',           full: 'Book Move' },
+  inaccuracy:  { badge: '?!', color: 'text-yellow-400 bg-yellow-400/15 border-yellow-400/30',     full: 'Inaccuracy' },
+  mistake:     { badge: '?',  color: 'text-orange-400 bg-orange-400/15 border-orange-400/30',     full: 'Mistake' },
+  blunder:     { badge: '??', color: 'text-rose-400 bg-rose-400/15 border-rose-400/30',           full: 'Blunder' },
+  missed_win:  { badge: '✗',  color: 'text-red-400 bg-red-400/15 border-red-400/30',             full: 'Missed Win' },
 };
 
 function formatTimeControl(tc: string): string {
@@ -119,8 +122,8 @@ function AnalysisSummaryPanel({
   game: H2HGame;
 }) {
   const WEIGHTS: Record<Classification, number> = {
-    checkmate: 100, brilliant: 100, excellent: 98, book: 90, good: 85,
-    inaccuracy: 55, mistake: 25, blunder: 0,
+    checkmate: 100, brilliant: 100, great: 100, best: 100, excellent: 98, book: 90, good: 85,
+    inaccuracy: 55, mistake: 25, blunder: 0, missed_win: 10,
   };
 
   const byColor = (c: 'white' | 'black') => analysis.filter(m => m.color === c);
@@ -133,12 +136,15 @@ function AnalysisSummaryPanel({
   const counts = (moves: MoveAnalysis[]) => ({
     checkmate: moves.filter(m => m.classification === 'checkmate').length,
     brilliant: moves.filter(m => m.classification === 'brilliant').length,
+    great: moves.filter(m => m.classification === 'great').length,
+    best: moves.filter(m => m.classification === 'best').length,
     excellent: moves.filter(m => m.classification === 'excellent').length,
     good: moves.filter(m => m.classification === 'good').length,
     book: moves.filter(m => m.classification === 'book').length,
     inaccuracy: moves.filter(m => m.classification === 'inaccuracy').length,
     mistake: moves.filter(m => m.classification === 'mistake').length,
     blunder: moves.filter(m => m.classification === 'blunder').length,
+    missed_win: moves.filter(m => m.classification === 'missed_win').length,
   });
 
   const wMoves = byColor('white');
@@ -163,7 +169,7 @@ function AnalysisSummaryPanel({
               <div className="text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>{p.name} ({p.rating})</div>
               <div className="text-2xl font-bold" style={{ color: CHESSCOM_GREEN }}>{p.acc.toFixed(1)}%</div>
               <div className="flex flex-wrap gap-1 justify-center mt-2">
-                {(['brilliant','excellent','good','book','inaccuracy','mistake','blunder'] as Classification[]).map(cls => {
+                {(['brilliant','great','best','excellent','good','book','inaccuracy','mistake','blunder','missed_win'] as Classification[]).map(cls => {
                   const cnt = p.c[cls];
                   if (cnt === 0) return null;
                   const cfg = CLASS_CFG[cls];
