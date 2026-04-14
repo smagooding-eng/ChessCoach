@@ -30,6 +30,27 @@ export interface PostResult {
   externalId?: string;
 }
 
+interface DiscordWebhookResponse {
+  id?: string;
+}
+
+interface TwitterTweetResponse {
+  data?: { id?: string };
+}
+
+interface RedditTokenResponse {
+  access_token?: string;
+  expires_in?: number;
+  error?: string;
+}
+
+interface RedditSubmitResponse {
+  json?: {
+    errors?: string[][];
+    data?: { url?: string };
+  };
+}
+
 export async function postToDiscord(webhookUrl: string, content: string): Promise<PostResult> {
   try {
     const discordPattern = /^https:\/\/(discord\.com|discordapp\.com)\/api\/webhooks\//;
@@ -49,13 +70,13 @@ export async function postToDiscord(webhookUrl: string, content: string): Promis
       body: JSON.stringify({ embeds: [embed] }),
     });
     if (!res.ok) {
-      const err = await res.text();
-      return { platform: 'Discord', success: false, error: `HTTP ${res.status}: ${err}` };
+      const errText = await res.text();
+      return { platform: 'Discord', success: false, error: `HTTP ${res.status}: ${errText}` };
     }
-    const data = await res.json() as any;
+    const data: DiscordWebhookResponse = await res.json();
     return { platform: 'Discord', success: true, externalId: data.id };
-  } catch (err: any) {
-    return { platform: 'Discord', success: false, error: err.message };
+  } catch (err: unknown) {
+    return { platform: 'Discord', success: false, error: err instanceof Error ? err.message : 'Unknown error' };
   }
 }
 
@@ -101,13 +122,13 @@ export async function postToTwitter(
     });
 
     if (!res.ok) {
-      const err = await res.text();
-      return { platform: 'Twitter/X', success: false, error: `HTTP ${res.status}: ${err}` };
+      const errText = await res.text();
+      return { platform: 'Twitter/X', success: false, error: `HTTP ${res.status}: ${errText}` };
     }
-    const data = await res.json() as any;
+    const data: TwitterTweetResponse = await res.json();
     return { platform: 'Twitter/X', success: true, externalId: data.data?.id };
-  } catch (err: any) {
-    return { platform: 'Twitter/X', success: false, error: err.message };
+  } catch (err: unknown) {
+    return { platform: 'Twitter/X', success: false, error: err instanceof Error ? err.message : 'Unknown error' };
   }
 }
 
@@ -129,11 +150,11 @@ async function getRedditToken(clientId: string, clientSecret: string, username: 
   });
 
   if (!res.ok) throw new Error(`Reddit auth failed: ${res.status}`);
-  const data = await res.json() as any;
+  const data: RedditTokenResponse = await res.json();
   if (data.error) throw new Error(`Reddit auth error: ${data.error}`);
 
-  redditAccessToken = data.access_token;
-  redditTokenExpiry = Date.now() + (data.expires_in - 60) * 1000;
+  redditAccessToken = data.access_token ?? null;
+  redditTokenExpiry = Date.now() + ((data.expires_in ?? 3600) - 60) * 1000;
   return redditAccessToken!;
 }
 
@@ -164,23 +185,24 @@ export async function postToReddit(
     });
 
     if (!res.ok) {
-      const err = await res.text();
-      return { platform: platformLabel, success: false, error: `HTTP ${res.status}: ${err}` };
+      const errText = await res.text();
+      return { platform: platformLabel, success: false, error: `HTTP ${res.status}: ${errText}` };
     }
 
-    const data = await res.json() as any;
+    const data: RedditSubmitResponse = await res.json();
     const errors = data.json?.errors;
     if (errors && errors.length > 0) {
-      return { platform: platformLabel, success: false, error: errors.map((e: any) => e.join(': ')).join('; ') };
+      return { platform: platformLabel, success: false, error: errors.map(e => e.join(': ')).join('; ') };
     }
 
     const postUrl = data.json?.data?.url;
     return { platform: platformLabel, success: true, externalId: postUrl };
-  } catch (err: any) {
-    if (err.message.includes('Reddit auth')) {
+  } catch (err: unknown) {
+    const errMsg = err instanceof Error ? err.message : 'Unknown error';
+    if (errMsg.includes('Reddit auth')) {
       redditAccessToken = null;
       redditTokenExpiry = 0;
     }
-    return { platform: platformLabel, success: false, error: err.message };
+    return { platform: platformLabel, success: false, error: errMsg };
   }
 }

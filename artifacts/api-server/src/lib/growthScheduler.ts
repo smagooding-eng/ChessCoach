@@ -1,7 +1,7 @@
 import cron from 'node-cron';
 import { db, growthCampaignsTable, usersTable, emailDripLogTable } from "@workspace/db";
 import { eq, and, lte, isNotNull, sql } from "drizzle-orm";
-import { executePostForCampaign, computeNextRun } from "../routes/growth";
+import { executePostForCampaign, computeNextRun } from "./growthService";
 import { sendEmail } from "./email";
 import { logger } from "./logger";
 
@@ -45,12 +45,12 @@ async function runDueCampaigns() {
           .where(eq(growthCampaignsTable.id, campaign.id));
 
         logger.info({ campaignId: campaign.id, nextRun }, '[growth] Campaign completed');
-      } catch (err: any) {
-        logger.error({ campaignId: campaign.id, error: err.message }, '[growth] Campaign failed');
+      } catch (err: unknown) {
+        logger.error({ campaignId: campaign.id, error: err instanceof Error ? err.message : 'Unknown' }, '[growth] Campaign failed');
       }
     }
-  } catch (err: any) {
-    logger.error({ error: err.message }, '[growth] Scheduler error');
+  } catch (err: unknown) {
+    logger.error({ error: err instanceof Error ? err.message : 'Unknown' }, '[growth] Scheduler error');
   }
 }
 
@@ -58,8 +58,8 @@ async function runEmailDrips() {
   try {
     await sendTrialExpiryReminders();
     await sendWinBackEmails();
-  } catch (err: any) {
-    logger.error({ error: err.message }, '[growth] Drip error');
+  } catch (err: unknown) {
+    logger.error({ error: err instanceof Error ? err.message : 'Unknown' }, '[growth] Drip error');
   }
 }
 
@@ -102,12 +102,12 @@ async function sendTrialExpiryReminders() {
         });
         await db.insert(emailDripLogTable).values({ userId: user.id, dripType: 'trial_expiry' });
         logger.info({ userId: user.id }, '[drip] Trial expiry reminder sent');
-      } catch (err: any) {
-        logger.error({ userId: user.id, error: err.message }, '[drip] Trial expiry send failed');
+      } catch (err: unknown) {
+        logger.error({ userId: user.id, error: err instanceof Error ? err.message : 'Unknown' }, '[drip] Trial expiry send failed');
       }
     }
-  } catch (err: any) {
-    logger.error({ error: err.message }, '[drip] Trial expiry check failed');
+  } catch (err: unknown) {
+    logger.error({ error: err instanceof Error ? err.message : 'Unknown' }, '[drip] Trial expiry check failed');
   }
 }
 
@@ -145,12 +145,12 @@ async function sendWinBackEmails() {
         });
         await db.insert(emailDripLogTable).values({ userId: user.id, dripType: 'win_back' });
         logger.info({ userId: user.id }, '[drip] Win-back email sent');
-      } catch (err: any) {
-        logger.error({ userId: user.id, error: err.message }, '[drip] Win-back send failed');
+      } catch (err: unknown) {
+        logger.error({ userId: user.id, error: err instanceof Error ? err.message : 'Unknown' }, '[drip] Win-back send failed');
       }
     }
-  } catch (err: any) {
-    logger.error({ error: err.message }, '[drip] Win-back check failed');
+  } catch (err: unknown) {
+    logger.error({ error: err instanceof Error ? err.message : 'Unknown' }, '[drip] Win-back check failed');
   }
 }
 

@@ -110,6 +110,7 @@ async function runSchemaMigrations() {
     logger.info('Schema migrations complete');
   } catch (err) {
     logger.error({ err }, 'Schema migration failed');
+    throw err;
   }
 }
 
