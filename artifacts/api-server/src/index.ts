@@ -122,18 +122,18 @@ app.listen(port, (err) => {
   logger.info({ port }, "Server listening");
 });
 
-runSchemaMigrations().catch((err) => {
+runSchemaMigrations().then(() => {
+  import("./lib/growthScheduler").then(({ startGrowthScheduler }) => {
+    startGrowthScheduler();
+  }).catch((err) => {
+    logger.error({ err }, "Growth scheduler failed to start");
+  });
+}).catch((err) => {
   logger.error({ err }, 'Schema migration error');
 });
 
 initStripe().catch((err) => {
   logger.error({ err }, 'Stripe init failed after server start');
-});
-
-import("./lib/growthScheduler").then(({ startGrowthScheduler }) => {
-  startGrowthScheduler();
-}).catch((err) => {
-  logger.error({ err }, "Growth scheduler failed to start");
 });
 
 import("./lib/puzzleSeed").then(({ seedPuzzlesIfNeeded, preGenerateExplanations }) => {
