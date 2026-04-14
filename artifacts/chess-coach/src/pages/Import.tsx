@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useUser } from '@/hooks/use-user';
 import { useImportChessGames } from '@/hooks/use-games';
+import { invalidateEloCache } from '@/hooks/use-elo-progress';
 import { motion } from 'framer-motion';
 import { CloudDownload, CheckCircle2, AlertCircle, RefreshCw, ArrowRight, Edit3, Check, X } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
@@ -59,6 +60,7 @@ export function Import() {
       }
       const data = await r.json();
       setResult(data);
+      invalidateEloCache();
     } catch (err: unknown) {
       const msg =
         err instanceof Error ? err.message : 'Failed to import games. Please try again.';

@@ -159,7 +159,7 @@ router.get("/games/elo-progress", async (req, res): Promise<void> => {
   const username = rawUsername.toLowerCase();
 
   try {
-    const [user] = await db
+    let user = (await db
       .select({
         createdAt: usersTable.createdAt,
         chesscomUsername: usersTable.chesscomUsername,
@@ -167,12 +167,26 @@ router.get("/games/elo-progress", async (req, res): Promise<void> => {
       })
       .from(usersTable)
       .where(eq(sql`lower(${usersTable.chesscomUsername})`, username))
-      .limit(1);
+      .limit(1))[0];
+
+    if (!user) {
+      user = (await db
+        .select({
+          createdAt: usersTable.createdAt,
+          chesscomUsername: usersTable.chesscomUsername,
+          lichessUsername: usersTable.lichessUsername,
+        })
+        .from(usersTable)
+        .where(eq(sql`lower(${usersTable.lichessUsername})`, username))
+        .limit(1))[0] ?? undefined;
+    }
 
     const signupDate = user?.createdAt ?? null;
+    const chesscomUser = user?.chesscomUsername?.toLowerCase() ?? null;
     const lichessUser = user?.lichessUsername?.toLowerCase() ?? null;
 
-    const conditions = [eq(gamesTable.username, username)];
+    const ownerUsername = chesscomUser ?? lichessUser ?? username;
+    const conditions = [eq(gamesTable.username, ownerUsername)];
     if (signupDate) {
       conditions.push(gte(gamesTable.playedAt, signupDate));
     }
@@ -197,9 +211,14 @@ router.get("/games/elo-progress", async (req, res): Promise<void> => {
       return;
     }
 
+    const playerNames = new Set<string>();
+    if (chesscomUser) playerNames.add(chesscomUser);
+    if (lichessUser) playerNames.add(lichessUser);
+    playerNames.add(username);
+
     const getRating = (g: typeof allRatings[0]) => {
       const wu = g.whiteUsername.toLowerCase();
-      if (wu === username || (lichessUser && wu === lichessUser)) return g.whiteRating;
+      if (playerNames.has(wu)) return g.whiteRating;
       return g.blackRating;
     };
 

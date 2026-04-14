@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { apiFetch } from '@/lib/api';
 
 export interface EloProgress {
@@ -22,6 +22,17 @@ export interface MultiEloProgress {
 }
 
 const cache = new Map<string, EloProgress>();
+const listeners = new Set<() => void>();
+
+export function invalidateEloCache() {
+  cache.clear();
+  listeners.forEach(fn => fn());
+}
+
+function onEloInvalidate(fn: () => void) {
+  listeners.add(fn);
+  return () => { listeners.delete(fn); };
+}
 
 async function fetchElo(username: string, platform?: string): Promise<EloProgress | null> {
   const key = platform ? `${username}:${platform}` : username;
@@ -50,6 +61,7 @@ export function useEloProgress(username: string | undefined) {
   });
   const [loading, setLoading] = useState(!data && !!username);
   const requestId = useRef(0);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     if (!username) {
@@ -58,7 +70,7 @@ export function useEloProgress(username: string | undefined) {
       return;
     }
     const key = username.toLowerCase();
-    if (cache.has(key)) {
+    if (refreshKey === 0 && cache.has(key)) {
       setData(cache.get(key)!);
       setLoading(false);
       return;
@@ -73,15 +85,28 @@ export function useEloProgress(username: string | undefined) {
     }).finally(() => {
       if (id === requestId.current) setLoading(false);
     });
-  }, [username]);
+  }, [username, refreshKey]);
 
-  return { data, loading };
+  const refresh = () => {
+    if (username) {
+      const key = username.toLowerCase();
+      cache.delete(key);
+    }
+    setRefreshKey(k => k + 1);
+  };
+
+  return { data, loading, refresh };
 }
 
 export function useMultiEloProgress(username: string | undefined) {
   const [data, setData] = useState<MultiEloProgress>({ combined: null, chesscom: null, lichess: null });
   const [loading, setLoading] = useState(!!username);
   const requestId = useRef(0);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  useEffect(() => {
+    return onEloInvalidate(() => setRefreshKey(k => k + 1));
+  }, []);
 
   useEffect(() => {
     if (!username) {
@@ -93,6 +118,12 @@ export function useMultiEloProgress(username: string | undefined) {
     const id = ++requestId.current;
     setLoading(true);
 
+    if (refreshKey > 0) {
+      cache.delete(key);
+      cache.delete(`${key}:chesscom`);
+      cache.delete(`${key}:lichess`);
+    }
+
     Promise.all([
       fetchElo(key),
       fetchElo(key, 'chesscom'),
@@ -103,7 +134,9 @@ export function useMultiEloProgress(username: string | undefined) {
     }).finally(() => {
       if (id === requestId.current) setLoading(false);
     });
-  }, [username]);
+  }, [username, refreshKey]);
 
-  return { data, loading };
+  const refresh = () => setRefreshKey(k => k + 1);
+
+  return { data, loading, refresh };
 }

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useUser } from '@/hooks/use-user';
+import { invalidateEloCache } from '@/hooks/use-elo-progress';
 import { apiFetch } from '@/lib/api';
 import { useLocation } from 'wouter';
 import {
@@ -391,6 +392,7 @@ export function OnboardingWizard({ onComplete }: Props) {
       .then(data => {
         if (data.error) throw new Error(data.error);
         setImportCount(data.imported ?? 0);
+        invalidateEloCache();
         return apiFetch(`/api/games?username=${encodeURIComponent(uname)}&limit=5`, { credentials: 'include' });
       })
       .then(r => r.json())
