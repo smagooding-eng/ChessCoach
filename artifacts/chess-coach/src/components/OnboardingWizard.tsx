@@ -323,6 +323,10 @@ export function OnboardingWizard({ onComplete }: Props) {
   const [editingUsername, setEditingUsername] = useState(false);
   const [savingUsername, setSavingUsername] = useState(false);
 
+  const [lichessUsername, setLichessUsername] = useState(authUser?.lichessUsername || '');
+  const [editingLichess, setEditingLichess] = useState(false);
+  const [savingLichess, setSavingLichess] = useState(false);
+
   const [importStatus, setImportStatus] = useState<'idle' | 'loading' | 'done' | 'error'>('idle');
   const [importCount, setImportCount] = useState(0);
   const [games, setGames] = useState<any[]>([]);
@@ -345,6 +349,7 @@ export function OnboardingWizard({ onComplete }: Props) {
   const effectiveUsername = username || localUsername;
 
   useEffect(() => { setLocalUsername(username || ''); }, [username]);
+  useEffect(() => { if (authUser?.lichessUsername) setLichessUsername(authUser.lichessUsername); }, [authUser?.lichessUsername]);
 
   useEffect(() => {
     apiFetch('/api/stripe/products', { credentials: 'include' })
@@ -376,6 +381,21 @@ export function OnboardingWizard({ onComplete }: Props) {
     } catch {} finally { setSavingUsername(false); }
   };
 
+  const saveLichessUsername = async () => {
+    if (!lichessUsername.trim()) return;
+    setSavingLichess(true);
+    try {
+      const res = await apiFetch('/api/auth/update-profile', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+        body: JSON.stringify({ lichessUsername: lichessUsername.trim() }),
+      });
+      if (res.ok) {
+        await refreshAuth();
+        setEditingLichess(false);
+      }
+    } catch {} finally { setSavingLichess(false); }
+  };
+
   const importRef = useRef(false);
   const handleImport = async () => {
     const uname = effectiveUsername;
@@ -384,23 +404,51 @@ export function OnboardingWizard({ onComplete }: Props) {
     setImportStatus('loading');
     setStep('review');
 
-    apiFetch('/api/games/import', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
-      body: JSON.stringify({ username: uname, months: 3 }),
-    })
-      .then(r => r.json())
-      .then(data => {
-        if (data.error) throw new Error(data.error);
-        setImportCount(data.imported ?? 0);
-        invalidateEloCache();
-        return apiFetch(`/api/games?username=${encodeURIComponent(uname)}&limit=5`, { credentials: 'include' });
-      })
-      .then(r => r.json())
-      .then(gamesData => {
-        setGames(gamesData.games ?? gamesData ?? []);
-        setImportStatus('done');
-      })
-      .catch(() => { setImportStatus('error'); });
+    let totalImported = 0;
+    let anySuccess = false;
+
+    try {
+      const ccRes = await apiFetch('/api/games/import', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+        body: JSON.stringify({ username: uname, months: 3 }),
+      });
+      const ccData = await ccRes.json();
+      if (!ccData.error) {
+        totalImported += (ccData.imported ?? 0);
+        anySuccess = true;
+      }
+    } catch {}
+
+    const lcUser = editingLichess ? '' : (lichessUsername.trim() || authUser?.lichessUsername || '');
+    if (lcUser) {
+      try {
+        const lcRes = await apiFetch('/api/games/import', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+          body: JSON.stringify({ username: lcUser, months: 3, platform: 'lichess', ownerUsername: uname }),
+        });
+        const lcData = await lcRes.json();
+        if (!lcData.error) {
+          totalImported += (lcData.imported ?? 0);
+          anySuccess = true;
+        }
+      } catch {}
+    }
+
+    if (!anySuccess) {
+      setImportStatus('error');
+      importRef.current = false;
+      return;
+    }
+
+    setImportCount(totalImported);
+    invalidateEloCache();
+
+    try {
+      const gRes = await apiFetch(`/api/games?username=${encodeURIComponent(uname)}&limit=5`, { credentials: 'include' });
+      const gamesData = await gRes.json();
+      setGames(gamesData.games ?? gamesData ?? []);
+    } catch {}
+    setImportStatus('done');
   };
 
   const handleReview = async (gameId: number) => {
@@ -615,13 +663,15 @@ export function OnboardingWizard({ onComplete }: Props) {
                   </div>
                 </div>
                 <p className="text-white/50 text-sm mb-5 ml-[52px]">
-                  We'll pull your last 3 months of games in the background while you continue.
+                  Connect your accounts and we'll pull your last 3 months of games.
                 </p>
 
-                <div className="p-4 rounded-xl bg-white/5 border border-white/10 mb-4">
+                <div className="p-4 rounded-xl bg-white/5 border border-white/10 mb-3">
                   {!effectiveUsername || editingUsername ? (
                     <div>
-                      <p className="text-white/40 text-xs mb-2">Enter your Chess.com username</p>
+                      <p className="text-white/40 text-xs mb-2 flex items-center gap-1.5">
+                        <span className="font-bold text-[#81b64c]">CC</span> Chess.com username
+                      </p>
                       <div className="flex gap-2">
                         <input
                           value={localUsername}
@@ -643,7 +693,7 @@ export function OnboardingWizard({ onComplete }: Props) {
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-full bg-[#81b64c]/20 flex items-center justify-center text-lg">♟</div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-white/40 text-xs">Chess.com</p>
+                        <p className="text-white/40 text-xs flex items-center gap-1"><span className="font-bold text-[#81b64c]">CC</span> Chess.com</p>
                         <p className="text-white font-semibold truncate">{effectiveUsername}</p>
                       </div>
                       <button onClick={() => setEditingUsername(true)}
@@ -654,6 +704,50 @@ export function OnboardingWizard({ onComplete }: Props) {
                     </div>
                   )}
                 </div>
+
+                <div className="p-4 rounded-xl bg-white/5 border border-white/10 mb-4">
+                  {(!lichessUsername.trim() && !authUser?.lichessUsername) || editingLichess ? (
+                    <div>
+                      <p className="text-white/40 text-xs mb-2 flex items-center gap-1.5">
+                        <span className="font-bold text-[#b0b0b0]">LC</span> Lichess username
+                        <span className="text-white/20">(optional)</span>
+                      </p>
+                      <div className="flex gap-2">
+                        <input
+                          value={lichessUsername}
+                          onChange={e => setLichessUsername(e.target.value)}
+                          onKeyDown={e => e.key === 'Enter' && saveLichessUsername()}
+                          placeholder="e.g. DrNykterstein"
+                          className="flex-1 px-3 py-2.5 rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-white/25 focus:outline-none focus:border-white/30 text-sm"
+                        />
+                        {lichessUsername.trim() && (
+                          <motion.button onClick={saveLichessUsername} disabled={!lichessUsername.trim() || savingLichess}
+                            className="px-4 py-2.5 rounded-lg bg-white/15 text-white font-medium text-sm disabled:opacity-40 flex items-center gap-1 hover:bg-white/20 transition-colors"
+                            whileTap={{ scale: 0.95 }}
+                          >
+                            {savingLichess ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                          </motion.button>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center">
+                        <svg viewBox="0 0 50 50" className="w-5 h-5" fill="#b0b0b0"><path d="M11.8 33.5c0-6.9 3.9-9.6 6.4-12.5L23 15.5l-4.6-8.5c-.5-1-1.7-1.6-2.8-1.3l-2.1.7C8 8.3 3.3 13.7 3.3 20.5c0 2.2.5 4.3 1.5 6.2l7 6.8zM38.3 17.6c-1.3-4.3-4.3-7.8-8.3-9.8l-5.1 5.2 4.5 7.8c2.7 2.8 6.8 5.5 6.8 12.7 0 1.2-.2 2.3-.5 3.4l5.9-5c1.5-2.5 2.4-5.5 2.4-8.5 0-2-.3-3.9-1-5.7l-4.7.1z"/><path d="M25 44.1c-4.3 0-8.2-1.7-11-4.5l-2.2 1.4c3.6 4 8.7 6.5 14.4 6.5 5.2 0 10-2.1 13.4-5.6l-2.3-1.5c-3 2.3-6.4 3.7-10.2 3.7h-2.1z"/></svg>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-white/40 text-xs flex items-center gap-1"><span className="font-bold text-[#b0b0b0]">LC</span> Lichess</p>
+                        <p className="text-white font-semibold truncate">{lichessUsername || authUser?.lichessUsername}</p>
+                      </div>
+                      <button onClick={() => setEditingLichess(true)}
+                        className="p-2 rounded-lg hover:bg-white/10 text-white/30 hover:text-white/60 transition-colors"
+                      >
+                        <Edit3 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+
                 {effectiveUsername && !editingUsername && (
                   <motion.button onClick={handleImport}
                     className="w-full py-3.5 rounded-xl bg-[#81b64c] text-white font-semibold hover:bg-[#6da03e] transition-all flex items-center justify-center gap-2"
