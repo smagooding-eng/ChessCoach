@@ -515,7 +515,7 @@ router.get("/public/stats", async (_req: Request, res: Response) => {
     const [gamesResult] = await db.select({ count: count() }).from(gamesTable)
       .where(isNotNull(gamesTable.reviewData));
     const [scoutsResult] = await db.select({ count: count() }).from(backgroundJobsTable)
-      .where(and(eq(backgroundJobsTable.type, "analysis"), eq(backgroundJobsTable.status, "completed")));
+      .where(and(eq(backgroundJobsTable.type, "scout"), eq(backgroundJobsTable.status, "done")));
 
     res.json({
       users: usersResult.count,
