@@ -117,8 +117,9 @@ router.post("/auth/register", async (req: Request, res: Response) => {
         to: user.email,
         subject: "Welcome to ChessScout.net — Your Edge Starts Now! ♜",
         html: welcomeEmailHtml(user.firstName),
+      }).then(() => {
+        db.insert(emailDripLogTable).values({ userId: user.id, dripType: 'welcome' }).catch(() => {});
       }).catch(() => {});
-      db.insert(emailDripLogTable).values({ userId: user.id, dripType: 'welcome' }).catch(() => {});
     }
   } catch (err: any) {
     req.log?.error?.({ err }, "Registration error");
@@ -295,8 +296,9 @@ router.get("/auth/google/callback", async (req: Request, res: Response) => {
             to: user.email,
             subject: "Welcome to ChessScout.net — Your Edge Starts Now! ♜",
             html: welcomeEmailHtml(user.firstName),
+          }).then(() => {
+            db.insert(emailDripLogTable).values({ userId: user.id, dripType: 'welcome' }).catch(() => {});
           }).catch(() => {});
-          db.insert(emailDripLogTable).values({ userId: user.id, dripType: 'welcome' }).catch(() => {});
         }
       }
     } else {
