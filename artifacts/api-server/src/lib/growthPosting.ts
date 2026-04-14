@@ -73,7 +73,7 @@ export async function postToDiscord(webhookUrl: string, content: string): Promis
       const errText = await res.text();
       return { platform: 'Discord', success: false, error: `HTTP ${res.status}: ${errText}` };
     }
-    const data: DiscordWebhookResponse = await res.json();
+    const data = await res.json() as DiscordWebhookResponse;
     return { platform: 'Discord', success: true, externalId: data.id };
   } catch (err: unknown) {
     return { platform: 'Discord', success: false, error: err instanceof Error ? err.message : 'Unknown error' };
@@ -125,7 +125,7 @@ export async function postToTwitter(
       const errText = await res.text();
       return { platform: 'Twitter/X', success: false, error: `HTTP ${res.status}: ${errText}` };
     }
-    const data: TwitterTweetResponse = await res.json();
+    const data = await res.json() as TwitterTweetResponse;
     return { platform: 'Twitter/X', success: true, externalId: data.data?.id };
   } catch (err: unknown) {
     return { platform: 'Twitter/X', success: false, error: err instanceof Error ? err.message : 'Unknown error' };
@@ -150,7 +150,7 @@ async function getRedditToken(clientId: string, clientSecret: string, username: 
   });
 
   if (!res.ok) throw new Error(`Reddit auth failed: ${res.status}`);
-  const data: RedditTokenResponse = await res.json();
+  const data = await res.json() as RedditTokenResponse;
   if (data.error) throw new Error(`Reddit auth error: ${data.error}`);
 
   redditAccessToken = data.access_token ?? null;
@@ -189,7 +189,7 @@ export async function postToReddit(
       return { platform: platformLabel, success: false, error: `HTTP ${res.status}: ${errText}` };
     }
 
-    const data: RedditSubmitResponse = await res.json();
+    const data = await res.json() as RedditSubmitResponse;
     const errors = data.json?.errors;
     if (errors && errors.length > 0) {
       return { platform: platformLabel, success: false, error: errors.map(e => e.join(': ')).join('; ') };

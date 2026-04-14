@@ -131,7 +131,7 @@ router.post("/admin/growth/credentials/test", requireAdmin, async (req: Request,
         res.json({ success: false, error: `Twitter API returned ${testRes.status}` });
         return;
       }
-      const data: TwitterTestResponse = await testRes.json();
+      const data = await testRes.json() as TwitterTestResponse;
       res.json({ success: true, message: `Authenticated as @${data.data?.username || 'unknown'}` });
       return;
     }
@@ -147,7 +147,7 @@ router.post("/admin/growth/credentials/test", requireAdmin, async (req: Request,
         },
         body: `grant_type=password&username=${encodeURIComponent(decrypted.username)}&password=${encodeURIComponent(decrypted.password)}`,
       });
-      const tokenData: RedditTokenTestResponse = await tokenRes.json();
+      const tokenData = await tokenRes.json() as RedditTokenTestResponse;
       if (tokenData.error) {
         res.json({ success: false, error: `Reddit: ${tokenData.error}` });
         return;

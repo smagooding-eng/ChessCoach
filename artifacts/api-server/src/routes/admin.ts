@@ -445,7 +445,7 @@ const CAMPAIGN_THEMES: Record<string, string> = {
   "ELO Improvement": "Target players who want to gain rating points. Emphasize how personalized training and weakness detection leads to measurable improvement.",
 };
 
-router.post("/admin/marketing/generate", requireAdmin, async (req: Request, res: Response) => {
+router.post("/admin/marketing/generate", requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
     const { theme, customNote } = req.body as { theme: string; customNote?: string };
     if (!theme || !CAMPAIGN_THEMES[theme]) {
@@ -506,7 +506,8 @@ Return VALID JSON only:
     const content = response.choices[0]?.message?.content ?? "{}";
     const parsed = JSON.parse(content);
     if (!parsed.posts || !Array.isArray(parsed.posts)) {
-      return res.status(500).json({ error: "AI returned unexpected format" });
+      res.status(500).json({ error: "AI returned unexpected format" });
+      return;
     }
     res.json(parsed);
   } catch (err: any) {
