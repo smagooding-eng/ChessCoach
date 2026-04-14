@@ -90,6 +90,9 @@ export function EloTrackerBadge({ elo }: { elo: EloProgress }) {
   return (
     <div className="flex items-center gap-1.5 px-2 py-1 rounded-md" style={{ background: 'rgba(255,255,255,0.04)' }}>
       <MiniSparkline data={elo.sparkline} width={44} height={16} />
+      <span className="text-[10px] font-bold tabular-nums" style={{ color: TEXT_MUTED }}>
+        {elo.currentRating}
+      </span>
       <div className="flex items-center gap-0.5">
         <Icon className="w-3 h-3" style={{ color }} />
         <span className="text-[10px] font-bold tabular-nums" style={{ color }}>
@@ -137,8 +140,13 @@ export function EloTrackerInline({ elo }: { elo: EloProgress }) {
   const sign = isUp ? '+' : '';
 
   return (
-    <span className="text-[10px] font-bold tabular-nums" style={{ color }}>
-      {sign}{elo.delta}
+    <span className="flex items-center gap-0.5">
+      <span className="text-[10px] font-bold tabular-nums" style={{ color: TEXT_MUTED }}>
+        {elo.currentRating}
+      </span>
+      <span className="text-[10px] font-bold tabular-nums" style={{ color }}>
+        ({sign}{elo.delta})
+      </span>
     </span>
   );
 }
@@ -155,8 +163,11 @@ export function MultiEloInline({ multi }: { multi: MultiEloProgress }) {
       {hasCC && (
         <span className="flex items-center gap-0.5">
           <span className="text-[8px] font-bold" style={{ color: CHESSCOM_GREEN }}>CC</span>
-          <span className="text-[10px] font-bold tabular-nums" style={{ color: getDeltaColor(chesscom!.delta) }}>
-            {chesscom!.delta > 0 ? '+' : ''}{chesscom!.delta}
+          <span className="text-[10px] font-bold tabular-nums" style={{ color: TEXT_MUTED }}>
+            {chesscom!.currentRating}
+          </span>
+          <span className="text-[9px] font-bold tabular-nums" style={{ color: getDeltaColor(chesscom!.delta) }}>
+            ({chesscom!.delta > 0 ? '+' : ''}{chesscom!.delta})
           </span>
         </span>
       )}
@@ -164,8 +175,11 @@ export function MultiEloInline({ multi }: { multi: MultiEloProgress }) {
       {hasLC && (
         <span className="flex items-center gap-0.5">
           <span className="text-[8px] font-bold" style={{ color: LICHESS_WHITE }}>LC</span>
-          <span className="text-[10px] font-bold tabular-nums" style={{ color: getDeltaColor(lichess!.delta) }}>
-            {lichess!.delta > 0 ? '+' : ''}{lichess!.delta}
+          <span className="text-[10px] font-bold tabular-nums" style={{ color: TEXT_MUTED }}>
+            {lichess!.currentRating}
+          </span>
+          <span className="text-[9px] font-bold tabular-nums" style={{ color: getDeltaColor(lichess!.delta) }}>
+            ({lichess!.delta > 0 ? '+' : ''}{lichess!.delta})
           </span>
         </span>
       )}
