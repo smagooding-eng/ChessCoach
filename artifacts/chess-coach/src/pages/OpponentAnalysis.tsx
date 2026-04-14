@@ -6,6 +6,7 @@ import { useUser } from '@/hooks/use-user';
 import { apiFetch } from '@/lib/api';
 import { PremiumGate } from '@/components/PremiumGate';
 import { WaitTipCarousel } from '@/components/WaitTipCarousel';
+import { useEloProgress } from '@/hooks/use-elo-progress';
 
 interface Profile {
   username: string;
@@ -132,6 +133,7 @@ function ScoutingWaitContent({ opponentRating }: { opponentRating?: number | nul
 export function OpponentAnalysis() {
   const [, navigate] = useLocation();
   const { username } = useUser();
+  const { data: eloData } = useEloProgress(username ?? undefined);
   const [inputUsername, setInputUsername] = useState('');
   const [loading, setLoading] = useState(false);
   const [statusMsg, setStatusMsg] = useState<string>('');
@@ -441,7 +443,7 @@ export function OpponentAnalysis() {
       )}
 
       {/* Loading skeleton with engagement */}
-      {loading && <ScoutingWaitContent opponentRating={result?.profile?.ratings?.rapid ?? result?.profile?.ratings?.blitz ?? null} />}
+      {loading && <ScoutingWaitContent opponentRating={eloData?.currentRating ?? null} />}
 
       {/* Results */}
       <AnimatePresence>
