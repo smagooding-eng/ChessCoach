@@ -319,3 +319,7 @@
   0%   { transform: translateX(-100%); }
   100% { transform: translateX(433%); }
 }
+
+.local-play-board [data-piece^="b"] {
+  transform: rotate(180deg);
+}

@@ -162,6 +162,8 @@ export function LocalPlay() {
     });
   }
 
+  const hasTimer = timeControl && timeControl.seconds !== null;
+
   return (
     <div className="space-y-3 pb-20 px-4 pt-4 md:px-0 md:pt-0">
       <button onClick={resetGame}
@@ -169,104 +171,115 @@ export function LocalPlay() {
         <ArrowLeft className="w-4 h-4" /> New Game
       </button>
 
-      <div className="grid grid-cols-1 xl:grid-cols-[1fr_300px] gap-4">
-        <div className="space-y-2">
-          {timeControl && timeControl.seconds !== null && (
-            <div className="glass-card rounded-xl p-2 flex items-center justify-between">
+      <div className="flex flex-col items-center gap-2 max-w-[580px] mx-auto">
+        {/* Black's side — rotated 180° so the player across can read it */}
+        <div className="w-full rotate-180">
+          <div className="flex items-center gap-2 w-full">
+            {hasTimer && (
               <div className={cn(
-                'px-3 py-1.5 rounded-lg font-mono font-bold text-lg',
+                'px-3 py-1.5 rounded-lg font-mono font-bold text-lg flex-1',
                 chess.turn() === 'b' && result === 'playing' ? 'bg-primary/20 text-primary' : 'text-muted-foreground'
               )}>
                 <span className="text-xs font-normal mr-2">Black</span>
                 {formatClock(blackTime)}
               </div>
-              <div className={cn(
-                'px-3 py-1.5 rounded-lg font-mono font-bold text-lg',
-                chess.turn() === 'w' && result === 'playing' ? 'bg-primary/20 text-primary' : 'text-muted-foreground'
-              )}>
-                <span className="text-xs font-normal mr-2">White</span>
-                {formatClock(whiteTime)}
-              </div>
-            </div>
-          )}
+            )}
+            {result === 'playing' && (
+              <button
+                onClick={() => resign('b')}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-medium hover:bg-red-500/20 transition-colors shrink-0"
+              >
+                <Flag className="w-3.5 h-3.5" /> Resign
+              </button>
+            )}
+            {!hasTimer && result === 'playing' && chess.turn() === 'b' && (
+              <span className="text-xs text-primary font-medium ml-auto">Your turn</span>
+            )}
+          </div>
+        </div>
 
+        {/* Board with black pieces rotated */}
+        <div className="w-full local-play-board">
           <ChessBoard
             fen={fen}
             practiceMode={result === 'playing'}
             onMovePlayed={handleMove}
           />
-
-          <AnimatePresence>
-            {result !== 'playing' && (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="glass-card rounded-xl p-5 text-center space-y-3"
-              >
-                <div className="flex items-center justify-center gap-2 text-lg font-bold">
-                  {result === 'draw' ? (
-                    <><Handshake className="w-5 h-5 text-muted-foreground" /> Draw!</>
-                  ) : (
-                    <><Trophy className="w-5 h-5 text-amber-400" /> {result === 'white' ? 'White' : 'Black'} Wins!</>
-                  )}
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  {chess.isCheckmate() ? 'Checkmate' : chess.isStalemate() ? 'Stalemate' : chess.isThreefoldRepetition() ? 'Threefold Repetition' : chess.isInsufficientMaterial() ? 'Insufficient Material' : whiteTime === 0 ? 'White ran out of time' : blackTime === 0 ? 'Black ran out of time' : 'Resignation'}
-                </p>
-                <button
-                  onClick={resetGame}
-                  className="px-4 py-2 bg-primary text-primary-foreground font-bold rounded-xl text-sm"
-                >
-                  <RotateCcw className="w-4 h-4 inline mr-1.5" /> New Game
-                </button>
-              </motion.div>
-            )}
-          </AnimatePresence>
         </div>
 
-        <div className="space-y-3">
-          {result === 'playing' && (
-            <div className="glass-card rounded-xl p-3 space-y-2">
-              <p className="text-xs text-muted-foreground text-center font-medium">
-                {chess.turn() === 'w' ? "White's" : "Black's"} turn
-                {chess.inCheck() ? ' (Check!)' : ''}
-              </p>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  onClick={() => resign('w')}
-                  className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-medium hover:bg-red-500/20 transition-colors"
-                >
-                  <Flag className="w-3.5 h-3.5" /> White Resigns
-                </button>
-                <button
-                  onClick={() => resign('b')}
-                  className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-medium hover:bg-red-500/20 transition-colors"
-                >
-                  <Flag className="w-3.5 h-3.5" /> Black Resigns
-                </button>
+        {/* White's side — normal orientation */}
+        <div className="w-full">
+          <div className="flex items-center gap-2 w-full">
+            {hasTimer && (
+              <div className={cn(
+                'px-3 py-1.5 rounded-lg font-mono font-bold text-lg flex-1',
+                chess.turn() === 'w' && result === 'playing' ? 'bg-primary/20 text-primary' : 'text-muted-foreground'
+              )}>
+                <span className="text-xs font-normal mr-2">White</span>
+                {formatClock(whiteTime)}
               </div>
-            </div>
-          )}
+            )}
+            {result === 'playing' && (
+              <button
+                onClick={() => resign('w')}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-medium hover:bg-red-500/20 transition-colors shrink-0"
+              >
+                <Flag className="w-3.5 h-3.5" /> Resign
+              </button>
+            )}
+            {!hasTimer && result === 'playing' && chess.turn() === 'w' && (
+              <span className="text-xs text-primary font-medium ml-auto">Your turn</span>
+            )}
+          </div>
+        </div>
 
-          <div className="glass-card rounded-xl overflow-hidden">
-            <div className="px-3 py-2 border-b border-border/30">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Moves</p>
-            </div>
-            <div ref={moveListRef} className="max-h-64 overflow-y-auto hide-scrollbar p-2">
-              {movePairs.length === 0 ? (
-                <p className="text-xs text-muted-foreground/50 text-center py-3">No moves yet</p>
-              ) : (
-                <div className="space-y-0.5">
-                  {movePairs.map(pair => (
-                    <div key={pair.num} className="flex items-center gap-1 text-xs">
-                      <span className="text-muted-foreground/50 w-6 text-right shrink-0">{pair.num}.</span>
-                      <span className="font-medium w-16 text-foreground">{pair.white?.san ?? ''}</span>
-                      <span className="font-medium w-16 text-foreground">{pair.black?.san ?? ''}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+        {/* Game over banner */}
+        <AnimatePresence>
+          {result !== 'playing' && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="glass-card rounded-xl p-5 text-center space-y-3 w-full"
+            >
+              <div className="flex items-center justify-center gap-2 text-lg font-bold">
+                {result === 'draw' ? (
+                  <><Handshake className="w-5 h-5 text-muted-foreground" /> Draw!</>
+                ) : (
+                  <><Trophy className="w-5 h-5 text-amber-400" /> {result === 'white' ? 'White' : 'Black'} Wins!</>
+                )}
+              </div>
+              <p className="text-sm text-muted-foreground">
+                {chess.isCheckmate() ? 'Checkmate' : chess.isStalemate() ? 'Stalemate' : chess.isThreefoldRepetition() ? 'Threefold Repetition' : chess.isInsufficientMaterial() ? 'Insufficient Material' : whiteTime === 0 ? 'White ran out of time' : blackTime === 0 ? 'Black ran out of time' : 'Resignation'}
+              </p>
+              <button
+                onClick={resetGame}
+                className="px-4 py-2 bg-primary text-primary-foreground font-bold rounded-xl text-sm"
+              >
+                <RotateCcw className="w-4 h-4 inline mr-1.5" /> New Game
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Move list */}
+        <div className="glass-card rounded-xl overflow-hidden w-full">
+          <div className="px-3 py-2 border-b border-border/30">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Moves</p>
+          </div>
+          <div ref={moveListRef} className="max-h-48 overflow-y-auto hide-scrollbar p-2">
+            {movePairs.length === 0 ? (
+              <p className="text-xs text-muted-foreground/50 text-center py-3">No moves yet</p>
+            ) : (
+              <div className="space-y-0.5">
+                {movePairs.map(pair => (
+                  <div key={pair.num} className="flex items-center gap-1 text-xs">
+                    <span className="text-muted-foreground/50 w-6 text-right shrink-0">{pair.num}.</span>
+                    <span className="font-medium w-16 text-foreground">{pair.white?.san ?? ''}</span>
+                    <span className="font-medium w-16 text-foreground">{pair.black?.san ?? ''}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>
