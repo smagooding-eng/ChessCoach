@@ -725,6 +725,7 @@ router.post("/games/:id/analyze-moves", async (req, res): Promise<void> => {
     pgn: game.pgn,
     moves,
     opening: game.opening,
+    eco: game.eco,
     result: game.result,
     whiteUsername: game.whiteUsername,
     blackUsername: game.blackUsername,
@@ -768,6 +769,7 @@ router.post("/games/:id/analyze-move", async (req, res): Promise<void> => {
       moves,
       moveIndex,
       opening: game.opening,
+      eco: game.eco,
       result: game.result,
       whiteUsername: game.whiteUsername,
       blackUsername: game.blackUsername,
@@ -827,6 +829,7 @@ async function runReviewJob(gameId: number, jobId: string, log: Logger): Promise
     const reviewResult = await reviewFullGame({
       moves,
       opening: game.opening,
+      eco: game.eco,
       result: game.result,
       whiteUsername: game.whiteUsername,
       blackUsername: game.blackUsername,

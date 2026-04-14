@@ -530,12 +530,11 @@ export function GameReplay() {
         <ArrowLeft className="w-4 h-4" /> Back to Games
       </Link>
 
-      {/* Opening banner — hidden on mobile to save space */}
       {game.opening && (
-        <div className="hidden md:flex glass-card rounded-2xl px-5 py-3 items-center gap-3 border border-primary/20 bg-primary/5">
+        <div className="flex glass-card rounded-2xl px-4 py-2.5 md:px-5 md:py-3 items-center gap-2 md:gap-3 border border-primary/20 bg-primary/5">
           <BookOpen className="w-4 h-4 text-primary shrink-0" />
           <span className="text-xs font-bold text-primary/70">{game.eco}</span>
-          <span className="font-semibold text-sm">{game.opening}</span>
+          <span className="font-semibold text-xs md:text-sm truncate">{game.opening}</span>
         </div>
       )}
 

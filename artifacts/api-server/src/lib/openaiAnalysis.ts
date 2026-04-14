@@ -2,7 +2,7 @@ import OpenAI from "openai";
 import { logger } from "./logger";
 import { evaluateAllPositions, classifyFromWinPctLoss, uciToSan, winPct, type PositionEval } from "./engineAnalysis";
 import { extractStartFen, normalizeFen } from "./chesscom";
-import { isBookPosition } from "./openingBook";
+import { isBookPosition, getBookFensForEco } from "./openingBook";
 
 const openai = new OpenAI({
   baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
@@ -149,9 +149,20 @@ interface AnalyzeMovesInput {
   pgn: string;
   moves: Array<{ moveNumber: number; san: string; color: string; fen: string | null }>;
   opening: string | null;
+  eco: string | null;
   result: string;
   whiteUsername: string;
   blackUsername: string;
+}
+
+function stripFenCounters(fen: string): string {
+  return fen.split(" ").slice(0, 4).join(" ");
+}
+
+function isInBookForGame(fen: string, ecoBookFens: Set<string>): boolean {
+  const key = stripFenCounters(fen);
+  if (ecoBookFens.size > 0) return ecoBookFens.has(key);
+  return isBookPosition(fen);
 }
 
 export async function analyzeMoves(input: AnalyzeMovesInput): Promise<MoveClassification[]> {
@@ -159,6 +170,7 @@ export async function analyzeMoves(input: AnalyzeMovesInput): Promise<MoveClassi
   const chess = new Chess();
   const fens: string[] = [chess.fen()];
   const uciMoves: Array<{ from: string; to: string } | null> = [];
+  const ecoBookFens = getBookFensForEco(input.eco);
 
   for (const m of input.moves) {
     try {
@@ -172,7 +184,7 @@ export async function analyzeMoves(input: AnalyzeMovesInput): Promise<MoveClassi
     }
   }
 
-  logger.info({ positions: fens.length }, "analyzeMoves: Running Stockfish on all positions");
+  logger.info({ positions: fens.length, eco: input.eco, bookFens: ecoBookFens.size }, "analyzeMoves: Running Stockfish on all positions");
   const evals = await evaluateAllPositions(fens);
   logger.info({ evaluated: evals.length }, "analyzeMoves: Stockfish complete");
 
@@ -193,7 +205,7 @@ export async function analyzeMoves(input: AnalyzeMovesInput): Promise<MoveClassi
 
     const fenAfterMove = fens[idx + 1];
     if (stillInBook && fenAfterMove) {
-      stillInBook = isBookPosition(fenAfterMove);
+      stillInBook = isInBookForGame(fenAfterMove, ecoBookFens);
     } else {
       stillInBook = false;
     }
@@ -278,6 +290,10 @@ export async function analyzeGamePgn(pgn: string, onProgress?: (done: number, to
   const normalizedPgn = pgn.replace(/\[FEN "([^"]+)"\]/, (_: string, fen: string) => `[FEN "${normalizeFen(fen)}"]`);
   const chess = new Chess(startFen);
 
+  const ecoMatch = pgn.match(/\[ECO\s+"([^"]+)"\]/);
+  const eco = ecoMatch ? ecoMatch[1] : null;
+  const ecoBookFens = getBookFensForEco(eco);
+
   try {
     chess.loadPgn(normalizedPgn);
   } catch {
@@ -298,7 +314,7 @@ export async function analyzeGamePgn(pgn: string, onProgress?: (done: number, to
     moveMeta.push({ san, color, from: result.from, to: result.to });
   }
 
-  logger.info({ positions: fens.length }, "analyzeGamePgn: Running Stockfish on all positions");
+  logger.info({ positions: fens.length, eco, bookFens: ecoBookFens.size }, "analyzeGamePgn: Running Stockfish on all positions");
   const evals = await evaluateAllPositions(fens, undefined, onProgress);
 
   const moves: PgnAnalysisResult["moves"] = [];
@@ -323,7 +339,7 @@ export async function analyzeGamePgn(pgn: string, onProgress?: (done: number, to
 
     const fenAfterMove = fens[idx + 1];
     if (stillInBook && fenAfterMove) {
-      stillInBook = isBookPosition(fenAfterMove);
+      stillInBook = isInBookForGame(fenAfterMove, ecoBookFens);
     } else {
       stillInBook = false;
     }
@@ -413,13 +429,15 @@ interface AnalyzeSingleMoveInput {
   moves: Array<{ moveNumber: number; san: string; color: string; from: string; to: string; fenBefore: string; fen: string | null }>;
   moveIndex: number;
   opening: string | null;
+  eco: string | null;
   result: string;
   whiteUsername: string;
   blackUsername: string;
 }
 
 export async function analyzeSingleMove(input: AnalyzeSingleMoveInput): Promise<SingleMoveAnalysis> {
-  const { moves, moveIndex, opening, result, whiteUsername, blackUsername } = input;
+  const { moves, moveIndex, opening, eco, result, whiteUsername, blackUsername } = input;
+  const ecoBookFens = getBookFensForEco(eco);
 
   const target = moves[moveIndex];
   if (!target) throw new Error("Move not found");
@@ -461,8 +479,8 @@ export async function analyzeSingleMove(input: AnalyzeSingleMoveInput): Promise<
 
   let isInBook = false;
   if (fenAfter) {
-    const allBookSoFar = isBookPosition(fenBefore) && isBookPosition(fenAfter);
-    if (allBookSoFar) {
+    let allPriorInBook = isInBookForGame(fenBefore, ecoBookFens);
+    if (allPriorInBook && isInBookForGame(fenAfter, ecoBookFens)) {
       isInBook = true;
     }
   }
@@ -551,6 +569,7 @@ function mergeReviewWithEngine(
   fens: string[],
   evals: PositionEval[],
   uciMoves: Array<{ from: string; to: string } | null>,
+  ecoBookFens: Set<string> = new Set(),
 ): MoveReview[] {
   const Chess = require("chess.js").Chess;
 
@@ -584,7 +603,7 @@ function mergeReviewWithEngine(
 
     const fenAfterMove = fens[idx + 1];
     if (stillInBook && fenAfterMove) {
-      stillInBook = isBookPosition(fenAfterMove);
+      stillInBook = isInBookForGame(fenAfterMove, ecoBookFens);
     } else {
       stillInBook = false;
     }
@@ -724,13 +743,15 @@ export interface GameReviewResult {
 export async function reviewFullGame(input: {
   moves: Array<{ moveNumber: number; san: string; color: string }>;
   opening: string | null;
+  eco: string | null;
   result: string;
   whiteUsername: string;
   blackUsername: string;
   startFen?: string;
   onProgress?: (done: number, total: number) => void;
 }): Promise<GameReviewResult> {
-  const { moves, opening, result, whiteUsername, blackUsername, startFen, onProgress } = input;
+  const { moves, opening, eco, result, whiteUsername, blackUsername, startFen, onProgress } = input;
+  const ecoBookFens = getBookFensForEco(eco);
   const startTime = Date.now();
 
   const Chess = require("chess.js").Chess;
@@ -877,7 +898,7 @@ JSON format:
       cons: Array.isArray(m.cons) ? m.cons : [],
     }));
 
-    const reviewMoves = mergeReviewWithEngine(rawMoves, moves, fens, evals, uciMoves);
+    const reviewMoves = mergeReviewWithEngine(rawMoves, moves, fens, evals, uciMoves, ecoBookFens);
 
     const gameSummary: GameReviewSummary | null = gameSummaryRaw ? {
       overview: gameSummaryRaw.overview ?? "",
