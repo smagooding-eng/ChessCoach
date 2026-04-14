@@ -297,6 +297,9 @@ export function classifyFromWinPctLoss(
   isInBook: boolean = false,
   playerWinPctAfter: number = 50,
   legalMoveCount: number = 20,
+  cpBefore: number = 0,
+  cpAfter: number = 0,
+  playerColor: "white" | "black" = "white",
 ): EngineClassification {
   if (isInBook) {
     return "book";
@@ -313,6 +316,10 @@ export function classifyFromWinPctLoss(
     return "missed_win";
   }
 
+  const playerCpBefore = playerColor === "white" ? cpBefore : -cpBefore;
+  const playerCpAfter = playerColor === "white" ? cpAfter : -cpAfter;
+  const cpLossRaw = playerCpBefore - playerCpAfter;
+
   const alreadyDecided = playerWinPctBefore < 10 || playerWinPctBefore > 90;
 
   if (winPctLoss > 25) {
@@ -325,6 +332,12 @@ export function classifyFromWinPctLoss(
   }
   if (winPctLoss > 5) {
     return "inaccuracy";
+  }
+
+  if (alreadyDecided && cpLossRaw > 0 && !isTopEngineMove) {
+    if (cpLossRaw > 300) return "blunder";
+    if (cpLossRaw > 150) return "mistake";
+    if (cpLossRaw > 75) return "inaccuracy";
   }
 
   if (isTopEngineMove) {

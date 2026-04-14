@@ -238,7 +238,7 @@ export async function analyzeMoves(input: AnalyzeMovesInput): Promise<MoveClassi
       legalMoves = pos.moves();
     } catch {}
 
-    let classification = classifyFromWinPctLoss(winPctLossRaw, isTopEngineMove, isSecondEngineMove, isOpeningRange, wasBalanced, playerWinBefore, stillInBook, playerWinAfter, legalMoves.length);
+    let classification = classifyFromWinPctLoss(winPctLossRaw, isTopEngineMove, isSecondEngineMove, isOpeningRange, wasBalanced, playerWinBefore, stillInBook, playerWinAfter, legalMoves.length, cpBefore, cpAfter, playerColor);
 
     if (legalMoves.length <= 1 && stillInBook) {
       classification = "book";
@@ -367,7 +367,7 @@ export async function analyzeGamePgn(pgn: string, onProgress?: (done: number, to
       legalMoves = pos.moves();
     } catch {}
 
-    let classification = classifyFromWinPctLoss(winPctLossRaw, isTopEngineMove, isSecondEngineMove, isOpeningRange, wasBalanced, playerWinBefore, stillInBook, playerWinAfter, legalMoves.length);
+    let classification = classifyFromWinPctLoss(winPctLossRaw, isTopEngineMove, isSecondEngineMove, isOpeningRange, wasBalanced, playerWinBefore, stillInBook, playerWinAfter, legalMoves.length, cpBefore, cpAfter, m.color as "white" | "black");
 
     if (legalMoves.length <= 1 && stillInBook) classification = "book";
 
@@ -480,7 +480,7 @@ export async function analyzeSingleMove(input: AnalyzeSingleMoveInput): Promise<
   let legalMoveCount = 20;
   try { legalMoveCount = new Chess(fenBefore).moves().length; } catch {}
 
-  let classification = classifyFromWinPctLoss(winPctLossRaw, isTopEngineMove, isSecondEngineMove, isOpeningRange, wasBalanced, playerWinBefore, isInBook, playerWinAfter, legalMoveCount);
+  let classification = classifyFromWinPctLoss(winPctLossRaw, isTopEngineMove, isSecondEngineMove, isOpeningRange, wasBalanced, playerWinBefore, isInBook, playerWinAfter, legalMoveCount, cpBefore, cpAfter, playerColor);
 
   if (classification === "brilliant") {
     if (!isSacrificialMove(fenBefore, target.san)) {
@@ -670,7 +670,7 @@ function mergeReviewWithEngine(
     let legalMoveCount = 20;
     try { legalMoveCount = new Chess(fenBefore).moves().length; } catch {}
 
-    classification = classifyFromWinPctLoss(winPctLossRaw, isTopEngineMove, isSecondEngineMove, isOpeningRange, wasBalanced, playerWinBefore, stillInBook, playerWinAfter, legalMoveCount);
+    classification = classifyFromWinPctLoss(winPctLossRaw, isTopEngineMove, isSecondEngineMove, isOpeningRange, wasBalanced, playerWinBefore, stillInBook, playerWinAfter, legalMoveCount, cpBefore, cpAfter, playerColor);
 
     const isBad = ["inaccuracy", "mistake", "blunder", "missed_win"].includes(classification);
     if (isBad && evalBefore.bestMoveSan && !isTopEngineMove) {
