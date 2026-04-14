@@ -295,11 +295,21 @@ async function postToPlatform(platform: string, content: string, title?: string)
     return postToDiscord(decrypted.webhookUrl, content);
   }
   if (platform === 'Twitter/X') {
-    return postToTwitter(decrypted as any, content);
+    return postToTwitter({
+      apiKey: decrypted.apiKey,
+      apiSecret: decrypted.apiSecret,
+      accessToken: decrypted.accessToken,
+      accessTokenSecret: decrypted.accessTokenSecret,
+    }, content);
   }
   if (platform.includes('Reddit')) {
-    const sub = platform.includes('r/chessbeginners') ? 'r/chessbeginners' : 'r/chess';
-    return postToReddit(decrypted as any, sub, title || 'ChessScout.net', content);
+    const sub = platform.includes('r/chessbeginners') ? 'chessbeginners' : 'chess';
+    return postToReddit({
+      clientId: decrypted.clientId,
+      clientSecret: decrypted.clientSecret,
+      username: decrypted.username,
+      password: decrypted.password,
+    }, sub, title || 'ChessScout.net', content);
   }
 
   return { platform, success: false, error: "Unsupported platform" };
@@ -377,7 +387,7 @@ router.get("/admin/growth/post-log", requireAdmin, async (req: Request, res: Res
     if (to) conditions.push(lte(growthPostLogTable.postedAt, new Date(to)));
 
     if (conditions.length > 0) {
-      query = query.where(and(...conditions)) as any;
+      query = query.where(and(...conditions));
     }
 
     const logs = await query;

@@ -371,11 +371,16 @@ function PostHistory() {
   const [logs, setLogs] = useState<PostLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
 
   useEffect(() => {
-    const url = filter ? `/api/admin/growth/post-log?platform=${encodeURIComponent(filter)}&limit=30` : '/api/admin/growth/post-log?limit=30';
-    apiFetch(url).then(r => r.json()).then(setLogs).catch(() => {}).finally(() => setLoading(false));
-  }, [filter]);
+    const params = new URLSearchParams({ limit: '30' });
+    if (filter) params.set('platform', filter);
+    if (fromDate) params.set('from', new Date(fromDate).toISOString());
+    if (toDate) params.set('to', new Date(toDate + 'T23:59:59').toISOString());
+    apiFetch(`/api/admin/growth/post-log?${params}`).then(r => r.json()).then(setLogs).catch(() => {}).finally(() => setLoading(false));
+  }, [filter, fromDate, toDate]);
 
   const statusIcon = (s: string) => s === 'sent' ? <CheckCircle2 className="w-3 h-3 text-green-400" /> : <XCircle className="w-3 h-3 text-red-400" />;
 
@@ -383,12 +388,16 @@ function PostHistory() {
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="rounded-2xl border border-border/40 bg-card overflow-hidden">
       <div className="px-5 py-3 border-b border-border/30 bg-indigo-500/5 flex items-center justify-between">
         <h3 className="text-sm font-bold text-indigo-400 flex items-center gap-2"><History className="w-4 h-4" /> Post History</h3>
-        <div className="relative">
-          <select value={filter} onChange={e => { setFilter(e.target.value); setLoading(true); }} className="appearance-none bg-background border border-border/40 rounded-lg px-2 py-1 text-[10px] text-foreground pr-6 focus:outline-none">
-            <option value="">All Platforms</option>
-            {PLATFORMS.map(p => <option key={p} value={p}>{p}</option>)}
-          </select>
-          <ChevronDown className="absolute right-1 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground pointer-events-none" />
+        <div className="flex items-center gap-2 flex-wrap">
+          <input type="date" value={fromDate} onChange={e => { setFromDate(e.target.value); setLoading(true); }} className="bg-background border border-border/40 rounded-lg px-2 py-1 text-[10px] text-foreground focus:outline-none" placeholder="From" />
+          <input type="date" value={toDate} onChange={e => { setToDate(e.target.value); setLoading(true); }} className="bg-background border border-border/40 rounded-lg px-2 py-1 text-[10px] text-foreground focus:outline-none" placeholder="To" />
+          <div className="relative">
+            <select value={filter} onChange={e => { setFilter(e.target.value); setLoading(true); }} className="appearance-none bg-background border border-border/40 rounded-lg px-2 py-1 text-[10px] text-foreground pr-6 focus:outline-none">
+              <option value="">All Platforms</option>
+              {PLATFORMS.map(p => <option key={p} value={p}>{p}</option>)}
+            </select>
+            <ChevronDown className="absolute right-1 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground pointer-events-none" />
+          </div>
         </div>
       </div>
       <div className="p-4">
