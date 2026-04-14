@@ -476,17 +476,19 @@ ${customNote ? `ADDITIONAL NOTE: ${customNote}` : ""}
 Generate ad copy for each of these platforms. Each post should feel native to the platform — match its tone, length conventions, and culture:
 
 1. **Twitter/X** — Max 280 chars. Punchy, use 2-3 relevant hashtags. Chess community tone.
-2. **Reddit (r/chess)** — Title + body. Informative, not salesy. Value-first. Reddit hates obvious ads, so frame as a useful tool discovery. 150-250 words body.
-3. **Facebook** — Engaging, slightly longer. 100-150 words. Include a call to action.
-4. **Instagram** — Caption style, 100-150 words. Use relevant emojis and 5-8 hashtags at the end.
-5. **Discord** — Casual, community-friendly. 80-120 words. Like sharing something cool with friends.
-6. **Forum/General** — Neutral, informative tone. 100-200 words. Could be posted on chess forums, Quora, etc.
+2. **Reddit (r/chess)** — Title + body. Informative, not salesy. Value-first. Reddit hates obvious ads, so frame as a useful tool discovery. 150-250 words body. Target experienced players.
+3. **Reddit (r/chessbeginners)** — Title + body. Beginner-friendly tone, encouraging. Frame as a learning tool that helps newer players improve. 150-250 words body. Avoid jargon.
+4. **Facebook** — Engaging, slightly longer. 100-150 words. Include a call to action.
+5. **Instagram** — Caption style, 100-150 words. Use relevant emojis and 5-8 hashtags at the end.
+6. **Discord** — Casual, community-friendly. 80-120 words. Like sharing something cool with friends.
+7. **Forum/General** — Neutral, informative tone. 100-200 words. Could be posted on chess forums, Quora, etc.
 
 Return VALID JSON only:
 {
   "posts": [
     { "platform": "Twitter/X", "content": "..." },
-    { "platform": "Reddit", "title": "...", "content": "..." },
+    { "platform": "Reddit (r/chess)", "title": "...", "content": "..." },
+    { "platform": "Reddit (r/chessbeginners)", "title": "...", "content": "..." },
     { "platform": "Facebook", "content": "..." },
     { "platform": "Instagram", "content": "..." },
     { "platform": "Discord", "content": "..." },
@@ -496,13 +498,16 @@ Return VALID JSON only:
 
     const response = await openai.chat.completions.create({
       model: "gpt-4o-mini",
-      max_tokens: 2000,
+      max_tokens: 2500,
       messages: [{ role: "user", content: prompt }],
       response_format: { type: "json_object" },
     });
 
     const content = response.choices[0]?.message?.content ?? "{}";
     const parsed = JSON.parse(content);
+    if (!parsed.posts || !Array.isArray(parsed.posts)) {
+      return res.status(500).json({ error: "AI returned unexpected format" });
+    }
     res.json(parsed);
   } catch (err: any) {
     res.status(500).json({ error: "Failed to generate marketing copy", details: err.message });
