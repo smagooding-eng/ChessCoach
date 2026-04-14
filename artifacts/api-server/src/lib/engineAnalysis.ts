@@ -299,11 +299,9 @@ export function classifyFromWinPctLoss(
 
   if (winPctLoss < 0) {
     if (
-      !isTopEngineMove &&
-      !isSecondEngineMove &&
-      winPctLoss < -10 &&
-      playerWinPctBefore >= 25 &&
-      playerWinPctBefore <= 52
+      winPctLoss < -5 &&
+      playerWinPctBefore >= 15 &&
+      playerWinPctBefore <= 65
     ) {
       return "brilliant";
     }
@@ -323,4 +321,54 @@ export function classifyFromWinPctLoss(
 
   if (alreadyDecided) return "mistake";
   return "blunder";
+}
+
+const PIECE_VALUES: Record<string, number> = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
+
+export function isSacrificialMove(fenBefore: string, san: string): boolean {
+  try {
+    const chess = new Chess(fenBefore);
+    const moveResult = chess.move(san);
+    if (!moveResult) return false;
+
+    const opponentMoves = chess.moves({ verbose: true });
+    const movedPieceValue = PIECE_VALUES[moveResult.piece] || 0;
+
+    const threatsToLandingSquare = opponentMoves.filter(
+      (m: any) => m.to === moveResult.to
+    );
+    if (threatsToLandingSquare.length > 0 && movedPieceValue >= 3) {
+      return true;
+    }
+
+    if (moveResult.captured) {
+      const capturedValue = PIECE_VALUES[moveResult.captured] || 0;
+      if (movedPieceValue > capturedValue + 1 && threatsToLandingSquare.length > 0) {
+        return true;
+      }
+    }
+
+    const opponentCaptures = opponentMoves.filter((m: any) => m.captured);
+    for (const cap of opponentCaptures) {
+      const victimValue = PIECE_VALUES[cap.captured!] || 0;
+      if (victimValue >= 3) {
+        const defenderPos = new Chess(chess.fen());
+        defenderPos.move(cap.san);
+        const recaptures = defenderPos.moves({ verbose: true }).filter(
+          (m: any) => m.to === cap.to
+        );
+        if (recaptures.length === 0) {
+          return true;
+        }
+        const bestRecaptureValue = Math.min(...recaptures.map((m: any) => PIECE_VALUES[m.piece] || 0));
+        if (bestRecaptureValue > victimValue) {
+          return true;
+        }
+      }
+    }
+
+    return false;
+  } catch {
+    return false;
+  }
 }

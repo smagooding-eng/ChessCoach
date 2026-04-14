@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 import { logger } from "./logger";
-import { evaluateAllPositions, classifyFromWinPctLoss, uciToSan, winPct, type PositionEval } from "./engineAnalysis";
+import { evaluateAllPositions, classifyFromWinPctLoss, isSacrificialMove, uciToSan, winPct, type PositionEval } from "./engineAnalysis";
 import { extractStartFen, normalizeFen } from "./chesscom";
 import { isBookPosition, getBookFensForEco } from "./openingBook";
 
@@ -244,13 +244,7 @@ export async function analyzeMoves(input: AnalyzeMovesInput): Promise<MoveClassi
     }
 
     if (classification === "brilliant") {
-      let dominated = false;
-      try {
-        const pos = new Chess(fens[idx]);
-        const result = pos.move(m.san);
-        if (result?.captured) dominated = true;
-      } catch {}
-      if (dominated || legalMoves.length <= 15) {
+      if (!isSacrificialMove(fens[idx], m.san)) {
         classification = "excellent";
       }
     }
@@ -376,13 +370,7 @@ export async function analyzeGamePgn(pgn: string, onProgress?: (done: number, to
     if (legalMoves.length <= 1 && stillInBook) classification = "book";
 
     if (classification === "brilliant") {
-      let dominated = false;
-      try {
-        const pos = new Chess(fens[idx]);
-        const result = pos.move(m.san);
-        if (result?.captured) dominated = true;
-      } catch {}
-      if (dominated || legalMoves.length <= 15) {
+      if (!isSacrificialMove(fens[idx], m.san)) {
         classification = "excellent";
       }
     }
@@ -683,13 +671,7 @@ function mergeReviewWithEngine(
     }
 
     if (classification === "brilliant") {
-      let dominated = false;
-      try {
-        const pos = new Chess(fenBefore);
-        const result = pos.move(om.san);
-        if (result?.captured) dominated = true;
-      } catch {}
-      if (dominated || legalMoves.length <= 15) {
+      if (!isSacrificialMove(fenBefore, om.san)) {
         classification = "excellent";
       }
     }
