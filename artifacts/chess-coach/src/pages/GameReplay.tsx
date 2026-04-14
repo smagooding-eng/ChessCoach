@@ -275,7 +275,7 @@ function formatClock(s: number | null | undefined): string {
   return `${m}:${sec.toString().padStart(2, '0')}`;
 }
 
-function SandboxBoard({ fen, moves: gameMoves, flipped }: { fen?: string; moves: Array<{ san: string; fen?: string }>; flipped: boolean }) {
+function SandboxBoard({ fen, moves: gameMoves, flipped }: { fen?: string; moves: Array<{ san: string; fen?: string | null }>; flipped: boolean }) {
   const START = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
   const [sandboxChess] = useState(() => {
     const c = new Chess(fen || START);
@@ -890,33 +890,45 @@ export function GameReplay() {
                 </div>
 
                 {/* Pre-analysis teaser stats */}
-                <div className="glass-card rounded-xl px-4 py-3 border border-white/10">
-                  <p className="text-[11px] font-bold text-white/30 uppercase tracking-wider mb-2">Game at a glance</p>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    <div>
-                      <p className="text-[10px] text-white/30">Moves</p>
-                      <p className="text-sm font-bold text-white">{Math.ceil(totalMoves / 2)}</p>
-                    </div>
-                    {game.opening && (
-                      <div className="col-span-2 sm:col-span-1">
-                        <p className="text-[10px] text-white/30">Opening</p>
-                        <p className="text-sm font-bold text-white truncate">{game.eco ? `${game.eco} ` : ''}{game.opening}</p>
+                {(() => {
+                  const fullMoves = Math.ceil(totalMoves / 2);
+                  const estMinutes = Math.round(totalMoves * 0.5);
+                  const estDuration = estMinutes < 60 ? `~${estMinutes} min` : `~${Math.floor(estMinutes / 60)}h ${estMinutes % 60}m`;
+
+                  return (
+                    <div className="glass-card rounded-xl px-4 py-3 border border-white/10">
+                      <p className="text-[11px] font-bold text-white/30 uppercase tracking-wider mb-2">Game at a glance</p>
+                      <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
+                        <div>
+                          <p className="text-[10px] text-white/30">Moves</p>
+                          <p className="text-sm font-bold text-white">{fullMoves}</p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] text-white/30">Est. Duration</p>
+                          <p className="text-sm font-bold text-white">{estDuration}</p>
+                        </div>
+                        {game.opening && (
+                          <div className="col-span-3 sm:col-span-1">
+                            <p className="text-[10px] text-white/30">Opening</p>
+                            <p className="text-sm font-bold text-white truncate">{game.eco ? `${game.eco} ` : ''}{game.opening}</p>
+                          </div>
+                        )}
+                        <div>
+                          <p className="text-[10px] text-white/30">Result</p>
+                          <p className={`text-sm font-bold ${game.result === 'win' ? 'text-emerald-400' : game.result === 'loss' ? 'text-rose-400' : 'text-white/60'}`}>
+                            {game.result === 'win' ? 'Win' : game.result === 'loss' ? 'Loss' : 'Draw'}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] text-white/30">Ratings</p>
+                          <p className="text-sm font-bold text-white">
+                            {game.whiteRating || '?'} vs {game.blackRating || '?'}
+                          </p>
+                        </div>
                       </div>
-                    )}
-                    <div>
-                      <p className="text-[10px] text-white/30">Result</p>
-                      <p className={`text-sm font-bold ${game.result === 'win' ? 'text-emerald-400' : game.result === 'loss' ? 'text-rose-400' : 'text-white/60'}`}>
-                        {game.result === 'win' ? 'Win' : game.result === 'loss' ? 'Loss' : 'Draw'}
-                      </p>
                     </div>
-                    <div>
-                      <p className="text-[10px] text-white/30">Ratings</p>
-                      <p className="text-sm font-bold text-white">
-                        {game.whiteRating || '?'} vs {game.blackRating || '?'}
-                      </p>
-                    </div>
-                  </div>
-                </div>
+                  );
+                })()}
 
                 <WaitTipCarousel rating={playerRating} />
 

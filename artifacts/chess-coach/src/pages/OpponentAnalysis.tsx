@@ -77,7 +77,7 @@ const SCOUTING_PHASES = [
   'Compiling scouting report…',
 ];
 
-function ScoutingWaitContent() {
+function ScoutingWaitContent({ opponentRating }: { opponentRating?: number | null }) {
   const [phaseIdx, setPhaseIdx] = useState(0);
 
   useEffect(() => {
@@ -124,7 +124,7 @@ function ScoutingWaitContent() {
         <div key={i} className="h-20 rounded-xl bg-secondary/30 animate-pulse" />
       ))}
 
-      <WaitTipCarousel rating={1200} />
+      <WaitTipCarousel rating={opponentRating} />
     </div>
   );
 }
@@ -441,7 +441,7 @@ export function OpponentAnalysis() {
       )}
 
       {/* Loading skeleton with engagement */}
-      {loading && <ScoutingWaitContent />}
+      {loading && <ScoutingWaitContent opponentRating={result?.profile?.ratings?.rapid ?? result?.profile?.ratings?.blitz ?? null} />}
 
       {/* Results */}
       <AnimatePresence>
