@@ -51,7 +51,7 @@ The project is structured as a monorepo using pnpm workspaces, targeting Node.js
 # External Dependencies
 
 - **AI**: OpenAI (gpt-5.2 for player analysis, gpt-4o for game review, gpt-audio for TTS narration)
-- **Chess Engine**: Local Stockfish 17 binary (via nix) for move evaluation.
+- **Chess Engine**: Local Stockfish 17 binary (via nix) for move evaluation. Move classification uses a comprehensive ECO opening book (`openingBook.ts`, ~300 lines covering all major openings A00-E99). Book moves are only assigned when the position matches known opening theory; once a move leaves the book, all subsequent moves are classified by engine eval only. Brilliant moves require ≥10 win% gain, non-engine-top move, ≤52% player win before, no captures, and ≥16 legal moves in position.
 - **Object Storage**: Google Cloud Storage via Replit sidecar for email image uploads.
 - **Database**: PostgreSQL (managed by Replit for production).
 - **Payment Gateway**: Stripe for subscriptions and customer portal.

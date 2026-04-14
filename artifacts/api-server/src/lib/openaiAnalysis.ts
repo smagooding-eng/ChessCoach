@@ -2,6 +2,7 @@ import OpenAI from "openai";
 import { logger } from "./logger";
 import { evaluateAllPositions, classifyFromWinPctLoss, uciToSan, winPct, type PositionEval } from "./engineAnalysis";
 import { extractStartFen, normalizeFen } from "./chesscom";
+import { isBookPosition } from "./openingBook";
 
 const openai = new OpenAI({
   baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
@@ -175,16 +176,26 @@ export async function analyzeMoves(input: AnalyzeMovesInput): Promise<MoveClassi
   const evals = await evaluateAllPositions(fens);
   logger.info({ evaluated: evals.length }, "analyzeMoves: Stockfish complete");
 
+  let stillInBook = true;
+
   return input.moves.map((m, idx) => {
     const evalBefore = evals[idx];
     const evalAfter = evals[idx + 1];
 
     if (!evalBefore || !evalAfter) {
+      stillInBook = false;
       return {
         moveIndex: idx, san: m.san, color: m.color,
         classification: "good" as const, explanation: "", cpLoss: 0,
         engineAvailable: false, bestMove: null,
       };
+    }
+
+    const fenAfterMove = fens[idx + 1];
+    if (stillInBook && fenAfterMove) {
+      stillInBook = isBookPosition(fenAfterMove);
+    } else {
+      stillInBook = false;
     }
 
     const cpBefore = evalBefore.cpWhite;
@@ -208,7 +219,7 @@ export async function analyzeMoves(input: AnalyzeMovesInput): Promise<MoveClassi
 
     const playerWinBefore = playerColor === "white" ? winPct(cpBefore) : (100 - winPct(cpBefore));
 
-    let classification = classifyFromWinPctLoss(winPctLossRaw, isTopEngineMove, isSecondEngineMove, isOpeningRange, wasBalanced, playerWinBefore);
+    let classification = classifyFromWinPctLoss(winPctLossRaw, isTopEngineMove, isSecondEngineMove, isOpeningRange, wasBalanced, playerWinBefore, stillInBook);
 
     let legalMoves: string[] = [];
     try {
@@ -216,7 +227,7 @@ export async function analyzeMoves(input: AnalyzeMovesInput): Promise<MoveClassi
       legalMoves = pos.moves();
     } catch {}
 
-    if (legalMoves.length <= 1) {
+    if (legalMoves.length <= 1 && stillInBook) {
       classification = "book";
     }
 
@@ -293,6 +304,7 @@ export async function analyzeGamePgn(pgn: string, onProgress?: (done: number, to
   const moves: PgnAnalysisResult["moves"] = [];
   const whiteLosses: number[] = [];
   const blackLosses: number[] = [];
+  let stillInBook = true;
 
   for (let idx = 0; idx < moveMeta.length; idx++) {
     const m = moveMeta[idx];
@@ -300,12 +312,20 @@ export async function analyzeGamePgn(pgn: string, onProgress?: (done: number, to
     const evalAfter = evals[idx + 1];
 
     if (!evalBefore || !evalAfter) {
+      stillInBook = false;
       moves.push({
         moveIndex: idx, san: m.san, color: m.color,
         classification: "good", cpLoss: 0, bestMove: null,
         evalBefore: 0, evalAfter: 0,
       });
       continue;
+    }
+
+    const fenAfterMove = fens[idx + 1];
+    if (stillInBook && fenAfterMove) {
+      stillInBook = isBookPosition(fenAfterMove);
+    } else {
+      stillInBook = false;
     }
 
     const cpBefore = evalBefore.cpWhite;
@@ -329,7 +349,7 @@ export async function analyzeGamePgn(pgn: string, onProgress?: (done: number, to
 
     const playerWinBefore = m.color === "white" ? winPct(cpBefore) : (100 - winPct(cpBefore));
 
-    let classification = classifyFromWinPctLoss(winPctLossRaw, isTopEngineMove, isSecondEngineMove, isOpeningRange, wasBalanced, playerWinBefore);
+    let classification = classifyFromWinPctLoss(winPctLossRaw, isTopEngineMove, isSecondEngineMove, isOpeningRange, wasBalanced, playerWinBefore, stillInBook);
 
     let legalMoves: string[] = [];
     try {
@@ -337,7 +357,7 @@ export async function analyzeGamePgn(pgn: string, onProgress?: (done: number, to
       legalMoves = pos.moves();
     } catch {}
 
-    if (legalMoves.length <= 1) classification = "book";
+    if (legalMoves.length <= 1 && stillInBook) classification = "book";
 
     if (classification === "brilliant") {
       let dominated = false;
@@ -439,7 +459,15 @@ export async function analyzeSingleMove(input: AnalyzeSingleMoveInput): Promise<
   const wasBalanced = Math.abs(cpBefore) < 150;
   const playerWinBefore = playerColor === "white" ? winPct(cpBefore) : (100 - winPct(cpBefore));
 
-  const classification = classifyFromWinPctLoss(winPctLossRaw, isTopEngineMove, isSecondEngineMove, isOpeningRange, wasBalanced, playerWinBefore);
+  let isInBook = false;
+  if (fenAfter) {
+    const allBookSoFar = isBookPosition(fenBefore) && isBookPosition(fenAfter);
+    if (allBookSoFar) {
+      isInBook = true;
+    }
+  }
+
+  const classification = classifyFromWinPctLoss(winPctLossRaw, isTopEngineMove, isSecondEngineMove, isOpeningRange, wasBalanced, playerWinBefore, isInBook);
   const isBad = ["inaccuracy", "mistake", "blunder"].includes(classification);
 
   const cpInfo =
@@ -531,7 +559,11 @@ function mergeReviewWithEngine(
     gptByIndex.set(rm.moveIndex, rm);
   }
 
-  return originalMoves.map((om, idx) => {
+  let stillInBook = true;
+
+  const results: MoveReview[] = [];
+  for (let idx = 0; idx < originalMoves.length; idx++) {
+    const om = originalMoves[idx];
     const gpt = gptByIndex.get(idx);
 
     let classification: MoveReview["classification"] = gpt?.classification ?? "good";
@@ -542,10 +574,19 @@ function mergeReviewWithEngine(
 
     const fenBefore = fens[idx];
     if (!fenBefore) {
-      return {
+      stillInBook = false;
+      results.push({
         moveIndex: idx, san: om.san, color: om.color as "white" | "black",
         classification, explanation, betterMove, pros, cons, cpLoss: 0, engineAvailable: false,
-      };
+      });
+      continue;
+    }
+
+    const fenAfterMove = fens[idx + 1];
+    if (stillInBook && fenAfterMove) {
+      stillInBook = isBookPosition(fenAfterMove);
+    } else {
+      stillInBook = false;
     }
 
     let legalMoves: string[];
@@ -553,28 +594,33 @@ function mergeReviewWithEngine(
       const pos = new Chess(fenBefore);
       legalMoves = pos.moves();
     } catch {
-      return {
+      stillInBook = false;
+      results.push({
         moveIndex: idx, san: om.san, color: om.color as "white" | "black",
         classification, explanation, betterMove, pros, cons, cpLoss: 0, engineAvailable: false,
-      };
+      });
+      continue;
     }
 
     if (legalMoves.length <= 1) {
-      return {
+      results.push({
         moveIndex: idx, san: om.san, color: om.color as "white" | "black",
         classification: "book" as const, explanation: explanation || "Forced move — the only legal option.",
         betterMove: null, pros, cons: [], cpLoss: 0, engineAvailable: true,
-      };
+      });
+      continue;
     }
 
     const evalBefore = evals[idx];
     const evalAfter = evals[idx + 1];
 
     if (!evalBefore || !evalAfter) {
-      return {
+      stillInBook = false;
+      results.push({
         moveIndex: idx, san: om.san, color: om.color as "white" | "black",
         classification, explanation, betterMove, pros, cons, cpLoss: 0, engineAvailable: false,
-      };
+      });
+      continue;
     }
 
     const cpBefore = evalBefore.cpWhite;
@@ -598,7 +644,7 @@ function mergeReviewWithEngine(
     const moveCpLoss = Math.max(0, winPctLossRaw);
 
     const playerWinBefore = playerColor === "white" ? winPct(cpBefore) : (100 - winPct(cpBefore));
-    classification = classifyFromWinPctLoss(winPctLossRaw, isTopEngineMove, isSecondEngineMove, isOpeningRange, wasBalanced, playerWinBefore);
+    classification = classifyFromWinPctLoss(winPctLossRaw, isTopEngineMove, isSecondEngineMove, isOpeningRange, wasBalanced, playerWinBefore, stillInBook);
 
     const isBad = ["inaccuracy", "mistake", "blunder"].includes(classification);
     if (isBad && evalBefore.bestMoveSan && !isTopEngineMove) {
@@ -633,12 +679,13 @@ function mergeReviewWithEngine(
       betterMove = evalBefore.bestMoveSan;
     }
 
-    return {
+    results.push({
       moveIndex: idx, san: om.san, color: om.color as "white" | "black",
       classification, explanation, betterMove, pros, cons,
       cpLoss: moveCpLoss, engineAvailable: true,
-    };
-  });
+    });
+  }
+  return results;
 }
 
 // ── Full-game review ─────────────────────────────────────────────────────────

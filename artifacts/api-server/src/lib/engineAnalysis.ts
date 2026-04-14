@@ -288,11 +288,12 @@ export function classifyFromWinPctLoss(
   winPctLoss: number,
   isTopEngineMove: boolean,
   isSecondEngineMove: boolean,
-  isOpeningRange: boolean,
-  wasBalanced: boolean,
+  _isOpeningRange: boolean,
+  _wasBalanced: boolean,
   playerWinPctBefore: number = 50,
+  isInBook: boolean = false,
 ): EngineClassification {
-  if (isOpeningRange && wasBalanced && winPctLoss <= 3) {
+  if (isInBook) {
     return "book";
   }
 
