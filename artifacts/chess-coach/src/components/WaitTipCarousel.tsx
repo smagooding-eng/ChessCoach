@@ -1,7 +1,7 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Lightbulb } from 'lucide-react';
-import { ELO_TIERS, getTierForRating } from '@/lib/elo-tips';
+import { getTierForRating } from '@/lib/elo-tips';
 
 interface WaitTipCarouselProps {
   rating?: number | null;
