@@ -45,22 +45,24 @@ router.get("/admin/growth/credentials", requireAdmin, async (_req: Request, res:
     }));
 
     res.json(result);
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
+  } catch (err: unknown) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Unknown error" });
   }
 });
 
-router.post("/admin/growth/credentials", requireAdmin, async (req: Request, res: Response) => {
+router.post("/admin/growth/credentials", requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
     const { platform, credentials } = req.body as { platform: string; credentials: Record<string, string> };
 
     if (!platform || !credentials) {
-      return res.status(400).json({ error: "platform and credentials required" });
+      res.status(400).json({ error: "platform and credentials required" });
+      return;
     }
 
     const validPlatforms = ["discord", "twitter", "reddit"];
     if (!validPlatforms.includes(platform)) {
-      return res.status(400).json({ error: `Invalid platform. Choose from: ${validPlatforms.join(", ")}` });
+      res.status(400).json({ error: `Invalid platform. Choose from: ${validPlatforms.join(", ")}` });
+      return;
     }
 
     const encrypted = encryptCredentials(credentials);
@@ -73,16 +75,19 @@ router.post("/admin/growth/credentials", requireAdmin, async (req: Request, res:
       });
 
     res.json({ success: true, platform });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
+  } catch (err: unknown) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Unknown error" });
   }
 });
 
-router.post("/admin/growth/credentials/test", requireAdmin, async (req: Request, res: Response) => {
+router.post("/admin/growth/credentials/test", requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
     const { platform } = req.body as { platform: string };
     const [cred] = await db.select().from(growthCredentialsTable).where(eq(growthCredentialsTable.platform, platform));
-    if (!cred) return res.status(404).json({ error: "No credentials found for " + platform });
+    if (!cred) {
+      res.status(404).json({ error: "No credentials found for " + platform });
+      return;
+    }
 
     const decrypted = decryptCredentials(cred.credentials);
 
@@ -90,11 +95,16 @@ router.post("/admin/growth/credentials/test", requireAdmin, async (req: Request,
       const url = decrypted.webhookUrl || '';
       const discordPattern = /^https:\/\/(discord\.com|discordapp\.com)\/api\/webhooks\//;
       if (!discordPattern.test(url)) {
-        return res.json({ success: false, error: "Invalid Discord webhook URL — must be a discord.com webhook" });
+        res.json({ success: false, error: "Invalid Discord webhook URL — must be a discord.com webhook" });
+        return;
       }
       const testRes = await fetch(url, { method: 'GET' });
-      if (!testRes.ok) return res.json({ success: false, error: "Invalid webhook URL" });
-      return res.json({ success: true, message: "Discord webhook is valid" });
+      if (!testRes.ok) {
+        res.json({ success: false, error: "Invalid webhook URL" });
+        return;
+      }
+      res.json({ success: true, message: "Discord webhook is valid" });
+      return;
     }
 
     if (platform === "twitter") {
@@ -122,9 +132,14 @@ router.post("/admin/growth/credentials/test", requireAdmin, async (req: Request,
         .map(([k, v]) => `${encodeURIComponent(k)}="${encodeURIComponent(v)}"`).join(', ');
 
       const testRes = await fetch(url, { headers: { 'Authorization': authHeader } });
-      if (!testRes.ok) return res.json({ success: false, error: `Twitter API returned ${testRes.status}` });
-      const data = await testRes.json() as any;
-      return res.json({ success: true, message: `Authenticated as @${data.data?.username || 'unknown'}` });
+      if (!testRes.ok) {
+        res.json({ success: false, error: `Twitter API returned ${testRes.status}` });
+        return;
+      }
+      const data = await testRes.json() as Record<string, unknown>;
+      const dataObj = data.data as Record<string, unknown> | undefined;
+      res.json({ success: true, message: `Authenticated as @${dataObj?.username || 'unknown'}` });
+      return;
     }
 
     if (platform === "reddit") {
@@ -138,23 +153,28 @@ router.post("/admin/growth/credentials/test", requireAdmin, async (req: Request,
         },
         body: `grant_type=password&username=${encodeURIComponent(decrypted.username)}&password=${encodeURIComponent(decrypted.password)}`,
       });
-      const tokenData = await tokenRes.json() as any;
-      if (tokenData.error) return res.json({ success: false, error: `Reddit: ${tokenData.error}` });
-      return res.json({ success: true, message: `Authenticated as u/${decrypted.username}` });
+      const tokenData = await tokenRes.json() as Record<string, unknown>;
+      if (tokenData.error) {
+        res.json({ success: false, error: `Reddit: ${tokenData.error}` });
+        return;
+      }
+      res.json({ success: true, message: `Authenticated as u/${decrypted.username}` });
+      return;
     }
 
     res.status(400).json({ error: "Unknown platform" });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    res.status(500).json({ success: false, error: err instanceof Error ? err.message : "Unknown error" });
   }
 });
 
 router.delete("/admin/growth/credentials/:platform", requireAdmin, async (req: Request, res: Response) => {
   try {
-    await db.delete(growthCredentialsTable).where(eq(growthCredentialsTable.platform, req.params.platform));
+    const platform = String(req.params.platform);
+    await db.delete(growthCredentialsTable).where(eq(growthCredentialsTable.platform, platform));
     res.json({ success: true });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
+  } catch (err: unknown) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Unknown error" });
   }
 });
 
@@ -162,8 +182,8 @@ router.get("/admin/growth/campaigns", requireAdmin, async (_req: Request, res: R
   try {
     const campaigns = await db.select().from(growthCampaignsTable).orderBy(desc(growthCampaignsTable.createdAt));
     res.json(campaigns);
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
+  } catch (err: unknown) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Unknown error" });
   }
 });
 
@@ -179,21 +199,24 @@ function computeNextRun(frequency: string, from?: Date): Date {
   return next;
 }
 
-router.post("/admin/growth/campaigns", requireAdmin, async (req: Request, res: Response) => {
+router.post("/admin/growth/campaigns", requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
     const { name, theme, platforms, frequency, customNote } = req.body as {
       name: string; theme: string; platforms: string[]; frequency: string; customNote?: string;
     };
 
     if (!name || !theme || !platforms?.length || !frequency) {
-      return res.status(400).json({ error: "name, theme, platforms, and frequency are required" });
+      res.status(400).json({ error: "name, theme, platforms, and frequency are required" });
+      return;
     }
     if (!CAMPAIGN_THEMES[theme]) {
-      return res.status(400).json({ error: "Invalid theme" });
+      res.status(400).json({ error: "Invalid theme" });
+      return;
     }
     const validFreqs = ['daily', 'every_3_days', 'weekly'];
     if (!validFreqs.includes(frequency)) {
-      return res.status(400).json({ error: "frequency must be: " + validFreqs.join(", ") });
+      res.status(400).json({ error: "frequency must be: " + validFreqs.join(", ") });
+      return;
     }
 
     const nextRunAt = computeNextRun(frequency);
@@ -202,46 +225,55 @@ router.post("/admin/growth/campaigns", requireAdmin, async (req: Request, res: R
       .returning();
 
     res.json(campaign);
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
+  } catch (err: unknown) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Unknown error" });
   }
 });
 
-router.patch("/admin/growth/campaigns/:id", requireAdmin, async (req: Request, res: Response) => {
+router.patch("/admin/growth/campaigns/:id", requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
+    const campaignId = String(req.params.id);
     const { status } = req.body as { status: string };
     const validStatuses = ['active', 'paused'];
     if (!validStatuses.includes(status)) {
-      return res.status(400).json({ error: "status must be active or paused" });
+      res.status(400).json({ error: "status must be active or paused" });
+      return;
     }
 
-    const updates: any = { status };
+    const updates: { status: string; nextRunAt?: Date } = { status };
     if (status === 'active') {
       const [existing] = await db.select({ frequency: growthCampaignsTable.frequency })
         .from(growthCampaignsTable)
-        .where(eq(growthCampaignsTable.id, req.params.id));
-      if (!existing) return res.status(404).json({ error: "Campaign not found" });
+        .where(eq(growthCampaignsTable.id, campaignId));
+      if (!existing) {
+        res.status(404).json({ error: "Campaign not found" });
+        return;
+      }
       updates.nextRunAt = computeNextRun(existing.frequency);
     }
 
     const [updated] = await db.update(growthCampaignsTable)
       .set(updates)
-      .where(eq(growthCampaignsTable.id, req.params.id))
+      .where(eq(growthCampaignsTable.id, campaignId))
       .returning();
 
-    if (!updated) return res.status(404).json({ error: "Campaign not found" });
+    if (!updated) {
+      res.status(404).json({ error: "Campaign not found" });
+      return;
+    }
     res.json(updated);
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
+  } catch (err: unknown) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Unknown error" });
   }
 });
 
 router.delete("/admin/growth/campaigns/:id", requireAdmin, async (req: Request, res: Response) => {
   try {
-    await db.delete(growthCampaignsTable).where(eq(growthCampaignsTable.id, req.params.id));
+    const campaignId = String(req.params.id);
+    await db.delete(growthCampaignsTable).where(eq(growthCampaignsTable.id, campaignId));
     res.json({ success: true });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
+  } catch (err: unknown) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Unknown error" });
   }
 });
 
@@ -341,59 +373,61 @@ export async function executePostForCampaign(campaignId: string | null, platform
       });
 
       results.push(result);
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : "Unknown error";
       await db.insert(growthPostLogTable).values({
         campaignId,
         platform,
         content: '',
         status: 'failed',
-        error: err.message,
+        error: errMsg,
       });
-      results.push({ platform, success: false, error: err.message });
+      results.push({ platform, success: false, error: errMsg });
     }
   }
 
   return results;
 }
 
-router.post("/admin/growth/post-now", requireAdmin, async (req: Request, res: Response) => {
+router.post("/admin/growth/post-now", requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
     const { platforms, theme, customNote } = req.body as { platforms: string[]; theme: string; customNote?: string };
 
     if (!platforms?.length || !theme) {
-      return res.status(400).json({ error: "platforms and theme are required" });
+      res.status(400).json({ error: "platforms and theme are required" });
+      return;
     }
     if (!CAMPAIGN_THEMES[theme]) {
-      return res.status(400).json({ error: "Invalid theme" });
+      res.status(400).json({ error: "Invalid theme" });
+      return;
     }
 
     const results = await executePostForCampaign(null, platforms, theme, customNote);
     res.json({ results });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
+  } catch (err: unknown) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Unknown error" });
   }
 });
 
 router.get("/admin/growth/post-log", requireAdmin, async (req: Request, res: Response) => {
   try {
     const { platform, from, to, limit: limitStr } = req.query as Record<string, string>;
-    const limit = parseInt(limitStr) || 50;
-
-    let query = db.select().from(growthPostLogTable).orderBy(desc(growthPostLogTable.postedAt)).limit(limit);
+    const queryLimit = parseInt(limitStr) || 50;
 
     const conditions = [];
     if (platform) conditions.push(eq(growthPostLogTable.platform, platform));
     if (from) conditions.push(gte(growthPostLogTable.postedAt, new Date(from)));
     if (to) conditions.push(lte(growthPostLogTable.postedAt, new Date(to)));
 
-    if (conditions.length > 0) {
-      query = query.where(and(...conditions));
-    }
+    const baseQuery = db.select().from(growthPostLogTable);
+    const filteredQuery = conditions.length > 0
+      ? baseQuery.where(and(...conditions))
+      : baseQuery;
+    const logs = await filteredQuery.orderBy(desc(growthPostLogTable.postedAt)).limit(queryLimit);
 
-    const logs = await query;
     res.json(logs);
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
+  } catch (err: unknown) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Unknown error" });
   }
 });
 
