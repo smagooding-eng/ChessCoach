@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { boolean, index, jsonb, pgTable, text, timestamp, varchar } from "drizzle-orm/pg-core";
+import { boolean, index, jsonb, pgTable, text, timestamp, uniqueIndex, varchar } from "drizzle-orm/pg-core";
 
 export const growthCredentialsTable = pgTable("growth_credentials", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -49,5 +49,5 @@ export const emailDripLogTable = pgTable("email_drip_log", {
   dripType: varchar("drip_type").notNull(),
   sentAt: timestamp("sent_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
-  index("idx_drip_user_type").on(table.userId, table.dripType),
+  uniqueIndex("idx_drip_user_type").on(table.userId, table.dripType),
 ]);

@@ -104,7 +104,8 @@ async function runSchemaMigrations() {
       drip_type VARCHAR NOT NULL,
       sent_at TIMESTAMPTZ NOT NULL DEFAULT now()
     )`);
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_drip_user_type ON email_drip_log(user_id, drip_type)`);
+    await db.execute(sql`DROP INDEX IF EXISTS idx_drip_user_type`);
+    await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS idx_drip_user_type ON email_drip_log(user_id, drip_type)`);
 
     logger.info('Schema migrations complete');
   } catch (err) {
