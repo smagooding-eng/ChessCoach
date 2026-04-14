@@ -6,6 +6,7 @@ import { Link } from 'wouter';
 import { Swords, Trophy, Target, AlertTriangle, BookOpen, Clock, GraduationCap, TrendingUp, ChevronRight, Search, Play, Bot } from 'lucide-react';
 import { useUser } from '@/hooks/use-user';
 import { useChessPlayer } from '@/hooks/use-chess-player';
+import { useMultiEloProgress } from '@/hooks/use-elo-progress';
 
 const CHESSCOM_GREEN = '#81b64c';
 const BG_DARK = '#262421';
@@ -33,6 +34,7 @@ const SEV_COLORS: Record<string, { bg: string; text: string }> = {
 export function Dashboard() {
   const { username } = useUser();
   const { player: chessPlayer } = useChessPlayer(username ?? undefined);
+  const { data: multiElo } = useMultiEloProgress(username ?? undefined);
   const { data: summary, isLoading: loadingSummary } = useMyAnalysisSummary();
   const { data: weaknesses } = useMyWeaknesses();
   const { data: coursesData } = useMyCourses();
@@ -71,12 +73,33 @@ export function Dashboard() {
 
           <div className="flex-1 min-w-0">
             <h1 className="text-lg font-black truncate" style={{ color: TEXT_LIGHT }}>{username}</h1>
-            {chessPlayer?.rating && (
+            {(multiElo.chesscom?.hasData || multiElo.lichess?.hasData) ? (
+              <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                {multiElo.chesscom?.hasData && (
+                  <div className="flex items-center gap-1">
+                    <span className="text-[9px] font-bold" style={{ color: CHESSCOM_GREEN }}>CC</span>
+                    <span className="text-lg font-black leading-none" style={{ color: CHESSCOM_GREEN }}>{multiElo.chesscom.currentRating}</span>
+                    <span className="text-[10px] font-bold" style={{ color: multiElo.chesscom.delta > 0 ? CHESSCOM_GREEN : multiElo.chesscom.delta < 0 ? '#dc4343' : TEXT_MUTED }}>
+                      {multiElo.chesscom.delta > 0 ? '+' : ''}{multiElo.chesscom.delta}
+                    </span>
+                  </div>
+                )}
+                {multiElo.lichess?.hasData && (
+                  <div className="flex items-center gap-1">
+                    <span className="text-[9px] font-bold" style={{ color: '#b0b0b0' }}>LC</span>
+                    <span className="text-lg font-black leading-none" style={{ color: '#b0b0b0' }}>{multiElo.lichess.currentRating}</span>
+                    <span className="text-[10px] font-bold" style={{ color: multiElo.lichess.delta > 0 ? CHESSCOM_GREEN : multiElo.lichess.delta < 0 ? '#dc4343' : TEXT_MUTED }}>
+                      {multiElo.lichess.delta > 0 ? '+' : ''}{multiElo.lichess.delta}
+                    </span>
+                  </div>
+                )}
+              </div>
+            ) : chessPlayer?.rating ? (
               <div className="flex items-center gap-1.5 mt-0.5">
                 <span className="text-xl font-black leading-none" style={{ color: CHESSCOM_GREEN }}>{chessPlayer.rating}</span>
                 <span className="text-[11px] font-semibold mt-0.5" style={{ color: TEXT_MUTED }}>ELO</span>
               </div>
-            )}
+            ) : null}
             {summary?.totalGames ? (
               <p className="text-xs mt-0.5" style={{ color: TEXT_MUTED }}>{summary.totalGames} games · {winRate}% win rate</p>
             ) : (
