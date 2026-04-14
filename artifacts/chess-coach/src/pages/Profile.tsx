@@ -7,6 +7,7 @@ import { useMyCourses } from '@/hooks/use-courses';
 import { Link, useLocation } from 'wouter';
 import { apiFetch } from '@/lib/api';
 import { motion, AnimatePresence } from 'framer-motion';
+import GrowthEngine from '@/components/GrowthEngine';
 import {
   User, Mail, Crown, LogOut, ChevronRight, Trophy, Swords, Target,
   GraduationCap, Settings, Shield, Edit3, Check, X, Eye, Users, CreditCard,
@@ -1454,6 +1455,8 @@ function AdminTicker() {
       </motion.div>
 
       <MarketingPanel />
+
+      <GrowthEngine />
 
       <AnimatePresence>
         {showEmailModal && (

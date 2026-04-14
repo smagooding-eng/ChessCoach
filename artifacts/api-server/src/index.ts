@@ -57,6 +57,55 @@ async function runSchemaMigrations() {
   try {
     await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_premium_override BOOLEAN NOT NULL DEFAULT false`);
     await db.execute(sql`UPDATE users SET is_premium_override = true WHERE email = 'lukakhvedelidze97@gmail.com' AND is_premium_override = false`);
+
+    await db.execute(sql`CREATE TABLE IF NOT EXISTS growth_credentials (
+      id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+      platform VARCHAR NOT NULL UNIQUE,
+      credentials TEXT NOT NULL,
+      is_active BOOLEAN NOT NULL DEFAULT true,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )`);
+
+    await db.execute(sql`CREATE TABLE IF NOT EXISTS growth_campaigns (
+      id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+      name VARCHAR NOT NULL,
+      theme VARCHAR NOT NULL,
+      platforms JSONB NOT NULL,
+      frequency VARCHAR NOT NULL,
+      custom_note TEXT,
+      status VARCHAR NOT NULL DEFAULT 'active',
+      next_run_at TIMESTAMPTZ,
+      last_run_at TIMESTAMPTZ,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_campaigns_status ON growth_campaigns(status)`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_campaigns_next_run ON growth_campaigns(next_run_at)`);
+
+    await db.execute(sql`CREATE TABLE IF NOT EXISTS growth_post_log (
+      id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+      campaign_id VARCHAR,
+      platform VARCHAR NOT NULL,
+      content TEXT NOT NULL,
+      title TEXT,
+      status VARCHAR NOT NULL DEFAULT 'pending',
+      error TEXT,
+      external_id VARCHAR,
+      posted_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_post_log_campaign ON growth_post_log(campaign_id)`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_post_log_platform ON growth_post_log(platform)`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_post_log_posted ON growth_post_log(posted_at)`);
+
+    await db.execute(sql`CREATE TABLE IF NOT EXISTS email_drip_log (
+      id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id VARCHAR NOT NULL,
+      drip_type VARCHAR NOT NULL,
+      sent_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_drip_user_type ON email_drip_log(user_id, drip_type)`);
+
     logger.info('Schema migrations complete');
   } catch (err) {
     logger.error({ err }, 'Schema migration failed');
@@ -78,6 +127,12 @@ runSchemaMigrations().catch((err) => {
 
 initStripe().catch((err) => {
   logger.error({ err }, 'Stripe init failed after server start');
+});
+
+import("./lib/growthScheduler").then(({ startGrowthScheduler }) => {
+  startGrowthScheduler();
+}).catch((err) => {
+  logger.error({ err }, "Growth scheduler failed to start");
 });
 
 import("./lib/puzzleSeed").then(({ seedPuzzlesIfNeeded, preGenerateExplanations }) => {

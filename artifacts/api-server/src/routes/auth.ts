@@ -1,8 +1,9 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import bcrypt from "bcryptjs";
-import { db, usersTable, referralConversionsTable } from "@workspace/db";
+import { db, usersTable, referralConversionsTable, emailDripLogTable } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
 import { storage } from "../lib/storage";
+import { sendEmail, welcomeEmailHtml } from "../lib/email";
 import crypto from "crypto";
 import {
   clearSession,
@@ -110,6 +111,15 @@ router.post("/auth/register", async (req: Request, res: Response) => {
     setSessionCookie(res, sid);
 
     res.json({ user: toSessionUser(user), token: sid });
+
+    if (user.email) {
+      sendEmail({
+        to: user.email,
+        subject: "Welcome to ChessScout.net — Your Edge Starts Now! ♜",
+        html: welcomeEmailHtml(user.firstName),
+      }).catch(() => {});
+      db.insert(emailDripLogTable).values({ userId: user.id, dripType: 'welcome' }).catch(() => {});
+    }
   } catch (err: any) {
     req.log?.error?.({ err }, "Registration error");
     res.status(500).json({ error: "Registration failed" });
@@ -278,6 +288,15 @@ router.get("/auth/google/callback", async (req: Request, res: Response) => {
             referredUserId: user.id,
             status: "signed_up",
           });
+        }
+
+        if (user.email) {
+          sendEmail({
+            to: user.email,
+            subject: "Welcome to ChessScout.net — Your Edge Starts Now! ♜",
+            html: welcomeEmailHtml(user.firstName),
+          }).catch(() => {});
+          db.insert(emailDripLogTable).values({ userId: user.id, dripType: 'welcome' }).catch(() => {});
         }
       }
     } else {
