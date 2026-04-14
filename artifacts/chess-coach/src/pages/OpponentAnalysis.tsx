@@ -5,6 +5,7 @@ import { Link, useLocation } from 'wouter';
 import { useUser } from '@/hooks/use-user';
 import { apiFetch } from '@/lib/api';
 import { PremiumGate } from '@/components/PremiumGate';
+import { WaitTipCarousel } from '@/components/WaitTipCarousel';
 
 interface Profile {
   username: string;
@@ -66,6 +67,67 @@ const TITLE_COLORS: Record<string, string> = {
 };
 
 type CourseGenState = 'idle' | 'generating' | 'done' | 'error';
+
+const SCOUTING_PHASES = [
+  'Fetching recent games…',
+  'Analyzing opening repertoire…',
+  'Studying middlegame patterns…',
+  'Identifying tactical tendencies…',
+  'Detecting weaknesses…',
+  'Compiling scouting report…',
+];
+
+function ScoutingWaitContent() {
+  const [phaseIdx, setPhaseIdx] = useState(0);
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      setPhaseIdx(prev => Math.min(prev + 1, SCOUTING_PHASES.length - 1));
+    }, 8000);
+    return () => clearInterval(id);
+  }, []);
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-2xl bg-secondary/40 p-5 border border-white/5">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin shrink-0" />
+          <div className="flex-1">
+            <p className="text-sm font-bold text-primary">Scouting in progress…</p>
+            <AnimatePresence mode="wait">
+              <motion.p
+                key={phaseIdx}
+                initial={{ opacity: 0, y: 4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }}
+                transition={{ duration: 0.3 }}
+                className="text-xs text-muted-foreground mt-0.5"
+              >
+                {SCOUTING_PHASES[phaseIdx]}
+              </motion.p>
+            </AnimatePresence>
+          </div>
+        </div>
+        <div className="flex gap-1">
+          {SCOUTING_PHASES.map((_, i) => (
+            <div
+              key={i}
+              className={`h-1 flex-1 rounded-full transition-all duration-700 ${
+                i <= phaseIdx ? 'bg-primary/50' : 'bg-white/5'
+              }`}
+            />
+          ))}
+        </div>
+      </div>
+
+      {[1, 2, 3].map(i => (
+        <div key={i} className="h-20 rounded-xl bg-secondary/30 animate-pulse" />
+      ))}
+
+      <WaitTipCarousel rating={1200} />
+    </div>
+  );
+}
 
 export function OpponentAnalysis() {
   const [, navigate] = useLocation();
@@ -378,18 +440,8 @@ export function OpponentAnalysis() {
         </motion.div>
       )}
 
-      {/* Loading skeleton */}
-      {loading && (
-        <div className="space-y-4">
-          <div className="h-32 rounded-2xl bg-secondary/40 animate-pulse" />
-          {[1, 2, 3].map(i => (
-            <div key={i} className="h-20 rounded-xl bg-secondary/30 animate-pulse" />
-          ))}
-          <p className="text-center text-muted-foreground text-sm animate-pulse">
-            Fetching games and running AI analysis…
-          </p>
-        </div>
-      )}
+      {/* Loading skeleton with engagement */}
+      {loading && <ScoutingWaitContent />}
 
       {/* Results */}
       <AnimatePresence>

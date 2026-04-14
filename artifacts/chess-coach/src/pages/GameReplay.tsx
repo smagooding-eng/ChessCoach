@@ -12,6 +12,8 @@ import {
 import { useUser } from '@/hooks/use-user';
 import { useChessPlayer } from '@/hooks/use-chess-player';
 import { apiFetch } from '@/lib/api';
+import { WaitTipCarousel } from '@/components/WaitTipCarousel';
+import { AnimatePresence, motion } from 'framer-motion';
 
 type Classification = 'checkmate' | 'brilliant' | 'great' | 'best' | 'excellent' | 'good' | 'book' | 'inaccuracy' | 'mistake' | 'blunder' | 'missed_win';
 
@@ -271,6 +273,60 @@ function formatClock(s: number | null | undefined): string {
   const m = Math.floor(s / 60);
   const sec = Math.floor(s % 60);
   return `${m}:${sec.toString().padStart(2, '0')}`;
+}
+
+function SandboxBoard({ fen, moves: gameMoves, flipped }: { fen?: string; moves: Array<{ san: string; fen?: string }>; flipped: boolean }) {
+  const START = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+  const [sandboxChess] = useState(() => {
+    const c = new Chess(fen || START);
+    for (const m of gameMoves) {
+      try { c.move(m.san); } catch { break; }
+    }
+    return c;
+  });
+  const [sandboxFen, setSandboxFen] = useState(sandboxChess.fen());
+  const [moveHistory, setMoveHistory] = useState<string[]>([]);
+
+  const handleSandboxMove = useCallback((san: string) => {
+    try {
+      sandboxChess.move(san);
+      setSandboxFen(sandboxChess.fen());
+      setMoveHistory(prev => [...prev, san]);
+    } catch {}
+  }, [sandboxChess]);
+
+  const undoSandboxMove = useCallback(() => {
+    sandboxChess.undo();
+    setSandboxFen(sandboxChess.fen());
+    setMoveHistory(prev => prev.slice(0, -1));
+  }, [sandboxChess]);
+
+  return (
+    <div>
+      <div className="max-w-[300px] mx-auto">
+        <ChessBoard
+          fen={sandboxFen}
+          flipped={flipped}
+          practiceMode={true}
+          onMovePlayed={(san) => handleSandboxMove(san)}
+        />
+      </div>
+      {moveHistory.length > 0 && (
+        <div className="flex items-center justify-between mt-2 px-1">
+          <p className="text-[10px] text-white/30 truncate flex-1">
+            {moveHistory.slice(-6).join(' ')}
+            {moveHistory.length > 6 && '…'}
+          </p>
+          <button
+            onClick={undoSandboxMove}
+            className="text-[10px] text-primary/60 hover:text-primary ml-2 shrink-0"
+          >
+            Undo
+          </button>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function GameReplay() {
@@ -775,33 +831,108 @@ export function GameReplay() {
             );
           })()}
 
-          {/* Review loading banner */}
-          {reviewing && (
-            <div className="glass-card rounded-xl px-4 py-4 border border-primary/30 bg-primary/5 flex flex-col gap-3">
-              <div className="flex items-center gap-3">
-                <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin shrink-0" />
-                <div>
-                  <p className="text-sm font-bold text-primary">Reviewing game…</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {reviewProgress
-                      ? `Analyzing position ${reviewProgress.done} of ${reviewProgress.total}`
-                      : 'Starting engine analysis…'}
-                  </p>
+          {/* Review loading — enhanced engagement */}
+          {reviewing && (() => {
+            const totalMoves = moves.length;
+            const progressPct = reviewProgress && reviewProgress.total > 0 ? Math.round((reviewProgress.done / reviewProgress.total) * 100) : 0;
+            const currentAnalysisMove = reviewProgress ? Math.min(reviewProgress.done, totalMoves - 1) : 0;
+            const currentSan = moves[currentAnalysisMove]?.san ?? '';
+            const getPhase = (idx: number) => {
+              if (totalMoves === 0) return 'Opening';
+              const pct = idx / totalMoves;
+              if (pct < 0.25) return 'Opening';
+              if (pct < 0.7) return 'Middlegame';
+              return 'Endgame';
+            };
+            const phase = reviewProgress ? getPhase(reviewProgress.done) : 'Opening';
+            const narrativeMsg = !reviewProgress
+              ? 'Starting engine analysis…'
+              : phase === 'Opening' && game.opening
+                ? `Analyzing ${game.opening}… move ${currentSan}`
+                : `${phase} · analyzing move ${reviewProgress.done} of ${reviewProgress.total}${currentSan ? ` (${currentSan})` : ''}`;
+
+            const playerRating = username
+              ? (game.whiteUsername.toLowerCase() === username.toLowerCase() ? game.whiteRating : game.blackRating)
+              : game.whiteRating;
+
+            return (
+              <div className="space-y-3">
+                <div className="glass-card rounded-xl px-4 py-4 border border-primary/30 bg-primary/5 flex flex-col gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold text-primary">Reviewing game…</p>
+                      <AnimatePresence mode="wait">
+                        <motion.p
+                          key={narrativeMsg}
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          transition={{ duration: 0.3 }}
+                          className="text-xs text-muted-foreground mt-0.5 truncate"
+                        >
+                          {narrativeMsg}
+                        </motion.p>
+                      </AnimatePresence>
+                    </div>
+                    {reviewProgress && (
+                      <span className="ml-auto text-xs font-mono text-primary/80 shrink-0">
+                        {progressPct}%
+                      </span>
+                    )}
+                  </div>
+                  <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-primary/60 transition-all duration-500"
+                      style={{ width: reviewProgress && reviewProgress.total > 0 ? `${progressPct}%` : '5%' }}
+                    />
+                  </div>
                 </div>
-                {reviewProgress && (
-                  <span className="ml-auto text-xs font-mono text-primary/80">
-                    {Math.round((reviewProgress.done / reviewProgress.total) * 100)}%
-                  </span>
-                )}
+
+                {/* Pre-analysis teaser stats */}
+                <div className="glass-card rounded-xl px-4 py-3 border border-white/10">
+                  <p className="text-[11px] font-bold text-white/30 uppercase tracking-wider mb-2">Game at a glance</p>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div>
+                      <p className="text-[10px] text-white/30">Moves</p>
+                      <p className="text-sm font-bold text-white">{Math.ceil(totalMoves / 2)}</p>
+                    </div>
+                    {game.opening && (
+                      <div className="col-span-2 sm:col-span-1">
+                        <p className="text-[10px] text-white/30">Opening</p>
+                        <p className="text-sm font-bold text-white truncate">{game.eco ? `${game.eco} ` : ''}{game.opening}</p>
+                      </div>
+                    )}
+                    <div>
+                      <p className="text-[10px] text-white/30">Result</p>
+                      <p className={`text-sm font-bold ${game.result === 'win' ? 'text-emerald-400' : game.result === 'loss' ? 'text-rose-400' : 'text-white/60'}`}>
+                        {game.result === 'win' ? 'Win' : game.result === 'loss' ? 'Loss' : 'Draw'}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-white/30">Ratings</p>
+                      <p className="text-sm font-bold text-white">
+                        {game.whiteRating || '?'} vs {game.blackRating || '?'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <WaitTipCarousel rating={playerRating} />
+
+                {/* Sandbox board */}
+                <div className="glass-card rounded-xl p-3 border border-white/10">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Zap className="w-3.5 h-3.5 text-primary/60" />
+                    <span className="text-[11px] font-bold text-white/30 uppercase tracking-wider">
+                      Sandbox — explore freely while you wait
+                    </span>
+                  </div>
+                  <SandboxBoard fen={game.startFen || undefined} moves={moves} flipped={flipped} />
+                </div>
               </div>
-              <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
-                <div
-                  className="h-full rounded-full bg-primary/60 transition-all duration-500"
-                  style={{ width: reviewProgress ? `${(reviewProgress.done / reviewProgress.total) * 100}%` : '5%' }}
-                />
-              </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* Review error */}
           {reviewError && (
