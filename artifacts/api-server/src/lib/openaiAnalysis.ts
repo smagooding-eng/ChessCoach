@@ -227,7 +227,7 @@ export async function analyzeMoves(input: AnalyzeMovesInput): Promise<MoveClassi
         const result = pos.move(m.san);
         if (result?.captured) dominated = true;
       } catch {}
-      if (dominated || legalMoves.length <= 8) {
+      if (dominated || legalMoves.length <= 15) {
         classification = "excellent";
       }
     }
@@ -346,7 +346,7 @@ export async function analyzeGamePgn(pgn: string, onProgress?: (done: number, to
         const result = pos.move(m.san);
         if (result?.captured) dominated = true;
       } catch {}
-      if (dominated || legalMoves.length <= 8) {
+      if (dominated || legalMoves.length <= 15) {
         classification = "excellent";
       }
     }
@@ -624,7 +624,7 @@ function mergeReviewWithEngine(
         const result = pos.move(om.san);
         if (result?.captured) dominated = true;
       } catch {}
-      if (dominated || legalMoves.length <= 8) {
+      if (dominated || legalMoves.length <= 15) {
         classification = "excellent";
       }
     }

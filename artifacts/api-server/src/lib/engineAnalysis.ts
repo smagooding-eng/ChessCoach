@@ -292,7 +292,7 @@ export function classifyFromWinPctLoss(
   wasBalanced: boolean,
   playerWinPctBefore: number = 50,
 ): EngineClassification {
-  if (isOpeningRange && wasBalanced && (isTopEngineMove || isSecondEngineMove) && winPctLoss <= 1) {
+  if (isOpeningRange && wasBalanced && winPctLoss <= 3) {
     return "book";
   }
 
@@ -300,9 +300,9 @@ export function classifyFromWinPctLoss(
     if (
       !isTopEngineMove &&
       !isSecondEngineMove &&
-      winPctLoss < -5 &&
+      winPctLoss < -10 &&
       playerWinPctBefore >= 25 &&
-      playerWinPctBefore <= 55
+      playerWinPctBefore <= 52
     ) {
       return "brilliant";
     }
