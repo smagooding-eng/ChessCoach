@@ -5,6 +5,7 @@ import { puzzleAttemptsTable } from "@workspace/db";
 import { sessionsTable } from "@workspace/db";
 import { getUncachableStripeClient } from "../lib/stripeClient";
 import { ADMIN_EMAILS } from "../lib/auth";
+import OpenAI from "openai";
 
 const router: IRouter = Router();
 const FREE_TRIAL_DAYS = 3;
@@ -432,6 +433,97 @@ router.post("/admin/fix-chess960", requireAdmin, async (req: Request, res: Respo
     res.json({ success: true, totalGames: allGames.length, fixedPgns: fixed, clearedReviews: cleared });
   } catch (err: any) {
     res.status(500).json({ error: "Failed to fix Chess960 games", details: err.message });
+  }
+});
+
+const CAMPAIGN_THEMES: Record<string, string> = {
+  "Free Trial": "Emphasize the free 3-day trial with no credit card required. Urgency: try it risk-free today.",
+  "Opponent Scouting": "Focus on the killer feature: AI scouting reports that expose any opponent's weaknesses before you play them.",
+  "Game Analysis": "Highlight move-by-move game analysis with Stockfish 17 engine + AI coaching explanations for every move.",
+  "New Feature": "Announce exciting new features. Be enthusiastic and specific about what's new.",
+  "General Promo": "Broad promotional message covering the full value proposition: scouting, analysis, courses, bots, and progress tracking.",
+  "ELO Improvement": "Target players who want to gain rating points. Emphasize how personalized training and weakness detection leads to measurable improvement.",
+};
+
+router.post("/admin/marketing/generate", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const { theme, customNote } = req.body as { theme: string; customNote?: string };
+    if (!theme || !CAMPAIGN_THEMES[theme]) {
+      res.status(400).json({ error: "Invalid theme. Choose from: " + Object.keys(CAMPAIGN_THEMES).join(", ") });
+      return;
+    }
+
+    const openai = new OpenAI({
+      baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+      apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+    });
+
+    const prompt = `You are a marketing copywriter for ChessScout.net — an AI-powered chess coaching app.
+
+PRODUCT INFO:
+- AI opponent scouting reports that expose weaknesses of any Chess.com or Lichess player
+- Move-by-move game analysis powered by Stockfish 17 + AI coaching
+- Personalized training courses generated from your actual mistakes
+- 8 practice AI bots from 400 to 2000 ELO
+- ELO tracking across Chess.com and Lichess
+- 3-day free trial, $4/month or $1/week, no credit card required
+- Website: https://chessscout.net
+
+CAMPAIGN THEME: ${theme}
+THEME GUIDANCE: ${CAMPAIGN_THEMES[theme]}
+${customNote ? `ADDITIONAL NOTE: ${customNote}` : ""}
+
+Generate ad copy for each of these platforms. Each post should feel native to the platform — match its tone, length conventions, and culture:
+
+1. **Twitter/X** — Max 280 chars. Punchy, use 2-3 relevant hashtags. Chess community tone.
+2. **Reddit (r/chess)** — Title + body. Informative, not salesy. Value-first. Reddit hates obvious ads, so frame as a useful tool discovery. 150-250 words body.
+3. **Facebook** — Engaging, slightly longer. 100-150 words. Include a call to action.
+4. **Instagram** — Caption style, 100-150 words. Use relevant emojis and 5-8 hashtags at the end.
+5. **Discord** — Casual, community-friendly. 80-120 words. Like sharing something cool with friends.
+6. **Forum/General** — Neutral, informative tone. 100-200 words. Could be posted on chess forums, Quora, etc.
+
+Return VALID JSON only:
+{
+  "posts": [
+    { "platform": "Twitter/X", "content": "..." },
+    { "platform": "Reddit", "title": "...", "content": "..." },
+    { "platform": "Facebook", "content": "..." },
+    { "platform": "Instagram", "content": "..." },
+    { "platform": "Discord", "content": "..." },
+    { "platform": "Forum/General", "content": "..." }
+  ]
+}`;
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      max_tokens: 2000,
+      messages: [{ role: "user", content: prompt }],
+      response_format: { type: "json_object" },
+    });
+
+    const content = response.choices[0]?.message?.content ?? "{}";
+    const parsed = JSON.parse(content);
+    res.json(parsed);
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to generate marketing copy", details: err.message });
+  }
+});
+
+router.get("/public/stats", async (_req: Request, res: Response) => {
+  try {
+    const [usersResult] = await db.select({ count: count() }).from(usersTable);
+    const [gamesResult] = await db.select({ count: count() }).from(gamesTable)
+      .where(isNotNull(gamesTable.reviewData));
+    const [scoutsResult] = await db.select({ count: count() }).from(backgroundJobsTable)
+      .where(and(eq(backgroundJobsTable.type, "analysis"), eq(backgroundJobsTable.status, "completed")));
+
+    res.json({
+      users: usersResult.count,
+      gamesAnalyzed: gamesResult.count,
+      opponentsScouted: scoutsResult.count,
+    });
+  } catch {
+    res.json({ users: 0, gamesAnalyzed: 0, opponentsScouted: 0 });
   }
 });
 

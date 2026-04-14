@@ -12,7 +12,7 @@ import {
   GraduationCap, Settings, Shield, Edit3, Check, X, Eye, Users, CreditCard,
   Activity, Send, AlertCircle, CheckCircle2, Bold, Italic, Heading1, Heading2,
   Link as LinkIcon, Image, Type, Palette, List, ListOrdered, Minus, Undo2, Redo2, FileText, Sparkles,
-  Trash2, Loader2, Zap, Gift, Copy, UserPlus
+  Trash2, Loader2, Zap, Gift, Copy, UserPlus, Megaphone, ChevronDown
 } from 'lucide-react';
 
 interface AdminStats {
@@ -1453,6 +1453,8 @@ function AdminTicker() {
         </div>
       </motion.div>
 
+      <MarketingPanel />
+
       <AnimatePresence>
         {showEmailModal && (
           <EmailComposerModal
@@ -1462,6 +1464,131 @@ function AdminTicker() {
         )}
       </AnimatePresence>
     </>
+  );
+}
+
+const MARKETING_THEMES = ["Free Trial", "Opponent Scouting", "Game Analysis", "New Feature", "General Promo", "ELO Improvement"];
+
+function MarketingPanel() {
+  const [theme, setTheme] = useState(MARKETING_THEMES[0]);
+  const [customNote, setCustomNote] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [posts, setPosts] = useState<Array<{ platform: string; title?: string; content: string }>>([]);
+  const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
+  const [error, setError] = useState('');
+
+  const generate = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const res = await apiFetch('/api/admin/marketing/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ theme, customNote: customNote.trim() || undefined }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setError(data.error || 'Generation failed'); return; }
+      if (data.posts && Array.isArray(data.posts)) setPosts(data.posts);
+      else setError('Unexpected response format');
+    } catch { setError('Network error — could not reach server'); }
+    finally { setLoading(false); }
+  };
+
+  const copyToClipboard = (text: string, idx: number) => {
+    navigator.clipboard.writeText(text);
+    setCopiedIdx(idx);
+    setTimeout(() => setCopiedIdx(null), 2000);
+  };
+
+  const platformIcon = (p: string) => {
+    if (p.includes('Twitter')) return '𝕏';
+    if (p.includes('Reddit')) return '🟠';
+    if (p.includes('Facebook')) return '📘';
+    if (p.includes('Instagram')) return '📸';
+    if (p.includes('Discord')) return '💬';
+    return '📝';
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="rounded-2xl border border-border/40 bg-card overflow-hidden"
+    >
+      <div className="px-5 py-3 border-b border-border/30 bg-purple-500/5">
+        <h3 className="text-sm font-bold text-purple-400 flex items-center gap-2">
+          <Megaphone className="w-4 h-4" /> Marketing Copy Generator
+        </h3>
+      </div>
+      <div className="p-4 space-y-3">
+        <div className="flex flex-col sm:flex-row gap-2">
+          <div className="relative flex-1">
+            <select
+              value={theme}
+              onChange={e => setTheme(e.target.value)}
+              className="w-full appearance-none bg-background border border-border/40 rounded-lg px-3 py-2 text-sm text-foreground pr-8 focus:outline-none focus:border-purple-500/40"
+            >
+              {MARKETING_THEMES.map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
+            <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+          </div>
+          <button
+            onClick={generate}
+            disabled={loading}
+            className="flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg bg-purple-500/15 border border-purple-500/25 text-purple-400 text-xs font-bold hover:bg-purple-500/25 transition-colors disabled:opacity-50 shrink-0"
+          >
+            {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+            {loading ? 'Generating...' : 'Generate Ads'}
+          </button>
+        </div>
+        <input
+          type="text"
+          value={customNote}
+          onChange={e => setCustomNote(e.target.value)}
+          placeholder="Optional: custom note or specific angle..."
+          className="w-full bg-background border border-border/30 rounded-lg px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-purple-500/30"
+        />
+
+        {error && (
+          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-xs">
+            <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+            {error}
+          </div>
+        )}
+
+        {posts.length > 0 && (
+          <div className="space-y-2 mt-2">
+            {posts.map((post, i) => {
+              const fullText = post.title ? `${post.title}\n\n${post.content}` : post.content;
+              return (
+                <div key={i} className="rounded-xl border border-border/30 overflow-hidden">
+                  <div className="flex items-center justify-between px-3 py-2 bg-background/50 border-b border-border/20">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm">{platformIcon(post.platform)}</span>
+                      <span className="text-xs font-bold text-foreground">{post.platform}</span>
+                      <span className="text-[10px] text-muted-foreground/60">{fullText.length} chars</span>
+                    </div>
+                    <button
+                      onClick={() => copyToClipboard(fullText, i)}
+                      className="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium transition-colors hover:bg-purple-500/10 text-purple-400"
+                    >
+                      {copiedIdx === i ? <><Check className="w-3 h-3" /> Copied!</> : <><Copy className="w-3 h-3" /> Copy</>}
+                    </button>
+                  </div>
+                  <div className="px-3 py-2.5">
+                    {post.title && (
+                      <p className="text-xs font-bold text-foreground mb-1">{post.title}</p>
+                    )}
+                    <p className="text-xs text-muted-foreground whitespace-pre-wrap leading-relaxed">{post.content}</p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </motion.div>
   );
 }
 

@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useUser } from '@/hooks/use-user';
 import { useLocation } from 'wouter';
-import { ArrowRight, Mail, Eye, EyeOff, UserPlus, LogIn, Search, BarChart3, Brain, TrendingUp, Check, X, Zap, Target, Crown, Crosshair, BookOpen, Gamepad2 } from 'lucide-react';
+import { ArrowRight, Mail, Eye, EyeOff, UserPlus, LogIn, Search, BarChart3, Brain, TrendingUp, Check, X, Zap, Target, Crown, Crosshair, BookOpen, Gamepad2, Users } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { apiFetch, apiUrl, setAuthToken } from '@/lib/api';
 
@@ -305,6 +305,84 @@ function HeroBoard() {
   );
 }
 
+function AnimatedCount({ target, duration = 1500 }: { target: number; duration?: number }) {
+  const [count, setCount] = useState(0);
+  const ref = useRef<HTMLSpanElement>(null);
+  const started = useRef(false);
+
+  const runAnimation = () => {
+    if (started.current) return;
+    started.current = true;
+    const start = performance.now();
+    const animate = (now: number) => {
+      const progress = Math.min((now - start) / duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setCount(Math.floor(eased * target));
+      if (progress < 1) requestAnimationFrame(animate);
+      else setCount(target);
+    };
+    requestAnimationFrame(animate);
+  };
+
+  useEffect(() => {
+    if (target <= 0 || started.current) return;
+    if (!('IntersectionObserver' in window)) { runAnimation(); return; }
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) { runAnimation(); observer.disconnect(); }
+    }, { threshold: 0.1 });
+    if (ref.current) observer.observe(ref.current);
+    return () => observer.disconnect();
+  }, [target, duration]);
+
+  return <span ref={ref}>{count.toLocaleString()}</span>;
+}
+
+function SocialProofBar() {
+  const [stats, setStats] = useState<{ users: number; gamesAnalyzed: number; opponentsScouted: number } | null>(null);
+
+  useEffect(() => {
+    apiFetch('/api/public/stats')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d) setStats(d); })
+      .catch(() => {});
+  }, []);
+
+  if (!stats || (stats.users < 2 && stats.gamesAnalyzed < 5)) return null;
+
+  const items = [
+    { label: 'Players', value: stats.users, icon: Users },
+    { label: 'Games Analyzed', value: stats.gamesAnalyzed, icon: BarChart3 },
+    { label: 'Opponents Scouted', value: stats.opponentsScouted, icon: Crosshair },
+  ].filter(i => i.value > 0);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true }}
+      className="py-10"
+      style={{ borderTop: '1px solid rgba(255,255,255,0.04)', borderBottom: '1px solid rgba(255,255,255,0.04)' }}
+    >
+      <div className="max-w-4xl mx-auto px-4 sm:px-8">
+        <div className="flex flex-wrap justify-center gap-8 sm:gap-16">
+          {items.map(item => (
+            <div key={item.label} className="text-center">
+              <div className="flex items-center justify-center gap-2 mb-1">
+                <item.icon className="w-4 h-4" style={{ color: G }} />
+                <span className="text-2xl sm:text-3xl font-black" style={{ color: TEXT }}>
+                  <AnimatedCount target={item.value} />
+                  {item.value >= 1000 ? '+' : ''}
+                </span>
+              </div>
+              <p className="text-xs font-medium" style={{ color: MUTED }}>{item.label}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
 function ScoutCard({ delay = 0 }: { delay?: number }) {
   return (
     <motion.div
@@ -473,6 +551,8 @@ export function LandingPage() {
           </div>
         </div>
       </section>
+
+      <SocialProofBar />
 
       <section className="py-16 sm:py-20" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
         <div className="max-w-5xl mx-auto px-4 sm:px-8">
