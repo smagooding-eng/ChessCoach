@@ -2,7 +2,7 @@ import React, { useState, useRef, useCallback } from 'react';
 import { Chess } from 'chess.js';
 import { ChessBoard } from '@/components/ChessBoard';
 import { apiFetch } from '@/lib/api';
-import { Camera, Upload, RotateCcw, Swords, Compass, AlertCircle, X, FlipVertical } from 'lucide-react';
+import { Camera, Upload, RotateCcw, Swords, Compass, AlertCircle, X, FlipVertical, Wand2, Trash2, ArrowLeft } from 'lucide-react';
 
 const PIECE_GLYPH: Record<string, string> = {
   K: '♔', Q: '♕', R: '♖', B: '♗', N: '♘', P: '♙',
@@ -96,7 +96,63 @@ function EditableBoard({ fen, flipped, onFenChange }: { fen: string; flipped: bo
   );
 }
 
-type ScanState = 'idle' | 'scanning' | 'result' | 'error';
+type ScanState = 'idle' | 'scanning' | 'result' | 'error' | 'builder';
+
+const EMPTY_FEN = '8/8/8/8/8/8/8/8 w - - 0 1';
+const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w - - 0 1';
+
+function BuilderBoard({
+  fen,
+  flipped,
+  selectedPiece,
+  onSquareTap,
+}: {
+  fen: string;
+  flipped: boolean;
+  selectedPiece: string | null;
+  onSquareTap: (rowIdx: number, colIdx: number) => void;
+}) {
+  const board = fenToBoard(fen);
+  const ranks = flipped ? [1, 2, 3, 4, 5, 6, 7, 8] : [8, 7, 6, 5, 4, 3, 2, 1];
+  const files = flipped ? ['h','g','f','e','d','c','b','a'] : ['a','b','c','d','e','f','g','h'];
+
+  return (
+    <div
+      className="grid grid-cols-8 w-full select-none rounded-[10px] overflow-hidden shadow-[0_30px_60px_rgba(0,0,0,0.6)]"
+      style={{ aspectRatio: '1', touchAction: 'manipulation' }}
+    >
+      {ranks.map((rank) =>
+        files.map((file) => {
+          const rowIdx = 8 - rank;
+          const colIdx = file.charCodeAt(0) - 97;
+          const piece = board[rowIdx][colIdx];
+          const isLight = (rowIdx + colIdx) % 2 === 0;
+          const bg = isLight ? '#f0d9b5' : '#b58863';
+          const isWhitePiece = piece && piece === piece.toUpperCase();
+          return (
+            <button
+              key={`${file}${rank}`}
+              type="button"
+              onClick={() => onSquareTap(rowIdx, colIdx)}
+              className="relative flex items-center justify-center text-[clamp(22px,6vw,40px)] leading-none p-0 m-0 border-0"
+              style={{
+                background: bg,
+                cursor: selectedPiece || piece ? 'pointer' : 'default',
+                aspectRatio: '1',
+                fontFamily: '"Segoe UI Symbol", "DejaVu Sans", "Apple Color Emoji", sans-serif',
+                color: isWhitePiece ? '#fff' : '#1a1a1a',
+                textShadow: isWhitePiece ? '0 1px 2px rgba(0,0,0,0.6)' : 'none',
+              }}
+              aria-label={`${file}${rank}${piece ? ` ${piece}` : ''}`}
+            >
+              {piece ? PIECE_GLYPH[piece] || piece : ''}
+            </button>
+          );
+        })
+      )}
+    </div>
+  );
+}
 
 export function ScanPosition() {
   const [state, setState] = useState<ScanState>('idle');
@@ -112,6 +168,10 @@ export function ScanPosition() {
   const [flipped, setFlipped] = useState(false);
   const [mode, setMode] = useState<'preview' | 'explore'>('preview');
   const [gameStatus, setGameStatus] = useState<string | null>(null);
+  const [builderFen, setBuilderFen] = useState(START_FEN);
+  const [builderPiece, setBuilderPiece] = useState<string | null>('P');
+  const [builderTurn, setBuilderTurn] = useState<'w' | 'b'>('w');
+  const [builderError, setBuilderError] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
@@ -282,6 +342,25 @@ export function ScanPosition() {
             <div>
               <p className="font-bold text-white text-sm">Take Photo</p>
               <p className="text-xs text-white/40">Use your camera to capture a position</p>
+            </div>
+          </div>
+
+          <div
+            onClick={() => {
+              setBuilderFen(START_FEN);
+              setBuilderTurn('w');
+              setBuilderPiece('P');
+              setBuilderError('');
+              setState('builder');
+            }}
+            className="glass-card rounded-2xl p-6 border border-white/10 hover:border-primary/30 transition-all cursor-pointer flex items-center gap-4 active:scale-[0.98]"
+          >
+            <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0" style={{ background: 'rgba(129,182,76,0.12)' }}>
+              <Wand2 className="w-5 h-5" style={{ color: '#81b64c' }} />
+            </div>
+            <div>
+              <p className="font-bold text-white text-sm">Build Position</p>
+              <p className="text-xs text-white/40">Set up any position from scratch and play it</p>
             </div>
           </div>
 
@@ -496,6 +575,216 @@ export function ScanPosition() {
           >
             <X className="w-3.5 h-3.5" />
             Scan New Position
+          </button>
+        </div>
+      )}
+
+      {state === 'builder' && (
+        <div className="space-y-3">
+          <div className="relative">
+            <BuilderBoard
+              fen={builderFen}
+              flipped={flipped}
+              selectedPiece={builderPiece}
+              onSquareTap={(rowIdx, colIdx) => {
+                const board = fenToBoard(builderFen);
+                const existing = board[rowIdx][colIdx];
+                const newBoard = board.map(r => r.slice());
+                if (builderPiece) {
+                  newBoard[rowIdx][colIdx] = builderPiece;
+                } else if (existing) {
+                  newBoard[rowIdx][colIdx] = null;
+                }
+                const restParts = builderFen.split(' ').slice(1);
+                const rest = restParts.length > 0 ? restParts.join(' ') : `${builderTurn} - - 0 1`;
+                setBuilderFen(boardToFen(newBoard, rest));
+                setBuilderError('');
+              }}
+            />
+            <button
+              onClick={() => setFlipped(f => !f)}
+              className="absolute top-2 left-2 z-10 p-1.5 rounded-lg bg-black/60 backdrop-blur-sm border border-white/10 hover:border-primary/30 transition-all"
+              title="Flip board"
+            >
+              <FlipVertical className="w-4 h-4 text-white/60" />
+            </button>
+          </div>
+
+          <div className="rounded-xl px-3 py-2 border border-white/10 bg-white/5 text-[11px] text-white/60 text-center">
+            {builderPiece ? (
+              <>Tap any square to place <span className="text-white/90 font-semibold">
+                {PIECE_GLYPH[builderPiece]} {builderPiece === builderPiece.toUpperCase() ? 'White' : 'Black'}{' '}
+                {({ K: 'King', Q: 'Queen', R: 'Rook', B: 'Bishop', N: 'Knight', P: 'Pawn' } as Record<string, string>)[builderPiece.toUpperCase()]}
+              </span></>
+            ) : (
+              <>Eraser selected — tap any piece to <span className="text-white/90 font-semibold">remove</span> it.</>
+            )}
+          </div>
+
+          {/* Piece palette: white row + black row + eraser */}
+          <div className="space-y-1.5">
+            <div className="grid grid-cols-6 gap-1">
+              {['K','Q','R','B','N','P'].map(p => (
+                <button
+                  key={p}
+                  onClick={() => setBuilderPiece(p)}
+                  className="aspect-square rounded-lg flex items-center justify-center text-[clamp(20px,5vw,32px)] leading-none transition-all"
+                  style={{
+                    background: builderPiece === p ? 'rgba(129,182,76,0.25)' : '#3a3835',
+                    border: builderPiece === p ? '2px solid #81b64c' : '2px solid transparent',
+                    color: '#fff',
+                    textShadow: '0 1px 2px rgba(0,0,0,0.6)',
+                    fontFamily: '"Segoe UI Symbol", "DejaVu Sans", sans-serif',
+                  }}
+                  aria-label={`White ${p}`}
+                >
+                  {PIECE_GLYPH[p]}
+                </button>
+              ))}
+            </div>
+            <div className="grid grid-cols-6 gap-1">
+              {['k','q','r','b','n','p'].map(p => (
+                <button
+                  key={p}
+                  onClick={() => setBuilderPiece(p)}
+                  className="aspect-square rounded-lg flex items-center justify-center text-[clamp(20px,5vw,32px)] leading-none transition-all"
+                  style={{
+                    background: builderPiece === p ? 'rgba(129,182,76,0.25)' : '#3a3835',
+                    border: builderPiece === p ? '2px solid #81b64c' : '2px solid transparent',
+                    color: '#1a1a1a',
+                    fontFamily: '"Segoe UI Symbol", "DejaVu Sans", sans-serif',
+                  }}
+                  aria-label={`Black ${p}`}
+                >
+                  {PIECE_GLYPH[p]}
+                </button>
+              ))}
+            </div>
+            <div className="grid grid-cols-3 gap-1">
+              <button
+                onClick={() => setBuilderPiece(null)}
+                className="py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all"
+                style={{
+                  background: builderPiece === null ? 'rgba(244,63,94,0.2)' : '#3a3835',
+                  border: builderPiece === null ? '2px solid rgba(244,63,94,0.6)' : '2px solid transparent',
+                  color: builderPiece === null ? '#fb7185' : '#fff',
+                }}
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                Eraser
+              </button>
+              <button
+                onClick={() => {
+                  setBuilderFen(`8/8/8/8/8/8/8/8 ${builderTurn} - - 0 1`);
+                  setBuilderError('');
+                }}
+                className="py-2 rounded-lg text-xs font-bold border border-white/10 hover:border-white/30 text-white/70 transition-all"
+              >
+                Clear Board
+              </button>
+              <button
+                onClick={() => {
+                  setBuilderFen(`rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR ${builderTurn} - - 0 1`);
+                  setBuilderError('');
+                }}
+                className="py-2 rounded-lg text-xs font-bold border border-white/10 hover:border-white/30 text-white/70 transition-all"
+              >
+                Start Pos
+              </button>
+            </div>
+          </div>
+
+          {/* Side to move */}
+          <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 p-1">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-white/40 px-2">Turn</span>
+            <button
+              onClick={() => {
+                setBuilderTurn('w');
+                const parts = builderFen.split(' ');
+                parts[1] = 'w';
+                setBuilderFen(parts.join(' '));
+                setBuilderError('');
+              }}
+              className="flex-1 py-1.5 rounded-lg text-xs font-bold transition-all"
+              style={{
+                background: builderTurn === 'w' ? '#fff' : 'transparent',
+                color: builderTurn === 'w' ? '#1a1a1a' : 'rgba(255,255,255,0.6)',
+              }}
+            >
+              White
+            </button>
+            <button
+              onClick={() => {
+                setBuilderTurn('b');
+                const parts = builderFen.split(' ');
+                parts[1] = 'b';
+                setBuilderFen(parts.join(' '));
+                setBuilderError('');
+              }}
+              className="flex-1 py-1.5 rounded-lg text-xs font-bold transition-all"
+              style={{
+                background: builderTurn === 'b' ? '#1a1a1a' : 'transparent',
+                color: builderTurn === 'b' ? '#fff' : 'rgba(255,255,255,0.6)',
+                border: builderTurn === 'b' ? '1px solid rgba(255,255,255,0.2)' : '1px solid transparent',
+              }}
+            >
+              Black
+            </button>
+          </div>
+
+          {builderError && (
+            <div className="rounded-xl px-3 py-2 border border-rose-500/30 bg-rose-500/5 flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+              <p className="text-xs text-rose-400">{builderError}</p>
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={() => {
+                try {
+                  const chess = new Chess(builderFen);
+                  setFen(chess.fen());
+                  setSandboxChess(chess);
+                  setSandboxFen(chess.fen());
+                  setMoveHistory([]);
+                  setGameStatus(null);
+                  setMode('explore');
+                  setState('result');
+                  setBuilderError('');
+                } catch (e) {
+                  setBuilderError(`Invalid position — ${(e as Error).message || 'check kings, pawn ranks, and side to move.'}`);
+                }
+              }}
+              className="py-3 rounded-xl font-bold text-sm transition-all active:scale-[0.97] flex items-center justify-center gap-2"
+              style={{ background: 'rgba(129,182,76,0.15)', color: '#81b64c', border: '1px solid rgba(129,182,76,0.3)' }}
+            >
+              <Compass className="w-4 h-4" />
+              Explore
+            </button>
+            <button
+              onClick={() => {
+                try {
+                  const chess = new Chess(builderFen);
+                  goToPlayAI(chess.fen());
+                } catch (e) {
+                  setBuilderError(`Invalid position — ${(e as Error).message || 'check kings, pawn ranks, and side to move.'}`);
+                }
+              }}
+              className="py-3 rounded-xl font-bold text-sm transition-all active:scale-[0.97] flex items-center justify-center gap-2"
+              style={{ background: 'rgba(129,182,76,0.15)', color: '#81b64c', border: '1px solid rgba(129,182,76,0.3)' }}
+            >
+              <Swords className="w-4 h-4" />
+              Play AI
+            </button>
+          </div>
+
+          <button
+            onClick={resetAll}
+            className="w-full py-2.5 rounded-xl text-xs font-bold text-white/40 hover:text-white/60 transition-all flex items-center justify-center gap-1.5"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            Back
           </button>
         </div>
       )}
