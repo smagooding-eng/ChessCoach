@@ -517,78 +517,161 @@ router.post("/analysis/scan-position", async (req: Request, res: Response): Prom
       apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
     });
 
-    const response = await ai.chat.completions.create({
-      model: "gpt-4o",
-      max_tokens: 1500,
-      temperature: 0,
-      messages: [
-        {
+    const PROMPT = `You are a chess position recognition expert. Read this image and identify EVERY piece on the board.
+
+STEP 1 — Find the board. Identify the 8x8 grid. If you can see a–h and 1–8 labels, use them. Otherwise assume White is at the bottom (a1 bottom-left, h8 top-right).
+
+STEP 2 — List EVERY piece you see, one per line, in this format:
+"<piece><color>@<square>"
+where piece = K (king), Q (queen), R (rook), B (bishop), N (knight), P (pawn)
+color = w (white) or b (black)
+square = file letter + rank number (e.g. e4, a8, h1)
+
+Examples:
+"Kw@e1" = white king on e1
+"Qb@d8" = black queen on d8
+"Pw@e4" = white pawn on e4
+
+STEP 3 — Self-check your list:
+- Exactly 1 white king (Kw) and 1 black king (Kb). If you have 0 or 2+, RE-LOOK at the image.
+- No pawns on rank 1 or rank 8.
+- Total pieces ≤ 32.
+- For each piece, verify the square color matches what you see (square color = light if (file+rank) is even where a=1, dark otherwise).
+
+STEP 4 — Identify whose turn it is. Look for "White to move" / "Black to move" text near the board, or arrows/highlights indicating the side to move. Default to "w" if uncertain.
+
+Return ONLY this JSON (no markdown, no commentary):
+{
+  "pieces": ["Kw@e1", "Qw@d1", "Pw@e2", "Kb@e8", ...],
+  "active_color": "w" | "b",
+  "confidence": "high" | "medium" | "low",
+  "notes": "<one-line description, e.g. 'White to move, mate in 2'>"
+}
+
+CRITICAL: List every single piece. Missing or duplicate pieces will produce a wrong position. Be especially careful to distinguish:
+- Bishop (♗ ♝) vs Pawn (♙ ♟) — bishop has a pointed/mitered top
+- Knight (♘ ♞) vs Bishop — knight is a horse head
+- Queen (♕ ♛) vs King (♔ ♚) — king has a cross on top, queen has a crown of points
+- Rook (♖ ♜) vs other pieces — rook is castle-shaped`;
+
+    type ScanResp = { pieces?: string[]; active_color?: string; confidence?: string; notes?: string };
+
+    async function callOnce(): Promise<ScanResp> {
+      const r = await ai.chat.completions.create({
+        model: "gpt-4o",
+        max_tokens: 1500,
+        temperature: 0,
+        messages: [{
           role: "user",
           content: [
-            {
-              type: "text",
-              text: `You are a chess position recognition expert. Read this chess board image and produce an exact FEN. Vision models often misread chess boards, so you MUST work methodically rank by rank.
-
-STEP 1 — Determine board orientation:
-- Look for rank/file labels (a–h, 1–8) on the edges. If absent, assume White is at the bottom.
-- The TOP-LEFT corner of the board (when White is at bottom) is square a8. The BOTTOM-RIGHT is h1.
-
-STEP 2 — For EACH of the 8 ranks (rank 8 first, then 7, 6, 5, 4, 3, 2, 1), list every square's content from file a → h. Use this format inside the "ranks" array:
-  ["8: a8=. b8=. c8=. d8=. e8=. f8=b g8=. h8=.", "7: a7=q b7=. ...", ...]
-  Where . means empty, uppercase = WHITE pieces (K Q R B N P), lowercase = BLACK pieces (k q r b n p).
-
-STEP 3 — Sanity checks before producing the FEN:
-- A standard chess position has at most 1 white king and 1 black king.
-- Pawns cannot be on rank 1 or rank 8.
-- If multiple bishops of the same color exist, they should typically be on opposite-colored squares (unless a pawn promoted).
-- Total piece count should be ≤ 32. Recount if it exceeds.
-
-STEP 4 — Assemble the FEN piece placement from your ranks (rank 8 / rank 7 / ... / rank 1), collapsing consecutive empty squares into digits.
-
-STEP 5 — Append: active color (w if it's white's move, b if black's — infer from context like "White to move" text or default to w), castling (use "-" if kings/rooks have moved or uncertain), en passant ("-"), halfmove (0), fullmove (1).
-
-Return ONLY this JSON (no markdown):
-{
-  "ranks": ["8: ...", "7: ...", "6: ...", "5: ...", "4: ...", "3: ...", "2: ...", "1: ..."],
-  "fen": "<full FEN string>",
-  "confidence": "high" | "medium" | "low",
-  "notes": "<short description, e.g. 'White to move, mate in 2'>"
-}`,
-            },
-            {
-              type: "image_url",
-              image_url: {
-                url: `data:${mimeType};base64,${base64Data}`,
-                detail: "high",
-              },
-            },
+            { type: "text", text: PROMPT },
+            { type: "image_url", image_url: { url: `data:${mimeType};base64,${base64Data}`, detail: "high" } },
           ],
-        },
-      ],
-      response_format: { type: "json_object" },
-    });
+        }],
+        response_format: { type: "json_object" },
+      });
+      const c = r.choices[0]?.message?.content ?? "{}";
+      try { return JSON.parse(c) as ScanResp; } catch { return {}; }
+    }
 
-    const content = response.choices[0]?.message?.content ?? "{}";
-    const parsed = JSON.parse(content) as { fen?: string; confidence?: string; notes?: string };
+    function piecesToFen(pieces: string[], activeColor: string): string | null {
+      const board: (string | null)[][] = Array.from({ length: 8 }, () => Array(8).fill(null));
+      const pieceMap: Record<string, string> = {
+        Kw: 'K', Qw: 'Q', Rw: 'R', Bw: 'B', Nw: 'N', Pw: 'P',
+        Kb: 'k', Qb: 'q', Rb: 'r', Bb: 'b', Nb: 'n', Pb: 'p',
+      };
+      for (const raw of pieces) {
+        const m = raw.trim().match(/^([KQRBNP])([wb])@([a-h])([1-8])$/i);
+        if (!m) continue;
+        const key = m[1].toUpperCase() + m[2].toLowerCase();
+        const fenPiece = pieceMap[key];
+        if (!fenPiece) continue;
+        const file = m[3].toLowerCase().charCodeAt(0) - 97; // 0-7
+        const rank = parseInt(m[4]) - 1; // 0-7
+        // FEN rank 8 = board[0], rank 1 = board[7]
+        const row = 7 - rank;
+        board[row][file] = fenPiece;
+      }
+      const ranks: string[] = [];
+      for (let r = 0; r < 8; r++) {
+        let line = '';
+        let empty = 0;
+        for (let f = 0; f < 8; f++) {
+          const p = board[r][f];
+          if (p) {
+            if (empty > 0) { line += empty.toString(); empty = 0; }
+            line += p;
+          } else {
+            empty++;
+          }
+        }
+        if (empty > 0) line += empty.toString();
+        ranks.push(line);
+      }
+      const placement = ranks.join('/');
+      const turn = activeColor === 'b' ? 'b' : 'w';
+      return `${placement} ${turn} - - 0 1`;
+    }
 
-    if (!parsed.fen) {
+    function scoreParse(p: ScanResp): number {
+      // Higher score = better. Counts kings present, valid pieces, etc.
+      if (!p.pieces || !Array.isArray(p.pieces)) return -1;
+      let kw = 0, kb = 0, total = 0;
+      const seenSquares = new Set<string>();
+      for (const raw of p.pieces) {
+        const m = raw.trim().match(/^([KQRBNP])([wb])@([a-h])([1-8])$/i);
+        if (!m) continue;
+        const sq = (m[3] + m[4]).toLowerCase();
+        if (seenSquares.has(sq)) return -1; // two pieces on same square = invalid
+        seenSquares.add(sq);
+        const piece = m[1].toUpperCase();
+        const color = m[2].toLowerCase();
+        if (piece === 'P' && (m[4] === '1' || m[4] === '8')) return -1; // pawn on back rank
+        if (piece === 'K' && color === 'w') kw++;
+        if (piece === 'K' && color === 'b') kb++;
+        total++;
+      }
+      if (kw !== 1 || kb !== 1) return 0;
+      if (total > 32) return 0;
+      return total;
+    }
+
+    // Two-pass: call twice, pick the better one (or merge if they agree)
+    const [pass1, pass2] = await Promise.all([callOnce(), callOnce()]);
+    const s1 = scoreParse(pass1);
+    const s2 = scoreParse(pass2);
+    const best = s1 >= s2 ? pass1 : pass2;
+
+    if (!best.pieces || best.pieces.length === 0) {
       res.status(422).json({ error: "Could not recognize a chess position in this image." });
+      return;
+    }
+
+    const builtFen = piecesToFen(best.pieces, best.active_color || 'w');
+    if (!builtFen) {
+      res.status(422).json({ error: "Could not parse the recognized position." });
       return;
     }
 
     let validatedFen: string;
     try {
-      const chess = new Chess(parsed.fen);
+      const chess = new Chess(builtFen);
       validatedFen = chess.fen();
     } catch {
-      res.status(422).json({ error: "AI returned an invalid position. Try a clearer image." });
+      res.status(422).json({ error: "AI returned an invalid position. Try a clearer, less obstructed image of the board." });
       return;
     }
 
+    // Check agreement between passes for confidence boost/penalty
+    const agree = s1 > 0 && s2 > 0 && JSON.stringify((pass1.pieces || []).slice().sort()) === JSON.stringify((pass2.pieces || []).slice().sort());
+    let confidence = best.confidence || "medium";
+    if (agree && confidence !== "high") confidence = "high";
+    if (!agree && confidence === "high") confidence = "medium";
+
     res.json({
       fen: validatedFen,
-      confidence: parsed.confidence || "medium",
-      notes: parsed.notes || "",
+      confidence,
+      notes: best.notes || "",
     });
   } catch (err: unknown) {
     req.log?.error?.({ err }, "Scan position error");
