@@ -284,7 +284,7 @@ function pickBot(playerRating: number): BotConfig {
 
 type SandboxResult = 'playing' | 'win' | 'loss' | 'draw';
 
-function SandboxBoard({ playerRating }: { playerRating: number }) {
+const SandboxBoard = React.memo(function SandboxBoard({ playerRating }: { playerRating: number }) {
   const [bot] = useState(() => pickBot(playerRating));
   const [playerColor] = useState<'w' | 'b'>(() => Math.random() < 0.5 ? 'w' : 'b');
   const [chess] = useState(() => new Chess());
@@ -418,7 +418,7 @@ function SandboxBoard({ playerRating }: { playerRating: number }) {
       )}
     </div>
   );
-}
+});
 
 export function GameReplay() {
   const { id } = useParams();
