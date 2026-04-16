@@ -519,30 +519,41 @@ router.post("/analysis/scan-position", async (req: Request, res: Response): Prom
 
     const response = await ai.chat.completions.create({
       model: "gpt-4o",
-      max_tokens: 500,
+      max_tokens: 1500,
+      temperature: 0,
       messages: [
         {
           role: "user",
           content: [
             {
               type: "text",
-              text: `You are a chess position recognition expert. Analyze this chess board image and determine the exact position of every piece.
+              text: `You are a chess position recognition expert. Read this chess board image and produce an exact FEN. Vision models often misread chess boards, so you MUST work methodically rank by rank.
 
-Return ONLY a valid JSON object with this structure:
+STEP 1 — Determine board orientation:
+- Look for rank/file labels (a–h, 1–8) on the edges. If absent, assume White is at the bottom.
+- The TOP-LEFT corner of the board (when White is at bottom) is square a8. The BOTTOM-RIGHT is h1.
+
+STEP 2 — For EACH of the 8 ranks (rank 8 first, then 7, 6, 5, 4, 3, 2, 1), list every square's content from file a → h. Use this format inside the "ranks" array:
+  ["8: a8=. b8=. c8=. d8=. e8=. f8=b g8=. h8=.", "7: a7=q b7=. ...", ...]
+  Where . means empty, uppercase = WHITE pieces (K Q R B N P), lowercase = BLACK pieces (k q r b n p).
+
+STEP 3 — Sanity checks before producing the FEN:
+- A standard chess position has at most 1 white king and 1 black king.
+- Pawns cannot be on rank 1 or rank 8.
+- If multiple bishops of the same color exist, they should typically be on opposite-colored squares (unless a pawn promoted).
+- Total piece count should be ≤ 32. Recount if it exceeds.
+
+STEP 4 — Assemble the FEN piece placement from your ranks (rank 8 / rank 7 / ... / rank 1), collapsing consecutive empty squares into digits.
+
+STEP 5 — Append: active color (w if it's white's move, b if black's — infer from context like "White to move" text or default to w), castling (use "-" if kings/rooks have moved or uncertain), en passant ("-"), halfmove (0), fullmove (1).
+
+Return ONLY this JSON (no markdown):
 {
-  "fen": "<FEN string>",
+  "ranks": ["8: ...", "7: ...", "6: ...", "5: ...", "4: ...", "3: ...", "2: ...", "1: ..."],
+  "fen": "<full FEN string>",
   "confidence": "high" | "medium" | "low",
-  "notes": "<brief description of position>"
-}
-
-Rules for FEN generation:
-- Use standard FEN notation: uppercase for white pieces (KQRBNP), lowercase for black (kqrbnp)
-- Numbers represent consecutive empty squares
-- Ranks are separated by /
-- Start from rank 8 (top of board from White's perspective) to rank 1
-- After the piece placement, add: active color (w or b — guess based on position, default to w), castling availability (KQkq or - if uncertain), en passant target (- if unknown), halfmove clock (0), fullmove number (1)
-- If you cannot determine the position, set confidence to "low" and provide your best guess
-- Be extremely precise about piece placement — double-check each rank`,
+  "notes": "<short description, e.g. 'White to move, mate in 2'>"
+}`,
             },
             {
               type: "image_url",
