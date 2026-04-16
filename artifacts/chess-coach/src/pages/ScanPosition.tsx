@@ -18,6 +18,7 @@ export function ScanPosition() {
   const [moveHistory, setMoveHistory] = useState<string[]>([]);
   const [flipped, setFlipped] = useState(false);
   const [mode, setMode] = useState<'preview' | 'explore'>('preview');
+  const [gameStatus, setGameStatus] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
@@ -68,12 +69,26 @@ export function ScanPosition() {
     reader.readAsDataURL(file);
   }, []);
 
+  const checkGameOver = useCallback((chess: Chess) => {
+    if (chess.isCheckmate()) {
+      const winner = chess.turn() === 'w' ? 'Black' : 'White';
+      setGameStatus(`Checkmate — ${winner} wins!`);
+    } else if (chess.isStalemate()) {
+      setGameStatus('Stalemate — Draw');
+    } else if (chess.isDraw()) {
+      setGameStatus('Draw');
+    } else {
+      setGameStatus(null);
+    }
+  }, []);
+
   const startExplore = useCallback(() => {
     try {
       const chess = new Chess(fen);
       setSandboxChess(chess);
       setSandboxFen(chess.fen());
       setMoveHistory([]);
+      setGameStatus(null);
       setMode('explore');
     } catch {
       setError('Invalid position — cannot load this FEN.');
@@ -87,14 +102,16 @@ export function ScanPosition() {
       sandboxChess.move(san);
       setSandboxFen(sandboxChess.fen());
       setMoveHistory(prev => [...prev, san]);
+      checkGameOver(sandboxChess);
     } catch {}
-  }, [sandboxChess]);
+  }, [sandboxChess, checkGameOver]);
 
   const undoMove = useCallback(() => {
     if (!sandboxChess) return;
     sandboxChess.undo();
     setSandboxFen(sandboxChess.fen());
     setMoveHistory(prev => prev.slice(0, -1));
+    setGameStatus(null);
   }, [sandboxChess]);
 
   const resetExplore = useCallback(() => {
@@ -103,6 +120,7 @@ export function ScanPosition() {
       setSandboxChess(chess);
       setSandboxFen(chess.fen());
       setMoveHistory([]);
+      setGameStatus(null);
     } catch {}
   }, [fen]);
 
@@ -118,6 +136,7 @@ export function ScanPosition() {
     setMoveHistory([]);
     setMode('preview');
     setFlipped(false);
+    setGameStatus(null);
   }, []);
 
   const goToPlayAI = useCallback((fromFen?: string) => {
@@ -291,7 +310,7 @@ export function ScanPosition() {
             <ChessBoard
               fen={sandboxFen}
               flipped={flipped}
-              practiceMode={true}
+              practiceMode={!gameStatus}
               onMovePlayed={(san) => handleSandboxMove(san)}
             />
             <button
@@ -301,6 +320,13 @@ export function ScanPosition() {
             >
               <FlipVertical className="w-4 h-4 text-white/60" />
             </button>
+            {gameStatus && (
+              <div className="absolute inset-0 rounded-[10px] flex items-center justify-center bg-black/50 pointer-events-none">
+                <div className="px-5 py-3 rounded-xl bg-amber-500/20 border border-amber-500/40 backdrop-blur-sm">
+                  <p className="text-lg font-black text-amber-300 text-center">♚ {gameStatus}</p>
+                </div>
+              </div>
+            )}
           </div>
 
           {moveHistory.length > 0 && (
