@@ -766,25 +766,20 @@ Return ONLY this JSON, no markdown:
     const voted = voteGrid(grids);
 
     // ─────────────────────────────────────────────────────────────────────────
-    // PIXEL-BASED COLOR OVERRIDE (with sanity check + auto-revert)
+    // FOCUSED COLOR VERIFICATION on a clean cropped board.
     //
-    // The AI is unreliable at piece COLOR (white vs black). We do our own
-    // deterministic check using grayscale brightness:
-    //   1. Ask the AI for the board's bounding box in the original image,
-    //      then PAD it by 8% so we never accidentally chop a rank/file.
-    //   2. Crop & resize the board area to 640×640 (every square is 80×80).
-    //   3. For each piece the AI placed, sample the center 60% of its square
-    //      and pick the pixels most different from the square's base color
-    //      (those pixels = the piece body, not the square underneath).
-    //   4. Cluster all pieces' brightness into two groups (k-means k=2). The
-    //      brighter cluster = WHITE pieces, the darker cluster = BLACK pieces.
-    //   5. Override the AI's color choice.
-    //   6. SANITY CHECK: if the override produces an impossible position
-    //      (≠1 white king, ≠1 black king, or >16 of either color), revert.
+    // The first AI scan reads piece TYPES well but is unreliable at COLOR
+    // (white vs black) when the input image has clutter (browser chrome,
+    // player panels, eval bars, screenshot UI, etc.).
     //
-    // If ANY step fails (bbox undetectable, crop fails, separation too small)
-    // we leave the AI's colors alone. The user always has tap-to-flip as a
-    // final fallback.
+    // So: ask the AI for the board's bounding box, crop & re-encode just the
+    // board, then run TWO focused color-verification passes that ONLY ask
+    // about color for the squares the first scan said are occupied.
+    //
+    // Each pass returns a map { "e1": "w", "d4": "b", ... }. We require both
+    // passes to AGREE for a square before flipping its color. Then we sanity
+    // check the result (1 white king, 1 black king, ≤16 each color) before
+    // committing — if it would produce an invalid position, we revert.
     // ─────────────────────────────────────────────────────────────────────────
     try {
       const originalBuf = Buffer.from(originalBase64, 'base64');
@@ -793,7 +788,20 @@ Return ONLY this JSON, no markdown:
       const imgH = meta.height ?? 0;
       if (imgW < 64 || imgH < 64) throw new Error('image too small');
 
-      // 1. Ask AI for the board bounding box.
+      // Build the list of occupied squares from the voted grid.
+      const occupiedSquares: Array<{ r: number; f: number; sq: string; piece: string }> = [];
+      for (let r = 0; r < 8; r++) {
+        for (let f = 0; f < 8; f++) {
+          const cell = voted[r][f];
+          if (!cell) continue;
+          const file = String.fromCharCode(97 + f);
+          const rank = 8 - r;
+          occupiedSquares.push({ r, f, sq: `${file}${rank}`, piece: cell });
+        }
+      }
+      if (occupiedSquares.length === 0) throw new Error('no pieces to verify');
+
+      // 1. Get a board bbox.
       const bboxResp = await ai.chat.completions.create({
         model: "gpt-5.2",
         max_completion_tokens: 200,
@@ -802,7 +810,7 @@ Return ONLY this JSON, no markdown:
           content: [
             { type: "text", text: `Find the chess board (the 8×8 grid of squares) in this image.
 Return its bounding box as fractions of the image (0–1).
-Include EVERY rank (1–8) and EVERY file (a–h). Do not crop tightly — err on the side of including too much.
+Include EVERY rank (1–8) and EVERY file (a–h). Err on the side of INCLUDING TOO MUCH.
 Return ONLY this JSON: { "left": 0.05, "top": 0.10, "right": 0.95, "bottom": 0.90 }` },
             { type: "image_url", image_url: { url: `data:${mimeType};base64,${base64Data}`, detail: "low" } },
           ],
@@ -817,8 +825,8 @@ Return ONLY this JSON: { "left": 0.05, "top": 0.10, "right": 0.95, "bottom": 0.9
       let bbo = Math.max(0, Math.min(1, bb.bottom ?? 1));
       if (br - bl < 0.2 || bbo - bt < 0.2) throw new Error('degenerate bbox');
 
-      // 2. Pad by 8% on each side, then make it square (board is square).
-      const padFrac = 0.08;
+      // 2. Pad by 10% and force a centered square crop.
+      const padFrac = 0.10;
       const cx = (bl + br) / 2;
       const cy = (bt + bbo) / 2;
       const halfSide = Math.max(br - bl, bbo - bt) / 2 + padFrac;
@@ -833,126 +841,85 @@ Return ONLY this JSON: { "left": 0.05, "top": 0.10, "right": 0.95, "bottom": 0.9
       const cropH = Math.max(8, Math.floor((bbo - bt) * imgH));
       const cropSide = Math.min(cropW, cropH, imgW - cropX, imgH - cropY);
 
-      const SZ = 640;
-      const { data, info: rinfo } = await sharp(originalBuf)
+      const croppedJpeg = await sharp(originalBuf)
         .extract({ left: cropX, top: cropY, width: cropSide, height: cropSide })
-        .resize(SZ, SZ, { fit: 'fill' })
-        .removeAlpha()
-        .raw()
-        .toBuffer({ resolveWithObject: true });
-      if (rinfo.width !== SZ || rinfo.height !== SZ) throw new Error('resize failed');
-      const CELL = SZ / 8;
+        .resize(640, 640, { fit: 'fill' })
+        .jpeg({ quality: 92 })
+        .toBuffer();
+      const cropB64 = croppedJpeg.toString('base64');
 
-      // 3. For each piece, brightness = MEAN grayscale luminance of the
-      // center 40% of the square. No fancy delta-from-base — that was wrong:
-      // it actually measured the piece's HIGHLIGHTS, not its body color, and
-      // inverted answers for pieces that share a color tone with their square.
-      // The center 40% of an occupied square is dominated by the piece itself,
-      // which is exactly what we want to measure.
-      function pieceBrightness(r: number, f: number): number | null {
-        const cx0 = Math.floor(f * CELL);
-        const cy0 = Math.floor(r * CELL);
-        const cellSize = Math.floor(CELL);
-        const pad = Math.floor(cellSize * 0.30); // center 40%
-        let sum = 0, n = 0;
-        for (let dy = pad; dy < cellSize - pad; dy++) {
-          for (let dx = pad; dx < cellSize - pad; dx++) {
-            const idx = ((cy0 + dy) * SZ + (cx0 + dx)) * 3;
-            sum += 0.299 * data[idx] + 0.587 * data[idx + 1] + 0.114 * data[idx + 2];
-            n++;
+      // 3. Build a focused color-verification prompt.
+      const sqList = occupiedSquares.map(s => s.sq).join(', ');
+      const COLOR_PROMPT = `This image shows a chess board, cropped tightly. White pieces are on the bottom (rank 1), or use any rank/file labels you can see as ground truth.
+
+For each of these squares, look at the piece sitting there and tell me its COLOR ONLY: "w" (white / light / cream / ivory) or "b" (black / dark / charcoal).
+
+A piece's COLOR is determined by the BODY of the piece itself, NOT by the color of the square it sits on. A white knight on a dark square is still WHITE. A black bishop on a light square is still BLACK.
+
+Squares to check: ${sqList}
+
+Return ONLY a JSON object mapping each square to its color, nothing else. Example:
+{ "e1": "w", "d8": "b", "a1": "w" }`;
+
+      async function colorPass(): Promise<Record<string, string>> {
+        try {
+          const r = await ai.chat.completions.create({
+            model: "gpt-5.2",
+            max_completion_tokens: 1500,
+            messages: [{
+              role: "user",
+              content: [
+                { type: "text", text: COLOR_PROMPT },
+                { type: "image_url", image_url: { url: `data:image/jpeg;base64,${cropB64}`, detail: "high" } },
+              ],
+            }],
+            response_format: { type: "json_object" },
+          });
+          const obj = JSON.parse(r.choices[0]?.message?.content ?? "{}") as Record<string, unknown>;
+          const out: Record<string, string> = {};
+          for (const [k, v] of Object.entries(obj)) {
+            const sq = k.toLowerCase().trim();
+            const val = String(v).toLowerCase().trim();
+            if (/^[a-h][1-8]$/.test(sq) && (val === 'w' || val === 'b')) out[sq] = val;
           }
-        }
-        return n === 0 ? null : sum / n;
+          return out;
+        } catch { return {}; }
       }
 
-      const occupied: Array<{ r: number; f: number; piece: string; lum: number }> = [];
+      // 4. Two parallel passes — only flip a piece if BOTH agree.
+      const [colorsA, colorsB] = await Promise.all([colorPass(), colorPass()]);
+
+      const scratch = voted.map(row => row.slice());
+      let flips = 0;
+      for (const { r, f, sq, piece } of occupiedSquares) {
+        const a = colorsA[sq];
+        const b = colorsB[sq];
+        if (!a || !b || a !== b) continue;     // require agreement
+        const wantWhite = a === 'w';
+        const isWhite = piece === piece.toUpperCase();
+        if (wantWhite === isWhite) continue;   // already correct
+        scratch[r][f] = wantWhite ? piece.toUpperCase() : piece.toLowerCase();
+        flips++;
+      }
+
+      // 5. Sanity check before committing.
+      let kw = 0, kb = 0, w = 0, b = 0;
       for (let r = 0; r < 8; r++) {
         for (let f = 0; f < 8; f++) {
-          const cell = voted[r][f];
-          if (!cell) continue;
-          const lum = pieceBrightness(r, f);
-          if (lum === null) continue;
-          occupied.push({ r, f, piece: cell, lum });
+          const c = scratch[r][f];
+          if (!c) continue;
+          if (c === 'K') kw++; else if (c === 'k') kb++;
+          if (c === c.toUpperCase()) w++; else b++;
         }
       }
-
-      if (occupied.length >= 4) {
-        // 4. K-means k=2 on luminance
-        const lums = occupied.map(o => o.lum).slice().sort((a, b) => a - b);
-        let cLow = lums[Math.floor(lums.length * 0.2)];
-        let cHigh = lums[Math.floor(lums.length * 0.8)];
-        for (let it = 0; it < 30; it++) {
-          const lowG: number[] = [], highG: number[] = [];
-          for (const l of lums) (Math.abs(l - cLow) <= Math.abs(l - cHigh) ? lowG : highG).push(l);
-          if (lowG.length === 0 || highG.length === 0) break;
-          const nL = lowG.reduce((a, b) => a + b, 0) / lowG.length;
-          const nH = highG.reduce((a, b) => a + b, 0) / highG.length;
-          if (Math.abs(nL - cLow) < 0.5 && Math.abs(nH - cHigh) < 0.5) { cLow = nL; cHigh = nH; break; }
-          cLow = nL; cHigh = nH;
-        }
-        const threshold = (cLow + cHigh) / 2;
-        const separation = cHigh - cLow;
-
-        // Need real separation — if all pieces are similar brightness, abort.
-        if (separation >= 25) {
-          // CONFIDENCE BAND: only override pieces whose brightness is FAR from the
-          // threshold (more than 35% of the way toward a cluster center). Pieces
-          // near the boundary are ambiguous — trust the AI for those.
-          const band = separation * 0.35;
-          // 5. Apply override into a SCRATCH copy first so we can sanity-check.
-          const scratch = voted.map(row => row.slice());
-          for (const { r, f, piece, lum } of occupied) {
-            // Skip ambiguous pieces (near threshold) — keep AI's color.
-            if (Math.abs(lum - threshold) < band) continue;
-            const shouldBeWhite = lum > threshold;
-            if (shouldBeWhite) scratch[r][f] = piece.toUpperCase();
-            else scratch[r][f] = piece.toLowerCase();
-          }
-
-          // 6. Sanity check on the scratch board.
-          let kw = 0, kb = 0, w = 0, b = 0;
-          for (let r = 0; r < 8; r++) {
-            for (let f = 0; f < 8; f++) {
-              const c = scratch[r][f];
-              if (!c) continue;
-              if (c === 'K') kw++;
-              else if (c === 'k') kb++;
-              if (c === c.toUpperCase()) w++; else b++;
-            }
-          }
-          const valid = kw === 1 && kb === 1 && w <= 16 && b <= 16;
-
-          if (valid) {
-            // Commit override
-            for (let r = 0; r < 8; r++) for (let f = 0; f < 8; f++) voted[r][f] = scratch[r][f];
-            req.log?.info?.({ separation, occupied: occupied.length }, "Pixel color override applied");
-          } else {
-            // Try inverted assignment (in case our cluster→color mapping was flipped)
-            const scratch2 = voted.map(row => row.slice());
-            for (const { r, f, piece, lum } of occupied) {
-              const shouldBeWhite = lum <= threshold;
-              if (shouldBeWhite) scratch2[r][f] = piece.toUpperCase();
-              else scratch2[r][f] = piece.toLowerCase();
-            }
-            let kw2 = 0, kb2 = 0, w2 = 0, b2 = 0;
-            for (let r = 0; r < 8; r++) for (let f = 0; f < 8; f++) {
-              const c = scratch2[r][f];
-              if (!c) continue;
-              if (c === 'K') kw2++;
-              else if (c === 'k') kb2++;
-              if (c === c.toUpperCase()) w2++; else b2++;
-            }
-            if (kw2 === 1 && kb2 === 1 && w2 <= 16 && b2 <= 16) {
-              for (let r = 0; r < 8; r++) for (let f = 0; f < 8; f++) voted[r][f] = scratch2[r][f];
-              req.log?.info?.({ separation, occupied: occupied.length }, "Pixel color override applied (inverted)");
-            } else {
-              req.log?.warn?.({ kw, kb, w, b }, "Pixel override produced invalid position — keeping AI colors");
-            }
-          }
-        }
+      if (kw === 1 && kb === 1 && w <= 16 && b <= 16) {
+        for (let r = 0; r < 8; r++) for (let f = 0; f < 8; f++) voted[r][f] = scratch[r][f];
+        req.log?.info?.({ flips, occupied: occupiedSquares.length }, "Color verification applied");
+      } else {
+        req.log?.warn?.({ kw, kb, w, b, flips }, "Color verification produced invalid position — keeping original");
       }
     } catch (err) {
-      req.log?.warn?.({ err: (err as Error).message }, "Pixel color override skipped — keeping AI colors");
+      req.log?.warn?.({ err: (err as Error).message }, "Color verification skipped");
     }
 
     const votedPieces = gridDirectToPieces(voted);

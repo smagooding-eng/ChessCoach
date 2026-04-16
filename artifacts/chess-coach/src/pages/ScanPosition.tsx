@@ -350,7 +350,7 @@ export function ScanPosition() {
       {state === 'result' && mode === 'preview' && (
         <div className="space-y-3">
           <div className="relative">
-            <EditableBoard fen={fen} flipped={flipped} onFenChange={setFen} />
+            <ChessBoard fen={fen} flipped={flipped} />
             <button
               onClick={() => setFlipped(f => !f)}
               className="absolute top-2 left-2 z-10 p-1.5 rounded-lg bg-black/60 backdrop-blur-sm border border-white/10 hover:border-primary/30 transition-all"
@@ -358,10 +358,6 @@ export function ScanPosition() {
             >
               <FlipVertical className="w-4 h-4 text-white/60" />
             </button>
-          </div>
-
-          <div className="rounded-xl px-3 py-2 border border-white/10 bg-white/5 text-[11px] text-white/60 text-center">
-            Wrong color on a piece? <span className="text-white/90 font-semibold">Tap it to flip</span> black ↔ white.
           </div>
 
           <div className={`rounded-xl px-3 py-2 border text-xs flex items-center gap-2 ${confidenceBg}`}>
