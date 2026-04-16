@@ -517,50 +517,61 @@ router.post("/analysis/scan-position", async (req: Request, res: Response): Prom
       apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
     });
 
-    const PROMPT = `You are a chess position recognition expert. Read this image and identify EVERY piece on the board.
+    const PROMPT = `You are reading a chess board from a screenshot. Read it SQUARE BY SQUARE — never skip any square.
 
-STEP 1 — Find the board. Identify the 8x8 grid. If you can see a–h and 1–8 labels, use them. Otherwise assume White is at the bottom (a1 bottom-left, h8 top-right).
+ORIENTATION:
+- If you see file labels a–h along an edge and rank labels 1–8 along the other edge, use them as ground truth. The labels show you where each square is.
+- Otherwise assume White is on the bottom (rank 1 = bottom row, file a = left column).
 
-STEP 2 — List EVERY piece you see, one per line, in this format:
-"<piece><color>@<square>"
-where piece = K (king), Q (queen), R (rook), B (bishop), N (knight), P (pawn)
-color = w (white) or b (black)
-square = file letter + rank number (e.g. e4, a8, h1)
+OUTPUT — return a JSON object with an 8-row grid covering EVERY square, from rank 8 down to rank 1, files a→h.
 
-Examples:
-"Kw@e1" = white king on e1
-"Qb@d8" = black queen on d8
-"Pw@e4" = white pawn on e4
+Each square's value is one of:
+- "."  (empty square)
+- "K","Q","R","B","N","P"  (WHITE piece — uppercase = light-colored piece)
+- "k","q","r","b","n","p"  (BLACK piece — lowercase = dark-colored piece)
 
-STEP 3 — Self-check your list:
-- Exactly 1 white king (Kw) and 1 black king (Kb). If you have 0 or 2+, RE-LOOK at the image.
-- No pawns on rank 1 or rank 8.
-- Total pieces ≤ 32.
-- For each piece, verify the square color matches what you see (square color = light if (file+rank) is even where a=1, dark otherwise).
+CRITICAL RULES — read carefully:
+1. The piece COLOR is determined by the piece's own color (white/light vs black/dark), NOT by the square color underneath it.
+2. Distinguishing pieces by silhouette:
+   - PAWN ♟ — small, simple round head on a base. The most common piece. Shorter than other pieces.
+   - ROOK ♜ — castle/tower shape with crenellations (square teeth) on top.
+   - KNIGHT ♞ — a horse head, faces sideways.
+   - BISHOP ♝ — tall with a pointed/mitered top, often with a small slit/notch.
+   - QUEEN ♛ — tall with a crown of multiple points/spikes around the top.
+   - KING ♚ — tall with a CROSS or "+" on top. Only ONE per color.
+3. EXACTLY 1 white king and 1 black king must appear. Count them at the end. If wrong, re-look.
+4. NO pawns may sit on rank 1 or rank 8. If you see a piece there, it is NOT a pawn.
+5. Maximum 8 pawns per color, max 32 pieces total.
+6. Empty squares ARE empty — do not invent pieces. If unsure whether a square has a piece, it is probably empty.
 
-STEP 4 — Identify whose turn it is. Look for "White to move" / "Black to move" text near the board, or arrows/highlights indicating the side to move. Default to "w" if uncertain.
+WHOSE TURN: Look for any "White to move" / "Black to move" label, evaluation bar arrow, or highlighted last-move squares. Default "w" if unclear.
 
-Return ONLY this JSON (no markdown, no commentary):
+Return ONLY this JSON, no markdown:
 {
-  "pieces": ["Kw@e1", "Qw@d1", "Pw@e2", "Kb@e8", ...],
+  "rank8": ["?","?","?","?","?","?","?","?"],   // files a..h on rank 8
+  "rank7": ["?","?","?","?","?","?","?","?"],
+  "rank6": ["?","?","?","?","?","?","?","?"],
+  "rank5": ["?","?","?","?","?","?","?","?"],
+  "rank4": ["?","?","?","?","?","?","?","?"],
+  "rank3": ["?","?","?","?","?","?","?","?"],
+  "rank2": ["?","?","?","?","?","?","?","?"],
+  "rank1": ["?","?","?","?","?","?","?","?"],
   "active_color": "w" | "b",
   "confidence": "high" | "medium" | "low",
-  "notes": "<one-line description, e.g. 'White to move, mate in 2'>"
-}
+  "notes": "<one-line description of the position>"
+}`;
 
-CRITICAL: List every single piece. Missing or duplicate pieces will produce a wrong position. Be especially careful to distinguish:
-- Bishop (♗ ♝) vs Pawn (♙ ♟) — bishop has a pointed/mitered top
-- Knight (♘ ♞) vs Bishop — knight is a horse head
-- Queen (♕ ♛) vs King (♔ ♚) — king has a cross on top, queen has a crown of points
-- Rook (♖ ♜) vs other pieces — rook is castle-shaped`;
-
-    type ScanResp = { pieces?: string[]; active_color?: string; confidence?: string; notes?: string };
+    type ScanResp = {
+      rank8?: string[]; rank7?: string[]; rank6?: string[]; rank5?: string[];
+      rank4?: string[]; rank3?: string[]; rank2?: string[]; rank1?: string[];
+      pieces?: string[]; // legacy fallback if model still returns piece list
+      active_color?: string; confidence?: string; notes?: string;
+    };
 
     async function callOnce(): Promise<ScanResp> {
       const r = await ai.chat.completions.create({
-        model: "gpt-4o",
-        max_tokens: 1500,
-        temperature: 0,
+        model: "gpt-5.2",
+        max_completion_tokens: 4000,
         messages: [{
           role: "user",
           content: [
@@ -572,6 +583,30 @@ CRITICAL: List every single piece. Missing or duplicate pieces will produce a wr
       });
       const c = r.choices[0]?.message?.content ?? "{}";
       try { return JSON.parse(c) as ScanResp; } catch { return {}; }
+    }
+
+    function gridToPieces(p: ScanResp): string[] {
+      const ranks: Array<[number, string[] | undefined]> = [
+        [8, p.rank8], [7, p.rank7], [6, p.rank6], [5, p.rank5],
+        [4, p.rank4], [3, p.rank3], [2, p.rank2], [1, p.rank1],
+      ];
+      const out: string[] = [];
+      for (const [rankNum, row] of ranks) {
+        if (!Array.isArray(row) || row.length !== 8) continue;
+        for (let f = 0; f < 8; f++) {
+          const cell = (row[f] || '').trim();
+          if (!cell || cell === '.' || cell === '?' || cell === '') continue;
+          if (cell.length !== 1) continue;
+          const isWhite = cell === cell.toUpperCase();
+          const piece = cell.toUpperCase();
+          if (!'KQRBNP'.includes(piece)) continue;
+          const file = String.fromCharCode(97 + f);
+          out.push(`${piece}${isWhite ? 'w' : 'b'}@${file}${rankNum}`);
+        }
+      }
+      // Fallback if model returned the legacy pieces[] format
+      if (out.length === 0 && Array.isArray(p.pieces)) return p.pieces;
+      return out;
     }
 
     function piecesToFen(pieces: string[], activeColor: string): string | null {
@@ -613,12 +648,10 @@ CRITICAL: List every single piece. Missing or duplicate pieces will produce a wr
       return `${placement} ${turn} - - 0 1`;
     }
 
-    function scoreParse(p: ScanResp): number {
-      // Higher score = better. Counts kings present, valid pieces, etc.
-      if (!p.pieces || !Array.isArray(p.pieces)) return -1;
+    function scoreParse(pieces: string[]): number {
       let kw = 0, kb = 0, total = 0;
       const seenSquares = new Set<string>();
-      for (const raw of p.pieces) {
+      for (const raw of pieces) {
         const m = raw.trim().match(/^([KQRBNP])([wb])@([a-h])([1-8])$/i);
         if (!m) continue;
         const sq = (m[3] + m[4]).toLowerCase();
@@ -638,16 +671,19 @@ CRITICAL: List every single piece. Missing or duplicate pieces will produce a wr
 
     // Two-pass: call twice, pick the better one (or merge if they agree)
     const [pass1, pass2] = await Promise.all([callOnce(), callOnce()]);
-    const s1 = scoreParse(pass1);
-    const s2 = scoreParse(pass2);
+    const pieces1 = gridToPieces(pass1);
+    const pieces2 = gridToPieces(pass2);
+    const s1 = scoreParse(pieces1);
+    const s2 = scoreParse(pieces2);
+    const bestPieces = s1 >= s2 ? pieces1 : pieces2;
     const best = s1 >= s2 ? pass1 : pass2;
 
-    if (!best.pieces || best.pieces.length === 0) {
+    if (bestPieces.length === 0) {
       res.status(422).json({ error: "Could not recognize a chess position in this image." });
       return;
     }
 
-    const builtFen = piecesToFen(best.pieces, best.active_color || 'w');
+    const builtFen = piecesToFen(bestPieces, best.active_color || 'w');
     if (!builtFen) {
       res.status(422).json({ error: "Could not parse the recognized position." });
       return;
@@ -663,7 +699,7 @@ CRITICAL: List every single piece. Missing or duplicate pieces will produce a wr
     }
 
     // Check agreement between passes for confidence boost/penalty
-    const agree = s1 > 0 && s2 > 0 && JSON.stringify((pass1.pieces || []).slice().sort()) === JSON.stringify((pass2.pieces || []).slice().sort());
+    const agree = s1 > 0 && s2 > 0 && JSON.stringify(pieces1.slice().sort()) === JSON.stringify(pieces2.slice().sort());
     let confidence = best.confidence || "medium";
     if (agree && confidence !== "high") confidence = "high";
     if (!agree && confidence === "high") confidence = "medium";
