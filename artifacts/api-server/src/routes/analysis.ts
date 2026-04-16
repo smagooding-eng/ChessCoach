@@ -609,6 +609,79 @@ Return ONLY this JSON, no markdown:
       return out;
     }
 
+    // Convert a ScanResp into an 8x8 string grid where each cell is one of
+    //   '', 'K','Q','R','B','N','P','k','q','r','b','n','p'
+    // Index [r][f] where r=0 is rank 8, f=0 is file a.
+    function respToGrid(p: ScanResp): string[][] | null {
+      const grid: string[][] = Array.from({ length: 8 }, () => Array(8).fill(''));
+      const rows: Array<string[] | undefined> = [p.rank8, p.rank7, p.rank6, p.rank5, p.rank4, p.rank3, p.rank2, p.rank1];
+      let validRows = 0;
+      for (let r = 0; r < 8; r++) {
+        const row = rows[r];
+        if (!Array.isArray(row) || row.length !== 8) continue;
+        validRows++;
+        for (let f = 0; f < 8; f++) {
+          const cell = (row[f] || '').trim();
+          if (!cell || cell === '.' || cell === '?' || cell === '_' || cell === '-') { grid[r][f] = ''; continue; }
+          if (cell.length !== 1) { grid[r][f] = ''; continue; }
+          if (!'KQRBNPkqrbnp'.includes(cell)) { grid[r][f] = ''; continue; }
+          grid[r][f] = cell;
+        }
+      }
+      // Try legacy pieces[] format
+      if (validRows < 4 && Array.isArray(p.pieces)) {
+        for (const raw of p.pieces) {
+          const m = String(raw).trim().match(/^([KQRBNP])([wb])@([a-h])([1-8])$/i);
+          if (!m) continue;
+          const piece = m[1].toUpperCase();
+          const isWhite = m[2].toLowerCase() === 'w';
+          const file = m[3].toLowerCase().charCodeAt(0) - 97;
+          const rank = parseInt(m[4]);
+          const r = 8 - rank;
+          grid[r][file] = isWhite ? piece : piece.toLowerCase();
+        }
+        validRows = 8;
+      }
+      return validRows >= 4 ? grid : null;
+    }
+
+    // Per-square majority vote across multiple grids.
+    function voteGrid(grids: string[][][]): string[][] {
+      const out: string[][] = Array.from({ length: 8 }, () => Array(8).fill(''));
+      for (let r = 0; r < 8; r++) {
+        for (let f = 0; f < 8; f++) {
+          const counts: Record<string, number> = {};
+          for (const g of grids) counts[g[r][f]] = (counts[g[r][f]] || 0) + 1;
+          // Pick the value with highest count; break ties by preferring non-empty
+          let best = '';
+          let bestCount = -1;
+          for (const [v, c] of Object.entries(counts)) {
+            if (c > bestCount || (c === bestCount && v !== '' && best === '')) {
+              best = v; bestCount = c;
+            }
+          }
+          out[r][f] = best;
+        }
+      }
+      return out;
+    }
+
+    function gridDirectToPieces(grid: string[][]): string[] {
+      const out: string[] = [];
+      for (let r = 0; r < 8; r++) {
+        for (let f = 0; f < 8; f++) {
+          const cell = grid[r][f];
+          if (!cell) continue;
+          const piece = cell.toUpperCase();
+          const isWhite = cell === piece;
+          const file = String.fromCharCode(97 + f);
+          const rank = 8 - r;
+          out.push(`${piece}${isWhite ? 'w' : 'b'}@${file}${rank}`);
+        }
+      }
+      return out;
+    }
+
     function piecesToFen(pieces: string[], activeColor: string): string | null {
       const board: (string | null)[][] = Array.from({ length: 8 }, () => Array(8).fill(null));
       const pieceMap: Record<string, string> = {
@@ -669,14 +742,35 @@ Return ONLY this JSON, no markdown:
       return total;
     }
 
-    // Two-pass: call twice, pick the better one (or merge if they agree)
-    const [pass1, pass2] = await Promise.all([callOnce(), callOnce()]);
-    const pieces1 = gridToPieces(pass1);
-    const pieces2 = gridToPieces(pass2);
-    const s1 = scoreParse(pieces1);
-    const s2 = scoreParse(pieces2);
-    const bestPieces = s1 >= s2 ? pieces1 : pieces2;
-    const best = s1 >= s2 ? pass1 : pass2;
+    // 3-pass parallel: per-square majority vote across the grids.
+    // This catches and corrects single-pass misreads on individual squares.
+    const passes = await Promise.all([callOnce(), callOnce(), callOnce()]);
+    const grids = passes.map(respToGrid).filter((g): g is string[][] => g !== null);
+
+    if (grids.length === 0) {
+      res.status(422).json({ error: "Could not recognize a chess position in this image." });
+      return;
+    }
+
+    const voted = voteGrid(grids);
+    const votedPieces = gridDirectToPieces(voted);
+    const votedScore = scoreParse(votedPieces);
+
+    // If voted result is invalid (e.g. wrong king count), fall back to best individual pass
+    let bestPieces: string[];
+    let best: ScanResp;
+    if (votedScore > 0) {
+      bestPieces = votedPieces;
+      // Pick best active_color/notes from passes that scored well
+      const scored = passes.map(p => ({ p, s: scoreParse(gridToPieces(p)) }));
+      scored.sort((a, b) => b.s - a.s);
+      best = scored[0].p;
+    } else {
+      const scored = passes.map(p => ({ p, pieces: gridToPieces(p), s: scoreParse(gridToPieces(p)) }));
+      scored.sort((a, b) => b.s - a.s);
+      bestPieces = scored[0].pieces;
+      best = scored[0].p;
+    }
 
     if (bestPieces.length === 0) {
       res.status(422).json({ error: "Could not recognize a chess position in this image." });
