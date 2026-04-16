@@ -531,7 +531,13 @@ Each square's value is one of:
 - "k","q","r","b","n","p"  (BLACK piece — lowercase = dark-colored piece)
 
 CRITICAL RULES — read carefully:
-1. The piece COLOR is determined by the piece's own color (white/light vs black/dark), NOT by the square color underneath it.
+1. PIECE COLOR (most important — get this right!):
+   - WHITE pieces are LIGHT-colored (cream / off-white / ivory). They appear pale against any square.
+   - BLACK pieces are DARK-colored (dark brown, charcoal, or solid black). They appear dark against any square.
+   - The piece's color is NEVER determined by the square it sits on. A white knight on a dark square is still WHITE. A black bishop on a light square is still BLACK.
+   - When a light piece sits on a light square, look for the SHADOW or OUTLINE that distinguishes it from the square — it is still white.
+   - When a dark piece sits on a dark square, the piece will still be visibly darker / more saturated than the square — it is still black.
+   - For each piece, ask yourself: "Is the BODY of this piece lighter or darker than a neutral gray?" Lighter = white. Darker = black.
 2. Distinguishing pieces by silhouette:
    - PAWN ♟ — small, simple round head on a base. The most common piece. Shorter than other pieces.
    - ROOK ♜ — castle/tower shape with crenellations (square teeth) on top.
@@ -543,6 +549,7 @@ CRITICAL RULES — read carefully:
 4. NO pawns may sit on rank 1 or rank 8. If you see a piece there, it is NOT a pawn.
 5. Maximum 8 pawns per color, max 32 pieces total.
 6. Empty squares ARE empty — do not invent pieces. If unsure whether a square has a piece, it is probably empty.
+7. FINAL COLOR PASS: Before responding, scan your output and re-check the color of every piece against the image. Pieces that look pale/cream in the image must be uppercase. Pieces that look dark/black must be lowercase. Wrong-color pieces are the most common scan error — fix them now.
 
 WHOSE TURN: Look for any "White to move" / "Black to move" label, evaluation bar arrow, or highlighted last-move squares. Default "w" if unclear.
 
