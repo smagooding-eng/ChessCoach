@@ -1,4 +1,5 @@
 import { Router, type IRouter } from "express";
+import type { Request, Response } from "express";
 import { db, gamesTable, weaknessesTable, coursesTable, backgroundJobsTable } from "@workspace/db";
 import { eq, desc, and, inArray } from "drizzle-orm";
 import {
@@ -12,6 +13,8 @@ import {
 import { analyzePlayerGames } from "../lib/openaiAnalysis";
 import { randomUUID } from "crypto";
 import type { Logger } from "pino";
+import OpenAI from "openai";
+import { Chess } from "chess.js";
 
 const router: IRouter = Router();
 
@@ -484,6 +487,102 @@ router.get("/analysis/weaknesses/:id", async (req, res): Promise<void> => {
       createdAt: c.createdAt.toISOString(),
     })),
   });
+});
+
+router.post("/analysis/scan-position", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { image } = req.body as { image: string };
+    if (!image) {
+      res.status(400).json({ error: "Image data is required" });
+      return;
+    }
+
+    const base64Match = image.match(/^data:image\/(png|jpeg|jpg|webp|gif);base64,(.+)$/);
+    if (!base64Match) {
+      res.status(400).json({ error: "Invalid image format. Send a base64 data URL." });
+      return;
+    }
+
+    const mimeType = `image/${base64Match[1]}` as "image/png" | "image/jpeg" | "image/webp" | "image/gif";
+    const base64Data = base64Match[2];
+
+    const sizeBytes = Math.ceil(base64Data.length * 0.75);
+    if (sizeBytes > 10 * 1024 * 1024) {
+      res.status(400).json({ error: "Image too large. Max 10MB." });
+      return;
+    }
+
+    const ai = new OpenAI({
+      baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+      apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+    });
+
+    const response = await ai.chat.completions.create({
+      model: "gpt-4o",
+      max_tokens: 500,
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: `You are a chess position recognition expert. Analyze this chess board image and determine the exact position of every piece.
+
+Return ONLY a valid JSON object with this structure:
+{
+  "fen": "<FEN string>",
+  "confidence": "high" | "medium" | "low",
+  "notes": "<brief description of position>"
+}
+
+Rules for FEN generation:
+- Use standard FEN notation: uppercase for white pieces (KQRBNP), lowercase for black (kqrbnp)
+- Numbers represent consecutive empty squares
+- Ranks are separated by /
+- Start from rank 8 (top of board from White's perspective) to rank 1
+- After the piece placement, add: active color (w or b — guess based on position, default to w), castling availability (KQkq or - if uncertain), en passant target (- if unknown), halfmove clock (0), fullmove number (1)
+- If you cannot determine the position, set confidence to "low" and provide your best guess
+- Be extremely precise about piece placement — double-check each rank`,
+            },
+            {
+              type: "image_url",
+              image_url: {
+                url: `data:${mimeType};base64,${base64Data}`,
+                detail: "high",
+              },
+            },
+          ],
+        },
+      ],
+      response_format: { type: "json_object" },
+    });
+
+    const content = response.choices[0]?.message?.content ?? "{}";
+    const parsed = JSON.parse(content) as { fen?: string; confidence?: string; notes?: string };
+
+    if (!parsed.fen) {
+      res.status(422).json({ error: "Could not recognize a chess position in this image." });
+      return;
+    }
+
+    let validatedFen: string;
+    try {
+      const chess = new Chess(parsed.fen);
+      validatedFen = chess.fen();
+    } catch {
+      res.status(422).json({ error: "AI returned an invalid position. Try a clearer image." });
+      return;
+    }
+
+    res.json({
+      fen: validatedFen,
+      confidence: parsed.confidence || "medium",
+      notes: parsed.notes || "",
+    });
+  } catch (err: unknown) {
+    req.log?.error?.({ err }, "Scan position error");
+    res.status(500).json({ error: "Failed to analyze the image. Please try again." });
+  }
 });
 
 export default router;

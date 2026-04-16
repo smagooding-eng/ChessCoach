@@ -4,7 +4,7 @@ import { useUser } from '@/hooks/use-user';
 import { useChessPlayer } from '@/hooks/use-chess-player';
 import { useMultiEloProgress } from '@/hooks/use-elo-progress';
 import { MultiEloTrackerBadge, MultiEloInline } from '@/components/EloTracker';
-import { LayoutDashboard, Import, History, BrainCircuit, GraduationCap, Swords, BookOpen, LogOut, MoreHorizontal, ChevronRight, Bot, Crown, Trophy, Play, Search, Download, Puzzle, User, Settings, CreditCard } from 'lucide-react';
+import { LayoutDashboard, Import, History, BrainCircuit, GraduationCap, Swords, BookOpen, LogOut, MoreHorizontal, ChevronRight, Bot, Crown, Trophy, Play, Search, Download, Puzzle, User, Settings, CreditCard, Camera } from 'lucide-react';
 import { usePwaInstall } from '@/hooks/use-pwa-install';
 import { InstallGuide } from '@/components/InstallGuide';
 import { cn } from '@/lib/utils';
@@ -26,6 +26,7 @@ const PRIMARY_NAV = [
   { href: '/puzzles',   label: 'Puzzles',         icon: Puzzle, badge: 'BETA' },
   { href: '/lookup',    label: 'Game Lookup',     icon: Search },
   { href: '/play',      label: 'Play Local',      icon: Play },
+  { href: '/scan',      label: 'Scan Position',   icon: Camera, badge: 'NEW' },
 ];
 
 const SECONDARY_NAV = [

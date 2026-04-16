@@ -141,9 +141,11 @@ export function ChessBoard({
       if (!move) return false;
       const san = move.san;
       const isCorrect = !expectedMoveSan || san === expectedMoveSan;
-      setFeedback(isCorrect ? 'correct' : 'wrong');
-      if (feedbackTimerRef.current) clearTimeout(feedbackTimerRef.current);
-      feedbackTimerRef.current = setTimeout(() => setFeedback(null), 900);
+      if (expectedMoveSan) {
+        setFeedback(isCorrect ? 'correct' : 'wrong');
+        if (feedbackTimerRef.current) clearTimeout(feedbackTimerRef.current);
+        feedbackTimerRef.current = setTimeout(() => setFeedback(null), 900);
+      }
       onMovePlayed?.(san, isCorrect);
       return true;
     } catch {
@@ -154,6 +156,10 @@ export function ChessBoard({
   // Drag-and-drop handler for practice mode
   const handlePieceDrop = useCallback(({ sourceSquare, targetSquare }: { piece: unknown; sourceSquare: string; targetSquare: string | null }) => {
     if (!practiceMode || !targetSquare) return false;
+    if (sourceSquare === targetSquare) {
+      setSelectedSquare(prev => prev === sourceSquare ? null : sourceSquare);
+      return false;
+    }
     setSelectedSquare(null);
     return tryMove(sourceSquare, targetSquare);
   }, [practiceMode, tryMove]);
