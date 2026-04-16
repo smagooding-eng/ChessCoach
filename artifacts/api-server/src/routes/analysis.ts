@@ -765,6 +765,210 @@ Return ONLY this JSON, no markdown:
 
     const voted = voteGrid(grids);
 
+    // ─────────────────────────────────────────────────────────────────────────
+    // PIXEL-BASED COLOR OVERRIDE (with sanity check + auto-revert)
+    //
+    // The AI is unreliable at piece COLOR (white vs black). We do our own
+    // deterministic check using grayscale brightness:
+    //   1. Ask the AI for the board's bounding box in the original image,
+    //      then PAD it by 8% so we never accidentally chop a rank/file.
+    //   2. Crop & resize the board area to 640×640 (every square is 80×80).
+    //   3. For each piece the AI placed, sample the center 60% of its square
+    //      and pick the pixels most different from the square's base color
+    //      (those pixels = the piece body, not the square underneath).
+    //   4. Cluster all pieces' brightness into two groups (k-means k=2). The
+    //      brighter cluster = WHITE pieces, the darker cluster = BLACK pieces.
+    //   5. Override the AI's color choice.
+    //   6. SANITY CHECK: if the override produces an impossible position
+    //      (≠1 white king, ≠1 black king, or >16 of either color), revert.
+    //
+    // If ANY step fails (bbox undetectable, crop fails, separation too small)
+    // we leave the AI's colors alone. The user always has tap-to-flip as a
+    // final fallback.
+    // ─────────────────────────────────────────────────────────────────────────
+    try {
+      const originalBuf = Buffer.from(originalBase64, 'base64');
+      const meta = await sharp(originalBuf).metadata();
+      const imgW = meta.width ?? 0;
+      const imgH = meta.height ?? 0;
+      if (imgW < 64 || imgH < 64) throw new Error('image too small');
+
+      // 1. Ask AI for the board bounding box.
+      const bboxResp = await ai.chat.completions.create({
+        model: "gpt-5.2",
+        max_completion_tokens: 200,
+        messages: [{
+          role: "user",
+          content: [
+            { type: "text", text: `Find the chess board (the 8×8 grid of squares) in this image.
+Return its bounding box as fractions of the image (0–1).
+Include EVERY rank (1–8) and EVERY file (a–h). Do not crop tightly — err on the side of including too much.
+Return ONLY this JSON: { "left": 0.05, "top": 0.10, "right": 0.95, "bottom": 0.90 }` },
+            { type: "image_url", image_url: { url: `data:${mimeType};base64,${base64Data}`, detail: "low" } },
+          ],
+        }],
+        response_format: { type: "json_object" },
+      });
+      const bb = JSON.parse(bboxResp.choices[0]?.message?.content ?? "{}") as
+        { left?: number; top?: number; right?: number; bottom?: number };
+      let bl = Math.max(0, Math.min(1, bb.left ?? 0));
+      let bt = Math.max(0, Math.min(1, bb.top ?? 0));
+      let br = Math.max(0, Math.min(1, bb.right ?? 1));
+      let bbo = Math.max(0, Math.min(1, bb.bottom ?? 1));
+      if (br - bl < 0.2 || bbo - bt < 0.2) throw new Error('degenerate bbox');
+
+      // 2. Pad by 8% on each side, then make it square (board is square).
+      const padFrac = 0.08;
+      const cx = (bl + br) / 2;
+      const cy = (bt + bbo) / 2;
+      const halfSide = Math.max(br - bl, bbo - bt) / 2 + padFrac;
+      bl = Math.max(0, cx - halfSide);
+      bt = Math.max(0, cy - halfSide);
+      br = Math.min(1, cx + halfSide);
+      bbo = Math.min(1, cy + halfSide);
+
+      const cropX = Math.floor(bl * imgW);
+      const cropY = Math.floor(bt * imgH);
+      const cropW = Math.max(8, Math.floor((br - bl) * imgW));
+      const cropH = Math.max(8, Math.floor((bbo - bt) * imgH));
+      const cropSide = Math.min(cropW, cropH, imgW - cropX, imgH - cropY);
+
+      const SZ = 640;
+      const { data, info: rinfo } = await sharp(originalBuf)
+        .extract({ left: cropX, top: cropY, width: cropSide, height: cropSide })
+        .resize(SZ, SZ, { fit: 'fill' })
+        .removeAlpha()
+        .raw()
+        .toBuffer({ resolveWithObject: true });
+      if (rinfo.width !== SZ || rinfo.height !== SZ) throw new Error('resize failed');
+      const CELL = SZ / 8;
+
+      // 3. For each piece, get brightness of the piece body.
+      function pieceBrightness(r: number, f: number): { lum: number; delta: number } | null {
+        const cx0 = Math.floor(f * CELL);
+        const cy0 = Math.floor(r * CELL);
+        const cellSize = Math.floor(CELL);
+        // Square base = mean of 8% edge ring
+        const edge = Math.max(2, Math.floor(cellSize * 0.08));
+        let bR = 0, bG = 0, bB = 0, bN = 0;
+        for (let dy = 0; dy < cellSize; dy++) {
+          for (let dx = 0; dx < cellSize; dx++) {
+            const onEdge = dx < edge || dx >= cellSize - edge || dy < edge || dy >= cellSize - edge;
+            if (!onEdge) continue;
+            const idx = ((cy0 + dy) * SZ + (cx0 + dx)) * 3;
+            bR += data[idx]; bG += data[idx + 1]; bB += data[idx + 2]; bN++;
+          }
+        }
+        if (bN === 0) return null;
+        bR /= bN; bG /= bN; bB /= bN;
+
+        // Center 60% — collect pixels & their delta from base
+        const pad = Math.floor(cellSize * 0.2);
+        const pix: Array<{ lum: number; delta: number }> = [];
+        for (let dy = pad; dy < cellSize - pad; dy++) {
+          for (let dx = pad; dx < cellSize - pad; dx++) {
+            const idx = ((cy0 + dy) * SZ + (cx0 + dx)) * 3;
+            const R = data[idx], G = data[idx + 1], B = data[idx + 2];
+            const dR = R - bR, dG = G - bG, dB = B - bB;
+            pix.push({
+              lum: 0.299 * R + 0.587 * G + 0.114 * B,
+              delta: Math.sqrt(dR * dR + dG * dG + dB * dB),
+            });
+          }
+        }
+        if (pix.length === 0) return null;
+        // Top 25% highest-delta pixels = piece body
+        pix.sort((a, b) => b.delta - a.delta);
+        const keep = Math.max(20, Math.floor(pix.length * 0.25));
+        let sumL = 0, sumD = 0;
+        for (let i = 0; i < keep; i++) { sumL += pix[i].lum; sumD += pix[i].delta; }
+        return { lum: sumL / keep, delta: sumD / keep };
+      }
+
+      const occupied: Array<{ r: number; f: number; piece: string; lum: number }> = [];
+      for (let r = 0; r < 8; r++) {
+        for (let f = 0; f < 8; f++) {
+          const cell = voted[r][f];
+          if (!cell) continue;
+          const m = pieceBrightness(r, f);
+          if (!m || m.delta < 18) continue;
+          occupied.push({ r, f, piece: cell, lum: m.lum });
+        }
+      }
+
+      if (occupied.length >= 4) {
+        // 4. K-means k=2 on luminance
+        const lums = occupied.map(o => o.lum).slice().sort((a, b) => a - b);
+        let cLow = lums[Math.floor(lums.length * 0.2)];
+        let cHigh = lums[Math.floor(lums.length * 0.8)];
+        for (let it = 0; it < 30; it++) {
+          const lowG: number[] = [], highG: number[] = [];
+          for (const l of lums) (Math.abs(l - cLow) <= Math.abs(l - cHigh) ? lowG : highG).push(l);
+          if (lowG.length === 0 || highG.length === 0) break;
+          const nL = lowG.reduce((a, b) => a + b, 0) / lowG.length;
+          const nH = highG.reduce((a, b) => a + b, 0) / highG.length;
+          if (Math.abs(nL - cLow) < 0.5 && Math.abs(nH - cHigh) < 0.5) { cLow = nL; cHigh = nH; break; }
+          cLow = nL; cHigh = nH;
+        }
+        const threshold = (cLow + cHigh) / 2;
+        const separation = cHigh - cLow;
+
+        // Need real separation — if all pieces are similar brightness, abort.
+        if (separation >= 18) {
+          // 5. Apply override into a SCRATCH copy first so we can sanity-check.
+          const scratch = voted.map(row => row.slice());
+          for (const { r, f, piece, lum } of occupied) {
+            const shouldBeWhite = lum > threshold;
+            if (shouldBeWhite) scratch[r][f] = piece.toUpperCase();
+            else scratch[r][f] = piece.toLowerCase();
+          }
+
+          // 6. Sanity check on the scratch board.
+          let kw = 0, kb = 0, w = 0, b = 0;
+          for (let r = 0; r < 8; r++) {
+            for (let f = 0; f < 8; f++) {
+              const c = scratch[r][f];
+              if (!c) continue;
+              if (c === 'K') kw++;
+              else if (c === 'k') kb++;
+              if (c === c.toUpperCase()) w++; else b++;
+            }
+          }
+          const valid = kw === 1 && kb === 1 && w <= 16 && b <= 16;
+
+          if (valid) {
+            // Commit override
+            for (let r = 0; r < 8; r++) for (let f = 0; f < 8; f++) voted[r][f] = scratch[r][f];
+            req.log?.info?.({ separation, occupied: occupied.length }, "Pixel color override applied");
+          } else {
+            // Try inverted assignment (in case our cluster→color mapping was flipped)
+            const scratch2 = voted.map(row => row.slice());
+            for (const { r, f, piece, lum } of occupied) {
+              const shouldBeWhite = lum <= threshold;
+              if (shouldBeWhite) scratch2[r][f] = piece.toUpperCase();
+              else scratch2[r][f] = piece.toLowerCase();
+            }
+            let kw2 = 0, kb2 = 0, w2 = 0, b2 = 0;
+            for (let r = 0; r < 8; r++) for (let f = 0; f < 8; f++) {
+              const c = scratch2[r][f];
+              if (!c) continue;
+              if (c === 'K') kw2++;
+              else if (c === 'k') kb2++;
+              if (c === c.toUpperCase()) w2++; else b2++;
+            }
+            if (kw2 === 1 && kb2 === 1 && w2 <= 16 && b2 <= 16) {
+              for (let r = 0; r < 8; r++) for (let f = 0; f < 8; f++) voted[r][f] = scratch2[r][f];
+              req.log?.info?.({ separation, occupied: occupied.length }, "Pixel color override applied (inverted)");
+            } else {
+              req.log?.warn?.({ kw, kb, w, b }, "Pixel override produced invalid position — keeping AI colors");
+            }
+          }
+        }
+      }
+    } catch (err) {
+      req.log?.warn?.({ err: (err as Error).message }, "Pixel color override skipped — keeping AI colors");
+    }
+
     const votedPieces = gridDirectToPieces(voted);
     const votedScore = scoreParse(votedPieces);
 
