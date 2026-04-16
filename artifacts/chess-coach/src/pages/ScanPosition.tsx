@@ -4,6 +4,98 @@ import { ChessBoard } from '@/components/ChessBoard';
 import { apiFetch } from '@/lib/api';
 import { Camera, Upload, RotateCcw, Swords, Compass, AlertCircle, X, FlipVertical } from 'lucide-react';
 
+const PIECE_GLYPH: Record<string, string> = {
+  K: '♔', Q: '♕', R: '♖', B: '♗', N: '♘', P: '♙',
+  k: '♚', q: '♛', r: '♜', b: '♝', n: '♞', p: '♟',
+};
+
+function fenToBoard(fen: string): (string | null)[][] {
+  const board: (string | null)[][] = Array.from({ length: 8 }, () => Array(8).fill(null));
+  const placement = (fen.split(' ')[0] || '');
+  const rows = placement.split('/');
+  for (let r = 0; r < 8; r++) {
+    let f = 0;
+    const row = rows[r] || '';
+    for (const ch of row) {
+      if (/[1-8]/.test(ch)) { f += parseInt(ch); }
+      else { if (f < 8) board[r][f] = ch; f++; }
+    }
+  }
+  return board;
+}
+
+function boardToFen(board: (string | null)[][], rest: string): string {
+  const ranks: string[] = [];
+  for (let r = 0; r < 8; r++) {
+    let line = '';
+    let empty = 0;
+    for (let f = 0; f < 8; f++) {
+      const p = board[r][f];
+      if (p) { if (empty > 0) { line += empty.toString(); empty = 0; } line += p; }
+      else { empty++; }
+    }
+    if (empty > 0) line += empty.toString();
+    ranks.push(line);
+  }
+  return ranks.join('/') + ' ' + rest;
+}
+
+function EditableBoard({ fen, flipped, onFenChange }: { fen: string; flipped: boolean; onFenChange: (fen: string) => void }) {
+  const board = fenToBoard(fen);
+  const ranks = flipped ? [1, 2, 3, 4, 5, 6, 7, 8] : [8, 7, 6, 5, 4, 3, 2, 1];
+  const files = flipped ? ['h','g','f','e','d','c','b','a'] : ['a','b','c','d','e','f','g','h'];
+  const restParts = fen.split(' ').slice(1);
+  const rest = restParts.length > 0 ? restParts.join(' ') : 'w - - 0 1';
+
+  const handleClick = (rowIdx: number, colIdx: number) => {
+    const piece = board[rowIdx][colIdx];
+    if (!piece) return;
+    // Toggle color: uppercase ↔ lowercase
+    const flipped = piece === piece.toUpperCase() ? piece.toLowerCase() : piece.toUpperCase();
+    const newBoard = board.map(r => r.slice());
+    newBoard[rowIdx][colIdx] = flipped;
+    onFenChange(boardToFen(newBoard, rest));
+  };
+
+  return (
+    <div
+      className="grid grid-cols-8 w-full select-none rounded-[10px] overflow-hidden shadow-[0_30px_60px_rgba(0,0,0,0.6)]"
+      style={{ aspectRatio: '1', touchAction: 'manipulation' }}
+    >
+      {ranks.map((rank) =>
+        files.map((file) => {
+          const rowIdx = 8 - rank;
+          const colIdx = file.charCodeAt(0) - 97;
+          const piece = board[rowIdx][colIdx];
+          const isLight = (rowIdx + colIdx) % 2 === 0;
+          const bg = isLight ? '#f0d9b5' : '#b58863';
+          const isWhitePiece = piece && piece === piece.toUpperCase();
+          return (
+            <button
+              key={`${file}${rank}`}
+              type="button"
+              onClick={() => handleClick(rowIdx, colIdx)}
+              disabled={!piece}
+              className="relative flex items-center justify-center text-[clamp(22px,6vw,40px)] leading-none p-0 m-0 border-0"
+              style={{
+                background: bg,
+                cursor: piece ? 'pointer' : 'default',
+                aspectRatio: '1',
+                fontFamily: '"Segoe UI Symbol", "DejaVu Sans", "Apple Color Emoji", sans-serif',
+                color: isWhitePiece ? '#fff' : '#1a1a1a',
+                textShadow: isWhitePiece ? '0 1px 2px rgba(0,0,0,0.6)' : 'none',
+              }}
+              aria-label={`${file}${rank}${piece ? ` ${piece}` : ''}`}
+            >
+              {piece ? PIECE_GLYPH[piece] || piece : ''}
+            </button>
+          );
+        })
+      )}
+    </div>
+  );
+}
+
 type ScanState = 'idle' | 'scanning' | 'result' | 'error';
 
 export function ScanPosition() {
@@ -258,7 +350,7 @@ export function ScanPosition() {
       {state === 'result' && mode === 'preview' && (
         <div className="space-y-3">
           <div className="relative">
-            <ChessBoard fen={fen} flipped={flipped} />
+            <EditableBoard fen={fen} flipped={flipped} onFenChange={setFen} />
             <button
               onClick={() => setFlipped(f => !f)}
               className="absolute top-2 left-2 z-10 p-1.5 rounded-lg bg-black/60 backdrop-blur-sm border border-white/10 hover:border-primary/30 transition-all"
@@ -266,6 +358,11 @@ export function ScanPosition() {
             >
               <FlipVertical className="w-4 h-4 text-white/60" />
             </button>
+          </div>
+
+          <div className="glass-card rounded-xl px-3 py-2 border border-amber-500/20 bg-amber-500/5 text-[11px] text-amber-200/80 flex items-start gap-2">
+            <span className="text-amber-300 font-bold shrink-0">TIP:</span>
+            <span>Wrong color on a piece? Tap it on the board above to flip it black ↔ white.</span>
           </div>
 
           <div className={`rounded-xl px-3 py-2 border text-xs flex items-center gap-2 ${confidenceBg}`}>
