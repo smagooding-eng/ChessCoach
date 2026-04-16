@@ -749,9 +749,9 @@ Return ONLY this JSON, no markdown:
       return total;
     }
 
-    // 3-pass parallel: per-square majority vote across the grids.
-    // This catches and corrects single-pass misreads on individual squares.
-    const passes = await Promise.all([callOnce(), callOnce(), callOnce()]);
+    // 5-pass parallel: per-square majority vote across the grids.
+    // More passes = better odds of catching single-pass misreads on individual squares.
+    const passes = await Promise.all([callOnce(), callOnce(), callOnce(), callOnce(), callOnce()]);
     const grids = passes.map(respToGrid).filter((g): g is string[][] => g !== null);
 
     if (grids.length === 0) {
@@ -759,7 +759,101 @@ Return ONLY this JSON, no markdown:
       return;
     }
 
-    const voted = voteGrid(grids);
+    let voted = voteGrid(grids);
+
+    // VERIFICATION PASS — show the voted grid back to the model with the original image
+    // and ask it to point out any wrong squares. This catches errors that all passes made the same way.
+    function gridToAscii(g: string[][]): string {
+      const lines: string[] = [];
+      for (let r = 0; r < 8; r++) {
+        const rank = 8 - r;
+        const cells: string[] = [];
+        for (let f = 0; f < 8; f++) {
+          cells.push(g[r][f] || '.');
+        }
+        lines.push(`rank ${rank}: ${cells.join(' ')}`);
+      }
+      lines.push('         a b c d e f g h');
+      return lines.join('\n');
+    }
+
+    const VERIFY_PROMPT = `I scanned a chess position from this image and got the grid below.
+
+My current reading:
+${gridToAscii(voted)}
+
+Legend: uppercase = WHITE piece, lowercase = BLACK piece, '.' = empty.
+Pieces: K/k = king, Q/q = queen, R/r = rook, B/b = bishop, N/n = knight, P/p = pawn.
+
+Your job: COMPARE my reading to the image and find ANY square that is wrong.
+The most common error is wrong piece COLOR (white labeled as black or vice versa). Also check for wrong piece type, missing pieces, or extra pieces.
+
+Look at every square. For each one that is wrong, report what it SHOULD be.
+
+Return ONLY this JSON:
+{
+  "corrections": [
+    {"square": "e4", "correct": "N"},
+    {"square": "d7", "correct": "."}
+  ]
+}
+
+Use "." for an empty square. Use uppercase for white, lowercase for black.
+If everything is correct, return {"corrections": []}.`;
+
+    type VerifyResp = { corrections?: Array<{ square?: string; correct?: string }> };
+
+    async function verifyOnce(): Promise<VerifyResp> {
+      try {
+        const r = await ai.chat.completions.create({
+          model: "gpt-5.2",
+          max_completion_tokens: 2000,
+          messages: [{
+            role: "user",
+            content: [
+              { type: "text", text: VERIFY_PROMPT },
+              { type: "image_url", image_url: { url: `data:${mimeType};base64,${base64Data}`, detail: "high" } },
+            ],
+          }],
+          response_format: { type: "json_object" },
+        });
+        const c = r.choices[0]?.message?.content ?? "{}";
+        return JSON.parse(c) as VerifyResp;
+      } catch { return {}; }
+    }
+
+    // Run 2 verification passes; only apply a correction if BOTH agree (high precision)
+    const [v1, v2] = await Promise.all([verifyOnce(), verifyOnce()]);
+
+    function corrMap(v: VerifyResp): Record<string, string> {
+      const m: Record<string, string> = {};
+      for (const c of v.corrections || []) {
+        const sq = String(c.square || '').toLowerCase().trim();
+        const val = String(c.correct ?? '').trim();
+        if (!/^[a-h][1-8]$/.test(sq)) continue;
+        if (val !== '.' && !'KQRBNPkqrbnp'.includes(val)) continue;
+        if (val.length > 1) continue;
+        m[sq] = val === '.' ? '' : val;
+      }
+      return m;
+    }
+    const m1 = corrMap(v1);
+    const m2 = corrMap(v2);
+
+    // Apply correction only if both verification passes agree on the same value for that square
+    const verifiedGrid: string[][] = voted.map(row => row.slice());
+    for (const sq of Object.keys(m1)) {
+      if (m2[sq] !== undefined && m1[sq] === m2[sq]) {
+        const file = sq.charCodeAt(0) - 97;
+        const rank = parseInt(sq[1]);
+        const r = 8 - rank;
+        // Sanity: don't introduce pawn on back rank
+        if ((m1[sq] === 'P' || m1[sq] === 'p') && (rank === 1 || rank === 8)) continue;
+        verifiedGrid[r][file] = m1[sq];
+      }
+    }
+    voted = verifiedGrid;
+
     const votedPieces = gridDirectToPieces(voted);
     const votedScore = scoreParse(votedPieces);
 
