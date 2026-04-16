@@ -894,10 +894,16 @@ Return ONLY this JSON: { "left": 0.05, "top": 0.10, "right": 0.95, "bottom": 0.9
         const separation = cHigh - cLow;
 
         // Need real separation — if all pieces are similar brightness, abort.
-        if (separation >= 18) {
+        if (separation >= 25) {
+          // CONFIDENCE BAND: only override pieces whose brightness is FAR from the
+          // threshold (more than 35% of the way toward a cluster center). Pieces
+          // near the boundary are ambiguous — trust the AI for those.
+          const band = separation * 0.35;
           // 5. Apply override into a SCRATCH copy first so we can sanity-check.
           const scratch = voted.map(row => row.slice());
           for (const { r, f, piece, lum } of occupied) {
+            // Skip ambiguous pieces (near threshold) — keep AI's color.
+            if (Math.abs(lum - threshold) < band) continue;
             const shouldBeWhite = lum > threshold;
             if (shouldBeWhite) scratch[r][f] = piece.toUpperCase();
             else scratch[r][f] = piece.toLowerCase();
