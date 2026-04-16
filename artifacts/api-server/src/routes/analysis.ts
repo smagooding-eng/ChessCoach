@@ -15,6 +15,7 @@ import { randomUUID } from "crypto";
 import type { Logger } from "pino";
 import OpenAI from "openai";
 import { Chess } from "chess.js";
+import sharp from "sharp";
 
 const router: IRouter = Router();
 
@@ -761,84 +762,125 @@ Return ONLY this JSON, no markdown:
 
     let voted = voteGrid(grids);
 
-    // COLOR-ONLY STAGE — for each occupied square, ask the model ONLY about piece color.
-    // Decoupling color from piece-type identification eliminates chess-context bias
-    // (e.g. "this looks like a white setup so this piece must be white").
-    // We list every occupied square and ask 3 times in parallel; if all 3 agree on a color
-    // that disagrees with the voted grid, we flip the color.
-    const occupied: Array<{ sq: string; r: number; f: number; piece: string }> = [];
-    for (let r = 0; r < 8; r++) {
-      for (let f = 0; f < 8; f++) {
-        const cell = voted[r][f];
-        if (!cell) continue;
-        const sq = String.fromCharCode(97 + f) + (8 - r);
-        occupied.push({ sq, r, f, piece: cell });
-      }
-    }
+    // PIXEL-BASED COLOR OVERRIDE — the AI is unreliable for piece color.
+    // We use deterministic image analysis: sample the center of each occupied square,
+    // isolate "piece pixels" (those that differ most from the square's base color),
+    // compute their brightness, then cluster all pieces into WHITE vs BLACK by brightness.
+    // This works regardless of board style because we're using the image itself as ground truth.
+    try {
+      const imgBuf = Buffer.from(base64Data, 'base64');
+      // Crop to the largest centered square (chess board is square) and resize to 512×512
+      const meta = await sharp(imgBuf).metadata();
+      const W = meta.width ?? 0;
+      const H = meta.height ?? 0;
+      if (W >= 64 && H >= 64) {
+        const side = Math.min(W, H);
+        const left = Math.floor((W - side) / 2);
+        const top = Math.floor((H - side) / 2);
+        const { data, info } = await sharp(imgBuf)
+          .extract({ left, top, width: side, height: side })
+          .resize(512, 512, { fit: 'fill' })
+          .removeAlpha()
+          .raw()
+          .toBuffer({ resolveWithObject: true });
+        const SZ = info.width; // 512
+        const CELL = SZ / 8;   // 64
 
-    if (occupied.length > 0) {
-      const squareList = occupied.map(o => o.sq).join(', ');
-      const COLOR_PROMPT = `Look at the chess board image. I will list specific squares and you tell me ONLY the color of the piece on each one.
-
-Squares to inspect: ${squareList}
-
-CRITICAL — judge color by the piece BODY, never by the square underneath:
-- WHITE pieces are pale/cream/ivory/light-gray. They look BRIGHT against the board.
-- BLACK pieces are dark-brown/charcoal/black. They look DARK against the board.
-- A piece's color does NOT depend on the square it sits on.
-- A white pawn on a dark square is still WHITE. A black pawn on a light square is still BLACK.
-- For each square, mentally compare the piece's brightness to a neutral mid-gray. Brighter = W, darker = B.
-
-Return ONLY this JSON, listing every square in the order I gave you:
-{ "colors": { "${occupied[0].sq}": "W", "${occupied[1]?.sq || 'a1'}": "B", ... } }
-
-Use exactly "W" for white or "B" for black. No other values.`;
-
-      type ColorResp = { colors?: Record<string, string> };
-      async function colorPass(): Promise<ColorResp> {
-        try {
-          const r = await ai.chat.completions.create({
-            model: "gpt-5.2",
-            max_completion_tokens: 2000,
-            messages: [{
-              role: "user",
-              content: [
-                { type: "text", text: COLOR_PROMPT },
-                { type: "image_url", image_url: { url: `data:${mimeType};base64,${base64Data}`, detail: "high" } },
-              ],
-            }],
-            response_format: { type: "json_object" },
-          });
-          const c = r.choices[0]?.message?.content ?? "{}";
-          return JSON.parse(c) as ColorResp;
-        } catch { return {}; }
-      }
-
-      const colorPasses = await Promise.all([colorPass(), colorPass(), colorPass()]);
-
-      // For each occupied square, get the majority color across the 3 passes
-      for (const { sq, r, f, piece } of occupied) {
-        const votes: string[] = [];
-        for (const cp of colorPasses) {
-          const v = String(cp.colors?.[sq] || '').toUpperCase().trim();
-          if (v === 'W' || v === 'B') votes.push(v);
-        }
-        if (votes.length < 2) continue; // Not enough valid votes — keep original
-        const w = votes.filter(v => v === 'W').length;
-        const b = votes.filter(v => v === 'B').length;
-        // Need a clear majority (at least 2 agreeing, and majority of valid votes)
-        if (w >= 2 && w > b) {
-          // Should be white
-          if (piece !== piece.toUpperCase()) {
-            voted[r][f] = piece.toUpperCase();
+        // For a square at (row r, file f), compute the "piece brightness":
+        // 1. Sample center 60% of the cell to get candidate pixels.
+        // 2. Sample the 4 corner strips of the cell (10% thick) to estimate the square's base color.
+        // 3. For each center pixel, measure how far its color is from the square base.
+        //    Pixels with the largest delta = piece pixels. Mean their luminance.
+        function pieceBrightness(r: number, f: number): number | null {
+          const cx0 = Math.floor(f * CELL);
+          const cy0 = Math.floor(r * CELL);
+          const cx1 = Math.floor((f + 1) * CELL);
+          const cy1 = Math.floor((r + 1) * CELL);
+          const cellW = cx1 - cx0;
+          const cellH = cy1 - cy0;
+          // Base color = mean of corner strips (8% from each edge)
+          const edge = Math.max(2, Math.floor(cellW * 0.08));
+          let bR = 0, bG = 0, bB = 0, bN = 0;
+          for (let dy = 0; dy < cellH; dy++) {
+            for (let dx = 0; dx < cellW; dx++) {
+              const onEdge = dx < edge || dx >= cellW - edge || dy < edge || dy >= cellH - edge;
+              if (!onEdge) continue;
+              const px = cx0 + dx, py = cy0 + dy;
+              const idx = (py * SZ + px) * 3;
+              bR += data[idx]; bG += data[idx + 1]; bB += data[idx + 2]; bN++;
+            }
           }
-        } else if (b >= 2 && b > w) {
-          // Should be black
-          if (piece !== piece.toLowerCase()) {
-            voted[r][f] = piece.toLowerCase();
+          if (bN === 0) return null;
+          bR /= bN; bG /= bN; bB /= bN;
+
+          // Center region = central 60%
+          const cPad = Math.floor(cellW * 0.2);
+          const pixels: Array<{ lum: number; delta: number }> = [];
+          for (let dy = cPad; dy < cellH - cPad; dy++) {
+            for (let dx = cPad; dx < cellW - cPad; dx++) {
+              const px = cx0 + dx, py = cy0 + dy;
+              const idx = (py * SZ + px) * 3;
+              const R = data[idx], G = data[idx + 1], B = data[idx + 2];
+              const dR = R - bR, dG = G - bG, dB = B - bB;
+              const delta = Math.sqrt(dR * dR + dG * dG + dB * dB);
+              const lum = 0.299 * R + 0.587 * G + 0.114 * B;
+              pixels.push({ lum, delta });
+            }
+          }
+          if (pixels.length === 0) return null;
+          // Use the top 30% highest-delta pixels as "piece pixels"
+          pixels.sort((a, b) => b.delta - a.delta);
+          const keep = Math.max(10, Math.floor(pixels.length * 0.3));
+          let sum = 0;
+          for (let i = 0; i < keep; i++) sum += pixels[i].lum;
+          return sum / keep;
+        }
+
+        const occupied: Array<{ r: number; f: number; piece: string; lum: number }> = [];
+        for (let r = 0; r < 8; r++) {
+          for (let f = 0; f < 8; f++) {
+            const cell = voted[r][f];
+            if (!cell) continue;
+            const lum = pieceBrightness(r, f);
+            if (lum == null) continue;
+            occupied.push({ r, f, piece: cell, lum });
+          }
+        }
+
+        if (occupied.length >= 2) {
+          // 1D k-means with k=2 to split into light/dark clusters
+          const lums = occupied.map(o => o.lum).sort((a, b) => a - b);
+          let cLow = lums[Math.floor(lums.length * 0.25)];
+          let cHigh = lums[Math.floor(lums.length * 0.75)];
+          for (let iter = 0; iter < 20; iter++) {
+            const lowG: number[] = [], highG: number[] = [];
+            for (const l of lums) {
+              if (Math.abs(l - cLow) <= Math.abs(l - cHigh)) lowG.push(l);
+              else highG.push(l);
+            }
+            if (lowG.length === 0 || highG.length === 0) break;
+            const newLow = lowG.reduce((a, b) => a + b, 0) / lowG.length;
+            const newHigh = highG.reduce((a, b) => a + b, 0) / highG.length;
+            if (Math.abs(newLow - cLow) < 0.5 && Math.abs(newHigh - cHigh) < 0.5) { cLow = newLow; cHigh = newHigh; break; }
+            cLow = newLow; cHigh = newHigh;
+          }
+          const threshold = (cLow + cHigh) / 2;
+          const separation = cHigh - cLow;
+          // Require meaningful separation (>25 luminance units) or skip override
+          if (separation > 25) {
+            for (const { r, f, piece, lum } of occupied) {
+              const shouldBeWhite = lum > threshold;
+              if (shouldBeWhite && piece !== piece.toUpperCase()) {
+                voted[r][f] = piece.toUpperCase();
+              } else if (!shouldBeWhite && piece !== piece.toLowerCase()) {
+                voted[r][f] = piece.toLowerCase();
+              }
+            }
           }
         }
       }
+    } catch (err) {
+      req.log?.warn?.({ err }, "Pixel-based color override failed, falling back to AI-only colors");
     }
 
     const votedPieces = gridDirectToPieces(voted);

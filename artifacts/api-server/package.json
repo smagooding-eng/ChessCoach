@@ -26,7 +26,8 @@
     "openid-client": "^6.8.2",
     "pino": "^9",
     "pino-http": "^10",
-    "resend": "^6.10.0"
+    "resend": "^6.10.0",
+    "sharp": "^0.34.5"
   },
   "devDependencies": {
     "@types/cookie-parser": "^1.4.10",
