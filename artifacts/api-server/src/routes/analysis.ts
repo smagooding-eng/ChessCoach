@@ -843,46 +843,26 @@ Return ONLY this JSON: { "left": 0.05, "top": 0.10, "right": 0.95, "bottom": 0.9
       if (rinfo.width !== SZ || rinfo.height !== SZ) throw new Error('resize failed');
       const CELL = SZ / 8;
 
-      // 3. For each piece, get brightness of the piece body.
-      function pieceBrightness(r: number, f: number): { lum: number; delta: number } | null {
+      // 3. For each piece, brightness = MEAN grayscale luminance of the
+      // center 40% of the square. No fancy delta-from-base — that was wrong:
+      // it actually measured the piece's HIGHLIGHTS, not its body color, and
+      // inverted answers for pieces that share a color tone with their square.
+      // The center 40% of an occupied square is dominated by the piece itself,
+      // which is exactly what we want to measure.
+      function pieceBrightness(r: number, f: number): number | null {
         const cx0 = Math.floor(f * CELL);
         const cy0 = Math.floor(r * CELL);
         const cellSize = Math.floor(CELL);
-        // Square base = mean of 8% edge ring
-        const edge = Math.max(2, Math.floor(cellSize * 0.08));
-        let bR = 0, bG = 0, bB = 0, bN = 0;
-        for (let dy = 0; dy < cellSize; dy++) {
-          for (let dx = 0; dx < cellSize; dx++) {
-            const onEdge = dx < edge || dx >= cellSize - edge || dy < edge || dy >= cellSize - edge;
-            if (!onEdge) continue;
-            const idx = ((cy0 + dy) * SZ + (cx0 + dx)) * 3;
-            bR += data[idx]; bG += data[idx + 1]; bB += data[idx + 2]; bN++;
-          }
-        }
-        if (bN === 0) return null;
-        bR /= bN; bG /= bN; bB /= bN;
-
-        // Center 60% — collect pixels & their delta from base
-        const pad = Math.floor(cellSize * 0.2);
-        const pix: Array<{ lum: number; delta: number }> = [];
+        const pad = Math.floor(cellSize * 0.30); // center 40%
+        let sum = 0, n = 0;
         for (let dy = pad; dy < cellSize - pad; dy++) {
           for (let dx = pad; dx < cellSize - pad; dx++) {
             const idx = ((cy0 + dy) * SZ + (cx0 + dx)) * 3;
-            const R = data[idx], G = data[idx + 1], B = data[idx + 2];
-            const dR = R - bR, dG = G - bG, dB = B - bB;
-            pix.push({
-              lum: 0.299 * R + 0.587 * G + 0.114 * B,
-              delta: Math.sqrt(dR * dR + dG * dG + dB * dB),
-            });
+            sum += 0.299 * data[idx] + 0.587 * data[idx + 1] + 0.114 * data[idx + 2];
+            n++;
           }
         }
-        if (pix.length === 0) return null;
-        // Top 25% highest-delta pixels = piece body
-        pix.sort((a, b) => b.delta - a.delta);
-        const keep = Math.max(20, Math.floor(pix.length * 0.25));
-        let sumL = 0, sumD = 0;
-        for (let i = 0; i < keep; i++) { sumL += pix[i].lum; sumD += pix[i].delta; }
-        return { lum: sumL / keep, delta: sumD / keep };
+        return n === 0 ? null : sum / n;
       }
 
       const occupied: Array<{ r: number; f: number; piece: string; lum: number }> = [];
@@ -890,9 +870,9 @@ Return ONLY this JSON: { "left": 0.05, "top": 0.10, "right": 0.95, "bottom": 0.9
         for (let f = 0; f < 8; f++) {
           const cell = voted[r][f];
           if (!cell) continue;
-          const m = pieceBrightness(r, f);
-          if (!m || m.delta < 18) continue;
-          occupied.push({ r, f, piece: cell, lum: m.lum });
+          const lum = pieceBrightness(r, f);
+          if (lum === null) continue;
+          occupied.push({ r, f, piece: cell, lum });
         }
       }
 
