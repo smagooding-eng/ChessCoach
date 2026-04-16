@@ -284,6 +284,112 @@ function pickBot(playerRating: number): BotConfig {
 
 type SandboxResult = 'playing' | 'win' | 'loss' | 'draw';
 
+const PIECE_GLYPH: Record<string, string> = {
+  K: '♔', Q: '♕', R: '♖', B: '♗', N: '♘', P: '♙',
+  k: '♚', q: '♛', r: '♜', b: '♝', n: '♞', p: '♟',
+};
+
+function fenToBoard(fen: string): (string | null)[][] {
+  const board: (string | null)[][] = Array.from({ length: 8 }, () => Array(8).fill(null));
+  const placement = fen.split(' ')[0];
+  const rows = placement.split('/');
+  for (let r = 0; r < 8; r++) {
+    let f = 0;
+    for (const ch of rows[r]) {
+      if (/[1-8]/.test(ch)) {
+        f += parseInt(ch);
+      } else {
+        if (f < 8) board[r][f] = ch;
+        f++;
+      }
+    }
+  }
+  return board;
+}
+
+function MiniBoard({
+  fen,
+  flipped,
+  active,
+  playerColor,
+  legalTargets,
+  selectedSquare,
+  lastMove,
+  onSquareClick,
+}: {
+  fen: string;
+  flipped: boolean;
+  active: boolean;
+  playerColor: 'w' | 'b';
+  legalTargets: string[];
+  selectedSquare: string | null;
+  lastMove: { from: string; to: string } | null;
+  onSquareClick: (square: string) => void;
+}) {
+  const board = fenToBoard(fen);
+  // Files left-to-right; if flipped, reverse
+  const ranks = flipped ? [1, 2, 3, 4, 5, 6, 7, 8] : [8, 7, 6, 5, 4, 3, 2, 1];
+  const files = flipped ? ['h','g','f','e','d','c','b','a'] : ['a','b','c','d','e','f','g','h'];
+  const targetSet = new Set(legalTargets);
+  return (
+    <div
+      className="grid grid-cols-8 w-full select-none rounded-[10px] overflow-hidden shadow-[0_30px_60px_rgba(0,0,0,0.6)]"
+      style={{ aspectRatio: '1', touchAction: 'manipulation' }}
+    >
+      {ranks.map((rank) =>
+        files.map((file) => {
+          const square = `${file}${rank}`;
+          // map back to board[row][col] (row 0 = rank 8, col 0 = file a)
+          const rowIdx = 8 - rank;
+          const colIdx = file.charCodeAt(0) - 97;
+          const piece = board[rowIdx][colIdx];
+          const isLight = (rowIdx + colIdx) % 2 === 0;
+          const isSelected = selectedSquare === square;
+          const isTarget = targetSet.has(square);
+          const isLastMove = lastMove && (lastMove.from === square || lastMove.to === square);
+          const isWhitePiece = piece && piece === piece.toUpperCase();
+          const canInteract = active && piece && ((isWhitePiece && playerColor === 'w') || (!isWhitePiece && playerColor === 'b'));
+          let bg = isLight ? '#f0d9b5' : '#b58863';
+          if (isLastMove) bg = isLight ? '#f5e57b' : '#cdc169';
+          if (isSelected) bg = '#7fb1ff';
+          return (
+            <button
+              key={square}
+              type="button"
+              onClick={() => active && onSquareClick(square)}
+              disabled={!active}
+              className="relative flex items-center justify-center text-[clamp(20px,5vw,32px)] leading-none p-0 m-0 border-0"
+              style={{
+                background: bg,
+                cursor: active ? (canInteract || isTarget || isSelected ? 'pointer' : 'default') : 'default',
+                aspectRatio: '1',
+                fontFamily: '"Segoe UI Symbol", "DejaVu Sans", "Apple Color Emoji", sans-serif',
+                color: piece && piece === piece.toUpperCase() ? '#fff' : '#1a1a1a',
+                textShadow: piece && piece === piece.toUpperCase() ? '0 1px 2px rgba(0,0,0,0.6)' : 'none',
+              }}
+              aria-label={`${square}${piece ? ` ${piece}` : ''}`}
+            >
+              {piece ? PIECE_GLYPH[piece] || piece : ''}
+              {isTarget && !piece && (
+                <span
+                  className="absolute pointer-events-none"
+                  style={{ width: '30%', height: '30%', borderRadius: '50%', background: 'rgba(100,180,255,0.6)' }}
+                />
+              )}
+              {isTarget && piece && (
+                <span
+                  className="absolute inset-0 pointer-events-none"
+                  style={{ borderRadius: '4px', boxShadow: 'inset 0 0 0 4px rgba(100,180,255,0.65)' }}
+                />
+              )}
+            </button>
+          );
+        })
+      )}
+    </div>
+  );
+}
+
 const SandboxBoard = React.memo(function SandboxBoard({ playerRating }: { playerRating: number }) {
   const [bot] = useState(() => pickBot(playerRating));
   const [playerColor] = useState<'w' | 'b'>(() => Math.random() < 0.5 ? 'w' : 'b');
@@ -292,10 +398,20 @@ const SandboxBoard = React.memo(function SandboxBoard({ playerRating }: { player
   const [moveHistory, setMoveHistory] = useState<string[]>([]);
   const [result, setResult] = useState<SandboxResult>('playing');
   const [thinking, setThinking] = useState(false);
+  const [selectedSquare, setSelectedSquare] = useState<string | null>(null);
+  const [lastMove, setLastMove] = useState<{ from: string; to: string } | null>(null);
   const gameKeyRef = useRef(0);
   const botTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const isPlayerTurn = chess.turn() === playerColor;
+
+  const legalTargets = useMemo(() => {
+    if (!selectedSquare || result !== 'playing' || chess.turn() !== playerColor) return [] as string[];
+    try {
+      const moves = chess.moves({ square: selectedSquare as Parameters<typeof chess.moves>[0]['square'], verbose: true });
+      return moves.map(m => m.to as string);
+    } catch { return []; }
+  }, [chess, selectedSquare, fen, result, playerColor]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const checkGameOver = useCallback((g: Chess): SandboxResult => {
     if (!g.isGameOver()) return 'playing';
@@ -337,20 +453,35 @@ const SandboxBoard = React.memo(function SandboxBoard({ playerRating }: { player
     return () => { if (botTimerRef.current) clearTimeout(botTimerRef.current); };
   }, []);
 
-  const handleMove = useCallback((san: string) => {
-    if (chess.turn() !== playerColor) return;
-    try {
-      chess.move(san);
-      setFen(chess.fen());
-      setMoveHistory(prev => [...prev, san]);
-      const status = checkGameOver(chess);
-      if (status !== 'playing') {
-        setResult(status);
-        return;
-      }
-      doBotMove(gameKeyRef.current);
-    } catch {}
-  }, [chess, playerColor, checkGameOver, doBotMove]);
+  const handleSquareClick = useCallback((square: string) => {
+    if (result !== 'playing' || thinking || chess.turn() !== playerColor) return;
+    const piece = chess.get(square as Parameters<typeof chess.get>[0]);
+    // If a square is already selected, try to move there
+    if (selectedSquare) {
+      if (square === selectedSquare) { setSelectedSquare(null); return; }
+      try {
+        const m = chess.move({ from: selectedSquare, to: square, promotion: 'q' });
+        if (m) {
+          setFen(chess.fen());
+          setMoveHistory(prev => [...prev, m.san]);
+          setLastMove({ from: m.from, to: m.to });
+          setSelectedSquare(null);
+          const status = checkGameOver(chess);
+          if (status !== 'playing') { setResult(status); return; }
+          doBotMove(gameKeyRef.current);
+          return;
+        }
+      } catch {}
+      // Invalid move — if clicked square has own piece, select it instead
+      if (piece && piece.color === playerColor) { setSelectedSquare(square); return; }
+      setSelectedSquare(null);
+      return;
+    }
+    // Nothing selected — select this square if it has the player's piece
+    if (piece && piece.color === playerColor) {
+      setSelectedSquare(square);
+    }
+  }, [chess, playerColor, selectedSquare, result, thinking, checkGameOver, doBotMove]);
 
   const resetGame = useCallback(() => {
     if (botTimerRef.current) clearTimeout(botTimerRef.current);
@@ -359,8 +490,21 @@ const SandboxBoard = React.memo(function SandboxBoard({ playerRating }: { player
     setMoveHistory([]);
     setResult('playing');
     setThinking(false);
+    setSelectedSquare(null);
+    setLastMove(null);
     gameKeyRef.current += 1;
   }, [chess]);
+
+  // Track last bot move for highlight
+  useEffect(() => {
+    if (moveHistory.length === 0) return;
+    // After bot moves, try to extract from chess history
+    try {
+      const hist = chess.history({ verbose: true });
+      const lastEntry = hist[hist.length - 1];
+      if (lastEntry) setLastMove({ from: lastEntry.from, to: lastEntry.to });
+    } catch {}
+  }, [moveHistory.length, chess]);
 
   const resultLabel = result === 'win' ? 'You win!' : result === 'loss' ? `${bot.name} wins` : result === 'draw' ? 'Draw' : null;
 
@@ -385,12 +529,15 @@ const SandboxBoard = React.memo(function SandboxBoard({ playerRating }: { player
       </div>
 
       <div className="relative max-w-[300px] mx-auto">
-        <ChessBoard
-          key={gameKeyRef.current}
+        <MiniBoard
           fen={fen}
           flipped={playerColor === 'b'}
-          practiceMode={result === 'playing'}
-          onMovePlayed={(san) => handleMove(san)}
+          active={result === 'playing'}
+          playerColor={playerColor}
+          legalTargets={legalTargets}
+          selectedSquare={selectedSquare}
+          lastMove={lastMove}
+          onSquareClick={handleSquareClick}
         />
         {result !== 'playing' && (
           <div className="absolute inset-0 rounded-[10px] bg-black/60 flex flex-col items-center justify-center gap-2 z-10">
