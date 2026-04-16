@@ -280,6 +280,12 @@ function SandboxBoard({ startFen, flipped }: { startFen: string; flipped: boolea
   const [sandboxFen, setSandboxFen] = useState(sandboxChess.fen());
   const [moveHistory, setMoveHistory] = useState<string[]>([]);
 
+  useEffect(() => {
+    sandboxChess.load(startFen);
+    setSandboxFen(sandboxChess.fen());
+    setMoveHistory([]);
+  }, [startFen, sandboxChess]);
+
   const handleSandboxMove = useCallback((san: string) => {
     try {
       sandboxChess.move(san);
