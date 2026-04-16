@@ -750,9 +750,8 @@ Return ONLY this JSON, no markdown:
       return total;
     }
 
-    // 5-pass parallel: per-square majority vote across the grids.
-    // More passes = better odds of catching single-pass misreads on individual squares.
-    const passes = await Promise.all([callOnce(), callOnce(), callOnce(), callOnce(), callOnce()]);
+    // 3-pass parallel: per-square majority vote across the grids.
+    const passes = await Promise.all([callOnce(), callOnce(), callOnce()]);
     const grids = passes.map(respToGrid).filter((g): g is string[][] => g !== null);
 
     if (grids.length === 0) {
@@ -760,8 +759,13 @@ Return ONLY this JSON, no markdown:
       return;
     }
 
-    let voted = voteGrid(grids);
+    const voted = voteGrid(grids);
 
+    // (Color is not perfectly reliable from any AI model — we let users tap pieces in the
+    // preview to flip color as a one-tap manual override.)
+    // Previously experimented with pixel-based color override using sharp, but it required
+    // exact board bounds which are not available for arbitrary screenshots/photos.
+    /* REMOVED — see tap-to-flip UI in ScanPosition.tsx
     // PIXEL-BASED COLOR OVERRIDE — the AI is unreliable for piece color.
     // We use deterministic image analysis: sample the center of each occupied square,
     // isolate "piece pixels" (those that differ most from the square's base color),
@@ -882,6 +886,7 @@ Return ONLY this JSON, no markdown:
     } catch (err) {
       req.log?.warn?.({ err }, "Pixel-based color override failed, falling back to AI-only colors");
     }
+    END_REMOVED */
 
     const votedPieces = gridDirectToPieces(voted);
     const votedScore = scoreParse(votedPieces);
