@@ -792,11 +792,20 @@ Return ONLY this JSON, no markdown:
       return;
     }
 
-    // Check agreement between passes for confidence boost/penalty
-    const agree = s1 > 0 && s2 > 0 && JSON.stringify(pieces1.slice().sort()) === JSON.stringify(pieces2.slice().sort());
-    let confidence = best.confidence || "medium";
-    if (agree && confidence !== "high") confidence = "high";
-    if (!agree && confidence === "high") confidence = "medium";
+    // Confidence based on how strongly the passes agreed.
+    // Count how many of the 64 squares had unanimous agreement across all grids.
+    let unanimous = 0;
+    for (let r = 0; r < 8; r++) {
+      for (let f = 0; f < 8; f++) {
+        const v = grids[0][r][f];
+        if (grids.every(g => g[r][f] === v)) unanimous++;
+      }
+    }
+    const agreementRatio = unanimous / 64;
+    let confidence: string;
+    if (agreementRatio >= 0.97) confidence = "high";
+    else if (agreementRatio >= 0.9) confidence = "medium";
+    else confidence = "low";
 
     res.json({
       fen: validatedFen,
