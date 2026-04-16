@@ -105,6 +105,7 @@ export function ScanPosition() {
   const [confidence, setConfidence] = useState('');
   const [notes, setNotes] = useState('');
   const [previewUrl, setPreviewUrl] = useState('');
+  const [croppedImage, setCroppedImage] = useState('');
   const [sandboxFen, setSandboxFen] = useState('');
   const [sandboxChess, setSandboxChess] = useState<Chess | null>(null);
   const [moveHistory, setMoveHistory] = useState<string[]>([]);
@@ -141,7 +142,7 @@ export function ScanPosition() {
           body: JSON.stringify({ image: dataUrl }),
         });
 
-        const data = await res.json() as { fen?: string; confidence?: string; notes?: string; error?: string };
+        const data = await res.json() as { fen?: string; confidence?: string; notes?: string; croppedImage?: string; error?: string };
 
         if (!res.ok || !data.fen) {
           setError(data.error || 'Could not recognize a chess position.');
@@ -152,6 +153,7 @@ export function ScanPosition() {
         setFen(data.fen);
         setConfidence(data.confidence || 'medium');
         setNotes(data.notes || '');
+        setCroppedImage(data.croppedImage || '');
         setState('result');
       } catch {
         setError('Failed to analyze the image. Please try again.');
@@ -223,6 +225,7 @@ export function ScanPosition() {
     setConfidence('');
     setNotes('');
     setPreviewUrl('');
+    setCroppedImage('');
     setSandboxFen('');
     setSandboxChess(null);
     setMoveHistory([]);
@@ -349,15 +352,42 @@ export function ScanPosition() {
 
       {state === 'result' && mode === 'preview' && (
         <div className="space-y-3">
-          <div className="relative">
-            <ChessBoard fen={fen} flipped={flipped} />
-            <button
-              onClick={() => setFlipped(f => !f)}
-              className="absolute top-2 left-2 z-10 p-1.5 rounded-lg bg-black/60 backdrop-blur-sm border border-white/10 hover:border-primary/30 transition-all"
-              title="Flip board"
-            >
-              <FlipVertical className="w-4 h-4 text-white/60" />
-            </button>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-1">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-white/40 text-center">Original</p>
+              {croppedImage ? (
+                <img
+                  src={croppedImage}
+                  alt="Cropped board"
+                  className="w-full rounded-[10px] border border-white/10 shadow-[0_30px_60px_rgba(0,0,0,0.6)]"
+                  style={{ aspectRatio: '1', objectFit: 'cover' }}
+                />
+              ) : previewUrl ? (
+                <img
+                  src={previewUrl}
+                  alt="Original"
+                  className="w-full rounded-[10px] border border-white/10 shadow-[0_30px_60px_rgba(0,0,0,0.6)]"
+                  style={{ aspectRatio: '1', objectFit: 'contain', background: '#000' }}
+                />
+              ) : null}
+            </div>
+            <div className="space-y-1">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-white/40 text-center">Detected</p>
+              <div className="relative">
+                <EditableBoard fen={fen} flipped={flipped} onFenChange={setFen} />
+                <button
+                  onClick={() => setFlipped(f => !f)}
+                  className="absolute top-1.5 left-1.5 z-10 p-1 rounded-md bg-black/60 backdrop-blur-sm border border-white/10 hover:border-primary/30 transition-all"
+                  title="Flip board"
+                >
+                  <FlipVertical className="w-3.5 h-3.5 text-white/60" />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-xl px-3 py-2 border border-white/10 bg-white/5 text-[11px] text-white/60 text-center">
+            Compare to the original — <span className="text-white/90 font-semibold">tap any piece</span> to flip its color.
           </div>
 
           <div className={`rounded-xl px-3 py-2 border text-xs flex items-center gap-2 ${confidenceBg}`}>

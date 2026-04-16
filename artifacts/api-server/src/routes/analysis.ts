@@ -765,6 +765,10 @@ Return ONLY this JSON, no markdown:
 
     const voted = voteGrid(grids);
 
+    // Holds the cropped 640x640 board image as a data URL — returned to the
+    // client so the user can compare what we detected vs. the original board.
+    let croppedDataUrl: string | null = null;
+
     // ─────────────────────────────────────────────────────────────────────────
     // FOCUSED COLOR VERIFICATION on a clean cropped board.
     //
@@ -847,6 +851,7 @@ Return ONLY this JSON: { "left": 0.05, "top": 0.10, "right": 0.95, "bottom": 0.9
         .jpeg({ quality: 92 })
         .toBuffer();
       const cropB64 = croppedJpeg.toString('base64');
+      croppedDataUrl = `data:image/jpeg;base64,${cropB64}`;
 
       // 3. Build a focused color-verification prompt.
       const sqList = occupiedSquares.map(s => s.sq).join(', ');
@@ -993,6 +998,7 @@ Return ONLY a JSON object mapping each square to its color, nothing else. Exampl
       fen: validatedFen,
       confidence,
       notes: best.notes || "",
+      croppedImage: croppedDataUrl,
     });
   } catch (err: unknown) {
     req.log?.error?.({ err }, "Scan position error");
