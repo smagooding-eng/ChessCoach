@@ -761,98 +761,85 @@ Return ONLY this JSON, no markdown:
 
     let voted = voteGrid(grids);
 
-    // VERIFICATION PASS — show the voted grid back to the model with the original image
-    // and ask it to point out any wrong squares. This catches errors that all passes made the same way.
-    function gridToAscii(g: string[][]): string {
-      const lines: string[] = [];
-      for (let r = 0; r < 8; r++) {
-        const rank = 8 - r;
-        const cells: string[] = [];
-        for (let f = 0; f < 8; f++) {
-          cells.push(g[r][f] || '.');
+    // COLOR-ONLY STAGE — for each occupied square, ask the model ONLY about piece color.
+    // Decoupling color from piece-type identification eliminates chess-context bias
+    // (e.g. "this looks like a white setup so this piece must be white").
+    // We list every occupied square and ask 3 times in parallel; if all 3 agree on a color
+    // that disagrees with the voted grid, we flip the color.
+    const occupied: Array<{ sq: string; r: number; f: number; piece: string }> = [];
+    for (let r = 0; r < 8; r++) {
+      for (let f = 0; f < 8; f++) {
+        const cell = voted[r][f];
+        if (!cell) continue;
+        const sq = String.fromCharCode(97 + f) + (8 - r);
+        occupied.push({ sq, r, f, piece: cell });
+      }
+    }
+
+    if (occupied.length > 0) {
+      const squareList = occupied.map(o => o.sq).join(', ');
+      const COLOR_PROMPT = `Look at the chess board image. I will list specific squares and you tell me ONLY the color of the piece on each one.
+
+Squares to inspect: ${squareList}
+
+CRITICAL — judge color by the piece BODY, never by the square underneath:
+- WHITE pieces are pale/cream/ivory/light-gray. They look BRIGHT against the board.
+- BLACK pieces are dark-brown/charcoal/black. They look DARK against the board.
+- A piece's color does NOT depend on the square it sits on.
+- A white pawn on a dark square is still WHITE. A black pawn on a light square is still BLACK.
+- For each square, mentally compare the piece's brightness to a neutral mid-gray. Brighter = W, darker = B.
+
+Return ONLY this JSON, listing every square in the order I gave you:
+{ "colors": { "${occupied[0].sq}": "W", "${occupied[1]?.sq || 'a1'}": "B", ... } }
+
+Use exactly "W" for white or "B" for black. No other values.`;
+
+      type ColorResp = { colors?: Record<string, string> };
+      async function colorPass(): Promise<ColorResp> {
+        try {
+          const r = await ai.chat.completions.create({
+            model: "gpt-5.2",
+            max_completion_tokens: 2000,
+            messages: [{
+              role: "user",
+              content: [
+                { type: "text", text: COLOR_PROMPT },
+                { type: "image_url", image_url: { url: `data:${mimeType};base64,${base64Data}`, detail: "high" } },
+              ],
+            }],
+            response_format: { type: "json_object" },
+          });
+          const c = r.choices[0]?.message?.content ?? "{}";
+          return JSON.parse(c) as ColorResp;
+        } catch { return {}; }
+      }
+
+      const colorPasses = await Promise.all([colorPass(), colorPass(), colorPass()]);
+
+      // For each occupied square, get the majority color across the 3 passes
+      for (const { sq, r, f, piece } of occupied) {
+        const votes: string[] = [];
+        for (const cp of colorPasses) {
+          const v = String(cp.colors?.[sq] || '').toUpperCase().trim();
+          if (v === 'W' || v === 'B') votes.push(v);
         }
-        lines.push(`rank ${rank}: ${cells.join(' ')}`);
-      }
-      lines.push('         a b c d e f g h');
-      return lines.join('\n');
-    }
-
-    const VERIFY_PROMPT = `I scanned a chess position from this image and got the grid below.
-
-My current reading:
-${gridToAscii(voted)}
-
-Legend: uppercase = WHITE piece, lowercase = BLACK piece, '.' = empty.
-Pieces: K/k = king, Q/q = queen, R/r = rook, B/b = bishop, N/n = knight, P/p = pawn.
-
-Your job: COMPARE my reading to the image and find ANY square that is wrong.
-The most common error is wrong piece COLOR (white labeled as black or vice versa). Also check for wrong piece type, missing pieces, or extra pieces.
-
-Look at every square. For each one that is wrong, report what it SHOULD be.
-
-Return ONLY this JSON:
-{
-  "corrections": [
-    {"square": "e4", "correct": "N"},
-    {"square": "d7", "correct": "."}
-  ]
-}
-
-Use "." for an empty square. Use uppercase for white, lowercase for black.
-If everything is correct, return {"corrections": []}.`;
-
-    type VerifyResp = { corrections?: Array<{ square?: string; correct?: string }> };
-
-    async function verifyOnce(): Promise<VerifyResp> {
-      try {
-        const r = await ai.chat.completions.create({
-          model: "gpt-5.2",
-          max_completion_tokens: 2000,
-          messages: [{
-            role: "user",
-            content: [
-              { type: "text", text: VERIFY_PROMPT },
-              { type: "image_url", image_url: { url: `data:${mimeType};base64,${base64Data}`, detail: "high" } },
-            ],
-          }],
-          response_format: { type: "json_object" },
-        });
-        const c = r.choices[0]?.message?.content ?? "{}";
-        return JSON.parse(c) as VerifyResp;
-      } catch { return {}; }
-    }
-
-    // Run 2 verification passes; only apply a correction if BOTH agree (high precision)
-    const [v1, v2] = await Promise.all([verifyOnce(), verifyOnce()]);
-
-    function corrMap(v: VerifyResp): Record<string, string> {
-      const m: Record<string, string> = {};
-      for (const c of v.corrections || []) {
-        const sq = String(c.square || '').toLowerCase().trim();
-        const val = String(c.correct ?? '').trim();
-        if (!/^[a-h][1-8]$/.test(sq)) continue;
-        if (val !== '.' && !'KQRBNPkqrbnp'.includes(val)) continue;
-        if (val.length > 1) continue;
-        m[sq] = val === '.' ? '' : val;
-      }
-      return m;
-    }
-    const m1 = corrMap(v1);
-    const m2 = corrMap(v2);
-
-    // Apply correction only if both verification passes agree on the same value for that square
-    const verifiedGrid: string[][] = voted.map(row => row.slice());
-    for (const sq of Object.keys(m1)) {
-      if (m2[sq] !== undefined && m1[sq] === m2[sq]) {
-        const file = sq.charCodeAt(0) - 97;
-        const rank = parseInt(sq[1]);
-        const r = 8 - rank;
-        // Sanity: don't introduce pawn on back rank
-        if ((m1[sq] === 'P' || m1[sq] === 'p') && (rank === 1 || rank === 8)) continue;
-        verifiedGrid[r][file] = m1[sq];
+        if (votes.length < 2) continue; // Not enough valid votes — keep original
+        const w = votes.filter(v => v === 'W').length;
+        const b = votes.filter(v => v === 'B').length;
+        // Need a clear majority (at least 2 agreeing, and majority of valid votes)
+        if (w >= 2 && w > b) {
+          // Should be white
+          if (piece !== piece.toUpperCase()) {
+            voted[r][f] = piece.toUpperCase();
+          }
+        } else if (b >= 2 && b > w) {
+          // Should be black
+          if (piece !== piece.toLowerCase()) {
+            voted[r][f] = piece.toLowerCase();
+          }
+        }
       }
     }
-    voted = verifiedGrid;
 
     const votedPieces = gridDirectToPieces(voted);
     const votedScore = scoreParse(votedPieces);
