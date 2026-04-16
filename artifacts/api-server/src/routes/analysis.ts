@@ -846,16 +846,12 @@ Return ONLY this JSON, no markdown:
     const voted = voteGrid(grids);
 
     // ─────────────────────────────────────────────────────────────────────────
-    // STAGE 4 — Pixel-based color override.
-    // We now have the board perfectly cropped to BOARD_SIZE×BOARD_SIZE, so an
-    // 8×8 grid lines up exactly with the squares. For each piece the AI found:
-    //  • sample edge pixels to estimate the square's base color
-    //  • pick the center pixels most different from base — those ARE the piece
-    //  • record that piece's mean luminance
-    // Then cluster the luminances into two groups (light vs dark) with k-means
-    // and override the AI's color based on which cluster each piece falls in.
+    // STAGE 4 — Pixel-based color override (DISABLED).
+    // Kept here behind `if (false)` because on varied piece styles/board themes
+    // the luminance clustering flipped MORE colors than it corrected. The AI
+    // reading a cleanly cropped 640×640 board (stages 1–3) is more reliable.
     // ─────────────────────────────────────────────────────────────────────────
-    try {
+    if (false) try {
       const SZ = rawInfo.width;            // 640
       const CELL = SZ / 8;                 // 80
       const data = rawRGB;
