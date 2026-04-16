@@ -978,12 +978,13 @@ Return ONLY this JSON, no markdown:
 
     // Clean obviously-impossible artifacts before building the FEN:
     // pawns cannot live on rank 1 or rank 8 — drop them if the AI placed any there.
+    // Piece format produced by gridDirectToPieces is `${PIECE}${w|b}@${file}${rank}` (e.g. "Pw@e2").
     const cleanedPieces = bestPieces.filter(ps => {
-      const m = ps.match(/^([prnbqkPRNBQK])([a-h])([1-8])$/);
-      if (!m) return false;
-      const piece = m[1];
-      const rank = parseInt(m[3], 10);
-      if ((piece === 'P' || piece === 'p') && (rank === 1 || rank === 8)) return false;
+      const m = ps.match(/^([KQRBNP])([wb])@([a-h])([1-8])$/i);
+      if (!m) return true; // keep non-matching entries — piecesToFen will skip them itself
+      const piece = m[1].toUpperCase();
+      const rank = parseInt(m[4], 10);
+      if (piece === 'P' && (rank === 1 || rank === 8)) return false;
       return true;
     });
 
