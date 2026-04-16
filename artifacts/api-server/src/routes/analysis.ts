@@ -976,19 +976,31 @@ Return ONLY this JSON, no markdown:
       return;
     }
 
-    const builtFen = piecesToFen(bestPieces, best.active_color || 'w');
+    // Clean obviously-impossible artifacts before building the FEN:
+    // pawns cannot live on rank 1 or rank 8 — drop them if the AI placed any there.
+    const cleanedPieces = bestPieces.filter(ps => {
+      const m = ps.match(/^([prnbqkPRNBQK])([a-h])([1-8])$/);
+      if (!m) return false;
+      const piece = m[1];
+      const rank = parseInt(m[3], 10);
+      if ((piece === 'P' || piece === 'p') && (rank === 1 || rank === 8)) return false;
+      return true;
+    });
+
+    const builtFen = piecesToFen(cleanedPieces, best.active_color || 'w');
     if (!builtFen) {
       res.status(422).json({ error: "Could not parse the recognized position." });
       return;
     }
 
-    let validatedFen: string;
+    // Try strict validation; if it fails, return the built FEN anyway so the user can
+    // see what was detected and fix it on the board instead of getting a hard error.
+    let validatedFen: string = builtFen;
     try {
       const chess = new Chess(builtFen);
       validatedFen = chess.fen();
     } catch {
-      res.status(422).json({ error: "AI returned an invalid position. Try a clearer, less obstructed image of the board." });
-      return;
+      validatedFen = builtFen;
     }
 
     // Confidence based on how strongly the passes agreed.
