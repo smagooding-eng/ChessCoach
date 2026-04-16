@@ -389,7 +389,7 @@ function SandboxBoard({ playerRating }: { playerRating: number }) {
           key={gameKeyRef.current}
           fen={fen}
           flipped={playerColor === 'b'}
-          practiceMode={result === 'playing' && isPlayerTurn && !thinking}
+          practiceMode={result === 'playing'}
           onMovePlayed={(san) => handleMove(san)}
         />
         {result !== 'playing' && (
