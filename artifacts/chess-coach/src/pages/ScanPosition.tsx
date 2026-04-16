@@ -2,13 +2,11 @@ import React, { useState, useRef, useCallback } from 'react';
 import { Chess } from 'chess.js';
 import { ChessBoard } from '@/components/ChessBoard';
 import { apiFetch } from '@/lib/api';
-import { useLocation } from 'wouter';
 import { Camera, Upload, RotateCcw, Swords, Compass, AlertCircle, X, FlipVertical } from 'lucide-react';
 
 type ScanState = 'idle' | 'scanning' | 'result' | 'error';
 
 export function ScanPosition() {
-  const [, navigate] = useLocation();
   const [state, setState] = useState<ScanState>('idle');
   const [error, setError] = useState('');
   const [fen, setFen] = useState('');
@@ -122,11 +120,13 @@ export function ScanPosition() {
     setFlipped(false);
   }, []);
 
-  const goToPlayAI = useCallback(() => {
-    const turnChar = fen.split(' ')[1] || 'w';
+  const goToPlayAI = useCallback((fromFen?: string) => {
+    const activeFen = fromFen || fen;
+    if (!activeFen) return;
+    const turnChar = activeFen.split(' ')[1] || 'w';
     const color = turnChar === 'b' ? 'b' : 'w';
-    navigate(`/practice?fen=${encodeURIComponent(fen)}&rating=1200&color=${color}`);
-  }, [fen, navigate]);
+    window.location.href = `/practice?fen=${encodeURIComponent(activeFen)}&rating=1200&color=${color}`;
+  }, [fen]);
 
   const confidenceColor = confidence === 'high' ? 'text-emerald-400' : confidence === 'medium' ? 'text-amber-400' : 'text-rose-400';
   const confidenceBg = confidence === 'high' ? 'bg-emerald-500/10 border-emerald-500/30' : confidence === 'medium' ? 'bg-amber-500/10 border-amber-500/30' : 'bg-rose-500/10 border-rose-500/30';
@@ -266,7 +266,7 @@ export function ScanPosition() {
               Explore
             </button>
             <button
-              onClick={goToPlayAI}
+              onClick={() => goToPlayAI()}
               className="py-3 rounded-xl font-bold text-sm transition-all active:scale-[0.97] flex items-center justify-center gap-2"
               style={{ background: 'rgba(129,182,76,0.15)', color: '#81b64c', border: '1px solid rgba(129,182,76,0.3)' }}
             >
@@ -333,7 +333,7 @@ export function ScanPosition() {
               Reset
             </button>
             <button
-              onClick={goToPlayAI}
+              onClick={() => goToPlayAI(sandboxFen)}
               className="flex-1 py-2.5 rounded-xl text-xs font-bold transition-all active:scale-[0.97] flex items-center justify-center gap-1.5"
               style={{ background: 'rgba(129,182,76,0.15)', color: '#81b64c', border: '1px solid rgba(129,182,76,0.3)' }}
             >
