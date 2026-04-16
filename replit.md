@@ -31,7 +31,7 @@ The project is structured as a monorepo using pnpm workspaces, targeting Node.js
 - **Personalized Courses (Premium)**: AI-generated courses with annotated PGN lessons derived from the player's actual games, focusing on identified weaknesses. Lessons include fix examples and interactive drills.
 - **Endgame Training (Premium)**: Comprehensive endgame courses covering checkmate patterns, essential endgames, and personalized lessons from user mistakes.
 - **Opponent Scout (Premium)**: Analyze any chess.com username to identify their weaknesses and opening preferences.
-- **Practice Bots**: Eight AI bots with configurable difficulty, offering live move analysis and quality ratings.
+- **Practice Bots**: Eight AI bots with configurable difficulty, offering live move analysis and quality ratings. The same bot engine powers the review sandbox — while a game review is processing, the user plays a mini-game against a bot tuned ~100 ELO above their rating (random color assignment, auto bot-first-move when player is black, game-over overlay with "Play Again"). Bot selection via `pickBot()` in `GameReplay.tsx`.
 - **Local PvP**: Pass-and-play chess on the same device with optional timers.
 - **Game Lookup**: Search and replay games between any two Chess.com players using the public API.
 - **Scan Position**: Upload a screenshot of a chess board (from a book, screen, or over-the-board game) and AI vision (GPT-4o) recognizes every piece, converts to FEN. Users can then explore the position freely (sandbox mode) or play against AI from that position. Supports camera capture on mobile. Route: `/scan`, API: `POST /api/analysis/scan-position` (accepts base64 data URL, validates FEN structure). Located in `artifacts/chess-coach/src/pages/ScanPosition.tsx`.

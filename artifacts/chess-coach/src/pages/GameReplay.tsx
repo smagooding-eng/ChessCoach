@@ -7,8 +7,9 @@ import { normalizeFen } from '@/lib/utils';
 import {
   ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
   Play, Pause, ArrowLeft, BrainCircuit, FlipVertical2,
-  Swords, Clock, Zap, BookOpen, Cpu, Lightbulb, Sparkles, Trophy, Target
+  Swords, Clock, Zap, BookOpen, Cpu, Lightbulb, Sparkles, Trophy, Target, RotateCcw, Bot
 } from 'lucide-react';
+import { BOTS, getBotMove, type BotConfig } from '@/lib/chess-bot';
 import { useUser } from '@/hooks/use-user';
 import { useChessPlayer } from '@/hooks/use-chess-player';
 import { apiFetch } from '@/lib/api';
@@ -275,53 +276,144 @@ function formatClock(s: number | null | undefined): string {
   return `${m}:${sec.toString().padStart(2, '0')}`;
 }
 
-function SandboxBoard({ startFen, flipped }: { startFen: string; flipped: boolean }) {
-  const [sandboxChess] = useState(() => new Chess(startFen));
-  const [sandboxFen, setSandboxFen] = useState(sandboxChess.fen());
+function pickBot(playerRating: number): BotConfig {
+  const target = playerRating + 100;
+  const sorted = [...BOTS].sort((a, b) => Math.abs(a.rating - target) - Math.abs(b.rating - target));
+  return sorted[0];
+}
+
+type SandboxResult = 'playing' | 'win' | 'loss' | 'draw';
+
+function SandboxBoard({ playerRating }: { playerRating: number }) {
+  const [bot] = useState(() => pickBot(playerRating));
+  const [playerColor] = useState<'w' | 'b'>(() => Math.random() < 0.5 ? 'w' : 'b');
+  const [chess] = useState(() => new Chess());
+  const [fen, setFen] = useState(chess.fen());
   const [moveHistory, setMoveHistory] = useState<string[]>([]);
+  const [result, setResult] = useState<SandboxResult>('playing');
+  const [thinking, setThinking] = useState(false);
+  const gameKeyRef = useRef(0);
+  const botTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const isPlayerTurn = chess.turn() === playerColor;
+
+  const checkGameOver = useCallback((g: Chess): SandboxResult => {
+    if (!g.isGameOver()) return 'playing';
+    if (g.isCheckmate()) return g.turn() === playerColor ? 'loss' : 'win';
+    return 'draw';
+  }, [playerColor]);
+
+  const doBotMove = useCallback((gameVersion: number) => {
+    if (chess.isGameOver() || chess.turn() === playerColor) return;
+    setThinking(true);
+    if (botTimerRef.current) clearTimeout(botTimerRef.current);
+    const delay = 300 + Math.random() * 500;
+    botTimerRef.current = setTimeout(() => {
+      if (gameKeyRef.current !== gameVersion || chess.isGameOver() || chess.turn() === playerColor) {
+        setThinking(false);
+        return;
+      }
+      const san = getBotMove(chess.fen(), bot);
+      if (san) {
+        try {
+          chess.move(san);
+          setFen(chess.fen());
+          setMoveHistory(prev => [...prev, san]);
+          const status = checkGameOver(chess);
+          if (status !== 'playing') setResult(status);
+        } catch {}
+      }
+      setThinking(false);
+    }, delay);
+  }, [chess, bot, playerColor, checkGameOver]);
 
   useEffect(() => {
-    sandboxChess.load(startFen);
-    setSandboxFen(sandboxChess.fen());
-    setMoveHistory([]);
-  }, [startFen, sandboxChess]);
+    if (playerColor === 'b' && moveHistory.length === 0 && result === 'playing') {
+      doBotMove(gameKeyRef.current);
+    }
+  }, [playerColor, moveHistory.length, result, doBotMove]);
 
-  const handleSandboxMove = useCallback((san: string) => {
+  useEffect(() => {
+    return () => { if (botTimerRef.current) clearTimeout(botTimerRef.current); };
+  }, []);
+
+  const handleMove = useCallback((san: string) => {
+    if (chess.turn() !== playerColor) return;
     try {
-      sandboxChess.move(san);
-      setSandboxFen(sandboxChess.fen());
+      chess.move(san);
+      setFen(chess.fen());
       setMoveHistory(prev => [...prev, san]);
+      const status = checkGameOver(chess);
+      if (status !== 'playing') {
+        setResult(status);
+        return;
+      }
+      doBotMove(gameKeyRef.current);
     } catch {}
-  }, [sandboxChess]);
+  }, [chess, playerColor, checkGameOver, doBotMove]);
 
-  const undoSandboxMove = useCallback(() => {
-    sandboxChess.undo();
-    setSandboxFen(sandboxChess.fen());
-    setMoveHistory(prev => prev.slice(0, -1));
-  }, [sandboxChess]);
+  const resetGame = useCallback(() => {
+    if (botTimerRef.current) clearTimeout(botTimerRef.current);
+    chess.reset();
+    setFen(chess.fen());
+    setMoveHistory([]);
+    setResult('playing');
+    setThinking(false);
+    gameKeyRef.current += 1;
+  }, [chess]);
+
+  const resultLabel = result === 'win' ? 'You win!' : result === 'loss' ? `${bot.name} wins` : result === 'draw' ? 'Draw' : null;
 
   return (
     <div>
-      <div className="max-w-[300px] mx-auto">
-        <ChessBoard
-          fen={sandboxFen}
-          flipped={flipped}
-          practiceMode={true}
-          onMovePlayed={(san) => handleSandboxMove(san)}
-        />
+      <div className="flex items-center justify-between mb-2 px-1">
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
+            <Bot className="w-3.5 h-3.5 text-primary" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[11px] font-bold text-white/80 truncate">{bot.name} <span className="text-white/30">({bot.rating})</span></p>
+            <p className="text-[9px] text-white/30">{bot.personality}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-1.5 shrink-0">
+          {thinking && <div className="w-3 h-3 border-2 border-primary border-t-transparent rounded-full animate-spin" />}
+          <span className="text-[10px] text-white/30">
+            {result !== 'playing' ? '' : isPlayerTurn ? 'Your turn' : 'Thinking…'}
+          </span>
+        </div>
       </div>
+
+      <div className="relative max-w-[300px] mx-auto">
+        <ChessBoard
+          key={gameKeyRef.current}
+          fen={fen}
+          flipped={playerColor === 'b'}
+          practiceMode={result === 'playing' && isPlayerTurn && !thinking}
+          onMovePlayed={(san) => handleMove(san)}
+        />
+        {result !== 'playing' && (
+          <div className="absolute inset-0 rounded-[10px] bg-black/60 flex flex-col items-center justify-center gap-2 z-10">
+            <p className={`text-lg font-black ${result === 'win' ? 'text-emerald-400' : result === 'loss' ? 'text-rose-400' : 'text-white/70'}`}>
+              {result === 'win' ? '🎉' : result === 'loss' ? '💀' : '🤝'} {resultLabel}
+            </p>
+            <button
+              onClick={resetGame}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary/20 hover:bg-primary/30 text-primary text-xs font-bold transition-colors"
+            >
+              <RotateCcw className="w-3 h-3" /> Play Again
+            </button>
+          </div>
+        )}
+      </div>
+
       {moveHistory.length > 0 && (
         <div className="flex items-center justify-between mt-2 px-1">
           <p className="text-[10px] text-white/30 truncate flex-1">
-            {moveHistory.slice(-6).join(' ')}
-            {moveHistory.length > 6 && '…'}
+            {moveHistory.slice(-8).join(' ')}
+            {moveHistory.length > 8 && '…'}
           </p>
-          <button
-            onClick={undoSandboxMove}
-            className="text-[10px] text-primary/60 hover:text-primary ml-2 shrink-0"
-          >
-            Undo
-          </button>
+          <span className="text-[9px] text-white/20 ml-2 shrink-0">{Math.ceil(moveHistory.length / 2)} moves</span>
         </div>
       )}
     </div>
@@ -979,15 +1071,15 @@ export function GameReplay() {
 
                 <WaitTipCarousel rating={playerRating} />
 
-                {/* Sandbox board */}
+                {/* AI Mini-Game */}
                 <div className="glass-card rounded-xl p-3 border border-white/10">
                   <div className="flex items-center gap-2 mb-2">
-                    <Zap className="w-3.5 h-3.5 text-primary/60" />
+                    <Swords className="w-3.5 h-3.5 text-primary/60" />
                     <span className="text-[11px] font-bold text-white/30 uppercase tracking-wider">
-                      Sandbox — explore freely while you wait
+                      Play while you wait
                     </span>
                   </div>
-                  <SandboxBoard startFen={currentFen} flipped={flipped} />
+                  <SandboxBoard playerRating={playerRating ?? 800} />
                 </div>
               </div>
             );
