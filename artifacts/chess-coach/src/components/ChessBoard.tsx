@@ -107,6 +107,12 @@ export function ChessBoard({
   const [selectedSquare, setSelectedSquare] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<'correct' | 'wrong' | null>(null);
   const feedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const onMovePlayedRef = useRef(onMovePlayed);
+  onMovePlayedRef.current = onMovePlayed;
+  const positionRef = useRef(position);
+  positionRef.current = position;
+  const expectedMoveSanRef = useRef(expectedMoveSan);
+  expectedMoveSanRef.current = expectedMoveSan;
 
   useEffect(() => {
     return () => { if (feedbackTimerRef.current) clearTimeout(feedbackTimerRef.current); };
@@ -136,24 +142,24 @@ export function ChessBoard({
 
   const tryMove = useCallback((from: string, to: string): boolean => {
     try {
-      const chess = new Chess(position);
+      const chess = new Chess(positionRef.current);
       const move = chess.move({ from, to, promotion: 'q' });
       if (!move) return false;
       const san = move.san;
-      const isCorrect = !expectedMoveSan || san === expectedMoveSan;
-      if (expectedMoveSan) {
+      const expected = expectedMoveSanRef.current;
+      const isCorrect = !expected || san === expected;
+      if (expected) {
         setFeedback(isCorrect ? 'correct' : 'wrong');
         if (feedbackTimerRef.current) clearTimeout(feedbackTimerRef.current);
         feedbackTimerRef.current = setTimeout(() => setFeedback(null), 900);
       }
-      onMovePlayed?.(san, isCorrect);
+      onMovePlayedRef.current?.(san, isCorrect);
       return true;
     } catch {
       return false;
     }
-  }, [position, expectedMoveSan, onMovePlayed]);
+  }, []);
 
-  // Drag-and-drop handler for practice mode
   const handlePieceDrop = useCallback(({ sourceSquare, targetSquare }: { piece: unknown; sourceSquare: string; targetSquare: string | null }) => {
     if (!practiceMode || !targetSquare) return false;
     if (sourceSquare === targetSquare) {
@@ -164,40 +170,40 @@ export function ChessBoard({
     return tryMove(sourceSquare, targetSquare);
   }, [practiceMode, tryMove]);
 
-  // Determine which pieces can be dragged (only the side to move)
   const canDragPiece = useCallback(({ piece }: { piece: { pieceType: string } | null }) => {
     if (!practiceMode || !piece) return false;
     try {
-      const chess = new Chess(position);
-      const turn = chess.turn(); // 'w' or 'b'
+      const chess = new Chess(positionRef.current);
+      const turn = chess.turn();
       const pieceColor = piece.pieceType[0].toLowerCase();
       return pieceColor === turn;
     } catch {
       return false;
     }
-  }, [practiceMode, position]);
+  }, [practiceMode]);
+
+  const selectedSquareRef = useRef(selectedSquare);
+  selectedSquareRef.current = selectedSquare;
+  const legalTargetsRef = useRef(legalTargets);
+  legalTargetsRef.current = legalTargets;
 
   const handleSquareClick = useCallback(({ square, piece }: { square: string; piece: { pieceType: string } | null }) => {
     if (!practiceMode) return;
+    const sel = selectedSquareRef.current;
 
-    // If a square is already selected
-    if (selectedSquare) {
-      // Clicking the same square → deselect
-      if (square === selectedSquare) {
+    if (sel) {
+      if (square === sel) {
         setSelectedSquare(null);
         return;
       }
-      // Clicking a legal target → attempt move
-      if (legalTargets.includes(square)) {
-        const moved = tryMove(selectedSquare, square);
+      if (legalTargetsRef.current.includes(square)) {
+        const moved = tryMove(sel, square);
         setSelectedSquare(null);
         if (!moved) {
-          // illegal for some reason — try selecting new square if it has a piece
           if (piece) setSelectedSquare(square);
         }
         return;
       }
-      // Clicking another piece → switch selection (or deselect)
       if (piece) {
         setSelectedSquare(square);
       } else {
@@ -206,12 +212,11 @@ export function ChessBoard({
       return;
     }
 
-    // No square selected: select if there's a piece of the side to move
     if (piece) {
       try {
-        const chess = new Chess(position);
-        const turn = chess.turn(); // 'w' or 'b'
-        const pieceColor = piece.pieceType[0].toLowerCase(); // 'w' or 'b'
+        const chess = new Chess(positionRef.current);
+        const turn = chess.turn();
+        const pieceColor = piece.pieceType[0].toLowerCase();
         if (pieceColor === turn) {
           setSelectedSquare(square);
         }
@@ -219,7 +224,7 @@ export function ChessBoard({
         setSelectedSquare(square);
       }
     }
-  }, [practiceMode, selectedSquare, legalTargets, tryMove, position]);
+  }, [practiceMode, tryMove]);
 
   // Build square styles
   const squareStyles = useMemo(() => {
