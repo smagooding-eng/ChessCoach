@@ -850,6 +850,25 @@ Return ONLY this JSON: { "left": 0.05, "top": 0.10, "right": 0.95, "bottom": 0.9
         .resize(640, 640, { fit: 'fill' })
         .jpeg({ quality: 92 })
         .toBuffer();
+
+      // Sanity check the crop: a real chess board has high color variance
+      // (alternating light/dark squares). If the crop is mostly one color
+      // (the bbox AI missed the board and grabbed black/dark UI chrome),
+      // abort the verification and don't return the bad crop to the user.
+      const stats = await sharp(croppedJpeg).stats();
+      const channelStdAvg = stats.channels.length > 0
+        ? stats.channels.slice(0, 3).reduce((a, c) => a + c.stdev, 0) / Math.min(3, stats.channels.length)
+        : 0;
+      const channelMeanAvg = stats.channels.length > 0
+        ? stats.channels.slice(0, 3).reduce((a, c) => a + c.mean, 0) / Math.min(3, stats.channels.length)
+        : 0;
+      // A real chess board crop has stddev > ~40 across RGB. A mostly-black
+      // (or mostly-white) image has stddev < 20.
+      if (channelStdAvg < 25 || channelMeanAvg < 15 || channelMeanAvg > 245) {
+        req.log?.warn?.({ stddev: channelStdAvg, mean: channelMeanAvg }, "Crop looks empty — bbox missed the board, skipping verification");
+        throw new Error('crop is empty / monochrome — bbox missed the board');
+      }
+
       const cropB64 = croppedJpeg.toString('base64');
       croppedDataUrl = `data:image/jpeg;base64,${cropB64}`;
 
