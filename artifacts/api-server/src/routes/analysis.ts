@@ -1183,7 +1183,7 @@ Return ONLY a JSON object mapping each square to its color, nothing else. Exampl
       fen: validatedFen,
       confidence,
       notes: best.notes || "",
-      croppedImage: croppedDataUrl,
+      croppedImage: `data:image/png;base64,${originalBuf.toString("base64")}`,
       annotatedImage: annotatedDataUrl,
     });
   } catch (err: unknown) {
