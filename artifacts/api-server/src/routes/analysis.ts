@@ -835,16 +835,20 @@ Return ONLY this JSON, no markdown:
         .raw()
         .toBuffer({ resolveWithObject: true });
 
-      // Tile size ≈ half a chess square so we can detect partial overlap.
-      const TILE = Math.max(4, Math.floor(Math.min(scanW, scanH) / 24));
-      const tilesX = Math.floor(scanW / TILE);
-      const tilesY = Math.floor(scanH / TILE);
+      // Tile size: large enough to span at least 1.5 chess squares so a
+      // tile placed anywhere on the board sees BOTH light and dark pixels.
+      // Too-small tiles fall entirely inside one chess square (uniform
+      // color → low variance) and miss the pattern.
+      const TILE = Math.max(8, Math.floor(Math.min(scanW, scanH) / 14));
+      const STEP = Math.max(2, Math.floor(TILE / 2)); // overlapping for finer bbox
+      const tilesX = Math.floor((scanW - TILE) / STEP) + 1;
+      const tilesY = Math.floor((scanH - TILE) / STEP) + 1;
       const tileVar: number[] = new Array(tilesX * tilesY).fill(0);
 
       for (let ty = 0; ty < tilesY; ty++) {
         for (let tx = 0; tx < tilesX; tx++) {
           let sum = 0, sumSq = 0;
-          const x0 = tx * TILE, y0 = ty * TILE;
+          const x0 = tx * STEP, y0 = ty * STEP;
           for (let y = y0; y < y0 + TILE; y++) {
             for (let x = x0; x < x0 + TILE; x++) {
               const v = gray[y * scanW + x];
@@ -857,15 +861,17 @@ Return ONLY this JSON, no markdown:
         }
       }
 
-      // Threshold: tiles in the top 35% of variance values are "board-like".
-      // Chess board tiles have ~half light + half dark pixels → very high
-      // variance. UI tiles are uniform or have small text → low variance.
-      const sortedVars = [...tileVar].sort((a, b) => a - b);
-      // Use a percentile cut so it adapts to the screenshot.
-      const pct = 0.65;
-      const thr = sortedVars[Math.floor(sortedVars.length * pct)];
+      // STRICT threshold. A tile fully on a chess board sees light+dark
+      // pixels → variance ≈ 3000-7000. A tile on UI text → variance ≈
+      // 200-800. A tile in empty UI → variance < 100. So an absolute
+      // floor of ~1500 cleanly separates board tiles from text tiles,
+      // and we additionally require top 20% of all tiles to adapt.
+      const sortedVars = [...tileVar].slice().sort((a, b) => a - b);
+      const pctThr = sortedVars[Math.floor(sortedVars.length * 0.80)];
+      const ABS_FLOOR = 1500;
+      const thr = Math.max(pctThr, ABS_FLOOR);
 
-      const isBoard: boolean[] = tileVar.map(v => v >= thr && v > 200);
+      const isBoard: boolean[] = tileVar.map(v => v >= thr);
 
       // Connected component labeling (4-neighbour BFS) on the tile grid.
       const label: number[] = new Array(tilesX * tilesY).fill(-1);
@@ -900,24 +906,37 @@ Return ONLY this JSON, no markdown:
 
       if (components.length === 0) throw new Error('no board-like tiles found');
 
-      // Score each component: prefer LARGE components that are also roughly SQUARE.
-      // The chess board is the only large square blob in a screenshot.
+      // Score each component to find THE board:
+      //  - Aspect ratio MUST be near-square (chess board is 1:1).
+      //  - Larger area > smaller area (the board is the largest blob of
+      //    such tightly-checkered tiles in a screenshot).
+      //  - Dense fill > sparse (a real board fills its bbox densely;
+      //    text spread out across a region does not).
+      // We REJECT components whose aspect is < 0.5 — text rows and icon
+      // strips form long thin blobs and should not win even if large.
       function score(c: typeof components[number]): number {
         const w = c.maxX - c.minX + 1;
         const h = c.maxY - c.minY + 1;
         const aspect = Math.min(w, h) / Math.max(w, h);
+        if (aspect < 0.5) return -1; // reject thin strips
         const fillRatio = c.count / (w * h);
-        // Reward area, square aspect, and dense fill.
-        return c.count * aspect * Math.max(0.3, fillRatio);
+        if (fillRatio < 0.4) return -1; // reject sparse / scattered
+        if (c.count < 6) return -1; // reject tiny noise blobs
+        // Square-ness matters most → aspect squared.
+        return c.count * aspect * aspect * fillRatio;
       }
       components.sort((a, b) => score(b) - score(a));
       const board = components[0];
+      if (score(board) <= 0) throw new Error('no plausible square component');
 
-      // Convert tile coords back to image fraction.
-      let bl = (board.minX * TILE) / scanW;
-      let br = ((board.maxX + 1) * TILE) / scanW;
-      let bt = (board.minY * TILE) / scanH;
-      let bbo = ((board.maxY + 1) * TILE) / scanH;
+      // Convert tile coords back to image pixel fractions. Each tile is
+      // centered at (tx*STEP + TILE/2, ty*STEP + TILE/2) in scan pixels,
+      // and covers TILE pixels — so the bbox spans from minX*STEP to
+      // (maxX*STEP + TILE), same for Y.
+      let bl = (board.minX * STEP) / scanW;
+      let br = (board.maxX * STEP + TILE) / scanW;
+      let bt = (board.minY * STEP) / scanH;
+      let bbo = (board.maxY * STEP + TILE) / scanH;
 
       // Force square bbox by expanding the shorter dimension around the center.
       // (Convert to PIXEL space first because scan grid isn't square.)
