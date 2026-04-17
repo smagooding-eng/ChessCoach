@@ -805,69 +805,101 @@ Return ONLY this JSON, no markdown:
       }
       if (occupiedSquares.length === 0) throw new Error('no pieces to verify');
 
-      // 1. Get a board bbox. Run TWO high-detail calls and INTERSECT them
-      // so any over-inclusive answer (e.g. one that grabs the whole phone
-      // screen) gets trimmed down by the tighter one. The prompt asks
-      // explicitly for the TIGHTEST box around just the 8×8 grid.
-      const BBOX_PROMPT = `Find the chessboard in this image — the 8×8 grid of alternating light/dark squares with the chess pieces on it.
+      // 1. Find the board GEOMETRICALLY by per-row / per-column variance.
+      //
+      // A chess board has a unique signature: every row contains alternating
+      // light/dark squares, so the per-row pixel variance is HIGH across
+      // every row that overlaps the board. Empty/UI areas (status bars,
+      // dark backgrounds, player panels) are nearly uniform so their
+      // per-row variance is LOW.
+      //
+      // We downsample the image to grayscale, compute the variance of each
+      // row and each column, threshold them, and the bounding box is the
+      // contiguous range of high-variance rows × high-variance columns.
+      // This works even when the board is a small portion of a tall phone
+      // screenshot surrounded by dark UI chrome — exactly where the AI
+      // bbox approach kept failing.
 
-Return the TIGHTEST possible bounding box that contains ONLY the board itself. EXCLUDE: status bars, browser chrome, app UI, player panels, eval bars, captured-piece rows, clocks, names, ratings, and ALL surrounding empty/dark space. The bbox should hug the four outer edges of the 8×8 grid.
+      // Downsample the image to a manageable size for variance scanning.
+      const SCAN_SIZE = 256;
+      const longSide = Math.max(imgW, imgH);
+      const scaleScan = SCAN_SIZE / longSide;
+      const scanW = Math.max(8, Math.round(imgW * scaleScan));
+      const scanH = Math.max(8, Math.round(imgH * scaleScan));
+      const { data: gray } = await sharp(originalBuf)
+        .resize(scanW, scanH, { fit: 'fill' })
+        .grayscale()
+        .removeAlpha()
+        .raw()
+        .toBuffer({ resolveWithObject: true });
 
-If rank labels (1–8) or file labels (a–h) sit just outside the squares, you may include them, but no more than that.
-
-Return as fractions of the image (0–1). ONLY this JSON:
-{ "left": 0.10, "top": 0.55, "right": 0.95, "bottom": 0.92 }`;
-
-      async function bboxOnce(): Promise<{ l: number; t: number; r: number; b: number } | null> {
-        try {
-          const resp = await ai.chat.completions.create({
-            model: "gpt-5.2",
-            max_completion_tokens: 200,
-            messages: [{
-              role: "user",
-              content: [
-                { type: "text", text: BBOX_PROMPT },
-                { type: "image_url", image_url: { url: `data:${mimeType};base64,${base64Data}`, detail: "high" } },
-              ],
-            }],
-            response_format: { type: "json_object" },
-          });
-          const j = JSON.parse(resp.choices[0]?.message?.content ?? "{}") as
-            { left?: number; top?: number; right?: number; bottom?: number };
-          const l = Math.max(0, Math.min(1, j.left ?? 0));
-          const t = Math.max(0, Math.min(1, j.top ?? 0));
-          const r = Math.max(0, Math.min(1, j.right ?? 1));
-          const b = Math.max(0, Math.min(1, j.bottom ?? 1));
-          if (r - l < 0.15 || b - t < 0.15) return null;
-          return { l, t, r, b };
-        } catch { return null; }
-      }
-
-      const [bb1, bb2] = await Promise.all([bboxOnce(), bboxOnce()]);
-      if (!bb1 && !bb2) throw new Error('bbox detection failed');
-
-      // Intersect the two boxes (or use whichever succeeded). Intersection
-      // forces the crop to whatever BOTH calls considered to be inside the
-      // board — kicking out any over-inclusive answer.
-      let bl: number, bt: number, br: number, bbo: number;
-      if (bb1 && bb2) {
-        bl = Math.max(bb1.l, bb2.l);
-        bt = Math.max(bb1.t, bb2.t);
-        br = Math.min(bb1.r, bb2.r);
-        bbo = Math.min(bb1.b, bb2.b);
-        // If intersection is empty/too small, fall back to the smaller of the two.
-        if (br - bl < 0.15 || bbo - bt < 0.15) {
-          const useBb = ((bb1.r - bb1.l) * (bb1.b - bb1.t)) < ((bb2.r - bb2.l) * (bb2.b - bb2.t)) ? bb1 : bb2;
-          bl = useBb.l; bt = useBb.t; br = useBb.r; bbo = useBb.b;
+      function rowVariance(y: number): number {
+        let sum = 0, sumSq = 0;
+        for (let x = 0; x < scanW; x++) {
+          const v = gray[y * scanW + x];
+          sum += v; sumSq += v * v;
         }
-      } else {
-        const useBb = (bb1 ?? bb2)!;
-        bl = useBb.l; bt = useBb.t; br = useBb.r; bbo = useBb.b;
+        const mean = sum / scanW;
+        return sumSq / scanW - mean * mean;
       }
-      if (br - bl < 0.15 || bbo - bt < 0.15) throw new Error('degenerate bbox');
+      function colVariance(x: number): number {
+        let sum = 0, sumSq = 0;
+        for (let y = 0; y < scanH; y++) {
+          const v = gray[y * scanW + x];
+          sum += v; sumSq += v * v;
+        }
+        const mean = sum / scanH;
+        return sumSq / scanH - mean * mean;
+      }
 
-      // 2. Pad by 10% and force a centered square crop.
-      const padFrac = 0.10;
+      const rowVars = new Array(scanH);
+      for (let y = 0; y < scanH; y++) rowVars[y] = rowVariance(y);
+      const colVars = new Array(scanW);
+      for (let x = 0; x < scanW; x++) colVars[x] = colVariance(x);
+
+      // Threshold: find the variance level that separates "uniform" rows
+      // (UI chrome) from "patterned" rows (the chess board). We use a
+      // percentage of the maximum variance — chess board rows typically
+      // sit near the maximum, while UI rows are an order of magnitude lower.
+      const maxRowVar = Math.max(...rowVars);
+      const maxColVar = Math.max(...colVars);
+      const rowThr = maxRowVar * 0.35;
+      const colThr = maxColVar * 0.35;
+
+      // Find the LONGEST contiguous run of rows above threshold — that's
+      // the board (other high-variance areas like icon strips will be short).
+      function longestRun(values: number[], thr: number): { start: number; end: number } {
+        let bestStart = 0, bestLen = 0, curStart = -1, curLen = 0;
+        for (let i = 0; i < values.length; i++) {
+          if (values[i] >= thr) {
+            if (curStart < 0) curStart = i;
+            curLen++;
+            if (curLen > bestLen) { bestLen = curLen; bestStart = curStart; }
+          } else {
+            curStart = -1; curLen = 0;
+          }
+        }
+        return { start: bestStart, end: bestStart + bestLen };
+      }
+
+      const yRange = longestRun(rowVars, rowThr);
+      const xRange = longestRun(colVars, colThr);
+
+      if (yRange.end - yRange.start < 8 || xRange.end - xRange.start < 8) {
+        throw new Error('could not detect board by variance');
+      }
+
+      // Convert scan-space coordinates back to original image coordinates.
+      let bl = xRange.start / scanW;
+      let br = xRange.end / scanW;
+      let bt = yRange.start / scanH;
+      let bbo = yRange.end / scanH;
+
+      req.log?.info?.({ bl, bt, br, bbo, maxRowVar, maxColVar }, "Board detected by variance");
+
+      // 2. Pad by 4% and force a centered square crop. (Geometric detection
+      // is tight, so less padding needed than the AI version.)
+      const padFrac = 0.04;
       const cx = (bl + br) / 2;
       const cy = (bt + bbo) / 2;
       const halfSide = Math.max(br - bl, bbo - bt) / 2 + padFrac;
