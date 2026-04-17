@@ -52,7 +52,9 @@ router.get("/onboarding/insights", requireAuth, async (req: Request, res: Respon
       .filter((h): h is string => !!h)
       .map((h) => h.toLowerCase());
     if (!ownedHandles.includes(username)) {
-      // First-time import: claim this handle for the user, unless another account already owns it.
+      // Try to claim this handle for the user. If another account already owns it,
+      // we still compute insights (chess.com/lichess games are public) but don't
+      // overwrite the existing link.
       const [otherOwner] = await db
         .select({ id: usersTable.id })
         .from(usersTable)
@@ -63,15 +65,13 @@ router.get("/onboarding/insights", requireAuth, async (req: Request, res: Respon
           ),
         )
         .limit(1);
-      if (otherOwner && otherOwner.id !== req.user!.id) {
-        res.status(403).json({ error: "Username is linked to a different account" });
-        return;
+      if (!otherOwner || otherOwner.id === req.user!.id) {
+        const updates =
+          platform === "lichess"
+            ? { lichessUsername: username }
+            : { chesscomUsername: username };
+        await db.update(usersTable).set(updates).where(eq(usersTable.id, req.user!.id));
       }
-      const updates =
-        platform === "lichess"
-          ? { lichessUsername: username }
-          : { chesscomUsername: username };
-      await db.update(usersTable).set(updates).where(eq(usersTable.id, req.user!.id));
     }
 
     const conditions = [eq(gamesTable.username, username)];
