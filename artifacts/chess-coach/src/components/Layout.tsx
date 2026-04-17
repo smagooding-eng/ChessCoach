@@ -96,6 +96,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const { canInstall, install, showGuide, setShowGuide, dismissInstall, platform } = usePwaInstall();
   const { showOnboarding } = useOnboardingCheck();
 
+  useEffect(() => { setMoreOpen(false); setProfileOpen(false); }, [location]);
+
   const displayRating = player?.rating;
 
   // Hide all chrome (sidebar, mobile header, bottom nav) until onboarding completes
@@ -110,8 +112,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const moreItems = [...PRIMARY_NAV.slice(4), ...SECONDARY_NAV, ...(authUser?.isAdmin ? ADMIN_NAV : [])];
   const activeMore = moreItems.find(i => location === i.href || location.startsWith(i.href + '/'));
   const isMoreActive = !!activeMore;
-
-  useEffect(() => { setMoreOpen(false); setProfileOpen(false); }, [location]);
 
   return (
     <div className="min-h-screen flex flex-col md:flex-row" style={{ background: BG_DARK }}>
