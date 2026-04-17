@@ -805,29 +805,66 @@ Return ONLY this JSON, no markdown:
       }
       if (occupiedSquares.length === 0) throw new Error('no pieces to verify');
 
-      // 1. Get a board bbox.
-      const bboxResp = await ai.chat.completions.create({
-        model: "gpt-5.2",
-        max_completion_tokens: 200,
-        messages: [{
-          role: "user",
-          content: [
-            { type: "text", text: `Find the chess board (the 8×8 grid of squares) in this image.
-Return its bounding box as fractions of the image (0–1).
-Include EVERY rank (1–8) and EVERY file (a–h). Err on the side of INCLUDING TOO MUCH.
-Return ONLY this JSON: { "left": 0.05, "top": 0.10, "right": 0.95, "bottom": 0.90 }` },
-            { type: "image_url", image_url: { url: `data:${mimeType};base64,${base64Data}`, detail: "low" } },
-          ],
-        }],
-        response_format: { type: "json_object" },
-      });
-      const bb = JSON.parse(bboxResp.choices[0]?.message?.content ?? "{}") as
-        { left?: number; top?: number; right?: number; bottom?: number };
-      let bl = Math.max(0, Math.min(1, bb.left ?? 0));
-      let bt = Math.max(0, Math.min(1, bb.top ?? 0));
-      let br = Math.max(0, Math.min(1, bb.right ?? 1));
-      let bbo = Math.max(0, Math.min(1, bb.bottom ?? 1));
-      if (br - bl < 0.2 || bbo - bt < 0.2) throw new Error('degenerate bbox');
+      // 1. Get a board bbox. Run TWO high-detail calls and INTERSECT them
+      // so any over-inclusive answer (e.g. one that grabs the whole phone
+      // screen) gets trimmed down by the tighter one. The prompt asks
+      // explicitly for the TIGHTEST box around just the 8×8 grid.
+      const BBOX_PROMPT = `Find the chessboard in this image — the 8×8 grid of alternating light/dark squares with the chess pieces on it.
+
+Return the TIGHTEST possible bounding box that contains ONLY the board itself. EXCLUDE: status bars, browser chrome, app UI, player panels, eval bars, captured-piece rows, clocks, names, ratings, and ALL surrounding empty/dark space. The bbox should hug the four outer edges of the 8×8 grid.
+
+If rank labels (1–8) or file labels (a–h) sit just outside the squares, you may include them, but no more than that.
+
+Return as fractions of the image (0–1). ONLY this JSON:
+{ "left": 0.10, "top": 0.55, "right": 0.95, "bottom": 0.92 }`;
+
+      async function bboxOnce(): Promise<{ l: number; t: number; r: number; b: number } | null> {
+        try {
+          const resp = await ai.chat.completions.create({
+            model: "gpt-5.2",
+            max_completion_tokens: 200,
+            messages: [{
+              role: "user",
+              content: [
+                { type: "text", text: BBOX_PROMPT },
+                { type: "image_url", image_url: { url: `data:${mimeType};base64,${base64Data}`, detail: "high" } },
+              ],
+            }],
+            response_format: { type: "json_object" },
+          });
+          const j = JSON.parse(resp.choices[0]?.message?.content ?? "{}") as
+            { left?: number; top?: number; right?: number; bottom?: number };
+          const l = Math.max(0, Math.min(1, j.left ?? 0));
+          const t = Math.max(0, Math.min(1, j.top ?? 0));
+          const r = Math.max(0, Math.min(1, j.right ?? 1));
+          const b = Math.max(0, Math.min(1, j.bottom ?? 1));
+          if (r - l < 0.15 || b - t < 0.15) return null;
+          return { l, t, r, b };
+        } catch { return null; }
+      }
+
+      const [bb1, bb2] = await Promise.all([bboxOnce(), bboxOnce()]);
+      if (!bb1 && !bb2) throw new Error('bbox detection failed');
+
+      // Intersect the two boxes (or use whichever succeeded). Intersection
+      // forces the crop to whatever BOTH calls considered to be inside the
+      // board — kicking out any over-inclusive answer.
+      let bl: number, bt: number, br: number, bbo: number;
+      if (bb1 && bb2) {
+        bl = Math.max(bb1.l, bb2.l);
+        bt = Math.max(bb1.t, bb2.t);
+        br = Math.min(bb1.r, bb2.r);
+        bbo = Math.min(bb1.b, bb2.b);
+        // If intersection is empty/too small, fall back to the smaller of the two.
+        if (br - bl < 0.15 || bbo - bt < 0.15) {
+          const useBb = ((bb1.r - bb1.l) * (bb1.b - bb1.t)) < ((bb2.r - bb2.l) * (bb2.b - bb2.t)) ? bb1 : bb2;
+          bl = useBb.l; bt = useBb.t; br = useBb.r; bbo = useBb.b;
+        }
+      } else {
+        const useBb = (bb1 ?? bb2)!;
+        bl = useBb.l; bt = useBb.t; br = useBb.r; bbo = useBb.b;
+      }
+      if (br - bl < 0.15 || bbo - bt < 0.15) throw new Error('degenerate bbox');
 
       // 2. Pad by 10% and force a centered square crop.
       const padFrac = 0.10;
