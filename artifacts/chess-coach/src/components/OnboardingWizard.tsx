@@ -5,7 +5,7 @@ import { invalidateEloCache } from '@/hooks/use-elo-progress';
 import { apiFetch } from '@/lib/api';
 import {
   AlertTriangle, Loader2, Sparkles, ArrowRight, Camera, Brain, Bot,
-  Target, Trophy, Swords, Compass, Check, ChevronRight,
+  Target, Trophy, Swords, Compass, Check, ChevronRight, Database, Zap,
 } from 'lucide-react';
 
 const ONBOARDING_KEY = 'chessscout_onboarding_v2';
@@ -23,7 +23,7 @@ const LOADING_MESSAGES = [
   "Building your personal report...",
 ];
 
-type Step = 'goal' | 'import' | 'loading' | 'aha' | 'tour' | 'commit';
+type Step = 'goal' | 'import' | 'loading' | 'aha' | 'tour' | 'deepImport' | 'commit';
 type Platform = 'chesscom' | 'lichess';
 
 interface Insight {
@@ -58,10 +58,10 @@ const SEV_ACCENT: Record<string, string> = {
 };
 
 const GOALS = [
-  { id: 'fix',       icon: Target,  title: 'Stop losing the same way',  blurb: 'Find the patterns costing you games.' },
-  { id: 'climb',     icon: Trophy,  title: 'Climb to my next level',    blurb: 'Targeted fixes to break your rating ceiling.' },
-  { id: 'tourney',   icon: Swords,  title: 'Prep for an opponent',      blurb: 'Scout their weaknesses before you play.' },
-  { id: 'explore',   icon: Compass, title: "I'm just exploring",        blurb: "Show me what's possible." },
+  { id: 'fix',       icon: Target,  title: 'Stop losing the same way',  blurb: 'Find the patterns costing you games.',           commit: "We've already spotted the patterns dragging your rating down. Let's go fix them." },
+  { id: 'climb',     icon: Trophy,  title: 'Climb to my next level',    blurb: 'Targeted fixes to break your rating ceiling.',   commit: "Your roadmap to the next rating tier is loaded. Time to climb." },
+  { id: 'tourney',   icon: Swords,  title: 'Prep for an opponent',      blurb: 'Scout their weaknesses before you play.',        commit: "You're ready to scout. Drop an opponent's username and we'll do the rest." },
+  { id: 'explore',   icon: Compass, title: "I'm just exploring",        blurb: "Show me what's possible.",                       commit: "Have a poke around — your dashboard is wired up with everything we found." },
 ] as const;
 
 const TOUR = [
@@ -171,22 +171,30 @@ export function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
   const [progress, setProgress] = useState(0);
   const [insights, setInsights] = useState<InsightsResponse | null>(null);
   const [tourIdx, setTourIdx] = useState(0);
+  const [gameCounter, setGameCounter] = useState(0);
+  const [deepImporting, setDeepImporting] = useState(false);
+  const [deepImported, setDeepImported] = useState<number | null>(null);
+  const [deepError, setDeepError] = useState<string | null>(null);
   const cancelledRef = useRef(false);
 
   useEffect(() => () => { cancelledRef.current = true; }, []);
 
-  // Loading message rotation + fake progress
+  // Loading message rotation + fake progress + ticking games counter
   useEffect(() => {
     if (step !== 'loading') return;
     setLoadingMsgIdx(0);
     setProgress(0);
+    setGameCounter(0);
     const msgIv = setInterval(() => {
       setLoadingMsgIdx((i) => (i + 1) % LOADING_MESSAGES.length);
     }, 1500);
     const progIv = setInterval(() => {
       setProgress((p) => (p < 90 ? p + Math.random() * 6 : p));
     }, 400);
-    return () => { clearInterval(msgIv); clearInterval(progIv); };
+    const counterIv = setInterval(() => {
+      setGameCounter((c) => c + Math.floor(Math.random() * 4 + 1));
+    }, 180);
+    return () => { clearInterval(msgIv); clearInterval(progIv); clearInterval(counterIv); };
   }, [step]);
 
   const startImport = useCallback(async () => {
@@ -236,12 +244,50 @@ export function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
     }
   }, [importUsername, platform, login, refreshAuth]);
 
-  // Step index for progress dots (goal=0, import=1, loading=1, aha=2, tour=3, commit=4)
+  const runDeepImport = useCallback(async () => {
+    const name = importUsername.trim();
+    if (!name) { setStep('commit'); return; }
+    setDeepError(null);
+    setDeepImporting(true);
+    try {
+      const res = await apiFetch('/api/games/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          username: name,
+          months: 24,
+          platform,
+          ownerUsername: name,
+        }),
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        throw new Error(j.error || `Import failed (${res.status})`);
+      }
+      const data = await res.json().catch(() => ({} as any));
+      if (cancelledRef.current) return;
+      const total = typeof data.total === 'number' ? data.total : null;
+      const imported = typeof data.imported === 'number' ? data.imported : null;
+      setDeepImported(total ?? imported ?? 0);
+      invalidateEloCache();
+      setTimeout(() => {
+        if (!cancelledRef.current) { setDeepImporting(false); setStep('commit'); }
+      }, 700);
+    } catch (e) {
+      if (cancelledRef.current) return;
+      setDeepImporting(false);
+      setDeepError(e instanceof Error ? e.message : 'Could not import more games');
+    }
+  }, [importUsername, platform]);
+
+  // Step index for progress dots
   const progressIndex =
     step === 'goal' ? 0 :
     step === 'import' || step === 'loading' ? 1 :
     step === 'aha' ? 2 :
-    step === 'tour' ? 3 : 4;
+    step === 'tour' ? 3 :
+    step === 'deepImport' ? 4 : 5;
 
   return (
     <motion.div
@@ -252,7 +298,7 @@ export function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
       style={{ background: BG }}
     >
       <div className="w-full max-w-xl">
-        <ProgressDots index={progressIndex} total={5} />
+        <ProgressDots index={progressIndex} total={6} />
 
         <AnimatePresence mode="wait">
           {/* STEP 1 — GOAL */}
@@ -444,6 +490,13 @@ export function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
                 <p className="text-xs mt-3 font-mono" style={{ color: MUTED }}>
                   {Math.round(progress)}%
                 </p>
+
+                <div className="mt-6 inline-flex items-center gap-2 px-3 py-1.5 rounded-full" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                  <Database className="w-3.5 h-3.5" style={{ color: G }} />
+                  <span className="text-xs font-mono font-bold" style={{ color: TEXT }}>
+                    {gameCounter} games processed
+                  </span>
+                </div>
               </div>
             </motion.div>
           )}
@@ -584,7 +637,7 @@ export function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
                     <button
                       onClick={() => {
                         if (tourIdx < TOUR.length - 1) setTourIdx(tourIdx + 1);
-                        else setStep('commit');
+                        else setStep('deepImport');
                       }}
                       className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl font-black text-base transition-all"
                       style={{ background: G, color: '#fff' }}
@@ -597,7 +650,7 @@ export function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
               })()}
 
               <button
-                onClick={() => setStep('commit')}
+                onClick={() => setStep('deepImport')}
                 className="text-xs mt-4 underline-offset-2 hover:underline"
                 style={{ color: MUTED }}
               >
@@ -606,7 +659,91 @@ export function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
             </motion.div>
           )}
 
-          {/* STEP 6 — COMMIT */}
+          {/* STEP 6 — DEEP IMPORT */}
+          {step === 'deepImport' && (
+            <motion.div
+              key="deepImport"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.3 }}
+              className="text-center"
+            >
+              <motion.div
+                animate={deepImporting ? { scale: [1, 1.06, 1] } : {}}
+                transition={deepImporting ? { repeat: Infinity, duration: 1.4 } : {}}
+                className="inline-flex items-center justify-center w-14 h-14 rounded-2xl mb-5"
+                style={{ background: `${G}1a`, border: `1px solid ${G}33` }}
+              >
+                {deepImporting
+                  ? <Loader2 className="w-7 h-7 animate-spin" style={{ color: G }} />
+                  : <Database className="w-7 h-7" style={{ color: G }} />}
+              </motion.div>
+
+              <h1 className="text-2xl md:text-4xl font-black mb-2 leading-tight" style={{ color: TEXT }}>
+                {deepImporting ? 'Pulling your full library…' : 'Want the complete picture?'}
+              </h1>
+              <p className="text-sm md:text-base mb-6 max-w-md mx-auto" style={{ color: MUTED }}>
+                {deepImporting
+                  ? "Hang tight — this can take a moment for active players."
+                  : `So far we've analyzed ${insights?.totalGames ?? 0} games from your last 3 months. Pull the rest so every blunder pattern shows up.`}
+              </p>
+
+              <div className="rounded-2xl p-5 mb-5 text-left" style={{ background: CARD, border: `1px solid rgba(255,255,255,0.06)` }}>
+                <div className="flex items-center justify-between mb-3 pb-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full" style={{ background: G }} />
+                    <span className="text-xs font-bold uppercase tracking-wider" style={{ color: MUTED }}>Already imported</span>
+                  </div>
+                  <span className="text-sm font-black font-mono" style={{ color: TEXT }}>{insights?.totalGames ?? 0} games</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Zap className="w-3.5 h-3.5" style={{ color: '#eaa631' }} />
+                    <span className="text-xs font-bold uppercase tracking-wider" style={{ color: MUTED }}>Add 2 more years</span>
+                  </div>
+                  <span className="text-sm font-black font-mono" style={{ color: G }}>+ everything available</span>
+                </div>
+              </div>
+
+              {deepError && (
+                <div className="mb-3 p-2.5 rounded-lg text-sm" style={{ background: 'rgba(220,67,67,0.1)', border: '1px solid rgba(220,67,67,0.25)', color: '#ef6b6b' }}>
+                  {deepError}
+                </div>
+              )}
+
+              <button
+                onClick={runDeepImport}
+                disabled={deepImporting}
+                className="w-full flex items-center justify-center gap-2 py-4 rounded-xl font-black text-base transition-all disabled:opacity-70"
+                style={{ background: G, color: '#fff' }}
+              >
+                {deepImporting ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    Importing…
+                  </>
+                ) : (
+                  <>
+                    Yes, import my full library
+                    <ArrowRight className="w-5 h-5" />
+                  </>
+                )}
+              </button>
+
+              {!deepImporting && (
+                <button
+                  onClick={() => setStep('commit')}
+                  className="text-xs mt-4 underline-offset-2 hover:underline"
+                  style={{ color: MUTED }}
+                >
+                  Maybe later
+                </button>
+              )}
+            </motion.div>
+          )}
+
+          {/* STEP 7 — COMMIT */}
           {step === 'commit' && (
             <motion.div
               key="commit"
@@ -628,11 +765,16 @@ export function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
               <h1 className="text-3xl md:text-4xl font-black mb-3 leading-tight" style={{ color: TEXT }}>
                 Your game plan is ready
               </h1>
-              <p className="text-base mb-7 max-w-md mx-auto" style={{ color: MUTED }}>
-                {insights && insights.totalGames > 0
-                  ? `${insights.totalGames} games analyzed. Your dashboard is loaded with personalized fixes.`
-                  : 'Your dashboard is set up. Import more games anytime to sharpen your plan.'}
-              </p>
+              {(() => {
+                const total = deepImported ?? insights?.totalGames ?? 0;
+                const goalCommit = GOALS.find(g => g.id === goal)?.commit
+                  ?? "Your dashboard is loaded and ready.";
+                return (
+                  <p className="text-base mb-7 max-w-md mx-auto" style={{ color: MUTED }}>
+                    {total > 0 ? `${total} games analyzed. ` : ''}{goalCommit}
+                  </p>
+                );
+              })()}
 
               <div className="rounded-2xl p-4 mb-6 text-left"
                 style={{ background: CARD, border: `1px solid rgba(255,255,255,0.06)` }}>
