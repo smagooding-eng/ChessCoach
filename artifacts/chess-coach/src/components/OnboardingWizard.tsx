@@ -532,10 +532,38 @@ export function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
                       initial={{ scale: 0.8, opacity: 0 }}
                       animate={{ scale: 1, opacity: 1 }}
                       transition={{ delay: 0.15, type: 'spring', stiffness: 180 }}
-                      className="inline-block mb-4"
+                      className="inline-block mb-4 relative"
                     >
-                      <div
-                        className="px-5 py-2 rounded-2xl"
+                      {/* sparkle particles around the number */}
+                      {[...Array(6)].map((_, i) => {
+                        const angle = (i / 6) * Math.PI * 2;
+                        const r = 70;
+                        return (
+                          <motion.div
+                            key={i}
+                            className="absolute left-1/2 top-1/2 w-1.5 h-1.5 rounded-full"
+                            style={{ background: '#ef6b6b' }}
+                            initial={{ x: 0, y: 0, opacity: 0, scale: 0 }}
+                            animate={{
+                              x: Math.cos(angle) * r,
+                              y: Math.sin(angle) * r,
+                              opacity: [0, 1, 0],
+                              scale: [0, 1.2, 0],
+                            }}
+                            transition={{ delay: 0.4 + i * 0.04, duration: 0.9, ease: 'easeOut' }}
+                          />
+                        );
+                      })}
+                      <motion.div
+                        className="px-5 py-2 rounded-2xl relative"
+                        animate={{
+                          boxShadow: [
+                            '0 0 0 rgba(220,67,67,0)',
+                            '0 0 40px rgba(220,67,67,0.45)',
+                            '0 0 0 rgba(220,67,67,0)',
+                          ],
+                        }}
+                        transition={{ duration: 2.4, repeat: Infinity, ease: 'easeInOut' }}
                         style={{
                           background: 'linear-gradient(135deg, rgba(220,67,67,0.18) 0%, rgba(220,67,67,0.04) 100%)',
                           border: '1.5px solid rgba(220,67,67,0.35)',
@@ -545,7 +573,7 @@ export function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
                           ~{leak}
                         </span>
                         <span className="text-xl md:text-2xl font-black ml-1" style={{ color: '#ef6b6b' }}>pts</span>
-                      </div>
+                      </motion.div>
                     </motion.div>
                     <p className="text-sm md:text-base font-semibold" style={{ color: TEXT }}>
                       every month you don't fix these.
@@ -730,7 +758,15 @@ export function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
                   <p className="text-2xl font-black mb-1" style={{ color: TEXT }}>{insights?.totalGames ?? 0}</p>
                   <p className="text-xs" style={{ color: MUTED }}>games · ~{insights?.insights?.length ?? 3} patterns</p>
                 </div>
-                <div className="rounded-xl p-4 text-left relative overflow-hidden"
+                <motion.div className="rounded-xl p-4 text-left relative overflow-hidden"
+                  animate={{
+                    boxShadow: [
+                      `0 0 0 ${G}00`,
+                      `0 0 30px ${G}55`,
+                      `0 0 0 ${G}00`,
+                    ],
+                  }}
+                  transition={{ duration: 2.2, repeat: Infinity, ease: 'easeInOut' }}
                   style={{
                     background: 'linear-gradient(135deg, rgba(129,182,76,0.18) 0%, rgba(129,182,76,0.04) 100%)',
                     border: `1.5px solid ${G}66`,
@@ -741,7 +777,7 @@ export function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
                   <p className="text-[10px] font-black uppercase tracking-widest mb-2" style={{ color: G }}>FULL HISTORY</p>
                   <p className="text-2xl font-black mb-1" style={{ color: TEXT }}>{Math.max(8, Math.round((insights?.totalGames ?? 0) * 2.5))}+</p>
                   <p className="text-xs" style={{ color: TEXT }}>games · <span style={{ color: G }}>~{Math.max(8, (insights?.insights?.length ?? 3) * 3)} patterns</span></p>
-                </div>
+                </motion.div>
               </div>
 
               {deepError && (
@@ -788,14 +824,43 @@ export function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.3 }}
-              className="text-center"
+              className="text-center relative"
             >
+              {/* CONFETTI BURST */}
+              <div className="absolute inset-x-0 top-0 h-40 pointer-events-none overflow-visible">
+                {Array.from({ length: 28 }).map((_, i) => {
+                  const colors = [G, '#ffc34d', '#dc4343', '#5ab9ff', '#b8e070', '#ea9733'];
+                  const color = colors[i % colors.length];
+                  const startX = (Math.random() - 0.5) * 100;
+                  const endX = startX + (Math.random() - 0.5) * 240;
+                  const endY = 200 + Math.random() * 180;
+                  const rot = Math.random() * 720;
+                  const size = 5 + Math.random() * 6;
+                  const isCircle = i % 3 === 0;
+                  return (
+                    <motion.div
+                      key={i}
+                      initial={{ x: `${startX}%`, y: 10, opacity: 1, rotate: 0, scale: 0.6 }}
+                      animate={{ x: `${endX}%`, y: endY, opacity: [1, 1, 0], rotate: rot, scale: 1 }}
+                      transition={{ duration: 1.6 + Math.random() * 0.8, ease: 'easeOut', delay: Math.random() * 0.15 }}
+                      className="absolute left-1/2 top-0"
+                      style={{
+                        width: size,
+                        height: isCircle ? size : size * 0.5,
+                        background: color,
+                        borderRadius: isCircle ? '50%' : 1,
+                      }}
+                    />
+                  );
+                })}
+              </div>
+
               <motion.div
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
                 transition={{ delay: 0.1, type: 'spring', stiffness: 200 }}
-                className="inline-flex items-center justify-center w-20 h-20 rounded-full mb-6"
-                style={{ background: `${G}1a`, border: `2px solid ${G}55` }}
+                className="inline-flex items-center justify-center w-20 h-20 rounded-full mb-6 relative"
+                style={{ background: `${G}1a`, border: `2px solid ${G}55`, boxShadow: `0 0 40px ${G}55` }}
               >
                 <Check className="w-10 h-10" style={{ color: G }} strokeWidth={3} />
               </motion.div>

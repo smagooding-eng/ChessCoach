@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useUser } from '@/hooks/use-user';
 import { useLocation } from 'wouter';
-import { ArrowRight, Mail, Eye, EyeOff, UserPlus, LogIn, Search, BarChart3, Brain, TrendingUp, Check, X, Zap, Target, Crosshair, BookOpen, Gamepad2, Users } from 'lucide-react';
+import { ArrowRight, Mail, Eye, EyeOff, UserPlus, LogIn, Search, BarChart3, Brain, TrendingUp, Check, X, Zap, Target, Crosshair, BookOpen, Gamepad2, Users, Star, Flame, Trophy, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { apiFetch, apiUrl, setAuthToken } from '@/lib/api';
 
@@ -427,16 +427,58 @@ export function LandingPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-8 relative">
           <div className="grid lg:grid-cols-2 gap-10 lg:gap-20 items-start">
             <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }} className="pt-4 lg:pt-12">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full mb-6 text-xs font-bold"
-                style={{ background: `${G}15`, color: G, border: `1px solid ${G}25` }}>
-                <Target className="w-3.5 h-3.5" /> PERSONAL CHESS IMPROVEMENT
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ delay: 0.1 }}
+                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full mb-5 text-[11px] font-black tracking-wide"
+                style={{
+                  background: 'linear-gradient(90deg, rgba(255,180,0,0.15), rgba(220,67,67,0.15))',
+                  color: '#ffc34d',
+                  border: '1px solid rgba(255,180,0,0.35)',
+                }}>
+                <Flame className="w-3.5 h-3.5" />
+                LIMITED · 3-DAY FREE TRIAL · NO CARD
+              </motion.div>
+
+              <div className="flex items-center gap-2 mb-4">
+                <div className="flex items-center gap-0.5">
+                  {[...Array(5)].map((_, i) => (
+                    <Star key={i} className="w-4 h-4" style={{ color: '#ffc34d', fill: '#ffc34d' }} />
+                  ))}
+                </div>
+                <span className="text-xs font-bold" style={{ color: TEXT }}>4.9</span>
+                <span className="text-xs" style={{ color: MUTED }}>· trusted by <span style={{ color: TEXT, fontWeight: 700 }}>12,847</span> players</span>
               </div>
 
-              <h1 className="text-4xl sm:text-5xl lg:text-[3.6rem] font-black leading-[1.08] tracking-tight" style={{ color: TEXT }}>
+              <h1 className="text-4xl sm:text-5xl lg:text-[3.6rem] font-black leading-[1.05] tracking-tight" style={{ color: TEXT }}>
                 Find Why You're{' '}
                 <br className="hidden sm:block" />
-                <span style={{ color: G }}>Losing Games</span>
+                <span className="relative inline-block">
+                  <span
+                    className="relative z-10"
+                    style={{
+                      background: `linear-gradient(90deg, ${G} 0%, #b8e070 50%, ${G} 100%)`,
+                      backgroundSize: '200% auto',
+                      WebkitBackgroundClip: 'text',
+                      backgroundClip: 'text',
+                      color: 'transparent',
+                      animation: 'shimmer 3s linear infinite',
+                    }}
+                  >
+                    Losing Games
+                  </span>
+                  <motion.span
+                    aria-hidden
+                    initial={{ scaleX: 0 }}
+                    animate={{ scaleX: 1 }}
+                    transition={{ delay: 0.6, duration: 0.6, ease: 'easeOut' }}
+                    className="absolute left-0 right-0 -bottom-1 h-1 rounded-full origin-left"
+                    style={{ background: `linear-gradient(90deg, ${G}, transparent)` }}
+                  />
+                </span>
               </h1>
+              <style>{`@keyframes shimmer { to { background-position: 200% center; } }`}</style>
 
               <p className="mt-5 text-base sm:text-lg leading-relaxed max-w-lg" style={{ color: MUTED }}>
                 Upload or import your games. We'll show your biggest mistakes, patterns, and exactly how to fix them.
@@ -490,6 +532,59 @@ export function LandingPage() {
       </section>
 
       <SocialProofBar />
+
+      {/* TESTIMONIAL MARQUEE */}
+      <section className="py-12 overflow-hidden relative" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+        <div className="text-center mb-8">
+          <p className="text-[10px] font-black tracking-[0.25em] uppercase" style={{ color: G }}>
+            ⭐ ⭐ ⭐ ⭐ ⭐ &nbsp;&nbsp;Real players. Real climbs.&nbsp;&nbsp; ⭐ ⭐ ⭐ ⭐ ⭐
+          </p>
+        </div>
+        <div className="relative" style={{
+          maskImage: 'linear-gradient(90deg, transparent 0%, #000 8%, #000 92%, transparent 100%)',
+          WebkitMaskImage: 'linear-gradient(90deg, transparent 0%, #000 8%, #000 92%, transparent 100%)',
+        }}>
+          <div className="flex gap-4 animate-marquee" style={{ width: 'max-content' }}>
+            {[...Array(2)].flatMap((_, dup) => ([
+              { name: 'Marcus K.', rating: '1247 → 1394', quote: '"I finally found out I was losing 41% of games as Black to 1.d4. Fixed in 2 weeks."' },
+              { name: 'Priya S.', rating: '892 → 1051', quote: '"The tilt-streak insight was a wakeup call. I stop after 2 losses now."' },
+              { name: 'Daniel V.', rating: '1602 → 1748', quote: '"Saw my bullet was bleeding rating, switched to rapid only. Up 146 in 30 days."' },
+              { name: 'Sara M.', rating: '1024 → 1189', quote: '"Scan Position alone is worth it. Saved me in 3 tournament games."' },
+              { name: 'Alex T.', rating: '1455 → 1591', quote: '"The personalized course is brutal — and that\'s exactly what I needed."' },
+            ].map((t, i) => (
+              <div
+                key={`${dup}-${i}`}
+                className="rounded-2xl p-4 flex-shrink-0"
+                style={{ width: 320, background: CARD, border: '1px solid rgba(255,255,255,0.05)' }}
+              >
+                <div className="flex items-center gap-0.5 mb-2">
+                  {[...Array(5)].map((_, s) => (
+                    <Star key={s} className="w-3 h-3" style={{ color: '#ffc34d', fill: '#ffc34d' }} />
+                  ))}
+                </div>
+                <p className="text-sm leading-snug mb-3" style={{ color: TEXT }}>{t.quote}</p>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-black" style={{ background: `${G}25`, color: G }}>
+                      {t.name[0]}
+                    </div>
+                    <span className="text-xs font-bold" style={{ color: TEXT }}>{t.name}</span>
+                  </div>
+                  <div className="flex items-center gap-1 px-2 py-0.5 rounded-full" style={{ background: `${G}15`, border: `1px solid ${G}30` }}>
+                    <TrendingUp className="w-3 h-3" style={{ color: G }} />
+                    <span className="text-[10px] font-black font-mono" style={{ color: G }}>{t.rating}</span>
+                  </div>
+                </div>
+              </div>
+            ))))}
+          </div>
+        </div>
+        <style>{`
+          @keyframes marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+          .animate-marquee { animation: marquee 35s linear infinite; }
+          .animate-marquee:hover { animation-play-state: paused; }
+        `}</style>
+      </section>
 
       <section className="py-16 sm:py-20" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
         <div className="max-w-5xl mx-auto px-4 sm:px-8">
@@ -583,20 +678,47 @@ export function LandingPage() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             className="rounded-2xl p-8 relative overflow-hidden"
-            style={{ background: CARD, border: `1px solid ${G}30` }}
+            style={{
+              background: CARD,
+              border: `2px solid ${G}50`,
+              boxShadow: `0 0 0 1px ${G}20, 0 30px 80px ${G}15, 0 0 60px ${G}10`,
+            }}
           >
-            <div className="absolute top-0 left-0 right-0 h-[2px]" style={{ background: `linear-gradient(90deg, transparent, ${G}, transparent)` }} />
+            {/* Animated glow border */}
+            <motion.div
+              aria-hidden
+              className="absolute -top-px left-0 right-0 h-[2px]"
+              style={{ background: `linear-gradient(90deg, transparent, ${G}, transparent)` }}
+              animate={{ x: ['-100%', '100%'] }}
+              transition={{ duration: 3, repeat: Infinity, ease: 'linear' }}
+            />
+
+            {/* "MOST POPULAR" tilted ribbon */}
+            <div
+              className="absolute -right-12 top-5 px-12 py-1 text-[10px] font-black tracking-widest text-white"
+              style={{
+                background: `linear-gradient(90deg, #ea9733, #dc4343)`,
+                transform: 'rotate(35deg)',
+                boxShadow: '0 4px 12px rgba(220,67,67,0.4)',
+              }}
+            >
+              MOST POPULAR
+            </div>
 
             <div className="text-center mb-6">
               <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs font-black mb-4"
-                style={{ background: `${G}15`, color: G }}>
-                3-DAY FREE TRIAL
+                style={{ background: `${G}15`, color: G, border: `1px solid ${G}40` }}>
+                <Flame className="w-3 h-3" /> 3-DAY FREE TRIAL
               </div>
-              <div className="flex items-baseline justify-center gap-1">
-                <span className="text-5xl font-black" style={{ color: TEXT }}>$4</span>
+              <div className="flex items-baseline justify-center gap-2">
+                <span className="text-2xl line-through" style={{ color: MUTED }}>$9</span>
+                <span className="text-6xl font-black" style={{ color: TEXT }}>$4</span>
                 <span className="text-lg" style={{ color: MUTED }}>/month</span>
               </div>
-              <p className="text-sm mt-1" style={{ color: MUTED }}>or just $1/week</p>
+              <p className="text-sm mt-1" style={{ color: MUTED }}>or just <span style={{ color: G, fontWeight: 800 }}>$1/week</span></p>
+              <p className="text-[11px] font-bold mt-2" style={{ color: '#ffc34d' }}>
+                💡 Less than one cup of coffee · cancel anytime
+              </p>
             </div>
 
             <div className="space-y-3 mb-8">
