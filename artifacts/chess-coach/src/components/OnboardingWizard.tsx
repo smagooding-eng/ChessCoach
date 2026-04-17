@@ -7,7 +7,7 @@ import {
   AlertTriangle, Loader2, Sparkles, ArrowRight, X,
 } from 'lucide-react';
 
-const ONBOARDING_KEY = 'chessscout_onboarding_v1';
+const ONBOARDING_KEY = 'chessscout_onboarding_v2';
 
 const G = '#81b64c';
 const BG = '#1a1816';
