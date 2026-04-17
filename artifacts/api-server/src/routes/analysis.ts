@@ -861,14 +861,17 @@ Return ONLY this JSON, no markdown:
         }
       }
 
-      // STRICT threshold. A tile fully on a chess board sees light+dark
-      // pixels → variance ≈ 3000-7000. A tile on UI text → variance ≈
-      // 200-800. A tile in empty UI → variance < 100. So an absolute
-      // floor of ~1500 cleanly separates board tiles from text tiles,
-      // and we additionally require top 20% of all tiles to adapt.
+      // Adaptive threshold. Real chess board colors vary widely:
+      //  - High contrast (lichess green/white): tile variance 4000+
+      //  - Chess.com cream/tan: tile variance 400-800
+      //  - Wood themes: 600-1200
+      // So we use a PERCENTILE (top 22% of tiles) plus a low absolute
+      // floor (200) just to reject pure-black UI tiles. Text tiles are
+      // mostly knocked out by the percentile cut + the connected-component
+      // size + the aspect/fill scoring downstream.
       const sortedVars = [...tileVar].slice().sort((a, b) => a - b);
-      const pctThr = sortedVars[Math.floor(sortedVars.length * 0.80)];
-      const ABS_FLOOR = 1500;
+      const pctThr = sortedVars[Math.floor(sortedVars.length * 0.78)];
+      const ABS_FLOOR = 200;
       const thr = Math.max(pctThr, ABS_FLOOR);
 
       const isBoard: boolean[] = tileVar.map(v => v >= thr);
@@ -1001,7 +1004,23 @@ Return ONLY this JSON, no markdown:
         const overlayY = Math.round((cropY / imgH) * previewH);
         const overlayW = Math.round((cropSide / imgW) * previewW);
         const overlayH = Math.round((cropSide / imgH) * previewH);
-        const svg = `<svg width="${previewW}" height="${previewH}" xmlns="http://www.w3.org/2000/svg"><rect x="${overlayX}" y="${overlayY}" width="${overlayW}" height="${overlayH}" fill="none" stroke="#81b64c" stroke-width="3" /></svg>`;
+        // Draw every qualifying tile as a translucent yellow square so we
+        // can see WHICH tiles passed the variance threshold. The green box
+        // is the final crop.
+        const tileRects: string[] = [];
+        const sxScale = previewW / scanW;
+        const syScale = previewH / scanH;
+        for (let ty = 0; ty < tilesY; ty++) {
+          for (let tx = 0; tx < tilesX; tx++) {
+            if (!isBoard[ty * tilesX + tx]) continue;
+            const rx = Math.round(tx * STEP * sxScale);
+            const ry = Math.round(ty * STEP * syScale);
+            const rw = Math.round(TILE * sxScale);
+            const rh = Math.round(TILE * syScale);
+            tileRects.push(`<rect x="${rx}" y="${ry}" width="${rw}" height="${rh}" fill="rgba(255,200,0,0.25)" />`);
+          }
+        }
+        const svg = `<svg width="${previewW}" height="${previewH}" xmlns="http://www.w3.org/2000/svg">${tileRects.join('')}<rect x="${overlayX}" y="${overlayY}" width="${overlayW}" height="${overlayH}" fill="none" stroke="#81b64c" stroke-width="3" /></svg>`;
         const annotated = await sharp(originalBuf)
           .resize(previewW, previewH, { fit: 'fill' })
           .composite([{ input: Buffer.from(svg), top: 0, left: 0 }])
