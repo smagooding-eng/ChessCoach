@@ -433,11 +433,11 @@ export function ScanPosition() {
 
       {state === 'result' && mode === 'preview' && (
         <div className="space-y-3">
-          {(annotatedImage || croppedImage || previewUrl) && (
+          {(croppedImage || previewUrl) && (
             <div className="space-y-1.5">
               <p className="text-[10px] font-bold uppercase tracking-wider text-white/40">Original</p>
               <img
-                src={annotatedImage || croppedImage || previewUrl}
+                src={croppedImage || previewUrl}
                 alt="Original board"
                 className="w-full rounded-[10px] border border-white/10 shadow-[0_20px_40px_rgba(0,0,0,0.5)]"
                 style={{
