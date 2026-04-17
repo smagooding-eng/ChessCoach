@@ -808,184 +808,72 @@ Return ONLY this JSON, no markdown:
       }
       if (occupiedSquares.length === 0) throw new Error('no pieces to verify');
 
-      // 1. Find the board with 2D TILE-VARIANCE DETECTION.
+      // 1. Find the board with AI VISION.
       //
-      // 1D row/column variance fails when the screenshot has UI elements
-      // (status bar text, headers, buttons) outside the board — every
-      // column passes through SOMETHING with high variance, so columns
-      // can't tell us where the board is.
-      //
-      // 2D works much better: tile the image into small squares (~1
-      // chess-square per tile), compute the variance of each tile, and
-      // mark tiles as "board-like" if their variance exceeds a threshold.
-      // Then find the LARGEST CONNECTED COMPONENT of board-like tiles —
-      // that connected blob IS the chess board. Isolated high-variance
-      // tiles (text, icons) form small components and are rejected.
+      // Geometric detection (variance, edges, components) repeatedly fails
+      // on real screenshots because chess.com's cream/tan boards have very
+      // low texture variance, while UI elements (text, buttons, eval bars)
+      // have high variance. We were chasing pixel heuristics and getting
+      // wrong crops every time. The vision model already finds the board
+      // perfectly (that's how it reads pieces), so just ASK it for the
+      // bounding box. One small extra call, dead reliable.
+      const bboxPromptImg = `data:${mimeType};base64,${originalBase64}`;
+      let aiBbox: { x1: number; y1: number; x2: number; y2: number } | null = null;
+      try {
+        const bboxResp = await ai.chat.completions.create({
+          model: "gpt-5.2",
+          max_completion_tokens: 200,
+          messages: [{
+            role: "user",
+            content: [
+              { type: "text", text: `Locate the 8x8 chess board in this image. Return ONLY a JSON object with the board's bounding box as percentages of the image dimensions (0-100). The bbox must INCLUDE all 64 squares plus any rank/file labels right next to the board, but EXCLUDE everything else (browser chrome, status bars, player names, eval bars, post text, captions, comments). The board is square — the bbox should be roughly square.
 
-      // Downsample for analysis; one tile ≈ one chess square (~1/8 of long side).
-      const SCAN_LONG = 320;
-      const longSideOrig = Math.max(imgW, imgH);
-      const scaleScan = SCAN_LONG / longSideOrig;
-      const scanW = Math.max(16, Math.round(imgW * scaleScan));
-      const scanH = Math.max(16, Math.round(imgH * scaleScan));
-      const { data: gray } = await sharp(originalBuf)
-        .resize(scanW, scanH, { fit: 'fill' })
-        .grayscale()
-        .removeAlpha()
-        .raw()
-        .toBuffer({ resolveWithObject: true });
-
-      // Tile size: large enough to span at least 1.5 chess squares so a
-      // tile placed anywhere on the board sees BOTH light and dark pixels.
-      // Too-small tiles fall entirely inside one chess square (uniform
-      // color → low variance) and miss the pattern.
-      const TILE = Math.max(8, Math.floor(Math.min(scanW, scanH) / 14));
-      const STEP = Math.max(2, Math.floor(TILE / 2)); // overlapping for finer bbox
-      const tilesX = Math.floor((scanW - TILE) / STEP) + 1;
-      const tilesY = Math.floor((scanH - TILE) / STEP) + 1;
-      const tileVar: number[] = new Array(tilesX * tilesY).fill(0);
-
-      for (let ty = 0; ty < tilesY; ty++) {
-        for (let tx = 0; tx < tilesX; tx++) {
-          let sum = 0, sumSq = 0;
-          const x0 = tx * STEP, y0 = ty * STEP;
-          for (let y = y0; y < y0 + TILE; y++) {
-            for (let x = x0; x < x0 + TILE; x++) {
-              const v = gray[y * scanW + x];
-              sum += v; sumSq += v * v;
-            }
-          }
-          const n = TILE * TILE;
-          const mean = sum / n;
-          tileVar[ty * tilesX + tx] = sumSq / n - mean * mean;
+Format: {"x1": <left%>, "y1": <top%>, "x2": <right%>, "y2": <bottom%>}` },
+              { type: "image_url", image_url: { url: bboxPromptImg, detail: "high" } },
+            ],
+          }],
+          response_format: { type: "json_object" },
+        });
+        const bboxRaw = bboxResp.choices[0]?.message?.content ?? "{}";
+        const parsed = JSON.parse(bboxRaw);
+        const x1 = Number(parsed.x1), y1 = Number(parsed.y1), x2 = Number(parsed.x2), y2 = Number(parsed.y2);
+        if ([x1, y1, x2, y2].every(v => Number.isFinite(v) && v >= 0 && v <= 100) && x2 > x1 && y2 > y1) {
+          aiBbox = { x1, y1, x2, y2 };
         }
+      } catch (e) {
+        req.log?.warn?.({ err: String(e) }, "AI bbox call failed");
       }
 
-      // Adaptive threshold. Real chess board colors vary widely:
-      //  - High contrast (lichess green/white): tile variance 4000+
-      //  - Chess.com cream/tan: tile variance 400-800
-      //  - Wood themes: 600-1200
-      // So we use a PERCENTILE (top 22% of tiles) plus a low absolute
-      // floor (200) just to reject pure-black UI tiles. Text tiles are
-      // mostly knocked out by the percentile cut + the connected-component
-      // size + the aspect/fill scoring downstream.
-      const sortedVars = [...tileVar].slice().sort((a, b) => a - b);
-      const pctThr = sortedVars[Math.floor(sortedVars.length * 0.78)];
-      const ABS_FLOOR = 200;
-      const thr = Math.max(pctThr, ABS_FLOOR);
-
-      const isBoardRaw: boolean[] = tileVar.map(v => v >= thr);
-
-      // MORPHOLOGICAL EROSION (3×3) — keep a tile only if it AND all 8
-      // neighbours are above threshold. This eliminates thin strips of
-      // high-variance UI (status bar text 1-2 tiles tall, headers, post
-      // text rows) that would otherwise get merged with the board's
-      // dense blob and balloon the bbox. The chess board is dense (7×7+
-      // tiles all qualifying) so erosion barely shrinks it.
-      const isBoard: boolean[] = new Array(tilesX * tilesY).fill(false);
-      for (let ty = 1; ty < tilesY - 1; ty++) {
-        for (let tx = 1; tx < tilesX - 1; tx++) {
-          let allOn = true;
-          for (let dy = -1; dy <= 1 && allOn; dy++) {
-            for (let dx = -1; dx <= 1; dx++) {
-              if (!isBoardRaw[(ty + dy) * tilesX + (tx + dx)]) { allOn = false; break; }
-            }
-          }
-          if (allOn) isBoard[ty * tilesX + tx] = true;
-        }
+      let cropX: number, cropY: number, cropSide: number;
+      if (aiBbox) {
+        // Use AI bbox. Inscribe a square within it so the result is square.
+        const pxL = (aiBbox.x1 / 100) * imgW;
+        const pxR = (aiBbox.x2 / 100) * imgW;
+        const pxT = (aiBbox.y1 / 100) * imgH;
+        const pxB = (aiBbox.y2 / 100) * imgH;
+        const cx = (pxL + pxR) / 2;
+        const cy = (pxT + pxB) / 2;
+        // Use the LARGER dimension so we don't accidentally cut off the board
+        // if the AI returned a slightly tall or wide bbox; clamp to image.
+        const halfMax = Math.max((pxR - pxL) / 2, (pxB - pxT) / 2);
+        const halfClamped = Math.min(halfMax, cx, imgW - cx, cy, imgH - cy);
+        cropX = Math.max(0, Math.round(cx - halfClamped));
+        cropY = Math.max(0, Math.round(cy - halfClamped));
+        cropSide = Math.min(Math.round(halfClamped * 2), imgW - cropX, imgH - cropY);
+        req.log?.info?.({ aiBbox, cropX, cropY, cropSide, imgW, imgH }, "Board cropped via AI bbox");
+      } else {
+        // Fallback: use the full image.
+        cropX = 0; cropY = 0; cropSide = Math.min(imgW, imgH);
       }
 
-      // Connected component labeling (4-neighbour BFS) on the eroded grid.
-      const label: number[] = new Array(tilesX * tilesY).fill(-1);
-      const components: Array<{ minX: number; maxX: number; minY: number; maxY: number; count: number }> = [];
-      for (let ty = 0; ty < tilesY; ty++) {
-        for (let tx = 0; tx < tilesX; tx++) {
-          if (!isBoard[ty * tilesX + tx] || label[ty * tilesX + tx] !== -1) continue;
-          const id = components.length;
-          const queue: number[] = [ty * tilesX + tx];
-          label[ty * tilesX + tx] = id;
-          const comp = { minX: tx, maxX: tx, minY: ty, maxY: ty, count: 0 };
-          while (queue.length) {
-            const idx = queue.shift()!;
-            const cx = idx % tilesX, cy = Math.floor(idx / tilesX);
-            comp.count++;
-            if (cx < comp.minX) comp.minX = cx;
-            if (cx > comp.maxX) comp.maxX = cx;
-            if (cy < comp.minY) comp.minY = cy;
-            if (cy > comp.maxY) comp.maxY = cy;
-            for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]) {
-              const nx = cx + dx, ny = cy + dy;
-              if (nx < 0 || nx >= tilesX || ny < 0 || ny >= tilesY) continue;
-              const ni = ny * tilesX + nx;
-              if (!isBoard[ni] || label[ni] !== -1) continue;
-              label[ni] = id;
-              queue.push(ni);
-            }
-          }
-          components.push(comp);
-        }
-      }
-
-      if (components.length === 0) throw new Error('no board-like tiles found');
-
-      // Score each component to find THE board:
-      //  - Aspect ratio MUST be near-square (chess board is 1:1).
-      //  - Larger area > smaller area (the board is the largest blob of
-      //    such tightly-checkered tiles in a screenshot).
-      //  - Dense fill > sparse (a real board fills its bbox densely;
-      //    text spread out across a region does not).
-      // We REJECT components whose aspect is < 0.5 — text rows and icon
-      // strips form long thin blobs and should not win even if large.
-      function score(c: typeof components[number]): number {
-        const w = c.maxX - c.minX + 1;
-        const h = c.maxY - c.minY + 1;
-        const aspect = Math.min(w, h) / Math.max(w, h);
-        if (aspect < 0.5) return -1; // reject thin strips
-        const fillRatio = c.count / (w * h);
-        if (fillRatio < 0.4) return -1; // reject sparse / scattered
-        if (c.count < 6) return -1; // reject tiny noise blobs
-        // Square-ness matters most → aspect squared.
-        return c.count * aspect * aspect * fillRatio;
-      }
-      components.sort((a, b) => score(b) - score(a));
-      const board = components[0];
-      if (score(board) <= 0) throw new Error('no plausible square component');
-
-      // Convert tile coords back to image pixel fractions. Each tile is
-      // centered at (tx*STEP + TILE/2, ty*STEP + TILE/2) in scan pixels,
-      // and covers TILE pixels — so the bbox spans from minX*STEP to
-      // (maxX*STEP + TILE), same for Y.
-      let bl = (board.minX * STEP) / scanW;
-      let br = (board.maxX * STEP + TILE) / scanW;
-      let bt = (board.minY * STEP) / scanH;
-      let bbo = (board.maxY * STEP + TILE) / scanH;
-
-      // INSCRIBE a square INSIDE the detected bbox — never expand beyond
-      // the detected region. The chess board is square so its tight bbox
-      // should also be roughly square; if it isn't, the smaller dimension
-      // is the right one and we trim the longer one.
-      const pxL = bl * imgW, pxR = br * imgW, pxT = bt * imgH, pxB = bbo * imgH;
-      const finalSide = Math.min(pxR - pxL, pxB - pxT);
-      const fcx = (pxL + pxR) / 2;
-      const fcy = (pxT + pxB) / 2;
-      const cropX = Math.max(0, Math.round(fcx - finalSide / 2));
-      const cropY = Math.max(0, Math.round(fcy - finalSide / 2));
-      const cropSide = Math.min(Math.round(finalSide), imgW - cropX, imgH - cropY);
-
-      bl = cropX / imgW; br = (cropX + cropSide) / imgW;
-      bt = cropY / imgH; bbo = (cropY + cropSide) / imgH;
-      req.log?.info?.({ bl, bt, br, bbo, components: components.length, boardCount: board.count, thr, cropX, cropY, cropSide }, "Board detected by tile components");
-
+      // 2. Crop to the board.
       const croppedJpeg = await sharp(originalBuf)
         .extract({ left: cropX, top: cropY, width: cropSide, height: cropSide })
         .resize(640, 640, { fit: 'fill' })
         .jpeg({ quality: 92 })
         .toBuffer();
 
-      // Sanity check the crop: a real chess board has high color variance
-      // (alternating light/dark squares). If the crop is mostly one color
-      // (the bbox AI missed the board and grabbed black/dark UI chrome),
-      // abort the verification and don't return the bad crop to the user.
+      // Sanity check: a real chess board crop has high color variance.
       const stats = await sharp(croppedJpeg).stats();
       const channelStdAvg = stats.channels.length > 0
         ? stats.channels.slice(0, 3).reduce((a, c) => a + c.stdev, 0) / Math.min(3, stats.channels.length)
@@ -993,8 +881,6 @@ Return ONLY this JSON, no markdown:
       const channelMeanAvg = stats.channels.length > 0
         ? stats.channels.slice(0, 3).reduce((a, c) => a + c.mean, 0) / Math.min(3, stats.channels.length)
         : 0;
-      // A real chess board crop has stddev > ~40 across RGB. A mostly-black
-      // (or mostly-white) image has stddev < 20.
       if (channelStdAvg < 25 || channelMeanAvg < 15 || channelMeanAvg > 245) {
         req.log?.warn?.({ stddev: channelStdAvg, mean: channelMeanAvg }, "Crop looks empty — bbox missed the board, skipping verification");
         throw new Error('crop is empty / monochrome — bbox missed the board');
@@ -1002,41 +888,6 @@ Return ONLY this JSON, no markdown:
 
       const cropB64 = croppedJpeg.toString('base64');
       croppedDataUrl = `data:image/jpeg;base64,${cropB64}`;
-
-      // Draw the detected bbox on the original (downscaled) so the user
-      // can see EXACTLY what region we cropped. This makes detection
-      // problems debuggable at a glance instead of guessing.
-      try {
-        const previewW = 480;
-        const previewH = Math.round(imgH * (previewW / imgW));
-        const overlayX = Math.round((cropX / imgW) * previewW);
-        const overlayY = Math.round((cropY / imgH) * previewH);
-        const overlayW = Math.round((cropSide / imgW) * previewW);
-        const overlayH = Math.round((cropSide / imgH) * previewH);
-        // Draw every qualifying tile as a translucent yellow square so we
-        // can see WHICH tiles passed the variance threshold. The green box
-        // is the final crop.
-        const tileRects: string[] = [];
-        const sxScale = previewW / scanW;
-        const syScale = previewH / scanH;
-        for (let ty = 0; ty < tilesY; ty++) {
-          for (let tx = 0; tx < tilesX; tx++) {
-            if (!isBoard[ty * tilesX + tx]) continue;
-            const rx = Math.round(tx * STEP * sxScale);
-            const ry = Math.round(ty * STEP * syScale);
-            const rw = Math.round(TILE * sxScale);
-            const rh = Math.round(TILE * syScale);
-            tileRects.push(`<rect x="${rx}" y="${ry}" width="${rw}" height="${rh}" fill="rgba(255,200,0,0.25)" />`);
-          }
-        }
-        const svg = `<svg width="${previewW}" height="${previewH}" xmlns="http://www.w3.org/2000/svg">${tileRects.join('')}<rect x="${overlayX}" y="${overlayY}" width="${overlayW}" height="${overlayH}" fill="none" stroke="#81b64c" stroke-width="3" /></svg>`;
-        const annotated = await sharp(originalBuf)
-          .resize(previewW, previewH, { fit: 'fill' })
-          .composite([{ input: Buffer.from(svg), top: 0, left: 0 }])
-          .jpeg({ quality: 80 })
-          .toBuffer();
-        annotatedDataUrl = `data:image/jpeg;base64,${annotated.toString('base64')}`;
-      } catch { /* overlay is best-effort */ }
 
       // 3. Build a focused color-verification prompt.
       const sqList = occupiedSquares.map(s => s.sq).join(', ');
