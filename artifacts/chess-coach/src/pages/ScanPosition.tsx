@@ -433,54 +433,35 @@ export function ScanPosition() {
 
       {state === 'result' && mode === 'preview' && (
         <div className="space-y-3">
-          {(previewUrl || croppedImage) && (
-            <div className="grid grid-cols-2 gap-2">
-              {previewUrl && (
-                <div className="space-y-1.5">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-white/40">Uploaded</p>
-                  <img
-                    src={previewUrl}
-                    alt="Uploaded screenshot"
-                    className="w-full rounded-[10px] border border-white/10 shadow-[0_20px_40px_rgba(0,0,0,0.5)]"
-                    style={{
-                      maxHeight: '40vh',
-                      objectFit: 'contain',
-                      background: '#000',
-                      display: 'block',
-                    }}
-                  />
-                </div>
-              )}
-              {croppedImage && (
-                <div className="space-y-1.5">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-white/40">Cropped Board</p>
-                  <img
-                    src={croppedImage}
-                    alt="Cropped board"
-                    className="w-full rounded-[10px] border border-white/10 shadow-[0_20px_40px_rgba(0,0,0,0.5)]"
-                    style={{
-                      maxHeight: '40vh',
-                      objectFit: 'contain',
-                      background: '#000',
-                      display: 'block',
-                    }}
-                  />
-                </div>
-              )}
-            </div>
-          )}
-
-          <div className="space-y-1.5">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-white/40">Detected — tap a piece to flip its color</p>
-            <div className="relative">
-              <EditableBoard fen={fen} flipped={flipped} onFenChange={setFen} />
-              <button
-                onClick={() => setFlipped(f => !f)}
-                className="absolute top-2 left-2 z-10 p-1.5 rounded-lg bg-black/60 backdrop-blur-sm border border-white/10 hover:border-primary/30 transition-all"
-                title="Flip board"
-              >
-                <FlipVertical className="w-4 h-4 text-white/60" />
-              </button>
+          <div className="grid grid-cols-2 gap-2">
+            {croppedImage && (
+              <div className="space-y-1.5">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-white/40">Cropped Board</p>
+                <img
+                  src={croppedImage}
+                  alt="Cropped board"
+                  className="w-full rounded-[10px] border border-white/10 shadow-[0_20px_40px_rgba(0,0,0,0.5)]"
+                  style={{
+                    aspectRatio: '1 / 1',
+                    objectFit: 'contain',
+                    background: '#000',
+                    display: 'block',
+                  }}
+                />
+              </div>
+            )}
+            <div className="space-y-1.5">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-white/40">Detected — tap a piece to flip its color</p>
+              <div className="relative">
+                <EditableBoard fen={fen} flipped={flipped} onFenChange={setFen} />
+                <button
+                  onClick={() => setFlipped(f => !f)}
+                  className="absolute top-2 left-2 z-10 p-1.5 rounded-lg bg-black/60 backdrop-blur-sm border border-white/10 hover:border-primary/30 transition-all"
+                  title="Flip board"
+                >
+                  <FlipVertical className="w-4 h-4 text-white/60" />
+                </button>
+              </div>
             </div>
           </div>
 
