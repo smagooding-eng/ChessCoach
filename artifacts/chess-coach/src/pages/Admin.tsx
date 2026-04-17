@@ -216,17 +216,17 @@ export function Admin() {
           />
           <StatCard
             icon={Swords}
-            label="Opponent Scouts"
+            label="Opponent Scout Jobs"
             primary={stats.activity.opponentsScoutedTotal}
-            primaryLabel="Total Runs"
+            primaryLabel="All Jobs"
             secondary={stats.activity.uniqueOpponentsScouted}
-            secondaryLabel="Unique"
+            secondaryLabel="Unique Targets"
           />
           <StatCard
             icon={Camera}
-            label="Position Scans"
+            label="Scan Page Visits"
             primary={stats.activity.positionScans}
-            primaryLabel="Page Visits"
+            primaryLabel="Visits"
           />
         </div>
       )}
