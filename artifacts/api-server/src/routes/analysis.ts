@@ -768,6 +768,9 @@ Return ONLY this JSON, no markdown:
     // Holds the cropped 640x640 board image as a data URL — returned to the
     // client so the user can compare what we detected vs. the original board.
     let croppedDataUrl: string | null = null;
+    // Original screenshot (downscaled) with the detected bbox drawn on it,
+    // so the user can SEE what region we identified as the board.
+    let annotatedDataUrl: string | null = null;
 
     // ─────────────────────────────────────────────────────────────────────────
     // FOCUSED COLOR VERIFICATION on a clean cropped board.
@@ -805,27 +808,26 @@ Return ONLY this JSON, no markdown:
       }
       if (occupiedSquares.length === 0) throw new Error('no pieces to verify');
 
-      // 1. Find the board GEOMETRICALLY by per-row / per-column variance.
+      // 1. Find the board with 2D TILE-VARIANCE DETECTION.
       //
-      // A chess board has a unique signature: every row contains alternating
-      // light/dark squares, so the per-row pixel variance is HIGH across
-      // every row that overlaps the board. Empty/UI areas (status bars,
-      // dark backgrounds, player panels) are nearly uniform so their
-      // per-row variance is LOW.
+      // 1D row/column variance fails when the screenshot has UI elements
+      // (status bar text, headers, buttons) outside the board — every
+      // column passes through SOMETHING with high variance, so columns
+      // can't tell us where the board is.
       //
-      // We downsample the image to grayscale, compute the variance of each
-      // row and each column, threshold them, and the bounding box is the
-      // contiguous range of high-variance rows × high-variance columns.
-      // This works even when the board is a small portion of a tall phone
-      // screenshot surrounded by dark UI chrome — exactly where the AI
-      // bbox approach kept failing.
+      // 2D works much better: tile the image into small squares (~1
+      // chess-square per tile), compute the variance of each tile, and
+      // mark tiles as "board-like" if their variance exceeds a threshold.
+      // Then find the LARGEST CONNECTED COMPONENT of board-like tiles —
+      // that connected blob IS the chess board. Isolated high-variance
+      // tiles (text, icons) form small components and are rejected.
 
-      // Downsample the image to a manageable size for variance scanning.
-      const SCAN_SIZE = 256;
-      const longSide = Math.max(imgW, imgH);
-      const scaleScan = SCAN_SIZE / longSide;
-      const scanW = Math.max(8, Math.round(imgW * scaleScan));
-      const scanH = Math.max(8, Math.round(imgH * scaleScan));
+      // Downsample for analysis; one tile ≈ one chess square (~1/8 of long side).
+      const SCAN_LONG = 320;
+      const longSideOrig = Math.max(imgW, imgH);
+      const scaleScan = SCAN_LONG / longSideOrig;
+      const scanW = Math.max(16, Math.round(imgW * scaleScan));
+      const scanH = Math.max(16, Math.round(imgH * scaleScan));
       const { data: gray } = await sharp(originalBuf)
         .resize(scanW, scanH, { fit: 'fill' })
         .grayscale()
@@ -833,150 +835,115 @@ Return ONLY this JSON, no markdown:
         .raw()
         .toBuffer({ resolveWithObject: true });
 
-      // Use SLIDING-WINDOW MAX variance for each row/column. Full-row
-      // variance fails when the board doesn't span the full width, because
-      // a row passing through (board + empty UI on the sides) gets a
-      // mid-range value that's hard to distinguish from a noisy UI row.
-      // Local window variance solves this: for each row we slide a small
-      // window across it and take the MAX variance any window sees. A row
-      // overlapping the board has at least one window landing fully on
-      // board pixels (alternating squares = huge variance). A row in dark
-      // UI has uniformly low variance everywhere.
-      const WIN = Math.max(8, Math.floor(Math.min(scanW, scanH) / 16));
+      // Tile size ≈ half a chess square so we can detect partial overlap.
+      const TILE = Math.max(4, Math.floor(Math.min(scanW, scanH) / 24));
+      const tilesX = Math.floor(scanW / TILE);
+      const tilesY = Math.floor(scanH / TILE);
+      const tileVar: number[] = new Array(tilesX * tilesY).fill(0);
 
-      function rowSignal(y: number): number {
-        let best = 0;
-        for (let x0 = 0; x0 + WIN <= scanW; x0 += Math.max(1, Math.floor(WIN / 2))) {
+      for (let ty = 0; ty < tilesY; ty++) {
+        for (let tx = 0; tx < tilesX; tx++) {
           let sum = 0, sumSq = 0;
-          for (let x = x0; x < x0 + WIN; x++) {
-            const v = gray[y * scanW + x];
-            sum += v; sumSq += v * v;
-          }
-          const mean = sum / WIN;
-          const variance = sumSq / WIN - mean * mean;
-          if (variance > best) best = variance;
-        }
-        return best;
-      }
-      function colSignal(x: number): number {
-        let best = 0;
-        for (let y0 = 0; y0 + WIN <= scanH; y0 += Math.max(1, Math.floor(WIN / 2))) {
-          let sum = 0, sumSq = 0;
-          for (let y = y0; y < y0 + WIN; y++) {
-            const v = gray[y * scanW + x];
-            sum += v; sumSq += v * v;
-          }
-          const mean = sum / WIN;
-          const variance = sumSq / WIN - mean * mean;
-          if (variance > best) best = variance;
-        }
-        return best;
-      }
-
-      const rowSigRaw: number[] = new Array(scanH);
-      for (let y = 0; y < scanH; y++) rowSigRaw[y] = rowSignal(y);
-      const colSigRaw: number[] = new Array(scanW);
-      for (let x = 0; x < scanW; x++) colSigRaw[x] = colSignal(x);
-
-      // Smooth with a 5-tap moving average — bridges single-row dips in
-      // the middle of the board (e.g. a rank that happens to be mostly
-      // empty pieces of one color).
-      function smooth(arr: number[]): number[] {
-        const out = new Array(arr.length).fill(0);
-        const R = 3;
-        for (let i = 0; i < arr.length; i++) {
-          let s = 0, n = 0;
-          for (let k = -R; k <= R; k++) {
-            const j = i + k;
-            if (j >= 0 && j < arr.length) { s += arr[j]; n++; }
-          }
-          out[i] = s / n;
-        }
-        return out;
-      }
-      const rowSig = smooth(rowSigRaw);
-      const colSig = smooth(colSigRaw);
-
-      const maxRowSig = Math.max(...rowSig);
-      const maxColSig = Math.max(...colSig);
-      // Use a LOW threshold (15% of max) so we capture the entire board
-      // even when some interior rows have lower contrast.
-      const rowThr = maxRowSig * 0.15;
-      const colThr = maxColSig * 0.15;
-
-      // Find the LONGEST contiguous run above threshold (allowing small gaps).
-      function longestRun(values: number[], thr: number, allowGap = 2): { start: number; end: number } {
-        let bestStart = 0, bestEnd = 0;
-        let curStart = -1;
-        let gap = 0;
-        for (let i = 0; i < values.length; i++) {
-          if (values[i] >= thr) {
-            if (curStart < 0) curStart = i;
-            gap = 0;
-          } else if (curStart >= 0) {
-            gap++;
-            if (gap > allowGap) {
-              const len = i - gap - curStart;
-              if (len > bestEnd - bestStart) { bestStart = curStart; bestEnd = i - gap; }
-              curStart = -1;
-              gap = 0;
+          const x0 = tx * TILE, y0 = ty * TILE;
+          for (let y = y0; y < y0 + TILE; y++) {
+            for (let x = x0; x < x0 + TILE; x++) {
+              const v = gray[y * scanW + x];
+              sum += v; sumSq += v * v;
             }
           }
+          const n = TILE * TILE;
+          const mean = sum / n;
+          tileVar[ty * tilesX + tx] = sumSq / n - mean * mean;
         }
-        if (curStart >= 0) {
-          const len = values.length - curStart;
-          if (len > bestEnd - bestStart) { bestStart = curStart; bestEnd = values.length; }
+      }
+
+      // Threshold: tiles in the top 35% of variance values are "board-like".
+      // Chess board tiles have ~half light + half dark pixels → very high
+      // variance. UI tiles are uniform or have small text → low variance.
+      const sortedVars = [...tileVar].sort((a, b) => a - b);
+      // Use a percentile cut so it adapts to the screenshot.
+      const pct = 0.65;
+      const thr = sortedVars[Math.floor(sortedVars.length * pct)];
+
+      const isBoard: boolean[] = tileVar.map(v => v >= thr && v > 200);
+
+      // Connected component labeling (4-neighbour BFS) on the tile grid.
+      const label: number[] = new Array(tilesX * tilesY).fill(-1);
+      const components: Array<{ minX: number; maxX: number; minY: number; maxY: number; count: number }> = [];
+      for (let ty = 0; ty < tilesY; ty++) {
+        for (let tx = 0; tx < tilesX; tx++) {
+          if (!isBoard[ty * tilesX + tx] || label[ty * tilesX + tx] !== -1) continue;
+          const id = components.length;
+          const queue: number[] = [ty * tilesX + tx];
+          label[ty * tilesX + tx] = id;
+          const comp = { minX: tx, maxX: tx, minY: ty, maxY: ty, count: 0 };
+          while (queue.length) {
+            const idx = queue.shift()!;
+            const cx = idx % tilesX, cy = Math.floor(idx / tilesX);
+            comp.count++;
+            if (cx < comp.minX) comp.minX = cx;
+            if (cx > comp.maxX) comp.maxX = cx;
+            if (cy < comp.minY) comp.minY = cy;
+            if (cy > comp.maxY) comp.maxY = cy;
+            for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+              const nx = cx + dx, ny = cy + dy;
+              if (nx < 0 || nx >= tilesX || ny < 0 || ny >= tilesY) continue;
+              const ni = ny * tilesX + nx;
+              if (!isBoard[ni] || label[ni] !== -1) continue;
+              label[ni] = id;
+              queue.push(ni);
+            }
+          }
+          components.push(comp);
         }
-        return { start: bestStart, end: bestEnd };
       }
 
-      const yRange = longestRun(rowSig, rowThr);
-      const xRange = longestRun(colSig, colThr);
+      if (components.length === 0) throw new Error('no board-like tiles found');
 
-      if (yRange.end - yRange.start < 8 || xRange.end - xRange.start < 8) {
-        throw new Error('could not detect board by variance');
+      // Score each component: prefer LARGE components that are also roughly SQUARE.
+      // The chess board is the only large square blob in a screenshot.
+      function score(c: typeof components[number]): number {
+        const w = c.maxX - c.minX + 1;
+        const h = c.maxY - c.minY + 1;
+        const aspect = Math.min(w, h) / Math.max(w, h);
+        const fillRatio = c.count / (w * h);
+        // Reward area, square aspect, and dense fill.
+        return c.count * aspect * Math.max(0.3, fillRatio);
       }
+      components.sort((a, b) => score(b) - score(a));
+      const board = components[0];
 
-      let bl = xRange.start / scanW;
-      let br = xRange.end / scanW;
-      let bt = yRange.start / scanH;
-      let bbo = yRange.end / scanH;
+      // Convert tile coords back to image fraction.
+      let bl = (board.minX * TILE) / scanW;
+      let br = ((board.maxX + 1) * TILE) / scanW;
+      let bt = (board.minY * TILE) / scanH;
+      let bbo = ((board.maxY + 1) * TILE) / scanH;
 
-      // The board is square. Force the bbox to be square by expanding the
-      // shorter dimension around its center (capped at image edges).
-      const widthFrac = br - bl;
-      const heightFrac = bbo - bt;
-      if (Math.abs(widthFrac - heightFrac) > 0.02) {
-        const target = Math.max(widthFrac, heightFrac);
-        const cxx = (bl + br) / 2;
-        const cyy = (bt + bbo) / 2;
-        // Convert frac to pixel-aware fractions (image may not be square)
-        const targetWfrac = target;
-        const targetHfrac = target * (imgW / imgH);
-        bl = Math.max(0, cxx - targetWfrac / 2);
-        br = Math.min(1, cxx + targetWfrac / 2);
-        bt = Math.max(0, cyy - targetHfrac / 2);
-        bbo = Math.min(1, cyy + targetHfrac / 2);
-      }
+      // Force square bbox by expanding the shorter dimension around the center.
+      // (Convert to PIXEL space first because scan grid isn't square.)
+      let pxL = bl * imgW, pxR = br * imgW, pxT = bt * imgH, pxB = bbo * imgH;
+      const pxW = pxR - pxL;
+      const pxH = pxB - pxT;
+      const side = Math.max(pxW, pxH);
+      const padPx = side * 0.04;
+      const cxPx = (pxL + pxR) / 2;
+      const cyPx = (pxT + pxB) / 2;
+      let half = side / 2 + padPx;
+      pxL = Math.max(0, cxPx - half);
+      pxR = Math.min(imgW, cxPx + half);
+      pxT = Math.max(0, cyPx - half);
+      pxB = Math.min(imgH, cyPx + half);
 
-      req.log?.info?.({ bl, bt, br, bbo, maxRowSig, maxColSig, rowThr, colThr }, "Board detected by variance");
+      // Make it exactly square (clamping above may have unbalanced it).
+      const finalSide = Math.min(pxR - pxL, pxB - pxT);
+      const fcx = (pxL + pxR) / 2;
+      const fcy = (pxT + pxB) / 2;
+      const cropX = Math.max(0, Math.round(fcx - finalSide / 2));
+      const cropY = Math.max(0, Math.round(fcy - finalSide / 2));
+      const cropSide = Math.min(Math.round(finalSide), imgW - cropX, imgH - cropY);
 
-      // 2. Pad by 4% and force a centered square crop. (Geometric detection
-      // is tight, so less padding needed than the AI version.)
-      const padFrac = 0.04;
-      const cx = (bl + br) / 2;
-      const cy = (bt + bbo) / 2;
-      const halfSide = Math.max(br - bl, bbo - bt) / 2 + padFrac;
-      bl = Math.max(0, cx - halfSide);
-      bt = Math.max(0, cy - halfSide);
-      br = Math.min(1, cx + halfSide);
-      bbo = Math.min(1, cy + halfSide);
-
-      const cropX = Math.floor(bl * imgW);
-      const cropY = Math.floor(bt * imgH);
-      const cropW = Math.max(8, Math.floor((br - bl) * imgW));
-      const cropH = Math.max(8, Math.floor((bbo - bt) * imgH));
-      const cropSide = Math.min(cropW, cropH, imgW - cropX, imgH - cropY);
+      bl = pxL / imgW; br = pxR / imgW; bt = pxT / imgH; bbo = pxB / imgH;
+      req.log?.info?.({ bl, bt, br, bbo, components: components.length, boardCount: board.count, thr, cropX, cropY, cropSide }, "Board detected by tile components");
 
       const croppedJpeg = await sharp(originalBuf)
         .extract({ left: cropX, top: cropY, width: cropSide, height: cropSide })
@@ -1004,6 +971,25 @@ Return ONLY this JSON, no markdown:
 
       const cropB64 = croppedJpeg.toString('base64');
       croppedDataUrl = `data:image/jpeg;base64,${cropB64}`;
+
+      // Draw the detected bbox on the original (downscaled) so the user
+      // can see EXACTLY what region we cropped. This makes detection
+      // problems debuggable at a glance instead of guessing.
+      try {
+        const previewW = 480;
+        const previewH = Math.round(imgH * (previewW / imgW));
+        const overlayX = Math.round((cropX / imgW) * previewW);
+        const overlayY = Math.round((cropY / imgH) * previewH);
+        const overlayW = Math.round((cropSide / imgW) * previewW);
+        const overlayH = Math.round((cropSide / imgH) * previewH);
+        const svg = `<svg width="${previewW}" height="${previewH}" xmlns="http://www.w3.org/2000/svg"><rect x="${overlayX}" y="${overlayY}" width="${overlayW}" height="${overlayH}" fill="none" stroke="#81b64c" stroke-width="3" /></svg>`;
+        const annotated = await sharp(originalBuf)
+          .resize(previewW, previewH, { fit: 'fill' })
+          .composite([{ input: Buffer.from(svg), top: 0, left: 0 }])
+          .jpeg({ quality: 80 })
+          .toBuffer();
+        annotatedDataUrl = `data:image/jpeg;base64,${annotated.toString('base64')}`;
+      } catch { /* overlay is best-effort */ }
 
       // 3. Build a focused color-verification prompt.
       const sqList = occupiedSquares.map(s => s.sq).join(', ');
@@ -1151,6 +1137,7 @@ Return ONLY a JSON object mapping each square to its color, nothing else. Exampl
       confidence,
       notes: best.notes || "",
       croppedImage: croppedDataUrl,
+      annotatedImage: annotatedDataUrl,
     });
   } catch (err: unknown) {
     req.log?.error?.({ err }, "Scan position error");

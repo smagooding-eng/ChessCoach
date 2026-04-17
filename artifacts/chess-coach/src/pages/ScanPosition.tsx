@@ -162,6 +162,7 @@ export function ScanPosition() {
   const [notes, setNotes] = useState('');
   const [previewUrl, setPreviewUrl] = useState('');
   const [croppedImage, setCroppedImage] = useState('');
+  const [annotatedImage, setAnnotatedImage] = useState('');
   const [sandboxFen, setSandboxFen] = useState('');
   const [sandboxChess, setSandboxChess] = useState<Chess | null>(null);
   const [moveHistory, setMoveHistory] = useState<string[]>([]);
@@ -202,7 +203,7 @@ export function ScanPosition() {
           body: JSON.stringify({ image: dataUrl }),
         });
 
-        const data = await res.json() as { fen?: string; confidence?: string; notes?: string; croppedImage?: string; error?: string };
+        const data = await res.json() as { fen?: string; confidence?: string; notes?: string; croppedImage?: string; annotatedImage?: string; error?: string };
 
         if (!res.ok || !data.fen) {
           setError(data.error || 'Could not recognize a chess position.');
@@ -214,6 +215,7 @@ export function ScanPosition() {
         setConfidence(data.confidence || 'medium');
         setNotes(data.notes || '');
         setCroppedImage(data.croppedImage || '');
+        setAnnotatedImage(data.annotatedImage || '');
         setState('result');
       } catch {
         setError('Failed to analyze the image. Please try again.');
@@ -431,11 +433,11 @@ export function ScanPosition() {
 
       {state === 'result' && mode === 'preview' && (
         <div className="space-y-3">
-          {(croppedImage || previewUrl) && (
+          {(annotatedImage || croppedImage || previewUrl) && (
             <div className="space-y-1.5">
               <p className="text-[10px] font-bold uppercase tracking-wider text-white/40">Original</p>
               <img
-                src={croppedImage || previewUrl}
+                src={annotatedImage || croppedImage || previewUrl}
                 alt="Original board"
                 className="w-full rounded-[10px] border border-white/10 shadow-[0_20px_40px_rgba(0,0,0,0.5)]"
                 style={{
