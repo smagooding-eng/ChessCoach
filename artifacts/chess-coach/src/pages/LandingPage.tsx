@@ -1,16 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useUser } from '@/hooks/use-user';
 import { useLocation } from 'wouter';
-import { ArrowRight, Mail, Eye, EyeOff, UserPlus, LogIn, Search, BarChart3, Brain, TrendingUp, Check, X, Zap, Target, Crown, Crosshair, BookOpen, Gamepad2, Users } from 'lucide-react';
+import { ArrowRight, Mail, Eye, EyeOff, UserPlus, LogIn, Search, BarChart3, Brain, TrendingUp, Check, X, Zap, Target, Crosshair, BookOpen, Gamepad2, Users } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { apiFetch, apiUrl, setAuthToken } from '@/lib/api';
 
 const G = '#81b64c';
 const BG = '#262421';
 const CARD = '#302e2b';
-const CARD_HOVER = '#3a3835';
-const LIGHT_SQ = '#eeeed2';
-const DARK_SQ = '#769656';
 const TEXT = '#e8e6e3';
 const MUTED = '#9e9b98';
 
@@ -238,73 +235,6 @@ function AuthModal({ open, onClose, initialMode, externalError }: { open: boolea
   );
 }
 
-const STARTING_POS = [
-  ['\u265C','\u265E','\u265D','\u265B','\u265A','\u265D','\u265E','\u265C'],
-  ['\u265F','\u265F','\u265F','\u265F','\u265F','\u265F','\u265F','\u265F'],
-  ['','','','','','','',''],
-  ['','','','','','','',''],
-  ['','','','','','','',''],
-  ['','','','','','','',''],
-  ['\u2659','\u2659','\u2659','\u2659','\u2659','\u2659','\u2659','\u2659'],
-  ['\u2656','\u2658','\u2657','\u2655','\u2654','\u2657','\u2658','\u2656'],
-];
-
-function HeroBoard() {
-  const [highlight, setHighlight] = useState<[number, number] | null>(null);
-
-  useEffect(() => {
-    const highlights: [number, number][] = [
-      [6, 4], [4, 4], [1, 4], [3, 4], [7, 6], [5, 5], [0, 1], [2, 2],
-      [6, 3], [4, 3], [1, 3], [3, 3], [7, 5], [5, 2], [0, 6], [2, 5],
-    ];
-    let i = 0;
-    const iv = setInterval(() => {
-      setHighlight(highlights[i % highlights.length]);
-      i++;
-    }, 2200);
-    setHighlight(highlights[0]);
-    return () => clearInterval(iv);
-  }, []);
-
-  return (
-    <div className="relative">
-      <div className="absolute -inset-8 rounded-3xl opacity-40 blur-3xl pointer-events-none"
-        style={{ background: `radial-gradient(ellipse at center, ${G}22 0%, transparent 70%)` }} />
-      <div className="relative rounded-xl overflow-hidden"
-        style={{ boxShadow: `0 0 0 3px ${CARD}, 0 25px 80px rgba(0,0,0,0.6), 0 0 60px ${G}15` }}>
-        <div className="grid grid-cols-8">
-          {STARTING_POS.flatMap((row, r) =>
-            row.map((piece, c) => {
-              const isLight = (r + c) % 2 === 0;
-              const isHighlighted = highlight && highlight[0] === r && highlight[1] === c;
-              return (
-                <div
-                  key={`${r}-${c}`}
-                  className="aspect-square flex items-center justify-center select-none transition-colors duration-700"
-                  style={{
-                    background: isHighlighted
-                      ? (isLight ? '#f6f682' : '#bbcc44')
-                      : (isLight ? LIGHT_SQ : DARK_SQ),
-                  }}
-                >
-                  {piece && (
-                    <span className="leading-none drop-shadow-md" style={{ fontSize: 'clamp(18px, 5vw, 42px)' }}>{piece}</span>
-                  )}
-                </div>
-              );
-            })
-          )}
-        </div>
-        <div className="flex justify-between px-1.5 py-1" style={{ background: CARD }}>
-          {['a','b','c','d','e','f','g','h'].map(f => (
-            <span key={f} className="text-[9px] font-bold w-[12.5%] text-center" style={{ color: MUTED }}>{f}</span>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function AnimatedCount({ target, duration = 1500 }: { target: number; duration?: number }) {
   const [count, setCount] = useState(0);
   const ref = useRef<HTMLSpanElement>(null);
@@ -383,41 +313,49 @@ function SocialProofBar() {
   );
 }
 
-function ScoutCard({ delay = 0 }: { delay?: number }) {
+function InsightsResultCard({ delay = 0 }: { delay?: number }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, delay }}
-      className="rounded-xl p-4"
-      style={{ background: CARD, border: '1px solid rgba(255,255,255,0.05)' }}
+      className="rounded-2xl p-5 sm:p-6"
+      style={{ background: CARD, border: '1px solid rgba(255,255,255,0.05)', boxShadow: `0 25px 80px rgba(0,0,0,0.5), 0 0 60px ${G}10` }}
     >
-      <div className="flex items-center gap-2 mb-3">
-        <Crosshair className="w-4 h-4" style={{ color: G }} />
-        <span className="text-[11px] font-black uppercase tracking-widest" style={{ color: G }}>Scouting Report</span>
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <BarChart3 className="w-4 h-4" style={{ color: G }} />
+          <span className="text-[11px] font-black uppercase tracking-widest" style={{ color: G }}>Your Mistakes</span>
+        </div>
+        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: 'rgba(255,255,255,0.05)', color: MUTED }}>
+          124 GAMES ANALYZED
+        </span>
       </div>
-      <div className="space-y-2">
+      <div className="space-y-2.5">
         {[
-          { label: 'Weak Endgames', severity: 'Critical', color: '#dc4343' },
-          { label: 'Blunders in Time Trouble', severity: 'High', color: '#e88930' },
-          { label: 'Struggles vs 1.d4', severity: 'Medium', color: '#e8c830' },
+          { label: 'Weak Endgames', severity: 'Critical', color: '#dc4343', detail: 'You lose 62% of games past move 30' },
+          { label: 'Blunders in Time Trouble', severity: 'High', color: '#e88930', detail: '41% of losses come under 30 seconds left' },
+          { label: 'Struggles vs 1.d4', severity: 'Medium', color: '#e8c830', detail: 'Win rate drops to 28% as Black' },
         ].map(w => (
-          <div key={w.label} className="flex items-center justify-between py-2 px-3 rounded-lg" style={{ background: `${w.color}08`, border: `1px solid ${w.color}25` }}>
-            <div className="flex items-center gap-2">
-              <div className="w-1.5 h-1.5 rounded-full" style={{ background: w.color }} />
-              <span className="text-xs font-medium" style={{ color: TEXT }}>{w.label}</span>
+          <div key={w.label} className="py-2.5 px-3 rounded-lg" style={{ background: `${w.color}08`, border: `1px solid ${w.color}25` }}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-1.5 h-1.5 rounded-full" style={{ background: w.color }} />
+                <span className="text-xs font-bold" style={{ color: TEXT }}>{w.label}</span>
+              </div>
+              <span className="text-[10px] font-black px-2 py-0.5 rounded-full" style={{ background: `${w.color}18`, color: w.color }}>{w.severity}</span>
             </div>
-            <span className="text-[10px] font-black px-2 py-0.5 rounded-full" style={{ background: `${w.color}18`, color: w.color }}>{w.severity}</span>
+            <p className="text-[11px] mt-1 ml-3.5" style={{ color: MUTED }}>{w.detail}</p>
           </div>
         ))}
       </div>
-      <div className="mt-3 py-2.5 px-3 rounded-lg" style={{ background: `${G}10`, border: `1px solid ${G}20` }}>
-        <div className="flex items-center gap-1.5 mb-1">
-          <Zap className="w-3 h-3" style={{ color: G }} />
-          <span className="text-[10px] font-black" style={{ color: G }}>GAME PLAN</span>
+      <div className="mt-4 py-3 px-3.5 rounded-lg" style={{ background: `${G}10`, border: `1px solid ${G}25` }}>
+        <div className="flex items-center gap-1.5 mb-1.5">
+          <Zap className="w-3.5 h-3.5" style={{ color: G }} />
+          <span className="text-[10px] font-black tracking-wider" style={{ color: G }}>YOUR GAME PLAN</span>
         </div>
-        <p className="text-[11px] leading-relaxed" style={{ color: MUTED }}>
-          Play 1.d4 — they struggle in closed positions. Push for endgames where they collapse.
+        <p className="text-[12px] leading-relaxed" style={{ color: TEXT }}>
+          Train rook endgames first. Practice 5+0 to build time-pressure habits. Add a sharp answer to 1.d4.
         </p>
       </div>
     </motion.div>
@@ -491,18 +429,21 @@ export function LandingPage() {
             <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }} className="pt-4 lg:pt-12">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full mb-6 text-xs font-bold"
                 style={{ background: `${G}15`, color: G, border: `1px solid ${G}25` }}>
-                <Crown className="w-3.5 h-3.5" /> THE #1 CHESS SCOUTING TOOL
+                <Target className="w-3.5 h-3.5" /> PERSONAL CHESS IMPROVEMENT
               </div>
 
               <h1 className="text-4xl sm:text-5xl lg:text-[3.6rem] font-black leading-[1.08] tracking-tight" style={{ color: TEXT }}>
-                Know Your{' '}
+                Find Why You're{' '}
                 <br className="hidden sm:block" />
-                Opponent's{' '}
-                <span style={{ color: G }}>Weaknesses</span>
+                <span style={{ color: G }}>Losing Games</span>
               </h1>
 
               <p className="mt-5 text-base sm:text-lg leading-relaxed max-w-lg" style={{ color: MUTED }}>
-                AI-powered scouting reports for any Chess.com player. Find their patterns, exploit their habits, and walk into every game with a plan.
+                Upload or import your games. We'll show your biggest mistakes, patterns, and exactly how to fix them.
+              </p>
+
+              <p className="mt-4 text-sm font-semibold max-w-lg" style={{ color: TEXT }}>
+                Most players lose for the same 2–3 reasons. We'll show you yours.
               </p>
 
               <div className="mt-8 flex flex-col sm:flex-row gap-3">
@@ -511,17 +452,17 @@ export function LandingPage() {
                   style={{ background: G, color: '#fff', boxShadow: `0 4px 20px ${G}40` }}
                   onMouseEnter={e => { e.currentTarget.style.background = '#6fa23e'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
                   onMouseLeave={e => { e.currentTarget.style.background = G; e.currentTarget.style.transform = 'translateY(0)'; }}>
-                  <Search className="w-4 h-4" />
-                  Scout Any Player Free
+                  <BarChart3 className="w-4 h-4" />
+                  Analyze My Games Free
                   <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                 </button>
-                <button onClick={openLogin}
-                  className="flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl font-semibold text-sm transition-all"
-                  style={{ background: 'rgba(255,255,255,0.05)', color: TEXT, border: '1px solid rgba(255,255,255,0.1)' }}
-                  onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.08)')}
-                  onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.05)')}>
-                  <BarChart3 className="w-4 h-4" />
-                  Analyze My Games
+                <button onClick={openSignup}
+                  className="flex items-center justify-center gap-2 px-5 py-3 rounded-xl font-medium text-xs transition-all"
+                  style={{ background: 'transparent', color: MUTED, border: '1px solid rgba(255,255,255,0.08)' }}
+                  onMouseEnter={e => { e.currentTarget.style.color = TEXT; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.16)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.color = MUTED; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'; }}>
+                  <Crosshair className="w-3.5 h-3.5" />
+                  Scout Opponent
                 </button>
               </div>
 
@@ -538,16 +479,12 @@ export function LandingPage() {
               transition={{ duration: 0.7, delay: 0.15 }}
               className="hidden lg:block"
             >
-              <div className="space-y-4">
-                <HeroBoard />
-                <ScoutCard delay={0.5} />
-              </div>
+              <InsightsResultCard delay={0.3} />
             </motion.div>
           </div>
 
-          <div className="lg:hidden mt-10 space-y-4 max-w-md mx-auto">
-            <HeroBoard />
-            <ScoutCard delay={0.3} />
+          <div className="lg:hidden mt-10 max-w-md mx-auto">
+            <InsightsResultCard delay={0.2} />
           </div>
         </div>
       </section>
@@ -565,9 +502,9 @@ export function LandingPage() {
 
           <div className="grid sm:grid-cols-3 gap-6">
             {[
-              { num: '01', icon: Search, title: 'Enter a Username', desc: 'Type any Chess.com username. We pull their recent games instantly.' },
-              { num: '02', icon: Brain, title: 'AI Finds Patterns', desc: 'Our engine analyzes hundreds of games to find real weaknesses.' },
-              { num: '03', icon: Target, title: 'Get Your Game Plan', desc: 'Walk in with a clear strategy built from their actual mistakes.' },
+              { num: '01', icon: BarChart3, title: 'Import Your Games', desc: 'Connect your Chess.com or Lichess account. We pull your recent games in seconds.' },
+              { num: '02', icon: Brain, title: 'We Find Your Mistakes', desc: 'Our engine spots the patterns costing you points — across openings, endgames, and time trouble.' },
+              { num: '03', icon: Target, title: 'Get a Clear Game Plan', desc: 'A short, focused list of what to fix first — with drills built around your actual weaknesses.' },
             ].map((item, i) => (
               <motion.div
                 key={item.num}
@@ -594,19 +531,19 @@ export function LandingPage() {
         <div className="max-w-5xl mx-auto px-4 sm:px-8">
           <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} className="text-center mb-12">
             <h2 className="text-2xl sm:text-3xl font-black" style={{ color: TEXT }}>
-              More Than Just Scouting
+              Built To Make You Better
             </h2>
-            <p className="mt-2 text-sm" style={{ color: MUTED }}>A full toolkit to sharpen your game</p>
+            <p className="mt-2 text-sm" style={{ color: MUTED }}>Every tool starts with your games and your mistakes</p>
           </motion.div>
 
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {[
-              { icon: Crosshair, title: 'Opponent Scout', desc: 'AI scouting reports with weaknesses, tendencies, and a game plan', accent: true },
-              { icon: BarChart3, title: 'Game Analysis', desc: 'Move-by-move breakdown with accuracy scores and turning points', accent: false },
-              { icon: Search, title: 'Game Lookup', desc: 'Find head-to-head games between any two Chess.com players', accent: false },
+              { icon: BarChart3, title: 'Game Analysis', desc: 'Move-by-move breakdown of your games with accuracy scores and the exact moments you went wrong', accent: true },
+              { icon: BookOpen, title: 'Personalized Courses', desc: 'AI-generated lessons built from your actual mistakes — not generic theory', accent: false },
+              { icon: Search, title: 'Scan Position', desc: 'Stuck in a game? Upload a screenshot and get the best move instantly', accent: false },
               { icon: Gamepad2, title: 'Practice Bots', desc: '8 AI opponents from 400 to 2000 ELO with live move analysis', accent: false },
-              { icon: BookOpen, title: 'Personalized Courses', desc: 'AI-generated lessons built from your actual mistakes', accent: false },
-              { icon: TrendingUp, title: 'Track Progress', desc: 'See your improvement over time across all categories', accent: false },
+              { icon: TrendingUp, title: 'Track Progress', desc: 'See your improvement over time across openings, tactics, and endgames', accent: false },
+              { icon: Crosshair, title: 'Opponent Scout', desc: 'Prepare for specific opponents (optional) — useful for tournaments and rivals', accent: false },
             ].map((item, i) => (
               <motion.div
                 key={item.title}
@@ -632,6 +569,9 @@ export function LandingPage() {
       <section className="py-16 sm:py-20" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
         <div className="max-w-lg mx-auto px-4 sm:px-8">
           <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} className="text-center mb-10">
+            <p className="text-xs font-black uppercase tracking-widest mb-3" style={{ color: G }}>
+              Fix your biggest mistakes in your next 3 games
+            </p>
             <h2 className="text-2xl sm:text-3xl font-black" style={{ color: TEXT }}>
               Simple Pricing
             </h2>
@@ -661,11 +601,11 @@ export function LandingPage() {
 
             <div className="space-y-3 mb-8">
               {[
-                'Unlimited opponent scouting',
-                'Full game analysis with AI',
-                'Personalized training courses',
-                'Practice against 8 AI bots',
-                'Head-to-head game lookup',
+                'Full AI analysis of every game you play',
+                'Personalized courses built from your mistakes',
+                'Scan any position for the best move',
+                'Practice against 8 AI bots (400–2000 ELO)',
+                'Opponent scouting when you need it',
               ].map((feature) => (
                 <div key={feature} className="flex items-center gap-3">
                   <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: `${G}18` }}>
@@ -701,7 +641,7 @@ export function LandingPage() {
                 style={{ background: G, color: '#fff', boxShadow: `0 4px 20px ${G}40` }}
                 onMouseEnter={e => { e.currentTarget.style.background = '#6fa23e'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
                 onMouseLeave={e => { e.currentTarget.style.background = G; e.currentTarget.style.transform = 'translateY(0)'; }}>
-                Get Started Free
+                Analyze My Games Free
                 <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
               </button>
             </div>
@@ -721,7 +661,7 @@ export function LandingPage() {
         <button onClick={openSignup}
           className="w-full group flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm"
           style={{ background: G, color: '#fff' }}>
-          Scout Your Opponent Free
+          Analyze My Games Free
           <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
         </button>
       </div>
