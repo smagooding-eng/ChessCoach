@@ -107,6 +107,17 @@ router.get("/admin/stats", requireAdmin, async (_req: Request, res: Response) =>
       db.select({ count: count() }).from(pageViewsTable).where(eq(pageViewsTable.path, '/scan')),
     ]);
 
+    const topPagesRows = await db
+      .select({
+        path: pageViewsTable.path,
+        views: count(),
+        uniqueVisitors: countDistinct(pageViewsTable.visitorId),
+      })
+      .from(pageViewsTable)
+      .groupBy(pageViewsTable.path)
+      .orderBy(sql`count(*) desc`)
+      .limit(20);
+
     res.json({
       pageViews: { total: totalViewsResult.count, today: todayViewsResult.count },
       uniqueVisitors: { total: totalUniqueResult.count, today: todayUniqueResult.count },
@@ -122,6 +133,11 @@ router.get("/admin/stats", requireAdmin, async (_req: Request, res: Response) =>
         uniqueOpponentsScouted: uniqueScoutTargetsResult[0].count,
         positionScans: scanViewsResult[0].count,
       },
+      topPages: topPagesRows.map((r) => ({
+        path: r.path,
+        views: r.views,
+        uniqueVisitors: r.uniqueVisitors,
+      })),
     });
   } catch (err: any) {
     res.status(500).json({ error: "Failed to fetch admin stats" });

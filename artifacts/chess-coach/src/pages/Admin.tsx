@@ -11,6 +11,36 @@ interface AdminStats {
   subscriptions: { active: number; trialing: number; canceled: number; pastDue: number; total: number };
   games: { total: number; today: number; analyzed: number };
   activity: { opponentsScoutedTotal: number; uniqueOpponentsScouted: number; positionScans: number };
+  topPages: { path: string; views: number; uniqueVisitors: number }[];
+}
+
+const PATH_LABELS: Record<string, string> = {
+  '/': 'Home / Dashboard',
+  '/import': 'Import Games',
+  '/games': 'Games List',
+  '/analysis': 'Analysis',
+  '/courses': 'Courses',
+  '/endgames': 'Endgames',
+  '/openings': 'Openings',
+  '/opponents': 'Opponent Scout',
+  '/practice': 'Practice Bots',
+  '/play': 'Play Local',
+  '/lookup': 'Game Lookup',
+  '/puzzles': 'Puzzles',
+  '/scan': 'Scan Position',
+  '/subscription': 'Subscription',
+  '/profile': 'Profile',
+  '/setup': 'Login / Signup',
+  '/admin': 'Admin Dashboard',
+};
+
+function labelForPath(path: string): string {
+  if (PATH_LABELS[path]) return PATH_LABELS[path];
+  if (path.startsWith('/games/')) return 'Game Replay';
+  if (path.startsWith('/analysis/')) return 'Weakness Detail';
+  if (path.startsWith('/courses/')) return 'Course Detail';
+  if (path.startsWith('/openings/')) return 'Opening Detail';
+  return path;
 }
 
 const CHESSCOM_GREEN = '#81b64c';
@@ -228,6 +258,54 @@ export function Admin() {
             primary={stats.activity.positionScans}
             primaryLabel="Visits"
           />
+        </div>
+      )}
+
+      {stats && stats.topPages && stats.topPages.length > 0 && (
+        <div
+          className="rounded-xl p-4"
+          style={{ background: BG_CARD, border: `1px solid rgba(255,255,255,0.05)` }}
+        >
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-base font-black" style={{ color: TEXT_LIGHT }}>
+              Most Used Features
+            </h2>
+            <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: TEXT_MUTED }}>
+              By page views (all time)
+            </p>
+          </div>
+          <div className="space-y-1.5">
+            {(() => {
+              const max = Math.max(...stats.topPages.map((p) => p.views), 1);
+              return stats.topPages.map((p) => {
+                const pct = (p.views / max) * 100;
+                return (
+                  <div key={p.path} className="flex items-center gap-3 text-sm">
+                    <div className="w-40 shrink-0 truncate font-semibold" style={{ color: TEXT_LIGHT }}>
+                      {labelForPath(p.path)}
+                    </div>
+                    <div className="flex-1 h-5 rounded relative overflow-hidden" style={{ background: 'rgba(255,255,255,0.04)' }}>
+                      <div
+                        className="absolute inset-y-0 left-0 rounded"
+                        style={{ width: `${pct}%`, background: `${CHESSCOM_GREEN}33` }}
+                      />
+                      <div className="absolute inset-0 flex items-center justify-between px-2 text-[11px]">
+                        <span className="font-mono truncate" style={{ color: TEXT_MUTED }}>
+                          {p.path}
+                        </span>
+                        <span className="font-bold shrink-0 ml-2" style={{ color: CHESSCOM_GREEN }}>
+                          {fmt(p.views)}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="w-20 shrink-0 text-right text-[11px] font-semibold" style={{ color: TEXT_MUTED }}>
+                      {fmt(p.uniqueVisitors)} <span className="opacity-70">unique</span>
+                    </div>
+                  </div>
+                );
+              });
+            })()}
+          </div>
         </div>
       )}
     </div>
