@@ -74,6 +74,7 @@ import { Subscription } from "@/pages/Subscription";
 import { Profile } from "@/pages/Profile";
 import { Puzzles } from "@/pages/Puzzles";
 import { ScanPosition } from "@/pages/ScanPosition";
+import { Admin } from "@/pages/Admin";
 import NotFound from "@/pages/not-found";
 import { Layout } from "@/components/Layout";
 import { OnboardingWizard, useOnboardingCheck } from "@/components/OnboardingWizard";
@@ -143,6 +144,7 @@ const PSubscription  = () => <ProtectedRoute component={Subscription} />;
 const PProfile       = () => <ProtectedRoute component={Profile} />;
 const PPuzzles       = () => <ProtectedRoute component={Puzzles} />;
 const PScanPosition  = () => <ProtectedRoute component={ScanPosition} />;
+const PAdmin         = () => <ProtectedRoute component={Admin} />;
 
 function getVisitorId(): string {
   const key = 'chess_coach_visitor_id';
@@ -196,6 +198,7 @@ function Router() {
       <Route path="/lookup"          component={PGameLookup} />
       <Route path="/puzzles"          component={PPuzzles} />
       <Route path="/scan"             component={PScanPosition} />
+      <Route path="/admin"            component={PAdmin} />
       <Route path="/subscription"    component={PSubscription} />
       <Route path="/profile"          component={PProfile} />
 

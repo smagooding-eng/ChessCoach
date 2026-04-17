@@ -4,7 +4,7 @@ import { useUser } from '@/hooks/use-user';
 import { useChessPlayer } from '@/hooks/use-chess-player';
 import { useMultiEloProgress } from '@/hooks/use-elo-progress';
 import { MultiEloTrackerBadge, MultiEloInline } from '@/components/EloTracker';
-import { LayoutDashboard, Import, History, BrainCircuit, GraduationCap, Swords, BookOpen, LogOut, MoreHorizontal, ChevronRight, Bot, Crown, Trophy, Play, Search, Download, Puzzle, User, Settings, CreditCard, Camera } from 'lucide-react';
+import { LayoutDashboard, Import, History, BrainCircuit, GraduationCap, Swords, BookOpen, LogOut, MoreHorizontal, ChevronRight, Bot, Crown, Trophy, Play, Search, Download, Puzzle, User, Settings, CreditCard, Camera, Shield } from 'lucide-react';
 import { usePwaInstall } from '@/hooks/use-pwa-install';
 import { InstallGuide } from '@/components/InstallGuide';
 import { cn } from '@/lib/utils';
@@ -38,7 +38,11 @@ const SECONDARY_NAV = [
   { href: '/subscription', label: 'Subscription',    icon: Crown },
 ];
 
-const ALL_NAV = [...PRIMARY_NAV, ...SECONDARY_NAV];
+const ADMIN_NAV = [
+  { href: '/admin', label: 'Admin', icon: Shield },
+];
+
+const ALL_NAV = [...PRIMARY_NAV, ...SECONDARY_NAV, ...ADMIN_NAV];
 
 function PlayerAvatar({ avatar, username, size = 'md' }: { avatar?: string; username?: string; size?: 'sm' | 'md' | 'lg' }) {
   const dim = size === 'sm' ? 28 : size === 'lg' ? 44 : 34;
@@ -92,7 +96,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
   const displayRating = player?.rating;
 
-  const moreItems = [...PRIMARY_NAV.slice(4), ...SECONDARY_NAV];
+  const moreItems = [...PRIMARY_NAV.slice(4), ...SECONDARY_NAV, ...(authUser?.isAdmin ? ADMIN_NAV : [])];
   const activeMore = moreItems.find(i => location === i.href || location.startsWith(i.href + '/'));
   const isMoreActive = !!activeMore;
 
@@ -116,6 +120,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
           {SECONDARY_NAV.map(item => (
             <SidebarLink key={item.href} item={item} isActive={location === item.href} />
           ))}
+          {authUser?.isAdmin && (
+            <>
+              <p className="text-[9px] font-black uppercase tracking-widest px-3 mt-3 mb-1.5" style={{ color: 'rgba(158,155,152,0.5)' }}>Admin</p>
+              {ADMIN_NAV.map(item => (
+                <SidebarLink key={item.href} item={item} isActive={location === item.href} />
+              ))}
+            </>
+          )}
         </nav>
 
         <div className="p-2.5" style={{ borderTop: `1px solid ${BORDER_COLOR}` }}>

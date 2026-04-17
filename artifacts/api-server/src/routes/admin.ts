@@ -91,11 +91,37 @@ router.get("/admin/stats", requireAdmin, async (_req: Request, res: Response) =>
       };
     } catch {}
 
+    const [
+      totalGamesResult,
+      todayGamesResult,
+      analyzedGamesResult,
+      scoutJobsResult,
+      uniqueScoutTargetsResult,
+      scanViewsResult,
+    ] = await Promise.all([
+      db.select({ count: count() }).from(gamesTable),
+      db.select({ count: count() }).from(gamesTable).where(gte(gamesTable.createdAt, todayStart)),
+      db.select({ count: count() }).from(gamesTable).where(eq(gamesTable.analyzed, true)),
+      db.select({ count: count() }).from(backgroundJobsTable).where(eq(backgroundJobsTable.type, 'scout')),
+      db.select({ count: countDistinct(backgroundJobsTable.targetUsername) }).from(backgroundJobsTable).where(eq(backgroundJobsTable.type, 'scout')),
+      db.select({ count: count() }).from(pageViewsTable).where(eq(pageViewsTable.path, '/scan')),
+    ]);
+
     res.json({
       pageViews: { total: totalViewsResult.count, today: todayViewsResult.count },
       uniqueVisitors: { total: totalUniqueResult.count, today: todayUniqueResult.count },
       users: { total: totalUsersResult.count, today: todayUsersResult.count },
       subscriptions: subBreakdown,
+      games: {
+        total: totalGamesResult[0].count,
+        today: todayGamesResult[0].count,
+        analyzed: analyzedGamesResult[0].count,
+      },
+      activity: {
+        opponentsScoutedTotal: scoutJobsResult[0].count,
+        uniqueOpponentsScouted: uniqueScoutTargetsResult[0].count,
+        positionScans: scanViewsResult[0].count,
+      },
     });
   } catch (err: any) {
     res.status(500).json({ error: "Failed to fetch admin stats" });
