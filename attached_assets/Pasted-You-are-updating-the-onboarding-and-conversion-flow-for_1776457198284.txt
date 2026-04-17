@@ -1,0 +1,171 @@
+You are updating the onboarding and conversion flow for ChessScout.net to increase activation and paid conversion.
+
+GOAL:
+Force users to experience value (game analysis insights) within 30 seconds of signup before allowing exploration of the app.
+
+---
+
+1. REMOVE CURRENT ONBOARDING FLOW
+
+Delete:
+
+- Welcome screen ("Welcome, Bob")
+- Feature cards (AI Review, Opponent Scout, Courses)
+- "Let's Go" screen
+- Opponent Scout step in onboarding
+
+These are reducing conversion and causing drop-off.
+
+---
+
+2. NEW POST-SIGNUP FLOW (MANDATORY)
+
+After successful signup:
+
+Redirect user to "/onboarding/import"
+
+Hide all navigation (bottom nav + header actions) until onboarding is complete.
+
+---
+
+3. IMPORT SCREEN (STEP 1)
+
+Design a full-screen modal/page with:
+
+Headline:
+"Find your biggest mistakes in 30 seconds"
+
+Subtext:
+"We'll analyze your recent games and show you exactly where you're losing."
+
+Buttons:
+
+- "Import from Chess.com"
+- "Import from Lichess"
+
+Optional small text below:
+"No login required. Takes ~10 seconds."
+
+NO skip button.
+
+---
+
+4. IMPORT PROCESS STATE (STEP 2)
+
+When import starts, show dynamic loading messages that rotate every 1.5s:
+
+- "Analyzing your last games..."
+- "Detecting patterns in your losses..."
+- "Finding your biggest weakness..."
+- "Building your personal report..."
+
+Include progress bar (fake progress is OK if needed).
+
+---
+
+5. AHA MOMENT SCREEN (STEP 3)
+
+After import completes, immediately show a results screen with:
+
+Large headline:
+"Here's what's holding you back"
+
+Then show 2–3 bold insights (generate from analysis data):
+
+Examples:
+
+- "You lose 64% of your endgames"
+- "You blunder 2.1x more under time pressure"
+- "You struggle against d4 openings"
+
+Design:
+
+- Big cards
+- High contrast
+- Emotionally impactful
+
+---
+
+6. CTA AFTER AHA MOMENT
+
+Primary button:
+"See how to fix this →"
+
+On click:
+Navigate to main dashboard with data populated
+
+---
+
+7. SOFT PAYWALL (CRITICAL)
+
+On dashboard:
+
+- Blur deeper insights (full breakdown, advanced analysis, training plan)
+- Show overlay:
+
+"Unlock your full breakdown and personalized training plan"
+
+CTA:
+"Upgrade to Pro"
+
+---
+
+8. CHANGE PRIMARY CTA SITE-WIDE
+
+Replace all instances of:
+"Start Free Trial"
+
+WITH:
+"Analyze My Games Free"
+
+---
+
+9. REPOSITION OPPONENT SCOUT
+
+Remove opponent scouting from onboarding completely.
+
+Keep it inside app as a secondary feature.
+
+Do NOT present it before user sees their own analysis.
+
+---
+
+10. BOOST SCAN POSITION FEATURE
+
+Add entry point on dashboard:
+
+Card:
+"Stuck in a game? Scan a position"
+
+Subtext:
+"Upload a screenshot and get the best move instantly"
+
+Make this highly visible after onboarding.
+
+---
+
+11. UX RULES
+
+- Do not show multiple choices early
+- Do not allow exploration before value is delivered
+- Keep flow linear: Import → Insight → Explore → Upgrade
+
+---
+
+12. SUCCESS METRIC
+
+Target:
+
+- Increase % of users importing games from ~7% to 40%+
+- Increase paid conversion from 2.2% → 5%+
+
+---
+
+Implement this flow cleanly using existing React structure.
+Reuse existing components where possible, but prioritize clarity over reuse.
+
+Do NOT keep any part of the old onboarding.
+
+---
+
+END.

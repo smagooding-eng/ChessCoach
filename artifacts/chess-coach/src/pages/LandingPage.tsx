@@ -118,7 +118,7 @@ function AuthModal({ open, onClose, initialMode, externalError }: { open: boolea
 
           <div className="text-center mb-6">
             <h2 className="text-2xl font-black" style={{ color: TEXT }}>
-              {mode === 'login' ? 'Welcome Back' : 'Start Your Free Trial'}
+              {mode === 'login' ? 'Welcome Back' : 'Analyze My Games Free'}
             </h2>
             <p className="text-sm mt-1" style={{ color: MUTED }}>
               {mode === 'login' ? 'Sign in to your account' : '3 days free, then $4/month'}
@@ -217,7 +217,7 @@ function AuthModal({ open, onClose, initialMode, externalError }: { open: boolea
               {loading ? (
                 <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
               ) : mode === 'register' ? (
-                <><UserPlus className="w-4 h-4" />Start Free Trial</>
+                <><UserPlus className="w-4 h-4" />Analyze My Games Free</>
               ) : (
                 <><LogIn className="w-4 h-4" />Sign In</>
               )}
@@ -681,7 +681,7 @@ export function LandingPage() {
               style={{ background: G, color: '#fff', boxShadow: `0 4px 20px ${G}40` }}
               onMouseEnter={e => { e.currentTarget.style.background = '#6fa23e'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
               onMouseLeave={e => { e.currentTarget.style.background = G; e.currentTarget.style.transform = 'translateY(0)'; }}>
-              Start Free Trial
+              Analyze My Games Free
               <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
             </button>
           </motion.div>

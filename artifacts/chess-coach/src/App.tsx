@@ -175,6 +175,8 @@ function OnboardingOverlay() {
   return <OnboardingWizard onComplete={dismissOnboarding} />;
 }
 
+export { useOnboardingCheck };
+
 function Router() {
   return (
     <><PageTracker /><OnboardingOverlay /><Switch>

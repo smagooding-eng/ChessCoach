@@ -479,7 +479,7 @@ ${divider}
 <p style="color:#e8e6e3;font-size:22px;font-weight:700;margin:0;">$1<span style="font-size:14px;font-weight:400;color:#9e9b98;">/week</span> &nbsp;or&nbsp; $4<span style="font-size:14px;font-weight:400;color:#9e9b98;">/month</span></p>
 <p style="color:#81b64c;font-size:13px;margin:4px 0 0;">Includes 3-day free trial</p>
 </div>
-<p style="text-align:center;"><a href="https://chessscout.net/subscription" style="${btnStyle}">Start Free Trial →</a></p>`,
+<p style="text-align:center;"><a href="https://chessscout.net/subscription" style="${btnStyle}">Analyze My Games Free →</a></p>`,
   },
   {
     name: '🚀 New Feature',

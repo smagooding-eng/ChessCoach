@@ -3,7 +3,7 @@ import { useMyAnalysisSummary, useMyWeaknesses } from '@/hooks/use-analysis';
 import { useMyCourses } from '@/hooks/use-courses';
 import { useMyGames } from '@/hooks/use-games';
 import { Link } from 'wouter';
-import { Swords, Trophy, Target, AlertTriangle, BookOpen, Clock, GraduationCap, TrendingUp, ChevronRight, Search, Play, Bot } from 'lucide-react';
+import { Swords, Trophy, Target, AlertTriangle, BookOpen, Clock, GraduationCap, TrendingUp, ChevronRight, Search, Play, Bot, Camera, Lock, Crown } from 'lucide-react';
 import { useUser } from '@/hooks/use-user';
 import { useChessPlayer } from '@/hooks/use-chess-player';
 import { useMultiEloProgress } from '@/hooks/use-elo-progress';
@@ -32,7 +32,7 @@ const SEV_COLORS: Record<string, { bg: string; text: string }> = {
 };
 
 export function Dashboard() {
-  const { username } = useUser();
+  const { username, isPremium } = useUser();
   const { player: chessPlayer } = useChessPlayer(username ?? undefined);
   const { data: multiElo } = useMultiEloProgress(username ?? undefined);
   const { data: summary, isLoading: loadingSummary } = useMyAnalysisSummary();
@@ -141,6 +141,30 @@ export function Dashboard() {
         ) : null}
       </div>
 
+      <Link href="/scan" className="block px-3 md:px-0">
+        <div className="rounded-xl p-4 md:p-5 transition-all group cursor-pointer flex items-center gap-4"
+          style={{
+            background: 'linear-gradient(135deg, rgba(129,182,76,0.18) 0%, rgba(129,182,76,0.04) 100%)',
+            border: `1px solid rgba(129,182,76,0.3)`,
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.borderColor = 'rgba(129,182,76,0.55)')}
+          onMouseLeave={(e) => (e.currentTarget.style.borderColor = 'rgba(129,182,76,0.3)')}>
+          <div className="shrink-0 w-12 h-12 md:w-14 md:h-14 rounded-xl flex items-center justify-center"
+            style={{ background: 'rgba(129,182,76,0.18)' }}>
+            <Camera className="w-6 h-6 md:w-7 md:h-7" style={{ color: CHESSCOM_GREEN }} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h3 className="font-black text-base md:text-lg" style={{ color: TEXT_LIGHT }}>
+              Stuck in a game? Scan a position
+            </h3>
+            <p className="text-xs md:text-sm mt-0.5" style={{ color: TEXT_MUTED }}>
+              Upload a screenshot and get the best move instantly.
+            </p>
+          </div>
+          <ChevronRight className="shrink-0 w-5 h-5 opacity-50 group-hover:opacity-90 group-hover:translate-x-1 transition-all" style={{ color: CHESSCOM_GREEN }} />
+        </div>
+      </Link>
+
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 md:gap-3 px-3 md:px-0">
         {[
           { label: 'Total Games', value: summary?.totalGames || 0, icon: <Swords className="w-4 h-4" /> },
@@ -161,28 +185,68 @@ export function Dashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 md:gap-4 px-3 md:px-0">
         <div className="lg:col-span-2 space-y-3 md:space-y-4">
 
-          <DashCard title="Key Weaknesses" icon={<AlertTriangle className="w-4 h-4" style={{ color: '#ea9733' }} />} linkHref="/analysis" linkText="Full Analysis">
-            {weaknesses?.weaknesses?.length ? (
-              <div className="space-y-1.5">
-                {weaknesses.weaknesses.slice(0, 3).map((w) => {
-                  const sev = SEV_COLORS[w.severity] ?? SEV_COLORS.Low;
-                  return (
-                    <Link key={w.id} href={`/analysis/${w.id}`}>
-                      <div className="group flex items-start gap-2.5 p-3 rounded-lg transition-colors cursor-pointer" style={{ background: 'transparent' }}
-                        onMouseEnter={e => (e.currentTarget.style.background = BG_CARD_HOVER)}
-                        onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-                        <span className="mt-px px-1.5 py-px rounded text-[10px] font-bold shrink-0" style={{ background: sev.bg, color: sev.text }}>
-                          {w.severity}
-                        </span>
+          <DashCard title="Key Weaknesses" icon={<AlertTriangle className="w-4 h-4" style={{ color: '#ea9733' }} />} linkHref={isPremium ? "/analysis" : "/subscription"} linkText={isPremium ? "Full Analysis" : "Upgrade"}>
+            {!isPremium ? (
+              <div className="relative min-h-[180px]">
+                <div className="space-y-1.5 pointer-events-none select-none" style={{ filter: 'blur(6px)' }}>
+                  {[
+                    { sev: 'High', cat: 'Endgame Technique', desc: 'You convert only 38% of winning endgames…' },
+                    { sev: 'Medium', cat: 'Opening Repertoire', desc: 'Multiple losses in the same opening line…' },
+                    { sev: 'Medium', cat: 'Tactical Awareness', desc: 'Missed forks and pins recur across games…' },
+                  ].map((w, i) => {
+                    const sev = SEV_COLORS[w.sev as keyof typeof SEV_COLORS] ?? SEV_COLORS.Low;
+                    return (
+                      <div key={i} className="flex items-start gap-2.5 p-3 rounded-lg">
+                        <span className="mt-px px-1.5 py-px rounded text-[10px] font-bold shrink-0" style={{ background: sev.bg, color: sev.text }}>{w.sev}</span>
                         <div className="min-w-0 flex-1">
-                          <p className="font-semibold text-sm" style={{ color: TEXT_LIGHT }}>{w.category}</p>
-                          <p className="text-xs line-clamp-1 mt-0.5" style={{ color: TEXT_MUTED }}>{w.description}</p>
+                          <p className="font-semibold text-sm" style={{ color: TEXT_LIGHT }}>{w.cat}</p>
+                          <p className="text-xs line-clamp-1 mt-0.5" style={{ color: TEXT_MUTED }}>{w.desc}</p>
                         </div>
-                        <ChevronRight className="w-3.5 h-3.5 shrink-0 mt-1 opacity-0 group-hover:opacity-60 transition-opacity" style={{ color: TEXT_MUTED }} />
                       </div>
+                    );
+                  })}
+                </div>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="text-center px-4 py-5 rounded-xl max-w-xs"
+                    style={{ background: 'rgba(38,36,33,0.92)', border: `1px solid rgba(234,166,49,0.35)`, backdropFilter: 'blur(2px)' }}>
+                    <div className="inline-flex items-center justify-center w-9 h-9 rounded-lg mb-2" style={{ background: 'rgba(234,166,49,0.18)' }}>
+                      <Lock className="w-4 h-4" style={{ color: '#eaa631' }} />
+                    </div>
+                    <p className="font-bold text-sm mb-1" style={{ color: TEXT_LIGHT }}>
+                      Unlock your full breakdown and personalized training plan
+                    </p>
+                    <Link href="/subscription">
+                      <button className="mt-2 inline-flex items-center gap-1.5 px-4 py-2 rounded-lg font-bold text-xs transition-all"
+                        style={{ background: '#eaa631', color: '#1a1816' }}>
+                        <Crown className="w-3.5 h-3.5" /> Upgrade to Pro
+                      </button>
                     </Link>
-                  );
-                })}
+                  </div>
+                </div>
+              </div>
+            ) : weaknesses?.weaknesses?.length ? (
+              <div className="relative">
+                <div className="space-y-1.5">
+                  {weaknesses.weaknesses.slice(0, 3).map((w) => {
+                    const sev = SEV_COLORS[w.severity] ?? SEV_COLORS.Low;
+                    return (
+                      <Link key={w.id} href={`/analysis/${w.id}`}>
+                        <div className="group flex items-start gap-2.5 p-3 rounded-lg transition-colors cursor-pointer" style={{ background: 'transparent' }}
+                          onMouseEnter={e => (e.currentTarget.style.background = BG_CARD_HOVER)}
+                          onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                          <span className="mt-px px-1.5 py-px rounded text-[10px] font-bold shrink-0" style={{ background: sev.bg, color: sev.text }}>
+                            {w.severity}
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <p className="font-semibold text-sm" style={{ color: TEXT_LIGHT }}>{w.category}</p>
+                            <p className="text-xs line-clamp-1 mt-0.5" style={{ color: TEXT_MUTED }}>{w.description}</p>
+                          </div>
+                          <ChevronRight className="w-3.5 h-3.5 shrink-0 mt-1 opacity-0 group-hover:opacity-60 transition-opacity" style={{ color: TEXT_MUTED }} />
+                        </div>
+                      </Link>
+                    );
+                  })}
+                </div>
               </div>
             ) : (
               <EmptyState icon={<Target className="w-7 h-7" />} text="No weaknesses found yet." linkHref="/analysis" linkText="Run AI Analysis →" />
