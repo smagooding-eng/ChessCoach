@@ -874,9 +874,28 @@ Return ONLY this JSON, no markdown:
       const ABS_FLOOR = 200;
       const thr = Math.max(pctThr, ABS_FLOOR);
 
-      const isBoard: boolean[] = tileVar.map(v => v >= thr);
+      const isBoardRaw: boolean[] = tileVar.map(v => v >= thr);
 
-      // Connected component labeling (4-neighbour BFS) on the tile grid.
+      // MORPHOLOGICAL EROSION (3×3) — keep a tile only if it AND all 8
+      // neighbours are above threshold. This eliminates thin strips of
+      // high-variance UI (status bar text 1-2 tiles tall, headers, post
+      // text rows) that would otherwise get merged with the board's
+      // dense blob and balloon the bbox. The chess board is dense (7×7+
+      // tiles all qualifying) so erosion barely shrinks it.
+      const isBoard: boolean[] = new Array(tilesX * tilesY).fill(false);
+      for (let ty = 1; ty < tilesY - 1; ty++) {
+        for (let tx = 1; tx < tilesX - 1; tx++) {
+          let allOn = true;
+          for (let dy = -1; dy <= 1 && allOn; dy++) {
+            for (let dx = -1; dx <= 1; dx++) {
+              if (!isBoardRaw[(ty + dy) * tilesX + (tx + dx)]) { allOn = false; break; }
+            }
+          }
+          if (allOn) isBoard[ty * tilesX + tx] = true;
+        }
+      }
+
+      // Connected component labeling (4-neighbour BFS) on the eroded grid.
       const label: number[] = new Array(tilesX * tilesY).fill(-1);
       const components: Array<{ minX: number; maxX: number; minY: number; maxY: number; count: number }> = [];
       for (let ty = 0; ty < tilesY; ty++) {
@@ -941,22 +960,11 @@ Return ONLY this JSON, no markdown:
       let bt = (board.minY * STEP) / scanH;
       let bbo = (board.maxY * STEP + TILE) / scanH;
 
-      // Force square bbox by expanding the shorter dimension around the center.
-      // (Convert to PIXEL space first because scan grid isn't square.)
-      let pxL = bl * imgW, pxR = br * imgW, pxT = bt * imgH, pxB = bbo * imgH;
-      const pxW = pxR - pxL;
-      const pxH = pxB - pxT;
-      const side = Math.max(pxW, pxH);
-      const padPx = side * 0.04;
-      const cxPx = (pxL + pxR) / 2;
-      const cyPx = (pxT + pxB) / 2;
-      let half = side / 2 + padPx;
-      pxL = Math.max(0, cxPx - half);
-      pxR = Math.min(imgW, cxPx + half);
-      pxT = Math.max(0, cyPx - half);
-      pxB = Math.min(imgH, cyPx + half);
-
-      // Make it exactly square (clamping above may have unbalanced it).
+      // INSCRIBE a square INSIDE the detected bbox — never expand beyond
+      // the detected region. The chess board is square so its tight bbox
+      // should also be roughly square; if it isn't, the smaller dimension
+      // is the right one and we trim the longer one.
+      const pxL = bl * imgW, pxR = br * imgW, pxT = bt * imgH, pxB = bbo * imgH;
       const finalSide = Math.min(pxR - pxL, pxB - pxT);
       const fcx = (pxL + pxR) / 2;
       const fcy = (pxT + pxB) / 2;
@@ -964,7 +972,8 @@ Return ONLY this JSON, no markdown:
       const cropY = Math.max(0, Math.round(fcy - finalSide / 2));
       const cropSide = Math.min(Math.round(finalSide), imgW - cropX, imgH - cropY);
 
-      bl = pxL / imgW; br = pxR / imgW; bt = pxT / imgH; bbo = pxB / imgH;
+      bl = cropX / imgW; br = (cropX + cropSide) / imgW;
+      bt = cropY / imgH; bbo = (cropY + cropSide) / imgH;
       req.log?.info?.({ bl, bt, br, bbo, components: components.length, boardCount: board.count, thr, cropX, cropY, cropSide }, "Board detected by tile components");
 
       const croppedJpeg = await sharp(originalBuf)
