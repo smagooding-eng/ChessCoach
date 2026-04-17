@@ -210,7 +210,7 @@ export function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
         credentials: 'include',
         body: JSON.stringify({
           username: name,
-          months: 3,
+          months: 12,
           platform,
           ownerUsername: name,
         }),
@@ -721,12 +721,12 @@ export function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
               <p className="text-sm md:text-base mb-6 max-w-md mx-auto" style={{ color: MUTED }}>
                 {deepImporting
                   ? "Hang tight — this can take a moment for active players."
-                  : <>You've only seen <span style={{ color: TEXT }}>3 months</span> so far. Pull 2 years and every recurring blunder pattern bubbles to the surface.</>}
+                  : <>You've seen <span style={{ color: TEXT }}>1 year</span> so far. Pull the rest and every long-running pattern surfaces.</>}
               </p>
 
               <div className="grid grid-cols-2 gap-2.5 mb-5">
                 <div className="rounded-xl p-4 text-left" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                  <p className="text-[10px] font-black uppercase tracking-widest mb-2" style={{ color: MUTED }}>3 MONTHS</p>
+                  <p className="text-[10px] font-black uppercase tracking-widest mb-2" style={{ color: MUTED }}>1 YEAR</p>
                   <p className="text-2xl font-black mb-1" style={{ color: TEXT }}>{insights?.totalGames ?? 0}</p>
                   <p className="text-xs" style={{ color: MUTED }}>games · ~{insights?.insights?.length ?? 3} patterns</p>
                 </div>
@@ -738,9 +738,9 @@ export function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
                   <div className="absolute top-2 right-2 px-1.5 py-0.5 rounded text-[8px] font-black tracking-wider" style={{ background: G, color: '#fff' }}>
                     RECOMMENDED
                   </div>
-                  <p className="text-[10px] font-black uppercase tracking-widest mb-2" style={{ color: G }}>2 YEARS</p>
-                  <p className="text-2xl font-black mb-1" style={{ color: TEXT }}>{Math.max(8, (insights?.totalGames ?? 0) * 8)}+</p>
-                  <p className="text-xs" style={{ color: TEXT }}>games · <span style={{ color: G }}>~{Math.max(15, (insights?.insights?.length ?? 3) * 5)} patterns</span></p>
+                  <p className="text-[10px] font-black uppercase tracking-widest mb-2" style={{ color: G }}>FULL HISTORY</p>
+                  <p className="text-2xl font-black mb-1" style={{ color: TEXT }}>{Math.max(8, Math.round((insights?.totalGames ?? 0) * 2.5))}+</p>
+                  <p className="text-xs" style={{ color: TEXT }}>games · <span style={{ color: G }}>~{Math.max(8, (insights?.insights?.length ?? 3) * 3)} patterns</span></p>
                 </div>
               </div>
 

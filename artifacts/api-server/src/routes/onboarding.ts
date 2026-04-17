@@ -84,7 +84,7 @@ router.get("/onboarding/insights", requireAuth, async (req: Request, res: Respon
       .from(gamesTable)
       .where(and(...conditions))
       .orderBy(desc(gamesTable.playedAt))
-      .limit(500);
+      .limit(2000);
 
     if (games.length === 0) {
       res.json({
@@ -186,6 +186,163 @@ router.get("/onboarding/insights", requireAuth, async (req: Request, res: Respon
       }
     }
 
+    // Helper: get user's rating from a game
+    const ratingOf = (g: typeof games[number]) =>
+      g.whiteUsername?.toLowerCase() === username ? g.whiteRating : g.blackRating;
+
+    // 5. Rating trend — last 30 days vs prior 30 days
+    if (games.length >= 20) {
+      const now = Date.now();
+      const day = 24 * 60 * 60 * 1000;
+      const recent = games.filter((g) => g.playedAt && now - g.playedAt.getTime() <= 30 * day && ratingOf(g) > 0);
+      const prior  = games.filter((g) => g.playedAt && now - g.playedAt.getTime() > 30 * day && now - g.playedAt.getTime() <= 60 * day && ratingOf(g) > 0);
+      if (recent.length >= 5 && prior.length >= 5) {
+        const recentAvg = Math.round(recent.reduce((s, g) => s + ratingOf(g), 0) / recent.length);
+        const priorAvg  = Math.round(prior.reduce((s, g) => s + ratingOf(g), 0) / prior.length);
+        const delta = recentAvg - priorAvg;
+        if (delta <= -25) {
+          insights.unshift({
+            headline: `Your rating dropped ${Math.abs(delta)} points in the last 30 days`,
+            detail: `From ${priorAvg} → ${recentAvg}. Something specific is going wrong recently — let's find it.`,
+            severity: "high",
+            metric: `${delta}`,
+          });
+        } else if (delta >= 25) {
+          insights.push({
+            headline: `You're up ${delta} points in the last 30 days`,
+            detail: `From ${priorAvg} → ${recentAvg}. Lock in this momentum before it fades.`,
+            severity: "low",
+            metric: `+${delta}`,
+          });
+        }
+      }
+    }
+
+    // 6. Tilt detection — longest losing streak in last 60 days
+    const sortedAsc = [...games].sort((a, b) => (a.playedAt?.getTime() ?? 0) - (b.playedAt?.getTime() ?? 0));
+    const last60 = sortedAsc.filter((g) => g.playedAt && Date.now() - g.playedAt.getTime() <= 60 * 24 * 60 * 60 * 1000);
+    if (last60.length >= 10) {
+      let longestStreak = 0;
+      let curStreak = 0;
+      let streakDate: Date | null = null;
+      let curStreakStart: Date | null = null;
+      for (const g of last60) {
+        if (g.result === "loss") {
+          if (curStreak === 0) curStreakStart = g.playedAt;
+          curStreak++;
+          if (curStreak > longestStreak) {
+            longestStreak = curStreak;
+            streakDate = curStreakStart;
+          }
+        } else {
+          curStreak = 0;
+        }
+      }
+      if (longestStreak >= 4 && streakDate) {
+        const dateStr = streakDate.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+        insights.push({
+          headline: `You went on a ${longestStreak}-game losing streak around ${dateStr}`,
+          detail: `Classic tilt pattern — losses snowball when you keep playing through frustration.`,
+          severity: longestStreak >= 6 ? "high" : "medium",
+          metric: `${longestStreak}L`,
+        });
+      }
+    }
+
+    // 7. Time-of-day pattern — late-night losses
+    const lossesWithTime = games.filter((g) => g.result === "loss" && g.playedAt);
+    if (lossesWithTime.length >= 15) {
+      const lateLosses = lossesWithTime.filter((g) => {
+        const h = g.playedAt!.getUTCHours();
+        // Loose late-night bucket in user-local time isn't possible without TZ; use UTC late or early hours as proxy.
+        return h >= 22 || h < 4;
+      }).length;
+      const lateRate = pct(lateLosses, lossesWithTime.length);
+      if (lateRate >= 35) {
+        insights.push({
+          headline: `${lateRate}% of your losses happen late at night`,
+          detail: `Fatigue is real — your decision quality drops after a long day. Stick to one or two warmup games before bed.`,
+          severity: "medium",
+          metric: `${lateRate}%`,
+        });
+      }
+    }
+
+    // 8. Time control weakness — worst format
+    const tcStats = new Map<string, { games: number; wins: number; losses: number }>();
+    for (const g of games) {
+      const tc = (g.timeControl || "unknown").trim();
+      // Normalize chess.com seconds-format into category
+      let bucket = tc;
+      const tcNum = parseInt(tc, 10);
+      if (!Number.isNaN(tcNum)) {
+        if (tcNum < 60) bucket = "bullet";
+        else if (tcNum < 180) bucket = "bullet";
+        else if (tcNum < 600) bucket = "blitz";
+        else if (tcNum < 1800) bucket = "rapid";
+        else bucket = "classical";
+      } else if (/\+/.test(tc)) {
+        const base = parseInt(tc.split("+")[0]!, 10);
+        if (!Number.isNaN(base)) {
+          if (base < 180) bucket = "bullet";
+          else if (base < 600) bucket = "blitz";
+          else if (base < 1800) bucket = "rapid";
+          else bucket = "classical";
+        }
+      }
+      const cur = tcStats.get(bucket) ?? { games: 0, wins: 0, losses: 0 };
+      cur.games++;
+      if (g.result === "win") cur.wins++;
+      else if (g.result === "loss") cur.losses++;
+      tcStats.set(bucket, cur);
+    }
+    let worstTc: { name: string; lossRate: number; games: number } | null = null;
+    let bestTc: { name: string; winRate: number; games: number } | null = null;
+    for (const [name, s] of tcStats) {
+      if (s.games < 8 || name === "unknown") continue;
+      const lossRate = pct(s.losses, s.games);
+      const winRate = pct(s.wins, s.games);
+      if (lossRate >= 55 && (!worstTc || lossRate > worstTc.lossRate)) {
+        worstTc = { name, lossRate, games: s.games };
+      }
+      if (winRate >= 55 && (!bestTc || winRate > bestTc.winRate)) {
+        bestTc = { name, winRate, games: s.games };
+      }
+    }
+    if (worstTc && bestTc && worstTc.name !== bestTc.name) {
+      insights.push({
+        headline: `Stop playing ${worstTc.name} — you lose ${worstTc.lossRate}% of those games`,
+        detail: `Meanwhile you win ${bestTc.winRate}% at ${bestTc.name}. Your skills don't translate at that speed.`,
+        severity: "medium",
+        metric: `${worstTc.lossRate}%`,
+      });
+    } else if (worstTc) {
+      insights.push({
+        headline: `${worstTc.lossRate}% of your ${worstTc.name} games are losses`,
+        detail: `Across ${worstTc.games} games — this format is bleeding rating points.`,
+        severity: "medium",
+        metric: `${worstTc.lossRate}%`,
+      });
+    }
+
+    // 9. Recent form — last 10 games
+    if (games.length >= 10) {
+      const last10 = games.slice(0, 10);
+      const last10Losses = last10.filter((g) => g.result === "loss").length;
+      if (last10Losses >= 7) {
+        insights.push({
+          headline: `You've lost ${last10Losses} of your last 10 games`,
+          detail: `Cold streak. Time to step back from rated play, fix the leaks first, then climb back.`,
+          severity: "high",
+          metric: `${last10Losses}/10`,
+        });
+      }
+    }
+
+    // Sort by severity (high first) then dedupe-ish
+    const severityRank = { high: 0, medium: 1, low: 2 } as const;
+    insights.sort((a, b) => severityRank[a.severity] - severityRank[b.severity]);
+
     // Fallback insights if no patterns triggered
     if (insights.length === 0) {
       const overallLossRate = pct(losses, games.length);
@@ -202,7 +359,7 @@ router.get("/onboarding/insights", requireAuth, async (req: Request, res: Respon
       wins,
       losses,
       draws,
-      insights: insights.slice(0, 3),
+      insights: insights.slice(0, 4),
     });
   } catch (err: any) {
     res.status(500).json({ error: "Failed to compute insights", detail: err?.message });
