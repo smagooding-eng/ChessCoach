@@ -833,69 +833,133 @@ Return ONLY this JSON, no markdown:
         .raw()
         .toBuffer({ resolveWithObject: true });
 
-      function rowVariance(y: number): number {
-        let sum = 0, sumSq = 0;
-        for (let x = 0; x < scanW; x++) {
-          const v = gray[y * scanW + x];
-          sum += v; sumSq += v * v;
+      // Use SLIDING-WINDOW MAX variance for each row/column. Full-row
+      // variance fails when the board doesn't span the full width, because
+      // a row passing through (board + empty UI on the sides) gets a
+      // mid-range value that's hard to distinguish from a noisy UI row.
+      // Local window variance solves this: for each row we slide a small
+      // window across it and take the MAX variance any window sees. A row
+      // overlapping the board has at least one window landing fully on
+      // board pixels (alternating squares = huge variance). A row in dark
+      // UI has uniformly low variance everywhere.
+      const WIN = Math.max(8, Math.floor(Math.min(scanW, scanH) / 16));
+
+      function rowSignal(y: number): number {
+        let best = 0;
+        for (let x0 = 0; x0 + WIN <= scanW; x0 += Math.max(1, Math.floor(WIN / 2))) {
+          let sum = 0, sumSq = 0;
+          for (let x = x0; x < x0 + WIN; x++) {
+            const v = gray[y * scanW + x];
+            sum += v; sumSq += v * v;
+          }
+          const mean = sum / WIN;
+          const variance = sumSq / WIN - mean * mean;
+          if (variance > best) best = variance;
         }
-        const mean = sum / scanW;
-        return sumSq / scanW - mean * mean;
+        return best;
       }
-      function colVariance(x: number): number {
-        let sum = 0, sumSq = 0;
-        for (let y = 0; y < scanH; y++) {
-          const v = gray[y * scanW + x];
-          sum += v; sumSq += v * v;
+      function colSignal(x: number): number {
+        let best = 0;
+        for (let y0 = 0; y0 + WIN <= scanH; y0 += Math.max(1, Math.floor(WIN / 2))) {
+          let sum = 0, sumSq = 0;
+          for (let y = y0; y < y0 + WIN; y++) {
+            const v = gray[y * scanW + x];
+            sum += v; sumSq += v * v;
+          }
+          const mean = sum / WIN;
+          const variance = sumSq / WIN - mean * mean;
+          if (variance > best) best = variance;
         }
-        const mean = sum / scanH;
-        return sumSq / scanH - mean * mean;
+        return best;
       }
 
-      const rowVars = new Array(scanH);
-      for (let y = 0; y < scanH; y++) rowVars[y] = rowVariance(y);
-      const colVars = new Array(scanW);
-      for (let x = 0; x < scanW; x++) colVars[x] = colVariance(x);
+      const rowSigRaw: number[] = new Array(scanH);
+      for (let y = 0; y < scanH; y++) rowSigRaw[y] = rowSignal(y);
+      const colSigRaw: number[] = new Array(scanW);
+      for (let x = 0; x < scanW; x++) colSigRaw[x] = colSignal(x);
 
-      // Threshold: find the variance level that separates "uniform" rows
-      // (UI chrome) from "patterned" rows (the chess board). We use a
-      // percentage of the maximum variance — chess board rows typically
-      // sit near the maximum, while UI rows are an order of magnitude lower.
-      const maxRowVar = Math.max(...rowVars);
-      const maxColVar = Math.max(...colVars);
-      const rowThr = maxRowVar * 0.35;
-      const colThr = maxColVar * 0.35;
+      // Smooth with a 5-tap moving average — bridges single-row dips in
+      // the middle of the board (e.g. a rank that happens to be mostly
+      // empty pieces of one color).
+      function smooth(arr: number[]): number[] {
+        const out = new Array(arr.length).fill(0);
+        const R = 3;
+        for (let i = 0; i < arr.length; i++) {
+          let s = 0, n = 0;
+          for (let k = -R; k <= R; k++) {
+            const j = i + k;
+            if (j >= 0 && j < arr.length) { s += arr[j]; n++; }
+          }
+          out[i] = s / n;
+        }
+        return out;
+      }
+      const rowSig = smooth(rowSigRaw);
+      const colSig = smooth(colSigRaw);
 
-      // Find the LONGEST contiguous run of rows above threshold — that's
-      // the board (other high-variance areas like icon strips will be short).
-      function longestRun(values: number[], thr: number): { start: number; end: number } {
-        let bestStart = 0, bestLen = 0, curStart = -1, curLen = 0;
+      const maxRowSig = Math.max(...rowSig);
+      const maxColSig = Math.max(...colSig);
+      // Use a LOW threshold (15% of max) so we capture the entire board
+      // even when some interior rows have lower contrast.
+      const rowThr = maxRowSig * 0.15;
+      const colThr = maxColSig * 0.15;
+
+      // Find the LONGEST contiguous run above threshold (allowing small gaps).
+      function longestRun(values: number[], thr: number, allowGap = 2): { start: number; end: number } {
+        let bestStart = 0, bestEnd = 0;
+        let curStart = -1;
+        let gap = 0;
         for (let i = 0; i < values.length; i++) {
           if (values[i] >= thr) {
             if (curStart < 0) curStart = i;
-            curLen++;
-            if (curLen > bestLen) { bestLen = curLen; bestStart = curStart; }
-          } else {
-            curStart = -1; curLen = 0;
+            gap = 0;
+          } else if (curStart >= 0) {
+            gap++;
+            if (gap > allowGap) {
+              const len = i - gap - curStart;
+              if (len > bestEnd - bestStart) { bestStart = curStart; bestEnd = i - gap; }
+              curStart = -1;
+              gap = 0;
+            }
           }
         }
-        return { start: bestStart, end: bestStart + bestLen };
+        if (curStart >= 0) {
+          const len = values.length - curStart;
+          if (len > bestEnd - bestStart) { bestStart = curStart; bestEnd = values.length; }
+        }
+        return { start: bestStart, end: bestEnd };
       }
 
-      const yRange = longestRun(rowVars, rowThr);
-      const xRange = longestRun(colVars, colThr);
+      const yRange = longestRun(rowSig, rowThr);
+      const xRange = longestRun(colSig, colThr);
 
       if (yRange.end - yRange.start < 8 || xRange.end - xRange.start < 8) {
         throw new Error('could not detect board by variance');
       }
 
-      // Convert scan-space coordinates back to original image coordinates.
       let bl = xRange.start / scanW;
       let br = xRange.end / scanW;
       let bt = yRange.start / scanH;
       let bbo = yRange.end / scanH;
 
-      req.log?.info?.({ bl, bt, br, bbo, maxRowVar, maxColVar }, "Board detected by variance");
+      // The board is square. Force the bbox to be square by expanding the
+      // shorter dimension around its center (capped at image edges).
+      const widthFrac = br - bl;
+      const heightFrac = bbo - bt;
+      if (Math.abs(widthFrac - heightFrac) > 0.02) {
+        const target = Math.max(widthFrac, heightFrac);
+        const cxx = (bl + br) / 2;
+        const cyy = (bt + bbo) / 2;
+        // Convert frac to pixel-aware fractions (image may not be square)
+        const targetWfrac = target;
+        const targetHfrac = target * (imgW / imgH);
+        bl = Math.max(0, cxx - targetWfrac / 2);
+        br = Math.min(1, cxx + targetWfrac / 2);
+        bt = Math.max(0, cyy - targetHfrac / 2);
+        bbo = Math.min(1, cyy + targetHfrac / 2);
+      }
+
+      req.log?.info?.({ bl, bt, br, bbo, maxRowSig, maxColSig, rowThr, colThr }, "Board detected by variance");
 
       // 2. Pad by 4% and force a centered square crop. (Geometric detection
       // is tight, so less padding needed than the AI version.)
