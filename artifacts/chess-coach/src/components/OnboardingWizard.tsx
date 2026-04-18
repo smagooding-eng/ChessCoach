@@ -117,6 +117,283 @@ function ProgressDots({ index, total }: { index: number; total: number }) {
   );
 }
 
+type Piece = { p: string; w: boolean };
+type HL = { sq: string; color: 'green' | 'red' | 'amber' };
+
+const FILES = ['a','b','c','d','e','f','g','h'];
+const RANKS = [8,7,6,5,4,3,2,1];
+
+function MiniBoard({
+  size = 152,
+  pieces,
+  highlights = [],
+  arrow,
+  scanLine = false,
+  badge,
+  rotateMs,
+}: {
+  size?: number;
+  pieces: Record<string, Piece>;
+  highlights?: HL[];
+  arrow?: { from: string; to: string; color?: string };
+  scanLine?: boolean;
+  badge?: { label: string; pulse?: boolean; color?: string };
+  rotateMs?: number;
+}) {
+  const SQ = size / 8;
+  const sqToXY = (sq: string) => {
+    const f = FILES.indexOf(sq[0]!);
+    const r = RANKS.indexOf(parseInt(sq[1]!, 10));
+    return { x: f * SQ + SQ / 2, y: r * SQ + SQ / 2 };
+  };
+  const colorFor = (c: HL['color']) => {
+    if (c === 'red') return { bg: 'rgba(220,67,67,0.55)', border: '#dc4343' };
+    if (c === 'amber') return { bg: 'rgba(255,179,71,0.55)', border: '#ffb347' };
+    return { bg: 'rgba(129,182,76,0.55)', border: '#81b64c' };
+  };
+  const arrowColor = arrow?.color ?? '#81b64c';
+  const arrowId = `ah-${arrowColor.replace('#','')}`;
+  const a = arrow ? sqToXY(arrow.from) : null;
+  const b = arrow ? sqToXY(arrow.to) : null;
+  const fontSize = Math.round(SQ * 0.78);
+
+  return (
+    <motion.div
+      className="relative shrink-0 rounded-md overflow-hidden"
+      style={{ width: size, height: size, boxShadow: '0 4px 16px rgba(0,0,0,0.4)' }}
+      animate={rotateMs ? { rotate: [0, 0.4, -0.4, 0] } : {}}
+      transition={rotateMs ? { duration: rotateMs / 1000, repeat: Infinity, ease: 'easeInOut' } : {}}
+    >
+      <div className="absolute inset-0 grid" style={{ gridTemplateColumns: 'repeat(8, 1fr)', gridTemplateRows: 'repeat(8, 1fr)' }}>
+        {RANKS.map((r, ri) =>
+          FILES.map((f, fi) => {
+            const sq = `${f}${r}`;
+            const isLight = (ri + fi) % 2 === 0;
+            const piece = pieces[sq];
+            const hl = highlights.find((h) => h.sq === sq);
+            const c = hl ? colorFor(hl.color) : null;
+            return (
+              <div
+                key={sq}
+                className="relative flex items-center justify-center"
+                style={{ background: isLight ? '#eeeed2' : '#769656' }}
+              >
+                {c && (
+                  <div className="absolute inset-0" style={{ background: c.bg, boxShadow: `inset 0 0 0 1.5px ${c.border}` }} />
+                )}
+                {piece && (
+                  <span
+                    className="relative"
+                    style={{
+                      fontSize,
+                      lineHeight: 1,
+                      color: piece.w ? '#fff' : '#1a1a1a',
+                      textShadow: piece.w
+                        ? '0 1px 1px rgba(0,0,0,0.6), 0 0 1px rgba(0,0,0,0.8)'
+                        : '0 1px 1px rgba(255,255,255,0.2)',
+                    }}
+                  >
+                    {piece.p}
+                  </span>
+                )}
+              </div>
+            );
+          })
+        )}
+      </div>
+      {arrow && a && b && (
+        <svg className="absolute inset-0 pointer-events-none" width={size} height={size}>
+          <defs>
+            <marker id={arrowId} markerWidth="3" markerHeight="3" refX="1.5" refY="1.5" orient="auto">
+              <polygon points="0 0, 3 1.5, 0 3" fill={arrowColor} />
+            </marker>
+          </defs>
+          <motion.line
+            x1={a.x} y1={a.y} x2={b.x} y2={b.y}
+            stroke={arrowColor} strokeWidth={3} strokeLinecap="round"
+            markerEnd={`url(#${arrowId})`}
+            initial={{ pathLength: 0, opacity: 0 }}
+            animate={{ pathLength: 1, opacity: 1 }}
+            transition={{ delay: 0.5, duration: 0.5, ease: 'easeOut' }}
+          />
+        </svg>
+      )}
+      {scanLine && (
+        <motion.div
+          aria-hidden
+          className="absolute left-0 right-0 pointer-events-none"
+          style={{
+            height: 8,
+            background: 'linear-gradient(90deg, transparent 0%, rgba(129,182,76,0.55) 50%, transparent 100%)',
+            filter: 'blur(2px)',
+            boxShadow: '0 0 8px rgba(129,182,76,0.6)',
+          }}
+          initial={{ top: 0 }}
+          animate={{ top: ['-8px', `${size}px`, '-8px'] }}
+          transition={{ duration: 2.4, repeat: Infinity, ease: 'easeInOut' }}
+        />
+      )}
+      {badge && (
+        <div className="absolute top-1.5 right-1.5 flex items-center gap-1 px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)' }}>
+          {badge.pulse && (
+            <motion.div
+              className="w-1.5 h-1.5 rounded-full"
+              style={{ background: badge.color ?? G }}
+              animate={{ opacity: [0.3, 1, 0.3] }}
+              transition={{ duration: 1.2, repeat: Infinity }}
+            />
+          )}
+          <span className="text-[8px] font-black tracking-wider" style={{ color: '#fff' }}>{badge.label}</span>
+        </div>
+      )}
+    </motion.div>
+  );
+}
+
+// Famous opening / tactical positions used for the deep-import shuffle animation.
+const SCHOLARS_MATE: Record<string, Piece> = {
+  a8:{p:'♜',w:false},b8:{p:'♞',w:false},c8:{p:'♝',w:false},d8:{p:'♛',w:false},e8:{p:'♚',w:false},f8:{p:'♝',w:false},h8:{p:'♜',w:false},
+  a7:{p:'♟',w:false},b7:{p:'♟',w:false},c7:{p:'♟',w:false},d7:{p:'♟',w:false},f7:{p:'♟',w:false},g7:{p:'♟',w:false},h7:{p:'♟',w:false},
+  c6:{p:'♞',w:false},f6:{p:'♞',w:false},e5:{p:'♟',w:false},
+  c4:{p:'♗',w:true},e4:{p:'♙',w:true},h5:{p:'♕',w:true},f3:{p:'♘',w:true},
+  a2:{p:'♙',w:true},b2:{p:'♙',w:true},c2:{p:'♙',w:true},d2:{p:'♙',w:true},f2:{p:'♙',w:true},g2:{p:'♙',w:true},h2:{p:'♙',w:true},
+  a1:{p:'♖',w:true},c1:{p:'♗',w:true},e1:{p:'♔',w:true},h1:{p:'♖',w:true},
+};
+
+const RUY_LOPEZ: Record<string, Piece> = {
+  a8:{p:'♜',w:false},c8:{p:'♝',w:false},d8:{p:'♛',w:false},e8:{p:'♚',w:false},f8:{p:'♝',w:false},g8:{p:'♞',w:false},h8:{p:'♜',w:false},
+  a6:{p:'♟',w:false},b7:{p:'♟',w:false},c7:{p:'♟',w:false},d7:{p:'♟',w:false},f7:{p:'♟',w:false},g7:{p:'♟',w:false},h7:{p:'♟',w:false},
+  c6:{p:'♞',w:false},f6:{p:'♞',w:false},e5:{p:'♟',w:false},
+  a4:{p:'♗',w:true},e4:{p:'♙',w:true},f3:{p:'♘',w:true},
+  a2:{p:'♙',w:true},b2:{p:'♙',w:true},c2:{p:'♙',w:true},d2:{p:'♙',w:true},f2:{p:'♙',w:true},g2:{p:'♙',w:true},h2:{p:'♙',w:true},
+  a1:{p:'♖',w:true},b1:{p:'♘',w:true},c1:{p:'♗',w:true},d1:{p:'♕',w:true},g1:{p:'♔',w:true},h1:{p:'♖',w:true},
+};
+
+const CARO_KANN: Record<string, Piece> = {
+  a8:{p:'♜',w:false},b8:{p:'♞',w:false},c8:{p:'♝',w:false},d8:{p:'♛',w:false},e8:{p:'♚',w:false},f8:{p:'♝',w:false},g8:{p:'♞',w:false},h8:{p:'♜',w:false},
+  a7:{p:'♟',w:false},b7:{p:'♟',w:false},e7:{p:'♟',w:false},f7:{p:'♟',w:false},g7:{p:'♟',w:false},h7:{p:'♟',w:false},
+  c6:{p:'♟',w:false},d5:{p:'♟',w:false},
+  d4:{p:'♙',w:true},e4:{p:'♙',w:true},
+  a2:{p:'♙',w:true},b2:{p:'♙',w:true},c2:{p:'♙',w:true},f2:{p:'♙',w:true},g2:{p:'♙',w:true},h2:{p:'♙',w:true},
+  a1:{p:'♖',w:true},b1:{p:'♘',w:true},c1:{p:'♗',w:true},d1:{p:'♕',w:true},e1:{p:'♔',w:true},f1:{p:'♗',w:true},g1:{p:'♘',w:true},h1:{p:'♖',w:true},
+};
+
+const QGD: Record<string, Piece> = {
+  a8:{p:'♜',w:false},b8:{p:'♞',w:false},c8:{p:'♝',w:false},d8:{p:'♛',w:false},e8:{p:'♚',w:false},f8:{p:'♝',w:false},g8:{p:'♞',w:false},h8:{p:'♜',w:false},
+  a7:{p:'♟',w:false},b7:{p:'♟',w:false},c7:{p:'♟',w:false},f7:{p:'♟',w:false},g7:{p:'♟',w:false},h7:{p:'♟',w:false},
+  d5:{p:'♟',w:false},e6:{p:'♟',w:false},
+  c4:{p:'♙',w:true},d4:{p:'♙',w:true},
+  a2:{p:'♙',w:true},b2:{p:'♙',w:true},e2:{p:'♙',w:true},f2:{p:'♙',w:true},g2:{p:'♙',w:true},h2:{p:'♙',w:true},
+  a1:{p:'♖',w:true},b1:{p:'♘',w:true},c1:{p:'♗',w:true},d1:{p:'♕',w:true},e1:{p:'♔',w:true},f1:{p:'♗',w:true},g1:{p:'♘',w:true},h1:{p:'♖',w:true},
+};
+
+const SICILIAN: Record<string, Piece> = {
+  a8:{p:'♜',w:false},b8:{p:'♞',w:false},c8:{p:'♝',w:false},d8:{p:'♛',w:false},e8:{p:'♚',w:false},f8:{p:'♝',w:false},g8:{p:'♞',w:false},h8:{p:'♜',w:false},
+  a7:{p:'♟',w:false},b7:{p:'♟',w:false},d7:{p:'♟',w:false},e7:{p:'♟',w:false},f7:{p:'♟',w:false},g7:{p:'♟',w:false},h7:{p:'♟',w:false},
+  c5:{p:'♟',w:false},
+  e4:{p:'♙',w:true},
+  a2:{p:'♙',w:true},b2:{p:'♙',w:true},c2:{p:'♙',w:true},d2:{p:'♙',w:true},f2:{p:'♙',w:true},g2:{p:'♙',w:true},h2:{p:'♙',w:true},
+  a1:{p:'♖',w:true},b1:{p:'♘',w:true},c1:{p:'♗',w:true},d1:{p:'♕',w:true},e1:{p:'♔',w:true},f1:{p:'♗',w:true},g1:{p:'♘',w:true},h1:{p:'♖',w:true},
+};
+
+const KINGS_INDIAN: Record<string, Piece> = {
+  a8:{p:'♜',w:false},b8:{p:'♞',w:false},c8:{p:'♝',w:false},d8:{p:'♛',w:false},f8:{p:'♜',w:false},g8:{p:'♚',w:false},
+  a7:{p:'♟',w:false},b7:{p:'♟',w:false},c7:{p:'♟',w:false},e7:{p:'♟',w:false},f7:{p:'♟',w:false},h7:{p:'♟',w:false},
+  d6:{p:'♟',w:false},f6:{p:'♞',w:false},g6:{p:'♟',w:false},
+  g7:{p:'♝',w:false},
+  c4:{p:'♙',w:true},d4:{p:'♙',w:true},e4:{p:'♙',w:true},
+  c3:{p:'♘',w:true},f3:{p:'♘',w:true},
+  a2:{p:'♙',w:true},b2:{p:'♙',w:true},f2:{p:'♙',w:true},g2:{p:'♙',w:true},h2:{p:'♙',w:true},
+  a1:{p:'♖',w:true},c1:{p:'♗',w:true},d1:{p:'♕',w:true},e1:{p:'♔',w:true},f1:{p:'♗',w:true},h1:{p:'♖',w:true},
+};
+
+const CYCLE_POSITIONS = [
+  { pos: SCHOLARS_MATE, label: 'Italian · Qxf7#', hl: [{ sq:'h5', color:'green' as const }, { sq:'f7', color:'green' as const }], arrow: { from:'h5', to:'f7' } },
+  { pos: RUY_LOPEZ, label: 'Ruy López · Bxc6', hl: [{ sq:'a4', color:'amber' as const }, { sq:'c6', color:'amber' as const }], arrow: { from:'a4', to:'c6', color:'#ffb347' } },
+  { pos: CARO_KANN, label: 'Caro-Kann · e4 dxe4', hl: [{ sq:'e4', color:'red' as const }, { sq:'d5', color:'red' as const }] },
+  { pos: QGD, label: 'Queen\'s Gambit Decl.', hl: [{ sq:'c4', color:'green' as const }, { sq:'d5', color:'amber' as const }] },
+  { pos: SICILIAN, label: 'Sicilian Defense', hl: [{ sq:'e4', color:'green' as const }, { sq:'c5', color:'red' as const }] },
+  { pos: KINGS_INDIAN, label: "King's Indian Setup", hl: [{ sq:'g7', color:'green' as const }, { sq:'e4', color:'green' as const }] },
+];
+
+function DeepImportVisual({ totalGames }: { totalGames: number }) {
+  const [idx, setIdx] = useState(0);
+  const [scanned, setScanned] = useState(0);
+  const [patterns, setPatterns] = useState(0);
+  const target = Math.max(800, Math.round(totalGames * 2.5));
+
+  useEffect(() => {
+    const cycle = setInterval(() => setIdx((i) => (i + 1) % CYCLE_POSITIONS.length), 700);
+    const tick = setInterval(() => {
+      setScanned((s) => Math.min(target, s + Math.floor(Math.random() * 9) + 3));
+      if (Math.random() < 0.18) setPatterns((p) => p + 1);
+    }, 140);
+    return () => { clearInterval(cycle); clearInterval(tick); };
+  }, [target]);
+
+  const cur = CYCLE_POSITIONS[idx]!;
+  const pct = Math.round((scanned / target) * 100);
+
+  return (
+    <div className="rounded-xl p-3 mb-5" style={{ background: 'rgba(0,0,0,0.4)', border: `1px solid ${G}33` }}>
+      <div className="flex items-center gap-3">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={idx}
+            initial={{ opacity: 0, scale: 0.92 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.92 }}
+            transition={{ duration: 0.2 }}
+          >
+            <MiniBoard
+              size={132}
+              pieces={cur.pos}
+              highlights={cur.hl}
+              arrow={cur.arrow}
+              scanLine
+              badge={{ label: 'ANALYZING', pulse: true }}
+            />
+          </motion.div>
+        </AnimatePresence>
+        <div className="flex-1 min-w-0 text-left">
+          <p className="text-[10px] font-black uppercase tracking-widest mb-1" style={{ color: G }}>NOW STUDYING</p>
+          <AnimatePresence mode="wait">
+            <motion.p
+              key={cur.label}
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.2 }}
+              className="text-sm font-black mb-2 truncate"
+              style={{ color: TEXT }}
+            >
+              {cur.label}
+            </motion.p>
+          </AnimatePresence>
+          <div className="space-y-1.5 mb-2">
+            <div className="flex items-center justify-between text-[10px] font-bold" style={{ color: MUTED }}>
+              <span>GAMES</span>
+              <span className="font-mono" style={{ color: TEXT }}>{scanned.toLocaleString()} / {target.toLocaleString()}</span>
+            </div>
+            <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.08)' }}>
+              <motion.div
+                className="h-full"
+                style={{ background: G }}
+                animate={{ width: `${pct}%` }}
+                transition={{ duration: 0.3 }}
+              />
+            </div>
+          </div>
+          <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-wider" style={{ color: G }}>
+            <Sparkles className="w-3 h-3" />
+            <span>{patterns} patterns found</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function TourDemo({ kind }: { kind: 'scan' | 'analysis' | 'practice' }) {
   if (kind === 'scan') {
     // Scholar's-mate-style position. Black to move into mate after Qxf7#.
@@ -271,27 +548,86 @@ function TourDemo({ kind }: { kind: 'scan' | 'analysis' | 'practice' }) {
     );
   }
   if (kind === 'analysis') {
+    // Greek-Gift-ish position: white played Nf3 (blunder, red), better was Bxh7+ (green).
+    const analysisPieces: Record<string, Piece> = {
+      a8:{p:'♜',w:false},c8:{p:'♝',w:false},d8:{p:'♛',w:false},f8:{p:'♜',w:false},g8:{p:'♚',w:false},
+      a7:{p:'♟',w:false},b7:{p:'♟',w:false},c7:{p:'♟',w:false},f7:{p:'♟',w:false},g7:{p:'♟',w:false},h7:{p:'♟',w:false},
+      c6:{p:'♞',w:false},f6:{p:'♞',w:false},e6:{p:'♟',w:false},
+      d4:{p:'♙',w:true},
+      d3:{p:'♗',w:true},c3:{p:'♘',w:true},
+      a2:{p:'♙',w:true},b2:{p:'♙',w:true},c2:{p:'♙',w:true},f2:{p:'♙',w:true},g2:{p:'♙',w:true},h2:{p:'♙',w:true},
+      a1:{p:'♖',w:true},c1:{p:'♗',w:true},d1:{p:'♕',w:true},f1:{p:'♖',w:true},g1:{p:'♔',w:true},
+      f3:{p:'♘',w:true},
+    };
     return (
-      <div className="rounded-xl p-3 mb-4 text-left" style={{ background: 'rgba(0,0,0,0.25)', border: `1px solid rgba(255,255,255,0.05)` }}>
-        <div className="flex items-center gap-2 mb-1.5">
-          <div className="w-1.5 h-1.5 rounded-full" style={{ background: '#dc4343' }} />
-          <p className="text-[10px] font-black uppercase tracking-wider" style={{ color: '#ef6b6b' }}>Move 14 — Blunder</p>
+      <div className="rounded-xl p-3 mb-4" style={{ background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.05)' }}>
+        <div className="flex items-center gap-3">
+          <MiniBoard
+            pieces={analysisPieces}
+            highlights={[
+              { sq: 'f3', color: 'red' },
+              { sq: 'h7', color: 'green' },
+              { sq: 'd3', color: 'green' },
+            ]}
+            arrow={{ from: 'd3', to: 'h7', color: '#81b64c' }}
+            badge={{ label: 'BLUNDER', color: '#dc4343', pulse: true }}
+          />
+          <div className="flex-1 min-w-0 text-left">
+            <div className="flex items-center gap-1.5 mb-1">
+              <div className="w-1.5 h-1.5 rounded-full" style={{ background: '#dc4343' }} />
+              <p className="text-[10px] font-black uppercase tracking-wider" style={{ color: '#ef6b6b' }}>Move 14</p>
+            </div>
+            <p className="text-sm font-black leading-tight mb-1.5" style={{ color: TEXT }}>You played <span className="font-mono" style={{ color: '#ef6b6b' }}>Nf3</span>, hanging tempo.</p>
+            <div className="flex items-center gap-1.5 mb-0.5">
+              <Check className="w-3 h-3" style={{ color: G }} strokeWidth={3} />
+              <p className="text-[10px] font-black uppercase tracking-wider" style={{ color: G }}>Better</p>
+            </div>
+            <p className="text-xs font-mono font-bold" style={{ color: TEXT }}><span style={{ color: G }}>Bxh7+</span> · winning attack</p>
+          </div>
         </div>
-        <p className="text-sm font-bold mb-1" style={{ color: TEXT }}>You played Nf3, hanging the e-pawn.</p>
-        <p className="text-xs" style={{ color: MUTED }}>Better: Bxh7+ winning material immediately.</p>
       </div>
     );
   }
+  // practice
+  // Caro-Kann main line — bot punishes Black's setup.
+  const practicePieces: Record<string, Piece> = {
+    a8:{p:'♜',w:false},c8:{p:'♝',w:false},d8:{p:'♛',w:false},e8:{p:'♚',w:false},f8:{p:'♝',w:false},h8:{p:'♜',w:false},
+    a7:{p:'♟',w:false},b7:{p:'♟',w:false},e7:{p:'♟',w:false},f7:{p:'♟',w:false},g7:{p:'♟',w:false},h7:{p:'♟',w:false},
+    c6:{p:'♟',w:false},d7:{p:'♞',w:false},f6:{p:'♞',w:false},
+    e4:{p:'♘',w:true},d4:{p:'♙',w:true},
+    a2:{p:'♙',w:true},b2:{p:'♙',w:true},c2:{p:'♙',w:true},f2:{p:'♙',w:true},g2:{p:'♙',w:true},h2:{p:'♙',w:true},
+    a1:{p:'♖',w:true},b1:{p:'♘',w:true},c1:{p:'♗',w:true},d1:{p:'♕',w:true},e1:{p:'♔',w:true},f1:{p:'♗',w:true},g1:{p:'♘',w:true},h1:{p:'♖',w:true},
+  };
   return (
-    <div className="rounded-xl p-3 mb-4 flex items-center gap-3" style={{ background: 'rgba(0,0,0,0.25)', border: `1px solid rgba(255,255,255,0.05)` }}>
-      <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0" style={{ background: `${G}22`, border: `1px solid ${G}44` }}>
-        <Bot className="w-5 h-5" style={{ color: G }} />
+    <div className="rounded-xl p-3 mb-4" style={{ background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.05)' }}>
+      <div className="flex items-center gap-3">
+        <MiniBoard
+          pieces={practicePieces}
+          highlights={[
+            { sq: 'e4', color: 'green' },
+            { sq: 'f6', color: 'red' },
+          ]}
+          arrow={{ from: 'e4', to: 'f6', color: '#81b64c' }}
+          badge={{ label: 'BOT TURN', pulse: true }}
+        />
+        <div className="flex-1 min-w-0 text-left">
+          <div className="flex items-center gap-2 mb-1.5">
+            <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ background: `${G}22`, border: `1px solid ${G}44` }}>
+              <Bot className="w-4 h-4" style={{ color: G }} />
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-black leading-tight" style={{ color: TEXT }}>Anti-Caro Bot</p>
+              <p className="text-[10px]" style={{ color: MUTED }}>Trained on your losses · 1450</p>
+            </div>
+          </div>
+          <p className="text-xs font-mono font-bold mb-1" style={{ color: TEXT }}>
+            Threat: <span style={{ color: '#ef6b6b' }}>Nxf6+</span>
+          </p>
+          <div className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-black" style={{ background: `${G}1f`, color: G, border: `1px solid ${G}44` }}>
+            READY TO DRILL
+          </div>
+        </div>
       </div>
-      <div className="min-w-0 flex-1 text-left">
-        <p className="text-sm font-bold leading-tight" style={{ color: TEXT }}>Anti-Caro Bot</p>
-        <p className="text-[11px]" style={{ color: MUTED }}>Trained on your Caro losses · 1450 ELO</p>
-      </div>
-      <div className="px-2 py-1 rounded text-[10px] font-black" style={{ background: `${G}1f`, color: G }}>READY</div>
     </div>
   );
 }
@@ -888,7 +1224,9 @@ export function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
                   : <>You've seen <span style={{ color: TEXT }}>1 year</span> so far. Pull the rest and every long-running pattern surfaces.</>}
               </p>
 
-              <div className="grid grid-cols-2 gap-2.5 mb-5">
+              {deepImporting && <DeepImportVisual totalGames={insights?.totalGames ?? 0} />}
+
+              <div className="grid grid-cols-2 gap-2.5 mb-5" style={deepImporting ? { opacity: 0.35 } : undefined}>
                 <div className="rounded-xl p-4 text-left" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
                   <p className="text-[10px] font-black uppercase tracking-widest mb-2" style={{ color: MUTED }}>1 YEAR</p>
                   <p className="text-2xl font-black mb-1" style={{ color: TEXT }}>{insights?.totalGames ?? 0}</p>
