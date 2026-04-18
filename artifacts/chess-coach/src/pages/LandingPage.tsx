@@ -11,6 +11,173 @@ const CARD = '#302e2b';
 const TEXT = '#e8e6e3';
 const MUTED = '#9e9b98';
 
+type LBPiece = { p: string; w: boolean };
+const LB_FILES = ['a','b','c','d','e','f','g','h'];
+const LB_RANKS = [8,7,6,5,4,3,2,1];
+
+function HeroBoard() {
+  // Scholar's mate-ready position. Best move: Qh5 -> f7 (mate).
+  const pieces: Record<string, LBPiece> = {
+    a8:{p:'♜',w:false},b8:{p:'♞',w:false},c8:{p:'♝',w:false},d8:{p:'♛',w:false},e8:{p:'♚',w:false},f8:{p:'♝',w:false},h8:{p:'♜',w:false},
+    a7:{p:'♟',w:false},b7:{p:'♟',w:false},c7:{p:'♟',w:false},d7:{p:'♟',w:false},f7:{p:'♟',w:false},g7:{p:'♟',w:false},h7:{p:'♟',w:false},
+    c6:{p:'♞',w:false},f6:{p:'♞',w:false},e5:{p:'♟',w:false},
+    c4:{p:'♗',w:true},e4:{p:'♙',w:true},h5:{p:'♕',w:true},f3:{p:'♘',w:true},
+    a2:{p:'♙',w:true},b2:{p:'♙',w:true},c2:{p:'♙',w:true},d2:{p:'♙',w:true},f2:{p:'♙',w:true},g2:{p:'♙',w:true},h2:{p:'♙',w:true},
+    a1:{p:'♖',w:true},c1:{p:'♗',w:true},e1:{p:'♔',w:true},h1:{p:'♖',w:true},
+  };
+  const SOURCE = 'h5';
+  const TARGET = 'f7';
+  const SIZE = 360;
+  const SQ = SIZE / 8;
+  const sqXY = (sq: string) => {
+    const f = LB_FILES.indexOf(sq[0]!);
+    const r = LB_RANKS.indexOf(parseInt(sq[1]!, 10));
+    return { x: f * SQ + SQ / 2, y: r * SQ + SQ / 2 };
+  };
+  const a = sqXY(SOURCE);
+  const b = sqXY(TARGET);
+  const fontSize = Math.round(SQ * 0.78);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20, rotate: -2 }}
+      animate={{ opacity: 1, y: 0, rotate: 0 }}
+      transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+      className="relative mx-auto"
+      style={{ width: SIZE, maxWidth: '100%' }}
+    >
+      {/* glow halo */}
+      <motion.div
+        aria-hidden
+        className="absolute -inset-8 rounded-[40px] pointer-events-none"
+        style={{ background: `radial-gradient(circle, ${G}33 0%, transparent 70%)`, filter: 'blur(24px)' }}
+        animate={{ opacity: [0.55, 0.85, 0.55] }}
+        transition={{ duration: 3.5, repeat: Infinity, ease: 'easeInOut' }}
+      />
+
+      <div
+        className="relative rounded-2xl overflow-hidden"
+        style={{
+          width: SIZE,
+          maxWidth: '100%',
+          boxShadow: '0 30px 60px -10px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.05)',
+        }}
+      >
+        <div className="aspect-square grid" style={{ gridTemplateColumns: 'repeat(8, 1fr)', gridTemplateRows: 'repeat(8, 1fr)' }}>
+          {LB_RANKS.map((r, ri) =>
+            LB_FILES.map((f, fi) => {
+              const sq = `${f}${r}`;
+              const isLight = (ri + fi) % 2 === 0;
+              const piece = pieces[sq];
+              const isHL = sq === SOURCE || sq === TARGET;
+              return (
+                <div key={sq} className="relative flex items-center justify-center" style={{ background: isLight ? '#eeeed2' : '#769656' }}>
+                  {isHL && (
+                    <div className="absolute inset-0" style={{ background: 'rgba(129,182,76,0.55)', boxShadow: 'inset 0 0 0 2px #81b64c' }} />
+                  )}
+                  {piece && (
+                    <span
+                      className="relative select-none"
+                      style={{
+                        fontSize,
+                        lineHeight: 1,
+                        color: piece.w ? '#fff' : '#1a1a1a',
+                        textShadow: piece.w
+                          ? '0 1px 2px rgba(0,0,0,0.7), 0 0 1px rgba(0,0,0,0.9)'
+                          : '0 1px 1px rgba(255,255,255,0.2)',
+                      }}
+                    >
+                      {piece.p}
+                    </span>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* arrow */}
+        <svg className="absolute inset-0 pointer-events-none w-full h-full" viewBox={`0 0 ${SIZE} ${SIZE}`}>
+          <defs>
+            <marker id="hbarrow" markerWidth="3.5" markerHeight="3.5" refX="1.7" refY="1.7" orient="auto">
+              <polygon points="0 0, 3.5 1.7, 0 3.5" fill="#81b64c" />
+            </marker>
+          </defs>
+          <motion.line
+            x1={a.x} y1={a.y} x2={b.x} y2={b.y}
+            stroke="#81b64c" strokeWidth={6} strokeLinecap="round"
+            markerEnd="url(#hbarrow)"
+            initial={{ pathLength: 0, opacity: 0 }}
+            animate={{ pathLength: 1, opacity: 1 }}
+            transition={{ delay: 0.7, duration: 0.7, ease: 'easeOut' }}
+            style={{ filter: 'drop-shadow(0 2px 6px rgba(129,182,76,0.6))' }}
+          />
+        </svg>
+
+        {/* scan line */}
+        <motion.div
+          aria-hidden
+          className="absolute left-0 right-0 pointer-events-none"
+          style={{
+            height: 14,
+            background: 'linear-gradient(90deg, transparent 0%, rgba(129,182,76,0.55) 50%, transparent 100%)',
+            filter: 'blur(3px)',
+            boxShadow: '0 0 12px rgba(129,182,76,0.7)',
+          }}
+          initial={{ top: 0 }}
+          animate={{ top: ['-14px', `${SIZE}px`, '-14px'] }}
+          transition={{ duration: 3.2, repeat: Infinity, ease: 'easeInOut' }}
+        />
+
+        {/* SCANNING badge */}
+        <div className="absolute top-3 right-3 flex items-center gap-1.5 px-2.5 py-1 rounded-full" style={{ background: 'rgba(0,0,0,0.78)', backdropFilter: 'blur(6px)' }}>
+          <motion.div className="w-2 h-2 rounded-full" style={{ background: G }} animate={{ opacity: [0.3, 1, 0.3] }} transition={{ duration: 1.2, repeat: Infinity }} />
+          <span className="text-[10px] font-black tracking-widest" style={{ color: '#fff' }}>AI ANALYZING</span>
+        </div>
+      </div>
+
+      {/* verdict pill that floats below */}
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 1.3, duration: 0.4 }}
+        className="absolute left-1/2 -bottom-7 -translate-x-1/2 flex items-center gap-2 px-4 py-2 rounded-full"
+        style={{
+          background: 'linear-gradient(90deg, #1f1d1b 0%, #2a2826 100%)',
+          border: `1.5px solid ${G}`,
+          boxShadow: `0 12px 30px -8px ${G}66, 0 0 0 1px rgba(255,255,255,0.05)`,
+          whiteSpace: 'nowrap',
+        }}
+      >
+        <Sparkles className="w-3.5 h-3.5" style={{ color: G }} />
+        <span className="text-[11px] font-black tracking-wider" style={{ color: G }}>BEST MOVE</span>
+        <span className="text-sm font-black font-mono" style={{ color: TEXT }}>Qxf7<span style={{ color: G }}>#</span></span>
+        <span className="text-[10px] font-bold" style={{ color: MUTED }}>· mate</span>
+      </motion.div>
+
+      {/* corner floating chips */}
+      <motion.div
+        initial={{ opacity: 0, x: -10 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ delay: 1.0 }}
+        className="absolute -top-3 -left-3 px-2.5 py-1 rounded-lg text-[10px] font-black tracking-wider"
+        style={{ background: '#dc4343', color: '#fff', boxShadow: '0 6px 18px rgba(220,67,67,0.5)' }}
+      >
+        ⚠ BLUNDER DETECTED
+      </motion.div>
+      <motion.div
+        initial={{ opacity: 0, x: 10 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ delay: 1.15 }}
+        className="absolute -bottom-3 -right-3 px-2.5 py-1 rounded-lg text-[10px] font-black tracking-wider"
+        style={{ background: G, color: '#fff', boxShadow: `0 6px 18px ${G}66` }}
+      >
+        +∞ EVAL
+      </motion.div>
+    </motion.div>
+  );
+}
+
 function AuthModal({ open, onClose, initialMode, externalError }: { open: boolean; onClose: () => void; initialMode: 'login' | 'register'; externalError?: string }) {
   const [mode, setMode] = useState<'login' | 'register'>(initialMode);
   const [email, setEmail] = useState('');
@@ -519,14 +686,20 @@ export function LandingPage() {
               initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.7, delay: 0.15 }}
-              className="hidden lg:block"
+              className="hidden lg:flex flex-col items-center gap-10"
             >
-              <InsightsResultCard delay={0.3} />
+              <HeroBoard />
+              <div className="w-full">
+                <InsightsResultCard delay={0.3} />
+              </div>
             </motion.div>
           </div>
 
-          <div className="lg:hidden mt-10 max-w-md mx-auto">
-            <InsightsResultCard delay={0.2} />
+          <div className="lg:hidden mt-10 max-w-md mx-auto flex flex-col items-center gap-10">
+            <HeroBoard />
+            <div className="w-full">
+              <InsightsResultCard delay={0.2} />
+            </div>
           </div>
         </div>
       </section>
