@@ -92,9 +92,10 @@
      so cards/panels feel layered without per-component shadow code. */
   .bg-card {
     box-shadow:
-      0 1px 0 rgba(255,255,255,0.04) inset,
-      0 14px 32px -14px rgba(0,0,0,0.55),
-      0 4px 12px -4px rgba(0,0,0,0.35);
+      0 1px 0 rgba(255,255,255,0.05) inset,
+      0 24px 50px -16px rgba(0,0,0,0.7),
+      0 10px 24px -6px rgba(0,0,0,0.5),
+      0 2px 6px rgba(0,0,0,0.35);
   }
 }
 
@@ -103,17 +104,19 @@
      to match the landing-page treatment. */
   .card-depth {
     box-shadow:
-      0 1px 0 rgba(255,255,255,0.05) inset,
-      0 25px 60px -20px rgba(0,0,0,0.6),
-      0 10px 30px -10px rgba(0,0,0,0.4),
-      0 0 60px rgba(129,182,76,0.06);
+      0 1px 0 rgba(255,255,255,0.06) inset,
+      0 40px 90px -24px rgba(0,0,0,0.75),
+      0 18px 40px -10px rgba(0,0,0,0.55),
+      0 4px 10px rgba(0,0,0,0.35),
+      0 0 80px rgba(129,182,76,0.08);
   }
   .card-depth-lg {
     box-shadow:
-      0 1px 0 rgba(255,255,255,0.06) inset,
-      0 35px 90px -20px rgba(0,0,0,0.65),
-      0 14px 40px -10px rgba(0,0,0,0.45),
-      0 0 80px rgba(129,182,76,0.08);
+      0 1px 0 rgba(255,255,255,0.07) inset,
+      0 60px 120px -28px rgba(0,0,0,0.8),
+      0 24px 60px -12px rgba(0,0,0,0.6),
+      0 6px 14px rgba(0,0,0,0.4),
+      0 0 110px rgba(129,182,76,0.1);
   }
   .glass-panel {
     @apply bg-card/80 backdrop-blur-xl border border-white/5;
