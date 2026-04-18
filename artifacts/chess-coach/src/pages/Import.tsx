@@ -150,7 +150,7 @@ export function Import() {
           <button
             onClick={() => { setPlatform('chesscom'); handleReset(); }}
             className={cn(
-              'flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm transition-all border',
+              'flex items-center gap-2 px-4 py-2.5 rounded-3xl font-semibold text-sm transition-all border',
               platform === 'chesscom'
                 ? 'bg-primary/15 border-primary/40 text-primary shadow-sm'
                 : 'bg-secondary/50 border-border text-muted-foreground hover:text-foreground hover:bg-secondary/70'
@@ -162,7 +162,7 @@ export function Import() {
           <button
             onClick={() => { setPlatform('lichess'); handleReset(); }}
             className={cn(
-              'flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm transition-all border',
+              'flex items-center gap-2 px-4 py-2.5 rounded-3xl font-semibold text-sm transition-all border',
               platform === 'lichess'
                 ? 'bg-primary/15 border-primary/40 text-primary shadow-sm'
                 : 'bg-secondary/50 border-border text-muted-foreground hover:text-foreground hover:bg-secondary/70'
@@ -177,7 +177,7 @@ export function Import() {
           <motion.div
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            className="p-6 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl mb-8"
+            className="p-6 bg-emerald-500/10 border border-emerald-500/20 rounded-[2rem] mb-8"
           >
             <CheckCircle2 className="w-12 h-12 text-emerald-500 mx-auto mb-3" />
             <h2 className="text-xl font-bold text-emerald-50 mb-2">Import Complete!</h2>
@@ -222,20 +222,20 @@ export function Import() {
             <div className="flex flex-wrap gap-4 justify-center">
               <button
                 onClick={handleReset}
-                className="px-5 py-2.5 rounded-xl bg-secondary text-foreground font-semibold hover:bg-secondary/80 transition-colors flex items-center gap-2"
+                className="px-5 py-2.5 rounded-3xl bg-secondary text-foreground font-semibold hover:bg-secondary/80 transition-colors flex items-center gap-2"
               >
                 <RefreshCw className="w-4 h-4" /> Import More
               </button>
               <Link
                 href="/games"
-                className="px-5 py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold shadow-lg shadow-primary/25 hover:shadow-primary/40 transition-all hover:-translate-y-0.5 flex items-center gap-2"
+                className="px-5 py-2.5 rounded-3xl bg-primary text-primary-foreground font-semibold shadow-lg shadow-primary/25 hover:shadow-primary/40 transition-all hover:-translate-y-0.5 flex items-center gap-2"
               >
                 View Games <ArrowRight className="w-4 h-4" />
               </Link>
               {result.total > 0 && (
                 <Link
                   href="/analysis"
-                  className="px-5 py-2.5 rounded-xl bg-emerald-600 text-white font-semibold shadow-lg hover:bg-emerald-500 transition-all hover:-translate-y-0.5"
+                  className="px-5 py-2.5 rounded-3xl bg-emerald-600 text-white font-semibold shadow-lg hover:bg-emerald-500 transition-all hover:-translate-y-0.5"
                 >
                   Analyze Now
                 </Link>
@@ -263,13 +263,13 @@ export function Import() {
                       if (e.key === 'Escape') handleCancelEdit();
                     }}
                     placeholder={`Your ${platformLabel} username`}
-                    className="flex-1 px-4 py-3 rounded-xl bg-secondary/80 border-2 border-primary text-foreground focus:outline-none focus:ring-4 focus:ring-primary/20 transition-all"
+                    className="flex-1 px-4 py-3 rounded-3xl bg-secondary/80 border-2 border-primary text-foreground focus:outline-none focus:ring-4 focus:ring-primary/20 transition-all"
                   />
                   <button
                     type="button"
                     onClick={handleSaveUsername}
                     disabled={saving || !editValue.trim()}
-                    className="p-3 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
+                    className="p-3 rounded-3xl bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
                   >
                     {saving ? (
                       <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -280,7 +280,7 @@ export function Import() {
                   <button
                     type="button"
                     onClick={handleCancelEdit}
-                    className="p-3 rounded-xl bg-secondary text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-colors"
+                    className="p-3 rounded-3xl bg-secondary text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-colors"
                   >
                     <X className="w-5 h-5" />
                   </button>
@@ -292,7 +292,7 @@ export function Import() {
                       type="text"
                       value={currentPlatformUsername || ''}
                       disabled
-                      className="w-full px-4 py-3 rounded-xl bg-secondary/50 border border-border text-muted-foreground cursor-not-allowed"
+                      className="w-full px-4 py-3 rounded-3xl bg-secondary/50 border border-border text-muted-foreground cursor-not-allowed"
                     />
                   </div>
                   <p className="text-xs text-muted-foreground mt-1 ml-1 flex items-center gap-1">
@@ -315,13 +315,13 @@ export function Import() {
                       value={editValue}
                       onChange={e => setEditValue(e.target.value)}
                       placeholder={`Enter your ${platformLabel} username`}
-                      className="flex-1 px-4 py-3 rounded-xl bg-secondary/80 border-2 border-border text-foreground focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/20 transition-all"
+                      className="flex-1 px-4 py-3 rounded-3xl bg-secondary/80 border-2 border-border text-foreground focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/20 transition-all"
                     />
                     <button
                       type="button"
                       onClick={handleSaveUsername}
                       disabled={saving || !editValue.trim()}
-                      className="p-3 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
+                      className="p-3 rounded-3xl bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
                     >
                       {saving ? (
                         <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -356,7 +356,7 @@ export function Import() {
                 max="12"
                 value={months}
                 onChange={(e) => setMonths(parseInt(e.target.value))}
-                className="w-full accent-primary h-2 bg-secondary rounded-lg appearance-none cursor-pointer"
+                className="w-full accent-primary h-2 bg-secondary rounded-[2rem] appearance-none cursor-pointer"
               />
               <div className="flex justify-between text-xs text-muted-foreground mt-2 px-1">
                 <span>1 month</span>
@@ -365,7 +365,7 @@ export function Import() {
             </div>
 
             {(error || apiError) && (
-              <div className="p-4 bg-destructive/10 border border-destructive/20 text-destructive rounded-xl text-sm flex gap-3 items-start">
+              <div className="p-4 bg-destructive/10 border border-destructive/20 text-destructive rounded-3xl text-sm flex gap-3 items-start">
                 <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
                 <div>
                   <p className="font-semibold mb-1">Import failed</p>
@@ -380,7 +380,7 @@ export function Import() {
               <button
                 type="submit"
                 disabled={isImporting || isSyncing || !currentPlatformUsername}
-                className="w-full flex justify-center items-center gap-2 px-6 py-4 rounded-xl font-bold bg-primary text-primary-foreground shadow-lg shadow-primary/25 hover:shadow-primary/40 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none hover:-translate-y-0.5 active:translate-y-0"
+                className="w-full flex justify-center items-center gap-2 px-6 py-4 rounded-3xl font-bold bg-primary text-primary-foreground shadow-lg shadow-primary/25 hover:shadow-primary/40 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none hover:-translate-y-0.5 active:translate-y-0"
               >
                 {isImporting || isSyncing ? (
                   <>
@@ -399,7 +399,7 @@ export function Import() {
                   type="button"
                   onClick={(e) => handleImport(e, true)}
                   disabled={isImporting || isSyncing}
-                  className="w-full flex justify-center items-center gap-2 px-5 py-3 rounded-xl font-semibold bg-secondary/80 text-foreground/80 border border-border/30 hover:bg-secondary hover:text-foreground transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full flex justify-center items-center gap-2 px-5 py-3 rounded-3xl font-semibold bg-secondary/80 text-foreground/80 border border-border/30 hover:bg-secondary hover:text-foreground transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isSyncing ? (
                     <>

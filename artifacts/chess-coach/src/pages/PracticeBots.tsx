@@ -62,7 +62,7 @@ function MoveAnalysisPanel({ move, playerColor }: { move: MoveRecord; playerColo
       key={`${move.fenBefore}-${move.san}`}
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
-      className={`rounded-xl overflow-hidden border ${cfg.border} bg-card/60`}
+      className={`rounded-3xl overflow-hidden border ${cfg.border} bg-card/60`}
     >
       <div className={`px-3 py-2.5 ${cfg.bg} flex items-center justify-between`}>
         <div className="flex items-center gap-2 min-w-0">
@@ -114,13 +114,13 @@ function BotCard({ bot, onSelect }: { bot: BotConfig; onSelect: (b: BotConfig) =
       whileTap={{ scale: 0.98 }}
       onClick={() => onSelect(bot)}
       className={cn(
-        'relative flex flex-col gap-3 p-5 rounded-2xl border bg-gradient-to-br text-left transition-shadow hover:shadow-xl hover:shadow-black/30 group',
+        'relative flex flex-col gap-3 p-5 rounded-[2rem] border bg-gradient-to-br text-left transition-shadow hover:shadow-xl hover:shadow-black/30 group',
         gradient,
       )}
     >
       <div className="flex items-center justify-between">
         <img src={bot.avatar} alt={bot.name} className="w-10 h-10 rounded-full border-2 border-white/20 shadow-md" />
-        <span className="text-xs font-bold px-2.5 py-1 rounded-lg bg-black/30 border border-white/10 text-white/80">
+        <span className="text-xs font-bold px-2.5 py-1 rounded-[2rem] bg-black/30 border border-white/10 text-white/80">
           {bot.rating} ELO
         </span>
       </div>
@@ -335,7 +335,7 @@ function GameView({ bot, onBack, startFen, startColor }: { bot: BotConfig; onBac
 
       <div className="grid grid-cols-1 xl:grid-cols-[1fr_340px] gap-4">
         <div className="space-y-2.5">
-          <div className="glass-card rounded-xl p-2.5 flex items-center justify-between">
+          <div className="glass-card rounded-3xl p-2.5 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <img src={bot.avatar} alt={bot.name} className="w-8 h-8 rounded-full border border-white/20 shadow" />
               <div>
@@ -365,7 +365,7 @@ function GameView({ bot, onBack, startFen, startColor }: { bot: BotConfig; onBac
             moveQuality={latestQuality}
           />
 
-          <div className="glass-card rounded-xl p-2.5 flex items-center justify-between">
+          <div className="glass-card rounded-3xl p-2.5 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div className="w-7 h-7 rounded-full bg-primary/20 border-2 border-primary/30 flex items-center justify-center">
                 <span className="text-[10px] font-black text-primary">You</span>
@@ -376,13 +376,13 @@ function GameView({ bot, onBack, startFen, startColor }: { bot: BotConfig; onBac
               {result === 'playing' && (
                 <button onClick={() => handleNewGame(playerColor === 'w' ? 'b' : 'w')}
                   title="Switch color"
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 text-muted-foreground text-xs font-bold hover:bg-white/10 transition-colors">
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-3xl bg-white/5 border border-white/10 text-muted-foreground text-xs font-bold hover:bg-white/10 transition-colors">
                   <RotateCcw className="w-3 h-3" /> Switch
                 </button>
               )}
               {result === 'playing' && (
                 <button onClick={handleResign}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-bold hover:bg-red-500/20 transition-colors">
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-3xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-bold hover:bg-red-500/20 transition-colors">
                   <Flag className="w-3 h-3" /> Resign
                 </button>
               )}
@@ -417,7 +417,7 @@ function GameView({ bot, onBack, startFen, startColor }: { bot: BotConfig; onBac
             </div>
           )}
 
-          <div className="glass-card rounded-xl overflow-hidden">
+          <div className="glass-card rounded-3xl overflow-hidden">
             <div className="px-3 py-2.5 border-b border-white/5 text-sm font-bold">Moves</div>
             <div ref={moveListRef} className="max-h-[220px] overflow-y-auto px-2 py-1.5">
               {movePairs.length === 0 ? (
@@ -464,7 +464,7 @@ function GameView({ bot, onBack, startFen, startColor }: { bot: BotConfig; onBac
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 className={cn(
-                  'glass-card rounded-xl p-5 text-center space-y-3 border',
+                  'glass-card rounded-3xl p-5 text-center space-y-3 border',
                   result === 'win' ? 'border-emerald-500/30 bg-emerald-500/5' :
                   result === 'loss' ? 'border-red-500/30 bg-red-500/5' :
                   'border-slate-500/30 bg-slate-500/5',
@@ -485,11 +485,11 @@ function GameView({ bot, onBack, startFen, startColor }: { bot: BotConfig; onBac
                 </p>
                 <div className="flex gap-2 justify-center flex-wrap">
                   <button onClick={() => handleNewGame('w')}
-                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#f0d9b5] text-[#2d2d2d] text-xs font-bold hover:opacity-90 transition-opacity">
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-3xl bg-[#f0d9b5] text-[#2d2d2d] text-xs font-bold hover:opacity-90 transition-opacity">
                     <RotateCcw className="w-3 h-3" /> Play as White
                   </button>
                   <button onClick={() => handleNewGame('b')}
-                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#2d2d2d] border border-white/20 text-[#f0d9b5] text-xs font-bold hover:opacity-90 transition-opacity">
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-3xl bg-[#2d2d2d] border border-white/20 text-[#f0d9b5] text-xs font-bold hover:opacity-90 transition-opacity">
                     <RotateCcw className="w-3 h-3" /> Play as Black
                   </button>
                 </div>
@@ -532,7 +532,7 @@ export function PracticeBots() {
 
   return (
     <div className="space-y-6 pb-20 px-4 pt-4 md:px-0 md:pt-0">
-      <div className="glass-card p-5 sm:p-6 rounded-2xl sm:rounded-3xl border-primary/20 relative overflow-hidden">
+      <div className="glass-card p-5 sm:p-6 rounded-[2rem] sm:rounded-3xl border-primary/20 relative overflow-hidden">
         <div className="absolute right-0 top-0 w-64 h-64 bg-primary/5 blur-3xl rounded-full pointer-events-none" />
         <div className="relative z-10">
           <h1 className="text-2xl sm:text-3xl font-display font-bold flex items-center gap-3">
@@ -550,7 +550,7 @@ export function PracticeBots() {
         ))}
       </div>
 
-      <div className="glass-card rounded-2xl p-4 sm:p-6 border border-white/8">
+      <div className="glass-card rounded-[2rem] p-4 sm:p-6 border border-white/8">
         <div className="flex items-center gap-2 mb-3 sm:mb-4">
           <Zap className="w-5 h-5 text-amber-400" />
           <h3 className="font-bold">How it works</h3>

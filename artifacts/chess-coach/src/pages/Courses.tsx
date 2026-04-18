@@ -165,7 +165,7 @@ export function Courses() {
           <button
             onClick={handleGenerate}
             disabled={isGenerating}
-            className="flex items-center gap-2 px-6 py-3 rounded-xl font-bold bg-primary text-primary-foreground shadow-lg shadow-primary/25 hover:shadow-primary/40 hover:-translate-y-0.5 active:translate-y-0 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center gap-2 px-6 py-3 rounded-3xl font-bold bg-primary text-primary-foreground shadow-lg shadow-primary/25 hover:shadow-primary/40 hover:-translate-y-0.5 active:translate-y-0 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isGenerating ? (
               <>
@@ -199,7 +199,7 @@ export function Courses() {
           <select
             value={filterCategory}
             onChange={e => setFilterCategory(e.target.value)}
-            className="px-3 py-1.5 rounded-lg text-sm bg-secondary text-foreground border border-border cursor-pointer"
+            className="px-3 py-1.5 rounded-[2rem] text-sm bg-secondary text-foreground border border-border cursor-pointer"
           >
             <option value="all">All Categories</option>
             {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
@@ -207,7 +207,7 @@ export function Courses() {
           <select
             value={filterDifficulty}
             onChange={e => setFilterDifficulty(e.target.value)}
-            className="px-3 py-1.5 rounded-lg text-sm bg-secondary text-foreground border border-border cursor-pointer"
+            className="px-3 py-1.5 rounded-[2rem] text-sm bg-secondary text-foreground border border-border cursor-pointer"
           >
             <option value="all">All Levels</option>
             {difficulties.map(d => <option key={d} value={d}>{d}</option>)}
@@ -215,7 +215,7 @@ export function Courses() {
           <select
             value={filterStatus}
             onChange={e => setFilterStatus(e.target.value)}
-            className="px-3 py-1.5 rounded-lg text-sm bg-secondary text-foreground border border-border cursor-pointer"
+            className="px-3 py-1.5 rounded-[2rem] text-sm bg-secondary text-foreground border border-border cursor-pointer"
           >
             <option value="all">All Progress</option>
             <option value="not-started">Not Started</option>
@@ -225,7 +225,7 @@ export function Courses() {
           {hasActiveFilters && (
             <button
               onClick={clearFilters}
-              className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-colors"
+              className="flex items-center gap-1 px-3 py-1.5 rounded-[2rem] text-xs font-bold text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-colors"
             >
               <X className="w-3.5 h-3.5" /> Clear
             </button>
@@ -283,7 +283,7 @@ export function Courses() {
                   </div>
                 </div>
 
-                <Link href={`/courses/${course.id}`} className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl font-bold transition-all
+                <Link href={`/courses/${course.id}`} className={`w-full flex items-center justify-center gap-2 py-3 rounded-3xl font-bold transition-all
                   ${isComplete ? 'bg-secondary text-foreground hover:bg-secondary/80' : 'bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground'}`}>
                   {isComplete ? 'Review Course' : <><PlayCircle className="w-5 h-5" /> Continue Learning</>}
                 </Link>
@@ -299,7 +299,7 @@ export function Courses() {
             <p className="text-muted-foreground mb-4">Try adjusting your filters to find courses.</p>
             <button
               onClick={clearFilters}
-              className="px-5 py-2.5 rounded-xl bg-primary/10 text-primary font-bold hover:bg-primary/20 transition-all"
+              className="px-5 py-2.5 rounded-3xl bg-primary/10 text-primary font-bold hover:bg-primary/20 transition-all"
             >
               Clear Filters
             </button>
@@ -313,7 +313,7 @@ export function Courses() {
             <p className="text-muted-foreground mb-6">Run an AI analysis and generate courses tailored to your weak spots.</p>
             <button
               onClick={handleGenerate}
-              className="px-6 py-3 rounded-xl bg-primary text-primary-foreground font-bold hover:shadow-lg hover:shadow-primary/25 hover:-translate-y-0.5 transition-all"
+              className="px-6 py-3 rounded-3xl bg-primary text-primary-foreground font-bold hover:shadow-lg hover:shadow-primary/25 hover:-translate-y-0.5 transition-all"
             >
               Generate Now
             </button>

@@ -199,7 +199,7 @@ export function Endgames() {
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
             className={cn(
-              'flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border transition-all whitespace-nowrap shrink-0',
+              'flex items-center gap-2 px-4 py-2.5 rounded-3xl text-sm font-semibold border transition-all whitespace-nowrap shrink-0',
               activeTab === tab.id
                 ? 'bg-primary/15 text-primary border-primary/30'
                 : 'bg-secondary/50 text-muted-foreground border-border hover:text-foreground hover:bg-secondary'
@@ -219,10 +219,10 @@ export function Endgames() {
           exit={{ opacity: 0, y: -8 }}
           transition={{ duration: 0.15 }}
         >
-          <div className="glass-card rounded-2xl p-5 md:p-6 mb-6 border border-white/5">
+          <div className="glass-card rounded-[2rem] p-5 md:p-6 mb-6 border border-white/5">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
               <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center shrink-0">
+                <div className="w-10 h-10 rounded-3xl bg-primary/15 flex items-center justify-center shrink-0">
                   <currentTab.icon className="w-5 h-5 text-primary" />
                 </div>
                 <div>
@@ -234,7 +234,7 @@ export function Endgames() {
               <button
                 onClick={() => handleGenerate(currentTab.apiType)}
                 disabled={!!generatingType}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold bg-primary text-primary-foreground shadow-lg shadow-primary/25 hover:shadow-primary/40 hover:-translate-y-0.5 active:translate-y-0 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm shrink-0"
+                className="flex items-center gap-2 px-5 py-2.5 rounded-3xl font-bold bg-primary text-primary-foreground shadow-lg shadow-primary/25 hover:shadow-primary/40 hover:-translate-y-0.5 active:translate-y-0 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm shrink-0"
               >
                 {generatingType === currentTab.apiType ? (
                   <>
@@ -275,7 +275,7 @@ export function Endgames() {
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ delay: i * 0.08 }}
                     key={course.id}
-                    className="glass-card rounded-2xl p-5 flex flex-col h-full group border-white/5 hover:border-primary/30 transition-colors"
+                    className="glass-card rounded-[2rem] p-5 flex flex-col h-full group border-white/5 hover:border-primary/30 transition-colors"
                   >
                     <div className="flex justify-between items-start mb-3">
                       <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-primary/10 text-primary border border-primary/20">
@@ -312,7 +312,7 @@ export function Endgames() {
                       </div>
 
                       <Link href={`/courses/${course.id}`} className={cn(
-                        'w-full flex items-center justify-center gap-2 py-2.5 rounded-xl font-bold text-sm transition-all',
+                        'w-full flex items-center justify-center gap-2 py-2.5 rounded-3xl font-bold text-sm transition-all',
                         isComplete
                           ? 'bg-secondary text-foreground hover:bg-secondary/80'
                           : 'bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground'
@@ -326,7 +326,7 @@ export function Endgames() {
               })}
             </div>
           ) : (
-            <div className="text-center py-16 border-2 border-dashed border-border rounded-2xl">
+            <div className="text-center py-16 border-2 border-dashed border-border rounded-[2rem]">
               <BookOpen className="w-10 h-10 text-muted-foreground mx-auto mb-3 opacity-50" />
               <h3 className="text-lg font-bold mb-1.5">No {currentTab.label} Yet</h3>
               <p className="text-sm text-muted-foreground mb-5 max-w-sm mx-auto">
@@ -337,7 +337,7 @@ export function Endgames() {
               <button
                 onClick={() => handleGenerate(currentTab.apiType)}
                 disabled={!!generatingType}
-                className="px-5 py-2.5 rounded-xl bg-primary text-primary-foreground font-bold text-sm hover:shadow-lg hover:shadow-primary/25 hover:-translate-y-0.5 transition-all disabled:opacity-50"
+                className="px-5 py-2.5 rounded-3xl bg-primary text-primary-foreground font-bold text-sm hover:shadow-lg hover:shadow-primary/25 hover:-translate-y-0.5 transition-all disabled:opacity-50"
               >
                 Generate Now
               </button>

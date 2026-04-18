@@ -990,7 +990,7 @@ ${sanitized}
         initial={{ opacity: 0, scale: 0.95, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 20 }}
-        className="w-full max-w-2xl max-h-[90vh] bg-[#302e2b] border border-amber-500/20 rounded-2xl flex flex-col overflow-hidden shadow-2xl"
+        className="w-full max-w-2xl max-h-[90vh] bg-[#302e2b] border border-amber-500/20 rounded-[2rem] flex flex-col overflow-hidden shadow-2xl"
       >
         <div className="px-5 py-4 border-b border-amber-500/15 bg-amber-500/5 flex items-center justify-between shrink-0">
           <h2 className="text-base font-bold text-amber-400 flex items-center gap-2">
@@ -1022,7 +1022,7 @@ ${sanitized}
                   <button
                     key={tpl.name}
                     onClick={() => applyTemplate(tpl)}
-                    className="shrink-0 bg-[#262421] border border-border/30 rounded-lg px-4 py-3 text-left hover:border-amber-500/30 transition-colors"
+                    className="shrink-0 bg-[#262421] border border-border/30 rounded-[2rem] px-4 py-3 text-left hover:border-amber-500/30 transition-colors"
                   >
                     <p className="text-xs font-semibold text-amber-400">{tpl.name}</p>
                     <p className="text-[10px] text-muted-foreground mt-0.5 max-w-[140px] truncate">{tpl.subject}</p>
@@ -1037,7 +1037,7 @@ ${sanitized}
           <div className="p-4 space-y-3">
             <div>
               <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 block">To</label>
-              <div className="bg-[#262421] border border-border/40 rounded-lg p-2 min-h-[40px]">
+              <div className="bg-[#262421] border border-border/40 rounded-[2rem] p-2 min-h-[40px]">
                 <div className="flex flex-wrap gap-1.5 mb-1">
                   {broadcastAll && (
                     <span className="inline-flex items-center gap-1 text-xs bg-amber-500/15 text-amber-400 px-2 py-1 rounded-md font-medium">
@@ -1082,7 +1082,7 @@ ${sanitized}
                 value={subject}
                 onChange={e => setSubject(e.target.value)}
                 placeholder="Email subject line"
-                className="w-full bg-[#262421] border border-border/40 rounded-lg px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:border-amber-500/40"
+                className="w-full bg-[#262421] border border-border/40 rounded-[2rem] px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:border-amber-500/40"
               />
             </div>
 
@@ -1155,7 +1155,7 @@ ${sanitized}
                   <div
                     ref={editorRef}
                     contentEditable
-                    className="bg-[#262421] border border-border/40 rounded-b-lg px-4 py-3 min-h-[200px] max-h-[350px] overflow-y-auto text-sm text-[#e8e6e3] focus:outline-none focus:border-amber-500/40 [&_h2]:text-lg [&_h2]:font-bold [&_h2]:text-[#81b64c] [&_h2]:mb-2 [&_h3]:text-base [&_h3]:font-semibold [&_h3]:text-[#e8e6e3] [&_h3]:mb-1 [&_p]:mb-2 [&_a]:text-[#81b64c] [&_a]:underline [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:mb-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:mb-2 [&_li]:mb-1 [&_img]:max-w-full [&_img]:rounded-lg [&_img]:my-2 [&_hr]:border-border/30 [&_hr]:my-3"
+                    className="bg-[#262421] border border-border/40 rounded-b-lg px-4 py-3 min-h-[200px] max-h-[350px] overflow-y-auto text-sm text-[#e8e6e3] focus:outline-none focus:border-amber-500/40 [&_h2]:text-lg [&_h2]:font-bold [&_h2]:text-[#81b64c] [&_h2]:mb-2 [&_h3]:text-base [&_h3]:font-semibold [&_h3]:text-[#e8e6e3] [&_h3]:mb-1 [&_p]:mb-2 [&_a]:text-[#81b64c] [&_a]:underline [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:mb-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:mb-2 [&_li]:mb-1 [&_img]:max-w-full [&_img]:rounded-[2rem] [&_img]:my-2 [&_hr]:border-border/30 [&_hr]:my-3"
                     data-placeholder="Start typing your email..."
                     onPaste={(e) => {
                       const items = e.clipboardData.items;
@@ -1253,7 +1253,7 @@ ${sanitized}
                   />
                 </>
               ) : (
-                <div className="bg-[#262421] border border-border/40 rounded-lg overflow-hidden">
+                <div className="bg-[#262421] border border-border/40 rounded-[2rem] overflow-hidden">
                   <div className="bg-[#1a1917] px-3 py-2 border-b border-border/20">
                     <p className="text-[10px] text-muted-foreground">Email Preview (as recipient will see it)</p>
                   </div>
@@ -1279,7 +1279,7 @@ ${sanitized}
 
         <div className="px-5 py-4 border-t border-amber-500/15 bg-amber-500/5 shrink-0 space-y-3">
           {result && (
-            <div className={`flex items-center gap-2 text-xs px-3 py-2 rounded-lg ${result.type === 'success' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>
+            <div className={`flex items-center gap-2 text-xs px-3 py-2 rounded-[2rem] ${result.type === 'success' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>
               {result.type === 'success' ? <CheckCircle2 className="w-3.5 h-3.5 shrink-0" /> : <AlertCircle className="w-3.5 h-3.5 shrink-0" />}
               {result.message}
             </div>
@@ -1288,14 +1288,14 @@ ${sanitized}
             <button
               onClick={handleTestEmail}
               disabled={sending}
-              className="text-xs px-3 py-2.5 rounded-lg bg-[#262421] border border-border/40 text-muted-foreground hover:text-foreground hover:border-amber-500/30 disabled:opacity-50 transition-colors"
+              className="text-xs px-3 py-2.5 rounded-[2rem] bg-[#262421] border border-border/40 text-muted-foreground hover:text-foreground hover:border-amber-500/30 disabled:opacity-50 transition-colors"
             >
               Send Test to Me
             </button>
             <button
               onClick={handleSend}
               disabled={sending}
-              className="flex-1 bg-amber-500/15 text-amber-400 hover:bg-amber-500/25 disabled:opacity-50 text-sm font-semibold py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2"
+              className="flex-1 bg-amber-500/15 text-amber-400 hover:bg-amber-500/25 disabled:opacity-50 text-sm font-semibold py-2.5 rounded-[2rem] transition-colors flex items-center justify-center gap-2"
             >
               <Send className="w-4 h-4" />
               {sending ? 'Sending...' : broadcastAll ? 'Send to All Users' : `Send to ${recipients.length} Recipient${recipients.length !== 1 ? 's' : ''}`}
@@ -1357,7 +1357,7 @@ function AdminTicker() {
     <>
       <motion.div
         variants={{ hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0 } }}
-        className="bg-card border border-amber-500/20 rounded-2xl overflow-hidden"
+        className="bg-card border border-amber-500/20 rounded-[2rem] overflow-hidden"
       >
         <div className="px-4 py-3 border-b border-amber-500/15 bg-amber-500/5">
           <h2 className="text-sm font-bold text-amber-400 flex items-center gap-2">
@@ -1386,7 +1386,7 @@ function AdminTicker() {
         </div>
         <div className="grid grid-cols-3 divide-x divide-border/30">
           <div className="p-4 text-center">
-            <div className="w-8 h-8 bg-blue-400/10 rounded-lg flex items-center justify-center mx-auto mb-2">
+            <div className="w-8 h-8 bg-blue-400/10 rounded-[2rem] flex items-center justify-center mx-auto mb-2">
               <Eye className="w-4 h-4 text-blue-400" />
             </div>
             <p className="text-xl font-black text-foreground">{(stats.uniqueVisitors?.total ?? stats.pageViews.total).toLocaleString()}</p>
@@ -1397,7 +1397,7 @@ function AdminTicker() {
             onClick={() => setShowUsers(v => !v)}
             className="p-4 text-center hover:bg-emerald-400/5 transition-colors cursor-pointer"
           >
-            <div className="w-8 h-8 bg-emerald-400/10 rounded-lg flex items-center justify-center mx-auto mb-2">
+            <div className="w-8 h-8 bg-emerald-400/10 rounded-[2rem] flex items-center justify-center mx-auto mb-2">
               <Users className="w-4 h-4 text-emerald-400" />
             </div>
             <p className="text-xl font-black text-foreground">{stats.users.total.toLocaleString()}</p>
@@ -1405,7 +1405,7 @@ function AdminTicker() {
             <p className="text-[10px] text-muted-foreground/60 mt-0.5">{stats.users.today} today</p>
           </button>
           <div className="p-4 text-center">
-            <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center mx-auto mb-2">
+            <div className="w-8 h-8 bg-primary/10 rounded-[2rem] flex items-center justify-center mx-auto mb-2">
               <CreditCard className="w-4 h-4 text-primary" />
             </div>
             <p className="text-xl font-black text-foreground">{stats.subscriptions.total.toLocaleString()}</p>
@@ -1425,7 +1425,7 @@ function AdminTicker() {
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="rounded-2xl border border-border/40 bg-card overflow-hidden"
+        className="rounded-[2rem] border border-border/40 bg-card overflow-hidden"
       >
         <div className="px-5 py-3 border-b border-border/30 bg-orange-500/5">
           <h3 className="text-sm font-bold text-orange-400 flex items-center gap-2">
@@ -1443,7 +1443,7 @@ function AdminTicker() {
                 else alert(`Error: ${data.error || 'Unknown error'}`);
               } catch { alert('Failed to run fix'); }
             }}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all hover:bg-orange-500/10 text-left border border-orange-500/20"
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-3xl text-sm font-medium transition-all hover:bg-orange-500/10 text-left border border-orange-500/20"
           >
             <span className="text-lg">♜</span>
             <div>
@@ -1517,7 +1517,7 @@ function MarketingPanel() {
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      className="rounded-2xl border border-border/40 bg-card overflow-hidden"
+      className="rounded-[2rem] border border-border/40 bg-card overflow-hidden"
     >
       <div className="px-5 py-3 border-b border-border/30 bg-purple-500/5">
         <h3 className="text-sm font-bold text-purple-400 flex items-center gap-2">
@@ -1530,7 +1530,7 @@ function MarketingPanel() {
             <select
               value={theme}
               onChange={e => setTheme(e.target.value)}
-              className="w-full appearance-none bg-background border border-border/40 rounded-lg px-3 py-2 text-sm text-foreground pr-8 focus:outline-none focus:border-purple-500/40"
+              className="w-full appearance-none bg-background border border-border/40 rounded-[2rem] px-3 py-2 text-sm text-foreground pr-8 focus:outline-none focus:border-purple-500/40"
             >
               {MARKETING_THEMES.map(t => <option key={t} value={t}>{t}</option>)}
             </select>
@@ -1539,7 +1539,7 @@ function MarketingPanel() {
           <button
             onClick={generate}
             disabled={loading}
-            className="flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg bg-purple-500/15 border border-purple-500/25 text-purple-400 text-xs font-bold hover:bg-purple-500/25 transition-colors disabled:opacity-50 shrink-0"
+            className="flex items-center justify-center gap-1.5 px-4 py-2 rounded-[2rem] bg-purple-500/15 border border-purple-500/25 text-purple-400 text-xs font-bold hover:bg-purple-500/25 transition-colors disabled:opacity-50 shrink-0"
           >
             {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
             {loading ? 'Generating...' : 'Generate Ads'}
@@ -1550,11 +1550,11 @@ function MarketingPanel() {
           value={customNote}
           onChange={e => setCustomNote(e.target.value)}
           placeholder="Optional: custom note or specific angle..."
-          className="w-full bg-background border border-border/30 rounded-lg px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-purple-500/30"
+          className="w-full bg-background border border-border/30 rounded-[2rem] px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-purple-500/30"
         />
 
         {error && (
-          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-xs">
+          <div className="flex items-center gap-2 px-3 py-2 rounded-[2rem] bg-red-500/10 border border-red-500/20 text-red-400 text-xs">
             <AlertCircle className="w-3.5 h-3.5 shrink-0" />
             {error}
           </div>
@@ -1565,7 +1565,7 @@ function MarketingPanel() {
             {posts.map((post, i) => {
               const fullText = post.title ? `${post.title}\n\n${post.content}` : post.content;
               return (
-                <div key={i} className="rounded-xl border border-border/30 overflow-hidden">
+                <div key={i} className="rounded-3xl border border-border/30 overflow-hidden">
                   <div className="flex items-center justify-between px-3 py-2 bg-background/50 border-b border-border/20">
                     <div className="flex items-center gap-2">
                       <span className="text-sm">{platformIcon(post.platform)}</span>
@@ -1632,7 +1632,7 @@ function ReferralCard({ isPremium }: { isPremium: boolean }) {
   return (
     <motion.div
       variants={{ hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0 } }}
-      className="bg-card border border-border/50 rounded-2xl overflow-hidden"
+      className="bg-card border border-border/50 rounded-[2rem] overflow-hidden"
     >
       <div className="px-4 py-3 border-b border-border/30">
         <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
@@ -1642,7 +1642,7 @@ function ReferralCard({ isPremium }: { isPremium: boolean }) {
       <div className="p-4">
         {!isPremium || !data?.isPaid ? (
           <div className="text-center py-4">
-            <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center mx-auto mb-3">
+            <div className="w-12 h-12 bg-primary/10 rounded-3xl flex items-center justify-center mx-auto mb-3">
               <Crown className="w-6 h-6 text-primary" />
             </div>
             <p className="text-sm font-semibold text-foreground mb-1">Unlock Referrals</p>
@@ -1659,12 +1659,12 @@ function ReferralCard({ isPremium }: { isPremium: boolean }) {
               <div>
                 <p className="text-xs text-muted-foreground mb-2">Your referral link</p>
                 <div className="flex items-center gap-2">
-                  <div className="flex-1 bg-background/60 border border-border/40 rounded-lg px-3 py-2 text-xs text-foreground font-mono truncate">
+                  <div className="flex-1 bg-background/60 border border-border/40 rounded-[2rem] px-3 py-2 text-xs text-foreground font-mono truncate">
                     {referralLink}
                   </div>
                   <button
                     onClick={handleCopy}
-                    className={`shrink-0 px-3 py-2 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                    className={`shrink-0 px-3 py-2 rounded-[2rem] text-xs font-semibold transition-all flex items-center gap-1.5 ${
                       copied
                         ? 'bg-emerald-500/15 text-emerald-400'
                         : 'bg-primary/10 text-primary hover:bg-primary/20'
@@ -1678,15 +1678,15 @@ function ReferralCard({ isPremium }: { isPremium: boolean }) {
             )}
 
             <div className="grid grid-cols-2 gap-3">
-              <div className="bg-background/40 border border-border/30 rounded-xl p-3 text-center">
-                <div className="w-7 h-7 bg-blue-400/10 rounded-lg flex items-center justify-center mx-auto mb-1.5">
+              <div className="bg-background/40 border border-border/30 rounded-3xl p-3 text-center">
+                <div className="w-7 h-7 bg-blue-400/10 rounded-[2rem] flex items-center justify-center mx-auto mb-1.5">
                   <UserPlus className="w-3.5 h-3.5 text-blue-400" />
                 </div>
                 <p className="text-lg font-black text-foreground">{data?.totalReferred ?? 0}</p>
                 <p className="text-[11px] text-muted-foreground">Signed Up</p>
               </div>
-              <div className="bg-background/40 border border-border/30 rounded-xl p-3 text-center">
-                <div className="w-7 h-7 bg-emerald-400/10 rounded-lg flex items-center justify-center mx-auto mb-1.5">
+              <div className="bg-background/40 border border-border/30 rounded-3xl p-3 text-center">
+                <div className="w-7 h-7 bg-emerald-400/10 rounded-[2rem] flex items-center justify-center mx-auto mb-1.5">
                   <Crown className="w-3.5 h-3.5 text-emerald-400" />
                 </div>
                 <p className="text-lg font-black text-foreground">{data?.totalConverted ?? 0}</p>
@@ -1699,7 +1699,7 @@ function ReferralCard({ isPremium }: { isPremium: boolean }) {
                 <p className="text-xs text-muted-foreground mb-2">Your referrals</p>
                 <div className="space-y-1.5">
                   {data.referrals.map(r => (
-                    <div key={r.id} className="flex items-center justify-between bg-background/30 border border-border/20 rounded-lg px-3 py-2">
+                    <div key={r.id} className="flex items-center justify-between bg-background/30 border border-border/20 rounded-[2rem] px-3 py-2">
                       <span className="text-xs text-foreground font-medium">{r.referredName}</span>
                       <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${
                         r.status === 'converted'
@@ -1774,15 +1774,15 @@ export function Profile() {
   return (
     <motion.div variants={container} initial="hidden" animate="show" className="space-y-5 p-4 md:p-0">
 
-      <motion.div variants={item} className="relative overflow-hidden bg-gradient-to-br from-[hsl(89,44%,18%)] via-card to-card border border-primary/10 rounded-2xl p-5 md:p-6">
+      <motion.div variants={item} className="relative overflow-hidden bg-gradient-to-br from-[hsl(89,44%,18%)] via-card to-card border border-primary/10 rounded-[2rem] p-5 md:p-6">
         <div className="absolute inset-0 opacity-[0.035] pointer-events-none"
           style={{ backgroundImage: 'repeating-conic-gradient(#fff 0% 25%, transparent 0% 50%)', backgroundSize: '36px 36px' }}
         />
         <div className="relative flex items-center gap-4">
           <div className="shrink-0">
             {player?.avatar
-              ? <img src={player.avatar} alt={username ?? ''} className="w-20 h-20 rounded-2xl object-cover border-2 border-primary/40 shadow-lg shadow-primary/20" />
-              : <div className="w-20 h-20 rounded-2xl bg-primary/20 border-2 border-primary/30 flex items-center justify-center">
+              ? <img src={player.avatar} alt={username ?? ''} className="w-20 h-20 rounded-[2rem] object-cover border-2 border-primary/40 shadow-lg shadow-primary/20" />
+              : <div className="w-20 h-20 rounded-[2rem] bg-primary/20 border-2 border-primary/30 flex items-center justify-center">
                   <User className="w-10 h-10 text-primary" />
                 </div>
             }
@@ -1808,7 +1808,7 @@ export function Profile() {
                 <input
                   value={newUsername}
                   onChange={e => setNewUsername(e.target.value)}
-                  className="bg-background/60 border border-border rounded-lg px-2 py-1 text-sm font-bold text-foreground w-full max-w-[200px]"
+                  className="bg-background/60 border border-border rounded-[2rem] px-2 py-1 text-sm font-bold text-foreground w-full max-w-[200px]"
                   autoFocus
                   onKeyDown={e => e.key === 'Enter' && handleSaveUsername()}
                 />
@@ -1849,8 +1849,8 @@ export function Profile() {
           { label: 'Rating', value: player?.rating ?? '—', icon: Target, color: 'text-primary', bg: 'bg-primary/10' },
           { label: 'Courses', value: `${completedCourses}/${(completedCourses + activeCourses) || 0}`, icon: GraduationCap, color: 'text-amber-400', bg: 'bg-amber-400/10' },
         ].map(stat => (
-          <div key={stat.label} className="bg-card border border-border/50 rounded-xl p-4 text-center">
-            <div className={`w-8 h-8 ${stat.bg} rounded-lg flex items-center justify-center mx-auto mb-2`}>
+          <div key={stat.label} className="bg-card border border-border/50 rounded-3xl p-4 text-center">
+            <div className={`w-8 h-8 ${stat.bg} rounded-[2rem] flex items-center justify-center mx-auto mb-2`}>
               <stat.icon className={`w-4 h-4 ${stat.color}`} />
             </div>
             <p className="text-lg font-black text-foreground">{stat.value}</p>
@@ -1861,7 +1861,7 @@ export function Profile() {
 
       {authUser && <ReferralCard isPremium={isPremium} />}
 
-      <motion.div variants={item} className="bg-card border border-border/50 rounded-2xl overflow-hidden">
+      <motion.div variants={item} className="bg-card border border-border/50 rounded-[2rem] overflow-hidden">
         <div className="px-4 py-3 border-b border-border/30">
           <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
             <Settings className="w-4 h-4 text-muted-foreground" /> Account
@@ -1870,7 +1870,7 @@ export function Profile() {
 
         <Link href="/subscription" className="flex items-center justify-between px-4 py-3.5 hover:bg-secondary/40 transition-colors border-b border-border/20">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center">
+            <div className="w-8 h-8 bg-primary/10 rounded-[2rem] flex items-center justify-center">
               <Crown className="w-4 h-4 text-primary" />
             </div>
             <div>
@@ -1889,7 +1889,7 @@ export function Profile() {
 
         <Link href="/analysis" className="flex items-center justify-between px-4 py-3.5 hover:bg-secondary/40 transition-colors border-b border-border/20">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-blue-400/10 rounded-lg flex items-center justify-center">
+            <div className="w-8 h-8 bg-blue-400/10 rounded-[2rem] flex items-center justify-center">
               <Target className="w-4 h-4 text-blue-400" />
             </div>
             <div>
@@ -1902,7 +1902,7 @@ export function Profile() {
 
         <Link href="/courses" className="flex items-center justify-between px-4 py-3.5 hover:bg-secondary/40 transition-colors border-b border-border/20">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-amber-400/10 rounded-lg flex items-center justify-center">
+            <div className="w-8 h-8 bg-amber-400/10 rounded-[2rem] flex items-center justify-center">
               <GraduationCap className="w-4 h-4 text-amber-400" />
             </div>
             <div>
@@ -1917,7 +1917,7 @@ export function Profile() {
           onClick={handleLogout}
           className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-red-500/5 transition-colors text-left"
         >
-          <div className="w-8 h-8 bg-red-400/10 rounded-lg flex items-center justify-center">
+          <div className="w-8 h-8 bg-red-400/10 rounded-[2rem] flex items-center justify-center">
             <LogOut className="w-4 h-4 text-red-400" />
           </div>
           <p className="text-sm font-semibold text-red-400">Sign Out</p>

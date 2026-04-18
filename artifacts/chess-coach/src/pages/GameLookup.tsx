@@ -156,7 +156,7 @@ function AnalysisSummaryPanel({
 
   return (
     <div className="space-y-4">
-      <div className="rounded-lg p-4 border" style={{ background: BG_CARD, border: CARD_BORDER, boxShadow: CARD_SHADOW }}>
+      <div className="rounded-[2rem] p-4 border" style={{ background: BG_CARD, border: CARD_BORDER, boxShadow: CARD_SHADOW }}>
         <h3 className="font-bold text-sm mb-3 flex items-center gap-2" style={{ color: TEXT_LIGHT }}>
           <Target size={14} style={{ color: CHESSCOM_GREEN }} /> Accuracy
         </h3>
@@ -186,7 +186,7 @@ function AnalysisSummaryPanel({
       </div>
 
       {turningPoints.length > 0 && (
-        <div className="rounded-lg p-4 border" style={{ background: BG_CARD, border: CARD_BORDER, boxShadow: CARD_SHADOW }}>
+        <div className="rounded-[2rem] p-4 border" style={{ background: BG_CARD, border: CARD_BORDER, boxShadow: CARD_SHADOW }}>
           <h3 className="font-bold text-sm mb-3 flex items-center gap-2" style={{ color: TEXT_LIGHT }}>
             <AlertTriangle size={14} style={{ color: '#f59e0b' }} /> Turning Points
           </h3>
@@ -571,7 +571,7 @@ export function GameLookup() {
             <ArrowLeft size={16} /> Back to Games
           </button>
 
-          <div className="rounded-xl border overflow-hidden" style={{ background: BG_CARD, border: CARD_BORDER, boxShadow: CARD_SHADOW }}>
+          <div className="rounded-3xl border overflow-hidden" style={{ background: BG_CARD, border: CARD_BORDER, boxShadow: CARD_SHADOW }}>
             <div className="p-4 border-b flex flex-wrap items-center gap-4" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
               <div className="flex items-center gap-3">
                 <div className="text-center">
@@ -595,7 +595,7 @@ export function GameLookup() {
                 {!isAnalyzing && analysis.length === 0 && (
                   <button
                     onClick={runAnalysis}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all hover:opacity-90"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-[2rem] text-xs font-bold transition-all hover:opacity-90"
                     style={{ background: CHESSCOM_GREEN, color: '#fff' }}
                   >
                     <Lightbulb size={13} /> Analyze Game
@@ -639,13 +639,13 @@ export function GameLookup() {
 
               <div className="flex flex-col border-l" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
                 <div className="flex items-center justify-center gap-1 md:gap-2 p-2 border-b" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
-                  <button onClick={goFirst} className="p-3 md:p-2 rounded-lg hover:bg-white/10 active:scale-90 transition-transform" style={{ color: TEXT_MUTED }}><ChevronsLeft className="w-5 h-5 md:w-[18px] md:h-[18px]" /></button>
-                  <button onClick={goPrev} className="p-3 md:p-2 rounded-lg hover:bg-white/10 active:scale-90 transition-transform" style={{ color: TEXT_MUTED }}><ChevronLeft className="w-5 h-5 md:w-[18px] md:h-[18px]" /></button>
-                  <button onClick={togglePlay} className="p-3 md:p-2 rounded-lg hover:bg-white/10 active:scale-90 transition-transform" style={{ color: CHESSCOM_GREEN }}>
+                  <button onClick={goFirst} className="p-3 md:p-2 rounded-[2rem] hover:bg-white/10 active:scale-90 transition-transform" style={{ color: TEXT_MUTED }}><ChevronsLeft className="w-5 h-5 md:w-[18px] md:h-[18px]" /></button>
+                  <button onClick={goPrev} className="p-3 md:p-2 rounded-[2rem] hover:bg-white/10 active:scale-90 transition-transform" style={{ color: TEXT_MUTED }}><ChevronLeft className="w-5 h-5 md:w-[18px] md:h-[18px]" /></button>
+                  <button onClick={togglePlay} className="p-3 md:p-2 rounded-[2rem] hover:bg-white/10 active:scale-90 transition-transform" style={{ color: CHESSCOM_GREEN }}>
                     {isPlaying ? <Pause className="w-5 h-5 md:w-[18px] md:h-[18px]" /> : <Play className="w-5 h-5 md:w-[18px] md:h-[18px]" />}
                   </button>
-                  <button onClick={goNext} className="p-3 md:p-2 rounded-lg hover:bg-white/10 active:scale-90 transition-transform" style={{ color: TEXT_MUTED }}><ChevronRight className="w-5 h-5 md:w-[18px] md:h-[18px]" /></button>
-                  <button onClick={goLast} className="p-3 md:p-2 rounded-lg hover:bg-white/10 active:scale-90 transition-transform" style={{ color: TEXT_MUTED }}><ChevronsRight className="w-5 h-5 md:w-[18px] md:h-[18px]" /></button>
+                  <button onClick={goNext} className="p-3 md:p-2 rounded-[2rem] hover:bg-white/10 active:scale-90 transition-transform" style={{ color: TEXT_MUTED }}><ChevronRight className="w-5 h-5 md:w-[18px] md:h-[18px]" /></button>
+                  <button onClick={goLast} className="p-3 md:p-2 rounded-[2rem] hover:bg-white/10 active:scale-90 transition-transform" style={{ color: TEXT_MUTED }}><ChevronsRight className="w-5 h-5 md:w-[18px] md:h-[18px]" /></button>
                   <span className="text-[10px] ml-2" style={{ color: TEXT_MUTED }}>
                     {moveIndex}/{totalMoves}
                   </span>
@@ -747,7 +747,7 @@ export function GameLookup() {
           </p>
         </div>
 
-        <div className="rounded-xl border p-5" style={{ background: BG_CARD, border: CARD_BORDER, boxShadow: CARD_SHADOW }}>
+        <div className="rounded-3xl border p-5" style={{ background: BG_CARD, border: CARD_BORDER, boxShadow: CARD_SHADOW }}>
           <div className="flex flex-col sm:flex-row gap-3 items-end">
             <div className="flex-1 w-full">
               <label className="text-xs font-medium mb-1 block" style={{ color: TEXT_MUTED }}>Player 1</label>
@@ -756,7 +756,7 @@ export function GameLookup() {
                 value={player1}
                 onChange={e => setPlayer1(e.target.value)}
                 placeholder="Chess.com username"
-                className="w-full px-3 py-2.5 rounded-lg text-sm border outline-none focus:ring-1 transition-all"
+                className="w-full px-3 py-2.5 rounded-[2rem] text-sm border outline-none focus:ring-1 transition-all"
                 style={{
                   background: BG_DARK,
                   borderColor: 'rgba(255,255,255,0.1)',
@@ -775,7 +775,7 @@ export function GameLookup() {
                 value={player2}
                 onChange={e => setPlayer2(e.target.value)}
                 placeholder="Chess.com username"
-                className="w-full px-3 py-2.5 rounded-lg text-sm border outline-none focus:ring-1 transition-all"
+                className="w-full px-3 py-2.5 rounded-[2rem] text-sm border outline-none focus:ring-1 transition-all"
                 style={{
                   background: BG_DARK,
                   borderColor: 'rgba(255,255,255,0.1)',
@@ -787,7 +787,7 @@ export function GameLookup() {
             <button
               onClick={handleSearch}
               disabled={loading || !player1.trim() || !player2.trim()}
-              className="px-5 py-2.5 rounded-lg font-bold text-sm transition-all hover:opacity-90 disabled:opacity-40 shrink-0"
+              className="px-5 py-2.5 rounded-[2rem] font-bold text-sm transition-all hover:opacity-90 disabled:opacity-40 shrink-0"
               style={{ background: CHESSCOM_GREEN, color: '#fff' }}
             >
               {loading ? (
@@ -803,7 +803,7 @@ export function GameLookup() {
         </div>
 
         {searchHistory.length > 0 && !loading && games.length === 0 && (
-          <div className="rounded-xl border p-4" style={{ background: BG_CARD, border: CARD_BORDER, boxShadow: CARD_SHADOW }}>
+          <div className="rounded-3xl border p-4" style={{ background: BG_CARD, border: CARD_BORDER, boxShadow: CARD_SHADOW }}>
             <div className="flex items-center gap-2 mb-3">
               <Clock size={14} style={{ color: TEXT_MUTED }} />
               <h3 className="text-xs font-bold uppercase tracking-wider" style={{ color: TEXT_MUTED }}>Previous Searches</h3>
@@ -817,7 +817,7 @@ export function GameLookup() {
                     setPlayer2(h.player2);
                     doSearch(h.player1, h.player2);
                   }}
-                  className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all hover:opacity-80"
+                  className="flex items-center gap-2 px-3 py-2 rounded-[2rem] text-sm transition-all hover:opacity-80"
                   style={{ background: 'rgba(129,182,76,0.08)', border: '1px solid rgba(129,182,76,0.15)', color: TEXT_LIGHT }}
                 >
                   <Swords size={12} style={{ color: CHESSCOM_GREEN }} />
@@ -834,13 +834,13 @@ export function GameLookup() {
         )}
 
         {error && (
-          <div className="rounded-lg p-3 text-sm border" style={{ background: 'rgba(220,67,67,0.1)', borderColor: 'rgba(220,67,67,0.3)', color: MISTAKE_RED }}>
+          <div className="rounded-[2rem] p-3 text-sm border" style={{ background: 'rgba(220,67,67,0.1)', borderColor: 'rgba(220,67,67,0.3)', color: MISTAKE_RED }}>
             {error}
           </div>
         )}
 
         {hasSearched && !loading && games.length === 0 && !error && (
-          <div className="text-center py-12 rounded-xl border" style={{ background: BG_CARD, border: CARD_BORDER, boxShadow: CARD_SHADOW }}>
+          <div className="text-center py-12 rounded-3xl border" style={{ background: BG_CARD, border: CARD_BORDER, boxShadow: CARD_SHADOW }}>
             <Swords size={40} className="mx-auto mb-3" style={{ color: TEXT_MUTED, opacity: 0.4 }} />
             <p className="text-sm font-medium" style={{ color: TEXT_MUTED }}>No games found between these players</p>
             <p className="text-xs mt-1" style={{ color: TEXT_MUTED, opacity: 0.7 }}>Games from the last 6 months are searched</p>
@@ -864,7 +864,7 @@ export function GameLookup() {
                   <button
                     key={game.id}
                     onClick={() => selectGame(game)}
-                    className="w-full text-left rounded-lg border p-3 transition-all hover:border-[rgba(129,182,76,0.4)] group"
+                    className="w-full text-left rounded-[2rem] border p-3 transition-all hover:border-[rgba(129,182,76,0.4)] group"
                     style={{ background: BG_CARD, border: CARD_BORDER, boxShadow: CARD_SHADOW }}
                   >
                     <div className="flex items-center gap-3">

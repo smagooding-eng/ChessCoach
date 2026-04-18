@@ -21,7 +21,7 @@ export function WaitTipCarousel({ rating, intervalMs = 7000 }: WaitTipCarouselPr
   }, [tips.length, intervalMs]);
 
   return (
-    <div className="rounded-xl bg-amber-500/5 border border-amber-500/20 px-4 py-3 overflow-hidden">
+    <div className="rounded-3xl bg-amber-500/5 border border-amber-500/20 px-4 py-3 overflow-hidden">
       <div className="flex items-center gap-2 mb-2">
         <Lightbulb className="w-3.5 h-3.5 text-amber-400 shrink-0" />
         <span className="text-[11px] font-bold text-amber-400/80 uppercase tracking-wider">

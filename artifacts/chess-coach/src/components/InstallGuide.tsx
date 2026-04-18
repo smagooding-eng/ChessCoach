@@ -86,7 +86,7 @@ export function InstallGuide({ platform, onClose, onDismiss }: {
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" onClick={onClose}>
       <div className="absolute inset-0 bg-black/60" />
-      <div className="relative w-full max-w-sm rounded-xl overflow-hidden"
+      <div className="relative w-full max-w-sm rounded-3xl overflow-hidden"
         style={{ background: BG_CARD, border: `1px solid ${BORDER_COLOR}` }}
         onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: `1px solid ${BORDER_COLOR}` }}>
@@ -104,10 +104,10 @@ export function InstallGuide({ platform, onClose, onDismiss }: {
           {platform === 'desktop' && <DesktopGuide />}
         </div>
         <div className="px-4 py-3 flex justify-end gap-2" style={{ borderTop: `1px solid ${BORDER_COLOR}` }}>
-          <button onClick={onDismiss} className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors hover:bg-white/5" style={{ color: TEXT_MUTED }}>
+          <button onClick={onDismiss} className="px-3 py-1.5 rounded-[2rem] text-xs font-semibold transition-colors hover:bg-white/5" style={{ color: TEXT_MUTED }}>
             Don't show again
           </button>
-          <button onClick={onClose} className="px-3 py-1.5 rounded-lg text-xs font-bold transition-colors" style={{ background: CHESSCOM_GREEN, color: '#1a1a1a' }}>
+          <button onClick={onClose} className="px-3 py-1.5 rounded-[2rem] text-xs font-bold transition-colors" style={{ background: CHESSCOM_GREEN, color: '#1a1a1a' }}>
             Got it
           </button>
         </div>

@@ -63,7 +63,7 @@ function SidebarLink({ item, isActive }: { item: typeof ALL_NAV[0]; isActive: bo
   return (
     <Link href={item.href} className="block">
       <div className={cn(
-        "relative flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all duration-150 cursor-pointer text-[13px] font-semibold",
+        "relative flex items-center gap-2.5 px-3 py-2 rounded-[2rem] transition-all duration-150 cursor-pointer text-[13px] font-semibold",
       )} style={{
         background: isActive ? 'rgba(129,182,76,0.12)' : 'transparent',
         color: isActive ? CHESSCOM_GREEN : TEXT_MUTED,
@@ -142,7 +142,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         </nav>
 
         <div className="p-2.5" style={{ borderTop: `1px solid ${BORDER_COLOR}` }}>
-          <div className="flex items-center justify-between px-2 py-2 rounded-lg" style={{ background: BG_CARD }}>
+          <div className="flex items-center justify-between px-2 py-2 rounded-[2rem]" style={{ background: BG_CARD }}>
             <Link href="/profile" className="flex items-center gap-2 min-w-0 hover:opacity-80 transition-opacity">
               <PlayerAvatar avatar={player?.avatar} username={username ?? ''} size="sm" />
               <div className="min-w-0">
@@ -210,13 +210,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
             >
               <div className="px-3 py-2 space-y-0.5">
                 <Link href="/profile" className="block">
-                  <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors active:bg-white/5" style={{ color: TEXT_LIGHT }}>
+                  <div className="flex items-center gap-3 px-3 py-2.5 rounded-[2rem] transition-colors active:bg-white/5" style={{ color: TEXT_LIGHT }}>
                     <User className="w-4.5 h-4.5" style={{ color: TEXT_MUTED }} />
                     <span className="font-semibold text-sm">Profile</span>
                   </div>
                 </Link>
                 <Link href="/subscription" className="block">
-                  <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors active:bg-white/5" style={{ color: TEXT_LIGHT }}>
+                  <div className="flex items-center gap-3 px-3 py-2.5 rounded-[2rem] transition-colors active:bg-white/5" style={{ color: TEXT_LIGHT }}>
                     <Crown className="w-4.5 h-4.5" style={{ color: '#eaa631' }} />
                     <span className="font-semibold text-sm">Subscription</span>
                     {isPremium && <span className="ml-auto text-[9px] font-black px-1.5 py-px rounded" style={{ background: 'rgba(129,182,76,0.15)', color: CHESSCOM_GREEN }}>PRO</span>}
@@ -225,7 +225,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 <div className="pt-1 mt-1" style={{ borderTop: `1px solid ${BORDER_COLOR}` }}>
                   <button
                     onClick={() => { setProfileOpen(false); handleLogout(); }}
-                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg active:bg-red-500/10 transition-colors"
+                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-[2rem] active:bg-red-500/10 transition-colors"
                     style={{ color: '#dc4343' }}
                   >
                     <LogOut className="w-4.5 h-4.5" />
@@ -242,7 +242,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <div className="md:max-w-5xl md:mx-auto">
           {subscription.status === 'free_trial' && subscription.trialDaysLeft != null && !authUser?.isAdmin && (
             <Link href="/subscription" className="block mb-3 mx-3 md:mx-0">
-              <div className="flex items-center justify-between px-3.5 py-2 rounded-lg text-sm transition-colors"
+              <div className="flex items-center justify-between px-3.5 py-2 rounded-[2rem] text-sm transition-colors"
                 style={{ background: 'rgba(234,166,49,0.1)', border: '1px solid rgba(234,166,49,0.2)', color: '#eaa631' }}>
                 <span>
                   <Crown className="w-3.5 h-3.5 inline-block mr-1 -mt-0.5" />
@@ -315,7 +315,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   const badge = (item as any).badge as string | undefined;
                   return (
                     <Link key={item.href} href={item.href} className="block">
-                      <div className="flex items-center gap-3 px-3.5 py-3 rounded-lg transition-colors"
+                      <div className="flex items-center gap-3 px-3.5 py-3 rounded-[2rem] transition-colors"
                         style={{
                           background: active ? 'rgba(129,182,76,0.1)' : 'transparent',
                           color: active ? CHESSCOM_GREEN : TEXT_LIGHT,
@@ -336,7 +336,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   {canInstall && (
                     <button
                       onClick={() => { setMoreOpen(false); install(); }}
-                      className="w-full flex items-center gap-3 px-3.5 py-3 rounded-lg active:bg-green-500/10 transition-colors"
+                      className="w-full flex items-center gap-3 px-3.5 py-3 rounded-[2rem] active:bg-green-500/10 transition-colors"
                       style={{ color: CHESSCOM_GREEN }}
                     >
                       <Download className="w-5 h-5" />
@@ -345,7 +345,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   )}
                   <button
                     onClick={() => { setMoreOpen(false); handleLogout(); }}
-                    className="w-full flex items-center gap-3 px-3.5 py-3 rounded-lg active:bg-red-500/10 transition-colors"
+                    className="w-full flex items-center gap-3 px-3.5 py-3 rounded-[2rem] active:bg-red-500/10 transition-colors"
                     style={{ color: '#dc4343' }}
                   >
                     <LogOut className="w-5 h-5" />

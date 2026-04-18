@@ -335,7 +335,7 @@ function DeepImportVisual({ totalGames }: { totalGames: number }) {
   const pct = Math.round((scanned / target) * 100);
 
   return (
-    <div className="rounded-xl p-3 mb-5" style={{ background: 'rgba(0,0,0,0.4)', border: `1px solid ${G}33` }}>
+    <div className="rounded-3xl p-3 mb-5" style={{ background: 'rgba(0,0,0,0.4)', border: `1px solid ${G}33` }}>
       <div className="flex items-center gap-3">
         <AnimatePresence mode="wait">
           <motion.div
@@ -430,7 +430,7 @@ function TourDemo({ kind }: { kind: 'scan' | 'analysis' | 'practice' }) {
     const b = sqToXY(TARGET);
 
     return (
-      <div className="rounded-xl p-3 mb-4" style={{ background: 'rgba(0,0,0,0.35)', border: `1px solid rgba(255,255,255,0.05)` }}>
+      <div className="rounded-3xl p-3 mb-4" style={{ background: 'rgba(0,0,0,0.35)', border: `1px solid rgba(255,255,255,0.05)` }}>
         <div className="flex items-center gap-3">
           {/* MINI BOARD WITH SCAN ANIMATION */}
           <div className="relative shrink-0 rounded-md overflow-hidden" style={{ width: 152, height: 152, boxShadow: '0 4px 16px rgba(0,0,0,0.4)' }}>
@@ -560,7 +560,7 @@ function TourDemo({ kind }: { kind: 'scan' | 'analysis' | 'practice' }) {
       f3:{p:'♘',w:true},
     };
     return (
-      <div className="rounded-xl p-3 mb-4" style={{ background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.05)' }}>
+      <div className="rounded-3xl p-3 mb-4" style={{ background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.05)' }}>
         <div className="flex items-center gap-3">
           <MiniBoard
             pieces={analysisPieces}
@@ -599,7 +599,7 @@ function TourDemo({ kind }: { kind: 'scan' | 'analysis' | 'practice' }) {
     a1:{p:'♖',w:true},b1:{p:'♘',w:true},c1:{p:'♗',w:true},d1:{p:'♕',w:true},e1:{p:'♔',w:true},f1:{p:'♗',w:true},g1:{p:'♘',w:true},h1:{p:'♖',w:true},
   };
   return (
-    <div className="rounded-xl p-3 mb-4" style={{ background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.05)' }}>
+    <div className="rounded-3xl p-3 mb-4" style={{ background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.05)' }}>
       <div className="flex items-center gap-3">
         <MiniBoard
           pieces={practicePieces}
@@ -612,7 +612,7 @@ function TourDemo({ kind }: { kind: 'scan' | 'analysis' | 'practice' }) {
         />
         <div className="flex-1 min-w-0 text-left">
           <div className="flex items-center gap-2 mb-1.5">
-            <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ background: `${G}22`, border: `1px solid ${G}44` }}>
+            <div className="w-7 h-7 rounded-[2rem] flex items-center justify-center shrink-0" style={{ background: `${G}22`, border: `1px solid ${G}44` }}>
               <Bot className="w-4 h-4" style={{ color: G }} />
             </div>
             <div className="min-w-0">
@@ -846,13 +846,13 @@ export function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
                     <button
                       key={g.id}
                       onClick={() => setGoal(g.id)}
-                      className="w-full text-left rounded-xl p-4 flex items-center gap-3 transition-all"
+                      className="w-full text-left rounded-3xl p-4 flex items-center gap-3 transition-all"
                       style={{
                         background: selected ? `${G}14` : CARD,
                         border: `1.5px solid ${selected ? `${G}80` : 'rgba(255,255,255,0.06)'}`,
                       }}
                     >
-                      <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"
+                      <div className="w-10 h-10 rounded-[2rem] flex items-center justify-center shrink-0"
                         style={{ background: selected ? `${G}26` : 'rgba(255,255,255,0.04)' }}>
                         <Icon className="w-5 h-5" style={{ color: selected ? G : MUTED }} />
                       </div>
@@ -875,7 +875,7 @@ export function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
               <button
                 onClick={() => setStep('import')}
                 disabled={!goal}
-                className="w-full mt-5 flex items-center justify-center gap-2 py-3.5 rounded-xl font-black text-base transition-all disabled:opacity-40"
+                className="w-full mt-5 flex items-center justify-center gap-2 py-3.5 rounded-3xl font-black text-base transition-all disabled:opacity-40"
                 style={{ background: G, color: '#fff' }}
               >
                 Continue
@@ -894,7 +894,7 @@ export function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
               transition={{ duration: 0.25 }}
               className="text-center"
             >
-              <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl mb-5"
+              <div className="inline-flex items-center justify-center w-14 h-14 rounded-[2rem] mb-5"
                 style={{ background: `${G}1a`, border: `1px solid ${G}33` }}>
                 <Sparkles className="w-7 h-7" style={{ color: G }} />
               </div>
@@ -905,11 +905,11 @@ export function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
                 Drop your handle. <span style={{ color: TEXT }}>30 seconds</span> · no password · we'll do the rest.
               </p>
 
-              <div className="rounded-2xl p-5 md:p-6" style={{ background: CARD, border: `1px solid rgba(255,255,255,0.06)` }}>
+              <div className="rounded-[2rem] p-5 md:p-6" style={{ background: CARD, border: `1px solid rgba(255,255,255,0.06)` }}>
                 <div className="flex gap-2 mb-4">
                   <button
                     onClick={() => setPlatform('chesscom')}
-                    className="flex-1 py-2.5 rounded-lg font-bold text-sm transition-all"
+                    className="flex-1 py-2.5 rounded-[2rem] font-bold text-sm transition-all"
                     style={{
                       background: platform === 'chesscom' ? `${G}1f` : 'rgba(255,255,255,0.04)',
                       color: platform === 'chesscom' ? G : MUTED,
@@ -920,7 +920,7 @@ export function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
                   </button>
                   <button
                     onClick={() => setPlatform('lichess')}
-                    className="flex-1 py-2.5 rounded-lg font-bold text-sm transition-all"
+                    className="flex-1 py-2.5 rounded-[2rem] font-bold text-sm transition-all"
                     style={{
                       background: platform === 'lichess' ? `${G}1f` : 'rgba(255,255,255,0.04)',
                       color: platform === 'lichess' ? G : MUTED,
@@ -936,7 +936,7 @@ export function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
                   value={importUsername}
                   onChange={(e) => setImportUsername(e.target.value)}
                   placeholder={`Your ${platform === 'chesscom' ? 'Chess.com' : 'Lichess'} username`}
-                  className="w-full px-4 py-3.5 rounded-xl text-base outline-none transition-all mb-3 text-center font-semibold"
+                  className="w-full px-4 py-3.5 rounded-3xl text-base outline-none transition-all mb-3 text-center font-semibold"
                   style={{
                     background: 'rgba(255,255,255,0.05)',
                     border: '2px solid rgba(255,255,255,0.08)',
@@ -949,7 +949,7 @@ export function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
                 />
 
                 {error && (
-                  <div className="mb-3 p-2.5 rounded-lg text-sm" style={{ background: 'rgba(220,67,67,0.1)', border: '1px solid rgba(220,67,67,0.25)', color: '#ef6b6b' }}>
+                  <div className="mb-3 p-2.5 rounded-[2rem] text-sm" style={{ background: 'rgba(220,67,67,0.1)', border: '1px solid rgba(220,67,67,0.25)', color: '#ef6b6b' }}>
                     {error}
                   </div>
                 )}
@@ -957,7 +957,7 @@ export function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
                 <button
                   onClick={startImport}
                   disabled={!importUsername.trim()}
-                  className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl font-black text-base transition-all disabled:opacity-50"
+                  className="w-full flex items-center justify-center gap-2 py-3.5 rounded-3xl font-black text-base transition-all disabled:opacity-50"
                   style={{ background: G, color: '#fff' }}
                 >
                   Analyze My Games
@@ -976,7 +976,7 @@ export function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
               exit={{ opacity: 0 }}
               className="text-center py-6"
             >
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-6"
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-[2rem] mb-6"
                 style={{ background: `${G}1a`, border: `1px solid ${G}33` }}>
                 <Loader2 className="w-8 h-8 animate-spin" style={{ color: G }} />
               </div>
@@ -1064,7 +1064,7 @@ export function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
                         );
                       })}
                       <motion.div
-                        className="px-5 py-2 rounded-2xl relative"
+                        className="px-5 py-2 rounded-[2rem] relative"
                         animate={{
                           boxShadow: [
                             '0 0 0 rgba(220,67,67,0)',
@@ -1098,7 +1098,7 @@ export function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
                     initial={{ opacity: 0, y: 12 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.15 + i * 0.12, duration: 0.3 }}
-                    className="rounded-2xl p-5"
+                    className="rounded-[2rem] p-5"
                     style={{
                       background: SEV_BG[ins.severity],
                       border: `1px solid ${SEV_BORDER[ins.severity]}`,
@@ -1106,7 +1106,7 @@ export function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
                   >
                     <div className="flex items-start gap-3">
                       <div
-                        className="shrink-0 w-9 h-9 rounded-lg flex items-center justify-center"
+                        className="shrink-0 w-9 h-9 rounded-[2rem] flex items-center justify-center"
                         style={{ background: `${SEV_ACCENT[ins.severity]}22` }}
                       >
                         <AlertTriangle className="w-5 h-5" style={{ color: SEV_ACCENT[ins.severity] }} />
@@ -1129,7 +1129,7 @@ export function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.5 + insights.insights.length * 0.12 }}
                 onClick={() => { setTourIdx(0); setStep('tour'); }}
-                className="w-full flex items-center justify-center gap-2 py-4 rounded-xl font-black text-base transition-all"
+                className="w-full flex items-center justify-center gap-2 py-4 rounded-3xl font-black text-base transition-all"
                 style={{ background: G, color: '#fff' }}
               >
                 Show me how to fix this
@@ -1165,9 +1165,9 @@ export function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
                 const t = TOUR[tourIdx];
                 const Icon = t.icon;
                 return (
-                  <div className="rounded-2xl p-5 md:p-6" style={{ background: CARD, border: `1px solid rgba(255,255,255,0.06)` }}>
+                  <div className="rounded-[2rem] p-5 md:p-6" style={{ background: CARD, border: `1px solid rgba(255,255,255,0.06)` }}>
                     <div className="flex items-center justify-center gap-2 mb-4">
-                      <div className="w-12 h-12 rounded-xl flex items-center justify-center"
+                      <div className="w-12 h-12 rounded-3xl flex items-center justify-center"
                         style={{ background: `${G}1a`, border: `1px solid ${G}33` }}>
                         <Icon className="w-6 h-6" style={{ color: G }} />
                       </div>
@@ -1209,7 +1209,7 @@ export function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
                         if (tourIdx < TOUR.length - 1) setTourIdx(tourIdx + 1);
                         else setStep('deepImport');
                       }}
-                      className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl font-black text-base transition-all"
+                      className="w-full flex items-center justify-center gap-2 py-3.5 rounded-3xl font-black text-base transition-all"
                       style={{ background: G, color: '#fff' }}
                     >
                       {tourIdx < TOUR.length - 1 ? 'Next weapon' : "I'm ready"}
@@ -1242,7 +1242,7 @@ export function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
               <motion.div
                 animate={deepImporting ? { scale: [1, 1.06, 1] } : {}}
                 transition={deepImporting ? { repeat: Infinity, duration: 1.4 } : {}}
-                className="inline-flex items-center justify-center w-14 h-14 rounded-2xl mb-5"
+                className="inline-flex items-center justify-center w-14 h-14 rounded-[2rem] mb-5"
                 style={{ background: `${G}1a`, border: `1px solid ${G}33` }}
               >
                 {deepImporting
@@ -1264,12 +1264,12 @@ export function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
               {deepImporting && <DeepImportVisual totalGames={insights?.totalGames ?? 0} />}
 
               <div className="grid grid-cols-2 gap-2.5 mb-5" style={deepImporting ? { opacity: 0.35 } : undefined}>
-                <div className="rounded-xl p-4 text-left" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                <div className="rounded-3xl p-4 text-left" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
                   <p className="text-[10px] font-black uppercase tracking-widest mb-2" style={{ color: MUTED }}>1 YEAR</p>
                   <p className="text-2xl font-black mb-1" style={{ color: TEXT }}>{insights?.totalGames ?? 0}</p>
                   <p className="text-xs" style={{ color: MUTED }}>games · ~{insights?.insights?.length ?? 3} patterns</p>
                 </div>
-                <motion.div className="rounded-xl p-4 text-left relative overflow-hidden"
+                <motion.div className="rounded-3xl p-4 text-left relative overflow-hidden"
                   animate={{
                     boxShadow: [
                       `0 0 0 ${G}00`,
@@ -1292,7 +1292,7 @@ export function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
               </div>
 
               {deepError && (
-                <div className="mb-3 p-2.5 rounded-lg text-sm" style={{ background: 'rgba(220,67,67,0.1)', border: '1px solid rgba(220,67,67,0.25)', color: '#ef6b6b' }}>
+                <div className="mb-3 p-2.5 rounded-[2rem] text-sm" style={{ background: 'rgba(220,67,67,0.1)', border: '1px solid rgba(220,67,67,0.25)', color: '#ef6b6b' }}>
                   {deepError}
                 </div>
               )}
@@ -1300,7 +1300,7 @@ export function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
               <button
                 onClick={runDeepImport}
                 disabled={deepImporting}
-                className="w-full flex items-center justify-center gap-2 py-4 rounded-xl font-black text-base transition-all disabled:opacity-70"
+                className="w-full flex items-center justify-center gap-2 py-4 rounded-3xl font-black text-base transition-all disabled:opacity-70"
                 style={{ background: G, color: '#fff' }}
               >
                 {deepImporting ? (
@@ -1391,7 +1391,7 @@ export function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
               })()}
 
               {/* Projected rating gain visual */}
-              <div className="rounded-2xl p-5 mb-4"
+              <div className="rounded-[2rem] p-5 mb-4"
                 style={{
                   background: 'linear-gradient(135deg, rgba(129,182,76,0.16) 0%, rgba(129,182,76,0.02) 100%)',
                   border: `1.5px solid ${G}55`,
@@ -1422,9 +1422,9 @@ export function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
                 </div>
               </div>
 
-              <div className="rounded-xl p-3 mb-6 flex items-center gap-2.5"
+              <div className="rounded-3xl p-3 mb-6 flex items-center gap-2.5"
                 style={{ background: CARD, border: `1px solid rgba(255,255,255,0.06)` }}>
-                <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: `${G}22` }}>
+                <div className="w-8 h-8 rounded-[2rem] flex items-center justify-center shrink-0" style={{ background: `${G}22` }}>
                   <Zap className="w-4 h-4" style={{ color: G }} />
                 </div>
                 <div className="text-left flex-1">
@@ -1435,7 +1435,7 @@ export function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
 
               <button
                 onClick={onComplete}
-                className="w-full flex items-center justify-center gap-2 py-4 rounded-xl font-black text-base transition-all"
+                className="w-full flex items-center justify-center gap-2 py-4 rounded-3xl font-black text-base transition-all"
                 style={{ background: G, color: '#fff' }}
               >
                 Start improving

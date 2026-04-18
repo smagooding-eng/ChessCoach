@@ -160,7 +160,7 @@ function HeroBoard() {
         initial={{ opacity: 0, x: -10 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ delay: 1.0 }}
-        className="absolute -top-3 -left-3 px-2.5 py-1 rounded-2xl text-[10px] font-black tracking-wider"
+        className="absolute -top-3 -left-3 px-2.5 py-1 rounded-[2rem] text-[10px] font-black tracking-wider"
         style={{ background: '#dc4343', color: '#fff', boxShadow: '0 6px 18px rgba(220,67,67,0.5)' }}
       >
         ⚠ BLUNDER DETECTED
@@ -169,7 +169,7 @@ function HeroBoard() {
         initial={{ opacity: 0, x: 10 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ delay: 1.15 }}
-        className="absolute -bottom-3 -right-3 px-2.5 py-1 rounded-2xl text-[10px] font-black tracking-wider"
+        className="absolute -bottom-3 -right-3 px-2.5 py-1 rounded-[2rem] text-[10px] font-black tracking-wider"
         style={{ background: G, color: '#fff', boxShadow: `0 6px 18px ${G}66` }}
       >
         +∞ EVAL
@@ -320,7 +320,7 @@ function AuthModal({ open, onClose, initialMode, externalError }: { open: boolea
           )}
 
           {error && (
-            <div className="mb-4 p-3 rounded-2xl text-sm" style={{ background: 'rgba(220,67,67,0.1)', border: '1px solid rgba(220,67,67,0.25)', color: '#ef6b6b' }}>{error}</div>
+            <div className="mb-4 p-3 rounded-[2rem] text-sm" style={{ background: 'rgba(220,67,67,0.1)', border: '1px solid rgba(220,67,67,0.25)', color: '#ef6b6b' }}>{error}</div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-3">
@@ -504,7 +504,7 @@ function InsightsResultCard({ delay = 0 }: { delay?: number }) {
           { label: 'Blunders in Time Trouble', severity: 'High', color: '#e88930', detail: '41% of losses come under 30 seconds left' },
           { label: 'Struggles vs 1.d4', severity: 'Medium', color: '#e8c830', detail: 'Win rate drops to 28% as Black' },
         ].map(w => (
-          <div key={w.label} className="py-2.5 px-3 rounded-2xl" style={{ background: `${w.color}08`, border: `1px solid ${w.color}25` }}>
+          <div key={w.label} className="py-2.5 px-3 rounded-[2rem]" style={{ background: `${w.color}08`, border: `1px solid ${w.color}25` }}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="w-1.5 h-1.5 rounded-full" style={{ background: w.color }} />
@@ -516,7 +516,7 @@ function InsightsResultCard({ delay = 0 }: { delay?: number }) {
           </div>
         ))}
       </div>
-      <div className="mt-4 py-3 px-3.5 rounded-2xl" style={{ background: `${G}10`, border: `1px solid ${G}25` }}>
+      <div className="mt-4 py-3 px-3.5 rounded-[2rem]" style={{ background: `${G}10`, border: `1px solid ${G}25` }}>
         <div className="flex items-center gap-1.5 mb-1.5">
           <Zap className="w-3.5 h-3.5" style={{ color: G }} />
           <span className="text-[10px] font-black tracking-wider" style={{ color: G }}>YOUR GAME PLAN</span>
@@ -576,7 +576,7 @@ export function LandingPage() {
               onMouseEnter={e => (e.currentTarget.style.color = TEXT)} onMouseLeave={e => (e.currentTarget.style.color = MUTED)}>
               Sign In
             </button>
-            <button onClick={openSignup} className="text-sm font-bold px-5 py-2 rounded-2xl transition-all"
+            <button onClick={openSignup} className="text-sm font-bold px-5 py-2 rounded-[2rem] transition-all"
               style={{ background: G, color: '#fff' }}
               onMouseEnter={e => (e.currentTarget.style.background = '#6fa23e')}
               onMouseLeave={e => (e.currentTarget.style.background = G)}>
@@ -783,7 +783,7 @@ export function LandingPage() {
                 style={{ background: CARD, border: '1px solid rgba(255,255,255,0.04)' }}
               >
                 <span className="absolute top-4 right-4 text-4xl font-black" style={{ color: 'rgba(255,255,255,0.03)' }}>{item.num}</span>
-                <div className="w-10 h-10 rounded-2xl flex items-center justify-center mb-4" style={{ background: `${G}15` }}>
+                <div className="w-10 h-10 rounded-[2rem] flex items-center justify-center mb-4" style={{ background: `${G}15` }}>
                   <item.icon className="w-5 h-5" style={{ color: G }} />
                 </div>
                 <h3 className="text-base font-bold mb-1.5" style={{ color: TEXT }}>{item.title}</h3>
