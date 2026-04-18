@@ -307,7 +307,7 @@ export function ChessBoard({
       {/* Move quality badge — shown in top-right corner of the board */}
       {moveQuality && !practiceMode && !feedback && (
         <div className="absolute top-2 right-2 pointer-events-none z-10">
-          <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-bold shadow-lg backdrop-blur-sm border
+          <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold shadow-lg backdrop-blur-sm border
             ${moveQuality === 'checkmate'   ? 'bg-amber-950/90 text-amber-300 border-amber-400/40' :
               moveQuality === 'brilliant'   ? 'bg-cyan-950/90 text-cyan-300 border-cyan-400/40' :
               moveQuality === 'great'       ? 'bg-sky-950/90 text-sky-300 border-sky-400/40' :

@@ -146,7 +146,7 @@ export function AICoachCard({
           <div className="flex items-center gap-2 mb-1.5 flex-wrap">
             <span className="text-sm font-bold text-foreground">{name}</span>
             <span className={cn(
-              'text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-md',
+              'text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-xl',
               t.badgeBg, t.badgeText,
             )}>
               {badge}

@@ -90,7 +90,7 @@ function ScoutingWaitContent({ opponentRating }: { opponentRating?: number | nul
 
   return (
     <div className="space-y-4">
-      <div className="rounded-md bg-secondary/40 p-5 border border-white/5">
+      <div className="rounded-xl bg-secondary/40 p-5 border border-white/5">
         <div className="flex items-center gap-3 mb-4">
           <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin shrink-0" />
           <div className="flex-1">
@@ -122,7 +122,7 @@ function ScoutingWaitContent({ opponentRating }: { opponentRating?: number | nul
       </div>
 
       {[1, 2, 3].map(i => (
-        <div key={i} className="h-20 rounded-md bg-secondary/30 animate-pulse" />
+        <div key={i} className="h-20 rounded-xl bg-secondary/30 animate-pulse" />
       ))}
 
       <WaitTipCarousel rating={opponentRating} />
@@ -378,14 +378,14 @@ export function OpponentAnalysis() {
             value={inputUsername}
             onChange={e => setInputUsername(e.target.value)}
             placeholder="chess.com username…"
-            className="w-full pl-10 pr-4 py-3 bg-secondary/70 border border-border rounded-md text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/60 transition-all"
+            className="w-full pl-10 pr-4 py-3 bg-secondary/70 border border-border rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/60 transition-all"
             disabled={loading}
           />
         </div>
         <button
           type="submit"
           disabled={loading || !inputUsername.trim()}
-          className="px-6 py-3 bg-primary text-primary-foreground font-bold rounded-md hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+          className="px-6 py-3 bg-primary text-primary-foreground font-bold rounded-xl hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
         >
           {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Swords className="w-4 h-4" />}
           {loading ? 'Scouting…' : 'Scout'}
@@ -394,7 +394,7 @@ export function OpponentAnalysis() {
 
       {/* Scout History */}
       {scoutHistory.length > 0 && !loading && (
-        <div className="glass-card rounded-md p-5">
+        <div className="glass-card rounded-xl p-5">
           <div className="flex items-center gap-2 mb-3">
             <History className="w-4 h-4 text-muted-foreground" />
             <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Previous Scouts</h3>
@@ -405,7 +405,7 @@ export function OpponentAnalysis() {
                 key={s.id}
                 onClick={() => loadHistoricScout(s.id)}
                 disabled={loadingHistory}
-                className="flex items-center gap-2 px-3 py-2 rounded-md bg-secondary/70 border border-border hover:border-primary/40 hover:text-primary transition-colors text-sm disabled:opacity-50"
+                className="flex items-center gap-2 px-3 py-2 rounded-xl bg-secondary/70 border border-border hover:border-primary/40 hover:text-primary transition-colors text-sm disabled:opacity-50"
               >
                 <User className="w-3.5 h-3.5" />
                 <span className="font-medium">{s.targetUsername}</span>
@@ -423,7 +423,7 @@ export function OpponentAnalysis() {
         <motion.div
           initial={{ opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}
-          className="p-4 rounded-md bg-primary/8 border border-primary/20 text-primary flex items-center gap-3"
+          className="p-4 rounded-xl bg-primary/8 border border-primary/20 text-primary flex items-center gap-3"
         >
           <Loader2 className="w-4 h-4 animate-spin shrink-0" />
           <span className="text-sm">{statusMsg}</span>
@@ -435,7 +435,7 @@ export function OpponentAnalysis() {
         <motion.div
           initial={{ opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}
-          className="p-4 rounded-md bg-destructive/15 border border-destructive/30 text-red-400 flex items-center gap-2"
+          className="p-4 rounded-xl bg-destructive/15 border border-destructive/30 text-red-400 flex items-center gap-2"
         >
           <AlertTriangle className="w-4 h-4 shrink-0" />
           {error}
@@ -454,7 +454,7 @@ export function OpponentAnalysis() {
             className="space-y-6"
           >
             {/* Profile + stats header */}
-            <div className="glass-card rounded-md p-6">
+            <div className="glass-card rounded-xl p-6">
               <div className="flex flex-col sm:flex-row gap-6">
                 {/* Avatar + identity */}
                 <div className="flex items-start gap-4">
@@ -515,7 +515,7 @@ export function OpponentAnalysis() {
                     <button
                       onClick={() => { setResult(null); handleAnalyze({ preventDefault: () => {} } as React.FormEvent); }}
                       disabled={loading}
-                      className="flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-secondary/70 border border-border hover:border-primary/40 hover:text-primary transition-colors text-xs disabled:opacity-50"
+                      className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-secondary/70 border border-border hover:border-primary/40 hover:text-primary transition-colors text-xs disabled:opacity-50"
                     >
                       <RefreshCw className="w-3 h-3" /> Re-scout
                     </button>
@@ -540,7 +540,7 @@ export function OpponentAnalysis() {
                   href={`https://www.chess.com/play/online/new?opponent=${result.username}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#81b64c] hover:bg-[#6fa03e] text-white font-bold rounded-md transition-colors text-sm shadow-lg"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#81b64c] hover:bg-[#6fa03e] text-white font-bold rounded-xl transition-colors text-sm shadow-lg"
                 >
                   <Swords className="w-4 h-4" />
                   Challenge {result.username} on Chess.com
@@ -590,7 +590,7 @@ export function OpponentAnalysis() {
                     initial={{ opacity: 0, x: -10 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: i * 0.07 }}
-                    className="glass-card rounded-md overflow-hidden cursor-pointer"
+                    className="glass-card rounded-xl overflow-hidden cursor-pointer"
                     onClick={() => setExpandedWeakness(expandedWeakness === i ? null : i)}
                   >
                     <div className="p-4">
@@ -663,7 +663,7 @@ export function OpponentAnalysis() {
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: i * 0.07 }}
                         onClick={() => o.opening && navigate(`/openings/${encodeURIComponent(o.opening)}`)}
-                        className="glass-card rounded-md p-4 cursor-pointer hover:bg-white/[0.04] hover:border-primary/30 transition-all group"
+                        className="glass-card rounded-xl p-4 cursor-pointer hover:bg-white/[0.04] hover:border-primary/30 transition-all group"
                       >
                         <div className="flex items-start justify-between gap-2 mb-2">
                           <span className="text-sm font-medium leading-snug line-clamp-2 group-hover:text-primary transition-colors">{o.opening || 'Unknown'}</span>
@@ -689,7 +689,7 @@ export function OpponentAnalysis() {
                 </div>
 
                 {/* Scout tip box */}
-                <div className="p-4 rounded-md bg-primary/10 border border-primary/20">
+                <div className="p-4 rounded-xl bg-primary/10 border border-primary/20">
                   <div className="flex gap-2">
                     <Target className="w-4 h-4 text-primary mt-0.5 shrink-0" />
                     <div>
@@ -708,11 +708,11 @@ export function OpponentAnalysis() {
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3 }}
-              className="glass-card rounded-md overflow-hidden border border-primary/20"
+              className="glass-card rounded-xl overflow-hidden border border-primary/20"
             >
               <div className="p-5 flex flex-col sm:flex-row items-start sm:items-center gap-4">
                 <div className="flex items-center gap-3 flex-1 min-w-0">
-                  <div className="w-10 h-10 rounded-md bg-primary/15 flex items-center justify-center shrink-0">
+                  <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center shrink-0">
                     <GraduationCap className="w-5 h-5 text-primary" />
                   </div>
                   <div className="min-w-0">
@@ -727,7 +727,7 @@ export function OpponentAnalysis() {
                 {courseGenState === 'idle' && (
                   <button
                     onClick={handleGenerateCourses}
-                    className="shrink-0 px-5 py-2.5 rounded-md bg-primary text-primary-foreground font-black text-sm hover:bg-primary/90 transition-colors flex items-center gap-2"
+                    className="shrink-0 px-5 py-2.5 rounded-xl bg-primary text-primary-foreground font-black text-sm hover:bg-primary/90 transition-colors flex items-center gap-2"
                   >
                     <BookOpen className="w-4 h-4" />
                     Build Courses
@@ -743,7 +743,7 @@ export function OpponentAnalysis() {
 
                 {courseGenState === 'done' && (
                   <Link href="/courses">
-                    <div className="shrink-0 flex items-center gap-2 px-5 py-2.5 rounded-md bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-black text-sm hover:bg-emerald-500/25 transition-colors cursor-pointer">
+                    <div className="shrink-0 flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-black text-sm hover:bg-emerald-500/25 transition-colors cursor-pointer">
                       <CheckCircle2 className="w-4 h-4" />
                       {coursesCreated} course{coursesCreated !== 1 ? 's' : ''} ready → View
                     </div>
@@ -755,7 +755,7 @@ export function OpponentAnalysis() {
                     <p className="text-xs text-red-400">{courseGenError}</p>
                     <button
                       onClick={handleGenerateCourses}
-                      className="px-4 py-2 rounded-md bg-red-500/15 text-red-400 border border-red-500/30 font-bold text-xs hover:bg-red-500/25 transition-colors"
+                      className="px-4 py-2 rounded-xl bg-red-500/15 text-red-400 border border-red-500/30 font-bold text-xs hover:bg-red-500/25 transition-colors"
                     >
                       Retry
                     </button>
@@ -778,7 +778,7 @@ export function OpponentAnalysis() {
                 <div className="px-5 pb-4 pt-0">
                   <div className="flex flex-wrap gap-2">
                     {result.weaknesses.slice(0, 3).map((w, i) => (
-                      <span key={i} className="px-2.5 py-1 rounded-md bg-primary/10 text-primary text-xs font-semibold">
+                      <span key={i} className="px-2.5 py-1 rounded-xl bg-primary/10 text-primary text-xs font-semibold">
                         vs {result.username}: Exploit {w.category}
                       </span>
                     ))}

@@ -60,7 +60,7 @@ export function Games() {
         <p className="text-muted-foreground text-sm max-w-sm text-center">
           {error instanceof Error ? error.message : 'An error occurred while fetching your games. Please try again.'}
         </p>
-        <Link href="/import" className="px-4 py-2 bg-primary text-primary-foreground rounded-md font-semibold hover:bg-primary/90 transition-colors">
+        <Link href="/import" className="px-4 py-2 bg-primary text-primary-foreground rounded-xl font-semibold hover:bg-primary/90 transition-colors">
           Go to Import
         </Link>
       </div>
@@ -111,13 +111,13 @@ export function Games() {
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Search opponent or opening…"
-            className="w-full pl-9 pr-4 py-2.5 bg-secondary/50 border border-border rounded-md focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all text-sm"
+            className="w-full pl-9 pr-4 py-2.5 bg-secondary/50 border border-border rounded-xl focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all text-sm"
           />
         </div>
         <button
           onClick={() => { setH2hMode(!h2hMode); setH2hOpponent(''); }}
           className={cn(
-            'flex items-center gap-1.5 px-3 py-2.5 rounded-md border text-sm font-medium transition-colors shrink-0',
+            'flex items-center gap-1.5 px-3 py-2.5 rounded-xl border text-sm font-medium transition-colors shrink-0',
             h2hMode ? 'bg-primary/15 border-primary/40 text-primary' : 'bg-secondary/50 border-border text-muted-foreground hover:text-foreground'
           )}
         >
@@ -127,7 +127,7 @@ export function Games() {
         <select
           value={platformFilter}
           onChange={(e) => setPlatformFilter(e.target.value as 'all' | 'chesscom' | 'lichess')}
-          className="px-4 py-2.5 bg-secondary/50 border border-border rounded-md outline-none focus:border-primary appearance-none cursor-pointer text-sm"
+          className="px-4 py-2.5 bg-secondary/50 border border-border rounded-xl outline-none focus:border-primary appearance-none cursor-pointer text-sm"
         >
           <option value="all">All Platforms</option>
           <option value="chesscom">Chess.com</option>
@@ -136,7 +136,7 @@ export function Games() {
         <select
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
-          className="px-4 py-2.5 bg-secondary/50 border border-border rounded-md outline-none focus:border-primary appearance-none cursor-pointer text-sm"
+          className="px-4 py-2.5 bg-secondary/50 border border-border rounded-xl outline-none focus:border-primary appearance-none cursor-pointer text-sm"
         >
           <option value="all">All Results</option>
           <option value="win">Wins</option>
@@ -146,7 +146,7 @@ export function Games() {
       </div>
 
       {h2hMode && (
-        <div className="glass-card rounded-md p-3 flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+        <div className="glass-card rounded-xl p-3 flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
           <Users className="w-4 h-4 text-primary shrink-0 hidden sm:block" />
           <span className="text-xs text-muted-foreground shrink-0">Head-to-Head vs:</span>
           <input
@@ -154,7 +154,7 @@ export function Games() {
             value={h2hOpponent}
             onChange={e => setH2hOpponent(e.target.value)}
             placeholder="Opponent username…"
-            className="flex-1 px-3 py-2 bg-secondary/70 border border-border rounded-md focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all text-sm"
+            className="flex-1 px-3 py-2 bg-secondary/70 border border-border rounded-xl focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all text-sm"
           />
           {h2hOpponent.trim() && (
             <div className="flex items-center gap-3 text-xs">
@@ -212,9 +212,9 @@ export function Games() {
                 key={game.id}
               >
                 <Link href={`/games/${game.id}`}>
-                  <div className={`glass-card rounded-md p-3.5 border border-white/5 border-l-[3px] ${borderColor} hover:bg-white/[0.03] transition-colors cursor-pointer group`}>
+                  <div className={`glass-card rounded-xl p-3.5 border border-white/5 border-l-[3px] ${borderColor} hover:bg-white/[0.03] transition-colors cursor-pointer group`}>
                     <div className="flex items-center gap-3">
-                      <div className={`w-8 h-8 rounded-md flex items-center justify-center shrink-0 ${
+                      <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
                         color === 'white' ? 'bg-white/90' : 'bg-neutral-700 border border-white/10'
                       }`}>
                         <span className={`text-xs font-bold ${color === 'white' ? 'text-neutral-900' : 'text-white'}`}>
@@ -268,7 +268,7 @@ export function Games() {
                       </div>
 
                       <div className="shrink-0">
-                        <div className="w-8 h-8 rounded-md bg-secondary flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-all">
+                        <div className="w-8 h-8 rounded-xl bg-secondary flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-all">
                           <Play className="w-3.5 h-3.5 ml-0.5" />
                         </div>
                       </div>
@@ -282,7 +282,7 @@ export function Games() {
         {hasMore && (
           <button
             onClick={() => setPageSize(p => p + 500)}
-            className="w-full py-3 text-sm font-medium text-primary hover:text-primary/80 bg-secondary/50 hover:bg-secondary/70 rounded-md border border-border transition-colors"
+            className="w-full py-3 text-sm font-medium text-primary hover:text-primary/80 bg-secondary/50 hover:bg-secondary/70 rounded-xl border border-border transition-colors"
           >
             Load more games ({total - games.length} remaining)
           </button>

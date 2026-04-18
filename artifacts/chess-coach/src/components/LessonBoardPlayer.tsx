@@ -773,9 +773,9 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
   if (!steps) {
     const fallbackFen = extractFen(activePgn) ?? START_FEN;
     return (
-      <div className="rounded-md overflow-hidden" style={{ backgroundColor: BG_DARK }}>
+      <div className="rounded-xl overflow-hidden" style={{ backgroundColor: BG_DARK }}>
         <div className="px-4 py-3">
-          <div className="bg-white/95 rounded-md px-4 py-3 shadow-sm">
+          <div className="bg-white/95 rounded-xl px-4 py-3 shadow-sm">
             <p className="text-sm text-gray-700">Study this position.</p>
           </div>
         </div>
@@ -832,7 +832,7 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
   })();
 
   return (
-    <div className="rounded-md overflow-hidden shadow-xl" style={{ backgroundColor: BG_DARK }}>
+    <div className="rounded-xl overflow-hidden shadow-xl" style={{ backgroundColor: BG_DARK }}>
       {/* ── Tab pills ─────────────────────────────────────────────────────── */}
       <div className="flex items-center gap-1.5 px-3 py-2 md:py-2.5 overflow-x-auto" style={{ backgroundColor: BG_CARD }}>
         <button
@@ -900,7 +900,7 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
                 exit={{ opacity: 0, y: -4 }}
                 transition={{ duration: 0.15 }}
               >
-                <div className="rounded-md px-3 py-2 md:px-4 md:py-3 shadow-sm" style={{
+                <div className="rounded-xl px-3 py-2 md:px-4 md:py-3 shadow-sm" style={{
                   background: step?.isMistake
                     ? 'rgba(220,67,67,0.12)'
                     : step?.isFix
@@ -966,14 +966,14 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
               />
               {step?.isMistake && (
                 <div className="absolute top-2 right-2 pointer-events-none z-10">
-                  <div className="flex items-center gap-1 px-2 py-1 rounded-md text-xs font-bold bg-red-600 text-white shadow-lg">
+                  <div className="flex items-center gap-1 px-2 py-1 rounded-xl text-xs font-bold bg-red-600 text-white shadow-lg">
                     <AlertTriangle className="w-3 h-3" /> Mistake
                   </div>
                 </div>
               )}
               {step?.isFix && (
                 <div className="absolute top-2 right-2 pointer-events-none z-10">
-                  <div className="flex items-center gap-1 px-2 py-1 rounded-md text-xs font-bold text-white shadow-lg" style={{ backgroundColor: CHESSCOM_GREEN }}>
+                  <div className="flex items-center gap-1 px-2 py-1 rounded-xl text-xs font-bold text-white shadow-lg" style={{ backgroundColor: CHESSCOM_GREEN }}>
                     <Check className="w-3 h-3" /> Best Move
                   </div>
                 </div>
@@ -986,7 +986,7 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
                     animate={{ opacity: 0 }}
                     transition={{ duration: 0.5 }}
                     className={cn(
-                      'absolute inset-0 rounded-md pointer-events-none',
+                      'absolute inset-0 rounded-xl pointer-events-none',
                       step?.isMistake ? 'bg-red-500/15' : step?.isFix ? 'bg-emerald-500/15' : 'bg-yellow-400/10'
                     )}
                   />
@@ -1079,14 +1079,14 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
             <button
               onClick={() => { setIsPlaying(false); go(0); }}
               disabled={isFirst}
-              className="p-2 md:p-2.5 rounded-md text-white/50 hover:text-white hover:bg-white/10 transition-all disabled:opacity-20"
+              className="p-2 md:p-2.5 rounded-xl text-white/50 hover:text-white hover:bg-white/10 transition-all disabled:opacity-20"
             >
               <SkipBack className="w-3.5 h-3.5 md:w-4 md:h-4" />
             </button>
             <button
               onClick={() => go(currentStep - 1)}
               disabled={isFirst}
-              className="p-2 md:p-2.5 rounded-md text-white/50 hover:text-white hover:bg-white/10 transition-all disabled:opacity-20"
+              className="p-2 md:p-2.5 rounded-xl text-white/50 hover:text-white hover:bg-white/10 transition-all disabled:opacity-20"
             >
               <ChevronLeft className="w-4 h-4 md:w-5 md:h-5" />
             </button>
@@ -1096,7 +1096,7 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
                 else if (isLast) { go(currentStep + 1); }
                 else { setIsPlaying(true); }
               }}
-              className="flex items-center gap-1.5 md:gap-2 px-5 md:px-8 py-2 md:py-2.5 rounded-md text-white font-bold text-sm transition-all hover:brightness-110 shadow-lg mx-1 md:mx-2"
+              className="flex items-center gap-1.5 md:gap-2 px-5 md:px-8 py-2 md:py-2.5 rounded-xl text-white font-bold text-sm transition-all hover:brightness-110 shadow-lg mx-1 md:mx-2"
               style={{ backgroundColor: CHESSCOM_GREEN }}
             >
               {isPlaying ? (
@@ -1110,7 +1110,7 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
             {mistakeIdx > 0 && currentStep < mistakeIdx && (
               <button
                 onClick={() => go(mistakeIdx)}
-                className="flex items-center gap-1 px-2 md:px-3 py-2 rounded-md text-xs font-bold transition-all whitespace-nowrap"
+                className="flex items-center gap-1 px-2 md:px-3 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap"
                 style={{ color: MISTAKE_RED, backgroundColor: 'rgba(220,67,67,0.12)' }}
                 title="Jump to mistake"
               >
@@ -1121,14 +1121,14 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
             <button
               onClick={() => go(currentStep + 1)}
               disabled={isLast}
-              className="p-2 md:p-2.5 rounded-md text-white/50 hover:text-white hover:bg-white/10 transition-all disabled:opacity-20"
+              className="p-2 md:p-2.5 rounded-xl text-white/50 hover:text-white hover:bg-white/10 transition-all disabled:opacity-20"
             >
               <ChevronRight className="w-4 h-4 md:w-5 md:h-5" />
             </button>
             <button
               onClick={() => { setIsPlaying(false); go(totalSteps - 1); }}
               disabled={isLast}
-              className="p-2 md:p-2.5 rounded-md text-white/50 hover:text-white hover:bg-white/10 transition-all disabled:opacity-20"
+              className="p-2 md:p-2.5 rounded-xl text-white/50 hover:text-white hover:bg-white/10 transition-all disabled:opacity-20"
             >
               <SkipForward className="w-3.5 h-3.5 md:w-4 md:h-4" />
             </button>
@@ -1143,7 +1143,7 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
                     : (steps[currentStep - 1]?.fen ?? steps[currentStep].fen);
                   navigate(`/practice?fen=${encodeURIComponent(prevFen)}&rating=1200`);
                 }}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-md text-xs font-bold transition-all active:scale-95 border border-primary/30 hover:border-primary/50"
+                className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all active:scale-95 border border-primary/30 hover:border-primary/50"
                 style={{ background: 'rgba(129,182,76,0.1)', color: CHESSCOM_GREEN }}
               >
                 <Swords className="w-3.5 h-3.5" />
@@ -1167,7 +1167,7 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
             <div className="px-4 py-3" style={{ backgroundColor: BG_CARD }}>
               <button
                 onClick={() => { setTab('repeat'); resetRepeat(); }}
-                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-md text-sm font-bold text-white hover:brightness-110 transition-all"
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold text-white hover:brightness-110 transition-all"
                 style={{ backgroundColor: CHESSCOM_GREEN }}
               >
                 <Repeat2 className="w-4 h-4" /> Practice This Sequence
@@ -1179,7 +1179,7 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
             <div className="px-4 py-3" style={{ backgroundColor: BG_CARD }}>
               <button
                 onClick={() => { setTab('drill'); resetDrill(); }}
-                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-md text-sm font-bold text-white hover:brightness-110 transition-all"
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold text-white hover:brightness-110 transition-all"
                 style={{ backgroundColor: CHESSCOM_GREEN }}
               >
                 <Swords className="w-4 h-4" /> Practice Drill
@@ -1194,7 +1194,7 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
         <div className="flex flex-col">
           {/* Commentary */}
           <div className="px-2 pt-2 pb-0.5 md:px-3 md:pt-3 md:pb-1">
-            <div className="rounded-md px-3 py-2 md:px-4 md:py-3 bg-white/95 shadow-sm">
+            <div className="rounded-xl px-3 py-2 md:px-4 md:py-3 bg-white/95 shadow-sm">
               <div className="flex items-start gap-3">
                 <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 mt-0.5" style={{ backgroundColor: CHESSCOM_GREEN }}>
                   <Repeat2 className="w-3.5 h-3.5 text-white" />
@@ -1222,7 +1222,7 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
           <div className="px-2 pb-1 max-w-[480px] mx-auto w-full">
             <div className="relative">
               {repeatComplete ? (
-                <div className="aspect-square rounded-md flex flex-col items-center justify-center gap-4 p-6" style={{ background: 'linear-gradient(135deg, #1a4731, #1e293b)' }}>
+                <div className="aspect-square rounded-xl flex flex-col items-center justify-center gap-4 p-6" style={{ background: 'linear-gradient(135deg, #1a4731, #1e293b)' }}>
                   <Trophy className="w-16 h-16 text-amber-400 drop-shadow-lg" />
                   <div className="text-center">
                     <p className="text-xl font-black text-white mb-1">Well Done!</p>
@@ -1270,14 +1270,14 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
                   <AnimatePresence>
                     {repeatFeedback === 'correct' && (
                       <motion.div key="rc" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                        className="absolute inset-0 rounded-md flex items-center justify-center pointer-events-none" style={{ backgroundColor: 'rgba(34,197,94,0.2)' }}>
-                        <div className="text-white font-black text-2xl px-6 py-3 rounded-md shadow-lg" style={{ backgroundColor: CHESSCOM_GREEN }}>✓ Correct!</div>
+                        className="absolute inset-0 rounded-xl flex items-center justify-center pointer-events-none" style={{ backgroundColor: 'rgba(34,197,94,0.2)' }}>
+                        <div className="text-white font-black text-2xl px-6 py-3 rounded-xl shadow-lg" style={{ backgroundColor: CHESSCOM_GREEN }}>✓ Correct!</div>
                       </motion.div>
                     )}
                     {repeatFeedback === 'wrong' && (
                       <motion.div key="rw" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                        className="absolute inset-0 rounded-md flex items-center justify-center bg-red-500/20 pointer-events-none">
-                        <div className="bg-red-500 text-white font-black text-xl px-6 py-3 rounded-md shadow-lg">✗ Try again</div>
+                        className="absolute inset-0 rounded-xl flex items-center justify-center bg-red-500/20 pointer-events-none">
+                        <div className="bg-red-500 text-white font-black text-xl px-6 py-3 rounded-xl shadow-lg">✗ Try again</div>
                       </motion.div>
                     )}
                   </AnimatePresence>
@@ -1334,14 +1334,14 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
           <div className="flex items-center gap-2 px-4 py-3">
             <button
               onClick={resetRepeat}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-md text-xs font-bold text-white/60 hover:text-white hover:bg-white/10 transition-all"
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-white/60 hover:text-white hover:bg-white/10 transition-all"
             >
               <RotateCcw className="w-3.5 h-3.5" /> {repeatComplete ? 'Go Again' : 'Reset'}
             </button>
             {repeatComplete && hasDrill && (
               <button
                 onClick={() => { setTab('drill'); resetDrill(); }}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-md text-xs font-bold text-white hover:brightness-110 transition-all"
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-white hover:brightness-110 transition-all"
                 style={{ backgroundColor: CHESSCOM_GREEN }}
               >
                 <Swords className="w-3.5 h-3.5" /> Practice Drill
@@ -1357,7 +1357,7 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
           {/* Commentary */}
           <div className="px-2 pt-2 pb-0.5 md:px-3 md:pt-3 md:pb-1">
             <div className={cn(
-              'rounded-md px-3 py-2 md:px-4 md:py-3 shadow-sm',
+              'rounded-xl px-3 py-2 md:px-4 md:py-3 shadow-sm',
               drillState === 'correct' ? 'bg-emerald-50 border border-emerald-200'
                 : drillState === 'revealed' ? 'bg-amber-50 border border-amber-200'
                 : 'bg-white/95'
@@ -1404,14 +1404,14 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
               <AnimatePresence>
                 {drillState === 'correct' && (
                   <motion.div key="correct" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                    className="absolute inset-0 rounded-md flex items-center justify-center pointer-events-none" style={{ backgroundColor: 'rgba(34,197,94,0.2)' }}>
-                    <div className="text-white font-black text-2xl px-6 py-3 rounded-md shadow-lg" style={{ backgroundColor: CHESSCOM_GREEN }}>✓ Correct!</div>
+                    className="absolute inset-0 rounded-xl flex items-center justify-center pointer-events-none" style={{ backgroundColor: 'rgba(34,197,94,0.2)' }}>
+                    <div className="text-white font-black text-2xl px-6 py-3 rounded-xl shadow-lg" style={{ backgroundColor: CHESSCOM_GREEN }}>✓ Correct!</div>
                   </motion.div>
                 )}
                 {drillState === 'wrong' && (
                   <motion.div key="wrong" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                    className="absolute inset-0 rounded-md flex items-center justify-center bg-red-500/20 pointer-events-none">
-                    <div className="bg-red-500 text-white font-black text-xl px-6 py-3 rounded-md shadow-lg">✗ Try again</div>
+                    className="absolute inset-0 rounded-xl flex items-center justify-center bg-red-500/20 pointer-events-none">
+                    <div className="bg-red-500 text-white font-black text-xl px-6 py-3 rounded-xl shadow-lg">✗ Try again</div>
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -1423,7 +1423,7 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
             <AnimatePresence mode="wait">
               {drillState === 'correct' && (
                 <motion.div key="ok" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-                  className="flex items-center gap-3 p-3 rounded-md bg-emerald-500/15 border border-emerald-500/30">
+                  className="flex items-center gap-3 p-3 rounded-xl bg-emerald-500/15 border border-emerald-500/30">
                   <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
                   <div>
                     <p className="text-sm font-bold text-emerald-400">Correct — {drillExpectedMove}!</p>
@@ -1433,7 +1433,7 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
               )}
               {drillState === 'revealed' && (
                 <motion.div key="rev" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-                  className="flex items-center gap-3 p-3 rounded-md bg-amber-500/15 border border-amber-500/30">
+                  className="flex items-center gap-3 p-3 rounded-xl bg-amber-500/15 border border-amber-500/30">
                   <Eye className="w-5 h-5 text-amber-400 shrink-0" />
                   <div>
                     <p className="text-sm font-bold text-amber-400">Answer: {drillExpectedMove}</p>
@@ -1447,7 +1447,7 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
               <div className="mt-2">
                 {showHint ? (
                   <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-                    className="flex items-start gap-2 p-3 rounded-md bg-blue-500/10 border border-blue-500/20">
+                    className="flex items-start gap-2 p-3 rounded-xl bg-blue-500/10 border border-blue-500/20">
                     <Lightbulb className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
                     <p className="text-xs text-blue-300">{drillHint}</p>
                   </motion.div>
@@ -1467,14 +1467,14 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
           <div className="flex items-center gap-2 px-4 py-3">
             <button
               onClick={resetDrill}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-md text-xs font-bold text-white/60 hover:text-white hover:bg-white/10 transition-all"
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-white/60 hover:text-white hover:bg-white/10 transition-all"
             >
               <RotateCcw className="w-3.5 h-3.5" /> Reset
             </button>
             {drillState === 'idle' && drillAttempts >= 2 && (
               <button
                 onClick={revealAnswer}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-md text-xs font-bold text-amber-400 hover:bg-amber-500/10 border border-amber-500/30 transition-all"
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-amber-400 hover:bg-amber-500/10 border border-amber-500/30 transition-all"
               >
                 <Eye className="w-3.5 h-3.5" /> Reveal answer
               </button>
@@ -1482,7 +1482,7 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
             {(drillState === 'correct' || drillState === 'revealed') && (
               <button
                 onClick={() => setTab('lesson')}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-md text-xs font-bold text-white hover:brightness-110 transition-all"
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-white hover:brightness-110 transition-all"
                 style={{ backgroundColor: CHESSCOM_GREEN }}
               >
                 <ChevronLeft className="w-3.5 h-3.5" /> Back to Lesson

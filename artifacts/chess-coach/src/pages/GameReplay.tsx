@@ -195,10 +195,10 @@ function GameRatingPanel({
 
   const PlayerAvatar = ({ username, dark, avatar }: { username: string; dark: boolean; avatar?: string }) => {
     if (avatar) {
-      return <img src={avatar} alt={username} className="w-12 h-12 rounded-md object-cover border-2 border-white/20" />;
+      return <img src={avatar} alt={username} className="w-12 h-12 rounded-xl object-cover border-2 border-white/20" />;
     }
     return (
-      <div className={`w-12 h-12 rounded-md border-2 border-white/20 flex items-center justify-center font-black text-sm
+      <div className={`w-12 h-12 rounded-xl border-2 border-white/20 flex items-center justify-center font-black text-sm
         ${dark ? 'bg-[#2d2d2d] text-[#f0d9b5]' : 'bg-[#f0d9b5] text-[#2d2d2d]'}`}>
         {username[0]?.toUpperCase()}
       </div>
@@ -206,7 +206,7 @@ function GameRatingPanel({
   };
 
   return (
-    <div className="glass-card rounded-md overflow-hidden border border-white/8">
+    <div className="glass-card rounded-xl overflow-hidden border border-white/8">
       {/* Header */}
       <div className="px-4 py-3 border-b border-white/5 flex items-center gap-2 bg-white/3">
         <Trophy className="w-4 h-4 text-primary" />
@@ -260,7 +260,7 @@ function GameRatingPanel({
       {/* Game Rating */}
       <div className="grid grid-cols-[1fr_60px_1fr] items-center py-4 bg-white/3 border-t border-white/8">
         <div className="flex justify-center">
-          <div className="px-4 py-2 rounded-md bg-background border border-white/15 min-w-[60px] text-center">
+          <div className="px-4 py-2 rounded-xl bg-background border border-white/15 min-w-[60px] text-center">
             <span className="text-xl font-black">{toGameRating(wAcc)}</span>
           </div>
         </div>
@@ -268,7 +268,7 @@ function GameRatingPanel({
           Game<br />Rating
         </div>
         <div className="flex justify-center">
-          <div className="px-4 py-2 rounded-md bg-background border border-white/15 min-w-[60px] text-center">
+          <div className="px-4 py-2 rounded-xl bg-background border border-white/15 min-w-[60px] text-center">
             <span className="text-xl font-black">{toGameRating(bAcc)}</span>
           </div>
         </div>
@@ -567,7 +567,7 @@ const SandboxBoard = React.memo(function SandboxBoard({ playerRating }: { player
             </p>
             <button
               onClick={resetGame}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-primary/20 hover:bg-primary/30 text-primary text-xs font-bold transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary/20 hover:bg-primary/30 text-primary text-xs font-bold transition-colors"
             >
               <RotateCcw className="w-3 h-3" /> Play Again
             </button>
@@ -859,7 +859,7 @@ export function GameReplay() {
       </Link>
 
       {game.opening && (
-        <div className="flex glass-card rounded-md px-4 py-2.5 md:px-5 md:py-3 items-center gap-2 md:gap-3 border border-primary/20 bg-primary/5">
+        <div className="flex glass-card rounded-xl px-4 py-2.5 md:px-5 md:py-3 items-center gap-2 md:gap-3 border border-primary/20 bg-primary/5">
           <BookOpen className="w-4 h-4 text-primary shrink-0" />
           <span className="text-xs font-bold text-primary/70">{game.eco}</span>
           <span className="font-semibold text-xs md:text-sm truncate">{game.opening}</span>
@@ -872,12 +872,12 @@ export function GameReplay() {
         <div className="space-y-2 md:space-y-4">
 
           {/* Players banner — compact on mobile */}
-          <div className="glass-card rounded-md overflow-hidden">
+          <div className="glass-card rounded-xl overflow-hidden">
             <div className="flex items-stretch">
               <div className="flex-1 flex items-center gap-2 px-3 py-2 md:py-3">
                 {whitePlayer?.avatar
-                  ? <img src={whitePlayer.avatar} alt={game.whiteUsername} className="w-7 h-7 md:w-9 md:h-9 rounded-md md:rounded-md object-cover border border-white/20 shrink-0" />
-                  : <div className="w-7 h-7 md:w-9 md:h-9 rounded-md md:rounded-md bg-[#eeeed2] flex items-center justify-center shrink-0"><span className="text-[#2d2d2d] font-black text-xs md:text-sm">{game.whiteUsername[0]?.toUpperCase()}</span></div>
+                  ? <img src={whitePlayer.avatar} alt={game.whiteUsername} className="w-7 h-7 md:w-9 md:h-9 rounded-xl md:rounded-xl object-cover border border-white/20 shrink-0" />
+                  : <div className="w-7 h-7 md:w-9 md:h-9 rounded-xl md:rounded-xl bg-[#eeeed2] flex items-center justify-center shrink-0"><span className="text-[#2d2d2d] font-black text-xs md:text-sm">{game.whiteUsername[0]?.toUpperCase()}</span></div>
                 }
                 <div className="min-w-0">
                   <p className="font-black text-xs md:text-sm truncate leading-tight">{game.whiteUsername}</p>
@@ -885,7 +885,7 @@ export function GameReplay() {
                 </div>
               </div>
               <div className="flex flex-col items-center justify-center px-2 md:px-3 border-x border-white/5 shrink-0">
-                <span className={`px-2 py-0.5 md:px-2.5 md:py-1 rounded-md text-[10px] md:text-[11px] font-black uppercase tracking-wider border
+                <span className={`px-2 py-0.5 md:px-2.5 md:py-1 rounded-xl text-[10px] md:text-[11px] font-black uppercase tracking-wider border
                   ${game.result === 'win'  ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' :
                     game.result === 'loss' ? 'bg-rose-500/15 text-rose-400 border-rose-500/30' :
                                              'bg-slate-500/15 text-slate-400 border-slate-500/30'}`}>
@@ -898,8 +898,8 @@ export function GameReplay() {
                   <p className="text-primary text-[10px] md:text-xs font-bold">{game.blackRating}</p>
                 </div>
                 {blackPlayer?.avatar
-                  ? <img src={blackPlayer.avatar} alt={game.blackUsername} className="w-7 h-7 md:w-9 md:h-9 rounded-md md:rounded-md object-cover border border-white/20 shrink-0" />
-                  : <div className="w-7 h-7 md:w-9 md:h-9 rounded-md md:rounded-md bg-[#2d2d2d] border border-white/20 flex items-center justify-center shrink-0"><span className="text-[#eeeed2] font-black text-xs md:text-sm">{game.blackUsername[0]?.toUpperCase()}</span></div>
+                  ? <img src={blackPlayer.avatar} alt={game.blackUsername} className="w-7 h-7 md:w-9 md:h-9 rounded-xl md:rounded-xl object-cover border border-white/20 shrink-0" />
+                  : <div className="w-7 h-7 md:w-9 md:h-9 rounded-xl md:rounded-xl bg-[#2d2d2d] border border-white/20 flex items-center justify-center shrink-0"><span className="text-[#eeeed2] font-black text-xs md:text-sm">{game.blackUsername[0]?.toUpperCase()}</span></div>
                 }
               </div>
             </div>
@@ -917,26 +917,26 @@ export function GameReplay() {
           />
 
           {/* Playback controls */}
-          <div className="glass-card rounded-md px-1.5 py-1.5 md:p-3 flex items-center justify-between">
+          <div className="glass-card rounded-xl px-1.5 py-1.5 md:p-3 flex items-center justify-between">
             <div className="flex items-center">
               <button onClick={() => { setCurrentMove(0); setIsPlaying(false); }} disabled={currentMove === 0}
-                className="p-2.5 md:p-2.5 rounded-md bg-secondary hover:bg-primary/20 hover:text-primary transition-colors disabled:opacity-40 active:scale-90">
+                className="p-2.5 md:p-2.5 rounded-xl bg-secondary hover:bg-primary/20 hover:text-primary transition-colors disabled:opacity-40 active:scale-90">
                 <ChevronsLeft className="w-5 h-5 md:w-4 md:h-4" />
               </button>
               <button onClick={() => setCurrentMove(p => Math.max(0, p - 1))} disabled={currentMove === 0}
-                className="p-2.5 md:p-2.5 rounded-md bg-secondary hover:bg-primary/20 hover:text-primary transition-colors disabled:opacity-40 active:scale-90">
+                className="p-2.5 md:p-2.5 rounded-xl bg-secondary hover:bg-primary/20 hover:text-primary transition-colors disabled:opacity-40 active:scale-90">
                 <ChevronLeft className="w-5 h-5 md:w-4 md:h-4" />
               </button>
               <button onClick={() => setIsPlaying(p => !p)}
-                className="px-3.5 py-2.5 md:px-4 md:py-2.5 rounded-md bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground transition-colors active:scale-90">
+                className="px-3.5 py-2.5 md:px-4 md:py-2.5 rounded-xl bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground transition-colors active:scale-90">
                 {isPlaying ? <Pause className="w-5 h-5 md:w-4 md:h-4" /> : <Play className="w-5 h-5 md:w-4 md:h-4" />}
               </button>
               <button onClick={() => setCurrentMove(p => Math.min(maxMoves, p + 1))} disabled={currentMove >= maxMoves}
-                className="p-2.5 md:p-2.5 rounded-md bg-secondary hover:bg-primary/20 hover:text-primary transition-colors disabled:opacity-40 active:scale-90">
+                className="p-2.5 md:p-2.5 rounded-xl bg-secondary hover:bg-primary/20 hover:text-primary transition-colors disabled:opacity-40 active:scale-90">
                 <ChevronRight className="w-5 h-5 md:w-4 md:h-4" />
               </button>
               <button onClick={() => { setCurrentMove(maxMoves); setIsPlaying(false); }} disabled={currentMove >= maxMoves}
-                className="p-2.5 md:p-2.5 rounded-md bg-secondary hover:bg-primary/20 hover:text-primary transition-colors disabled:opacity-40 active:scale-90">
+                className="p-2.5 md:p-2.5 rounded-xl bg-secondary hover:bg-primary/20 hover:text-primary transition-colors disabled:opacity-40 active:scale-90">
                 <ChevronsRight className="w-5 h-5 md:w-4 md:h-4" />
               </button>
             </div>
@@ -945,13 +945,13 @@ export function GameReplay() {
               <span className="text-[10px] md:text-xs text-muted-foreground font-mono">{currentMove}/{maxMoves}</span>
 
               <button onClick={() => setFlipped(f => !f)} title="Flip board"
-                className="p-2.5 md:p-2.5 rounded-md bg-secondary hover:bg-primary/20 hover:text-primary transition-colors active:scale-90">
+                className="p-2.5 md:p-2.5 rounded-xl bg-secondary hover:bg-primary/20 hover:text-primary transition-colors active:scale-90">
                 <FlipVertical2 className="w-5 h-5 md:w-4 md:h-4" />
               </button>
 
               <button
                 onClick={() => { setPracticeMode(p => !p); setIsPlaying(false); }}
-                className={`p-2.5 md:px-3 md:py-2 rounded-md text-xs font-bold transition-colors border active:scale-90
+                className={`p-2.5 md:px-3 md:py-2 rounded-xl text-xs font-bold transition-colors border active:scale-90
                   ${practiceMode
                     ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
                     : 'bg-secondary border-border hover:border-primary/40 hover:text-primary'}`}>
@@ -964,7 +964,7 @@ export function GameReplay() {
               <button
                 onClick={() => handleReview(false)}
                 disabled={reviewing || reviewMoves.length > 0}
-                className={`p-2.5 md:px-3 md:py-2 rounded-md text-xs font-bold transition-colors border flex items-center gap-1 md:gap-1.5 active:scale-90
+                className={`p-2.5 md:px-3 md:py-2 rounded-xl text-xs font-bold transition-colors border flex items-center gap-1 md:gap-1.5 active:scale-90
                   ${reviewMoves.length > 0
                     ? 'bg-primary/15 text-primary border-primary/30'
                     : 'bg-secondary border-border hover:border-primary/40 hover:text-primary disabled:opacity-50'}`}>
@@ -980,7 +980,7 @@ export function GameReplay() {
               {reviewMoves.length > 0 && !reviewing && (
                 <button
                   onClick={() => handleReview(true)}
-                  className="p-2.5 rounded-md text-xs font-bold transition-colors border bg-secondary border-border hover:border-primary/40 hover:text-primary active:scale-90"
+                  className="p-2.5 rounded-xl text-xs font-bold transition-colors border bg-secondary border-border hover:border-primary/40 hover:text-primary active:scale-90"
                   title="Re-analyze with improved engine">
                   <BrainCircuit className="w-5 h-5 md:w-3.5 md:h-3.5" />
                 </button>
@@ -1014,7 +1014,7 @@ export function GameReplay() {
                       {(currentReview.pros?.length > 0 || currentReview.cons?.length > 0) && (
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
                           {currentReview.pros?.length > 0 && (
-                            <div className="rounded-md bg-emerald-500/8 border border-emerald-500/20 px-3 py-2.5">
+                            <div className="rounded-xl bg-emerald-500/8 border border-emerald-500/20 px-3 py-2.5">
                               <p className="text-[11px] font-bold text-emerald-400 uppercase tracking-wide mb-1.5 flex items-center gap-1">
                                 <span>✓</span> Pros
                               </p>
@@ -1029,7 +1029,7 @@ export function GameReplay() {
                             </div>
                           )}
                           {currentReview.cons?.length > 0 && (
-                            <div className="rounded-md bg-rose-500/8 border border-rose-500/20 px-3 py-2.5">
+                            <div className="rounded-xl bg-rose-500/8 border border-rose-500/20 px-3 py-2.5">
                               <p className="text-[11px] font-bold text-rose-400 uppercase tracking-wide mb-1.5 flex items-center gap-1">
                                 <span>✗</span> Cons
                               </p>
@@ -1048,7 +1048,7 @@ export function GameReplay() {
 
                       {/* Better move suggestion */}
                       {isBad && currentReview.betterMove && (
-                        <div className="flex items-start gap-2.5 rounded-md bg-amber-500/8 border border-amber-500/20 px-3 py-2.5">
+                        <div className="flex items-start gap-2.5 rounded-xl bg-amber-500/8 border border-amber-500/20 px-3 py-2.5">
                           <Lightbulb className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
                           <div className="text-xs">
                             <span className="text-amber-400 font-bold text-[11px] uppercase tracking-wide block mb-0.5">Better move</span>
@@ -1072,7 +1072,7 @@ export function GameReplay() {
                       const prevFen = currentMove <= 1 ? gameStartFen : (moves[currentMove - 2]?.fen ?? currentFen);
                       navigate(`/practice?fen=${encodeURIComponent(prevFen)}&rating=${opponentRating}&color=${playerColor}`);
                     }}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-md text-sm font-bold transition-all active:scale-95 border border-primary/30 hover:border-primary/50 mt-1"
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all active:scale-95 border border-primary/30 hover:border-primary/50 mt-1"
                     style={{ background: 'rgba(129,182,76,0.1)', color: '#81b64c' }}
                   >
                     <Swords className="w-4 h-4" />
@@ -1109,7 +1109,7 @@ export function GameReplay() {
 
             return (
               <div className="space-y-3">
-                <div className="glass-card rounded-md px-4 py-4 border border-primary/30 bg-primary/5 flex flex-col gap-3">
+                <div className="glass-card rounded-xl px-4 py-4 border border-primary/30 bg-primary/5 flex flex-col gap-3">
                   <div className="flex items-center gap-3">
                     <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin shrink-0" />
                     <div className="flex-1 min-w-0">
@@ -1184,7 +1184,7 @@ export function GameReplay() {
                   const material = getMaterialBalance();
 
                   return (
-                    <div className="glass-card rounded-md px-4 py-3 border border-white/10">
+                    <div className="glass-card rounded-xl px-4 py-3 border border-white/10">
                       <p className="text-[11px] font-bold text-white/30 uppercase tracking-wider mb-2">Game at a glance</p>
                       <div className="grid grid-cols-3 sm:grid-cols-4 gap-x-4 gap-y-2">
                         <div>
@@ -1233,7 +1233,7 @@ export function GameReplay() {
                 <WaitTipCarousel rating={playerRating} />
 
                 {/* AI Mini-Game */}
-                <div className="glass-card rounded-md p-3 border border-white/10">
+                <div className="glass-card rounded-xl p-3 border border-white/10">
                   <div className="flex items-center gap-2 mb-2">
                     <Swords className="w-3.5 h-3.5 text-primary/60" />
                     <span className="text-[11px] font-bold text-white/30 uppercase tracking-wider">
@@ -1248,7 +1248,7 @@ export function GameReplay() {
 
           {/* Review error */}
           {reviewError && (
-            <div className="glass-card rounded-md px-4 py-3 border border-rose-500/30 bg-rose-500/5 text-sm text-rose-400 flex items-center justify-between gap-3">
+            <div className="glass-card rounded-xl px-4 py-3 border border-rose-500/30 bg-rose-500/5 text-sm text-rose-400 flex items-center justify-between gap-3">
               <span>{reviewError}</span>
               <button onClick={() => { setReviewError(null); handleReview(true); }}
                 className="text-xs font-bold underline underline-offset-2 hover:no-underline">Retry</button>
@@ -1257,7 +1257,7 @@ export function GameReplay() {
 
           {/* Practice mode hint */}
           {practiceMode && (
-            <div className="glass-card rounded-md px-4 py-3 border border-emerald-500/30 bg-emerald-500/5 text-sm text-emerald-300 flex items-center gap-2">
+            <div className="glass-card rounded-xl px-4 py-3 border border-emerald-500/30 bg-emerald-500/5 text-sm text-emerald-300 flex items-center gap-2">
               {fetchingBest
                 ? <><div className="w-3.5 h-3.5 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin shrink-0" />
                     <span>Finding engine's best move…</span></>
@@ -1271,7 +1271,7 @@ export function GameReplay() {
 
           {/* Start position prompt / Review Game CTA */}
           {currentMove === 0 && reviewMoves.length === 0 && !reviewing && (
-            <div className="glass-card rounded-md px-4 py-4 border border-primary/20 bg-primary/5 flex flex-col sm:flex-row items-start sm:items-center gap-3 justify-between">
+            <div className="glass-card rounded-xl px-4 py-4 border border-primary/20 bg-primary/5 flex flex-col sm:flex-row items-start sm:items-center gap-3 justify-between">
               <div className="flex items-start gap-3">
                 <BrainCircuit className="w-5 h-5 text-primary shrink-0 mt-0.5" />
                 <div>
@@ -1281,7 +1281,7 @@ export function GameReplay() {
               </div>
               <button
                 onClick={() => handleReview(false)}
-                className="shrink-0 flex items-center gap-2 px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-bold hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20">
+                className="shrink-0 flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-bold hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20">
                 <Sparkles className="w-4 h-4" />
                 Review Game
               </button>
@@ -1307,7 +1307,7 @@ export function GameReplay() {
 
           {/* AI Game Summary — shown after review completes */}
           {gameSummary && reviewMoves.length > 0 && (
-            <div className="glass-card rounded-md overflow-hidden border border-white/8">
+            <div className="glass-card rounded-xl overflow-hidden border border-white/8">
               <div className="px-4 py-3 border-b border-white/5 flex items-center gap-2 bg-white/3">
                 <BrainCircuit className="w-4 h-4 text-primary" />
                 <span className="font-bold text-sm">AI Game Analysis</span>
@@ -1321,7 +1321,7 @@ export function GameReplay() {
                       <span className="text-base">✗</span> Key Mistakes
                     </h4>
                     {gameSummary.keyMistakes.map((km, i) => (
-                      <div key={i} className="rounded-md border border-white/5 overflow-hidden">
+                      <div key={i} className="rounded-xl border border-white/5 overflow-hidden">
                         <button
                           onClick={() => setCurrentMove(km.moveIndex)}
                           className="w-full text-left px-3 py-2 bg-red-500/8 border-b border-red-500/15 hover:bg-red-500/12 transition-colors flex items-center gap-2"
@@ -1381,7 +1381,7 @@ export function GameReplay() {
         </div>
 
         {/* ── Right col: move list ── */}
-        <div className="glass-card rounded-md flex flex-col xl:max-h-[700px]">
+        <div className="glass-card rounded-xl flex flex-col xl:max-h-[700px]">
           <div className="p-4 border-b border-white/5 flex items-center justify-between shrink-0">
             <h3 className="font-bold text-sm">Move List</h3>
             <div className="flex items-center gap-2">
@@ -1398,7 +1398,7 @@ export function GameReplay() {
             {/* Starting position */}
             <div
               onClick={() => { setCurrentMove(0); setPracticeMode(false); }}
-              className={`px-3 py-1.5 rounded-md text-xs cursor-pointer transition-colors mb-1
+              className={`px-3 py-1.5 rounded-xl text-xs cursor-pointer transition-colors mb-1
                 ${currentMove === 0 ? 'bg-primary/20 text-primary font-bold' : 'hover:bg-white/5 text-muted-foreground'}`}
             >
               Start
@@ -1427,7 +1427,7 @@ export function GameReplay() {
                   <button
                     ref={isActive ? activeRowRef : null}
                     onClick={() => { setCurrentMove(moveIndex + 1); setPracticeMode(false); }}
-                    className={`flex-1 flex items-center gap-1 py-1.5 px-2 rounded-md font-mono text-xs text-left transition-colors
+                    className={`flex-1 flex items-center gap-1 py-1.5 px-2 rounded-xl font-mono text-xs text-left transition-colors
                       ${isActive ? 'bg-primary text-primary-foreground font-bold' : 'hover:bg-white/5'}`}
                   >
                     <span className="truncate">{move.san}</span>
@@ -1445,7 +1445,7 @@ export function GameReplay() {
               };
 
               return (
-                <div key={i} className={`flex items-center gap-0.5 text-sm rounded-md ${i % 2 === 0 ? '' : 'bg-white/[0.02]'}`}>
+                <div key={i} className={`flex items-center gap-0.5 text-sm rounded-xl ${i % 2 === 0 ? '' : 'bg-white/[0.02]'}`}>
                   <span className="w-7 text-muted-foreground font-mono text-xs shrink-0 text-right pr-1">{i + 1}.</span>
                   <MoveBtn moveIndex={wi} move={wm} cls={wClass} />
                   <MoveBtn moveIndex={bi} move={bm} cls={bClass} />

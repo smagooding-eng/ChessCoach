@@ -79,7 +79,7 @@ function renderStep(text: string): React.ReactNode {
     const paragraphs = body.split(/\n\n+/).filter(Boolean);
     return (
       <div className="space-y-3">
-        <div className="rounded-md p-4 space-y-2" style={{ background: 'rgba(220,67,67,0.1)', border: '1px solid rgba(220,67,67,0.25)' }}>
+        <div className="rounded-xl p-4 space-y-2" style={{ background: 'rgba(220,67,67,0.1)', border: '1px solid rgba(220,67,67,0.25)' }}>
           <div className="flex items-center gap-2 mb-1">
             <span className="text-lg" style={{ color: MISTAKE_RED }}>✗</span>
             <h4 className="text-sm font-bold uppercase tracking-wider" style={{ color: MISTAKE_RED }}>The Mistake</h4>
@@ -95,7 +95,7 @@ function renderStep(text: string): React.ReactNode {
     const paragraphs = body.split(/\n\n+/).filter(Boolean);
     return (
       <div className="space-y-3">
-        <div className="rounded-md p-4 space-y-2" style={{ background: 'rgba(129,182,76,0.1)', border: `1px solid rgba(129,182,76,0.25)` }}>
+        <div className="rounded-xl p-4 space-y-2" style={{ background: 'rgba(129,182,76,0.1)', border: `1px solid rgba(129,182,76,0.25)` }}>
           <div className="flex items-center gap-2 mb-1">
             <span className="text-lg" style={{ color: CHESSCOM_GREEN }}>✓</span>
             <h4 className="text-sm font-bold uppercase tracking-wider" style={{ color: CHESSCOM_GREEN }}>The Fix</h4>
@@ -253,7 +253,7 @@ function LessonContentStepper({ content, lessonId, onStepChange }: { content: st
         <button
           onClick={() => (speaking || loading) ? stopReading() : readAloud(steps[step])}
           className={cn(
-            'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold transition-all',
+            'flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all',
             (speaking || loading)
               ? 'text-white'
               : 'text-white/50 hover:text-white hover:bg-white/10'
@@ -288,7 +288,7 @@ function LessonContentStepper({ content, lessonId, onStepChange }: { content: st
           <button
             onClick={() => goTo(step - 1)}
             disabled={isFirst}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-md hover:bg-white/10 transition-all disabled:opacity-20 text-white/50 hover:text-white"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl hover:bg-white/10 transition-all disabled:opacity-20 text-white/50 hover:text-white"
           >
             <ChevronLeft className="w-3.5 h-3.5" /> Prev
           </button>
@@ -312,7 +312,7 @@ function LessonContentStepper({ content, lessonId, onStepChange }: { content: st
           <button
             onClick={() => goTo(step + 1)}
             disabled={isLast}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-md hover:bg-white/10 transition-all disabled:opacity-20 text-white/50 hover:text-white"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl hover:bg-white/10 transition-all disabled:opacity-20 text-white/50 hover:text-white"
           >
             Next <ChevronRight className="w-3.5 h-3.5" />
           </button>
@@ -366,7 +366,7 @@ export function CourseDetail() {
       <div className="flex flex-col items-center justify-center py-20 gap-4">
         <Target className="w-10 h-10 text-muted-foreground" />
         <p className="text-muted-foreground">This course could not be loaded.</p>
-        <Link href="/courses" className="px-5 py-2 rounded-md bg-primary/10 hover:bg-primary/20 text-primary text-sm font-semibold transition-colors border border-primary/20">
+        <Link href="/courses" className="px-5 py-2 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary text-sm font-semibold transition-colors border border-primary/20">
           View all courses
         </Link>
       </div>
@@ -379,7 +379,7 @@ export function CourseDetail() {
     <div className="pb-20 max-w-4xl mx-auto space-y-2 md:space-y-4 px-3 md:px-0">
       {/* Compact back + course info header */}
       <div className="flex items-center gap-2 md:gap-3">
-        <Link href="/courses" className="p-2 rounded-md hover:bg-white/10 transition-colors text-white/50 hover:text-white">
+        <Link href="/courses" className="p-2 rounded-xl hover:bg-white/10 transition-colors text-white/50 hover:text-white">
           <ArrowLeft className="w-5 h-5" />
         </Link>
         <div className="flex-1 min-w-0">
@@ -408,11 +408,11 @@ export function CourseDetail() {
       </div>
 
       {sortedLessons.length === 0 ? (
-        <div className="rounded-md p-12 text-center text-white/50" style={{ backgroundColor: BG_DARK }}>No lessons available.</div>
+        <div className="rounded-xl p-12 text-center text-white/50" style={{ backgroundColor: BG_DARK }}>No lessons available.</div>
       ) : (
         <div className="flex gap-4 items-start">
           {/* Sidebar — lesson list */}
-          <div className="hidden lg:flex flex-col w-56 shrink-0 rounded-md overflow-hidden" style={{ backgroundColor: BG_DARK }}>
+          <div className="hidden lg:flex flex-col w-56 shrink-0 rounded-xl overflow-hidden" style={{ backgroundColor: BG_DARK }}>
             <div className="px-4 py-3 flex items-center gap-2" style={{ backgroundColor: BG_CARD }}>
               <List className="w-4 h-4" style={{ color: CHESSCOM_GREEN }} />
               <span className="font-bold text-sm text-white/80">Lessons</span>
@@ -538,7 +538,7 @@ export function CourseDetail() {
 
                 {/* Step-by-step lesson text with TTS */}
                 {lesson && lesson.content && (
-                  <div className="rounded-md p-3 md:p-4 mt-2 md:mt-3" style={{ backgroundColor: BG_DARK }}>
+                  <div className="rounded-xl p-3 md:p-4 mt-2 md:mt-3" style={{ backgroundColor: BG_DARK }}>
                     <LessonContentStepper
                       key={lesson.id}
                       content={lesson.content}
@@ -553,7 +553,7 @@ export function CourseDetail() {
                   <button
                     disabled={isFirst}
                     onClick={() => setCurrentIdx(i => i - 1)}
-                    className="flex items-center gap-2 px-5 py-2 rounded-md text-sm font-bold text-white/50 hover:text-white hover:bg-white/10 transition-all disabled:opacity-20"
+                    className="flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-bold text-white/50 hover:text-white hover:bg-white/10 transition-all disabled:opacity-20"
                   >
                     <ChevronLeft className="w-4 h-4" /> Previous
                   </button>
@@ -562,7 +562,7 @@ export function CourseDetail() {
                     onClick={() => handleMarkComplete(!lesson?.completed)}
                     disabled={isUpdating}
                     className={cn(
-                      'flex items-center gap-2 px-6 py-2.5 rounded-md text-sm font-bold transition-all',
+                      'flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold transition-all',
                       lesson?.completed
                         ? 'bg-white/10 text-white/60 hover:text-white hover:bg-white/15'
                         : 'text-white hover:brightness-110 shadow-lg'
@@ -576,7 +576,7 @@ export function CourseDetail() {
                   <button
                     disabled={isLast}
                     onClick={() => setCurrentIdx(i => i + 1)}
-                    className="flex items-center gap-2 px-5 py-2 rounded-md text-sm font-bold text-white/50 hover:text-white hover:bg-white/10 transition-all disabled:opacity-20"
+                    className="flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-bold text-white/50 hover:text-white hover:bg-white/10 transition-all disabled:opacity-20"
                   >
                     Next <ChevronRight className="w-4 h-4" />
                   </button>

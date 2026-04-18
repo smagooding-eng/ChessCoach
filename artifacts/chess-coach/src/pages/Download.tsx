@@ -47,14 +47,14 @@ export default function DownloadPage() {
           </p>
         </div>
 
-        <div className="rounded-md p-6 sm:p-8 mb-6"
+        <div className="rounded-xl p-6 sm:p-8 mb-6"
           style={{
             background: `linear-gradient(180deg, ${CARD} 0%, #2a2825 100%)`,
             border: '1px solid rgba(255,255,255,0.08)',
             boxShadow: '0 30px 80px -20px rgba(0,0,0,0.7), 0 1px 0 rgba(255,255,255,0.05) inset',
           }}>
           <div className="flex flex-col sm:flex-row items-center gap-5">
-            <div className="w-20 h-20 rounded-md flex items-center justify-center shrink-0"
+            <div className="w-20 h-20 rounded-xl flex items-center justify-center shrink-0"
               style={{ background: `${G}1a`, border: `1px solid ${G}33` }}>
               <Smartphone className="w-10 h-10" style={{ color: G }} />
             </div>
@@ -72,7 +72,7 @@ export default function DownloadPage() {
             <a
               href={APP_HREF}
               download={APP_FILENAME}
-              className="group inline-flex items-center gap-2 px-6 py-3.5 rounded-md font-black text-sm transition-all shrink-0"
+              className="group inline-flex items-center gap-2 px-6 py-3.5 rounded-xl font-black text-sm transition-all shrink-0"
               style={{ background: G, color: '#fff', boxShadow: `0 12px 30px -6px ${G}66` }}
               onMouseEnter={e => { e.currentTarget.style.background = '#6fa23e'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
               onMouseLeave={e => { e.currentTarget.style.background = G; e.currentTarget.style.transform = 'translateY(0)'; }}
@@ -88,7 +88,7 @@ export default function DownloadPage() {
               { icon: Sparkles,    label: 'Full feature parity' },
               { icon: Smartphone,  label: 'No Play Store needed' },
             ].map((f, i) => (
-              <div key={i} className="flex items-center gap-2 px-3 py-2 rounded-md"
+              <div key={i} className="flex items-center gap-2 px-3 py-2 rounded-xl"
                 style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
                 <f.icon className="w-4 h-4" style={{ color: G }} />
                 <span className="text-xs font-semibold" style={{ color: TEXT }}>{f.label}</span>
@@ -97,7 +97,7 @@ export default function DownloadPage() {
           </div>
         </div>
 
-        <div className="rounded-md p-5 sm:p-6"
+        <div className="rounded-xl p-5 sm:p-6"
           style={{ background: CARD, border: '1px solid rgba(255,255,255,0.06)' }}>
           <h3 className="text-sm font-black mb-3 tracking-wide" style={{ color: TEXT }}>
             Install instructions
@@ -118,7 +118,7 @@ export default function DownloadPage() {
             ))}
           </ol>
 
-          <div className="mt-5 flex items-start gap-2 p-3 rounded-md"
+          <div className="mt-5 flex items-start gap-2 p-3 rounded-xl"
             style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
             <Check className="w-4 h-4 mt-0.5 shrink-0" style={{ color: G }} />
             <p className="text-xs" style={{ color: MUTED }}>

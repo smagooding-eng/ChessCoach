@@ -227,7 +227,7 @@ export function OpeningDetail() {
       </Link>
 
       {/* Header */}
-      <div className="glass-card rounded-md p-5 flex flex-wrap items-start justify-between gap-4">
+      <div className="glass-card rounded-xl p-5 flex flex-wrap items-start justify-between gap-4">
         <div>
           {data.eco && (
             <span className="inline-block px-2 py-0.5 rounded text-[11px] font-bold bg-primary/15 text-primary border border-primary/20 mb-2">
@@ -260,7 +260,7 @@ export function OpeningDetail() {
       </div>
 
       {/* Win bar */}
-      <div className="glass-card rounded-md px-5 py-3 space-y-1.5">
+      <div className="glass-card rounded-xl px-5 py-3 space-y-1.5">
         <div className="flex justify-between text-xs text-muted-foreground mb-1">
           <span className="text-emerald-400 font-medium">{wins} Wins</span>
           <span>{draws} Draws</span>
@@ -285,28 +285,28 @@ export function OpeningDetail() {
               <div className="flex gap-2">
                 {practicing ? (
                   <>
-                    <div className="flex items-center gap-0.5 rounded-md bg-secondary p-0.5">
+                    <div className="flex items-center gap-0.5 rounded-xl bg-secondary p-0.5">
                       <button onClick={() => { setPracticeColor('white'); resetPractice(); }}
-                        className={`px-2.5 py-1 rounded-md text-xs font-bold transition-colors ${practiceColor === 'white' ? 'bg-[#f0d9b5] text-[#2d2d2d]' : 'text-muted-foreground hover:text-foreground'}`}>
+                        className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-colors ${practiceColor === 'white' ? 'bg-[#f0d9b5] text-[#2d2d2d]' : 'text-muted-foreground hover:text-foreground'}`}>
                         White
                       </button>
                       <button onClick={() => { setPracticeColor('black'); resetPractice(); }}
-                        className={`px-2.5 py-1 rounded-md text-xs font-bold transition-colors ${practiceColor === 'black' ? 'bg-[#2d2d2d] text-[#f0d9b5] border border-white/20' : 'text-muted-foreground hover:text-foreground'}`}>
+                        className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-colors ${practiceColor === 'black' ? 'bg-[#2d2d2d] text-[#f0d9b5] border border-white/20' : 'text-muted-foreground hover:text-foreground'}`}>
                         Black
                       </button>
                     </div>
                     <button onClick={resetPractice}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-secondary text-muted-foreground hover:text-foreground text-sm font-medium transition-colors">
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-secondary text-muted-foreground hover:text-foreground text-sm font-medium transition-colors">
                       <RotateCcw className="w-3.5 h-3.5" /> Restart
                     </button>
                     <button onClick={() => setPracticing(false)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-secondary text-muted-foreground hover:text-foreground text-sm font-medium transition-colors">
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-secondary text-muted-foreground hover:text-foreground text-sm font-medium transition-colors">
                       <Target className="w-3.5 h-3.5" /> Walkthrough
                     </button>
                   </>
                 ) : (
                   <button onClick={startPractice}
-                    className="flex items-center gap-1.5 px-4 py-1.5 rounded-md bg-primary text-primary-foreground text-sm font-bold shadow shadow-primary/30 hover:bg-primary/90 transition-colors">
+                    className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-primary text-primary-foreground text-sm font-bold shadow shadow-primary/30 hover:bg-primary/90 transition-colors">
                     <GraduationCap className="w-3.5 h-3.5" /> Practice
                   </button>
                 )}
@@ -315,7 +315,7 @@ export function OpeningDetail() {
           </div>
 
           {mainLine.length === 0 ? (
-            <div className="glass-card rounded-md py-16 text-center text-muted-foreground">
+            <div className="glass-card rounded-xl py-16 text-center text-muted-foreground">
               <BookOpen className="w-10 h-10 mx-auto mb-3 opacity-30" />
               <p>No game data available for this opening.</p>
             </div>
@@ -323,12 +323,12 @@ export function OpeningDetail() {
             /* ── Practice Mode ─────────────────────────────────────── */
             <>
               {practiceComplete ? (
-                <div className="glass-card rounded-md py-16 text-center space-y-4">
+                <div className="glass-card rounded-xl py-16 text-center space-y-4">
                   <CheckCircle2 className="w-14 h-14 text-emerald-400 mx-auto" />
                   <h3 className="text-2xl font-bold text-emerald-400">Line Complete!</h3>
                   <p className="text-muted-foreground">You played all {mainLine.length} moves correctly.</p>
                   <button onClick={resetPractice}
-                    className="inline-flex items-center gap-2 px-6 py-3 rounded-md bg-primary text-primary-foreground font-bold hover:bg-primary/90 transition-colors">
+                    className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-primary text-primary-foreground font-bold hover:bg-primary/90 transition-colors">
                     <RotateCcw className="w-4 h-4" /> Practice Again
                   </button>
                 </div>
@@ -352,7 +352,7 @@ export function OpeningDetail() {
                         initial={{ opacity: 0, y: -8 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0 }}
-                        className={`flex items-center gap-3 px-4 py-3 rounded-md font-semibold text-sm
+                        className={`flex items-center gap-3 px-4 py-3 rounded-xl font-semibold text-sm
                           ${feedback === 'correct' ? 'bg-emerald-500/15 border border-emerald-500/30 text-emerald-400' : 'bg-red-500/15 border border-red-500/30 text-red-400'}`}
                       >
                         {feedback === 'correct'
@@ -364,7 +364,7 @@ export function OpeningDetail() {
                   </AnimatePresence>
 
                   {/* Practice info */}
-                  <div className="glass-card rounded-md px-4 py-3 flex items-center justify-between gap-4">
+                  <div className="glass-card rounded-xl px-4 py-3 flex items-center justify-between gap-4">
                     <div className="flex items-center gap-3">
                       <div className={`w-7 h-7 rounded-full shrink-0 flex items-center justify-center text-[10px] font-bold
                         ${mainLine[practiceStep]?.color === 'white' ? 'bg-[#f0d9b5] text-black' : 'bg-[#2d2d2d] border border-white/20 text-white'}`}>
@@ -392,7 +392,7 @@ export function OpeningDetail() {
                   <div className="flex flex-wrap gap-1">
                     {mainLine.map((m, i) => (
                       <span key={i}
-                        className={`px-2 py-0.5 rounded-md font-mono text-xs
+                        className={`px-2 py-0.5 rounded-xl font-mono text-xs
                           ${i < practiceStep ? 'bg-emerald-500/20 text-emerald-400' :
                             i === practiceStep ? 'bg-primary/20 text-primary ring-1 ring-primary/40 font-bold' :
                             'bg-secondary/50 text-muted-foreground/40'}`}
@@ -419,7 +419,7 @@ export function OpeningDetail() {
               />
 
               {/* Move annotation */}
-              <div className="glass-card rounded-md px-4 py-3 min-h-[56px] flex items-center gap-3">
+              <div className="glass-card rounded-xl px-4 py-3 min-h-[56px] flex items-center gap-3">
                 <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0
                   ${currentMoveData?.color === 'white' ? 'bg-[#f0d9b5] border border-black/20' : 'bg-[#2d2d2d] border border-white/20'}`} />
                 {currentMoveData ? (
@@ -435,22 +435,22 @@ export function OpeningDetail() {
               </div>
 
               {/* Controls */}
-              <div className="glass-card rounded-md p-3 flex items-center justify-between gap-3">
+              <div className="glass-card rounded-xl p-3 flex items-center justify-between gap-3">
                 <div className="flex items-center gap-1 md:gap-1.5">
                   <button onClick={() => setStep(0)} disabled={step === 0}
-                    className="p-3 md:p-2.5 rounded-md bg-secondary hover:bg-primary/20 hover:text-primary disabled:opacity-40 transition-colors active:scale-90">
+                    className="p-3 md:p-2.5 rounded-xl bg-secondary hover:bg-primary/20 hover:text-primary disabled:opacity-40 transition-colors active:scale-90">
                     <ChevronsLeft className="w-5 h-5 md:w-4 md:h-4" />
                   </button>
                   <button onClick={() => setStep(s => Math.max(0, s - 1))} disabled={step === 0}
-                    className="p-3 md:p-2.5 rounded-md bg-secondary hover:bg-primary/20 hover:text-primary disabled:opacity-40 transition-colors active:scale-90">
+                    className="p-3 md:p-2.5 rounded-xl bg-secondary hover:bg-primary/20 hover:text-primary disabled:opacity-40 transition-colors active:scale-90">
                     <ChevronLeft className="w-5 h-5 md:w-4 md:h-4" />
                   </button>
                   <button onClick={() => setStep(s => Math.min(maxStep, s + 1))} disabled={step >= maxStep}
-                    className="p-3 md:p-2.5 rounded-md bg-secondary hover:bg-primary/20 hover:text-primary disabled:opacity-40 transition-colors active:scale-90">
+                    className="p-3 md:p-2.5 rounded-xl bg-secondary hover:bg-primary/20 hover:text-primary disabled:opacity-40 transition-colors active:scale-90">
                     <ChevronRight className="w-5 h-5 md:w-4 md:h-4" />
                   </button>
                   <button onClick={() => setStep(maxStep)} disabled={step >= maxStep}
-                    className="p-3 md:p-2.5 rounded-md bg-secondary hover:bg-primary/20 hover:text-primary disabled:opacity-40 transition-colors active:scale-90">
+                    className="p-3 md:p-2.5 rounded-xl bg-secondary hover:bg-primary/20 hover:text-primary disabled:opacity-40 transition-colors active:scale-90">
                     <ChevronsRight className="w-5 h-5 md:w-4 md:h-4" />
                   </button>
                 </div>
@@ -463,7 +463,7 @@ export function OpeningDetail() {
                     <button
                       key={i}
                       onClick={() => setStep(i + 1)}
-                      className={`px-2 py-0.5 rounded-md font-mono text-xs transition-colors
+                      className={`px-2 py-0.5 rounded-xl font-mono text-xs transition-colors
                         ${step === i + 1 ? 'bg-primary text-primary-foreground font-bold' : 'bg-secondary hover:bg-white/10'}`}
                     >
                       {m.color === 'white' ? `${m.moveNumber}.` : ''}{m.san}
@@ -483,7 +483,7 @@ export function OpeningDetail() {
                 <span className="text-xs text-muted-foreground">with this opening</span>
               </div>
 
-              <div className="glass-card rounded-md divide-y divide-border/50 overflow-hidden">
+              <div className="glass-card rounded-xl divide-y divide-border/50 overflow-hidden">
                 {data.sampleGames.map((game, i) => {
                   const isWhite = game.whiteUsername.toLowerCase() === username?.toLowerCase();
                   return (
@@ -494,7 +494,7 @@ export function OpeningDetail() {
                       transition={{ delay: i * 0.04 }}
                       className="flex items-center gap-3 px-4 py-3 hover:bg-white/[0.025] transition-colors"
                     >
-                      <span className={`shrink-0 w-14 text-center py-1 rounded-md text-xs font-bold uppercase tracking-wide
+                      <span className={`shrink-0 w-14 text-center py-1 rounded-xl text-xs font-bold uppercase tracking-wide
                         ${game.result === 'win'  ? 'bg-emerald-500/15 text-emerald-400' :
                           game.result === 'loss' ? 'bg-red-500/15 text-red-400' :
                                                    'bg-slate-500/15 text-slate-400'}`}>
@@ -515,7 +515,7 @@ export function OpeningDetail() {
                       </div>
 
                       <Link href={`/games/${game.id}`}
-                        className="shrink-0 flex items-center justify-center w-9 h-9 rounded-md bg-secondary text-primary hover:bg-primary hover:text-primary-foreground transition-all">
+                        className="shrink-0 flex items-center justify-center w-9 h-9 rounded-xl bg-secondary text-primary hover:bg-primary hover:text-primary-foreground transition-all">
                         <Play className="w-4 h-4 ml-0.5" />
                       </Link>
                     </motion.div>
@@ -539,7 +539,7 @@ export function OpeningDetail() {
             <h2 className="text-lg font-bold">Other Openings</h2>
           </div>
 
-          <div className="glass-card rounded-md divide-y divide-border/50 overflow-hidden">
+          <div className="glass-card rounded-xl divide-y divide-border/50 overflow-hidden">
             {otherOpenings.map((o, i) => {
               const linkParam = encodeURIComponent(o.eco ?? o.opening);
               const wr = o.winRate;
@@ -576,7 +576,7 @@ export function OpeningDetail() {
 
           {/* As white / as black */}
           {stat && (
-            <div className="glass-card rounded-md p-4 space-y-3">
+            <div className="glass-card rounded-xl p-4 space-y-3">
               <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-wider">By Color</h3>
 
               {stat.white.games > 0 && (
@@ -622,7 +622,7 @@ export function OpeningDetail() {
               <div className="space-y-2">
                 {best && (
                   <Link href={`/openings/${encodeURIComponent(best.eco ?? best.opening)}`}
-                    className="glass-card rounded-md p-3 flex items-center gap-3 hover:border-emerald-500/30 transition-colors group">
+                    className="glass-card rounded-xl p-3 flex items-center gap-3 hover:border-emerald-500/30 transition-colors group">
                     <TrendingUp className="w-4 h-4 text-emerald-400 shrink-0" />
                     <div className="flex-1 min-w-0">
                       <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Best opening</p>
@@ -633,7 +633,7 @@ export function OpeningDetail() {
                 )}
                 {worst && worst.opening !== best?.opening && (
                   <Link href={`/openings/${encodeURIComponent(worst.eco ?? worst.opening)}`}
-                    className="glass-card rounded-md p-3 flex items-center gap-3 hover:border-red-500/30 transition-colors group">
+                    className="glass-card rounded-xl p-3 flex items-center gap-3 hover:border-red-500/30 transition-colors group">
                     <TrendingDown className="w-4 h-4 text-red-400 shrink-0" />
                     <div className="flex-1 min-w-0">
                       <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Needs work</p>

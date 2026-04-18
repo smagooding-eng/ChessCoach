@@ -168,7 +168,7 @@ export function Analysis() {
   return (
     <PremiumGate feature="AI Game Analysis">
     <div className="space-y-5 pb-10 px-3 pt-3 md:px-0 md:pt-0">
-      <div className="rounded-md p-5 md:p-6" style={{ background: BG_CARD, border: CARD_BORDER, boxShadow: CARD_SHADOW }}>
+      <div className="rounded-xl p-5 md:p-6" style={{ background: BG_CARD, border: CARD_BORDER, boxShadow: CARD_SHADOW }}>
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
             <h1 className="text-2xl font-black flex items-center gap-2.5" style={{ color: TEXT_LIGHT }}>
@@ -182,7 +182,7 @@ export function Analysis() {
           <button
             onClick={handleAnalyze}
             disabled={isAnalyzing}
-            className="shrink-0 px-5 py-2.5 rounded-md font-bold text-sm text-white flex items-center gap-2 transition-opacity hover:opacity-90 disabled:opacity-50"
+            className="shrink-0 px-5 py-2.5 rounded-xl font-bold text-sm text-white flex items-center gap-2 transition-opacity hover:opacity-90 disabled:opacity-50"
             style={{ background: CHESSCOM_GREEN }}
           >
             {isAnalyzing ? (
@@ -198,7 +198,7 @@ export function Analysis() {
         <motion.div
           initial={{ opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}
-          className="p-3.5 rounded-md flex items-center gap-3 text-sm"
+          className="p-3.5 rounded-xl flex items-center gap-3 text-sm"
           style={{ background: 'rgba(129,182,76,0.08)', border: '1px solid rgba(129,182,76,0.2)', color: CHESSCOM_GREEN }}
         >
           <Loader2 className="w-4 h-4 animate-spin shrink-0" />
@@ -210,7 +210,7 @@ export function Analysis() {
         <motion.div
           initial={{ opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}
-          className="p-3.5 rounded-md flex items-center gap-2 text-sm"
+          className="p-3.5 rounded-xl flex items-center gap-2 text-sm"
           style={{ background: 'rgba(220,67,67,0.1)', border: '1px solid rgba(220,67,67,0.25)', color: '#dc4343' }}
         >
           <AlertTriangle className="w-4 h-4 shrink-0" />
@@ -225,7 +225,7 @@ export function Analysis() {
       ) : summary ? (
         <>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <div className="rounded-md p-5 space-y-6" style={{ background: BG_CARD, border: CARD_BORDER, boxShadow: CARD_SHADOW }}>
+            <div className="rounded-xl p-5 space-y-6" style={{ background: BG_CARD, border: CARD_BORDER, boxShadow: CARD_SHADOW }}>
               <h2 className="text-lg font-bold" style={{ color: TEXT_LIGHT }}>Performance Breakdown</h2>
 
               <div className="flex flex-col sm:flex-row items-center justify-around gap-6">
@@ -270,7 +270,7 @@ export function Analysis() {
               </div>
             </div>
 
-            <div className="rounded-md p-5" style={{ background: BG_CARD, border: CARD_BORDER, boxShadow: CARD_SHADOW }}>
+            <div className="rounded-xl p-5" style={{ background: BG_CARD, border: CARD_BORDER, boxShadow: CARD_SHADOW }}>
               <h2 className="text-lg font-bold mb-4" style={{ color: TEXT_LIGHT }}>Top Openings Win Rate</h2>
               <div className="space-y-2">
                 {openingData.map((o, i) => (
@@ -280,7 +280,7 @@ export function Analysis() {
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: i * 0.06 }}
                     onClick={() => navigate(`/openings/${encodeURIComponent(o.fullName)}`)}
-                    className="flex items-center gap-3 p-2.5 rounded-md cursor-pointer group transition-colors"
+                    className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer group transition-colors"
                     style={{ background: 'transparent' }}
                     onMouseEnter={e => (e.currentTarget.style.background = BG_CARD_HOVER)}
                     onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
@@ -315,7 +315,7 @@ export function Analysis() {
               ? Math.min(100, Math.round(((summary.avgRating - tier.min) / (tier.max - tier.min)) * 100))
               : 100;
             return (
-              <div className="rounded-md overflow-hidden" style={{ background: BG_CARD, border: CARD_BORDER, boxShadow: CARD_SHADOW }}>
+              <div className="rounded-xl overflow-hidden" style={{ background: BG_CARD, border: CARD_BORDER, boxShadow: CARD_SHADOW }}>
                 <div className="px-5 py-4 flex flex-col sm:flex-row items-start sm:items-center gap-3 justify-between" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                   <div className="flex items-center gap-2.5">
                     <TrendingUp className="w-5 h-5" style={{ color: CHESSCOM_GREEN }} />
@@ -327,13 +327,13 @@ export function Analysis() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2.5">
-                    <div className={`px-2.5 py-1 rounded-md text-xs font-bold ${tier.bgColor} ${tier.color} border ${tier.borderColor}`}>
+                    <div className={`px-2.5 py-1 rounded-xl text-xs font-bold ${tier.bgColor} ${tier.color} border ${tier.borderColor}`}>
                       {tier.icon} {tier.label}
                     </div>
                     {nextTier && (
                       <>
                         <ArrowUpRight className="w-3.5 h-3.5" style={{ color: TEXT_MUTED }} />
-                        <div className={`px-2.5 py-1 rounded-md text-xs font-bold ${nextTier.bgColor} ${nextTier.color} border ${nextTier.borderColor} opacity-60`}>
+                        <div className={`px-2.5 py-1 rounded-xl text-xs font-bold ${nextTier.bgColor} ${nextTier.color} border ${nextTier.borderColor} opacity-60`}>
                           {nextTier.icon} {nextTier.label}
                         </div>
                       </>
@@ -373,7 +373,7 @@ export function Analysis() {
                         initial={{ opacity: 0, x: -8 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: i * 0.08 }}
-                        className="flex gap-2.5 p-3 rounded-md transition-colors"
+                        className="flex gap-2.5 p-3 rounded-xl transition-colors"
                         style={{ background: 'rgba(255,255,255,0.03)' }}
                         onMouseEnter={e => (e.currentTarget.style.background = BG_CARD_HOVER)}
                         onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.03)')}
@@ -400,7 +400,7 @@ export function Analysis() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.1 }}
                 onClick={() => navigate(`/analysis/${weakness.id}`)}
-                className="rounded-md p-5 cursor-pointer group transition-all"
+                className="rounded-xl p-5 cursor-pointer group transition-all"
                 style={{
                   background: BG_CARD,
                   borderLeft: `3px solid ${weakness.severity === 'Critical' ? '#dc4343' : weakness.severity === 'High' ? '#ea9733' : '#6da5d8'}`,
@@ -439,7 +439,7 @@ export function Analysis() {
             ))}
 
             {!weaknessesData?.weaknesses?.length && (
-              <div className="col-span-full text-center py-10 rounded-md text-sm" style={{ border: '1px dashed rgba(255,255,255,0.1)', color: TEXT_MUTED }}>
+              <div className="col-span-full text-center py-10 rounded-xl text-sm" style={{ border: '1px dashed rgba(255,255,255,0.1)', color: TEXT_MUTED }}>
                 Run an analysis to discover your weaknesses and build a personalized plan.
               </div>
             )}

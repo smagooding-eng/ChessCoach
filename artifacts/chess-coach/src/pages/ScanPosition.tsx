@@ -323,9 +323,9 @@ export function ScanPosition() {
         <div className="space-y-3">
           <div
             onClick={() => fileInputRef.current?.click()}
-            className="glass-card rounded-md p-8 border border-white/10 hover:border-primary/30 transition-all cursor-pointer flex flex-col items-center gap-3 active:scale-[0.98]"
+            className="glass-card rounded-xl p-8 border border-white/10 hover:border-primary/30 transition-all cursor-pointer flex flex-col items-center gap-3 active:scale-[0.98]"
           >
-            <div className="w-14 h-14 rounded-md flex items-center justify-center" style={{ background: 'rgba(129,182,76,0.12)' }}>
+            <div className="w-14 h-14 rounded-xl flex items-center justify-center" style={{ background: 'rgba(129,182,76,0.12)' }}>
               <Upload className="w-7 h-7" style={{ color: '#81b64c' }} />
             </div>
             <div className="text-center">
@@ -336,9 +336,9 @@ export function ScanPosition() {
 
           <div
             onClick={() => cameraInputRef.current?.click()}
-            className="glass-card rounded-md p-6 border border-white/10 hover:border-primary/30 transition-all cursor-pointer flex items-center gap-4 active:scale-[0.98]"
+            className="glass-card rounded-xl p-6 border border-white/10 hover:border-primary/30 transition-all cursor-pointer flex items-center gap-4 active:scale-[0.98]"
           >
-            <div className="w-11 h-11 rounded-md flex items-center justify-center shrink-0" style={{ background: 'rgba(129,182,76,0.12)' }}>
+            <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0" style={{ background: 'rgba(129,182,76,0.12)' }}>
               <Camera className="w-5 h-5" style={{ color: '#81b64c' }} />
             </div>
             <div>
@@ -355,9 +355,9 @@ export function ScanPosition() {
               setBuilderError('');
               setState('builder');
             }}
-            className="glass-card rounded-md p-6 border border-white/10 hover:border-primary/30 transition-all cursor-pointer flex items-center gap-4 active:scale-[0.98]"
+            className="glass-card rounded-xl p-6 border border-white/10 hover:border-primary/30 transition-all cursor-pointer flex items-center gap-4 active:scale-[0.98]"
           >
-            <div className="w-11 h-11 rounded-md flex items-center justify-center shrink-0" style={{ background: 'rgba(129,182,76,0.12)' }}>
+            <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0" style={{ background: 'rgba(129,182,76,0.12)' }}>
               <Wand2 className="w-5 h-5" style={{ color: '#81b64c' }} />
             </div>
             <div>
@@ -382,7 +382,7 @@ export function ScanPosition() {
             onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
           />
 
-          <div className="glass-card rounded-md p-4 border border-white/5">
+          <div className="glass-card rounded-xl p-4 border border-white/5">
             <p className="text-[11px] font-bold text-white/30 uppercase tracking-wider mb-2">Tips for best results</p>
             <ul className="text-xs text-white/50 space-y-1.5">
               <li className="flex gap-2"><span style={{ color: '#81b64c' }}>•</span> Use a clear, well-lit photo of the board</li>
@@ -397,11 +397,11 @@ export function ScanPosition() {
       {state === 'scanning' && (
         <div className="space-y-4">
           {previewUrl && (
-            <div className="glass-card rounded-md overflow-hidden border border-white/10">
+            <div className="glass-card rounded-xl overflow-hidden border border-white/10">
               <img src={previewUrl} alt="Chess position" className="w-full max-h-80 object-contain bg-black/30" />
             </div>
           )}
-          <div className="glass-card rounded-md px-4 py-5 border border-primary/30 bg-primary/5 flex items-center gap-3">
+          <div className="glass-card rounded-xl px-4 py-5 border border-primary/30 bg-primary/5 flex items-center gap-3">
             <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin shrink-0" />
             <div>
               <p className="text-sm font-bold" style={{ color: '#81b64c' }}>Analyzing position...</p>
@@ -414,17 +414,17 @@ export function ScanPosition() {
       {state === 'error' && (
         <div className="space-y-3">
           {previewUrl && (
-            <div className="glass-card rounded-md overflow-hidden border border-white/10">
+            <div className="glass-card rounded-xl overflow-hidden border border-white/10">
               <img src={previewUrl} alt="Chess position" className="w-full max-h-80 object-contain bg-black/30" />
             </div>
           )}
-          <div className="glass-card rounded-md px-4 py-3 border border-rose-500/30 bg-rose-500/5 flex items-center gap-3">
+          <div className="glass-card rounded-xl px-4 py-3 border border-rose-500/30 bg-rose-500/5 flex items-center gap-3">
             <AlertCircle className="w-5 h-5 text-rose-400 shrink-0" />
             <p className="text-sm text-rose-400 flex-1">{error}</p>
           </div>
           <button
             onClick={resetAll}
-            className="w-full py-3 rounded-md font-bold text-sm transition-all active:scale-[0.97] border border-white/10 hover:border-primary/30 text-white/60 hover:text-white"
+            className="w-full py-3 rounded-xl font-bold text-sm transition-all active:scale-[0.97] border border-white/10 hover:border-primary/30 text-white/60 hover:text-white"
           >
             Try Again
           </button>
@@ -456,7 +456,7 @@ export function ScanPosition() {
                 <EditableBoard fen={fen} flipped={flipped} onFenChange={setFen} />
                 <button
                   onClick={() => setFlipped(f => !f)}
-                  className="absolute top-2 left-2 z-10 p-1.5 rounded-md bg-black/60 backdrop-blur-sm border border-white/10 hover:border-primary/30 transition-all"
+                  className="absolute top-2 left-2 z-10 p-1.5 rounded-xl bg-black/60 backdrop-blur-sm border border-white/10 hover:border-primary/30 transition-all"
                   title="Flip board"
                 >
                   <FlipVertical className="w-4 h-4 text-white/60" />
@@ -465,7 +465,7 @@ export function ScanPosition() {
             </div>
           </div>
 
-          <div className={`rounded-md px-3 py-2 border text-xs flex items-center gap-2 ${confidenceBg}`}>
+          <div className={`rounded-xl px-3 py-2 border text-xs flex items-center gap-2 ${confidenceBg}`}>
             <span className={`font-bold uppercase ${confidenceColor}`}>
               {confidence} confidence
             </span>
@@ -475,7 +475,7 @@ export function ScanPosition() {
           <div className="grid grid-cols-2 gap-2">
             <button
               onClick={startExplore}
-              className="py-3 rounded-md font-bold text-sm transition-all active:scale-[0.97] flex items-center justify-center gap-2"
+              className="py-3 rounded-xl font-bold text-sm transition-all active:scale-[0.97] flex items-center justify-center gap-2"
               style={{ background: 'rgba(129,182,76,0.15)', color: '#81b64c', border: '1px solid rgba(129,182,76,0.3)' }}
             >
               <Compass className="w-4 h-4" />
@@ -483,7 +483,7 @@ export function ScanPosition() {
             </button>
             <button
               onClick={() => goToPlayAI()}
-              className="py-3 rounded-md font-bold text-sm transition-all active:scale-[0.97] flex items-center justify-center gap-2"
+              className="py-3 rounded-xl font-bold text-sm transition-all active:scale-[0.97] flex items-center justify-center gap-2"
               style={{ background: 'rgba(129,182,76,0.15)', color: '#81b64c', border: '1px solid rgba(129,182,76,0.3)' }}
             >
               <Swords className="w-4 h-4" />
@@ -493,7 +493,7 @@ export function ScanPosition() {
 
           <button
             onClick={resetAll}
-            className="w-full py-2.5 rounded-md text-xs font-bold text-white/40 hover:text-white/60 transition-all flex items-center justify-center gap-1.5"
+            className="w-full py-2.5 rounded-xl text-xs font-bold text-white/40 hover:text-white/60 transition-all flex items-center justify-center gap-1.5"
           >
             <X className="w-3.5 h-3.5" />
             Scan New Position
@@ -512,14 +512,14 @@ export function ScanPosition() {
             />
             <button
               onClick={() => setFlipped(f => !f)}
-              className="absolute top-2 left-2 z-10 p-1.5 rounded-md bg-black/60 backdrop-blur-sm border border-white/10 hover:border-primary/30 transition-all"
+              className="absolute top-2 left-2 z-10 p-1.5 rounded-xl bg-black/60 backdrop-blur-sm border border-white/10 hover:border-primary/30 transition-all"
               title="Flip board"
             >
               <FlipVertical className="w-4 h-4 text-white/60" />
             </button>
             {gameStatus && (
               <div className="absolute inset-0 rounded-[10px] flex items-center justify-center bg-black/50 pointer-events-none">
-                <div className="px-5 py-3 rounded-md bg-amber-500/20 border border-amber-500/40 backdrop-blur-sm">
+                <div className="px-5 py-3 rounded-xl bg-amber-500/20 border border-amber-500/40 backdrop-blur-sm">
                   <p className="text-lg font-black text-amber-300 text-center">♚ {gameStatus}</p>
                 </div>
               </div>
@@ -527,7 +527,7 @@ export function ScanPosition() {
           </div>
 
           {moveHistory.length > 0 && (
-            <div className="glass-card rounded-md px-3 py-2 border border-white/10 flex items-center gap-2">
+            <div className="glass-card rounded-xl px-3 py-2 border border-white/10 flex items-center gap-2">
               <p className="text-xs text-white/40 truncate flex-1">
                 {moveHistory.map((m, i) => (
                   <span key={i}>
@@ -543,7 +543,7 @@ export function ScanPosition() {
             <button
               onClick={undoMove}
               disabled={moveHistory.length === 0}
-              className="flex-1 py-2.5 rounded-md text-xs font-bold transition-all active:scale-[0.97] flex items-center justify-center gap-1.5 border border-white/10 hover:border-primary/30 text-white/50 disabled:opacity-30"
+              className="flex-1 py-2.5 rounded-xl text-xs font-bold transition-all active:scale-[0.97] flex items-center justify-center gap-1.5 border border-white/10 hover:border-primary/30 text-white/50 disabled:opacity-30"
             >
               <RotateCcw className="w-3.5 h-3.5" />
               Undo
@@ -551,13 +551,13 @@ export function ScanPosition() {
             <button
               onClick={resetExplore}
               disabled={moveHistory.length === 0}
-              className="flex-1 py-2.5 rounded-md text-xs font-bold transition-all active:scale-[0.97] flex items-center justify-center gap-1.5 border border-white/10 hover:border-primary/30 text-white/50 disabled:opacity-30"
+              className="flex-1 py-2.5 rounded-xl text-xs font-bold transition-all active:scale-[0.97] flex items-center justify-center gap-1.5 border border-white/10 hover:border-primary/30 text-white/50 disabled:opacity-30"
             >
               Reset
             </button>
             <button
               onClick={() => goToPlayAI(sandboxFen)}
-              className="flex-1 py-2.5 rounded-md text-xs font-bold transition-all active:scale-[0.97] flex items-center justify-center gap-1.5"
+              className="flex-1 py-2.5 rounded-xl text-xs font-bold transition-all active:scale-[0.97] flex items-center justify-center gap-1.5"
               style={{ background: 'rgba(129,182,76,0.15)', color: '#81b64c', border: '1px solid rgba(129,182,76,0.3)' }}
             >
               <Swords className="w-3.5 h-3.5" />
@@ -567,7 +567,7 @@ export function ScanPosition() {
 
           <button
             onClick={resetAll}
-            className="w-full py-2.5 rounded-md text-xs font-bold text-white/40 hover:text-white/60 transition-all flex items-center justify-center gap-1.5"
+            className="w-full py-2.5 rounded-xl text-xs font-bold text-white/40 hover:text-white/60 transition-all flex items-center justify-center gap-1.5"
           >
             <X className="w-3.5 h-3.5" />
             Scan New Position
@@ -599,14 +599,14 @@ export function ScanPosition() {
             />
             <button
               onClick={() => setFlipped(f => !f)}
-              className="absolute top-2 left-2 z-10 p-1.5 rounded-md bg-black/60 backdrop-blur-sm border border-white/10 hover:border-primary/30 transition-all"
+              className="absolute top-2 left-2 z-10 p-1.5 rounded-xl bg-black/60 backdrop-blur-sm border border-white/10 hover:border-primary/30 transition-all"
               title="Flip board"
             >
               <FlipVertical className="w-4 h-4 text-white/60" />
             </button>
           </div>
 
-          <div className="rounded-md px-3 py-2 border border-white/10 bg-white/5 text-[11px] text-white/60 text-center">
+          <div className="rounded-xl px-3 py-2 border border-white/10 bg-white/5 text-[11px] text-white/60 text-center">
             {builderPiece ? (
               <>Tap any square to place <span className="text-white/90 font-semibold">
                 {PIECE_GLYPH[builderPiece]} {builderPiece === builderPiece.toUpperCase() ? 'White' : 'Black'}{' '}
@@ -624,7 +624,7 @@ export function ScanPosition() {
                 <button
                   key={p}
                   onClick={() => setBuilderPiece(p)}
-                  className="aspect-square rounded-md flex items-center justify-center text-[clamp(20px,5vw,32px)] leading-none transition-all"
+                  className="aspect-square rounded-xl flex items-center justify-center text-[clamp(20px,5vw,32px)] leading-none transition-all"
                   style={{
                     background: builderPiece === p ? 'rgba(129,182,76,0.25)' : '#3a3835',
                     border: builderPiece === p ? '2px solid #81b64c' : '2px solid transparent',
@@ -643,7 +643,7 @@ export function ScanPosition() {
                 <button
                   key={p}
                   onClick={() => setBuilderPiece(p)}
-                  className="aspect-square rounded-md flex items-center justify-center text-[clamp(20px,5vw,32px)] leading-none transition-all"
+                  className="aspect-square rounded-xl flex items-center justify-center text-[clamp(20px,5vw,32px)] leading-none transition-all"
                   style={{
                     background: builderPiece === p ? 'rgba(129,182,76,0.25)' : '#3a3835',
                     border: builderPiece === p ? '2px solid #81b64c' : '2px solid transparent',
@@ -659,7 +659,7 @@ export function ScanPosition() {
             <div className="grid grid-cols-3 gap-1">
               <button
                 onClick={() => setBuilderPiece(null)}
-                className="py-2 rounded-md text-xs font-bold flex items-center justify-center gap-1.5 transition-all"
+                className="py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all"
                 style={{
                   background: builderPiece === null ? 'rgba(244,63,94,0.2)' : '#3a3835',
                   border: builderPiece === null ? '2px solid rgba(244,63,94,0.6)' : '2px solid transparent',
@@ -674,7 +674,7 @@ export function ScanPosition() {
                   setBuilderFen(`8/8/8/8/8/8/8/8 ${builderTurn} - - 0 1`);
                   setBuilderError('');
                 }}
-                className="py-2 rounded-md text-xs font-bold border border-white/10 hover:border-white/30 text-white/70 transition-all"
+                className="py-2 rounded-xl text-xs font-bold border border-white/10 hover:border-white/30 text-white/70 transition-all"
               >
                 Clear Board
               </button>
@@ -683,7 +683,7 @@ export function ScanPosition() {
                   setBuilderFen(`rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR ${builderTurn} - - 0 1`);
                   setBuilderError('');
                 }}
-                className="py-2 rounded-md text-xs font-bold border border-white/10 hover:border-white/30 text-white/70 transition-all"
+                className="py-2 rounded-xl text-xs font-bold border border-white/10 hover:border-white/30 text-white/70 transition-all"
               >
                 Start Pos
               </button>
@@ -691,7 +691,7 @@ export function ScanPosition() {
           </div>
 
           {/* Side to move */}
-          <div className="flex items-center gap-2 rounded-md border border-white/10 bg-white/5 p-1">
+          <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 p-1">
             <span className="text-[11px] font-bold uppercase tracking-wider text-white/40 px-2">Turn</span>
             <button
               onClick={() => {
@@ -701,7 +701,7 @@ export function ScanPosition() {
                 setBuilderFen(parts.join(' '));
                 setBuilderError('');
               }}
-              className="flex-1 py-1.5 rounded-md text-xs font-bold transition-all"
+              className="flex-1 py-1.5 rounded-xl text-xs font-bold transition-all"
               style={{
                 background: builderTurn === 'w' ? '#fff' : 'transparent',
                 color: builderTurn === 'w' ? '#1a1a1a' : 'rgba(255,255,255,0.6)',
@@ -717,7 +717,7 @@ export function ScanPosition() {
                 setBuilderFen(parts.join(' '));
                 setBuilderError('');
               }}
-              className="flex-1 py-1.5 rounded-md text-xs font-bold transition-all"
+              className="flex-1 py-1.5 rounded-xl text-xs font-bold transition-all"
               style={{
                 background: builderTurn === 'b' ? '#1a1a1a' : 'transparent',
                 color: builderTurn === 'b' ? '#fff' : 'rgba(255,255,255,0.6)',
@@ -729,7 +729,7 @@ export function ScanPosition() {
           </div>
 
           {builderError && (
-            <div className="rounded-md px-3 py-2 border border-rose-500/30 bg-rose-500/5 flex items-center gap-2">
+            <div className="rounded-xl px-3 py-2 border border-rose-500/30 bg-rose-500/5 flex items-center gap-2">
               <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
               <p className="text-xs text-rose-400">{builderError}</p>
             </div>
@@ -752,7 +752,7 @@ export function ScanPosition() {
                   setBuilderError(`Invalid position — ${(e as Error).message || 'check kings, pawn ranks, and side to move.'}`);
                 }
               }}
-              className="py-3 rounded-md font-bold text-sm transition-all active:scale-[0.97] flex items-center justify-center gap-2"
+              className="py-3 rounded-xl font-bold text-sm transition-all active:scale-[0.97] flex items-center justify-center gap-2"
               style={{ background: 'rgba(129,182,76,0.15)', color: '#81b64c', border: '1px solid rgba(129,182,76,0.3)' }}
             >
               <Compass className="w-4 h-4" />
@@ -767,7 +767,7 @@ export function ScanPosition() {
                   setBuilderError(`Invalid position — ${(e as Error).message || 'check kings, pawn ranks, and side to move.'}`);
                 }
               }}
-              className="py-3 rounded-md font-bold text-sm transition-all active:scale-[0.97] flex items-center justify-center gap-2"
+              className="py-3 rounded-xl font-bold text-sm transition-all active:scale-[0.97] flex items-center justify-center gap-2"
               style={{ background: 'rgba(129,182,76,0.15)', color: '#81b64c', border: '1px solid rgba(129,182,76,0.3)' }}
             >
               <Swords className="w-4 h-4" />
@@ -777,7 +777,7 @@ export function ScanPosition() {
 
           <button
             onClick={resetAll}
-            className="w-full py-2.5 rounded-md text-xs font-bold text-white/40 hover:text-white/60 transition-all flex items-center justify-center gap-1.5"
+            className="w-full py-2.5 rounded-xl text-xs font-bold text-white/40 hover:text-white/60 transition-all flex items-center justify-center gap-1.5"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
             Back
