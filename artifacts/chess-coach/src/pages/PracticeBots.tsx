@@ -94,7 +94,7 @@ function MoveAnalysisPanel({ move, playerColor }: { move: MoveRecord; playerColo
       {(pros.length > 0 || cons.length > 0) && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
           {pros.length > 0 && (
-            <div className="rounded-2xl bg-emerald-500/8 border border-emerald-500/20 px-2.5 py-2">
+            <div className="rounded-md bg-emerald-500/8 border border-emerald-500/20 px-2.5 py-2">
               <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-wide mb-1">Pros</p>
               <ul className="space-y-1">
                 {pros.map((p, i) => (
@@ -107,7 +107,7 @@ function MoveAnalysisPanel({ move, playerColor }: { move: MoveRecord; playerColo
             </div>
           )}
           {cons.length > 0 && (
-            <div className="rounded-2xl bg-red-500/8 border border-red-500/20 px-2.5 py-2">
+            <div className="rounded-md bg-red-500/8 border border-red-500/20 px-2.5 py-2">
               <p className="text-[10px] font-bold text-red-400 uppercase tracking-wide mb-1">Cons</p>
               <ul className="space-y-1">
                 {cons.map((c, i) => (
@@ -141,13 +141,13 @@ function BotCard({ bot, onSelect }: { bot: BotConfig; onSelect: (b: BotConfig) =
       whileTap={{ scale: 0.98 }}
       onClick={() => onSelect(bot)}
       className={cn(
-        'relative flex flex-col gap-3 p-5 rounded-[2rem] border bg-gradient-to-br text-left transition-shadow hover:shadow-xl hover:shadow-black/30 group',
+        'relative flex flex-col gap-3 p-5 rounded-md border bg-gradient-to-br text-left transition-shadow hover:shadow-xl hover:shadow-black/30 group',
         gradient,
       )}
     >
       <div className="flex items-center justify-between">
         <img src={bot.avatar} alt={bot.name} className="w-10 h-10 rounded-full border-2 border-white/20 shadow-md" />
-        <span className="text-xs font-bold px-2.5 py-1 rounded-[2rem] bg-black/30 border border-white/10 text-white/80">
+        <span className="text-xs font-bold px-2.5 py-1 rounded-md bg-black/30 border border-white/10 text-white/80">
           {bot.rating} ELO
         </span>
       </div>
@@ -362,7 +362,7 @@ function GameView({ bot, onBack, startFen, startColor }: { bot: BotConfig; onBac
 
       <div className="grid grid-cols-1 xl:grid-cols-[1fr_340px] gap-4">
         <div className="space-y-2.5">
-          <div className="glass-card rounded-3xl p-2.5 flex items-center justify-between">
+          <div className="glass-card rounded-md p-2.5 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <img src={bot.avatar} alt={bot.name} className="w-8 h-8 rounded-full border border-white/20 shadow" />
               <div>
@@ -392,7 +392,7 @@ function GameView({ bot, onBack, startFen, startColor }: { bot: BotConfig; onBac
             moveQuality={latestQuality}
           />
 
-          <div className="glass-card rounded-3xl p-2.5 flex items-center justify-between">
+          <div className="glass-card rounded-md p-2.5 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div className="w-7 h-7 rounded-full bg-primary/20 border-2 border-primary/30 flex items-center justify-center">
                 <span className="text-[10px] font-black text-primary">You</span>
@@ -403,13 +403,13 @@ function GameView({ bot, onBack, startFen, startColor }: { bot: BotConfig; onBac
               {result === 'playing' && (
                 <button onClick={() => handleNewGame(playerColor === 'w' ? 'b' : 'w')}
                   title="Switch color"
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-3xl bg-white/5 border border-white/10 text-muted-foreground text-xs font-bold hover:bg-white/10 transition-colors">
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-white/5 border border-white/10 text-muted-foreground text-xs font-bold hover:bg-white/10 transition-colors">
                   <RotateCcw className="w-3 h-3" /> Switch
                 </button>
               )}
               {result === 'playing' && (
                 <button onClick={handleResign}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-3xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-bold hover:bg-red-500/20 transition-colors">
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-bold hover:bg-red-500/20 transition-colors">
                   <Flag className="w-3 h-3" /> Resign
                 </button>
               )}
@@ -444,7 +444,7 @@ function GameView({ bot, onBack, startFen, startColor }: { bot: BotConfig; onBac
             </div>
           )}
 
-          <div className="glass-card rounded-3xl overflow-hidden">
+          <div className="glass-card rounded-md overflow-hidden">
             <div className="px-3 py-2.5 border-b border-white/5 text-sm font-bold">Moves</div>
             <div ref={moveListRef} className="max-h-[220px] overflow-y-auto px-2 py-1.5">
               {movePairs.length === 0 ? (
@@ -491,7 +491,7 @@ function GameView({ bot, onBack, startFen, startColor }: { bot: BotConfig; onBac
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 className={cn(
-                  'glass-card rounded-3xl p-5 text-center space-y-3 border',
+                  'glass-card rounded-md p-5 text-center space-y-3 border',
                   result === 'win' ? 'border-emerald-500/30 bg-emerald-500/5' :
                   result === 'loss' ? 'border-red-500/30 bg-red-500/5' :
                   'border-slate-500/30 bg-slate-500/5',
@@ -512,11 +512,11 @@ function GameView({ bot, onBack, startFen, startColor }: { bot: BotConfig; onBac
                 </p>
                 <div className="flex gap-2 justify-center flex-wrap">
                   <button onClick={() => handleNewGame('w')}
-                    className="flex items-center gap-1.5 px-4 py-2 rounded-3xl bg-[#f0d9b5] text-[#2d2d2d] text-xs font-bold hover:opacity-90 transition-opacity">
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-md bg-[#f0d9b5] text-[#2d2d2d] text-xs font-bold hover:opacity-90 transition-opacity">
                     <RotateCcw className="w-3 h-3" /> Play as White
                   </button>
                   <button onClick={() => handleNewGame('b')}
-                    className="flex items-center gap-1.5 px-4 py-2 rounded-3xl bg-[#2d2d2d] border border-white/20 text-[#f0d9b5] text-xs font-bold hover:opacity-90 transition-opacity">
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-md bg-[#2d2d2d] border border-white/20 text-[#f0d9b5] text-xs font-bold hover:opacity-90 transition-opacity">
                     <RotateCcw className="w-3 h-3" /> Play as Black
                   </button>
                 </div>
@@ -644,9 +644,9 @@ function OpeningTrainerView({ opening, onBack }: { opening: OpeningLine; onBack:
 
       <div className="grid grid-cols-1 xl:grid-cols-[1fr_340px] gap-4">
         <div className="space-y-2.5">
-          <div className="glass-card rounded-3xl p-3 flex items-center justify-between gap-3">
+          <div className="glass-card rounded-md p-3 flex items-center justify-between gap-3">
             <div className="flex items-center gap-2 min-w-0">
-              <div className="w-9 h-9 rounded-2xl bg-primary/15 border border-primary/30 flex items-center justify-center shrink-0">
+              <div className="w-9 h-9 rounded-md bg-primary/15 border border-primary/30 flex items-center justify-center shrink-0">
                 <BookOpen className="w-4 h-4 text-primary" />
               </div>
               <div className="min-w-0">
@@ -662,7 +662,7 @@ function OpeningTrainerView({ opening, onBack }: { opening: OpeningLine; onBack:
                 <p className="text-sm font-mono font-bold text-primary">{accuracy}%</p>
               </div>
               {streak >= 2 && (
-                <div className="px-2 py-1 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-400 text-[10px] font-bold">
+                <div className="px-2 py-1 rounded-md bg-amber-500/15 border border-amber-500/30 text-amber-400 text-[10px] font-bold">
                   🔥 {streak}
                 </div>
               )}
@@ -688,7 +688,7 @@ function OpeningTrainerView({ opening, onBack }: { opening: OpeningLine; onBack:
             moveQuality={null}
           />
 
-          <div className="glass-card rounded-3xl p-2.5 flex items-center justify-between flex-wrap gap-2">
+          <div className="glass-card rounded-md p-2.5 flex items-center justify-between flex-wrap gap-2">
             <div className="flex items-center gap-2">
               <div className="w-7 h-7 rounded-full bg-primary/20 border-2 border-primary/30 flex items-center justify-center">
                 <span className="text-[10px] font-black text-primary">You</span>
@@ -704,11 +704,11 @@ function OpeningTrainerView({ opening, onBack }: { opening: OpeningLine; onBack:
             <div className="flex items-center gap-2">
               <button onClick={handleShowHint}
                 disabled={!playerExpected}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-3xl bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-bold hover:bg-amber-500/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-bold hover:bg-amber-500/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
                 <Lightbulb className="w-3 h-3" /> {hintOpen && playerExpected ? playerExpected : 'Hint'}
               </button>
               <button onClick={handleReset}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-3xl bg-white/5 border border-white/10 text-muted-foreground text-xs font-bold hover:bg-white/10 transition-colors">
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-white/5 border border-white/10 text-muted-foreground text-xs font-bold hover:bg-white/10 transition-colors">
                 <RotateCcw className="w-3 h-3" /> Restart
               </button>
             </div>
@@ -734,7 +734,7 @@ function OpeningTrainerView({ opening, onBack }: { opening: OpeningLine; onBack:
             )}
           </AnimatePresence>
 
-          <div className="glass-card rounded-3xl p-3 space-y-2">
+          <div className="glass-card rounded-md p-3 space-y-2">
             <div className="flex items-center gap-2">
               <Lightbulb className="w-4 h-4 text-amber-400" />
               <h3 className="font-bold text-sm">Key Ideas</h3>
@@ -750,7 +750,7 @@ function OpeningTrainerView({ opening, onBack }: { opening: OpeningLine; onBack:
             </ul>
           </div>
 
-          <div className="glass-card rounded-3xl overflow-hidden">
+          <div className="glass-card rounded-md overflow-hidden">
             <div className="px-3 py-2.5 border-b border-white/5 text-sm font-bold flex items-center justify-between">
               <span>Move History</span>
               <span className="text-[10px] text-muted-foreground font-normal">{score.correct}/{score.total} correct</span>
@@ -787,7 +787,7 @@ function OpeningTrainerView({ opening, onBack }: { opening: OpeningLine; onBack:
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="glass-card rounded-3xl p-5 text-center space-y-3 border border-emerald-500/30 bg-emerald-500/5"
+                className="glass-card rounded-md p-5 text-center space-y-3 border border-emerald-500/30 bg-emerald-500/5"
               >
                 <div className="text-4xl">🎓</div>
                 <h3 className="text-xl font-black text-emerald-400">Line Complete!</h3>
@@ -796,11 +796,11 @@ function OpeningTrainerView({ opening, onBack }: { opening: OpeningLine; onBack:
                 </p>
                 <div className="flex gap-2 justify-center flex-wrap">
                   <button onClick={handleReset}
-                    className="flex items-center gap-1.5 px-4 py-2 rounded-3xl bg-[#f0d9b5] text-[#2d2d2d] text-xs font-bold hover:opacity-90 transition-opacity">
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-md bg-[#f0d9b5] text-[#2d2d2d] text-xs font-bold hover:opacity-90 transition-opacity">
                     <RotateCcw className="w-3 h-3" /> Practice Again
                   </button>
                   <button onClick={onBack}
-                    className="flex items-center gap-1.5 px-4 py-2 rounded-3xl bg-[#2d2d2d] border border-white/20 text-[#f0d9b5] text-xs font-bold hover:opacity-90 transition-opacity">
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-md bg-[#2d2d2d] border border-white/20 text-[#f0d9b5] text-xs font-bold hover:opacity-90 transition-opacity">
                     Pick Another Opening
                   </button>
                 </div>
@@ -821,13 +821,13 @@ function OpeningCard({ opening, onSelect }: { opening: OpeningLine; onSelect: (o
       whileHover={{ scale: 1.03 }}
       whileTap={{ scale: 0.98 }}
       onClick={() => onSelect(opening)}
-      className="relative flex flex-col gap-3 p-5 rounded-[2rem] border border-white/10 bg-gradient-to-br from-[#2d2c29] to-[#1f1e1c] text-left transition-shadow hover:shadow-xl hover:shadow-black/30 group"
+      className="relative flex flex-col gap-3 p-5 rounded-md border border-white/10 bg-gradient-to-br from-[#2d2c29] to-[#1f1e1c] text-left transition-shadow hover:shadow-xl hover:shadow-black/30 group"
     >
       <div className="flex items-center justify-between">
-        <div className="w-10 h-10 rounded-2xl bg-primary/15 border border-primary/30 flex items-center justify-center">
+        <div className="w-10 h-10 rounded-md bg-primary/15 border border-primary/30 flex items-center justify-center">
           <BookOpen className="w-5 h-5 text-primary" />
         </div>
-        <span className="text-xs font-bold px-2.5 py-1 rounded-[2rem] bg-black/30 border border-white/10 text-white/80">
+        <span className="text-xs font-bold px-2.5 py-1 rounded-md bg-black/30 border border-white/10 text-white/80">
           {opening.eco}
         </span>
       </div>
@@ -881,7 +881,7 @@ export function PracticeBots() {
 
   return (
     <div className="space-y-6 pb-20 px-4 pt-4 md:px-0 md:pt-0">
-      <div className="glass-card p-5 sm:p-6 rounded-[2rem] sm:rounded-3xl border-primary/20 relative overflow-hidden">
+      <div className="glass-card p-5 sm:p-6 rounded-md sm:rounded-md border-primary/20 relative overflow-hidden">
         <div className="absolute right-0 top-0 w-64 h-64 bg-primary/5 blur-3xl rounded-full pointer-events-none" />
         <div className="relative z-10">
           <h1 className="text-2xl sm:text-3xl font-display font-bold flex items-center gap-3">
@@ -893,11 +893,11 @@ export function PracticeBots() {
         </div>
       </div>
 
-      <div className="inline-flex p-1 rounded-3xl bg-card/60 border border-white/10 gap-1">
+      <div className="inline-flex p-1 rounded-md bg-card/60 border border-white/10 gap-1">
         <button
           onClick={() => setTab('bots')}
           className={cn(
-            'flex items-center gap-2 px-4 py-2 rounded-2xl text-sm font-bold transition-all',
+            'flex items-center gap-2 px-4 py-2 rounded-md text-sm font-bold transition-all',
             tab === 'bots' ? 'bg-primary text-primary-foreground shadow' : 'text-muted-foreground hover:text-foreground'
           )}
         >
@@ -906,7 +906,7 @@ export function PracticeBots() {
         <button
           onClick={() => setTab('openings')}
           className={cn(
-            'flex items-center gap-2 px-4 py-2 rounded-2xl text-sm font-bold transition-all',
+            'flex items-center gap-2 px-4 py-2 rounded-md text-sm font-bold transition-all',
             tab === 'openings' ? 'bg-primary text-primary-foreground shadow' : 'text-muted-foreground hover:text-foreground'
           )}
         >
@@ -922,7 +922,7 @@ export function PracticeBots() {
             ))}
           </div>
 
-          <div className="glass-card rounded-[2rem] p-4 sm:p-6 border border-white/8">
+          <div className="glass-card rounded-md p-4 sm:p-6 border border-white/8">
             <div className="flex items-center gap-2 mb-3 sm:mb-4">
               <Zap className="w-5 h-5 text-amber-400" />
               <h3 className="font-bold">How it works</h3>
@@ -951,7 +951,7 @@ export function PracticeBots() {
             ))}
           </div>
 
-          <div className="glass-card rounded-[2rem] p-4 sm:p-6 border border-white/8">
+          <div className="glass-card rounded-md p-4 sm:p-6 border border-white/8">
             <div className="flex items-center gap-2 mb-3 sm:mb-4">
               <BookOpen className="w-5 h-5 text-primary" />
               <h3 className="font-bold">How opening drills work</h3>

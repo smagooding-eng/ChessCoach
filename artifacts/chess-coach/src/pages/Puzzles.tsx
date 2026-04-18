@@ -432,12 +432,12 @@ export function Puzzles() {
           )}
         </div>
 
-        <div className="flex gap-1 mb-4 p-1 rounded-3xl" style={{ background: 'rgba(255,255,255,0.04)' }}>
+        <div className="flex gap-1 mb-4 p-1 rounded-md" style={{ background: 'rgba(255,255,255,0.04)' }}>
           {(['daily', 'games'] as const).map(t => (
             <button
               key={t}
               onClick={() => setTab(t)}
-              className="flex-1 py-2 px-3 rounded-[2rem] text-sm font-semibold transition-all"
+              className="flex-1 py-2 px-3 rounded-md text-sm font-semibold transition-all"
               style={{
                 background: tab === t ? CHESSCOM_GREEN : 'transparent',
                 color: tab === t ? '#000' : TEXT_MUTED,
@@ -451,7 +451,7 @@ export function Puzzles() {
         {tab === 'daily' && (
           <>
             {daily && !daily.premium && daily.limit && state !== 'limit_reached' && (
-              <div className="flex items-center justify-between px-3 py-2 rounded-[2rem] mb-3"
+              <div className="flex items-center justify-between px-3 py-2 rounded-md mb-3"
                 style={{ background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.2)' }}>
                 <span className="text-xs font-medium" style={{ color: '#fbbf24' }}>
                   {daily.used}/{daily.limit} free puzzles today
@@ -472,7 +472,7 @@ export function Puzzles() {
 
             {state === 'limit_reached' && (
               <div className="flex flex-col items-center justify-center py-16 text-center">
-                <div className="w-16 h-16 rounded-[2rem] flex items-center justify-center mb-4"
+                <div className="w-16 h-16 rounded-md flex items-center justify-center mb-4"
                   style={{ background: 'rgba(245,158,11,0.15)' }}>
                   <Lock size={28} style={{ color: '#f59e0b' }} />
                 </div>
@@ -481,7 +481,7 @@ export function Puzzles() {
                   Free users get {daily?.limit ?? 5} puzzles per day. Upgrade to ChessScout Pro for unlimited puzzles!
                 </p>
                 <button onClick={() => navigate('/subscription')}
-                  className="flex items-center gap-2 px-6 py-3 rounded-3xl font-bold transition-all hover:scale-105"
+                  className="flex items-center gap-2 px-6 py-3 rounded-md font-bold transition-all hover:scale-105"
                   style={{ background: CHESSCOM_GREEN, color: '#000' }}>
                   <Crown size={18} />Upgrade to Pro
                 </button>
@@ -492,7 +492,7 @@ export function Puzzles() {
               <div className="flex flex-col items-center justify-center py-16 text-center">
                 <p className="text-sm mb-4" style={{ color: TEXT_MUTED }}>No puzzles available right now.</p>
                 <button onClick={fetchNextPuzzle}
-                  className="px-4 py-2 rounded-[2rem] text-sm font-semibold" style={{ background: CHESSCOM_GREEN, color: '#000' }}>
+                  className="px-4 py-2 rounded-md text-sm font-semibold" style={{ background: CHESSCOM_GREEN, color: '#000' }}>
                   Try Again
                 </button>
               </div>
@@ -578,7 +578,7 @@ export function Puzzles() {
                   {state === 'ready' && (
                     <button
                       onClick={() => setShowHint(!showHint)}
-                      className="flex items-center gap-1.5 px-4 py-2 rounded-[2rem] text-sm font-semibold transition-all"
+                      className="flex items-center gap-1.5 px-4 py-2 rounded-md text-sm font-semibold transition-all"
                       style={{ background: 'rgba(255,255,255,0.06)', color: showHint ? '#fbbf24' : TEXT_MUTED }}>
                       <Lightbulb size={16} />Hint
                     </button>
@@ -589,7 +589,7 @@ export function Puzzles() {
                       onClick={() => {
                         fetchNextPuzzle();
                       }}
-                      className="flex items-center gap-1.5 px-6 py-2.5 rounded-[2rem] text-sm font-bold transition-all hover:scale-105"
+                      className="flex items-center gap-1.5 px-6 py-2.5 rounded-md text-sm font-bold transition-all hover:scale-105"
                       style={{ background: CHESSCOM_GREEN, color: '#000' }}>
                       <ChevronRight size={16} />Next Puzzle
                     </button>
@@ -620,7 +620,7 @@ export function Puzzles() {
                         setGame(new Chess(puzzle.fen));
                         setTimeout(playSolution, 400);
                       }}
-                      className="flex items-center gap-1.5 px-4 py-2 rounded-[2rem] text-sm font-semibold transition-all"
+                      className="flex items-center gap-1.5 px-4 py-2 rounded-md text-sm font-semibold transition-all"
                       style={{ background: 'rgba(255,255,255,0.08)', color: TEXT_MUTED }}>
                       <Zap size={16} />Show Solution
                     </button>
@@ -629,7 +629,7 @@ export function Puzzles() {
                   {state === 'showing_solution' && (
                     <button
                       onClick={fetchNextPuzzle}
-                      className="flex items-center gap-1.5 px-6 py-2.5 rounded-[2rem] text-sm font-bold transition-all hover:scale-105"
+                      className="flex items-center gap-1.5 px-6 py-2.5 rounded-md text-sm font-bold transition-all hover:scale-105"
                       style={{ background: CHESSCOM_GREEN, color: '#000' }}>
                       <ChevronRight size={16} />Next Puzzle
                     </button>
@@ -637,7 +637,7 @@ export function Puzzles() {
                 </div>
 
                 {state === 'correct' && (
-                  <div className="mt-4 rounded-3xl p-4" style={{ background: BG_CARD, border: '1px solid rgba(129,182,76,0.2)' }}>
+                  <div className="mt-4 rounded-md p-4" style={{ background: BG_CARD, border: '1px solid rgba(129,182,76,0.2)' }}>
                     <div className="flex items-center gap-2 mb-2">
                       <Lightbulb size={16} style={{ color: '#fbbf24' }} />
                       <span className="text-sm font-bold" style={{ color: TEXT_LIGHT }}>Why this works</span>
@@ -663,7 +663,7 @@ export function Puzzles() {
                   { label: 'Streak', value: stats.streak, icon: <Flame size={14} /> },
                   { label: 'Today', value: stats.todayCount, icon: <Zap size={14} /> },
                 ].map(s => (
-                  <div key={s.label} className="rounded-3xl p-3 text-center" style={{ background: BG_CARD, border: CARD_BORDER, boxShadow: CARD_SHADOW }}>
+                  <div key={s.label} className="rounded-md p-3 text-center" style={{ background: BG_CARD, border: CARD_BORDER, boxShadow: CARD_SHADOW }}>
                     <div className="flex items-center justify-center gap-1 mb-1" style={{ color: CHESSCOM_GREEN }}>
                       {s.icon}
                     </div>
@@ -685,7 +685,7 @@ export function Puzzles() {
               <button
                 onClick={generateFromGames}
                 disabled={generatingFromGames}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-[2rem] text-xs font-semibold transition-all disabled:opacity-50"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all disabled:opacity-50"
                 style={{ background: CHESSCOM_GREEN, color: '#000' }}>
                 {generatingFromGames ? <Loader2 size={14} className="animate-spin" /> : <Zap size={14} />}
                 Generate
@@ -694,7 +694,7 @@ export function Puzzles() {
 
             {gamePuzzles.length === 0 ? (
               <div className="text-center py-12">
-                <div className="w-14 h-14 rounded-[2rem] flex items-center justify-center mx-auto mb-3"
+                <div className="w-14 h-14 rounded-md flex items-center justify-center mx-auto mb-3"
                   style={{ background: 'rgba(129,182,76,0.1)' }}>
                   <Target size={24} style={{ color: CHESSCOM_GREEN }} />
                 </div>
@@ -705,7 +705,7 @@ export function Puzzles() {
                 <button
                   onClick={generateFromGames}
                   disabled={generatingFromGames}
-                  className="px-4 py-2 rounded-[2rem] text-sm font-semibold"
+                  className="px-4 py-2 rounded-md text-sm font-semibold"
                   style={{ background: CHESSCOM_GREEN, color: '#000' }}>
                   Generate Puzzles
                 </button>
@@ -719,10 +719,10 @@ export function Puzzles() {
                       setTab('daily');
                       loadPuzzleById(p.id);
                     }}
-                    className="w-full flex items-center justify-between px-4 py-3 rounded-3xl transition-all hover:scale-[1.01]"
+                    className="w-full flex items-center justify-between px-4 py-3 rounded-md transition-all hover:scale-[1.01]"
                     style={{ background: BG_CARD }}>
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-[2rem] flex items-center justify-center text-lg"
+                      <div className="w-8 h-8 rounded-md flex items-center justify-center text-lg"
                         style={{ background: p.solved ? 'rgba(74,222,128,0.15)' : 'rgba(255,255,255,0.06)' }}>
                         {p.solved ? '✓' : '♟'}
                       </div>

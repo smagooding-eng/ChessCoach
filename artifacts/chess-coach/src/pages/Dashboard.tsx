@@ -55,12 +55,12 @@ export function Dashboard() {
     <div className="space-y-4 md:space-y-5">
 
       <div style={{ background: BG_CARD, border: CARD_BORDER, boxShadow: CARD_SHADOW }}
-        className="p-4 md:p-5 rounded-3xl">
+        className="p-4 md:p-5 rounded-md">
         <div className="flex items-center gap-3">
           <div className="shrink-0 relative">
             {chessPlayer?.avatar
-              ? <img src={chessPlayer.avatar} alt={username ?? ''} className="w-14 h-14 rounded-[2rem] object-cover" style={{ border: `2px solid ${CHESSCOM_GREEN}` }} />
-              : <div className="w-14 h-14 rounded-[2rem] flex items-center justify-center" style={{ background: 'rgba(129,182,76,0.15)', border: `2px solid rgba(129,182,76,0.3)` }}>
+              ? <img src={chessPlayer.avatar} alt={username ?? ''} className="w-14 h-14 rounded-md object-cover" style={{ border: `2px solid ${CHESSCOM_GREEN}` }} />
+              : <div className="w-14 h-14 rounded-md flex items-center justify-center" style={{ background: 'rgba(129,182,76,0.15)', border: `2px solid rgba(129,182,76,0.3)` }}>
                   <span className="text-xl font-black" style={{ color: CHESSCOM_GREEN }}>{username?.[0]?.toUpperCase()}</span>
                 </div>
             }
@@ -108,19 +108,19 @@ export function Dashboard() {
           </div>
 
           <div className="hidden sm:flex flex-col gap-1.5 shrink-0">
-            <Link href="/import" className="px-3 py-2 rounded-[2rem] font-bold text-xs text-white flex items-center gap-1.5 transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-white/30" style={{ background: CHESSCOM_GREEN }}>
+            <Link href="/import" className="px-3 py-2 rounded-md font-bold text-xs text-white flex items-center gap-1.5 transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-white/30" style={{ background: CHESSCOM_GREEN }}>
               <ImportIcon /> Import
             </Link>
-            <Link href="/opponents" className="px-3 py-2 rounded-[2rem] font-bold text-xs flex items-center gap-1.5 transition-colors hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-white/30" style={{ background: 'rgba(255,255,255,0.06)', color: TEXT_LIGHT }}>
+            <Link href="/opponents" className="px-3 py-2 rounded-md font-bold text-xs flex items-center gap-1.5 transition-colors hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-white/30" style={{ background: 'rgba(255,255,255,0.06)', color: TEXT_LIGHT }}>
               <Swords className="w-3.5 h-3.5" style={{ color: CHESSCOM_GREEN }} /> Scout
             </Link>
           </div>
         </div>
         <div className="flex sm:hidden gap-2 mt-3">
-          <Link href="/import" className="flex-1 px-3 py-2 rounded-[2rem] font-bold text-xs text-white flex items-center justify-center gap-1.5 transition-opacity hover:opacity-90" style={{ background: CHESSCOM_GREEN }}>
+          <Link href="/import" className="flex-1 px-3 py-2 rounded-md font-bold text-xs text-white flex items-center justify-center gap-1.5 transition-opacity hover:opacity-90" style={{ background: CHESSCOM_GREEN }}>
             <ImportIcon /> Import Games
           </Link>
-          <Link href="/opponents" className="flex-1 px-3 py-2 rounded-[2rem] font-bold text-xs flex items-center justify-center gap-1.5 transition-colors hover:bg-white/10" style={{ background: 'rgba(255,255,255,0.06)', color: TEXT_LIGHT }}>
+          <Link href="/opponents" className="flex-1 px-3 py-2 rounded-md font-bold text-xs flex items-center justify-center gap-1.5 transition-colors hover:bg-white/10" style={{ background: 'rgba(255,255,255,0.06)', color: TEXT_LIGHT }}>
             <Swords className="w-3.5 h-3.5" style={{ color: CHESSCOM_GREEN }} /> Scout
           </Link>
         </div>
@@ -142,14 +142,14 @@ export function Dashboard() {
       </div>
 
       <Link href="/scan" className="block px-3 md:px-0">
-        <div className="rounded-3xl p-4 md:p-5 transition-all group cursor-pointer flex items-center gap-4"
+        <div className="rounded-md p-4 md:p-5 transition-all group cursor-pointer flex items-center gap-4"
           style={{
             background: 'linear-gradient(135deg, rgba(129,182,76,0.18) 0%, rgba(129,182,76,0.04) 100%)',
             border: `1px solid rgba(129,182,76,0.3)`,
           }}
           onMouseEnter={(e) => (e.currentTarget.style.borderColor = 'rgba(129,182,76,0.55)')}
           onMouseLeave={(e) => (e.currentTarget.style.borderColor = 'rgba(129,182,76,0.3)')}>
-          <div className="shrink-0 w-12 h-12 md:w-14 md:h-14 rounded-3xl flex items-center justify-center"
+          <div className="shrink-0 w-12 h-12 md:w-14 md:h-14 rounded-md flex items-center justify-center"
             style={{ background: 'rgba(129,182,76,0.18)' }}>
             <Camera className="w-6 h-6 md:w-7 md:h-7" style={{ color: CHESSCOM_GREEN }} />
           </div>
@@ -172,7 +172,7 @@ export function Dashboard() {
           { label: 'Avg Rating', value: Math.round(summary?.avgRating || 0) || '—', icon: <TrendingUp className="w-4 h-4" /> },
           { label: 'Games Reviewed', value: allGamesData?.games?.filter(g => g.reviewed).length ?? 0, icon: <Target className="w-4 h-4" /> },
         ].map((s) => (
-          <div key={s.label} className="rounded-[2rem] p-3.5" style={{ background: BG_CARD, border: CARD_BORDER, boxShadow: CARD_SHADOW }}>
+          <div key={s.label} className="rounded-md p-3.5" style={{ background: BG_CARD, border: CARD_BORDER, boxShadow: CARD_SHADOW }}>
             <div className="flex items-center justify-between mb-2">
               <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: TEXT_MUTED }}>{s.label}</p>
               <span style={{ color: CHESSCOM_GREEN }}>{s.icon}</span>
@@ -196,7 +196,7 @@ export function Dashboard() {
                   ].map((w, i) => {
                     const sev = SEV_COLORS[w.sev as keyof typeof SEV_COLORS] ?? SEV_COLORS.Low;
                     return (
-                      <div key={i} className="flex items-start gap-2.5 p-3 rounded-[2rem]">
+                      <div key={i} className="flex items-start gap-2.5 p-3 rounded-md">
                         <span className="mt-px px-1.5 py-px rounded text-[10px] font-bold shrink-0" style={{ background: sev.bg, color: sev.text }}>{w.sev}</span>
                         <div className="min-w-0 flex-1">
                           <p className="font-semibold text-sm" style={{ color: TEXT_LIGHT }}>{w.cat}</p>
@@ -207,16 +207,16 @@ export function Dashboard() {
                   })}
                 </div>
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="text-center px-4 py-5 rounded-3xl max-w-xs"
+                  <div className="text-center px-4 py-5 rounded-md max-w-xs"
                     style={{ background: 'rgba(38,36,33,0.92)', border: `1px solid rgba(234,166,49,0.35)`, backdropFilter: 'blur(2px)' }}>
-                    <div className="inline-flex items-center justify-center w-9 h-9 rounded-[2rem] mb-2" style={{ background: 'rgba(234,166,49,0.18)' }}>
+                    <div className="inline-flex items-center justify-center w-9 h-9 rounded-md mb-2" style={{ background: 'rgba(234,166,49,0.18)' }}>
                       <Lock className="w-4 h-4" style={{ color: '#eaa631' }} />
                     </div>
                     <p className="font-bold text-sm mb-1" style={{ color: TEXT_LIGHT }}>
                       Unlock your full breakdown and personalized training plan
                     </p>
                     <Link href="/subscription">
-                      <button className="mt-2 inline-flex items-center gap-1.5 px-4 py-2 rounded-[2rem] font-bold text-xs transition-all"
+                      <button className="mt-2 inline-flex items-center gap-1.5 px-4 py-2 rounded-md font-bold text-xs transition-all"
                         style={{ background: '#eaa631', color: '#1a1816' }}>
                         <Crown className="w-3.5 h-3.5" /> Upgrade to Pro
                       </button>
@@ -231,7 +231,7 @@ export function Dashboard() {
                     const sev = SEV_COLORS[w.severity] ?? SEV_COLORS.Low;
                     return (
                       <Link key={w.id} href={`/analysis/${w.id}`}>
-                        <div className="group flex items-start gap-2.5 p-3 rounded-[2rem] transition-colors cursor-pointer" style={{ background: 'transparent' }}
+                        <div className="group flex items-start gap-2.5 p-3 rounded-md transition-colors cursor-pointer" style={{ background: 'transparent' }}
                           onMouseEnter={e => (e.currentTarget.style.background = BG_CARD_HOVER)}
                           onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
                           <span className="mt-px px-1.5 py-px rounded text-[10px] font-bold shrink-0" style={{ background: sev.bg, color: sev.text }}>
@@ -259,7 +259,7 @@ export function Dashboard() {
                 const res = RESULT_COLORS[game.result] ?? RESULT_COLORS.draw;
                 return (
                   <Link key={game.id} href={`/games/${game.id}`} className="block">
-                    <div className="group flex items-center gap-2.5 p-2.5 rounded-[2rem] transition-colors"
+                    <div className="group flex items-center gap-2.5 p-2.5 rounded-md transition-colors"
                       onMouseEnter={e => (e.currentTarget.style.background = BG_CARD_HOVER)}
                       onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
                       <span className="w-6 text-center py-0.5 rounded text-[10px] font-black shrink-0" style={{ background: res.bg, color: res.text }}>
@@ -287,12 +287,12 @@ export function Dashboard() {
 
         <div className="space-y-3 md:space-y-4">
           <Link href="/opponents" className="block">
-            <div className="rounded-[2rem] p-4 md:p-5 transition-colors group cursor-pointer"
+            <div className="rounded-md p-4 md:p-5 transition-colors group cursor-pointer"
               style={{ background: 'linear-gradient(135deg, rgba(129,182,76,0.12) 0%, rgba(129,182,76,0.04) 100%)', border: `1px solid rgba(129,182,76,0.2)` }}
               onMouseEnter={e => (e.currentTarget.style.borderColor = 'rgba(129,182,76,0.4)')}
               onMouseLeave={e => (e.currentTarget.style.borderColor = 'rgba(129,182,76,0.2)')}>
               <div className="flex items-center gap-3 mb-2">
-                <div className="w-10 h-10 rounded-[2rem] flex items-center justify-center" style={{ background: 'rgba(129,182,76,0.15)' }}>
+                <div className="w-10 h-10 rounded-md flex items-center justify-center" style={{ background: 'rgba(129,182,76,0.15)' }}>
                   <Swords className="w-5 h-5" style={{ color: CHESSCOM_GREEN }} />
                 </div>
                 <div className="flex-1 min-w-0">
@@ -307,7 +307,7 @@ export function Dashboard() {
             </div>
           </Link>
 
-          <div className="rounded-[2rem] p-4 space-y-1" style={{ background: BG_CARD, border: CARD_BORDER, boxShadow: CARD_SHADOW }}>
+          <div className="rounded-md p-4 space-y-1" style={{ background: BG_CARD, border: CARD_BORDER, boxShadow: CARD_SHADOW }}>
             <p className="text-[10px] font-bold uppercase tracking-wider mb-2.5" style={{ color: TEXT_MUTED }}>Quick Actions</p>
             {[
               { href: '/opponents', label: 'Scout an Opponent', icon: <Swords className="w-4 h-4" /> },
@@ -318,7 +318,7 @@ export function Dashboard() {
               { href: '/analysis', label: 'Run AI Analysis', icon: <Target className="w-4 h-4" /> },
             ].map(action => (
               <Link key={action.href} href={action.href} className="block">
-                <div className="flex items-center gap-2.5 px-2.5 py-2 rounded-[2rem] transition-colors text-sm font-medium group"
+                <div className="flex items-center gap-2.5 px-2.5 py-2 rounded-md transition-colors text-sm font-medium group"
                   style={{ color: TEXT_MUTED }}
                   onMouseEnter={e => { e.currentTarget.style.color = CHESSCOM_GREEN; e.currentTarget.style.background = 'rgba(129,182,76,0.08)'; }}
                   onMouseLeave={e => { e.currentTarget.style.color = TEXT_MUTED; e.currentTarget.style.background = 'transparent'; }}>
@@ -331,7 +331,7 @@ export function Dashboard() {
           </div>
 
           {coursesData?.courses?.length ? (
-            <div className="rounded-[2rem] p-4" style={{ background: BG_CARD, border: CARD_BORDER, boxShadow: CARD_SHADOW }}>
+            <div className="rounded-md p-4" style={{ background: BG_CARD, border: CARD_BORDER, boxShadow: CARD_SHADOW }}>
               <div className="flex items-center justify-between mb-3">
                 <h2 className="text-sm font-bold flex items-center gap-2" style={{ color: TEXT_LIGHT }}>
                   <GraduationCap className="w-4 h-4" style={{ color: '#b583e0' }} /> Courses
@@ -346,7 +346,7 @@ export function Dashboard() {
                   const progress = Math.round((course.completedLessons / course.totalLessons) * 100) || 0;
                   return (
                     <Link key={course.id} href={`/courses/${course.id}`} className="block">
-                      <div className="group flex items-center gap-2.5 p-2 rounded-[2rem] transition-colors"
+                      <div className="group flex items-center gap-2.5 p-2 rounded-md transition-colors"
                         onMouseEnter={e => (e.currentTarget.style.background = BG_CARD_HOVER)}
                         onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
                         <div className="flex-1 min-w-0">
@@ -370,7 +370,7 @@ function DashCard({ title, icon, linkHref, linkText, children }: {
   title: string; icon: React.ReactNode; linkHref: string; linkText: string; children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-[2rem] p-4 md:p-5" style={{ background: BG_CARD, border: CARD_BORDER, boxShadow: CARD_SHADOW }}>
+    <div className="rounded-md p-4 md:p-5" style={{ background: BG_CARD, border: CARD_BORDER, boxShadow: CARD_SHADOW }}>
       <div className="flex items-center justify-between mb-3.5">
         <h2 className="text-sm font-bold flex items-center gap-2" style={{ color: TEXT_LIGHT }}>
           {icon} {title}
@@ -386,7 +386,7 @@ function DashCard({ title, icon, linkHref, linkText, children }: {
 
 function EmptyState({ icon, text, linkHref, linkText }: { icon: React.ReactNode; text: string; linkHref: string; linkText: string }) {
   return (
-    <div className="text-center py-8 rounded-[2rem]" style={{ border: `1px dashed rgba(255,255,255,0.1)` }}>
+    <div className="text-center py-8 rounded-md" style={{ border: `1px dashed rgba(255,255,255,0.1)` }}>
       <div className="mx-auto mb-2 opacity-25" style={{ color: TEXT_MUTED }}>{icon}</div>
       <p className="text-sm" style={{ color: TEXT_MUTED }}>{text}</p>
       <Link href={linkHref} className="mt-2 inline-block text-sm font-semibold hover:underline" style={{ color: CHESSCOM_GREEN }}>{linkText}</Link>

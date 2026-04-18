@@ -115,7 +115,7 @@ export function AICoachCard({
         {/* Avatar */}
         <div className="shrink-0 relative">
           <div className={cn(
-            'relative w-10 h-10 rounded-2xl ring-2 flex items-center justify-center bg-gradient-to-br shadow-md',
+            'relative w-10 h-10 rounded-full ring-2 flex items-center justify-center bg-gradient-to-br shadow-md',
             t.avatarRing,
             t.avatarGrad,
           )}>

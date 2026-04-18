@@ -42,7 +42,7 @@ export function PremiumGate({ children, feature }: PremiumGateProps) {
       <p className="mb-6 max-w-sm text-xs" style={{ color: TEXT_MUTED }}>
         Includes a 3-day free trial — cancel anytime.
       </p>
-      <Link href="/subscription" className="flex items-center gap-2 px-5 py-2.5 rounded-[2rem] font-bold text-sm text-white transition-opacity hover:opacity-90" style={{ background: CHESSCOM_GREEN }}>
+      <Link href="/subscription" className="flex items-center gap-2 px-5 py-2.5 rounded-md font-bold text-sm text-white transition-opacity hover:opacity-90" style={{ background: CHESSCOM_GREEN }}>
         <CreditCard className="w-4 h-4" />
         Subscribe Now
       </Link>

@@ -124,7 +124,7 @@ export function Setup() {
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-md glass-panel p-8 md:p-10 rounded-3xl relative z-10"
+        className="w-full max-w-md glass-panel p-8 md:p-10 rounded-md relative z-10"
       >
         <div className="text-center mb-6">
           <div className="mx-auto w-16 h-16 mb-4 bg-primary/20 rounded-full flex items-center justify-center shadow-[0_0_30px_hsl(89_44%_50%_/_0.3)]">
@@ -142,7 +142,7 @@ export function Setup() {
           <>
             <button
               onClick={handleGoogleLogin}
-              className="w-full flex items-center justify-center gap-3 px-4 py-3 rounded-3xl border-2 border-border bg-secondary/50 hover:bg-secondary transition-colors text-foreground font-medium mb-4"
+              className="w-full flex items-center justify-center gap-3 px-4 py-3 rounded-md border-2 border-border bg-secondary/50 hover:bg-secondary transition-colors text-foreground font-medium mb-4"
             >
               <svg className="w-5 h-5" viewBox="0 0 24 24">
                 <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/>
@@ -162,7 +162,7 @@ export function Setup() {
         )}
 
         {error && (
-          <div className="mb-4 p-3 rounded-[2rem] bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
+          <div className="mb-4 p-3 rounded-md bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
             {error}
           </div>
         )}
@@ -178,7 +178,7 @@ export function Setup() {
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
                 placeholder="Your name"
-                className="w-full px-4 py-3 rounded-3xl bg-secondary/80 border-2 border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/20 transition-all text-sm"
+                className="w-full px-4 py-3 rounded-md bg-secondary/80 border-2 border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/20 transition-all text-sm"
               />
             </div>
           )}
@@ -194,7 +194,7 @@ export function Setup() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@example.com"
-                className="w-full pl-10 pr-4 py-3 rounded-3xl bg-secondary/80 border-2 border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/20 transition-all text-sm"
+                className="w-full pl-10 pr-4 py-3 rounded-md bg-secondary/80 border-2 border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/20 transition-all text-sm"
                 required
               />
             </div>
@@ -210,7 +210,7 @@ export function Setup() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder={mode === 'register' ? 'Min 6 characters' : 'Your password'}
-                className="w-full px-4 py-3 pr-10 rounded-3xl bg-secondary/80 border-2 border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/20 transition-all text-sm"
+                className="w-full px-4 py-3 pr-10 rounded-md bg-secondary/80 border-2 border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/20 transition-all text-sm"
                 required
                 minLength={mode === 'register' ? 6 : undefined}
               />
@@ -234,7 +234,7 @@ export function Setup() {
                 value={chesscomUsername}
                 onChange={(e) => setChesscomUsername(e.target.value)}
                 placeholder="e.g. Hikaru"
-                className="w-full px-4 py-3 rounded-3xl bg-secondary/80 border-2 border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/20 transition-all text-sm"
+                className="w-full px-4 py-3 rounded-md bg-secondary/80 border-2 border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/20 transition-all text-sm"
               />
             </div>
           )}

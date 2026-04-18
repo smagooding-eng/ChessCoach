@@ -130,7 +130,7 @@ export function Subscription() {
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mb-6 p-4 rounded-3xl bg-green-500/10 border border-green-500/30 text-green-400 text-center"
+          className="mb-6 p-4 rounded-md bg-green-500/10 border border-green-500/30 text-green-400 text-center"
         >
           <Check className="w-5 h-5 inline-block mr-2" />
           Welcome to ChessScout Pro! Your subscription is now active.
@@ -140,7 +140,7 @@ export function Subscription() {
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mb-6 p-4 rounded-3xl bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 text-center"
+          className="mb-6 p-4 rounded-md bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 text-center"
         >
           Checkout was canceled. You can try again anytime.
         </motion.div>
@@ -166,7 +166,7 @@ export function Subscription() {
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mb-6 max-w-md mx-auto p-4 rounded-3xl bg-amber-500/10 border border-amber-500/30 text-amber-400 text-center text-sm"
+          className="mb-6 max-w-md mx-auto p-4 rounded-md bg-amber-500/10 border border-amber-500/30 text-amber-400 text-center text-sm"
         >
           <Clock className="w-4 h-4 inline-block mr-1.5 -mt-0.5" />
           {subscription.trialDaysLeft} day{subscription.trialDaysLeft === 1 ? '' : 's'} remaining in your free trial. Add your payment info below to continue after the trial.
@@ -175,7 +175,7 @@ export function Subscription() {
 
       {isPremium && subscription.status !== 'free_trial' ? (
         <div className="max-w-md mx-auto">
-          <div className="glass-panel rounded-[2rem] p-6 mb-6">
+          <div className="glass-panel rounded-md p-6 mb-6">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
                 <Crown className="w-5 h-5 text-primary" />
@@ -200,7 +200,7 @@ export function Subscription() {
             <button
               onClick={handlePortal}
               disabled={portalLoading}
-              className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-3xl bg-secondary hover:bg-secondary/80 transition-colors font-semibold text-sm"
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-md bg-secondary hover:bg-secondary/80 transition-colors font-semibold text-sm"
             >
               {portalLoading ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -219,7 +219,7 @@ export function Subscription() {
       ) : (
         <div className="max-w-3xl mx-auto">
           <div className="grid md:grid-cols-2 gap-6 mb-8">
-            <div className="glass-panel rounded-[2rem] p-6 border-2 border-border/60">
+            <div className="glass-panel rounded-md p-6 border-2 border-border/60">
               <h3 className="text-lg font-bold mb-1">Free Plan</h3>
               <p className="text-3xl font-bold mb-4">$0<span className="text-sm font-normal text-muted-foreground">/forever</span></p>
               <div className="space-y-2.5 mb-6">
@@ -230,12 +230,12 @@ export function Subscription() {
                   </div>
                 ))}
               </div>
-              <div className="px-4 py-3 rounded-3xl bg-secondary/50 text-center text-sm text-muted-foreground font-medium">
+              <div className="px-4 py-3 rounded-md bg-secondary/50 text-center text-sm text-muted-foreground font-medium">
                 Current Plan
               </div>
             </div>
 
-            <div className="glass-panel rounded-[2rem] p-6 border-2 border-primary/40 relative overflow-hidden">
+            <div className="glass-panel rounded-md p-6 border-2 border-primary/40 relative overflow-hidden">
               <div className="absolute top-3 right-3 px-2 py-0.5 rounded-full bg-primary/20 text-primary text-[10px] font-bold uppercase tracking-wider">
                 3-day free trial
               </div>
@@ -282,7 +282,7 @@ export function Subscription() {
                     <button
                       onClick={() => handleCheckout(weeklyPrice.id)}
                       disabled={!!checkoutLoading}
-                      className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-3xl bg-secondary hover:bg-secondary/80 transition-colors font-semibold text-sm"
+                      className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-md bg-secondary hover:bg-secondary/80 transition-colors font-semibold text-sm"
                     >
                       {checkoutLoading === weeklyPrice.id ? (
                         <Loader2 className="w-4 h-4 animate-spin" />

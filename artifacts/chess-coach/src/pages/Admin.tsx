@@ -73,12 +73,12 @@ function StatCard({
   const color = accent ?? CHESSCOM_GREEN;
   return (
     <div
-      className="rounded-3xl p-4 flex flex-col gap-3"
+      className="rounded-md p-4 flex flex-col gap-3"
       style={{ background: BG_CARD, border: `1px solid rgba(255,255,255,0.05)` }}
     >
       <div className="flex items-center gap-2">
         <div
-          className="w-8 h-8 rounded-[2rem] flex items-center justify-center"
+          className="w-8 h-8 rounded-md flex items-center justify-center"
           style={{ background: `${color}1a` }}
         >
           <Icon className="w-4 h-4" style={{ color }} />
@@ -161,7 +161,7 @@ export function Admin() {
         <button
           onClick={load}
           disabled={loading}
-          className="flex items-center gap-2 px-3 py-2 rounded-[2rem] font-semibold text-sm transition-all disabled:opacity-50"
+          className="flex items-center gap-2 px-3 py-2 rounded-md font-semibold text-sm transition-all disabled:opacity-50"
           style={{
             background: `${CHESSCOM_GREEN}1a`,
             color: CHESSCOM_GREEN,
@@ -175,7 +175,7 @@ export function Admin() {
 
       {error && (
         <div
-          className="rounded-[2rem] p-3 text-sm"
+          className="rounded-md p-3 text-sm"
           style={{ background: 'rgba(220,67,67,0.1)', border: '1px solid rgba(220,67,67,0.3)', color: '#dc4343' }}
         >
           {error}
@@ -263,7 +263,7 @@ export function Admin() {
 
       {stats && stats.topPages && stats.topPages.length > 0 && (
         <div
-          className="rounded-3xl p-4"
+          className="rounded-md p-4"
           style={{ background: BG_CARD, border: `1px solid rgba(255,255,255,0.05)` }}
         >
           <div className="flex items-center justify-between mb-3">
