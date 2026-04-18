@@ -685,7 +685,7 @@ export function LandingPage() {
                   onMouseEnter={e => { e.currentTarget.style.color = TEXT; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.16)'; }}
                   onMouseLeave={e => { e.currentTarget.style.color = MUTED; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'; }}>
                   <DownloadIcon className="w-3.5 h-3.5" />
-                  Download Android app
+                  Download App
                 </a>
               </div>
 

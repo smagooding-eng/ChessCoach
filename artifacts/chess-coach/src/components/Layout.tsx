@@ -93,7 +93,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const [moreOpen, setMoreOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const handleLogout = isAuthenticated ? authLogout : logout;
-  const { canInstall, install, showGuide, setShowGuide, dismissInstall, platform } = usePwaInstall();
+  const { showGuide, setShowGuide, dismissInstall, platform } = usePwaInstall();
   const { showOnboarding } = useOnboardingCheck();
 
   useEffect(() => { setMoreOpen(false); setProfileOpen(false); }, [location]);
@@ -160,12 +160,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 <MultiEloTrackerBadge multi={multiElo} />
               </div>
             )}
-            {canInstall && (
-              <button onClick={install} className="p-1.5 rounded transition-colors shrink-0 hover:bg-green-400/10" style={{ color: CHESSCOM_GREEN }} title="Install App">
-                <Download className="w-3.5 h-3.5" />
-              </button>
-            )}
-            <Link href="/download" className="p-1.5 rounded transition-colors shrink-0 hover:bg-green-400/10" style={{ color: CHESSCOM_GREEN }} title="Download Android app">
+            <Link href="/download" className="p-1.5 rounded transition-colors shrink-0 hover:bg-green-400/10" style={{ color: CHESSCOM_GREEN }} title="Download App">
               <Download className="w-3.5 h-3.5" />
             </Link>
             <button onClick={() => handleLogout()} className="p-1.5 rounded transition-colors shrink-0 hover:bg-red-400/10" style={{ color: TEXT_MUTED }} title="Sign out"
@@ -184,12 +179,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <span className="font-black text-gradient text-sm">ChessScout.net</span>
           </Link>
           <div className="flex items-center gap-2">
-            {canInstall && (
-              <button onClick={install} className="p-1.5 rounded active:scale-95 transition-all" style={{ color: CHESSCOM_GREEN }} title="Install App">
-                <Download className="w-5 h-5" />
-              </button>
-            )}
-            <Link href="/download" className="p-1.5 rounded active:scale-95 transition-all" style={{ color: CHESSCOM_GREEN }} title="Download Android app">
+            <Link href="/download" className="p-1.5 rounded active:scale-95 transition-all" style={{ color: CHESSCOM_GREEN }} title="Download App">
               <Download className="w-5 h-5" />
             </Link>
             <button onClick={() => setProfileOpen(o => !o)} className="flex items-center gap-2 active:opacity-70 transition-opacity">
@@ -339,20 +329,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   );
                 })}
                 <div className="mt-2 pt-2" style={{ borderTop: `1px solid ${BORDER_COLOR}` }}>
-                  {canInstall && (
-                    <button
-                      onClick={() => { setMoreOpen(false); install(); }}
-                      className="w-full flex items-center gap-3 px-3.5 py-3 rounded-[2rem] active:bg-green-500/10 transition-colors"
-                      style={{ color: CHESSCOM_GREEN }}
-                    >
-                      <Download className="w-5 h-5" />
-                      <span className="font-semibold text-sm">Install App</span>
-                    </button>
-                  )}
                   <Link href="/download" onClick={() => setMoreOpen(false)} className="block">
                     <div className="w-full flex items-center gap-3 px-3.5 py-3 rounded-[2rem] active:bg-green-500/10 transition-colors" style={{ color: CHESSCOM_GREEN }}>
                       <Download className="w-5 h-5" />
-                      <span className="font-semibold text-sm">Download Android app</span>
+                      <span className="font-semibold text-sm">Download App</span>
                     </div>
                   </Link>
                   <button

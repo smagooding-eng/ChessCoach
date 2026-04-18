@@ -8,14 +8,14 @@ const CARD = '#302e2b';
 const TEXT = '#e8e6e3';
 const MUTED = '#9e9b98';
 
-const APK_HREF = `${import.meta.env.BASE_URL}chessscout.apk`;
-const APK_FILENAME = 'ChessScout.apk';
+const APP_HREF = `${import.meta.env.BASE_URL}chessscout.apk`;
+const APP_FILENAME = 'ChessScout.apk';
 
 export default function DownloadPage() {
   const [version] = useState('1.0.0');
 
   useEffect(() => {
-    document.title = 'Download ChessScout for Android';
+    document.title = 'Download the ChessScout App';
   }, []);
 
   return (
@@ -40,10 +40,10 @@ export default function DownloadPage() {
             <Smartphone className="w-3.5 h-3.5" /> ANDROID APP
           </div>
           <h1 className="text-4xl sm:text-5xl font-black leading-[1.05] tracking-tight mb-4" style={{ color: TEXT }}>
-            Get ChessScout on <span style={{ color: G }}>Android</span>
+            Get the <span style={{ color: G }}>ChessScout</span> App
           </h1>
           <p className="text-base sm:text-lg max-w-xl mx-auto" style={{ color: MUTED }}>
-            Install the official ChessScout APK on your Android device to analyze games, scan positions, and train on the go.
+            Install the official ChessScout app on your Android device to analyze games, scan positions, and train on the go.
           </p>
         </div>
 
@@ -63,22 +63,22 @@ export default function DownloadPage() {
                 ChessScout for Android · v{version}
               </p>
               <h2 className="text-xl sm:text-2xl font-black mb-1" style={{ color: TEXT }}>
-                {APK_FILENAME}
+                ChessScout
               </h2>
               <p className="text-sm" style={{ color: MUTED }}>
-                Direct APK download · works on Android 8.0 and above
+                Direct download · works on Android 8.0 and above
               </p>
             </div>
             <a
-              href={APK_HREF}
-              download={APK_FILENAME}
+              href={APP_HREF}
+              download={APP_FILENAME}
               className="group inline-flex items-center gap-2 px-6 py-3.5 rounded-md font-black text-sm transition-all shrink-0"
               style={{ background: G, color: '#fff', boxShadow: `0 12px 30px -6px ${G}66` }}
               onMouseEnter={e => { e.currentTarget.style.background = '#6fa23e'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
               onMouseLeave={e => { e.currentTarget.style.background = G; e.currentTarget.style.transform = 'translateY(0)'; }}
             >
               <DownloadIcon className="w-4 h-4" />
-              Download APK
+              Download App
             </a>
           </div>
 
@@ -104,7 +104,7 @@ export default function DownloadPage() {
           </h3>
           <ol className="space-y-2.5 text-sm" style={{ color: MUTED }}>
             {[
-              'Tap "Download APK" above. The file will save to your Downloads folder.',
+              'Tap "Download App" above. The file will save to your Downloads folder.',
               'Open the file. Android may ask permission to install from this source — tap Settings and allow it.',
               'Tap Install. When it finishes, open the app and sign in with your ChessScout account.',
             ].map((step, i) => (
