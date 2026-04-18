@@ -766,10 +766,47 @@ export function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[100] flex items-start md:items-center justify-center p-4 pt-8 md:pt-4 overflow-y-auto"
-      style={{ background: BG }}
+      className="fixed inset-0 z-[100] flex items-start md:items-center justify-center p-3 md:p-6 pt-6 md:pt-6 overflow-y-auto"
+      style={{
+        background: `radial-gradient(ellipse at top, rgba(129,182,76,0.12) 0%, ${BG} 45%, #0f0d0c 100%)`,
+      }}
     >
-      <div className="w-full max-w-xl">
+      {/* ambient floating glows */}
+      <motion.div
+        aria-hidden
+        className="fixed top-[-120px] left-[-120px] w-[420px] h-[420px] rounded-full pointer-events-none"
+        style={{ background: 'radial-gradient(circle, rgba(129,182,76,0.18) 0%, transparent 70%)', filter: 'blur(20px)' }}
+        animate={{ x: [0, 40, 0], y: [0, 30, 0] }}
+        transition={{ duration: 12, repeat: Infinity, ease: 'easeInOut' }}
+      />
+      <motion.div
+        aria-hidden
+        className="fixed bottom-[-150px] right-[-150px] w-[480px] h-[480px] rounded-full pointer-events-none"
+        style={{ background: 'radial-gradient(circle, rgba(234,151,51,0.14) 0%, transparent 70%)', filter: 'blur(24px)' }}
+        animate={{ x: [0, -30, 0], y: [0, -40, 0] }}
+        transition={{ duration: 14, repeat: Infinity, ease: 'easeInOut' }}
+      />
+
+      <motion.div
+        initial={{ opacity: 0, y: 24, scale: 0.97 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+        className="w-full max-w-xl relative rounded-[28px] p-5 md:p-8"
+        style={{
+          background: 'linear-gradient(180deg, rgba(48,46,43,0.95) 0%, rgba(38,36,33,0.95) 100%)',
+          border: '1px solid rgba(255,255,255,0.07)',
+          boxShadow:
+            '0 30px 80px -20px rgba(0,0,0,0.65), 0 0 0 1px rgba(129,182,76,0.06), inset 0 1px 0 rgba(255,255,255,0.04)',
+          backdropFilter: 'blur(8px)',
+        }}
+      >
+        {/* top sheen */}
+        <div
+          aria-hidden
+          className="absolute top-0 left-8 right-8 h-px pointer-events-none"
+          style={{ background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.18) 50%, transparent 100%)' }}
+        />
+
         <ProgressDots index={progressIndex} total={6} />
 
         <AnimatePresence mode="wait">
@@ -1407,7 +1444,7 @@ export function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
             </motion.div>
           )}
         </AnimatePresence>
-      </div>
+      </motion.div>
     </motion.div>
   );
 }
