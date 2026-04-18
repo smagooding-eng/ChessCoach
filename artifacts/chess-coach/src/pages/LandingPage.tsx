@@ -704,7 +704,6 @@ export function LandingPage() {
         </div>
       </section>
 
-      <SocialProofBar />
 
       {/* TESTIMONIAL MARQUEE */}
       <section className="py-12 overflow-hidden relative" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
