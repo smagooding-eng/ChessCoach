@@ -732,23 +732,33 @@ function DemoReviewStep({ onContinue }: { onContinue: () => void }) {
           ))}
         </div>
 
-        <div className="flex justify-center mb-4">
-          <MiniBoard
-            size={240}
-            pieces={pos}
-            highlights={move ? [{ sq: move.from, color: 'green' }, { sq: move.to, color: move.classification === 'mistake' || move.classification === 'inaccuracy' ? 'amber' : 'green' }] : []}
-            arrow={move ? { from: move.from, to: move.to, color: move.badgeColor } : undefined}
-          />
+        <div className="flex justify-center mb-4 min-h-[240px]">
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.div
+              key={`board-${idx}`}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.45, ease: 'easeOut' }}
+            >
+              <MiniBoard
+                size={240}
+                pieces={pos}
+                highlights={move ? [{ sq: move.from, color: 'green' }, { sq: move.to, color: move.classification === 'mistake' || move.classification === 'inaccuracy' ? 'amber' : 'green' }] : []}
+                arrow={move ? { from: move.from, to: move.to, color: move.badgeColor } : undefined}
+              />
+            </motion.div>
+          </AnimatePresence>
         </div>
 
         {move ? (
-          <AnimatePresence mode="wait">
+          <AnimatePresence mode="wait" initial={false}>
             <motion.div
               key={`mv-${idx}`}
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.22 }}
+              transition={{ duration: 0.45, ease: 'easeOut' }}
             >
               <div className="flex items-center justify-center gap-2 mb-3">
                 <span className="text-base font-black font-mono" style={{ color: TEXT }}>{move.san}</span>
