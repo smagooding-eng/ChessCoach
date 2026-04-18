@@ -87,7 +87,34 @@
   }
 }
 
+@layer base {
+  /* Default depth for any element using the card background token,
+     so cards/panels feel layered without per-component shadow code. */
+  .bg-card {
+    box-shadow:
+      0 1px 0 rgba(255,255,255,0.04) inset,
+      0 14px 32px -14px rgba(0,0,0,0.55),
+      0 4px 12px -4px rgba(0,0,0,0.35);
+  }
+}
+
 @layer utilities {
+  /* Stronger elevation for hero/feature cards, with a soft green halo
+     to match the landing-page treatment. */
+  .card-depth {
+    box-shadow:
+      0 1px 0 rgba(255,255,255,0.05) inset,
+      0 25px 60px -20px rgba(0,0,0,0.6),
+      0 10px 30px -10px rgba(0,0,0,0.4),
+      0 0 60px rgba(129,182,76,0.06);
+  }
+  .card-depth-lg {
+    box-shadow:
+      0 1px 0 rgba(255,255,255,0.06) inset,
+      0 35px 90px -20px rgba(0,0,0,0.65),
+      0 14px 40px -10px rgba(0,0,0,0.45),
+      0 0 80px rgba(129,182,76,0.08);
+  }
   .glass-panel {
     @apply bg-card/80 backdrop-blur-xl border border-white/5;
     box-shadow:
