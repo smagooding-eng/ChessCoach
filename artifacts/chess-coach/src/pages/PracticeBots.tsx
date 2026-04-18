@@ -4,9 +4,21 @@ import { ChessBoard, type MoveQuality } from '@/components/ChessBoard';
 import { normalizeFen } from '@/lib/utils';
 import { BOTS, getBotMove, BotConfig, analyzeMoveQuality, type MoveAnalysisResult } from '@/lib/chess-bot';
 import { OPENINGS, type OpeningLine } from '@/lib/openings';
+import { AICoachCard, type AICoachTone } from '@/components/AICoachCard';
 import { ArrowLeft, RotateCcw, Flag, Clock, Trophy, Swords, Zap, ChevronRight, ChevronDown, ChevronUp, BookOpen, Check, X, Lightbulb } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
+
+const QUALITY_TO_TONE: Record<string, AICoachTone> = {
+  checkmate: 'gold',
+  brilliant: 'info',
+  excellent: 'positive',
+  good: 'positive',
+  book: 'neutral',
+  inaccuracy: 'warning',
+  mistake: 'warning',
+  blunder: 'danger',
+};
 
 type GameResult = 'playing' | 'win' | 'loss' | 'draw';
 type MoveRecord = { san: string; fen: string; fenBefore: string; color: 'w' | 'b'; analysis: MoveAnalysisResult | null };
@@ -57,51 +69,65 @@ function MoveAnalysisPanel({ move, playerColor }: { move: MoveRecord; playerColo
   const { quality, evalBefore, evalAfter, pros, cons, summary, bestMoveSan } = move.analysis;
   const cfg = QUALITY_CFG[quality] ?? QUALITY_CFG.good;
   const who = move.color === playerColor ? 'You' : 'Bot';
+  const tone = QUALITY_TO_TONE[quality] ?? 'neutral';
+
+  const titleNode = (
+    <span className="flex items-center gap-1.5">
+      <span className={`text-base font-black ${cfg.text} leading-none`}>{cfg.icon}</span>
+      <span className="font-mono text-foreground/80">{move.san}</span>
+      <span className="text-muted-foreground/50">·</span>
+      <span className={`font-bold ${cfg.text}`}>{cfg.label}</span>
+      <span className="text-muted-foreground/50 hidden sm:inline">·</span>
+      <span className="text-[10px] text-muted-foreground hidden sm:inline">{who}</span>
+    </span>
+  );
 
   return (
-    <motion.div
-      key={`${move.fenBefore}-${move.san}`}
-      initial={{ opacity: 0, y: 6 }}
-      animate={{ opacity: 1, y: 0 }}
-      className={`rounded-3xl overflow-hidden border ${cfg.border} bg-card/60`}
-    >
-      <div className={`px-3 py-2.5 ${cfg.bg} flex items-center justify-between`}>
-        <div className="flex items-center gap-2 min-w-0">
-          <span className={`text-base font-black ${cfg.text}`}>{cfg.icon}</span>
-          <div className="min-w-0">
-            <p className={`text-sm font-bold ${cfg.text} truncate`}>{move.san} — {cfg.label}</p>
-            <p className="text-[10px] text-muted-foreground">{who} · {move.color === 'w' ? 'White' : 'Black'}</p>
-          </div>
+    <AICoachCard tone={tone} name="Coach" badge="AI" title={titleNode} compact>
+      <p className="text-xs text-muted-foreground/80">
+        Eval{' '}
+        <span className="font-mono font-bold text-foreground/90 tabular-nums">
+          {(evalBefore / 100).toFixed(1)} → {(evalAfter / 100).toFixed(1)}
+        </span>
+      </p>
+      <p>{summary}</p>
+      {(pros.length > 0 || cons.length > 0) && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+          {pros.length > 0 && (
+            <div className="rounded-2xl bg-emerald-500/8 border border-emerald-500/20 px-2.5 py-2">
+              <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-wide mb-1">Pros</p>
+              <ul className="space-y-1">
+                {pros.map((p, i) => (
+                  <li key={i} className="text-xs leading-snug flex items-start gap-1.5">
+                    <span className="text-emerald-500 shrink-0 mt-0.5">•</span>
+                    <span>{p}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {cons.length > 0 && (
+            <div className="rounded-2xl bg-red-500/8 border border-red-500/20 px-2.5 py-2">
+              <p className="text-[10px] font-bold text-red-400 uppercase tracking-wide mb-1">Cons</p>
+              <ul className="space-y-1">
+                {cons.map((c, i) => (
+                  <li key={i} className="text-xs leading-snug flex items-start gap-1.5">
+                    <span className="text-red-500 shrink-0 mt-0.5">•</span>
+                    <span>{c}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
-        <div className="text-right shrink-0 ml-2">
-          <p className="text-[10px] text-muted-foreground">Eval</p>
-          <p className="text-xs font-mono font-bold tabular-nums">
-            {(evalBefore / 100).toFixed(1)} → {(evalAfter / 100).toFixed(1)}
-          </p>
+      )}
+      {bestMoveSan && (
+        <div className="flex items-center gap-2 text-xs pt-1.5 border-t border-white/5">
+          <span className="text-primary">★</span>
+          <span className="text-muted-foreground">Best was <strong className="text-foreground font-mono">{bestMoveSan}</strong></span>
         </div>
-      </div>
-      <div className="px-3 py-2.5 space-y-1.5">
-        {pros.map((p, i) => (
-          <div key={`p${i}`} className="flex items-start gap-2 text-xs">
-            <span className="text-emerald-400 shrink-0 mt-0.5">✓</span>
-            <span className="text-foreground/80">{p}</span>
-          </div>
-        ))}
-        {cons.map((c, i) => (
-          <div key={`c${i}`} className="flex items-start gap-2 text-xs">
-            <span className="text-red-400 shrink-0 mt-0.5">✗</span>
-            <span className="text-foreground/80">{c}</span>
-          </div>
-        ))}
-        {bestMoveSan && (
-          <div className="flex items-start gap-2 text-xs pt-1 border-t border-white/5">
-            <span className="text-primary shrink-0 mt-0.5">★</span>
-            <span className="text-muted-foreground">Best was <strong className="text-foreground">{bestMoveSan}</strong></span>
-          </div>
-        )}
-        <p className="text-[11px] text-muted-foreground/70 pt-1">{summary}</p>
-      </div>
-    </motion.div>
+      )}
+    </AICoachCard>
   );
 }
 
@@ -559,6 +585,9 @@ function OpeningTrainerView({ opening, onBack }: { opening: OpeningLine; onBack:
   const handleMovePlayed = useCallback((san: string, isCorrect: boolean) => {
     if (phase !== 'theory') return;
     const expected = opening.moves[stepIdx];
+    // Apply the move to the parent chess instance (ChessBoard only computes SAN).
+    const moveResult = chess.move(san);
+    if (!moveResult) return;
     if (san === expected) {
       setHistory(h => [...h, { san, expected, correct: true }]);
       setStreak(s => s + 1);
@@ -567,7 +596,7 @@ function OpeningTrainerView({ opening, onBack }: { opening: OpeningLine; onBack:
       setStepIdx(i => i + 1);
       setHintOpen(false);
     } else {
-      // Wrong move — undo
+      // Wrong move — undo so the user can retry.
       chess.undo();
       setFen(chess.fen());
       setStreak(0);
@@ -690,24 +719,17 @@ function OpeningTrainerView({ opening, onBack }: { opening: OpeningLine; onBack:
           <AnimatePresence>
             {wrongFeedback && (
               <motion.div
-                initial={{ opacity: 0, y: -8, scale: 0.96 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: -8, scale: 0.96 }}
-                className="rounded-3xl border border-red-500/30 bg-red-500/10 p-3"
+                initial={{ opacity: 0, y: -8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
               >
-                <div className="flex items-start gap-2">
-                  <div className="w-7 h-7 rounded-2xl bg-red-500/20 border border-red-500/40 flex items-center justify-center shrink-0">
-                    <X className="w-4 h-4 text-red-400" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-bold text-red-400">Out of book</p>
-                    <p className="text-[11px] text-foreground/80 mt-0.5">
-                      You played <strong className="font-mono">{wrongFeedback.played}</strong>. Theory continues with{' '}
-                      <strong className="font-mono text-emerald-400">{wrongFeedback.expected}</strong>.
-                    </p>
-                    <p className="text-[10px] text-muted-foreground mt-1">Try again — your move was undone.</p>
-                  </div>
-                </div>
+                <AICoachCard tone="warning" name="Coach" badge="OUT OF BOOK" compact>
+                  <p>
+                    You played <strong className="font-mono text-red-400">{wrongFeedback.played}</strong>. The main line continues with{' '}
+                    <strong className="font-mono text-emerald-400">{wrongFeedback.expected}</strong>.
+                  </p>
+                  <p className="text-[11px] text-muted-foreground">Your move was undone — give it another try.</p>
+                </AICoachCard>
               </motion.div>
             )}
           </AnimatePresence>

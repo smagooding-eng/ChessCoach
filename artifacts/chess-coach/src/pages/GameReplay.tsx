@@ -14,9 +14,30 @@ import { useUser } from '@/hooks/use-user';
 import { useChessPlayer } from '@/hooks/use-chess-player';
 import { apiFetch } from '@/lib/api';
 import { WaitTipCarousel } from '@/components/WaitTipCarousel';
+import { AICoachCard, type AICoachTone } from '@/components/AICoachCard';
 import { AnimatePresence, motion } from 'framer-motion';
 
 type Classification = 'checkmate' | 'brilliant' | 'great' | 'best' | 'excellent' | 'good' | 'book' | 'inaccuracy' | 'mistake' | 'blunder' | 'missed_win';
+
+function classificationToTone(c?: Classification | null): AICoachTone {
+  switch (c) {
+    case 'brilliant': return 'info';
+    case 'great':
+    case 'best':
+    case 'excellent':
+      return 'positive';
+    case 'good':
+    case 'book':
+      return 'neutral';
+    case 'inaccuracy': return 'warning';
+    case 'mistake':
+    case 'missed_win':
+      return 'warning';
+    case 'blunder': return 'danger';
+    case 'checkmate': return 'gold';
+    default: return 'neutral';
+  }
+}
 
 type ReviewMove = {
   moveIndex: number;
@@ -970,30 +991,24 @@ export function GameReplay() {
           {/* Per-move analysis panel — positioned right below controls for easy follow-along */}
           {currentMove > 0 && reviewMoves.length > 0 && (() => {
             const move = moves[currentMove - 1];
-            return (
-              <div className="glass-card rounded-[2rem] overflow-hidden border border-white/8">
-                {/* Header */}
-                <div className="px-4 py-3 flex items-center gap-2 border-b border-white/5 bg-white/3">
-                  <BrainCircuit className={`w-4 h-4 shrink-0 ${cfg ? cfg.color.split(' ')[0] : 'text-primary'}`} />
-                  <span className={`font-bold text-sm ${cfg ? cfg.color.split(' ')[0] : 'text-primary'}`}>
-                    {cfg ? `${cfg.full} — ` : ''}<span className="font-mono">{move?.san}</span>
+            const tone = classificationToTone(currentReview?.classification as Classification | undefined);
+            const titleNode = (
+              <span className="flex items-center gap-1.5">
+                {cfg && <span className={`font-bold ${cfg.color.split(' ')[0]}`}>{cfg.full}</span>}
+                {cfg && <span className="text-muted-foreground/50">·</span>}
+                <span className="font-mono text-foreground/80">{move?.san}</span>
+                {cfg && (
+                  <span className={`ml-1 text-[10px] font-bold px-1.5 py-0.5 rounded border ${cfg.color}`}>
+                    {cfg.badge}
                   </span>
-                  {cfg && (
-                    <span className={`text-xs font-bold px-2 py-0.5 rounded border ${cfg.color}`}>
-                      {cfg.badge}
-                    </span>
-                  )}
-                  {!currentReview && (
-                    <span className="ml-2 text-xs text-muted-foreground italic">No review data for this move</span>
-                  )}
-                </div>
-
-                {/* Body */}
-                <div className="px-4 py-3 space-y-3">
-                  {currentReview ? (
-                    <>
-                      {/* Explanation */}
-                      <p className="text-sm text-foreground/85 leading-relaxed">{currentReview.explanation}</p>
+                )}
+              </span>
+            );
+            return (
+              <AICoachCard tone={tone} name="Coach" badge="AI" title={titleNode}>
+                {currentReview ? (
+                  <>
+                    <p>{currentReview.explanation}</p>
 
                       {/* Pros & Cons */}
                       {(currentReview.pros?.length > 0 || currentReview.cons?.length > 0) && (
@@ -1041,31 +1056,30 @@ export function GameReplay() {
                           </div>
                         </div>
                       )}
-                    </>
-                  ) : (
-                    <p className="text-sm text-muted-foreground italic py-1">This move wasn't included in the review.</p>
-                  )}
+                  </>
+                ) : (
+                  <p className="text-sm text-muted-foreground italic py-1">This move wasn't included in the review.</p>
+                )}
 
-                  {currentFen && (
-                    <button
-                      onClick={() => {
-                        const isBlack = game?.blackUsername.toLowerCase() === username?.toLowerCase();
-                        const opponentRating = game
-                          ? (isBlack ? game.whiteRating : game.blackRating) || 1200
-                          : 1200;
-                        const playerColor = isBlack ? 'b' : 'w';
-                        const prevFen = currentMove <= 1 ? gameStartFen : (moves[currentMove - 2]?.fen ?? currentFen);
-                        navigate(`/practice?fen=${encodeURIComponent(prevFen)}&rating=${opponentRating}&color=${playerColor}`);
-                      }}
-                      className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-3xl text-sm font-bold transition-all active:scale-95 border border-primary/30 hover:border-primary/50 mt-1"
-                      style={{ background: 'rgba(129,182,76,0.1)', color: '#81b64c' }}
-                    >
-                      <Swords className="w-4 h-4" />
-                      Jump in from here
-                    </button>
-                  )}
-                </div>
-              </div>
+                {currentFen && (
+                  <button
+                    onClick={() => {
+                      const isBlack = game?.blackUsername.toLowerCase() === username?.toLowerCase();
+                      const opponentRating = game
+                        ? (isBlack ? game.whiteRating : game.blackRating) || 1200
+                        : 1200;
+                      const playerColor = isBlack ? 'b' : 'w';
+                      const prevFen = currentMove <= 1 ? gameStartFen : (moves[currentMove - 2]?.fen ?? currentFen);
+                      navigate(`/practice?fen=${encodeURIComponent(prevFen)}&rating=${opponentRating}&color=${playerColor}`);
+                    }}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-3xl text-sm font-bold transition-all active:scale-95 border border-primary/30 hover:border-primary/50 mt-1"
+                    style={{ background: 'rgba(129,182,76,0.1)', color: '#81b64c' }}
+                  >
+                    <Swords className="w-4 h-4" />
+                    Jump in from here
+                  </button>
+                )}
+              </AICoachCard>
             );
           })()}
 
@@ -1276,12 +1290,9 @@ export function GameReplay() {
 
           {/* Coach notes */}
           {game.analysisNotes && currentMove === 0 && (
-            <div className="glass-card rounded-3xl p-4 border-l-4 border-l-primary bg-primary/5 text-sm">
-              <div className="flex items-center gap-2 text-primary font-bold mb-1.5">
-                <BrainCircuit className="w-4 h-4" /> Coach Notes
-              </div>
-              <p className="text-foreground/80 leading-relaxed">{game.analysisNotes}</p>
-            </div>
+            <AICoachCard tone="neutral" name="Coach" badge="NOTES" title="Game overview">
+              <p>{game.analysisNotes}</p>
+            </AICoachCard>
           )}
 
           {/* Game Rating Panel — shown after review completes */}
