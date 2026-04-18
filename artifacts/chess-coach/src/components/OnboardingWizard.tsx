@@ -6,7 +6,9 @@ import { apiFetch } from '@/lib/api';
 import {
   AlertTriangle, Loader2, Sparkles, ArrowRight, Camera, Brain, Bot,
   Target, Trophy, Swords, Compass, Check, ChevronRight, Database, Zap,
+  BookOpen, Crown, TrendingUp, ChevronLeft,
 } from 'lucide-react';
+import { AICoachCard } from '@/components/AICoachCard';
 
 const ONBOARDING_KEY = 'chessscout_onboarding_v2';
 
@@ -23,7 +25,7 @@ const LOADING_MESSAGES = [
   "Building your personal report...",
 ];
 
-type Step = 'goal' | 'import' | 'loading' | 'aha' | 'tour' | 'deepImport' | 'commit';
+type Step = 'goal' | 'import' | 'loading' | 'aha' | 'tour' | 'demoReview' | 'deepImport' | 'commit';
 type Platform = 'chesscom' | 'lichess';
 
 interface Insight {
@@ -632,6 +634,198 @@ function TourDemo({ kind }: { kind: 'scan' | 'analysis' | 'practice' }) {
   );
 }
 
+// =====================================================================
+// DEMO REVIEW STEP — interactive AI review walkthrough during onboarding
+// =====================================================================
+
+const DEMO_START: Record<string, Piece> = {
+  a8:{p:'♜',w:false},b8:{p:'♞',w:false},c8:{p:'♝',w:false},d8:{p:'♛',w:false},e8:{p:'♚',w:false},f8:{p:'♝',w:false},g8:{p:'♞',w:false},h8:{p:'♜',w:false},
+  a7:{p:'♟',w:false},b7:{p:'♟',w:false},c7:{p:'♟',w:false},d7:{p:'♟',w:false},e7:{p:'♟',w:false},f7:{p:'♟',w:false},g7:{p:'♟',w:false},h7:{p:'♟',w:false},
+  a2:{p:'♙',w:true},b2:{p:'♙',w:true},c2:{p:'♙',w:true},d2:{p:'♙',w:true},e2:{p:'♙',w:true},f2:{p:'♙',w:true},g2:{p:'♙',w:true},h2:{p:'♙',w:true},
+  a1:{p:'♖',w:true},b1:{p:'♘',w:true},c1:{p:'♗',w:true},d1:{p:'♕',w:true},e1:{p:'♔',w:true},f1:{p:'♗',w:true},g1:{p:'♘',w:true},h1:{p:'♖',w:true},
+};
+
+type DemoMove = {
+  san: string;
+  from: string;
+  to: string;
+  by: 'white' | 'black';
+  classification: 'best' | 'book' | 'inaccuracy' | 'mistake' | 'excellent';
+  tone: 'positive' | 'warning' | 'danger' | 'info' | 'neutral' | 'gold';
+  badge: string;
+  badgeColor: string;
+  text: string;
+};
+
+const DEMO_MOVES: DemoMove[] = [
+  { san: '1. e4',    from: 'e2', to: 'e4', by: 'white', classification: 'book',       tone: 'info',     badge: 'BOOK',        badgeColor: '#5b9bd5',
+    text: "Classic King's Pawn opening. Fights for the center and frees both the queen and bishop in one move." },
+  { san: '1… e5',    from: 'e7', to: 'e5', by: 'black', classification: 'book',       tone: 'info',     badge: 'BOOK',        badgeColor: '#5b9bd5',
+    text: "Symmetric reply — a principled, classical defense. Both sides are now playing for fast development." },
+  { san: '2. Qh5?',  from: 'd1', to: 'h5', by: 'white', classification: 'mistake',    tone: 'warning',  badge: 'MISTAKE',     badgeColor: '#ffb347',
+    text: "Premature queen sortie. Bringing the queen out this early lets Black gain tempo by developing pieces with threats." },
+  { san: '2… Nc6',   from: 'b8', to: 'c6', by: 'black', classification: 'best',       tone: 'positive', badge: 'BEST',        badgeColor: '#81b64c',
+    text: "Calmly defends e5 while developing a knight to its best square. This is exactly how to punish an early queen sortie." },
+  { san: '3. Bc4',   from: 'f1', to: 'c4', by: 'white', classification: 'inaccuracy', tone: 'warning',  badge: 'INACCURACY',  badgeColor: '#ffb347',
+    text: "Threatens scholar's mate on f7, but Black has a clean defense. White is now playing for tricks instead of a real plan." },
+  { san: '3… g6!',   from: 'g7', to: 'g6', by: 'black', classification: 'excellent',  tone: 'gold',     badge: 'EXCELLENT',   badgeColor: '#eaa631',
+    text: "Defends f7 and attacks the queen with tempo — Black solves both problems in a single move." },
+];
+
+function applyDemoMoves(n: number): Record<string, Piece> {
+  const pos: Record<string, Piece> = { ...DEMO_START };
+  for (let i = 0; i < n; i++) {
+    const m = DEMO_MOVES[i];
+    pos[m.to] = pos[m.from];
+    delete pos[m.from];
+  }
+  return pos;
+}
+
+function DemoReviewStep({ onContinue }: { onContinue: () => void }) {
+  const [idx, setIdx] = useState(0); // 0 = start; 1..N = after move N-1
+  const totalMoves = DEMO_MOVES.length;
+  const move = idx > 0 ? DEMO_MOVES[idx - 1] : null;
+  const pos = applyDemoMoves(idx);
+
+  const canPrev = idx > 0;
+  const canNext = idx < totalMoves;
+  const isComplete = idx === totalMoves;
+
+  return (
+    <motion.div
+      key="demoReview"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -20 }}
+      transition={{ duration: 0.3 }}
+      className="text-center"
+    >
+      <p className="text-[10px] font-black uppercase tracking-widest mb-3" style={{ color: G }}>
+        See it in action · live AI review
+      </p>
+      <h1 className="text-2xl md:text-4xl font-black mb-2 leading-[1.05] tracking-tight" style={{ color: TEXT }}>
+        Step through a real <span style={{ color: G }}>AI review</span>
+      </h1>
+      <p className="text-sm md:text-base mb-5 max-w-md mx-auto" style={{ color: MUTED }}>
+        This is exactly how every game in your library will be analyzed — move by move, with the coach explaining what worked and what didn't.
+      </p>
+
+      <div
+        className="rounded-xl p-4 md:p-5 mb-4"
+        style={{
+          background: `linear-gradient(180deg, ${CARD} 0%, #2a2825 100%)`,
+          border: '1px solid rgba(255,255,255,0.06)',
+          boxShadow: '0 24px 60px -14px rgba(0,0,0,0.6), 0 1px 0 rgba(255,255,255,0.05) inset',
+        }}
+      >
+        {/* Move dots */}
+        <div className="flex justify-center gap-1.5 mb-4">
+          {DEMO_MOVES.map((m, i) => (
+            <div key={i}
+              className="h-1 rounded-full transition-all"
+              style={{
+                width: i === idx - 1 ? 22 : 6,
+                background: i < idx ? m.badgeColor : 'rgba(255,255,255,0.12)',
+              }}
+            />
+          ))}
+        </div>
+
+        <div className="flex justify-center mb-4">
+          <MiniBoard
+            size={240}
+            pieces={pos}
+            highlights={move ? [{ sq: move.from, color: 'green' }, { sq: move.to, color: move.classification === 'mistake' || move.classification === 'inaccuracy' ? 'amber' : 'green' }] : []}
+            arrow={move ? { from: move.from, to: move.to, color: move.badgeColor } : undefined}
+          />
+        </div>
+
+        {move ? (
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={`mv-${idx}`}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.22 }}
+            >
+              <div className="flex items-center justify-center gap-2 mb-3">
+                <span className="text-base font-black font-mono" style={{ color: TEXT }}>{move.san}</span>
+                <span className="px-2 py-0.5 rounded text-[10px] font-black tracking-wider"
+                  style={{ background: `${move.badgeColor}22`, color: move.badgeColor, border: `1px solid ${move.badgeColor}55` }}>
+                  {move.badge}
+                </span>
+              </div>
+              <AICoachCard tone={move.tone} name="Coach" badge="LIVE" title={`${move.by === 'white' ? 'White' : 'Black'} played ${move.san}`}>
+                <p>{move.text}</p>
+              </AICoachCard>
+            </motion.div>
+          </AnimatePresence>
+        ) : (
+          <div className="px-1 py-4 text-sm" style={{ color: MUTED }}>
+            <BookOpen className="w-5 h-5 mx-auto mb-2" style={{ color: G }} />
+            Click <span className="font-bold" style={{ color: TEXT }}>Next move</span> to see the coach analyze each move.
+          </div>
+        )}
+
+        <div className="flex items-center gap-2 mt-4">
+          <button
+            onClick={() => canPrev && setIdx(idx - 1)}
+            disabled={!canPrev}
+            className="flex items-center justify-center gap-1 px-3 py-2.5 rounded-xl text-xs font-bold transition-colors disabled:opacity-40"
+            style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: TEXT }}
+          >
+            <ChevronLeft className="w-4 h-4" /> Back
+          </button>
+          {canNext ? (
+            <button
+              onClick={() => setIdx(idx + 1)}
+              className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-black text-sm transition-all"
+              style={{ background: G, color: '#fff', boxShadow: `0 12px 30px -8px ${G}88` }}
+            >
+              {idx === 0 ? 'Start review' : `Next move (${idx}/${totalMoves})`}
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          ) : (
+            <button
+              onClick={onContinue}
+              className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-black text-sm transition-all"
+              style={{ background: G, color: '#fff', boxShadow: `0 12px 30px -8px ${G}88` }}
+            >
+              <Crown className="w-4 h-4" />
+              Continue
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {isComplete && (
+        <motion.div
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="rounded-xl p-3 mb-2 flex items-start gap-2 text-left"
+          style={{ background: `${G}10`, border: `1px solid ${G}30` }}
+        >
+          <TrendingUp className="w-4 h-4 mt-0.5 shrink-0" style={{ color: G }} />
+          <p className="text-xs" style={{ color: TEXT }}>
+            <span className="font-bold">That's one game.</span> Every game in your library gets the same treatment — patterns surface, weaknesses get named, and the coach builds a plan around your real mistakes.
+          </p>
+        </motion.div>
+      )}
+
+      <button
+        onClick={onContinue}
+        className="text-xs mt-3 underline-offset-2 hover:underline"
+        style={{ color: MUTED }}
+      >
+        Skip review
+      </button>
+    </motion.div>
+  );
+}
+
 export function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
   const { authUser, login, refreshAuth } = useUser();
   const [step, setStep] = useState<Step>('goal');
@@ -759,7 +953,8 @@ export function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
     step === 'import' || step === 'loading' ? 1 :
     step === 'aha' ? 2 :
     step === 'tour' ? 3 :
-    step === 'deepImport' ? 4 : 5;
+    step === 'demoReview' ? 4 :
+    step === 'deepImport' ? 5 : 6;
 
   return (
     <motion.div
@@ -807,7 +1002,7 @@ export function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
           style={{ background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.18) 50%, transparent 100%)' }}
         />
 
-        <ProgressDots index={progressIndex} total={6} />
+        <ProgressDots index={progressIndex} total={7} />
 
         <AnimatePresence mode="wait">
           {/* STEP 1 — GOAL */}
@@ -1207,7 +1402,7 @@ export function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
                     <button
                       onClick={() => {
                         if (tourIdx < TOUR.length - 1) setTourIdx(tourIdx + 1);
-                        else setStep('deepImport');
+                        else setStep('demoReview');
                       }}
                       className="w-full flex items-center justify-center gap-2 py-3.5 rounded-3xl font-black text-base transition-all"
                       style={{ background: G, color: '#fff' }}
@@ -1220,7 +1415,7 @@ export function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
               })()}
 
               <button
-                onClick={() => setStep('deepImport')}
+                onClick={() => setStep('demoReview')}
                 className="text-xs mt-4 underline-offset-2 hover:underline"
                 style={{ color: MUTED }}
               >
@@ -1229,7 +1424,12 @@ export function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
             </motion.div>
           )}
 
-          {/* STEP 6 — DEEP IMPORT */}
+          {/* STEP 6 — DEMO REVIEW (live AI walkthrough) */}
+          {step === 'demoReview' && (
+            <DemoReviewStep onContinue={() => setStep('deepImport')} />
+          )}
+
+          {/* STEP 7 — DEEP IMPORT */}
           {step === 'deepImport' && (
             <motion.div
               key="deepImport"
