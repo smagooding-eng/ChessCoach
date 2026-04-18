@@ -165,6 +165,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 <Download className="w-3.5 h-3.5" />
               </button>
             )}
+            <Link href="/download" className="p-1.5 rounded transition-colors shrink-0 hover:bg-green-400/10" style={{ color: CHESSCOM_GREEN }} title="Download Android app">
+              <Download className="w-3.5 h-3.5" />
+            </Link>
             <button onClick={() => handleLogout()} className="p-1.5 rounded transition-colors shrink-0 hover:bg-red-400/10" style={{ color: TEXT_MUTED }} title="Sign out"
               onMouseEnter={e => (e.currentTarget.style.color = '#dc4343')}
               onMouseLeave={e => (e.currentTarget.style.color = TEXT_MUTED)}>
@@ -186,6 +189,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 <Download className="w-5 h-5" />
               </button>
             )}
+            <Link href="/download" className="p-1.5 rounded active:scale-95 transition-all" style={{ color: CHESSCOM_GREEN }} title="Download Android app">
+              <Download className="w-5 h-5" />
+            </Link>
             <button onClick={() => setProfileOpen(o => !o)} className="flex items-center gap-2 active:opacity-70 transition-opacity">
               <div className="flex flex-col items-end">
                 <span className="text-xs font-bold leading-tight" style={{ color: TEXT_LIGHT }}>{username}</span>
@@ -343,6 +349,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
                       <span className="font-semibold text-sm">Install App</span>
                     </button>
                   )}
+                  <Link href="/download" onClick={() => setMoreOpen(false)} className="block">
+                    <div className="w-full flex items-center gap-3 px-3.5 py-3 rounded-[2rem] active:bg-green-500/10 transition-colors" style={{ color: CHESSCOM_GREEN }}>
+                      <Download className="w-5 h-5" />
+                      <span className="font-semibold text-sm">Download Android app</span>
+                    </div>
+                  </Link>
                   <button
                     onClick={() => { setMoreOpen(false); handleLogout(); }}
                     className="w-full flex items-center gap-3 px-3.5 py-3 rounded-[2rem] active:bg-red-500/10 transition-colors"
