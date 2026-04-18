@@ -119,16 +119,152 @@ function ProgressDots({ index, total }: { index: number; total: number }) {
 
 function TourDemo({ kind }: { kind: 'scan' | 'analysis' | 'practice' }) {
   if (kind === 'scan') {
+    // Scholar's-mate-style position. Black to move into mate after Qxf7#.
+    const pieces: Record<string, { p: string; w: boolean }> = {
+      a8: { p: '♜', w: false }, b8: { p: '♞', w: false }, c8: { p: '♝', w: false },
+      d8: { p: '♛', w: false }, e8: { p: '♚', w: false }, f8: { p: '♝', w: false },
+      h8: { p: '♜', w: false },
+      a7: { p: '♟', w: false }, b7: { p: '♟', w: false }, c7: { p: '♟', w: false },
+      d7: { p: '♟', w: false }, f7: { p: '♟', w: false }, g7: { p: '♟', w: false },
+      h7: { p: '♟', w: false },
+      c6: { p: '♞', w: false }, f6: { p: '♞', w: false },
+      e5: { p: '♟', w: false },
+      c4: { p: '♗', w: true }, e4: { p: '♙', w: true },
+      h5: { p: '♕', w: true },
+      f3: { p: '♘', w: true },
+      a2: { p: '♙', w: true }, b2: { p: '♙', w: true }, c2: { p: '♙', w: true },
+      d2: { p: '♙', w: true }, f2: { p: '♙', w: true }, g2: { p: '♙', w: true },
+      h2: { p: '♙', w: true },
+      a1: { p: '♖', w: true }, c1: { p: '♗', w: true }, e1: { p: '♔', w: true },
+      h1: { p: '♖', w: true },
+    };
+    const files = ['a','b','c','d','e','f','g','h'];
+    const ranks = [8,7,6,5,4,3,2,1];
+    const SOURCE = 'h5';
+    const TARGET = 'f7';
+    // Compute pixel coords for the move arrow, board is 152x152, square = 19px.
+    const SQ = 19;
+    const sqToXY = (sq: string) => {
+      const f = files.indexOf(sq[0]!);
+      const r = ranks.indexOf(parseInt(sq[1]!, 10));
+      return { x: f * SQ + SQ / 2, y: r * SQ + SQ / 2 };
+    };
+    const a = sqToXY(SOURCE);
+    const b = sqToXY(TARGET);
+
     return (
-      <div className="rounded-xl p-3 mb-4" style={{ background: 'rgba(0,0,0,0.25)', border: `1px solid rgba(255,255,255,0.05)` }}>
+      <div className="rounded-xl p-3 mb-4" style={{ background: 'rgba(0,0,0,0.35)', border: `1px solid rgba(255,255,255,0.05)` }}>
         <div className="flex items-center gap-3">
-          <div className="w-14 h-14 rounded-lg flex items-center justify-center text-xl shrink-0" style={{ background: '#769656', color: '#fff' }}>
-            <span style={{ fontSize: 28 }}>♛</span>
+          {/* MINI BOARD WITH SCAN ANIMATION */}
+          <div className="relative shrink-0 rounded-md overflow-hidden" style={{ width: 152, height: 152, boxShadow: '0 4px 16px rgba(0,0,0,0.4)' }}>
+            <div className="absolute inset-0 grid" style={{ gridTemplateColumns: 'repeat(8, 1fr)', gridTemplateRows: 'repeat(8, 1fr)' }}>
+              {ranks.map((r, ri) =>
+                files.map((f, fi) => {
+                  const sq = `${f}${r}`;
+                  const isLight = (ri + fi) % 2 === 0;
+                  const piece = pieces[sq];
+                  const isHL = sq === SOURCE || sq === TARGET;
+                  return (
+                    <div
+                      key={sq}
+                      className="relative flex items-center justify-center"
+                      style={{ background: isLight ? '#eeeed2' : '#769656' }}
+                    >
+                      {isHL && (
+                        <div className="absolute inset-0" style={{ background: 'rgba(129,182,76,0.55)', boxShadow: 'inset 0 0 0 1.5px #81b64c' }} />
+                      )}
+                      {piece && (
+                        <span
+                          className="relative"
+                          style={{
+                            fontSize: 15,
+                            lineHeight: 1,
+                            color: piece.w ? '#fff' : '#1a1a1a',
+                            textShadow: piece.w
+                              ? '0 1px 1px rgba(0,0,0,0.6), 0 0 1px rgba(0,0,0,0.8)'
+                              : '0 1px 1px rgba(255,255,255,0.2)',
+                          }}
+                        >
+                          {piece.p}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+            {/* Move arrow */}
+            <svg className="absolute inset-0 pointer-events-none" width={152} height={152}>
+              <defs>
+                <marker id="arrowhead" markerWidth="3" markerHeight="3" refX="1.5" refY="1.5" orient="auto">
+                  <polygon points="0 0, 3 1.5, 0 3" fill="#81b64c" />
+                </marker>
+              </defs>
+              <motion.line
+                x1={a.x} y1={a.y} x2={b.x} y2={b.y}
+                stroke="#81b64c" strokeWidth={3} strokeLinecap="round"
+                markerEnd="url(#arrowhead)"
+                initial={{ pathLength: 0, opacity: 0 }}
+                animate={{ pathLength: 1, opacity: 1 }}
+                transition={{ delay: 0.6, duration: 0.5, ease: 'easeOut' }}
+              />
+            </svg>
+            {/* Scan-line sweep */}
+            <motion.div
+              aria-hidden
+              className="absolute left-0 right-0 pointer-events-none"
+              style={{
+                height: 8,
+                background: 'linear-gradient(90deg, transparent 0%, rgba(129,182,76,0.55) 50%, transparent 100%)',
+                filter: 'blur(2px)',
+                boxShadow: '0 0 8px rgba(129,182,76,0.6)',
+              }}
+              initial={{ top: 0 }}
+              animate={{ top: ['-8px', '152px', '-8px'] }}
+              transition={{ duration: 2.4, repeat: Infinity, ease: 'easeInOut' }}
+            />
+            {/* "ANALYZING" badge */}
+            <div className="absolute top-1.5 right-1.5 flex items-center gap-1 px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)' }}>
+              <motion.div
+                className="w-1.5 h-1.5 rounded-full"
+                style={{ background: G }}
+                animate={{ opacity: [0.3, 1, 0.3] }}
+                transition={{ duration: 1.2, repeat: Infinity }}
+              />
+              <span className="text-[8px] font-black tracking-wider" style={{ color: '#fff' }}>SCANNING</span>
+            </div>
           </div>
-          <ChevronRight className="w-4 h-4 shrink-0" style={{ color: MUTED }} />
-          <div className="min-w-0 flex-1 text-left">
-            <p className="text-[10px] font-black uppercase tracking-wider mb-0.5" style={{ color: G }}>Best move</p>
-            <p className="text-sm font-bold font-mono" style={{ color: TEXT }}>Qxf7+ → mate in 3</p>
+
+          {/* Verdict */}
+          <div className="flex-1 min-w-0 text-left">
+            <p className="text-[10px] font-black uppercase tracking-wider mb-1" style={{ color: G }}>AI Verdict</p>
+            <motion.p
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.9, duration: 0.3 }}
+              className="text-base font-black font-mono leading-tight"
+              style={{ color: TEXT }}
+            >
+              Qxf7<span style={{ color: G }}>#</span>
+            </motion.p>
+            <motion.p
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 1.1, duration: 0.3 }}
+              className="text-xs mt-0.5"
+              style={{ color: MUTED }}
+            >
+              checkmate · 0.4s
+            </motion.p>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 1.2 }}
+              className="mt-2 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-black"
+              style={{ background: `${G}22`, color: G, border: `1px solid ${G}44` }}
+            >
+              +∞ EVAL
+            </motion.div>
           </div>
         </div>
       </div>
