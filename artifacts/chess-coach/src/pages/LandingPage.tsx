@@ -56,7 +56,7 @@ function HeroBoard() {
       />
 
       <div
-        className="relative rounded-2xl overflow-hidden"
+        className="relative rounded-[2rem] overflow-hidden"
         style={{
           width: SIZE,
           maxWidth: '100%',
@@ -160,7 +160,7 @@ function HeroBoard() {
         initial={{ opacity: 0, x: -10 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ delay: 1.0 }}
-        className="absolute -top-3 -left-3 px-2.5 py-1 rounded-lg text-[10px] font-black tracking-wider"
+        className="absolute -top-3 -left-3 px-2.5 py-1 rounded-2xl text-[10px] font-black tracking-wider"
         style={{ background: '#dc4343', color: '#fff', boxShadow: '0 6px 18px rgba(220,67,67,0.5)' }}
       >
         ⚠ BLUNDER DETECTED
@@ -169,7 +169,7 @@ function HeroBoard() {
         initial={{ opacity: 0, x: 10 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ delay: 1.15 }}
-        className="absolute -bottom-3 -right-3 px-2.5 py-1 rounded-lg text-[10px] font-black tracking-wider"
+        className="absolute -bottom-3 -right-3 px-2.5 py-1 rounded-2xl text-[10px] font-black tracking-wider"
         style={{ background: G, color: '#fff', boxShadow: `0 6px 18px ${G}66` }}
       >
         +∞ EVAL
@@ -272,7 +272,7 @@ function AuthModal({ open, onClose, initialMode, externalError }: { open: boolea
           initial={{ opacity: 0, scale: 0.95, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 20 }}
-          className="w-full max-w-md rounded-2xl relative p-8"
+          className="w-full max-w-md rounded-[2rem] relative p-8"
           style={{ background: CARD, border: `1px solid rgba(255,255,255,0.06)` }}
           onClick={(e) => e.stopPropagation()}
         >
@@ -298,7 +298,7 @@ function AuthModal({ open, onClose, initialMode, externalError }: { open: boolea
             <>
               <button
                 onClick={handleGoogleLogin}
-                className="w-full flex items-center justify-center gap-3 px-4 py-3 rounded-xl border transition-colors font-medium mb-4"
+                className="w-full flex items-center justify-center gap-3 px-4 py-3 rounded-3xl border transition-colors font-medium mb-4"
                 style={{ background: 'rgba(255,255,255,0.04)', borderColor: 'rgba(255,255,255,0.1)', color: TEXT }}
                 onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.08)')}
                 onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.04)')}
@@ -320,7 +320,7 @@ function AuthModal({ open, onClose, initialMode, externalError }: { open: boolea
           )}
 
           {error && (
-            <div className="mb-4 p-3 rounded-lg text-sm" style={{ background: 'rgba(220,67,67,0.1)', border: '1px solid rgba(220,67,67,0.25)', color: '#ef6b6b' }}>{error}</div>
+            <div className="mb-4 p-3 rounded-2xl text-sm" style={{ background: 'rgba(220,67,67,0.1)', border: '1px solid rgba(220,67,67,0.25)', color: '#ef6b6b' }}>{error}</div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-3">
@@ -330,7 +330,7 @@ function AuthModal({ open, onClose, initialMode, externalError }: { open: boolea
                   Name <span style={{ color: MUTED }}>(optional)</span>
                 </label>
                 <input type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="Your name"
-                  className="w-full px-4 py-3 rounded-xl text-sm outline-none transition-all"
+                  className="w-full px-4 py-3 rounded-3xl text-sm outline-none transition-all"
                   style={{ background: 'rgba(255,255,255,0.05)', border: '2px solid rgba(255,255,255,0.08)', color: TEXT }}
                   onFocus={e => (e.target.style.borderColor = G)}
                   onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.08)')} />
@@ -341,7 +341,7 @@ function AuthModal({ open, onClose, initialMode, externalError }: { open: boolea
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: MUTED }} />
                 <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" required
-                  className="w-full pl-10 pr-4 py-3 rounded-xl text-sm outline-none transition-all"
+                  className="w-full pl-10 pr-4 py-3 rounded-3xl text-sm outline-none transition-all"
                   style={{ background: 'rgba(255,255,255,0.05)', border: '2px solid rgba(255,255,255,0.08)', color: TEXT }}
                   onFocus={e => (e.target.style.borderColor = G)}
                   onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.08)')} />
@@ -352,7 +352,7 @@ function AuthModal({ open, onClose, initialMode, externalError }: { open: boolea
               <div className="relative">
                 <input type={showPassword ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)}
                   placeholder={mode === 'register' ? 'Min 6 characters' : 'Your password'} required minLength={mode === 'register' ? 6 : undefined}
-                  className="w-full px-4 py-3 pr-10 rounded-xl text-sm outline-none transition-all"
+                  className="w-full px-4 py-3 pr-10 rounded-3xl text-sm outline-none transition-all"
                   style={{ background: 'rgba(255,255,255,0.05)', border: '2px solid rgba(255,255,255,0.08)', color: TEXT }}
                   onFocus={e => (e.target.style.borderColor = G)}
                   onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.08)')} />
@@ -367,14 +367,14 @@ function AuthModal({ open, onClose, initialMode, externalError }: { open: boolea
                   Chess.com Username <span style={{ color: MUTED }}>(optional)</span>
                 </label>
                 <input type="text" value={chesscomUsername} onChange={(e) => setChesscomUsername(e.target.value)} placeholder="e.g. Hikaru"
-                  className="w-full px-4 py-3 rounded-xl text-sm outline-none transition-all"
+                  className="w-full px-4 py-3 rounded-3xl text-sm outline-none transition-all"
                   style={{ background: 'rgba(255,255,255,0.05)', border: '2px solid rgba(255,255,255,0.08)', color: TEXT }}
                   onFocus={e => (e.target.style.borderColor = G)}
                   onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.08)')} />
               </div>
             )}
             <button type="submit" disabled={loading}
-              className="w-full group flex items-center justify-center gap-2 py-3.5 rounded-xl font-bold text-sm transition-all mt-2"
+              className="w-full group flex items-center justify-center gap-2 py-3.5 rounded-3xl font-bold text-sm transition-all mt-2"
               style={{ background: G, color: '#fff' }}
               onMouseEnter={e => (e.currentTarget.style.background = '#6fa23e')}
               onMouseLeave={e => (e.currentTarget.style.background = G)}>
@@ -486,7 +486,7 @@ function InsightsResultCard({ delay = 0 }: { delay?: number }) {
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, delay }}
-      className="rounded-2xl p-5 sm:p-6"
+      className="rounded-[2rem] p-5 sm:p-6"
       style={{ background: CARD, border: '1px solid rgba(255,255,255,0.05)', boxShadow: `0 25px 80px rgba(0,0,0,0.5), 0 0 60px ${G}10` }}
     >
       <div className="flex items-center justify-between mb-4">
@@ -504,7 +504,7 @@ function InsightsResultCard({ delay = 0 }: { delay?: number }) {
           { label: 'Blunders in Time Trouble', severity: 'High', color: '#e88930', detail: '41% of losses come under 30 seconds left' },
           { label: 'Struggles vs 1.d4', severity: 'Medium', color: '#e8c830', detail: 'Win rate drops to 28% as Black' },
         ].map(w => (
-          <div key={w.label} className="py-2.5 px-3 rounded-lg" style={{ background: `${w.color}08`, border: `1px solid ${w.color}25` }}>
+          <div key={w.label} className="py-2.5 px-3 rounded-2xl" style={{ background: `${w.color}08`, border: `1px solid ${w.color}25` }}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="w-1.5 h-1.5 rounded-full" style={{ background: w.color }} />
@@ -516,7 +516,7 @@ function InsightsResultCard({ delay = 0 }: { delay?: number }) {
           </div>
         ))}
       </div>
-      <div className="mt-4 py-3 px-3.5 rounded-lg" style={{ background: `${G}10`, border: `1px solid ${G}25` }}>
+      <div className="mt-4 py-3 px-3.5 rounded-2xl" style={{ background: `${G}10`, border: `1px solid ${G}25` }}>
         <div className="flex items-center gap-1.5 mb-1.5">
           <Zap className="w-3.5 h-3.5" style={{ color: G }} />
           <span className="text-[10px] font-black tracking-wider" style={{ color: G }}>YOUR GAME PLAN</span>
@@ -563,7 +563,7 @@ export function LandingPage() {
   const openLogin = () => { setAuthMode('login'); setAuthOpen(true); };
 
   return (
-    <div className="min-h-screen overflow-x-hidden" style={{ background: BG }}>
+    <div className="min-h-screen overflow-x-hidden" style={{ background: `radial-gradient(ellipse at top, #2c2925 0%, ${BG} 50%, #1c1a18 100%)` }}>
       <nav className="sticky top-0 z-40 backdrop-blur-xl" style={{ background: `${BG}dd`, borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-8 h-14 flex items-center justify-between">
           <div className="flex items-center gap-0.5">
@@ -576,7 +576,7 @@ export function LandingPage() {
               onMouseEnter={e => (e.currentTarget.style.color = TEXT)} onMouseLeave={e => (e.currentTarget.style.color = MUTED)}>
               Sign In
             </button>
-            <button onClick={openSignup} className="text-sm font-bold px-5 py-2 rounded-lg transition-all"
+            <button onClick={openSignup} className="text-sm font-bold px-5 py-2 rounded-2xl transition-all"
               style={{ background: G, color: '#fff' }}
               onMouseEnter={e => (e.currentTarget.style.background = '#6fa23e')}
               onMouseLeave={e => (e.currentTarget.style.background = G)}>
@@ -657,7 +657,7 @@ export function LandingPage() {
 
               <div className="mt-8 flex flex-col sm:flex-row gap-3">
                 <button onClick={openSignup}
-                  className="group flex items-center justify-center gap-2.5 px-7 py-3.5 rounded-xl font-bold text-sm transition-all"
+                  className="group flex items-center justify-center gap-2.5 px-7 py-3.5 rounded-3xl font-bold text-sm transition-all"
                   style={{ background: G, color: '#fff', boxShadow: `0 4px 20px ${G}40` }}
                   onMouseEnter={e => { e.currentTarget.style.background = '#6fa23e'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
                   onMouseLeave={e => { e.currentTarget.style.background = G; e.currentTarget.style.transform = 'translateY(0)'; }}>
@@ -666,7 +666,7 @@ export function LandingPage() {
                   <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                 </button>
                 <button onClick={openSignup}
-                  className="flex items-center justify-center gap-2 px-5 py-3 rounded-xl font-medium text-xs transition-all"
+                  className="flex items-center justify-center gap-2 px-5 py-3 rounded-3xl font-medium text-xs transition-all"
                   style={{ background: 'transparent', color: MUTED, border: '1px solid rgba(255,255,255,0.08)' }}
                   onMouseEnter={e => { e.currentTarget.style.color = TEXT; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.16)'; }}
                   onMouseLeave={e => { e.currentTarget.style.color = MUTED; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'; }}>
@@ -726,7 +726,7 @@ export function LandingPage() {
             ].map((t, i) => (
               <div
                 key={`${dup}-${i}`}
-                className="rounded-2xl p-4 flex-shrink-0"
+                className="rounded-[2rem] p-4 flex-shrink-0"
                 style={{ width: 320, background: CARD, border: '1px solid rgba(255,255,255,0.05)' }}
               >
                 <div className="flex items-center gap-0.5 mb-2">
@@ -779,11 +779,11 @@ export function LandingPage() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: i * 0.1 }}
-                className="rounded-xl p-6 relative overflow-hidden group"
+                className="rounded-3xl p-6 relative overflow-hidden group"
                 style={{ background: CARD, border: '1px solid rgba(255,255,255,0.04)' }}
               >
                 <span className="absolute top-4 right-4 text-4xl font-black" style={{ color: 'rgba(255,255,255,0.03)' }}>{item.num}</span>
-                <div className="w-10 h-10 rounded-lg flex items-center justify-center mb-4" style={{ background: `${G}15` }}>
+                <div className="w-10 h-10 rounded-2xl flex items-center justify-center mb-4" style={{ background: `${G}15` }}>
                   <item.icon className="w-5 h-5" style={{ color: G }} />
                 </div>
                 <h3 className="text-base font-bold mb-1.5" style={{ color: TEXT }}>{item.title}</h3>
@@ -818,7 +818,7 @@ export function LandingPage() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: i * 0.06 }}
-                className="rounded-xl p-5 transition-colors"
+                className="rounded-3xl p-5 transition-colors"
                 style={{
                   background: item.accent ? `${G}08` : CARD,
                   border: item.accent ? `1px solid ${G}30` : '1px solid rgba(255,255,255,0.04)',
@@ -849,7 +849,7 @@ export function LandingPage() {
             initial={{ opacity: 0, y: 16 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            className="rounded-2xl p-8 relative overflow-hidden"
+            className="rounded-[2rem] p-8 relative overflow-hidden"
             style={{
               background: CARD,
               border: `2px solid ${G}50`,
@@ -911,7 +911,7 @@ export function LandingPage() {
             </div>
 
             <button onClick={openSignup}
-              className="w-full group flex items-center justify-center gap-2 py-3.5 rounded-xl font-bold text-sm transition-all"
+              className="w-full group flex items-center justify-center gap-2 py-3.5 rounded-3xl font-bold text-sm transition-all"
               style={{ background: G, color: '#fff', boxShadow: `0 4px 20px ${G}40` }}
               onMouseEnter={e => { e.currentTarget.style.background = '#6fa23e'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
               onMouseLeave={e => { e.currentTarget.style.background = G; e.currentTarget.style.transform = 'translateY(0)'; }}>
@@ -931,7 +931,7 @@ export function LandingPage() {
             </h2>
             <div className="mt-8">
               <button onClick={openSignup}
-                className="group inline-flex items-center justify-center gap-2 px-8 py-4 rounded-xl font-bold text-sm transition-all"
+                className="group inline-flex items-center justify-center gap-2 px-8 py-4 rounded-3xl font-bold text-sm transition-all"
                 style={{ background: G, color: '#fff', boxShadow: `0 4px 20px ${G}40` }}
                 onMouseEnter={e => { e.currentTarget.style.background = '#6fa23e'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
                 onMouseLeave={e => { e.currentTarget.style.background = G; e.currentTarget.style.transform = 'translateY(0)'; }}>
@@ -953,7 +953,7 @@ export function LandingPage() {
 
       <div className="fixed bottom-0 left-0 right-0 z-30 sm:hidden p-3 bottom-nav-safe" style={{ background: `${BG}f0`, backdropFilter: 'blur(12px)', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
         <button onClick={openSignup}
-          className="w-full group flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm"
+          className="w-full group flex items-center justify-center gap-2 py-3 rounded-3xl font-bold text-sm"
           style={{ background: G, color: '#fff' }}>
           Analyze My Games Free
           <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
