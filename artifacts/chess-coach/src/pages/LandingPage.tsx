@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useUser } from '@/hooks/use-user';
 import { useLocation } from 'wouter';
-import { ArrowRight, Mail, Eye, EyeOff, UserPlus, LogIn, Search, BarChart3, Brain, TrendingUp, Check, X, Zap, Target, Crosshair, BookOpen, Gamepad2, Users, Star, Flame, Trophy, Sparkles } from 'lucide-react';
+import { ArrowRight, Mail, Eye, EyeOff, UserPlus, LogIn, Search, BarChart3, Brain, TrendingUp, Check, X, Zap, Target, Crosshair, BookOpen, Gamepad2, Users, Star, Flame, Trophy, Sparkles, Download as DownloadIcon, Smartphone } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { apiFetch, apiUrl, setAuthToken } from '@/lib/api';
 
@@ -572,6 +572,12 @@ export function LandingPage() {
             <span className="text-sm font-bold ml-0.5" style={{ color: MUTED }}>.net</span>
           </div>
           <div className="flex items-center gap-3">
+            <a href={`${import.meta.env.BASE_URL}download`}
+              className="hidden sm:inline-flex items-center gap-1.5 text-sm font-medium transition-colors"
+              style={{ color: MUTED }}
+              onMouseEnter={e => (e.currentTarget.style.color = TEXT)} onMouseLeave={e => (e.currentTarget.style.color = MUTED)}>
+              <Smartphone className="w-3.5 h-3.5" /> Download
+            </a>
             <button onClick={openLogin} className="text-sm font-medium transition-colors" style={{ color: MUTED }}
               onMouseEnter={e => (e.currentTarget.style.color = TEXT)} onMouseLeave={e => (e.currentTarget.style.color = MUTED)}>
               Sign In
@@ -673,6 +679,14 @@ export function LandingPage() {
                   <Crosshair className="w-3.5 h-3.5" />
                   Scout Opponent
                 </button>
+                <a href={`${import.meta.env.BASE_URL}download`}
+                  className="flex items-center justify-center gap-2 px-5 py-3 rounded-md font-medium text-xs transition-all"
+                  style={{ background: 'transparent', color: MUTED, border: '1px solid rgba(255,255,255,0.08)' }}
+                  onMouseEnter={e => { e.currentTarget.style.color = TEXT; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.16)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.color = MUTED; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'; }}>
+                  <DownloadIcon className="w-3.5 h-3.5" />
+                  Download Android app
+                </a>
               </div>
 
               <div className="mt-6 flex flex-wrap items-center gap-4 text-xs font-semibold" style={{ color: MUTED }}>
