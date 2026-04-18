@@ -715,7 +715,7 @@ export function LandingPage() {
                 <span className="text-6xl font-black" style={{ color: TEXT }}>$4</span>
                 <span className="text-lg" style={{ color: MUTED }}>/month</span>
               </div>
-              <p className="text-sm mt-1" style={{ color: MUTED }}>or just <span style={{ color: G, fontWeight: 800 }}>$1/week</span></p>
+              <p className="text-sm mt-1" style={{ color: MUTED }}>or just <span style={{ color: G, fontWeight: 800 }}>$40/year</span> <span style={{ color: G, fontSize: 11, fontWeight: 700 }}>(save 17%)</span></p>
               <p className="text-[11px] font-bold mt-2" style={{ color: '#ffc34d' }}>
                 💡 Less than one cup of coffee · cancel anytime
               </p>
