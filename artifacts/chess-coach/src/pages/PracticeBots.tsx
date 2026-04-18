@@ -3,7 +3,8 @@ import { Chess } from 'chess.js';
 import { ChessBoard, type MoveQuality } from '@/components/ChessBoard';
 import { normalizeFen } from '@/lib/utils';
 import { BOTS, getBotMove, BotConfig, analyzeMoveQuality, type MoveAnalysisResult } from '@/lib/chess-bot';
-import { ArrowLeft, RotateCcw, Flag, Clock, Trophy, Swords, Zap, ChevronRight, ChevronDown, ChevronUp } from 'lucide-react';
+import { OPENINGS, type OpeningLine } from '@/lib/openings';
+import { ArrowLeft, RotateCcw, Flag, Clock, Trophy, Swords, Zap, ChevronRight, ChevronDown, ChevronUp, BookOpen, Check, X, Lightbulb } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
@@ -502,6 +503,326 @@ function GameView({ bot, onBack, startFen, startColor }: { bot: BotConfig; onBac
   );
 }
 
+function OpeningTrainerView({ opening, onBack }: { opening: OpeningLine; onBack: () => void }) {
+  const playerColor = opening.userColor;
+  const [chess] = useState(() => new Chess());
+  const [fen, setFen] = useState(chess.fen());
+  const [stepIdx, setStepIdx] = useState(0);
+  const [history, setHistory] = useState<{ san: string; expected: string; correct: boolean }[]>([]);
+  const [phase, setPhase] = useState<'theory' | 'freeplay' | 'completed'>('theory');
+  const [wrongFeedback, setWrongFeedback] = useState<{ played: string; expected: string } | null>(null);
+  const [hintOpen, setHintOpen] = useState(false);
+  const [streak, setStreak] = useState(0);
+  const [score, setScore] = useState({ correct: 0, total: 0 });
+  const botTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const wrongTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const expectedNow = phase === 'theory' && stepIdx < opening.moves.length ? opening.moves[stepIdx] : null;
+  const isPlayerTurn = chess.turn() === playerColor;
+  const playerExpected = expectedNow && isPlayerTurn ? expectedNow : null;
+
+  const clearBot = useCallback(() => {
+    if (botTimeoutRef.current) { clearTimeout(botTimeoutRef.current); botTimeoutRef.current = null; }
+  }, []);
+
+  useEffect(() => () => {
+    clearBot();
+    if (wrongTimerRef.current) clearTimeout(wrongTimerRef.current);
+  }, [clearBot]);
+
+  const advanceBotMove = useCallback(() => {
+    if (phase !== 'theory') return;
+    if (stepIdx >= opening.moves.length) {
+      setPhase('completed');
+      return;
+    }
+    if (chess.turn() === playerColor) return;
+    const expected = opening.moves[stepIdx];
+    clearBot();
+    botTimeoutRef.current = setTimeout(() => {
+      const r = chess.move(expected);
+      if (!r) return;
+      setFen(chess.fen());
+      setStepIdx(i => i + 1);
+    }, 550);
+  }, [chess, opening.moves, phase, playerColor, stepIdx, clearBot]);
+
+  useEffect(() => {
+    if (phase === 'theory' && !isPlayerTurn && stepIdx < opening.moves.length) {
+      advanceBotMove();
+    }
+    if (phase === 'theory' && stepIdx >= opening.moves.length) {
+      setPhase('completed');
+    }
+  }, [phase, isPlayerTurn, stepIdx, opening.moves.length, advanceBotMove]);
+
+  const handleMovePlayed = useCallback((san: string, isCorrect: boolean) => {
+    if (phase !== 'theory') return;
+    const expected = opening.moves[stepIdx];
+    if (san === expected) {
+      setHistory(h => [...h, { san, expected, correct: true }]);
+      setStreak(s => s + 1);
+      setScore(s => ({ correct: s.correct + 1, total: s.total + 1 }));
+      setFen(chess.fen());
+      setStepIdx(i => i + 1);
+      setHintOpen(false);
+    } else {
+      // Wrong move — undo
+      chess.undo();
+      setFen(chess.fen());
+      setStreak(0);
+      setScore(s => ({ correct: s.correct, total: s.total + 1 }));
+      setHistory(h => [...h, { san, expected, correct: false }]);
+      setWrongFeedback({ played: san, expected });
+      if (wrongTimerRef.current) clearTimeout(wrongTimerRef.current);
+      wrongTimerRef.current = setTimeout(() => setWrongFeedback(null), 2200);
+    }
+    void isCorrect;
+  }, [chess, opening.moves, phase, stepIdx]);
+
+  const handleReset = () => {
+    clearBot();
+    chess.reset();
+    setFen(chess.fen());
+    setStepIdx(0);
+    setHistory([]);
+    setPhase('theory');
+    setWrongFeedback(null);
+    setHintOpen(false);
+    setStreak(0);
+    setScore({ correct: 0, total: 0 });
+  };
+
+  const handleShowHint = () => setHintOpen(true);
+
+  const lastMove = useMemo(() => {
+    const hist = chess.history({ verbose: true });
+    if (hist.length === 0) return null;
+    const last = hist[hist.length - 1];
+    return { from: last.from, to: last.to };
+  }, [fen, chess]);
+
+  const totalSteps = opening.moves.length;
+  const progressPct = Math.min(100, Math.round((stepIdx / totalSteps) * 100));
+  const accuracy = score.total === 0 ? 100 : Math.round((score.correct / score.total) * 100);
+
+  return (
+    <div className="space-y-3 pb-20 px-4 pt-4 md:px-0 md:pt-0">
+      <button onClick={onBack}
+        className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors text-sm">
+        <ArrowLeft className="w-4 h-4" /> All Openings
+      </button>
+
+      <div className="grid grid-cols-1 xl:grid-cols-[1fr_340px] gap-4">
+        <div className="space-y-2.5">
+          <div className="glass-card rounded-3xl p-3 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="w-9 h-9 rounded-2xl bg-primary/15 border border-primary/30 flex items-center justify-center shrink-0">
+                <BookOpen className="w-4 h-4 text-primary" />
+              </div>
+              <div className="min-w-0">
+                <p className="font-bold text-sm truncate">{opening.name}</p>
+                <p className="text-[10px] text-muted-foreground">
+                  {opening.eco} · You play {playerColor === 'w' ? 'White' : 'Black'} · Move {Math.min(stepIdx + 1, totalSteps)}/{totalSteps}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <div className="text-right">
+                <p className="text-[10px] text-muted-foreground">Accuracy</p>
+                <p className="text-sm font-mono font-bold text-primary">{accuracy}%</p>
+              </div>
+              {streak >= 2 && (
+                <div className="px-2 py-1 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-400 text-[10px] font-bold">
+                  🔥 {streak}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
+            <motion.div
+              className="h-full bg-gradient-to-r from-primary/70 to-primary"
+              initial={{ width: 0 }}
+              animate={{ width: `${progressPct}%` }}
+              transition={{ type: 'spring', stiffness: 120, damping: 20 }}
+            />
+          </div>
+
+          <ChessBoard
+            fen={fen}
+            flipped={playerColor === 'b'}
+            practiceMode={phase === 'theory' && isPlayerTurn}
+            expectedMoveSan={playerExpected}
+            onMovePlayed={handleMovePlayed}
+            lastMove={lastMove}
+            moveQuality={null}
+          />
+
+          <div className="glass-card rounded-3xl p-2.5 flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-full bg-primary/20 border-2 border-primary/30 flex items-center justify-center">
+                <span className="text-[10px] font-black text-primary">You</span>
+              </div>
+              <p className="font-bold text-sm">You ({playerColor === 'w' ? 'White' : 'Black'})</p>
+              {phase === 'theory' && isPlayerTurn && (
+                <span className="text-[10px] text-muted-foreground">— your move</span>
+              )}
+              {phase === 'theory' && !isPlayerTurn && stepIdx < totalSteps && (
+                <span className="text-[10px] text-muted-foreground">— opening line replies…</span>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <button onClick={handleShowHint}
+                disabled={!playerExpected}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-3xl bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-bold hover:bg-amber-500/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+                <Lightbulb className="w-3 h-3" /> {hintOpen && playerExpected ? playerExpected : 'Hint'}
+              </button>
+              <button onClick={handleReset}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-3xl bg-white/5 border border-white/10 text-muted-foreground text-xs font-bold hover:bg-white/10 transition-colors">
+                <RotateCcw className="w-3 h-3" /> Restart
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          <AnimatePresence>
+            {wrongFeedback && (
+              <motion.div
+                initial={{ opacity: 0, y: -8, scale: 0.96 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -8, scale: 0.96 }}
+                className="rounded-3xl border border-red-500/30 bg-red-500/10 p-3"
+              >
+                <div className="flex items-start gap-2">
+                  <div className="w-7 h-7 rounded-2xl bg-red-500/20 border border-red-500/40 flex items-center justify-center shrink-0">
+                    <X className="w-4 h-4 text-red-400" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold text-red-400">Out of book</p>
+                    <p className="text-[11px] text-foreground/80 mt-0.5">
+                      You played <strong className="font-mono">{wrongFeedback.played}</strong>. Theory continues with{' '}
+                      <strong className="font-mono text-emerald-400">{wrongFeedback.expected}</strong>.
+                    </p>
+                    <p className="text-[10px] text-muted-foreground mt-1">Try again — your move was undone.</p>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <div className="glass-card rounded-3xl p-3 space-y-2">
+            <div className="flex items-center gap-2">
+              <Lightbulb className="w-4 h-4 text-amber-400" />
+              <h3 className="font-bold text-sm">Key Ideas</h3>
+            </div>
+            <p className="text-[11px] text-muted-foreground leading-relaxed">{opening.description}</p>
+            <ul className="space-y-1.5 pt-1">
+              {opening.ideas.map((idea, i) => (
+                <li key={i} className="flex items-start gap-2 text-[11px]">
+                  <span className="text-primary shrink-0 mt-0.5">•</span>
+                  <span className="text-foreground/80">{idea}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <div className="glass-card rounded-3xl overflow-hidden">
+            <div className="px-3 py-2.5 border-b border-white/5 text-sm font-bold flex items-center justify-between">
+              <span>Move History</span>
+              <span className="text-[10px] text-muted-foreground font-normal">{score.correct}/{score.total} correct</span>
+            </div>
+            <div className="max-h-[180px] overflow-y-auto px-2 py-1.5">
+              {history.length === 0 ? (
+                <p className="text-xs text-muted-foreground text-center py-6">
+                  {isPlayerTurn ? 'Make your first move…' : 'Bot is preparing…'}
+                </p>
+              ) : (
+                <div className="space-y-1">
+                  {history.map((h, i) => (
+                    <div key={i} className="flex items-center gap-2 text-[11px] px-1.5 py-1 rounded">
+                      {h.correct ? (
+                        <Check className="w-3 h-3 text-emerald-400 shrink-0" />
+                      ) : (
+                        <X className="w-3 h-3 text-red-400 shrink-0" />
+                      )}
+                      <span className={cn('font-mono', h.correct ? 'text-foreground/80' : 'text-red-400 line-through')}>
+                        {h.san}
+                      </span>
+                      {!h.correct && (
+                        <span className="font-mono text-emerald-400 text-[10px]">→ {h.expected}</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <AnimatePresence>
+            {phase === 'completed' && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="glass-card rounded-3xl p-5 text-center space-y-3 border border-emerald-500/30 bg-emerald-500/5"
+              >
+                <div className="text-4xl">🎓</div>
+                <h3 className="text-xl font-black text-emerald-400">Line Complete!</h3>
+                <p className="text-xs text-muted-foreground">
+                  {opening.name} · {accuracy}% accuracy · {score.correct}/{score.total} moves
+                </p>
+                <div className="flex gap-2 justify-center flex-wrap">
+                  <button onClick={handleReset}
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-3xl bg-[#f0d9b5] text-[#2d2d2d] text-xs font-bold hover:opacity-90 transition-opacity">
+                    <RotateCcw className="w-3 h-3" /> Practice Again
+                  </button>
+                  <button onClick={onBack}
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-3xl bg-[#2d2d2d] border border-white/20 text-[#f0d9b5] text-xs font-bold hover:opacity-90 transition-opacity">
+                    Pick Another Opening
+                  </button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function OpeningCard({ opening, onSelect }: { opening: OpeningLine; onSelect: (o: OpeningLine) => void }) {
+  return (
+    <motion.button
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      whileHover={{ scale: 1.03 }}
+      whileTap={{ scale: 0.98 }}
+      onClick={() => onSelect(opening)}
+      className="relative flex flex-col gap-3 p-5 rounded-[2rem] border border-white/10 bg-gradient-to-br from-[#2d2c29] to-[#1f1e1c] text-left transition-shadow hover:shadow-xl hover:shadow-black/30 group"
+    >
+      <div className="flex items-center justify-between">
+        <div className="w-10 h-10 rounded-2xl bg-primary/15 border border-primary/30 flex items-center justify-center">
+          <BookOpen className="w-5 h-5 text-primary" />
+        </div>
+        <span className="text-xs font-bold px-2.5 py-1 rounded-[2rem] bg-black/30 border border-white/10 text-white/80">
+          {opening.eco}
+        </span>
+      </div>
+      <div>
+        <h3 className="text-base font-black text-white leading-tight">{opening.name}</h3>
+        <p className="text-[11px] font-bold uppercase tracking-wider text-white/50 mt-1">
+          Play as {opening.userColor === 'w' ? 'White' : 'Black'} · {Math.ceil(opening.moves.length / 2)} moves deep
+        </p>
+      </div>
+      <p className="text-xs text-white/60 leading-relaxed line-clamp-2">{opening.description}</p>
+      <div className="flex items-center gap-1.5 text-xs font-bold text-white/40 group-hover:text-primary transition-colors mt-auto pt-2">
+        Train Line <ChevronRight className="w-3.5 h-3.5" />
+      </div>
+    </motion.button>
+  );
+}
+
 function findBotAboveRating(rating: number): BotConfig {
   const sorted = [...BOTS].sort((a, b) => a.rating - b.rating);
   for (const bot of sorted) {
@@ -525,9 +846,15 @@ export function PracticeBots() {
   const [selectedBot, setSelectedBot] = useState<BotConfig | null>(() =>
     jumpIn ? findBotAboveRating(jumpIn.rating) : null
   );
+  const [selectedOpening, setSelectedOpening] = useState<OpeningLine | null>(null);
+  const [tab, setTab] = useState<'bots' | 'openings'>('bots');
 
   if (selectedBot) {
     return <GameView bot={selectedBot} onBack={() => setSelectedBot(null)} startFen={jumpIn?.fen} startColor={jumpIn?.color} />;
+  }
+
+  if (selectedOpening) {
+    return <OpeningTrainerView opening={selectedOpening} onBack={() => setSelectedOpening(null)} />;
   }
 
   return (
@@ -536,40 +863,94 @@ export function PracticeBots() {
         <div className="absolute right-0 top-0 w-64 h-64 bg-primary/5 blur-3xl rounded-full pointer-events-none" />
         <div className="relative z-10">
           <h1 className="text-2xl sm:text-3xl font-display font-bold flex items-center gap-3">
-            <Swords className="w-7 h-7 sm:w-8 sm:h-8 text-primary" /> Practice Bots
+            <Swords className="w-7 h-7 sm:w-8 sm:h-8 text-primary" /> Practice
           </h1>
           <p className="text-muted-foreground mt-2 max-w-lg text-sm">
-            Challenge AI opponents at your skill level. Beat a bot and move up to the next!
+            Battle AI opponents or drill specific openings move-by-move with instant feedback.
           </p>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
-        {BOTS.map((bot) => (
-          <BotCard key={bot.name} bot={bot} onSelect={setSelectedBot} />
-        ))}
+      <div className="inline-flex p-1 rounded-3xl bg-card/60 border border-white/10 gap-1">
+        <button
+          onClick={() => setTab('bots')}
+          className={cn(
+            'flex items-center gap-2 px-4 py-2 rounded-2xl text-sm font-bold transition-all',
+            tab === 'bots' ? 'bg-primary text-primary-foreground shadow' : 'text-muted-foreground hover:text-foreground'
+          )}
+        >
+          <Swords className="w-4 h-4" /> Bots
+        </button>
+        <button
+          onClick={() => setTab('openings')}
+          className={cn(
+            'flex items-center gap-2 px-4 py-2 rounded-2xl text-sm font-bold transition-all',
+            tab === 'openings' ? 'bg-primary text-primary-foreground shadow' : 'text-muted-foreground hover:text-foreground'
+          )}
+        >
+          <BookOpen className="w-4 h-4" /> Opening Trainer
+        </button>
       </div>
 
-      <div className="glass-card rounded-[2rem] p-4 sm:p-6 border border-white/8">
-        <div className="flex items-center gap-2 mb-3 sm:mb-4">
-          <Zap className="w-5 h-5 text-amber-400" />
-          <h3 className="font-bold">How it works</h3>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 text-sm text-muted-foreground">
-          <div className="flex gap-3">
-            <span className="text-lg font-black text-primary shrink-0">1</span>
-            <p>Pick a bot that matches your current rating or slightly above for a good challenge.</p>
+      {tab === 'bots' ? (
+        <>
+          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
+            {BOTS.map((bot) => (
+              <BotCard key={bot.name} bot={bot} onSelect={setSelectedBot} />
+            ))}
           </div>
-          <div className="flex gap-3">
-            <span className="text-lg font-black text-primary shrink-0">2</span>
-            <p>Play a full game. The bot thinks using real chess evaluation — no random moves (except at lower levels).</p>
+
+          <div className="glass-card rounded-[2rem] p-4 sm:p-6 border border-white/8">
+            <div className="flex items-center gap-2 mb-3 sm:mb-4">
+              <Zap className="w-5 h-5 text-amber-400" />
+              <h3 className="font-bold">How it works</h3>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 text-sm text-muted-foreground">
+              <div className="flex gap-3">
+                <span className="text-lg font-black text-primary shrink-0">1</span>
+                <p>Pick a bot that matches your current rating or slightly above for a good challenge.</p>
+              </div>
+              <div className="flex gap-3">
+                <span className="text-lg font-black text-primary shrink-0">2</span>
+                <p>Play a full game. The bot thinks using real chess evaluation — no random moves (except at lower levels).</p>
+              </div>
+              <div className="flex gap-3">
+                <span className="text-lg font-black text-primary shrink-0">3</span>
+                <p>Win consistently? Move up to the next bot and keep climbing!</p>
+              </div>
+            </div>
           </div>
-          <div className="flex gap-3">
-            <span className="text-lg font-black text-primary shrink-0">3</span>
-            <p>Win consistently? Move up to the next bot and keep climbing!</p>
+        </>
+      ) : (
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
+            {OPENINGS.map((opening) => (
+              <OpeningCard key={opening.id} opening={opening} onSelect={setSelectedOpening} />
+            ))}
           </div>
-        </div>
-      </div>
+
+          <div className="glass-card rounded-[2rem] p-4 sm:p-6 border border-white/8">
+            <div className="flex items-center gap-2 mb-3 sm:mb-4">
+              <BookOpen className="w-5 h-5 text-primary" />
+              <h3 className="font-bold">How opening drills work</h3>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 text-sm text-muted-foreground">
+              <div className="flex gap-3">
+                <span className="text-lg font-black text-primary shrink-0">1</span>
+                <p>Pick an opening. The bot will play the opposite side following the main theory line.</p>
+              </div>
+              <div className="flex gap-3">
+                <span className="text-lg font-black text-primary shrink-0">2</span>
+                <p>Play the expected book move. If you deviate, you'll get instant feedback and a chance to retry.</p>
+              </div>
+              <div className="flex gap-3">
+                <span className="text-lg font-black text-primary shrink-0">3</span>
+                <p>Stuck? Tap the Hint button to reveal the next move and lock in the pattern.</p>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
