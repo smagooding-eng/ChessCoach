@@ -223,7 +223,7 @@ export function Dashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 md:gap-4 px-3 md:px-0">
         <div className="lg:col-span-2 space-y-3 md:space-y-4">
 
-          <DashCard title="Key Weaknesses" icon={<AlertTriangle className="w-4 h-4" style={{ color: '#ea9733' }} />} linkHref={isPremium ? "/analysis" : "/subscription"} linkText={isPremium ? "Full Analysis" : "Upgrade"}>
+          <DashCard title="Key Weaknesses" icon={<AlertTriangle className="w-4 h-4" style={{ color: CHESSCOM_GREEN }} />} linkHref={isPremium ? "/analysis" : "/subscription"} linkText={isPremium ? "Full Analysis" : "Upgrade"}>
             {!isPremium ? (
               <div className="relative min-h-[180px]">
                 <div className="space-y-1.5 pointer-events-none select-none" style={{ filter: 'blur(6px)' }}>
@@ -245,17 +245,17 @@ export function Dashboard() {
                   })}
                 </div>
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="text-center px-4 py-5 rounded-xl max-w-xs"
-                    style={{ background: 'rgba(38,36,33,0.92)', border: `1px solid rgba(234,166,49,0.35)`, backdropFilter: 'blur(2px)' }}>
-                    <div className="inline-flex items-center justify-center w-9 h-9 rounded-xl mb-2" style={{ background: 'rgba(234,166,49,0.18)' }}>
-                      <Lock className="w-4 h-4" style={{ color: '#eaa631' }} />
+                  <div className="text-center px-5 py-5 rounded-2xl max-w-xs"
+                    style={{ background: 'rgba(38,36,33,0.94)', border: `1px solid rgba(129,182,76,0.35)`, backdropFilter: 'blur(2px)', boxShadow: '0 8px 24px -8px rgba(0,0,0,0.6)' }}>
+                    <div className="inline-flex items-center justify-center w-10 h-10 rounded-xl mb-2.5" style={{ background: 'rgba(129,182,76,0.18)', border: '1px solid rgba(129,182,76,0.35)' }}>
+                      <Lock className="w-4 h-4" style={{ color: CHESSCOM_GREEN }} />
                     </div>
-                    <p className="font-bold text-sm mb-1" style={{ color: TEXT_LIGHT }}>
+                    <p className="font-black text-sm mb-2.5" style={{ color: TEXT_LIGHT, letterSpacing: '-0.01em' }}>
                       Unlock your full breakdown and personalized training plan
                     </p>
                     <Link href="/subscription">
-                      <button className="mt-2 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl font-bold text-xs transition-all"
-                        style={{ background: '#eaa631', color: '#1a1816' }}>
+                      <button className="mt-1 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl font-black text-xs text-white transition-all hover:scale-[1.02]"
+                        style={{ background: `linear-gradient(180deg, #95c45a 0%, ${CHESSCOM_GREEN} 100%)`, boxShadow: '0 4px 12px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.2)' }}>
                         <Crown className="w-3.5 h-3.5" /> Upgrade to Pro
                       </button>
                     </Link>
@@ -291,7 +291,7 @@ export function Dashboard() {
             )}
           </DashCard>
 
-          <DashCard title="Recent Games" icon={<Clock className="w-4 h-4" style={{ color: '#6da5d8' }} />} linkHref="/games" linkText="All Games">
+          <DashCard title="Recent Games" icon={<Clock className="w-4 h-4" style={{ color: CHESSCOM_GREEN }} />} linkHref="/games" linkText="All Games">
             <div className="space-y-0.5">
               {gamesData?.games?.slice(0, 5).map((game, i) => {
                 const res = RESULT_COLORS[game.result] ?? RESULT_COLORS.draw;
@@ -332,28 +332,44 @@ export function Dashboard() {
 
         <div className="space-y-3 md:space-y-4">
           <Link href="/opponents" className="block">
-            <div className="rounded-xl p-4 md:p-5 transition-colors group cursor-pointer"
-              style={{ background: 'linear-gradient(135deg, rgba(129,182,76,0.12) 0%, rgba(129,182,76,0.04) 100%)', border: `1px solid rgba(129,182,76,0.2)` }}
-              onMouseEnter={e => (e.currentTarget.style.borderColor = 'rgba(129,182,76,0.4)')}
-              onMouseLeave={e => (e.currentTarget.style.borderColor = 'rgba(129,182,76,0.2)')}>
-              <div className="flex items-center gap-3 mb-2">
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(129,182,76,0.15)' }}>
+            <div className="relative overflow-hidden rounded-2xl p-4 md:p-5 transition-colors group cursor-pointer"
+              style={{
+                background: 'linear-gradient(180deg, #353230 0%, #2b2926 100%)',
+                border: `1px solid rgba(129,182,76,0.3)`,
+                boxShadow: '0 8px 24px -10px rgba(0,0,0,0.6), 0 2px 6px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04)',
+              }}
+              onMouseEnter={e => (e.currentTarget.style.borderColor = 'rgba(129,182,76,0.5)')}
+              onMouseLeave={e => (e.currentTarget.style.borderColor = 'rgba(129,182,76,0.3)')}>
+              <div className="absolute top-0 left-0 right-0 h-[3px]" style={{ background: `linear-gradient(90deg, ${CHESSCOM_GREEN} 0%, rgba(129,182,76,0.35) 70%, transparent 100%)` }} />
+              <div className="relative flex items-center gap-3 mb-2.5">
+                <div className="w-11 h-11 rounded-xl flex items-center justify-center" style={{ background: 'rgba(129,182,76,0.18)', border: '1px solid rgba(129,182,76,0.35)' }}>
                   <Swords className="w-5 h-5" style={{ color: CHESSCOM_GREEN }} />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h3 className="font-black text-sm" style={{ color: TEXT_LIGHT }}>Opponent Scout</h3>
-                  <p className="text-[11px]" style={{ color: TEXT_MUTED }}>Our #1 feature</p>
+                  <span className="inline-block text-[9px] font-black uppercase tracking-[0.18em]" style={{ color: CHESSCOM_GREEN }}>#1 Feature</span>
+                  <h3 className="font-black text-base leading-tight" style={{ color: TEXT_LIGHT, letterSpacing: '-0.01em' }}>Opponent Scout</h3>
                 </div>
                 <ChevronRight className="w-4 h-4 shrink-0 opacity-40 group-hover:opacity-80 transition-opacity" style={{ color: CHESSCOM_GREEN }} />
               </div>
-              <p className="text-xs leading-relaxed" style={{ color: TEXT_MUTED }}>
+              <p className="relative text-xs leading-relaxed" style={{ color: TEXT_MUTED }}>
                 AI-powered scouting report on any Chess.com player. Find weaknesses, tendencies, and prep lines before your next match.
               </p>
             </div>
           </Link>
 
-          <div className="rounded-xl p-4 space-y-1" style={{ background: BG_CARD, border: CARD_BORDER, boxShadow: CARD_SHADOW }}>
-            <p className="text-[10px] font-bold uppercase tracking-wider mb-2.5" style={{ color: TEXT_MUTED }}>Quick Actions</p>
+          <div className="relative overflow-hidden rounded-2xl p-4 md:p-5 space-y-1"
+            style={{
+              background: 'linear-gradient(180deg, #353230 0%, #2b2926 100%)',
+              border: '1px solid rgba(255,255,255,0.06)',
+              boxShadow: '0 8px 24px -10px rgba(0,0,0,0.6), 0 2px 6px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04)',
+            }}>
+            <div className="absolute top-0 left-0 right-0 h-[3px]" style={{ background: `linear-gradient(90deg, ${CHESSCOM_GREEN} 0%, rgba(129,182,76,0.35) 70%, transparent 100%)` }} />
+            <div className="relative flex items-center gap-2.5 mb-3">
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(129,182,76,0.15)', border: '1px solid rgba(129,182,76,0.3)' }}>
+                <Zap className="w-4 h-4" style={{ color: CHESSCOM_GREEN }} />
+              </div>
+              <h2 className="text-base md:text-lg font-black" style={{ color: TEXT_LIGHT, letterSpacing: '-0.01em' }}>Quick Actions</h2>
+            </div>
             {[
               { href: '/opponents', label: 'Scout an Opponent', icon: <Swords className="w-4 h-4" /> },
               { href: '/lookup', label: 'Game Lookup', icon: <Search className="w-4 h-4" /> },
@@ -376,28 +392,42 @@ export function Dashboard() {
           </div>
 
           {coursesData?.courses?.length ? (
-            <div className="rounded-xl p-4" style={{ background: BG_CARD, border: CARD_BORDER, boxShadow: CARD_SHADOW }}>
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="text-sm font-bold flex items-center gap-2" style={{ color: TEXT_LIGHT }}>
-                  <GraduationCap className="w-4 h-4" style={{ color: '#b583e0' }} /> Courses
-                  <span className="px-1.5 py-px rounded text-[8px] font-black tracking-wider" style={{ background: 'rgba(234,166,49,0.15)', color: '#eaa631' }}>BETA</span>
-                </h2>
-                <Link href="/courses" className="text-[11px] font-semibold flex items-center gap-0.5 hover:underline" style={{ color: CHESSCOM_GREEN }}>
+            <div className="relative overflow-hidden rounded-2xl p-4 md:p-5"
+              style={{
+                background: 'linear-gradient(180deg, #353230 0%, #2b2926 100%)',
+                border: '1px solid rgba(255,255,255,0.06)',
+                boxShadow: '0 8px 24px -10px rgba(0,0,0,0.6), 0 2px 6px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04)',
+              }}>
+              <div className="absolute top-0 left-0 right-0 h-[3px]" style={{ background: `linear-gradient(90deg, ${CHESSCOM_GREEN} 0%, rgba(129,182,76,0.35) 70%, transparent 100%)` }} />
+              <div className="relative flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(129,182,76,0.15)', border: '1px solid rgba(129,182,76,0.3)' }}>
+                    <GraduationCap className="w-4 h-4" style={{ color: CHESSCOM_GREEN }} />
+                  </div>
+                  <h2 className="text-base md:text-lg font-black flex items-center gap-2" style={{ color: TEXT_LIGHT, letterSpacing: '-0.01em' }}>
+                    Courses
+                    <span className="px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-[0.18em]" style={{ background: 'rgba(129,182,76,0.18)', color: CHESSCOM_GREEN, border: '1px solid rgba(129,182,76,0.3)' }}>Beta</span>
+                  </h2>
+                </div>
+                <Link href="/courses" className="text-[11px] font-black uppercase tracking-wider flex items-center gap-0.5 hover:underline" style={{ color: CHESSCOM_GREEN }}>
                   All <ChevronRight className="w-3 h-3" />
                 </Link>
               </div>
-              <div className="space-y-2">
+              <div className="relative space-y-1">
                 {coursesData.courses.slice(0, 3).map(course => {
                   const progress = Math.round((course.completedLessons / course.totalLessons) * 100) || 0;
                   return (
                     <Link key={course.id} href={`/courses/${course.id}`} className="block">
-                      <div className="group flex items-center gap-2.5 p-2 rounded-xl transition-colors"
+                      <div className="group flex items-center gap-2.5 p-2.5 rounded-xl transition-colors"
                         onMouseEnter={e => (e.currentTarget.style.background = BG_CARD_HOVER)}
                         onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
                         <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-xs line-clamp-1" style={{ color: TEXT_LIGHT }}>{course.title}</p>
+                          <p className="font-bold text-sm line-clamp-1" style={{ color: TEXT_LIGHT }}>{course.title}</p>
+                          <div className="mt-1.5 h-1 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
+                            <div className="h-full rounded-full" style={{ width: `${progress}%`, background: CHESSCOM_GREEN }} />
+                          </div>
                         </div>
-                        <span className="text-[10px] shrink-0" style={{ color: TEXT_MUTED }}>{progress}%</span>
+                        <span className="text-xs font-black shrink-0" style={{ color: CHESSCOM_GREEN }}>{progress}%</span>
                       </div>
                     </Link>
                   );
@@ -415,16 +445,25 @@ function DashCard({ title, icon, linkHref, linkText, children }: {
   title: string; icon: React.ReactNode; linkHref: string; linkText: string; children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-xl p-4 md:p-5" style={{ background: BG_CARD, border: CARD_BORDER, boxShadow: CARD_SHADOW }}>
-      <div className="flex items-center justify-between mb-3.5">
-        <h2 className="text-sm font-bold flex items-center gap-2" style={{ color: TEXT_LIGHT }}>
-          {icon} {title}
-        </h2>
-        <Link href={linkHref} className="text-[11px] font-semibold flex items-center gap-0.5 hover:underline" style={{ color: CHESSCOM_GREEN }}>
+    <div className="relative overflow-hidden rounded-2xl p-4 md:p-5"
+      style={{
+        background: 'linear-gradient(180deg, #353230 0%, #2b2926 100%)',
+        border: '1px solid rgba(255,255,255,0.06)',
+        boxShadow: '0 8px 24px -10px rgba(0,0,0,0.6), 0 2px 6px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04)',
+      }}>
+      <div className="absolute top-0 left-0 right-0 h-[3px]" style={{ background: `linear-gradient(90deg, ${CHESSCOM_GREEN} 0%, rgba(129,182,76,0.35) 70%, transparent 100%)` }} />
+      <div className="relative flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(129,182,76,0.15)', border: '1px solid rgba(129,182,76,0.3)' }}>
+            {icon}
+          </div>
+          <h2 className="text-base md:text-lg font-black" style={{ color: TEXT_LIGHT, letterSpacing: '-0.01em' }}>{title}</h2>
+        </div>
+        <Link href={linkHref} className="text-[11px] font-black uppercase tracking-wider flex items-center gap-0.5 hover:underline" style={{ color: CHESSCOM_GREEN }}>
           {linkText} <ChevronRight className="w-3 h-3" />
         </Link>
       </div>
-      {children}
+      <div className="relative">{children}</div>
     </div>
   );
 }
