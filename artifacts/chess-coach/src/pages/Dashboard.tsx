@@ -3,7 +3,7 @@ import { useMyAnalysisSummary, useMyWeaknesses } from '@/hooks/use-analysis';
 import { useMyCourses } from '@/hooks/use-courses';
 import { useMyGames } from '@/hooks/use-games';
 import { Link } from 'wouter';
-import { Swords, Trophy, Target, AlertTriangle, BookOpen, Clock, GraduationCap, TrendingUp, ChevronRight, Search, Play, Bot, Camera, Lock, Crown } from 'lucide-react';
+import { Swords, Trophy, Target, AlertTriangle, BookOpen, Clock, GraduationCap, TrendingUp, ChevronRight, Search, Play, Bot, Camera, Lock, Crown, Sparkles, Flame } from 'lucide-react';
 import { useUser } from '@/hooks/use-user';
 import { useChessPlayer } from '@/hooks/use-chess-player';
 import { useMultiEloProgress } from '@/hooks/use-elo-progress';
@@ -51,11 +51,49 @@ export function Dashboard() {
 
   const winRate = summary ? ((summary.winRate || 0) * 100).toFixed(1) : '—';
 
+  const reviewedCount = allGamesData?.games?.filter(g => g.reviewed).length ?? 0;
+
   return (
     <div className="space-y-4 md:space-y-5">
 
+      {!isPremium && (
+        <Link href="/subscription" className="block px-3 md:px-0">
+          <div
+            className="relative overflow-hidden rounded-xl p-4 md:p-5 group cursor-pointer"
+            style={{
+              background: 'linear-gradient(135deg, #2a8a4f 0%, #1f6e8c 50%, #2563b8 100%)',
+              border: '1px solid rgba(255,255,255,0.12)',
+              boxShadow: '0 18px 40px -10px rgba(37,99,184,0.45), 0 8px 20px -6px rgba(0,0,0,0.5)',
+            }}
+          >
+            <div className="absolute -top-12 -right-8 w-44 h-44 rounded-full pointer-events-none"
+              style={{ background: 'radial-gradient(circle, rgba(255,255,255,0.18) 0%, transparent 70%)' }} />
+            <div className="absolute top-3 right-3 opacity-25">
+              <Sparkles className="w-16 h-16 text-white" />
+            </div>
+            <div className="relative flex items-center gap-3">
+              <div className="shrink-0 w-11 h-11 rounded-xl flex items-center justify-center"
+                style={{ background: 'rgba(255,255,255,0.18)', border: '1px solid rgba(255,255,255,0.25)' }}>
+                <Crown className="w-5 h-5 text-white" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/80">Try Premium</p>
+                <h3 className="text-base md:text-lg font-black text-white leading-tight">Unlock your full coaching plan</h3>
+                <p className="text-xs text-white/80 mt-0.5">Deep AI review · Opponent scouting · Custom courses</p>
+              </div>
+              <ChevronRight className="shrink-0 w-5 h-5 text-white/80 group-hover:translate-x-1 transition-transform" />
+            </div>
+          </div>
+        </Link>
+      )}
+
       <div style={{ background: BG_CARD, border: CARD_BORDER, boxShadow: CARD_SHADOW }}
-        className="p-4 md:p-5 rounded-xl">
+        className="relative overflow-hidden p-4 md:p-5 rounded-xl">
+        <div className="absolute -bottom-10 -right-6 opacity-[0.06] pointer-events-none rotate-12">
+          <svg width="180" height="180" viewBox="0 0 24 24" fill="currentColor" style={{ color: CHESSCOM_GREEN }}>
+            <path d="M19 22H5v-2h14v2M17.16 8.26C18.22 9.63 19 10.91 19 13a7 7 0 0 1-14 0c0-2.09.78-3.37 1.84-4.74C7.93 6.86 9 5.65 9 3.5L8.5 2h7L15 3.5c0 2.15 1.07 3.36 2.16 4.76Z"/>
+          </svg>
+        </div>
         <div className="flex items-center gap-3">
           <div className="shrink-0 relative">
             {chessPlayer?.avatar
@@ -167,17 +205,30 @@ export function Dashboard() {
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 md:gap-3 px-3 md:px-0">
         {[
-          { label: 'Total Games', value: summary?.totalGames || 0, icon: <Swords className="w-4 h-4" /> },
-          { label: 'Win Rate', value: `${winRate}%`, icon: <Trophy className="w-4 h-4" /> },
-          { label: 'Avg Rating', value: Math.round(summary?.avgRating || 0) || '—', icon: <TrendingUp className="w-4 h-4" /> },
-          { label: 'Games Reviewed', value: allGamesData?.games?.filter(g => g.reviewed).length ?? 0, icon: <Target className="w-4 h-4" /> },
+          { label: 'Total Games', value: summary?.totalGames || 0, icon: <Swords className="w-4 h-4" />, accent: '#3b82f6' },
+          { label: 'Win Rate', value: `${winRate}%`, icon: <Trophy className="w-4 h-4" />, accent: '#10b981' },
+          { label: 'Avg Rating', value: Math.round(summary?.avgRating || 0) || '—', icon: <TrendingUp className="w-4 h-4" />, accent: CHESSCOM_GREEN },
+          { label: 'Games Reviewed', value: reviewedCount, icon: <Target className="w-4 h-4" />, accent: '#f59e0b' },
         ].map((s) => (
-          <div key={s.label} className="rounded-xl p-3.5" style={{ background: BG_CARD, border: CARD_BORDER, boxShadow: CARD_SHADOW }}>
-            <div className="flex items-center justify-between mb-2">
+          <div
+            key={s.label}
+            className="relative overflow-hidden rounded-xl p-3.5"
+            style={{
+              background: BG_CARD,
+              border: `1px solid ${s.accent}33`,
+              boxShadow: `${CARD_SHADOW}, 0 0 24px -8px ${s.accent}33`,
+            }}
+          >
+            <div className="absolute top-0 left-0 right-0 h-[3px]" style={{ background: `linear-gradient(90deg, ${s.accent} 0%, ${s.accent}55 100%)` }} />
+            <div className="absolute -bottom-6 -right-6 w-20 h-20 rounded-full pointer-events-none"
+              style={{ background: `radial-gradient(circle, ${s.accent}22 0%, transparent 70%)` }} />
+            <div className="relative flex items-center justify-between mb-2">
               <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: TEXT_MUTED }}>{s.label}</p>
-              <span style={{ color: CHESSCOM_GREEN }}>{s.icon}</span>
+              <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: `${s.accent}1a`, color: s.accent }}>
+                {s.icon}
+              </div>
             </div>
-            <div className="text-2xl font-black" style={{ color: TEXT_LIGHT }}>{s.value}</div>
+            <div className="relative text-2xl font-black" style={{ color: TEXT_LIGHT }}>{s.value}</div>
           </div>
         ))}
       </div>
