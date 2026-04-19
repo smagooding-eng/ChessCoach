@@ -539,6 +539,9 @@ function cancelQueue(userId: string) {
   }
 }
 
+// Track the last bot persona served per user so they don't see the same one twice in a row.
+const userLastPersona = new Map<string, string>();
+
 async function spawnBotMatch(userId: string, username: string, userRating: number, tcId: TimeControlId, mode: Mode) {
   const queue = queues.get(queueKey(tcId, mode))!;
   const idx = queue.findIndex(w => w.userId === userId);
@@ -547,7 +550,11 @@ async function spawnBotMatch(userId: string, username: string, userRating: numbe
   clearTimeout(waiter.fallbackTimer);
   const tc = TIME_CONTROLS[tcId];
   const targetRating = Math.max(600, Math.min(2200, userRating + (Math.random() * 200 - 100)));
-  const persona: Persona = findPersonaForRating(targetRating);
+  const exclude = new Set<string>();
+  const last = userLastPersona.get(userId);
+  if (last) exclude.add(last);
+  const persona: Persona = findPersonaForRating(targetRating, exclude);
+  userLastPersona.set(userId, persona.id);
   const userProfile = humanProfile(userId, username);
   const userPlayer: Player = { kind: 'human', userId, username, rating: userRating, ...userProfile };
   const botPlayer: Player = {
@@ -701,9 +708,32 @@ function parseCookie(req: IncomingMessage): Record<string, string> {
 export function attachLiveServer(server: HttpServer) {
   const wss = new WebSocketServer({ noServer: true });
 
+  function isOriginAllowed(origin: string | undefined): boolean {
+    if (!origin) return false;
+    let host: string;
+    try { host = new URL(origin).host; } catch { return false; }
+    const allow = new Set<string>();
+    const replitDomain = process.env.REPLIT_DEV_DOMAIN;
+    const allowed = process.env.LIVE_WS_ALLOWED_ORIGINS;
+    if (replitDomain) allow.add(replitDomain);
+    if (allowed) for (const d of allowed.split(',')) allow.add(d.trim());
+    // Same-origin requests (loopback / internal preview) are allowed in dev.
+    if (process.env.NODE_ENV !== 'production') {
+      if (host.startsWith('localhost') || host.startsWith('127.0.0.1') || host.startsWith('0.0.0.0')) return true;
+      if (host.endsWith('.replit.dev') || host.endsWith('.repl.co')) return true;
+    } else {
+      if (host.endsWith('.replit.app')) return true;
+    }
+    return allow.has(host);
+  }
+
   server.on('upgrade', async (req, socket, head) => {
     const url = req.url || '';
     if (!url.startsWith('/api/live/ws')) return;
+    const origin = req.headers.origin as string | undefined;
+    if (!isOriginAllowed(origin)) {
+      socket.write('HTTP/1.1 403 Forbidden\r\n\r\n'); socket.destroy(); return;
+    }
     let session: Awaited<ReturnType<typeof getSession>> = null;
     try {
       const cookies = parseCookie(req);
