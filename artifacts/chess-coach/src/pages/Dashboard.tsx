@@ -235,7 +235,7 @@ export function Dashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 md:gap-4 px-3 md:px-0">
         <div className="lg:col-span-2 space-y-3 md:space-y-4">
 
-          <DashCard title="Key Weaknesses" icon={<AlertTriangle className="w-4 h-4" style={{ color: CHESSCOM_GREEN }} />} linkHref={isPremium ? "/analysis" : "/subscription"} linkText={isPremium ? "Full Analysis" : "Upgrade"}>
+          <DashCard title="Key Weaknesses" visual={<SectionVisual variant="weakness" />} linkHref={isPremium ? "/analysis" : "/subscription"} linkText={isPremium ? "Full Analysis" : "Upgrade"}>
             {!isPremium ? (
               <div className="relative min-h-[180px]">
                 <div className="space-y-1.5 pointer-events-none select-none" style={{ filter: 'blur(6px)' }}>
@@ -303,7 +303,7 @@ export function Dashboard() {
             )}
           </DashCard>
 
-          <DashCard title="Recent Games" icon={<Clock className="w-4 h-4" style={{ color: CHESSCOM_GREEN }} />} linkHref="/games" linkText="All Games">
+          <DashCard title="Recent Games" visual={<SectionVisual variant="games" />} linkHref="/games" linkText="All Games">
             <div className="space-y-0.5">
               {gamesData?.games?.slice(0, 5).map((game, i) => {
                 const res = RESULT_COLORS[game.result] ?? RESULT_COLORS.draw;
@@ -354,9 +354,7 @@ export function Dashboard() {
               onMouseLeave={e => (e.currentTarget.style.borderColor = 'rgba(129,182,76,0.3)')}>
               
               <div className="relative flex items-center gap-3 mb-2.5">
-                <div className="w-11 h-11 rounded-xl flex items-center justify-center" style={{ background: 'rgba(129,182,76,0.18)', border: '1px solid rgba(129,182,76,0.35)' }}>
-                  <Swords className="w-5 h-5" style={{ color: CHESSCOM_GREEN }} />
-                </div>
+                <SectionVisual variant="scout" />
                 <div className="flex-1 min-w-0">
                   <span className="inline-block text-[9px] font-black uppercase tracking-[0.18em]" style={{ color: CHESSCOM_GREEN }}>#1 Feature</span>
                   <h3 className="font-black text-base leading-tight" style={{ color: TEXT_LIGHT, letterSpacing: '-0.01em' }}>Opponent Scout</h3>
@@ -376,10 +374,8 @@ export function Dashboard() {
               boxShadow: '0 8px 24px -10px rgba(0,0,0,0.6), 0 2px 6px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04)',
             }}>
             
-            <div className="relative flex items-center gap-2.5 mb-3">
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(129,182,76,0.15)', border: '1px solid rgba(129,182,76,0.3)' }}>
-                <Zap className="w-4 h-4" style={{ color: CHESSCOM_GREEN }} />
-              </div>
+            <div className="relative flex items-center gap-3 mb-3">
+              <SectionVisual variant="actions" />
               <h2 className="text-base md:text-lg font-black" style={{ color: TEXT_LIGHT, letterSpacing: '-0.01em' }}>Quick Actions</h2>
             </div>
             {[
@@ -412,10 +408,8 @@ export function Dashboard() {
               }}>
               
               <div className="relative flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(129,182,76,0.15)', border: '1px solid rgba(129,182,76,0.3)' }}>
-                    <GraduationCap className="w-4 h-4" style={{ color: CHESSCOM_GREEN }} />
-                  </div>
+                <div className="flex items-center gap-3">
+                  <SectionVisual variant="courses" />
                   <h2 className="text-base md:text-lg font-black flex items-center gap-2" style={{ color: TEXT_LIGHT, letterSpacing: '-0.01em' }}>
                     Courses
                     <span className="px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-[0.18em]" style={{ background: 'rgba(129,182,76,0.18)', color: CHESSCOM_GREEN, border: '1px solid rgba(129,182,76,0.3)' }}>Beta</span>
@@ -453,8 +447,8 @@ export function Dashboard() {
   );
 }
 
-function DashCard({ title, icon, linkHref, linkText, children }: {
-  title: string; icon: React.ReactNode; linkHref: string; linkText: string; children: React.ReactNode;
+function DashCard({ title, visual, linkHref, linkText, children }: {
+  title: string; visual?: React.ReactNode; linkHref: string; linkText: string; children: React.ReactNode;
 }) {
   return (
     <div className="relative overflow-hidden rounded-2xl p-4 md:p-5"
@@ -463,12 +457,9 @@ function DashCard({ title, icon, linkHref, linkText, children }: {
         border: '1px solid rgba(255,255,255,0.06)',
         boxShadow: '0 8px 24px -10px rgba(0,0,0,0.6), 0 2px 6px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04)',
       }}>
-      
       <div className="relative flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(129,182,76,0.15)', border: '1px solid rgba(129,182,76,0.3)' }}>
-            {icon}
-          </div>
+        <div className="flex items-center gap-3">
+          {visual}
           <h2 className="text-base md:text-lg font-black" style={{ color: TEXT_LIGHT, letterSpacing: '-0.01em' }}>{title}</h2>
         </div>
         <Link href={linkHref} className="text-[11px] font-black uppercase tracking-wider flex items-center gap-0.5 hover:underline" style={{ color: CHESSCOM_GREEN }}>
@@ -491,6 +482,38 @@ function EmptyState({ icon, text, linkHref, linkText }: { icon: React.ReactNode;
 }
 
 const ImportIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>;
+
+// Small chess-themed visual that replaces icon chips at the head of each section.
+// Each variant renders a 40x40 mini-board with a different highlight motif.
+function SectionVisual({ variant }: { variant: 'weakness' | 'games' | 'scout' | 'actions' | 'courses' }) {
+  const SIZE = 40;
+  // Different highlight per variant
+  const highlights: Record<string, { r: number; c: number; color: string }[]> = {
+    weakness: [{ r: 4, c: 3, color: 'rgba(220,67,67,0.7)' }, { r: 3, c: 4, color: 'rgba(220,67,67,0.45)' }],
+    games:    [{ r: 6, c: 4, color: 'rgba(129,182,76,0.7)' }, { r: 4, c: 4, color: 'rgba(129,182,76,0.45)' }],
+    scout:    [{ r: 3, c: 3, color: 'rgba(129,182,76,0.7)' }, { r: 3, c: 4, color: 'rgba(129,182,76,0.45)' }, { r: 4, c: 3, color: 'rgba(129,182,76,0.45)' }],
+    actions:  [{ r: 2, c: 2, color: 'rgba(129,182,76,0.55)' }, { r: 2, c: 5, color: 'rgba(129,182,76,0.55)' }, { r: 5, c: 2, color: 'rgba(129,182,76,0.55)' }, { r: 5, c: 5, color: 'rgba(129,182,76,0.55)' }],
+    courses:  [{ r: 1, c: 1, color: 'rgba(129,182,76,0.5)' }, { r: 2, c: 2, color: 'rgba(129,182,76,0.55)' }, { r: 3, c: 3, color: 'rgba(129,182,76,0.6)' }],
+  };
+  const hl = highlights[variant];
+  return (
+    <div className="relative shrink-0 rounded-lg overflow-hidden" style={{ width: SIZE, height: SIZE, boxShadow: '0 3px 8px rgba(0,0,0,0.5), 0 0 0 1px rgba(0,0,0,0.4)' }}>
+      <div className="grid h-full w-full" style={{ gridTemplateColumns: 'repeat(8, 1fr)', gridTemplateRows: 'repeat(8, 1fr)' }}>
+        {Array.from({ length: 64 }).map((_, i) => {
+          const r = Math.floor(i / 8);
+          const c = i % 8;
+          const isLight = (r + c) % 2 === 0;
+          const accent = hl.find(h => h.r === r && h.c === c);
+          return (
+            <div key={i} style={{ background: isLight ? '#eeeed2' : '#769656', position: 'relative' }}>
+              {accent && <div className="absolute inset-0" style={{ background: accent.color, boxShadow: `inset 0 0 0 1px ${accent.color}` }} />}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 // Lightweight chess-board thumbnail (starting position) — purely decorative.
 // Mirrors chess.com's home-feed thumbnails: little green-and-cream board with pieces.
