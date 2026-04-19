@@ -79,6 +79,16 @@ interface LiveGame {
   dbGameIds: { white?: number; black?: number };
   // Pending draw offer from a side; cleared after one move
   drawOfferFrom?: 'w' | 'b';
+  // Per-side ply at which a draw offer was last made. Used to enforce
+  // "single offer per side per side-to-move" — a side cannot re-offer
+  // (after a decline or otherwise) until at least one move has been
+  // played to advance the ply. Indexed by side.
+  lastDrawOfferPly: { w: number; b: number };
+  // Pending takeback request from a side; cleared on any move or rejection. Casual games only.
+  takebackRequestFrom?: 'w' | 'b';
+  // Snapshot of clocks BEFORE each move was applied — index i corresponds to the position after i moves.
+  // Used to restore clocks on takeback. clockHistory[0] is the starting clocks.
+  clockHistory: { whiteTimeMs: number; blackTimeMs: number }[];
   // Disconnect tracking → 30s grace
   disconnectTimers: { w?: ReturnType<typeof setTimeout>; b?: ReturnType<typeof setTimeout> };
 }
@@ -141,6 +151,7 @@ function gamePublicState(g: LiveGame) {
     white: publicPlayer(g.white),
     black: publicPlayer(g.black),
     drawOfferFrom: g.drawOfferFrom,
+    takebackRequestFrom: g.takebackRequestFrom,
     ratingDelta: g.status === 'finished' ? g.ratingDelta : undefined,
     dbGameIds: g.status === 'finished' ? g.dbGameIds : undefined,
   };
@@ -246,6 +257,8 @@ async function createGame(white: Player, black: Player, tc: TimeControlSpec, mod
     ratingAfter: {},
     ratingDelta: { white: 0, black: 0 },
     dbGameIds: {},
+    clockHistory: [{ whiteTimeMs: tc.initialMs, blackTimeMs: tc.initialMs }],
+    lastDrawOfferPly: { w: -1, b: -1 },
     disconnectTimers: {},
   };
 
@@ -312,10 +325,13 @@ function applyMoveInternal(g: LiveGame, san: string): boolean {
   else g.blackTimeMs = Math.max(0, g.blackTimeMs - elapsed) + g.tc.incrementMs;
   g.lastTickAt = now;
   g.sanMoves.push(moveResult.san);
+  g.clockHistory.push({ whiteTimeMs: g.whiteTimeMs, blackTimeMs: g.blackTimeMs });
   // Any active draw offer is auto-declined when the offerer's opponent moves
   if (g.drawOfferFrom && g.drawOfferFrom !== moverColor) g.drawOfferFrom = undefined;
   // The mover making a move clears their own offer too (no double-offer spam)
   if (g.drawOfferFrom === moverColor) g.drawOfferFrom = undefined;
+  // Any active takeback request is cleared on any move
+  if (g.takebackRequestFrom) g.takebackRequestFrom = undefined;
 
   if (g.chess.isCheckmate()) { finishGame(g, moverColor === 'w' ? 'white' : 'black', 'checkmate'); return true; }
   if (g.chess.isStalemate()) { finishGame(g, 'draw', 'stalemate'); return true; }
@@ -612,8 +628,24 @@ function handleDrawOffer(ws: WebSocket, userId: string, gameId: string) {
   if (g.white.userId === userId) mySide = 'w';
   else if (g.black.userId === userId) mySide = 'b';
   if (!mySide) return;
+  // Server-authoritative draw rules:
+  //  - You may only offer a draw on your own turn (matches standard chess UX
+  //    and prevents spamming offers while the opponent is thinking).
+  //  - Single offer per side per side-to-move: if you already have an offer
+  //    standing on this turn, ignore re-offers; if your opponent already has
+  //    one standing, you should accept/decline that instead of overwriting.
+  if (g.chess.turn() !== mySide) return send(ws, { type: 'error', message: 'You can only offer a draw on your own turn' });
+  if (g.drawOfferFrom) return; // an offer (yours or opponent's) is already pending — no overwrite
+  // One offer per side per side-to-move: ply increases on every move, so a
+  // decline followed by an immediate re-offer (same ply) is rejected here
+  // until the offerer has actually moved and ply has advanced.
+  const currentPly = g.sanMoves.length;
+  if (g.lastDrawOfferPly[mySide] === currentPly) {
+    return send(ws, { type: 'error', message: 'You already offered a draw this turn — make a move first' });
+  }
   const oppPlayer = mySide === 'w' ? g.black : g.white;
   g.drawOfferFrom = mySide;
+  g.lastDrawOfferPly[mySide] = currentPly;
   broadcast(g.id, { type: 'state', state: gamePublicState(g) });
   if (oppPlayer.kind === 'bot') {
     // Behave like a human: think for 1.5–4s, then accept (~15%) or decline.
@@ -646,6 +678,83 @@ function handleDrawDecline(ws: WebSocket, userId: string, gameId: string) {
   else if (g.black.userId === userId) mySide = 'b';
   if (!mySide || mySide === g.drawOfferFrom) return;
   g.drawOfferFrom = undefined;
+  broadcast(g.id, { type: 'state', state: gamePublicState(g) });
+}
+
+function handleTakebackRequest(ws: WebSocket, userId: string, gameId: string) {
+  const g = games.get(gameId);
+  if (!g || g.status !== 'active') return;
+  // Takebacks disabled in ranked games to protect rating integrity.
+  if (g.mode !== 'casual') return send(ws, { type: 'error', message: 'Takebacks are not allowed in ranked games' });
+  let mySide: 'w' | 'b' | null = null;
+  if (g.white.userId === userId) mySide = 'w';
+  else if (g.black.userId === userId) mySide = 'b';
+  if (!mySide) return;
+  // Single pending takeback request at a time, regardless of which side raised it.
+  // The opposing side must accept or decline before another can be queued.
+  if (g.takebackRequestFrom) return;
+  // Need at least one of requester's own moves on the board to take back.
+  const requesterMovesPlayed = mySide === 'w'
+    ? Math.ceil(g.sanMoves.length / 2)
+    : Math.floor(g.sanMoves.length / 2);
+  if (requesterMovesPlayed < 1) return send(ws, { type: 'error', message: 'No moves to take back yet' });
+  const oppPlayer = mySide === 'w' ? g.black : g.white;
+  g.takebackRequestFrom = mySide;
+  broadcast(g.id, { type: 'state', state: gamePublicState(g) });
+  if (oppPlayer.kind === 'bot') {
+    // Bots act like a friendly human in casual: short think, accept ~70% of the time.
+    const delay = 1500 + Math.floor(Math.random() * 2000);
+    setTimeout(() => {
+      if (g.status !== 'active' || g.takebackRequestFrom !== mySide) return;
+      const accept = Math.random() < 0.7;
+      if (accept) applyTakeback(g, mySide!);
+      else { g.takebackRequestFrom = undefined; broadcast(g.id, { type: 'takeback_declined' }); broadcast(g.id, { type: 'state', state: gamePublicState(g) }); }
+    }, delay);
+  }
+}
+
+function applyTakeback(g: LiveGame, requesterSide: 'w' | 'b') {
+  // Roll back plies until it's the requester's turn AND we have removed at least
+  // one of the requester's own moves. Result: requester is on move, at the position
+  // before their last move (1 ply if it's currently the opponent's turn, 2 if the
+  // requester's turn). Clocks are restored to the snapshot taken right after that
+  // earlier position was reached.
+  const plies = g.chess.turn() === requesterSide ? 2 : 1;
+  if (g.sanMoves.length < plies) return;
+  for (let i = 0; i < plies; i++) {
+    g.chess.undo();
+    g.sanMoves.pop();
+    g.clockHistory.pop();
+  }
+  const last = g.clockHistory[g.clockHistory.length - 1];
+  g.whiteTimeMs = last.whiteTimeMs;
+  g.blackTimeMs = last.blackTimeMs;
+  g.lastTickAt = Date.now();
+  g.takebackRequestFrom = undefined;
+  g.drawOfferFrom = undefined;
+  scheduleExpire(g);
+  scheduleBotIfNeeded(g);
+  broadcast(g.id, { type: 'state', state: gamePublicState(g) });
+}
+
+function handleTakebackAccept(ws: WebSocket, userId: string, gameId: string) {
+  const g = games.get(gameId);
+  if (!g || g.status !== 'active' || !g.takebackRequestFrom) return;
+  let mySide: 'w' | 'b' | null = null;
+  if (g.white.userId === userId) mySide = 'w';
+  else if (g.black.userId === userId) mySide = 'b';
+  if (!mySide || mySide === g.takebackRequestFrom) return;
+  applyTakeback(g, g.takebackRequestFrom);
+}
+
+function handleTakebackDecline(ws: WebSocket, userId: string, gameId: string) {
+  const g = games.get(gameId);
+  if (!g || !g.takebackRequestFrom) return;
+  let mySide: 'w' | 'b' | null = null;
+  if (g.white.userId === userId) mySide = 'w';
+  else if (g.black.userId === userId) mySide = 'b';
+  if (!mySide || mySide === g.takebackRequestFrom) return;
+  g.takebackRequestFrom = undefined;
   broadcast(g.id, { type: 'state', state: gamePublicState(g) });
 }
 
@@ -795,6 +904,15 @@ export function attachLiveServer(server: HttpServer) {
             break;
           case 'draw_decline':
             handleDrawDecline(ws, info.userId, msg.gameId);
+            break;
+          case 'takeback_request':
+            handleTakebackRequest(ws, info.userId, msg.gameId);
+            break;
+          case 'takeback_accept':
+            handleTakebackAccept(ws, info.userId, msg.gameId);
+            break;
+          case 'takeback_decline':
+            handleTakebackDecline(ws, info.userId, msg.gameId);
             break;
           case 'subscribe':
             handleSubscribe(ws, msg.gameId);
