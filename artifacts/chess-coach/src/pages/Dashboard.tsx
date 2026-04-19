@@ -80,11 +80,11 @@ export function Dashboard() {
 
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
-              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-[0.18em]" style={{ background: 'rgba(129,182,76,0.18)', color: CHESSCOM_GREEN, border: '1px solid rgba(129,182,76,0.3)' }}>
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-black uppercase tracking-[0.18em]" style={{ background: 'rgba(129,182,76,0.18)', color: CHESSCOM_GREEN, border: '1px solid rgba(129,182,76,0.3)' }}>
                 <Sparkles className="w-2.5 h-2.5" /> Player
               </span>
               {isPremium && (
-                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-[0.18em] text-black" style={{ background: 'linear-gradient(135deg, #f5c460, #e5a631)' }}>
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-black uppercase tracking-[0.18em] text-black" style={{ background: 'linear-gradient(135deg, #f5c460, #e5a631)' }}>
                   <Crown className="w-2.5 h-2.5" /> Pro
                 </span>
               )}
@@ -97,7 +97,7 @@ export function Dashboard() {
                   <div className="flex flex-col">
                     <span className="text-[10px] font-black uppercase tracking-[0.18em] leading-none" style={{ color: CHESSCOM_GREEN }}>Chess.com</span>
                     <div className="flex items-baseline gap-1.5 mt-1">
-                      <span className="text-3xl md:text-4xl font-black leading-none" style={{ color: TEXT_LIGHT, letterSpacing: '-0.03em' }}>{multiElo.chesscom.currentRating}</span>
+                      <span className="text-3xl md:text-4xl font-black leading-none" style={{ color: TEXT_LIGHT, letterSpacing: '-0.02em' }}>{multiElo.chesscom.currentRating}</span>
                       <span className="inline-flex items-center text-xs font-black px-1.5 py-0.5 rounded" style={{ background: multiElo.chesscom.delta > 0 ? 'rgba(129,182,76,0.2)' : multiElo.chesscom.delta < 0 ? 'rgba(220,67,67,0.2)' : 'rgba(158,155,152,0.15)', color: multiElo.chesscom.delta > 0 ? CHESSCOM_GREEN : multiElo.chesscom.delta < 0 ? '#dc4343' : TEXT_MUTED }}>
                         {multiElo.chesscom.delta > 0 ? '▲' : multiElo.chesscom.delta < 0 ? '▼' : '–'} {Math.abs(multiElo.chesscom.delta)}
                       </span>
@@ -108,7 +108,7 @@ export function Dashboard() {
                   <div className="flex flex-col">
                     <span className="text-[10px] font-black uppercase tracking-[0.18em] leading-none" style={{ color: '#b0b0b0' }}>Lichess</span>
                     <div className="flex items-baseline gap-1.5 mt-1">
-                      <span className="text-3xl md:text-4xl font-black leading-none" style={{ color: TEXT_LIGHT, letterSpacing: '-0.03em' }}>{multiElo.lichess.currentRating}</span>
+                      <span className="text-3xl md:text-4xl font-black leading-none" style={{ color: TEXT_LIGHT, letterSpacing: '-0.02em' }}>{multiElo.lichess.currentRating}</span>
                       <span className="inline-flex items-center text-xs font-black px-1.5 py-0.5 rounded" style={{ background: multiElo.lichess.delta > 0 ? 'rgba(129,182,76,0.2)' : multiElo.lichess.delta < 0 ? 'rgba(220,67,67,0.2)' : 'rgba(158,155,152,0.15)', color: multiElo.lichess.delta > 0 ? CHESSCOM_GREEN : multiElo.lichess.delta < 0 ? '#dc4343' : TEXT_MUTED }}>
                         {multiElo.lichess.delta > 0 ? '▲' : multiElo.lichess.delta < 0 ? '▼' : '–'} {Math.abs(multiElo.lichess.delta)}
                       </span>
@@ -118,7 +118,7 @@ export function Dashboard() {
               </div>
             ) : chessPlayer?.rating ? (
               <div className="flex items-baseline gap-2 mt-3">
-                <span className="text-4xl font-black leading-none" style={{ color: TEXT_LIGHT, letterSpacing: '-0.03em' }}>{chessPlayer.rating}</span>
+                <span className="text-4xl font-black leading-none" style={{ color: TEXT_LIGHT, letterSpacing: '-0.02em' }}>{chessPlayer.rating}</span>
                 <span className="text-xs font-black uppercase tracking-wider" style={{ color: CHESSCOM_GREEN }}>ELO</span>
               </div>
             ) : null}
@@ -222,7 +222,7 @@ export function Dashboard() {
                     {s.icon}
                   </div>
                   <div className="min-w-0">
-                    <p className="text-[9px] font-black uppercase tracking-[0.14em] leading-none mb-1" style={{ color: TEXT_MUTED }}>{s.label}</p>
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] leading-none mb-1" style={{ color: TEXT_MUTED }}>{s.label}</p>
                     <p className="text-lg md:text-xl font-black leading-none truncate" style={{ color: TEXT_LIGHT, letterSpacing: '-0.02em' }}>{s.value}</p>
                   </div>
                 </div>
@@ -249,7 +249,7 @@ export function Dashboard() {
                       <div key={i} className="flex items-start gap-2.5 p-3 rounded-xl">
                         <span className="mt-px px-1.5 py-px rounded text-[10px] font-bold shrink-0" style={{ background: sev.bg, color: sev.text }}>{w.sev}</span>
                         <div className="min-w-0 flex-1">
-                          <p className="font-semibold text-sm" style={{ color: TEXT_LIGHT }}>{w.cat}</p>
+                          <p className="font-bold text-sm" style={{ color: TEXT_LIGHT }}>{w.cat}</p>
                           <p className="text-xs line-clamp-1 mt-0.5" style={{ color: TEXT_MUTED }}>{w.desc}</p>
                         </div>
                       </div>
@@ -288,7 +288,7 @@ export function Dashboard() {
                             {w.severity}
                           </span>
                           <div className="min-w-0 flex-1">
-                            <p className="font-semibold text-sm" style={{ color: TEXT_LIGHT }}>{w.category}</p>
+                            <p className="font-bold text-sm" style={{ color: TEXT_LIGHT }}>{w.category}</p>
                             <p className="text-xs line-clamp-1 mt-0.5" style={{ color: TEXT_MUTED }}>{w.description}</p>
                           </div>
                           <ChevronRight className="w-3.5 h-3.5 shrink-0 mt-1 opacity-0 group-hover:opacity-60 transition-opacity" style={{ color: TEXT_MUTED }} />
@@ -319,7 +319,7 @@ export function Dashboard() {
                           <span className="px-1.5 py-px rounded text-[10px] font-black shrink-0" style={{ background: res.bg, color: res.text }}>
                             {game.result === 'win' ? 'WIN' : game.result === 'loss' ? 'LOSS' : 'DRAW'}
                           </span>
-                          <p className="text-[11px] font-bold uppercase tracking-wider" style={{ color: TEXT_MUTED }}>
+                          <p className="text-[10px] font-black uppercase tracking-[0.18em]" style={{ color: TEXT_MUTED }}>
                             {playedAsWhite ? 'as White' : 'as Black'}
                           </p>
                         </div>
@@ -356,7 +356,7 @@ export function Dashboard() {
               <div className="relative flex items-center gap-3 mb-2.5">
                 <PieceTile piece="♞" size={48} />
                 <div className="flex-1 min-w-0">
-                  <span className="inline-block text-[9px] font-black uppercase tracking-[0.18em]" style={{ color: CHESSCOM_GREEN }}>#1 Feature</span>
+                  <span className="inline-block text-[10px] font-black uppercase tracking-[0.18em]" style={{ color: CHESSCOM_GREEN }}>#1 Feature</span>
                   <h3 className="font-black text-base leading-tight" style={{ color: TEXT_LIGHT, letterSpacing: '-0.01em' }}>Opponent Scout</h3>
                 </div>
                 <ChevronRight className="w-4 h-4 shrink-0 opacity-40 group-hover:opacity-80 transition-opacity" style={{ color: CHESSCOM_GREEN }} />
@@ -412,10 +412,10 @@ export function Dashboard() {
                   <PieceTile piece="♝" />
                   <h2 className="text-base md:text-lg font-black flex items-center gap-2" style={{ color: TEXT_LIGHT, letterSpacing: '-0.01em' }}>
                     Courses
-                    <span className="px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-[0.18em]" style={{ background: 'rgba(129,182,76,0.18)', color: CHESSCOM_GREEN, border: '1px solid rgba(129,182,76,0.3)' }}>Beta</span>
+                    <span className="px-1.5 py-0.5 rounded text-[10px] font-black uppercase tracking-[0.18em]" style={{ background: 'rgba(129,182,76,0.18)', color: CHESSCOM_GREEN, border: '1px solid rgba(129,182,76,0.3)' }}>Beta</span>
                   </h2>
                 </div>
-                <Link href="/courses" className="text-[11px] font-black uppercase tracking-wider flex items-center gap-0.5 hover:underline" style={{ color: CHESSCOM_GREEN }}>
+                <Link href="/courses" className="text-[10px] font-black uppercase tracking-[0.18em] flex items-center gap-0.5 hover:underline" style={{ color: CHESSCOM_GREEN }}>
                   All <ChevronRight className="w-3 h-3" />
                 </Link>
               </div>
@@ -462,7 +462,7 @@ function DashCard({ title, visual, linkHref, linkText, children }: {
           {visual}
           <h2 className="text-base md:text-lg font-black" style={{ color: TEXT_LIGHT, letterSpacing: '-0.01em' }}>{title}</h2>
         </div>
-        <Link href={linkHref} className="text-[11px] font-black uppercase tracking-wider flex items-center gap-0.5 hover:underline" style={{ color: CHESSCOM_GREEN }}>
+        <Link href={linkHref} className="text-[10px] font-black uppercase tracking-[0.18em] flex items-center gap-0.5 hover:underline" style={{ color: CHESSCOM_GREEN }}>
           {linkText} <ChevronRight className="w-3 h-3" />
         </Link>
       </div>
@@ -476,7 +476,7 @@ function EmptyState({ icon, text, linkHref, linkText }: { icon: React.ReactNode;
     <div className="text-center py-8 rounded-xl" style={{ border: `1px dashed rgba(255,255,255,0.1)` }}>
       <div className="mx-auto mb-2 opacity-25" style={{ color: TEXT_MUTED }}>{icon}</div>
       <p className="text-sm" style={{ color: TEXT_MUTED }}>{text}</p>
-      <Link href={linkHref} className="mt-2 inline-block text-sm font-semibold hover:underline" style={{ color: CHESSCOM_GREEN }}>{linkText}</Link>
+      <Link href={linkHref} className="mt-2 inline-block text-sm font-bold hover:underline" style={{ color: CHESSCOM_GREEN }}>{linkText}</Link>
     </div>
   );
 }
