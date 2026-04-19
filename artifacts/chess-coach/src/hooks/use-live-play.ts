@@ -28,7 +28,6 @@ export interface LiveGameState {
   white: LivePlayer;
   black: LivePlayer;
   drawOfferFrom?: 'w' | 'b';
-  takebackRequestFrom?: 'w' | 'b';
   ratingDelta?: { white: number; black: number };
   dbGameIds?: { white?: number; black?: number };
 }
@@ -139,7 +138,7 @@ export function useLivePlay() {
           setTimeout(() => setError(null), 2500);
           break;
         case 'takeback_declined':
-          setError('Takeback declined');
+          // legacy no-op (takebacks removed)
           setTimeout(() => setError(null), 2500);
           break;
         case 'error':
@@ -187,9 +186,6 @@ export function useLivePlay() {
   const offerDraw = useCallback(() => { if (game) send({ type: 'draw_offer', gameId: game.id }); }, [game, send]);
   const acceptDraw = useCallback(() => { if (game) send({ type: 'draw_accept', gameId: game.id }); }, [game, send]);
   const declineDraw = useCallback(() => { if (game) send({ type: 'draw_decline', gameId: game.id }); }, [game, send]);
-  const requestTakeback = useCallback(() => { if (game) send({ type: 'takeback_request', gameId: game.id }); }, [game, send]);
-  const acceptTakeback = useCallback(() => { if (game) send({ type: 'takeback_accept', gameId: game.id }); }, [game, send]);
-  const declineTakeback = useCallback(() => { if (game) send({ type: 'takeback_decline', gameId: game.id }); }, [game, send]);
   const reset = useCallback(() => {
     setGame(null); setColor(null); setError(null); setStatus('idle');
     setQueuedTc(null); setQueuedMode(null); setOpponentDisconnect(null); setPremove(null);
@@ -198,6 +194,6 @@ export function useLivePlay() {
   return {
     status, error, game, color, queuedTc, queuedMode, opponentDisconnect, premove, setPremove,
     enterQueue, cancel, move, resign, offerDraw, acceptDraw, declineDraw,
-    requestTakeback, acceptTakeback, declineTakeback, reset,
+    reset,
   };
 }

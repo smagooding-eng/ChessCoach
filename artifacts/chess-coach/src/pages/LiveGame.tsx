@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ChessBoard } from '@/components/ChessBoard';
 import { Chess } from 'chess.js';
 import type { useLivePlay } from '@/hooks/use-live-play';
-import { Flag, ArrowLeft, Trophy, Clock, Handshake, X, WifiOff, BookOpen, Undo2 } from 'lucide-react';
+import { Flag, ArrowLeft, Trophy, Clock, Handshake, X, WifiOff, BookOpen } from 'lucide-react';
 import { useLocation } from 'wouter';
 
 const CHESSCOM_GREEN = '#81b64c';
@@ -55,7 +55,7 @@ function PlayerStrip({ p, ms, active, isYou }: { p: { username: string; rating: 
 }
 
 export function LiveGame({ live, onLeave }: { live: ReturnType<typeof useLivePlay>; onLeave: () => void }) {
-  const { game, color, move, resign, status, opponentDisconnect, premove, setPremove, offerDraw, acceptDraw, declineDraw, requestTakeback, acceptTakeback, declineTakeback } = live;
+  const { game, color, move, resign, status, opponentDisconnect, premove, setPremove, offerDraw, acceptDraw, declineDraw } = live;
   const [, navigate] = useLocation();
   const [tick, setTick] = useState(0);
   const reviewId = game?.dbGameIds && color
@@ -125,14 +125,6 @@ export function LiveGame({ live, onLeave }: { live: ReturnType<typeof useLivePla
 
   const opponentOfferedDraw = game.drawOfferFrom && game.drawOfferFrom !== color;
   const youOfferedDraw = game.drawOfferFrom && game.drawOfferFrom === color;
-  const opponentRequestedTakeback = game.takebackRequestFrom && game.takebackRequestFrom !== color;
-  const youRequestedTakeback = game.takebackRequestFrom && game.takebackRequestFrom === color;
-  const takebackAllowed = game.mode === 'casual';
-  // Need at least one of your own moves on the board to take back.
-  const yourMovesPlayed = color === 'w'
-    ? Math.ceil(game.sanMoves.length / 2)
-    : Math.floor(game.sanMoves.length / 2);
-  const canRequestTakeback = takebackAllowed && yourMovesPlayed >= 1 && !youRequestedTakeback && !opponentRequestedTakeback;
 
   const resultBanner = (() => {
     if (game.status !== 'finished') return null;
@@ -237,36 +229,8 @@ export function LiveGame({ live, onLeave }: { live: ReturnType<typeof useLivePla
         </div>
       )}
 
-      {opponentRequestedTakeback && (
-        <div className="rounded-lg p-3 flex items-center justify-between gap-3"
-          style={{ background: 'rgba(234,151,51,0.12)', border: '1px solid rgba(234,151,51,0.4)' }}>
-          <span className="text-sm font-bold" style={{ color: TEXT_LIGHT }}>Opponent requested a takeback.</span>
-          <div className="flex gap-2">
-            <button onClick={acceptTakeback}
-              className="px-3 py-1.5 rounded-lg text-xs font-black"
-              style={{ background: `linear-gradient(180deg, #95c45a 0%, ${CHESSCOM_GREEN} 100%)`, color: 'white' }}>Allow</button>
-            <button onClick={declineTakeback}
-              className="px-3 py-1.5 rounded-lg text-xs font-black"
-              style={{ background: 'rgba(255,255,255,0.08)', color: TEXT_LIGHT, border: '1px solid rgba(255,255,255,0.1)' }}>Decline</button>
-          </div>
-        </div>
-      )}
-      {youRequestedTakeback && (
-        <div className="rounded-lg p-2 text-xs text-center" style={{ background: 'rgba(255,255,255,0.04)', color: TEXT_MUTED }}>
-          Takeback request sent — waiting for opponent's reply.
-        </div>
-      )}
-
       {game.status === 'active' && (
         <div className="flex justify-end gap-2 flex-wrap">
-          {takebackAllowed && (
-            <button onClick={requestTakeback} disabled={!canRequestTakeback}
-              title={yourMovesPlayed < 1 ? 'Make a move first' : 'Ask your opponent to undo your last move'}
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold disabled:opacity-50"
-              style={{ background: 'rgba(234,151,51,0.12)', color: '#ea9733', border: '1px solid rgba(234,151,51,0.3)' }}>
-              <Undo2 className="w-3.5 h-3.5" /> Request Takeback
-            </button>
-          )}
           <button onClick={offerDraw} disabled={!!youOfferedDraw || !!opponentOfferedDraw || game.turn !== color}
             title={game.turn !== color ? 'You can only offer a draw on your own turn' : 'Offer your opponent a draw'}
             className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold disabled:opacity-50"
