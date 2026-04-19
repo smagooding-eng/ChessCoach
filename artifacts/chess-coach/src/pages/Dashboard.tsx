@@ -63,12 +63,12 @@ export function Dashboard() {
           border: '1px solid rgba(255,255,255,0.06)',
           boxShadow: '0 18px 50px -16px rgba(0,0,0,0.6), 0 4px 16px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04)',
         }}>
-        <div className="relative flex items-start gap-4">
+        <div className="relative flex items-center gap-3">
           <div className="shrink-0 relative">
             {chessPlayer?.avatar
-              ? <img src={chessPlayer.avatar} alt={username ?? ''} className="relative w-14 h-14 md:w-16 md:h-16 rounded-xl object-cover" style={{ border: `2px solid ${CHESSCOM_GREEN}`, boxShadow: '0 6px 18px -4px rgba(0,0,0,0.6)' }} />
-              : <div className="relative w-14 h-14 md:w-16 md:h-16 rounded-xl flex items-center justify-center" style={{ background: 'rgba(129,182,76,0.18)', border: `2px solid ${CHESSCOM_GREEN}`, boxShadow: '0 6px 18px -4px rgba(0,0,0,0.6)' }}>
-                  <span className="text-2xl font-black" style={{ color: CHESSCOM_GREEN }}>{username?.[0]?.toUpperCase()}</span>
+              ? <img src={chessPlayer.avatar} alt={username ?? ''} className="relative w-12 h-12 md:w-14 md:h-14 rounded-xl object-cover" style={{ border: `2px solid ${CHESSCOM_GREEN}`, boxShadow: '0 6px 18px -4px rgba(0,0,0,0.6)' }} />
+              : <div className="relative w-12 h-12 md:w-14 md:h-14 rounded-xl flex items-center justify-center" style={{ background: 'rgba(129,182,76,0.18)', border: `2px solid ${CHESSCOM_GREEN}`, boxShadow: '0 6px 18px -4px rgba(0,0,0,0.6)' }}>
+                  <span className="text-xl font-black" style={{ color: CHESSCOM_GREEN }}>{username?.[0]?.toUpperCase()}</span>
                 </div>
             }
             {chessPlayer?.title && (
@@ -79,84 +79,80 @@ export function Dashboard() {
           </div>
 
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1">
-              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-black uppercase tracking-[0.18em]" style={{ background: 'rgba(129,182,76,0.18)', color: CHESSCOM_GREEN, border: '1px solid rgba(129,182,76,0.3)' }}>
-                <Sparkles className="w-2.5 h-2.5" /> Player
-              </span>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <h1 className="text-xl md:text-2xl font-black truncate leading-none" style={{ color: TEXT_LIGHT, letterSpacing: '-0.02em', textShadow: '0 2px 8px rgba(0,0,0,0.3)' }}>{username}</h1>
               {isPremium && (
-                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-black uppercase tracking-[0.18em] text-black" style={{ background: 'linear-gradient(135deg, #f5c460, #e5a631)' }}>
+                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-[0.16em] text-black" style={{ background: 'linear-gradient(135deg, #f5c460, #e5a631)' }}>
                   <Crown className="w-2.5 h-2.5" /> Pro
                 </span>
               )}
             </div>
-            <h1 className="text-2xl md:text-3xl font-black truncate leading-none" style={{ color: TEXT_LIGHT, letterSpacing: '-0.02em', textShadow: '0 2px 8px rgba(0,0,0,0.3)' }}>{username}</h1>
 
             {(multiElo.chesscom?.hasData || multiElo.lichess?.hasData) ? (
-              <div className="flex items-center gap-3 mt-3 flex-wrap">
+              <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
                 {multiElo.chesscom?.hasData && (
-                  <div className="flex flex-col">
-                    <span className="text-[10px] font-black uppercase tracking-[0.18em] leading-none" style={{ color: CHESSCOM_GREEN }}>Chess.com</span>
-                    <div className="flex items-baseline gap-1.5 mt-1">
-                      <span className="text-2xl md:text-3xl font-black leading-none" style={{ color: TEXT_LIGHT, letterSpacing: '-0.02em' }}>{multiElo.chesscom.currentRating}</span>
-                      <span className="inline-flex items-center text-xs font-black px-1.5 py-0.5 rounded" style={{ background: multiElo.chesscom.delta > 0 ? 'rgba(129,182,76,0.2)' : multiElo.chesscom.delta < 0 ? 'rgba(220,67,67,0.2)' : 'rgba(158,155,152,0.15)', color: multiElo.chesscom.delta > 0 ? CHESSCOM_GREEN : multiElo.chesscom.delta < 0 ? '#dc4343' : TEXT_MUTED }}>
-                        {multiElo.chesscom.delta > 0 ? '▲' : multiElo.chesscom.delta < 0 ? '▼' : '–'} {Math.abs(multiElo.chesscom.delta)}
+                  <span className="inline-flex items-baseline gap-1 px-2 py-1 rounded-md" style={{ background: 'rgba(129,182,76,0.12)', border: '1px solid rgba(129,182,76,0.25)' }}>
+                    <span className="text-[9px] font-black uppercase tracking-[0.14em]" style={{ color: CHESSCOM_GREEN }}>CC</span>
+                    <span className="text-sm font-black" style={{ color: TEXT_LIGHT, letterSpacing: '-0.01em' }}>{multiElo.chesscom.currentRating}</span>
+                    {multiElo.chesscom.delta !== 0 && (
+                      <span className="text-[10px] font-black" style={{ color: multiElo.chesscom.delta > 0 ? CHESSCOM_GREEN : '#dc4343' }}>
+                        {multiElo.chesscom.delta > 0 ? '+' : '−'}{Math.abs(multiElo.chesscom.delta)}
                       </span>
-                    </div>
-                  </div>
+                    )}
+                  </span>
                 )}
                 {multiElo.lichess?.hasData && (
-                  <div className="flex flex-col">
-                    <span className="text-[10px] font-black uppercase tracking-[0.18em] leading-none" style={{ color: '#b0b0b0' }}>Lichess</span>
-                    <div className="flex items-baseline gap-1.5 mt-1">
-                      <span className="text-2xl md:text-3xl font-black leading-none" style={{ color: TEXT_LIGHT, letterSpacing: '-0.02em' }}>{multiElo.lichess.currentRating}</span>
-                      <span className="inline-flex items-center text-xs font-black px-1.5 py-0.5 rounded" style={{ background: multiElo.lichess.delta > 0 ? 'rgba(129,182,76,0.2)' : multiElo.lichess.delta < 0 ? 'rgba(220,67,67,0.2)' : 'rgba(158,155,152,0.15)', color: multiElo.lichess.delta > 0 ? CHESSCOM_GREEN : multiElo.lichess.delta < 0 ? '#dc4343' : TEXT_MUTED }}>
-                        {multiElo.lichess.delta > 0 ? '▲' : multiElo.lichess.delta < 0 ? '▼' : '–'} {Math.abs(multiElo.lichess.delta)}
+                  <span className="inline-flex items-baseline gap-1 px-2 py-1 rounded-md" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}>
+                    <span className="text-[9px] font-black uppercase tracking-[0.14em]" style={{ color: '#b0b0b0' }}>LC</span>
+                    <span className="text-sm font-black" style={{ color: TEXT_LIGHT, letterSpacing: '-0.01em' }}>{multiElo.lichess.currentRating}</span>
+                    {multiElo.lichess.delta !== 0 && (
+                      <span className="text-[10px] font-black" style={{ color: multiElo.lichess.delta > 0 ? CHESSCOM_GREEN : '#dc4343' }}>
+                        {multiElo.lichess.delta > 0 ? '+' : '−'}{Math.abs(multiElo.lichess.delta)}
                       </span>
-                    </div>
-                  </div>
+                    )}
+                  </span>
                 )}
               </div>
             ) : chessPlayer?.rating ? (
-              <div className="flex items-baseline gap-2 mt-3">
-                <span className="text-3xl font-black leading-none" style={{ color: TEXT_LIGHT, letterSpacing: '-0.02em' }}>{chessPlayer.rating}</span>
-                <span className="text-xs font-black uppercase tracking-wider" style={{ color: CHESSCOM_GREEN }}>ELO</span>
+              <div className="flex items-baseline gap-1.5 mt-1.5">
+                <span className="text-lg font-black leading-none" style={{ color: TEXT_LIGHT, letterSpacing: '-0.01em' }}>{chessPlayer.rating}</span>
+                <span className="text-[10px] font-black uppercase tracking-wider" style={{ color: CHESSCOM_GREEN }}>ELO</span>
               </div>
             ) : null}
           </div>
         </div>
 
         {summary?.totalGames ? (
-          <div className="relative mt-5">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[10px] font-black uppercase tracking-[0.18em]" style={{ color: TEXT_MUTED }}>Performance</span>
-              <span className="text-[11px] font-bold" style={{ color: TEXT_LIGHT }}>{summary.totalGames.toLocaleString()} games · <span style={{ color: CHESSCOM_GREEN }}>{winRate}%</span> win rate</span>
+          <div className="relative mt-4">
+            <div className="flex items-baseline justify-between mb-1.5 gap-2">
+              <span className="text-[11px] font-bold truncate" style={{ color: TEXT_MUTED }}>
+                <span style={{ color: TEXT_LIGHT }}>{summary.totalGames.toLocaleString()}</span> games
+              </span>
+              <span className="text-[11px] font-bold whitespace-nowrap" style={{ color: TEXT_MUTED }}>
+                <span style={{ color: CHESSCOM_GREEN }}>{summary.wins.toLocaleString()}W</span>
+                {' · '}
+                <span style={{ color: TEXT_LIGHT }}>{summary.draws.toLocaleString()}D</span>
+                {' · '}
+                <span style={{ color: '#dc4343' }}>{summary.losses.toLocaleString()}L</span>
+                {' · '}
+                <span style={{ color: CHESSCOM_GREEN }}>{winRate}%</span>
+              </span>
             </div>
-            <div className="flex h-3 rounded-full overflow-hidden gap-0.5" style={{ boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.5), 0 1px 0 rgba(255,255,255,0.04)' }}>
+            <div className="flex h-2 rounded-full overflow-hidden gap-0.5" style={{ boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.5), 0 1px 0 rgba(255,255,255,0.04)' }}>
               <div className="relative" style={{ width: `${(summary.wins / summary.totalGames) * 100}%`, background: `linear-gradient(180deg, #a8d567 0%, ${CHESSCOM_GREEN} 100%)`, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.25)' }} />
               <div style={{ width: `${(summary.draws / summary.totalGames) * 100}%`, background: 'linear-gradient(180deg, #c0bdba 0%, #8a8784 100%)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.18)' }} />
               <div style={{ width: `${(summary.losses / summary.totalGames) * 100}%`, background: 'linear-gradient(180deg, #ec6b6b 0%, #c93535 100%)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.2)' }} />
             </div>
-            <div className="flex gap-4 mt-2">
-              <span className="inline-flex items-center gap-1.5 text-xs font-black" style={{ color: CHESSCOM_GREEN }}>
-                <span className="inline-block w-2 h-2 rounded-sm" style={{ background: CHESSCOM_GREEN, boxShadow: `0 0 8px ${CHESSCOM_GREEN}` }} />{summary.wins.toLocaleString()} W
-              </span>
-              <span className="inline-flex items-center gap-1.5 text-xs font-bold" style={{ color: TEXT_MUTED }}>
-                <span className="inline-block w-2 h-2 rounded-sm" style={{ background: TEXT_MUTED }} />{summary.draws.toLocaleString()} D
-              </span>
-              <span className="inline-flex items-center gap-1.5 text-xs font-black" style={{ color: '#dc4343' }}>
-                <span className="inline-block w-2 h-2 rounded-sm" style={{ background: '#dc4343', boxShadow: '0 0 8px #dc4343' }} />{summary.losses.toLocaleString()} L
-              </span>
-            </div>
           </div>
         ) : (
-          <p className="relative mt-4 text-sm" style={{ color: TEXT_MUTED }}>Import games to start coaching</p>
+          <p className="relative mt-3 text-sm" style={{ color: TEXT_MUTED }}>Import games to start coaching</p>
         )}
 
-        <div className="relative flex gap-2 mt-5">
-          <Link href="/import" className="flex-1 px-4 py-3 rounded-xl font-black text-sm text-white flex items-center justify-center gap-2 transition-all hover:scale-[1.02] active:scale-[0.98]" style={{ background: `linear-gradient(180deg, #95c45a 0%, ${CHESSCOM_GREEN} 100%)`, boxShadow: `0 4px 12px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.2)` }}>
-            <ImportIcon /> Import Games
+        <div className="relative flex gap-2 mt-4">
+          <Link href="/import" className="flex-1 px-3 py-2.5 rounded-lg font-black text-sm text-white flex items-center justify-center gap-2 transition-all hover:scale-[1.02] active:scale-[0.98]" style={{ background: `linear-gradient(180deg, #95c45a 0%, ${CHESSCOM_GREEN} 100%)`, boxShadow: `0 4px 12px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.2)` }}>
+            <ImportIcon /> Import
           </Link>
-          <Link href="/opponents" className="flex-1 px-4 py-3 rounded-xl font-black text-sm flex items-center justify-center gap-2 transition-all hover:scale-[1.02] active:scale-[0.98]" style={{ background: 'rgba(255,255,255,0.07)', color: TEXT_LIGHT, border: '1px solid rgba(255,255,255,0.1)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)' }}>
+          <Link href="/opponents" className="flex-1 px-3 py-2.5 rounded-lg font-black text-sm flex items-center justify-center gap-2 transition-all hover:scale-[1.02] active:scale-[0.98]" style={{ background: 'rgba(255,255,255,0.07)', color: TEXT_LIGHT, border: '1px solid rgba(255,255,255,0.1)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)' }}>
             <Swords className="w-4 h-4" style={{ color: CHESSCOM_GREEN }} /> Scout
           </Link>
         </div>
