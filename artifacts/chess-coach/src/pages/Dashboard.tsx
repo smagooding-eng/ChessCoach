@@ -90,8 +90,21 @@ export function Dashboard() {
 
             {(multiElo.chesscom?.hasData || multiElo.lichess?.hasData) ? (
               <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                {(() => {
+                  const ratings: number[] = [];
+                  if (multiElo.chesscom?.hasData) ratings.push(multiElo.chesscom.currentRating);
+                  if (multiElo.lichess?.hasData) ratings.push(multiElo.lichess.currentRating);
+                  if (ratings.length === 0) return null;
+                  const scoutElo = Math.round(ratings.reduce((a, b) => a + b, 0) / ratings.length);
+                  return (
+                    <span className="inline-flex items-baseline gap-1 px-2.5 py-1 rounded-md" style={{ background: `linear-gradient(135deg, rgba(129,182,76,0.28), rgba(129,182,76,0.18))`, border: `1px solid ${CHESSCOM_GREEN}`, boxShadow: '0 2px 8px rgba(129,182,76,0.25)' }}>
+                      <span className="text-[9px] font-black uppercase tracking-[0.14em]" style={{ color: CHESSCOM_GREEN }}>Scout</span>
+                      <span className="text-base font-black" style={{ color: TEXT_LIGHT, letterSpacing: '-0.01em' }}>{scoutElo}</span>
+                    </span>
+                  );
+                })()}
                 {multiElo.chesscom?.hasData && (
-                  <span className="inline-flex items-baseline gap-1 px-2 py-1 rounded-md" style={{ background: 'rgba(129,182,76,0.12)', border: '1px solid rgba(129,182,76,0.25)' }}>
+                  <span className="inline-flex items-baseline gap-1 px-2 py-1 rounded-md" style={{ background: 'rgba(129,182,76,0.08)', border: '1px solid rgba(129,182,76,0.2)' }}>
                     <span className="text-[9px] font-black uppercase tracking-[0.14em]" style={{ color: CHESSCOM_GREEN }}>CC</span>
                     <span className="text-sm font-black" style={{ color: TEXT_LIGHT, letterSpacing: '-0.01em' }}>{multiElo.chesscom.currentRating}</span>
                     {multiElo.chesscom.delta !== 0 && (
