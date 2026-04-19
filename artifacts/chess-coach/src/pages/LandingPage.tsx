@@ -288,7 +288,7 @@ function AuthModal({ open, onClose, initialMode, externalError }: { open: boolea
               {mode === 'login' ? 'Sign in to your account' : '3 days free, then $4/month'}
             </p>
             {mode === 'register' && (
-              <p className="text-xs font-semibold mt-1.5 flex items-center justify-center gap-1" style={{ color: G }}>
+              <p className="text-xs font-bold mt-1.5 flex items-center justify-center gap-1" style={{ color: G }}>
                 <Check className="w-3.5 h-3.5" /> No credit card required
               </p>
             )}
@@ -657,7 +657,7 @@ export function LandingPage() {
                 Upload or import your games. We'll show your biggest mistakes, patterns, and exactly how to fix them.
               </p>
 
-              <p className="mt-4 text-sm font-semibold max-w-lg" style={{ color: TEXT }}>
+              <p className="mt-4 text-sm font-bold max-w-lg" style={{ color: TEXT }}>
                 Most players lose for the same 2–3 reasons. We'll show you yours.
               </p>
 
@@ -689,7 +689,7 @@ export function LandingPage() {
                 </a>
               </div>
 
-              <div className="mt-6 flex flex-wrap items-center gap-4 text-xs font-semibold" style={{ color: MUTED }}>
+              <div className="mt-6 flex flex-wrap items-center gap-4 text-xs font-bold" style={{ color: MUTED }}>
                 <span className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5" style={{ color: G }} /> 3-day free trial</span>
                 <span className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5" style={{ color: G }} /> No credit card</span>
                 <span className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5" style={{ color: G }} /> Cancel anytime</span>

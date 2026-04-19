@@ -83,7 +83,7 @@ function StatCard({
         >
           <Icon className="w-4 h-4" style={{ color }} />
         </div>
-        <p className="text-xs font-bold uppercase tracking-wider" style={{ color: TEXT_MUTED }}>
+        <p className="text-[10px] font-black uppercase tracking-[0.18em]" style={{ color: TEXT_MUTED }}>
           {label}
         </p>
       </div>
@@ -92,7 +92,7 @@ function StatCard({
           <p className="text-2xl font-black leading-none" style={{ color: TEXT_LIGHT }}>
             {fmt(primary)}
           </p>
-          <p className="text-[10px] font-semibold uppercase tracking-wide mt-1" style={{ color: TEXT_MUTED }}>
+          <p className="text-[10px] font-bold uppercase tracking-wide mt-1" style={{ color: TEXT_MUTED }}>
             {primaryLabel}
           </p>
         </div>
@@ -101,7 +101,7 @@ function StatCard({
             <p className="text-base font-bold leading-none" style={{ color }}>
               {fmt(secondary)}
             </p>
-            <p className="text-[10px] font-semibold uppercase tracking-wide mt-1" style={{ color: TEXT_MUTED }}>
+            <p className="text-[10px] font-bold uppercase tracking-wide mt-1" style={{ color: TEXT_MUTED }}>
               {secondaryLabel}
             </p>
           </div>
@@ -161,7 +161,7 @@ export function Admin() {
         <button
           onClick={load}
           disabled={loading}
-          className="flex items-center gap-2 px-3 py-2 rounded-xl font-semibold text-sm transition-all disabled:opacity-50"
+          className="flex items-center gap-2 px-3 py-2 rounded-xl font-bold text-sm transition-all disabled:opacity-50"
           style={{
             background: `${CHESSCOM_GREEN}1a`,
             color: CHESSCOM_GREEN,
@@ -270,7 +270,7 @@ export function Admin() {
             <h2 className="text-base font-black" style={{ color: TEXT_LIGHT }}>
               Most Used Features
             </h2>
-            <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: TEXT_MUTED }}>
+            <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: TEXT_MUTED }}>
               By page views (all time)
             </p>
           </div>
@@ -281,7 +281,7 @@ export function Admin() {
                 const pct = (p.views / max) * 100;
                 return (
                   <div key={p.path} className="flex items-center gap-3 text-sm">
-                    <div className="w-40 shrink-0 truncate font-semibold" style={{ color: TEXT_LIGHT }}>
+                    <div className="w-40 shrink-0 truncate font-bold" style={{ color: TEXT_LIGHT }}>
                       {labelForPath(p.path)}
                     </div>
                     <div className="flex-1 h-5 rounded relative overflow-hidden" style={{ background: 'rgba(255,255,255,0.04)' }}>
@@ -298,7 +298,7 @@ export function Admin() {
                         </span>
                       </div>
                     </div>
-                    <div className="w-20 shrink-0 text-right text-[11px] font-semibold" style={{ color: TEXT_MUTED }}>
+                    <div className="w-20 shrink-0 text-right text-[11px] font-bold" style={{ color: TEXT_MUTED }}>
                       {fmt(p.uniqueVisitors)} <span className="opacity-70">unique</span>
                     </div>
                   </div>

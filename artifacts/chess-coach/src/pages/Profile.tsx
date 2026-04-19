@@ -141,7 +141,7 @@ function UserDetailPanel({ userId, onBack }: { userId: string; onBack: () => voi
   return (
     <div className="max-h-[400px] overflow-y-auto">
       <div className="px-4 py-3 bg-amber-500/5 border-b border-amber-500/15 flex items-center justify-between sticky top-0 z-10">
-        <button onClick={onBack} className="text-xs text-amber-400 hover:text-amber-300 flex items-center gap-1 font-semibold">
+        <button onClick={onBack} className="text-xs text-amber-400 hover:text-amber-300 flex items-center gap-1 font-bold">
           <ChevronRight className="w-3 h-3 rotate-180" /> Back
         </button>
         <span className="text-xs font-bold text-foreground truncate ml-2">
@@ -193,7 +193,7 @@ function UserDetailPanel({ userId, onBack }: { userId: string; onBack: () => voi
             {referrals.map(r => (
               <div key={r.id} className="flex items-center justify-between text-[11px] bg-background/30 rounded px-2 py-1.5">
                 <span className="text-foreground/80">{r.referredEmail || r.referredName || 'Unknown'}</span>
-                <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${
+                <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
                   r.status === 'converted' ? 'bg-emerald-500/15 text-emerald-400' : 'bg-blue-500/15 text-blue-400'
                 }`}>
                   {r.status === 'converted' ? 'Pro' : 'Signed Up'}
@@ -300,14 +300,14 @@ function UserListPanel({ onClose, onEmailUsers }: { onClose: () => void; onEmail
             <>
               <button
                 onClick={handleEmailSelected}
-                className="text-[10px] font-semibold px-2.5 py-1 rounded bg-amber-500/15 text-amber-400 hover:bg-amber-500/25 transition-colors flex items-center gap-1"
+                className="text-[10px] font-bold px-2.5 py-1 rounded bg-amber-500/15 text-amber-400 hover:bg-amber-500/25 transition-colors flex items-center gap-1"
               >
                 <Mail className="w-3 h-3" /> Email {selected.size}
               </button>
               <button
                 onClick={handleDeleteSelected}
                 disabled={deleting}
-                className={`text-[10px] font-semibold px-2.5 py-1 rounded flex items-center gap-1 transition-colors ${deleteConfirm ? 'bg-red-500/30 text-red-300 hover:bg-red-500/40' : 'bg-red-500/15 text-red-400 hover:bg-red-500/25'}`}
+                className={`text-[10px] font-bold px-2.5 py-1 rounded flex items-center gap-1 transition-colors ${deleteConfirm ? 'bg-red-500/30 text-red-300 hover:bg-red-500/40' : 'bg-red-500/15 text-red-400 hover:bg-red-500/25'}`}
               >
                 {deleting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
                 {deleteConfirm ? 'Confirm Delete?' : `Delete ${selected.size}`}
@@ -315,7 +315,7 @@ function UserListPanel({ onClose, onEmailUsers }: { onClose: () => void; onEmail
               {deleteConfirm && (
                 <button
                   onClick={() => setDeleteConfirm(false)}
-                  className="text-[10px] font-semibold px-1.5 py-1 rounded bg-neutral-500/15 text-neutral-400 hover:bg-neutral-500/25 transition-colors"
+                  className="text-[10px] font-bold px-1.5 py-1 rounded bg-neutral-500/15 text-neutral-400 hover:bg-neutral-500/25 transition-colors"
                 >
                   Cancel
                 </button>
@@ -331,7 +331,7 @@ function UserListPanel({ onClose, onEmailUsers }: { onClose: () => void; onEmail
         <div className="px-3 py-2 flex items-center gap-1 overflow-x-auto border-b border-border/20">
           <button
             onClick={toggleAll}
-            className={`text-[11px] font-semibold px-2 py-1 rounded transition-colors mr-1 ${allSelected ? 'bg-amber-500/20 text-amber-400' : 'bg-secondary/30 text-muted-foreground hover:text-foreground'}`}
+            className={`text-[11px] font-bold px-2 py-1 rounded transition-colors mr-1 ${allSelected ? 'bg-amber-500/20 text-amber-400' : 'bg-secondary/30 text-muted-foreground hover:text-foreground'}`}
           >
             {allSelected ? 'Deselect All' : 'Select All'}
           </button>
@@ -344,7 +344,7 @@ function UserListPanel({ onClose, onEmailUsers }: { onClose: () => void; onEmail
               <button
                 key={tab.key}
                 onClick={() => setFilter(tab.key)}
-                className={`text-[11px] font-semibold px-2.5 py-1 rounded-full transition-colors whitespace-nowrap ${active ? 'bg-amber-500/15' : 'hover:bg-secondary/50'}`}
+                className={`text-[11px] font-bold px-2.5 py-1 rounded-full transition-colors whitespace-nowrap ${active ? 'bg-amber-500/15' : 'hover:bg-secondary/50'}`}
                 style={{ color: active ? undefined : 'var(--muted-foreground)' }}
               >
                 <span className={active ? tab.color : ''}>{tab.label}</span>
@@ -1024,7 +1024,7 @@ ${sanitized}
                     onClick={() => applyTemplate(tpl)}
                     className="shrink-0 bg-[#262421] border border-border/30 rounded-xl px-4 py-3 text-left hover:border-amber-500/30 transition-colors"
                   >
-                    <p className="text-xs font-semibold text-amber-400">{tpl.name}</p>
+                    <p className="text-xs font-bold text-amber-400">{tpl.name}</p>
                     <p className="text-[10px] text-muted-foreground mt-0.5 max-w-[140px] truncate">{tpl.subject}</p>
                   </button>
                 ))}
@@ -1036,7 +1036,7 @@ ${sanitized}
         <div className="flex-1 overflow-y-auto">
           <div className="p-4 space-y-3">
             <div>
-              <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 block">To</label>
+              <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-1.5 block">To</label>
               <div className="bg-[#262421] border border-border/40 rounded-xl p-2 min-h-[40px]">
                 <div className="flex flex-wrap gap-1.5 mb-1">
                   {broadcastAll && (
@@ -1077,7 +1077,7 @@ ${sanitized}
             </div>
 
             <div>
-              <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 block">Subject</label>
+              <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-1.5 block">Subject</label>
               <input
                 value={subject}
                 onChange={e => setSubject(e.target.value)}
@@ -1088,17 +1088,17 @@ ${sanitized}
 
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Body</label>
+                <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Body</label>
                 <div className="flex gap-1 p-0.5 bg-[#262421] rounded-xl">
                   <button
                     onClick={() => setMode('compose')}
-                    className={`text-[10px] font-semibold px-2 py-1 rounded transition-colors ${mode === 'compose' ? 'bg-amber-500/15 text-amber-400' : 'text-muted-foreground'}`}
+                    className={`text-[10px] font-bold px-2 py-1 rounded transition-colors ${mode === 'compose' ? 'bg-amber-500/15 text-amber-400' : 'text-muted-foreground'}`}
                   >
                     Compose
                   </button>
                   <button
                     onClick={() => setMode('preview')}
-                    className={`text-[10px] font-semibold px-2 py-1 rounded transition-colors ${mode === 'preview' ? 'bg-amber-500/15 text-amber-400' : 'text-muted-foreground'}`}
+                    className={`text-[10px] font-bold px-2 py-1 rounded transition-colors ${mode === 'preview' ? 'bg-amber-500/15 text-amber-400' : 'text-muted-foreground'}`}
                   >
                     Preview
                   </button>
@@ -1155,7 +1155,7 @@ ${sanitized}
                   <div
                     ref={editorRef}
                     contentEditable
-                    className="bg-[#262421] border border-border/40 rounded-b-lg px-4 py-3 min-h-[200px] max-h-[350px] overflow-y-auto text-sm text-[#e8e6e3] focus:outline-none focus:border-amber-500/40 [&_h2]:text-lg [&_h2]:font-bold [&_h2]:text-[#81b64c] [&_h2]:mb-2 [&_h3]:text-base [&_h3]:font-semibold [&_h3]:text-[#e8e6e3] [&_h3]:mb-1 [&_p]:mb-2 [&_a]:text-[#81b64c] [&_a]:underline [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:mb-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:mb-2 [&_li]:mb-1 [&_img]:max-w-full [&_img]:rounded-xl [&_img]:my-2 [&_hr]:border-border/30 [&_hr]:my-3"
+                    className="bg-[#262421] border border-border/40 rounded-b-lg px-4 py-3 min-h-[200px] max-h-[350px] overflow-y-auto text-sm text-[#e8e6e3] focus:outline-none focus:border-amber-500/40 [&_h2]:text-lg [&_h2]:font-bold [&_h2]:text-[#81b64c] [&_h2]:mb-2 [&_h3]:text-base [&_h3]:font-bold [&_h3]:text-[#e8e6e3] [&_h3]:mb-1 [&_p]:mb-2 [&_a]:text-[#81b64c] [&_a]:underline [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:mb-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:mb-2 [&_li]:mb-1 [&_img]:max-w-full [&_img]:rounded-xl [&_img]:my-2 [&_hr]:border-border/30 [&_hr]:my-3"
                     data-placeholder="Start typing your email..."
                     onPaste={(e) => {
                       const items = e.clipboardData.items;
@@ -1295,7 +1295,7 @@ ${sanitized}
             <button
               onClick={handleSend}
               disabled={sending}
-              className="flex-1 bg-amber-500/15 text-amber-400 hover:bg-amber-500/25 disabled:opacity-50 text-sm font-semibold py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2"
+              className="flex-1 bg-amber-500/15 text-amber-400 hover:bg-amber-500/25 disabled:opacity-50 text-sm font-bold py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2"
             >
               <Send className="w-4 h-4" />
               {sending ? 'Sending...' : broadcastAll ? 'Send to All Users' : `Send to ${recipients.length} Recipient${recipients.length !== 1 ? 's' : ''}`}
@@ -1366,7 +1366,7 @@ function AdminTicker() {
               <button
                 onClick={handleClearCache}
                 disabled={clearing}
-                className="text-[10px] font-semibold px-2 py-1 rounded transition-colors flex items-center gap-1 bg-red-500/10 text-red-400/70 hover:bg-red-500/15 hover:text-red-400 disabled:opacity-50"
+                className="text-[10px] font-bold px-2 py-1 rounded transition-colors flex items-center gap-1 bg-red-500/10 text-red-400/70 hover:bg-red-500/15 hover:text-red-400 disabled:opacity-50"
               >
                 {clearing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
                 {clearing ? 'Clearing...' : 'Clear Cache'}
@@ -1376,7 +1376,7 @@ function AdminTicker() {
               )}
               <button
                 onClick={openComposer}
-                className="text-[10px] font-semibold px-2 py-1 rounded transition-colors flex items-center gap-1 bg-amber-500/10 text-amber-400/70 hover:bg-amber-500/15 hover:text-amber-400"
+                className="text-[10px] font-bold px-2 py-1 rounded transition-colors flex items-center gap-1 bg-amber-500/10 text-amber-400/70 hover:bg-amber-500/15 hover:text-amber-400"
               >
                 <Mail className="w-3 h-3" /> Compose
               </button>
@@ -1447,7 +1447,7 @@ function AdminTicker() {
           >
             <span className="text-lg">♜</span>
             <div>
-              <p className="text-foreground font-semibold">Fix Chess960 Games</p>
+              <p className="text-foreground font-bold">Fix Chess960 Games</p>
               <p className="text-xs text-muted-foreground">Normalize FENs for old imported Chess960 games &amp; clear stale reviews</p>
             </div>
           </button>
@@ -1645,11 +1645,11 @@ function ReferralCard({ isPremium }: { isPremium: boolean }) {
             <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center mx-auto mb-3">
               <Crown className="w-6 h-6 text-primary" />
             </div>
-            <p className="text-sm font-semibold text-foreground mb-1">Unlock Referrals</p>
+            <p className="text-sm font-bold text-foreground mb-1">Unlock Referrals</p>
             <p className="text-xs text-muted-foreground mb-3">
               Become a Pro subscriber to get your personal referral link and invite friends to ChessScout.
             </p>
-            <Link href="/subscription" className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:text-primary/80 transition-colors">
+            <Link href="/subscription" className="inline-flex items-center gap-1.5 text-xs font-bold text-primary hover:text-primary/80 transition-colors">
               Upgrade to Pro <ChevronRight className="w-3 h-3" />
             </Link>
           </div>
@@ -1664,7 +1664,7 @@ function ReferralCard({ isPremium }: { isPremium: boolean }) {
                   </div>
                   <button
                     onClick={handleCopy}
-                    className={`shrink-0 px-3 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                    className={`shrink-0 px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
                       copied
                         ? 'bg-emerald-500/15 text-emerald-400'
                         : 'bg-primary/10 text-primary hover:bg-primary/20'
@@ -1701,7 +1701,7 @@ function ReferralCard({ isPremium }: { isPremium: boolean }) {
                   {data.referrals.map(r => (
                     <div key={r.id} className="flex items-center justify-between bg-background/30 border border-border/20 rounded-xl px-3 py-2">
                       <span className="text-xs text-foreground font-medium">{r.referredName}</span>
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
                         r.status === 'converted'
                           ? 'bg-emerald-500/15 text-emerald-400'
                           : 'bg-blue-500/15 text-blue-400'

@@ -806,7 +806,7 @@ export function GameLookup() {
           <div className="rounded-xl border p-4" style={{ background: BG_CARD, border: CARD_BORDER, boxShadow: CARD_SHADOW }}>
             <div className="flex items-center gap-2 mb-3">
               <Clock size={14} style={{ color: TEXT_MUTED }} />
-              <h3 className="text-xs font-bold uppercase tracking-wider" style={{ color: TEXT_MUTED }}>Previous Searches</h3>
+              <h3 className="text-[10px] font-black uppercase tracking-[0.18em]" style={{ color: TEXT_MUTED }}>Previous Searches</h3>
             </div>
             <div className="flex flex-wrap gap-2">
               {searchHistory.map((h, i) => (

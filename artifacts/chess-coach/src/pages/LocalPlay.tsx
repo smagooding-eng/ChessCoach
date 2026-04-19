@@ -264,7 +264,7 @@ export function LocalPlay() {
         {/* Move list */}
         <div className="glass-card rounded-xl overflow-hidden w-full">
           <div className="px-3 py-2 border-b border-border/30">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Moves</p>
+            <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Moves</p>
           </div>
           <div ref={moveListRef} className="max-h-48 overflow-y-auto hide-scrollbar p-2">
             {movePairs.length === 0 ? (

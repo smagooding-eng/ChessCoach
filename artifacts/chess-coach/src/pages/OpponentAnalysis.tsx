@@ -397,7 +397,7 @@ export function OpponentAnalysis() {
         <div className="glass-card rounded-xl p-5">
           <div className="flex items-center gap-2 mb-3">
             <History className="w-4 h-4 text-muted-foreground" />
-            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Previous Scouts</h3>
+            <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-wider">Previous Scouts</h3>
           </div>
           <div className="flex flex-wrap gap-2">
             {scoutHistory.map(s => (
@@ -550,7 +550,7 @@ export function OpponentAnalysis() {
               {/* Head-to-head section */}
               {result.headToHead && result.headToHead.total > 0 && (
                 <div className="mt-5 pt-5 border-t border-border/50">
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5">
                     <Swords className="w-3.5 h-3.5 text-primary" /> Your Head-to-Head Record
                   </p>
                   <div className="flex items-center gap-6">
@@ -599,7 +599,7 @@ export function OpponentAnalysis() {
                           <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold border ${SEV_STYLES[w.severity] ?? SEV_STYLES.Low}`}>
                             {w.severity}
                           </span>
-                          <h4 className="font-semibold">{w.category}</h4>
+                          <h4 className="font-bold">{w.category}</h4>
                         </div>
                         <div className="flex items-center gap-3">
                           <div className="flex items-center gap-1.5">
@@ -629,7 +629,7 @@ export function OpponentAnalysis() {
                           className="overflow-hidden"
                         >
                           <div className="px-4 pb-4 pt-0 border-t border-border/50">
-                            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 mt-3">
+                            <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2 mt-3">
                               Examples from their games
                             </p>
                             <ul className="space-y-1.5">
@@ -719,7 +719,7 @@ export function OpponentAnalysis() {
                     <p className="font-black text-sm">Generate Exploit Courses</p>
                     <p className="text-xs text-muted-foreground mt-0.5">
                       AI builds {Math.min(result.weaknesses.length, 3)} courses teaching you how to punish{' '}
-                      <span className="text-foreground font-semibold">{result.username}</span>'s top weaknesses
+                      <span className="text-foreground font-bold">{result.username}</span>'s top weaknesses
                     </p>
                   </div>
                 </div>
@@ -735,7 +735,7 @@ export function OpponentAnalysis() {
                 )}
 
                 {courseGenState === 'generating' && (
-                  <div className="shrink-0 flex items-center gap-2 text-primary text-sm font-semibold">
+                  <div className="shrink-0 flex items-center gap-2 text-primary text-sm font-bold">
                     <Loader2 className="w-4 h-4 animate-spin" />
                     Generating… this takes 2–3 min
                   </div>
@@ -778,7 +778,7 @@ export function OpponentAnalysis() {
                 <div className="px-5 pb-4 pt-0">
                   <div className="flex flex-wrap gap-2">
                     {result.weaknesses.slice(0, 3).map((w, i) => (
-                      <span key={i} className="px-2.5 py-1 rounded-xl bg-primary/10 text-primary text-xs font-semibold">
+                      <span key={i} className="px-2.5 py-1 rounded-xl bg-primary/10 text-primary text-xs font-bold">
                         vs {result.username}: Exploit {w.category}
                       </span>
                     ))}

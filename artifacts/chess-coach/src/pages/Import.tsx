@@ -150,7 +150,7 @@ export function Import() {
           <button
             onClick={() => { setPlatform('chesscom'); handleReset(); }}
             className={cn(
-              'flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm transition-all border',
+              'flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm transition-all border',
               platform === 'chesscom'
                 ? 'bg-primary/15 border-primary/40 text-primary shadow-sm'
                 : 'bg-secondary/50 border-border text-muted-foreground hover:text-foreground hover:bg-secondary/70'
@@ -162,7 +162,7 @@ export function Import() {
           <button
             onClick={() => { setPlatform('lichess'); handleReset(); }}
             className={cn(
-              'flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm transition-all border',
+              'flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm transition-all border',
               platform === 'lichess'
                 ? 'bg-primary/15 border-primary/40 text-primary shadow-sm'
                 : 'bg-secondary/50 border-border text-muted-foreground hover:text-foreground hover:bg-secondary/70'
@@ -222,20 +222,20 @@ export function Import() {
             <div className="flex flex-wrap gap-4 justify-center">
               <button
                 onClick={handleReset}
-                className="px-5 py-2.5 rounded-xl bg-secondary text-foreground font-semibold hover:bg-secondary/80 transition-colors flex items-center gap-2"
+                className="px-5 py-2.5 rounded-xl bg-secondary text-foreground font-bold hover:bg-secondary/80 transition-colors flex items-center gap-2"
               >
                 <RefreshCw className="w-4 h-4" /> Import More
               </button>
               <Link
                 href="/games"
-                className="px-5 py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold shadow-lg shadow-primary/25 hover:shadow-primary/40 transition-all hover:-translate-y-0.5 flex items-center gap-2"
+                className="px-5 py-2.5 rounded-xl bg-primary text-primary-foreground font-bold shadow-lg shadow-primary/25 hover:shadow-primary/40 transition-all hover:-translate-y-0.5 flex items-center gap-2"
               >
                 View Games <ArrowRight className="w-4 h-4" />
               </Link>
               {result.total > 0 && (
                 <Link
                   href="/analysis"
-                  className="px-5 py-2.5 rounded-xl bg-emerald-600 text-white font-semibold shadow-lg hover:bg-emerald-500 transition-all hover:-translate-y-0.5"
+                  className="px-5 py-2.5 rounded-xl bg-emerald-600 text-white font-bold shadow-lg hover:bg-emerald-500 transition-all hover:-translate-y-0.5"
                 >
                   Analyze Now
                 </Link>
@@ -368,7 +368,7 @@ export function Import() {
               <div className="p-4 bg-destructive/10 border border-destructive/20 text-destructive rounded-xl text-sm flex gap-3 items-start">
                 <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
                 <div>
-                  <p className="font-semibold mb-1">Import failed</p>
+                  <p className="font-bold mb-1">Import failed</p>
                   <p className="text-destructive/80 break-words">
                     {apiError || (error?.message) || 'Failed to import games. Check that your username is correct and try again.'}
                   </p>
@@ -399,7 +399,7 @@ export function Import() {
                   type="button"
                   onClick={(e) => handleImport(e, true)}
                   disabled={isImporting || isSyncing}
-                  className="w-full flex justify-center items-center gap-2 px-5 py-3 rounded-xl font-semibold bg-secondary/80 text-foreground/80 border border-border/30 hover:bg-secondary hover:text-foreground transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full flex justify-center items-center gap-2 px-5 py-3 rounded-xl font-bold bg-secondary/80 text-foreground/80 border border-border/30 hover:bg-secondary hover:text-foreground transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isSyncing ? (
                     <>

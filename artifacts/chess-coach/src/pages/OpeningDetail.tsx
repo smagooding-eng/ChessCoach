@@ -352,7 +352,7 @@ export function OpeningDetail() {
                         initial={{ opacity: 0, y: -8 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0 }}
-                        className={`flex items-center gap-3 px-4 py-3 rounded-xl font-semibold text-sm
+                        className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold text-sm
                           ${feedback === 'correct' ? 'bg-emerald-500/15 border border-emerald-500/30 text-emerald-400' : 'bg-red-500/15 border border-red-500/30 text-red-400'}`}
                       >
                         {feedback === 'correct'
@@ -371,7 +371,7 @@ export function OpeningDetail() {
                         {mainLine[practiceStep]?.moveNumber}
                       </div>
                       <div>
-                        <p className="text-sm font-semibold">
+                        <p className="text-sm font-bold">
                           {isUserTurn ? `Your turn — move ${practiceStep + 1} of ${mainLine.length}` : 'Opponent playing…'}
                         </p>
                         <p className="text-xs text-muted-foreground">

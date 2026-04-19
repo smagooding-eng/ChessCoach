@@ -437,7 +437,7 @@ export function Puzzles() {
             <button
               key={t}
               onClick={() => setTab(t)}
-              className="flex-1 py-2 px-3 rounded-xl text-sm font-semibold transition-all"
+              className="flex-1 py-2 px-3 rounded-xl text-sm font-bold transition-all"
               style={{
                 background: tab === t ? CHESSCOM_GREEN : 'transparent',
                 color: tab === t ? '#000' : TEXT_MUTED,
@@ -492,7 +492,7 @@ export function Puzzles() {
               <div className="flex flex-col items-center justify-center py-16 text-center">
                 <p className="text-sm mb-4" style={{ color: TEXT_MUTED }}>No puzzles available right now.</p>
                 <button onClick={fetchNextPuzzle}
-                  className="px-4 py-2 rounded-xl text-sm font-semibold" style={{ background: CHESSCOM_GREEN, color: '#000' }}>
+                  className="px-4 py-2 rounded-xl text-sm font-bold" style={{ background: CHESSCOM_GREEN, color: '#000' }}>
                   Try Again
                 </button>
               </div>
@@ -523,7 +523,7 @@ export function Puzzles() {
                 </div>
 
                 <div className="mb-3 text-center">
-                  <span className="text-sm font-semibold" style={{ color: boardOrientation === 'white' ? TEXT_LIGHT : TEXT_LIGHT }}>
+                  <span className="text-sm font-bold" style={{ color: boardOrientation === 'white' ? TEXT_LIGHT : TEXT_LIGHT }}>
                     {state === 'ready' ? (
                       <span style={{ color: CHESSCOM_GREEN }}>
                         {game.turn() === 'w' ? '⬜ White' : '⬛ Black'} to move — find the best move!
@@ -578,7 +578,7 @@ export function Puzzles() {
                   {state === 'ready' && (
                     <button
                       onClick={() => setShowHint(!showHint)}
-                      className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold transition-all"
+                      className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold transition-all"
                       style={{ background: 'rgba(255,255,255,0.06)', color: showHint ? '#fbbf24' : TEXT_MUTED }}>
                       <Lightbulb size={16} />Hint
                     </button>
@@ -620,7 +620,7 @@ export function Puzzles() {
                         setGame(new Chess(puzzle.fen));
                         setTimeout(playSolution, 400);
                       }}
-                      className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold transition-all"
+                      className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold transition-all"
                       style={{ background: 'rgba(255,255,255,0.08)', color: TEXT_MUTED }}>
                       <Zap size={16} />Show Solution
                     </button>
@@ -685,7 +685,7 @@ export function Puzzles() {
               <button
                 onClick={generateFromGames}
                 disabled={generatingFromGames}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all disabled:opacity-50"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all disabled:opacity-50"
                 style={{ background: CHESSCOM_GREEN, color: '#000' }}>
                 {generatingFromGames ? <Loader2 size={14} className="animate-spin" /> : <Zap size={14} />}
                 Generate
@@ -705,7 +705,7 @@ export function Puzzles() {
                 <button
                   onClick={generateFromGames}
                   disabled={generatingFromGames}
-                  className="px-4 py-2 rounded-xl text-sm font-semibold"
+                  className="px-4 py-2 rounded-xl text-sm font-bold"
                   style={{ background: CHESSCOM_GREEN, color: '#000' }}>
                   Generate Puzzles
                 </button>
@@ -727,7 +727,7 @@ export function Puzzles() {
                         {p.solved ? '✓' : '♟'}
                       </div>
                       <div className="text-left">
-                        <div className="text-sm font-semibold" style={{ color: TEXT_LIGHT }}>
+                        <div className="text-sm font-bold" style={{ color: TEXT_LIGHT }}>
                           Rating {p.rating}
                         </div>
                         <div className="text-xs" style={{ color: TEXT_MUTED }}>

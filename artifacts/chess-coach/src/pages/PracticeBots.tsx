@@ -153,7 +153,7 @@ function BotCard({ bot, onSelect }: { bot: BotConfig; onSelect: (b: BotConfig) =
       </div>
       <div>
         <h3 className="text-lg font-black text-white">{bot.name}</h3>
-        <p className="text-[11px] font-bold uppercase tracking-wider text-white/50 mt-0.5">{bot.personality}</p>
+        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/50 mt-0.5">{bot.personality}</p>
       </div>
       <p className="text-xs text-white/60 leading-relaxed">{bot.description}</p>
       <div className="flex items-center gap-1.5 text-xs font-bold text-white/40 group-hover:text-white/70 transition-colors mt-auto pt-2">
@@ -833,7 +833,7 @@ function OpeningCard({ opening, onSelect }: { opening: OpeningLine; onSelect: (o
       </div>
       <div>
         <h3 className="text-base font-black text-white leading-tight">{opening.name}</h3>
-        <p className="text-[11px] font-bold uppercase tracking-wider text-white/50 mt-1">
+        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/50 mt-1">
           Play as {opening.userColor === 'w' ? 'White' : 'Black'} · {Math.ceil(opening.moves.length / 2)} moves deep
         </p>
       </div>

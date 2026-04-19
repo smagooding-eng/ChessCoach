@@ -366,7 +366,7 @@ export function CourseDetail() {
       <div className="flex flex-col items-center justify-center py-20 gap-4">
         <Target className="w-10 h-10 text-muted-foreground" />
         <p className="text-muted-foreground">This course could not be loaded.</p>
-        <Link href="/courses" className="px-5 py-2 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary text-sm font-semibold transition-colors border border-primary/20">
+        <Link href="/courses" className="px-5 py-2 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary text-sm font-bold transition-colors border border-primary/20">
           View all courses
         </Link>
       </div>
@@ -510,7 +510,7 @@ export function CourseDetail() {
                 {/* Lesson header */}
                 <div className="flex items-center justify-between gap-3 mb-3">
                   <div>
-                    <p className="text-[11px] font-bold uppercase tracking-wider mb-0.5" style={{ color: CHESSCOM_GREEN }}>
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] mb-0.5" style={{ color: CHESSCOM_GREEN }}>
                       Lesson {currentIdx + 1} of {sortedLessons.length}
                     </p>
                     <h2 className="text-lg font-bold text-white leading-snug">{lesson?.title}</h2>

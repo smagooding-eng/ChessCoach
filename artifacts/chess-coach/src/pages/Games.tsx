@@ -60,7 +60,7 @@ export function Games() {
         <p className="text-muted-foreground text-sm max-w-sm text-center">
           {error instanceof Error ? error.message : 'An error occurred while fetching your games. Please try again.'}
         </p>
-        <Link href="/import" className="px-4 py-2 bg-primary text-primary-foreground rounded-xl font-semibold hover:bg-primary/90 transition-colors">
+        <Link href="/import" className="px-4 py-2 bg-primary text-primary-foreground rounded-xl font-bold hover:bg-primary/90 transition-colors">
           Go to Import
         </Link>
       </div>
@@ -224,7 +224,7 @@ export function Games() {
 
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-semibold text-sm truncate">vs {opponent}</span>
+                          <span className="font-bold text-sm truncate">vs {opponent}</span>
                           <span className="text-xs text-muted-foreground">({opponentRating})</span>
                           <span className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide
                             ${game.result === 'win' ? 'bg-emerald-500/20 text-emerald-400' :

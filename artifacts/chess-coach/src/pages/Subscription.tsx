@@ -183,7 +183,7 @@ export function Subscription() {
               <div>
                 <h3 className="font-bold text-lg">ChessScout Pro</h3>
                 <p className="text-sm text-muted-foreground capitalize">
-                  Status: <span className="text-primary font-semibold">{subscription.status}</span>
+                  Status: <span className="text-primary font-bold">{subscription.status}</span>
                 </p>
               </div>
             </div>
@@ -200,7 +200,7 @@ export function Subscription() {
             <button
               onClick={handlePortal}
               disabled={portalLoading}
-              className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-secondary hover:bg-secondary/80 transition-colors font-semibold text-sm"
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-secondary hover:bg-secondary/80 transition-colors font-bold text-sm"
             >
               {portalLoading ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -249,7 +249,7 @@ export function Subscription() {
                   <div key={f.label} className="flex items-start gap-2.5">
                     <f.icon className="w-4 h-4 text-primary shrink-0 mt-0.5" />
                     <div>
-                      <p className="text-sm font-semibold">{f.label}</p>
+                      <p className="text-sm font-bold">{f.label}</p>
                       <p className="text-xs text-muted-foreground">{f.desc}</p>
                     </div>
                   </div>
@@ -282,7 +282,7 @@ export function Subscription() {
                     <button
                       onClick={() => handleCheckout(weeklyPrice.id)}
                       disabled={!!checkoutLoading}
-                      className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-secondary hover:bg-secondary/80 transition-colors font-semibold text-sm"
+                      className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-secondary hover:bg-secondary/80 transition-colors font-bold text-sm"
                     >
                       {checkoutLoading === weeklyPrice.id ? (
                         <Loader2 className="w-4 h-4 animate-spin" />

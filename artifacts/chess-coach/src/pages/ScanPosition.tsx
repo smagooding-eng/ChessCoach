@@ -608,12 +608,12 @@ export function ScanPosition() {
 
           <div className="rounded-xl px-3 py-2 border border-white/10 bg-white/5 text-[11px] text-white/60 text-center">
             {builderPiece ? (
-              <>Tap any square to place <span className="text-white/90 font-semibold">
+              <>Tap any square to place <span className="text-white/90 font-bold">
                 {PIECE_GLYPH[builderPiece]} {builderPiece === builderPiece.toUpperCase() ? 'White' : 'Black'}{' '}
                 {({ K: 'King', Q: 'Queen', R: 'Rook', B: 'Bishop', N: 'Knight', P: 'Pawn' } as Record<string, string>)[builderPiece.toUpperCase()]}
               </span></>
             ) : (
-              <>Eraser selected — tap any piece to <span className="text-white/90 font-semibold">remove</span> it.</>
+              <>Eraser selected — tap any piece to <span className="text-white/90 font-bold">remove</span> it.</>
             )}
           </div>
 
@@ -692,7 +692,7 @@ export function ScanPosition() {
 
           {/* Side to move */}
           <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 p-1">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-white/40 px-2">Turn</span>
+            <span className="text-[10px] font-black uppercase tracking-[0.18em] text-white/40 px-2">Turn</span>
             <button
               onClick={() => {
                 setBuilderTurn('w');

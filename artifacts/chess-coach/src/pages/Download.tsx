@@ -91,7 +91,7 @@ export default function DownloadPage() {
               <div key={i} className="flex items-center gap-2 px-3 py-2 rounded-xl"
                 style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
                 <f.icon className="w-4 h-4" style={{ color: G }} />
-                <span className="text-xs font-semibold" style={{ color: TEXT }}>{f.label}</span>
+                <span className="text-xs font-bold" style={{ color: TEXT }}>{f.label}</span>
               </div>
             ))}
           </div>

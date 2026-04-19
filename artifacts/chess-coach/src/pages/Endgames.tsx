@@ -199,7 +199,7 @@ export function Endgames() {
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
             className={cn(
-              'flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border transition-all whitespace-nowrap shrink-0',
+              'flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold border transition-all whitespace-nowrap shrink-0',
               activeTab === tab.id
                 ? 'bg-primary/15 text-primary border-primary/30'
                 : 'bg-secondary/50 text-muted-foreground border-border hover:text-foreground hover:bg-secondary'
