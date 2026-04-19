@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { PieceTile } from '@/components/DesignSystem';
+import { PageHero } from '@/components/DesignSystem';
 import { Chess } from 'chess.js';
 import { ChessBoard } from '@/components/ChessBoard';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -125,13 +125,7 @@ export function LocalPlay() {
   if (!gameStarted) {
     return (
       <div className="space-y-6 px-4 pt-4 md:px-0 md:pt-0 pb-10">
-        <div className="flex items-center gap-3">
-          <PieceTile piece="♛" size={48} />
-          <div>
-            <h1 className="text-2xl md:text-3xl font-black" style={{ letterSpacing: '-0.02em' }}>Play</h1>
-            <p className="text-muted-foreground">Play chess locally against a friend on this device.</p>
-          </div>
-        </div>
+        <PageHero piece="♛" title="Play" subtitle="Play chess locally against a friend on this device." />
 
         <div className="max-w-md mx-auto space-y-4">
           <h2 className="text-lg font-bold text-center">Choose Time Control</h2>

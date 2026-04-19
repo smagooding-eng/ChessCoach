@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { PieceTile } from '@/components/DesignSystem';
+import { PageHero } from '@/components/DesignSystem';
 import { useLocation } from 'wouter';
 import { useMyAnalysisSummary, useMyWeaknesses } from '@/hooks/use-analysis';
 import { useUser } from '@/hooks/use-user';
@@ -169,18 +169,11 @@ export function Analysis() {
   return (
     <PremiumGate feature="AI Game Analysis">
     <div className="space-y-5 pb-10 px-3 pt-3 md:px-0 md:pt-0">
-      <div className="rounded-xl p-5 md:p-6" style={{ background: BG_CARD, border: CARD_BORDER, boxShadow: CARD_SHADOW }}>
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div className="flex items-center gap-3">
-            <PieceTile piece="♚" size={48} />
-            <div>
-              <h1 className="text-2xl md:text-3xl font-black" style={{ color: TEXT_LIGHT, letterSpacing: '-0.02em' }}>AI Analysis</h1>
-              <p className="mt-1.5 max-w-lg text-sm" style={{ color: TEXT_MUTED }}>
-                Our coach engine processes all your games to detect recurring patterns, blunders, and strategic leaks.
-              </p>
-            </div>
-          </div>
-
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-stretch gap-4">
+        <div className="flex-1 min-w-0">
+          <PageHero piece="♚" title="AI Analysis" subtitle="Our coach engine processes all your games to detect recurring patterns, blunders, and strategic leaks." />
+        </div>
+        <div className="flex items-center">
           <button
             onClick={handleAnalyze}
             disabled={isAnalyzing}

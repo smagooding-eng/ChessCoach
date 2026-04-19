@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
-import { PieceTile } from '@/components/DesignSystem';
+import { PageHero } from '@/components/DesignSystem';
 import { useMyCourses } from '@/hooks/use-courses';
 import { useUser } from '@/hooks/use-user';
 import { useQueryClient } from '@tanstack/react-query';
@@ -186,13 +186,7 @@ export function Endgames() {
   return (
     <PremiumGate feature="Endgame Training">
     <div className="space-y-6 pb-20 px-4 pt-4 md:px-0 md:pt-0">
-      <div className="flex items-center gap-3">
-        <PieceTile piece="♚" size={48} />
-        <div>
-          <h1 className="text-2xl md:text-3xl font-black" style={{ letterSpacing: '-0.02em' }}>Endgame Training</h1>
-          <p className="text-muted-foreground mt-1">Master the endgame — the most important phase of chess.</p>
-        </div>
-      </div>
+      <PageHero piece="♚" title="Endgame Training" subtitle="Master the endgame — the most important phase of chess." />
 
       <div className="flex gap-2 overflow-x-auto pb-1">
         {TABS.map(tab => (

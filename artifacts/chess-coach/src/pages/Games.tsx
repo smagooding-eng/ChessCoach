@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { PieceTile } from '@/components/DesignSystem';
+import { PageHero } from '@/components/DesignSystem';
 import { useMyGames } from '@/hooks/use-games';
 import { useUser } from '@/hooks/use-user';
 import { Link } from 'wouter';
@@ -99,13 +99,7 @@ export function Games() {
 
   return (
     <div className="space-y-5 px-4 pt-4 md:px-0 md:pt-0 pb-10">
-      <div className="flex items-center gap-3">
-        <PieceTile piece="♜" size={48} />
-        <div>
-          <h1 className="text-2xl md:text-3xl font-black" style={{ letterSpacing: '-0.02em' }}>My Games</h1>
-          <p className="text-muted-foreground text-sm">View and replay your imported chess games.</p>
-        </div>
-      </div>
+      <PageHero piece="♜" title="My Games" subtitle="View and replay your imported chess games." />
 
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
         <div className="relative flex-1">

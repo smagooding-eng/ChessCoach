@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { PieceTile } from '@/components/DesignSystem';
+import { PageHero } from '@/components/DesignSystem';
 import { useLocation } from 'wouter';
 import { useUser } from '@/hooks/use-user';
 import { apiFetch } from '@/lib/api';
@@ -150,17 +150,9 @@ export function Admin() {
 
   return (
     <div className="px-3 md:px-0 pt-4 md:pt-0 space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <PieceTile piece="♚" size={48} />
-          <div>
-            <h1 className="text-2xl md:text-3xl font-black" style={{ color: TEXT_LIGHT, letterSpacing: '-0.02em' }}>
-              Admin Dashboard
-            </h1>
-            <p className="text-sm mt-1" style={{ color: TEXT_MUTED }}>
-              Combined user and activity stats across the entire app.
-            </p>
-          </div>
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div className="flex-1 min-w-[260px]">
+          <PageHero piece="♚" title="Admin Dashboard" subtitle="Combined user and activity stats across the entire app." />
         </div>
         <button
           onClick={load}
