@@ -57,8 +57,9 @@ export function Dashboard() {
     <div className="space-y-4 md:space-y-5">
 
       <div style={{ background: BG_CARD, border: CARD_BORDER, boxShadow: CARD_SHADOW }}
-        className="p-4 md:p-5 rounded-xl">
-        <div className="flex items-center gap-3">
+        className="relative overflow-hidden p-4 md:p-5 rounded-xl">
+        <div aria-hidden className="pointer-events-none absolute -top-4 -right-4 select-none" style={{ fontSize: 130, lineHeight: 1, color: 'rgba(129,182,76,0.06)', textShadow: '0 0 1px rgba(129,182,76,0.18)' }}>♞</div>
+        <div className="relative flex items-center gap-3">
           <div className="shrink-0 relative">
             {chessPlayer?.avatar
               ? <img src={chessPlayer.avatar} alt={username ?? ''} className="w-14 h-14 rounded-xl object-cover" style={{ border: `2px solid ${CHESSCOM_GREEN}` }} />
@@ -128,39 +129,44 @@ export function Dashboard() {
         </div>
 
         {summary?.totalGames ? (
-          <div className="mt-3">
-            <div className="flex h-1 rounded-full overflow-hidden gap-px">
-              <div style={{ width: `${(summary.wins / summary.totalGames) * 100}%`, background: CHESSCOM_GREEN }} />
-              <div style={{ width: `${(summary.draws / summary.totalGames) * 100}%`, background: TEXT_MUTED }} />
-              <div style={{ width: `${(summary.losses / summary.totalGames) * 100}%`, background: '#dc4343' }} />
+          <div className="relative mt-3">
+            <div className="flex h-2 rounded-full overflow-hidden gap-px" style={{ boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.45)' }}>
+              <div style={{ width: `${(summary.wins / summary.totalGames) * 100}%`, background: `linear-gradient(180deg, #9ccc5d 0%, ${CHESSCOM_GREEN} 100%)` }} />
+              <div style={{ width: `${(summary.draws / summary.totalGames) * 100}%`, background: `linear-gradient(180deg, #b8b6b3 0%, ${TEXT_MUTED} 100%)` }} />
+              <div style={{ width: `${(summary.losses / summary.totalGames) * 100}%`, background: 'linear-gradient(180deg, #e25656 0%, #dc4343 100%)' }} />
             </div>
             <div className="flex gap-3 mt-1.5">
-              <span className="text-[11px] font-bold" style={{ color: CHESSCOM_GREEN }}>{summary.wins}W</span>
-              <span className="text-[11px]" style={{ color: TEXT_MUTED }}>{summary.draws}D</span>
-              <span className="text-[11px] font-bold" style={{ color: '#dc4343' }}>{summary.losses}L</span>
+              <span className="inline-flex items-center gap-1 text-[11px] font-bold" style={{ color: CHESSCOM_GREEN }}>
+                <span className="inline-block w-1.5 h-1.5 rounded-full" style={{ background: CHESSCOM_GREEN }} />{summary.wins}W
+              </span>
+              <span className="inline-flex items-center gap-1 text-[11px]" style={{ color: TEXT_MUTED }}>
+                <span className="inline-block w-1.5 h-1.5 rounded-full" style={{ background: TEXT_MUTED }} />{summary.draws}D
+              </span>
+              <span className="inline-flex items-center gap-1 text-[11px] font-bold" style={{ color: '#dc4343' }}>
+                <span className="inline-block w-1.5 h-1.5 rounded-full" style={{ background: '#dc4343' }} />{summary.losses}L
+              </span>
             </div>
           </div>
         ) : null}
       </div>
 
       <Link href="/scan" className="block px-3 md:px-0">
-        <div className="rounded-xl p-4 md:p-5 transition-all group cursor-pointer flex items-center gap-4"
+        <div className="relative overflow-hidden rounded-xl p-4 md:p-5 transition-all group cursor-pointer flex items-center gap-4"
           style={{
-            background: 'linear-gradient(135deg, rgba(129,182,76,0.18) 0%, rgba(129,182,76,0.04) 100%)',
+            background: 'linear-gradient(135deg, rgba(129,182,76,0.22) 0%, rgba(129,182,76,0.04) 100%)',
             border: `1px solid rgba(129,182,76,0.3)`,
           }}
           onMouseEnter={(e) => (e.currentTarget.style.borderColor = 'rgba(129,182,76,0.55)')}
           onMouseLeave={(e) => (e.currentTarget.style.borderColor = 'rgba(129,182,76,0.3)')}>
-          <div className="shrink-0 w-12 h-12 md:w-14 md:h-14 rounded-xl flex items-center justify-center"
-            style={{ background: 'rgba(129,182,76,0.18)' }}>
-            <Camera className="w-6 h-6 md:w-7 md:h-7" style={{ color: CHESSCOM_GREEN }} />
-          </div>
-          <div className="flex-1 min-w-0">
+          <BoardThumb size={56} />
+          <div className="flex-1 min-w-0 relative">
+            <span className="inline-block px-1.5 py-px rounded text-[9px] font-black uppercase tracking-[0.15em] mb-1" style={{ background: 'rgba(129,182,76,0.25)', color: CHESSCOM_GREEN }}>AI Coach</span>
             <h3 className="font-black text-base md:text-lg" style={{ color: TEXT_LIGHT }}>
               Stuck in a game? Scan a position
             </h3>
-            <p className="text-xs md:text-sm mt-0.5" style={{ color: TEXT_MUTED }}>
-              Upload a screenshot and get the best move instantly.
+            <p className="text-xs md:text-sm mt-0.5 flex items-center gap-1.5" style={{ color: TEXT_MUTED }}>
+              <Camera className="w-3.5 h-3.5" style={{ color: CHESSCOM_GREEN }} />
+              Upload a screenshot and get the best move instantly
             </p>
           </div>
           <ChevronRight className="shrink-0 w-5 h-5 opacity-50 group-hover:opacity-90 group-hover:translate-x-1 transition-all" style={{ color: CHESSCOM_GREEN }} />
@@ -169,17 +175,18 @@ export function Dashboard() {
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 md:gap-3 px-3 md:px-0">
         {[
-          { label: 'Total Games', value: summary?.totalGames || 0, icon: <Swords className="w-4 h-4" /> },
-          { label: 'Win Rate', value: `${winRate}%`, icon: <Trophy className="w-4 h-4" /> },
-          { label: 'Avg Rating', value: Math.round(summary?.avgRating || 0) || '—', icon: <TrendingUp className="w-4 h-4" /> },
-          { label: 'Games Reviewed', value: reviewedCount, icon: <Target className="w-4 h-4" /> },
+          { label: 'Total Games', value: summary?.totalGames || 0, icon: <Swords className="w-4 h-4" />, glyph: '♜' },
+          { label: 'Win Rate', value: `${winRate}%`, icon: <Trophy className="w-4 h-4" />, glyph: '♛' },
+          { label: 'Avg Rating', value: Math.round(summary?.avgRating || 0) || '—', icon: <TrendingUp className="w-4 h-4" />, glyph: '♞' },
+          { label: 'Games Reviewed', value: reviewedCount, icon: <Target className="w-4 h-4" />, glyph: '♝' },
         ].map((s) => (
-          <div key={s.label} className="rounded-xl p-3.5" style={{ background: BG_CARD, border: CARD_BORDER, boxShadow: CARD_SHADOW }}>
-            <div className="flex items-center justify-between mb-2">
+          <div key={s.label} className="relative overflow-hidden rounded-xl p-3.5" style={{ background: BG_CARD, border: CARD_BORDER, boxShadow: CARD_SHADOW }}>
+            <div aria-hidden className="pointer-events-none absolute -bottom-5 -right-2 select-none" style={{ fontSize: 84, lineHeight: 1, color: 'rgba(129,182,76,0.08)', textShadow: '0 0 1px rgba(255,255,255,0.05)' }}>{s.glyph}</div>
+            <div className="relative flex items-center justify-between mb-2">
               <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: TEXT_MUTED }}>{s.label}</p>
               <span style={{ color: CHESSCOM_GREEN }}>{s.icon}</span>
             </div>
-            <div className="text-2xl font-black" style={{ color: TEXT_LIGHT }}>{s.value}</div>
+            <div className="relative text-2xl font-black" style={{ color: TEXT_LIGHT }}>{s.value}</div>
           </div>
         ))}
       </div>
