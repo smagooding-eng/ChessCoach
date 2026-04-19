@@ -192,11 +192,16 @@ async function seedRatingFromImports(userId: string, tc: TimeControlId): Promise
   if (existing.gamesPlayed > 0 || existing.rating !== DEFAULT_RATING.rating) return existing;
   try {
     interface ImportRow { username: string; white_username: string; black_username: string; white_rating: number | string; black_rating: number | string }
+    // Pull from BOTH linked platform usernames so we can average across them.
     const res = await db.execute(sql`
       SELECT username, white_username, black_username, white_rating, black_rating
       FROM games
-      WHERE username = (SELECT COALESCE(chesscom_username, lichess_username) FROM users WHERE id = ${userId})
-      LIMIT 50
+      WHERE username IN (
+        SELECT LOWER(chesscom_username) FROM users WHERE id = ${userId} AND chesscom_username IS NOT NULL
+        UNION
+        SELECT LOWER(lichess_username) FROM users WHERE id = ${userId} AND lichess_username IS NOT NULL
+      )
+      LIMIT 100
     `);
     const rows = rowsOf<ImportRow>(res);
     if (rows && rows.length > 0) {

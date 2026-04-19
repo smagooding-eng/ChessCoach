@@ -190,7 +190,7 @@ router.get("/games/elo-progress", async (req, res): Promise<void> => {
     if (signupDate) {
       conditions.push(gte(gamesTable.playedAt, signupDate));
     }
-    if (platformFilter && (platformFilter === "chesscom" || platformFilter === "lichess")) {
+    if (platformFilter && (platformFilter === "chesscom" || platformFilter === "lichess" || platformFilter === "chessscout")) {
       conditions.push(eq(gamesTable.platform, platformFilter));
     }
 
@@ -270,7 +270,7 @@ router.get("/games", async (req, res): Promise<void> => {
   if (username) {
     conditions.push(eq(gamesTable.username, username.toLowerCase()));
   }
-  if (platform && (platform === "chesscom" || platform === "lichess")) {
+  if (platform && (platform === "chesscom" || platform === "lichess" || platform === "chessscout")) {
     conditions.push(eq(gamesTable.platform, platform));
   }
 
