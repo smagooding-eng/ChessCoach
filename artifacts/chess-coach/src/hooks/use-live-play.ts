@@ -76,10 +76,27 @@ export function useLivePlay() {
     setStatus(s => (s === 'in_game' || s === 'finished' ? s : 'connecting'));
     const ws = new WebSocket(buildWsUrl());
     wsRef.current = ws;
-    ws.onopen = () => {
+    ws.onopen = async () => {
       setError(null);
       setStatus(s => (s === 'connecting' ? 'idle' : s));
-      const g = gameRef.current;
+      let g = gameRef.current;
+      // Auto-resume after a hard refresh: if we don't have an in-memory game, ask the
+      // server whether this user has an active live game and rehydrate it before subscribing.
+      if (!g) {
+        try {
+          const r = await fetch(`${import.meta.env.BASE_URL}api/live/active-game`, { credentials: 'include' });
+          if (r.ok) {
+            const j = await r.json();
+            if (j?.game) {
+              setGame(j.game);
+              gameRef.current = j.game;
+              g = j.game;
+              if (j.color === 'w' || j.color === 'b') { setColor(j.color); colorRef.current = j.color; }
+              setStatus(j.game.status === 'finished' ? 'finished' : 'in_game');
+            }
+          }
+        } catch {}
+      }
       if (g && g.status === 'active') ws.send(JSON.stringify({ type: 'subscribe', gameId: g.id }));
       else if (queuedTcRef.current && queuedModeRef.current) ws.send(JSON.stringify({ type: 'queue', timeControl: queuedTcRef.current, mode: queuedModeRef.current }));
     };

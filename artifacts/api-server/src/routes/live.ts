@@ -18,8 +18,9 @@ router.get('/live/ratings', requireAuth, async (req: Request, res: Response) => 
 });
 
 router.get('/live/active-game', requireAuth, (req: Request, res: Response) => {
-  const g = getActiveGameForUser(req.user!.id);
-  res.json({ game: g });
+  const result = getActiveGameForUser(req.user!.id);
+  if (!result) { res.json({ game: null }); return; }
+  res.json({ game: result.state, color: result.color });
 });
 
 export default router;

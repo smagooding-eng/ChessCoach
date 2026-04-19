@@ -850,12 +850,14 @@ export async function getUserRatings(userId: string) {
   return out;
 }
 
-export function getActiveGameForUser(userId: string) {
+export function getActiveGameForUser(userId: string): { state: ReturnType<typeof gamePublicState>; color: 'w' | 'b' } | null {
   const gid = userActiveGame.get(userId);
   if (!gid) return null;
   const g = games.get(gid);
   if (!g) return null;
-  return gamePublicState(g);
+  const color: 'w' | 'b' | null = g.white.userId === userId ? 'w' : g.black.userId === userId ? 'b' : null;
+  if (!color) return null;
+  return { state: gamePublicState(g), color };
 }
 
 export function listTimeControls() {
