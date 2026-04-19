@@ -194,30 +194,42 @@ export function Dashboard() {
         </div>
       </Link>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 md:gap-3 px-3 md:px-0">
-        {[
-          { label: 'Total Games', value: summary?.totalGames?.toLocaleString() || 0, icon: <Swords className="w-5 h-5" /> },
-          { label: 'Win Rate', value: `${winRate}%`, icon: <Trophy className="w-5 h-5" /> },
-          { label: 'Avg Rating', value: Math.round(summary?.avgRating || 0) || '—', icon: <Activity className="w-5 h-5" /> },
-          { label: 'Reviewed', value: reviewedCount, icon: <Award className="w-5 h-5" /> },
-        ].map((s) => (
-          <div key={s.label} className="relative overflow-hidden rounded-2xl p-4 md:p-5 min-h-[120px] md:min-h-[140px]"
-            style={{
-              background: `linear-gradient(180deg, #353230 0%, #2b2926 100%)`,
-              border: `1px solid rgba(255,255,255,0.06)`,
-              boxShadow: `0 8px 24px -10px rgba(0,0,0,0.6), 0 2px 6px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04)`,
-            }}>
-            <div className="absolute top-0 left-0 right-0 h-[3px]" style={{ background: `linear-gradient(90deg, ${CHESSCOM_GREEN} 0%, rgba(129,182,76,0.35) 70%, transparent 100%)` }} />
-
-            <div className="relative flex items-center justify-between mb-3">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(129,182,76,0.18)', border: `1px solid rgba(129,182,76,0.35)`, color: CHESSCOM_GREEN }}>
-                {s.icon}
-              </div>
-            </div>
-            <p className="relative text-[10px] font-black uppercase tracking-[0.15em] mb-1" style={{ color: TEXT_MUTED }}>{s.label}</p>
-            <div className="relative text-3xl md:text-4xl font-black leading-none" style={{ color: TEXT_LIGHT, letterSpacing: '-0.03em', textShadow: '0 2px 8px rgba(0,0,0,0.3)' }}>{s.value}</div>
+      <div className="px-3 md:px-0">
+        <div className="relative overflow-hidden rounded-2xl"
+          style={{
+            background: 'linear-gradient(180deg, #353230 0%, #2b2926 100%)',
+            border: '1px solid rgba(255,255,255,0.06)',
+            boxShadow: '0 8px 24px -10px rgba(0,0,0,0.6), 0 2px 6px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04)',
+          }}>
+          <div className="absolute top-0 left-0 right-0 h-[3px]" style={{ background: `linear-gradient(90deg, ${CHESSCOM_GREEN} 0%, rgba(129,182,76,0.35) 70%, transparent 100%)` }} />
+          <div className="relative grid grid-cols-2 sm:grid-cols-4">
+            {[
+              { label: 'Total Games', value: summary?.totalGames?.toLocaleString() || '0', icon: <Swords className="w-3.5 h-3.5" /> },
+              { label: 'Win Rate', value: `${winRate}%`, icon: <Trophy className="w-3.5 h-3.5" /> },
+              { label: 'Avg Rating', value: Math.round(summary?.avgRating || 0) || '—', icon: <Activity className="w-3.5 h-3.5" /> },
+              { label: 'Reviewed', value: reviewedCount, icon: <Award className="w-3.5 h-3.5" /> },
+            ].map((s, i) => {
+              const isLeftColMobile = i % 2 === 0;
+              const isTopRowMobile = i < 2;
+              return (
+                <div key={s.label} className="px-3 py-3 md:px-4 md:py-3.5 flex items-center gap-3"
+                  style={{
+                    borderRight: isLeftColMobile ? '1px solid rgba(255,255,255,0.05)' : undefined,
+                    borderBottom: isTopRowMobile ? '1px solid rgba(255,255,255,0.05)' : undefined,
+                  }}>
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+                    style={{ background: 'rgba(129,182,76,0.15)', border: '1px solid rgba(129,182,76,0.3)', color: CHESSCOM_GREEN }}>
+                    {s.icon}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[9px] font-black uppercase tracking-[0.14em] leading-none mb-1" style={{ color: TEXT_MUTED }}>{s.label}</p>
+                    <p className="text-lg md:text-xl font-black leading-none truncate" style={{ color: TEXT_LIGHT, letterSpacing: '-0.02em' }}>{s.value}</p>
+                  </div>
+                </div>
+              );
+            })}
           </div>
-        ))}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 md:gap-4 px-3 md:px-0">
