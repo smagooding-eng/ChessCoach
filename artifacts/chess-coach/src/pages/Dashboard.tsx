@@ -10,12 +10,12 @@ import { useMultiEloProgress } from '@/hooks/use-elo-progress';
 
 const CHESSCOM_GREEN = '#81b64c';
 const BG_DARK = '#262421';
-const BG_CARD = 'linear-gradient(180deg, #353230 0%, #2d2b28 100%)';
+const BG_CARD = 'linear-gradient(180deg, #383532 0%, #2a2825 100%)';
 const BG_CARD_FLAT = '#302e2b';
 const BG_CARD_HOVER = '#3a3733';
 const TEXT_LIGHT = '#e8e6e3';
 const TEXT_MUTED = '#9e9b98';
-const CARD_SHADOW = '0 4px 16px rgba(0,0,0,0.25), 0 1px 4px rgba(0,0,0,0.15), inset 0 1px 0 rgba(129,182,76,0.04)';
+const CARD_SHADOW = '0 18px 50px -16px rgba(0,0,0,0.6), 0 4px 16px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04)';
 const CARD_BORDER = '1px solid rgba(129,182,76,0.08)';
 
 const RESULT_COLORS: Record<string, { bg: string; text: string }> = {
@@ -165,7 +165,7 @@ export function Dashboard() {
       <Link href="/scan" className="block px-3 md:px-0">
         <div className="relative overflow-hidden rounded-2xl p-5 md:p-6 transition-all group cursor-pointer flex items-center gap-4 md:gap-5"
           style={{
-            background: 'linear-gradient(180deg, #353230 0%, #2b2926 100%)',
+            background: 'linear-gradient(180deg, #383532 0%, #2a2825 100%)',
             border: `1px solid rgba(129,182,76,0.3)`,
             boxShadow: '0 12px 32px -8px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.05)',
           }}
@@ -197,9 +197,9 @@ export function Dashboard() {
       <div className="px-3 md:px-0">
         <div className="relative overflow-hidden rounded-2xl"
           style={{
-            background: 'linear-gradient(180deg, #353230 0%, #2b2926 100%)',
+            background: 'linear-gradient(180deg, #383532 0%, #2a2825 100%)',
             border: '1px solid rgba(255,255,255,0.06)',
-            boxShadow: '0 8px 24px -10px rgba(0,0,0,0.6), 0 2px 6px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04)',
+            boxShadow: '0 18px 50px -16px rgba(0,0,0,0.6), 0 4px 16px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04)',
           }}>
           
           <div className="relative grid grid-cols-2 sm:grid-cols-4">
@@ -346,9 +346,9 @@ export function Dashboard() {
           <Link href="/opponents" className="block">
             <div className="relative overflow-hidden rounded-2xl p-4 md:p-5 transition-colors group cursor-pointer"
               style={{
-                background: 'linear-gradient(180deg, #353230 0%, #2b2926 100%)',
+                background: 'linear-gradient(180deg, #383532 0%, #2a2825 100%)',
                 border: `1px solid rgba(129,182,76,0.3)`,
-                boxShadow: '0 8px 24px -10px rgba(0,0,0,0.6), 0 2px 6px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04)',
+                boxShadow: '0 18px 50px -16px rgba(0,0,0,0.6), 0 4px 16px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04)',
               }}
               onMouseEnter={e => (e.currentTarget.style.borderColor = 'rgba(129,182,76,0.5)')}
               onMouseLeave={e => (e.currentTarget.style.borderColor = 'rgba(129,182,76,0.3)')}>
@@ -369,9 +369,9 @@ export function Dashboard() {
 
           <div className="relative overflow-hidden rounded-2xl p-4 md:p-5 space-y-1"
             style={{
-              background: 'linear-gradient(180deg, #353230 0%, #2b2926 100%)',
+              background: 'linear-gradient(180deg, #383532 0%, #2a2825 100%)',
               border: '1px solid rgba(255,255,255,0.06)',
-              boxShadow: '0 8px 24px -10px rgba(0,0,0,0.6), 0 2px 6px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04)',
+              boxShadow: '0 18px 50px -16px rgba(0,0,0,0.6), 0 4px 16px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04)',
             }}>
             
             <div className="relative flex items-center gap-3 mb-3">
@@ -402,9 +402,9 @@ export function Dashboard() {
           {coursesData?.courses?.length ? (
             <div className="relative overflow-hidden rounded-2xl p-4 md:p-5"
               style={{
-                background: 'linear-gradient(180deg, #353230 0%, #2b2926 100%)',
+                background: 'linear-gradient(180deg, #383532 0%, #2a2825 100%)',
                 border: '1px solid rgba(255,255,255,0.06)',
-                boxShadow: '0 8px 24px -10px rgba(0,0,0,0.6), 0 2px 6px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04)',
+                boxShadow: '0 18px 50px -16px rgba(0,0,0,0.6), 0 4px 16px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04)',
               }}>
               
               <div className="relative flex items-center justify-between mb-4">
@@ -453,9 +453,9 @@ function DashCard({ title, visual, linkHref, linkText, children }: {
   return (
     <div className="relative overflow-hidden rounded-2xl p-4 md:p-5"
       style={{
-        background: 'linear-gradient(180deg, #353230 0%, #2b2926 100%)',
+        background: 'linear-gradient(180deg, #383532 0%, #2a2825 100%)',
         border: '1px solid rgba(255,255,255,0.06)',
-        boxShadow: '0 8px 24px -10px rgba(0,0,0,0.6), 0 2px 6px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04)',
+        boxShadow: '0 18px 50px -16px rgba(0,0,0,0.6), 0 4px 16px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04)',
       }}>
       <div className="relative flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">

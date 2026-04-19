@@ -7,17 +7,17 @@ export const TEXT_LIGHT = '#e8e6e3';
 export const TEXT_MUTED = '#9e9b98';
 
 export const PANEL_STYLE: React.CSSProperties = {
-  background: 'linear-gradient(180deg, #353230 0%, #2b2926 100%)',
+  background: 'linear-gradient(180deg, #383532 0%, #2a2825 100%)',
   border: '1px solid rgba(255,255,255,0.06)',
   boxShadow:
-    '0 8px 24px -10px rgba(0,0,0,0.6), 0 2px 6px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04)',
+    '0 18px 50px -16px rgba(0,0,0,0.6), 0 4px 16px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04)',
 };
 
 export const HERO_PANEL_STYLE: React.CSSProperties = {
-  background: 'linear-gradient(180deg, #353230 0%, #2b2926 100%)',
+  background: 'linear-gradient(180deg, #383532 0%, #2a2825 100%)',
   border: '1px solid rgba(255,255,255,0.06)',
   boxShadow:
-    '0 8px 24px -10px rgba(0,0,0,0.6), 0 2px 6px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04)',
+    '0 18px 50px -16px rgba(0,0,0,0.6), 0 4px 16px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04)',
 };
 
 export const PRIMARY_BTN_STYLE: React.CSSProperties = {
@@ -169,26 +169,26 @@ export function PageHero({
 }) {
   return (
     <div className="relative overflow-hidden p-4 md:p-5 rounded-2xl" style={HERO_PANEL_STYLE}>
-      <div className="relative flex items-center gap-3">
-        {piece && <PieceTile piece={piece} size={44} />}
+      <div className="relative flex items-start gap-4">
+        {piece && <PieceTile piece={piece} size={56} />}
         <div className="flex-1 min-w-0">
           {eyebrow && (
-            <span className={`${t.eyebrow} block mb-1`} style={{ color: CHESSCOM_GREEN }}>
+            <span className={`${t.eyebrow} inline-flex items-center gap-1 px-1.5 py-0.5 rounded mb-1`} style={{ background: 'rgba(129,182,76,0.18)', color: CHESSCOM_GREEN, border: '1px solid rgba(129,182,76,0.3)' }}>
               {eyebrow}
             </span>
           )}
           <h1
-            className="text-base md:text-lg font-black leading-tight"
-            style={{ letterSpacing: '-0.01em', color: TEXT_LIGHT }}
+            className="text-2xl md:text-3xl font-black leading-none"
+            style={{ letterSpacing: '-0.02em', color: TEXT_LIGHT, textShadow: '0 2px 8px rgba(0,0,0,0.3)' }}
           >
             {title}
           </h1>
           {subtitle && (
-            <p className="text-xs md:text-sm mt-0.5" style={{ color: TEXT_MUTED }}>
+            <p className="text-sm mt-2" style={{ color: TEXT_MUTED }}>
               {subtitle}
             </p>
           )}
-          {actions && <div className="mt-3 flex flex-wrap gap-2">{actions}</div>}
+          {actions && <div className="mt-4 flex flex-wrap gap-2">{actions}</div>}
         </div>
       </div>
     </div>

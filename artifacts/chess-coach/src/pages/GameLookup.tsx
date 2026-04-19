@@ -11,12 +11,12 @@ import {
 } from 'lucide-react';
 
 const BG_DARK = '#262421';
-const BG_CARD = 'linear-gradient(180deg, #353230 0%, #2d2b28 100%)';
+const BG_CARD = 'linear-gradient(180deg, #383532 0%, #2a2825 100%)';
 const TEXT_LIGHT = '#e8e6e3';
 const TEXT_MUTED = '#9e9b98';
 const CHESSCOM_GREEN = '#81b64c';
 const MISTAKE_RED = '#dc4343';
-const CARD_SHADOW = '0 4px 16px rgba(0,0,0,0.25), 0 1px 4px rgba(0,0,0,0.15), inset 0 1px 0 rgba(129,182,76,0.04)';
+const CARD_SHADOW = '0 18px 50px -16px rgba(0,0,0,0.6), 0 4px 16px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04)';
 const CARD_BORDER = '1px solid rgba(129,182,76,0.08)';
 
 type Classification = 'checkmate' | 'brilliant' | 'great' | 'best' | 'excellent' | 'good' | 'book' | 'inaccuracy' | 'mistake' | 'blunder' | 'missed_win';

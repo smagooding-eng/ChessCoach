@@ -14,7 +14,8 @@ const ONBOARDING_KEY = 'chessscout_onboarding_v2';
 
 const G = '#81b64c';
 const BG = '#1a1816';
-const CARD = '#262421';
+const CARD = 'linear-gradient(180deg, #383532 0%, #2a2825 100%)';
+const CARD_SHADOW = '0 18px 50px -16px rgba(0,0,0,0.6), 0 4px 16px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04)';
 const TEXT = '#e8e6e3';
 const MUTED = '#9e9b98';
 
@@ -1110,7 +1111,7 @@ export function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
                 Drop your handle. <span style={{ color: TEXT }}>30 seconds</span> · no password · we'll do the rest.
               </p>
 
-              <div className="rounded-[2rem] p-5 md:p-6" style={{ background: CARD, border: `1px solid rgba(255,255,255,0.06)` }}>
+              <div className="rounded-[2rem] p-5 md:p-6" style={{ background: CARD, border: '1px solid rgba(255,255,255,0.06)', boxShadow: CARD_SHADOW }}>
                 <div className="flex gap-2 mb-4">
                   <button
                     onClick={() => setPlatform('chesscom')}
@@ -1370,7 +1371,7 @@ export function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
                 const t = TOUR[tourIdx];
                 const Icon = t.icon;
                 return (
-                  <div className="rounded-[2rem] p-5 md:p-6" style={{ background: CARD, border: `1px solid rgba(255,255,255,0.06)` }}>
+                  <div className="rounded-[2rem] p-5 md:p-6" style={{ background: CARD, border: '1px solid rgba(255,255,255,0.06)', boxShadow: CARD_SHADOW }}>
                     <div className="flex items-center justify-center gap-2 mb-4">
                       <div className="w-12 h-12 rounded-3xl flex items-center justify-center"
                         style={{ background: `${G}1a`, border: `1px solid ${G}33` }}>
@@ -1633,7 +1634,7 @@ export function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
               </div>
 
               <div className="rounded-3xl p-3 mb-6 flex items-center gap-2.5"
-                style={{ background: CARD, border: `1px solid rgba(255,255,255,0.06)` }}>
+                style={{ background: CARD, border: '1px solid rgba(255,255,255,0.06)', boxShadow: CARD_SHADOW }}>
                 <div className="w-8 h-8 rounded-[2rem] flex items-center justify-center shrink-0" style={{ background: `${G}22` }}>
                   <Zap className="w-4 h-4" style={{ color: G }} />
                 </div>
