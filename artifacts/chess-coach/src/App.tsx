@@ -71,6 +71,7 @@ import { OpeningDetail } from "@/pages/OpeningDetail";
 import { PracticeBots } from "@/pages/PracticeBots";
 import { LocalPlay } from "@/pages/LocalPlay";
 import { LivePlay } from "@/pages/LivePlay";
+import { LiveHistory } from "@/pages/LiveHistory";
 import { GameLookup } from "@/pages/GameLookup";
 import { Subscription } from "@/pages/Subscription";
 import { Profile } from "@/pages/Profile";
@@ -142,6 +143,7 @@ const POpponents     = () => <ProtectedRoute component={OpponentAnalysis} />;
 const PPracticeBots  = () => <ProtectedRoute component={PracticeBots} />;
 const PLocalPlay     = () => <ProtectedRoute component={LocalPlay} />;
 const PLivePlay      = () => <ProtectedRoute component={LivePlay} />;
+const PLiveHistory   = () => <ProtectedRoute component={LiveHistory} fallbackNav="/live" />;
 const PGameLookup    = () => <ProtectedRoute component={GameLookup} />;
 const PSubscription  = () => <ProtectedRoute component={Subscription} />;
 const PProfile       = () => <ProtectedRoute component={Profile} />;
@@ -202,6 +204,7 @@ function Router() {
       <Route path="/practice"        component={PPracticeBots} />
       <Route path="/play"            component={PLocalPlay} />
       <Route path="/live"            component={PLivePlay} />
+      <Route path="/live/history"    component={PLiveHistory} />
       <Route path="/lookup"          component={PGameLookup} />
       <Route path="/puzzles"          component={PPuzzles} />
       <Route path="/scan"             component={PScanPosition} />

@@ -1,6 +1,6 @@
 import { Router, type IRouter, type Request, type Response } from 'express';
 import { requireAuth } from '../middlewares/authMiddleware';
-import { getUserRatings, listTimeControls, getActiveGameForUser } from '../lib/liveServer';
+import { getUserRatings, listTimeControls, getActiveGameForUser, getUserLiveHistory } from '../lib/liveServer';
 
 const router: IRouter = Router();
 
@@ -14,6 +14,16 @@ router.get('/live/ratings', requireAuth, async (req: Request, res: Response) => 
     res.json({ ratings });
   } catch (err) {
     res.status(500).json({ error: 'Failed to load ratings' });
+  }
+});
+
+router.get('/live/history', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const limit = Math.min(500, Math.max(1, Number(req.query.limit) || 200));
+    const games = await getUserLiveHistory(req.user!.id, limit);
+    res.json({ games });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to load history' });
   }
 });
 

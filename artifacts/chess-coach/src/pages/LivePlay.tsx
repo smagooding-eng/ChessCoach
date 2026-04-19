@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { useLivePlay, type LiveMode } from '@/hooks/use-live-play';
 import { useLiveRatings } from '@/hooks/use-live-ratings';
 import { LiveGame } from '@/pages/LiveGame';
-import { Loader2, Swords, Zap, Clock, X, Trophy, Sparkles, Award } from 'lucide-react';
+import { Link } from 'wouter';
+import { Loader2, Swords, Zap, Clock, X, Trophy, Sparkles, Award, History, ChevronRight } from 'lucide-react';
 
 const CHESSCOM_GREEN = '#81b64c';
 const TEXT_LIGHT = '#e8e6e3';
@@ -29,9 +30,15 @@ export function LivePlay() {
 
   return (
     <div className="space-y-4 md:space-y-6 p-4 md:p-0">
-      <div>
-        <h1 className="text-2xl md:text-3xl font-black" style={{ color: TEXT_LIGHT, letterSpacing: '-0.02em' }}>Play Live</h1>
-        <p className="text-sm" style={{ color: TEXT_MUTED }}>Get matched against players in your range. Average wait under 30 seconds.</p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-black" style={{ color: TEXT_LIGHT, letterSpacing: '-0.02em' }}>Play Live</h1>
+          <p className="text-sm" style={{ color: TEXT_MUTED }}>Get matched against players in your range. Average wait under 30 seconds.</p>
+        </div>
+        <Link href="/live/history" className="shrink-0 inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-colors"
+          style={{ background: 'rgba(129,182,76,0.12)', color: CHESSCOM_GREEN, border: '1px solid rgba(129,182,76,0.3)' }}>
+          <History className="w-3.5 h-3.5" /> History <ChevronRight className="w-3 h-3 -ml-0.5 hidden sm:inline-block" />
+        </Link>
       </div>
 
       {live.status === 'queued' ? (

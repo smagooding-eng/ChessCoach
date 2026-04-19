@@ -1072,6 +1072,75 @@ export function getActiveGameForUser(userId: string): { state: ReturnType<typeof
   return { state: gamePublicState(g), color };
 }
 
+interface LiveHistoryRow {
+  id: string;
+  mode: string;
+  time_control: string;
+  white_user_id: string | null;
+  black_user_id: string | null;
+  white_username: string;
+  black_username: string;
+  result: string;
+  termination: string;
+  white_rating_before: number | string | null;
+  black_rating_before: number | string | null;
+  white_rating_after: number | string | null;
+  black_rating_after: number | string | null;
+  started_at: string | Date;
+  finished_at: string | Date;
+  games_id: number | string | null;
+}
+
+export async function getUserLiveHistory(userId: string, limit: number) {
+  const res = await db.execute(sql`
+    SELECT
+      lg.id, lg.mode, lg.time_control,
+      lg.white_user_id, lg.black_user_id,
+      lg.white_username, lg.black_username,
+      lg.result, lg.termination,
+      lg.white_rating_before, lg.black_rating_before,
+      lg.white_rating_after, lg.black_rating_after,
+      lg.started_at, lg.finished_at,
+      g.id AS games_id
+    FROM live_games lg
+    LEFT JOIN games g ON g.platform = 'chessscout'
+      AND g.played_at = lg.started_at
+      AND (
+        (lg.white_user_id = ${userId} AND LOWER(g.username) = LOWER(lg.white_username))
+        OR (lg.black_user_id = ${userId} AND LOWER(g.username) = LOWER(lg.black_username))
+      )
+    WHERE lg.white_user_id = ${userId} OR lg.black_user_id = ${userId}
+    ORDER BY lg.finished_at DESC
+    LIMIT ${limit}
+  `);
+  const rows = rowsOf<LiveHistoryRow>(res);
+  return rows.map(r => {
+    const userIsWhite = r.white_user_id === userId;
+    const myRatingBefore = userIsWhite ? r.white_rating_before : r.black_rating_before;
+    const myRatingAfter = userIsWhite ? r.white_rating_after : r.black_rating_after;
+    const oppRatingBefore = userIsWhite ? r.black_rating_before : r.white_rating_before;
+    const myResult: 'win' | 'loss' | 'draw' =
+      r.result === 'draw' ? 'draw'
+      : (r.result === 'white' && userIsWhite) || (r.result === 'black' && !userIsWhite) ? 'win'
+      : 'loss';
+    return {
+      id: r.id,
+      gamesId: r.games_id != null ? Number(r.games_id) : null,
+      mode: r.mode,
+      timeControl: r.time_control,
+      color: userIsWhite ? 'white' : 'black',
+      opponentUsername: userIsWhite ? r.black_username : r.white_username,
+      result: myResult,
+      termination: r.termination,
+      ratingBefore: myRatingBefore != null ? Math.round(Number(myRatingBefore)) : null,
+      ratingAfter: myRatingAfter != null ? Math.round(Number(myRatingAfter)) : null,
+      opponentRating: oppRatingBefore != null ? Math.round(Number(oppRatingBefore)) : null,
+      startedAt: typeof r.started_at === 'string' ? r.started_at : r.started_at.toISOString(),
+      finishedAt: typeof r.finished_at === 'string' ? r.finished_at : r.finished_at.toISOString(),
+    };
+  });
+}
+
 export function listTimeControls() {
   return Object.values(TIME_CONTROLS).map(tc => ({ id: tc.id, label: tc.label, initialMs: tc.initialMs, incrementMs: tc.incrementMs }));
 }
