@@ -7,6 +7,7 @@ import { motion } from 'framer-motion';
 import { Search, Play, Filter, BookOpen, Sparkles, Users } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { GameThumb } from '@/components/GameThumb';
 
 export function Games() {
   const [pageSize, setPageSize] = useState(500);
@@ -196,12 +197,6 @@ export function Games() {
             const opponentRating = getOpponentRating(game);
             const reviewed = game.reviewed;
 
-            const borderColor = color === 'white'
-              ? 'border-l-white/80'
-              : color === 'black'
-              ? 'border-l-neutral-500'
-              : 'border-l-border';
-
             return (
               <motion.div
                 initial={{ opacity: 0, y: 8 }}
@@ -210,15 +205,9 @@ export function Games() {
                 key={game.id}
               >
                 <Link href={`/games/${game.id}`}>
-                  <div className={`glass-card rounded-xl p-3.5 border border-white/5 border-l-[3px] ${borderColor} hover:bg-white/[0.03] transition-colors cursor-pointer group`}>
+                  <div className="glass-card rounded-xl p-3.5 border border-white/5 hover:bg-white/[0.03] transition-colors cursor-pointer group">
                     <div className="flex items-center gap-3">
-                      <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
-                        color === 'white' ? 'bg-white/90' : 'bg-neutral-700 border border-white/10'
-                      }`}>
-                        <span className={`text-xs font-bold ${color === 'white' ? 'text-neutral-900' : 'text-white'}`}>
-                          {color === 'white' ? 'W' : 'B'}
-                        </span>
-                      </div>
+                      <GameThumb pgn={game.pgn} userColor={color} size={56} />
 
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
