@@ -63,9 +63,6 @@ export function Dashboard() {
           border: '1px solid rgba(129,182,76,0.18)',
           boxShadow: '0 18px 50px -16px rgba(0,0,0,0.6), 0 4px 16px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04)',
         }}>
-        <div aria-hidden className="pointer-events-none absolute -top-10 -right-6 select-none rotate-12" style={{ fontSize: 220, lineHeight: 1, color: 'rgba(129,182,76,0.10)', textShadow: '0 0 30px rgba(129,182,76,0.25)' }}>♞</div>
-        <div aria-hidden className="pointer-events-none absolute -bottom-16 -left-8 select-none -rotate-12" style={{ fontSize: 180, lineHeight: 1, color: 'rgba(255,255,255,0.025)' }}>♚</div>
-
         <div className="relative flex items-start gap-4">
           <div className="shrink-0 relative">
             <div className="absolute -inset-1.5 rounded-2xl opacity-60 blur-md" style={{ background: `radial-gradient(circle, ${CHESSCOM_GREEN}, transparent 70%)` }} />
@@ -175,7 +172,6 @@ export function Dashboard() {
           }}
           onMouseEnter={(e) => (e.currentTarget.style.borderColor = 'rgba(129,182,76,0.7)')}
           onMouseLeave={(e) => (e.currentTarget.style.borderColor = 'rgba(129,182,76,0.4)')}>
-          <div aria-hidden className="pointer-events-none absolute -bottom-8 -right-4 select-none rotate-12" style={{ fontSize: 140, lineHeight: 1, color: 'rgba(129,182,76,0.08)' }}>♟</div>
           <div className="relative">
             <BoardThumb size={84} />
             <div className="absolute -bottom-1.5 -right-1.5 w-8 h-8 rounded-full flex items-center justify-center shadow-lg" style={{ background: `linear-gradient(135deg, #95c45a, ${CHESSCOM_GREEN})`, boxShadow: `0 4px 12px ${CHESSCOM_GREEN}80` }}>
@@ -201,22 +197,21 @@ export function Dashboard() {
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 md:gap-3 px-3 md:px-0">
         {[
-          { label: 'Total Games', value: summary?.totalGames?.toLocaleString() || 0, icon: <Swords className="w-5 h-5" />, glyph: '♜', color: '#6da5d8', tint: 'rgba(109,165,216,0.14)' },
-          { label: 'Win Rate', value: `${winRate}%`, icon: <Trophy className="w-5 h-5" />, glyph: '♛', color: CHESSCOM_GREEN, tint: 'rgba(129,182,76,0.14)' },
-          { label: 'Avg Rating', value: Math.round(summary?.avgRating || 0) || '—', icon: <Activity className="w-5 h-5" />, glyph: '♞', color: '#eaa631', tint: 'rgba(234,166,49,0.14)' },
-          { label: 'Reviewed', value: reviewedCount, icon: <Award className="w-5 h-5" />, glyph: '♝', color: '#b87df0', tint: 'rgba(184,125,240,0.14)' },
+          { label: 'Total Games', value: summary?.totalGames?.toLocaleString() || 0, icon: <Swords className="w-5 h-5" /> },
+          { label: 'Win Rate', value: `${winRate}%`, icon: <Trophy className="w-5 h-5" /> },
+          { label: 'Avg Rating', value: Math.round(summary?.avgRating || 0) || '—', icon: <Activity className="w-5 h-5" /> },
+          { label: 'Reviewed', value: reviewedCount, icon: <Award className="w-5 h-5" /> },
         ].map((s) => (
           <div key={s.label} className="relative overflow-hidden rounded-2xl p-4 md:p-5 min-h-[120px] md:min-h-[140px]"
             style={{
-              background: `radial-gradient(110% 100% at 100% 0%, ${s.tint} 0%, transparent 60%), linear-gradient(180deg, #353230 0%, #2b2926 100%)`,
-              border: `1px solid ${s.color}33`,
-              boxShadow: `0 8px 24px -8px rgba(0,0,0,0.5), 0 0 0 1px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.05)`,
+              background: `radial-gradient(110% 100% at 100% 0%, rgba(129,182,76,0.14) 0%, transparent 60%), linear-gradient(180deg, #353230 0%, #2b2926 100%)`,
+              border: `1px solid rgba(129,182,76,0.22)`,
+              boxShadow: `0 10px 28px -10px rgba(129,182,76,0.35), 0 4px 14px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.05)`,
             }}>
-            <div aria-hidden className="pointer-events-none absolute -bottom-6 -right-2 select-none" style={{ fontSize: 110, lineHeight: 1, color: `${s.color}1a`, textShadow: `0 0 20px ${s.color}33` }}>{s.glyph}</div>
-            <div className="absolute top-0 left-0 right-0 h-[3px]" style={{ background: `linear-gradient(90deg, ${s.color} 0%, ${s.color}55 70%, transparent 100%)` }} />
+            <div className="absolute top-0 left-0 right-0 h-[3px]" style={{ background: `linear-gradient(90deg, ${CHESSCOM_GREEN} 0%, rgba(129,182,76,0.35) 70%, transparent 100%)` }} />
 
             <div className="relative flex items-center justify-between mb-3">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: `${s.color}22`, border: `1px solid ${s.color}40`, color: s.color, boxShadow: `0 4px 12px -2px ${s.color}30` }}>
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(129,182,76,0.18)', border: `1px solid rgba(129,182,76,0.4)`, color: CHESSCOM_GREEN, boxShadow: `0 4px 14px -2px rgba(129,182,76,0.4)` }}>
                 {s.icon}
               </div>
             </div>
