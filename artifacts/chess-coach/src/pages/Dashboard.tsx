@@ -3,7 +3,7 @@ import { useMyAnalysisSummary, useMyWeaknesses } from '@/hooks/use-analysis';
 import { useMyCourses } from '@/hooks/use-courses';
 import { useMyGames } from '@/hooks/use-games';
 import { Link } from 'wouter';
-import { Swords, Trophy, Target, AlertTriangle, BookOpen, Clock, GraduationCap, TrendingUp, ChevronRight, Search, Play, Bot, Camera, Lock, Crown } from 'lucide-react';
+import { Swords, Trophy, Target, AlertTriangle, BookOpen, Clock, GraduationCap, TrendingUp, ChevronRight, Search, Play, Bot, Camera, Lock, Crown, Flame, Zap, Award, Activity, Sparkles, ArrowUpRight } from 'lucide-react';
 import { useUser } from '@/hooks/use-user';
 import { useChessPlayer } from '@/hooks/use-chess-player';
 import { useMultiEloProgress } from '@/hooks/use-elo-progress';
@@ -56,137 +56,172 @@ export function Dashboard() {
   return (
     <div className="space-y-4 md:space-y-5">
 
-      <div style={{ background: BG_CARD, border: CARD_BORDER, boxShadow: CARD_SHADOW }}
-        className="relative overflow-hidden p-4 md:p-5 rounded-xl">
-        <div aria-hidden className="pointer-events-none absolute -top-4 -right-4 select-none" style={{ fontSize: 130, lineHeight: 1, color: 'rgba(129,182,76,0.06)', textShadow: '0 0 1px rgba(129,182,76,0.18)' }}>♞</div>
-        <div className="relative flex items-center gap-3">
+      <div
+        className="relative overflow-hidden p-5 md:p-7 rounded-2xl"
+        style={{
+          background: 'radial-gradient(120% 140% at 100% 0%, rgba(129,182,76,0.22) 0%, rgba(129,182,76,0.05) 38%, transparent 72%), linear-gradient(180deg, #383532 0%, #2a2825 100%)',
+          border: '1px solid rgba(129,182,76,0.18)',
+          boxShadow: '0 18px 50px -16px rgba(0,0,0,0.6), 0 4px 16px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04)',
+        }}>
+        <div aria-hidden className="pointer-events-none absolute -top-10 -right-6 select-none rotate-12" style={{ fontSize: 220, lineHeight: 1, color: 'rgba(129,182,76,0.10)', textShadow: '0 0 30px rgba(129,182,76,0.25)' }}>♞</div>
+        <div aria-hidden className="pointer-events-none absolute -bottom-16 -left-8 select-none -rotate-12" style={{ fontSize: 180, lineHeight: 1, color: 'rgba(255,255,255,0.025)' }}>♚</div>
+
+        <div className="relative flex items-start gap-4">
           <div className="shrink-0 relative">
+            <div className="absolute -inset-1.5 rounded-2xl opacity-60 blur-md" style={{ background: `radial-gradient(circle, ${CHESSCOM_GREEN}, transparent 70%)` }} />
             {chessPlayer?.avatar
-              ? <img src={chessPlayer.avatar} alt={username ?? ''} className="w-14 h-14 rounded-xl object-cover" style={{ border: `2px solid ${CHESSCOM_GREEN}` }} />
-              : <div className="w-14 h-14 rounded-xl flex items-center justify-center" style={{ background: 'rgba(129,182,76,0.15)', border: `2px solid rgba(129,182,76,0.3)` }}>
-                  <span className="text-xl font-black" style={{ color: CHESSCOM_GREEN }}>{username?.[0]?.toUpperCase()}</span>
+              ? <img src={chessPlayer.avatar} alt={username ?? ''} className="relative w-20 h-20 md:w-24 md:h-24 rounded-2xl object-cover" style={{ border: `3px solid ${CHESSCOM_GREEN}`, boxShadow: '0 8px 24px -4px rgba(0,0,0,0.6)' }} />
+              : <div className="relative w-20 h-20 md:w-24 md:h-24 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(129,182,76,0.18)', border: `3px solid ${CHESSCOM_GREEN}`, boxShadow: '0 8px 24px -4px rgba(0,0,0,0.6)' }}>
+                  <span className="text-4xl font-black" style={{ color: CHESSCOM_GREEN }}>{username?.[0]?.toUpperCase()}</span>
                 </div>
             }
             {chessPlayer?.title && (
-              <span className="absolute -bottom-1 -right-1 px-1 py-px rounded text-[9px] font-black text-black leading-none" style={{ background: '#e5a631' }}>
+              <span className="absolute -bottom-1.5 -right-1.5 px-1.5 py-0.5 rounded-md text-[10px] font-black text-black leading-none shadow-lg" style={{ background: 'linear-gradient(180deg, #f5c460 0%, #e5a631 100%)' }}>
                 {chessPlayer.title}
               </span>
             )}
           </div>
 
           <div className="flex-1 min-w-0">
-            <h1 className="text-lg font-black truncate" style={{ color: TEXT_LIGHT }}>{username}</h1>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-[0.18em]" style={{ background: 'rgba(129,182,76,0.18)', color: CHESSCOM_GREEN, border: '1px solid rgba(129,182,76,0.3)' }}>
+                <Sparkles className="w-2.5 h-2.5" /> Player
+              </span>
+              {isPremium && (
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-[0.18em] text-black" style={{ background: 'linear-gradient(135deg, #f5c460, #e5a631)' }}>
+                  <Crown className="w-2.5 h-2.5" /> Pro
+                </span>
+              )}
+            </div>
+            <h1 className="text-3xl md:text-4xl font-black truncate leading-none" style={{ color: TEXT_LIGHT, letterSpacing: '-0.02em', textShadow: '0 2px 8px rgba(0,0,0,0.3)' }}>{username}</h1>
+
             {(multiElo.chesscom?.hasData || multiElo.lichess?.hasData) ? (
-              <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+              <div className="flex items-center gap-3 mt-3 flex-wrap">
                 {multiElo.chesscom?.hasData && (
-                  <div className="flex items-center gap-1">
-                    <span className="text-[9px] font-bold" style={{ color: CHESSCOM_GREEN }}>CC</span>
-                    <span className="text-lg font-black leading-none" style={{ color: CHESSCOM_GREEN }}>{multiElo.chesscom.currentRating}</span>
-                    <span className="text-[10px] font-bold" style={{ color: multiElo.chesscom.delta > 0 ? CHESSCOM_GREEN : multiElo.chesscom.delta < 0 ? '#dc4343' : TEXT_MUTED }}>
-                      {multiElo.chesscom.delta > 0 ? '+' : ''}{multiElo.chesscom.delta}
-                    </span>
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-black uppercase tracking-[0.18em] leading-none" style={{ color: CHESSCOM_GREEN }}>Chess.com</span>
+                    <div className="flex items-baseline gap-1.5 mt-1">
+                      <span className="text-3xl md:text-4xl font-black leading-none" style={{ color: TEXT_LIGHT, letterSpacing: '-0.03em' }}>{multiElo.chesscom.currentRating}</span>
+                      <span className="inline-flex items-center text-xs font-black px-1.5 py-0.5 rounded" style={{ background: multiElo.chesscom.delta > 0 ? 'rgba(129,182,76,0.2)' : multiElo.chesscom.delta < 0 ? 'rgba(220,67,67,0.2)' : 'rgba(158,155,152,0.15)', color: multiElo.chesscom.delta > 0 ? CHESSCOM_GREEN : multiElo.chesscom.delta < 0 ? '#dc4343' : TEXT_MUTED }}>
+                        {multiElo.chesscom.delta > 0 ? '▲' : multiElo.chesscom.delta < 0 ? '▼' : '–'} {Math.abs(multiElo.chesscom.delta)}
+                      </span>
+                    </div>
                   </div>
                 )}
                 {multiElo.lichess?.hasData && (
-                  <div className="flex items-center gap-1">
-                    <span className="text-[9px] font-bold" style={{ color: '#b0b0b0' }}>LC</span>
-                    <span className="text-lg font-black leading-none" style={{ color: '#b0b0b0' }}>{multiElo.lichess.currentRating}</span>
-                    <span className="text-[10px] font-bold" style={{ color: multiElo.lichess.delta > 0 ? CHESSCOM_GREEN : multiElo.lichess.delta < 0 ? '#dc4343' : TEXT_MUTED }}>
-                      {multiElo.lichess.delta > 0 ? '+' : ''}{multiElo.lichess.delta}
-                    </span>
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-black uppercase tracking-[0.18em] leading-none" style={{ color: '#b0b0b0' }}>Lichess</span>
+                    <div className="flex items-baseline gap-1.5 mt-1">
+                      <span className="text-3xl md:text-4xl font-black leading-none" style={{ color: TEXT_LIGHT, letterSpacing: '-0.03em' }}>{multiElo.lichess.currentRating}</span>
+                      <span className="inline-flex items-center text-xs font-black px-1.5 py-0.5 rounded" style={{ background: multiElo.lichess.delta > 0 ? 'rgba(129,182,76,0.2)' : multiElo.lichess.delta < 0 ? 'rgba(220,67,67,0.2)' : 'rgba(158,155,152,0.15)', color: multiElo.lichess.delta > 0 ? CHESSCOM_GREEN : multiElo.lichess.delta < 0 ? '#dc4343' : TEXT_MUTED }}>
+                        {multiElo.lichess.delta > 0 ? '▲' : multiElo.lichess.delta < 0 ? '▼' : '–'} {Math.abs(multiElo.lichess.delta)}
+                      </span>
+                    </div>
                   </div>
                 )}
               </div>
             ) : chessPlayer?.rating ? (
-              <div className="flex items-center gap-1.5 mt-0.5">
-                <span className="text-xl font-black leading-none" style={{ color: CHESSCOM_GREEN }}>{chessPlayer.rating}</span>
-                <span className="text-[11px] font-semibold mt-0.5" style={{ color: TEXT_MUTED }}>ELO</span>
+              <div className="flex items-baseline gap-2 mt-3">
+                <span className="text-4xl font-black leading-none" style={{ color: TEXT_LIGHT, letterSpacing: '-0.03em' }}>{chessPlayer.rating}</span>
+                <span className="text-xs font-black uppercase tracking-wider" style={{ color: CHESSCOM_GREEN }}>ELO</span>
               </div>
             ) : null}
-            {summary?.totalGames ? (
-              <p className="text-xs mt-0.5" style={{ color: TEXT_MUTED }}>{summary.totalGames} games · {winRate}% win rate</p>
-            ) : (
-              <p className="text-xs mt-0.5" style={{ color: TEXT_MUTED }}>Import games to start coaching</p>
-            )}
           </div>
-
-          <div className="hidden sm:flex flex-col gap-1.5 shrink-0">
-            <Link href="/import" className="px-3 py-2 rounded-xl font-bold text-xs text-white flex items-center gap-1.5 transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-white/30" style={{ background: CHESSCOM_GREEN }}>
-              <ImportIcon /> Import
-            </Link>
-            <Link href="/opponents" className="px-3 py-2 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-colors hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-white/30" style={{ background: 'rgba(255,255,255,0.06)', color: TEXT_LIGHT }}>
-              <Swords className="w-3.5 h-3.5" style={{ color: CHESSCOM_GREEN }} /> Scout
-            </Link>
-          </div>
-        </div>
-        <div className="flex sm:hidden gap-2 mt-3">
-          <Link href="/import" className="flex-1 px-3 py-2 rounded-xl font-bold text-xs text-white flex items-center justify-center gap-1.5 transition-opacity hover:opacity-90" style={{ background: CHESSCOM_GREEN }}>
-            <ImportIcon /> Import Games
-          </Link>
-          <Link href="/opponents" className="flex-1 px-3 py-2 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-colors hover:bg-white/10" style={{ background: 'rgba(255,255,255,0.06)', color: TEXT_LIGHT }}>
-            <Swords className="w-3.5 h-3.5" style={{ color: CHESSCOM_GREEN }} /> Scout
-          </Link>
         </div>
 
         {summary?.totalGames ? (
-          <div className="relative mt-3">
-            <div className="flex h-2 rounded-full overflow-hidden gap-px" style={{ boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.45)' }}>
-              <div style={{ width: `${(summary.wins / summary.totalGames) * 100}%`, background: `linear-gradient(180deg, #9ccc5d 0%, ${CHESSCOM_GREEN} 100%)` }} />
-              <div style={{ width: `${(summary.draws / summary.totalGames) * 100}%`, background: `linear-gradient(180deg, #b8b6b3 0%, ${TEXT_MUTED} 100%)` }} />
-              <div style={{ width: `${(summary.losses / summary.totalGames) * 100}%`, background: 'linear-gradient(180deg, #e25656 0%, #dc4343 100%)' }} />
+          <div className="relative mt-5">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[10px] font-black uppercase tracking-[0.18em]" style={{ color: TEXT_MUTED }}>Performance</span>
+              <span className="text-[11px] font-bold" style={{ color: TEXT_LIGHT }}>{summary.totalGames.toLocaleString()} games · <span style={{ color: CHESSCOM_GREEN }}>{winRate}%</span> win rate</span>
             </div>
-            <div className="flex gap-3 mt-1.5">
-              <span className="inline-flex items-center gap-1 text-[11px] font-bold" style={{ color: CHESSCOM_GREEN }}>
-                <span className="inline-block w-1.5 h-1.5 rounded-full" style={{ background: CHESSCOM_GREEN }} />{summary.wins}W
+            <div className="flex h-3 rounded-full overflow-hidden gap-0.5" style={{ boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.5), 0 1px 0 rgba(255,255,255,0.04)' }}>
+              <div className="relative" style={{ width: `${(summary.wins / summary.totalGames) * 100}%`, background: `linear-gradient(180deg, #a8d567 0%, ${CHESSCOM_GREEN} 100%)`, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.25)' }} />
+              <div style={{ width: `${(summary.draws / summary.totalGames) * 100}%`, background: 'linear-gradient(180deg, #c0bdba 0%, #8a8784 100%)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.18)' }} />
+              <div style={{ width: `${(summary.losses / summary.totalGames) * 100}%`, background: 'linear-gradient(180deg, #ec6b6b 0%, #c93535 100%)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.2)' }} />
+            </div>
+            <div className="flex gap-4 mt-2">
+              <span className="inline-flex items-center gap-1.5 text-xs font-black" style={{ color: CHESSCOM_GREEN }}>
+                <span className="inline-block w-2 h-2 rounded-sm" style={{ background: CHESSCOM_GREEN, boxShadow: `0 0 8px ${CHESSCOM_GREEN}` }} />{summary.wins.toLocaleString()} W
               </span>
-              <span className="inline-flex items-center gap-1 text-[11px]" style={{ color: TEXT_MUTED }}>
-                <span className="inline-block w-1.5 h-1.5 rounded-full" style={{ background: TEXT_MUTED }} />{summary.draws}D
+              <span className="inline-flex items-center gap-1.5 text-xs font-bold" style={{ color: TEXT_MUTED }}>
+                <span className="inline-block w-2 h-2 rounded-sm" style={{ background: TEXT_MUTED }} />{summary.draws.toLocaleString()} D
               </span>
-              <span className="inline-flex items-center gap-1 text-[11px] font-bold" style={{ color: '#dc4343' }}>
-                <span className="inline-block w-1.5 h-1.5 rounded-full" style={{ background: '#dc4343' }} />{summary.losses}L
+              <span className="inline-flex items-center gap-1.5 text-xs font-black" style={{ color: '#dc4343' }}>
+                <span className="inline-block w-2 h-2 rounded-sm" style={{ background: '#dc4343', boxShadow: '0 0 8px #dc4343' }} />{summary.losses.toLocaleString()} L
               </span>
             </div>
           </div>
-        ) : null}
+        ) : (
+          <p className="relative mt-4 text-sm" style={{ color: TEXT_MUTED }}>Import games to start coaching</p>
+        )}
+
+        <div className="relative flex gap-2 mt-5">
+          <Link href="/import" className="flex-1 px-4 py-3 rounded-xl font-black text-sm text-white flex items-center justify-center gap-2 transition-all hover:scale-[1.02] active:scale-[0.98]" style={{ background: `linear-gradient(180deg, #95c45a 0%, ${CHESSCOM_GREEN} 100%)`, boxShadow: `0 6px 16px -4px rgba(129,182,76,0.5), inset 0 1px 0 rgba(255,255,255,0.25)` }}>
+            <ImportIcon /> Import Games
+          </Link>
+          <Link href="/opponents" className="flex-1 px-4 py-3 rounded-xl font-black text-sm flex items-center justify-center gap-2 transition-all hover:scale-[1.02] active:scale-[0.98]" style={{ background: 'rgba(255,255,255,0.07)', color: TEXT_LIGHT, border: '1px solid rgba(255,255,255,0.1)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)' }}>
+            <Swords className="w-4 h-4" style={{ color: CHESSCOM_GREEN }} /> Scout
+          </Link>
+        </div>
       </div>
 
       <Link href="/scan" className="block px-3 md:px-0">
-        <div className="relative overflow-hidden rounded-xl p-4 md:p-5 transition-all group cursor-pointer flex items-center gap-4"
+        <div className="relative overflow-hidden rounded-2xl p-5 md:p-6 transition-all group cursor-pointer flex items-center gap-4 md:gap-5"
           style={{
-            background: 'linear-gradient(135deg, rgba(129,182,76,0.22) 0%, rgba(129,182,76,0.04) 100%)',
-            border: `1px solid rgba(129,182,76,0.3)`,
+            background: 'radial-gradient(120% 100% at 0% 0%, rgba(129,182,76,0.32) 0%, rgba(129,182,76,0.08) 50%, rgba(38,36,33,0.4) 100%)',
+            border: `1px solid rgba(129,182,76,0.4)`,
+            boxShadow: '0 12px 32px -8px rgba(129,182,76,0.25), inset 0 1px 0 rgba(255,255,255,0.06)',
           }}
-          onMouseEnter={(e) => (e.currentTarget.style.borderColor = 'rgba(129,182,76,0.55)')}
-          onMouseLeave={(e) => (e.currentTarget.style.borderColor = 'rgba(129,182,76,0.3)')}>
-          <BoardThumb size={56} />
+          onMouseEnter={(e) => (e.currentTarget.style.borderColor = 'rgba(129,182,76,0.7)')}
+          onMouseLeave={(e) => (e.currentTarget.style.borderColor = 'rgba(129,182,76,0.4)')}>
+          <div aria-hidden className="pointer-events-none absolute -bottom-8 -right-4 select-none rotate-12" style={{ fontSize: 140, lineHeight: 1, color: 'rgba(129,182,76,0.08)' }}>♟</div>
+          <div className="relative">
+            <BoardThumb size={84} />
+            <div className="absolute -bottom-1.5 -right-1.5 w-8 h-8 rounded-full flex items-center justify-center shadow-lg" style={{ background: `linear-gradient(135deg, #95c45a, ${CHESSCOM_GREEN})`, boxShadow: `0 4px 12px ${CHESSCOM_GREEN}80` }}>
+              <Camera className="w-4 h-4 text-white" />
+            </div>
+          </div>
           <div className="flex-1 min-w-0 relative">
-            <span className="inline-block px-1.5 py-px rounded text-[9px] font-black uppercase tracking-[0.15em] mb-1" style={{ background: 'rgba(129,182,76,0.25)', color: CHESSCOM_GREEN }}>AI Coach</span>
-            <h3 className="font-black text-base md:text-lg" style={{ color: TEXT_LIGHT }}>
-              Stuck in a game? Scan a position
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-[0.18em] mb-1.5" style={{ background: 'rgba(129,182,76,0.25)', color: CHESSCOM_GREEN, border: '1px solid rgba(129,182,76,0.4)' }}>
+              <Zap className="w-2.5 h-2.5" /> AI Coach
+            </span>
+            <h3 className="font-black text-lg md:text-2xl leading-tight" style={{ color: TEXT_LIGHT, letterSpacing: '-0.02em' }}>
+              Stuck in a game?
             </h3>
-            <p className="text-xs md:text-sm mt-0.5 flex items-center gap-1.5" style={{ color: TEXT_MUTED }}>
-              <Camera className="w-3.5 h-3.5" style={{ color: CHESSCOM_GREEN }} />
-              Upload a screenshot and get the best move instantly
+            <p className="text-sm md:text-base font-bold mt-0.5" style={{ color: CHESSCOM_GREEN }}>
+              Scan & get the best move instantly
             </p>
           </div>
-          <ChevronRight className="shrink-0 w-5 h-5 opacity-50 group-hover:opacity-90 group-hover:translate-x-1 transition-all" style={{ color: CHESSCOM_GREEN }} />
+          <div className="shrink-0 w-10 h-10 rounded-xl flex items-center justify-center transition-all group-hover:translate-x-1" style={{ background: 'rgba(129,182,76,0.2)', border: '1px solid rgba(129,182,76,0.35)' }}>
+            <ArrowUpRight className="w-5 h-5" style={{ color: CHESSCOM_GREEN }} />
+          </div>
         </div>
       </Link>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 md:gap-3 px-3 md:px-0">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 md:gap-3 px-3 md:px-0">
         {[
-          { label: 'Total Games', value: summary?.totalGames || 0, icon: <Swords className="w-4 h-4" />, glyph: '♜' },
-          { label: 'Win Rate', value: `${winRate}%`, icon: <Trophy className="w-4 h-4" />, glyph: '♛' },
-          { label: 'Avg Rating', value: Math.round(summary?.avgRating || 0) || '—', icon: <TrendingUp className="w-4 h-4" />, glyph: '♞' },
-          { label: 'Games Reviewed', value: reviewedCount, icon: <Target className="w-4 h-4" />, glyph: '♝' },
+          { label: 'Total Games', value: summary?.totalGames?.toLocaleString() || 0, icon: <Swords className="w-5 h-5" />, glyph: '♜', color: '#6da5d8', tint: 'rgba(109,165,216,0.14)' },
+          { label: 'Win Rate', value: `${winRate}%`, icon: <Trophy className="w-5 h-5" />, glyph: '♛', color: CHESSCOM_GREEN, tint: 'rgba(129,182,76,0.14)' },
+          { label: 'Avg Rating', value: Math.round(summary?.avgRating || 0) || '—', icon: <Activity className="w-5 h-5" />, glyph: '♞', color: '#eaa631', tint: 'rgba(234,166,49,0.14)' },
+          { label: 'Reviewed', value: reviewedCount, icon: <Award className="w-5 h-5" />, glyph: '♝', color: '#b87df0', tint: 'rgba(184,125,240,0.14)' },
         ].map((s) => (
-          <div key={s.label} className="relative overflow-hidden rounded-xl p-3.5" style={{ background: BG_CARD, border: CARD_BORDER, boxShadow: CARD_SHADOW }}>
-            <div aria-hidden className="pointer-events-none absolute -bottom-5 -right-2 select-none" style={{ fontSize: 84, lineHeight: 1, color: 'rgba(129,182,76,0.08)', textShadow: '0 0 1px rgba(255,255,255,0.05)' }}>{s.glyph}</div>
-            <div className="relative flex items-center justify-between mb-2">
-              <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: TEXT_MUTED }}>{s.label}</p>
-              <span style={{ color: CHESSCOM_GREEN }}>{s.icon}</span>
+          <div key={s.label} className="relative overflow-hidden rounded-2xl p-4 md:p-5 min-h-[120px] md:min-h-[140px]"
+            style={{
+              background: `radial-gradient(110% 100% at 100% 0%, ${s.tint} 0%, transparent 60%), linear-gradient(180deg, #353230 0%, #2b2926 100%)`,
+              border: `1px solid ${s.color}33`,
+              boxShadow: `0 8px 24px -8px rgba(0,0,0,0.5), 0 0 0 1px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.05)`,
+            }}>
+            <div aria-hidden className="pointer-events-none absolute -bottom-6 -right-2 select-none" style={{ fontSize: 110, lineHeight: 1, color: `${s.color}1a`, textShadow: `0 0 20px ${s.color}33` }}>{s.glyph}</div>
+            <div className="absolute top-0 left-0 right-0 h-[3px]" style={{ background: `linear-gradient(90deg, ${s.color} 0%, ${s.color}55 70%, transparent 100%)` }} />
+
+            <div className="relative flex items-center justify-between mb-3">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: `${s.color}22`, border: `1px solid ${s.color}40`, color: s.color, boxShadow: `0 4px 12px -2px ${s.color}30` }}>
+                {s.icon}
+              </div>
             </div>
-            <div className="relative text-2xl font-black" style={{ color: TEXT_LIGHT }}>{s.value}</div>
+            <p className="relative text-[10px] font-black uppercase tracking-[0.15em] mb-1" style={{ color: TEXT_MUTED }}>{s.label}</p>
+            <div className="relative text-3xl md:text-4xl font-black leading-none" style={{ color: TEXT_LIGHT, letterSpacing: '-0.03em', textShadow: '0 2px 8px rgba(0,0,0,0.3)' }}>{s.value}</div>
           </div>
         ))}
       </div>
