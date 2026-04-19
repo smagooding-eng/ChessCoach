@@ -201,7 +201,7 @@ export function Dashboard() {
             border: '1px solid rgba(255,255,255,0.06)',
             boxShadow: '0 8px 24px -10px rgba(0,0,0,0.6), 0 2px 6px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04)',
           }}>
-          <div className="absolute top-0 left-0 right-0 h-[3px]" style={{ background: `linear-gradient(90deg, ${CHESSCOM_GREEN} 0%, rgba(129,182,76,0.35) 70%, transparent 100%)` }} />
+          
           <div className="relative grid grid-cols-2 sm:grid-cols-4">
             {[
               { label: 'Total Games', value: summary?.totalGames?.toLocaleString() || '0', icon: <Swords className="w-3.5 h-3.5" /> },
@@ -352,7 +352,7 @@ export function Dashboard() {
               }}
               onMouseEnter={e => (e.currentTarget.style.borderColor = 'rgba(129,182,76,0.5)')}
               onMouseLeave={e => (e.currentTarget.style.borderColor = 'rgba(129,182,76,0.3)')}>
-              <div className="absolute top-0 left-0 right-0 h-[3px]" style={{ background: `linear-gradient(90deg, ${CHESSCOM_GREEN} 0%, rgba(129,182,76,0.35) 70%, transparent 100%)` }} />
+              
               <div className="relative flex items-center gap-3 mb-2.5">
                 <div className="w-11 h-11 rounded-xl flex items-center justify-center" style={{ background: 'rgba(129,182,76,0.18)', border: '1px solid rgba(129,182,76,0.35)' }}>
                   <Swords className="w-5 h-5" style={{ color: CHESSCOM_GREEN }} />
@@ -375,7 +375,7 @@ export function Dashboard() {
               border: '1px solid rgba(255,255,255,0.06)',
               boxShadow: '0 8px 24px -10px rgba(0,0,0,0.6), 0 2px 6px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04)',
             }}>
-            <div className="absolute top-0 left-0 right-0 h-[3px]" style={{ background: `linear-gradient(90deg, ${CHESSCOM_GREEN} 0%, rgba(129,182,76,0.35) 70%, transparent 100%)` }} />
+            
             <div className="relative flex items-center gap-2.5 mb-3">
               <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(129,182,76,0.15)', border: '1px solid rgba(129,182,76,0.3)' }}>
                 <Zap className="w-4 h-4" style={{ color: CHESSCOM_GREEN }} />
@@ -410,7 +410,7 @@ export function Dashboard() {
                 border: '1px solid rgba(255,255,255,0.06)',
                 boxShadow: '0 8px 24px -10px rgba(0,0,0,0.6), 0 2px 6px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04)',
               }}>
-              <div className="absolute top-0 left-0 right-0 h-[3px]" style={{ background: `linear-gradient(90deg, ${CHESSCOM_GREEN} 0%, rgba(129,182,76,0.35) 70%, transparent 100%)` }} />
+              
               <div className="relative flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2.5">
                   <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(129,182,76,0.15)', border: '1px solid rgba(129,182,76,0.3)' }}>
@@ -463,7 +463,7 @@ function DashCard({ title, icon, linkHref, linkText, children }: {
         border: '1px solid rgba(255,255,255,0.06)',
         boxShadow: '0 8px 24px -10px rgba(0,0,0,0.6), 0 2px 6px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04)',
       }}>
-      <div className="absolute top-0 left-0 right-0 h-[3px]" style={{ background: `linear-gradient(90deg, ${CHESSCOM_GREEN} 0%, rgba(129,182,76,0.35) 70%, transparent 100%)` }} />
+      
       <div className="relative flex items-center justify-between mb-4">
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(129,182,76,0.15)', border: '1px solid rgba(129,182,76,0.3)' }}>
