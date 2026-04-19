@@ -13,6 +13,7 @@ import storageRouter from "./storage";
 import puzzlesRouter from "./puzzles";
 import growthRouter from "./growth";
 import onboardingRouter from "./onboarding";
+import liveRouter from "./live";
 import { requirePremium } from "../middlewares/authMiddleware";
 import { db, pageViewsTable } from "@workspace/db";
 
@@ -28,6 +29,7 @@ router.use("/storage", storageRouter);
 router.use(puzzlesRouter);
 router.use(growthRouter);
 router.use(onboardingRouter);
+router.use(liveRouter);
 
 router.post("/track", async (req: Request, res: Response) => {
   try {

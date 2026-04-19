@@ -3,6 +3,7 @@ import { Link, useLocation } from 'wouter';
 import { useUser } from '@/hooks/use-user';
 import { useChessPlayer } from '@/hooks/use-chess-player';
 import { useMultiEloProgress } from '@/hooks/use-elo-progress';
+import { useLiveRatings, bestLiveRating } from '@/hooks/use-live-ratings';
 import { LayoutDashboard, Import, History, BrainCircuit, GraduationCap, Swords, BookOpen, LogOut, MoreHorizontal, ChevronRight, Bot, Crown, Trophy, Play, Search, Download, Puzzle, User, Settings, CreditCard, Camera, Shield } from 'lucide-react';
 import { usePwaInstall } from '@/hooks/use-pwa-install';
 import { InstallGuide } from '@/components/InstallGuide';
@@ -25,6 +26,7 @@ const PRIMARY_NAV = [
   { href: '/analysis',  label: 'Analysis',        icon: BrainCircuit },
   { href: '/puzzles',   label: 'Puzzles',         icon: Puzzle, badge: 'BETA' },
   { href: '/lookup',    label: 'Game Lookup',     icon: Search },
+  { href: '/live',      label: 'Play Live',       icon: Swords, badge: 'NEW' },
   { href: '/play',      label: 'Play Local',      icon: Play },
   { href: '/scan',      label: 'Scan Position',   icon: Camera, badge: 'NEW' },
 ];
@@ -100,9 +102,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const ratings: number[] = [];
   if (multiElo.chesscom?.hasData) ratings.push(multiElo.chesscom.currentRating);
   if (multiElo.lichess?.hasData) ratings.push(multiElo.lichess.currentRating);
-  const scoutElo = ratings.length > 0
-    ? Math.round(ratings.reduce((a, b) => a + b, 0) / ratings.length)
-    : (player?.rating ?? null);
+  const { data: liveRatingsData } = useLiveRatings();
+  const liveBest = bestLiveRating(liveRatingsData?.ratings);
+  const scoutElo = liveBest
+    ? liveBest.rating
+    : (ratings.length > 0
+        ? Math.round(ratings.reduce((a, b) => a + b, 0) / ratings.length)
+        : (player?.rating ?? null));
 
   // Hide all chrome (sidebar, mobile header, bottom nav) until onboarding completes
   if (showOnboarding) {

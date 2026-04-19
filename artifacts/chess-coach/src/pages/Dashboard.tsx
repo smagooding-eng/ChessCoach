@@ -8,6 +8,7 @@ import { Swords, Trophy, Target, AlertTriangle, BookOpen, Clock, GraduationCap, 
 import { useUser } from '@/hooks/use-user';
 import { useChessPlayer } from '@/hooks/use-chess-player';
 import { useMultiEloProgress } from '@/hooks/use-elo-progress';
+import { useLiveRatings, bestLiveRating } from '@/hooks/use-live-ratings';
 
 const CHESSCOM_GREEN = '#81b64c';
 const BG_DARK = '#262421';
@@ -36,6 +37,8 @@ export function Dashboard() {
   const { username, isPremium } = useUser();
   const { player: chessPlayer } = useChessPlayer(username ?? undefined);
   const { data: multiElo } = useMultiEloProgress(username ?? undefined);
+  const { data: liveRatingsData } = useLiveRatings();
+  const liveBest = bestLiveRating(liveRatingsData?.ratings);
   const { data: summary, isLoading: loadingSummary } = useMyAnalysisSummary();
   const { data: weaknesses } = useMyWeaknesses();
   const { data: coursesData } = useMyCourses();
@@ -95,8 +98,10 @@ export function Dashboard() {
                   const ratings: number[] = [];
                   if (multiElo.chesscom?.hasData) ratings.push(multiElo.chesscom.currentRating);
                   if (multiElo.lichess?.hasData) ratings.push(multiElo.lichess.currentRating);
-                  if (ratings.length === 0) return null;
-                  const scoutElo = Math.round(ratings.reduce((a, b) => a + b, 0) / ratings.length);
+                  if (ratings.length === 0 && !liveBest) return null;
+                  const scoutElo = liveBest
+                    ? liveBest.rating
+                    : Math.round(ratings.reduce((a, b) => a + b, 0) / ratings.length);
                   return (
                     <span className="inline-flex items-baseline gap-1 px-2.5 py-1 rounded-md" style={{ background: `linear-gradient(135deg, rgba(129,182,76,0.28), rgba(129,182,76,0.18))`, border: `1px solid ${CHESSCOM_GREEN}`, boxShadow: '0 2px 8px rgba(129,182,76,0.25)' }}>
                       <span className="text-[9px] font-black uppercase tracking-[0.14em]" style={{ color: CHESSCOM_GREEN }}>Scout</span>

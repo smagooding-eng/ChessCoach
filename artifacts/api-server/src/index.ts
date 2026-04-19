@@ -4,6 +4,8 @@ import app from "./app";
 import { logger } from "./lib/logger";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
+import { createServer } from "http";
+import { attachLiveServer } from "./lib/liveServer";
 
 async function initStripe() {
   const databaseUrl = process.env.DATABASE_URL;
@@ -107,6 +109,17 @@ async function runSchemaMigrations() {
     await db.execute(sql`DROP INDEX IF EXISTS idx_drip_user_type`);
     await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS idx_drip_user_type ON email_drip_log(user_id, drip_type)`);
 
+    await db.execute(sql`CREATE TABLE IF NOT EXISTS user_live_ratings (
+      user_id VARCHAR NOT NULL,
+      time_control VARCHAR NOT NULL,
+      rating REAL NOT NULL DEFAULT 1500,
+      rd REAL NOT NULL DEFAULT 350,
+      vol REAL NOT NULL DEFAULT 0.06,
+      games_played INTEGER NOT NULL DEFAULT 0,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      PRIMARY KEY (user_id, time_control)
+    )`);
+
     logger.info('Schema migrations complete');
   } catch (err) {
     logger.error({ err }, 'Schema migration failed');
@@ -114,12 +127,13 @@ async function runSchemaMigrations() {
   }
 }
 
-app.listen(port, (err) => {
+const httpServer = createServer(app);
+attachLiveServer(httpServer);
+httpServer.listen(port, (err?: Error) => {
   if (err) {
     logger.error({ err }, "Error listening on port");
     process.exit(1);
   }
-
   logger.info({ port }, "Server listening");
 });
 
