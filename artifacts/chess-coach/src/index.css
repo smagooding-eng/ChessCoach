@@ -31,13 +31,13 @@
 
 :root {
   /* Chess.com-inspired warm dark-brown palette */
-  --background: 22 8% 16%;
+  --background: 22 8% 12%;
   --foreground: 38 55% 83%;
 
-  --card: 25 7% 20%;
+  --card: 25 7% 22%;
   --card-foreground: 38 55% 83%;
 
-  --popover: 25 7% 20%;
+  --popover: 25 7% 22%;
   --popover-foreground: 38 55% 83%;
 
   /* Chess.com action green as primary */
