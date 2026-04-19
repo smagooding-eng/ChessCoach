@@ -29,6 +29,7 @@ export interface LiveGameState {
   black: LivePlayer;
   drawOfferFrom?: 'w' | 'b';
   ratingDelta?: { white: number; black: number };
+  dbGameIds?: { white?: number; black?: number };
 }
 
 export interface OpponentDisconnect { side: 'w' | 'b'; graceMs: number; until: number }
@@ -107,15 +108,7 @@ export function useLivePlay() {
         case 'state':
           setGame(msg.state);
           if (msg.state.status === 'finished') setStatus('finished');
-          // Auto-send premove when it becomes our turn
-          if (msg.state.status === 'active' && colorRef.current && msg.state.turn === colorRef.current && premoveRef.current) {
-            const pm = premoveRef.current;
-            setPremove(null);
-            const san = `${pm.from}-${pm.to}${pm.promotion ? '=' + pm.promotion.toUpperCase() : ''}`;
-            // We can't easily turn from/to into SAN without chess.js here; pass as best-effort
-            // The board calls move(san) directly via onMovePlayed — premove is integrated there.
-            void san;
-          }
+          // Premove is replayed by LiveGame from the new state's `turn` and `fen`.
           break;
         case 'opponent_disconnected':
           setOpponentDisconnect({ side: msg.side, graceMs: msg.graceMs, until: Date.now() + msg.graceMs });

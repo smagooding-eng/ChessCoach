@@ -75,6 +75,8 @@ interface LiveGame {
   expireTimer?: ReturnType<typeof setTimeout>;
   botTimer?: ReturnType<typeof setTimeout>;
   ratingDelta: { white: number; black: number };
+  // DB ids in the unified games table after persistence (for deep-linking to Review)
+  dbGameIds: { white?: number; black?: number };
   // Pending draw offer from a side; cleared after one move
   drawOfferFrom?: 'w' | 'b';
   // Disconnect tracking → 30s grace
@@ -103,7 +105,7 @@ for (const id of Object.keys(TIME_CONTROLS) as TimeControlId[]) {
   for (const m of ['casual', 'ranked'] as Mode[]) queues.set(queueKey(id, m), []);
 }
 
-const wsUser = new WeakMap<WebSocket, { userId: string; username: string; createdAt?: string }>();
+const wsUser = new WeakMap<WebSocket, { userId: string; username: string }>();
 
 function send(ws: WebSocket, msg: any) {
   if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg));
@@ -140,6 +142,7 @@ function gamePublicState(g: LiveGame) {
     black: publicPlayer(g.black),
     drawOfferFrom: g.drawOfferFrom,
     ratingDelta: g.status === 'finished' ? g.ratingDelta : undefined,
+    dbGameIds: g.status === 'finished' ? g.dbGameIds : undefined,
   };
 }
 
@@ -155,8 +158,17 @@ function publicPlayer(p: Player) {
   };
 }
 
+interface DbResult<T> { rows?: T[] }
+function rowsOf<T>(res: unknown): T[] {
+  if (Array.isArray(res)) return res as T[];
+  const r = res as DbResult<T>;
+  return r?.rows ?? [];
+}
+
+interface RatingRow { rating: number | string; rd: number | string; vol: number | string; games_played: number | string }
 async function loadUserRating(userId: string, tc: TimeControlId): Promise<{ rating: number; rd: number; vol: number; gamesPlayed: number }> {
-  const rows: any[] = await db.execute(sql`SELECT rating, rd, vol, games_played FROM user_live_ratings WHERE user_id = ${userId} AND time_control = ${tc}`).then((r: any) => r.rows ?? r);
+  const res = await db.execute(sql`SELECT rating, rd, vol, games_played FROM user_live_ratings WHERE user_id = ${userId} AND time_control = ${tc}`);
+  const rows = rowsOf<RatingRow>(res);
   if (rows.length > 0) {
     const r = rows[0];
     return { rating: Number(r.rating), rd: Number(r.rd), vol: Number(r.vol), gamesPlayed: Number(r.games_played) };
@@ -179,12 +191,14 @@ async function seedRatingFromImports(userId: string, tc: TimeControlId): Promise
   const existing = await loadUserRating(userId, tc);
   if (existing.gamesPlayed > 0 || existing.rating !== DEFAULT_RATING.rating) return existing;
   try {
-    const rows: any[] = await db.execute(sql`
+    interface ImportRow { username: string; white_username: string; black_username: string; white_rating: number | string; black_rating: number | string }
+    const res = await db.execute(sql`
       SELECT username, white_username, black_username, white_rating, black_rating
       FROM games
       WHERE username = (SELECT COALESCE(chesscom_username, lichess_username) FROM users WHERE id = ${userId})
       LIMIT 50
-    `).then((r: any) => r.rows ?? r);
+    `);
+    const rows = rowsOf<ImportRow>(res);
     if (rows && rows.length > 0) {
       const ratings: number[] = [];
       for (const g of rows) {
@@ -203,6 +217,8 @@ async function seedRatingFromImports(userId: string, tc: TimeControlId): Promise
   } catch (e) {
     logger.warn({ e }, 'seedRatingFromImports failed');
   }
+  // No imports — persist the 1200 baseline so matchmaking and rating snapshot agree.
+  await saveUserRating(userId, tc, 1200, 350, DEFAULT_RATING.vol, 0);
   return { rating: 1200, rd: 350, vol: DEFAULT_RATING.vol, gamesPlayed: 0 };
 }
 
@@ -222,6 +238,7 @@ async function createGame(white: Player, black: Player, tc: TimeControlSpec, mod
     ratingSnapshots: {},
     ratingAfter: {},
     ratingDelta: { white: 0, black: 0 },
+    dbGameIds: {},
     disconnectTimers: {},
   };
 
@@ -408,7 +425,7 @@ async function persistFinishedGame(g: LiveGame) {
     const lost = (g.result === 'black' && playedAsWhite) || (g.result === 'white' && !playedAsWhite);
     const resultStr = won ? 'win' : lost ? 'loss' : 'draw';
     try {
-      await db.insert(gamesTable).values({
+      const inserted = await db.insert(gamesTable).values({
         username: p.username.toLowerCase(),
         pgn,
         whiteUsername: g.white.username,
@@ -422,7 +439,9 @@ async function persistFinishedGame(g: LiveGame) {
         playedAt: playedAtIso,
         url: null,
         platform: 'chessscout',
-      });
+      }).returning({ id: gamesTable.id });
+      const insertedId = inserted[0]?.id;
+      if (typeof insertedId === 'number') g.dbGameIds[side] = insertedId;
     } catch (e) {
       logger.warn({ e, gameId: g.id, userId: p.userId }, 'failed to persist live game into games table');
     }
@@ -694,10 +713,9 @@ export function attachLiveServer(server: HttpServer) {
     if (!session?.user?.id) {
       socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n'); socket.destroy(); return;
     }
-    const userInfo = {
+    const userInfo: { userId: string; username: string } = {
       userId: session.user.id,
       username: session.user.chesscomUsername || session.user.lichessUsername || (session.user.firstName || session.user.email?.split('@')[0] || 'Player'),
-      createdAt: (session.user as any).createdAt,
     };
     wss.handleUpgrade(req, socket, head, ws => {
       wsUser.set(ws, userInfo);

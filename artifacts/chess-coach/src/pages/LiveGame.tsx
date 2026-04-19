@@ -2,8 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ChessBoard } from '@/components/ChessBoard';
 import { Chess } from 'chess.js';
 import type { useLivePlay } from '@/hooks/use-live-play';
-import { useMyGames } from '@/hooks/use-games';
-import { Flag, ArrowLeft, Trophy, Clock, Handshake, X, Wifi, WifiOff, BookOpen } from 'lucide-react';
+import { Flag, ArrowLeft, Trophy, Clock, Handshake, X, WifiOff, BookOpen } from 'lucide-react';
 import { useLocation } from 'wouter';
 
 const CHESSCOM_GREEN = '#81b64c';
@@ -49,9 +48,9 @@ export function LiveGame({ live, onLeave }: { live: ReturnType<typeof useLivePla
   const { game, color, move, resign, status, opponentDisconnect, premove, setPremove, offerDraw, acceptDraw, declineDraw } = live;
   const [, navigate] = useLocation();
   const [tick, setTick] = useState(0);
-  const { data: myGames, refetch: refetchGames } = useMyGames(1);
-  useEffect(() => { if (game?.status === 'finished') void refetchGames(); }, [game?.status, refetchGames]);
-  const reviewId = myGames?.games?.[0]?.id;
+  const reviewId = game?.dbGameIds && color
+    ? (color === 'w' ? game.dbGameIds.white : game.dbGameIds.black)
+    : undefined;
 
   useEffect(() => {
     const id = setInterval(() => setTick(t => t + 1), 100);
