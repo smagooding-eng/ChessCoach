@@ -14,7 +14,7 @@ export function Games() {
   const { data, isLoading, isError, error } = useMyGames(pageSize);
   const { username } = useUser();
   const [filter, setFilter] = useState('all');
-  const [platformFilter, setPlatformFilter] = useState<'all' | 'chesscom' | 'lichess'>('all');
+  const [platformFilter, setPlatformFilter] = useState<'all' | 'chesscom' | 'lichess' | 'chessscout'>('all');
   const [search, setSearch] = useState('');
   const [h2hMode, setH2hMode] = useState(false);
   const [h2hOpponent, setH2hOpponent] = useState('');
@@ -125,12 +125,13 @@ export function Games() {
         </button>
         <select
           value={platformFilter}
-          onChange={(e) => setPlatformFilter(e.target.value as 'all' | 'chesscom' | 'lichess')}
+          onChange={(e) => setPlatformFilter(e.target.value as 'all' | 'chesscom' | 'lichess' | 'chessscout')}
           className="px-4 py-2.5 bg-secondary/50 border border-border rounded-xl outline-none focus:border-primary appearance-none cursor-pointer text-sm"
         >
           <option value="all">All Platforms</option>
           <option value="chesscom">Chess.com</option>
           <option value="lichess">Lichess</option>
+          <option value="chessscout">ChessScout Live</option>
         </select>
         <select
           value={filter}
@@ -226,14 +227,22 @@ export function Games() {
                           )}
                         </div>
                         <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
-                          <span className={cn(
-                            'inline-flex items-center gap-0.5 px-1 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider',
-                            (game.platform || 'chesscom') === 'lichess'
-                              ? 'bg-white/10 text-white/70'
-                              : 'bg-emerald-500/10 text-emerald-400/70'
-                          )}>
-                            {(game.platform || 'chesscom') === 'lichess' ? 'LC' : 'CC'}
-                          </span>
+                          {(() => {
+                            const plat = (game.platform || 'chesscom') as 'lichess' | 'chesscom' | 'chessscout';
+                            const cls =
+                              plat === 'lichess' ? 'bg-white/10 text-white/70'
+                              : plat === 'chessscout' ? 'bg-primary/15 text-primary'
+                              : 'bg-emerald-500/10 text-emerald-400/70';
+                            const label = plat === 'lichess' ? 'LC' : plat === 'chessscout' ? 'CS' : 'CC';
+                            return (
+                              <span className={cn(
+                                'inline-flex items-center gap-0.5 px-1 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider',
+                                cls,
+                              )} title={plat === 'chessscout' ? 'ChessScout Live' : plat === 'lichess' ? 'Lichess' : 'Chess.com'}>
+                                {label}
+                              </span>
+                            );
+                          })()}
                           <span>{format(new Date(game.playedAt), 'MMM d, yyyy')}</span>
                           <span className="text-border">·</span>
                           <span>{game.timeControl}</span>
