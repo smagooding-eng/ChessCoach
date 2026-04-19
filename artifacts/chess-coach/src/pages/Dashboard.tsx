@@ -2,6 +2,7 @@ import React from 'react';
 import { useMyAnalysisSummary, useMyWeaknesses } from '@/hooks/use-analysis';
 import { useMyCourses } from '@/hooks/use-courses';
 import { useMyGames } from '@/hooks/use-games';
+import { GameThumb } from '@/components/GameThumb';
 import { Link } from 'wouter';
 import { Swords, Trophy, Target, AlertTriangle, BookOpen, Clock, GraduationCap, TrendingUp, ChevronRight, Search, Play, Bot, Camera, Lock, Crown, Flame, Zap, Award, Activity, Sparkles, ArrowUpRight } from 'lucide-react';
 import { useUser } from '@/hooks/use-user';
@@ -322,7 +323,7 @@ export function Dashboard() {
                     <div className="group flex items-center gap-3 p-2.5 rounded-xl transition-colors"
                       onMouseEnter={e => (e.currentTarget.style.background = BG_CARD_HOVER)}
                       onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-                      <BoardThumb size={56} flip={i % 2 === 1} />
+                      <GameThumb pgn={game.pgn} userColor={playedAsWhite ? 'white' : 'black'} size={56} />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <span className="px-1.5 py-px rounded text-[10px] font-black shrink-0" style={{ background: res.bg, color: res.text }}>
