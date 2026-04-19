@@ -1,4 +1,5 @@
 // Live Play server: WebSocket transport, matchmaking, game state machine, bot fallback.
+// Supports two modes: 'casual' (no rating change) and 'ranked' (Glicko-2 update).
 
 import type { Server as HttpServer, IncomingMessage } from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
@@ -9,10 +10,11 @@ import { sql } from 'drizzle-orm';
 import { getSession, SESSION_COOKIE } from './auth';
 import { logger } from './logger';
 import { getBotMove, botThinkMs } from './botEngine';
-import { findPersonaForRating, type Persona } from './personaPool';
+import { findPersonaForRating, getAllPersonas, type Persona } from './personaPool';
 import { updateRating, DEFAULT_RATING } from './glicko2';
 
 export type TimeControlId = 'blitz_5_0' | 'blitz_5_3' | 'rapid_10_0';
+export type Mode = 'casual' | 'ranked';
 
 interface TimeControlSpec { id: TimeControlId; initialMs: number; incrementMs: number; label: string; }
 const TIME_CONTROLS: Record<TimeControlId, TimeControlSpec> = {
@@ -21,22 +23,40 @@ const TIME_CONTROLS: Record<TimeControlId, TimeControlSpec> = {
   rapid_10_0: { id: 'rapid_10_0', initialMs: 10 * 60 * 1000,incrementMs: 0,        label: '10 min' },
 };
 
-const MATCH_WAIT_MS = 30 * 1000;
+const BOT_FALLBACK_MS = 30 * 1000;        // after this, spawn a bot if still queued
+const DISCONNECT_GRACE_MS = 30 * 1000;    // opponent disconnect → 30s to reconnect
+const WIDEN_INTERVAL_MS = 2_000;          // periodic match scanner
+const HUMAN_COUNTRIES = [
+  'US','CA','GB','DE','FR','IT','ES','NL','BR','AR','MX','PL','RU','UA','TR','IN','PH',
+  'AU','NZ','ZA','SE','NO','DK','FI','PT','GR','JP','KR','VN','CL','CO','PE','RO','HU','CZ','BE','IE','CH',
+];
+function hashStr(s: string): number { let h = 0; for (let i = 0; i < s.length; i++) { h = (h * 31 + s.charCodeAt(i)) | 0; } return h >>> 0; }
+// Same title distribution as bots so titles never act as a "human vs bot" tell.
+const HUMAN_TITLES: (string | null)[] = [null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,'NM','CM','FM','IM'];
+function humanProfile(userId: string, username: string, createdAtIso?: string): { country: string; title: string | null; avatar: string; memberSinceYear: number } {
+  const h = hashStr(userId);
+  const country = HUMAN_COUNTRIES[h % HUMAN_COUNTRIES.length];
+  const title = HUMAN_TITLES[(h >>> 7) % HUMAN_TITLES.length];
+  const memberSinceYear = createdAtIso ? new Date(createdAtIso).getFullYear() : (2014 + ((h >>> 13) % 11));
+  const avatar = `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(username)}&backgroundType=gradientLinear`;
+  return { country, title, avatar, memberSinceYear };
+}
 
 interface Player {
   kind: 'human' | 'bot';
   userId?: string;
   username: string;
   rating: number;
-  country?: string;
-  title?: string | null;
-  avatar?: string;
-  memberSinceYear?: number;
+  country: string;
+  title: string | null;
+  avatar: string;
+  memberSinceYear: number;
   personaId?: string;
 }
 
 interface LiveGame {
   id: string;
+  mode: Mode;
   white: Player;
   black: Player;
   tc: TimeControlSpec;
@@ -46,18 +66,19 @@ interface LiveGame {
   lastTickAt: number;
   status: 'active' | 'finished';
   result?: 'white' | 'black' | 'draw';
-  termination?: 'checkmate' | 'resignation' | 'timeout' | 'stalemate' | 'draw_repetition' | 'draw_50' | 'draw_insufficient' | 'draw_agreement';
+  termination?: 'checkmate' | 'resignation' | 'timeout' | 'stalemate' | 'draw_repetition' | 'draw_50' | 'draw_insufficient' | 'draw_agreement' | 'abandoned';
   startedAt: number;
   finishedAt?: number;
-  // SAN list for replay
   sanMoves: string[];
-  // Per-color persisted rating snapshots (for human players, taken from DB at start)
   ratingSnapshots: { white?: { userId: string; rating: number; rd: number; vol: number }; black?: { userId: string; rating: number; rd: number; vol: number } };
-  // Server-side timers
+  ratingAfter: { white?: { rating: number; rd: number; vol: number }; black?: { rating: number; rd: number; vol: number } };
   expireTimer?: ReturnType<typeof setTimeout>;
   botTimer?: ReturnType<typeof setTimeout>;
-  // For UI: rating change applied to each side
   ratingDelta: { white: number; black: number };
+  // Pending draw offer from a side; cleared after one move
+  drawOfferFrom?: 'w' | 'b';
+  // Disconnect tracking → 30s grace
+  disconnectTimers: { w?: ReturnType<typeof setTimeout>; b?: ReturnType<typeof setTimeout> };
 }
 
 interface WaitingPlayer {
@@ -66,6 +87,7 @@ interface WaitingPlayer {
   rating: number;
   ws: WebSocket;
   tc: TimeControlSpec;
+  mode: Mode;
   joinedAt: number;
   fallbackTimer: ReturnType<typeof setTimeout>;
 }
@@ -73,11 +95,15 @@ interface WaitingPlayer {
 const games = new Map<string, LiveGame>();
 const subscribers = new Map<string, Set<WebSocket>>();        // gameId -> sockets
 const userActiveGame = new Map<string, string>();             // userId -> gameId
-const queues = new Map<TimeControlId, WaitingPlayer[]>();
-for (const id of Object.keys(TIME_CONTROLS) as TimeControlId[]) queues.set(id, []);
+const userSockets = new Map<string, Set<WebSocket>>();        // userId -> sockets
+// queues keyed by `${tcId}:${mode}`
+const queues = new Map<string, WaitingPlayer[]>();
+function queueKey(tc: TimeControlId, mode: Mode) { return `${tc}:${mode}`; }
+for (const id of Object.keys(TIME_CONTROLS) as TimeControlId[]) {
+  for (const m of ['casual', 'ranked'] as Mode[]) queues.set(queueKey(id, m), []);
+}
 
-// Track ws -> userId
-const wsUser = new WeakMap<WebSocket, { userId: string; username: string }>();
+const wsUser = new WeakMap<WebSocket, { userId: string; username: string; createdAt?: string }>();
 
 function send(ws: WebSocket, msg: any) {
   if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg));
@@ -90,7 +116,6 @@ function broadcast(gameId: string, msg: any) {
 }
 
 function gamePublicState(g: LiveGame) {
-  // Apply real-time clock to active player
   let whiteTimeMs = g.whiteTimeMs;
   let blackTimeMs = g.blackTimeMs;
   if (g.status === 'active') {
@@ -100,6 +125,7 @@ function gamePublicState(g: LiveGame) {
   }
   return {
     id: g.id,
+    mode: g.mode,
     fen: g.chess.fen(),
     sanMoves: g.sanMoves,
     turn: g.chess.turn() as 'w' | 'b',
@@ -112,16 +138,20 @@ function gamePublicState(g: LiveGame) {
     timeControl: { id: g.tc.id, initial: g.tc.initialMs, increment: g.tc.incrementMs, label: g.tc.label },
     white: publicPlayer(g.white),
     black: publicPlayer(g.black),
+    drawOfferFrom: g.drawOfferFrom,
     ratingDelta: g.status === 'finished' ? g.ratingDelta : undefined,
   };
 }
 
 function publicPlayer(p: Player) {
-  // IMPORTANT: emit identical shape for human + bot to prevent disguise leakage.
-  // Only username + rating; clients render an initial badge for everyone.
+  // Identical shape for humans and bots — disguise via uniformity.
   return {
     username: p.username,
     rating: Math.round(p.rating),
+    country: p.country,
+    title: p.title,
+    avatar: p.avatar,
+    memberSinceYear: p.memberSinceYear,
   };
 }
 
@@ -145,11 +175,9 @@ async function saveUserRating(userId: string, tc: TimeControlId, rating: number,
   `);
 }
 
-// Initialize user's rating from imported games avg if no ranked games yet.
 async function seedRatingFromImports(userId: string, tc: TimeControlId): Promise<{ rating: number; rd: number; vol: number; gamesPlayed: number }> {
   const existing = await loadUserRating(userId, tc);
   if (existing.gamesPlayed > 0 || existing.rating !== DEFAULT_RATING.rating) return existing;
-  // Try to derive from imports — average of white/black ratings of games where the user played
   try {
     const rows: any[] = await db.execute(sql`
       SELECT username, white_username, black_username, white_rating, black_rating
@@ -167,6 +195,8 @@ async function seedRatingFromImports(userId: string, tc: TimeControlId): Promise
       if (ratings.length > 0) {
         const avg = Math.round(ratings.reduce((a, b) => a + b, 0) / ratings.length);
         const seeded = Math.max(600, Math.min(2400, avg));
+        // Persist seed so matchmaking and snapshot agree
+        await saveUserRating(userId, tc, seeded, 200, DEFAULT_RATING.vol, 0);
         return { rating: seeded, rd: 200, vol: DEFAULT_RATING.vol, gamesPlayed: 0 };
       }
     }
@@ -176,14 +206,12 @@ async function seedRatingFromImports(userId: string, tc: TimeControlId): Promise
   return { rating: 1200, rd: 350, vol: DEFAULT_RATING.vol, gamesPlayed: 0 };
 }
 
-function generateGameId() {
-  return crypto.randomBytes(8).toString('hex');
-}
+function generateGameId() { return crypto.randomBytes(8).toString('hex'); }
 
-async function createGame(white: Player, black: Player, tc: TimeControlSpec): Promise<LiveGame> {
+async function createGame(white: Player, black: Player, tc: TimeControlSpec, mode: Mode): Promise<LiveGame> {
   const game: LiveGame = {
     id: generateGameId(),
-    white, black, tc,
+    mode, white, black, tc,
     chess: new Chess(),
     whiteTimeMs: tc.initialMs,
     blackTimeMs: tc.initialMs,
@@ -192,10 +220,11 @@ async function createGame(white: Player, black: Player, tc: TimeControlSpec): Pr
     startedAt: Date.now(),
     sanMoves: [],
     ratingSnapshots: {},
+    ratingAfter: {},
     ratingDelta: { white: 0, black: 0 },
+    disconnectTimers: {},
   };
 
-  // Snapshot ratings for human players
   for (const color of ['white', 'black'] as const) {
     const p = color === 'white' ? white : black;
     if (p.kind === 'human' && p.userId) {
@@ -244,7 +273,6 @@ function scheduleBotIfNeeded(g: LiveGame) {
 }
 
 function applyMoveInternal(g: LiveGame, san: string): boolean {
-  // Reject if mover already flagged
   const now = Date.now();
   const elapsed = now - g.lastTickAt;
   const turnBefore = g.chess.turn();
@@ -255,17 +283,17 @@ function applyMoveInternal(g: LiveGame, san: string): boolean {
   }
   const moveResult = g.chess.move(san);
   if (!moveResult) return false;
-  const moverColor = moveResult.color; // 'w' | 'b'
+  const moverColor = moveResult.color;
   if (moverColor === 'w') g.whiteTimeMs = Math.max(0, g.whiteTimeMs - elapsed) + g.tc.incrementMs;
   else g.blackTimeMs = Math.max(0, g.blackTimeMs - elapsed) + g.tc.incrementMs;
   g.lastTickAt = now;
   g.sanMoves.push(moveResult.san);
+  // Any active draw offer is auto-declined when the offerer's opponent moves
+  if (g.drawOfferFrom && g.drawOfferFrom !== moverColor) g.drawOfferFrom = undefined;
+  // The mover making a move clears their own offer too (no double-offer spam)
+  if (g.drawOfferFrom === moverColor) g.drawOfferFrom = undefined;
 
-  // Check end states
-  if (g.chess.isCheckmate()) {
-    finishGame(g, moverColor === 'w' ? 'white' : 'black', 'checkmate');
-    return true;
-  }
+  if (g.chess.isCheckmate()) { finishGame(g, moverColor === 'w' ? 'white' : 'black', 'checkmate'); return true; }
   if (g.chess.isStalemate()) { finishGame(g, 'draw', 'stalemate'); return true; }
   if (g.chess.isThreefoldRepetition()) { finishGame(g, 'draw', 'draw_repetition'); return true; }
   if (g.chess.isInsufficientMaterial()) { finishGame(g, 'draw', 'draw_insufficient'); return true; }
@@ -285,17 +313,19 @@ function finishGame(g: LiveGame, result: 'white' | 'black' | 'draw', termination
   g.finishedAt = Date.now();
   if (g.expireTimer) { clearTimeout(g.expireTimer); g.expireTimer = undefined; }
   if (g.botTimer) { clearTimeout(g.botTimer); g.botTimer = undefined; }
+  if (g.disconnectTimers.w) { clearTimeout(g.disconnectTimers.w); g.disconnectTimers.w = undefined; }
+  if (g.disconnectTimers.b) { clearTimeout(g.disconnectTimers.b); g.disconnectTimers.b = undefined; }
 
-  // Update ratings + persist
-  void persistFinishedGame(g).catch(err => logger.error({ err, gameId: g.id }, 'persistFinishedGame failed'));
+  void persistFinishedGame(g)
+    .then(() => broadcast(g.id, { type: 'state', state: gamePublicState(g) }))
+    .catch(err => {
+      logger.error({ err, gameId: g.id }, 'persistFinishedGame failed');
+      broadcast(g.id, { type: 'state', state: gamePublicState(g) });
+    });
 
-  // Free user→game maps
   if (g.white.kind === 'human' && g.white.userId) userActiveGame.delete(g.white.userId);
   if (g.black.kind === 'human' && g.black.userId) userActiveGame.delete(g.black.userId);
 
-  broadcast(g.id, { type: 'state', state: gamePublicState(g) });
-
-  // Cleanup after grace period for reconnect
   setTimeout(() => {
     games.delete(g.id);
     subscribers.delete(g.id);
@@ -303,32 +333,34 @@ function finishGame(g: LiveGame, result: 'white' | 'black' | 'draw', termination
 }
 
 async function persistFinishedGame(g: LiveGame) {
-  // Compute Glicko updates
   const wScore = g.result === 'white' ? 1 : g.result === 'draw' ? 0.5 : 0;
   const bScore = 1 - wScore;
-
   const ws = g.ratingSnapshots.white;
   const bs = g.ratingSnapshots.black;
 
-  // White update — needs opponent rating for matchmaking purposes
-  if (ws) {
-    const opp = bs ? { rating: bs.rating, rd: bs.rd, vol: bs.vol } : { rating: g.black.rating, rd: 80, vol: DEFAULT_RATING.vol };
-    const newW = updateRating({ rating: ws.rating, rd: ws.rd, vol: ws.vol }, opp, wScore);
-    g.ratingDelta.white = Math.round(newW.rating - ws.rating);
-    await saveUserRating(ws.userId, g.tc.id, newW.rating, newW.rd, newW.vol, 1);
-  }
-  if (bs) {
-    const opp = ws ? { rating: ws.rating, rd: ws.rd, vol: ws.vol } : { rating: g.white.rating, rd: 80, vol: DEFAULT_RATING.vol };
-    const newB = updateRating({ rating: bs.rating, rd: bs.rd, vol: bs.vol }, opp, bScore);
-    g.ratingDelta.black = Math.round(newB.rating - bs.rating);
-    await saveUserRating(bs.userId, g.tc.id, newB.rating, newB.rd, newB.vol, 1);
+  // Only RANKED games update Glicko ratings
+  if (g.mode === 'ranked') {
+    if (ws) {
+      const opp = bs ? { rating: bs.rating, rd: bs.rd, vol: bs.vol } : { rating: g.black.rating, rd: 80, vol: DEFAULT_RATING.vol };
+      const newW = updateRating({ rating: ws.rating, rd: ws.rd, vol: ws.vol }, opp, wScore);
+      g.ratingDelta.white = Math.round(newW.rating - ws.rating);
+      g.ratingAfter.white = newW;
+      await saveUserRating(ws.userId, g.tc.id, newW.rating, newW.rd, newW.vol, 1);
+    }
+    if (bs) {
+      const opp = ws ? { rating: ws.rating, rd: ws.rd, vol: ws.vol } : { rating: g.white.rating, rd: 80, vol: DEFAULT_RATING.vol };
+      const newB = updateRating({ rating: bs.rating, rd: bs.rd, vol: bs.vol }, opp, bScore);
+      g.ratingDelta.black = Math.round(newB.rating - bs.rating);
+      g.ratingAfter.black = newB;
+      await saveUserRating(bs.userId, g.tc.id, newB.rating, newB.rd, newB.vol, 1);
+    }
   }
 
   // Build PGN
   const pgnChess = new Chess();
   for (const san of g.sanMoves) pgnChess.move(san);
   pgnChess.header(
-    'Event', `ChessScout ${g.tc.label}`,
+    'Event', `ChessScout ${g.mode === 'ranked' ? 'Ranked' : 'Casual'} ${g.tc.label}`,
     'Site', 'ChessScout.net',
     'Date', new Date(g.startedAt).toISOString().slice(0, 10).replace(/-/g, '.'),
     'White', g.white.username,
@@ -341,8 +373,31 @@ async function persistFinishedGame(g: LiveGame) {
   );
   const pgn = pgnChess.pgn();
 
-  // Determine `username` field for each persisted record (for ownership filtering)
-  // Persist one record per human player so it shows up in their Games page.
+  // Persist live_games row (canonical record)
+  try {
+    await db.execute(sql`
+      INSERT INTO live_games (
+        id, mode, time_control, white_user_id, black_user_id,
+        white_username, black_username, white_persona_id, black_persona_id,
+        result, termination, pgn,
+        white_rating_before, black_rating_before, white_rating_after, black_rating_after,
+        started_at, finished_at
+      ) VALUES (
+        ${g.id}, ${g.mode}, ${g.tc.id},
+        ${g.white.userId ?? null}, ${g.black.userId ?? null},
+        ${g.white.username}, ${g.black.username},
+        ${g.white.personaId ?? null}, ${g.black.personaId ?? null},
+        ${g.result}, ${g.termination}, ${pgn},
+        ${ws?.rating ?? null}, ${bs?.rating ?? null},
+        ${g.ratingAfter.white?.rating ?? null}, ${g.ratingAfter.black?.rating ?? null},
+        ${new Date(g.startedAt).toISOString()}, ${new Date(g.finishedAt!).toISOString()}
+      )
+    `);
+  } catch (e) {
+    logger.warn({ e, gameId: g.id }, 'failed to persist live_games row');
+  }
+
+  // Dual-write per human player into the unified games table so it appears in Dashboard/Games/Review.
   const playedAtIso = new Date(g.startedAt);
   const tcLabel = `${Math.floor(g.tc.initialMs / 60000)}+${Math.floor(g.tc.incrementMs / 1000)}`;
   for (const side of ['white', 'black'] as const) {
@@ -369,15 +424,66 @@ async function persistFinishedGame(g: LiveGame) {
         platform: 'chessscout',
       });
     } catch (e) {
-      logger.warn({ e, gameId: g.id, userId: p.userId }, 'failed to persist live game');
+      logger.warn({ e, gameId: g.id, userId: p.userId }, 'failed to persist live game into games table');
     }
   }
 }
 
-// --- Matchmaking ---
+// --- Matchmaking with widening bracket ---
 
-async function joinQueue(ws: WebSocket, userId: string, username: string, tcId: TimeControlId) {
-  // Already in a game?
+function matchWindowFor(joinedAt: number): number {
+  const waitedSec = (Date.now() - joinedAt) / 1000;
+  // start at 100, +50 every 5s, max 800
+  return Math.min(800, 100 + Math.floor(waitedSec / 5) * 50);
+}
+
+function tryMatchInQueue(key: string) {
+  const queue = queues.get(key)!;
+  if (queue.length < 2) return;
+  // Sort by joinedAt to prioritize longest waiters
+  const sorted = [...queue].sort((a, b) => a.joinedAt - b.joinedAt);
+  for (let i = 0; i < sorted.length; i++) {
+    const a = sorted[i];
+    const aWin = matchWindowFor(a.joinedAt);
+    for (let j = i + 1; j < sorted.length; j++) {
+      const b = sorted[j];
+      const bWin = matchWindowFor(b.joinedAt);
+      const window = Math.max(aWin, bWin);
+      if (Math.abs(a.rating - b.rating) <= window) {
+        // Match!
+        const idxA = queue.indexOf(a);
+        const idxB = queue.indexOf(b);
+        if (idxA < 0 || idxB < 0) return;
+        // Remove highest index first
+        if (idxA > idxB) { queue.splice(idxA, 1); queue.splice(idxB, 1); }
+        else { queue.splice(idxB, 1); queue.splice(idxA, 1); }
+        clearTimeout(a.fallbackTimer);
+        clearTimeout(b.fallbackTimer);
+        void startHumanMatch(a, b);
+        return;
+      }
+    }
+  }
+}
+
+async function startHumanMatch(a: WaitingPlayer, b: WaitingPlayer) {
+  const whiteFirst = Math.random() < 0.5;
+  const aProfile = humanProfile(a.userId, a.username);
+  const bProfile = humanProfile(b.userId, b.username);
+  const aPlayer: Player = { kind: 'human', userId: a.userId, username: a.username, rating: a.rating, ...aProfile };
+  const bPlayer: Player = { kind: 'human', userId: b.userId, username: b.username, rating: b.rating, ...bProfile };
+  const game = await createGame(whiteFirst ? aPlayer : bPlayer, whiteFirst ? bPlayer : aPlayer, a.tc, a.mode);
+  subscribeWs(a.ws, game.id);
+  subscribeWs(b.ws, game.id);
+  send(a.ws, { type: 'match_found', state: gamePublicState(game), color: whiteFirst ? 'w' : 'b' });
+  send(b.ws, { type: 'match_found', state: gamePublicState(game), color: whiteFirst ? 'b' : 'w' });
+}
+
+setInterval(() => {
+  for (const key of queues.keys()) tryMatchInQueue(key);
+}, WIDEN_INTERVAL_MS).unref();
+
+async function joinQueue(ws: WebSocket, userId: string, username: string, tcId: TimeControlId, mode: Mode) {
   const existing = userActiveGame.get(userId);
   if (existing) {
     const g = games.get(existing);
@@ -387,40 +493,25 @@ async function joinQueue(ws: WebSocket, userId: string, username: string, tcId: 
       return;
     }
   }
-  // Already queued? Cancel old.
   cancelQueue(userId);
-
   const tc = TIME_CONTROLS[tcId];
   if (!tc) { send(ws, { type: 'error', message: 'Invalid time control' }); return; }
+  if (mode !== 'casual' && mode !== 'ranked') { send(ws, { type: 'error', message: 'Invalid mode' }); return; }
 
   const seed = await seedRatingFromImports(userId, tcId);
   const myRating = seed.rating;
 
-  // Try to match against another waiter
-  const queue = queues.get(tcId)!;
-  const idx = queue.findIndex(w => Math.abs(w.rating - myRating) <= 200 && w.userId !== userId);
-  if (idx >= 0) {
-    const opp = queue.splice(idx, 1)[0];
-    clearTimeout(opp.fallbackTimer);
-    const whiteFirst = Math.random() < 0.5;
-    const myPlayer: Player = { kind: 'human', userId, username, rating: myRating };
-    const oppPlayer: Player = { kind: 'human', userId: opp.userId, username: opp.username, rating: opp.rating };
-    const game = await createGame(whiteFirst ? myPlayer : oppPlayer, whiteFirst ? oppPlayer : myPlayer, tc);
-    subscribeWs(ws, game.id);
-    subscribeWs(opp.ws, game.id);
-    send(ws,     { type: 'match_found', state: gamePublicState(game), color: whiteFirst ? 'w' : 'b' });
-    send(opp.ws, { type: 'match_found', state: gamePublicState(game), color: whiteFirst ? 'b' : 'w' });
-    return;
-  }
-
-  // Queue with bot fallback
-  const fallbackTimer = setTimeout(() => spawnBotMatch(userId, username, myRating, tcId), MATCH_WAIT_MS);
-  queue.push({ userId, username, rating: myRating, ws, tc, joinedAt: Date.now(), fallbackTimer });
-  send(ws, { type: 'queued', tcId, eta: MATCH_WAIT_MS });
+  const key = queueKey(tcId, mode);
+  const queue = queues.get(key)!;
+  const fallbackTimer = setTimeout(() => spawnBotMatch(userId, username, myRating, tcId, mode), BOT_FALLBACK_MS);
+  queue.push({ userId, username, rating: myRating, ws, tc, mode, joinedAt: Date.now(), fallbackTimer });
+  send(ws, { type: 'queued', tcId, mode, eta: BOT_FALLBACK_MS });
+  // Try immediate match
+  tryMatchInQueue(key);
 }
 
 function cancelQueue(userId: string) {
-  for (const [tcId, list] of queues) {
+  for (const list of queues.values()) {
     const idx = list.findIndex(w => w.userId === userId);
     if (idx >= 0) {
       clearTimeout(list[idx].fallbackTimer);
@@ -429,24 +520,24 @@ function cancelQueue(userId: string) {
   }
 }
 
-async function spawnBotMatch(userId: string, username: string, userRating: number, tcId: TimeControlId) {
-  const queue = queues.get(tcId)!;
+async function spawnBotMatch(userId: string, username: string, userRating: number, tcId: TimeControlId, mode: Mode) {
+  const queue = queues.get(queueKey(tcId, mode))!;
   const idx = queue.findIndex(w => w.userId === userId);
   if (idx < 0) return;
   const waiter = queue.splice(idx, 1)[0];
   clearTimeout(waiter.fallbackTimer);
   const tc = TIME_CONTROLS[tcId];
-  // Pick persona within ±150 of user rating
   const targetRating = Math.max(600, Math.min(2200, userRating + (Math.random() * 200 - 100)));
   const persona: Persona = findPersonaForRating(targetRating);
-  const userPlayer: Player = { kind: 'human', userId, username, rating: userRating };
+  const userProfile = humanProfile(userId, username);
+  const userPlayer: Player = { kind: 'human', userId, username, rating: userRating, ...userProfile };
   const botPlayer: Player = {
     kind: 'bot', username: persona.username, rating: persona.rating,
     country: persona.country, title: persona.title, avatar: persona.avatar,
     memberSinceYear: persona.memberSinceYear, personaId: persona.id,
   };
   const userIsWhite = Math.random() < 0.5;
-  const game = await createGame(userIsWhite ? userPlayer : botPlayer, userIsWhite ? botPlayer : userPlayer, tc);
+  const game = await createGame(userIsWhite ? userPlayer : botPlayer, userIsWhite ? botPlayer : userPlayer, tc, mode);
   subscribeWs(waiter.ws, game.id);
   send(waiter.ws, { type: 'match_found', state: gamePublicState(game), color: userIsWhite ? 'w' : 'b' });
 }
@@ -458,7 +549,7 @@ function subscribeWs(ws: WebSocket, gameId: string) {
 }
 
 function unsubscribeAll(ws: WebSocket) {
-  for (const [, set] of subscribers) set.delete(ws);
+  for (const set of subscribers.values()) set.delete(ws);
 }
 
 function handleMove(ws: WebSocket, userId: string, gameId: string, san: string) {
@@ -481,6 +572,50 @@ function handleResign(ws: WebSocket, userId: string, gameId: string) {
   else if (g.black.userId === userId) finishGame(g, 'white', 'resignation');
 }
 
+function handleDrawOffer(ws: WebSocket, userId: string, gameId: string) {
+  const g = games.get(gameId);
+  if (!g || g.status !== 'active') return;
+  let mySide: 'w' | 'b' | null = null;
+  if (g.white.userId === userId) mySide = 'w';
+  else if (g.black.userId === userId) mySide = 'b';
+  if (!mySide) return;
+  const oppPlayer = mySide === 'w' ? g.black : g.white;
+  g.drawOfferFrom = mySide;
+  broadcast(g.id, { type: 'state', state: gamePublicState(g) });
+  if (oppPlayer.kind === 'bot') {
+    // Behave like a human: think for 1.5–4s, then accept (~15%) or decline.
+    // In losing positions for the bot, accept rate goes up. We keep it lightweight.
+    const delay = 1500 + Math.floor(Math.random() * 2500);
+    setTimeout(() => {
+      if (g.status !== 'active' || g.drawOfferFrom !== mySide) return;
+      const accept = Math.random() < 0.15;
+      if (accept) finishGame(g, 'draw', 'draw_agreement');
+      else { g.drawOfferFrom = undefined; broadcast(g.id, { type: 'draw_declined' }); broadcast(g.id, { type: 'state', state: gamePublicState(g) }); }
+    }, delay);
+  }
+}
+
+function handleDrawAccept(ws: WebSocket, userId: string, gameId: string) {
+  const g = games.get(gameId);
+  if (!g || g.status !== 'active' || !g.drawOfferFrom) return;
+  let mySide: 'w' | 'b' | null = null;
+  if (g.white.userId === userId) mySide = 'w';
+  else if (g.black.userId === userId) mySide = 'b';
+  if (!mySide || mySide === g.drawOfferFrom) return;
+  finishGame(g, 'draw', 'draw_agreement');
+}
+
+function handleDrawDecline(ws: WebSocket, userId: string, gameId: string) {
+  const g = games.get(gameId);
+  if (!g || !g.drawOfferFrom) return;
+  let mySide: 'w' | 'b' | null = null;
+  if (g.white.userId === userId) mySide = 'w';
+  else if (g.black.userId === userId) mySide = 'b';
+  if (!mySide || mySide === g.drawOfferFrom) return;
+  g.drawOfferFrom = undefined;
+  broadcast(g.id, { type: 'state', state: gamePublicState(g) });
+}
+
 function handleSubscribe(ws: WebSocket, gameId: string) {
   const g = games.get(gameId);
   if (!g) return send(ws, { type: 'error', message: 'Game not found' });
@@ -490,7 +625,47 @@ function handleSubscribe(ws: WebSocket, gameId: string) {
   else if (g.black.userId === userId) color = 'b';
   if (!color) return send(ws, { type: 'error', message: 'Not a participant' });
   subscribeWs(ws, gameId);
+  // Cancel any pending disconnect timer for this side
+  if (g.disconnectTimers[color]) {
+    clearTimeout(g.disconnectTimers[color]!);
+    g.disconnectTimers[color] = undefined;
+    broadcast(g.id, { type: 'opponent_reconnected', side: color });
+  }
   send(ws, { type: 'match_found', state: gamePublicState(g), color });
+}
+
+function handleSocketClose(ws: WebSocket) {
+  const info = wsUser.get(ws);
+  if (info) {
+    const set = userSockets.get(info.userId);
+    if (set) {
+      set.delete(ws);
+      if (set.size === 0) userSockets.delete(info.userId);
+    }
+    cancelQueue(info.userId);
+    // Disconnect grace for any active game where they're a participant
+    if (!userSockets.has(info.userId)) {
+      const gid = userActiveGame.get(info.userId);
+      if (gid) {
+        const g = games.get(gid);
+        if (g && g.status === 'active') {
+          const side: 'w' | 'b' | null =
+            g.white.userId === info.userId ? 'w' :
+            g.black.userId === info.userId ? 'b' : null;
+          if (side) {
+            broadcast(g.id, { type: 'opponent_disconnected', side, graceMs: DISCONNECT_GRACE_MS });
+            if (g.disconnectTimers[side]) clearTimeout(g.disconnectTimers[side]!);
+            g.disconnectTimers[side] = setTimeout(() => {
+              if (g.status !== 'active') return;
+              if (userSockets.has(info.userId)) return; // reconnected
+              finishGame(g, side === 'w' ? 'black' : 'white', 'abandoned');
+            }, DISCONNECT_GRACE_MS);
+          }
+        }
+      }
+    }
+  }
+  unsubscribeAll(ws);
 }
 
 function parseCookie(req: IncomingMessage): Record<string, string> {
@@ -522,9 +697,13 @@ export function attachLiveServer(server: HttpServer) {
     const userInfo = {
       userId: session.user.id,
       username: session.user.chesscomUsername || session.user.lichessUsername || (session.user.firstName || session.user.email?.split('@')[0] || 'Player'),
+      createdAt: (session.user as any).createdAt,
     };
     wss.handleUpgrade(req, socket, head, ws => {
       wsUser.set(ws, userInfo);
+      let set = userSockets.get(userInfo.userId);
+      if (!set) { set = new Set(); userSockets.set(userInfo.userId, set); }
+      set.add(ws);
       wss.emit('connection', ws, req);
     });
   });
@@ -540,7 +719,7 @@ export function attachLiveServer(server: HttpServer) {
       try {
         switch (msg.type) {
           case 'queue':
-            await joinQueue(ws, info.userId, info.username, msg.timeControl);
+            await joinQueue(ws, info.userId, info.username, msg.timeControl, (msg.mode as Mode) || 'casual');
             break;
           case 'cancel':
             cancelQueue(info.userId);
@@ -551,6 +730,15 @@ export function attachLiveServer(server: HttpServer) {
             break;
           case 'resign':
             handleResign(ws, info.userId, msg.gameId);
+            break;
+          case 'draw_offer':
+            handleDrawOffer(ws, info.userId, msg.gameId);
+            break;
+          case 'draw_accept':
+            handleDrawAccept(ws, info.userId, msg.gameId);
+            break;
+          case 'draw_decline':
+            handleDrawDecline(ws, info.userId, msg.gameId);
             break;
           case 'subscribe':
             handleSubscribe(ws, msg.gameId);
@@ -565,16 +753,30 @@ export function attachLiveServer(server: HttpServer) {
       }
     });
 
-    ws.on('close', () => {
-      cancelQueue(info.userId);
-      unsubscribeAll(ws);
-    });
+    ws.on('close', () => handleSocketClose(ws));
   });
 
   logger.info('Live play WebSocket server attached on /api/live/ws');
 }
 
-// --- REST helpers exported for routes ---
+export async function seedBotPersonas() {
+  for (const p of getAllPersonas()) {
+    try {
+      await db.execute(sql`
+        INSERT INTO bot_personas (id, username, rating, country, title, avatar, member_since_year)
+        VALUES (${p.id}, ${p.username}, ${Math.round(p.rating)}, ${p.country}, ${p.title}, ${p.avatar}, ${p.memberSinceYear})
+        ON CONFLICT (id) DO UPDATE SET
+          rating = EXCLUDED.rating, country = EXCLUDED.country, title = EXCLUDED.title,
+          avatar = EXCLUDED.avatar, member_since_year = EXCLUDED.member_since_year
+      `);
+    } catch (e) {
+      logger.warn({ e, personaId: p.id }, 'persona upsert failed');
+      break; // table likely missing; abort batch
+    }
+  }
+}
+
+// --- REST helpers ---
 export async function getUserRatings(userId: string) {
   const out: Record<string, { rating: number; rd: number; gamesPlayed: number; isProvisional: boolean }> = {};
   for (const id of Object.keys(TIME_CONTROLS) as TimeControlId[]) {

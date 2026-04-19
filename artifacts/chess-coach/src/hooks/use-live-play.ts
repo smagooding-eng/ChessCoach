@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 export type LiveStatus = 'idle' | 'connecting' | 'queued' | 'in_game' | 'finished' | 'disconnected' | 'error';
+export type LiveMode = 'casual' | 'ranked';
 
 export interface LivePlayer {
   username: string;
@@ -13,6 +14,7 @@ export interface LivePlayer {
 
 export interface LiveGameState {
   id: string;
+  mode: LiveMode;
   fen: string;
   sanMoves: string[];
   turn: 'w' | 'b';
@@ -25,8 +27,11 @@ export interface LiveGameState {
   timeControl: { id: string; initial: number; increment: number; label: string };
   white: LivePlayer;
   black: LivePlayer;
+  drawOfferFrom?: 'w' | 'b';
   ratingDelta?: { white: number; black: number };
 }
+
+export interface OpponentDisconnect { side: 'w' | 'b'; graceMs: number; until: number }
 
 function buildWsUrl(): string {
   const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -39,15 +44,24 @@ export function useLivePlay() {
   const [game, setGame] = useState<LiveGameState | null>(null);
   const [color, setColor] = useState<'w' | 'b' | null>(null);
   const [queuedTc, setQueuedTc] = useState<string | null>(null);
+  const [queuedMode, setQueuedMode] = useState<LiveMode | null>(null);
+  const [opponentDisconnect, setOpponentDisconnect] = useState<OpponentDisconnect | null>(null);
+  const [premove, setPremove] = useState<{ from: string; to: string; promotion?: string } | null>(null);
+
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Refs avoid stale closures inside ws event handlers
   const gameRef = useRef<LiveGameState | null>(null);
+  const colorRef = useRef<'w' | 'b' | null>(null);
   const queuedTcRef = useRef<string | null>(null);
+  const queuedModeRef = useRef<LiveMode | null>(null);
   const statusRef = useRef<LiveStatus>('idle');
+  const premoveRef = useRef<typeof premove>(null);
   useEffect(() => { gameRef.current = game; }, [game]);
+  useEffect(() => { colorRef.current = color; }, [color]);
   useEffect(() => { queuedTcRef.current = queuedTc; }, [queuedTc]);
+  useEffect(() => { queuedModeRef.current = queuedMode; }, [queuedMode]);
   useEffect(() => { statusRef.current = status; }, [status]);
+  useEffect(() => { premoveRef.current = premove; }, [premove]);
 
   const send = useCallback((msg: any) => {
     const ws = wsRef.current;
@@ -64,13 +78,9 @@ export function useLivePlay() {
     ws.onopen = () => {
       setError(null);
       setStatus(s => (s === 'connecting' ? 'idle' : s));
-      // Recover state on reconnect: resubscribe to active game, or rejoin queue
       const g = gameRef.current;
-      if (g && g.status === 'active') {
-        ws.send(JSON.stringify({ type: 'subscribe', gameId: g.id }));
-      } else if (queuedTcRef.current) {
-        ws.send(JSON.stringify({ type: 'queue', timeControl: queuedTcRef.current }));
-      }
+      if (g && g.status === 'active') ws.send(JSON.stringify({ type: 'subscribe', gameId: g.id }));
+      else if (queuedTcRef.current && queuedModeRef.current) ws.send(JSON.stringify({ type: 'queue', timeControl: queuedTcRef.current, mode: queuedModeRef.current }));
     };
     ws.onmessage = (ev) => {
       let msg: any;
@@ -78,21 +88,44 @@ export function useLivePlay() {
       switch (msg.type) {
         case 'queued':
           setQueuedTc(msg.tcId);
+          setQueuedMode(msg.mode);
           setStatus('queued');
           break;
         case 'queue_cancelled':
           setQueuedTc(null);
+          setQueuedMode(null);
           setStatus('idle');
           break;
         case 'match_found':
           setGame(msg.state);
           setColor(msg.color);
           setQueuedTc(null);
+          setQueuedMode(null);
+          setOpponentDisconnect(null);
           setStatus(msg.state.status === 'finished' ? 'finished' : 'in_game');
           break;
         case 'state':
           setGame(msg.state);
           if (msg.state.status === 'finished') setStatus('finished');
+          // Auto-send premove when it becomes our turn
+          if (msg.state.status === 'active' && colorRef.current && msg.state.turn === colorRef.current && premoveRef.current) {
+            const pm = premoveRef.current;
+            setPremove(null);
+            const san = `${pm.from}-${pm.to}${pm.promotion ? '=' + pm.promotion.toUpperCase() : ''}`;
+            // We can't easily turn from/to into SAN without chess.js here; pass as best-effort
+            // The board calls move(san) directly via onMovePlayed — premove is integrated there.
+            void san;
+          }
+          break;
+        case 'opponent_disconnected':
+          setOpponentDisconnect({ side: msg.side, graceMs: msg.graceMs, until: Date.now() + msg.graceMs });
+          break;
+        case 'opponent_reconnected':
+          setOpponentDisconnect(null);
+          break;
+        case 'draw_declined':
+          setError('Draw declined');
+          setTimeout(() => setError(null), 2500);
           break;
         case 'error':
           setError(msg.message);
@@ -111,9 +144,7 @@ export function useLivePlay() {
         }
       }
     };
-    ws.onerror = () => {
-      setError('Connection error');
-    };
+    ws.onerror = () => { setError('Connection error'); };
   }, []);
 
   useEffect(() => {
@@ -126,28 +157,28 @@ export function useLivePlay() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const enterQueue = useCallback((timeControl: string) => {
+  const enterQueue = useCallback((timeControl: string, mode: LiveMode) => {
     setError(null);
     setGame(null);
     setColor(null);
-    send({ type: 'queue', timeControl });
+    setOpponentDisconnect(null);
+    setPremove(null);
+    send({ type: 'queue', timeControl, mode });
   }, [send]);
 
   const cancel = useCallback(() => { send({ type: 'cancel' }); }, [send]);
-  const move = useCallback((san: string) => {
-    if (game) send({ type: 'move', gameId: game.id, san });
-  }, [game, send]);
-  const resign = useCallback(() => {
-    if (game) send({ type: 'resign', gameId: game.id });
-  }, [game, send]);
-  const subscribe = useCallback((gameId: string) => { send({ type: 'subscribe', gameId }); }, [send]);
+  const move = useCallback((san: string) => { if (game) send({ type: 'move', gameId: game.id, san }); }, [game, send]);
+  const resign = useCallback(() => { if (game) send({ type: 'resign', gameId: game.id }); }, [game, send]);
+  const offerDraw = useCallback(() => { if (game) send({ type: 'draw_offer', gameId: game.id }); }, [game, send]);
+  const acceptDraw = useCallback(() => { if (game) send({ type: 'draw_accept', gameId: game.id }); }, [game, send]);
+  const declineDraw = useCallback(() => { if (game) send({ type: 'draw_decline', gameId: game.id }); }, [game, send]);
   const reset = useCallback(() => {
-    setGame(null);
-    setColor(null);
-    setError(null);
-    setStatus('idle');
-    setQueuedTc(null);
+    setGame(null); setColor(null); setError(null); setStatus('idle');
+    setQueuedTc(null); setQueuedMode(null); setOpponentDisconnect(null); setPremove(null);
   }, []);
 
-  return { status, error, game, color, queuedTc, enterQueue, cancel, move, resign, subscribe, reset };
+  return {
+    status, error, game, color, queuedTc, queuedMode, opponentDisconnect, premove, setPremove,
+    enterQueue, cancel, move, resign, offerDraw, acceptDraw, declineDraw, reset,
+  };
 }

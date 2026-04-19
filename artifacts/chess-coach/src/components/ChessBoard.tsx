@@ -92,6 +92,11 @@ interface ChessBoardProps {
   onMovePlayed?: (san: string, isCorrect: boolean) => void;
   lastMove?: { from: string; to: string } | null;
   moveQuality?: MoveQuality | null;
+  // Premove: allow user to set a planned move while it's not their turn.
+  premoveMode?: boolean;
+  premoveColor?: 'w' | 'b';
+  premove?: { from: string; to: string } | null;
+  onPremoveSet?: (premove: { from: string; to: string } | null) => void;
 }
 
 export function ChessBoard({
@@ -102,6 +107,10 @@ export function ChessBoard({
   onMovePlayed,
   lastMove,
   moveQuality,
+  premoveMode = false,
+  premoveColor,
+  premove,
+  onPremoveSet,
 }: ChessBoardProps) {
   const position = normalizeFen(fen || START_FEN);
   const [selectedSquare, setSelectedSquare] = useState<string | null>(null);
@@ -160,27 +169,39 @@ export function ChessBoard({
     }
   }, []);
 
-  const handlePieceDrop = useCallback(({ sourceSquare, targetSquare }: { piece: unknown; sourceSquare: string; targetSquare: string | null }) => {
-    if (!practiceMode || !targetSquare) return false;
+  const handlePieceDrop = useCallback(({ sourceSquare, targetSquare, piece }: { piece: { pieceType: string } | null; sourceSquare: string; targetSquare: string | null }) => {
+    if (!targetSquare) return false;
+    if (premoveMode && !practiceMode && piece) {
+      const pc = piece.pieceType[0].toLowerCase();
+      if (premoveColor && pc !== premoveColor) return false;
+      onPremoveSet?.({ from: sourceSquare, to: targetSquare });
+      return true;
+    }
+    if (!practiceMode) return false;
     if (sourceSquare === targetSquare) {
       setSelectedSquare(prev => prev === sourceSquare ? null : sourceSquare);
       return false;
     }
     setSelectedSquare(null);
     return tryMove(sourceSquare, targetSquare);
-  }, [practiceMode, tryMove]);
+  }, [practiceMode, premoveMode, premoveColor, onPremoveSet, tryMove]);
 
   const canDragPiece = useCallback(({ piece }: { piece: { pieceType: string } | null }) => {
-    if (!practiceMode || !piece) return false;
-    try {
-      const chess = new Chess(positionRef.current);
-      const turn = chess.turn();
-      const pieceColor = piece.pieceType[0].toLowerCase();
-      return pieceColor === turn;
-    } catch {
-      return false;
+    if (!piece) return false;
+    if (practiceMode) {
+      try {
+        const chess = new Chess(positionRef.current);
+        const turn = chess.turn();
+        const pieceColor = piece.pieceType[0].toLowerCase();
+        return pieceColor === turn;
+      } catch { return false; }
     }
-  }, [practiceMode]);
+    if (premoveMode) {
+      const pc = piece.pieceType[0].toLowerCase();
+      return premoveColor ? pc === premoveColor : true;
+    }
+    return false;
+  }, [practiceMode, premoveMode, premoveColor]);
 
   const selectedSquareRef = useRef(selectedSquare);
   selectedSquareRef.current = selectedSquare;
@@ -188,6 +209,20 @@ export function ChessBoard({
   legalTargetsRef.current = legalTargets;
 
   const handleSquareClick = useCallback(({ square, piece }: { square: string; piece: { pieceType: string } | null }) => {
+    if (premoveMode && !practiceMode) {
+      const sel = selectedSquareRef.current;
+      if (sel) {
+        if (square === sel) { setSelectedSquare(null); return; }
+        onPremoveSet?.({ from: sel, to: square });
+        setSelectedSquare(null);
+        return;
+      }
+      if (piece) {
+        const pc = piece.pieceType[0].toLowerCase();
+        if (!premoveColor || pc === premoveColor) setSelectedSquare(square);
+      }
+      return;
+    }
     if (!practiceMode) return;
     const sel = selectedSquareRef.current;
 
@@ -243,6 +278,12 @@ export function ChessBoard({
       styles[selectedSquare] = { background: 'rgba(100, 180, 255, 0.55)', borderRadius: '4px' };
     }
 
+    // Premove highlight
+    if (premove) {
+      styles[premove.from] = { ...(styles[premove.from] || {}), background: 'rgba(255, 140, 90, 0.45)', boxShadow: 'inset 0 0 0 2px rgba(255,140,90,0.9)' };
+      styles[premove.to] = { ...(styles[premove.to] || {}), background: 'rgba(255, 140, 90, 0.55)', boxShadow: 'inset 0 0 0 2px rgba(255,140,90,0.9)' };
+    }
+
     for (const sq of legalTargets) {
       if (legalMoveInfo.captures.has(sq)) {
         styles[sq] = {
@@ -277,7 +318,7 @@ export function ChessBoard({
           options={{
             position,
             boardOrientation: flipped ? 'black' : 'white',
-            allowDragging: practiceMode,
+            allowDragging: practiceMode || premoveMode,
             dragActivationDistance: 8,
             canDragPiece,
             onPieceDrop: handlePieceDrop,
@@ -286,7 +327,7 @@ export function ChessBoard({
             boardStyle: {
               borderRadius: '10px',
               boxShadow: '0 30px 60px rgba(0,0,0,0.6)',
-              cursor: practiceMode ? 'pointer' : 'default',
+              cursor: (practiceMode || premoveMode) ? 'pointer' : 'default',
             },
             lightSquareStyle: { backgroundColor: '#f0d9b5' },
             darkSquareStyle: { backgroundColor: '#b58863' },

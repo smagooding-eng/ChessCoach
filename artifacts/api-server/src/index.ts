@@ -5,7 +5,7 @@ import { logger } from "./lib/logger";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { createServer } from "http";
-import { attachLiveServer } from "./lib/liveServer";
+import { attachLiveServer, seedBotPersonas } from "./lib/liveServer";
 
 async function initStripe() {
   const databaseUrl = process.env.DATABASE_URL;
@@ -119,6 +119,38 @@ async function runSchemaMigrations() {
       updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
       PRIMARY KEY (user_id, time_control)
     )`);
+    await db.execute(sql`CREATE TABLE IF NOT EXISTS bot_personas (
+      id VARCHAR PRIMARY KEY,
+      username VARCHAR NOT NULL,
+      rating INTEGER NOT NULL,
+      country VARCHAR,
+      title VARCHAR,
+      avatar VARCHAR,
+      member_since_year INTEGER,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )`);
+    await db.execute(sql`CREATE TABLE IF NOT EXISTS live_games (
+      id VARCHAR PRIMARY KEY,
+      mode VARCHAR NOT NULL,
+      time_control VARCHAR NOT NULL,
+      white_user_id VARCHAR,
+      black_user_id VARCHAR,
+      white_username VARCHAR NOT NULL,
+      black_username VARCHAR NOT NULL,
+      white_persona_id VARCHAR,
+      black_persona_id VARCHAR,
+      result VARCHAR NOT NULL,
+      termination VARCHAR NOT NULL,
+      pgn TEXT NOT NULL,
+      white_rating_before REAL,
+      black_rating_before REAL,
+      white_rating_after REAL,
+      black_rating_after REAL,
+      started_at TIMESTAMPTZ NOT NULL,
+      finished_at TIMESTAMPTZ NOT NULL
+    )`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_live_games_white_user ON live_games(white_user_id, finished_at DESC)`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_live_games_black_user ON live_games(black_user_id, finished_at DESC)`);
 
     logger.info('Schema migrations complete');
   } catch (err) {
@@ -138,6 +170,7 @@ httpServer.listen(port, (err?: Error) => {
 });
 
 runSchemaMigrations().then(() => {
+  void seedBotPersonas().catch((err) => logger.warn({ err }, 'seedBotPersonas failed'));
   import("./lib/growthScheduler").then(({ startGrowthScheduler }) => {
     startGrowthScheduler();
   }).catch((err) => {

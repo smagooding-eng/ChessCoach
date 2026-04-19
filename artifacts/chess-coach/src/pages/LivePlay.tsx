@@ -1,8 +1,8 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { useLivePlay } from '@/hooks/use-live-play';
+import React, { useEffect, useState } from 'react';
+import { useLivePlay, type LiveMode } from '@/hooks/use-live-play';
 import { useLiveRatings } from '@/hooks/use-live-ratings';
 import { LiveGame } from '@/pages/LiveGame';
-import { Loader2, Swords, Zap, Clock, X, Trophy } from 'lucide-react';
+import { Loader2, Swords, Zap, Clock, X, Trophy, Sparkles, Award } from 'lucide-react';
 
 const CHESSCOM_GREEN = '#81b64c';
 const TEXT_LIGHT = '#e8e6e3';
@@ -17,8 +17,8 @@ const TC_OPTIONS = [
 export function LivePlay() {
   const live = useLivePlay();
   const { data: ratingsData, refetch } = useLiveRatings();
+  const [mode, setMode] = useState<LiveMode>('casual');
 
-  // Reload ratings whenever a game ends
   useEffect(() => {
     if (live.status === 'finished') void refetch();
   }, [live.status, refetch]);
@@ -41,7 +41,7 @@ export function LivePlay() {
           <div>
             <p className="text-lg font-black" style={{ color: TEXT_LIGHT }}>Searching for an opponent…</p>
             <p className="text-sm mt-1" style={{ color: TEXT_MUTED }}>
-              {TC_OPTIONS.find(t => t.id === live.queuedTc)?.label} · we usually find one within 30s
+              {TC_OPTIONS.find(t => t.id === live.queuedTc)?.label} · {live.queuedMode === 'ranked' ? 'Ranked' : 'Casual'} · we usually find one within 30s
             </p>
           </div>
           <button onClick={live.cancel}
@@ -51,44 +51,64 @@ export function LivePlay() {
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
-          {TC_OPTIONS.map(opt => {
-            const r = ratingsData?.ratings[opt.id];
-            return (
-              <button
-                key={opt.id}
-                disabled={live.status === 'connecting' || live.status === 'disconnected'}
-                onClick={() => live.enterQueue(opt.id)}
-                className="text-left p-5 rounded-2xl transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
+        <>
+          {/* Mode toggle */}
+          <div className="inline-flex rounded-xl p-1" style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.06)' }}>
+            {(['casual','ranked'] as LiveMode[]).map(m => (
+              <button key={m} onClick={() => setMode(m)}
+                className="px-4 py-2 rounded-lg text-xs font-black uppercase tracking-[0.14em] inline-flex items-center gap-1.5 transition-colors"
                 style={{
-                  background: 'linear-gradient(180deg, #383532 0%, #2a2825 100%)',
-                  border: '1px solid rgba(129,182,76,0.25)',
-                  boxShadow: '0 12px 32px -8px rgba(0,0,0,0.5)',
+                  background: mode === m ? `linear-gradient(180deg, #95c45a 0%, ${CHESSCOM_GREEN} 100%)` : 'transparent',
+                  color: mode === m ? 'white' : TEXT_MUTED,
                 }}>
-                <div className="flex items-center gap-2 mb-3">
-                  <opt.icon className="w-5 h-5" style={{ color: CHESSCOM_GREEN }} />
-                  <span className="text-xs font-black uppercase tracking-[0.18em]" style={{ color: CHESSCOM_GREEN }}>{opt.sub}</span>
-                </div>
-                <div className="text-3xl font-black" style={{ color: TEXT_LIGHT, letterSpacing: '-0.02em' }}>{opt.label}</div>
-                <div className="mt-3 flex items-baseline gap-2">
-                  {r && r.gamesPlayed > 0 ? (
-                    <>
-                      <span className="text-xs font-black uppercase tracking-[0.14em]" style={{ color: CHESSCOM_GREEN }}>Your ELO</span>
-                      <span className="text-lg font-black" style={{ color: TEXT_LIGHT }}>{r.rating}{r.isProvisional ? '?' : ''}</span>
-                      <span className="text-[11px]" style={{ color: TEXT_MUTED }}>· {r.gamesPlayed} games</span>
-                    </>
-                  ) : (
-                    <span className="text-xs" style={{ color: TEXT_MUTED }}>Unranked — first game sets your ELO</span>
-                  )}
-                </div>
-                <div className="mt-4 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-black"
-                  style={{ background: `linear-gradient(180deg, #95c45a 0%, ${CHESSCOM_GREEN} 100%)`, color: 'white', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.2)' }}>
-                  <Swords className="w-3.5 h-3.5" /> Find Game
-                </div>
+                {m === 'casual' ? <Sparkles className="w-3.5 h-3.5" /> : <Award className="w-3.5 h-3.5" />}
+                {m}
               </button>
-            );
-          })}
-        </div>
+            ))}
+          </div>
+          <p className="text-xs -mt-2" style={{ color: TEXT_MUTED }}>
+            {mode === 'casual' ? 'Casual games do not change your ELO.' : 'Ranked games update your Glicko-2 rating.'}
+          </p>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
+            {TC_OPTIONS.map(opt => {
+              const r = ratingsData?.ratings[opt.id];
+              return (
+                <button
+                  key={opt.id}
+                  disabled={live.status === 'connecting' || live.status === 'disconnected'}
+                  onClick={() => live.enterQueue(opt.id, mode)}
+                  className="text-left p-5 rounded-2xl transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
+                  style={{
+                    background: 'linear-gradient(180deg, #383532 0%, #2a2825 100%)',
+                    border: '1px solid rgba(129,182,76,0.25)',
+                    boxShadow: '0 12px 32px -8px rgba(0,0,0,0.5)',
+                  }}>
+                  <div className="flex items-center gap-2 mb-3">
+                    <opt.icon className="w-5 h-5" style={{ color: CHESSCOM_GREEN }} />
+                    <span className="text-xs font-black uppercase tracking-[0.18em]" style={{ color: CHESSCOM_GREEN }}>{opt.sub}</span>
+                  </div>
+                  <div className="text-3xl font-black" style={{ color: TEXT_LIGHT, letterSpacing: '-0.02em' }}>{opt.label}</div>
+                  <div className="mt-3 flex items-baseline gap-2">
+                    {r && r.gamesPlayed > 0 ? (
+                      <>
+                        <span className="text-xs font-black uppercase tracking-[0.14em]" style={{ color: CHESSCOM_GREEN }}>Your ELO</span>
+                        <span className="text-lg font-black" style={{ color: TEXT_LIGHT }}>{r.rating}{r.isProvisional ? '?' : ''}</span>
+                        <span className="text-[11px]" style={{ color: TEXT_MUTED }}>· {r.gamesPlayed} games</span>
+                      </>
+                    ) : (
+                      <span className="text-xs" style={{ color: TEXT_MUTED }}>Unranked — first ranked game sets your ELO</span>
+                    )}
+                  </div>
+                  <div className="mt-4 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-black"
+                    style={{ background: `linear-gradient(180deg, #95c45a 0%, ${CHESSCOM_GREEN} 100%)`, color: 'white', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.2)' }}>
+                    <Swords className="w-3.5 h-3.5" /> {mode === 'ranked' ? 'Find Ranked' : 'Find Casual'}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </>
       )}
 
       {live.error && (

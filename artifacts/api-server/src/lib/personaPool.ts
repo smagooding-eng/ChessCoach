@@ -20,10 +20,9 @@ const COUNTRIES = [
 
 const TITLES = [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, 'NM', 'CM', 'FM', 'IM']; // bias toward untitled
 
-const AVATARS = [
-  '/avatars/tommy.svg','/avatars/rosa.svg','/avatars/derek.svg','/avatars/mia.svg',
-  '/avatars/viktor.svg','/avatars/nadia.svg','/avatars/chen.svg','/avatars/fischer.svg',
-];
+function dicebearAvatar(seed: string): string {
+  return `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(seed)}&backgroundType=gradientLinear`;
+}
 
 export interface Persona {
   id: string;            // stable id, e.g. "p_42"
@@ -79,7 +78,7 @@ function buildPool() {
       username,
       country: pick(rng, COUNTRIES),
       title: pick(rng, TITLES),
-      avatar: AVATARS[i % AVATARS.length],
+      avatar: dicebearAvatar(username),
       memberSinceYear: 2014 + Math.floor(rng() * 11),
       rating,
     });
@@ -98,3 +97,5 @@ export function findPersonaForRating(targetRating: number, exclude: Set<string> 
 export function getPersona(id: string): Persona | undefined {
   return POOL.find(p => p.id === id);
 }
+
+export function getAllPersonas(): Persona[] { return POOL.slice(); }
