@@ -12,6 +12,10 @@ import { logger } from './logger';
 import { getBotMove, botThinkMs } from './botEngine';
 import { findPersonaForRating, getAllPersonas, type Persona } from './personaPool';
 import { updateRating, DEFAULT_RATING } from './glicko2';
+import { fetchChessComProfile } from './chesscom';
+import { fetchLichessProfile } from './lichess';
+import { usersTable } from '@workspace/db';
+import { eq } from 'drizzle-orm';
 
 export type TimeControlId = 'blitz_5_0' | 'blitz_5_3' | 'rapid_10_0';
 export type Mode = 'casual' | 'ranked';
@@ -33,13 +37,101 @@ const HUMAN_COUNTRIES = [
 function hashStr(s: string): number { let h = 0; for (let i = 0; i < s.length; i++) { h = (h * 31 + s.charCodeAt(i)) | 0; } return h >>> 0; }
 // Same title distribution as bots so titles never act as a "human vs bot" tell.
 const HUMAN_TITLES: (string | null)[] = [null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,'NM','CM','FM','IM'];
-function humanProfile(userId: string, username: string, createdAtIso?: string): { country: string; title: string | null; avatar: string; memberSinceYear: number } {
+
+interface HumanProfileData { country: string; title: string | null; avatar: string; memberSinceYear: number }
+
+function defaultHumanProfile(userId: string, username: string, createdAtIso?: string): HumanProfileData {
   const h = hashStr(userId);
   const country = HUMAN_COUNTRIES[h % HUMAN_COUNTRIES.length];
   const title = HUMAN_TITLES[(h >>> 7) % HUMAN_TITLES.length];
   const memberSinceYear = createdAtIso ? new Date(createdAtIso).getFullYear() : (2014 + ((h >>> 13) % 11));
   const avatar = `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(username)}&backgroundType=gradientLinear`;
   return { country, title, avatar, memberSinceYear };
+}
+
+// Cache of resolved human profile data per userId. Real data fetched once per
+// process from chess.com / lichess (when the user has a linked handle), then
+// merged with deterministic defaults so every field is always populated —
+// matching the bot persona shape exactly. Bots get the same treatment via
+// personaPool, so flag/title/avatar can never be used as a "this is a bot" tell.
+const humanProfileCache = new Map<string, HumanProfileData>();
+const humanProfileInflight = new Map<string, Promise<HumanProfileData>>();
+
+async function resolveHumanProfile(userId: string, username: string): Promise<HumanProfileData> {
+  const cached = humanProfileCache.get(userId);
+  if (cached) return cached;
+  const inflight = humanProfileInflight.get(userId);
+  if (inflight) return inflight;
+  const p = (async () => {
+    const fallback = defaultHumanProfile(userId, username);
+    let chesscom: string | null = null;
+    let lichess: string | null = null;
+    let dbCreatedAt: Date | null = null;
+    try {
+      const rows = await db.select({
+        chesscomUsername: usersTable.chesscomUsername,
+        lichessUsername: usersTable.lichessUsername,
+        createdAt: usersTable.createdAt,
+        profileImageUrl: usersTable.profileImageUrl,
+      }).from(usersTable).where(eq(usersTable.id, userId)).limit(1);
+      const u = rows[0];
+      if (u) {
+        chesscom = u.chesscomUsername ?? null;
+        lichess = u.lichessUsername ?? null;
+        dbCreatedAt = u.createdAt ?? null;
+        if (u.profileImageUrl) fallback.avatar = u.profileImageUrl;
+      }
+    } catch (e) {
+      logger.warn({ e, userId }, 'resolveHumanProfile: user lookup failed');
+    }
+    if (dbCreatedAt) fallback.memberSinceYear = new Date(dbCreatedAt).getFullYear();
+
+    let country: string | undefined;
+    let title: string | undefined;
+    let avatar: string | undefined;
+
+    // Bound external fetches so a slow chess.com / lichess response can't
+    // delay match start. If the timeout fires, fallback values are used; the
+    // result is cached either way so subsequent matches benefit from a
+    // background refresh on next request.
+    const withTimeout = <T,>(p: Promise<T>, ms: number): Promise<T | null> =>
+      new Promise(resolve => {
+        let done = false;
+        const timer = setTimeout(() => { if (!done) { done = true; resolve(null); } }, ms);
+        p.then(v => { if (!done) { done = true; clearTimeout(timer); resolve(v); } })
+         .catch(() => { if (!done) { done = true; clearTimeout(timer); resolve(null); } });
+      });
+
+    if (chesscom) {
+      const cp = await withTimeout(fetchChessComProfile(chesscom), 1500);
+      if (cp) {
+        if (cp.country && /^[A-Za-z]{2}$/.test(cp.country)) country = cp.country.toUpperCase();
+        if (cp.title) title = cp.title;
+        if (cp.avatar) avatar = cp.avatar;
+        if (cp.joined) fallback.memberSinceYear = new Date(cp.joined * 1000).getFullYear();
+      }
+    }
+    if ((!country || !title) && lichess) {
+      const lp = await withTimeout(fetchLichessProfile(lichess), 1500);
+      if (lp) {
+        if (!country && lp.country && /^[A-Za-z]{2}$/.test(lp.country)) country = lp.country.toUpperCase();
+        if (!title && lp.title) title = lp.title;
+        if (lp.createdAt) fallback.memberSinceYear = new Date(lp.createdAt).getFullYear();
+      }
+    }
+
+    const resolved: HumanProfileData = {
+      country: country ?? fallback.country,
+      title: title ?? fallback.title,
+      avatar: avatar ?? fallback.avatar,
+      memberSinceYear: fallback.memberSinceYear,
+    };
+    humanProfileCache.set(userId, resolved);
+    humanProfileInflight.delete(userId);
+    return resolved;
+  })();
+  humanProfileInflight.set(userId, p);
+  return p;
 }
 
 interface Player {
@@ -510,8 +602,10 @@ function tryMatchInQueue(key: string) {
 
 async function startHumanMatch(a: WaitingPlayer, b: WaitingPlayer) {
   const whiteFirst = Math.random() < 0.5;
-  const aProfile = humanProfile(a.userId, a.username);
-  const bProfile = humanProfile(b.userId, b.username);
+  const [aProfile, bProfile] = await Promise.all([
+    resolveHumanProfile(a.userId, a.username),
+    resolveHumanProfile(b.userId, b.username),
+  ]);
   const aPlayer: Player = { kind: 'human', userId: a.userId, username: a.username, rating: a.rating, ...aProfile };
   const bPlayer: Player = { kind: 'human', userId: b.userId, username: b.username, rating: b.rating, ...bProfile };
   const game = await createGame(whiteFirst ? aPlayer : bPlayer, whiteFirst ? bPlayer : aPlayer, a.tc, a.mode);
@@ -578,7 +672,7 @@ async function spawnBotMatch(userId: string, username: string, userRating: numbe
   if (last) exclude.add(last);
   const persona: Persona = findPersonaForRating(targetRating, exclude);
   userLastPersona.set(userId, persona.id);
-  const userProfile = humanProfile(userId, username);
+  const userProfile = await resolveHumanProfile(userId, username);
   const userPlayer: Player = { kind: 'human', userId, username, rating: userRating, ...userProfile };
   const botPlayer: Player = {
     kind: 'bot', username: persona.username, rating: persona.rating,

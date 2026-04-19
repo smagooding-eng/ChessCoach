@@ -1,6 +1,37 @@
 import { logger } from "./logger";
 import { extractOpeningFromPgn } from "./chesscom";
 
+export interface LichessProfile {
+  username: string;
+  title?: string;
+  country?: string;
+  // Lichess does not serve profile pictures via API, so this stays undefined.
+  avatar?: string;
+  createdAt?: number;
+}
+
+export async function fetchLichessProfile(username: string): Promise<LichessProfile | null> {
+  const lower = username.toLowerCase();
+  try {
+    const res = await fetch(`https://lichess.org/api/user/${encodeURIComponent(lower)}`, {
+      headers: { Accept: "application/json" },
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as Record<string, unknown>;
+    const profile = (data.profile ?? {}) as Record<string, unknown>;
+    const flag = typeof profile.flag === "string" ? profile.flag : undefined;
+    return {
+      username: lower,
+      title: typeof data.title === "string" ? data.title : undefined,
+      country: flag ? flag.toUpperCase() : undefined,
+      createdAt: typeof data.createdAt === "number" ? data.createdAt : undefined,
+    };
+  } catch (err) {
+    logger.warn({ err, username }, "Failed to fetch lichess profile");
+    return null;
+  }
+}
+
 export interface LichessGame {
   id: string;
   rated: boolean;
