@@ -235,7 +235,7 @@ export function Dashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 md:gap-4 px-3 md:px-0">
         <div className="lg:col-span-2 space-y-3 md:space-y-4">
 
-          <DashCard title="Key Weaknesses" visual={<div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(129,182,76,0.15)', border: '1px solid rgba(129,182,76,0.3)' }}><AlertTriangle className="w-4 h-4" style={{ color: CHESSCOM_GREEN }} /></div>} linkHref={isPremium ? "/analysis" : "/subscription"} linkText={isPremium ? "Full Analysis" : "Upgrade"}>
+          <DashCard title="Key Weaknesses" visual={<PieceTile piece="♚" />} linkHref={isPremium ? "/analysis" : "/subscription"} linkText={isPremium ? "Full Analysis" : "Upgrade"}>
             {!isPremium ? (
               <div className="relative min-h-[180px]">
                 <div className="space-y-1.5 pointer-events-none select-none" style={{ filter: 'blur(6px)' }}>
@@ -303,7 +303,7 @@ export function Dashboard() {
             )}
           </DashCard>
 
-          <DashCard title="Recent Games" visual={<div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(129,182,76,0.15)', border: '1px solid rgba(129,182,76,0.3)' }}><Clock className="w-4 h-4" style={{ color: CHESSCOM_GREEN }} /></div>} linkHref="/games" linkText="All Games">
+          <DashCard title="Recent Games" visual={<PieceTile piece="♜" />} linkHref="/games" linkText="All Games">
             <div className="space-y-0.5">
               {gamesData?.games?.slice(0, 5).map((game, i) => {
                 const res = RESULT_COLORS[game.result] ?? RESULT_COLORS.draw;
@@ -354,9 +354,7 @@ export function Dashboard() {
               onMouseLeave={e => (e.currentTarget.style.borderColor = 'rgba(129,182,76,0.3)')}>
               
               <div className="relative flex items-center gap-3 mb-2.5">
-                <div className="w-11 h-11 rounded-xl flex items-center justify-center" style={{ background: 'rgba(129,182,76,0.18)', border: '1px solid rgba(129,182,76,0.35)' }}>
-                  <Swords className="w-5 h-5" style={{ color: CHESSCOM_GREEN }} />
-                </div>
+                <PieceTile piece="♞" size={48} />
                 <div className="flex-1 min-w-0">
                   <span className="inline-block text-[9px] font-black uppercase tracking-[0.18em]" style={{ color: CHESSCOM_GREEN }}>#1 Feature</span>
                   <h3 className="font-black text-base leading-tight" style={{ color: TEXT_LIGHT, letterSpacing: '-0.01em' }}>Opponent Scout</h3>
@@ -376,10 +374,8 @@ export function Dashboard() {
               boxShadow: '0 8px 24px -10px rgba(0,0,0,0.6), 0 2px 6px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04)',
             }}>
             
-            <div className="relative flex items-center gap-2.5 mb-3">
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(129,182,76,0.15)', border: '1px solid rgba(129,182,76,0.3)' }}>
-                <Zap className="w-4 h-4" style={{ color: CHESSCOM_GREEN }} />
-              </div>
+            <div className="relative flex items-center gap-3 mb-3">
+              <PieceTile piece="♛" />
               <h2 className="text-base md:text-lg font-black" style={{ color: TEXT_LIGHT, letterSpacing: '-0.01em' }}>Quick Actions</h2>
             </div>
             {[
@@ -412,10 +408,8 @@ export function Dashboard() {
               }}>
               
               <div className="relative flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(129,182,76,0.15)', border: '1px solid rgba(129,182,76,0.3)' }}>
-                    <GraduationCap className="w-4 h-4" style={{ color: CHESSCOM_GREEN }} />
-                  </div>
+                <div className="flex items-center gap-3">
+                  <PieceTile piece="♝" />
                   <h2 className="text-base md:text-lg font-black flex items-center gap-2" style={{ color: TEXT_LIGHT, letterSpacing: '-0.01em' }}>
                     Courses
                     <span className="px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-[0.18em]" style={{ background: 'rgba(129,182,76,0.18)', color: CHESSCOM_GREEN, border: '1px solid rgba(129,182,76,0.3)' }}>Beta</span>
@@ -488,6 +482,29 @@ function EmptyState({ icon, text, linkHref, linkText }: { icon: React.ReactNode;
 }
 
 const ImportIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>;
+
+// Chess-piece illustration tile used at the head of each dashboard section.
+// Chunky green-gradient square with a bold white chess piece silhouette — like a chess.com puzzle/lesson card.
+function PieceTile({ piece, size = 44 }: { piece: '♚' | '♛' | '♜' | '♝' | '♞' | '♟'; size?: number }) {
+  return (
+    <div className="relative shrink-0 rounded-xl flex items-center justify-center overflow-hidden"
+      style={{
+        width: size, height: size,
+        background: 'linear-gradient(160deg, #8fc556 0%, #6a9c3c 55%, #4f7a2a 100%)',
+        boxShadow: '0 4px 10px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.25), inset 0 -2px 0 rgba(0,0,0,0.25), 0 0 0 1px rgba(0,0,0,0.4)',
+      }}>
+      <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(circle at 30% 25%, rgba(255,255,255,0.18), transparent 55%)' }} />
+      <span style={{
+        fontSize: Math.round(size * 0.72),
+        lineHeight: 1,
+        color: '#ffffff',
+        textShadow: '0 2px 3px rgba(0,0,0,0.45), 0 0 1px rgba(0,0,0,0.6)',
+        fontFamily: '"Segoe UI Symbol", "Apple Symbols", "DejaVu Sans", "Arial Unicode MS", sans-serif',
+        marginTop: -2,
+      }}>{piece}</span>
+    </div>
+  );
+}
 
 // Lightweight chess-board thumbnail (starting position) — purely decorative.
 // Mirrors chess.com's home-feed thumbnails: little green-and-cream board with pieces.
