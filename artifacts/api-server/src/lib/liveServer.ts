@@ -714,15 +714,16 @@ export function attachLiveServer(server: HttpServer) {
     try { host = new URL(origin).host; } catch { return false; }
     const allow = new Set<string>();
     const replitDomain = process.env.REPLIT_DEV_DOMAIN;
+    const replitDeployment = process.env.REPLIT_DEPLOYMENT_DOMAIN;
     const allowed = process.env.LIVE_WS_ALLOWED_ORIGINS;
     if (replitDomain) allow.add(replitDomain);
+    if (replitDeployment) allow.add(replitDeployment);
     if (allowed) for (const d of allowed.split(',')) allow.add(d.trim());
-    // Same-origin requests (loopback / internal preview) are allowed in dev.
+    // Same-origin loopback only in dev.
     if (process.env.NODE_ENV !== 'production') {
-      if (host.startsWith('localhost') || host.startsWith('127.0.0.1') || host.startsWith('0.0.0.0')) return true;
-      if (host.endsWith('.replit.dev') || host.endsWith('.repl.co')) return true;
-    } else {
-      if (host.endsWith('.replit.app')) return true;
+      if (host === 'localhost' || host.startsWith('localhost:')) return true;
+      if (host === '127.0.0.1' || host.startsWith('127.0.0.1:')) return true;
+      if (host === '0.0.0.0' || host.startsWith('0.0.0.0:')) return true;
     }
     return allow.has(host);
   }
@@ -828,7 +829,10 @@ export async function seedBotPersonas() {
 export async function getUserRatings(userId: string) {
   const out: Record<string, { rating: number; rd: number; gamesPlayed: number; isProvisional: boolean }> = {};
   for (const id of Object.keys(TIME_CONTROLS) as TimeControlId[]) {
-    const r = await loadUserRating(userId, id);
+    // Eagerly seed the per-time-control rating row from imports (or 1200 baseline)
+    // so /live/ratings always reflects a stored, persistent value — even before
+    // the user has queued for their first live game.
+    const r = await seedRatingFromImports(userId, id);
     out[id] = {
       rating: Math.round(r.rating),
       rd: Math.round(r.rd),
