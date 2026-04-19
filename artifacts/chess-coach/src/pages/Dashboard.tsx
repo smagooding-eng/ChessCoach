@@ -57,7 +57,7 @@ export function Dashboard() {
     <div className="space-y-4 md:space-y-5">
 
       <div
-        className="relative overflow-hidden p-5 md:p-7 rounded-2xl"
+        className="relative overflow-hidden p-4 md:p-5 rounded-2xl"
         style={{
           background: 'linear-gradient(180deg, #383532 0%, #2a2825 100%)',
           border: '1px solid rgba(255,255,255,0.06)',
@@ -66,9 +66,9 @@ export function Dashboard() {
         <div className="relative flex items-start gap-4">
           <div className="shrink-0 relative">
             {chessPlayer?.avatar
-              ? <img src={chessPlayer.avatar} alt={username ?? ''} className="relative w-20 h-20 md:w-24 md:h-24 rounded-2xl object-cover" style={{ border: `3px solid ${CHESSCOM_GREEN}`, boxShadow: '0 8px 24px -4px rgba(0,0,0,0.6)' }} />
-              : <div className="relative w-20 h-20 md:w-24 md:h-24 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(129,182,76,0.18)', border: `3px solid ${CHESSCOM_GREEN}`, boxShadow: '0 8px 24px -4px rgba(0,0,0,0.6)' }}>
-                  <span className="text-4xl font-black" style={{ color: CHESSCOM_GREEN }}>{username?.[0]?.toUpperCase()}</span>
+              ? <img src={chessPlayer.avatar} alt={username ?? ''} className="relative w-14 h-14 md:w-16 md:h-16 rounded-xl object-cover" style={{ border: `2px solid ${CHESSCOM_GREEN}`, boxShadow: '0 6px 18px -4px rgba(0,0,0,0.6)' }} />
+              : <div className="relative w-14 h-14 md:w-16 md:h-16 rounded-xl flex items-center justify-center" style={{ background: 'rgba(129,182,76,0.18)', border: `2px solid ${CHESSCOM_GREEN}`, boxShadow: '0 6px 18px -4px rgba(0,0,0,0.6)' }}>
+                  <span className="text-2xl font-black" style={{ color: CHESSCOM_GREEN }}>{username?.[0]?.toUpperCase()}</span>
                 </div>
             }
             {chessPlayer?.title && (
@@ -89,7 +89,7 @@ export function Dashboard() {
                 </span>
               )}
             </div>
-            <h1 className="text-3xl md:text-4xl font-black truncate leading-none" style={{ color: TEXT_LIGHT, letterSpacing: '-0.02em', textShadow: '0 2px 8px rgba(0,0,0,0.3)' }}>{username}</h1>
+            <h1 className="text-2xl md:text-3xl font-black truncate leading-none" style={{ color: TEXT_LIGHT, letterSpacing: '-0.02em', textShadow: '0 2px 8px rgba(0,0,0,0.3)' }}>{username}</h1>
 
             {(multiElo.chesscom?.hasData || multiElo.lichess?.hasData) ? (
               <div className="flex items-center gap-3 mt-3 flex-wrap">
@@ -97,7 +97,7 @@ export function Dashboard() {
                   <div className="flex flex-col">
                     <span className="text-[10px] font-black uppercase tracking-[0.18em] leading-none" style={{ color: CHESSCOM_GREEN }}>Chess.com</span>
                     <div className="flex items-baseline gap-1.5 mt-1">
-                      <span className="text-3xl md:text-4xl font-black leading-none" style={{ color: TEXT_LIGHT, letterSpacing: '-0.02em' }}>{multiElo.chesscom.currentRating}</span>
+                      <span className="text-2xl md:text-3xl font-black leading-none" style={{ color: TEXT_LIGHT, letterSpacing: '-0.02em' }}>{multiElo.chesscom.currentRating}</span>
                       <span className="inline-flex items-center text-xs font-black px-1.5 py-0.5 rounded" style={{ background: multiElo.chesscom.delta > 0 ? 'rgba(129,182,76,0.2)' : multiElo.chesscom.delta < 0 ? 'rgba(220,67,67,0.2)' : 'rgba(158,155,152,0.15)', color: multiElo.chesscom.delta > 0 ? CHESSCOM_GREEN : multiElo.chesscom.delta < 0 ? '#dc4343' : TEXT_MUTED }}>
                         {multiElo.chesscom.delta > 0 ? '▲' : multiElo.chesscom.delta < 0 ? '▼' : '–'} {Math.abs(multiElo.chesscom.delta)}
                       </span>
@@ -108,7 +108,7 @@ export function Dashboard() {
                   <div className="flex flex-col">
                     <span className="text-[10px] font-black uppercase tracking-[0.18em] leading-none" style={{ color: '#b0b0b0' }}>Lichess</span>
                     <div className="flex items-baseline gap-1.5 mt-1">
-                      <span className="text-3xl md:text-4xl font-black leading-none" style={{ color: TEXT_LIGHT, letterSpacing: '-0.02em' }}>{multiElo.lichess.currentRating}</span>
+                      <span className="text-2xl md:text-3xl font-black leading-none" style={{ color: TEXT_LIGHT, letterSpacing: '-0.02em' }}>{multiElo.lichess.currentRating}</span>
                       <span className="inline-flex items-center text-xs font-black px-1.5 py-0.5 rounded" style={{ background: multiElo.lichess.delta > 0 ? 'rgba(129,182,76,0.2)' : multiElo.lichess.delta < 0 ? 'rgba(220,67,67,0.2)' : 'rgba(158,155,152,0.15)', color: multiElo.lichess.delta > 0 ? CHESSCOM_GREEN : multiElo.lichess.delta < 0 ? '#dc4343' : TEXT_MUTED }}>
                         {multiElo.lichess.delta > 0 ? '▲' : multiElo.lichess.delta < 0 ? '▼' : '–'} {Math.abs(multiElo.lichess.delta)}
                       </span>
@@ -118,7 +118,7 @@ export function Dashboard() {
               </div>
             ) : chessPlayer?.rating ? (
               <div className="flex items-baseline gap-2 mt-3">
-                <span className="text-4xl font-black leading-none" style={{ color: TEXT_LIGHT, letterSpacing: '-0.02em' }}>{chessPlayer.rating}</span>
+                <span className="text-3xl font-black leading-none" style={{ color: TEXT_LIGHT, letterSpacing: '-0.02em' }}>{chessPlayer.rating}</span>
                 <span className="text-xs font-black uppercase tracking-wider" style={{ color: CHESSCOM_GREEN }}>ELO</span>
               </div>
             ) : null}
