@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
+import { PieceTile } from '@/components/DesignSystem';
 import { Chess } from 'chess.js';
 import { Chessboard } from 'react-chessboard';
 import { apiFetch } from '@/lib/api';
@@ -420,9 +421,10 @@ export function Puzzles() {
     <div className="min-h-screen pb-24" style={{ background: BG_DARK }}>
       <div className="max-w-2xl mx-auto px-4 pt-6">
         <div className="flex items-center justify-between mb-4">
-          <h1 className="text-xl font-bold" style={{ color: TEXT_LIGHT }}>
-            <span className="mr-2">♟</span>Puzzles
-          </h1>
+          <div className="flex items-center gap-3">
+            <PieceTile piece="♛" size={44} />
+            <h1 className="text-2xl md:text-3xl font-black" style={{ color: TEXT_LIGHT, letterSpacing: '-0.02em' }}>Puzzles</h1>
+          </div>
           {stats && (
             <div className="flex items-center gap-3 text-xs" style={{ color: TEXT_MUTED }}>
               <span className="flex items-center gap-1"><Flame size={14} style={{ color: '#f59e0b' }} />{stats.streak}</span>

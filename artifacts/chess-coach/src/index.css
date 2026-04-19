@@ -355,3 +355,46 @@
 .local-play-board [data-piece^="b"] {
   transform: rotate(180deg);
 }
+
+/* ============================================================
+ * Design System — global panel sweep
+ * Targets the dominant ad-hoc card patterns across pages and
+ * unifies them with the Dashboard panel style.
+ * ============================================================ */
+
+/* Inline-style attribute overrides — match the most common ad-hoc card backgrounds.  */
+[style*="rgba(255,255,255,0.05)"][style*="border-radius"],
+[style*="rgba(255, 255, 255, 0.05)"][style*="border-radius"],
+[style*="background: rgba(255,255,255,0.05)"][class*="rounded"],
+[style*="background: rgba(255, 255, 255, 0.05)"][class*="rounded"] {
+  background: linear-gradient(180deg, #353230 0%, #2b2926 100%) !important;
+  border: 1px solid rgba(255,255,255,0.06) !important;
+  box-shadow:
+    0 8px 24px -10px rgba(0,0,0,0.6),
+    0 2px 6px rgba(0,0,0,0.3),
+    inset 0 1px 0 rgba(255,255,255,0.04) !important;
+}
+
+/* shadcn Card primitive — bring it under the same panel system. */
+[data-slot="card"],
+[class~="card"]:not(button):not(input):not(select):not(textarea):not([role]) {
+  background: linear-gradient(180deg, #353230 0%, #2b2926 100%) !important;
+  border: 1px solid rgba(255,255,255,0.06) !important;
+  border-radius: 1rem !important;
+  box-shadow:
+    0 8px 24px -10px rgba(0,0,0,0.6),
+    0 2px 6px rgba(0,0,0,0.3),
+    inset 0 1px 0 rgba(255,255,255,0.04) !important;
+}
+
+/* Page heading uniformity — every h1 gets the display treatment. */
+main h1, [data-page] h1 {
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  color: #e8e6e3;
+}
+main h2, [data-page] h2 {
+  font-weight: 900;
+  letter-spacing: -0.01em;
+  color: #e8e6e3;
+}

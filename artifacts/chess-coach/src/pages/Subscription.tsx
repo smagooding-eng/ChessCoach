@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { PieceTile } from '@/components/DesignSystem';
 import { useUser } from '@/hooks/use-user';
 import { useLocation } from 'wouter';
 import { Crown, Check, Zap, BrainCircuit, GraduationCap, Swords, Volume2, Loader2, ExternalLink, Clock } from 'lucide-react';
@@ -146,9 +147,9 @@ export function Subscription() {
         </motion.div>
       )}
 
-      <div className="text-center mb-8">
-        <Crown className="w-12 h-12 text-primary mx-auto mb-3" />
-        <h1 className="text-3xl font-display font-bold mb-2">
+      <div className="flex flex-col items-center text-center mb-8">
+        <PieceTile piece="♛" size={56} />
+        <h1 className="text-2xl md:text-3xl font-black mt-3 mb-2" style={{ letterSpacing: '-0.02em' }}>
           {subscription.status === 'free_trial'
             ? 'Free Trial'
             : isPremium ? 'Your Premium Plan' : 'Upgrade to Pro'}

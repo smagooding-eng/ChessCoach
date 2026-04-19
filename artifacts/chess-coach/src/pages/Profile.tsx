@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { PieceTile } from '@/components/DesignSystem';
 import { useUser } from '@/hooks/use-user';
 import { useChessPlayer } from '@/hooks/use-chess-player';
 import { useMyAnalysisSummary } from '@/hooks/use-analysis';
@@ -1793,10 +1794,8 @@ export function Profile() {
         <div className="relative flex items-center gap-4">
           <div className="shrink-0">
             {player?.avatar
-              ? <img src={player.avatar} alt={username ?? ''} className="w-20 h-20 rounded-full object-cover" style={{ border: `2px solid ${G}40`, boxShadow: `0 12px 30px -10px ${G}66` }} />
-              : <div className="w-20 h-20 rounded-full flex items-center justify-center" style={{ background: `${G}1a`, border: `2px solid ${G}33` }}>
-                  <User className="w-10 h-10" style={{ color: G }} />
-                </div>
+              ? <img src={player.avatar} alt={username ?? ''} className="w-16 h-16 md:w-20 md:h-20 rounded-2xl object-cover" style={{ border: `2px solid ${G}`, boxShadow: `0 6px 18px -4px rgba(0,0,0,0.6)` }} />
+              : <PieceTile piece="♚" size={72} />
             }
           </div>
           <div className="min-w-0 flex-1">

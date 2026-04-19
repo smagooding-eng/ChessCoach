@@ -1,4 +1,5 @@
 import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
+import { PieceTile } from '@/components/DesignSystem';
 import { useMyCourses } from '@/hooks/use-courses';
 import { useUser } from '@/hooks/use-user';
 import { useQueryClient } from '@tanstack/react-query';
@@ -156,9 +157,12 @@ export function Courses() {
     <PremiumGate feature="Personalized Courses">
     <div className="space-y-8 pb-20 px-4 pt-4 md:px-0 md:pt-0">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-display font-bold flex items-center gap-3">My Courses <span className="px-2 py-0.5 rounded text-[10px] font-black tracking-wider bg-amber-500/15 text-amber-400 border border-amber-500/20">BETA</span></h1>
-          <p className="text-muted-foreground">Personalized lesson plans based on your AI analysis.</p>
+        <div className="flex items-center gap-3">
+          <PieceTile piece="♝" size={48} />
+          <div>
+            <h1 className="text-2xl md:text-3xl font-black flex items-center gap-3" style={{ letterSpacing: '-0.02em' }}>My Courses <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-[0.18em] bg-amber-500/15 text-amber-400 border border-amber-500/20">BETA</span></h1>
+            <p className="text-muted-foreground">Personalized lesson plans based on your AI analysis.</p>
+          </div>
         </div>
 
         <div className="flex flex-col items-end gap-2">

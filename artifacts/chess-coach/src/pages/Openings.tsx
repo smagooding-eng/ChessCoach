@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { PieceTile } from '@/components/DesignSystem';
 import { Link, useLocation } from 'wouter';
 import { motion } from 'framer-motion';
 import {
@@ -91,14 +92,14 @@ export function Openings() {
   return (
     <div className="space-y-6 pb-20 px-4 pt-4 md:px-0 md:pt-0">
       {/* Header */}
-      <div>
-        <div className="flex items-center gap-3 mb-1">
-          <BookOpen className="w-7 h-7 text-primary" />
-          <h1 className="text-4xl font-display font-black flex items-center gap-3">Opening Repertoire <span className="px-2 py-0.5 rounded text-[10px] font-black tracking-wider bg-amber-500/15 text-amber-400 border border-amber-500/20">BETA</span></h1>
+      <div className="flex items-center gap-3">
+        <PieceTile piece="♞" size={48} />
+        <div>
+          <h1 className="text-2xl md:text-3xl font-black flex items-center gap-3" style={{ letterSpacing: '-0.02em' }}>Opening Repertoire <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-[0.18em] bg-amber-500/15 text-amber-400 border border-amber-500/20">BETA</span></h1>
+          <p className="text-muted-foreground text-sm">
+            {totalGames} games imported · click any opening to view stats &amp; practice
+          </p>
         </div>
-        <p className="text-muted-foreground ml-10 text-sm">
-          {totalGames} games imported · click any opening to view stats &amp; practice
-        </p>
       </div>
 
       {openings.length === 0 ? (

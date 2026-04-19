@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { PieceTile } from '@/components/DesignSystem';
 import { useParams, Link } from 'wouter';
 import { useUser } from '@/hooks/use-user';
 import {
@@ -202,9 +203,12 @@ export function WeaknessDetail() {
                     <SevIcon className="w-3.5 h-3.5" />
                     {sev.label} Priority
                   </p>
-                  <h1 className="text-3xl md:text-4xl font-display font-black leading-tight mt-0.5">
-                    {weakness.category}
-                  </h1>
+                  <div className="flex items-center gap-3 mt-0.5">
+                    <PieceTile piece="♚" size={48} />
+                    <h1 className="text-2xl md:text-3xl font-black leading-tight" style={{ letterSpacing: '-0.02em' }}>
+                      {weakness.category}
+                    </h1>
+                  </div>
                 </div>
               </div>
 

@@ -1,4 +1,5 @@
 import React, { useState, useRef, useCallback } from 'react';
+import { PieceTile } from '@/components/DesignSystem';
 import { Chess } from 'chess.js';
 import { ChessBoard } from '@/components/ChessBoard';
 import { apiFetch } from '@/lib/api';
@@ -309,8 +310,9 @@ export function ScanPosition() {
 
   return (
     <div className="max-w-lg mx-auto px-4 py-6 space-y-4">
-      <div className="text-center">
-        <h1 className="text-2xl font-black tracking-tight">
+      <div className="flex flex-col items-center text-center">
+        <PieceTile piece="♞" size={56} />
+        <h1 className="text-2xl md:text-3xl font-black mt-3" style={{ letterSpacing: '-0.02em' }}>
           <span className="text-white">Scan</span>{' '}
           <span style={{ color: '#81b64c' }}>Position</span>
         </h1>

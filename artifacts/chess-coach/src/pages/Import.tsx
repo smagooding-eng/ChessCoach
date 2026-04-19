@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { PieceTile } from '@/components/DesignSystem';
 import { useUser } from '@/hooks/use-user';
 import { useImportChessGames } from '@/hooks/use-games';
 import { invalidateEloCache } from '@/hooks/use-elo-progress';
@@ -137,11 +138,11 @@ export function Import() {
       <div className="glass-card rounded-xl p-8 md:p-10 text-center relative overflow-hidden">
         <div className="absolute top-0 right-0 w-64 h-64 bg-primary/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
 
-        <div className="w-16 h-16 bg-primary/20 rounded-full flex items-center justify-center mx-auto mb-6">
-          <CloudDownload className="w-8 h-8 text-primary" />
+        <div className="flex justify-center mb-4">
+          <PieceTile piece="♟" size={56} />
         </div>
 
-        <h1 className="text-3xl font-display font-bold mb-4">Import Games</h1>
+        <h1 className="text-2xl md:text-3xl font-black mb-4" style={{ letterSpacing: '-0.02em' }}>Import Games</h1>
         <p className="text-muted-foreground mb-6 max-w-md mx-auto">
           Fetch your recent games to power AI analysis. Import from Chess.com, Lichess, or both.
         </p>

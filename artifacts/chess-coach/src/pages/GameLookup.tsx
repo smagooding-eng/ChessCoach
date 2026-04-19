@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import { PieceTile } from '@/components/DesignSystem';
 import { ChessBoard } from '@/components/ChessBoard';
 import { Chess } from 'chess.js';
 import { apiFetch } from '@/lib/api';
@@ -737,14 +738,16 @@ export function GameLookup() {
   return (
     <div className="min-h-screen p-3 md:p-6" style={{ background: BG_DARK }}>
       <div className="max-w-4xl mx-auto space-y-6">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-3" style={{ color: TEXT_LIGHT }}>
-            <Search size={28} style={{ color: CHESSCOM_GREEN }} />
-            Game Lookup
-          </h1>
-          <p className="text-sm mt-1" style={{ color: TEXT_MUTED }}>
-            Find and analyze games between any two Chess.com players
-          </p>
+        <div className="flex items-center gap-3">
+          <PieceTile piece="♜" size={48} />
+          <div>
+            <h1 className="text-2xl md:text-3xl font-black" style={{ color: TEXT_LIGHT, letterSpacing: '-0.02em' }}>
+              Game Lookup
+            </h1>
+            <p className="text-sm mt-1" style={{ color: TEXT_MUTED }}>
+              Find and analyze games between any two Chess.com players
+            </p>
+          </div>
         </div>
 
         <div className="rounded-xl border p-5" style={{ background: BG_CARD, border: CARD_BORDER, boxShadow: CARD_SHADOW }}>

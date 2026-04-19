@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
+import { PieceTile } from '@/components/DesignSystem';
 import { Chess } from 'chess.js';
 import { ChessBoard, type MoveQuality } from '@/components/ChessBoard';
 import { normalizeFen } from '@/lib/utils';
@@ -883,13 +884,14 @@ export function PracticeBots() {
     <div className="space-y-6 pb-20 px-4 pt-4 md:px-0 md:pt-0">
       <div className="glass-card p-5 sm:p-6 rounded-xl sm:rounded-xl border-primary/20 relative overflow-hidden">
         <div className="absolute right-0 top-0 w-64 h-64 bg-primary/5 blur-3xl rounded-full pointer-events-none" />
-        <div className="relative z-10">
-          <h1 className="text-2xl sm:text-3xl font-display font-bold flex items-center gap-3">
-            <Swords className="w-7 h-7 sm:w-8 sm:h-8 text-primary" /> Practice
-          </h1>
-          <p className="text-muted-foreground mt-2 max-w-lg text-sm">
-            Battle AI opponents or drill specific openings move-by-move with instant feedback.
-          </p>
+        <div className="relative z-10 flex items-center gap-3">
+          <PieceTile piece="♞" size={56} />
+          <div>
+            <h1 className="text-2xl md:text-3xl font-black" style={{ letterSpacing: '-0.02em' }}>Practice</h1>
+            <p className="text-muted-foreground mt-2 max-w-lg text-sm">
+              Battle AI opponents or drill specific openings move-by-move with instant feedback.
+            </p>
+          </div>
         </div>
       </div>
 
