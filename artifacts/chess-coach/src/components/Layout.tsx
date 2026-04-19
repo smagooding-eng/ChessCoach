@@ -3,7 +3,6 @@ import { Link, useLocation } from 'wouter';
 import { useUser } from '@/hooks/use-user';
 import { useChessPlayer } from '@/hooks/use-chess-player';
 import { useMultiEloProgress } from '@/hooks/use-elo-progress';
-import { MultiEloTrackerBadge, MultiEloInline } from '@/components/EloTracker';
 import { LayoutDashboard, Import, History, BrainCircuit, GraduationCap, Swords, BookOpen, LogOut, MoreHorizontal, ChevronRight, Bot, Crown, Trophy, Play, Search, Download, Puzzle, User, Settings, CreditCard, Camera, Shield } from 'lucide-react';
 import { usePwaInstall } from '@/hooks/use-pwa-install';
 import { InstallGuide } from '@/components/InstallGuide';
@@ -98,7 +97,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
   useEffect(() => { setMoreOpen(false); setProfileOpen(false); }, [location]);
 
-  const displayRating = player?.rating;
+  const ratings: number[] = [];
+  if (multiElo.chesscom?.hasData) ratings.push(multiElo.chesscom.currentRating);
+  if (multiElo.lichess?.hasData) ratings.push(multiElo.lichess.currentRating);
+  const scoutElo = ratings.length > 0
+    ? Math.round(ratings.reduce((a, b) => a + b, 0) / ratings.length)
+    : (player?.rating ?? null);
 
   // Hide all chrome (sidebar, mobile header, bottom nav) until onboarding completes
   if (showOnboarding) {
@@ -142,24 +146,19 @@ export function Layout({ children }: { children: React.ReactNode }) {
         </nav>
 
         <div className="p-2.5" style={{ borderTop: `1px solid ${BORDER_COLOR}` }}>
-          <div className="flex items-center justify-between px-2 py-2 rounded-xl" style={{ background: BG_CARD }}>
-            <Link href="/profile" className="flex items-center gap-2 min-w-0 hover:opacity-80 transition-opacity">
+          <div className="flex items-center gap-1.5 px-2 py-2 rounded-xl" style={{ background: BG_CARD }}>
+            <Link href="/profile" className="flex items-center gap-2 min-w-0 flex-1 hover:opacity-80 transition-opacity">
               <PlayerAvatar avatar={player?.avatar} username={username ?? ''} size="sm" />
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <p className="text-xs font-bold truncate leading-tight" style={{ color: TEXT_LIGHT }}>{username}</p>
-                <div className="flex items-center gap-1">
-                  {displayRating && (
-                    <span className="text-[10px] font-bold leading-tight" style={{ color: CHESSCOM_GREEN }}>{displayRating}</span>
-                  )}
-                  {(multiElo.chesscom?.hasData || multiElo.lichess?.hasData) && <MultiEloInline multi={multiElo} />}
-                </div>
+                {scoutElo != null && (
+                  <div className="flex items-baseline gap-1 mt-0.5">
+                    <span className="text-[8px] font-black uppercase tracking-[0.14em] leading-none" style={{ color: CHESSCOM_GREEN }}>Scout</span>
+                    <span className="text-[11px] font-black leading-none" style={{ color: TEXT_LIGHT }}>{scoutElo}</span>
+                  </div>
+                )}
               </div>
             </Link>
-            {(multiElo.chesscom?.hasData || multiElo.lichess?.hasData) && (
-              <div className="shrink-0">
-                <MultiEloTrackerBadge multi={multiElo} />
-              </div>
-            )}
             <Link href="/download" className="p-1.5 rounded transition-colors shrink-0 hover:bg-green-400/10" style={{ color: CHESSCOM_GREEN }} title="Download App">
               <Download className="w-3.5 h-3.5" />
             </Link>
@@ -183,12 +182,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
               <Download className="w-5 h-5" />
             </Link>
             <button onClick={() => setProfileOpen(o => !o)} className="flex items-center gap-2 active:opacity-70 transition-opacity">
-              <div className="flex flex-col items-end">
-                <span className="text-xs font-bold leading-tight" style={{ color: TEXT_LIGHT }}>{username}</span>
-                <div className="flex items-center gap-1">
-                  {displayRating && <span className="text-[10px] font-bold leading-tight" style={{ color: CHESSCOM_GREEN }}>{displayRating}</span>}
-                  {(multiElo.chesscom?.hasData || multiElo.lichess?.hasData) && <MultiEloInline multi={multiElo} />}
-                </div>
+              <div className="flex flex-col items-end gap-0.5">
+                <span className="text-xs font-bold leading-none" style={{ color: TEXT_LIGHT }}>{username}</span>
+                {scoutElo != null && (
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-[8px] font-black uppercase tracking-[0.14em] leading-none" style={{ color: CHESSCOM_GREEN }}>Scout</span>
+                    <span className="text-[11px] font-black leading-none" style={{ color: TEXT_LIGHT }}>{scoutElo}</span>
+                  </div>
+                )}
               </div>
               <PlayerAvatar avatar={player?.avatar} username={username ?? ''} size="sm" />
             </button>
