@@ -1,6 +1,6 @@
 import { Router, type IRouter, type Request, type Response } from 'express';
 import { requireAuth } from '../middlewares/authMiddleware';
-import { getUserRatings, listTimeControls } from '../lib/liveServer';
+import { getUserRatings, listTimeControls, getActiveGameForUser } from '../lib/liveServer';
 
 const router: IRouter = Router();
 
@@ -15,6 +15,11 @@ router.get('/live/ratings', requireAuth, async (req: Request, res: Response) => 
   } catch (err) {
     res.status(500).json({ error: 'Failed to load ratings' });
   }
+});
+
+router.get('/live/active-game', requireAuth, (req: Request, res: Response) => {
+  const g = getActiveGameForUser(req.user!.id);
+  res.json({ game: g });
 });
 
 export default router;

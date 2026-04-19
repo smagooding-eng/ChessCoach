@@ -850,6 +850,14 @@ export async function getUserRatings(userId: string) {
   return out;
 }
 
+export function getActiveGameForUser(userId: string) {
+  const gid = userActiveGame.get(userId);
+  if (!gid) return null;
+  const g = games.get(gid);
+  if (!g) return null;
+  return gamePublicState(g);
+}
+
 export function listTimeControls() {
   return Object.values(TIME_CONTROLS).map(tc => ({ id: tc.id, label: tc.label, initialMs: tc.initialMs, incrementMs: tc.incrementMs }));
 }
