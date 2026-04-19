@@ -220,20 +220,25 @@ export function Analysis() {
       ) : summary ? (
         <>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <div className="rounded-xl p-5 space-y-6" style={{ background: BG_CARD, border: CARD_BORDER, boxShadow: CARD_SHADOW }}>
-              <h2 className="text-lg font-bold" style={{ color: TEXT_LIGHT }}>Performance Breakdown</h2>
+            <div className="rounded-xl p-4" style={{ background: BG_CARD, border: CARD_BORDER, boxShadow: CARD_SHADOW }}>
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-base font-bold" style={{ color: TEXT_LIGHT }}>Performance Breakdown</h2>
+                <span className="text-[11px] font-bold" style={{ color: TEXT_MUTED }}>
+                  <span style={{ color: TEXT_LIGHT }}>{summary.totalGames.toLocaleString()}</span> games
+                </span>
+              </div>
 
-              <div className="flex flex-col sm:flex-row items-center justify-around gap-6">
-                <div className="w-44 h-44">
+              <div className="flex items-center gap-4">
+                <div className="relative w-28 h-28 shrink-0">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                       <Pie
                         data={pieData}
                         cx="50%"
                         cy="50%"
-                        innerRadius={55}
-                        outerRadius={75}
-                        paddingAngle={4}
+                        innerRadius={38}
+                        outerRadius={54}
+                        paddingAngle={3}
                         dataKey="value"
                         stroke="none"
                       >
@@ -247,20 +252,37 @@ export function Analysis() {
                       />
                     </PieChart>
                   </ResponsiveContainer>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                    <span className="text-xl font-black leading-none" style={{ color: CHESSCOM_GREEN, letterSpacing: '-0.02em' }}>
+                      {Math.round((summary.wins / Math.max(summary.totalGames, 1)) * 100)}%
+                    </span>
+                    <span className="text-[9px] font-black uppercase tracking-[0.14em] mt-0.5" style={{ color: TEXT_MUTED }}>Win</span>
+                  </div>
                 </div>
-                <div className="space-y-2.5 w-full sm:w-auto">
-                  <div className="flex items-center justify-between gap-6">
-                    <div className="flex items-center gap-2 text-sm" style={{ color: TEXT_LIGHT }}><div className="w-3 h-3 rounded-full" style={{ background: CHESSCOM_GREEN }}/> Wins</div>
-                    <div className="font-bold text-sm" style={{ color: TEXT_LIGHT }}>{summary.wins}</div>
-                  </div>
-                  <div className="flex items-center justify-between gap-6">
-                    <div className="flex items-center gap-2 text-sm" style={{ color: TEXT_LIGHT }}><div className="w-3 h-3 rounded-full" style={{ background: '#dc4343' }}/> Losses</div>
-                    <div className="font-bold text-sm" style={{ color: TEXT_LIGHT }}>{summary.losses}</div>
-                  </div>
-                  <div className="flex items-center justify-between gap-6">
-                    <div className="flex items-center gap-2 text-sm" style={{ color: TEXT_LIGHT }}><div className="w-3 h-3 rounded-full" style={{ background: '#6b6966' }}/> Draws</div>
-                    <div className="font-bold text-sm" style={{ color: TEXT_LIGHT }}>{summary.draws}</div>
-                  </div>
+
+                <div className="flex-1 min-w-0 grid grid-cols-2 gap-1.5">
+                  {[
+                    { label: 'Wins', value: summary.wins, color: CHESSCOM_GREEN },
+                    { label: 'Losses', value: summary.losses, color: '#dc4343' },
+                    { label: 'Draws', value: summary.draws, color: '#6b6966' },
+                    {
+                      label: 'W : L',
+                      value: summary.losses > 0
+                        ? (summary.wins / summary.losses).toFixed(2)
+                        : summary.wins > 0 ? '∞' : '—',
+                      color: TEXT_LIGHT,
+                    },
+                  ].map((s) => (
+                    <div key={s.label} className="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-md" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                      <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.14em]" style={{ color: TEXT_MUTED }}>
+                        <span className="inline-block w-1.5 h-1.5 rounded-full" style={{ background: s.color }} />
+                        {s.label}
+                      </span>
+                      <span className="text-sm font-black tabular-nums" style={{ color: TEXT_LIGHT, letterSpacing: '-0.01em' }}>
+                        {typeof s.value === 'number' ? s.value.toLocaleString() : s.value}
+                      </span>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
