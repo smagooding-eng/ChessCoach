@@ -59,13 +59,12 @@ export function Dashboard() {
       <div
         className="relative overflow-hidden p-5 md:p-7 rounded-2xl"
         style={{
-          background: 'radial-gradient(120% 140% at 100% 0%, rgba(129,182,76,0.22) 0%, rgba(129,182,76,0.05) 38%, transparent 72%), linear-gradient(180deg, #383532 0%, #2a2825 100%)',
-          border: '1px solid rgba(129,182,76,0.18)',
+          background: 'linear-gradient(180deg, #383532 0%, #2a2825 100%)',
+          border: '1px solid rgba(255,255,255,0.06)',
           boxShadow: '0 18px 50px -16px rgba(0,0,0,0.6), 0 4px 16px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04)',
         }}>
         <div className="relative flex items-start gap-4">
           <div className="shrink-0 relative">
-            <div className="absolute -inset-1.5 rounded-2xl opacity-60 blur-md" style={{ background: `radial-gradient(circle, ${CHESSCOM_GREEN}, transparent 70%)` }} />
             {chessPlayer?.avatar
               ? <img src={chessPlayer.avatar} alt={username ?? ''} className="relative w-20 h-20 md:w-24 md:h-24 rounded-2xl object-cover" style={{ border: `3px solid ${CHESSCOM_GREEN}`, boxShadow: '0 8px 24px -4px rgba(0,0,0,0.6)' }} />
               : <div className="relative w-20 h-20 md:w-24 md:h-24 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(129,182,76,0.18)', border: `3px solid ${CHESSCOM_GREEN}`, boxShadow: '0 8px 24px -4px rgba(0,0,0,0.6)' }}>
@@ -154,7 +153,7 @@ export function Dashboard() {
         )}
 
         <div className="relative flex gap-2 mt-5">
-          <Link href="/import" className="flex-1 px-4 py-3 rounded-xl font-black text-sm text-white flex items-center justify-center gap-2 transition-all hover:scale-[1.02] active:scale-[0.98]" style={{ background: `linear-gradient(180deg, #95c45a 0%, ${CHESSCOM_GREEN} 100%)`, boxShadow: `0 6px 16px -4px rgba(129,182,76,0.5), inset 0 1px 0 rgba(255,255,255,0.25)` }}>
+          <Link href="/import" className="flex-1 px-4 py-3 rounded-xl font-black text-sm text-white flex items-center justify-center gap-2 transition-all hover:scale-[1.02] active:scale-[0.98]" style={{ background: `linear-gradient(180deg, #95c45a 0%, ${CHESSCOM_GREEN} 100%)`, boxShadow: `0 4px 12px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.2)` }}>
             <ImportIcon /> Import Games
           </Link>
           <Link href="/opponents" className="flex-1 px-4 py-3 rounded-xl font-black text-sm flex items-center justify-center gap-2 transition-all hover:scale-[1.02] active:scale-[0.98]" style={{ background: 'rgba(255,255,255,0.07)', color: TEXT_LIGHT, border: '1px solid rgba(255,255,255,0.1)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)' }}>
@@ -166,15 +165,15 @@ export function Dashboard() {
       <Link href="/scan" className="block px-3 md:px-0">
         <div className="relative overflow-hidden rounded-2xl p-5 md:p-6 transition-all group cursor-pointer flex items-center gap-4 md:gap-5"
           style={{
-            background: 'radial-gradient(120% 100% at 0% 0%, rgba(129,182,76,0.32) 0%, rgba(129,182,76,0.08) 50%, rgba(38,36,33,0.4) 100%)',
-            border: `1px solid rgba(129,182,76,0.4)`,
-            boxShadow: '0 12px 32px -8px rgba(129,182,76,0.25), inset 0 1px 0 rgba(255,255,255,0.06)',
+            background: 'linear-gradient(180deg, #353230 0%, #2b2926 100%)',
+            border: `1px solid rgba(129,182,76,0.3)`,
+            boxShadow: '0 12px 32px -8px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.05)',
           }}
-          onMouseEnter={(e) => (e.currentTarget.style.borderColor = 'rgba(129,182,76,0.7)')}
-          onMouseLeave={(e) => (e.currentTarget.style.borderColor = 'rgba(129,182,76,0.4)')}>
+          onMouseEnter={(e) => (e.currentTarget.style.borderColor = 'rgba(129,182,76,0.5)')}
+          onMouseLeave={(e) => (e.currentTarget.style.borderColor = 'rgba(129,182,76,0.3)')}>
           <div className="relative">
             <BoardThumb size={84} />
-            <div className="absolute -bottom-1.5 -right-1.5 w-8 h-8 rounded-full flex items-center justify-center shadow-lg" style={{ background: `linear-gradient(135deg, #95c45a, ${CHESSCOM_GREEN})`, boxShadow: `0 4px 12px ${CHESSCOM_GREEN}80` }}>
+            <div className="absolute -bottom-1.5 -right-1.5 w-8 h-8 rounded-full flex items-center justify-center" style={{ background: `linear-gradient(135deg, #95c45a, ${CHESSCOM_GREEN})`, boxShadow: '0 4px 10px rgba(0,0,0,0.5)' }}>
               <Camera className="w-4 h-4 text-white" />
             </div>
           </div>
@@ -204,14 +203,14 @@ export function Dashboard() {
         ].map((s) => (
           <div key={s.label} className="relative overflow-hidden rounded-2xl p-4 md:p-5 min-h-[120px] md:min-h-[140px]"
             style={{
-              background: `radial-gradient(110% 100% at 100% 0%, rgba(129,182,76,0.14) 0%, transparent 60%), linear-gradient(180deg, #353230 0%, #2b2926 100%)`,
-              border: `1px solid rgba(129,182,76,0.22)`,
-              boxShadow: `0 10px 28px -10px rgba(129,182,76,0.35), 0 4px 14px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.05)`,
+              background: `linear-gradient(180deg, #353230 0%, #2b2926 100%)`,
+              border: `1px solid rgba(255,255,255,0.06)`,
+              boxShadow: `0 8px 24px -10px rgba(0,0,0,0.6), 0 2px 6px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04)`,
             }}>
             <div className="absolute top-0 left-0 right-0 h-[3px]" style={{ background: `linear-gradient(90deg, ${CHESSCOM_GREEN} 0%, rgba(129,182,76,0.35) 70%, transparent 100%)` }} />
 
             <div className="relative flex items-center justify-between mb-3">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(129,182,76,0.18)', border: `1px solid rgba(129,182,76,0.4)`, color: CHESSCOM_GREEN, boxShadow: `0 4px 14px -2px rgba(129,182,76,0.4)` }}>
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(129,182,76,0.18)', border: `1px solid rgba(129,182,76,0.35)`, color: CHESSCOM_GREEN }}>
                 {s.icon}
               </div>
             </div>
