@@ -34,7 +34,7 @@ const TABS: { id: EndgameTab; label: string; icon: React.ElementType; desc: stri
     id: 'personal',
     label: 'Your Endgame Mistakes',
     icon: Target,
-    desc: 'AI-analyzed endgame errors from your actual games with corrections.',
+    desc: 'Analyzed endgame errors from your actual games with corrections.',
     apiType: 'personal_endgames',
   },
 ];

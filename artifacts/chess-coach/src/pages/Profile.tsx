@@ -450,7 +450,7 @@ ${divider}
 <h3 style="color:#81b64c;font-size:16px;margin:0 0 12px;">Here's what you can do right now:</h3>
 <table style="width:100%;border-collapse:collapse;">
 <tr><td style="padding:8px 0;vertical-align:top;width:30px;color:#81b64c;font-size:18px;">🔍</td><td style="padding:8px 0;"><strong style="color:#e8e6e3;">Opponent Scout</strong><br/><span style="color:#9e9b98;font-size:13px;">Deep analysis of any player's openings, weaknesses &amp; tendencies</span></td></tr>
-<tr><td style="padding:8px 0;vertical-align:top;width:30px;color:#81b64c;font-size:18px;">♟️</td><td style="padding:8px 0;"><strong style="color:#e8e6e3;">Game Lookup</strong><br/><span style="color:#9e9b98;font-size:13px;">Review any Chess.com game with AI-powered move analysis</span></td></tr>
+<tr><td style="padding:8px 0;vertical-align:top;width:30px;color:#81b64c;font-size:18px;">♟️</td><td style="padding:8px 0;"><strong style="color:#e8e6e3;">Game Lookup</strong><br/><span style="color:#9e9b98;font-size:13px;">Review any Chess.com game with deep move analysis</span></td></tr>
 <tr><td style="padding:8px 0;vertical-align:top;width:30px;color:#81b64c;font-size:18px;">🧩</td><td style="padding:8px 0;"><strong style="color:#e8e6e3;">Daily Puzzles</strong><br/><span style="color:#9e9b98;font-size:13px;">Sharpen your tactics with curated puzzle sets</span></td></tr>
 <tr><td style="padding:8px 0;vertical-align:top;width:30px;color:#81b64c;font-size:18px;">🤖</td><td style="padding:8px 0;"><strong style="color:#e8e6e3;">Practice Bots</strong><br/><span style="color:#9e9b98;font-size:13px;">Train against bots calibrated to different rating levels</span></td></tr>
 </table>
@@ -469,11 +469,11 @@ ${divider}
 <h3 style="color:#e8e6e3;margin:0 0 16px;font-size:15px;">Pro members get:</h3>
 <table style="width:100%;border-collapse:collapse;">
 <tr><td style="padding:6px 0;color:#81b64c;">✓</td><td style="padding:6px 0;"><strong>Unlimited puzzles</strong> — No daily cap</td></tr>
-<tr><td style="padding:6px 0;color:#81b64c;">✓</td><td style="padding:6px 0;"><strong>Opponent Scouting</strong> — AI weakness reports</td></tr>
+<tr><td style="padding:6px 0;color:#81b64c;">✓</td><td style="padding:6px 0;"><strong>Opponent Scouting</strong> — Deep weakness reports</td></tr>
 <tr><td style="padding:6px 0;color:#81b64c;">✓</td><td style="padding:6px 0;"><strong>Deep Game Analysis</strong> — Move-by-move engine eval</td></tr>
 <tr><td style="padding:6px 0;color:#81b64c;">✓</td><td style="padding:6px 0;"><strong>Personalized Courses</strong> — Built from your games</td></tr>
 <tr><td style="padding:6px 0;color:#81b64c;">✓</td><td style="padding:6px 0;"><strong>Endgame Trainer</strong> — Targeted drills</td></tr>
-<tr><td style="padding:6px 0;color:#81b64c;">✓</td><td style="padding:6px 0;"><strong>AI Explanations</strong> — Understand every puzzle</td></tr>
+<tr><td style="padding:6px 0;color:#81b64c;">✓</td><td style="padding:6px 0;"><strong>Coach Explanations</strong> — Understand every puzzle</td></tr>
 </table>
 </div>
 <div style="text-align:center;background:linear-gradient(135deg,rgba(129,182,76,0.1),rgba(129,182,76,0.05));border:1px solid rgba(129,182,76,0.2);border-radius:8px;padding:20px;margin-bottom:20px;">
@@ -588,7 +588,7 @@ ${divider}
 <table style="width:100%;border-collapse:collapse;">
 <tr><td style="padding:6px 0;color:#ff6b6b;">✗</td><td style="padding:6px 0;color:#9e9b98;">Unlimited puzzles → Back to 5/day</td></tr>
 <tr><td style="padding:6px 0;color:#ff6b6b;">✗</td><td style="padding:6px 0;color:#9e9b98;">Opponent scouting reports</td></tr>
-<tr><td style="padding:6px 0;color:#ff6b6b;">✗</td><td style="padding:6px 0;color:#9e9b98;">AI move explanations</td></tr>
+<tr><td style="padding:6px 0;color:#ff6b6b;">✗</td><td style="padding:6px 0;color:#9e9b98;">Coach move explanations</td></tr>
 <tr><td style="padding:6px 0;color:#ff6b6b;">✗</td><td style="padding:6px 0;color:#9e9b98;">Personalized courses</td></tr>
 <tr><td style="padding:6px 0;color:#ff6b6b;">✗</td><td style="padding:6px 0;color:#9e9b98;">Endgame training drills</td></tr>
 </table>
@@ -631,7 +631,7 @@ ${divider}
 <table style="width:100%;border-collapse:collapse;">
 <tr><td style="padding:8px 0;vertical-align:top;width:30px;font-size:16px;">⚡</td><td style="padding:8px 0;"><strong style="color:#e8e6e3;">2 minutes</strong> — Solve a daily puzzle</td></tr>
 <tr><td style="padding:8px 0;vertical-align:top;width:30px;font-size:16px;">🎯</td><td style="padding:8px 0;"><strong style="color:#e8e6e3;">5 minutes</strong> — Scout your next opponent</td></tr>
-<tr><td style="padding:8px 0;vertical-align:top;width:30px;font-size:16px;">📖</td><td style="padding:8px 0;"><strong style="color:#e8e6e3;">10 minutes</strong> — Review a recent game with AI</td></tr>
+<tr><td style="padding:8px 0;vertical-align:top;width:30px;font-size:16px;">📖</td><td style="padding:8px 0;"><strong style="color:#e8e6e3;">10 minutes</strong> — Review a recent game with the coach</td></tr>
 <tr><td style="padding:8px 0;vertical-align:top;width:30px;font-size:16px;">🤖</td><td style="padding:8px 0;"><strong style="color:#e8e6e3;">15 minutes</strong> — Play a practice bot match</td></tr>
 </table>
 </div>

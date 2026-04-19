@@ -407,7 +407,7 @@ export function ScanPosition() {
             <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin shrink-0" />
             <div>
               <p className="text-sm font-bold" style={{ color: '#81b64c' }}>Analyzing position...</p>
-              <p className="text-xs text-white/40 mt-0.5">AI is identifying every piece on the board</p>
+              <p className="text-xs text-white/40 mt-0.5">Identifying every piece on the board</p>
             </div>
           </div>
         </div>
@@ -489,7 +489,7 @@ export function ScanPosition() {
               style={{ background: 'rgba(129,182,76,0.15)', color: '#81b64c', border: '1px solid rgba(129,182,76,0.3)' }}
             >
               <Swords className="w-4 h-4" />
-              Play AI
+              Play Bot
             </button>
           </div>
 
@@ -563,7 +563,7 @@ export function ScanPosition() {
               style={{ background: 'rgba(129,182,76,0.15)', color: '#81b64c', border: '1px solid rgba(129,182,76,0.3)' }}
             >
               <Swords className="w-3.5 h-3.5" />
-              Play AI
+              Play Bot
             </button>
           </div>
 
@@ -773,7 +773,7 @@ export function ScanPosition() {
               style={{ background: 'rgba(129,182,76,0.15)', color: '#81b64c', border: '1px solid rgba(129,182,76,0.3)' }}
             >
               <Swords className="w-4 h-4" />
-              Play AI
+              Play Bot
             </button>
           </div>
 

@@ -1005,7 +1005,7 @@ export function GameReplay() {
               </span>
             );
             return (
-              <AICoachCard tone={tone} name="Coach" badge="AI" title={titleNode}>
+              <AICoachCard tone={tone} name="Coach" badge="Coach" title={titleNode}>
                 {currentReview ? (
                   <>
                     <p>{currentReview.explanation}</p>
@@ -1275,7 +1275,7 @@ export function GameReplay() {
               <div className="flex items-start gap-3">
                 <BrainCircuit className="w-5 h-5 text-primary shrink-0 mt-0.5" />
                 <div>
-                  <p className="text-sm font-bold text-foreground">Review this game with AI</p>
+                  <p className="text-sm font-bold text-foreground">Review this game with the coach</p>
                   <p className="text-xs text-muted-foreground mt-0.5">Get instant analysis for every move — classifications, explanations, and better alternatives.</p>
                 </div>
               </div>
@@ -1310,7 +1310,7 @@ export function GameReplay() {
             <div className="glass-card rounded-xl overflow-hidden border border-white/8">
               <div className="px-4 py-3 border-b border-white/5 flex items-center gap-2 bg-white/3">
                 <BrainCircuit className="w-4 h-4 text-primary" />
-                <span className="font-bold text-sm">AI Game Analysis</span>
+                <span className="font-bold text-sm">Game Analysis</span>
               </div>
               <div className="p-4 space-y-4">
                 <p className="text-sm text-foreground/85 leading-relaxed">{gameSummary.overview}</p>

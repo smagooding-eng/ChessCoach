@@ -7,8 +7,8 @@ import { motion } from 'framer-motion';
 import { apiFetch } from '@/lib/api';
 
 const PREMIUM_FEATURES = [
-  { icon: BrainCircuit, label: 'AI Game Analysis', desc: 'Deep GPT-powered analysis of every game' },
-  { icon: GraduationCap, label: 'Personalized Courses', desc: 'AI-generated courses based on your weaknesses' },
+  { icon: BrainCircuit, label: 'Deep Game Analysis', desc: 'In-depth analysis of every game you play' },
+  { icon: GraduationCap, label: 'Personalized Courses', desc: 'Custom courses built from your weaknesses' },
   { icon: Volume2, label: 'TTS Narration', desc: 'Listen to lesson content with text-to-speech' },
   { icon: Swords, label: 'Opponent Scouting', desc: 'Analyze your opponents\' strengths and weaknesses' },
 ];

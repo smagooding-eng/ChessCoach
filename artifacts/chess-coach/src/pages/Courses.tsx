@@ -158,7 +158,7 @@ export function Courses() {
     <div className="space-y-8 pb-20 px-4 pt-4 md:px-0 md:pt-0">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-stretch gap-4">
         <div className="flex-1 min-w-0">
-          <PageHero piece="♝" title="My Courses" subtitle="Personalized lesson plans based on your AI analysis." />
+          <PageHero piece="♝" title="My Courses" subtitle="Personalized lesson plans based on your deep analysis." />
         </div>
 
         <div className="flex flex-col items-end gap-2">
@@ -181,7 +181,7 @@ export function Courses() {
           </button>
           {isGenerating && (
             <p className="text-xs text-muted-foreground animate-pulse">
-              Generating up to 4 AI courses — this takes 1–2 minutes…
+              Generating up to 4 personalized courses — this takes 1–2 minutes…
             </p>
           )}
           {genError && (
@@ -310,7 +310,7 @@ export function Courses() {
           <div className="col-span-full text-center py-20 border-2 border-dashed border-border rounded-xl">
             <BookOpen className="w-12 h-12 text-muted-foreground mx-auto mb-4 opacity-50" />
             <h3 className="text-xl font-bold mb-2">No Courses Yet</h3>
-            <p className="text-muted-foreground mb-6">Run an AI analysis and generate courses tailored to your weak spots.</p>
+            <p className="text-muted-foreground mb-6">Run a deep analysis and generate courses tailored to your weak spots.</p>
             <button
               onClick={handleGenerate}
               className="px-6 py-3 rounded-xl bg-primary text-primary-foreground font-bold hover:shadow-lg hover:shadow-primary/25 hover:-translate-y-0.5 transition-all"

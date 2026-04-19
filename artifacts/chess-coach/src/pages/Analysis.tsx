@@ -115,7 +115,7 @@ export function Analysis() {
 
     setIsAnalyzing(true);
     setAnalyzeError(null);
-    setStatusMsg('Starting AI analysis…');
+    setStatusMsg('Starting deep analysis…');
 
     try {
       const startRes = await apiFetch('/api/analysis/start', {
@@ -130,7 +130,7 @@ export function Analysis() {
       const { jobId } = await startRes.json() as { jobId: string };
 
       if (!mountedRef.current) return;
-      setStatusMsg('Analyzing your games with AI… this may take 30–60 seconds');
+      setStatusMsg('Analyzing your games… this may take 30–60 seconds');
 
       await pollJob(jobId);
 
@@ -167,11 +167,11 @@ export function Analysis() {
   }) || [];
 
   return (
-    <PremiumGate feature="AI Game Analysis">
+    <PremiumGate feature="Deep Game Analysis">
     <div className="space-y-5 pb-10 px-3 pt-3 md:px-0 md:pt-0">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-stretch gap-4">
         <div className="flex-1 min-w-0">
-          <PageHero piece="♚" title="AI Analysis" subtitle="Our coach engine processes all your games to detect recurring patterns, blunders, and strategic leaks." />
+          <PageHero piece="♚" title="Deep Analysis" subtitle="Our coach engine processes all your games to detect recurring patterns, blunders, and strategic leaks." />
         </div>
         <div className="flex items-center">
           <button

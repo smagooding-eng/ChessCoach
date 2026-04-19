@@ -287,7 +287,7 @@ export function OpponentAnalysis() {
       const { jobId } = await startRes.json() as { jobId: string };
 
       if (!mountedRef.current) return;
-      setStatusMsg('Fetching games & running AI analysis… this may take 30–60 seconds');
+      setStatusMsg('Fetching games & running deep analysis… this may take 30–60 seconds');
 
       const scoutResult = await pollScoutJob(jobId);
       if (mountedRef.current) {
@@ -711,7 +711,7 @@ export function OpponentAnalysis() {
                   <div className="min-w-0">
                     <p className="font-black text-sm">Generate Exploit Courses</p>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      AI builds {Math.min(result.weaknesses.length, 3)} courses teaching you how to punish{' '}
+                      We build {Math.min(result.weaknesses.length, 3)} courses teaching you how to punish{' '}
                       <span className="text-foreground font-bold">{result.username}</span>'s top weaknesses
                     </p>
                   </div>

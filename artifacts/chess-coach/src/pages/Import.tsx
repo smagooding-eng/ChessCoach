@@ -144,7 +144,7 @@ export function Import() {
 
         <h1 className="text-2xl md:text-3xl font-black mb-4" style={{ letterSpacing: '-0.02em' }}>Import Games</h1>
         <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-          Fetch your recent games to power AI analysis. Import from Chess.com, Lichess, or both.
+          Fetch your recent games to power deep analysis. Import from Chess.com, Lichess, or both.
         </p>
 
         <div className="flex justify-center gap-2 mb-8">

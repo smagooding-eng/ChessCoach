@@ -443,7 +443,7 @@ export default function GrowthEngine() {
           <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
             <Globe className="w-4 h-4 text-purple-400" /> Growth Engine
           </h3>
-          <p className="text-[10px] text-muted-foreground mt-0.5">AI-powered automated posting to Discord, Twitter/X, and Reddit</p>
+          <p className="text-[10px] text-muted-foreground mt-0.5">Automated posting to Discord, Twitter/X, and Reddit</p>
         </div>
         <div className="flex border-b border-border/20">
           {tabs.map(t => (

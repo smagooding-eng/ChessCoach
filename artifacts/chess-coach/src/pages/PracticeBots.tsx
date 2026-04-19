@@ -84,7 +84,7 @@ function MoveAnalysisPanel({ move, playerColor }: { move: MoveRecord; playerColo
   );
 
   return (
-    <AICoachCard tone={tone} name="Coach" badge="AI" title={titleNode} compact>
+    <AICoachCard tone={tone} name="Coach" badge="Coach" title={titleNode} compact>
       <p className="text-xs text-muted-foreground/80">
         Eval{' '}
         <span className="font-mono font-bold text-foreground/90 tabular-nums">
@@ -889,7 +889,7 @@ export function PracticeBots() {
           <div>
             <h1 className="text-2xl md:text-3xl font-black" style={{ letterSpacing: '-0.02em' }}>Practice</h1>
             <p className="text-muted-foreground mt-2 max-w-lg text-sm">
-              Battle AI opponents or drill specific openings move-by-move with instant feedback.
+              Battle bot opponents or drill specific openings move-by-move with instant feedback.
             </p>
           </div>
         </div>

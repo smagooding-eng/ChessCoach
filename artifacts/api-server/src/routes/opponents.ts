@@ -232,7 +232,7 @@ async function runAnalysis(
     if (!analysis || !Array.isArray(analysis.weaknesses)) {
       await db.update(backgroundJobsTable).set({
         status: "error",
-        error: "AI analysis returned an unexpected response. Please try again.",
+        error: "Analysis returned an unexpected response. Please try again.",
         completedAt: new Date(),
       }).where(eq(backgroundJobsTable.id, jobId));
       return;

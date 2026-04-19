@@ -246,7 +246,7 @@ router.post("/admin/clear-ai-cache", requireAdmin, async (_req: Request, res: Re
       },
     });
   } catch (err: any) {
-    res.status(500).json({ error: "Failed to clear AI cache", details: err.message });
+    res.status(500).json({ error: "Failed to clear analysis cache", details: err.message });
   }
 });
 
@@ -480,8 +480,8 @@ router.post("/admin/fix-chess960", requireAdmin, async (req: Request, res: Respo
 
 const CAMPAIGN_THEMES: Record<string, string> = {
   "Free Trial": "Emphasize the free 3-day trial with no credit card required. Urgency: try it risk-free today.",
-  "Opponent Scouting": "Focus on the killer feature: AI scouting reports that expose any opponent's weaknesses before you play them.",
-  "Game Analysis": "Highlight move-by-move game analysis with Stockfish 17 engine + AI coaching explanations for every move.",
+  "Opponent Scouting": "Focus on the killer feature: smart scouting reports that expose any opponent's weaknesses before you play them.",
+  "Game Analysis": "Highlight move-by-move game analysis with Stockfish 17 engine + coaching explanations for every move.",
   "New Feature": "Announce exciting new features. Be enthusiastic and specific about what's new.",
   "General Promo": "Broad promotional message covering the full value proposition: scouting, analysis, courses, bots, and progress tracking.",
   "ELO Improvement": "Target players who want to gain rating points. Emphasize how personalized training and weakness detection leads to measurable improvement.",
@@ -500,13 +500,13 @@ router.post("/admin/marketing/generate", requireAdmin, async (req: Request, res:
       apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
     });
 
-    const prompt = `You are a marketing copywriter for ChessScout.net — an AI-powered chess coaching app.
+    const prompt = `You are a marketing copywriter for ChessScout.net — a smart chess coaching app.
 
 PRODUCT INFO:
-- AI opponent scouting reports that expose weaknesses of any Chess.com or Lichess player
-- Move-by-move game analysis powered by Stockfish 17 + AI coaching
+- Smart opponent scouting reports that expose weaknesses of any Chess.com or Lichess player
+- Move-by-move game analysis powered by Stockfish 17 + coaching
 - Personalized training courses generated from your actual mistakes
-- 8 practice AI bots from 400 to 2000 ELO
+- 8 practice bots from 400 to 2000 ELO
 - ELO tracking across Chess.com and Lichess
 - 3-day free trial, $4/month or $1/week, no credit card required
 - Website: https://chessscout.net
@@ -548,7 +548,7 @@ Return VALID JSON only:
     const content = response.choices[0]?.message?.content ?? "{}";
     const parsed = JSON.parse(content);
     if (!parsed.posts || !Array.isArray(parsed.posts)) {
-      res.status(500).json({ error: "AI returned unexpected format" });
+      res.status(500).json({ error: "Engine returned unexpected format" });
       return;
     }
     res.json(parsed);

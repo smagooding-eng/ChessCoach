@@ -61,7 +61,7 @@ export async function postToDiscord(webhookUrl: string, content: string): Promis
       title: "♜ ChessScout.net",
       description: content,
       color: 0x81b64c,
-      footer: { text: "ChessScout — AI Chess Coaching" },
+      footer: { text: "ChessScout — Smart Chess Coaching" },
       url: "https://chessscout.net",
     };
     const res = await fetch(webhookUrl + '?wait=true', {

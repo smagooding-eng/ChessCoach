@@ -73,7 +73,7 @@ const TOUR = [
     icon: Camera,
     badge: 'NEW',
     title: 'Scan any position',
-    sub: 'Snap a board mid-game and get the AI verdict in seconds.',
+    sub: 'Snap a board mid-game and get the coach verdict in seconds.',
     bullet1: 'Works on books, screens, real boards',
     bullet2: 'Best move + threats + plan',
     bullet3: 'No more guessing in postgame review',
@@ -83,7 +83,7 @@ const TOUR = [
     id: 'analysis',
     icon: Brain,
     badge: 'CORE',
-    title: 'AI Game Coach',
+    title: 'Game Coach',
     sub: 'Every game gets a personalized breakdown of your blunders and fixes.',
     bullet1: 'Plain-English mistake explanations',
     bullet2: 'Pattern detection across all your games',
@@ -517,7 +517,7 @@ function TourDemo({ kind }: { kind: 'scan' | 'analysis' | 'practice' }) {
 
           {/* Verdict */}
           <div className="flex-1 min-w-0 text-left">
-            <p className="text-[10px] font-black uppercase tracking-wider mb-1" style={{ color: G }}>AI Verdict</p>
+            <p className="text-[10px] font-black uppercase tracking-wider mb-1" style={{ color: G }}>Verdict</p>
             <motion.p
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
@@ -703,10 +703,10 @@ function DemoReviewStep({ onContinue }: { onContinue: () => void }) {
       className="text-center"
     >
       <p className="text-[10px] font-black uppercase tracking-widest mb-3" style={{ color: G }}>
-        See it in action · live AI review
+        See it in action · live review
       </p>
       <h1 className="text-2xl md:text-4xl font-black mb-2 leading-[1.05] tracking-tight" style={{ color: TEXT }}>
-        Step through a real <span style={{ color: G }}>AI review</span>
+        Step through a real <span style={{ color: G }}>game review</span> walkthrough
       </h1>
       <p className="text-sm md:text-base mb-5 max-w-md mx-auto" style={{ color: MUTED }}>
         This is exactly how every game in your library will be analyzed — move by move, with the coach explaining what worked and what didn't.

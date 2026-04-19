@@ -247,7 +247,7 @@ export function WeaknessDetail() {
         </div>
       </motion.div>
 
-      {/* ── AI-Identified Patterns ── */}
+      {/* ── Identified Patterns ── */}
       {(examplesWithLinks?.length > 0 || weakness.examples?.length > 0) && (
         <motion.div
           initial={{ opacity: 0, y: 12 }}
@@ -259,7 +259,7 @@ export function WeaknessDetail() {
             <div className="p-2 rounded-xl bg-amber-500/15 border border-amber-500/30">
               <Lightbulb className="w-5 h-5 text-amber-400" />
             </div>
-            AI-Identified Patterns
+            Identified Patterns
           </h2>
           <div className="space-y-3">
             {(examplesWithLinks ?? weakness.examples.map(text => ({ text, gameIds: [] }))).map((ex, i) => (

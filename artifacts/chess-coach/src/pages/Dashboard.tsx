@@ -175,7 +175,7 @@ export function Dashboard() {
           </div>
           <div className="flex-1 min-w-0 relative">
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-[0.18em] mb-1.5" style={{ background: 'rgba(129,182,76,0.25)', color: CHESSCOM_GREEN, border: '1px solid rgba(129,182,76,0.4)' }}>
-              <Zap className="w-2.5 h-2.5" /> AI Coach
+              <Zap className="w-2.5 h-2.5" /> Coach
             </span>
             <h3 className="font-black text-lg md:text-2xl leading-tight" style={{ color: TEXT_LIGHT, letterSpacing: '-0.02em' }}>
               Stuck in a game?
@@ -295,7 +295,7 @@ export function Dashboard() {
                 </div>
               </div>
             ) : (
-              <EmptyState icon={<Target className="w-7 h-7" />} text="No weaknesses found yet." linkHref="/analysis" linkText="Run AI Analysis →" />
+              <EmptyState icon={<Target className="w-7 h-7" />} text="No weaknesses found yet." linkHref="/analysis" linkText="Run Deep Analysis →" />
             )}
           </DashCard>
 
@@ -358,7 +358,7 @@ export function Dashboard() {
                 <ChevronRight className="w-4 h-4 shrink-0 opacity-40 group-hover:opacity-80 transition-opacity" style={{ color: CHESSCOM_GREEN }} />
               </div>
               <p className="relative text-xs leading-relaxed" style={{ color: TEXT_MUTED }}>
-                AI-powered scouting report on any Chess.com player. Find weaknesses, tendencies, and prep lines before your next match.
+                Smart scouting report on any Chess.com player. Find weaknesses, tendencies, and prep lines before your next match.
               </p>
             </div>
           </Link>
@@ -380,7 +380,7 @@ export function Dashboard() {
               { href: '/play', label: 'Play Local', icon: <Play className="w-4 h-4" /> },
               { href: '/practice', label: 'Practice vs Bots', icon: <Bot className="w-4 h-4" /> },
               { href: '/import', label: 'Import Games', icon: <ImportIcon /> },
-              { href: '/analysis', label: 'Run AI Analysis', icon: <Target className="w-4 h-4" /> },
+              { href: '/analysis', label: 'Run Deep Analysis', icon: <Target className="w-4 h-4" /> },
             ].map(action => (
               <Link key={action.href} href={action.href} className="block">
                 <div className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl transition-colors text-sm font-medium group"

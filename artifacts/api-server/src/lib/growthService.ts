@@ -11,8 +11,8 @@ import {
 
 export const CAMPAIGN_THEMES: Record<string, string> = {
   "Free Trial": "Emphasize the free 3-day trial with no credit card required. Urgency: try it risk-free today.",
-  "Opponent Scouting": "Focus on the killer feature: AI scouting reports that expose any opponent's weaknesses before you play them.",
-  "Game Analysis": "Highlight move-by-move game analysis with Stockfish 17 engine + AI coaching explanations for every move.",
+  "Opponent Scouting": "Focus on the killer feature: smart scouting reports that expose any opponent's weaknesses before you play them.",
+  "Game Analysis": "Highlight move-by-move game analysis with Stockfish 17 engine + coaching explanations for every move.",
   "New Feature": "Announce exciting new features. Be enthusiastic and specific about what's new.",
   "General Promo": "Broad promotional message covering the full value proposition: scouting, analysis, courses, bots, and progress tracking.",
   "ELO Improvement": "Target players who want to gain rating points. Emphasize how personalized training and weakness detection leads to measurable improvement.",
@@ -52,9 +52,9 @@ async function generateContentForPlatform(theme: string, platform: string, custo
 
   const needsTitle = platform.includes('Reddit');
 
-  const prompt = `You are a marketing copywriter for ChessScout.net — an AI-powered chess coaching app.
+  const prompt = `You are a marketing copywriter for ChessScout.net — a smart chess coaching app.
 
-PRODUCT: AI opponent scouting, Stockfish 17 game analysis, personalized courses, practice bots (400-2000 ELO), ELO tracking. 3-day free trial, $4/month, no credit card required. https://chessscout.net
+PRODUCT: Smart opponent scouting, Stockfish 17 game analysis, personalized courses, practice bots (400-2000 ELO), ELO tracking. 3-day free trial, $4/month, no credit card required. https://chessscout.net
 
 THEME: ${theme} — ${CAMPAIGN_THEMES[theme]}
 ${customNote ? `NOTE: ${customNote}` : ""}

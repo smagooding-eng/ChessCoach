@@ -1,7 +1,7 @@
 {
   "name": "ChessScout.net",
   "short_name": "ChessScout",
-  "description": "AI-powered chess coaching — scout opponents, analyze games, improve your play",
+  "description": "Smart chess coaching — scout opponents, analyze games, improve your play",
   "start_url": ".",
   "display": "standalone",
   "background_color": "#141413",

@@ -166,7 +166,7 @@ function trialExpiryHtml(name: string | null): string {
       Your 3-day ChessScout trial expires in less than 12 hours. After that, you'll lose access to:
     </p>
     <ul style="color:#e8e6e3;font-size:14px;line-height:2;padding-left:20px;margin:0 0 20px;">
-      <li>AI opponent scouting reports</li>
+      <li>Deep opponent scouting reports</li>
       <li>Unlimited game analysis with Stockfish 17</li>
       <li>Personalized training courses</li>
       <li>Practice bots from 400 to 2000 ELO</li>
@@ -197,7 +197,7 @@ function winBackHtml(name: string | null): string {
       Here's what you're missing:
     </p>
     <ul style="color:#e8e6e3;font-size:14px;line-height:2;padding-left:20px;margin:0 0 20px;">
-      <li>New AI analysis features for deeper insights</li>
+      <li>New analysis features for deeper insights</li>
       <li>Fresh daily puzzles to sharpen your tactics</li>
       <li>Updated scouting reports for your opponents</li>
     </ul>

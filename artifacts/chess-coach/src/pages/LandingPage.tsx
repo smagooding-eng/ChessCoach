@@ -132,7 +132,7 @@ function HeroBoard() {
         {/* SCANNING badge */}
         <div className="absolute top-3 right-3 flex items-center gap-1.5 px-2.5 py-1 rounded-full" style={{ background: 'rgba(0,0,0,0.78)', backdropFilter: 'blur(6px)' }}>
           <motion.div className="w-2 h-2 rounded-full" style={{ background: G }} animate={{ opacity: [0.3, 1, 0.3] }} transition={{ duration: 1.2, repeat: Infinity }} />
-          <span className="text-[10px] font-black tracking-widest" style={{ color: '#fff' }}>AI ANALYZING</span>
+          <span className="text-[10px] font-black tracking-widest" style={{ color: '#fff' }}>ANALYZING</span>
         </div>
       </div>
 
@@ -820,9 +820,9 @@ export function LandingPage() {
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {[
               { icon: BarChart3, title: 'Game Analysis', desc: 'Move-by-move breakdown of your games with accuracy scores and the exact moments you went wrong', accent: true },
-              { icon: BookOpen, title: 'Personalized Courses', desc: 'AI-generated lessons built from your actual mistakes — not generic theory', accent: false },
+              { icon: BookOpen, title: 'Personalized Courses', desc: 'Custom lessons built from your actual mistakes — not generic theory', accent: false },
               { icon: Search, title: 'Scan Position', desc: 'Stuck in a game? Upload a screenshot and get the best move instantly', accent: false },
-              { icon: Gamepad2, title: 'Practice Bots', desc: '8 AI opponents from 400 to 2000 ELO with live move analysis', accent: false },
+              { icon: Gamepad2, title: 'Practice Bots', desc: '8 bot opponents from 400 to 2000 ELO with live move analysis', accent: false },
               { icon: TrendingUp, title: 'Track Progress', desc: 'See your improvement over time across openings, tactics, and endgames', accent: false },
               { icon: Crosshair, title: 'Opponent Scout', desc: 'Prepare for specific opponents (optional) — useful for tournaments and rivals', accent: false },
             ].map((item, i) => (
@@ -909,10 +909,10 @@ export function LandingPage() {
 
             <div className="space-y-3 mb-8">
               {[
-                'Full AI analysis of every game you play',
+                'Full deep analysis of every game you play',
                 'Personalized courses built from your mistakes',
                 'Scan any position for the best move',
-                'Practice against 8 AI bots (400–2000 ELO)',
+                'Practice against 8 bots (400–2000 ELO)',
                 'Opponent scouting when you need it',
               ].map((feature) => (
                 <div key={feature} className="flex items-center gap-3">

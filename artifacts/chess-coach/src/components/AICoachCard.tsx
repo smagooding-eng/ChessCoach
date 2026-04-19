@@ -86,7 +86,7 @@ type Props = {
 export function AICoachCard({
   tone = 'neutral',
   name = 'Coach',
-  badge = 'AI',
+  badge = 'Coach',
   title,
   children,
   className,
