@@ -208,8 +208,10 @@ async function seedRatingFromImports(userId: string, tc: TimeControlId): Promise
       const ratings: number[] = [];
       for (const g of rows) {
         const me = String(g.username).toLowerCase();
-        if (String(g.white_username).toLowerCase() === me && g.white_rating > 0) ratings.push(Number(g.white_rating));
-        else if (String(g.black_username).toLowerCase() === me && g.black_rating > 0) ratings.push(Number(g.black_rating));
+        const wr = Number(g.white_rating);
+        const br = Number(g.black_rating);
+        if (String(g.white_username).toLowerCase() === me && wr > 0) ratings.push(wr);
+        else if (String(g.black_username).toLowerCase() === me && br > 0) ratings.push(br);
       }
       if (ratings.length > 0) {
         const avg = Math.round(ratings.reduce((a, b) => a + b, 0) / ratings.length);
