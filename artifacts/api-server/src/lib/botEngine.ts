@@ -130,18 +130,50 @@ function minimax(chess: Chess, depth: number, alpha: number, beta: number, maxim
 }
 
 // Map ELO 600..2400 to engine config.
-export function configForRating(elo: number): { depth: number; blunderRate: number; randomRate: number } {
-  // depth: ramps 1 -> 4 between 800 and 2200
+//
+// Tuning intent: bots should play noticeably "for their level" and not throw
+// away pieces or hang mate at any rating above ~900. Blunder/randomness curves
+// are aggressive at the low end and taper off quickly through the middle band.
+export function configForRating(elo: number): {
+  depth: number;
+  blunderRate: number;     // chance of a fully random legal move
+  randomRate: number;      // chance of choosing from top-N instead of best
+  topN: number;            // how many "good enough" candidates to mix in
+  avoidHangCap: number;    // max material loss (centipawns) tolerated when avoiding hangs; 0 disables filter
+} {
   let depth: number;
-  if (elo < 800) depth = 1;
-  else if (elo < 1200) depth = 2;
-  else if (elo < 1700) depth = 3;
+  if (elo < 800) depth = 2;
+  else if (elo < 1100) depth = 2;
+  else if (elo < 1400) depth = 3;
+  else if (elo < 1800) depth = 3;
+  else if (elo < 2100) depth = 4;
   else depth = 4;
-  // blunderRate: full random move chance
-  const blunderRate = Math.max(0.005, Math.min(0.45, 0.55 - (elo - 600) / 4400));
-  // randomRate: pick from top-N candidate moves by eval (adds noise without total blunder)
-  const randomRate = Math.max(0.05, Math.min(0.6, 0.7 - (elo - 600) / 3600));
-  return { depth, blunderRate, randomRate };
+
+  // Smooth, gentler blunder curve — at 1200 ~6%, 1500 ~3%, 1800 ~1.5%, 800 ~14%.
+  const t = Math.max(0, Math.min(1, (elo - 600) / 1600));
+  const blunderRate = Math.max(0.005, 0.18 * Math.pow(1 - t, 2.0));
+  // Top-N noise: pick a near-best move instead of best move some of the time.
+  const randomRate = Math.max(0.08, 0.55 * Math.pow(1 - t, 1.4));
+  // Wider candidate set at low ratings.
+  const topN = elo < 1000 ? 4 : elo < 1500 ? 3 : 2;
+  // Hanging-piece filter: at >=1100 we re-roll moves that drop more than a
+  // pawn for nothing; at higher ratings tolerance drops to "no free material at all".
+  const avoidHangCap = elo < 1100 ? 0 : elo < 1500 ? 150 : elo < 1900 ? 80 : 30;
+  return { depth, blunderRate, randomRate, topN, avoidHangCap };
+}
+
+// Heuristic SEE-lite: after our move, look one ply ahead — the worst recapture
+// our opponent can play. Returns the centipawn material we lose on the next ply.
+function worstReplyMaterialLoss(chess: Chess): number {
+  const replies = chess.moves({ verbose: true });
+  let worst = 0;
+  for (const r of replies) {
+    if (!r.captured) continue;
+    const gain = PIECE_VALUES[r.captured] ?? 0;
+    // Approximate net loss: opponent gains this much material.
+    if (gain > worst) worst = gain;
+  }
+  return worst;
 }
 
 export function getBotMove(fen: string, elo: number): string | null {
@@ -150,40 +182,56 @@ export function getBotMove(fen: string, elo: number): string | null {
   if (moves.length === 0) return null;
   const cfg = configForRating(elo);
 
-  // Pure random blunder
+  // Pure random blunder — kept small at all but the lowest ratings.
   if (Math.random() < cfg.blunderRate) {
     return moves[Math.floor(Math.random() * moves.length)];
   }
 
   const maximizing = chess.turn() === 'w';
 
-  // Cap depth in branching positions to keep latency reasonable
+  // Cap depth in branching positions to keep latency reasonable.
   let effectiveDepth = cfg.depth;
   if (moves.length > 40) effectiveDepth = Math.min(effectiveDepth, 2);
   else if (moves.length > 30 && effectiveDepth > 3) effectiveDepth = 3;
 
-  const evals: { move: string; eval: number }[] = [];
+  const evals: { move: string; eval: number; hangLoss: number }[] = [];
   const shuffled = [...moves].sort(() => Math.random() - 0.5);
   for (const move of shuffled) {
     chess.move(move);
     const e = minimax(chess, effectiveDepth - 1, -Infinity, Infinity, !maximizing);
+    const hangLoss = cfg.avoidHangCap > 0 ? worstReplyMaterialLoss(chess) : 0;
     chess.undo();
-    evals.push({ move, eval: e });
+    evals.push({ move, eval: e, hangLoss });
   }
   evals.sort((a, b) => maximizing ? b.eval - a.eval : a.eval - b.eval);
 
-  // With probability randomRate, pick from top-3 instead of best
-  if (evals.length > 1 && Math.random() < cfg.randomRate) {
-    const topN = Math.min(3, evals.length);
-    return evals[Math.floor(Math.random() * topN)].move;
+  // Apply a "don't drop pieces" filter for ratings high enough to be expected
+  // to see basic tactics. We keep moves whose worst 1-ply reply doesn't lose
+  // more than the cap. If everything hangs, fall back to original list (it's
+  // probably forced).
+  let pool = evals;
+  if (cfg.avoidHangCap > 0) {
+    const safe = evals.filter(e => e.hangLoss <= cfg.avoidHangCap);
+    if (safe.length > 0) pool = safe;
   }
-  return evals[0].move;
+
+  // With probability randomRate, pick from top-N (within the safe pool).
+  if (pool.length > 1 && Math.random() < cfg.randomRate) {
+    const topN = Math.min(cfg.topN, pool.length);
+    return pool[Math.floor(Math.random() * topN)].move;
+  }
+  return pool[0].move;
 }
 
 // Simulated thinking time in ms based on rating + branching factor.
+//
+// Goal: feels human, never instant. Lower bound ~1.4s in trivial positions,
+// upper bound ~10s in complex middlegames. Higher ratings think a touch longer.
 export function botThinkMs(elo: number, movesAvailable: number): number {
-  const base = 600 + Math.min(2400, elo) * 0.6;
-  const branching = Math.min(2.0, movesAvailable / 25);
-  const jitter = 0.65 + Math.random() * 0.7;
-  return Math.round(base * branching * jitter);
+  const eloN = Math.max(600, Math.min(2400, elo));
+  const base = 1500 + (eloN - 600) * 0.9;            // 1.5s @ 600 → ~3.1s @ 2400
+  const branching = 0.55 + Math.min(1.6, movesAvailable / 22); // 0.55 → 2.15
+  const jitter = 0.75 + Math.random() * 0.6;         // 0.75 → 1.35
+  const ms = base * branching * jitter;
+  return Math.max(1400, Math.min(10000, Math.round(ms)));
 }
