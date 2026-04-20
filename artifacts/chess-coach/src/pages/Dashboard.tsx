@@ -10,6 +10,7 @@ import { useChessPlayer } from '@/hooks/use-chess-player';
 import { useMultiEloProgress } from '@/hooks/use-elo-progress';
 import { useLiveRatings, bestLiveRating } from '@/hooks/use-live-ratings';
 import { ImportPromptModal } from '@/components/ImportPromptModal';
+import { EmailVerifyBanner } from '@/components/EmailVerifyBanner';
 
 const CHESSCOM_GREEN = '#81b64c';
 const BG_DARK = '#262421';
@@ -62,6 +63,7 @@ export function Dashboard() {
   return (
     <div className="space-y-4 md:space-y-5">
       <ImportPromptModal />
+      <EmailVerifyBanner />
 
       <div
         className="relative overflow-hidden p-4 md:p-5 rounded-2xl"

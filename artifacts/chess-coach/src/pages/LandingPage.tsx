@@ -178,14 +178,37 @@ function HeroBoard() {
   );
 }
 
+const EMAIL_RE = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+function clientValidEmail(email: string): boolean {
+  const trimmed = email.trim().toLowerCase();
+  if (!EMAIL_RE.test(trimmed)) return false;
+  const [local, domain] = trimmed.split('@');
+  if (!local || !domain) return false;
+  if (local.startsWith('.') || local.endsWith('.') || local.includes('..')) return false;
+  if (domain.startsWith('.') || domain.endsWith('.') || domain.includes('..')) return false;
+  const tld = domain.split('.').pop() || '';
+  return tld.length >= 2;
+}
+
+type PwdCheck = { ok: boolean; label: string };
+function passwordChecks(pwd: string): PwdCheck[] {
+  return [
+    { ok: pwd.length >= 8, label: 'At least 8 characters' },
+    { ok: /[A-Za-z]/.test(pwd), label: 'Contains a letter' },
+    { ok: /[0-9]/.test(pwd), label: 'Contains a number' },
+  ];
+}
+
 function AuthModal({ open, onClose, initialMode, externalError }: { open: boolean; onClose: () => void; initialMode: 'login' | 'register'; externalError?: string }) {
   const [mode, setMode] = useState<'login' | 'register'>(initialMode);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [firstName, setFirstName] = useState('');
   const [chesscomUsername, setChesscomUsername] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState(externalError || '');
+  const [emailTouched, setEmailTouched] = useState(false);
 
   useEffect(() => { setMode(initialMode); }, [initialMode]);
   useEffect(() => { if (externalError) setError(externalError); }, [externalError]);
@@ -211,10 +234,25 @@ function AuthModal({ open, onClose, initialMode, externalError }: { open: boolea
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    if (mode === 'register') {
+      if (!clientValidEmail(email)) {
+        setError('Please enter a valid email address');
+        return;
+      }
+      const failed = passwordChecks(password).filter(c => !c.ok);
+      if (failed.length > 0) {
+        setError(failed[0].label);
+        return;
+      }
+      if (password !== confirmPassword) {
+        setError('Passwords do not match');
+        return;
+      }
+    }
     setLoading(true);
     try {
       const endpoint = mode === 'register' ? '/api/auth/register' : '/api/auth/login';
-      const body: Record<string, string> = { email, password };
+      const body: Record<string, string> = { email: email.trim().toLowerCase(), password };
       if (mode === 'register') {
         if (firstName.trim()) body.firstName = firstName.trim();
         if (chesscomUsername.trim()) body.chesscomUsername = chesscomUsername.trim();
@@ -340,18 +378,20 @@ function AuthModal({ open, onClose, initialMode, externalError }: { open: boolea
               <label className="block text-xs font-medium mb-1 ml-1" style={{ color: TEXT }}>Email</label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: MUTED }} />
-                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" required
+                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} onBlur={() => setEmailTouched(true)} placeholder="you@example.com" required
                   className="w-full pl-10 pr-4 py-3 rounded-xl text-sm outline-none transition-all"
                   style={{ background: 'rgba(255,255,255,0.05)', border: '2px solid rgba(255,255,255,0.08)', color: TEXT }}
-                  onFocus={e => (e.target.style.borderColor = G)}
-                  onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.08)')} />
+                  onFocus={e => (e.target.style.borderColor = G)} />
               </div>
+              {mode === 'register' && emailTouched && email && !clientValidEmail(email) && (
+                <p className="text-[11px] mt-1 ml-1" style={{ color: '#ef6b6b' }}>That doesn't look like a valid email address.</p>
+              )}
             </div>
             <div>
               <label className="block text-xs font-medium mb-1 ml-1" style={{ color: TEXT }}>Password</label>
               <div className="relative">
                 <input type={showPassword ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)}
-                  placeholder={mode === 'register' ? 'Min 6 characters' : 'Your password'} required minLength={mode === 'register' ? 6 : undefined}
+                  placeholder={mode === 'register' ? 'At least 8 chars, with letters & numbers' : 'Your password'} required minLength={mode === 'register' ? 8 : undefined}
                   className="w-full px-4 py-3 pr-10 rounded-xl text-sm outline-none transition-all"
                   style={{ background: 'rgba(255,255,255,0.05)', border: '2px solid rgba(255,255,255,0.08)', color: TEXT }}
                   onFocus={e => (e.target.style.borderColor = G)}
@@ -360,7 +400,33 @@ function AuthModal({ open, onClose, initialMode, externalError }: { open: boolea
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
+              {mode === 'register' && password && (
+                <ul className="mt-1.5 ml-1 space-y-0.5">
+                  {passwordChecks(password).map((c) => (
+                    <li key={c.label} className="flex items-center gap-1.5 text-[11px]" style={{ color: c.ok ? G : MUTED }}>
+                      <Check className="w-3 h-3" style={{ opacity: c.ok ? 1 : 0.35 }} />
+                      {c.label}
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
+            {mode === 'register' && (
+              <div>
+                <label className="block text-xs font-medium mb-1 ml-1" style={{ color: TEXT }}>Confirm Password</label>
+                <div className="relative">
+                  <input type={showPassword ? 'text' : 'password'} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="Re-enter your password" required minLength={8}
+                    className="w-full px-4 py-3 rounded-xl text-sm outline-none transition-all"
+                    style={{ background: 'rgba(255,255,255,0.05)', border: '2px solid rgba(255,255,255,0.08)', color: TEXT }}
+                    onFocus={e => (e.target.style.borderColor = G)}
+                    onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.08)')} />
+                </div>
+                {confirmPassword && password !== confirmPassword && (
+                  <p className="text-[11px] mt-1 ml-1" style={{ color: '#ef6b6b' }}>Passwords don't match yet.</p>
+                )}
+              </div>
+            )}
             {mode === 'register' && (
               <div>
                 <label className="block text-xs font-medium mb-1 ml-1" style={{ color: TEXT }}>

@@ -10,6 +10,7 @@ interface AuthUser {
   chesscomUsername: string | null;
   lichessUsername: string | null;
   isAdmin: boolean;
+  emailVerified?: boolean;
 }
 
 interface SubscriptionInfo {

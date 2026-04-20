@@ -18,6 +18,7 @@ export interface SessionUser {
   lichessUsername: string | null;
   isAdmin: boolean;
   inviteCode: string | null;
+  emailVerified?: boolean;
 }
 
 export interface SessionData {
