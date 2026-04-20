@@ -4,6 +4,7 @@ import { useUser } from '@/hooks/use-user';
 import { useMyGames } from '@/hooks/use-games';
 import { invalidateEloCache } from '@/hooks/use-elo-progress';
 import { apiFetch } from '@/lib/api';
+import { trackImportJob } from '@/components/ImportStatusWatcher';
 
 const STORAGE_KEY_PREFIX = 'importPromptDismissed_v2:';
 const CHESSCOM_GREEN = '#81b64c';
@@ -43,44 +44,28 @@ export function ImportPromptModal() {
     setImporting(true);
     setError(null);
     try {
-      if (chesscom) {
-        setStatusText(`Importing Chess.com games for ${chesscom}…`);
-        const r = await apiFetch('/api/games/import', {
+      const platforms: Array<{ platform: 'chesscom' | 'lichess'; user: string }> = [];
+      if (chesscom) platforms.push({ platform: 'chesscom', user: chesscom });
+      if (lichess) platforms.push({ platform: 'lichess', user: lichess });
+
+      for (const { platform, user } of platforms) {
+        const r = await apiFetch('/api/games/import-bg', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
-          body: JSON.stringify({
-            username: chesscom,
-            months: 240,
-            platform: 'chesscom',
-          }),
+          body: JSON.stringify({ username: user, months: 240, platform }),
         });
         if (!r.ok) {
           const e = await r.json().catch(() => ({}));
-          throw new Error(e.error || `Chess.com import failed (${r.status})`);
+          throw new Error(e.error || `${platform} import failed (${r.status})`);
         }
-      }
-      if (lichess) {
-        setStatusText(`Importing Lichess games for ${lichess}…`);
-        const r = await apiFetch('/api/games/import', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({
-            username: lichess,
-            months: 240,
-            platform: 'lichess',
-          }),
-        });
-        if (!r.ok) {
-          const e = await r.json().catch(() => ({}));
-          throw new Error(e.error || `Lichess import failed (${r.status})`);
-        }
+        const { jobId } = await r.json();
+        trackImportJob(jobId, platform, user);
       }
       invalidateEloCache();
       if (storageKey) localStorage.setItem(storageKey, '1');
-      setStatusText('Done! Your games are loaded.');
-      setTimeout(() => setOpen(false), 900);
+      setStatusText('Importing in the background — keep exploring, we\'ll let you know when it\'s done.');
+      setTimeout(() => setOpen(false), 1200);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Import failed');
     } finally {

@@ -20,6 +20,146 @@ import type { Logger } from "pino";
 
 const router: IRouter = Router();
 
+type ImportJobOptions = {
+  userId: string;
+  platformUsername: string;
+  platform: "chesscom" | "lichess";
+  months: number;
+  forceUpdate: boolean;
+  log: Logger;
+};
+
+async function runImportJob(opts: ImportJobOptions): Promise<{ imported: number; updated: number; total: number; error?: string }> {
+  const { userId, platformUsername, platform, months, forceUpdate, log } = opts;
+  const storedUsername = platformUsername.toLowerCase();
+  let imported = 0;
+  let updated = 0;
+
+  if (platform === "lichess") {
+    let lichessGames;
+    try {
+      lichessGames = await fetchLichessGames(platformUsername, months);
+    } catch (err) {
+      log.error({ err }, "Failed to fetch games from Lichess");
+      return { imported, updated, total: 0, error: "Failed to fetch games from Lichess. Check the username and try again." };
+    }
+
+    for (const game of lichessGames) {
+      try {
+        if (!game.pgn) continue;
+        const meta = extractLichessGameMetadata(game, platformUsername);
+
+        if (meta.lichessGameId) {
+          const existing = await db
+            .select({ id: gamesTable.id, pgn: gamesTable.pgn })
+            .from(gamesTable)
+            .where(and(eq(gamesTable.lichessGameId, meta.lichessGameId), eq(gamesTable.userId, userId)))
+            .limit(1);
+          if (existing.length > 0) {
+            if (forceUpdate && existing[0].pgn !== game.pgn) {
+              await db.update(gamesTable).set({ pgn: game.pgn!, reviewData: null, ...meta }).where(eq(gamesTable.id, existing[0].id));
+              updated++;
+            }
+            continue;
+          }
+        }
+        await db.insert(gamesTable).values({ userId, username: storedUsername, pgn: game.pgn!, ...meta });
+        imported++;
+      } catch (err) {
+        log.warn({ err }, "Failed to insert Lichess game");
+      }
+    }
+  } else {
+    let games;
+    try {
+      games = await fetchChessComGames(platformUsername, months);
+    } catch (err) {
+      log.error({ err }, "Failed to fetch games from chess.com");
+      return { imported, updated, total: 0, error: "Failed to fetch games from chess.com. Check the username and try again." };
+    }
+
+    for (const game of games) {
+      try {
+        const meta = extractGameMetadata(game, platformUsername);
+        if (meta.chesscomGameId) {
+          const existing = await db
+            .select({ id: gamesTable.id, pgn: gamesTable.pgn })
+            .from(gamesTable)
+            .where(and(eq(gamesTable.chesscomGameId, meta.chesscomGameId), eq(gamesTable.userId, userId)))
+            .limit(1);
+          if (existing.length > 0) {
+            if (forceUpdate && existing[0].pgn !== game.pgn) {
+              await db.update(gamesTable).set({ pgn: game.pgn, reviewData: null, ...meta }).where(eq(gamesTable.id, existing[0].id));
+              updated++;
+            }
+            continue;
+          }
+        }
+        await db.insert(gamesTable).values({ userId, username: storedUsername, pgn: game.pgn, platform: "chesscom", ...meta });
+        imported++;
+      } catch (err) {
+        log.warn({ err }, "Failed to insert game");
+      }
+    }
+  }
+
+  const [{ value: total }] = await db.select({ value: count() }).from(gamesTable).where(eq(gamesTable.userId, userId));
+  return { imported, updated, total: Number(total) };
+}
+
+router.post("/games/import-bg", requireAuth, async (req, res): Promise<void> => {
+  const parsed = ImportGamesBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+  const { username: platformUsername, months = 3 } = parsed.data;
+  const platform: string = req.body?.platform || "chesscom";
+  const forceUpdate = req.body?.forceUpdate === true;
+  const userId = req.user!.id;
+  if (platform !== "chesscom" && platform !== "lichess") {
+    res.status(400).json({ error: "platform must be 'chesscom' or 'lichess'" });
+    return;
+  }
+
+  const jobId = randomUUID();
+  await db.insert(backgroundJobsTable).values({
+    id: jobId,
+    userId,
+    type: "import-games",
+    status: "pending",
+    targetUsername: `${platform}:${platformUsername.toLowerCase()}`,
+  });
+
+  res.json({ jobId, status: "pending" });
+
+  (async () => {
+    const log = req.log;
+    log.info({ jobId, platformUsername, platform, months, userId }, "Background import started");
+    try {
+      const result = await runImportJob({ userId, platformUsername, platform: platform as "chesscom" | "lichess", months, forceUpdate, log });
+      if (result.error) {
+        await db.update(backgroundJobsTable).set({ status: "error", error: result.error }).where(eq(backgroundJobsTable.id, jobId));
+      } else {
+        await db.update(backgroundJobsTable).set({ status: "done", result: { ...result, platform, username: platformUsername } }).where(eq(backgroundJobsTable.id, jobId));
+      }
+    } catch (err: any) {
+      log.error({ err, jobId }, "Background import failed");
+      await db.update(backgroundJobsTable).set({ status: "error", error: err?.message || "Import failed" }).where(eq(backgroundJobsTable.id, jobId)).catch(() => {});
+    }
+  })().catch(() => {});
+});
+
+router.get("/games/import-status/:jobId", requireAuth, async (req, res): Promise<void> => {
+  const [job] = await db.select().from(backgroundJobsTable).where(eq(backgroundJobsTable.id, req.params.jobId as string));
+  if (!job || job.userId !== req.user!.id) {
+    res.status(404).json({ error: "Job not found" });
+    return;
+  }
+  res.setHeader("Cache-Control", "no-store");
+  res.json({ status: job.status, error: job.error ?? null, result: job.result ?? null });
+});
+
 router.post("/games/import", requireAuth, async (req, res): Promise<void> => {
   const parsed = ImportGamesBody.safeParse(req.body);
   if (!parsed.success) {
