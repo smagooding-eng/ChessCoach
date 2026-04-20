@@ -80,6 +80,7 @@ async function runImportJob(opts: ImportJobOptions): Promise<{ imported: number;
 
     for (const game of games) {
       try {
+        if (!game.pgn) continue;
         const meta = extractGameMetadata(game, platformUsername);
         if (meta.chesscomGameId) {
           const existing = await db
