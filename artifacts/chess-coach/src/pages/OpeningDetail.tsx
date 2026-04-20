@@ -25,6 +25,7 @@ type OpeningMove = {
 type SampleGame = {
   id: number;
   result: string;
+  username?: string;
   whiteUsername: string;
   blackUsername: string;
   whiteRating: number;
