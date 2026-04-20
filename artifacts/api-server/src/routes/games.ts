@@ -304,27 +304,16 @@ router.get("/games/elo-progress", async (req, res): Promise<void> => {
   const username = rawUsername.toLowerCase();
 
   try {
-    let user = (await db
+    const candidates = await db
       .select({
         createdAt: usersTable.createdAt,
         chesscomUsername: usersTable.chesscomUsername,
         lichessUsername: usersTable.lichessUsername,
       })
       .from(usersTable)
-      .where(eq(sql`lower(${usersTable.chesscomUsername})`, username))
-      .limit(1))[0];
+      .where(sql`lower(${usersTable.chesscomUsername}) = ${username} OR lower(${usersTable.lichessUsername}) = ${username}`);
 
-    if (!user) {
-      user = (await db
-        .select({
-          createdAt: usersTable.createdAt,
-          chesscomUsername: usersTable.chesscomUsername,
-          lichessUsername: usersTable.lichessUsername,
-        })
-        .from(usersTable)
-        .where(eq(sql`lower(${usersTable.lichessUsername})`, username))
-        .limit(1))[0] ?? undefined;
-    }
+    const user = candidates.find(u => u.chesscomUsername && u.lichessUsername) ?? candidates[0];
 
     const signupDate = user?.createdAt ?? null;
     const chesscomUser = user?.chesscomUsername?.toLowerCase() ?? null;
@@ -332,9 +321,6 @@ router.get("/games/elo-progress", async (req, res): Promise<void> => {
 
     const ownerNames = Array.from(new Set([chesscomUser, lichessUser, username].filter(Boolean) as string[]));
     const conditions = [inArray(gamesTable.username, ownerNames)];
-    if (signupDate) {
-      conditions.push(gte(gamesTable.playedAt, signupDate));
-    }
     if (platformFilter && (platformFilter === "chesscom" || platformFilter === "lichess" || platformFilter === "chessscout")) {
       conditions.push(eq(gamesTable.platform, platformFilter));
     }
