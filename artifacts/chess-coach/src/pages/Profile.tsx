@@ -1858,34 +1858,36 @@ export function Profile() {
 
       {authUser?.isAdmin && <AdminTicker />}
 
-      <motion.div variants={item} className="rounded-xl p-4 md:p-5"
-        style={{ background: CARD, border: `1px solid ${BORDER}`, boxShadow: '0 12px 30px rgba(0,0,0,0.35)' }}>
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <Trophy className="w-4 h-4" style={{ color: G }} />
-            <h3 className="text-sm font-black uppercase tracking-[0.14em]" style={{ color: TEXT }}>ChessScout Live ELO</h3>
+      {authUser?.isAdmin && (
+        <motion.div variants={item} className="rounded-xl p-4 md:p-5"
+          style={{ background: CARD, border: `1px solid ${BORDER}`, boxShadow: '0 12px 30px rgba(0,0,0,0.35)' }}>
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <Trophy className="w-4 h-4" style={{ color: G }} />
+              <h3 className="text-sm font-black uppercase tracking-[0.14em]" style={{ color: TEXT }}>ChessScout Live ELO</h3>
+            </div>
+            <Link href="/live"><a className="text-[11px] font-black uppercase tracking-[0.14em]" style={{ color: G }}>Play Live →</a></Link>
           </div>
-          <Link href="/live"><a className="text-[11px] font-black uppercase tracking-[0.14em]" style={{ color: G }}>Play Live →</a></Link>
-        </div>
-        <div className="grid grid-cols-3 gap-3">
-          {[
-            { id: 'blitz_5_0', label: '5 min' },
-            { id: 'blitz_5_3', label: '5 | 3' },
-            { id: 'rapid_10_0', label: '10 min' },
-          ].map(tc => {
-            const r = liveRatings?.ratings[tc.id];
-            return (
-              <div key={tc.id} className="text-center p-3 rounded-lg" style={{ background: 'rgba(0,0,0,0.25)' }}>
-                <div className="text-[10px] font-black uppercase tracking-[0.18em]" style={{ color: MUTED }}>{tc.label}</div>
-                <div className="text-2xl font-black mt-1" style={{ color: TEXT }}>
-                  {r && r.gamesPlayed > 0 ? `${r.rating}${r.isProvisional ? '?' : ''}` : '—'}
+          <div className="grid grid-cols-3 gap-3">
+            {[
+              { id: 'blitz_5_0', label: '5 min' },
+              { id: 'blitz_5_3', label: '5 | 3' },
+              { id: 'rapid_10_0', label: '10 min' },
+            ].map(tc => {
+              const r = liveRatings?.ratings[tc.id];
+              return (
+                <div key={tc.id} className="text-center p-3 rounded-lg" style={{ background: 'rgba(0,0,0,0.25)' }}>
+                  <div className="text-[10px] font-black uppercase tracking-[0.18em]" style={{ color: MUTED }}>{tc.label}</div>
+                  <div className="text-2xl font-black mt-1" style={{ color: TEXT }}>
+                    {r && r.gamesPlayed > 0 ? `${r.rating}${r.isProvisional ? '?' : ''}` : '—'}
+                  </div>
+                  <div className="text-[10px]" style={{ color: MUTED }}>{r?.gamesPlayed ?? 0} {(r?.gamesPlayed ?? 0) === 1 ? 'game' : 'games'}</div>
                 </div>
-                <div className="text-[10px]" style={{ color: MUTED }}>{r?.gamesPlayed ?? 0} {(r?.gamesPlayed ?? 0) === 1 ? 'game' : 'games'}</div>
-              </div>
-            );
-          })}
-        </div>
-      </motion.div>
+              );
+            })}
+          </div>
+        </motion.div>
+      )}
 
       <motion.div variants={item} className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[

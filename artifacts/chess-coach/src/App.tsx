@@ -96,15 +96,19 @@ const queryClient = new QueryClient({
 });
 
 // Protected Route Wrapper
-function ProtectedRoute({ component: Component, fallbackNav }: { component: React.ComponentType; fallbackNav?: string }) {
-  const { username, isLoaded, isAuthenticated, isAuthLoading } = useUser();
+function ProtectedRoute({ component: Component, fallbackNav, requireAdmin }: { component: React.ComponentType; fallbackNav?: string; requireAdmin?: boolean }) {
+  const { username, isLoaded, isAuthenticated, isAuthLoading, authUser } = useUser();
   const [, navigate] = useLocation();
 
   useEffect(() => {
     if (isLoaded && !isAuthLoading && !username && !isAuthenticated) {
       navigate('/setup', { replace: true } as never);
+      return;
     }
-  }, [isLoaded, username, navigate, isAuthenticated, isAuthLoading]);
+    if (requireAdmin && !isAuthLoading && isAuthenticated && !authUser?.isAdmin) {
+      navigate('/', { replace: true } as never);
+    }
+  }, [isLoaded, username, navigate, isAuthenticated, isAuthLoading, requireAdmin, authUser]);
 
   if (!isLoaded || isAuthLoading) {
     return (
@@ -118,6 +122,7 @@ function ProtectedRoute({ component: Component, fallbackNav }: { component: Reac
     );
   }
   if (!username && !isAuthenticated) return null;
+  if (requireAdmin && !authUser?.isAdmin) return null;
 
   return (
     <Layout>
@@ -142,8 +147,8 @@ const POpeningDetail = () => <ProtectedRoute component={OpeningDetail} fallbackN
 const POpponents     = () => <ProtectedRoute component={OpponentAnalysis} />;
 const PPracticeBots  = () => <ProtectedRoute component={PracticeBots} />;
 const PLocalPlay     = () => <ProtectedRoute component={LocalPlay} />;
-const PLivePlay      = () => <ProtectedRoute component={LivePlay} />;
-const PLiveHistory   = () => <ProtectedRoute component={LiveHistory} fallbackNav="/live" />;
+const PLivePlay      = () => <ProtectedRoute component={LivePlay} requireAdmin />;
+const PLiveHistory   = () => <ProtectedRoute component={LiveHistory} fallbackNav="/live" requireAdmin />;
 const PGameLookup    = () => <ProtectedRoute component={GameLookup} />;
 const PSubscription  = () => <ProtectedRoute component={Subscription} />;
 const PProfile       = () => <ProtectedRoute component={Profile} />;

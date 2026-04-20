@@ -26,7 +26,6 @@ const PRIMARY_NAV = [
   { href: '/analysis',  label: 'Analysis',        icon: BrainCircuit },
   { href: '/puzzles',   label: 'Puzzles',         icon: Puzzle, badge: 'BETA' },
   { href: '/lookup',    label: 'Game Lookup',     icon: Search },
-  { href: '/live',      label: 'Play Live',       icon: Swords, badge: 'NEW' },
   { href: '/play',      label: 'Play Local',      icon: Play },
   { href: '/scan',      label: 'Scan Position',   icon: Camera, badge: 'NEW' },
 ];

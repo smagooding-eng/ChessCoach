@@ -3,7 +3,8 @@ import { PageHero } from '@/components/DesignSystem';
 import { useLocation } from 'wouter';
 import { useUser } from '@/hooks/use-user';
 import { apiFetch } from '@/lib/api';
-import { RefreshCw, Users, Eye, UserCheck, CreditCard, Gamepad2, Brain, Swords, Camera } from 'lucide-react';
+import { Link } from 'wouter';
+import { RefreshCw, Users, Eye, UserCheck, CreditCard, Gamepad2, Brain, Swords, Camera, Play, History } from 'lucide-react';
 
 interface AdminStats {
   pageViews: { total: number; today: number };
@@ -177,6 +178,32 @@ export function Admin() {
           {error}
         </div>
       )}
+
+      <div
+        className="rounded-xl p-4"
+        style={{ background: BG_CARD, border: `1px solid rgba(255,255,255,0.05)` }}
+      >
+        <div className="flex items-center justify-between gap-3 mb-3">
+          <div>
+            <h2 className="text-base font-black" style={{ color: TEXT_LIGHT }}>Live Play (admin only)</h2>
+            <p className="text-[11px] mt-0.5" style={{ color: TEXT_MUTED }}>Hidden from regular users for now. Use these links to test.</p>
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Link href="/live">
+            <a className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl font-bold text-sm"
+              style={{ background: `${CHESSCOM_GREEN}1a`, color: CHESSCOM_GREEN, border: `1px solid ${CHESSCOM_GREEN}33` }}>
+              <Play className="w-4 h-4" /> Play Live
+            </a>
+          </Link>
+          <Link href="/live/history">
+            <a className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl font-bold text-sm"
+              style={{ background: 'rgba(255,255,255,0.04)', color: TEXT_LIGHT, border: '1px solid rgba(255,255,255,0.08)' }}>
+              <History className="w-4 h-4" /> Live History
+            </a>
+          </Link>
+        </div>
+      </div>
 
       {loading && !stats && (
         <div className="flex items-center justify-center py-16" style={{ color: TEXT_MUTED }}>
