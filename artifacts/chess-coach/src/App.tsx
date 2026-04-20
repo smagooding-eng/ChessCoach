@@ -80,7 +80,6 @@ import { ScanPosition } from "@/pages/ScanPosition";
 import { Admin } from "@/pages/Admin";
 import NotFound from "@/pages/not-found";
 import { Layout } from "@/components/Layout";
-import { OnboardingWizard, useOnboardingCheck } from "@/components/OnboardingWizard";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -179,17 +178,9 @@ function PageTracker() {
   return null;
 }
 
-function OnboardingOverlay() {
-  const { showOnboarding, dismissOnboarding } = useOnboardingCheck();
-  if (!showOnboarding) return null;
-  return <OnboardingWizard onComplete={dismissOnboarding} />;
-}
-
-export { useOnboardingCheck };
-
 function Router() {
   return (
-    <><PageTracker /><OnboardingOverlay /><Switch>
+    <><PageTracker /><Switch>
       <Route path="/setup" component={LandingPage} />
       <Route path="/download" component={DownloadPage} />
 

@@ -7,7 +7,6 @@ import { useLiveRatings, bestLiveRating } from '@/hooks/use-live-ratings';
 import { LayoutDashboard, Import, History, BrainCircuit, GraduationCap, Swords, BookOpen, LogOut, MoreHorizontal, ChevronRight, Bot, Crown, Trophy, Play, Search, Download, Puzzle, User, Settings, CreditCard, Camera, Shield } from 'lucide-react';
 import { usePwaInstall } from '@/hooks/use-pwa-install';
 import { InstallGuide } from '@/components/InstallGuide';
-import { useOnboardingCheck } from '@/components/OnboardingWizard';
 import { cn } from '@/lib/utils';
 import { AnimatePresence, motion } from 'framer-motion';
 
@@ -94,7 +93,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const [profileOpen, setProfileOpen] = useState(false);
   const handleLogout = isAuthenticated ? authLogout : logout;
   const { showGuide, setShowGuide, dismissInstall, platform } = usePwaInstall();
-  const { showOnboarding } = useOnboardingCheck();
 
   useEffect(() => { setMoreOpen(false); setProfileOpen(false); }, [location]);
 
@@ -108,15 +106,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
     : (ratings.length > 0
         ? Math.round(ratings.reduce((a, b) => a + b, 0) / ratings.length)
         : (player?.rating ?? null));
-
-  // Hide all chrome (sidebar, mobile header, bottom nav) until onboarding completes
-  if (showOnboarding) {
-    return (
-      <div className="min-h-screen" style={{ background: BG_DARK }}>
-        {children}
-      </div>
-    );
-  }
 
   const moreItems = [...PRIMARY_NAV.slice(4), ...SECONDARY_NAV, ...(authUser?.isAdmin ? ADMIN_NAV : [])];
   const activeMore = moreItems.find(i => location === i.href || location.startsWith(i.href + '/'));
