@@ -1,0 +1,157 @@
+import { useEffect, useState } from 'react';
+import { CloudDownload, X } from 'lucide-react';
+import { useUser } from '@/hooks/use-user';
+import { useMyGames } from '@/hooks/use-games';
+import { invalidateEloCache } from '@/hooks/use-elo-progress';
+import { apiFetch } from '@/lib/api';
+
+const STORAGE_KEY = 'importPromptDismissed_v1';
+const CHESSCOM_GREEN = '#81b64c';
+const BG_CARD = '#302e2b';
+const TEXT_LIGHT = '#e8e6e3';
+const TEXT_MUTED = '#9e9b98';
+const BORDER = 'rgba(255,255,255,0.08)';
+
+export function ImportPromptModal() {
+  const { authUser, username } = useUser();
+  const { data: gamesData, isLoading: gamesLoading } = useMyGames(1);
+  const [open, setOpen] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [statusText, setStatusText] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const chesscom = authUser?.chesscomUsername ?? null;
+  const lichess = authUser?.lichessUsername ?? null;
+  const hasGames = (gamesData?.games?.length ?? 0) > 0;
+
+  useEffect(() => {
+    if (!authUser) return;
+    if (gamesLoading) return;
+    if (hasGames) return;
+    if (!chesscom && !lichess) return;
+    if (localStorage.getItem(STORAGE_KEY) === '1') return;
+    setOpen(true);
+  }, [authUser, gamesLoading, hasGames, chesscom, lichess]);
+
+  const dismiss = () => {
+    localStorage.setItem(STORAGE_KEY, '1');
+    setOpen(false);
+  };
+
+  const runImport = async () => {
+    setImporting(true);
+    setError(null);
+    try {
+      if (chesscom) {
+        setStatusText(`Importing Chess.com games for ${chesscom}…`);
+        const r = await apiFetch('/api/games/import', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            username: chesscom,
+            months: 240,
+            platform: 'chesscom',
+            ownerUsername: username || chesscom,
+          }),
+        });
+        if (!r.ok) {
+          const e = await r.json().catch(() => ({}));
+          throw new Error(e.error || `Chess.com import failed (${r.status})`);
+        }
+      }
+      if (lichess) {
+        setStatusText(`Importing Lichess games for ${lichess}…`);
+        const r = await apiFetch('/api/games/import', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            username: lichess,
+            months: 240,
+            platform: 'lichess',
+            ownerUsername: username || lichess || chesscom || '',
+          }),
+        });
+        if (!r.ok) {
+          const e = await r.json().catch(() => ({}));
+          throw new Error(e.error || `Lichess import failed (${r.status})`);
+        }
+      }
+      invalidateEloCache();
+      localStorage.setItem(STORAGE_KEY, '1');
+      setStatusText('Done! Your games are loaded.');
+      setTimeout(() => setOpen(false), 900);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Import failed');
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  if (!open) return null;
+
+  const accounts = [chesscom && `Chess.com (${chesscom})`, lichess && `Lichess (${lichess})`]
+    .filter(Boolean)
+    .join(' and ');
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center px-4"
+      style={{ background: 'rgba(0,0,0,0.65)' }}
+      onClick={(e) => { if (e.target === e.currentTarget && !importing) dismiss(); }}>
+      <div className="w-full max-w-md rounded-2xl p-6 space-y-5"
+        style={{ background: BG_CARD, border: `1px solid ${BORDER}`, boxShadow: '0 20px 60px rgba(0,0,0,0.55)' }}>
+        <div className="flex items-start gap-3">
+          <div className="rounded-xl p-2.5" style={{ background: 'rgba(129,182,76,0.15)', color: CHESSCOM_GREEN }}>
+            <CloudDownload size={22} />
+          </div>
+          <div className="flex-1">
+            <h2 className="text-lg font-black" style={{ color: TEXT_LIGHT }}>Import all your games?</h2>
+            <p className="text-xs mt-1" style={{ color: TEXT_MUTED }}>
+              We'll pull every game from {accounts || 'your linked account'} so we can analyze your style and
+              pinpoint weaknesses. This can take a minute or two for large histories.
+            </p>
+          </div>
+          {!importing && (
+            <button onClick={dismiss} className="rounded-md p-1 hover:bg-white/5" style={{ color: TEXT_MUTED }}>
+              <X size={16} />
+            </button>
+          )}
+        </div>
+
+        {statusText && (
+          <div className="rounded-lg px-3 py-2 text-xs font-bold"
+            style={{ background: 'rgba(129,182,76,0.1)', color: CHESSCOM_GREEN, border: '1px solid rgba(129,182,76,0.25)' }}>
+            {statusText}
+          </div>
+        )}
+
+        {error && (
+          <div className="rounded-lg px-3 py-2 text-xs"
+            style={{ background: 'rgba(220,67,67,0.1)', color: '#dc4343', border: '1px solid rgba(220,67,67,0.3)' }}>
+            {error}
+          </div>
+        )}
+
+        <div className="flex gap-2">
+          <button
+            onClick={runImport}
+            disabled={importing}
+            className="flex-1 py-2.5 rounded-xl font-black text-sm disabled:opacity-60"
+            style={{ background: `linear-gradient(180deg, #95c45a 0%, ${CHESSCOM_GREEN} 100%)`, color: 'white' }}
+          >
+            {importing ? 'Importing…' : 'Import all games'}
+          </button>
+          <button
+            onClick={dismiss}
+            disabled={importing}
+            className="px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-widest disabled:opacity-50"
+            style={{ color: TEXT_MUTED, border: `1px solid ${BORDER}` }}
+          >
+            Maybe later
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
