@@ -53,7 +53,6 @@ export function ImportPromptModal() {
             username: chesscom,
             months: 240,
             platform: 'chesscom',
-            ownerUsername: username || chesscom,
           }),
         });
         if (!r.ok) {
@@ -71,7 +70,6 @@ export function ImportPromptModal() {
             username: lichess,
             months: 240,
             platform: 'lichess',
-            ownerUsername: username || lichess || chesscom || '',
           }),
         });
         if (!r.ok) {

@@ -1,5 +1,6 @@
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
 import { db, gamesTable, backgroundJobsTable, usersTable } from "@workspace/db";
+import { requireAuth } from "../middlewares/authMiddleware";
 import { eq, desc, count, isNull, and, asc, sql, gte } from "drizzle-orm";
 import {
   ImportGamesBody,
@@ -19,7 +20,7 @@ import type { Logger } from "pino";
 
 const router: IRouter = Router();
 
-router.post("/games/import", async (req, res): Promise<void> => {
+router.post("/games/import", requireAuth, async (req, res): Promise<void> => {
   const parsed = ImportGamesBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
@@ -29,14 +30,15 @@ router.post("/games/import", async (req, res): Promise<void> => {
   const { username: platformUsername, months = 3 } = parsed.data;
   const forceUpdate = req.body?.forceUpdate === true;
   const platform: string = req.body?.platform || "chesscom";
-  const ownerUsername = req.body?.ownerUsername || platformUsername;
+  const userId = req.user!.id;
+  const storedUsername = platformUsername.toLowerCase();
 
   if (platform !== "chesscom" && platform !== "lichess") {
     res.status(400).json({ error: "platform must be 'chesscom' or 'lichess'" });
     return;
   }
 
-  req.log.info({ platformUsername, ownerUsername, months, forceUpdate, platform }, `Importing games from ${platform}`);
+  req.log.info({ platformUsername, userId, months, forceUpdate, platform }, `Importing games from ${platform}`);
 
   let imported = 0;
   let updated = 0;
@@ -62,7 +64,7 @@ router.post("/games/import", async (req, res): Promise<void> => {
             .from(gamesTable)
             .where(and(
               eq(gamesTable.lichessGameId, meta.lichessGameId),
-              eq(gamesTable.username, ownerUsername.toLowerCase())
+              eq(gamesTable.userId, userId)
             ))
             .limit(1);
 
@@ -78,7 +80,8 @@ router.post("/games/import", async (req, res): Promise<void> => {
         }
 
         await db.insert(gamesTable).values({
-          username: ownerUsername.toLowerCase(),
+          userId,
+          username: storedUsername,
           pgn: game.pgn!,
           ...meta,
         });
@@ -107,7 +110,7 @@ router.post("/games/import", async (req, res): Promise<void> => {
             .from(gamesTable)
             .where(and(
               eq(gamesTable.chesscomGameId, meta.chesscomGameId),
-              eq(gamesTable.username, ownerUsername.toLowerCase())
+              eq(gamesTable.userId, userId)
             ))
             .limit(1);
 
@@ -123,7 +126,8 @@ router.post("/games/import", async (req, res): Promise<void> => {
         }
 
         await db.insert(gamesTable).values({
-          username: ownerUsername.toLowerCase(),
+          userId,
+          username: storedUsername,
           pgn: game.pgn,
           platform: "chesscom",
           ...meta,
@@ -138,7 +142,7 @@ router.post("/games/import", async (req, res): Promise<void> => {
   const [{ value: total }] = await db
     .select({ value: count() })
     .from(gamesTable)
-    .where(eq(gamesTable.username, ownerUsername.toLowerCase()));
+    .where(eq(gamesTable.userId, userId));
 
   res.json({
     imported,
@@ -259,17 +263,13 @@ router.get("/games/elo-progress", async (req, res): Promise<void> => {
   }
 });
 
-router.get("/games", async (req, res): Promise<void> => {
+router.get("/games", requireAuth, async (req, res): Promise<void> => {
   const query = ListGamesQueryParams.safeParse(req.query);
-  const username = query.success ? query.data.username : undefined;
   const limit = query.success ? (query.data.limit ?? 50) : 50;
   const offset = query.success ? (query.data.offset ?? 0) : 0;
   const platform = query.success ? query.data.platform : undefined;
 
-  const conditions = [];
-  if (username) {
-    conditions.push(eq(gamesTable.username, username.toLowerCase()));
-  }
+  const conditions = [eq(gamesTable.userId, req.user!.id)];
   if (platform && (platform === "chesscom" || platform === "lichess" || platform === "chessscout")) {
     conditions.push(eq(gamesTable.platform, platform));
   }
@@ -329,17 +329,17 @@ router.post("/games/fix-openings", async (req, res): Promise<void> => {
 });
 
 // Get sample games for a specific opening — used by the opening detail page
-router.get("/games/openings/detail", async (req, res): Promise<void> => {
+router.get("/games/openings/detail", requireAuth, async (req, res): Promise<void> => {
   const username = (req.query.username as string | undefined)?.toLowerCase();
   const opening  = req.query.opening as string | undefined;
   const eco      = req.query.eco as string | undefined;
 
-  if (!username || (!opening && !eco)) {
-    res.status(400).json({ error: "username and opening or eco are required" });
+  if (!opening && !eco) {
+    res.status(400).json({ error: "opening or eco is required" });
     return;
   }
 
-  // Find games matching this opening (by name or ECO code)
+  // Find games matching this opening (by name or ECO code), scoped to the signed-in user
   const allGames = await db
     .select({
       id: gamesTable.id,
@@ -352,9 +352,10 @@ router.get("/games/openings/detail", async (req, res): Promise<void> => {
       whiteRating: gamesTable.whiteRating,
       blackRating: gamesTable.blackRating,
       playedAt: gamesTable.playedAt,
+      username: gamesTable.username,
     })
     .from(gamesTable)
-    .where(eq(gamesTable.username, username))
+    .where(eq(gamesTable.userId, req.user!.id))
     .orderBy(desc(gamesTable.playedAt));
 
   const matched = allGames.filter(g => {
@@ -429,13 +430,7 @@ router.get("/games/openings/detail", async (req, res): Promise<void> => {
   });
 });
 
-router.get("/games/openings", async (req, res): Promise<void> => {
-  const username = (req.query.username as string | undefined)?.toLowerCase();
-  if (!username) {
-    res.status(400).json({ error: "username is required" });
-    return;
-  }
-
+router.get("/games/openings", requireAuth, async (req, res): Promise<void> => {
   const games = await db
     .select({
       result: gamesTable.result,
@@ -443,9 +438,10 @@ router.get("/games/openings", async (req, res): Promise<void> => {
       eco: gamesTable.eco,
       whiteUsername: gamesTable.whiteUsername,
       blackUsername: gamesTable.blackUsername,
+      username: gamesTable.username,
     })
     .from(gamesTable)
-    .where(eq(gamesTable.username, username));
+    .where(eq(gamesTable.userId, req.user!.id));
 
   const totalGames = games.length;
 
@@ -469,7 +465,7 @@ router.get("/games/openings", async (req, res): Promise<void> => {
     const stat = map.get(key)!;
     if (!stat.eco && g.eco) stat.eco = g.eco;
 
-    const isWhite = g.whiteUsername.toLowerCase() === username;
+    const isWhite = g.whiteUsername.toLowerCase() === g.username;
     const colorStat = isWhite ? stat.white : stat.black;
 
     stat.total.games++;

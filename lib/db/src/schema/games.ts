@@ -4,6 +4,7 @@ import { z } from "zod/v4";
 
 export const gamesTable = pgTable("games", {
   id: serial("id").primaryKey(),
+  userId: text("user_id"),
   username: text("username").notNull(),
   pgn: text("pgn").notNull(),
   whiteUsername: text("white_username").notNull(),
