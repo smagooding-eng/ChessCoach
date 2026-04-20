@@ -57,30 +57,27 @@ export function ImportStatusWatcher() {
   const [bannerVisible, setBannerVisible] = useState(false);
   const pollRef = useRef<number | null>(null);
 
-  // Migrate session-stored jobs into per-user storage
-  useEffect(() => {
-    if (!authUser?.id) return;
-    try {
-      const raw = sessionStorage.getItem('newImportJobs');
-      if (raw) {
-        const incoming = JSON.parse(raw) as Job[];
-        if (Array.isArray(incoming) && incoming.length > 0) {
-          const existing = readJobs(authUser.id);
-          const ids = new Set(existing.map(j => j.jobId));
-          const merged = [...existing, ...incoming.filter(j => !ids.has(j.jobId))];
-          writeJobs(authUser.id, merged);
-          sessionStorage.removeItem('newImportJobs');
-        }
-      }
-    } catch { /* ignore */ }
-  }, [authUser?.id]);
-
   // Polling loop
   useEffect(() => {
     if (!authUser?.id) return;
     const userId = authUser.id;
 
+    const migrateSessionJobs = () => {
+      try {
+        const raw = sessionStorage.getItem('newImportJobs');
+        if (!raw) return;
+        const incoming = JSON.parse(raw) as Job[];
+        if (!Array.isArray(incoming) || incoming.length === 0) return;
+        const existing = readJobs(userId);
+        const ids = new Set(existing.map(j => j.jobId));
+        const merged = [...existing, ...incoming.filter(j => !ids.has(j.jobId))];
+        writeJobs(userId, merged);
+        sessionStorage.removeItem('newImportJobs');
+      } catch { /* ignore */ }
+    };
+
     const tick = async () => {
+      migrateSessionJobs();
       const jobs = readJobs(userId);
       if (jobs.length === 0) return;
 
