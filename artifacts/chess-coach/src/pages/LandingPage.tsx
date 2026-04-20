@@ -206,6 +206,7 @@ function AuthModal({ open, onClose, initialMode, externalError }: { open: boolea
   const [confirmPassword, setConfirmPassword] = useState('');
   const [firstName, setFirstName] = useState('');
   const [chesscomUsername, setChesscomUsername] = useState('');
+  const [lichessUsername, setLichessUsername] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState(externalError || '');
   const [emailTouched, setEmailTouched] = useState(false);
@@ -256,6 +257,7 @@ function AuthModal({ open, onClose, initialMode, externalError }: { open: boolea
       if (mode === 'register') {
         if (firstName.trim()) body.firstName = firstName.trim();
         if (chesscomUsername.trim()) body.chesscomUsername = chesscomUsername.trim();
+        if (lichessUsername.trim()) body.lichessUsername = lichessUsername.trim();
         const ref = localStorage.getItem('chessscout_ref') || '';
         if (ref) body.referralCode = ref;
       }
@@ -433,6 +435,18 @@ function AuthModal({ open, onClose, initialMode, externalError }: { open: boolea
                   Chess.com Username <span style={{ color: MUTED }}>(optional)</span>
                 </label>
                 <input type="text" value={chesscomUsername} onChange={(e) => setChesscomUsername(e.target.value)} placeholder="e.g. Hikaru"
+                  className="w-full px-4 py-3 rounded-xl text-sm outline-none transition-all"
+                  style={{ background: 'rgba(255,255,255,0.05)', border: '2px solid rgba(255,255,255,0.08)', color: TEXT }}
+                  onFocus={e => (e.target.style.borderColor = G)}
+                  onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.08)')} />
+              </div>
+            )}
+            {mode === 'register' && (
+              <div>
+                <label className="block text-xs font-medium mb-1 ml-1" style={{ color: TEXT }}>
+                  Lichess Username <span style={{ color: MUTED }}>(optional)</span>
+                </label>
+                <input type="text" value={lichessUsername} onChange={(e) => setLichessUsername(e.target.value)} placeholder="e.g. DrNykterstein"
                   className="w-full px-4 py-3 rounded-xl text-sm outline-none transition-all"
                   style={{ background: 'rgba(255,255,255,0.05)', border: '2px solid rgba(255,255,255,0.08)', color: TEXT }}
                   onFocus={e => (e.target.style.borderColor = G)}

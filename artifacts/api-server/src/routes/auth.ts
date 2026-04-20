@@ -96,7 +96,7 @@ function generateInviteCode(): string {
 }
 
 router.post("/auth/register", async (req: Request, res: Response) => {
-  const { email: rawEmail, password, firstName, chesscomUsername, referralCode } = req.body;
+  const { email: rawEmail, password, firstName, chesscomUsername, lichessUsername, referralCode } = req.body;
   const email = typeof rawEmail === "string" ? rawEmail.trim().toLowerCase() : "";
 
   if (!email || !password) {
@@ -146,6 +146,7 @@ router.post("/auth/register", async (req: Request, res: Response) => {
         authProvider: "local",
         firstName: firstName || null,
         chesscomUsername: chesscomUsername || null,
+        lichessUsername: lichessUsername || null,
         isAdmin: ADMIN_EMAILS.includes(email),
         referredByUserId: referrerUserId,
         emailVerified: false,
