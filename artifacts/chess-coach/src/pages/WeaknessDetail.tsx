@@ -161,7 +161,10 @@ export function WeaknessDetail() {
   const { weakness, examplesWithLinks, relatedGames, relatedCourses } = data;
   const sev = SEV_CFG[weakness.severity] ?? SEV_CFG.Medium;
   const pct = Math.round(weakness.frequency * 100);
-  const isWhite = (g: RelatedGame) => g.whiteUsername.toLowerCase() === username?.toLowerCase();
+  const isWhite = (g: RelatedGame) => {
+    const u = ((g as any).username || username || '').toLowerCase();
+    return g.whiteUsername.toLowerCase() === u;
+  };
   const CategoryIcon = CATEGORY_ICONS[weakness.category] ?? AlertTriangle;
   const SevIcon = sev.icon;
 

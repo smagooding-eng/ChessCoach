@@ -69,33 +69,36 @@ export function Games() {
     );
   }
 
+  const getMyHandle = (game: typeof games[0]) =>
+    (game.username || username || '').toLowerCase();
+
   const getPlayerColor = (game: typeof games[0]) => {
-    if (!username) return null;
-    const u = username.toLowerCase();
+    const u = getMyHandle(game);
+    if (!u) return null;
     if (game.whiteUsername.toLowerCase() === u) return 'white';
     if (game.blackUsername.toLowerCase() === u) return 'black';
     return null;
   };
 
   const getOpponent = (game: typeof games[0]) => {
-    if (!username) return game.blackUsername;
-    const u = username.toLowerCase();
+    const u = getMyHandle(game);
     if (game.whiteUsername.toLowerCase() === u) return game.blackUsername;
-    return game.whiteUsername;
+    if (game.blackUsername.toLowerCase() === u) return game.whiteUsername;
+    return game.blackUsername;
   };
 
   const getUserRating = (game: typeof games[0]) => {
-    if (!username) return game.whiteRating;
-    const u = username.toLowerCase();
+    const u = getMyHandle(game);
     if (game.whiteUsername.toLowerCase() === u) return game.whiteRating;
-    return game.blackRating;
+    if (game.blackUsername.toLowerCase() === u) return game.blackRating;
+    return game.whiteRating;
   };
 
   const getOpponentRating = (game: typeof games[0]) => {
-    if (!username) return game.blackRating;
-    const u = username.toLowerCase();
+    const u = getMyHandle(game);
     if (game.whiteUsername.toLowerCase() === u) return game.blackRating;
-    return game.whiteRating;
+    if (game.blackUsername.toLowerCase() === u) return game.whiteRating;
+    return game.blackRating;
   };
 
   return (

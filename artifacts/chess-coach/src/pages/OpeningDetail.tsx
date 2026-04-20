@@ -485,7 +485,8 @@ export function OpeningDetail() {
 
               <div className="glass-card rounded-xl divide-y divide-border/50 overflow-hidden">
                 {data.sampleGames.map((game, i) => {
-                  const isWhite = game.whiteUsername.toLowerCase() === username?.toLowerCase();
+                  const myHandle = (game.username || username || '').toLowerCase();
+                  const isWhite = game.whiteUsername.toLowerCase() === myHandle;
                   return (
                     <motion.div
                       key={game.id}

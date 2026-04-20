@@ -1103,8 +1103,9 @@ export function GameReplay() {
                 ? `Analyzing ${game.opening}… move ${currentSan}`
                 : `${phase} · analyzing move ${reviewProgress.done} of ${reviewProgress.total}${currentSan ? ` (${currentSan})` : ''}`;
 
-            const playerRating = username
-              ? (game.whiteUsername.toLowerCase() === username.toLowerCase() ? game.whiteRating : game.blackRating)
+            const myHandle = ((game as any).username || username || '').toLowerCase();
+            const playerRating = myHandle
+              ? (game.whiteUsername.toLowerCase() === myHandle ? game.whiteRating : game.blackRating)
               : game.whiteRating;
 
             return (
