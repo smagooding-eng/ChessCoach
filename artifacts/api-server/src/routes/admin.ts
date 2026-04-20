@@ -1,6 +1,6 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { db, usersTable, pageViewsTable, gamesTable, weaknessesTable, coursesTable, lessonsTable, backgroundJobsTable, referralConversionsTable } from "@workspace/db";
-import { sql, count, gte, countDistinct, inArray, eq, and, isNotNull } from "drizzle-orm";
+import { sql, count, gte, countDistinct, inArray, eq, and, isNotNull, ne, not, like } from "drizzle-orm";
 import { puzzleAttemptsTable } from "@workspace/db";
 import { sessionsTable } from "@workspace/db";
 import { getUncachableStripeClient } from "../lib/stripeClient";
@@ -99,9 +99,9 @@ router.get("/admin/stats", requireAdmin, async (_req: Request, res: Response) =>
       uniqueScoutTargetsResult,
       scanViewsResult,
     ] = await Promise.all([
-      db.select({ count: count() }).from(gamesTable),
-      db.select({ count: count() }).from(gamesTable).where(gte(gamesTable.createdAt, todayStart)),
-      db.select({ count: count() }).from(gamesTable).where(eq(gamesTable.analyzed, true)),
+      db.select({ count: count() }).from(gamesTable).where(ne(gamesTable.platform, 'chessscout')),
+      db.select({ count: count() }).from(gamesTable).where(and(ne(gamesTable.platform, 'chessscout'), gte(gamesTable.createdAt, todayStart))),
+      db.select({ count: count() }).from(gamesTable).where(and(ne(gamesTable.platform, 'chessscout'), eq(gamesTable.analyzed, true))),
       db.select({ count: count() }).from(backgroundJobsTable).where(eq(backgroundJobsTable.type, 'scout')),
       db.select({ count: countDistinct(backgroundJobsTable.targetUsername) }).from(backgroundJobsTable).where(eq(backgroundJobsTable.type, 'scout')),
       db.select({ count: count() }).from(pageViewsTable).where(eq(pageViewsTable.path, '/scan')),
@@ -114,6 +114,7 @@ router.get("/admin/stats", requireAdmin, async (_req: Request, res: Response) =>
         uniqueVisitors: countDistinct(pageViewsTable.visitorId),
       })
       .from(pageViewsTable)
+      .where(and(ne(pageViewsTable.path, '/live'), not(like(pageViewsTable.path, '/live/%'))))
       .groupBy(pageViewsTable.path)
       .orderBy(sql`count(*) desc`)
       .limit(20);
