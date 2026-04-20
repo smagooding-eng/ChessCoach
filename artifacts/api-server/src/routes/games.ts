@@ -1,7 +1,7 @@
 import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
 import { db, gamesTable, backgroundJobsTable, usersTable } from "@workspace/db";
 import { requireAuth } from "../middlewares/authMiddleware";
-import { eq, desc, count, isNull, and, asc, sql, gte } from "drizzle-orm";
+import { eq, desc, count, isNull, and, asc, sql, gte, inArray } from "drizzle-orm";
 import {
   ImportGamesBody,
   ImportGamesResponse,
@@ -330,8 +330,8 @@ router.get("/games/elo-progress", async (req, res): Promise<void> => {
     const chesscomUser = user?.chesscomUsername?.toLowerCase() ?? null;
     const lichessUser = user?.lichessUsername?.toLowerCase() ?? null;
 
-    const ownerUsername = chesscomUser ?? lichessUser ?? username;
-    const conditions = [eq(gamesTable.username, ownerUsername)];
+    const ownerNames = Array.from(new Set([chesscomUser, lichessUser, username].filter(Boolean) as string[]));
+    const conditions = [inArray(gamesTable.username, ownerNames)];
     if (signupDate) {
       conditions.push(gte(gamesTable.playedAt, signupDate));
     }
