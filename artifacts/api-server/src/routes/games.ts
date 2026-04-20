@@ -63,7 +63,7 @@ async function runImportJob(opts: ImportJobOptions): Promise<{ imported: number;
             continue;
           }
         }
-        await db.insert(gamesTable).values({ userId, username: storedUsername, pgn: game.pgn!, ...meta });
+        await db.insert(gamesTable).values({ userId, username: storedUsername, ...meta, pgn: game.pgn! });
         imported++;
       } catch (err) {
         log.warn({ err }, "Failed to insert Lichess game");
@@ -95,7 +95,7 @@ async function runImportJob(opts: ImportJobOptions): Promise<{ imported: number;
             continue;
           }
         }
-        await db.insert(gamesTable).values({ userId, username: storedUsername, pgn: game.pgn, platform: "chesscom", ...meta });
+        await db.insert(gamesTable).values({ userId, username: storedUsername, platform: "chesscom", ...meta, pgn: game.pgn });
         imported++;
       } catch (err) {
         log.warn({ err }, "Failed to insert game");
