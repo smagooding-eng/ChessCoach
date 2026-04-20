@@ -78,6 +78,7 @@ import { Profile } from "@/pages/Profile";
 import { Puzzles } from "@/pages/Puzzles";
 import { ScanPosition } from "@/pages/ScanPosition";
 import { Admin } from "@/pages/Admin";
+import { Welcome } from "@/pages/Welcome";
 import NotFound from "@/pages/not-found";
 import { Layout } from "@/components/Layout";
 
@@ -95,9 +96,9 @@ const queryClient = new QueryClient({
 });
 
 // Protected Route Wrapper
-function ProtectedRoute({ component: Component, fallbackNav, requireAdmin }: { component: React.ComponentType; fallbackNav?: string; requireAdmin?: boolean }) {
+function ProtectedRoute({ component: Component, fallbackNav, requireAdmin, skipWelcomeRedirect }: { component: React.ComponentType; fallbackNav?: string; requireAdmin?: boolean; skipWelcomeRedirect?: boolean }) {
   const { username, isLoaded, isAuthenticated, isAuthLoading, authUser } = useUser();
-  const [, navigate] = useLocation();
+  const [location, navigate] = useLocation();
 
   useEffect(() => {
     if (isLoaded && !isAuthLoading && !username && !isAuthenticated) {
@@ -106,8 +107,20 @@ function ProtectedRoute({ component: Component, fallbackNav, requireAdmin }: { c
     }
     if (requireAdmin && !isAuthLoading && isAuthenticated && !authUser?.isAdmin) {
       navigate('/', { replace: true } as never);
+      return;
     }
-  }, [isLoaded, username, navigate, isAuthenticated, isAuthLoading, requireAdmin, authUser]);
+    if (
+      !skipWelcomeRedirect &&
+      !isAuthLoading &&
+      isAuthenticated &&
+      authUser &&
+      !authUser.chesscomUsername &&
+      !authUser.lichessUsername &&
+      location !== '/welcome'
+    ) {
+      navigate('/welcome', { replace: true } as never);
+    }
+  }, [isLoaded, username, navigate, isAuthenticated, isAuthLoading, requireAdmin, authUser, skipWelcomeRedirect, location]);
 
   if (!isLoaded || isAuthLoading) {
     return (
@@ -154,6 +167,7 @@ const PProfile       = () => <ProtectedRoute component={Profile} />;
 const PPuzzles       = () => <ProtectedRoute component={Puzzles} />;
 const PScanPosition  = () => <ProtectedRoute component={ScanPosition} />;
 const PAdmin         = () => <ProtectedRoute component={Admin} />;
+const PWelcome       = () => <ProtectedRoute component={Welcome} skipWelcomeRedirect />;
 
 function getVisitorId(): string {
   const key = 'chess_coach_visitor_id';
@@ -183,6 +197,7 @@ function Router() {
     <><PageTracker /><Switch>
       <Route path="/setup" component={LandingPage} />
       <Route path="/download" component={DownloadPage} />
+      <Route path="/welcome" component={PWelcome} />
 
       {/* Protected Routes — stable named components prevent remounting on every render */}
       <Route path="/"            component={PDashboard} />
