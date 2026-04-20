@@ -197,14 +197,15 @@ router.get("/auth/google/callback", async (req: Request, res: Response) => {
   const { code } = req.query;
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  const callbackOrigin = getOrigin(req);
 
   if (!code || !clientId || !clientSecret) {
-    res.redirect(FRONTEND_URL + "/?error=google_auth_failed");
+    res.redirect(callbackOrigin + "/?error=google_auth_failed");
     return;
   }
 
   try {
-    const origin = getOrigin(req);
+    const origin = callbackOrigin;
     const redirectUri = `${origin}/api/auth/google/callback`;
     const stateParam = (req.query.state as string) || '';
     const googleRefCode = stateParam.startsWith('ref:') ? stateParam.slice(4) : '';
@@ -222,7 +223,7 @@ router.get("/auth/google/callback", async (req: Request, res: Response) => {
     });
 
     if (!tokenRes.ok) {
-      res.redirect(FRONTEND_URL + "/?error=google_auth_failed");
+      res.redirect(callbackOrigin + "/?error=google_auth_failed");
       return;
     }
 
@@ -233,7 +234,7 @@ router.get("/auth/google/callback", async (req: Request, res: Response) => {
     });
 
     if (!userInfoRes.ok) {
-      res.redirect(FRONTEND_URL + "/?error=google_auth_failed");
+      res.redirect(callbackOrigin + "/?error=google_auth_failed");
       return;
     }
 
@@ -309,10 +310,10 @@ router.get("/auth/google/callback", async (req: Request, res: Response) => {
     const sid = await createSession(sessionData);
     setSessionCookie(res, sid);
 
-    res.redirect(FRONTEND_URL + "/#token=" + sid);
+    res.redirect(callbackOrigin + "/#token=" + sid);
   } catch (err: any) {
     req.log?.error?.({ err }, "Google callback error");
-    res.redirect(FRONTEND_URL + "/?error=google_auth_failed");
+    res.redirect(callbackOrigin + "/?error=google_auth_failed");
   }
 });
 
