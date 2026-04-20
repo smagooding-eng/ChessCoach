@@ -319,10 +319,33 @@ function TerminationLabel({ termination, result }: { termination: string; result
   return <span className="text-muted-foreground/70">{map[termination] ?? termination} · {result}</span>;
 }
 
+type ModeFilter = 'all' | 'ranked' | 'casual';
+
 export function LiveHistory() {
   const { data, isLoading, isError } = useLiveHistory(500);
   const { data: ratingsData } = useLiveRatings();
   const games: LiveHistoryGame[] = data?.games ?? [];
+  const [listTcFilter, setListTcFilter] = useState<TcFilter>('all');
+  const [listModeFilter, setListModeFilter] = useState<ModeFilter>('all');
+
+  const filteredGames = useMemo(() => {
+    return games.filter(g =>
+      (listTcFilter === 'all' || g.timeControl === listTcFilter) &&
+      (listModeFilter === 'all' || g.mode === listModeFilter)
+    );
+  }, [games, listTcFilter, listModeFilter]);
+
+  const listTcOptions: { id: TcFilter; label: string }[] = [
+    { id: 'all', label: 'All' },
+    { id: 'blitz_5_0', label: '5+0' },
+    { id: 'blitz_5_3', label: '5+3' },
+    { id: 'rapid_10_0', label: '10+0' },
+  ];
+  const listModeOptions: { id: ModeFilter; label: string }[] = [
+    { id: 'all', label: 'All' },
+    { id: 'ranked', label: 'Ranked' },
+    { id: 'casual', label: 'Casual' },
+  ];
 
   // Build chronological rating progression per time control (rankedonly + ratingAfter present)
   const seriesByTc = useMemo(() => {
@@ -448,7 +471,56 @@ export function LiveHistory() {
         </div>
       ) : (
         <div className="space-y-2">
-          {games.map((g, i) => {
+          <div className="glass-card rounded-xl p-3 border border-white/5 flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">Time</span>
+              <div className="flex items-center gap-1 flex-wrap">
+                {listTcOptions.map(opt => (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => setListTcFilter(opt.id)}
+                    className={cn(
+                      'px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wide transition-colors border',
+                      listTcFilter === opt.id
+                        ? 'bg-primary/20 text-primary border-primary/40'
+                        : 'bg-secondary/40 text-muted-foreground border-border hover:text-foreground'
+                    )}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">Mode</span>
+              <div className="flex items-center gap-1 flex-wrap">
+                {listModeOptions.map(opt => (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => setListModeFilter(opt.id)}
+                    className={cn(
+                      'px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wide transition-colors border',
+                      listModeFilter === opt.id
+                        ? 'bg-primary/20 text-primary border-primary/40'
+                        : 'bg-secondary/40 text-muted-foreground border-border hover:text-foreground'
+                    )}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <span className="ml-auto text-[10px] uppercase tracking-wider text-muted-foreground tabular-nums">
+              {filteredGames.length} of {games.length}
+            </span>
+          </div>
+          {filteredGames.length === 0 ? (
+            <div className="text-center py-10 text-sm text-muted-foreground">
+              No games match these filters.
+            </div>
+          ) : filteredGames.map((g, i) => {
             const meta = TC_META[g.timeControl];
             const ratingDelta = g.ratingBefore != null && g.ratingAfter != null ? g.ratingAfter - g.ratingBefore : null;
             const deltaColor = ratingDelta == null ? TEXT_MUTED : ratingDelta > 0 ? CHESSCOM_GREEN : ratingDelta < 0 ? RED : TEXT_MUTED;
