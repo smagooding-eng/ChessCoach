@@ -1,8 +1,8 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Link } from 'wouter';
 import { motion } from 'framer-motion';
-import { format } from 'date-fns';
-import { Play, TrendingUp, TrendingDown, Minus, Swords, Zap, Clock } from 'lucide-react';
+import { format, formatDistanceToNowStrict } from 'date-fns';
+import { Play, TrendingUp, TrendingDown, Minus, Swords, Zap, Clock, Users } from 'lucide-react';
 import { PageHero } from '@/components/DesignSystem';
 import { useLiveHistory, type LiveHistoryGame } from '@/hooks/use-live-history';
 import { useLiveRatings } from '@/hooks/use-live-ratings';
@@ -83,6 +83,224 @@ function RatingChart({ points, width = 320, height = 120 }: { points: { rating: 
         />
       ))}
     </svg>
+  );
+}
+
+interface OpponentAggregate {
+  username: string;
+  games: number;
+  wins: number;
+  losses: number;
+  draws: number;
+  rankedDelta: number;
+  rankedGames: number;
+  lastPlayed: string;
+  avgOpponentRating: number | null;
+  ratingPoints: { rating: number; finishedAt: string }[];
+}
+
+function aggregateOpponents(games: LiveHistoryGame[]): OpponentAggregate[] {
+  const map = new Map<string, OpponentAggregate>();
+  // games arrive DESC by finishedAt; iterate in chronological order so
+  // ratingPoints end up oldest → newest for the sparkline.
+  for (const g of [...games].reverse()) {
+    const key = g.opponentUsername;
+    let agg = map.get(key);
+    if (!agg) {
+      agg = {
+        username: key,
+        games: 0, wins: 0, losses: 0, draws: 0,
+        rankedDelta: 0, rankedGames: 0,
+        lastPlayed: g.finishedAt,
+        avgOpponentRating: null,
+        ratingPoints: [],
+      };
+      map.set(key, agg);
+    }
+    agg.games++;
+    if (g.result === 'win') agg.wins++;
+    else if (g.result === 'loss') agg.losses++;
+    else agg.draws++;
+    if (g.mode === 'ranked' && g.ratingBefore != null && g.ratingAfter != null) {
+      agg.rankedDelta += g.ratingAfter - g.ratingBefore;
+      agg.rankedGames++;
+      agg.ratingPoints.push({ rating: g.ratingAfter, finishedAt: g.finishedAt });
+    }
+    // Latest finishedAt wins (we're iterating chronologically so always overwrite)
+    agg.lastPlayed = g.finishedAt;
+  }
+  // Compute average opponent rating in a second pass for accuracy
+  const ratingSums = new Map<string, { sum: number; n: number }>();
+  for (const g of games) {
+    if (g.opponentRating == null) continue;
+    const cur = ratingSums.get(g.opponentUsername) ?? { sum: 0, n: 0 };
+    cur.sum += g.opponentRating;
+    cur.n++;
+    ratingSums.set(g.opponentUsername, cur);
+  }
+  for (const agg of map.values()) {
+    const r = ratingSums.get(agg.username);
+    agg.avgOpponentRating = r && r.n > 0 ? Math.round(r.sum / r.n) : null;
+  }
+  return [...map.values()].sort((a, b) =>
+    b.games - a.games || new Date(b.lastPlayed).getTime() - new Date(a.lastPlayed).getTime()
+  );
+}
+
+function MiniSparkline({ points, width = 80, height = 24 }: { points: { rating: number; finishedAt: string }[]; width?: number; height?: number }) {
+  if (points.length < 2) {
+    return <div className="text-[10px] text-muted-foreground">—</div>;
+  }
+  const ratings = points.map(p => p.rating);
+  const min = Math.min(...ratings);
+  const max = Math.max(...ratings);
+  const span = Math.max(1, max - min);
+  const xFor = (i: number) => (i / (points.length - 1)) * width;
+  const yFor = (r: number) => height - 2 - ((r - min) / span) * (height - 4);
+  const trendUp = points[points.length - 1].rating >= points[0].rating;
+  const color = trendUp ? CHESSCOM_GREEN : RED;
+  const polyPoints = points.map((p, i) => `${xFor(i)},${yFor(p.rating)}`).join(' ');
+  return (
+    <svg width={width} height={height} className="overflow-visible block">
+      <polyline points={polyPoints} fill="none" stroke={color} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+type TcFilter = 'all' | LiveHistoryGame['timeControl'];
+
+function FrequentOpponents({ games }: { games: LiveHistoryGame[] }) {
+  const [tcFilter, setTcFilter] = useState<TcFilter>('all');
+  const [showAll, setShowAll] = useState(false);
+
+  const filtered = useMemo(
+    () => tcFilter === 'all' ? games : games.filter(g => g.timeControl === tcFilter),
+    [games, tcFilter]
+  );
+
+  const opponents = useMemo(() => aggregateOpponents(filtered), [filtered]);
+  // Only show opponents played at least twice — single-encounter opponents
+  // aren't really "frequent" and they'd flood the list.
+  const recurring = useMemo(() => opponents.filter(o => o.games >= 2), [opponents]);
+  const visible = showAll ? recurring : recurring.slice(0, 6);
+
+  const tcOptions: { id: TcFilter; label: string }[] = [
+    { id: 'all', label: 'All' },
+    { id: 'blitz_5_0', label: '5 min' },
+    { id: 'blitz_5_3', label: '5 | 3' },
+    { id: 'rapid_10_0', label: '10 min' },
+  ];
+
+  return (
+    <div className="glass-card rounded-xl p-3.5 border border-white/5">
+      <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 rounded-lg bg-primary/15 text-primary flex items-center justify-center">
+            <Users className="w-4 h-4" />
+          </div>
+          <div>
+            <div className="text-sm font-bold leading-tight">Frequent opponents</div>
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+              {recurring.length === 0 ? 'No rivalries yet' : `${recurring.length} ${recurring.length === 1 ? 'rival' : 'rivals'}`}
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center gap-1 flex-wrap">
+          {tcOptions.map(opt => (
+            <button
+              key={opt.id}
+              type="button"
+              onClick={() => setTcFilter(opt.id)}
+              className={cn(
+                'px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wide transition-colors border',
+                tcFilter === opt.id
+                  ? 'bg-primary/20 text-primary border-primary/40'
+                  : 'bg-secondary/40 text-muted-foreground border-border hover:text-foreground'
+              )}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {recurring.length === 0 ? (
+        <div className="text-center py-6 text-xs text-muted-foreground">
+          Play the same opponent twice to start tracking your matchup.
+        </div>
+      ) : (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+            {visible.map(o => {
+              const total = o.games;
+              const wPct = (o.wins / total) * 100;
+              const dPct = (o.draws / total) * 100;
+              const lPct = (o.losses / total) * 100;
+              const winRate = Math.round((o.wins + o.draws * 0.5) / total * 100);
+              const deltaColor = o.rankedDelta > 0 ? CHESSCOM_GREEN : o.rankedDelta < 0 ? RED : TEXT_MUTED;
+              return (
+                <div key={o.username} className="rounded-lg p-2.5 bg-white/[0.02] border border-white/5">
+                  <div className="flex items-center justify-between gap-2 mb-1.5">
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-bold truncate">{o.username}</div>
+                      <div className="text-[10px] text-muted-foreground tabular-nums">
+                        {total} {total === 1 ? 'game' : 'games'}
+                        {o.avgOpponentRating != null && <> · avg {o.avgOpponentRating}</>}
+                        {' · '}
+                        {formatDistanceToNowStrict(new Date(o.lastPlayed), { addSuffix: true })}
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <div className="text-sm font-black tabular-nums">{winRate}%</div>
+                      <div className="text-[9px] uppercase tracking-wider text-muted-foreground">win rate</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 h-1.5 rounded-full overflow-hidden bg-white/5 flex">
+                      {wPct > 0 && <div style={{ width: `${wPct}%`, backgroundColor: CHESSCOM_GREEN }} />}
+                      {dPct > 0 && <div style={{ width: `${dPct}%`, backgroundColor: '#6b7280' }} />}
+                      {lPct > 0 && <div style={{ width: `${lPct}%`, backgroundColor: RED }} />}
+                    </div>
+                    <div className="text-[10px] font-bold tabular-nums whitespace-nowrap">
+                      <span className="text-emerald-400">{o.wins}</span>
+                      <span className="text-muted-foreground mx-0.5">/</span>
+                      <span className="text-muted-foreground">{o.draws}</span>
+                      <span className="text-muted-foreground mx-0.5">/</span>
+                      <span className="text-red-400">{o.losses}</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between mt-1.5">
+                    <div className="flex items-center gap-1 text-[10px] font-bold tabular-nums" style={{ color: deltaColor }}>
+                      {o.rankedGames > 0 ? (
+                        <>
+                          {o.rankedDelta > 0 ? <TrendingUp className="w-3 h-3" /> : o.rankedDelta < 0 ? <TrendingDown className="w-3 h-3" /> : <Minus className="w-3 h-3" />}
+                          {o.rankedDelta > 0 ? '+' : ''}{o.rankedDelta}
+                          <span className="text-muted-foreground ml-0.5 font-normal">ranked</span>
+                        </>
+                      ) : (
+                        <span className="text-muted-foreground font-normal">Casual only</span>
+                      )}
+                    </div>
+                    <MiniSparkline points={o.ratingPoints} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          {recurring.length > 6 && (
+            <div className="mt-3 flex justify-center">
+              <button
+                type="button"
+                onClick={() => setShowAll(s => !s)}
+                className="px-3 py-1 rounded-lg text-[11px] font-bold bg-secondary/60 text-muted-foreground hover:text-foreground border border-border transition-colors"
+              >
+                {showAll ? 'Show top 6' : `Show all ${recurring.length}`}
+              </button>
+            </div>
+          )}
+        </>
+      )}
+    </div>
   );
 }
 
@@ -209,6 +427,10 @@ export function LiveHistory() {
           );
         })}
       </div>
+
+      {!isLoading && !isError && games.length > 0 && (
+        <FrequentOpponents games={games} />
+      )}
 
       {isLoading ? (
         <div className="flex flex-col items-center justify-center py-16 gap-3">
