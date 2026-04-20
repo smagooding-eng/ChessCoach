@@ -35,9 +35,10 @@ const SEV_COLORS: Record<string, { bg: string; text: string }> = {
 };
 
 export function Dashboard() {
-  const { username, isPremium } = useUser();
-  const { player: chessPlayer } = useChessPlayer(username ?? undefined);
-  const { data: multiElo } = useMultiEloProgress(username ?? undefined);
+  const { username, isPremium, authUser } = useUser();
+  const ratingHandle = username ?? authUser?.chesscomUsername ?? authUser?.lichessUsername ?? undefined;
+  const { player: chessPlayer } = useChessPlayer(ratingHandle);
+  const { data: multiElo } = useMultiEloProgress(ratingHandle);
   const { data: liveRatingsData } = useLiveRatings();
   const liveBest = bestLiveRating(liveRatingsData?.ratings);
   const { data: summary, isLoading: loadingSummary } = useMyAnalysisSummary();

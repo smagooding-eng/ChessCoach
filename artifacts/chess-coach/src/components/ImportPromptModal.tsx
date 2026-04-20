@@ -5,7 +5,7 @@ import { useMyGames } from '@/hooks/use-games';
 import { invalidateEloCache } from '@/hooks/use-elo-progress';
 import { apiFetch } from '@/lib/api';
 
-const STORAGE_KEY = 'importPromptDismissed_v1';
+const STORAGE_KEY_PREFIX = 'importPromptDismissed_v2:';
 const CHESSCOM_GREEN = '#81b64c';
 const BG_CARD = '#302e2b';
 const TEXT_LIGHT = '#e8e6e3';
@@ -23,18 +23,19 @@ export function ImportPromptModal() {
   const chesscom = authUser?.chesscomUsername ?? null;
   const lichess = authUser?.lichessUsername ?? null;
   const hasGames = (gamesData?.games?.length ?? 0) > 0;
+  const storageKey = authUser?.id ? `${STORAGE_KEY_PREFIX}${authUser.id}` : null;
 
   useEffect(() => {
-    if (!authUser) return;
+    if (!authUser || !storageKey) return;
     if (gamesLoading) return;
     if (hasGames) return;
     if (!chesscom && !lichess) return;
-    if (localStorage.getItem(STORAGE_KEY) === '1') return;
+    if (localStorage.getItem(storageKey) === '1') return;
     setOpen(true);
-  }, [authUser, gamesLoading, hasGames, chesscom, lichess]);
+  }, [authUser, gamesLoading, hasGames, chesscom, lichess, storageKey]);
 
   const dismiss = () => {
-    localStorage.setItem(STORAGE_KEY, '1');
+    if (storageKey) localStorage.setItem(storageKey, '1');
     setOpen(false);
   };
 
@@ -79,7 +80,7 @@ export function ImportPromptModal() {
         }
       }
       invalidateEloCache();
-      localStorage.setItem(STORAGE_KEY, '1');
+      if (storageKey) localStorage.setItem(storageKey, '1');
       setStatusText('Done! Your games are loaded.');
       setTimeout(() => setOpen(false), 900);
     } catch (err) {
