@@ -240,7 +240,7 @@ export async function analyzeMoves(input: AnalyzeMovesInput): Promise<MoveClassi
 
     let classification = classifyFromWinPctLoss(winPctLossRaw, isTopEngineMove, isSecondEngineMove, isOpeningRange, wasBalanced, playerWinBefore, stillInBook, playerWinAfter, legalMoves.length, cpBefore, cpAfter, playerColor);
 
-    if (legalMoves.length <= 1 && stillInBook) {
+    if (legalMoves.length <= 1 && stillInBook && isOpeningRange) {
       classification = "book";
     }
 
@@ -369,7 +369,7 @@ export async function analyzeGamePgn(pgn: string, onProgress?: (done: number, to
 
     let classification = classifyFromWinPctLoss(winPctLossRaw, isTopEngineMove, isSecondEngineMove, isOpeningRange, wasBalanced, playerWinBefore, stillInBook, playerWinAfter, legalMoves.length, cpBefore, cpAfter, m.color as "white" | "black");
 
-    if (legalMoves.length <= 1 && stillInBook) classification = "book";
+    if (legalMoves.length <= 1 && stillInBook && isOpeningRange) classification = "book";
 
     if (classification === "brilliant") {
       if (!isSacrificialMove(fens[idx], m.san)) {

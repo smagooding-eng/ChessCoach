@@ -291,7 +291,7 @@ export function classifyFromWinPctLoss(
   winPctLoss: number,
   isTopEngineMove: boolean,
   isSecondEngineMove: boolean,
-  _isOpeningRange: boolean,
+  isOpeningRange: boolean,
   _wasBalanced: boolean,
   playerWinPctBefore: number = 50,
   isInBook: boolean = false,
@@ -301,7 +301,10 @@ export function classifyFromWinPctLoss(
   cpAfter: number = 0,
   playerColor: "white" | "black" = "white",
 ): EngineClassification {
-  if (isInBook) {
+  // Book moves should only register during the opening phase. Once we've
+  // left the opening, even if the position somehow matches a book entry,
+  // we classify on engine merit (best/excellent/good/etc.) instead.
+  if (isInBook && isOpeningRange) {
     return "book";
   }
 
