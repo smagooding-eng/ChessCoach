@@ -138,7 +138,7 @@ export interface MoveClassification {
   moveIndex: number;
   san: string;
   color: string;
-  classification: "brilliant" | "great" | "best" | "excellent" | "good" | "book" | "inaccuracy" | "mistake" | "blunder" | "missed_win";
+  classification: "checkmate" | "brilliant" | "great" | "best" | "excellent" | "good" | "book" | "inaccuracy" | "mistake" | "blunder" | "missed_win";
   explanation: string;
   cpLoss: number;
   engineAvailable: boolean;
@@ -250,6 +250,13 @@ export async function analyzeMoves(input: AnalyzeMovesInput): Promise<MoveClassi
       }
     }
 
+    // Checkmate: if the played move actually delivers mate, override
+    // whatever the engine-eval-based classifier produced.
+    try {
+      const after = new Chess(fens[idx + 1]);
+      if (after.isCheckmate()) classification = "checkmate";
+    } catch {}
+
     const isBad = ["inaccuracy", "mistake", "blunder", "missed_win"].includes(classification);
     let bestMove: string | null = null;
     if (isBad && evalBefore.bestMoveSan && !isTopEngineMove) {
@@ -269,7 +276,7 @@ export interface PgnAnalysisResult {
     moveIndex: number;
     san: string;
     color: "white" | "black";
-    classification: "brilliant" | "great" | "best" | "excellent" | "good" | "book" | "inaccuracy" | "mistake" | "blunder" | "missed_win";
+    classification: "checkmate" | "brilliant" | "great" | "best" | "excellent" | "good" | "book" | "inaccuracy" | "mistake" | "blunder" | "missed_win";
     cpLoss: number;
     bestMove: string | null;
     evalBefore: number;
@@ -377,6 +384,12 @@ export async function analyzeGamePgn(pgn: string, onProgress?: (done: number, to
       }
     }
 
+    // Checkmate override: actual delivered mate trumps any other label.
+    try {
+      const after = new Chess(fens[idx + 1]);
+      if (after.isCheckmate()) classification = "checkmate";
+    } catch {}
+
     const isBad = ["inaccuracy", "mistake", "blunder", "missed_win"].includes(classification);
     let bestMove: string | null = null;
     if (isBad && evalBefore.bestMoveSan && !isTopEngineMove) {
@@ -406,7 +419,7 @@ export async function analyzeGamePgn(pgn: string, onProgress?: (done: number, to
 }
 
 export interface SingleMoveAnalysis {
-  classification: "brilliant" | "great" | "best" | "excellent" | "good" | "book" | "inaccuracy" | "mistake" | "blunder" | "missed_win";
+  classification: "checkmate" | "brilliant" | "great" | "best" | "excellent" | "good" | "book" | "inaccuracy" | "mistake" | "blunder" | "missed_win";
   pros: string[];
   cons: string[];
   betterMove: string | null;
@@ -714,7 +727,7 @@ export interface MoveReview {
   moveIndex: number;
   san: string;
   color: "white" | "black";
-  classification: "brilliant" | "great" | "best" | "excellent" | "good" | "book" | "inaccuracy" | "mistake" | "blunder" | "missed_win";
+  classification: "checkmate" | "brilliant" | "great" | "best" | "excellent" | "good" | "book" | "inaccuracy" | "mistake" | "blunder" | "missed_win";
   explanation: string;
   betterMove: string | null;
   pros: string[];

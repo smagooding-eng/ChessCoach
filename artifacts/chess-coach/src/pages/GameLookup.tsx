@@ -66,7 +66,7 @@ type TurningPoint = {
 };
 
 const CLASS_CFG: Record<Classification, { badge: string; color: string; full: string }> = {
-  checkmate:   { badge: '♚',  color: 'text-amber-400 bg-amber-400/15 border-amber-400/30',        full: 'Checkmate' },
+  checkmate:   { badge: '♚#', color: 'text-yellow-200 bg-gradient-to-br from-yellow-400/30 to-amber-600/25 border-yellow-300/60 shadow-[0_0_12px_rgba(250,204,21,0.35)]', full: 'Checkmate — Game Won' },
   brilliant:   { badge: '!!', color: 'text-cyan-400 bg-cyan-400/15 border-cyan-400/30',           full: 'Brilliant Move' },
   great:       { badge: '!',  color: 'text-sky-400 bg-sky-400/15 border-sky-400/30',              full: 'Great Move' },
   best:        { badge: '!',  color: 'text-emerald-400 bg-emerald-400/15 border-emerald-400/30',  full: 'Best Move' },

@@ -7,6 +7,7 @@ const ANALYSIS_DEPTH = IS_PROD ? 15 : 20;
 const ENGINE_TIMEOUT_MS = IS_PROD ? 15000 : 30000;
 
 export type EngineClassification =
+  | "checkmate"
   | "brilliant"
   | "great"
   | "best"
@@ -344,7 +345,19 @@ export function classifyFromWinPctLoss(
   }
 
   if (isTopEngineMove) {
-    if (winPctLoss < -5 && playerWinPctBefore >= 15 && playerWinPctBefore <= 70) {
+    // Brilliant must be RARE: requires (a) the player was in a roughly
+    // balanced or worse position, (b) a huge win-pct swing in their favor
+    // (≥15 points) AND (c) the engine eval after the move shows a material
+    // / positional gain on the order of a queen (≥600 cp). Downstream the
+    // move must also pass `isSacrificialMove`. Anything weaker downgrades
+    // to best/great/excellent.
+    const playerCpSwing = -cpLossRaw; // positive when the player gained
+    if (
+      winPctLoss < -15 &&
+      playerWinPctBefore >= 15 &&
+      playerWinPctBefore <= 65 &&
+      playerCpSwing >= 600
+    ) {
       return "brilliant";
     }
 
