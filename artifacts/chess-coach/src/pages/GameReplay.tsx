@@ -855,7 +855,7 @@ export function GameReplay() {
   const isBad = currentReview && ['inaccuracy', 'mistake', 'blunder', 'missed_win'].includes(currentReview.classification);
 
   return (
-    <div className="space-y-2 md:space-y-3 pb-20 px-3 pt-3 md:px-0 md:pt-0 xl:pb-0 xl:h-[calc(100vh-3rem)] xl:flex xl:flex-col xl:overflow-hidden">
+    <div className="space-y-2 md:space-y-3 px-3 pt-3 md:px-0 md:pt-0 pb-2 md:pb-0 h-[calc(100dvh-8rem)] md:h-[calc(100vh-3.5rem)] xl:h-[calc(100vh-3rem)] flex flex-col overflow-hidden">
       <Link href="/games" className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors text-sm shrink-0">
         <ArrowLeft className="w-4 h-4" /> Back to Games
       </Link>
@@ -868,7 +868,7 @@ export function GameReplay() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px] gap-6 xl:flex-1 xl:min-h-0">
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px] gap-4 xl:gap-6 flex-1 min-h-0 overflow-y-auto xl:overflow-hidden hide-scrollbar">
 
         {/* ── Left col: board + controls ── */}
         <div className="space-y-2 md:space-y-4 xl:min-h-0 xl:overflow-y-auto xl:pr-2 hide-scrollbar">
