@@ -101,13 +101,20 @@ export async function verifyPuzzle(
     if (claims.themes && claims.themes.length > 0) {
       const claimed = new Set(claims.themes.map(t => t.toLowerCase()));
       const detected = new Set(motif.themes.map(t => t.toLowerCase()));
-      // Expect at least one tactical motif claim to show up in detection
-      const tacticalClaims = ["fork", "pin", "skewer", "sacrifice", "hangingpiece", "mate", "matein1", "matein2", "matein3"];
-      const claimedTactical = [...claimed].filter(t => tacticalClaims.some(tc => t.includes(tc)));
-      if (claimedTactical.length > 0) {
-        const matched = claimedTactical.some(c => [...detected].some(d => d.includes(c) || c.includes(d)));
+      // Strict: every claimed tactical motif must appear in the detector
+      // output. Categorical labels (blunder/mistake/opening/etc.) are not
+      // motif claims and are ignored here.
+      const tacticalClaimTokens = ["fork", "pin", "skewer", "discoveredattack", "sacrifice", "hangingpiece", "mate"];
+      const norm = (s: string) => s.replace(/[^a-z0-9]/g, "");
+      const claimedTactical = [...claimed].filter(t => tacticalClaimTokens.some(tc => norm(t).includes(tc)));
+      for (const c of claimedTactical) {
+        const cn = norm(c);
+        const matched = [...detected].some(d => {
+          const dn = norm(d);
+          return dn === cn || dn.includes(cn) || cn.includes(dn);
+        });
         if (!matched) {
-          reasons.push(`claimed motifs ${[...claimedTactical].join("/")} not detected in solution`);
+          reasons.push(`claimed motif ${c} not detected in solution`);
         }
       }
     }
@@ -140,7 +147,25 @@ export async function verifyPuzzle(
         }
       }
 
-      const evals = await evaluateAllPositions(fens, opts.engineDepth ?? DEFAULT_ENGINE_DEPTH);
+      // Also evaluate the position AFTER the full solution so we can confirm
+      // a real eval-delta (not just move agreement). We append it last; the
+      // best-move check below only iterates `fens.length`.
+      const replayForEnd = new Chess(fen);
+      let endFen: string | null = null;
+      for (const u of uciSolution) {
+        const m = replayForEnd.move({
+          from: u.slice(0, 2),
+          to: u.slice(2, 4),
+          promotion: u.length > 4 ? u[4] : undefined,
+        });
+        if (!m) { endFen = null; break; }
+      }
+      if (!replayForEnd.isGameOver() || replayForEnd.isCheckmate()) {
+        endFen = replayForEnd.fen();
+      }
+
+      const fensToEval = endFen ? [...fens, endFen] : fens;
+      const evals = await evaluateAllPositions(fensToEval, opts.engineDepth ?? DEFAULT_ENGINE_DEPTH);
       let allMatched = true;
       for (let i = 0; i < fens.length; i++) {
         const top = (evals[i]?.bestMoveUci ?? "").toLowerCase();
@@ -151,6 +176,29 @@ export async function verifyPuzzle(
         }
       }
       engineMatched = allMatched;
+
+      // Engine eval-delta reconciliation: confirm the solution actually
+      // improves the position from the mover's perspective. Required so we
+      // never persist a "puzzle" whose solution is, in fact, neutral or
+      // losing per the engine.
+      if (endFen) {
+        const startCp = evals[0]?.cpWhite ?? null;
+        const endCp = evals[evals.length - 1]?.cpWhite ?? null;
+        const moverSign = parsed.turn() === "w" ? 1 : -1;
+        // engineAnalysis encodes mate as |cp| ≈ 10000; treat that as a mate
+        // signal regardless of sign on the absolute scale.
+        const endIsMateForMover = endCp !== null && Math.abs(endCp) >= 9000 && Math.sign(endCp) === moverSign;
+        const looksWinning =
+          motif.mateIn !== null ||
+          endIsMateForMover ||
+          (startCp !== null && endCp !== null && (endCp - startCp) * moverSign >= 150);
+        if (!looksWinning) {
+          reasons.push(
+            `engine eval-delta does not favor mover (start=${startCp}, end=${endCp})`,
+          );
+          engineMatched = false;
+        }
+      }
     } catch {
       // Engine failure when verification was requested is treated as a hard
       // fail — we will not save a puzzle we could not verify.

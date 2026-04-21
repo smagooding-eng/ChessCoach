@@ -14,6 +14,8 @@ import {
 } from "@workspace/api-zod";
 import { generateCourseForWeakness, generateEndgameCourse, type EndgameType } from "../lib/openaiAnalysis";
 import { verifyLesson, verifyLessonDrillEngine } from "../lib/puzzleVerifier";
+import { analyzePuzzle } from "../lib/chessMotifs";
+import { Chess } from "chess.js";
 import { randomUUID } from "crypto";
 import type { Logger } from "pino";
 
@@ -98,6 +100,47 @@ async function sanitizeLessons(lessons: RawLesson[], log?: Logger): Promise<{ le
         next.drillExpectedMove = null;
         next.drillHint = null;
         changed = true;
+      }
+    }
+
+    // Tactical-claim consistency: when the lesson title implies a specific
+    // motif, the example PGN must actually demonstrate it per the motif
+    // detector. Otherwise strip the example (the lesson stays as text).
+    if (next.examplePgn) {
+      const titleLower = (lesson.title ?? "").toLowerCase();
+      const tacticTokens = ["fork", "pin", "skewer", "discovered", "sacrifice", "mate"];
+      const claimed = tacticTokens.filter(t => titleLower.includes(t));
+      if (claimed.length > 0) {
+        try {
+          const c = new Chess();
+          c.loadPgn(next.examplePgn);
+          const history = c.history({ verbose: true });
+          if (history.length >= 2) {
+            // Re-derive the position just before the final move and the UCI
+            // of that move so the detector can run on it.
+            const replay = new Chess();
+            for (let i = 0; i < history.length - 1; i++) {
+              replay.move({ from: history[i].from, to: history[i].to, promotion: history[i].promotion });
+            }
+            const last = history[history.length - 1];
+            const uci = `${last.from}${last.to}${last.promotion ?? ""}`;
+            const motif = analyzePuzzle(replay.fen(), [uci]);
+            const detected = new Set(motif.themes.map(t => t.toLowerCase()));
+            const norm = (s: string) => s.replace(/[^a-z0-9]/g, "");
+            const missing = claimed.filter(c => ![...detected].some(d => norm(d).includes(c)));
+            if (missing.length > 0) {
+              log?.warn({ title: lesson.title, missing }, "Lesson example does not demonstrate claimed tactic; stripping example");
+              next.examplePgn = null;
+              next.fixExamplePgn = null;
+              changed = true;
+            }
+          }
+        } catch {
+          // Unparseable PGN: strip the example.
+          next.examplePgn = null;
+          next.fixExamplePgn = null;
+          changed = true;
+        }
       }
     }
 
