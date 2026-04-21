@@ -1,4 +1,10 @@
-import { Chess, type Square } from "chess.js";
+import { Chess, type Square, type PieceSymbol, type Color } from "chess.js";
+
+interface BoardPiece {
+  square: Square;
+  type: PieceSymbol;
+  color: Color;
+}
 
 const PIECE_VALUE: Record<string, number> = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
 
@@ -102,14 +108,14 @@ function detectPinOrSkewer(chess: Chess, mover: "w" | "b"): boolean {
     const rank = parseInt(s.sq[1]) - 1;
     for (const [df, dr] of dirs[s.type]) {
       let f = file + df, r = rank + dr;
-      let firstHit: { sq: string; piece: any } | null = null;
+      let firstHit: { sq: string; piece: BoardPiece } | null = null;
       while (f >= 0 && f < 8 && r >= 0 && r < 8) {
         const t = String.fromCharCode(97 + f) + (r + 1);
         const p = chess.get(t as Square);
         if (p) {
           if (!firstHit) {
             if (p.color !== opp) break;
-            firstHit = { sq: t, piece: p };
+            firstHit = { sq: t, piece: p as BoardPiece };
           } else {
             if (p.color === opp && (PIECE_VALUE[p.type] ?? 0) >= (PIECE_VALUE[firstHit.piece.type] ?? 0)) {
               return true;

@@ -13,10 +13,77 @@ import {
   UpdateCourseProgressResponse,
 } from "@workspace/api-zod";
 import { generateCourseForWeakness, generateEndgameCourse, type EndgameType } from "../lib/openaiAnalysis";
+import { verifyLesson } from "../lib/puzzleVerifier";
 import { randomUUID } from "crypto";
 import type { Logger } from "pino";
 
 const router: IRouter = Router();
+
+interface RawLesson {
+  title: string;
+  content: string;
+  orderIndex: number;
+  examplePgn: string | null;
+  fixExamplePgn?: string | null;
+  drillFen?: string | null;
+  drillExpectedMove?: string | null;
+  drillHint?: string | null;
+}
+
+/**
+ * Verify each lesson before persistence. Invalid example/fix/drill data is
+ * stripped (text-only downgrade) so the lesson stays useful while bad chess
+ * data is removed. Returns the sanitized lesson list and a count of downgrades.
+ */
+function sanitizeLessons(lessons: RawLesson[], log?: Logger): { lessons: RawLesson[]; downgraded: number } {
+  let downgraded = 0;
+  const sanitized = lessons.map((lesson) => {
+    const next: RawLesson = { ...lesson };
+    let changed = false;
+
+    // Re-check after each strip so we converge on a valid lesson.
+    let verdict = verifyLesson({
+      examplePgn: next.examplePgn ?? null,
+      fixExamplePgn: next.fixExamplePgn ?? null,
+      drillFen: next.drillFen ?? null,
+      drillExpectedMove: next.drillExpectedMove ?? null,
+    });
+
+    if (!verdict.ok && verdict.reasons.some(r => r.startsWith("drill"))) {
+      next.drillFen = null;
+      next.drillExpectedMove = null;
+      next.drillHint = null;
+      changed = true;
+    }
+    verdict = verifyLesson({
+      examplePgn: next.examplePgn ?? null,
+      fixExamplePgn: next.fixExamplePgn ?? null,
+      drillFen: next.drillFen ?? null,
+      drillExpectedMove: next.drillExpectedMove ?? null,
+    });
+    if (!verdict.ok && verdict.reasons.some(r => r.startsWith("fix"))) {
+      next.fixExamplePgn = null;
+      changed = true;
+    }
+    verdict = verifyLesson({
+      examplePgn: next.examplePgn ?? null,
+      fixExamplePgn: next.fixExamplePgn ?? null,
+      drillFen: next.drillFen ?? null,
+      drillExpectedMove: next.drillExpectedMove ?? null,
+    });
+    if (!verdict.ok && verdict.reasons.some(r => r.startsWith("example"))) {
+      next.examplePgn = null;
+      changed = true;
+    }
+
+    if (changed) {
+      downgraded++;
+      log?.warn({ title: lesson.title, reasons: verdict.reasons }, "Lesson downgraded to text-only after verification failure");
+    }
+    return next;
+  });
+  return { lessons: sanitized, downgraded };
+}
 
 async function runCourseGenerationJob(username: string, jobId: string, log: Logger): Promise<void> {
   try {
@@ -62,17 +129,18 @@ async function runCourseGenerationJob(username: string, jobId: string, log: Logg
           examples: weakness.examples,
         }, relatedGamePgns);
 
+        const { lessons: safeLessons } = sanitizeLessons(courseData.lessons as RawLesson[], log);
         const [course] = await db.insert(coursesTable).values({
           username: username.toLowerCase(),
           title: courseData.title,
           description: courseData.description,
           category: courseData.category,
           difficulty: courseData.difficulty,
-          totalLessons: courseData.lessons.length,
+          totalLessons: safeLessons.length,
           completedLessons: 0,
         }).returning();
 
-        for (const lesson of courseData.lessons) {
+        for (const lesson of safeLessons) {
           await db.insert(lessonsTable).values({
             courseId: course.id,
             title: lesson.title,
@@ -252,6 +320,7 @@ router.post("/courses/generate", async (req, res): Promise<void> => {
         examples: weakness.examples,
       }, relatedGamePgns);
 
+      const { lessons: safeLessons } = sanitizeLessons(courseData.lessons as RawLesson[], req.log);
       const [course] = await db
         .insert(coursesTable)
         .values({
@@ -260,12 +329,12 @@ router.post("/courses/generate", async (req, res): Promise<void> => {
           description: courseData.description,
           category: courseData.category,
           difficulty: courseData.difficulty,
-          totalLessons: courseData.lessons.length,
+          totalLessons: safeLessons.length,
           completedLessons: 0,
         })
         .returning();
 
-      for (const lesson of courseData.lessons) {
+      for (const lesson of safeLessons) {
         await db.insert(lessonsTable).values({
           courseId: course.id,
           title: lesson.title,
@@ -331,6 +400,7 @@ async function runEndgameJob(
 
     const courseData = await generateEndgameCourse(type, playerRating, gamePgns);
 
+    const { lessons: safeLessons } = sanitizeLessons(courseData.lessons as RawLesson[], log);
     const [course] = await db
       .insert(coursesTable)
       .values({
@@ -339,12 +409,12 @@ async function runEndgameJob(
         description: courseData.description,
         category: courseData.category || "Endgame Technique",
         difficulty: courseData.difficulty,
-        totalLessons: courseData.lessons.length,
+        totalLessons: safeLessons.length,
         completedLessons: 0,
       })
       .returning();
 
-    for (const lesson of courseData.lessons) {
+    for (const lesson of safeLessons) {
       await db.insert(lessonsTable).values({
         courseId: course.id,
         title: lesson.title,

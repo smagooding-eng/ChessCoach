@@ -59,7 +59,22 @@ export function Puzzles() {
   const [feedback, setFeedback] = useState<'correct' | 'wrong' | null>(null);
   const [showHint, setShowHint] = useState(false);
   const [selectedSquare, setSelectedSquare] = useState<string | null>(null);
+  const [showBeta, setShowBeta] = useState(true);
   const startTimeRef = useRef<number>(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    apiFetch('/api/puzzles/quality')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        if (!cancelled && d && typeof d.passRate === 'number') {
+          setShowBeta(d.passRate < 0.95);
+        }
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
   const [tab, setTab] = useState<'daily' | 'games'>('daily');
   const [gamePuzzles, setGamePuzzles] = useState<any[]>([]);
   const [generatingFromGames, setGeneratingFromGames] = useState(false);
@@ -423,7 +438,12 @@ export function Puzzles() {
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
             <PieceTile piece="♛" size={44} />
-            <h1 className="text-2xl md:text-3xl font-black" style={{ color: TEXT_LIGHT, letterSpacing: '-0.02em' }}>Puzzles</h1>
+            <h1 className="text-2xl md:text-3xl font-black flex items-center gap-2" style={{ color: TEXT_LIGHT, letterSpacing: '-0.02em' }}>
+              Puzzles
+              {showBeta && (
+                <span className="px-1.5 py-0.5 rounded text-[10px] font-black uppercase tracking-[0.18em]" style={{ background: 'rgba(129,182,76,0.18)', color: CHESSCOM_GREEN, border: '1px solid rgba(129,182,76,0.3)' }}>Beta</span>
+              )}
+            </h1>
           </div>
           {stats && (
             <div className="flex items-center gap-3 text-xs" style={{ color: TEXT_MUTED }}>

@@ -17,7 +17,21 @@ export function Courses() {
 
   const [isGenerating, setIsGenerating] = useState(false);
   const [genError, setGenError] = useState<string | null>(null);
+  const [showBeta, setShowBeta] = useState(true);
   const mountedRef = useRef(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    apiFetch('/api/courses/quality')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        if (!cancelled && d && typeof d.passRate === 'number') {
+          setShowBeta(d.passRate < 0.95);
+        }
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const startPolling = useCallback((jobId: string) => {
@@ -158,7 +172,7 @@ export function Courses() {
     <div className="space-y-8 pb-20 px-4 pt-4 md:px-0 md:pt-0">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-stretch gap-4">
         <div className="flex-1 min-w-0">
-          <PageHero piece="♝" title="My Courses" subtitle="Personalized lesson plans based on your deep analysis." />
+          <PageHero piece="♝" title={showBeta ? "My Courses (Beta)" : "My Courses"} subtitle="Personalized lesson plans based on your deep analysis." />
         </div>
 
         <div className="flex flex-col items-end gap-2">
