@@ -573,6 +573,19 @@ router.post("/admin/courses/cleanup-sweep", requireAdmin, async (req: Request, r
     let passed = 0;
     const failedExamples: { id: number; reasons: string[] }[] = [];
 
+    // Per-category aggregation: lesson belongs to a course; bucket by course.category.
+    const courseCategoryById = new Map<number, string>();
+    {
+      const courses = await db.select({ id: coursesTable.id, category: coursesTable.category }).from(coursesTable);
+      for (const c of courses) courseCategoryById.set(c.id, c.category ?? "uncategorized");
+    }
+    const byCategory = new Map<string, { passed: number; archived: number }>();
+    const bumpCat = (cat: string, key: "passed" | "archived") => {
+      const cur = byCategory.get(cat) ?? { passed: 0, archived: 0 };
+      cur[key] += 1;
+      byCategory.set(cat, cur);
+    };
+
     for (const l of lessons) {
       const verdict = verifyLesson({
         id: l.id,
@@ -586,15 +599,22 @@ router.post("/admin/courses/cleanup-sweep", requireAdmin, async (req: Request, r
         const ev = await verifyLessonDrillEngine(l.drillFen, l.drillExpectedMove);
         if (!ev.ok) engineFail = ev.reasons;
       }
+      const cat = courseCategoryById.get(l.courseId) ?? "uncategorized";
       if (verdict.ok && engineFail.length === 0) {
         passed++;
+        bumpCat(cat, "passed");
       } else {
         archived++;
+        bumpCat(cat, "archived");
         const reasons = verdict.ok ? engineFail : verdict.reasons;
         if (failedExamples.length < 25) failedExamples.push({ id: l.id, reasons });
         await db.update(lessonsTable).set({ archived: true }).where(eq(lessonsTable.id, l.id));
       }
     }
+    const perCategory = [...byCategory.entries()].map(([category, v]) => {
+      const total = v.passed + v.archived;
+      return { category, passed: v.passed, archived: v.archived, passRate: total > 0 ? v.passed / total : 1 };
+    });
 
     // Auto-archive courses whose lessons are all archived
     const allCourses = await db.select().from(coursesTable).where(eq(coursesTable.archived, false));
@@ -616,6 +636,7 @@ router.post("/admin/courses/cleanup-sweep", requireAdmin, async (req: Request, r
       archived,
       coursesArchived,
       passRate: lessons.length > 0 ? passed / lessons.length : 1,
+      perCategory,
       failedExamples,
     });
   } catch (err: any) {

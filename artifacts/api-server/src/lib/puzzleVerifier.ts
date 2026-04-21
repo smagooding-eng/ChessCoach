@@ -207,11 +207,9 @@ export async function verifyPuzzle(
     }
   }
 
-  const reconciliationOk = !reasons.some(r =>
-    r.startsWith("claimed mate") ||
-    r.startsWith("claimed material") ||
-    r.startsWith("claimed motifs"),
-  );
+  // Any reason starting with "claimed " is a claim/detector mismatch and
+  // must fail the puzzle.
+  const reconciliationOk = !reasons.some(r => r.startsWith("claimed "));
   const ok = motif.legal && hasGain && (engineMatched !== false) && reconciliationOk;
   return {
     ok,
