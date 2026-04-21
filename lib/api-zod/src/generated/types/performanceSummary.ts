@@ -5,6 +5,7 @@
  * Chess Coach API
  * OpenAPI spec version: 0.1.0
  */
+import type { MonthlyTrendPoint } from "./monthlyTrendPoint";
 import type { OpeningStat } from "./openingStat";
 import type { TimeControlStat } from "./timeControlStat";
 
@@ -18,4 +19,5 @@ export interface PerformanceSummary {
   avgRating: number;
   openingStats: OpeningStat[];
   resultsByTimeControl: TimeControlStat[];
+  monthlyTrend?: MonthlyTrendPoint[];
 }

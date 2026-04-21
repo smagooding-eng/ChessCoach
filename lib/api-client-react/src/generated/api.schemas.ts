@@ -13,14 +13,12 @@ export interface ImportGamesBody {
   username: string;
   /** Number of past months to fetch (1-12) */
   months?: number;
-  platform?: 'chesscom' | 'lichess';
 }
 
 export interface ImportGamesResponse {
   imported: number;
   total: number;
   username: string;
-  platform?: string;
 }
 
 export interface Game {
@@ -38,13 +36,14 @@ export interface Game {
   /** @nullable */
   eco?: string | null;
   playedAt: string;
-  platform?: string;
   /** @nullable */
   url?: string | null;
   analyzed: boolean;
   /** @nullable */
   analysisNotes?: string | null;
   reviewed: boolean;
+  /** @nullable */
+  platform?: string | null;
   createdAt: string;
 }
 
@@ -53,13 +52,13 @@ export interface Move {
   san: string;
   color: string;
   /** @nullable */
-  from?: string | null;
-  /** @nullable */
-  to?: string | null;
+  fen?: string | null;
   /** @nullable */
   fenBefore?: string | null;
   /** @nullable */
-  fen?: string | null;
+  from?: string | null;
+  /** @nullable */
+  to?: string | null;
   /** @nullable */
   comment?: string | null;
   /** @nullable */
@@ -71,8 +70,6 @@ export interface Move {
 export interface GameReplay {
   id: number;
   pgn: string;
-  /** @nullable */
-  startFen?: string | null;
   moves: Move[];
   whiteUsername: string;
   blackUsername: string;
@@ -85,6 +82,8 @@ export interface GameReplay {
   eco?: string | null;
   /** @nullable */
   analysisNotes?: string | null;
+  /** @nullable */
+  startFen?: string | null;
 }
 
 export interface ListGamesResponse {
@@ -119,6 +118,8 @@ export interface WeaknessRecord {
   description: string;
   frequency: number;
   examples: string[];
+  /** @nullable */
+  previewFen?: string | null;
   createdAt: string;
 }
 
@@ -144,6 +145,15 @@ export interface TimeControlStat {
   losses: number;
 }
 
+export interface MonthlyTrendPoint {
+  month: string;
+  wins: number;
+  losses: number;
+  draws: number;
+  games: number;
+  winRate: number;
+}
+
 export interface PerformanceSummary {
   username: string;
   totalGames: number;
@@ -154,6 +164,7 @@ export interface PerformanceSummary {
   avgRating: number;
   openingStats: OpeningStat[];
   resultsByTimeControl: TimeControlStat[];
+  monthlyTrend?: MonthlyTrendPoint[];
 }
 
 export interface GenerateCoursesBody {
@@ -273,10 +284,6 @@ export type ListGamesParams = {
    * Offset for pagination
    */
   offset?: number;
-  /**
-   * Filter by platform
-   */
-  platform?: string;
 };
 
 export type GetWeaknessesParams = {

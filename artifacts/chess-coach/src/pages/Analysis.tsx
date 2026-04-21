@@ -4,9 +4,10 @@ import { useLocation } from 'wouter';
 import { useMyAnalysisSummary, useMyWeaknesses } from '@/hooks/use-analysis';
 import { useUser } from '@/hooks/use-user';
 import { useQueryClient } from '@tanstack/react-query';
-import { Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { BrainCircuit, AlertTriangle, Activity, ChevronRight, Loader2, TrendingUp, CheckCircle2, ArrowUpRight, BookOpen, Trophy, Target, Brain, Clock, Shield, Zap, Eye } from 'lucide-react';
+import { Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area, XAxis, YAxis, CartesianGrid } from 'recharts';
+import { BrainCircuit, AlertTriangle, Activity, ChevronRight, Loader2, TrendingUp, CheckCircle2, ArrowUpRight, BookOpen, Trophy, Target, Brain, Clock, Shield, Zap, Eye, LineChart } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { Chessboard } from 'react-chessboard';
 import { getTierForRating, ELO_TIERS } from '@/lib/elo-tips';
 import { apiFetch } from '@/lib/api';
 import { PremiumGate } from '@/components/PremiumGate';
@@ -405,6 +406,50 @@ export function Analysis() {
             );
           })()}
 
+          {summary.monthlyTrend && summary.monthlyTrend.length > 0 && summary.monthlyTrend.some(p => p.games > 0) && (() => {
+            const trendData = summary.monthlyTrend!.map(p => {
+              const [y, m] = p.month.split('-');
+              const monthName = new Date(parseInt(y), parseInt(m) - 1, 1).toLocaleString('en-US', { month: 'short' });
+              return { ...p, label: monthName, winPct: Math.round((p.winRate || 0) * 100) };
+            });
+            return (
+              <div className="rounded-xl p-5" style={{ background: BG_CARD, border: CARD_BORDER, boxShadow: CARD_SHADOW }}>
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-base font-bold flex items-center gap-2" style={{ color: TEXT_LIGHT }}>
+                    <LineChart className="w-4 h-4" style={{ color: CHESSCOM_GREEN }} />
+                    Last 6 Months
+                  </h2>
+                  <span className="text-[11px] font-bold uppercase tracking-widest" style={{ color: TEXT_MUTED }}>Win rate trend</span>
+                </div>
+                <div className="h-44 -ml-3">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={trendData} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
+                      <defs>
+                        <linearGradient id="winGradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor={CHESSCOM_GREEN} stopOpacity={0.55} />
+                          <stop offset="100%" stopColor={CHESSCOM_GREEN} stopOpacity={0.02} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                      <XAxis dataKey="label" tick={{ fill: TEXT_MUTED, fontSize: 11 }} axisLine={false} tickLine={false} />
+                      <YAxis domain={[0, 100]} tick={{ fill: TEXT_MUTED, fontSize: 11 }} axisLine={false} tickLine={false} width={32} unit="%" />
+                      <RechartsTooltip
+                        contentStyle={{ background: BG_DARK, border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, color: TEXT_LIGHT, fontSize: 12 }}
+                        labelStyle={{ color: TEXT_MUTED, fontWeight: 700 }}
+                        formatter={(value: number, _key, item: any) => {
+                          const p = item?.payload;
+                          if (!p) return [`${value}%`, 'Win rate'];
+                          return [`${value}% (${p.wins}W / ${p.losses}L / ${p.draws}D · ${p.games} games)`, 'Win rate'];
+                        }}
+                      />
+                      <Area type="monotone" dataKey="winPct" stroke={CHESSCOM_GREEN} strokeWidth={2.5} fill="url(#winGradient)" dot={{ r: 3, fill: CHESSCOM_GREEN, strokeWidth: 0 }} activeDot={{ r: 5 }} />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            );
+          })()}
+
           <h2 className="text-xl font-black mt-8 mb-4 flex items-center gap-2" style={{ color: TEXT_LIGHT }}>
             <AlertTriangle className="w-5 h-5" style={{ color: '#ea9733' }} /> Identified Weaknesses
           </h2>
@@ -465,7 +510,24 @@ export function Analysis() {
                     </div>
                   </div>
 
-                  <p className="text-sm mb-4 line-clamp-2" style={{ color: TEXT_MUTED }}>{weakness.description}</p>
+                  <div className="flex gap-3 mb-4">
+                    {weakness.previewFen && (
+                      <div className="shrink-0 w-[72px] h-[72px] rounded-lg overflow-hidden border pointer-events-none" style={{ borderColor: `${sevColor}40` }}>
+                        <Chessboard
+                          options={{
+                            position: weakness.previewFen,
+                            allowDragging: false,
+                            boardStyle: { borderRadius: 0 },
+                            darkSquareStyle: { backgroundColor: '#b58863' },
+                            lightSquareStyle: { backgroundColor: '#f0d9b5' },
+                            showNotation: false,
+                            animationDurationInMs: 0,
+                          }}
+                        />
+                      </div>
+                    )}
+                    <p className="text-sm line-clamp-3 flex-1 min-w-0" style={{ color: TEXT_MUTED }}>{weakness.description}</p>
+                  </div>
 
                   <div className="flex items-center gap-3 text-sm">
                     <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: BG_DARK }}>

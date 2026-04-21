@@ -24,14 +24,12 @@ export const ImportGamesBody = zod.object({
     .number()
     .optional()
     .describe("Number of past months to fetch (1-12)"),
-  platform: zod.enum(["chesscom", "lichess"]).optional().describe("Platform to import from"),
 });
 
 export const ImportGamesResponse = zod.object({
   imported: zod.number(),
   total: zod.number(),
   username: zod.string(),
-  platform: zod.string().optional(),
 });
 
 /**
@@ -41,7 +39,6 @@ export const ListGamesQueryParams = zod.object({
   username: zod.coerce.string().optional().describe("Filter by username"),
   limit: zod.coerce.number().optional().describe("Limit results"),
   offset: zod.coerce.number().optional().describe("Offset for pagination"),
-  platform: zod.coerce.string().optional().describe("Filter by platform (chesscom, lichess)"),
 });
 
 export const ListGamesResponse = zod.object({
@@ -62,8 +59,8 @@ export const ListGamesResponse = zod.object({
       url: zod.string().nullish(),
       analyzed: zod.boolean(),
       analysisNotes: zod.string().nullish(),
-      platform: zod.string().optional(),
       reviewed: zod.boolean(),
+      platform: zod.string().nullish(),
       createdAt: zod.string(),
     }),
   ),
@@ -94,6 +91,7 @@ export const GetGameResponse = zod.object({
   analyzed: zod.boolean(),
   analysisNotes: zod.string().nullish(),
   reviewed: zod.boolean(),
+  platform: zod.string().nullish(),
   createdAt: zod.string(),
 });
 
@@ -107,16 +105,15 @@ export const GetGameReplayParams = zod.object({
 export const GetGameReplayResponse = zod.object({
   id: zod.number(),
   pgn: zod.string(),
-  startFen: zod.string().nullish(),
   moves: zod.array(
     zod.object({
       moveNumber: zod.number(),
       san: zod.string(),
       color: zod.string(),
+      fen: zod.string().nullish(),
+      fenBefore: zod.string().nullish(),
       from: zod.string().nullish(),
       to: zod.string().nullish(),
-      fenBefore: zod.string().nullish(),
-      fen: zod.string().nullish(),
       comment: zod.string().nullish(),
       clockSeconds: zod.number().nullish(),
       classification: zod.string().nullish(),
@@ -130,6 +127,7 @@ export const GetGameReplayResponse = zod.object({
   opening: zod.string().nullish(),
   eco: zod.string().nullish(),
   analysisNotes: zod.string().nullish(),
+  startFen: zod.string().nullish(),
 });
 
 /**
@@ -172,6 +170,7 @@ export const GetWeaknessesResponse = zod.object({
       description: zod.string(),
       frequency: zod.number(),
       examples: zod.array(zod.string()),
+      previewFen: zod.string().nullish(),
       createdAt: zod.string(),
     }),
   ),
@@ -210,6 +209,18 @@ export const GetAnalysisSummaryResponse = zod.object({
       losses: zod.number(),
     }),
   ),
+  monthlyTrend: zod
+    .array(
+      zod.object({
+        month: zod.string(),
+        wins: zod.number(),
+        losses: zod.number(),
+        draws: zod.number(),
+        games: zod.number(),
+        winRate: zod.number(),
+      }),
+    )
+    .optional(),
 });
 
 /**

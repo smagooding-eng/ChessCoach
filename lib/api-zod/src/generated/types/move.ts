@@ -13,6 +13,12 @@ export interface Move {
   /** @nullable */
   fen?: string | null;
   /** @nullable */
+  fenBefore?: string | null;
+  /** @nullable */
+  from?: string | null;
+  /** @nullable */
+  to?: string | null;
+  /** @nullable */
   comment?: string | null;
   /** @nullable */
   clockSeconds?: number | null;

@@ -14,5 +14,7 @@ export interface WeaknessRecord {
   description: string;
   frequency: number;
   examples: string[];
+  /** @nullable */
+  previewFen?: string | null;
   createdAt: string;
 }

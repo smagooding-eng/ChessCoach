@@ -32,6 +32,7 @@ export * from "./listGamesResponse";
 export * from "./logoutSuccess";
 export * from "./mobileTokenExchangeRequest";
 export * from "./mobileTokenExchangeSuccess";
+export * from "./monthlyTrendPoint";
 export * from "./move";
 export * from "./openingStat";
 export * from "./performanceSummary";

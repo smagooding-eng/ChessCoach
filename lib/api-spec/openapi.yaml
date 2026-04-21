@@ -460,6 +460,8 @@ components:
           type: ["string", "null"]
         reviewed:
           type: boolean
+        platform:
+          type: ["string", "null"]
         createdAt:
           type: string
       required:
@@ -504,6 +506,8 @@ components:
           type: ["string", "null"]
         analysisNotes:
           type: ["string", "null"]
+        startFen:
+          type: ["string", "null"]
       required:
         - id
         - pgn
@@ -524,6 +528,12 @@ components:
         color:
           type: string
         fen:
+          type: ["string", "null"]
+        fenBefore:
+          type: ["string", "null"]
+        from:
+          type: ["string", "null"]
+        to:
           type: ["string", "null"]
         comment:
           type: ["string", "null"]
@@ -632,6 +642,8 @@ components:
           type: array
           items:
             type: string
+        previewFen:
+          type: ["string", "null"]
         createdAt:
           type: string
       required:
@@ -669,6 +681,10 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/TimeControlStat"
+        monthlyTrend:
+          type: array
+          items:
+            $ref: "#/components/schemas/MonthlyTrendPoint"
       required:
         - username
         - totalGames
@@ -679,6 +695,29 @@ components:
         - avgRating
         - openingStats
         - resultsByTimeControl
+
+    MonthlyTrendPoint:
+      type: object
+      properties:
+        month:
+          type: string
+        wins:
+          type: integer
+        losses:
+          type: integer
+        draws:
+          type: integer
+        games:
+          type: integer
+        winRate:
+          type: number
+      required:
+        - month
+        - wins
+        - losses
+        - draws
+        - games
+        - winRate
 
     OpeningStat:
       type: object

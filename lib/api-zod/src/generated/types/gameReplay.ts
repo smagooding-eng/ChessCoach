@@ -22,4 +22,6 @@ export interface GameReplay {
   eco?: string | null;
   /** @nullable */
   analysisNotes?: string | null;
+  /** @nullable */
+  startFen?: string | null;
 }

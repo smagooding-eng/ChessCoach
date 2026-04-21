@@ -19,6 +19,7 @@ type Weakness = {
   description: string;
   frequency: number;
   examples: string[];
+  previewFen?: string | null;
   createdAt: string;
 };
 
@@ -236,8 +237,8 @@ export function WeaknessDetail() {
               </div>
             </div>
 
-            {/* Right — impact ring */}
-            <div className="flex flex-col items-center gap-2 shrink-0 mx-auto md:mx-0">
+            {/* Right — impact ring + sample position */}
+            <div className="flex flex-col items-center gap-3 shrink-0 mx-auto md:mx-0">
               <div className="relative">
                 <ImpactRing pct={pct} color={sev.ring} />
                 <div className="absolute inset-0 flex flex-col items-center justify-center">
@@ -245,6 +246,27 @@ export function WeaknessDetail() {
                   <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mt-0.5">Impact</span>
                 </div>
               </div>
+              {(weakness.previewFen || relatedGames[0]?.midGameFen) && (
+                <div className="flex flex-col items-center gap-1.5">
+                  <div
+                    className="w-[180px] h-[180px] rounded-xl overflow-hidden pointer-events-none"
+                    style={{ border: `2px solid ${sev.ring}66`, boxShadow: `0 6px 24px -8px ${sev.ring}55` }}
+                  >
+                    <Chessboard
+                      options={{
+                        position: weakness.previewFen ?? relatedGames[0]?.midGameFen ?? 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
+                        allowDragging: false,
+                        boardStyle: { borderRadius: 0 },
+                        darkSquareStyle: { backgroundColor: '#b58863' },
+                        lightSquareStyle: { backgroundColor: '#f0d9b5' },
+                        showNotation: false,
+                        animationDurationInMs: 0,
+                      }}
+                    />
+                  </div>
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Sample position</span>
+                </div>
+              )}
             </div>
           </div>
         </div>

@@ -274,13 +274,59 @@ router.get("/analysis/weaknesses", async (req, res): Promise<void> => {
 
   const lastUpdated = weaknesses.length > 0 ? weaknesses[0].createdAt.toISOString() : null;
 
+  // Build preview FENs by looking up each weakness's first related game's PGN
+  const allGameIds = Array.from(new Set(
+    weaknesses.flatMap((w) => (w.relatedGameIds ?? []).slice(0, 1))
+  ));
+  const pgnById = new Map<number, string | null>();
+  if (allGameIds.length > 0) {
+    const rows = await db
+      .select({ id: gamesTable.id, pgn: gamesTable.pgn })
+      .from(gamesTable)
+      .where(inArray(gamesTable.id, allGameIds));
+    for (const r of rows) pgnById.set(r.id, r.pgn);
+  }
+  function fenFromPgn(pgn: string | null): string | null {
+    if (!pgn) return null;
+    try {
+      const Chess = require("chess.js").Chess;
+      const c = new Chess();
+      c.loadPgn(pgn);
+      const history = c.history({ verbose: true });
+      const mid = Math.min(Math.floor(history.length * 0.55), history.length);
+      if (mid === 0) return null;
+      const player = new Chess();
+      for (let i = 0; i < mid; i++) player.move(history[i].san);
+      return player.fen();
+    } catch {
+      return null;
+    }
+  }
+
+  // Memoize PGN -> FEN parsing per gameId so weaknesses sharing the same first
+  // related game don't repeat the parse.
+  const fenByGameId = new Map<number, string | null>();
+
   res.json(
     GetWeaknessesResponse.parse({
       username,
-      weaknesses: weaknesses.map((w) => ({
-        ...w,
-        createdAt: w.createdAt.toISOString(),
-      })),
+      weaknesses: weaknesses.map((w) => {
+        const firstId = (w.relatedGameIds ?? [])[0];
+        let previewFen: string | null = null;
+        if (firstId != null) {
+          if (fenByGameId.has(firstId)) {
+            previewFen = fenByGameId.get(firstId) ?? null;
+          } else {
+            previewFen = fenFromPgn(pgnById.get(firstId) ?? null);
+            fenByGameId.set(firstId, previewFen);
+          }
+        }
+        return {
+          ...w,
+          previewFen,
+          createdAt: w.createdAt.toISOString(),
+        };
+      }),
       lastUpdated,
     })
   );
@@ -346,6 +392,34 @@ router.get("/analysis/summary", async (req, res): Promise<void> => {
     .map(([timeControl, stat]) => ({ timeControl, ...stat }))
     .sort((a, b) => b.games - a.games);
 
+  // Build last-6-month trend (chronological), bucketed by UTC year-month for TZ stability
+  const monthlyMap = new Map<string, { wins: number; losses: number; draws: number; games: number }>();
+  const now = new Date();
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1));
+    const key = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+    monthlyMap.set(key, { wins: 0, losses: 0, draws: 0, games: 0 });
+  }
+  for (const g of games) {
+    if (!g.playedAt) continue;
+    const d = new Date(g.playedAt);
+    const key = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+    const bucket = monthlyMap.get(key);
+    if (!bucket) continue;
+    bucket.games++;
+    if (g.result === "win") bucket.wins++;
+    else if (g.result === "loss") bucket.losses++;
+    else bucket.draws++;
+  }
+  const monthlyTrend = Array.from(monthlyMap.entries()).map(([month, b]) => ({
+    month,
+    wins: b.wins,
+    losses: b.losses,
+    draws: b.draws,
+    games: b.games,
+    winRate: b.games > 0 ? Math.round((b.wins / b.games) * 100) / 100 : 0,
+  }));
+
   res.json(
     GetAnalysisSummaryResponse.parse({
       username,
@@ -357,6 +431,7 @@ router.get("/analysis/summary", async (req, res): Promise<void> => {
       avgRating: totalGames > 0 ? Math.round(totalRating / totalGames) : 0,
       openingStats,
       resultsByTimeControl,
+      monthlyTrend,
     })
   );
 });
