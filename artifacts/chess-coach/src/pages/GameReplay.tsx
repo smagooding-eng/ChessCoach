@@ -855,26 +855,26 @@ export function GameReplay() {
   const isBad = currentReview && ['inaccuracy', 'mistake', 'blunder', 'missed_win'].includes(currentReview.classification);
 
   return (
-    <div className="space-y-2 md:space-y-3 px-3 pt-3 md:px-0 md:pt-0 pb-2 md:pb-0 h-[calc(100dvh-8rem)] md:h-[calc(100vh-3.5rem)] xl:h-[calc(100vh-3rem)] flex flex-col overflow-hidden">
-      <Link href="/games" className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors text-sm shrink-0">
+    <div className="gap-2 md:gap-3 px-3 pt-3 md:px-0 md:pt-0 pb-2 md:pb-0 h-[calc(100dvh-8rem)] md:h-[calc(100vh-3.5rem)] xl:h-[calc(100vh-3rem)] flex flex-col overflow-hidden">
+      <Link href="/games" className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors text-sm shrink-0 order-3 xl:order-none">
         <ArrowLeft className="w-4 h-4" /> Back to Games
       </Link>
 
       {game.opening && (
-        <div className="flex glass-card rounded-xl px-4 py-2 md:px-5 md:py-2.5 items-center gap-2 md:gap-3 border border-primary/20 bg-primary/5 shrink-0">
+        <div className="flex glass-card rounded-xl px-4 py-2 md:px-5 md:py-2.5 items-center gap-2 md:gap-3 border border-primary/20 bg-primary/5 shrink-0 order-2 xl:order-none">
           <BookOpen className="w-4 h-4 text-primary shrink-0" />
           <span className="text-xs font-bold text-primary/70">{game.eco}</span>
           <span className="font-bold text-xs md:text-sm truncate">{game.opening}</span>
         </div>
       )}
 
-      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px] gap-4 xl:gap-6 flex-1 min-h-0 overflow-y-auto xl:overflow-hidden hide-scrollbar">
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px] gap-4 xl:gap-6 flex-1 min-h-0 overflow-y-auto xl:overflow-hidden hide-scrollbar order-1 xl:order-none">
 
         {/* ── Left col: board + controls ── */}
-        <div className="space-y-2 md:space-y-4 xl:min-h-0 xl:overflow-y-auto xl:pr-2 hide-scrollbar">
+        <div className="flex flex-col gap-2 md:gap-4 xl:min-h-0 xl:overflow-y-auto xl:pr-2 hide-scrollbar">
 
-          {/* Players banner — compact on mobile */}
-          <div className="glass-card rounded-xl overflow-hidden">
+          {/* Players banner — compact on mobile, pushed below board on mobile */}
+          <div className="glass-card rounded-xl overflow-hidden order-4 xl:order-none">
             <div className="flex items-stretch">
               <div className="flex-1 flex items-center gap-2 px-3 py-2 md:py-3">
                 {whitePlayer?.avatar
@@ -908,7 +908,7 @@ export function GameReplay() {
           </div>
 
           {/* Chess board — capped on mobile so the AI coach card fits below without scrolling */}
-          <div className="mx-auto w-full max-w-[min(100%,46dvh)] md:max-w-[min(100%,55dvh)] xl:max-w-none">
+          <div className="mx-auto w-full max-w-[min(100%,52dvh)] md:max-w-[min(100%,55dvh)] xl:max-w-none order-1 xl:order-none">
             {isBad && currentReview && currentMove > 0 && !practiceMode ? (
               (() => {
                 const prevFen = currentMove <= 1 ? gameStartFen : (moves[currentMove - 2]?.fen ?? gameStartFen);
@@ -940,7 +940,7 @@ export function GameReplay() {
           </div>
 
           {/* Playback controls */}
-          <div className="glass-card rounded-xl px-1.5 py-1.5 md:p-3 flex items-center justify-between">
+          <div className="glass-card rounded-xl px-1.5 py-1.5 md:p-3 flex items-center justify-between order-2 xl:order-none">
             <div className="flex items-center">
               <button onClick={() => { setCurrentMove(0); setIsPlaying(false); }} disabled={currentMove === 0}
                 className="p-2.5 md:p-2.5 rounded-xl bg-secondary hover:bg-primary/20 hover:text-primary transition-colors disabled:opacity-40 active:scale-90">
@@ -1028,7 +1028,7 @@ export function GameReplay() {
               </span>
             );
             return (
-              <AICoachCard tone={tone} name="Coach" badge="Coach" title={titleNode}>
+              <AICoachCard tone={tone} name="Coach" badge="Coach" title={titleNode} className="order-3 xl:order-none">
                 {currentReview ? (
                   <>
                     <div className="flex items-start justify-between gap-2">
