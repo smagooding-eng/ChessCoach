@@ -15,6 +15,7 @@ import { useChessPlayer } from '@/hooks/use-chess-player';
 import { apiFetch } from '@/lib/api';
 import { WaitTipCarousel } from '@/components/WaitTipCarousel';
 import { AICoachCard, type AICoachTone } from '@/components/AICoachCard';
+import { MistakeFixView } from '@/components/MistakeFixView';
 import { AnimatePresence, motion } from 'framer-motion';
 
 type Classification = 'checkmate' | 'brilliant' | 'great' | 'best' | 'excellent' | 'good' | 'book' | 'inaccuracy' | 'mistake' | 'blunder' | 'missed_win';
@@ -905,16 +906,35 @@ export function GameReplay() {
             </div>
           </div>
 
-          {/* Chess board */}
-          <ChessBoard
-            fen={currentFen}
-            flipped={flipped}
-            practiceMode={practiceMode}
-            expectedMoveSan={practiceMode ? bestMoveSan : null}
-            onMovePlayed={handleMovePlayed}
-            lastMove={lastMove}
-            moveQuality={currentReview?.classification ?? null}
-          />
+          {/* Chess board — split mistake/fix view for bad moves, single board otherwise */}
+          {isBad && currentReview && currentMove > 0 && !practiceMode ? (
+            (() => {
+              const prevFen = currentMove <= 1 ? gameStartFen : (moves[currentMove - 2]?.fen ?? gameStartFen);
+              const playedSan = moves[currentMove - 1]?.san ?? null;
+              const playedMove = playedSan && lastMove
+                ? { san: playedSan, from: lastMove.from, to: lastMove.to }
+                : null;
+              return (
+                <MistakeFixView
+                  prevFen={prevFen}
+                  playedMove={playedMove}
+                  betterMoveText={currentReview.betterMove}
+                  classification={currentReview.classification}
+                  flipped={flipped}
+                />
+              );
+            })()
+          ) : (
+            <ChessBoard
+              fen={currentFen}
+              flipped={flipped}
+              practiceMode={practiceMode}
+              expectedMoveSan={practiceMode ? bestMoveSan : null}
+              onMovePlayed={handleMovePlayed}
+              lastMove={lastMove}
+              moveQuality={currentReview?.classification ?? null}
+            />
+          )}
 
           {/* Playback controls */}
           <div className="glass-card rounded-xl px-1.5 py-1.5 md:p-3 flex items-center justify-between">

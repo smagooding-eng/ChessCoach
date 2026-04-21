@@ -5,7 +5,7 @@ import { useMyAnalysisSummary, useMyWeaknesses } from '@/hooks/use-analysis';
 import { useUser } from '@/hooks/use-user';
 import { useQueryClient } from '@tanstack/react-query';
 import { Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { BrainCircuit, AlertTriangle, Activity, ChevronRight, Loader2, TrendingUp, CheckCircle2, ArrowUpRight } from 'lucide-react';
+import { BrainCircuit, AlertTriangle, Activity, ChevronRight, Loader2, TrendingUp, CheckCircle2, ArrowUpRight, BookOpen, Trophy, Target, Brain, Clock, Shield, Zap, Eye } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { getTierForRating, ELO_TIERS } from '@/lib/elo-tips';
 import { apiFetch } from '@/lib/api';
@@ -410,50 +410,83 @@ export function Analysis() {
           </h2>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {weaknessesData?.weaknesses?.map((weakness, i) => (
-              <motion.div
-                key={weakness.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.1 }}
-                onClick={() => navigate(`/analysis/${weakness.id}`)}
-                className="rounded-xl p-5 cursor-pointer group transition-all"
-                style={{
-                  background: BG_CARD,
-                  borderLeft: `3px solid ${weakness.severity === 'Critical' ? '#dc4343' : weakness.severity === 'High' ? '#ea9733' : '#6da5d8'}`,
-                }}
-                onMouseEnter={e => (e.currentTarget.style.background = BG_CARD_HOVER)}
-                onMouseLeave={e => (e.currentTarget.style.background = BG_CARD)}
-              >
-                <div className="flex justify-between items-start mb-3">
-                  <h3 className="text-base font-bold transition-colors" style={{ color: TEXT_LIGHT }}>{weakness.category}</h3>
-                  <div className="flex items-center gap-2">
-                    <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase"
-                      style={{
-                        background: weakness.severity === 'Critical' ? 'rgba(220,67,67,0.15)' : weakness.severity === 'High' ? 'rgba(234,151,51,0.15)' : 'rgba(109,165,216,0.15)',
-                        color: weakness.severity === 'Critical' ? '#dc4343' : weakness.severity === 'High' ? '#ea9733' : '#6da5d8',
-                      }}>
-                      {weakness.severity}
-                    </span>
-                    <ChevronRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-60 transition-opacity" style={{ color: TEXT_MUTED }} />
+            {weaknessesData?.weaknesses?.map((weakness, i) => {
+              const sevColor = weakness.severity === 'Critical' ? '#dc4343'
+                : weakness.severity === 'High' ? '#ea9733'
+                : weakness.severity === 'Medium' ? '#6da5d8'
+                : '#94a3b8';
+              const sevBg = weakness.severity === 'Critical' ? 'rgba(220,67,67,0.15)'
+                : weakness.severity === 'High' ? 'rgba(234,151,51,0.15)'
+                : weakness.severity === 'Medium' ? 'rgba(109,165,216,0.15)'
+                : 'rgba(148,163,184,0.15)';
+              const SevIcon = weakness.severity === 'Critical' ? Zap
+                : weakness.severity === 'High' ? AlertTriangle
+                : weakness.severity === 'Medium' ? Shield
+                : Eye;
+              const CategoryIcon = weakness.category.includes('Endgame') ? Trophy
+                : weakness.category.includes('Opening') ? BookOpen
+                : weakness.category.includes('Tactic') ? Target
+                : weakness.category.includes('Time') ? Clock
+                : weakness.category.includes('Defense') ? Shield
+                : Brain;
+              const pct = Math.round(weakness.frequency * 100);
+              return (
+                <motion.div
+                  key={weakness.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.08 }}
+                  onClick={() => navigate(`/analysis/${weakness.id}`)}
+                  className="rounded-xl p-5 cursor-pointer group transition-all relative overflow-hidden"
+                  style={{
+                    background: BG_CARD,
+                    borderLeft: `3px solid ${sevColor}`,
+                  }}
+                  onMouseEnter={e => (e.currentTarget.style.background = BG_CARD_HOVER)}
+                  onMouseLeave={e => (e.currentTarget.style.background = BG_CARD)}
+                >
+                  {/* Decorative severity glow */}
+                  <div className="absolute -top-8 -right-8 w-24 h-24 rounded-full opacity-[0.07] pointer-events-none" style={{ background: sevColor }} />
+
+                  <div className="flex justify-between items-start mb-3 relative">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="p-2 rounded-xl shrink-0" style={{ background: sevBg, border: `1px solid ${sevColor}40` }}>
+                        <CategoryIcon className="w-4 h-4" style={{ color: sevColor }} />
+                      </div>
+                      <h3 className="text-base font-bold transition-colors truncate" style={{ color: TEXT_LIGHT }}>{weakness.category}</h3>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase"
+                        style={{ background: sevBg, color: sevColor }}>
+                        <SevIcon className="w-3 h-3" />
+                        {weakness.severity}
+                      </span>
+                      <ChevronRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-60 transition-opacity" style={{ color: TEXT_MUTED }} />
+                    </div>
                   </div>
-                </div>
 
-                <p className="text-sm mb-4 line-clamp-2" style={{ color: TEXT_MUTED }}>{weakness.description}</p>
+                  <p className="text-sm mb-4 line-clamp-2" style={{ color: TEXT_MUTED }}>{weakness.description}</p>
 
-                <div className="flex items-center gap-3 text-sm">
-                  <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: BG_DARK }}>
-                    <div className="h-full rounded-full" style={{ width: `${weakness.frequency * 100}%`, background: CHESSCOM_GREEN }} />
+                  <div className="flex items-center gap-3 text-sm">
+                    <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: BG_DARK }}>
+                      <motion.div
+                        className="h-full rounded-full"
+                        style={{ background: sevColor }}
+                        initial={{ width: 0 }}
+                        animate={{ width: `${pct}%` }}
+                        transition={{ duration: 0.8, delay: 0.2 + i * 0.05, ease: 'easeOut' }}
+                      />
+                    </div>
+                    <span className="text-xs font-bold tabular-nums" style={{ color: sevColor }}>{pct}%</span>
                   </div>
-                  <span className="text-xs font-bold" style={{ color: CHESSCOM_GREEN }}>{Math.round(weakness.frequency * 100)}%</span>
-                </div>
 
-                <div className="mt-3 pt-3 flex items-center gap-1 text-xs opacity-0 group-hover:opacity-100 transition-opacity" style={{ borderTop: '1px solid rgba(255,255,255,0.05)', color: CHESSCOM_GREEN }}>
-                  <span>View examples & courses</span>
-                  <ChevronRight className="w-3 h-3" />
-                </div>
-              </motion.div>
-            ))}
+                  <div className="mt-3 pt-3 flex items-center justify-between text-xs opacity-0 group-hover:opacity-100 transition-opacity" style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                    <span style={{ color: CHESSCOM_GREEN }}>View examples & courses</span>
+                    <ChevronRight className="w-3 h-3" style={{ color: CHESSCOM_GREEN }} />
+                  </div>
+                </motion.div>
+              );
+            })}
 
             {!weaknessesData?.weaknesses?.length && (
               <div className="col-span-full text-center py-10 rounded-xl text-sm" style={{ border: '1px dashed rgba(255,255,255,0.1)', color: TEXT_MUTED }}>
