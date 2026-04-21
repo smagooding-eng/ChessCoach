@@ -557,6 +557,60 @@ Return VALID JSON only:
   }
 });
 
+// Coach alignment report — what fraction of recent reviewed-game move
+// explanations passed reconciliation (engine-aligned) vs were replaced
+// by the deterministic fallback. Useful for monitoring drift.
+router.get("/admin/coach-alignment", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const limit = Math.min(200, Math.max(1, parseInt(String(req.query.limit ?? "50"))));
+    const rows = await db.select({ id: gamesTable.id, reviewData: gamesTable.reviewData })
+      .from(gamesTable)
+      .where(isNotNull(gamesTable.reviewData))
+      .orderBy(sql`${gamesTable.id} DESC`)
+      .limit(limit);
+
+    let totalMoves = 0;
+    let aligned = 0;
+    let fallback = 0;
+    let unmarked = 0;
+    const perGame: Array<{ gameId: number; moves: number; aligned: number; fallback: number; pct: number | null }> = [];
+
+    for (const row of rows) {
+      const data = row.reviewData as { moves?: Array<{ coachStatus?: string }> } | null;
+      const moves = Array.isArray(data?.moves) ? data!.moves : [];
+      let a = 0, f = 0, u = 0;
+      for (const m of moves) {
+        if (m.coachStatus === "engine-aligned") a++;
+        else if (m.coachStatus === "fallback") f++;
+        else u++;
+      }
+      totalMoves += moves.length;
+      aligned += a;
+      fallback += f;
+      unmarked += u;
+      perGame.push({
+        gameId: row.id,
+        moves: moves.length,
+        aligned: a,
+        fallback: f,
+        pct: a + f > 0 ? Math.round(100 * a / (a + f)) : null,
+      });
+    }
+
+    res.json({
+      gamesScanned: rows.length,
+      totalMoves,
+      aligned,
+      fallback,
+      unmarked,
+      alignmentPct: aligned + fallback > 0 ? Math.round(100 * aligned / (aligned + fallback)) : null,
+      perGame,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to compute alignment report", details: err?.message });
+  }
+});
+
 router.get("/public/stats", async (_req: Request, res: Response) => {
   try {
     const [usersResult] = await db.select({ count: count() }).from(usersTable);

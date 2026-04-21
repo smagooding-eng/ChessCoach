@@ -3,6 +3,15 @@ import { logger } from "./logger";
 import { evaluateAllPositions, classifyFromWinPctLoss, isSacrificialMove, uciToSan, winPct, type PositionEval } from "./engineAnalysis";
 import { extractStartFen, normalizeFen } from "./chesscom";
 import { isBookPosition, getBookFensForEco } from "./openingBook";
+import {
+  computeEngineFacts,
+  renderFactSheet,
+  buildFallbackExplanation,
+  buildFallbackProsCons,
+  reconcileExplanation,
+  type CoachStatus,
+  type EngineFacts,
+} from "./engineFacts";
 
 const openai = new OpenAI({
   baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
@@ -426,6 +435,7 @@ export interface SingleMoveAnalysis {
   cpLoss: number | null;
   engineDepth: number | null;
   engineAvailable: boolean;
+  coachStatus?: CoachStatus;
 }
 
 interface AnalyzeSingleMoveInput {
@@ -503,14 +513,22 @@ export async function analyzeSingleMove(input: AnalyzeSingleMoveInput): Promise<
 
   const isBad = ["inaccuracy", "mistake", "blunder", "missed_win"].includes(classification);
 
-  const cpInfo =
-    `Stockfish 17 (depth ${evalBefore.depth}) reports win% loss = ${cpLoss.toFixed(1)}%. ` +
-    `Eval before: ${cpBefore}cp, after: ${cpAfter}cp (white's perspective).`;
+  // Build engine fact sheet up-front so the LLM can't drift.
+  const facts: EngineFacts = computeEngineFacts({
+    fenBefore,
+    fenAfter,
+    evalBefore,
+    evalAfter,
+    sanPlayed: target.san,
+    classification,
+    playerColor,
+    inBook: isInBook,
+    legalMoveCount,
+  });
+  const factSheet = renderFactSheet(facts);
 
-  const betterMoveHint = evalBefore.bestMoveSan && !isTopEngineMove
-    ? `The engine's recommended move was ${evalBefore.bestMoveSan}.` : "";
-
-  const prompt = `You are an expert chess coach providing in-depth move analysis.
+  const prompt = `You are an expert chess coach. Use ONLY the engine facts below.
+Do not invent pieces, captures, or motifs not in the fact sheet. Match the eval direction.
 
 Game: ${whiteUsername} (White) vs ${blackUsername} (Black)
 Opening: ${opening ?? "Unknown"} | Result: ${result}
@@ -520,17 +538,20 @@ ${contextMoves}
 
 Player "${player}" (${playerColor}) played ${target.moveNumber}${playerColor === "white" ? "." : "..."} ${target.san}.
 
-ENGINE VERDICT: "${classification}"
-${cpInfo}
-${betterMoveHint}
+ENGINE FACT SHEET (authoritative):
+${factSheet}
 
-Provide 2-3 concrete PROS and 2-3 concrete CONS for this specific move.
-${isBad && evalBefore.bestMoveSan ? `Also explain briefly why ${evalBefore.bestMoveSan} would have been better.` : ""}
+Rules:
+- Pros must be true given the facts above (e.g. only mention a captured piece if captured≠none).
+- Cons must reflect the eval direction. If verdict is mistake/blunder/missed_win you MUST mention what was lost or missed.
+- Reference only pieces in piecesOnBoard. Do NOT name pieces that aren't there.
+- If hangs=none, do NOT say a piece "hangs" or "is lost".
+- Each item ≤ 14 words.
 
 Respond with valid JSON:
 {
-  "pros": ["...", "...", "..."],
-  "cons": ["...", "...", "..."]${isBad && evalBefore.bestMoveSan ? ',\n  "betterMoveExplanation": "..."' : ""}
+  "pros": ["...", "..."],
+  "cons": ["...", "..."]${isBad && evalBefore.bestMoveSan ? ',\n  "betterMoveExplanation": "1 sentence on why ' + evalBefore.bestMoveSan + ' is stronger"' : ""}
 }`;
 
   try {
@@ -550,28 +571,52 @@ Respond with valid JSON:
     let betterMove: string | null = null;
     if (isBad && evalBefore.bestMoveSan) {
       betterMove = evalBefore.bestMoveSan;
-      if (parsed.betterMoveExplanation) betterMove += ` — ${parsed.betterMoveExplanation}`;
+      if (parsed.betterMoveExplanation && reconcileExplanation(parsed.betterMoveExplanation, facts).ok) {
+        betterMove += ` — ${parsed.betterMoveExplanation}`;
+      }
+    }
+
+    let pros = Array.isArray(parsed.pros) ? parsed.pros.filter(p => typeof p === "string") : [];
+    let cons = Array.isArray(parsed.cons) ? parsed.cons.filter(c => typeof c === "string") : [];
+
+    let coachStatus: CoachStatus = "engine-aligned";
+    const cleanPros = pros.filter(p => reconcileExplanation(p, facts).ok);
+    const cleanCons = cons.filter(c => reconcileExplanation(c, facts).ok);
+    if (cleanPros.length !== pros.length || cleanCons.length !== cons.length) {
+      coachStatus = "fallback";
+    }
+    if (cleanPros.length === 0 && cleanCons.length === 0) {
+      const fb = buildFallbackProsCons(facts);
+      pros = fb.pros;
+      cons = fb.cons;
+      coachStatus = "fallback";
+    } else {
+      pros = cleanPros;
+      cons = cleanCons;
     }
 
     return {
       classification,
-      pros: Array.isArray(parsed.pros) ? parsed.pros : [],
-      cons: Array.isArray(parsed.cons) ? parsed.cons : [],
+      pros,
+      cons,
       betterMove,
       cpLoss,
       engineDepth: evalBefore.depth,
       engineAvailable: true,
+      coachStatus,
     };
   } catch (err) {
     logger.error({ err }, "GPT pros/cons failed");
+    const fb = buildFallbackProsCons(facts);
     return {
       classification,
-      pros: [],
-      cons: [],
+      pros: fb.pros,
+      cons: fb.cons,
       betterMove: evalBefore.bestMoveSan,
       cpLoss,
       engineDepth: evalBefore.depth,
       engineAvailable: true,
+      coachStatus: "fallback",
     };
   }
 }
@@ -712,10 +757,55 @@ function mergeReviewWithEngine(
       betterMove = evalBefore.bestMoveSan;
     }
 
+    // ── Engine fact extraction + reconciliation guard ─────────────────────
+    const facts = computeEngineFacts({
+      fenBefore,
+      fenAfter: fenAfterMove ?? fenBefore,
+      evalBefore,
+      evalAfter,
+      sanPlayed: om.san,
+      classification,
+      playerColor,
+      inBook: stillInBook,
+      legalMoveCount: legalMoves.length,
+    });
+
+    let coachStatus: CoachStatus = "engine-aligned";
+
+    // Validate explanation; if invalid, fall back to deterministic template
+    if (explanation && explanation.trim()) {
+      const check = reconcileExplanation(explanation, facts);
+      if (!check.ok) {
+        logger.debug({ moveIndex: idx, san: om.san, classification, reasons: check.reasons }, "coach explanation reconciliation failed");
+        explanation = buildFallbackExplanation(facts, om.san);
+        coachStatus = "fallback";
+      }
+    } else {
+      explanation = buildFallbackExplanation(facts, om.san);
+      coachStatus = "fallback";
+    }
+
+    // Validate pros/cons: any item that fails reconciliation is dropped;
+    // if everything is dropped we use the fact-based fallback set.
+    const cleanPros = pros.filter(p => reconcileExplanation(p, facts).ok);
+    const cleanCons = cons.filter(c => reconcileExplanation(c, facts).ok);
+    if (cleanPros.length !== pros.length || cleanCons.length !== cons.length) {
+      coachStatus = "fallback";
+    }
+    if (cleanPros.length === 0 && cleanCons.length === 0) {
+      const fb = buildFallbackProsCons(facts);
+      pros = fb.pros;
+      cons = fb.cons;
+    } else {
+      pros = cleanPros;
+      cons = cleanCons;
+    }
+
     results.push({
       moveIndex: idx, san: om.san, color: om.color as "white" | "black",
       classification, explanation, betterMove, pros, cons,
       cpLoss: moveCpLoss, engineAvailable: true,
+      coachStatus,
     });
   }
   return results;
@@ -734,6 +824,10 @@ export interface MoveReview {
   cons: string[];
   cpLoss?: number;
   engineAvailable?: boolean;
+  /** Whether the coach text was validated against the engine fact sheet
+   *  ("engine-aligned") or had to be replaced with a deterministic template
+   *  ("fallback"). Absent when no LLM text was applicable. */
+  coachStatus?: CoachStatus;
 }
 
 export interface GameReviewSummary {

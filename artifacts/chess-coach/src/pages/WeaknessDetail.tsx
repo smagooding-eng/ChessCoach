@@ -10,6 +10,7 @@ import {
 import { motion } from 'framer-motion';
 import { Chessboard } from 'react-chessboard';
 import { apiFetch } from '@/lib/api';
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip } from 'recharts';
 
 type Weakness = {
   id: number;
@@ -271,6 +272,66 @@ export function WeaknessDetail() {
           </div>
         </div>
       </motion.div>
+
+      {/* ── Occurrence trend ── */}
+      {relatedGames.length > 0 && (() => {
+        // Bucket related games by month using playedAt
+        const buckets = new Map<string, number>();
+        relatedGames.forEach(g => {
+          if (!g.playedAt) return;
+          const d = new Date(g.playedAt);
+          if (isNaN(d.getTime())) return;
+          const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+          buckets.set(key, (buckets.get(key) ?? 0) + 1);
+        });
+        if (buckets.size < 2) return null;
+        // Fill last 6 months
+        const now = new Date();
+        const months: { key: string; label: string; count: number }[] = [];
+        for (let i = 5; i >= 0; i--) {
+          const dt = new Date(now.getFullYear(), now.getMonth() - i, 1);
+          const key = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`;
+          months.push({
+            key,
+            label: dt.toLocaleString('en-US', { month: 'short' }),
+            count: buckets.get(key) ?? 0,
+          });
+        }
+        return (
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.05 }}
+            className="glass-card rounded-xl p-6"
+          >
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-lg font-black flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-amber-500/15 border border-amber-500/30">
+                  <TrendingDown className={`w-5 h-5 ${sev.color}`} />
+                </div>
+                Occurrences over time
+              </h2>
+              <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Last 6 months</span>
+            </div>
+            <div className="h-36 -ml-3">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={months} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                  <XAxis dataKey="label" tick={{ fill: '#9e9b98', fontSize: 11 }} axisLine={false} tickLine={false} />
+                  <YAxis allowDecimals={false} tick={{ fill: '#9e9b98', fontSize: 11 }} axisLine={false} tickLine={false} width={26} />
+                  <RechartsTooltip
+                    contentStyle={{ background: '#262421', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, color: '#e8e6e3', fontSize: 12 }}
+                    labelStyle={{ color: '#9e9b98', fontWeight: 700 }}
+                    formatter={(value: number) => [`${value} game${value === 1 ? '' : 's'}`, 'Showed up in']}
+                    cursor={{ fill: 'rgba(255,255,255,0.04)' }}
+                  />
+                  <Bar dataKey="count" fill={sev.ring} radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </motion.div>
+        );
+      })()}
 
       {/* ── Identified Patterns ── */}
       {(examplesWithLinks?.length > 0 || weakness.examples?.length > 0) && (

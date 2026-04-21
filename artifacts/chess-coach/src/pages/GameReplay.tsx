@@ -51,6 +51,7 @@ type ReviewMove = {
   cons: string[];
   cpLoss?: number;
   engineAvailable?: boolean;
+  coachStatus?: 'engine-aligned' | 'fallback';
 };
 
 type KeyMistake = {
@@ -1028,7 +1029,24 @@ export function GameReplay() {
               <AICoachCard tone={tone} name="Coach" badge="Coach" title={titleNode}>
                 {currentReview ? (
                   <>
-                    <p>{currentReview.explanation}</p>
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="flex-1">{currentReview.explanation}</p>
+                      {currentReview.coachStatus && (
+                        <span
+                          title={currentReview.coachStatus === 'engine-aligned'
+                            ? 'Coach text validated against the engine fact sheet.'
+                            : 'Engine-derived fallback (LLM text was disregarded as inconsistent with the engine).'}
+                          className={`shrink-0 inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border ${
+                            currentReview.coachStatus === 'engine-aligned'
+                              ? 'text-emerald-400 bg-emerald-400/10 border-emerald-400/30'
+                              : 'text-amber-400 bg-amber-400/10 border-amber-400/30'
+                          }`}
+                        >
+                          <span aria-hidden>{currentReview.coachStatus === 'engine-aligned' ? '✓' : '⚙'}</span>
+                          {currentReview.coachStatus === 'engine-aligned' ? 'Engine-aligned' : 'Engine fallback'}
+                        </span>
+                      )}
+                    </div>
 
                       {/* Pros & Cons */}
                       {(currentReview.pros?.length > 0 || currentReview.cons?.length > 0) && (

@@ -450,6 +450,120 @@ export function Analysis() {
             );
           })()}
 
+          {weaknessesData?.weaknesses && weaknessesData.weaknesses.length > 0 && (() => {
+            const sevCounts = {
+              Critical: weaknessesData.weaknesses.filter(w => w.severity === 'Critical').length,
+              High:     weaknessesData.weaknesses.filter(w => w.severity === 'High').length,
+              Medium:   weaknessesData.weaknesses.filter(w => w.severity === 'Medium').length,
+              Low:      weaknessesData.weaknesses.filter(w => w.severity === 'Low').length,
+            };
+            const total = weaknessesData.weaknesses.length;
+            const sevRows: Array<{ key: keyof typeof sevCounts; color: string; bg: string; icon: typeof Zap }> = [
+              { key: 'Critical', color: '#dc4343', bg: 'rgba(220,67,67,0.15)',   icon: Zap            },
+              { key: 'High',     color: '#ea9733', bg: 'rgba(234,151,51,0.15)',  icon: AlertTriangle  },
+              { key: 'Medium',   color: '#6da5d8', bg: 'rgba(109,165,216,0.15)', icon: Shield         },
+              { key: 'Low',      color: '#94a3b8', bg: 'rgba(148,163,184,0.15)', icon: Eye            },
+            ];
+            const catMap = new Map<string, number>();
+            weaknessesData.weaknesses.forEach(w => catMap.set(w.category, (catMap.get(w.category) ?? 0) + 1));
+            const topCats = Array.from(catMap.entries()).sort((a, b) => b[1] - a[1]).slice(0, 5);
+            const topCount = topCats[0]?.[1] ?? 1;
+            return (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-2">
+                <div className="rounded-xl p-5" style={{ background: BG_CARD, border: CARD_BORDER, boxShadow: CARD_SHADOW }}>
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-base font-bold flex items-center gap-2" style={{ color: TEXT_LIGHT }}>
+                      <Brain className="w-4 h-4" style={{ color: CHESSCOM_GREEN }} />
+                      Severity Breakdown
+                    </h2>
+                    <span className="text-[11px] font-bold" style={{ color: TEXT_MUTED }}>
+                      <span style={{ color: TEXT_LIGHT }}>{total}</span> issues
+                    </span>
+                  </div>
+                  {/* Stacked composite bar */}
+                  <div className="flex w-full h-3 rounded-full overflow-hidden mb-3" style={{ background: BG_DARK }}>
+                    {sevRows.map(r => sevCounts[r.key] > 0 && (
+                      <div
+                        key={r.key}
+                        title={`${r.key}: ${sevCounts[r.key]}`}
+                        style={{ width: `${(sevCounts[r.key] / total) * 100}%`, background: r.color }}
+                      />
+                    ))}
+                  </div>
+                  <div className="space-y-2">
+                    {sevRows.map(r => {
+                      const c = sevCounts[r.key];
+                      const Icon = r.icon;
+                      const pct = total > 0 ? Math.round((c / total) * 100) : 0;
+                      return (
+                        <div key={r.key} className="flex items-center gap-3">
+                          <span className="inline-flex items-center gap-1.5 w-24 shrink-0 text-xs font-bold" style={{ color: r.color }}>
+                            <Icon className="w-3.5 h-3.5" />
+                            {r.key}
+                          </span>
+                          <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: BG_DARK }}>
+                            <motion.div
+                              className="h-full rounded-full"
+                              style={{ background: r.color }}
+                              initial={{ width: 0 }}
+                              animate={{ width: `${pct}%` }}
+                              transition={{ duration: 0.7, ease: 'easeOut' }}
+                            />
+                          </div>
+                          <span className="text-xs font-bold tabular-nums w-10 text-right" style={{ color: TEXT_LIGHT }}>{c}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="rounded-xl p-5" style={{ background: BG_CARD, border: CARD_BORDER, boxShadow: CARD_SHADOW }}>
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-base font-bold flex items-center gap-2" style={{ color: TEXT_LIGHT }}>
+                      <Target className="w-4 h-4" style={{ color: CHESSCOM_GREEN }} />
+                      Top Weakness Areas
+                    </h2>
+                    <span className="text-[11px] font-bold" style={{ color: TEXT_MUTED }}>By count</span>
+                  </div>
+                  <div className="space-y-2.5">
+                    {topCats.map(([cat, n], idx) => {
+                      const Icon = cat.includes('Endgame') ? Trophy
+                        : cat.includes('Opening') ? BookOpen
+                        : cat.includes('Tactic') ? Target
+                        : cat.includes('Time') ? Clock
+                        : cat.includes('Defense') ? Shield
+                        : Brain;
+                      return (
+                        <motion.div
+                          key={cat}
+                          initial={{ opacity: 0, x: 6 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: idx * 0.05 }}
+                          className="flex items-center gap-3"
+                        >
+                          <div className="flex items-center gap-2 w-[140px] shrink-0 min-w-0">
+                            <Icon className="w-3.5 h-3.5 shrink-0" style={{ color: CHESSCOM_GREEN }} />
+                            <span className="text-xs font-medium truncate" style={{ color: TEXT_LIGHT }}>{cat}</span>
+                          </div>
+                          <div className="flex-1 h-4 rounded overflow-hidden" style={{ background: BG_DARK }}>
+                            <motion.div
+                              className="h-full rounded"
+                              style={{ background: CHESSCOM_GREEN, opacity: 0.8 }}
+                              initial={{ width: 0 }}
+                              animate={{ width: `${(n / topCount) * 100}%` }}
+                              transition={{ duration: 0.7, delay: idx * 0.05, ease: 'easeOut' }}
+                            />
+                          </div>
+                          <span className="text-xs font-bold tabular-nums w-6 text-right" style={{ color: TEXT_LIGHT }}>{n}</span>
+                        </motion.div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
           <h2 className="text-xl font-black mt-8 mb-4 flex items-center gap-2" style={{ color: TEXT_LIGHT }}>
             <AlertTriangle className="w-5 h-5" style={{ color: '#ea9733' }} /> Identified Weaknesses
           </h2>
