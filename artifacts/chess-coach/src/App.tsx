@@ -195,9 +195,27 @@ function PageTracker() {
   return null;
 }
 
+// Scroll the window (and the main scroll container, if any) to the top
+// whenever the route path changes, so each page starts at the top.
+function ScrollToTop() {
+  const [location] = useLocation();
+  useEffect(() => {
+    try {
+      window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+    } catch {
+      window.scrollTo(0, 0);
+    }
+    const main = document.querySelector('main');
+    if (main && typeof main.scrollTo === 'function') {
+      main.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+    }
+  }, [location]);
+  return null;
+}
+
 function Router() {
   return (
-    <><PageTracker /><Switch>
+    <><ScrollToTop /><PageTracker /><Switch>
       <Route path="/setup" component={LandingPage} />
       <Route path="/download" component={DownloadPage} />
       <Route path="/privacy" component={PrivacyPage} />

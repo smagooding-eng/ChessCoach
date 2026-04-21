@@ -855,23 +855,23 @@ export function GameReplay() {
   const isBad = currentReview && ['inaccuracy', 'mistake', 'blunder', 'missed_win'].includes(currentReview.classification);
 
   return (
-    <div className="space-y-2 md:space-y-4 pb-20 px-3 pt-3 md:px-0 md:pt-0">
-      <Link href="/games" className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors text-sm">
+    <div className="space-y-2 md:space-y-3 pb-20 px-3 pt-3 md:px-0 md:pt-0 xl:pb-0 xl:h-[calc(100vh-3rem)] xl:flex xl:flex-col xl:overflow-hidden">
+      <Link href="/games" className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors text-sm shrink-0">
         <ArrowLeft className="w-4 h-4" /> Back to Games
       </Link>
 
       {game.opening && (
-        <div className="flex glass-card rounded-xl px-4 py-2.5 md:px-5 md:py-3 items-center gap-2 md:gap-3 border border-primary/20 bg-primary/5">
+        <div className="flex glass-card rounded-xl px-4 py-2 md:px-5 md:py-2.5 items-center gap-2 md:gap-3 border border-primary/20 bg-primary/5 shrink-0">
           <BookOpen className="w-4 h-4 text-primary shrink-0" />
           <span className="text-xs font-bold text-primary/70">{game.eco}</span>
           <span className="font-bold text-xs md:text-sm truncate">{game.opening}</span>
         </div>
       )}
 
-      <div className="grid grid-cols-1 xl:grid-cols-[1fr_340px] gap-6">
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px] gap-6 xl:flex-1 xl:min-h-0">
 
         {/* ── Left col: board + controls ── */}
-        <div className="space-y-2 md:space-y-4">
+        <div className="space-y-2 md:space-y-4 xl:min-h-0 xl:overflow-y-auto xl:pr-2 hide-scrollbar">
 
           {/* Players banner — compact on mobile */}
           <div className="glass-card rounded-xl overflow-hidden">
@@ -1420,7 +1420,7 @@ export function GameReplay() {
         </div>
 
         {/* ── Right col: move list ── */}
-        <div className="glass-card rounded-xl flex flex-col xl:max-h-[700px]">
+        <div className="glass-card rounded-xl flex flex-col xl:h-full xl:min-h-0">
           <div className="p-4 border-b border-white/5 flex items-center justify-between shrink-0">
             <h3 className="font-bold text-sm">Move List</h3>
             <div className="flex items-center gap-2">
