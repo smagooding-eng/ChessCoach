@@ -907,35 +907,37 @@ export function GameReplay() {
             </div>
           </div>
 
-          {/* Chess board — split mistake/fix view for bad moves, single board otherwise */}
-          {isBad && currentReview && currentMove > 0 && !practiceMode ? (
-            (() => {
-              const prevFen = currentMove <= 1 ? gameStartFen : (moves[currentMove - 2]?.fen ?? gameStartFen);
-              const playedSan = moves[currentMove - 1]?.san ?? null;
-              const playedMove = playedSan && lastMove
-                ? { san: playedSan, from: lastMove.from, to: lastMove.to }
-                : null;
-              return (
-                <MistakeFixView
-                  prevFen={prevFen}
-                  playedMove={playedMove}
-                  betterMoveText={currentReview.betterMove}
-                  classification={currentReview.classification}
-                  flipped={flipped}
-                />
-              );
-            })()
-          ) : (
-            <ChessBoard
-              fen={currentFen}
-              flipped={flipped}
-              practiceMode={practiceMode}
-              expectedMoveSan={practiceMode ? bestMoveSan : null}
-              onMovePlayed={handleMovePlayed}
-              lastMove={lastMove}
-              moveQuality={currentReview?.classification ?? null}
-            />
-          )}
+          {/* Chess board — capped on mobile so the AI coach card fits below without scrolling */}
+          <div className="mx-auto w-full max-w-[min(100%,46dvh)] md:max-w-[min(100%,55dvh)] xl:max-w-none">
+            {isBad && currentReview && currentMove > 0 && !practiceMode ? (
+              (() => {
+                const prevFen = currentMove <= 1 ? gameStartFen : (moves[currentMove - 2]?.fen ?? gameStartFen);
+                const playedSan = moves[currentMove - 1]?.san ?? null;
+                const playedMove = playedSan && lastMove
+                  ? { san: playedSan, from: lastMove.from, to: lastMove.to }
+                  : null;
+                return (
+                  <MistakeFixView
+                    prevFen={prevFen}
+                    playedMove={playedMove}
+                    betterMoveText={currentReview.betterMove}
+                    classification={currentReview.classification}
+                    flipped={flipped}
+                  />
+                );
+              })()
+            ) : (
+              <ChessBoard
+                fen={currentFen}
+                flipped={flipped}
+                practiceMode={practiceMode}
+                expectedMoveSan={practiceMode ? bestMoveSan : null}
+                onMovePlayed={handleMovePlayed}
+                lastMove={lastMove}
+                moveQuality={currentReview?.classification ?? null}
+              />
+            )}
+          </div>
 
           {/* Playback controls */}
           <div className="glass-card rounded-xl px-1.5 py-1.5 md:p-3 flex items-center justify-between">
@@ -1048,40 +1050,22 @@ export function GameReplay() {
                       )}
                     </div>
 
-                      {/* Pros & Cons */}
+                      {/* Pros & Cons — clean inline list, no boxed containers */}
                       {(currentReview.pros?.length > 0 || currentReview.cons?.length > 0) && (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
-                          {currentReview.pros?.length > 0 && (
-                            <div className="rounded-xl bg-emerald-500/8 border border-emerald-500/20 px-3 py-2.5">
-                              <p className="text-[11px] font-bold text-emerald-400 uppercase tracking-wide mb-1.5 flex items-center gap-1">
-                                <span>✓</span> Pros
-                              </p>
-                              <ul className="space-y-1">
-                                {currentReview.pros.map((p, i) => (
-                                  <li key={i} className="text-xs text-foreground/80 leading-snug flex items-start gap-1.5">
-                                    <span className="text-emerald-500 shrink-0 mt-0.5">•</span>
-                                    {p}
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
-                          )}
-                          {currentReview.cons?.length > 0 && (
-                            <div className="rounded-xl bg-rose-500/8 border border-rose-500/20 px-3 py-2.5">
-                              <p className="text-[11px] font-bold text-rose-400 uppercase tracking-wide mb-1.5 flex items-center gap-1">
-                                <span>✗</span> Cons
-                              </p>
-                              <ul className="space-y-1">
-                                {currentReview.cons.map((c, i) => (
-                                  <li key={i} className="text-xs text-foreground/80 leading-snug flex items-start gap-1.5">
-                                    <span className="text-rose-500 shrink-0 mt-0.5">•</span>
-                                    {c}
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
-                          )}
-                        </div>
+                        <ul className="pt-1 space-y-1">
+                          {currentReview.pros?.map((p, i) => (
+                            <li key={`pro-${i}`} className="text-xs text-foreground/85 leading-snug flex items-start gap-2">
+                              <span className="text-emerald-400 shrink-0 mt-0.5 font-bold">+</span>
+                              <span>{p}</span>
+                            </li>
+                          ))}
+                          {currentReview.cons?.map((c, i) => (
+                            <li key={`con-${i}`} className="text-xs text-foreground/85 leading-snug flex items-start gap-2">
+                              <span className="text-rose-400 shrink-0 mt-0.5 font-bold">−</span>
+                              <span>{c}</span>
+                            </li>
+                          ))}
+                        </ul>
                       )}
 
                       {/* Better move suggestion */}
