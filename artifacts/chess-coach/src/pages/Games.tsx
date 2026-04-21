@@ -10,7 +10,7 @@ import { cn } from '@/lib/utils';
 import { GameThumb } from '@/components/GameThumb';
 
 export function Games() {
-  const [pageSize, setPageSize] = useState(500);
+  const [pageSize, setPageSize] = useState(100);
   const { data, isLoading, isError, error } = useMyGames(pageSize);
   const { username } = useUser();
   const [filter, setFilter] = useState('all');
