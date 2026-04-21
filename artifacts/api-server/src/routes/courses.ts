@@ -81,17 +81,23 @@ async function sanitizeLessons(lessons: RawLesson[], log?: Logger): Promise<{ le
     // the claimed expected move matches Stockfish's top choice. If not, strip
     // the drill (text-only downgrade).
     if (next.drillFen && next.drillExpectedMove) {
+      let engineOk = false;
+      let engineReasons: string[] = ["engine verification unavailable"];
       try {
         const engineVerdict = await verifyLessonDrillEngine(next.drillFen, next.drillExpectedMove);
-        if (!engineVerdict.ok) {
-          log?.warn({ title: lesson.title, reasons: engineVerdict.reasons }, "Drill failed engine reconciliation");
-          next.drillFen = null;
-          next.drillExpectedMove = null;
-          next.drillHint = null;
-          changed = true;
-        }
+        engineOk = engineVerdict.ok;
+        engineReasons = engineVerdict.reasons;
       } catch {
-        // Engine unavailable: keep the legality-verified drill but flag.
+        engineOk = false;
+        engineReasons = ["engine verification failed"];
+      }
+      if (!engineOk) {
+        // Strict: never persist a drill claim we could not engine-verify.
+        log?.warn({ title: lesson.title, reasons: engineReasons }, "Drill stripped (engine reconciliation failed or unavailable)");
+        next.drillFen = null;
+        next.drillExpectedMove = null;
+        next.drillHint = null;
+        changed = true;
       }
     }
 

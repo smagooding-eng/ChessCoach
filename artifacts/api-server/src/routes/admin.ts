@@ -559,7 +559,8 @@ Return VALID JSON only:
 
 router.post("/admin/courses/cleanup-sweep", requireAdmin, async (req: Request, res: Response) => {
   try {
-    const { verifyLesson } = await import("../lib/puzzleVerifier");
+    const { verifyLesson, verifyLessonDrillEngine } = await import("../lib/puzzleVerifier");
+    const useEngine = req.body?.useEngine !== false;
     const limit = Math.min(parseInt(String(req.body?.limit ?? "1000")), 5000);
 
     const lessons = await db
@@ -580,11 +581,17 @@ router.post("/admin/courses/cleanup-sweep", requireAdmin, async (req: Request, r
         drillFen: l.drillFen,
         drillExpectedMove: l.drillExpectedMove,
       });
-      if (verdict.ok) {
+      let engineFail: string[] = [];
+      if (verdict.ok && useEngine && l.drillFen && l.drillExpectedMove) {
+        const ev = await verifyLessonDrillEngine(l.drillFen, l.drillExpectedMove);
+        if (!ev.ok) engineFail = ev.reasons;
+      }
+      if (verdict.ok && engineFail.length === 0) {
         passed++;
       } else {
         archived++;
-        if (failedExamples.length < 25) failedExamples.push({ id: l.id, reasons: verdict.reasons });
+        const reasons = verdict.ok ? engineFail : verdict.reasons;
+        if (failedExamples.length < 25) failedExamples.push({ id: l.id, reasons });
         await db.update(lessonsTable).set({ archived: true }).where(eq(lessonsTable.id, l.id));
       }
     }

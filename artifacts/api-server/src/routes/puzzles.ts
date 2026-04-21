@@ -422,17 +422,28 @@ router.post("/puzzles/generate-from-games", requireAuth, async (req: Request, re
 
     let generated = 0;
 
+    interface ReviewMove {
+      color?: string;
+      classification?: string;
+      bestMove?: string;
+      fen?: string;
+      moveNumber?: number;
+    }
+    interface ReviewData { moves?: ReviewMove[] }
+
     for (const game of reviewedGames) {
-      const reviewData = game.reviewData as any;
+      const reviewData = (game.reviewData as ReviewData | null) ?? null;
       if (!reviewData?.moves) continue;
 
       const playerColor = game.whiteUsername?.toLowerCase() === user.chesscomUsername.toLowerCase() ? "white" : "black";
       const colorChar = playerColor === "white" ? "w" : "b";
 
-      const candidateMoves = reviewData.moves.filter((m: any) =>
+      type FullMove = ReviewMove & { bestMove: string; fen: string };
+      const candidateMoves: FullMove[] = reviewData.moves.filter((m): m is FullMove =>
         (m.color === colorChar || m.color === playerColor) &&
-        ["blunder", "mistake"].includes(m.classification) &&
-        m.bestMove && m.fen,
+        ["blunder", "mistake"].includes(m.classification ?? "") &&
+        typeof m.bestMove === "string" && m.bestMove.length > 0 &&
+        typeof m.fen === "string" && m.fen.length > 0,
       );
 
       const { verifyWithRetry } = await import("../lib/puzzleVerifier");
@@ -452,7 +463,8 @@ router.post("/puzzles/generate-from-games", requireAuth, async (req: Request, re
 
         // Retry-with-feedback: if first candidate move fails, try later
         // alternative moves from the same game as the puzzle source.
-        const result = await verifyWithRetry(async (attempt) => {
+        type Candidate = { fen: string; solutionUci: string[]; _src: ReviewMove };
+        const result = await verifyWithRetry<Candidate>(async (attempt) => {
           const candidate = attempt === 0 ? move : candidateMoves[mi + attempt];
           if (!candidate || !candidate.bestMove || !candidate.fen) return null;
           return {
@@ -460,7 +472,7 @@ router.post("/puzzles/generate-from-games", requireAuth, async (req: Request, re
             solutionUci: String(candidate.bestMove).trim().split(/\s+/),
             _src: candidate,
           };
-        }, { attempts: 3, claims: { themes: [move.classification] } });
+        }, { attempts: 3, claims: { themes: [move.classification ?? "blunder"] } });
 
         if (!result) {
           req.log.debug({ gameId: game.id, fen: move.fen }, "All retries exhausted for game-puzzle candidate");
@@ -468,7 +480,7 @@ router.post("/puzzles/generate-from-games", requireAuth, async (req: Request, re
         }
 
         const verdict = result.verdict;
-        const src = (result.candidate as any)._src ?? move;
+        const src: ReviewMove = result.candidate._src ?? move;
         const detected = verdict.detectedThemes.slice();
         const claimed = src.classification === "blunder" ? ["blunder"] : ["mistake"];
         const themesCsv = Array.from(new Set([...claimed, ...detected, "tactical"])).join(",");
