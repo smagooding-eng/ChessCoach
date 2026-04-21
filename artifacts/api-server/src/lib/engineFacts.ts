@@ -57,15 +57,10 @@ function detectHangAfter(fenAfter: string, ourColor: "white" | "black"): { piece
       sim.move(m.san);
       const recaps = (sim.moves({ verbose: true }) as Array<{ to: string; piece: string }>)
         .filter(r => r.to === m.to);
-      let net = victimVal;
-      if (recaps.length > 0) {
-        const cheapest = Math.min(...recaps.map(r => PIECE_VALUES[r.piece] || 0));
-        net = victimVal - attackerVal;
-        // After recapture, we get attacker back
-        net = victimVal - attackerVal + (cheapest <= attackerVal ? 0 : 0);
-        // Simpler net: opponent gains victim - attacker (single exchange)
-        net = victimVal - attackerVal;
-      }
+      // Net material gain for the opponent after a single exchange.
+      // If we have a defender that recaptures, opponent loses attacker;
+      // otherwise they keep the full victim value.
+      const net = recaps.length > 0 ? victimVal - attackerVal : victimVal;
       if (net >= 2) {
         if (!worst || victimVal > worst.value) {
           worst = { piece: m.captured, value: victimVal };
