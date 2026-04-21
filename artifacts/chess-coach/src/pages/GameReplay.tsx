@@ -874,7 +874,7 @@ export function GameReplay() {
         <div className="flex flex-col gap-2 md:gap-4 xl:min-h-0 xl:overflow-y-auto xl:pr-2 hide-scrollbar">
 
           {/* Players banner — compact on mobile, pushed below board on mobile */}
-          <div className="glass-card rounded-xl overflow-hidden order-4 xl:order-none">
+          <div className="glass-card rounded-xl overflow-hidden order-last xl:order-none">
             <div className="flex items-stretch">
               <div className="flex-1 flex items-center gap-2 px-3 py-2 md:py-3">
                 {whitePlayer?.avatar
@@ -908,7 +908,7 @@ export function GameReplay() {
           </div>
 
           {/* Chess board — capped on mobile so the AI coach card fits below without scrolling */}
-          <div className="mx-auto w-full max-w-[min(100%,52dvh)] md:max-w-[min(100%,55dvh)] xl:max-w-none order-1 xl:order-none">
+          <div className="mx-auto w-full max-w-[min(100%,52dvh)] md:max-w-[min(100%,55dvh)] xl:max-w-none order-[-3] xl:order-none">
             {isBad && currentReview && currentMove > 0 && !practiceMode ? (
               (() => {
                 const prevFen = currentMove <= 1 ? gameStartFen : (moves[currentMove - 2]?.fen ?? gameStartFen);
@@ -940,7 +940,7 @@ export function GameReplay() {
           </div>
 
           {/* Playback controls */}
-          <div className="glass-card rounded-xl px-1.5 py-1.5 md:p-3 flex items-center justify-between order-2 xl:order-none">
+          <div className="glass-card rounded-xl px-1.5 py-1.5 md:p-3 flex items-center justify-between order-[-2] xl:order-none">
             <div className="flex items-center">
               <button onClick={() => { setCurrentMove(0); setIsPlaying(false); }} disabled={currentMove === 0}
                 className="p-2.5 md:p-2.5 rounded-xl bg-secondary hover:bg-primary/20 hover:text-primary transition-colors disabled:opacity-40 active:scale-90">
@@ -1028,7 +1028,7 @@ export function GameReplay() {
               </span>
             );
             return (
-              <AICoachCard tone={tone} name="Coach" badge="Coach" title={titleNode} className="order-3 xl:order-none">
+              <AICoachCard tone={tone} name="Coach" badge="Coach" title={titleNode} className="order-[-1] xl:order-none">
                 {currentReview ? (
                   <>
                     <div className="flex items-start justify-between gap-2">
