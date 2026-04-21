@@ -532,7 +532,7 @@ router.post("/admin/puzzles/cleanup-sweep", requireAuth, async (req: Request, re
     return;
   }
   try {
-    const useEngine = req.body?.useEngine === true;
+    const useEngine = req.body?.useEngine !== false;
     const limit = Math.min(parseInt(req.body?.limit ?? "500"), 5000);
     const { verifyPuzzle } = await import("../lib/puzzleVerifier");
 

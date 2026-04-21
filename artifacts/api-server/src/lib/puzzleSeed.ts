@@ -200,6 +200,7 @@ export async function seedPuzzlesIfNeeded(minCount = 15) {
 
   let inserted = 0;
 
+  const { verifyPuzzle } = await import("./puzzleVerifier");
   for (const puzzle of VERIFIED_PUZZLES) {
     if (!validatePuzzle(puzzle)) {
       console.log(`[puzzles] Skipping invalid puzzle: ${puzzle.lichessId}`);
@@ -213,6 +214,15 @@ export async function seedPuzzlesIfNeeded(minCount = 15) {
       .limit(1);
 
     if (existingPuzzle) continue;
+
+    // Engine-verify hand-curated seeds too — same gate as generation.
+    const verdict = await verifyPuzzle(puzzle.fen, puzzle.moves.split(" "), {
+      claims: { themes: puzzle.themes.split(",").map(s => s.trim()).filter(Boolean) },
+    });
+    if (!verdict.ok) {
+      console.log(`[puzzles] Seed rejected ${puzzle.lichessId}: ${verdict.reasons.join("; ")}`);
+      continue;
+    }
 
     await db.insert(puzzlesTable).values({
       lichessId: puzzle.lichessId,
@@ -247,15 +257,22 @@ export async function seedPuzzlesIfNeeded(minCount = 15) {
             .where(eq(puzzlesTable.lichessId, data.puzzle.id))
             .limit(1);
           if (!ex) {
-            await db.insert(puzzlesTable).values({
-              lichessId: data.puzzle.id,
-              fen,
-              moves: data.puzzle.solution.join(" "),
-              rating: data.puzzle.rating,
-              themes: data.puzzle.themes.join(","),
-              source: "lichess",
+            const dailyVerdict = await verifyPuzzle(fen, data.puzzle.solution, {
+              claims: { themes: Array.isArray(data.puzzle.themes) ? data.puzzle.themes : [] },
             });
-            inserted++;
+            if (dailyVerdict.ok) {
+              await db.insert(puzzlesTable).values({
+                lichessId: data.puzzle.id,
+                fen,
+                moves: data.puzzle.solution.join(" "),
+                rating: data.puzzle.rating,
+                themes: data.puzzle.themes.join(","),
+                source: "lichess",
+              });
+              inserted++;
+            } else {
+              console.log(`[puzzles] Daily puzzle rejected: ${dailyVerdict.reasons.join("; ")}`);
+            }
           }
         }
       }

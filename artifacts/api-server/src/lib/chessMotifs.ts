@@ -86,6 +86,84 @@ function detectHangingPiece(chess: Chess, mover: "w" | "b"): boolean {
   return false;
 }
 
+/**
+ * A skewer is a pin where the (more) valuable piece is in front of the less
+ * valuable one — attacker forces the valuable piece to move and wins the
+ * piece behind it.
+ */
+function detectSkewer(chess: Chess, mover: "w" | "b"): boolean {
+  const board = chess.board();
+  const opp = mover === "w" ? "b" : "w";
+  const sliders: { sq: Square; type: string }[] = [];
+  for (let r = 0; r < 8; r++) {
+    for (let c = 0; c < 8; c++) {
+      const p = board[r][c];
+      if (p && p.color === mover && (p.type === "b" || p.type === "r" || p.type === "q")) {
+        sliders.push({ sq: p.square as Square, type: p.type });
+      }
+    }
+  }
+  const dirs: Record<string, [number, number][]> = {
+    b: [[1, 1], [1, -1], [-1, 1], [-1, -1]],
+    r: [[1, 0], [-1, 0], [0, 1], [0, -1]],
+    q: [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]],
+  };
+  for (const s of sliders) {
+    const file = s.sq.charCodeAt(0) - 97;
+    const rank = parseInt(s.sq[1]) - 1;
+    for (const [df, dr] of dirs[s.type]) {
+      let f = file + df, r = rank + dr;
+      let firstHit: { piece: BoardPiece } | null = null;
+      while (f >= 0 && f < 8 && r >= 0 && r < 8) {
+        const t = String.fromCharCode(97 + f) + (r + 1);
+        const p = chess.get(t as Square);
+        if (p) {
+          if (!firstHit) {
+            if (p.color !== opp) break;
+            firstHit = { piece: p as BoardPiece };
+          } else {
+            // Skewer: front piece more valuable than back piece, both opp.
+            if (p.color === opp && (PIECE_VALUE[firstHit.piece.type] ?? 0) > (PIECE_VALUE[p.type] ?? 0)) {
+              return true;
+            }
+            break;
+          }
+        }
+        f += df; r += dr;
+      }
+    }
+  }
+  return false;
+}
+
+/**
+ * Discovered attack: a mover piece moved out of the line, unmasking a
+ * (different) friendly piece's attack on a valuable opponent piece.
+ * We compare attackers on opponent's high-value pieces between before and
+ * after positions.
+ */
+function detectDiscoveredAttack(before: Chess, after: Chess, mover: "w" | "b", movedFrom: Square): boolean {
+  const opp = mover === "w" ? "b" : "w";
+  // Switch turn so attackers() returns the mover's attackers.
+  const beforeView = withTurn(before, mover);
+  const afterView = withTurn(after, mover);
+  if (!beforeView || !afterView) return false;
+  const board = afterView.board();
+  for (const row of board) {
+    for (const sq of row) {
+      if (!sq || sq.color !== opp) continue;
+      if ((PIECE_VALUE[sq.type] ?? 0) < 3) continue;
+      const beforeAttackers = beforeView.attackers(sq.square as Square, mover);
+      const afterAttackers = afterView.attackers(sq.square as Square, mover);
+      // A new attacker appeared whose square is not where the mover just moved
+      // to — i.e. a piece that was masked is now attacking.
+      const newAttackers = afterAttackers.filter(a => !beforeAttackers.includes(a) && a !== movedFrom);
+      if (newAttackers.length > 0) return true;
+    }
+  }
+  return false;
+}
+
 function detectPinOrSkewer(chess: Chess, mover: "w" | "b"): boolean {
   const board = chess.board();
   const opp = mover === "w" ? "b" : "w";
@@ -183,9 +261,14 @@ export function analyzePuzzle(fen: string, uciSolution: string[]): MotifResult {
         }
       }
 
-      // Fork / pin / hanging — evaluate position created for opponent
+      // Fork / pin / skewer / discovered / hanging — evaluate the position
+      // created for the opponent.
       if (detectFork(chess, mover)) themes.add("fork");
       if (detectPinOrSkewer(chess, mover)) themes.add("pin");
+      if (detectSkewer(chess, mover)) themes.add("skewer");
+      if (last && detectDiscoveredAttack(before, chess, mover, last.from as Square)) {
+        themes.add("discoveredAttack");
+      }
       // hanging-piece detection runs on the BEFORE position from the mover's POV
       if (detectHangingPiece(before, mover)) themes.add("hangingPiece");
 

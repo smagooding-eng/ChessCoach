@@ -152,9 +152,10 @@ export async function verifyPuzzle(
       }
       engineMatched = allMatched;
     } catch {
-      // Engine failures should not poison verification: surface as a non-fatal note.
-      reasons.push("engine verification skipped");
-      engineMatched = undefined;
+      // Engine failure when verification was requested is treated as a hard
+      // fail — we will not save a puzzle we could not verify.
+      reasons.push("engine verification failed");
+      engineMatched = false;
     }
   }
 
@@ -207,6 +208,41 @@ export interface LessonRecord {
 export interface LessonVerifyResult {
   ok: boolean;
   reasons: string[];
+}
+
+/**
+ * Engine check for a lesson drill: confirm the claimed expected move matches
+ * Stockfish's top choice in the drill position. Used as an optional async
+ * upgrade over `verifyLesson`'s synchronous legality check.
+ */
+export async function verifyLessonDrillEngine(
+  drillFen: string,
+  drillExpectedMove: string,
+  depth = DEFAULT_ENGINE_DEPTH,
+): Promise<LessonVerifyResult> {
+  try {
+    // Resolve SAN/UCI claim to a UCI string we can compare against engine output.
+    const c = new Chess(drillFen);
+    const m = drillExpectedMove.trim();
+    let claimedUci: string | null = null;
+    try {
+      const applied = c.move(m);
+      if (applied) claimedUci = `${applied.from}${applied.to}${applied.promotion ?? ""}`.toLowerCase();
+    } catch {
+      // fall through
+    }
+    if (!claimedUci && /^[a-h][1-8][a-h][1-8][qrbn]?$/i.test(m)) {
+      claimedUci = m.toLowerCase();
+    }
+    if (!claimedUci) return { ok: false, reasons: ["unparseable expected move"] };
+
+    const evals = await evaluateAllPositions([drillFen], depth);
+    const top = (evals[0]?.bestMoveUci ?? "").toLowerCase();
+    if (top && top === claimedUci) return { ok: true, reasons: [] };
+    return { ok: false, reasons: [`engine prefers ${top || "(no move)"} over claimed ${claimedUci}`] };
+  } catch {
+    return { ok: false, reasons: ["engine verification failed"] };
+  }
 }
 
 /** Lightweight legality check for course lessons. */

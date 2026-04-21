@@ -13,7 +13,7 @@ import {
   UpdateCourseProgressResponse,
 } from "@workspace/api-zod";
 import { generateCourseForWeakness, generateEndgameCourse, type EndgameType } from "../lib/openaiAnalysis";
-import { verifyLesson } from "../lib/puzzleVerifier";
+import { verifyLesson, verifyLessonDrillEngine } from "../lib/puzzleVerifier";
 import { randomUUID } from "crypto";
 import type { Logger } from "pino";
 
@@ -35,9 +35,10 @@ interface RawLesson {
  * stripped (text-only downgrade) so the lesson stays useful while bad chess
  * data is removed. Returns the sanitized lesson list and a count of downgrades.
  */
-function sanitizeLessons(lessons: RawLesson[], log?: Logger): { lessons: RawLesson[]; downgraded: number } {
+async function sanitizeLessons(lessons: RawLesson[], log?: Logger): Promise<{ lessons: RawLesson[]; downgraded: number }> {
   let downgraded = 0;
-  const sanitized = lessons.map((lesson) => {
+  const sanitized: RawLesson[] = [];
+  for (const lesson of lessons) {
     const next: RawLesson = { ...lesson };
     let changed = false;
 
@@ -76,12 +77,30 @@ function sanitizeLessons(lessons: RawLesson[], log?: Logger): { lessons: RawLess
       changed = true;
     }
 
+    // Engine reconciliation: if a drill survived legality checks, verify that
+    // the claimed expected move matches Stockfish's top choice. If not, strip
+    // the drill (text-only downgrade).
+    if (next.drillFen && next.drillExpectedMove) {
+      try {
+        const engineVerdict = await verifyLessonDrillEngine(next.drillFen, next.drillExpectedMove);
+        if (!engineVerdict.ok) {
+          log?.warn({ title: lesson.title, reasons: engineVerdict.reasons }, "Drill failed engine reconciliation");
+          next.drillFen = null;
+          next.drillExpectedMove = null;
+          next.drillHint = null;
+          changed = true;
+        }
+      } catch {
+        // Engine unavailable: keep the legality-verified drill but flag.
+      }
+    }
+
     if (changed) {
       downgraded++;
-      log?.warn({ title: lesson.title, reasons: verdict.reasons }, "Lesson downgraded to text-only after verification failure");
+      log?.warn({ title: lesson.title }, "Lesson downgraded to text-only after verification failure");
     }
-    return next;
-  });
+    sanitized.push(next);
+  }
   return { lessons: sanitized, downgraded };
 }
 
@@ -129,7 +148,7 @@ async function runCourseGenerationJob(username: string, jobId: string, log: Logg
           examples: weakness.examples,
         }, relatedGamePgns);
 
-        const { lessons: safeLessons } = sanitizeLessons(courseData.lessons as RawLesson[], log);
+        const { lessons: safeLessons } = await sanitizeLessons(courseData.lessons as RawLesson[], log);
         const [course] = await db.insert(coursesTable).values({
           username: username.toLowerCase(),
           title: courseData.title,
@@ -338,7 +357,7 @@ router.post("/courses/generate", async (req, res): Promise<void> => {
         examples: weakness.examples,
       }, relatedGamePgns);
 
-      const { lessons: safeLessons } = sanitizeLessons(courseData.lessons as RawLesson[], req.log);
+      const { lessons: safeLessons } = await sanitizeLessons(courseData.lessons as RawLesson[], req.log);
       const [course] = await db
         .insert(coursesTable)
         .values({
@@ -418,7 +437,7 @@ async function runEndgameJob(
 
     const courseData = await generateEndgameCourse(type, playerRating, gamePgns);
 
-    const { lessons: safeLessons } = sanitizeLessons(courseData.lessons as RawLesson[], log);
+    const { lessons: safeLessons } = await sanitizeLessons(courseData.lessons as RawLesson[], log);
     const [course] = await db
       .insert(coursesTable)
       .values({
