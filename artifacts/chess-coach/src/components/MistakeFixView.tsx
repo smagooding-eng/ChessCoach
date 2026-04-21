@@ -144,7 +144,7 @@ export function MistakeFixView({
   const goNext = () => setSlide(1);
 
   return (
-    <div className="space-y-3 max-w-[520px] mx-auto">
+    <div className="space-y-1.5 md:space-y-2 max-w-[520px] mx-auto">
       {/* Tab toggle */}
       <div role="tablist" aria-label="Compare your move with the engine" className="flex items-stretch gap-1 p-1 rounded-lg bg-white/5 border border-white/10">
         {slides.map((s, idx) => {
@@ -198,7 +198,7 @@ export function MistakeFixView({
         </button>
 
         {/* Slide header */}
-        <div className="flex items-center justify-between gap-2 px-1 mb-2">
+        <div className="hidden md:flex items-center justify-between gap-2 px-1 mb-2">
           <div className="flex items-center gap-1.5 min-w-0">
             <Icon className={`w-3.5 h-3.5 shrink-0 ${current.iconClass}`} />
             <span className="text-[10px] font-black uppercase tracking-[0.12em] text-white/70 truncate">
@@ -244,22 +244,8 @@ export function MistakeFixView({
           </AnimatePresence>
         </div>
 
-        {/* Slide indicators */}
-        <div className="flex items-center justify-center gap-1.5 mt-2">
-          {slides.map((s, idx) => (
-            <button
-              key={s.key}
-              type="button"
-              onClick={() => setSlide(idx as 0 | 1)}
-              aria-label={`Go to slide ${idx + 1}`}
-              className={`h-1.5 rounded-full transition-all ${
-                idx === slide ? 'w-6 bg-white/70' : 'w-1.5 bg-white/25 hover:bg-white/40'
-              }`}
-            />
-          ))}
-        </div>
-
-        <p className="text-[10px] text-white/40 text-center px-2 leading-snug mt-1.5">
+        {/* Caption — hidden on mobile to save vertical space; the tab toggle already labels the view */}
+        <p className="hidden md:block text-[10px] text-white/40 text-center px-2 leading-snug mt-1.5">
           {current.caption}
         </p>
       </div>

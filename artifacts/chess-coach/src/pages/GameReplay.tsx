@@ -907,8 +907,13 @@ export function GameReplay() {
             </div>
           </div>
 
-          {/* Chess board — capped on mobile so the AI coach card fits below without scrolling */}
-          <div className="mx-auto w-full max-w-[min(100%,52dvh)] md:max-w-[min(100%,55dvh)] xl:max-w-none order-[-3] xl:order-none">
+          {/* Chess board — capped on mobile so the AI coach card fits below without scrolling.
+              When MistakeFixView is shown we cap smaller because it adds ~90px of chrome (tabs, header, indicators). */}
+          <div className={`mx-auto w-full xl:max-w-none order-[-3] xl:order-none ${
+            isBad && currentReview && currentMove > 0 && !practiceMode
+              ? 'max-w-[min(100%,40dvh)] md:max-w-[min(100%,46dvh)]'
+              : 'max-w-[min(100%,52dvh)] md:max-w-[min(100%,55dvh)]'
+          }`}>
             {isBad && currentReview && currentMove > 0 && !practiceMode ? (
               (() => {
                 const prevFen = currentMove <= 1 ? gameStartFen : (moves[currentMove - 2]?.fen ?? gameStartFen);
