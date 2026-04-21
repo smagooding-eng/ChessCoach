@@ -7,6 +7,7 @@
  */
 import type { MonthlyTrendPoint } from "./monthlyTrendPoint";
 import type { OpeningStat } from "./openingStat";
+import type { PhaseAccuracy } from "./phaseAccuracy";
 import type { TimeControlStat } from "./timeControlStat";
 
 export interface PerformanceSummary {
@@ -20,4 +21,5 @@ export interface PerformanceSummary {
   openingStats: OpeningStat[];
   resultsByTimeControl: TimeControlStat[];
   monthlyTrend?: MonthlyTrendPoint[];
+  phaseAccuracy?: PhaseAccuracy;
 }

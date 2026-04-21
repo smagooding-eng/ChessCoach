@@ -154,6 +154,29 @@ export interface MonthlyTrendPoint {
   winRate: number;
 }
 
+export interface PhaseStat {
+  /** Average accuracy percent (0-100) for the user's moves in this phase. */
+  accuracy: number;
+  /** Total user moves analyzed in this phase across all games. */
+  moves: number;
+  blunders: number;
+  mistakes: number;
+  inaccuracies: number;
+  /** Count of best/great/brilliant/excellent classifications. */
+  bestOrBetter: number;
+}
+
+/**
+ * Average accuracy and move counts by game phase across all reviewed games for the user.
+ */
+export interface PhaseAccuracy {
+  opening: PhaseStat;
+  middlegame: PhaseStat;
+  endgame: PhaseStat;
+  /** Number of games whose review data contributed to these stats. */
+  gamesAnalyzed: number;
+}
+
 export interface PerformanceSummary {
   username: string;
   totalGames: number;
@@ -165,6 +188,7 @@ export interface PerformanceSummary {
   openingStats: OpeningStat[];
   resultsByTimeControl: TimeControlStat[];
   monthlyTrend?: MonthlyTrendPoint[];
+  phaseAccuracy?: PhaseAccuracy;
 }
 
 export interface GenerateCoursesBody {

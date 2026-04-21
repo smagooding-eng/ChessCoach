@@ -221,6 +221,78 @@ export const GetAnalysisSummaryResponse = zod.object({
       }),
     )
     .optional(),
+  phaseAccuracy: zod
+    .object({
+      opening: zod.object({
+        accuracy: zod
+          .number()
+          .describe(
+            "Average accuracy percent (0-100) for the user's moves in this phase.",
+          ),
+        moves: zod
+          .number()
+          .describe(
+            "Total user moves analyzed in this phase across all games.",
+          ),
+        blunders: zod.number(),
+        mistakes: zod.number(),
+        inaccuracies: zod.number(),
+        bestOrBetter: zod
+          .number()
+          .describe(
+            "Count of best\/great\/brilliant\/excellent classifications.",
+          ),
+      }),
+      middlegame: zod.object({
+        accuracy: zod
+          .number()
+          .describe(
+            "Average accuracy percent (0-100) for the user's moves in this phase.",
+          ),
+        moves: zod
+          .number()
+          .describe(
+            "Total user moves analyzed in this phase across all games.",
+          ),
+        blunders: zod.number(),
+        mistakes: zod.number(),
+        inaccuracies: zod.number(),
+        bestOrBetter: zod
+          .number()
+          .describe(
+            "Count of best\/great\/brilliant\/excellent classifications.",
+          ),
+      }),
+      endgame: zod.object({
+        accuracy: zod
+          .number()
+          .describe(
+            "Average accuracy percent (0-100) for the user's moves in this phase.",
+          ),
+        moves: zod
+          .number()
+          .describe(
+            "Total user moves analyzed in this phase across all games.",
+          ),
+        blunders: zod.number(),
+        mistakes: zod.number(),
+        inaccuracies: zod.number(),
+        bestOrBetter: zod
+          .number()
+          .describe(
+            "Count of best\/great\/brilliant\/excellent classifications.",
+          ),
+      }),
+      gamesAnalyzed: zod
+        .number()
+        .describe(
+          "Number of games whose review data contributed to these stats.",
+        ),
+    })
+    .optional()
+    .describe(
+      "Average accuracy and move counts by game phase across all reviewed games for the user.",
+    ),
 });
 
 /**

@@ -36,6 +36,8 @@ export * from "./monthlyTrendPoint";
 export * from "./move";
 export * from "./openingStat";
 export * from "./performanceSummary";
+export * from "./phaseAccuracy";
+export * from "./phaseStat";
 export * from "./timeControlStat";
 export * from "./updateProgressBody";
 export * from "./weakness";

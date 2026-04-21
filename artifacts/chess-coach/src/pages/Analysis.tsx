@@ -564,6 +564,84 @@ export function Analysis() {
             );
           })()}
 
+          {summary?.phaseAccuracy && summary.phaseAccuracy.gamesAnalyzed > 0 && (() => {
+            const pa = summary.phaseAccuracy;
+            const phases: Array<{ key: 'opening' | 'middlegame' | 'endgame'; label: string; icon: typeof BookOpen }> = [
+              { key: 'opening',    label: 'Opening',    icon: BookOpen },
+              { key: 'middlegame', label: 'Middlegame', icon: Brain },
+              { key: 'endgame',    label: 'Endgame',    icon: Trophy },
+            ];
+            const accColor = (acc: number) =>
+              acc >= 85 ? '#10b981' :
+              acc >= 70 ? CHESSCOM_GREEN :
+              acc >= 55 ? '#ea9733' :
+              acc >= 40 ? '#f97316' : '#dc4343';
+            return (
+              <div className="rounded-xl p-5 mt-4" style={{ background: BG_CARD, border: CARD_BORDER, boxShadow: CARD_SHADOW }}>
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-base font-bold flex items-center gap-2" style={{ color: TEXT_LIGHT }}>
+                    <LineChart className="w-4 h-4" style={{ color: CHESSCOM_GREEN }} />
+                    Accuracy by Game Phase
+                  </h2>
+                  <span className="text-[11px] font-bold" style={{ color: TEXT_MUTED }}>
+                    From <span style={{ color: TEXT_LIGHT }}>{pa.gamesAnalyzed}</span> reviewed game{pa.gamesAnalyzed === 1 ? '' : 's'}
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  {phases.map((p, idx) => {
+                    const stat = pa[p.key];
+                    const Icon = p.icon;
+                    const color = stat.moves > 0 ? accColor(stat.accuracy) : TEXT_MUTED;
+                    return (
+                      <motion.div
+                        key={p.key}
+                        initial={{ opacity: 0, y: 6 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: idx * 0.06 }}
+                        className="rounded-lg p-4"
+                        style={{ background: BG_CARD_FLAT, border: CARD_BORDER }}
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <Icon className="w-4 h-4" style={{ color: CHESSCOM_GREEN }} />
+                            <span className="text-xs font-bold uppercase tracking-wide" style={{ color: TEXT_LIGHT }}>{p.label}</span>
+                          </div>
+                          <span className="text-[10px] font-bold tabular-nums" style={{ color: TEXT_MUTED }}>
+                            {stat.moves} move{stat.moves === 1 ? '' : 's'}
+                          </span>
+                        </div>
+                        <div className="flex items-baseline gap-1.5 mb-2">
+                          <span className="text-3xl font-black tabular-nums" style={{ color }}>
+                            {stat.moves > 0 ? stat.accuracy : '—'}
+                          </span>
+                          {stat.moves > 0 && (
+                            <span className="text-sm font-bold" style={{ color }}>%</span>
+                          )}
+                        </div>
+                        <div className="h-1.5 rounded-full overflow-hidden mb-3" style={{ background: BG_DARK }}>
+                          <motion.div
+                            className="h-full rounded-full"
+                            style={{ background: color }}
+                            initial={{ width: 0 }}
+                            animate={{ width: `${stat.moves > 0 ? stat.accuracy : 0}%` }}
+                            transition={{ duration: 0.7, delay: idx * 0.06, ease: 'easeOut' }}
+                          />
+                        </div>
+                        <div className="flex justify-between gap-1.5 text-[10px] font-bold tabular-nums">
+                          {stat.bestOrBetter > 0 && <span className="text-cyan-400">+{stat.bestOrBetter}</span>}
+                          {stat.inaccuracies > 0 && <span className="text-yellow-400">{stat.inaccuracies}?!</span>}
+                          {stat.mistakes > 0 && <span className="text-orange-400">{stat.mistakes}?</span>}
+                          {stat.blunders > 0 && <span className="text-rose-400">{stat.blunders}??</span>}
+                          {stat.moves === 0 && <span style={{ color: TEXT_MUTED }}>No moves yet</span>}
+                        </div>
+                      </motion.div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
+
           <h2 className="text-xl font-black mt-8 mb-4 flex items-center gap-2" style={{ color: TEXT_LIGHT }}>
             <AlertTriangle className="w-5 h-5" style={{ color: '#ea9733' }} /> Identified Weaknesses
           </h2>
