@@ -235,7 +235,25 @@ router.get("/courses/quality", async (_req, res): Promise<void> => {
     const total = totalRow?.c ?? 0;
     const archived = archivedRow?.c ?? 0;
     const valid = total - archived;
-    res.json({ total, valid, archived, passRate: total > 0 ? valid / total : 1 });
+
+    // Rolling-window: last 100 lessons by id (proxy for "fresh batch").
+    const recent = await db
+      .select({ id: lessonsTable.id, archived: lessonsTable.archived })
+      .from(lessonsTable)
+      .orderBy(desc(lessonsTable.id))
+      .limit(100);
+    const recentTotal = recent.length;
+    const recentArchived = recent.filter(r => r.archived).length;
+    const passRateRecent = recentTotal > 0 ? (recentTotal - recentArchived) / recentTotal : 1;
+
+    res.json({
+      total,
+      valid,
+      archived,
+      passRate: total > 0 ? valid / total : 1,
+      window: recentTotal,
+      passRateRecent,
+    });
   } catch {
     res.status(500).json({ error: "failed" });
   }

@@ -57,14 +57,16 @@ export function Dashboard() {
       apiFetch('/api/courses/quality').then(r => r.ok ? r.json() : null).catch(() => null),
     ]).then(([puzzles, courses]) => {
       if (cancelled) return;
-      const rates: number[] = [];
-      if (puzzles && typeof puzzles.passRate === 'number') rates.push(puzzles.passRate);
-      if (courses && typeof courses.passRate === 'number') rates.push(courses.passRate);
-      if (rates.length === 0) return;
-      // Hide Beta tag once the weakest of (puzzle, course) content quality
-      // crosses the promotion threshold.
-      const min = Math.min(...rates);
-      setCoursesBeta(min < 0.95);
+      const sources = [puzzles, courses].filter(Boolean) as Array<{ passRate?: number; passRateRecent?: number; window?: number }>;
+      if (sources.length === 0) return;
+      // Hide Beta only when EVERY source's rolling fresh-batch window
+      // sustains the promotion threshold.
+      const allPromoted = sources.every(s => {
+        const r = typeof s.passRateRecent === 'number' ? s.passRateRecent : (s.passRate ?? 0);
+        const w = typeof s.window === 'number' ? s.window : 0;
+        return r >= 0.95 && w >= 30;
+      });
+      setCoursesBeta(!allPromoted);
     });
     return () => { cancelled = true; };
   }, []);

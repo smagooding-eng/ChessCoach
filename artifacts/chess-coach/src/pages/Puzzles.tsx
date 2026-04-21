@@ -67,8 +67,12 @@ export function Puzzles() {
     apiFetch('/api/puzzles/quality')
       .then(r => r.ok ? r.json() : null)
       .then(d => {
-        if (!cancelled && d && typeof d.passRate === 'number') {
-          setShowBeta(d.passRate < 0.95);
+        if (!cancelled && d) {
+          // Promote out of Beta only when the rolling fresh-batch window
+          // sustains a high pass rate (and is large enough to be meaningful).
+          const recent = typeof d.passRateRecent === 'number' ? d.passRateRecent : d.passRate;
+          const window = typeof d.window === 'number' ? d.window : 0;
+          setShowBeta(!(recent >= 0.95 && window >= 50));
         }
       })
       .catch(() => {});

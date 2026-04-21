@@ -15,6 +15,9 @@ export interface VerifyOptions {
   /** Defaults to true. Set false to skip the Stockfish best-move check. */
   useEngine?: boolean;
   engineDepth?: number;
+  /** When true (default with useEngine), verify every mover-to-move puzzle move
+   * matches the engine top choice — not just the first move. */
+  verifyFullLine?: boolean;
   /** Optional source-claimed metadata; verifier reconciles against motif analysis. */
   claims?: PuzzleClaims;
 }
@@ -67,9 +70,20 @@ export async function verifyPuzzle(
     return { ok: false, reasons: ["illegal move in solution"], detectedThemes: [], mateIn: null, materialGain: 0 };
   }
 
-  const hasGain = motif.materialGain >= 2 || motif.mateIn !== null || motif.themes.includes("sacrifice");
+  // A puzzle must demonstrably win — mate, material, or a sacrifice that
+  // recovers material/positional value. Bare "sacrifice" with negative
+  // material is a classic false positive and is explicitly disallowed.
+  const isSacrifice = motif.themes.includes("sacrifice");
+  const hasGain =
+    motif.mateIn !== null ||
+    motif.materialGain >= 2 ||
+    (isSacrifice && motif.materialGain >= 0);
   if (!hasGain) {
-    reasons.push("solution does not produce a meaningful gain");
+    reasons.push(
+      isSacrifice
+        ? "sacrifice does not recover material"
+        : "solution does not produce a meaningful gain",
+    );
   }
 
   // Reconcile against source claims when supplied.
@@ -101,14 +115,42 @@ export async function verifyPuzzle(
 
   let engineMatched: boolean | undefined;
   if (useEngine) {
+    const verifyFullLine = opts.verifyFullLine ?? true;
     try {
-      const evals = await evaluateAllPositions([fen], opts.engineDepth ?? DEFAULT_ENGINE_DEPTH);
-      const top = evals[0]?.bestMoveUci ?? "";
-      const want = uciSolution[0]?.toLowerCase();
-      engineMatched = top.toLowerCase() === want;
-      if (!engineMatched) {
-        reasons.push(`engine prefers ${top || "(no move)"} over ${want}`);
+      // Build the list of FENs to evaluate: starting position plus every
+      // position where it is the mover's turn (so engine top == solution
+      // move). Limit to first 6 mover plies to keep cost bounded.
+      const fens: string[] = [fen];
+      const expectedMoves: string[] = [uciSolution[0].toLowerCase()];
+      if (verifyFullLine && uciSolution.length > 1) {
+        const replay = new Chess(fen);
+        const startSide = replay.turn();
+        for (let i = 0; i < uciSolution.length && expectedMoves.length < 6; i++) {
+          const u = uciSolution[i];
+          const m = replay.move({
+            from: u.slice(0, 2),
+            to: u.slice(2, 4),
+            promotion: u.length > 4 ? u[4] : undefined,
+          });
+          if (!m) break;
+          if (replay.turn() === startSide && i + 1 < uciSolution.length) {
+            fens.push(replay.fen());
+            expectedMoves.push(uciSolution[i + 1].toLowerCase());
+          }
+        }
       }
+
+      const evals = await evaluateAllPositions(fens, opts.engineDepth ?? DEFAULT_ENGINE_DEPTH);
+      let allMatched = true;
+      for (let i = 0; i < fens.length; i++) {
+        const top = (evals[i]?.bestMoveUci ?? "").toLowerCase();
+        const want = expectedMoves[i];
+        if (top !== want) {
+          allMatched = false;
+          reasons.push(`engine prefers ${top || "(no move)"} over ${want} at ply ${i}`);
+        }
+      }
+      engineMatched = allMatched;
     } catch {
       // Engine failures should not poison verification: surface as a non-fatal note.
       reasons.push("engine verification skipped");

@@ -429,10 +429,15 @@ router.post("/puzzles/generate-from-games", requireAuth, async (req: Request, re
       const playerColor = game.whiteUsername?.toLowerCase() === user.chesscomUsername.toLowerCase() ? "white" : "black";
       const colorChar = playerColor === "white" ? "w" : "b";
 
-      for (const move of reviewData.moves) {
-        if (move.color !== colorChar && move.color !== playerColor) continue;
-        if (!["blunder", "mistake"].includes(move.classification)) continue;
-        if (!move.bestMove || !move.fen) continue;
+      const candidateMoves = reviewData.moves.filter((m: any) =>
+        (m.color === colorChar || m.color === playerColor) &&
+        ["blunder", "mistake"].includes(m.classification) &&
+        m.bestMove && m.fen,
+      );
+
+      const { verifyWithRetry } = await import("../lib/puzzleVerifier");
+      for (let mi = 0; mi < candidateMoves.length; mi++) {
+        const move = candidateMoves[mi];
 
         const existingPuzzle = await db
           .select({ id: puzzlesTable.id })
@@ -445,24 +450,37 @@ router.post("/puzzles/generate-from-games", requireAuth, async (req: Request, re
 
         if (existingPuzzle.length > 0) continue;
 
-        const { verifyPuzzle } = await import("../lib/puzzleVerifier");
-        const verdict = await verifyPuzzle(move.fen, String(move.bestMove).trim().split(/\s+/));
-        if (!verdict.ok) {
-          req.log.debug({ gameId: game.id, fen: move.fen, reasons: verdict.reasons }, "Skipping unverified game-puzzle");
+        // Retry-with-feedback: if first candidate move fails, try later
+        // alternative moves from the same game as the puzzle source.
+        const result = await verifyWithRetry(async (attempt) => {
+          const candidate = attempt === 0 ? move : candidateMoves[mi + attempt];
+          if (!candidate || !candidate.bestMove || !candidate.fen) return null;
+          return {
+            fen: candidate.fen,
+            solutionUci: String(candidate.bestMove).trim().split(/\s+/),
+            _src: candidate,
+          };
+        }, { attempts: 3, claims: { themes: [move.classification] } });
+
+        if (!result) {
+          req.log.debug({ gameId: game.id, fen: move.fen }, "All retries exhausted for game-puzzle candidate");
           continue;
         }
+
+        const verdict = result.verdict;
+        const src = (result.candidate as any)._src ?? move;
         const detected = verdict.detectedThemes.slice();
-        const claimed = move.classification === "blunder" ? ["blunder"] : ["mistake"];
+        const claimed = src.classification === "blunder" ? ["blunder"] : ["mistake"];
         const themesCsv = Array.from(new Set([...claimed, ...detected, "tactical"])).join(",");
 
         await db.insert(puzzlesTable).values({
-          fen: move.fen,
-          moves: move.bestMove,
+          fen: result.candidate.fen,
+          moves: result.candidate.solutionUci.join(" "),
           rating: game.whiteRating || game.blackRating || 1200,
           themes: themesCsv,
           source: "game",
           gameId: game.id,
-          moveNumber: move.moveNumber ?? null,
+          moveNumber: src.moveNumber ?? null,
         });
         generated++;
       }
@@ -483,7 +501,26 @@ router.get("/puzzles/quality", async (_req: Request, res: Response) => {
     const archived = archivedRow?.c ?? 0;
     const valid = total - archived;
     const passRate = total > 0 ? valid / total : 1;
-    res.json({ total, valid, archived, passRate });
+
+    // Rolling-window: last 200 puzzles by id (proxy for "fresh batch").
+    const recent = await db
+      .select({ id: puzzlesTable.id, archived: puzzlesTable.archived })
+      .from(puzzlesTable)
+      .orderBy(desc(puzzlesTable.id))
+      .limit(200);
+    const recentTotal = recent.length;
+    const recentArchived = recent.filter(r => r.archived).length;
+    const recentValid = recentTotal - recentArchived;
+    const passRateRecent = recentTotal > 0 ? recentValid / recentTotal : 1;
+
+    res.json({
+      total,
+      valid,
+      archived,
+      passRate,
+      window: recentTotal,
+      passRateRecent,
+    });
   } catch {
     res.status(500).json({ error: "failed" });
   }
@@ -566,7 +603,9 @@ async function fetchAndStoreLichessPuzzle() {
     if (!testResult) return null;
 
     const { verifyPuzzle } = await import("../lib/puzzleVerifier");
-    const verdict = await verifyPuzzle(fen, data.puzzle.solution);
+    const verdict = await verifyPuzzle(fen, data.puzzle.solution, {
+      claims: { themes: Array.isArray(data.puzzle.themes) ? data.puzzle.themes : [] },
+    });
     if (!verdict.ok) return null;
 
     const [existing] = await db

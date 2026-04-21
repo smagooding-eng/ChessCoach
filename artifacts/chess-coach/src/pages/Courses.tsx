@@ -25,8 +25,10 @@ export function Courses() {
     apiFetch('/api/courses/quality')
       .then(r => r.ok ? r.json() : null)
       .then(d => {
-        if (!cancelled && d && typeof d.passRate === 'number') {
-          setShowBeta(d.passRate < 0.95);
+        if (!cancelled && d) {
+          const recent = typeof d.passRateRecent === 'number' ? d.passRateRecent : d.passRate;
+          const window = typeof d.window === 'number' ? d.window : 0;
+          setShowBeta(!(recent >= 0.95 && window >= 30));
         }
       })
       .catch(() => {});
