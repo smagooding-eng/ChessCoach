@@ -11,6 +11,7 @@ export const puzzlesTable = pgTable("puzzles", {
   gameId: integer("game_id"),
   moveNumber: integer("move_number"),
   explanation: text("explanation"),
+  archived: boolean("archived").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

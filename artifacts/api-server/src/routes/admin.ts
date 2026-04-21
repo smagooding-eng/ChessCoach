@@ -557,6 +557,77 @@ Return VALID JSON only:
   }
 });
 
+router.post("/admin/courses/cleanup-sweep", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const { verifyLesson } = await import("../lib/puzzleVerifier");
+    const limit = Math.min(parseInt(String(req.body?.limit ?? "1000")), 5000);
+
+    const lessons = await db
+      .select()
+      .from(lessonsTable)
+      .where(eq(lessonsTable.archived, false))
+      .limit(limit);
+
+    let archived = 0;
+    let passed = 0;
+    const failedExamples: { id: number; reasons: string[] }[] = [];
+
+    for (const l of lessons) {
+      const verdict = verifyLesson({
+        id: l.id,
+        examplePgn: l.examplePgn,
+        fixExamplePgn: l.fixExamplePgn,
+        drillFen: l.drillFen,
+        drillExpectedMove: l.drillExpectedMove,
+      });
+      if (verdict.ok) {
+        passed++;
+      } else {
+        archived++;
+        if (failedExamples.length < 25) failedExamples.push({ id: l.id, reasons: verdict.reasons });
+        await db.update(lessonsTable).set({ archived: true }).where(eq(lessonsTable.id, l.id));
+      }
+    }
+
+    // Auto-archive courses whose lessons are all archived
+    const allCourses = await db.select().from(coursesTable).where(eq(coursesTable.archived, false));
+    let coursesArchived = 0;
+    for (const c of allCourses) {
+      const courseLessons = await db
+        .select()
+        .from(lessonsTable)
+        .where(and(eq(lessonsTable.courseId, c.id), eq(lessonsTable.archived, false)));
+      if (courseLessons.length === 0) {
+        await db.update(coursesTable).set({ archived: true }).where(eq(coursesTable.id, c.id));
+        coursesArchived++;
+      }
+    }
+
+    res.json({
+      scanned: lessons.length,
+      passed,
+      archived,
+      coursesArchived,
+      passRate: lessons.length > 0 ? passed / lessons.length : 1,
+      failedExamples,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.get("/admin/courses/quality", requireAdmin, async (_req: Request, res: Response) => {
+  try {
+    const [totalRow] = await db.select({ c: count() }).from(lessonsTable);
+    const [archivedRow] = await db.select({ c: count() }).from(lessonsTable).where(eq(lessonsTable.archived, true));
+    const total = totalRow?.c ?? 0;
+    const archived = archivedRow?.c ?? 0;
+    res.json({ total, valid: total - archived, archived, passRate: total > 0 ? (total - archived) / total : 1 });
+  } catch {
+    res.status(500).json({ error: "failed" });
+  }
+});
+
 // Coach alignment report — what fraction of recent reviewed-game move
 // explanations passed reconciliation (engine-aligned) vs were replaced
 // by the deterministic fallback. Useful for monitoring drift.

@@ -89,7 +89,10 @@ router.get("/puzzles/next", requireAuth, async (req: Request, res: Response) => 
       const result = await db
         .select()
         .from(puzzlesTable)
-        .where(sql`${puzzlesTable.id} NOT IN (${sql.join(allExcluded.map(id => sql`${id}`), sql`, `)})`)
+        .where(and(
+          eq(puzzlesTable.archived, false),
+          sql`${puzzlesTable.id} NOT IN (${sql.join(allExcluded.map(id => sql`${id}`), sql`, `)})`,
+        ))
         .orderBy(sql`RANDOM()`)
         .limit(1);
       puzzle = result[0];
@@ -99,6 +102,7 @@ router.get("/puzzles/next", requireAuth, async (req: Request, res: Response) => 
       const result = await db
         .select()
         .from(puzzlesTable)
+        .where(eq(puzzlesTable.archived, false))
         .orderBy(sql`RANDOM()`)
         .limit(1);
       puzzle = result[0];
@@ -240,6 +244,7 @@ router.get("/puzzles/my-puzzles", requireAuth, async (req: Request, res: Respons
       .from(puzzlesTable)
       .where(and(
         eq(puzzlesTable.source, "game"),
+        eq(puzzlesTable.archived, false),
         inArray(puzzlesTable.gameId, userGameIds),
       ))
       .orderBy(desc(puzzlesTable.createdAt))
@@ -281,7 +286,7 @@ router.get("/puzzles/:id", requireAuth, async (req: Request, res: Response) => {
     const [puzzle] = await db
       .select()
       .from(puzzlesTable)
-      .where(eq(puzzlesTable.id, puzzleId))
+      .where(and(eq(puzzlesTable.id, puzzleId), eq(puzzlesTable.archived, false)))
       .limit(1);
 
     if (!puzzle) {
@@ -315,7 +320,7 @@ router.post("/puzzles/:id/solve", requireAuth, async (req: Request, res: Respons
     const [puzzle] = await db
       .select()
       .from(puzzlesTable)
-      .where(eq(puzzlesTable.id, puzzleId))
+      .where(and(eq(puzzlesTable.id, puzzleId), eq(puzzlesTable.archived, false)))
       .limit(1);
 
     if (!puzzle) {
@@ -369,7 +374,7 @@ router.post("/puzzles/:id/explain", requireAuth, async (req: Request, res: Respo
     const [puzzle] = await db
       .select()
       .from(puzzlesTable)
-      .where(eq(puzzlesTable.id, puzzleId))
+      .where(and(eq(puzzlesTable.id, puzzleId), eq(puzzlesTable.archived, false)))
       .limit(1);
 
     if (!puzzle) {
@@ -440,11 +445,21 @@ router.post("/puzzles/generate-from-games", requireAuth, async (req: Request, re
 
         if (existingPuzzle.length > 0) continue;
 
+        const { verifyPuzzle } = await import("../lib/puzzleVerifier");
+        const verdict = await verifyPuzzle(move.fen, String(move.bestMove).trim().split(/\s+/));
+        if (!verdict.ok) {
+          req.log.debug({ gameId: game.id, fen: move.fen, reasons: verdict.reasons }, "Skipping unverified game-puzzle");
+          continue;
+        }
+        const detected = verdict.detectedThemes.slice();
+        const claimed = move.classification === "blunder" ? ["blunder"] : ["mistake"];
+        const themesCsv = Array.from(new Set([...claimed, ...detected, "tactical"])).join(",");
+
         await db.insert(puzzlesTable).values({
           fen: move.fen,
           moves: move.bestMove,
           rating: game.whiteRating || game.blackRating || 1200,
-          themes: move.classification === "blunder" ? "blunder,tactical" : "mistake,tactical",
+          themes: themesCsv,
           source: "game",
           gameId: game.id,
           moveNumber: move.moveNumber ?? null,
@@ -457,6 +472,59 @@ router.post("/puzzles/generate-from-games", requireAuth, async (req: Request, re
   } catch (err: any) {
     req.log.error({ error: err.message }, "Failed to generate game puzzles");
     res.status(500).json({ error: "Failed to generate puzzles" });
+  }
+});
+
+router.get("/puzzles/quality", async (_req: Request, res: Response) => {
+  try {
+    const [totalRow] = await db.select({ c: count() }).from(puzzlesTable);
+    const [archivedRow] = await db.select({ c: count() }).from(puzzlesTable).where(eq(puzzlesTable.archived, true));
+    const total = totalRow?.c ?? 0;
+    const archived = archivedRow?.c ?? 0;
+    const valid = total - archived;
+    const passRate = total > 0 ? valid / total : 1;
+    res.json({ total, valid, archived, passRate });
+  } catch {
+    res.status(500).json({ error: "failed" });
+  }
+});
+
+router.post("/admin/puzzles/cleanup-sweep", requireAuth, async (req: Request, res: Response) => {
+  if (!req.user?.isAdmin) {
+    res.status(403).json({ error: "Admin only" });
+    return;
+  }
+  try {
+    const useEngine = req.body?.useEngine === true;
+    const limit = Math.min(parseInt(req.body?.limit ?? "500"), 5000);
+    const { verifyPuzzle } = await import("../lib/puzzleVerifier");
+
+    const all = await db
+      .select()
+      .from(puzzlesTable)
+      .where(eq(puzzlesTable.archived, false))
+      .limit(limit);
+
+    const stats: Record<string, { total: number; passed: number; archived: number }> = {};
+    let archivedCount = 0;
+    for (const p of all) {
+      const source = p.source ?? "unknown";
+      stats[source] ??= { total: 0, passed: 0, archived: 0 };
+      stats[source].total++;
+      const verdict = await verifyPuzzle(p.fen, p.moves.split(" "), { useEngine, engineDepth: 12 });
+      if (verdict.ok) {
+        stats[source].passed++;
+      } else {
+        stats[source].archived++;
+        archivedCount++;
+        await db.update(puzzlesTable).set({ archived: true }).where(eq(puzzlesTable.id, p.id));
+      }
+    }
+
+    res.json({ scanned: all.length, archived: archivedCount, byCategory: stats });
+  } catch (err: any) {
+    req.log.error({ error: err.message }, "puzzle cleanup sweep failed");
+    res.status(500).json({ error: err.message });
   }
 });
 
@@ -496,6 +564,10 @@ async function fetchAndStoreLichessPuzzle() {
       promotion: firstMove.length > 4 ? firstMove[4] : undefined,
     });
     if (!testResult) return null;
+
+    const { verifyPuzzle } = await import("../lib/puzzleVerifier");
+    const verdict = await verifyPuzzle(fen, data.puzzle.solution);
+    if (!verdict.ok) return null;
 
     const [existing] = await db
       .select()

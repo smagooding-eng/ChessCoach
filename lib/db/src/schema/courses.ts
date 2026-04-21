@@ -1,4 +1,4 @@
-import { pgTable, text, serial, timestamp, integer } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, timestamp, integer, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -11,6 +11,7 @@ export const coursesTable = pgTable("courses", {
   difficulty: text("difficulty").notNull(),
   totalLessons: integer("total_lessons").notNull().default(0),
   completedLessons: integer("completed_lessons").notNull().default(0),
+  archived: boolean("archived").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -26,6 +27,7 @@ export const lessonsTable = pgTable("lessons", {
   drillFen: text("drill_fen"),
   drillExpectedMove: text("drill_expected_move"),
   drillHint: text("drill_hint"),
+  archived: boolean("archived").notNull().default(false),
 });
 
 export const insertCourseSchema = createInsertSchema(coursesTable).omit({ id: true, createdAt: true });

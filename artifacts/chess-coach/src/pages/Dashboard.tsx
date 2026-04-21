@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { apiFetch } from '@/lib/api';
 import { useMyAnalysisSummary, useMyWeaknesses } from '@/hooks/use-analysis';
 import { useMyCourses } from '@/hooks/use-courses';
 import { useMyGames } from '@/hooks/use-games';
@@ -47,6 +48,26 @@ export function Dashboard() {
   const { data: coursesData } = useMyCourses();
   const { data: gamesData } = useMyGames(5);
   const { data: allGamesData } = useMyGames();
+
+  const [coursesBeta, setCoursesBeta] = useState(true);
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all([
+      apiFetch('/api/puzzles/quality').then(r => r.ok ? r.json() : null).catch(() => null),
+      apiFetch('/api/courses/quality').then(r => r.ok ? r.json() : null).catch(() => null),
+    ]).then(([puzzles, courses]) => {
+      if (cancelled) return;
+      const rates: number[] = [];
+      if (puzzles && typeof puzzles.passRate === 'number') rates.push(puzzles.passRate);
+      if (courses && typeof courses.passRate === 'number') rates.push(courses.passRate);
+      if (rates.length === 0) return;
+      // Hide Beta tag once the weakest of (puzzle, course) content quality
+      // crosses the promotion threshold.
+      const min = Math.min(...rates);
+      setCoursesBeta(min < 0.95);
+    });
+    return () => { cancelled = true; };
+  }, []);
 
   if (loadingSummary) {
     return (
@@ -432,7 +453,9 @@ export function Dashboard() {
                   <PieceTile piece="♝" />
                   <h2 className="text-base md:text-lg font-black flex items-center gap-2" style={{ color: TEXT_LIGHT, letterSpacing: '-0.01em' }}>
                     Courses
-                    <span className="px-1.5 py-0.5 rounded text-[10px] font-black uppercase tracking-[0.18em]" style={{ background: 'rgba(129,182,76,0.18)', color: CHESSCOM_GREEN, border: '1px solid rgba(129,182,76,0.3)' }}>Beta</span>
+                    {coursesBeta && (
+                      <span className="px-1.5 py-0.5 rounded text-[10px] font-black uppercase tracking-[0.18em]" style={{ background: 'rgba(129,182,76,0.18)', color: CHESSCOM_GREEN, border: '1px solid rgba(129,182,76,0.3)' }}>Beta</span>
+                    )}
                   </h2>
                 </div>
                 <Link href="/courses" className="text-[10px] font-black uppercase tracking-[0.18em] flex items-center gap-0.5 hover:underline" style={{ color: CHESSCOM_GREEN }}>

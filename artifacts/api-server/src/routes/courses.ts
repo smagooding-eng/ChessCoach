@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db, coursesTable, lessonsTable, weaknessesTable, gamesTable, backgroundJobsTable } from "@workspace/db";
-import { eq, desc, inArray, and } from "drizzle-orm";
+import { eq, desc, inArray, and, count } from "drizzle-orm";
 import {
   ListCoursesQueryParams,
   ListCoursesResponse,
@@ -160,6 +160,19 @@ router.get("/courses/active-job", async (req, res): Promise<void> => {
   res.json({ job: job ? { jobId: job.id, status: job.status } : null });
 });
 
+router.get("/courses/quality", async (_req, res): Promise<void> => {
+  try {
+    const [totalRow] = await db.select({ c: count() }).from(lessonsTable);
+    const [archivedRow] = await db.select({ c: count() }).from(lessonsTable).where(eq(lessonsTable.archived, true));
+    const total = totalRow?.c ?? 0;
+    const archived = archivedRow?.c ?? 0;
+    const valid = total - archived;
+    res.json({ total, valid, archived, passRate: total > 0 ? valid / total : 1 });
+  } catch {
+    res.status(500).json({ error: "failed" });
+  }
+});
+
 router.get("/courses", async (req, res): Promise<void> => {
   const query = ListCoursesQueryParams.safeParse(req.query);
   if (!query.success) {
@@ -172,7 +185,10 @@ router.get("/courses", async (req, res): Promise<void> => {
   const courses = await db
     .select()
     .from(coursesTable)
-    .where(eq(coursesTable.username, username.toLowerCase()))
+    .where(and(
+      eq(coursesTable.username, username.toLowerCase()),
+      eq(coursesTable.archived, false),
+    ))
     .orderBy(desc(coursesTable.createdAt));
 
   res.json(
@@ -438,7 +454,10 @@ router.get("/courses/endgame", async (req, res): Promise<void> => {
   const courses = await db
     .select()
     .from(coursesTable)
-    .where(eq(coursesTable.username, username))
+    .where(and(
+      eq(coursesTable.username, username),
+      eq(coursesTable.archived, false),
+    ))
     .orderBy(desc(coursesTable.createdAt));
 
   const endgameCourses = courses.filter(c =>
@@ -466,7 +485,7 @@ router.get("/courses/:id", async (req, res): Promise<void> => {
   const [course] = await db
     .select()
     .from(coursesTable)
-    .where(eq(coursesTable.id, params.data.id));
+    .where(and(eq(coursesTable.id, params.data.id), eq(coursesTable.archived, false)));
 
   if (!course) {
     res.status(404).json({ error: "Course not found" });
@@ -476,7 +495,7 @@ router.get("/courses/:id", async (req, res): Promise<void> => {
   const lessons = await db
     .select()
     .from(lessonsTable)
-    .where(eq(lessonsTable.courseId, course.id))
+    .where(and(eq(lessonsTable.courseId, course.id), eq(lessonsTable.archived, false)))
     .orderBy(lessonsTable.orderIndex);
 
   res.json(
