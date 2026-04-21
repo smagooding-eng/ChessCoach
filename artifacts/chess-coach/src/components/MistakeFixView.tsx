@@ -1,8 +1,9 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { Chess } from 'chess.js';
+import { motion, AnimatePresence } from 'framer-motion';
 import { ChessBoard } from './ChessBoard';
 import { normalizeFen } from '@/lib/utils';
-import { AlertTriangle, CheckCircle2, ArrowRight } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight } from 'lucide-react';
 
 type Classification =
   | 'checkmate' | 'brilliant' | 'great' | 'best' | 'excellent' | 'good' | 'book'
@@ -94,92 +95,172 @@ export function MistakeFixView({
   const classLabel = CLASS_LABEL[classification];
   const tone = CLASS_TONE[classification];
 
+  // Slide state: 0 = "what you played", 1 = "engine recommends".
+  // Default to the played side so the user sees their mistake first.
+  const [slide, setSlide] = useState<0 | 1>(0);
+
+  // Reset to "what you played" whenever the underlying move changes
+  useEffect(() => {
+    setSlide(0);
+  }, [prevFen, playedMove?.san, betterMoveText]);
+
+  const slides = [
+    {
+      key: 'played' as const,
+      title: 'What you played',
+      icon: AlertTriangle,
+      iconClass: tone.chipText,
+      ring: tone.ring,
+      chipBg: tone.chipBg,
+      chipText: tone.chipText,
+      chipBorder: tone.chipBorder,
+      moveSan: playedMove?.san ?? null,
+      fen: playedAfterFen,
+      lastMove: playedMove ? { from: playedMove.from, to: playedMove.to } : null,
+      quality: classification,
+      caption: `Position after your ${classLabel.toLowerCase()}`,
+      empty: false,
+    },
+    {
+      key: 'engine' as const,
+      title: 'Engine recommends',
+      icon: CheckCircle2,
+      iconClass: 'text-emerald-400',
+      ring: 'ring-emerald-400/40',
+      chipBg: 'bg-emerald-400/15',
+      chipText: 'text-emerald-300',
+      chipBorder: 'border-emerald-400/40',
+      moveSan: better?.san ?? null,
+      fen: better?.resultFen ?? prevFen,
+      lastMove: better ? { from: better.from, to: better.to } : null,
+      quality: 'best' as const,
+      caption: better ? "Position after engine's move" : 'No alternative available',
+      empty: !better,
+    },
+  ];
+  const current = slides[slide];
+  const Icon = current.icon;
+  const goPrev = () => setSlide(0);
+  const goNext = () => setSlide(1);
+
   return (
-    <div className="space-y-3">
-      {/* Compare header */}
-      <div className="flex items-center justify-center gap-2">
-        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-[0.14em] border ${tone.chipBg} ${tone.chipText} ${tone.chipBorder}`}>
-          <AlertTriangle className="w-3 h-3" />
-          {classLabel}
-        </span>
-        <ArrowRight className="w-3.5 h-3.5 text-white/30" />
-        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-[0.14em] border bg-emerald-400/15 text-emerald-300 border-emerald-400/40">
-          <CheckCircle2 className="w-3 h-3" />
-          ENGINE LINE
-        </span>
+    <div className="space-y-3 max-w-[520px] mx-auto">
+      {/* Tab toggle */}
+      <div role="tablist" aria-label="Compare your move with the engine" className="flex items-stretch gap-1 p-1 rounded-lg bg-white/5 border border-white/10">
+        {slides.map((s, idx) => {
+          const active = idx === slide;
+          const SIcon = s.icon;
+          return (
+            <button
+              key={s.key}
+              role="tab"
+              aria-selected={active}
+              onClick={() => setSlide(idx as 0 | 1)}
+              className={`flex-1 flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md text-[10px] font-black uppercase tracking-[0.12em] transition-colors ${
+                active
+                  ? `${s.chipBg} ${s.chipText} border ${s.chipBorder}`
+                  : 'text-white/50 hover:text-white/80 hover:bg-white/5 border border-transparent'
+              }`}
+            >
+              <SIcon className="w-3 h-3 shrink-0" />
+              <span className="truncate">{idx === 0 ? classLabel : 'Engine line'}</span>
+              {s.moveSan && (
+                <span className={`hidden sm:inline-block font-mono normal-case tracking-normal text-[10px] font-bold ml-1 ${active ? s.chipText : 'text-white/40'}`}>
+                  {s.moveSan}
+                </span>
+              )}
+            </button>
+          );
+        })}
       </div>
 
-      {/* Dual board grid: stacked on narrow, side-by-side on md+ */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-w-[820px] mx-auto">
-        {/* WHAT YOU PLAYED */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between gap-2 px-1">
-            <div className="flex items-center gap-1.5 min-w-0">
-              <AlertTriangle className={`w-3.5 h-3.5 shrink-0 ${tone.chipText}`} />
-              <span className="text-[10px] font-black uppercase tracking-[0.12em] text-white/70 truncate">
-                What you played
-              </span>
-            </div>
-            {playedMove && (
-              <span className={`shrink-0 font-mono text-[11px] font-bold px-1.5 py-0.5 rounded border ${tone.chipBg} ${tone.chipText} ${tone.chipBorder}`}>
-                {playedMove.san}
-              </span>
-            )}
-          </div>
-          <div className={`rounded-xl ring-1 ${tone.ring} overflow-hidden`}>
-            <ChessBoard
-              fen={playedAfterFen}
-              flipped={flipped}
-              lastMove={playedMove ? { from: playedMove.from, to: playedMove.to } : null}
-              moveQuality={classification}
-            />
-          </div>
-        </div>
+      {/* Single board, sliding between the two views */}
+      <div className="relative">
+        {/* Prev arrow */}
+        <button
+          type="button"
+          onClick={goPrev}
+          disabled={slide === 0}
+          aria-label="Show what you played"
+          className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1/2 z-10 w-8 h-8 rounded-full bg-black/60 border border-white/10 backdrop-blur flex items-center justify-center text-white/70 hover:text-white hover:bg-black/80 disabled:opacity-30 disabled:cursor-not-allowed transition"
+        >
+          <ChevronLeft className="w-4 h-4" />
+        </button>
+        {/* Next arrow */}
+        <button
+          type="button"
+          onClick={goNext}
+          disabled={slide === 1}
+          aria-label="Show engine's recommended move"
+          className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 z-10 w-8 h-8 rounded-full bg-black/60 border border-white/10 backdrop-blur flex items-center justify-center text-white/70 hover:text-white hover:bg-black/80 disabled:opacity-30 disabled:cursor-not-allowed transition"
+        >
+          <ChevronRight className="w-4 h-4" />
+        </button>
 
-        {/* ENGINE LINE */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between gap-2 px-1">
-            <div className="flex items-center gap-1.5 min-w-0">
-              <CheckCircle2 className="w-3.5 h-3.5 shrink-0 text-emerald-400" />
-              <span className="text-[10px] font-black uppercase tracking-[0.12em] text-white/70 truncate">
-                Engine recommends
-              </span>
-            </div>
-            {better && (
-              <span className="shrink-0 font-mono text-[11px] font-bold px-1.5 py-0.5 rounded border bg-emerald-400/15 text-emerald-300 border-emerald-400/40">
-                {better.san}
-              </span>
-            )}
+        {/* Slide header */}
+        <div className="flex items-center justify-between gap-2 px-1 mb-2">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <Icon className={`w-3.5 h-3.5 shrink-0 ${current.iconClass}`} />
+            <span className="text-[10px] font-black uppercase tracking-[0.12em] text-white/70 truncate">
+              {current.title}
+            </span>
           </div>
-          {better ? (
-            <div className="rounded-xl ring-1 ring-emerald-400/40 overflow-hidden">
-              <ChessBoard
-                fen={better.resultFen}
-                flipped={flipped}
-                lastMove={{ from: better.from, to: better.to }}
-                moveQuality="best"
-              />
-            </div>
-          ) : (
-            <div className="aspect-square w-full rounded-xl bg-white/5 border border-dashed border-white/10 flex flex-col items-center justify-center gap-2 text-center px-4">
-              <CheckCircle2 className="w-7 h-7 text-white/20" />
-              <p className="text-[11px] text-white/50 leading-snug">
-                {betterMoveText
-                  ? <>Coach suggests:<br/><span className="font-mono text-white/70">{betterMoveText}</span></>
-                  : 'No alternative move was suggested.'}
-              </p>
-            </div>
+          {current.moveSan && (
+            <span className={`shrink-0 font-mono text-[11px] font-bold px-1.5 py-0.5 rounded border ${current.chipBg} ${current.chipText} ${current.chipBorder}`}>
+              {current.moveSan}
+            </span>
           )}
         </div>
-      </div>
 
-      {/* Compact captions row */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        <p className="text-[10px] text-white/40 text-center px-2 leading-snug">
-          Position after your {classLabel.toLowerCase()}
-        </p>
-        <p className="text-[10px] text-white/40 text-center px-2 leading-snug">
-          {better ? "Position after engine's move" : 'No alternative available'}
+        <div className="relative overflow-hidden rounded-xl">
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.div
+              key={current.key}
+              initial={{ opacity: 0, x: slide === 1 ? 24 : -24 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: slide === 1 ? -24 : 24 }}
+              transition={{ duration: 0.18, ease: 'easeOut' }}
+            >
+              {current.empty ? (
+                <div className="aspect-square w-full rounded-xl bg-white/5 border border-dashed border-white/10 flex flex-col items-center justify-center gap-2 text-center px-4">
+                  <CheckCircle2 className="w-7 h-7 text-white/20" />
+                  <p className="text-[11px] text-white/50 leading-snug">
+                    {betterMoveText
+                      ? <>Coach suggests:<br/><span className="font-mono text-white/70">{betterMoveText}</span></>
+                      : 'No alternative move was suggested.'}
+                  </p>
+                </div>
+              ) : (
+                <div className={`rounded-xl ring-1 ${current.ring} overflow-hidden`}>
+                  <ChessBoard
+                    fen={current.fen}
+                    flipped={flipped}
+                    lastMove={current.lastMove}
+                    moveQuality={current.quality}
+                  />
+                </div>
+              )}
+            </motion.div>
+          </AnimatePresence>
+        </div>
+
+        {/* Slide indicators */}
+        <div className="flex items-center justify-center gap-1.5 mt-2">
+          {slides.map((s, idx) => (
+            <button
+              key={s.key}
+              type="button"
+              onClick={() => setSlide(idx as 0 | 1)}
+              aria-label={`Go to slide ${idx + 1}`}
+              className={`h-1.5 rounded-full transition-all ${
+                idx === slide ? 'w-6 bg-white/70' : 'w-1.5 bg-white/25 hover:bg-white/40'
+              }`}
+            />
+          ))}
+        </div>
+
+        <p className="text-[10px] text-white/40 text-center px-2 leading-snug mt-1.5">
+          {current.caption}
         </p>
       </div>
     </div>
