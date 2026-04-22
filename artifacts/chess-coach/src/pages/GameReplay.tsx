@@ -914,7 +914,10 @@ export function GameReplay() {
           </div>
 
           {/* Chess board — capped on mobile so the AI coach card fits below.
-              Size stays the same regardless of move quality so the board doesn't jump as you click through moves. */}
+              Size stays the same regardless of move quality so the board doesn't jump as you click through moves.
+              We always reserve a fixed-height slot above the board for the
+              MistakeFixView tab toggle ("Played | Engine line") so the board
+              doesn't shift up/down when navigating between bad and good moves. */}
           <div className="mx-auto w-full max-w-[min(100%,52dvh)] md:max-w-[min(100%,55dvh)] xl:max-w-none order-[-3] xl:order-none">
             {isBad && currentReview && currentMove > 0 && !practiceMode ? (
               (() => {
@@ -935,15 +938,21 @@ export function GameReplay() {
                 );
               })()
             ) : (
-              <ChessBoard
-                fen={currentFen}
-                flipped={flipped}
-                practiceMode={practiceMode}
-                expectedMoveSan={practiceMode ? bestMoveSan : null}
-                onMovePlayed={handleMovePlayed}
-                lastMove={lastMove}
-                moveQuality={currentReview?.classification ?? null}
-              />
+              <div className="max-w-[520px] mx-auto space-y-1.5 md:space-y-2">
+                {/* Invisible spacer matching MistakeFixView's tab toggle height
+                    so the board occupies the same vertical position whether or
+                    not the move is classified as bad. */}
+                <div aria-hidden className="h-[34px] invisible" />
+                <ChessBoard
+                  fen={currentFen}
+                  flipped={flipped}
+                  practiceMode={practiceMode}
+                  expectedMoveSan={practiceMode ? bestMoveSan : null}
+                  onMovePlayed={handleMovePlayed}
+                  lastMove={lastMove}
+                  moveQuality={currentReview?.classification ?? null}
+                />
+              </div>
             )}
           </div>
 
