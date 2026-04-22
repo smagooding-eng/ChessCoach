@@ -145,15 +145,16 @@ function AnalysisSummaryPanel({
     return Math.min(100, Math.max(0, 103.1668 * Math.exp(-0.075 * avgLoss) - 3.1668));
   };
 
-  // Fold "book" into "good" so the breakdown matches chess.com's 9-row layout.
+  // Keep "book" as its own bucket so well-known opening moves are surfaced
+  // distinctly (it's a learning signal users explicitly want to see).
   const counts = (moves: MoveAnalysis[]) => ({
     checkmate: moves.filter(m => m.classification === 'checkmate').length,
     brilliant: moves.filter(m => m.classification === 'brilliant').length,
     great: moves.filter(m => m.classification === 'great').length,
     best: moves.filter(m => m.classification === 'best').length,
     excellent: moves.filter(m => m.classification === 'excellent').length,
-    good: moves.filter(m => m.classification === 'good' || m.classification === 'book').length,
-    book: 0,
+    good: moves.filter(m => m.classification === 'good').length,
+    book: moves.filter(m => m.classification === 'book').length,
     inaccuracy: moves.filter(m => m.classification === 'inaccuracy').length,
     mistake: moves.filter(m => m.classification === 'mistake').length,
     blunder: moves.filter(m => m.classification === 'blunder').length,
@@ -182,7 +183,7 @@ function AnalysisSummaryPanel({
               <div className="text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>{p.name} ({p.rating})</div>
               <div className="text-2xl font-bold" style={{ color: CHESSCOM_GREEN }}>{p.acc.toFixed(1)}%</div>
               <div className="flex flex-wrap gap-1 justify-center mt-2">
-                {(['brilliant','great','best','excellent','good','inaccuracy','mistake','blunder','missed_win'] as Classification[]).map(cls => {
+                {(['brilliant','great','best','excellent','good','book','inaccuracy','mistake','blunder','missed_win'] as Classification[]).map(cls => {
                   const cnt = p.c[cls];
                   if (cnt === 0) return null;
                   const cfg = CLASS_CFG[cls];
