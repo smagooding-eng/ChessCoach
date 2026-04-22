@@ -96,9 +96,11 @@ function GameRatingPanel({
   whiteAvatar?: string;
   blackAvatar?: string;
 }) {
+  // Fallback midpoints aligned with the chess.com-style bucket boundaries
+  // (excellent ≤2, good ≤6, inaccuracy ≤15, mistake ≤30, blunder >30).
   const WIN_PCT_LOSS_BY_CLASS: Record<Classification, number> = {
-    checkmate: 0, brilliant: 0, great: 0, best: 0, excellent: 0.5, book: 0.7, good: 2,
-    inaccuracy: 8, mistake: 16, blunder: 33, missed_win: 25,
+    checkmate: 0, brilliant: 0, great: 0, best: 0, excellent: 1, book: 1, good: 3,
+    inaccuracy: 9, mistake: 18, blunder: 35, missed_win: 25,
   };
 
   const byColor = (c: 'white' | 'black') => reviewMoves.filter(m => m.color === c);
@@ -112,7 +114,9 @@ function GameRatingPanel({
       return s + Math.max(base, ['good', 'book', 'excellent', 'best', 'great'].includes(m.classification) && !m.engineAvailable ? unverifiedFloor : base);
     }, 0);
     const avgWinPctLoss = totalWinPctLoss / moves.length;
-    return Math.min(100, Math.max(0, 103.1668 * Math.exp(-0.065 * avgWinPctLoss) - 3.1668));
+    // Chess.com-aligned curve (-0.075). Gives ~54.5% / ~48.3% on the
+    // reference game where the previous -0.065 exponent reported 60.7 / 51.4.
+    return Math.min(100, Math.max(0, 103.1668 * Math.exp(-0.075 * avgWinPctLoss) - 3.1668));
   };
 
   const toGameRating = (acc: number) => {
@@ -1483,9 +1487,12 @@ export function GameReplay() {
 
           {/* Review summary — per-player accuracy */}
           {reviewMoves.length > 0 && (() => {
+            // Chess.com-aligned bucket midpoints + curve (-0.075). Must stay
+            // in sync with GameRatingPanel.WIN_PCT_LOSS_BY_CLASS / calcAccuracy
+            // and with backend openaiAnalysis.toAccuracy.
             const WIN_PCT_MAP: Record<Classification, number> = {
-              checkmate: 0, brilliant: 0, great: 0, best: 0, excellent: 0.5, book: 0.7, good: 2,
-              inaccuracy: 8, mistake: 16, blunder: 33, missed_win: 25,
+              checkmate: 0, brilliant: 0, great: 0, best: 0, excellent: 1, book: 1, good: 3,
+              inaccuracy: 9, mistake: 18, blunder: 35, missed_win: 25,
             };
 
             function calcAccuracy(moves: ReviewMove[]) {
@@ -1497,7 +1504,7 @@ export function GameReplay() {
                 return s + Math.max(base, ['good', 'book', 'excellent', 'best', 'great'].includes(m.classification) && !m.engineAvailable ? unverifiedFloor : base);
               }, 0);
               const avgWinPctLoss = totalWinPctLoss / moves.length;
-              return Math.round(Math.min(100, Math.max(0, 103.1668 * Math.exp(-0.065 * avgWinPctLoss) - 3.1668)));
+              return Math.round(Math.min(100, Math.max(0, 103.1668 * Math.exp(-0.075 * avgWinPctLoss) - 3.1668)));
             }
 
             function countFor(moves: ReviewMove[]) {

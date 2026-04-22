@@ -122,26 +122,38 @@ function AnalysisSummaryPanel({
   turningPoints: TurningPoint[];
   game: H2HGame;
 }) {
-  const WEIGHTS: Record<Classification, number> = {
-    checkmate: 100, brilliant: 100, great: 100, best: 100, excellent: 98, book: 90, good: 85,
-    inaccuracy: 55, mistake: 25, blunder: 0, missed_win: 10,
+  // Win-pct-loss fallback table for moves whose engine eval wasn't captured
+  // in this older analysis snapshot. Numbers chosen to roughly mirror the
+  // chess.com bucket midpoints.
+  const WIN_PCT_LOSS_BY_CLASS: Record<Classification, number> = {
+    checkmate: 0, brilliant: 0, great: 0, best: 0, excellent: 1, book: 1, good: 3,
+    inaccuracy: 9, mistake: 18, blunder: 35, missed_win: 25,
   };
 
   const byColor = (c: 'white' | 'black') => analysis.filter(m => m.color === c);
 
+  // Chess.com-aligned accuracy: 103.1668 * exp(-0.075 * avgWinPctLoss) - 3.1668
   const calcAccuracy = (moves: MoveAnalysis[]) => {
     if (moves.length === 0) return 0;
-    return moves.reduce((s, m) => s + WEIGHTS[m.classification], 0) / moves.length;
+    const totalLoss = moves.reduce((s, m) => {
+      const loss = m.cpLoss != null && m.cpLoss >= 0
+        ? m.cpLoss
+        : WIN_PCT_LOSS_BY_CLASS[m.classification];
+      return s + loss;
+    }, 0);
+    const avgLoss = totalLoss / moves.length;
+    return Math.min(100, Math.max(0, 103.1668 * Math.exp(-0.075 * avgLoss) - 3.1668));
   };
 
+  // Fold "book" into "good" so the breakdown matches chess.com's 9-row layout.
   const counts = (moves: MoveAnalysis[]) => ({
     checkmate: moves.filter(m => m.classification === 'checkmate').length,
     brilliant: moves.filter(m => m.classification === 'brilliant').length,
     great: moves.filter(m => m.classification === 'great').length,
     best: moves.filter(m => m.classification === 'best').length,
     excellent: moves.filter(m => m.classification === 'excellent').length,
-    good: moves.filter(m => m.classification === 'good').length,
-    book: moves.filter(m => m.classification === 'book').length,
+    good: moves.filter(m => m.classification === 'good' || m.classification === 'book').length,
+    book: 0,
     inaccuracy: moves.filter(m => m.classification === 'inaccuracy').length,
     mistake: moves.filter(m => m.classification === 'mistake').length,
     blunder: moves.filter(m => m.classification === 'blunder').length,
@@ -170,7 +182,7 @@ function AnalysisSummaryPanel({
               <div className="text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>{p.name} ({p.rating})</div>
               <div className="text-2xl font-bold" style={{ color: CHESSCOM_GREEN }}>{p.acc.toFixed(1)}%</div>
               <div className="flex flex-wrap gap-1 justify-center mt-2">
-                {(['brilliant','great','best','excellent','good','book','inaccuracy','mistake','blunder','missed_win'] as Classification[]).map(cls => {
+                {(['brilliant','great','best','excellent','good','inaccuracy','mistake','blunder','missed_win'] as Classification[]).map(cls => {
                   const cnt = p.c[cls];
                   if (cnt === 0) return null;
                   const cfg = CLASS_CFG[cls];

@@ -417,8 +417,11 @@ export async function analyzeGamePgn(pgn: string, onProgress?: (done: number, to
   const avgBlackLoss = blackLosses.length > 0
     ? blackLosses.reduce((a, b) => a + b, 0) / blackLosses.length : 0;
 
+  // Chess.com-aligned curve: empirically fitted from reference games where
+  // chess.com reported W/B accuracy of 54.5/48.3 vs our previous (-0.065)
+  // exponent's 60.7/51.4 outputs. -0.075 brings us within ~1.5 points.
   const toAccuracy = (avgLoss: number) =>
-    Math.max(0, Math.min(100, 103.1668 * Math.exp(-0.065 * avgLoss) - 3.1668));
+    Math.max(0, Math.min(100, 103.1668 * Math.exp(-0.075 * avgLoss) - 3.1668));
 
   return {
     moves,

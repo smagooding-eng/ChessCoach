@@ -346,7 +346,7 @@ export function classifyFromWinPctLoss(
   if (wasWinning && isNowLosing && winPctLoss > 25) {
     return "missed_win";
   }
-  if (hadMateOrCrush && winPctLoss > 15) {
+  if (hadMateOrCrush && winPctLoss > 20) {
     return "missed_win";
   }
 
@@ -356,22 +356,24 @@ export function classifyFromWinPctLoss(
 
   const alreadyDecided = playerWinPctBefore < 10 || playerWinPctBefore > 90;
 
-  if (winPctLoss > 25) {
+  // Chess.com-aligned bad-move thresholds (slightly more lenient than before
+  // to match their distribution observed across reference games).
+  if (winPctLoss > 30) {
     if (alreadyDecided) return "mistake";
     return "blunder";
   }
-  if (winPctLoss > 12) {
+  if (winPctLoss > 15) {
     if (alreadyDecided) return "inaccuracy";
     return "mistake";
   }
-  if (winPctLoss > 5) {
+  if (winPctLoss > 6) {
     return "inaccuracy";
   }
 
   if (alreadyDecided && cpLossRaw > 0 && !isTopEngineMove) {
-    if (cpLossRaw > 300) return "blunder";
-    if (cpLossRaw > 150) return "mistake";
-    if (cpLossRaw > 75) return "inaccuracy";
+    if (cpLossRaw > 400) return "blunder";
+    if (cpLossRaw > 200) return "mistake";
+    if (cpLossRaw > 100) return "inaccuracy";
   }
 
   if (isTopEngineMove) {
@@ -380,7 +382,7 @@ export function classifyFromWinPctLoss(
     // (≥15 points) AND (c) the engine eval after the move shows a material
     // / positional gain on the order of a queen (≥600 cp). Downstream the
     // move must also pass `isSacrificialMove`. Anything weaker downgrades
-    // to best/great/excellent.
+    // to best/excellent.
     const playerCpSwing = -cpLossRaw; // positive when the player gained
     if (
       winPctLoss < -15 &&
@@ -391,20 +393,21 @@ export function classifyFromWinPctLoss(
       return "brilliant";
     }
 
-    if (legalMoveCount <= 5 && winPctLoss <= 0) {
-      return "great";
-    }
-
-    const evalSwing = playerWinPctAfter - playerWinPctBefore;
-    if (evalSwing > 15 && playerWinPctBefore <= 55) {
+    // "Great" mirrors chess.com: only the SOLE saving move in a position
+    // where every other legal reply is materially worse. We approximate by
+    // requiring an extremely small legal-move count (≤3) AND a clear
+    // positive swing for the player (winPctLoss ≤ -3 means the player
+    // gained ≥3 win-pct points by playing the engine top move).
+    if (legalMoveCount <= 3 && winPctLoss <= -3) {
       return "great";
     }
 
     return "best";
   }
 
-  if (winPctLoss <= 1) return "excellent";
-  if (winPctLoss <= 5) return "good";
+  // Non-top engine move buckets, widened to mirror chess.com:
+  if (winPctLoss <= 2) return "excellent";
+  if (winPctLoss <= 6) return "good";
 
   return "good";
 }
