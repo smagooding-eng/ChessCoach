@@ -431,6 +431,8 @@ router.get("/games", requireAuth, async (req, res): Promise<void> => {
       total: Number(total),
     })
   );
+
+  triggerBackgroundReReviewForStaleReviews(req.user!.id, req.log).catch(() => {});
 });
 
 // One-time utility: re-extract opening names from PGN for all games with null opening
@@ -1005,6 +1007,73 @@ async function runReviewJob(gameId: number, jobId: string, log: Logger): Promise
 }
 
 const STALE_JOB_MS = 5 * 60 * 1000;
+
+const RE_REVIEW_COOLDOWN_MS = 5 * 60 * 1000;
+const RE_REVIEW_PER_TRIGGER = 2;
+const lastReReviewTriggerByUser = new Map<string, number>();
+
+const STALE_REVIEW_BAD_FILTER = sql`(
+  jsonb_path_exists(${gamesTable.reviewData}, '$.moves[*] ? (@.classification == "blunder" || @.classification == "mistake" || @.classification == "inaccuracy" || @.classification == "missed_win")'::jsonpath)
+  OR jsonb_path_exists(${gamesTable.reviewData}, '$[*] ? (@.classification == "blunder" || @.classification == "mistake" || @.classification == "inaccuracy" || @.classification == "missed_win")'::jsonpath)
+)`;
+
+const STALE_REVIEW_NO_BEST_LINE_FILTER = sql`NOT (
+  jsonb_path_exists(${gamesTable.reviewData}, '$.moves[*].bestLineSan[0]'::jsonpath)
+  OR jsonb_path_exists(${gamesTable.reviewData}, '$[*].bestLineSan[0]'::jsonpath)
+)`;
+
+async function triggerBackgroundReReviewForStaleReviews(userId: string, log: Logger): Promise<void> {
+  const now = Date.now();
+  const last = lastReReviewTriggerByUser.get(userId) ?? 0;
+  if (now - last < RE_REVIEW_COOLDOWN_MS) return;
+  lastReReviewTriggerByUser.set(userId, now);
+
+  try {
+    const [{ value: pendingCount }] = await db
+      .select({ value: count() })
+      .from(backgroundJobsTable)
+      .where(and(
+        eq(backgroundJobsTable.userId, userId),
+        eq(backgroundJobsTable.type, "review"),
+        eq(backgroundJobsTable.status, "pending"),
+      ));
+
+    if (Number(pendingCount) > 0) return;
+
+    const stale = await db
+      .select({ id: gamesTable.id })
+      .from(gamesTable)
+      .where(and(
+        eq(gamesTable.userId, userId),
+        sql`${gamesTable.reviewData} IS NOT NULL`,
+        STALE_REVIEW_BAD_FILTER,
+        STALE_REVIEW_NO_BEST_LINE_FILTER,
+      ))
+      .orderBy(asc(gamesTable.playedAt))
+      .limit(RE_REVIEW_PER_TRIGGER);
+
+    if (stale.length === 0) return;
+
+    log.info({ userId, count: stale.length }, "Auto-queueing background re-review for stale (older) game reviews");
+
+    for (const g of stale) {
+      const active = await findActiveReviewJob(g.id);
+      if (active) continue;
+
+      const jobId = randomUUID();
+      await db.insert(backgroundJobsTable).values({
+        id: jobId,
+        userId,
+        type: "review",
+        status: "pending",
+        targetUsername: String(g.id),
+      });
+      runReviewJob(g.id, jobId, log).catch(() => {});
+    }
+  } catch (err) {
+    log.warn({ err, userId }, "Failed to schedule background re-review for stale reviews");
+  }
+}
 
 async function findActiveReviewJob(gameId: number) {
   const [job] = await db.select().from(backgroundJobsTable).where(
