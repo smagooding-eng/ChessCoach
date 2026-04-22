@@ -800,6 +800,21 @@ export function GameReplay() {
     ? (reviewMoves.find(r => r.moveIndex === currentMove - 1) ?? null)
     : null;
 
+  // True when this game has a cached review with bad moves but no engine
+  // continuation lines — i.e. the review predates the bestLineSan feature
+  // and would benefit from a re-analyze.
+  const needsContinuationBackfill = useMemo(() => {
+    if (reviewMoves.length === 0) return false;
+    const hasBadMoves = reviewMoves.some(m =>
+      ['inaccuracy', 'mistake', 'blunder', 'missed_win'].includes(m.classification)
+    );
+    if (!hasBadMoves) return false;
+    const hasAnyContinuation = reviewMoves.some(m =>
+      Array.isArray(m.bestLineSan) && m.bestLineSan.length > 0
+    );
+    return !hasAnyContinuation;
+  }, [reviewMoves]);
+
   // Fetch best move from Lichess in practice mode
   useEffect(() => {
     if (!practiceMode || currentMove >= maxMoves) { setBestMoveSan(null); return; }
@@ -1020,13 +1035,34 @@ export function GameReplay() {
               {reviewMoves.length > 0 && !reviewing && (
                 <button
                   onClick={() => handleReview(true)}
-                  className="p-2.5 rounded-xl text-xs font-bold transition-colors border bg-secondary border-border hover:border-primary/40 hover:text-primary active:scale-90"
-                  title="Re-analyze with improved engine">
-                  <BrainCircuit className="w-5 h-5 md:w-3.5 md:h-3.5" />
+                  className={`p-2.5 md:px-3 md:py-2 rounded-xl text-xs font-bold transition-colors border flex items-center gap-1 md:gap-1.5 active:scale-90
+                    ${needsContinuationBackfill
+                      ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/40 hover:bg-emerald-500/25 animate-pulse'
+                      : 'bg-secondary border-border hover:border-primary/40 hover:text-primary'}`}
+                  title={needsContinuationBackfill
+                    ? 'This review is missing engine continuation lines. Click to re-analyze.'
+                    : 'Re-analyze this game with the latest engine'}>
+                  <RotateCcw className="w-5 h-5 md:w-3.5 md:h-3.5" />
+                  <span className="hidden md:inline">Re-analyze</span>
                 </button>
               )}
             </div>
           </div>
+
+          {needsContinuationBackfill && !reviewing && (
+            <div className="mt-2 rounded-xl border border-emerald-500/30 bg-emerald-500/[0.07] px-3 py-2 flex items-start gap-2">
+              <Sparkles className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+              <div className="flex-1 text-xs text-emerald-100/90 leading-snug">
+                <span className="font-semibold text-emerald-300">New: Engine continuations.</span>{' '}
+                This review predates engine continuation lines. Re-analyze to see the next several best moves after each mistake.
+              </div>
+              <button
+                onClick={() => handleReview(true)}
+                className="shrink-0 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-200 border border-emerald-500/40 active:scale-95">
+                Re-analyze
+              </button>
+            </div>
+          )}
 
           {/* Per-move analysis panel — positioned right below controls for easy follow-along */}
           {currentMove > 0 && reviewMoves.length > 0 && (() => {
