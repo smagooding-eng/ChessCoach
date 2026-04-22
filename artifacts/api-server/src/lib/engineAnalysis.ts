@@ -31,7 +31,31 @@ export interface PositionEval {
   bestMoveUci: string;
   secondBestUci: string;
   bestMoveSan: string | null;
+  /** SAN sequence of the engine's principal variation, starting with bestMoveSan.
+   *  Up to 6 plies. Empty if PV could not be parsed. */
+  bestLineSan: string[];
   depth: number;
+}
+
+/** Convert a UCI principal-variation sequence into SAN strings by walking the moves. */
+function uciSequenceToSan(startFen: string, uciMoves: string[], maxPlies = 6): string[] {
+  const out: string[] = [];
+  try {
+    const chess = new Chess(startFen);
+    for (const uci of uciMoves) {
+      if (out.length >= maxPlies) break;
+      if (!uci || uci.length < 4) break;
+      const from = uci.slice(0, 2);
+      const to = uci.slice(2, 4);
+      const promotion = uci.length === 5 ? (uci[4] as "q" | "r" | "b" | "n") : undefined;
+      const m = chess.move({ from, to, ...(promotion ? { promotion } : {}) });
+      if (!m) break;
+      out.push(m.san);
+    }
+  } catch {
+    // ignore — return whatever we have so far
+  }
+  return out;
 }
 
 function uciToSan(fen: string, uci: string): string | null {
@@ -176,6 +200,7 @@ class StockfishProcess {
     let secondBestUci = "";
     let bestDepth = 0;
     let secondBestDepth = 0;
+    let bestPvUciSeq: string[] = [];
 
     const isBlackToMove = fen.includes(" b ");
 
@@ -202,12 +227,14 @@ class StockfishProcess {
       }
 
       const pvLine = line.match(/ pv (.+)$/);
-      const firstMove = pvLine ? pvLine[1].split(" ")[0] : "";
+      const pvTokens = pvLine ? pvLine[1].split(/\s+/).filter(Boolean) : [];
+      const firstMove = pvTokens[0] ?? "";
 
       if (pvNum === 1 && lineDepth >= bestDepth) {
         bestCp = isBlackToMove ? -cpValue : cpValue;
         bestMoveUci = firstMove;
         bestDepth = lineDepth;
+        if (pvTokens.length > 0) bestPvUciSeq = pvTokens;
       } else if (pvNum === 2 && lineDepth >= secondBestDepth) {
         secondBestUci = firstMove;
         secondBestDepth = lineDepth;
@@ -220,8 +247,11 @@ class StockfishProcess {
     }
 
     const bestMoveSan = bestMoveUci ? uciToSan(fen, bestMoveUci) : null;
+    const bestLineSan = bestPvUciSeq.length > 0
+      ? uciSequenceToSan(fen, bestPvUciSeq, 6)
+      : (bestMoveSan ? [bestMoveSan] : []);
 
-    return { cpWhite: bestCp, bestMoveUci, secondBestUci, bestMoveSan, depth: bestDepth };
+    return { cpWhite: bestCp, bestMoveUci, secondBestUci, bestMoveSan, bestLineSan, depth: bestDepth };
   }
 
   destroy(): void {
@@ -279,7 +309,7 @@ export async function evaluateAllPositions(
       results.push(ev);
     } catch (err) {
       logger.warn({ err, fen: fens[i], idx: i }, "Engine eval failed for position");
-      results.push({ cpWhite: 0, bestMoveUci: "", secondBestUci: "", bestMoveSan: null, depth: 0 });
+      results.push({ cpWhite: 0, bestMoveUci: "", secondBestUci: "", bestMoveSan: null, bestLineSan: [], depth: 0 });
     }
     if (onProgress && i % 5 === 0) onProgress(i + 1, fens.length);
   }

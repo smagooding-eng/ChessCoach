@@ -13,9 +13,36 @@ interface MistakeFixViewProps {
   prevFen: string;
   playedMove: { san: string; from: string; to: string } | null;
   betterMoveText: string | null;
+  /** Engine principal variation (SAN) starting from prevFen. First element is the recommended move. */
+  bestLineSan?: string[];
   classification: Classification;
   flipped: boolean;
   onJumpIn?: () => void;
+}
+
+/** Render a SAN sequence with proper move numbers, e.g. "12. Nxe5 Nxe5 13. d4 Bb4+".
+ *  prevFen tells us whose turn it is and what the move number is at the start of the line. */
+function formatSanLine(prevFen: string, sanMoves: string[]): string {
+  if (!sanMoves.length) return '';
+  const parts = prevFen.split(/\s+/);
+  const sideToMove = parts[1] === 'b' ? 'b' : 'w';
+  let moveNumber = parseInt(parts[5] ?? '1', 10);
+  if (!Number.isFinite(moveNumber) || moveNumber < 1) moveNumber = 1;
+
+  const out: string[] = [];
+  let isWhiteToMove = sideToMove === 'w';
+  for (let i = 0; i < sanMoves.length; i++) {
+    if (isWhiteToMove) {
+      out.push(`${moveNumber}.`);
+      out.push(sanMoves[i]);
+    } else {
+      if (i === 0) out.push(`${moveNumber}...`);
+      out.push(sanMoves[i]);
+      moveNumber += 1;
+    }
+    isWhiteToMove = !isWhiteToMove;
+  }
+  return out.join(' ');
 }
 
 function tryMove(fen: string, san: string): { from: string; to: string; resultFen: string; san: string } | null {
@@ -73,6 +100,7 @@ export function MistakeFixView({
   prevFen,
   playedMove,
   betterMoveText,
+  bestLineSan = [],
   classification,
   flipped,
 }: MistakeFixViewProps) {
@@ -243,6 +271,22 @@ export function MistakeFixView({
             </motion.div>
           </AnimatePresence>
         </div>
+
+        {/* Engine continuation — shows the next few best moves AFTER the recommended fix
+            so the user can see how the line plays out. Only on the engine slide. */}
+        {slide === 1 && bestLineSan.length > 1 && (
+          <div className="mt-2 rounded-lg border border-emerald-400/20 bg-emerald-400/[0.06] px-2.5 py-1.5">
+            <div className="flex items-center gap-1.5 mb-1">
+              <CheckCircle2 className="w-3 h-3 text-emerald-400/80 shrink-0" />
+              <span className="text-[9px] font-black uppercase tracking-[0.14em] text-emerald-300/80">
+                Engine continuation
+              </span>
+            </div>
+            <p className="font-mono text-[11px] text-emerald-100/85 leading-snug break-words">
+              {formatSanLine(prevFen, bestLineSan)}
+            </p>
+          </div>
+        )}
 
         {/* Caption — hidden on mobile to save vertical space; the tab toggle already labels the view */}
         <p className="hidden md:block text-[10px] text-white/40 text-center px-2 leading-snug mt-1.5">

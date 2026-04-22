@@ -52,6 +52,8 @@ type ReviewMove = {
   cpLoss?: number;
   engineAvailable?: boolean;
   coachStatus?: 'engine-aligned' | 'fallback';
+  /** SAN sequence of the engine's recommended continuation. Up to 6 plies. */
+  bestLineSan?: string[];
 };
 
 type KeyMistake = {
@@ -907,13 +909,9 @@ export function GameReplay() {
             </div>
           </div>
 
-          {/* Chess board — capped on mobile so the AI coach card fits below without scrolling.
-              When MistakeFixView is shown we cap smaller because it adds ~90px of chrome (tabs, header, indicators). */}
-          <div className={`mx-auto w-full xl:max-w-none order-[-3] xl:order-none ${
-            isBad && currentReview && currentMove > 0 && !practiceMode
-              ? 'max-w-[min(100%,40dvh)] md:max-w-[min(100%,46dvh)]'
-              : 'max-w-[min(100%,52dvh)] md:max-w-[min(100%,55dvh)]'
-          }`}>
+          {/* Chess board — capped on mobile so the AI coach card fits below.
+              Size stays the same regardless of move quality so the board doesn't jump as you click through moves. */}
+          <div className="mx-auto w-full max-w-[min(100%,52dvh)] md:max-w-[min(100%,55dvh)] xl:max-w-none order-[-3] xl:order-none">
             {isBad && currentReview && currentMove > 0 && !practiceMode ? (
               (() => {
                 const prevFen = currentMove <= 1 ? gameStartFen : (moves[currentMove - 2]?.fen ?? gameStartFen);
@@ -926,6 +924,7 @@ export function GameReplay() {
                     prevFen={prevFen}
                     playedMove={playedMove}
                     betterMoveText={currentReview.betterMove}
+                    bestLineSan={currentReview.bestLineSan ?? []}
                     classification={currentReview.classification}
                     flipped={flipped}
                   />

@@ -163,7 +163,7 @@ export function AICoachCard({
               <ThinkingDot delay={0.3} />
             </div>
           ) : (
-            <div className="text-sm text-foreground/85 leading-relaxed space-y-2">
+            <div className="text-sm text-foreground/85 leading-relaxed space-y-2 max-h-[28dvh] xl:max-h-none overflow-y-auto hide-scrollbar pr-1">
               {children}
             </div>
           )}

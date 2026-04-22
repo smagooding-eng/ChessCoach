@@ -801,11 +801,14 @@ function mergeReviewWithEngine(
       cons = cleanCons;
     }
 
+    const bestLineSan = isBad ? (evalBefore.bestLineSan ?? []) : [];
+
     results.push({
       moveIndex: idx, san: om.san, color: om.color as "white" | "black",
       classification, explanation, betterMove, pros, cons,
       cpLoss: moveCpLoss, engineAvailable: true,
       coachStatus,
+      bestLineSan,
     });
   }
   return results;
@@ -828,6 +831,9 @@ export interface MoveReview {
    *  ("engine-aligned") or had to be replaced with a deterministic template
    *  ("fallback"). Absent when no LLM text was applicable. */
   coachStatus?: CoachStatus;
+  /** Engine principal variation (in SAN) starting from the position BEFORE the player's move.
+   *  Only populated for inaccuracy/mistake/blunder/missed_win moves. Up to 6 plies. */
+  bestLineSan?: string[];
 }
 
 export interface GameReviewSummary {
