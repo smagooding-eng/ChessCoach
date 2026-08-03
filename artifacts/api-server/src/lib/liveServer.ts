@@ -836,11 +836,7 @@ export function attachLiveServer(server: HttpServer) {
     let host: string;
     try { host = new URL(origin).host; } catch { return false; }
     const allow = new Set<string>();
-    const replitDomain = process.env.REPLIT_DEV_DOMAIN;
-    const replitDeployment = process.env.REPLIT_DEPLOYMENT_DOMAIN;
     const allowed = process.env.LIVE_WS_ALLOWED_ORIGINS;
-    if (replitDomain) allow.add(replitDomain);
-    if (replitDeployment) allow.add(replitDeployment);
     if (allowed) for (const d of allowed.split(',')) allow.add(d.trim());
     // Same-origin loopback only in dev.
     if (process.env.NODE_ENV !== 'production') {

@@ -1,6 +1,10 @@
-import { File } from "@google-cloud/storage";
+import {
+  HeadObjectCommand,
+  CopyObjectCommand,
+} from "@aws-sdk/client-s3";
+import { objectStorageClient, type ObjectHandle } from "./objectStorage";
 
-const ACL_POLICY_METADATA_KEY = "custom:aclPolicy";
+const ACL_POLICY_METADATA_KEY = "acl-policy";
 
 // Can be flexibly defined according to the use case.
 //
@@ -29,7 +33,10 @@ export interface ObjectAclRule {
   permission: ObjectPermission;
 }
 
-// Stored as object custom metadata under "custom:aclPolicy" (JSON string).
+// Stored as an S3/R2 object custom metadata entry under "acl-policy" (JSON
+// string). S3-compatible stores don't support in-place metadata updates, so
+// setObjectAclPolicy re-uploads the object onto itself (CopyObjectCommand
+// with the same source/destination key) with the new metadata attached.
 export interface ObjectAclPolicy {
   owner: string;
   visibility: "public" | "private";
@@ -68,30 +75,49 @@ function createObjectAccessGroup(
 }
 
 export async function setObjectAclPolicy(
-  objectFile: File,
+  objectHandle: ObjectHandle,
   aclPolicy: ObjectAclPolicy,
 ): Promise<void> {
-  const [exists] = await objectFile.exists();
-  if (!exists) {
-    throw new Error(`Object not found: ${objectFile.name}`);
+  const existing = await objectStorageClient.send(
+    new HeadObjectCommand({
+      Bucket: objectHandle.bucketName,
+      Key: objectHandle.objectName,
+    })
+  ).catch(() => null);
+
+  if (!existing) {
+    throw new Error(`Object not found: ${objectHandle.objectName}`);
   }
 
-  await objectFile.setMetadata({
-    metadata: {
-      [ACL_POLICY_METADATA_KEY]: JSON.stringify(aclPolicy),
-    },
-  });
+  await objectStorageClient.send(
+    new CopyObjectCommand({
+      Bucket: objectHandle.bucketName,
+      Key: objectHandle.objectName,
+      CopySource: `${objectHandle.bucketName}/${objectHandle.objectName}`,
+      MetadataDirective: "REPLACE",
+      ContentType: existing.ContentType,
+      Metadata: {
+        ...(existing.Metadata || {}),
+        [ACL_POLICY_METADATA_KEY]: JSON.stringify(aclPolicy),
+      },
+    })
+  );
 }
 
 export async function getObjectAclPolicy(
-  objectFile: File,
+  objectHandle: ObjectHandle,
 ): Promise<ObjectAclPolicy | null> {
-  const [metadata] = await objectFile.getMetadata();
-  const aclPolicy = metadata?.metadata?.[ACL_POLICY_METADATA_KEY];
+  const metadata = await objectStorageClient.send(
+    new HeadObjectCommand({
+      Bucket: objectHandle.bucketName,
+      Key: objectHandle.objectName,
+    })
+  );
+  const aclPolicy = metadata?.Metadata?.[ACL_POLICY_METADATA_KEY];
   if (!aclPolicy) {
     return null;
   }
-  return JSON.parse(aclPolicy as string);
+  return JSON.parse(aclPolicy);
 }
 
 export async function canAccessObject({
@@ -100,7 +126,7 @@ export async function canAccessObject({
   requestedPermission,
 }: {
   userId?: string;
-  objectFile: File;
+  objectFile: ObjectHandle;
   requestedPermission: ObjectPermission;
 }): Promise<boolean> {
   const aclPolicy = await getObjectAclPolicy(objectFile);

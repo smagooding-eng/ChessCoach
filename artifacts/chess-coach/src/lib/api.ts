@@ -1,17 +1,20 @@
-const REPLIT_BACKEND = "https://chess-performance-analyzer.replit.app";
 const TOKEN_KEY = "chess_coach_token";
 
 function resolveBase(): string {
   if (import.meta.env.VITE_API_URL) {
     return (import.meta.env.VITE_API_URL as string).replace(/\/+$/, "");
   }
-  if (typeof window !== "undefined") {
-    const host = window.location.hostname;
-    if (host.includes("replit") || host === "localhost") {
-      return "";
-    }
+  if (typeof window !== "undefined" && window.location.hostname === "localhost") {
+    return "";
   }
-  return REPLIT_BACKEND;
+  if (import.meta.env.DEV) {
+    return "";
+  }
+  console.warn(
+    "VITE_API_URL is not set — API requests will fail. Set it to your backend's URL " +
+      "(e.g. https://your-api.onrender.com) in Vercel's project environment variables."
+  );
+  return "";
 }
 
 const _base = resolveBase();

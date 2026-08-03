@@ -663,8 +663,7 @@ router.post("/analysis/scan-position", async (req: Request, res: Response): Prom
     }
 
     const ai = new OpenAI({
-      baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
-      apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+      apiKey: process.env.OPENAI_API_KEY,
     });
 
     // Send the user's original image straight to the AI — no cropping, no

@@ -143,10 +143,11 @@ router.post("/admin/email/upload-image", requireAdmin, async (req: Request, res:
       body: buffer,
     });
 
-    const domain = process.env.REPLIT_DEPLOYMENT === '1'
-      ? process.env.REPLIT_DOMAINS?.split(',')[0]
-      : process.env.REPLIT_DEV_DOMAIN;
-    const publicUrl = `https://${domain}/api/storage${objectPath}`;
+    const publicAppUrl = (process.env.PUBLIC_APP_URL || "").replace(/\/+$/, "");
+    if (!publicAppUrl) {
+      throw new Error("PUBLIC_APP_URL environment variable is required.");
+    }
+    const publicUrl = `${publicAppUrl}/api/storage${objectPath}`;
 
     res.json({ success: true, url: publicUrl });
   } catch (err: any) {

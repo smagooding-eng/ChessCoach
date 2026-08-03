@@ -496,8 +496,7 @@ router.post("/admin/marketing/generate", requireAdmin, async (req: Request, res:
     }
 
     const openai = new OpenAI({
-      baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
-      apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+      apiKey: process.env.OPENAI_API_KEY,
     });
 
     const prompt = `You are a marketing copywriter for ChessScout.net — a smart chess coaching app.

@@ -86,7 +86,7 @@ export function getSessionId(req: Request): string | undefined {
   return req.cookies?.[SESSION_COOKIE];
 }
 
-const isSecure = process.env.NODE_ENV !== "development" || !!process.env.REPLIT_DEPLOYMENT;
+const isSecure = process.env.NODE_ENV !== "development";
 
 const isCrossOrigin = !!process.env.CORS_ORIGIN;
 

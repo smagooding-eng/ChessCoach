@@ -1,0 +1,9 @@
+node_modules
+**/node_modules
+**/dist
+**/.turbo
+.git
+attached_assets
+*.md
+artifacts/chess-coach/dist
+artifacts/mockup-sandbox/dist

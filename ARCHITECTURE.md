@@ -9,7 +9,6 @@ I prefer detailed explanations.
 I want to be asked before making major changes.
 I prefer to use simple language.
 I like functional programming.
-I do not want changes to the folder `artifacts/replit-auth-web/`.
 I want to ensure all background job types (review, analysis, scout) have stale-job recovery: pending jobs older than 5-10 minutes should be auto-expired to prevent stuck polling after server crashes.
 All status endpoints must enforce user ownership for IDOR protection.
 
@@ -52,11 +51,11 @@ The project is structured as a monorepo using pnpm workspaces, targeting Node.js
 
 # External Dependencies
 
-- **AI**: OpenAI (gpt-5.2 for player analysis, gpt-4o for game review, gpt-audio for TTS narration)
-- **Chess Engine**: Local Stockfish 17 binary (via nix) for move evaluation. Move classification uses a comprehensive ECO opening book (`openingBook.ts`, ~300 lines covering all major openings A00-E99). Book moves are only assigned when the position matches known opening theory; once a move leaves the book, all subsequent moves are classified by engine eval only. Full engine-driven classification system: `brilliant` (sacrifice + engine top move + improves position significantly), `great` (momentum shift or few good alternatives, engine top move), `best` (engine's #1 choice), `excellent` (very close to best, ≤1% win loss), `good` (solid, ≤5% win loss), `book` (opening theory), `inaccuracy` (>5% win loss), `mistake` (>12% win loss), `blunder` (>25% win loss), `missed_win` (was winning ≥70% but dropped to ≤40%). Brilliant requires `isSacrificialMove()` check — piece left hanging or exchange sacrifice. When position is already decided (player win% <10 or >90), win% compresses at extremes, so raw centipawn loss is used as fallback: >300cp = blunder, >150cp = mistake, >75cp = inaccuracy.
-- **Object Storage**: Google Cloud Storage via Replit sidecar for email image uploads.
-- **Database**: PostgreSQL (managed by Replit for production).
+- **AI**: OpenAI, called directly with `OPENAI_API_KEY` (gpt-5.2 for player analysis, gpt-4o for game review, gpt-audio for TTS narration, gpt-image-1 for image generation).
+- **Chess Engine**: Stockfish binary (installed via apt in the API server's Docker image) for move evaluation. Move classification uses a comprehensive ECO opening book (`openingBook.ts`, ~300 lines covering all major openings A00-E99). Book moves are only assigned when the position matches known opening theory; once a move leaves the book, all subsequent moves are classified by engine eval only. Full engine-driven classification system: `brilliant` (sacrifice + engine top move + improves position significantly), `great` (momentum shift or few good alternatives, engine top move), `best` (engine's #1 choice), `excellent` (very close to best, ≤1% win loss), `good` (solid, ≤5% win loss), `book` (opening theory), `inaccuracy` (>5% win loss), `mistake` (>12% win loss), `blunder` (>25% win loss), `missed_win` (was winning ≥70% but dropped to ≤40%). Brilliant requires `isSacrificialMove()` check — piece left hanging or exchange sacrifice. When position is already decided (player win% <10 or >90), win% compresses at extremes, so raw centipawn loss is used as fallback: >300cp = blunder, >150cp = mistake, >75cp = inaccuracy.
+- **Object Storage**: Cloudflare R2 (S3-compatible), accessed directly via `@aws-sdk/client-s3` — used for email image uploads and other private/public object storage.
+- **Database**: PostgreSQL (Neon, or any standard Postgres provider), via `DATABASE_URL`.
 - **Payment Gateway**: Stripe for subscriptions and customer portal.
 - **Email Service**: Resend for email delivery.
 - **Chess.com API**: For importing games and looking up player data.
-- **Replit AI Integrations**: For accessing OpenAI services.
+- **Hosting**: Frontend (`artifacts/chess-coach`) on Vercel as a static SPA. Backend (`artifacts/api-server`) as an always-on Docker web service (e.g. Render) — it holds a live WebSocket server, a Stockfish process, and a node-cron scheduler, none of which fit a serverless model.

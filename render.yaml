@@ -1,0 +1,32 @@
+services:
+  - type: web
+    name: chesscoach-api
+    runtime: docker
+    dockerfilePath: ./artifacts/api-server/Dockerfile
+    dockerContext: .
+    plan: free
+    healthCheckPath: /api/healthz
+    envVars:
+      - key: PORT
+        value: 8080
+      - key: NODE_ENV
+        value: production
+      # Set the rest of these in the Render dashboard (Environment tab) —
+      # they're secrets and shouldn't live in this file:
+      #   DATABASE_URL
+      #   PUBLIC_APP_URL          (this service's own public Render URL)
+      #   CORS_ORIGIN             (your Vercel frontend URL)
+      #   LIVE_WS_ALLOWED_ORIGINS (your Vercel frontend URL, for the WebSocket)
+      #   OPENAI_API_KEY
+      #   STRIPE_SECRET_KEY
+      #   STRIPE_PUBLISHABLE_KEY
+      #   RESEND_API_KEY
+      #   RESEND_FROM_EMAIL
+      #   GOOGLE_CLIENT_ID
+      #   GOOGLE_CLIENT_SECRET
+      #   R2_ACCOUNT_ID
+      #   R2_ACCESS_KEY_ID
+      #   R2_SECRET_ACCESS_KEY
+      #   PUBLIC_OBJECT_SEARCH_PATHS
+      #   PRIVATE_OBJECT_DIR
+      #   SESSION_SECRET

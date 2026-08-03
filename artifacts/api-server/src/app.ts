@@ -59,7 +59,7 @@ app.use(
 );
 const corsOrigin = process.env.CORS_ORIGIN;
 app.use(cors({
-  origin: corsOrigin ? [corsOrigin, /\.replit\.dev$/, /\.replit\.app$/] : true,
+  origin: corsOrigin ? [corsOrigin] : true,
   credentials: true,
 }));
 app.use(cookieParser());

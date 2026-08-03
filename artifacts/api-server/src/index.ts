@@ -24,7 +24,13 @@ async function initStripe() {
     const stripeSync = await getStripeSync();
 
     logger.info('Setting up managed webhook...');
-    const webhookBaseUrl = `https://${process.env.REPLIT_DOMAINS?.split(',')[0]}`;
+    const publicAppUrl = process.env.PUBLIC_APP_URL;
+    if (!publicAppUrl) {
+      throw new Error(
+        'PUBLIC_APP_URL environment variable is required (e.g. https://your-api.onrender.com).'
+      );
+    }
+    const webhookBaseUrl = publicAppUrl.replace(/\/+$/, '');
     const webhookResult = await stripeSync.findOrCreateManagedWebhook(
       `${webhookBaseUrl}/api/stripe/webhook`);
     logger.info({ url: webhookResult?.webhook?.url || 'setup complete' }, 'Webhook configured');
