@@ -22,6 +22,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Sanity check that stockfish is on PATH at build time (fails fast if the
 # apt package layout ever changes instead of failing at runtime).
+RUN ln -s /usr/games/stockfish /usr/local/bin/stockfish
 RUN command -v stockfish
 
 RUN corepack enable
