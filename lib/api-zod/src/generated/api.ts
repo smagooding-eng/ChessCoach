@@ -37,6 +37,7 @@ export const ImportGamesResponse = zod.object({
  */
 export const ListGamesQueryParams = zod.object({
   username: zod.coerce.string().optional().describe("Filter by username"),
+  platform: zod.enum(["chesscom", "lichess", "chessscout"]).optional().describe("Filter by platform"),
   limit: zod.coerce.number().optional().describe("Limit results"),
   offset: zod.coerce.number().optional().describe("Offset for pagination"),
 });

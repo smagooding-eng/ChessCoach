@@ -65,6 +65,12 @@ paths:
             type: string
           description: Filter by username
         - in: query
+          name: platform
+          schema:
+            type: string
+            enum: [chesscom, lichess, chessscout]
+          description: Filter by platform
+        - in: query
           name: limit
           schema:
             type: integer
