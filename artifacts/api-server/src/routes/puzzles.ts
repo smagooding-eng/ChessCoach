@@ -109,7 +109,7 @@ router.get("/puzzles/next", requireAuth, async (req: Request, res: Response) => 
     }
 
     if (!puzzle) {
-      const fetched = await fetchAndStoreLichessPuzzle();
+      const fetched = await fetchAndStoreLichessPuzzle(allExcluded);
       if (fetched) puzzle = fetched;
     }
 
@@ -592,55 +592,74 @@ router.post("/puzzles/seed", requireAuth, async (req: Request, res: Response) =>
   }
 });
 
-async function fetchAndStoreLichessPuzzle() {
-  try {
-    const res = await fetch("https://lichess.org/api/puzzle/daily", {
-      headers: { Accept: "application/json" },
-    });
-    if (!res.ok) return null;
-    const data: any = await res.json();
+// NOTE: lichess.org/api/puzzle/daily returns Lichess's single "Puzzle of the
+// Day" — identical for every visitor to lichess.org until the next calendar
+// day. Using it here as a per-request "give me a new puzzle" fallback meant
+// this app could only ever gain ~1 new puzzle system-wide per day, and once
+// a user had solved it, they'd cycle back to the same handful of daily
+// puzzles collected across days. puzzle/next is Lichess's actual "serve a
+// puzzle for training" endpoint and should return varied puzzles per call —
+// worth confirming this behaves as expected once deployed (I can't make
+// outbound network calls to verify from this environment). If Lichess ever
+// changes or rate-limits this, the real fix is a one-time bulk import from
+// Lichess's public puzzle database (database.lichess.org/#puzzles, several
+// million puzzles as a CSV) rather than fetching one at a time at runtime.
+async function fetchAndStoreLichessPuzzle(excludeIds: number[] = []) {
+  const MAX_ATTEMPTS = 5;
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    try {
+      const res = await fetch("https://lichess.org/api/puzzle/next", {
+        headers: { Accept: "application/json" },
+      });
+      if (!res.ok) return null;
+      const data: any = await res.json();
 
-    if (!data.puzzle?.fen || !data.puzzle?.solution?.length) return null;
+      if (!data.puzzle?.fen || !data.puzzle?.solution?.length) continue;
 
-    const fen = data.puzzle.fen;
-    const solutionUci = data.puzzle.solution.join(" ");
+      const fen = data.puzzle.fen;
+      const solutionUci = data.puzzle.solution.join(" ");
 
-    const validationChess = new Chess(fen);
-    const firstMove = data.puzzle.solution[0];
-    const testResult = validationChess.move({
-      from: firstMove.slice(0, 2),
-      to: firstMove.slice(2, 4),
-      promotion: firstMove.length > 4 ? firstMove[4] : undefined,
-    });
-    if (!testResult) return null;
+      const validationChess = new Chess(fen);
+      const firstMove = data.puzzle.solution[0];
+      const testResult = validationChess.move({
+        from: firstMove.slice(0, 2),
+        to: firstMove.slice(2, 4),
+        promotion: firstMove.length > 4 ? firstMove[4] : undefined,
+      });
+      if (!testResult) continue;
 
-    const { verifyPuzzle } = await import("../lib/puzzleVerifier");
-    const verdict = await verifyPuzzle(fen, data.puzzle.solution, {
-      claims: { themes: Array.isArray(data.puzzle.themes) ? data.puzzle.themes : [] },
-    });
-    if (!verdict.ok) return null;
+      const [existing] = await db
+        .select()
+        .from(puzzlesTable)
+        .where(eq(puzzlesTable.lichessId, data.puzzle.id))
+        .limit(1);
 
-    const [existing] = await db
-      .select()
-      .from(puzzlesTable)
-      .where(eq(puzzlesTable.lichessId, data.puzzle.id))
-      .limit(1);
+      if (existing) {
+        if (excludeIds.includes(existing.id)) continue; // already attempted — try again
+        return existing;
+      }
 
-    if (existing) return existing;
+      const { verifyPuzzle } = await import("../lib/puzzleVerifier");
+      const verdict = await verifyPuzzle(fen, data.puzzle.solution, {
+        claims: { themes: Array.isArray(data.puzzle.themes) ? data.puzzle.themes : [] },
+      });
+      if (!verdict.ok) continue;
 
-    const [inserted] = await db.insert(puzzlesTable).values({
-      lichessId: data.puzzle.id,
-      fen,
-      moves: solutionUci,
-      rating: data.puzzle.rating,
-      themes: data.puzzle.themes.join(","),
-      source: "lichess",
-    }).returning();
+      const [inserted] = await db.insert(puzzlesTable).values({
+        lichessId: data.puzzle.id,
+        fen,
+        moves: solutionUci,
+        rating: data.puzzle.rating,
+        themes: data.puzzle.themes.join(","),
+        source: "lichess",
+      }).returning();
 
-    return inserted;
-  } catch {
-    return null;
+      return inserted;
+    } catch {
+      continue;
+    }
   }
+  return null;
 }
 
 export default router;

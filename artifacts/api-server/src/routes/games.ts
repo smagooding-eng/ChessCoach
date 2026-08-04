@@ -63,8 +63,8 @@ async function runImportJob(opts: ImportJobOptions): Promise<{ imported: number;
             continue;
           }
         }
-        await db.insert(gamesTable).values({ userId, username: storedUsername, ...meta, pgn: game.pgn! });
-        imported++;
+        const [row] = await db.insert(gamesTable).values({ userId, username: storedUsername, ...meta, pgn: game.pgn! }).onConflictDoNothing().returning({ id: gamesTable.id });
+        if (row) imported++;
       } catch (err) {
         log.warn({ err }, "Failed to insert Lichess game");
       }
@@ -96,8 +96,8 @@ async function runImportJob(opts: ImportJobOptions): Promise<{ imported: number;
             continue;
           }
         }
-        await db.insert(gamesTable).values({ userId, username: storedUsername, platform: "chesscom", ...meta, pgn: game.pgn });
-        imported++;
+        const [row] = await db.insert(gamesTable).values({ userId, username: storedUsername, platform: "chesscom", ...meta, pgn: game.pgn }).onConflictDoNothing().returning({ id: gamesTable.id });
+        if (row) imported++;
       } catch (err) {
         log.warn({ err }, "Failed to insert game");
       }
@@ -220,13 +220,13 @@ router.post("/games/import", requireAuth, async (req, res): Promise<void> => {
           }
         }
 
-        await db.insert(gamesTable).values({
+        const [row] = await db.insert(gamesTable).values({
           userId,
           username: storedUsername,
           pgn: game.pgn!,
           ...meta,
-        });
-        imported++;
+        }).onConflictDoNothing().returning({ id: gamesTable.id });
+        if (row) imported++;
       } catch (err) {
         req.log.warn({ err }, "Failed to insert Lichess game");
       }
@@ -266,14 +266,14 @@ router.post("/games/import", requireAuth, async (req, res): Promise<void> => {
           }
         }
 
-        await db.insert(gamesTable).values({
+        const [row] = await db.insert(gamesTable).values({
           userId,
           username: storedUsername,
           pgn: game.pgn,
           platform: "chesscom",
           ...meta,
-        });
-        imported++;
+        }).onConflictDoNothing().returning({ id: gamesTable.id });
+        if (row) imported++;
       } catch (err) {
         req.log.warn({ err }, "Failed to insert game");
       }

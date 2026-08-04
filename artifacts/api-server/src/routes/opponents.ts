@@ -4,6 +4,7 @@ import { sql, eq, and, desc } from "drizzle-orm";
 import { fetchChessComGames, extractGameMetadata, fetchChessComProfile } from "../lib/chesscom";
 import { analyzePlayerGames, generateExploitCourseForOpponent } from "../lib/openaiAnalysis";
 import { randomUUID } from "crypto";
+import { requireAuth } from "../middlewares/authMiddleware";
 
 const router: IRouter = Router();
 
@@ -13,6 +14,7 @@ interface CourseJob {
   coursesCreated?: number;
   error?: string;
   createdAt: number;
+  userId: string;
 }
 const courseJobs = new Map<string, CourseJob>();
 setInterval(() => {
@@ -336,45 +338,51 @@ interface OpponentWeakness {
   relatedGameIndices?: number[];
 }
 
-router.post("/opponents/generate-courses", async (req, res): Promise<void> => {
-  const { opponentUsername, weaknesses, requestingUser } = req.body as {
+router.post("/opponents/generate-courses", requireAuth, async (req, res): Promise<void> => {
+  const { opponentUsername, weaknesses } = req.body as {
     opponentUsername?: string;
     weaknesses?: OpponentWeakness[];
-    requestingUser?: string;
   };
 
-  if (!opponentUsername || !weaknesses?.length || !requestingUser) {
-    res.status(400).json({ error: "opponentUsername, weaknesses, and requestingUser are required" });
+  if (!opponentUsername || !weaknesses?.length) {
+    res.status(400).json({ error: "opponentUsername and weaknesses are required" });
     return;
   }
 
+  // Who receives the generated course — always the authenticated user, never
+  // trusted from the request body (that field used to be spoofable, letting
+  // anyone attribute generated courses to an arbitrary username).
+  const requestingUser = req.user!.chesscomUsername || req.user!.lichessUsername;
+  if (!requestingUser) {
+    res.status(400).json({ error: "Link a Chess.com or Lichess username to your account first." });
+    return;
+  }
+
+  const userId = req.user!.id;
   let storedGamePgns: string[] = [];
   try {
-    const userId = req.user?.id;
-    if (userId) {
-      const [latestJob] = await db
-        .select({ result: backgroundJobsTable.result })
-        .from(backgroundJobsTable)
-        .where(
-          and(
-            eq(backgroundJobsTable.userId, userId),
-            eq(backgroundJobsTable.type, "scout"),
-            eq(backgroundJobsTable.status, "done"),
-            eq(backgroundJobsTable.targetUsername, opponentUsername.toLowerCase()),
-          )
+    const [latestJob] = await db
+      .select({ result: backgroundJobsTable.result })
+      .from(backgroundJobsTable)
+      .where(
+        and(
+          eq(backgroundJobsTable.userId, userId),
+          eq(backgroundJobsTable.type, "scout"),
+          eq(backgroundJobsTable.status, "done"),
+          eq(backgroundJobsTable.targetUsername, opponentUsername.toLowerCase()),
         )
-        .orderBy(desc(backgroundJobsTable.createdAt))
-        .limit(1);
-      if (latestJob?.result && (latestJob.result as any).gamePgns) {
-        storedGamePgns = (latestJob.result as any).gamePgns;
-      }
+      )
+      .orderBy(desc(backgroundJobsTable.createdAt))
+      .limit(1);
+    if (latestJob?.result && (latestJob.result as any).gamePgns) {
+      storedGamePgns = (latestJob.result as any).gamePgns;
     }
   } catch (err) {
     req.log.warn({ err }, "Failed to fetch stored game PGNs for course generation");
   }
 
   const jobId = randomUUID();
-  courseJobs.set(jobId, { status: "pending", createdAt: Date.now() });
+  courseJobs.set(jobId, { status: "pending", createdAt: Date.now(), userId });
   res.json({ jobId });
 
   req.log.info({ opponentUsername, requestingUser, jobId }, "Generating exploit courses (background)");
@@ -384,9 +392,9 @@ router.post("/opponents/generate-courses", async (req, res): Promise<void> => {
   });
 });
 
-router.get("/opponents/courses-job/:jobId", (req, res): void => {
+router.get("/opponents/courses-job/:jobId", requireAuth, (req, res): void => {
   const job = courseJobs.get(req.params.jobId);
-  if (!job) {
+  if (!job || job.userId !== req.user!.id) {
     res.status(404).json({ error: "Job not found or expired" });
     return;
   }
@@ -464,6 +472,7 @@ async function runCourseGeneration(
     coursesCreated,
     error: coursesCreated === 0 ? "Failed to generate any courses. Please try again." : undefined,
     createdAt: courseJobs.get(jobId)!.createdAt,
+    userId: courseJobs.get(jobId)!.userId,
   });
 
   log.info({ jobId, opponentUsername, coursesCreated }, "Exploit course generation complete");

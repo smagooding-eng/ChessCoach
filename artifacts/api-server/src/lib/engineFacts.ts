@@ -133,9 +133,11 @@ export function computeEngineFacts(opts: {
   // Hung piece detection on resulting position
   const { piece: hungPiece, value: hungValue } = detectHangAfter(fenAfter, playerColor);
 
-  // Build short engine PV from bestMoveSan only (deeper PV not stored; provide one ply)
-  const bestLineSan: string[] = [];
-  if (evalBefore.bestMoveSan) bestLineSan.push(evalBefore.bestMoveSan);
+  // Full engine PV (up to 6 plies), already computed by evaluateAllPositions —
+  // previously this was truncated to just the first move here.
+  const bestLineSan: string[] = evalBefore.bestLineSan?.length
+    ? evalBefore.bestLineSan
+    : (evalBefore.bestMoveSan ? [evalBefore.bestMoveSan] : []);
 
   return {
     classification,
@@ -171,6 +173,7 @@ export function renderFactSheet(f: EngineFacts): string {
   if (f.hungPiece) lines.push(`hangs=${PIECE_NAMES[f.hungPiece]} (worth ${f.hungValue}) — opponent can win it next move`);
   else lines.push(`hangs=none`);
   if (f.bestMoveSan) lines.push(`engineBest=${f.bestMoveSan}`);
+  if (f.bestLineSan.length > 1) lines.push(`engineLine=${f.bestLineSan.join(" ")}`);
   if (f.isCheckmate) lines.push(`checkmate=true`);
   else if (f.isCheck) lines.push(`check=true`);
   if (f.inBook) lines.push(`book=true`);

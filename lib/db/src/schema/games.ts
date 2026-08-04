@@ -1,6 +1,7 @@
-import { pgTable, text, serial, timestamp, integer, boolean, real, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, timestamp, integer, boolean, real, jsonb, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
+import { sql } from "drizzle-orm";
 
 export const gamesTable = pgTable("games", {
   id: serial("id").primaryKey(),
@@ -24,7 +25,17 @@ export const gamesTable = pgTable("games", {
   platform: text("platform").notNull().default("chesscom"),
   reviewData: jsonb("review_data"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
+}, (table) => [
+  // Prevent duplicate imports of the same external game for the same user.
+  // Partial (WHERE ... IS NOT NULL) since most rows won't have both IDs set,
+  // and live in-app games (platform "chessscout") have neither.
+  uniqueIndex("games_user_chesscom_unique")
+    .on(table.userId, table.chesscomGameId)
+    .where(sql`${table.chesscomGameId} IS NOT NULL`),
+  uniqueIndex("games_user_lichess_unique")
+    .on(table.userId, table.lichessGameId)
+    .where(sql`${table.lichessGameId} IS NOT NULL`),
+]);
 
 export const insertGameSchema = createInsertSchema(gamesTable).omit({ id: true, createdAt: true });
 export type InsertGame = z.infer<typeof insertGameSchema>;

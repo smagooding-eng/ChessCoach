@@ -1316,7 +1316,302 @@ function ensureAllLessonsHavePgn(course: CourseOutput, gamePgns?: string[]): Cou
   };
 }
 
+// ── Fact-grounded course generation ──────────────────────────────────────
+//
+// generateCourseForWeakness / generateExploitCourseForOpponent / the
+// personal-endgames branch of generateEndgameCourse used to ask GPT to
+// "mentally replay" a PGN, invent the FEN at the mistake, decide what the
+// mistake was, and invent a legal correct continuation — all from GPT's own
+// knowledge, with no chess.js or Stockfish verification. That's exactly the
+// kind of task LLMs are unreliable at (tracking exact board state over many
+// moves), which is why lesson PGNs/positions/"best moves" could end up
+// wrong or even illegal.
+//
+// TeachableMistake below is a real, engine-verified error found by replaying
+// actual games with chess.js and evaluating every position with Stockfish —
+// the same mechanism reviewFullGame already uses. GPT is only used to write
+// the prose explanation, grounded by the real fact sheet and validated with
+// reconcileExplanation (same guard as single-move analysis).
+
+export interface TeachableMistake {
+  gameIndex: number;
+  moveNumber: number;
+  color: "white" | "black";
+  sanPlayed: string;
+  /** FEN immediately before the mistake — this is what the student is quizzed on. */
+  fenBeforeMistake: string;
+  facts: EngineFacts;
+  /** A few SAN moves of real game history leading up to the mistake, for board context. */
+  contextSan: string[];
+  /** SAN move immediately after the mistake (if any), for showing the consequence. */
+  consequenceSan: string[];
+  bestMoveSan: string;
+  bestLineSan: string[];
+}
+
+// Course generation commonly calls this once per weakness (up to 4x in a
+// single batch), often falling back to the SAME "player's last N games"
+// when a weakness has no specific related games — without caching, that
+// means re-running a full Stockfish pass over identical games up to 4x in
+// one job. Cache by content hash, capped so it can't grow unbounded across
+// the life of the server process.
+const teachableMistakeCache = new Map<string, TeachableMistake[]>();
+const TEACHABLE_MISTAKE_CACHE_MAX = 30;
+
+function cacheKeyFor(gamePgns: string[], skipOpeningPlies: number): string {
+  const crypto = require("crypto");
+  return crypto.createHash("sha1").update(`${skipOpeningPlies}:${gamePgns.join("\u0000")}`).digest("hex");
+}
+
+/**
+ * Replays real game PGNs, evaluates every position with Stockfish, and
+ * returns actual mistakes/blunders/missed wins ranked worst-first. This is
+ * the ground truth that course generation should teach from, instead of
+ * letting GPT invent positions.
+ */
+export async function findTeachableMistakes(
+  gamePgns: string[],
+  opts?: { maxResults?: number; skipOpeningPlies?: number },
+): Promise<TeachableMistake[]> {
+  const maxResults = opts?.maxResults ?? 8;
+  const skipOpeningPlies = opts?.skipOpeningPlies ?? 10;
+
+  const cacheKey = cacheKeyFor(gamePgns, skipOpeningPlies);
+  const cached = teachableMistakeCache.get(cacheKey);
+  if (cached) {
+    return cached.slice(0, maxResults);
+  }
+
+  const Chess = require("chess.js").Chess;
+
+  const candidates: TeachableMistake[] = [];
+
+  for (let gameIndex = 0; gameIndex < gamePgns.length; gameIndex++) {
+    try {
+      const chess = new Chess();
+      chess.loadPgn(gamePgns[gameIndex]);
+      const history = chess.history({ verbose: true }) as Array<{
+        san: string; color: "w" | "b"; from: string; to: string;
+      }>;
+      if (history.length < 4) continue;
+
+      // Replay from scratch to collect FEN before each ply.
+      const replay = new Chess();
+      const fens: string[] = [replay.fen()];
+      for (const m of history) {
+        replay.move(m.san);
+        fens.push(replay.fen());
+      }
+
+      const evals = await evaluateAllPositions(fens);
+
+      for (let ply = skipOpeningPlies; ply < history.length; ply++) {
+        const m = history[ply];
+        const evalBefore = evals[ply];
+        const evalAfter = evals[ply + 1];
+        if (!evalBefore || !evalAfter) continue;
+
+        const fenBefore = fens[ply];
+        let legalMoveCount = 20;
+        try { legalMoveCount = new Chess(fenBefore).moves().length; } catch {}
+        if (legalMoveCount <= 1) continue; // forced move, nothing to teach
+
+        const playerColor: "white" | "black" = m.color === "w" ? "white" : "black";
+        const cpBefore = evalBefore.cpWhite;
+        const cpAfter = evalAfter.cpWhite;
+        const playedUci = `${m.from}${m.to}`;
+        const isTopEngineMove = evalBefore.bestMoveUci.startsWith(playedUci);
+        const isSecondEngineMove = evalBefore.secondBestUci.startsWith(playedUci);
+        const isOpeningRange = ply < 30;
+        const wasBalanced = Math.abs(cpBefore) < 150;
+
+        let winPctLossRaw: number;
+        if (playerColor === "white") {
+          winPctLossRaw = winPct(cpBefore) - winPct(cpAfter);
+        } else {
+          winPctLossRaw = (100 - winPct(cpBefore)) - (100 - winPct(cpAfter));
+        }
+        const playerWinBefore = playerColor === "white" ? winPct(cpBefore) : 100 - winPct(cpBefore);
+        const playerWinAfter = playerColor === "white" ? winPct(cpAfter) : 100 - winPct(cpAfter);
+
+        const classification = classifyFromWinPctLoss(
+          winPctLossRaw, isTopEngineMove, isSecondEngineMove, isOpeningRange, wasBalanced,
+          playerWinBefore, false, playerWinAfter, legalMoveCount, cpBefore, cpAfter, playerColor,
+        );
+
+        if (!["inaccuracy", "mistake", "blunder", "missed_win"].includes(classification)) continue;
+        if (!evalBefore.bestMoveSan) continue;
+
+        const facts = computeEngineFacts({
+          fenBefore, fenAfter: fens[ply + 1], evalBefore, evalAfter,
+          sanPlayed: m.san, classification, playerColor, inBook: false, legalMoveCount,
+        });
+
+        const contextSan = history.slice(Math.max(0, ply - 5), ply).map(h => h.san);
+        const consequenceSan = history.slice(ply + 1, ply + 4).map(h => h.san);
+
+        candidates.push({
+          gameIndex,
+          moveNumber: Math.floor(ply / 2) + 1,
+          color: playerColor,
+          sanPlayed: m.san,
+          fenBeforeMistake: fenBefore,
+          facts,
+          contextSan,
+          consequenceSan,
+          bestMoveSan: evalBefore.bestMoveSan,
+          bestLineSan: evalBefore.bestLineSan?.length ? evalBefore.bestLineSan : [evalBefore.bestMoveSan],
+        });
+      }
+    } catch (err) {
+      logger.warn({ err, gameIndex }, "findTeachableMistakes: failed to replay game, skipping");
+    }
+  }
+
+  // Worst first (biggest win% swing), then dedupe near-identical positions.
+  candidates.sort((a, b) => b.facts.winPctSwing - a.facts.winPctSwing);
+
+  if (teachableMistakeCache.size >= TEACHABLE_MISTAKE_CACHE_MAX) {
+    const oldestKey = teachableMistakeCache.keys().next().value;
+    if (oldestKey !== undefined) teachableMistakeCache.delete(oldestKey);
+  }
+  teachableMistakeCache.set(cacheKey, candidates);
+
+  return candidates.slice(0, maxResults);
+}
+
+/** Deterministically build the PGN context around a real mistake — no GPT involved. */
+function buildContextPgn(mistake: TeachableMistake, useBestMove: boolean): string {
+  const Chess = require("chess.js").Chess;
+  const replay = new Chess(mistake.fenBeforeMistake);
+  const isBlackToMove = mistake.fenBeforeMistake.split(" ")[1] === "b";
+  const startMoveNum = mistake.moveNumber;
+
+  // Each token is a fully-formed "SAN {comment}" (or just "SAN") string, in
+  // playing order starting from fenBeforeMistake.
+  const tokens: string[] = [];
+
+  if (useBestMove) {
+    const bestSan = mistake.bestMoveSan;
+    try { replay.move(bestSan); } catch { return `[FEN "${mistake.fenBeforeMistake}"]\n\n*`; }
+    tokens.push(`${bestSan} {[FIX] ${bestSan} is the engine's preferred move here.}`);
+    for (let i = 1; i < mistake.bestLineSan.length && i < 5; i++) {
+      const san = mistake.bestLineSan[i];
+      try { replay.move(san); tokens.push(san); } catch { break; }
+    }
+  } else {
+    try { replay.move(mistake.sanPlayed); } catch { return `[FEN "${mistake.fenBeforeMistake}"]\n\n*`; }
+    tokens.push(`${mistake.sanPlayed} {[MISTAKE] This is the move being reviewed.}`);
+    for (const san of mistake.consequenceSan) {
+      try { replay.move(san); tokens.push(san); } catch { break; }
+    }
+  }
+
+  // Number the tokens, respecting whose move it is at fenBeforeMistake.
+  let moveNum = startMoveNum;
+  let out = "";
+  for (let i = 0; i < tokens.length; i++) {
+    const isWhiteMove = isBlackToMove ? i % 2 === 1 : i % 2 === 0;
+    if (isWhiteMove) {
+      out += `${moveNum}. ${tokens[i]} `;
+    } else {
+      if (i === 0) out += `${moveNum}... ${tokens[i]} `;
+      else out += `${tokens[i]} `;
+      moveNum += 1;
+    }
+  }
+  return `[FEN "${mistake.fenBeforeMistake}"]\n\n${out.trim()} *`;
+}
+
+/** Ask GPT for just the prose explanation of a real, engine-verified mistake — grounded and validated. */
+async function writeGroundedLessonContent(mistake: TeachableMistake): Promise<{ title: string; content: string }> {
+  const factSheet = renderFactSheet(mistake.facts);
+  const moveLabel = mistake.color === "white"
+    ? `${mistake.moveNumber}. ${mistake.sanPlayed}`
+    : `${mistake.moveNumber}... ${mistake.sanPlayed}`;
+  const fixLabel = mistake.color === "white"
+    ? `${mistake.moveNumber}. ${mistake.bestMoveSan}`
+    : `${mistake.moveNumber}... ${mistake.bestMoveSan}`;
+
+  const prompt = `You are a chess coach. Write a short lesson about ONE real move from the student's own game.
+
+Engine facts (ground truth — do not contradict these): ${factSheet}
+Move played: ${moveLabel}
+Engine's preferred move instead: ${fixLabel}
+
+Write valid JSON:
+{
+  "title": "Short lesson title (max 60 chars), naming the pattern (e.g. 'Missed knight fork on move ${mistake.moveNumber}')",
+  "content": "## The Mistake\\n1-2 short paragraphs on why **${moveLabel}** was wrong, using ONLY the facts above (do not invent tactics, threats, or piece positions not listed in the facts).\\n\\n## The Fix\\n1-2 short paragraphs on why **${fixLabel}** was better, using ONLY the facts above. End with one takeaway sentence."
+}
+
+Rules: Only reference pieces, captures, and threats that appear in the engine facts above. Do not describe hanging pieces, tactics, or threats that aren't listed. Keep it concrete and specific to this position, not generic advice.`;
+
+  try {
+    const response = await openai.chat.completions.create({
+      model: "gpt-5.2",
+      max_completion_tokens: 900,
+      messages: [{ role: "user", content: prompt }],
+      response_format: { type: "json_object" },
+    });
+    const parsed = JSON.parse(response.choices[0]?.message?.content ?? "{}") as { title?: string; content?: string };
+    const check = parsed.content ? reconcileExplanation(parsed.content, mistake.facts) : { ok: false, reasons: ["empty"] };
+    if (parsed.title && parsed.content && check.ok) {
+      return { title: parsed.title, content: parsed.content };
+    }
+    logger.warn({ reasons: check.reasons }, "Grounded lesson content failed reconciliation, using fallback");
+  } catch (err) {
+    logger.warn({ err }, "Failed to generate grounded lesson content, using fallback");
+  }
+
+  // Deterministic, fact-only fallback — never wrong, just less prose-y.
+  const mistakeExplanation = buildFallbackExplanation(mistake.facts, mistake.sanPlayed);
+  const fallbackPros = buildFallbackProsCons(mistake.facts);
+  return {
+    title: `${mistake.facts.classification === "blunder" ? "Blunder" : "Mistake"} on move ${mistake.moveNumber}`,
+    content: `## The Mistake\n**${moveLabel}** — ${mistakeExplanation}\n\n## The Fix\n**${fixLabel}** was the engine's preferred move instead. ${fallbackPros.cons.join(" ")}`,
+  };
+}
+
+/** Build a full CourseOutput lesson from one real, verified mistake. */
+async function buildLessonFromMistake(mistake: TeachableMistake, orderIndex: number): Promise<CourseLesson> {
+  const { title, content } = await writeGroundedLessonContent(mistake);
+  return {
+    title,
+    content,
+    orderIndex,
+    examplePgn: buildContextPgn(mistake, false),
+    fixExamplePgn: buildContextPgn(mistake, true),
+    drillFen: mistake.fenBeforeMistake,
+    drillExpectedMove: mistake.bestMoveSan,
+    drillHint: mistake.facts.hungPiece
+      ? `Watch out for your ${mistake.facts.hungPiece} — find the move that keeps it safe.`
+      : `Look for the engine's top idea in this position.`,
+  };
+}
+
 export async function generateExploitCourseForOpponent(
+  opponentUsername: string,
+  weakness: WeaknessResult,
+  relatedGamePgns?: string[]
+): Promise<CourseOutput> {
+  if (relatedGamePgns?.length) {
+    const mistakes = await findTeachableMistakes(relatedGamePgns, { maxResults: 5 });
+    if (mistakes.length > 0) {
+      const lessons = await Promise.all(mistakes.map((m, i) => buildLessonFromMistake(m, i)));
+      return {
+        title: `vs ${opponentUsername}: exploiting their ${weakness.category}`.slice(0, 60),
+        description: `A course built from ${opponentUsername}'s actual games, targeting real moments where their ${weakness.category} showed up.`,
+        category: weakness.category,
+        difficulty: "Intermediate",
+        lessons,
+      };
+    }
+  }
+  return generateExploitCourseForOpponentLLM(opponentUsername, weakness, relatedGamePgns);
+}
+
+async function generateExploitCourseForOpponentLLM(
   opponentUsername: string,
   weakness: WeaknessResult,
   relatedGamePgns?: string[]
@@ -1392,6 +1687,26 @@ Respond with valid JSON:
 }
 
 export async function generateCourseForWeakness(
+  weakness: WeaknessResult,
+  relatedGamePgns?: string[]
+): Promise<CourseOutput> {
+  if (relatedGamePgns?.length) {
+    const mistakes = await findTeachableMistakes(relatedGamePgns, { maxResults: 5 });
+    if (mistakes.length > 0) {
+      const lessons = await Promise.all(mistakes.map((m, i) => buildLessonFromMistake(m, i)));
+      return {
+        title: `Fixing your ${weakness.category}`.slice(0, 60),
+        description: `A course built from your own games, targeting the ${mistakes.length} clearest real moments where ${weakness.category.toLowerCase()} cost you.`,
+        category: weakness.category,
+        difficulty: weakness.severity === "high" ? "Advanced" : weakness.severity === "low" ? "Beginner" : "Intermediate",
+        lessons,
+      };
+    }
+  }
+  return generateCourseForWeaknessLLM(weakness, relatedGamePgns);
+}
+
+async function generateCourseForWeaknessLLM(
   weakness: WeaknessResult,
   relatedGamePgns?: string[]
 ): Promise<CourseOutput> {
@@ -1511,6 +1826,29 @@ const ENDGAME_TOPICS: Record<Exclude<EndgameType, "personal_endgames">, { title:
 };
 
 export async function generateEndgameCourse(
+  type: EndgameType,
+  playerRating?: number,
+  gamePgns?: string[],
+): Promise<CourseOutput> {
+  if (type === "personal_endgames" && gamePgns?.length) {
+    // Endgame mistakes only — approximate "endgame phase" as roughly the
+    // last third of the game by skipping straight past the opening/middlegame.
+    const mistakes = await findTeachableMistakes(gamePgns, { maxResults: 5, skipOpeningPlies: 40 });
+    if (mistakes.length > 0) {
+      const lessons = await Promise.all(mistakes.map((m, i) => buildLessonFromMistake(m, i)));
+      return {
+        title: "Your Endgame Mistakes",
+        description: `A course built from real endgame moments in your own games (${mistakes.length} verified mistakes).`,
+        category: "endgames",
+        difficulty: "Intermediate",
+        lessons,
+      };
+    }
+  }
+  return generateEndgameCourseLLM(type, playerRating, gamePgns);
+}
+
+async function generateEndgameCourseLLM(
   type: EndgameType,
   playerRating?: number,
   gamePgns?: string[],

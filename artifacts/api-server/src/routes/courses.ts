@@ -275,7 +275,11 @@ router.post("/courses/generate-start", async (req, res): Promise<void> => {
 });
 
 router.get("/courses/generate-status/:jobId", async (req, res): Promise<void> => {
-  const [job] = await db.select().from(backgroundJobsTable).where(eq(backgroundJobsTable.id, req.params.jobId as string));
+  const userId = req.user?.id;
+  if (!userId) { res.status(401).json({ error: "Not authenticated" }); return; }
+  const [job] = await db.select().from(backgroundJobsTable).where(
+    and(eq(backgroundJobsTable.id, req.params.jobId as string), eq(backgroundJobsTable.userId, userId))
+  );
   if (!job) { res.status(404).json({ error: "Job not found" }); return; }
   res.setHeader("Cache-Control", "no-store");
   res.json({ status: job.status, error: job.error });
@@ -571,7 +575,11 @@ router.post("/courses/endgame/generate-start", async (req, res): Promise<void> =
 });
 
 router.get("/courses/endgame/generate-status/:jobId", async (req, res): Promise<void> => {
-  const [job] = await db.select().from(backgroundJobsTable).where(eq(backgroundJobsTable.id, req.params.jobId as string));
+  const userId = req.user?.id;
+  if (!userId) { res.status(401).json({ error: "Not authenticated" }); return; }
+  const [job] = await db.select().from(backgroundJobsTable).where(
+    and(eq(backgroundJobsTable.id, req.params.jobId as string), eq(backgroundJobsTable.userId, userId))
+  );
   if (!job) { res.status(404).json({ error: "Job not found" }); return; }
   res.setHeader("Cache-Control", "no-store");
   res.json({ status: job.status, error: job.error });

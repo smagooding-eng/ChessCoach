@@ -235,49 +235,66 @@ export async function seedPuzzlesIfNeeded(minCount = 15) {
     inserted++;
   }
 
-  try {
-    const res = await fetch("https://lichess.org/api/puzzle/daily", {
-      headers: { Accept: "application/json" },
-    });
-    if (res.ok) {
+  // NOTE: the static VERIFIED_PUZZLES list above is intentionally small
+  // (~25 entries) — a real long-term fix is a one-time bulk import from
+  // Lichess's public puzzle database (database.lichess.org/#puzzles,
+  // millions of puzzles as a CSV) rather than relying on this function.
+  // In the meantime, pull a small batch from Lichess's puzzle/next endpoint
+  // (a fresh puzzle per call, unlike /api/puzzle/daily which returns the
+  // same single puzzle to everyone until the next calendar day) so calling
+  // this repeatedly (e.g. via the admin /puzzles/seed endpoint) actually
+  // grows the pool over time instead of adding at most one puzzle, ever.
+  const BATCH_SIZE = 10;
+  let dailyInserted = 0;
+  for (let i = 0; i < BATCH_SIZE; i++) {
+    try {
+      const res = await fetch("https://lichess.org/api/puzzle/next", {
+        headers: { Accept: "application/json" },
+      });
+      if (!res.ok) break;
       const data: any = await res.json();
-      if (data.puzzle?.fen && data.puzzle?.solution?.length) {
-        const fen = data.puzzle.fen;
-        const chess = new Chess(fen);
-        const firstMove = data.puzzle.solution[0];
-        const testResult = chess.move({
-          from: firstMove.slice(0, 2),
-          to: firstMove.slice(2, 4),
-          promotion: firstMove.length > 4 ? firstMove[4] : undefined,
-        });
-        if (testResult) {
-          const [ex] = await db
-            .select({ id: puzzlesTable.id })
-            .from(puzzlesTable)
-            .where(eq(puzzlesTable.lichessId, data.puzzle.id))
-            .limit(1);
-          if (!ex) {
-            const dailyVerdict = await verifyPuzzle(fen, data.puzzle.solution, {
-              claims: { themes: Array.isArray(data.puzzle.themes) ? data.puzzle.themes : [] },
-            });
-            if (dailyVerdict.ok) {
-              await db.insert(puzzlesTable).values({
-                lichessId: data.puzzle.id,
-                fen,
-                moves: data.puzzle.solution.join(" "),
-                rating: data.puzzle.rating,
-                themes: data.puzzle.themes.join(","),
-                source: "lichess",
-              });
-              inserted++;
-            } else {
-              console.log(`[puzzles] Daily puzzle rejected: ${dailyVerdict.reasons.join("; ")}`);
-            }
-          }
-        }
+      if (!data.puzzle?.fen || !data.puzzle?.solution?.length) continue;
+
+      const fen = data.puzzle.fen;
+      const chess = new Chess(fen);
+      const firstMove = data.puzzle.solution[0];
+      const testResult = chess.move({
+        from: firstMove.slice(0, 2),
+        to: firstMove.slice(2, 4),
+        promotion: firstMove.length > 4 ? firstMove[4] : undefined,
+      });
+      if (!testResult) continue;
+
+      const [ex] = await db
+        .select({ id: puzzlesTable.id })
+        .from(puzzlesTable)
+        .where(eq(puzzlesTable.lichessId, data.puzzle.id))
+        .limit(1);
+      if (ex) continue;
+
+      const dailyVerdict = await verifyPuzzle(fen, data.puzzle.solution, {
+        claims: { themes: Array.isArray(data.puzzle.themes) ? data.puzzle.themes : [] },
+      });
+      if (!dailyVerdict.ok) {
+        console.log(`[puzzles] Fetched puzzle rejected: ${dailyVerdict.reasons.join("; ")}`);
+        continue;
       }
+
+      await db.insert(puzzlesTable).values({
+        lichessId: data.puzzle.id,
+        fen,
+        moves: data.puzzle.solution.join(" "),
+        rating: data.puzzle.rating,
+        themes: data.puzzle.themes.join(","),
+        source: "lichess",
+      });
+      inserted++;
+      dailyInserted++;
+    } catch {
+      break;
     }
-  } catch {}
+  }
+  void dailyInserted;
 
   console.log(`[puzzles] Seed complete: ${inserted} new puzzles inserted`);
 }

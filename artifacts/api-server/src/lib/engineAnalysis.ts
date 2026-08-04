@@ -3,8 +3,19 @@ import { logger } from "./logger";
 import { spawn, ChildProcessWithoutNullStreams } from "child_process";
 
 const IS_PROD = process.env.NODE_ENV === "production";
-const ANALYSIS_DEPTH = IS_PROD ? 15 : 20;
-const ENGINE_TIMEOUT_MS = IS_PROD ? 15000 : 30000;
+
+// All tunable via env vars so engine strength/speed can be adjusted per-host
+// (e.g. a beefier Render plan) without a code change and redeploy.
+// Defaults: deeper than before (18 vs the old 15) since analysis quality
+// depends heavily on search depth, but kept well short of "as deep as
+// possible" because Render's free tier gives this process a single shared
+// vCPU — depth grows the time-per-position roughly exponentially, and full
+// game reviews evaluate every ply in the game.
+const ANALYSIS_DEPTH = parseInt(process.env.ENGINE_DEPTH || "") || (IS_PROD ? 18 : 20);
+const ENGINE_MULTIPV = parseInt(process.env.ENGINE_MULTIPV || "") || 3;
+const ENGINE_THREADS = parseInt(process.env.ENGINE_THREADS || "") || (IS_PROD ? 1 : 2);
+const ENGINE_HASH_MB = parseInt(process.env.ENGINE_HASH_MB || "") || (IS_PROD ? 64 : 256);
+const ENGINE_TIMEOUT_MS = parseInt(process.env.ENGINE_TIMEOUT_MS || "") || (IS_PROD ? 20000 : 30000);
 
 export type EngineClassification =
   | "checkmate"
@@ -111,8 +122,8 @@ class StockfishProcess {
   }
 
   async init(): Promise<void> {
-    const hashMB = IS_PROD ? 64 : 256;
-    const threads = IS_PROD ? 1 : 2;
+    const hashMB = ENGINE_HASH_MB;
+    const threads = ENGINE_THREADS;
 
     this.proc = spawn("stockfish", [], { stdio: ["pipe", "pipe", "pipe"] });
 
@@ -152,9 +163,9 @@ class StockfishProcess {
     await this.sendAndWait("uci", "uciok");
     await this.sendAndWait(`setoption name Hash value ${hashMB}`, "");
     await this.sendAndWait(`setoption name Threads value ${threads}`, "");
-    await this.sendAndWait("setoption name MultiPV value 2", "");
+    await this.sendAndWait(`setoption name MultiPV value ${ENGINE_MULTIPV}`, "");
     await this.sendAndWait("isready", "readyok");
-    logger.info({ hashMB, threads, depth: ANALYSIS_DEPTH, env: IS_PROD ? "production" : "development" }, "Stockfish engine initialized");
+    logger.info({ hashMB, threads, multiPv: ENGINE_MULTIPV, depth: ANALYSIS_DEPTH, env: IS_PROD ? "production" : "development" }, "Stockfish engine initialized");
   }
 
   async newGame(): Promise<void> {
