@@ -4,7 +4,6 @@ import { useUser } from '@/hooks/use-user';
 import { useChessPlayer } from '@/hooks/use-chess-player';
 import { useMyAnalysisSummary } from '@/hooks/use-analysis';
 import { useLiveRatings } from '@/hooks/use-live-ratings';
-import { useMyGames } from '@/hooks/use-games';
 import { useMyCourses } from '@/hooks/use-courses';
 import { Link, useLocation } from 'wouter';
 import { apiFetch } from '@/lib/api';
@@ -890,6 +889,10 @@ ${sanitized}
       return;
     }
 
+    if (broadcastAll && !confirm('Send this email to ALL users right now? This cannot be undone.')) {
+      return;
+    }
+
     setSending(true);
     setResult(null);
 
@@ -1727,7 +1730,6 @@ export function Profile() {
   const { player } = useChessPlayer(username ?? undefined);
   const { data: summary } = useMyAnalysisSummary();
   const { data: liveRatings } = useLiveRatings();
-  const { data: gamesData } = useMyGames();
   const { data: coursesData } = useMyCourses();
   const [, setLocation] = useLocation();
 
@@ -1735,7 +1737,7 @@ export function Profile() {
   const [newUsername, setNewUsername] = useState(username ?? '');
   const [saving, setSaving] = useState(false);
 
-  const totalGames = gamesData?.games?.length ?? 0;
+  const totalGames = summary?.totalGames ?? 0;
   const winRate = summary ? ((summary.winRate || 0) * 100).toFixed(1) : null;
   const activeCourses = coursesData?.courses?.filter(c => c.completedLessons < c.totalLessons).length || 0;
   const completedCourses = coursesData?.courses?.filter(c => c.completedLessons >= c.totalLessons).length || 0;

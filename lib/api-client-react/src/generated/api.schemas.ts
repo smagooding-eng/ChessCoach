@@ -177,6 +177,13 @@ export interface PhaseAccuracy {
   gamesAnalyzed: number;
 }
 
+export interface AccuracyTrendPoint {
+  month: string;
+  accuracy: number;
+  moves: number;
+  blunderRate: number;
+}
+
 export interface PerformanceSummary {
   username: string;
   totalGames: number;
@@ -185,10 +192,12 @@ export interface PerformanceSummary {
   draws: number;
   winRate: number;
   avgRating: number;
+  reviewedCount: number;
   openingStats: OpeningStat[];
   resultsByTimeControl: TimeControlStat[];
   monthlyTrend?: MonthlyTrendPoint[];
   phaseAccuracy?: PhaseAccuracy;
+  accuracyTrend?: AccuracyTrendPoint[];
 }
 
 export interface GenerateCoursesBody {
@@ -300,6 +309,14 @@ export type ListGamesParams = {
    * Filter by username
    */
   username?: string;
+  /**
+   * Filter by platform
+   */
+  platform?: 'chesscom' | 'lichess' | 'chessscout';
+  /**
+   * Filter to games played against this opponent username
+   */
+  opponent?: string;
   /**
    * Limit results
    */

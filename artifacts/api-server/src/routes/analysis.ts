@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import type { Request, Response } from "express";
 import { db, gamesTable, weaknessesTable, coursesTable, backgroundJobsTable } from "@workspace/db";
-import { eq, desc, and, inArray } from "drizzle-orm";
+import { eq, desc, and, inArray, sql } from "drizzle-orm";
 import {
   AnalyzeGamesBody,
   AnalyzeGamesResponse,
@@ -10,7 +10,8 @@ import {
   GetAnalysisSummaryQueryParams,
   GetAnalysisSummaryResponse,
 } from "@workspace/api-zod";
-import { analyzePlayerGames } from "../lib/openaiAnalysis";
+import { analyzePlayerGames, computeGroundedWeaknesses } from "../lib/openaiAnalysis";
+import { accuracyFromAvgLoss } from "../lib/engineAnalysis";
 import { randomUUID } from "crypto";
 import type { Logger } from "pino";
 import OpenAI from "openai";
@@ -49,14 +50,38 @@ async function runAnalysisJob(username: string, jobId: string, log: Logger): Pro
       gameId: g.id,
     }));
 
-    const analysis = await analyzePlayerGames(username, gameSummaries);
+    // Prefer real engine-grounded weakness detection, computed from the
+    // user's FULL reviewed history (not just the last 50 games above, which
+    // exist mainly to feed the GPT fallback) — "consistent trends across
+    // all games" should actually mean all games, not a recent slice. Only
+    // the columns the grounded function needs are selected, skipping the
+    // (potentially large) pgn text.
+    const allReviewed = await db
+      .select({
+        id: gamesTable.id,
+        opening: gamesTable.opening,
+        whiteUsername: gamesTable.whiteUsername,
+        blackUsername: gamesTable.blackUsername,
+        reviewData: gamesTable.reviewData,
+      })
+      .from(gamesTable)
+      .where(and(
+        eq(gamesTable.username, username.toLowerCase()),
+        sql`${gamesTable.reviewData} IS NOT NULL`,
+      ))
+      .orderBy(desc(gamesTable.playedAt))
+      .limit(500);
+
+    const grounded = computeGroundedWeaknesses(username, allReviewed);
+    const analysis = grounded ?? await analyzePlayerGames(username, gameSummaries);
+    const indexSourceGames = grounded ? allReviewed : games;
 
     await db.delete(weaknessesTable).where(eq(weaknessesTable.username, username.toLowerCase()));
 
     for (const weakness of analysis.weaknesses) {
       const relatedGameIds = (weakness.relatedGameIndices ?? [])
-        .filter((idx) => idx >= 0 && idx < games.length)
-        .map((idx) => games[idx].id)
+        .filter((idx) => idx >= 0 && idx < indexSourceGames.length)
+        .map((idx) => indexSourceGames[idx].id)
         .filter((id): id is number => typeof id === "number");
 
       await db.insert(weaknessesTable).values({
@@ -221,14 +246,32 @@ router.post("/analysis/analyze", async (req, res): Promise<void> => {
     gameId: g.id,
   }));
 
-  const analysis = await analyzePlayerGames(username, gameSummaries);
+  const allReviewed = await db
+    .select({
+      id: gamesTable.id,
+      opening: gamesTable.opening,
+      whiteUsername: gamesTable.whiteUsername,
+      blackUsername: gamesTable.blackUsername,
+      reviewData: gamesTable.reviewData,
+    })
+    .from(gamesTable)
+    .where(and(
+      eq(gamesTable.username, username.toLowerCase()),
+      sql`${gamesTable.reviewData} IS NOT NULL`,
+    ))
+    .orderBy(desc(gamesTable.playedAt))
+    .limit(500);
+
+  const grounded = computeGroundedWeaknesses(username, allReviewed);
+  const analysis = grounded ?? await analyzePlayerGames(username, gameSummaries);
+  const indexSourceGames = grounded ? allReviewed : games;
 
   await db.delete(weaknessesTable).where(eq(weaknessesTable.username, username.toLowerCase()));
 
   for (const weakness of analysis.weaknesses) {
     const relatedGameIds = (weakness.relatedGameIndices ?? [])
-      .filter((idx) => idx >= 0 && idx < games.length)
-      .map((idx) => games[idx].id)
+      .filter((idx) => idx >= 0 && idx < indexSourceGames.length)
+      .map((idx) => indexSourceGames[idx].id)
       .filter((id): id is number => typeof id === "number");
 
     await db.insert(weaknessesTable).values({
@@ -342,9 +385,23 @@ router.get("/analysis/summary", async (req, res): Promise<void> => {
   const { username } = query.data;
 
   const games = await db
-    .select()
+    .select({
+      whiteUsername: gamesTable.whiteUsername,
+      blackUsername: gamesTable.blackUsername,
+      whiteRating: gamesTable.whiteRating,
+      blackRating: gamesTable.blackRating,
+      result: gamesTable.result,
+      opening: gamesTable.opening,
+      timeControl: gamesTable.timeControl,
+      playedAt: gamesTable.playedAt,
+      reviewData: gamesTable.reviewData,
+    })
     .from(gamesTable)
     .where(eq(gamesTable.username, username.toLowerCase()));
+
+  const reviewedCount = games.filter(
+    (g) => g.reviewData && typeof g.reviewData === "object"
+  ).length;
 
   const totalGames = games.length;
 
@@ -436,6 +493,7 @@ router.get("/analysis/summary", async (req, res): Promise<void> => {
     endgame:    { moves: 0, winPctLossSum: 0, blunders: 0, mistakes: 0, inaccuracies: 0, bestOrBetter: 0 },
   };
   let gamesAnalyzed = 0;
+  const monthlyAccuracyMap = new Map<string, { moves: number; winPctLossSum: number; blunders: number }>();
   for (const g of games) {
     if (!g.reviewData || typeof g.reviewData !== "object") continue;
     const rd = g.reviewData as { moves?: unknown };
@@ -444,6 +502,9 @@ router.get("/analysis/summary", async (req, res): Promise<void> => {
 
     const userColor: "white" | "black" = g.whiteUsername.toLowerCase() === username.toLowerCase() ? "white" : "black";
     let contributedThisGame = false;
+    const gameMonthKey = g.playedAt
+      ? `${new Date(g.playedAt).getUTCFullYear()}-${String(new Date(g.playedAt).getUTCMonth() + 1).padStart(2, "0")}`
+      : null;
 
     for (const raw of movesArr) {
       if (!raw || typeof raw !== "object") continue;
@@ -475,13 +536,24 @@ router.get("/analysis/summary", async (req, res): Promise<void> => {
         ? (m.cpLoss as number)
         : Math.max(base, ["good", "book", "excellent", "best", "great"].includes(cls) && !m.engineAvailable ? 3 : base);
       bucket.winPctLossSum += sample;
+
+      // Progression tracking: same per-move data, bucketed by the game's
+      // month instead of by game phase, so accuracy/blunder-rate over time
+      // is a real computed trend rather than just win/loss counts.
+      if (gameMonthKey) {
+        if (!monthlyAccuracyMap.has(gameMonthKey)) {
+          monthlyAccuracyMap.set(gameMonthKey, { moves: 0, winPctLossSum: 0, blunders: 0 });
+        }
+        const mBucket = monthlyAccuracyMap.get(gameMonthKey)!;
+        mBucket.moves++;
+        mBucket.winPctLossSum += sample;
+        if (cls === "blunder") mBucket.blunders++;
+      }
     }
     if (contributedThisGame) gamesAnalyzed++;
   }
-  const accuracyFromAvgLoss = (avg: number) =>
-    Math.round(Math.min(100, Math.max(0, 103.1668 * Math.exp(-0.065 * avg) - 3.1668)));
   const phaseStat = (b: typeof phaseBuckets["opening"]) => ({
-    accuracy: b.moves > 0 ? accuracyFromAvgLoss(b.winPctLossSum / b.moves) : 0,
+    accuracy: b.moves > 0 ? Math.round(accuracyFromAvgLoss(b.winPctLossSum / b.moves)) : 0,
     moves: b.moves,
     blunders: b.blunders,
     mistakes: b.mistakes,
@@ -495,6 +567,19 @@ router.get("/analysis/summary", async (req, res): Promise<void> => {
     gamesAnalyzed,
   };
 
+  // Real progression over time: accuracy and blunder rate by month, computed
+  // from actual engine-verified move classifications — not just win/loss
+  // counts (monthlyTrend, above), so this can genuinely show "you're
+  // blundering less than you were 3 months ago" or the reverse.
+  const accuracyTrend = Array.from(monthlyAccuracyMap.entries())
+    .sort(([a], [b]) => (a < b ? -1 : 1))
+    .map(([month, b]) => ({
+      month,
+      accuracy: b.moves > 0 ? Math.round(accuracyFromAvgLoss(b.winPctLossSum / b.moves)) : 0,
+      moves: b.moves,
+      blunderRate: b.moves > 0 ? Math.round((b.blunders / b.moves) * 1000) / 10 : 0,
+    }));
+
   res.json(
     GetAnalysisSummaryResponse.parse({
       username,
@@ -504,10 +589,12 @@ router.get("/analysis/summary", async (req, res): Promise<void> => {
       draws,
       winRate: totalGames > 0 ? Math.round((wins / totalGames) * 100) / 100 : 0,
       avgRating: totalGames > 0 ? Math.round(totalRating / totalGames) : 0,
+      reviewedCount,
       openingStats,
       resultsByTimeControl,
       monthlyTrend,
       phaseAccuracy,
+      accuracyTrend,
     })
   );
 });

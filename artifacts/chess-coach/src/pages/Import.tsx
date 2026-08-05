@@ -1,25 +1,26 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { PieceTile } from '@/components/DesignSystem';
 import { useUser } from '@/hooks/use-user';
-import { useImportChessGames } from '@/hooks/use-games';
 import { invalidateEloCache } from '@/hooks/use-elo-progress';
 import { motion } from 'framer-motion';
 import { CloudDownload, CheckCircle2, AlertCircle, RefreshCw, ArrowRight, Edit3, Check, X } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
 import { apiFetch } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import { trackImportJob } from '@/components/ImportStatusWatcher';
 
 type Platform = 'chesscom' | 'lichess';
 
 export function Import() {
   const { username, isLoaded, login, authUser, refreshAuth } = useUser();
   const [months, setMonths] = useState(3);
-  const { importGames, isImporting, error } = useImportChessGames();
+  const [isImporting, setIsImporting] = useState(false);
   const [result, setResult] = useState<{ imported: number; updated?: number; total: number; platform?: string } | null>(null);
   const [apiError, setApiError] = useState<string | null>(null);
   const [, setLocation] = useLocation();
   const [isSyncing, setIsSyncing] = useState(false);
   const [platform, setPlatform] = useState<Platform>('chesscom');
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const [editing, setEditing] = useState(false);
   const [editValue, setEditValue] = useState('');
@@ -31,6 +32,16 @@ export function Import() {
 
   const platformLabel = platform === 'chesscom' ? 'Chess.com' : 'Lichess';
 
+  useEffect(() => {
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+  }, []);
+
+  // Uses the background-job import endpoint instead of the old synchronous
+  // one, which awaited a single request that looped through every game to
+  // import (potentially hundreds for a large history) with no progress
+  // shown and a real risk of hitting a request timeout partway through.
+  // ImportPromptModal (the Dashboard onboarding prompt) already used this
+  // safer pattern — this page, the actual dedicated Import page, didn't.
   const handleImport = async (e: React.FormEvent, forceUpdate = false) => {
     e.preventDefault();
     const importUsername = currentPlatformUsername;
@@ -41,9 +52,10 @@ export function Import() {
       return;
     }
     setApiError(null);
+    setIsImporting(true);
     if (forceUpdate) setIsSyncing(true);
     try {
-      const r = await apiFetch('/api/games/import', {
+      const r = await apiFetch('/api/games/import-bg', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -59,14 +71,42 @@ export function Import() {
         const errData = await r.json().catch(() => ({}));
         throw new Error(errData.error || `Import failed (${r.status})`);
       }
-      const data = await r.json();
-      setResult(data);
-      invalidateEloCache();
+      const { jobId } = await r.json() as { jobId: string };
+      trackImportJob(jobId, platform, importUsername);
+
+      if (pollRef.current) clearInterval(pollRef.current);
+      pollRef.current = setInterval(async () => {
+        try {
+          const statusRes = await apiFetch(`/api/games/import-status/${jobId}`, { cache: 'no-store' });
+          if (!statusRes.ok) return;
+          const job = await statusRes.json() as {
+            status: string;
+            error?: string | null;
+            result?: { imported: number; updated?: number; total: number; platform?: string } | null;
+          };
+          if (job.status === 'done') {
+            if (pollRef.current) clearInterval(pollRef.current);
+            pollRef.current = null;
+            setResult(job.result ?? { imported: 0, total: 0 });
+            invalidateEloCache();
+            setIsImporting(false);
+            setIsSyncing(false);
+          } else if (job.status === 'error') {
+            if (pollRef.current) clearInterval(pollRef.current);
+            pollRef.current = null;
+            setApiError(job.error || 'Import failed. Please try again.');
+            setIsImporting(false);
+            setIsSyncing(false);
+          }
+        } catch {
+          // transient network error — keep polling
+        }
+      }, 2500);
     } catch (err: unknown) {
       const msg =
         err instanceof Error ? err.message : 'Failed to import games. Please try again.';
       setApiError(msg);
-    } finally {
+      setIsImporting(false);
       setIsSyncing(false);
     }
   };

@@ -4,8 +4,9 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { UserProvider } from "@/context/UserContext";
 import { ImportStatusWatcher } from "@/components/ImportStatusWatcher";
+import { Layout } from "@/components/Layout";
 import { useUser } from "@/hooks/use-user";
-import { useEffect, Component, type ReactNode } from "react";
+import { useEffect, Component, Suspense, lazy, type ReactNode } from "react";
 import { apiFetch } from "@/lib/api";
 
 function ErrorFallback({ error, fallbackNav, onReset }: { error: Error | null; fallbackNav: string; onReset: () => void }) {
@@ -53,37 +54,38 @@ class ErrorBoundary extends Component<
   }
 }
 
-// Pages
-import { Setup } from "@/pages/Setup";
-import { LandingPage } from "@/pages/LandingPage";
-import DownloadPage from "@/pages/Download";
-import PrivacyPage from "@/pages/Privacy";
-import TermsPage from "@/pages/Terms";
-import { Dashboard } from "@/pages/Dashboard";
-import { Import } from "@/pages/Import";
-import { Games } from "@/pages/Games";
-import { GameReplay } from "@/pages/GameReplay";
-import { Analysis } from "@/pages/Analysis";
-import { Courses } from "@/pages/Courses";
-import { CourseDetail } from "@/pages/CourseDetail";
-import { Endgames } from "@/pages/Endgames";
-import { WeaknessDetail } from "@/pages/WeaknessDetail";
-import { OpponentAnalysis } from "@/pages/OpponentAnalysis";
-import { Openings } from "@/pages/Openings";
-import { OpeningDetail } from "@/pages/OpeningDetail";
-import { PracticeBots } from "@/pages/PracticeBots";
-import { LocalPlay } from "@/pages/LocalPlay";
-import { LivePlay } from "@/pages/LivePlay";
-import { LiveHistory } from "@/pages/LiveHistory";
-import { GameLookup } from "@/pages/GameLookup";
-import { Subscription } from "@/pages/Subscription";
-import { Profile } from "@/pages/Profile";
-import { Puzzles } from "@/pages/Puzzles";
-import { ScanPosition } from "@/pages/ScanPosition";
-import { Admin } from "@/pages/Admin";
-import { Welcome } from "@/pages/Welcome";
-import NotFound from "@/pages/not-found";
-import { Layout } from "@/components/Layout";
+// Pages — lazy-loaded so each page's JS only downloads when that route is
+// actually visited, instead of every page (including rarely-used ones like
+// Admin and ScanPosition) being bundled into the initial page load.
+const Setup = lazy(() => import("@/pages/Setup").then(m => ({ default: m.Setup })));
+const LandingPage = lazy(() => import("@/pages/LandingPage").then(m => ({ default: m.LandingPage })));
+const DownloadPage = lazy(() => import("@/pages/Download"));
+const PrivacyPage = lazy(() => import("@/pages/Privacy"));
+const TermsPage = lazy(() => import("@/pages/Terms"));
+const Dashboard = lazy(() => import("@/pages/Dashboard").then(m => ({ default: m.Dashboard })));
+const Import = lazy(() => import("@/pages/Import").then(m => ({ default: m.Import })));
+const Games = lazy(() => import("@/pages/Games").then(m => ({ default: m.Games })));
+const GameReplay = lazy(() => import("@/pages/GameReplay").then(m => ({ default: m.GameReplay })));
+const Analysis = lazy(() => import("@/pages/Analysis").then(m => ({ default: m.Analysis })));
+const Courses = lazy(() => import("@/pages/Courses").then(m => ({ default: m.Courses })));
+const CourseDetail = lazy(() => import("@/pages/CourseDetail").then(m => ({ default: m.CourseDetail })));
+const Endgames = lazy(() => import("@/pages/Endgames").then(m => ({ default: m.Endgames })));
+const WeaknessDetail = lazy(() => import("@/pages/WeaknessDetail").then(m => ({ default: m.WeaknessDetail })));
+const OpponentAnalysis = lazy(() => import("@/pages/OpponentAnalysis").then(m => ({ default: m.OpponentAnalysis })));
+const Openings = lazy(() => import("@/pages/Openings").then(m => ({ default: m.Openings })));
+const OpeningDetail = lazy(() => import("@/pages/OpeningDetail").then(m => ({ default: m.OpeningDetail })));
+const PracticeBots = lazy(() => import("@/pages/PracticeBots").then(m => ({ default: m.PracticeBots })));
+const LocalPlay = lazy(() => import("@/pages/LocalPlay").then(m => ({ default: m.LocalPlay })));
+const LivePlay = lazy(() => import("@/pages/LivePlay").then(m => ({ default: m.LivePlay })));
+const LiveHistory = lazy(() => import("@/pages/LiveHistory").then(m => ({ default: m.LiveHistory })));
+const GameLookup = lazy(() => import("@/pages/GameLookup").then(m => ({ default: m.GameLookup })));
+const Subscription = lazy(() => import("@/pages/Subscription").then(m => ({ default: m.Subscription })));
+const Profile = lazy(() => import("@/pages/Profile").then(m => ({ default: m.Profile })));
+const Puzzles = lazy(() => import("@/pages/Puzzles").then(m => ({ default: m.Puzzles })));
+const ScanPosition = lazy(() => import("@/pages/ScanPosition").then(m => ({ default: m.ScanPosition })));
+const Admin = lazy(() => import("@/pages/Admin").then(m => ({ default: m.Admin })));
+const Welcome = lazy(() => import("@/pages/Welcome").then(m => ({ default: m.Welcome })));
+const NotFound = lazy(() => import("@/pages/not-found"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -251,6 +253,18 @@ function Router() {
   );
 }
 
+function PageLoadingFallback() {
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-background">
+      <div className="text-4xl animate-bounce">&#9820;</div>
+      <div className="w-32 h-1 bg-primary/15 rounded-full overflow-hidden">
+        <div className="h-full w-[30%] bg-primary rounded-full animate-[barSlide_1.4s_ease-in-out_infinite]"
+          style={{ animation: 'barSlide 1.4s ease-in-out infinite' }} />
+      </div>
+    </div>
+  );
+}
+
 function App() {
   return (
     <ErrorBoundary>
@@ -258,7 +272,9 @@ function App() {
         <UserProvider>
           <TooltipProvider>
             <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-              <Router />
+              <Suspense fallback={<PageLoadingFallback />}>
+                <Router />
+              </Suspense>
               <ImportStatusWatcher />
             </WouterRouter>
             <Toaster />

@@ -450,6 +450,63 @@ export function Analysis() {
             );
           })()}
 
+          {summary.accuracyTrend && summary.accuracyTrend.length > 0 && (() => {
+            const accData = summary.accuracyTrend!.map(p => {
+              const [y, m] = p.month.split('-');
+              const monthName = new Date(parseInt(y), parseInt(m) - 1, 1).toLocaleString('en-US', { month: 'short' });
+              return { ...p, label: monthName };
+            });
+            const first = accData[0]?.accuracy ?? 0;
+            const last = accData[accData.length - 1]?.accuracy ?? 0;
+            const delta = last - first;
+            return (
+              <div className="rounded-xl p-5" style={{ background: BG_CARD, border: CARD_BORDER, boxShadow: CARD_SHADOW }}>
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-base font-bold flex items-center gap-2" style={{ color: TEXT_LIGHT }}>
+                    <TrendingUp className="w-4 h-4" style={{ color: CHESSCOM_GREEN }} />
+                    Accuracy Over Time
+                  </h2>
+                  {accData.length >= 2 && (
+                    <span
+                      className="text-[11px] font-bold uppercase tracking-widest"
+                      style={{ color: delta >= 0 ? CHESSCOM_GREEN : '#dc4343' }}
+                    >
+                      {delta >= 0 ? '+' : ''}{delta.toFixed(1)} pts since {accData[0].label}
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs mb-3" style={{ color: TEXT_MUTED }}>
+                  Real engine-verified accuracy per month, from your reviewed games — not just win/loss counts.
+                </p>
+                <div className="h-44 -ml-3">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={accData} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
+                      <defs>
+                        <linearGradient id="accGradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor={CHESSCOM_GREEN} stopOpacity={0.55} />
+                          <stop offset="100%" stopColor={CHESSCOM_GREEN} stopOpacity={0.02} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                      <XAxis dataKey="label" tick={{ fill: TEXT_MUTED, fontSize: 11 }} axisLine={false} tickLine={false} />
+                      <YAxis domain={[0, 100]} tick={{ fill: TEXT_MUTED, fontSize: 11 }} axisLine={false} tickLine={false} width={32} unit="%" />
+                      <RechartsTooltip
+                        contentStyle={{ background: BG_DARK, border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, color: TEXT_LIGHT, fontSize: 12 }}
+                        labelStyle={{ color: TEXT_MUTED, fontWeight: 700 }}
+                        formatter={(value: number, _key, item: any) => {
+                          const p = item?.payload;
+                          if (!p) return [`${value}%`, 'Accuracy'];
+                          return [`${value}% accuracy · ${p.blunderRate}% blunder rate (${p.moves} moves)`, 'Accuracy'];
+                        }}
+                      />
+                      <Area type="monotone" dataKey="accuracy" stroke={CHESSCOM_GREEN} strokeWidth={2.5} fill="url(#accGradient)" dot={{ r: 3, fill: CHESSCOM_GREEN, strokeWidth: 0 }} activeDot={{ r: 5 }} />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            );
+          })()}
+
           {weaknessesData?.weaknesses && weaknessesData.weaknesses.length > 0 && (() => {
             const sevCounts = {
               Critical: weaknessesData.weaknesses.filter(w => w.severity === 'Critical').length,

@@ -2,10 +2,10 @@ import { useListGames, useGetGame, useGetGameReplay, useImportGames } from '@wor
 import { useUser } from './use-user';
 import { useQueryClient } from '@tanstack/react-query';
 
-export function useMyGames(limit?: number) {
+export function useMyGames(limit?: number, opts?: { platform?: 'chesscom' | 'lichess' | 'chessscout'; opponent?: string }) {
   const { authUser, isLoaded } = useUser();
   const result = useListGames(
-    authUser ? { limit: limit ?? 500 } : undefined,
+    authUser ? { limit: limit ?? 500, platform: opts?.platform, opponent: opts?.opponent } : undefined,
     // @ts-expect-error orval generates UseQueryOptions but we only need { enabled }
     { query: { enabled: !!authUser } }
   );

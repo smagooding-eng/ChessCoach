@@ -1,7 +1,7 @@
 import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
 import { db, gamesTable, backgroundJobsTable, usersTable } from "@workspace/db";
 import { requireAuth } from "../middlewares/authMiddleware";
-import { eq, desc, count, isNull, and, asc, sql, gte, inArray } from "drizzle-orm";
+import { eq, desc, count, isNull, and, or, ilike, asc, sql, gte, inArray } from "drizzle-orm";
 import {
   ImportGamesBody,
   ImportGamesResponse,
@@ -395,10 +395,19 @@ router.get("/games", requireAuth, async (req, res): Promise<void> => {
   const limit = query.success ? (query.data.limit ?? 50) : 50;
   const offset = query.success ? (query.data.offset ?? 0) : 0;
   const platform = query.success ? query.data.platform : undefined;
+  const opponent = query.success ? query.data.opponent?.trim() : undefined;
 
   const conditions = [eq(gamesTable.userId, req.user!.id)];
   if (platform && (platform === "chesscom" || platform === "lichess" || platform === "chessscout")) {
     conditions.push(eq(gamesTable.platform, platform));
+  }
+  if (opponent) {
+    conditions.push(
+      or(
+        ilike(gamesTable.whiteUsername, opponent),
+        ilike(gamesTable.blackUsername, opponent),
+      )!
+    );
   }
 
   let dbQuery = db
@@ -703,7 +712,9 @@ router.get("/games/review-status/:jobId", async (req, res): Promise<void> => {
       const cached = game.reviewData as Record<string, unknown>;
       const moves = cached.moves ?? cached;
       const gameSummary = cached.gameSummary ?? null;
-      res.json({ status: "done", reviewData: { moves, gameSummary } });
+      const whiteAccuracy = cached.whiteAccuracy ?? null;
+      const blackAccuracy = cached.blackAccuracy ?? null;
+      res.json({ status: "done", reviewData: { moves, gameSummary, whiteAccuracy, blackAccuracy } });
       return;
     }
   }
@@ -956,6 +967,142 @@ async function runAnalyzePgnJob(pgn: string, jobId: string, log: Logger): Promis
   }
 }
 
+// Reviews a single game and writes its reviewData — the same core logic
+// runReviewJob uses for a single manually-triggered review, factored out so
+// bulk review can reuse it without creating a backgroundJobsTable row per
+// game (which would be hundreds of rows for a large backlog).
+async function reviewOneGame(
+  game: typeof gamesTable.$inferSelect,
+  onProgress?: (done: number, total: number) => void,
+): Promise<void> {
+  const moves = parsePgnMoves(game.pgn);
+  const startFen = extractStartFen(game.pgn);
+  const reviewResult = await reviewFullGame({
+    moves,
+    opening: game.opening,
+    eco: game.eco,
+    result: game.result,
+    whiteUsername: game.whiteUsername,
+    blackUsername: game.blackUsername,
+    startFen: startFen !== "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1" ? startFen : undefined,
+    onProgress,
+  });
+
+  await db.update(gamesTable)
+    .set({ reviewData: { ...reviewResult, _v2: true } as unknown as Record<string, unknown> })
+    .where(eq(gamesTable.id, game.id));
+}
+
+// Bulk review processes games strictly one at a time — the Stockfish engine
+// queue (see engineAnalysis.ts) would keep this safe even if run
+// concurrently, but sequential is deliberate here too: it avoids piling up
+// dozens of simultaneous OpenAI calls and database writes, and keeps CPU
+// contention with normal site traffic bounded rather than spiking all at
+// once. `maxGames` caps how many this specific invocation processes —
+// the auto/background trigger uses a small cap; the manual "Review All"
+// button uses a much larger one.
+export async function runBulkReviewJob(
+  userId: string,
+  jobId: string,
+  log: Logger,
+  maxGames: number,
+): Promise<void> {
+  try {
+    const unreviewed = await db
+      .select()
+      .from(gamesTable)
+      .where(and(eq(gamesTable.userId, userId), isNull(gamesTable.reviewData)))
+      .orderBy(desc(gamesTable.playedAt))
+      .limit(maxGames);
+
+    const total = unreviewed.length;
+    let reviewedSoFar = 0;
+
+    if (total === 0) {
+      await db.update(backgroundJobsTable).set({
+        status: "done",
+        result: { reviewedSoFar: 0, total: 0 } as unknown as Record<string, unknown>,
+        completedAt: new Date(),
+      }).where(eq(backgroundJobsTable.id, jobId));
+      return;
+    }
+
+    for (const game of unreviewed) {
+      try {
+        await reviewOneGame(game);
+        reviewedSoFar++;
+      } catch (err) {
+        log.warn({ err, gameId: game.id }, "Bulk review: one game failed, continuing with the rest");
+      }
+      await db.update(backgroundJobsTable).set({
+        result: { reviewedSoFar, total, currentGameId: game.id } as unknown as Record<string, unknown>,
+      }).where(eq(backgroundJobsTable.id, jobId));
+    }
+
+    await db.update(backgroundJobsTable).set({
+      status: "done",
+      completedAt: new Date(),
+    }).where(eq(backgroundJobsTable.id, jobId));
+
+    log.info({ jobId, userId, reviewedSoFar, total }, "Bulk review job complete");
+  } catch (err) {
+    log.error({ err, jobId, userId }, "Bulk review job failed");
+    const msg = err instanceof Error ? err.message : "Bulk review failed";
+    await db.update(backgroundJobsTable).set({
+      status: "error",
+      error: msg,
+      completedAt: new Date(),
+    }).where(eq(backgroundJobsTable.id, jobId));
+  }
+}
+
+const MANUAL_BULK_REVIEW_MAX = 100;
+const BULK_REVIEW_STALE_MS = 60 * 60 * 1000; // generous — 100 sequential game reviews can legitimately take a long time
+
+router.post("/games/review-all", requireAuth, async (req, res): Promise<void> => {
+  const userId = req.user!.id;
+
+  const [pending] = await db.select().from(backgroundJobsTable).where(
+    and(
+      eq(backgroundJobsTable.userId, userId),
+      eq(backgroundJobsTable.type, "bulk_review"),
+      eq(backgroundJobsTable.status, "pending"),
+    )
+  );
+  if (pending) {
+    const age = Date.now() - new Date(pending.createdAt!).getTime();
+    if (age <= BULK_REVIEW_STALE_MS) {
+      res.json({ jobId: pending.id });
+      return;
+    }
+    await db.update(backgroundJobsTable).set({
+      status: "error",
+      error: "Timed out (server restart or crash)",
+      completedAt: new Date(),
+    }).where(eq(backgroundJobsTable.id, pending.id));
+  }
+
+  const jobId = randomUUID();
+  await db.insert(backgroundJobsTable).values({
+    id: jobId,
+    userId,
+    type: "bulk_review",
+    status: "pending",
+  });
+
+  res.json({ jobId });
+  runBulkReviewJob(userId, jobId, req.log, MANUAL_BULK_REVIEW_MAX).catch(() => {});
+});
+
+router.get("/games/review-all-status/:jobId", requireAuth, async (req, res): Promise<void> => {
+  const [job] = await db.select().from(backgroundJobsTable).where(
+    and(eq(backgroundJobsTable.id, req.params.jobId), eq(backgroundJobsTable.userId, req.user!.id))
+  );
+  if (!job) { res.status(404).json({ error: "Job not found" }); return; }
+  res.setHeader("Cache-Control", "no-store");
+  res.json({ status: job.status, error: job.error, ...(job.result as object ?? {}) });
+});
+
 async function runReviewJob(gameId: number, jobId: string, log: Logger): Promise<void> {
   try {
     const [game] = await db.select().from(gamesTable).where(eq(gamesTable.id, gameId));
@@ -1117,13 +1264,15 @@ router.get("/games/:id/review", async (req, res): Promise<void> => {
     const cached = game.reviewData as Record<string, unknown>;
     let moves = cached.moves ?? cached;
     const gameSummary = cached.gameSummary ?? null;
+    const whiteAccuracy = cached.whiteAccuracy ?? null;
+    const blackAccuracy = cached.blackAccuracy ?? null;
     if (Array.isArray(moves) && moves.length > 0 && !cached._v2) {
       moves = (moves as Record<string, unknown>[]).map(m => {
         const { cpLoss, engineAvailable, ...rest } = m;
         return rest;
       });
     }
-    res.json({ status: "done", reviewData: { moves, gameSummary } });
+    res.json({ status: "done", reviewData: { moves, gameSummary, whiteAccuracy, blackAccuracy } });
     return;
   }
 
@@ -1160,13 +1309,15 @@ router.post("/games/:id/review", async (req, res): Promise<void> => {
     const cached = game.reviewData as Record<string, unknown>;
     let moves = cached.moves ?? cached;
     const gameSummary = cached.gameSummary ?? null;
+    const whiteAccuracy = cached.whiteAccuracy ?? null;
+    const blackAccuracy = cached.blackAccuracy ?? null;
     if (Array.isArray(moves) && moves.length > 0 && !cached._v2) {
       moves = (moves as Record<string, unknown>[]).map(m => {
         const { cpLoss, engineAvailable, ...rest } = m;
         return rest;
       });
     }
-    res.json({ status: "done", reviewData: { moves, gameSummary } });
+    res.json({ status: "done", reviewData: { moves, gameSummary, whiteAccuracy, blackAccuracy } });
     return;
   }
 

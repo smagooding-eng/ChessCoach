@@ -71,6 +71,11 @@ paths:
             enum: [chesscom, lichess, chessscout]
           description: Filter by platform
         - in: query
+          name: opponent
+          schema:
+            type: string
+          description: Filter to games played against this opponent username
+        - in: query
           name: limit
           schema:
             type: integer
@@ -679,6 +684,9 @@ components:
           type: number
         avgRating:
           type: number
+        reviewedCount:
+          type: number
+          description: Number of the user's games that have completed AI move-by-move review.
         openingStats:
           type: array
           items:
@@ -693,6 +701,21 @@ components:
             $ref: "#/components/schemas/MonthlyTrendPoint"
         phaseAccuracy:
           $ref: "#/components/schemas/PhaseAccuracy"
+        accuracyTrend:
+          type: array
+          description: Real progression over time — accuracy and blunder rate by month, computed from engine-verified move classifications across all reviewed games.
+          items:
+            type: object
+            properties:
+              month:
+                type: string
+              accuracy:
+                type: number
+              moves:
+                type: number
+              blunderRate:
+                type: number
+            required: [month, accuracy, moves, blunderRate]
       required:
         - username
         - totalGames
@@ -701,6 +724,7 @@ components:
         - draws
         - winRate
         - avgRating
+        - reviewedCount
         - openingStats
         - resultsByTimeControl
 

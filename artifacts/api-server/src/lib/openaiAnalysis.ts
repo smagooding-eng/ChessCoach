@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 import { logger } from "./logger";
-import { evaluateAllPositions, classifyFromWinPctLoss, isSacrificialMove, uciToSan, winPct, type PositionEval } from "./engineAnalysis";
+import { evaluateAllPositions, classifyFromWinPctLoss, isSacrificialMove, uciToSan, winPct, accuracyFromAvgLoss, estimatedLossForMove, type PositionEval } from "./engineAnalysis";
 import { extractStartFen, normalizeFen } from "./chesscom";
 import { isBookPosition, getBookFensForEco } from "./openingBook";
 import {
@@ -416,11 +416,12 @@ export async function analyzeGamePgn(pgn: string, onProgress?: (done: number, to
   const avgBlackLoss = blackLosses.length > 0
     ? blackLosses.reduce((a, b) => a + b, 0) / blackLosses.length : 0;
 
-  // Chess.com-aligned curve: empirically fitted from reference games where
-  // chess.com reported W/B accuracy of 54.5/48.3 vs our previous (-0.065)
-  // exponent's 60.7/51.4 outputs. -0.075 brings us within ~1.5 points.
-  const toAccuracy = (avgLoss: number) =>
-    Math.max(0, Math.min(100, 103.1668 * Math.exp(-0.075 * avgLoss) - 3.1668));
+  // Uses the single shared accuracy formula (engineAnalysis.ts) — this used
+  // to have its own locally-duplicated formula with a different exponent
+  // than analysis.ts's copy, causing inconsistent accuracy numbers for
+  // identical underlying performance depending on which code path rendered
+  // it.
+  const toAccuracy = accuracyFromAvgLoss;
 
   return {
     moves,
@@ -854,6 +855,13 @@ export interface GameReviewSummary {
 export interface GameReviewResult {
   moves: MoveReview[];
   gameSummary: GameReviewSummary | null;
+  /** Computed once, authoritatively, using the shared accuracy formula —
+   *  previously each consumer of reviewMoves (the frontend, and a separate
+   *  analyze-pgn function) computed its own accuracy independently, with
+   *  different fallback-severity tables, guaranteeing they could disagree
+   *  for the same underlying moves. */
+  whiteAccuracy: number;
+  blackAccuracy: number;
 }
 
 export async function reviewFullGame(input: {
@@ -1042,7 +1050,19 @@ JSON format:
     const totalTime = Date.now() - startTime;
     logger.info({ totalTimeMs: totalTime, moves: moves.length, gptMovesCovered: allParsedMoves.length }, "Game review complete");
 
-    return { moves: reviewMoves, gameSummary };
+    const accuracyFor = (color: "white" | "black") => {
+      const colorMoves = reviewMoves.filter((m) => m.color === color);
+      if (colorMoves.length === 0) return 0;
+      const avgLoss = colorMoves.reduce((sum, m) => sum + estimatedLossForMove(m), 0) / colorMoves.length;
+      return Math.round(accuracyFromAvgLoss(avgLoss) * 10) / 10;
+    };
+
+    return {
+      moves: reviewMoves,
+      gameSummary,
+      whiteAccuracy: accuracyFor("white"),
+      blackAccuracy: accuracyFor("black"),
+    };
   } catch (err) {
     logger.error({ err }, "Failed to review full game with OpenAI");
     throw err;
@@ -1332,6 +1352,169 @@ function ensureAllLessonsHavePgn(course: CourseOutput, gamePgns?: string[]): Cou
 // the same mechanism reviewFullGame already uses. GPT is only used to write
 // the prose explanation, grounded by the real fact sheet and validated with
 // reconcileExplanation (same guard as single-move analysis).
+
+// ── Engine-grounded weakness detection ───────────────────────────────────
+//
+// analyzePlayerGames (below) asks GPT to read raw move text from the last
+// 30 games and guess at weaknesses from its own chess knowledge — the same
+// unreliable pattern already fixed for lesson generation. But for games
+// that have already been through reviewFullGame, real per-move
+// classifications (blunder/mistake/inaccuracy/etc, computed by Stockfish,
+// not guessed) already exist. This computes weaknesses directly from that
+// real data — deterministically, no GPT call at all, since these are
+// statistics, not judgment calls. Falls back to null (caller should use the
+// GPT-based path instead) when there isn't enough reviewed-game data yet
+// for the numbers to be meaningful.
+
+export interface GroundedReviewedGame {
+  id: number;
+  opening: string | null;
+  whiteUsername: string;
+  blackUsername: string;
+  reviewData: unknown;
+}
+
+const MIN_REVIEWED_GAMES_FOR_GROUNDED_WEAKNESSES = 8;
+
+export function computeGroundedWeaknesses(
+  username: string,
+  games: GroundedReviewedGame[],
+): AnalysisOutput | null {
+  if (games.length < MIN_REVIEWED_GAMES_FOR_GROUNDED_WEAKNESSES) return null;
+
+  type FlatMove = { classification: string; moveIndex: number; gameId: number; opening: string | null };
+  const playerMoves: FlatMove[] = [];
+
+  for (const g of games) {
+    const rd = g.reviewData as { moves?: MoveReview[] } | MoveReview[] | null;
+    const moves: MoveReview[] = Array.isArray(rd)
+      ? rd
+      : Array.isArray((rd as { moves?: MoveReview[] } | null)?.moves)
+        ? (rd as { moves: MoveReview[] }).moves
+        : [];
+    const userColor: "white" | "black" =
+      g.whiteUsername.toLowerCase() === username.toLowerCase() ? "white" : "black";
+    for (const m of moves) {
+      if (m.color !== userColor || typeof m.classification !== "string") continue;
+      playerMoves.push({ classification: m.classification, moveIndex: m.moveIndex ?? 0, gameId: g.id, opening: g.opening });
+    }
+  }
+
+  if (playerMoves.length < 20) return null;
+
+  const totalMoves = playerMoves.length;
+  const countBy = (cls: string) => playerMoves.filter((m) => m.classification === cls).length;
+  const blunders = countBy("blunder");
+  const mistakes = countBy("mistake");
+  const missedWins = countBy("missed_win");
+  const badMoveRate = (blunders + mistakes) / totalMoves;
+
+  const phaseOf = (moveIndex: number): "opening" | "middlegame" | "endgame" => {
+    const moveNumber = Math.floor(moveIndex / 2) + 1;
+    return moveNumber <= 15 ? "opening" : moveNumber <= 32 ? "middlegame" : "endgame";
+  };
+  const phaseBad: Record<string, number> = { opening: 0, middlegame: 0, endgame: 0 };
+  const phaseTotal: Record<string, number> = { opening: 0, middlegame: 0, endgame: 0 };
+  for (const m of playerMoves) {
+    const p = phaseOf(m.moveIndex);
+    phaseTotal[p]++;
+    if (m.classification === "blunder" || m.classification === "mistake") phaseBad[p]++;
+  }
+  const phaseRate = (p: string) => (phaseTotal[p] > 0 ? phaseBad[p] / phaseTotal[p] : 0);
+
+  const openingGroups = new Map<string, { games: Set<number>; bad: number; total: number }>();
+  for (const m of playerMoves) {
+    const key = m.opening || "Unknown Opening";
+    if (!openingGroups.has(key)) openingGroups.set(key, { games: new Set(), bad: 0, total: 0 });
+    const grp = openingGroups.get(key)!;
+    grp.games.add(m.gameId);
+    grp.total++;
+    if (m.classification === "blunder" || m.classification === "mistake") grp.bad++;
+  }
+
+  // Maps a real gameId back to its index in the `games` array — the frontend
+  // (WeaknessDetail.tsx) derives a preview board position from the first
+  // related game's index, so leaving this empty (as it was before) meant
+  // every grounded weakness silently lost its preview board.
+  const gameIdToIndex = new Map<number, number>();
+  games.forEach((g, i) => gameIdToIndex.set(g.id, i));
+  const toIndices = (gameIds: Iterable<number>, limit = 5): number[] =>
+    Array.from(new Set(Array.from(gameIds).map((id) => gameIdToIndex.get(id)).filter((i): i is number => i != null))).slice(0, limit);
+
+  const weaknesses: WeaknessResult[] = [];
+
+  const phases: Array<"opening" | "middlegame" | "endgame"> = ["opening", "middlegame", "endgame"];
+  const validPhases = phases.filter((p) => phaseTotal[p] >= 10);
+  if (validPhases.length >= 2) {
+    const worst = validPhases.reduce((a, b) => (phaseRate(a) > phaseRate(b) ? a : b));
+    const best = validPhases.reduce((a, b) => (phaseRate(a) < phaseRate(b) ? a : b));
+    if (worst !== best && phaseRate(worst) > phaseRate(best) * 1.4 && phaseRate(worst) > 0.08) {
+      const label = worst === "opening" ? "Opening Preparation" : worst === "middlegame" ? "Positional Play" : "Endgame Technique";
+      const contributingGameIds = playerMoves
+        .filter((m) => phaseOf(m.moveIndex) === worst && (m.classification === "blunder" || m.classification === "mistake"))
+        .map((m) => m.gameId);
+      weaknesses.push({
+        category: label,
+        severity: phaseRate(worst) > 0.25 ? "High" : phaseRate(worst) > 0.15 ? "Medium" : "Low",
+        description: `Across your ${games.length} reviewed games, ${Math.round(phaseRate(worst) * 100)}% of your ${worst} moves were inaccuracies or worse, versus ${Math.round(phaseRate(best) * 100)}% in the ${best}. This is your most costly phase.`,
+        frequency: phaseBad[worst],
+        examples: [],
+        relatedGameIndices: toIndices(contributingGameIds),
+      });
+    }
+  }
+
+  if (missedWins >= 3) {
+    const rate = missedWins / games.length;
+    const contributingGameIds = playerMoves.filter((m) => m.classification === "missed_win").map((m) => m.gameId);
+    weaknesses.push({
+      category: "Tactical Awareness",
+      severity: rate > 0.15 ? "High" : rate > 0.08 ? "Medium" : "Low",
+      description: `You've let a winning position slip away in ${missedWins} of your last ${games.length} reviewed games (${Math.round(rate * 100)}%) — the engine confirms you were winning before a mistake handed back the advantage.`,
+      frequency: missedWins,
+      examples: [],
+      relatedGameIndices: toIndices(contributingGameIds),
+    });
+  }
+
+  if (blunders >= 5) {
+    const perGame = blunders / games.length;
+    const contributingGameIds = playerMoves.filter((m) => m.classification === "blunder").map((m) => m.gameId);
+    weaknesses.push({
+      category: "Tactical Awareness",
+      severity: perGame > 1 ? "High" : perGame > 0.5 ? "Medium" : "Low",
+      description: `You've blundered ${blunders} times across ${games.length} reviewed games — about ${perGame.toFixed(1)} per game on average.`,
+      frequency: blunders,
+      examples: [],
+      relatedGameIndices: toIndices(contributingGameIds),
+    });
+  }
+
+  let worstOpening: { name: string; rate: number; gameCount: number } | null = null;
+  for (const [name, grp] of openingGroups.entries()) {
+    if (grp.games.size < 3 || grp.total < 8) continue;
+    const rate = grp.bad / grp.total;
+    if (!worstOpening || rate > worstOpening.rate) worstOpening = { name, rate, gameCount: grp.games.size };
+  }
+  if (worstOpening && worstOpening.rate > badMoveRate * 1.3 && worstOpening.rate > 0.12) {
+    const contributingGameIds = openingGroups.get(worstOpening.name)?.games ?? new Set<number>();
+    weaknesses.push({
+      category: "Opening Preparation",
+      severity: worstOpening.rate > 0.25 ? "High" : "Medium",
+      description: `In the ${worstOpening.name} (${worstOpening.gameCount} games), ${Math.round(worstOpening.rate * 100)}% of your moves were inaccuracies or worse — noticeably above your ${Math.round(badMoveRate * 100)}% overall rate.`,
+      frequency: worstOpening.gameCount,
+      examples: [],
+      relatedGameIndices: toIndices(contributingGameIds),
+    });
+  }
+
+  if (weaknesses.length === 0) return null;
+
+  return {
+    weaknesses: weaknesses.slice(0, 6),
+    summary: `Based on real engine analysis of your ${games.length} reviewed games (${totalMoves} of your moves evaluated), your overall inaccuracy-or-worse rate is ${Math.round(badMoveRate * 100)}%.`,
+  };
+}
 
 export interface TeachableMistake {
   gameIndex: number;

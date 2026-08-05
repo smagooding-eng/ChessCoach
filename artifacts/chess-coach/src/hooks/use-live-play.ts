@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { getApiBase, apiFetch } from '@/lib/api';
 
 export type LiveStatus = 'idle' | 'connecting' | 'queued' | 'in_game' | 'finished' | 'disconnected' | 'error';
 export type LiveMode = 'casual' | 'ranked';
@@ -35,6 +36,14 @@ export interface LiveGameState {
 export interface OpponentDisconnect { side: 'w' | 'b'; graceMs: number; until: number }
 
 function buildWsUrl(): string {
+  const apiBase = getApiBase();
+  if (apiBase) {
+    // apiBase is an absolute http(s) URL to the backend (e.g. Render) —
+    // swap the scheme for its ws(s) equivalent.
+    return apiBase.replace(/^http/, 'ws') + '/api/live/ws';
+  }
+  // No VITE_API_URL configured — same-origin case (local dev, or a
+  // deployment where frontend and backend share a host).
   const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   return `${proto}//${window.location.host}/api/live/ws`;
 }
@@ -84,7 +93,7 @@ export function useLivePlay() {
       // server whether this user has an active live game and rehydrate it before subscribing.
       if (!g) {
         try {
-          const r = await fetch(`${import.meta.env.BASE_URL}api/live/active-game`, { credentials: 'include' });
+          const r = await apiFetch('/api/live/active-game', { credentials: 'include' });
           if (r.ok) {
             const j = await r.json();
             if (j?.game) {

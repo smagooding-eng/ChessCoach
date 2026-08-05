@@ -47,7 +47,6 @@ export function Dashboard() {
   const { data: weaknesses } = useMyWeaknesses();
   const { data: coursesData } = useMyCourses();
   const { data: gamesData } = useMyGames(5);
-  const { data: allGamesData } = useMyGames();
 
   const [coursesBeta, setCoursesBeta] = useState(true);
   useEffect(() => {
@@ -81,7 +80,7 @@ export function Dashboard() {
 
   const winRate = summary ? ((summary.winRate || 0) * 100).toFixed(1) : '—';
 
-  const reviewedCount = allGamesData?.games?.filter(g => g.reviewed).length ?? 0;
+  const reviewedCount = summary?.reviewedCount ?? 0;
 
   return (
     <div className="space-y-4 md:space-y-5">

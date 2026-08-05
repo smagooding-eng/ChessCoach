@@ -38,6 +38,7 @@ export const ImportGamesResponse = zod.object({
 export const ListGamesQueryParams = zod.object({
   username: zod.coerce.string().optional().describe("Filter by username"),
   platform: zod.enum(["chesscom", "lichess", "chessscout"]).optional().describe("Filter by platform"),
+  opponent: zod.coerce.string().optional().describe("Filter to games played against this opponent username"),
   limit: zod.coerce.number().optional().describe("Limit results"),
   offset: zod.coerce.number().optional().describe("Offset for pagination"),
 });
@@ -193,6 +194,7 @@ export const GetAnalysisSummaryResponse = zod.object({
   draws: zod.number(),
   winRate: zod.number(),
   avgRating: zod.number(),
+  reviewedCount: zod.number(),
   openingStats: zod.array(
     zod.object({
       opening: zod.string(),
@@ -293,6 +295,19 @@ export const GetAnalysisSummaryResponse = zod.object({
     .optional()
     .describe(
       "Average accuracy and move counts by game phase across all reviewed games for the user.",
+    ),
+  accuracyTrend: zod
+    .array(
+      zod.object({
+        month: zod.string(),
+        accuracy: zod.number().describe("Average accuracy percent (0-100) for this month."),
+        moves: zod.number(),
+        blunderRate: zod.number().describe("Percent of moves that month classified as blunders."),
+      }),
+    )
+    .optional()
+    .describe(
+      "Real progression over time — accuracy and blunder rate by month, computed from engine-verified move classifications across all reviewed games.",
     ),
 });
 

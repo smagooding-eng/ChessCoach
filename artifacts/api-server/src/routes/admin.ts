@@ -259,7 +259,13 @@ router.post("/admin/users/delete", requireAdmin, async (req: Request, res: Respo
     }
 
     const usersToDelete = await db
-      .select({ id: usersTable.id, email: usersTable.email, stripeCustomerId: usersTable.stripeCustomerId })
+      .select({
+        id: usersTable.id,
+        email: usersTable.email,
+        stripeCustomerId: usersTable.stripeCustomerId,
+        chesscomUsername: usersTable.chesscomUsername,
+        lichessUsername: usersTable.lichessUsername,
+      })
       .from(usersTable)
       .where(inArray(usersTable.id, userIds));
 
@@ -276,6 +282,14 @@ router.post("/admin/users/delete", requireAdmin, async (req: Request, res: Respo
       res.status(404).json({ error: "No matching users found" });
       return;
     }
+
+    // Usernames tied to these accounts — games/weaknesses/courses are keyed
+    // by username (string), not userId, since they mirror imported
+    // chess.com/lichess data rather than the internal user record.
+    const usernames = Array.from(new Set(
+      usersToDelete.flatMap(u => [u.chesscomUsername, u.lichessUsername].filter((s): s is string => !!s))
+        .map(s => s.toLowerCase())
+    ));
 
     try {
       const stripe = await getUncachableStripeClient();
@@ -294,8 +308,35 @@ router.post("/admin/users/delete", requireAdmin, async (req: Request, res: Respo
     await db.delete(puzzleAttemptsTable).where(inArray(puzzleAttemptsTable.userId, ids));
     await db.delete(backgroundJobsTable).where(inArray(backgroundJobsTable.userId, ids));
     await db.delete(pageViewsTable).where(inArray(pageViewsTable.userId, ids));
+    await db.delete(referralConversionsTable).where(
+      sql`${referralConversionsTable.referrerUserId} IN (${sql.join(ids.map(id => sql`${id}`), sql`, `)})
+          OR ${referralConversionsTable.referredUserId} IN (${sql.join(ids.map(id => sql`${id}`), sql`, `)})`
+    );
 
-    const deletedResult = await db.delete(usersTable).where(inArray(usersTable.id, ids));
+    if (usernames.length > 0) {
+      // Lessons must go before courses — lessonsTable.courseId is a real DB
+      // foreign key to coursesTable.id with no cascade, so deleting a course
+      // that still has lessons referencing it would fail outright.
+      const coursesToDelete = await db
+        .select({ id: coursesTable.id })
+        .from(coursesTable)
+        .where(inArray(coursesTable.username, usernames));
+      const courseIds = coursesToDelete.map(c => c.id);
+      if (courseIds.length > 0) {
+        await db.delete(lessonsTable).where(inArray(lessonsTable.courseId, courseIds));
+      }
+      await db.delete(coursesTable).where(inArray(coursesTable.username, usernames));
+      await db.delete(weaknessesTable).where(inArray(weaknessesTable.username, usernames));
+      await db.delete(gamesTable).where(inArray(gamesTable.userId, ids));
+    }
+
+    // sessionsTable isn't cleaned up here — it has no userId column (the
+    // association lives inside an opaque JSONB session blob), and stale
+    // sessions already expire naturally via their `expire` timestamp, so a
+    // deleted user's session simply stops authenticating rather than
+    // lingering as a real orphaned-data concern.
+
+    await db.delete(usersTable).where(inArray(usersTable.id, ids));
 
     res.json({ success: true, deleted: ids.length });
   } catch (err: any) {

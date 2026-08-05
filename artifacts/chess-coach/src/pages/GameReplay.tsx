@@ -90,17 +90,25 @@ function GameRatingPanel({
   game,
   whiteAvatar,
   blackAvatar,
+  serverAccuracy,
 }: {
   reviewMoves: ReviewMove[];
   game: { whiteUsername: string; blackUsername: string; whiteRating?: number; blackRating?: number };
   whiteAvatar?: string;
   blackAvatar?: string;
+  /** Backend-computed accuracy (reviewFullGame), using the single shared
+   *  formula — preferred over the local calculation below when available.
+   *  Falls back to local computation only for reviews cached before this
+   *  field existed. */
+  serverAccuracy?: { white: number; black: number } | null;
 }) {
-  // Fallback midpoints aligned with the chess.com-style bucket boundaries
-  // (excellent ≤2, good ≤6, inaccuracy ≤15, mistake ≤30, blunder >30).
+  // Fallback path only — used for reviews cached before the backend started
+  // computing accuracy itself (see serverAccuracy prop). Kept in sync with
+  // the backend's single source of truth: CLASSIFICATION_FALLBACK_LOSS in
+  // artifacts/api-server/src/lib/engineAnalysis.ts.
   const WIN_PCT_LOSS_BY_CLASS: Record<Classification, number> = {
-    checkmate: 0, brilliant: 0, great: 0, best: 0, excellent: 1, book: 1, good: 3,
-    inaccuracy: 9, mistake: 18, blunder: 35, missed_win: 25,
+    checkmate: 0, brilliant: 0, great: 0, best: 0, excellent: 0.5, book: 0.7, good: 2,
+    inaccuracy: 8, mistake: 16, blunder: 33, missed_win: 25,
   };
 
   const byColor = (c: 'white' | 'black') => reviewMoves.filter(m => m.color === c);
@@ -178,8 +186,8 @@ function GameRatingPanel({
 
   const wArr = byColor('white');
   const bArr = byColor('black');
-  const wAcc = calcAccuracy(wArr);
-  const bAcc = calcAccuracy(bArr);
+  const wAcc = serverAccuracy?.white ?? calcAccuracy(wArr);
+  const bAcc = serverAccuracy?.black ?? calcAccuracy(bArr);
   const wc   = counts(wArr);
   const bc   = counts(bArr);
 
@@ -616,12 +624,17 @@ export function GameReplay() {
   const [gameSummary, setGameSummary]   = useState<GameSummary | null>(null);
   const [loadingSavedReview, setLoadingSavedReview] = useState(true);
   const [reviewProgress, setReviewProgress] = useState<{ done: number; total: number } | null>(null);
+  // Computed once, authoritatively, by the backend (reviewFullGame) using
+  // the single shared accuracy formula. Older cached reviews created before
+  // this field existed will have this as null — GameRatingPanel falls back
+  // to its own calculation only in that case, for backward compatibility.
+  const [gameAccuracy, setGameAccuracy] = useState<{ white: number; black: number } | null>(null);
 
   useEffect(() => {
     if (!game) { setLoadingSavedReview(false); return; }
     apiFetch(`/api/games/${game.id}/review`)
       .then(r => r.ok ? r.json() : null)
-      .then((d: { status?: string; jobId?: string; reviewData?: ReviewMove[] | { moves: ReviewMove[]; gameSummary?: GameSummary } } | null) => {
+      .then((d: { status?: string; jobId?: string; reviewData?: ReviewMove[] | { moves: ReviewMove[]; gameSummary?: GameSummary; whiteAccuracy?: number | null; blackAccuracy?: number | null } } | null) => {
         if (!d) return;
         if (d.status === 'pending' && d.jobId) {
           setReviewing(true);
@@ -635,6 +648,9 @@ export function GameReplay() {
         } else if (d.reviewData.moves && Array.isArray(d.reviewData.moves)) {
           setReviewMoves(d.reviewData.moves);
           if (d.reviewData.gameSummary) setGameSummary(d.reviewData.gameSummary);
+          if (d.reviewData.whiteAccuracy != null && d.reviewData.blackAccuracy != null) {
+            setGameAccuracy({ white: d.reviewData.whiteAccuracy, black: d.reviewData.blackAccuracy });
+          }
         }
       })
       .catch(() => {})
@@ -716,13 +732,16 @@ export function GameReplay() {
       try {
         const res = await apiFetch(`/api/games/review-status/${jobId}`);
         if (!res.ok) return;
-        const data = await res.json() as { status: string; reviewData?: { moves: ReviewMove[]; gameSummary?: GameSummary }; error?: string; progress?: number | null; total?: number | null };
+        const data = await res.json() as { status: string; reviewData?: { moves: ReviewMove[]; gameSummary?: GameSummary; whiteAccuracy?: number | null; blackAccuracy?: number | null }; error?: string; progress?: number | null; total?: number | null };
 
         if (data.status === 'done' && data.reviewData) {
           const moves = data.reviewData.moves ?? [];
           if (moves.length > 0) setReviewMoves(moves);
           else setReviewError('Review returned no data. Please try again.');
           if (data.reviewData.gameSummary) setGameSummary(data.reviewData.gameSummary);
+          if (data.reviewData.whiteAccuracy != null && data.reviewData.blackAccuracy != null) {
+            setGameAccuracy({ white: data.reviewData.whiteAccuracy, black: data.reviewData.blackAccuracy });
+          }
           setReviewing(false);
           setReviewProgress(null);
           reviewJobIdRef.current = null;
@@ -750,19 +769,23 @@ export function GameReplay() {
     if (force) {
       setReviewMoves([]);
       setGameSummary(null);
+      setGameAccuracy(null);
     }
 
     try {
       const url = force ? `/api/games/${game.id}/review?force=true` : `/api/games/${game.id}/review`;
       const res = await apiFetch(url, { method: 'POST' });
       if (!res.ok) throw new Error('Failed to start review');
-      const data = await res.json() as { status: string; jobId?: string; reviewData?: { moves: ReviewMove[]; gameSummary?: GameSummary } };
+      const data = await res.json() as { status: string; jobId?: string; reviewData?: { moves: ReviewMove[]; gameSummary?: GameSummary; whiteAccuracy?: number | null; blackAccuracy?: number | null } };
 
       if (data.status === 'done' && data.reviewData) {
         const moves = data.reviewData.moves ?? [];
         if (moves.length > 0) setReviewMoves(moves);
         else setReviewError('Review returned no data. Please try again.');
         if (data.reviewData.gameSummary) setGameSummary(data.reviewData.gameSummary);
+        if (data.reviewData.whiteAccuracy != null && data.reviewData.blackAccuracy != null) {
+          setGameAccuracy({ white: data.reviewData.whiteAccuracy, black: data.reviewData.blackAccuracy });
+        }
         setReviewing(false);
       } else if (data.status === 'pending' && data.jobId) {
         reviewJobIdRef.current = data.jobId;
@@ -1378,6 +1401,7 @@ export function GameReplay() {
               game={game}
               whiteAvatar={whitePlayer?.avatar}
               blackAvatar={blackPlayer?.avatar}
+              serverAccuracy={gameAccuracy}
             />
           )}
 

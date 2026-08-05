@@ -86,6 +86,45 @@ export { uciToSan };
 
 export const winPct = (cp: number) => 50 + 50 * (2 / (1 + Math.exp(-0.00368208 * cp)) - 1);
 
+// Converts an average win%-loss (or centipawn-loss, both are used
+// interchangeably as loss-severity inputs elsewhere in this codebase) into
+// a 0-100 accuracy score. This used to be duplicated in two different
+// files with two different (and both wrong) exponent constants — one used
+// -0.065, the other -0.075 — meaning the app computed genuinely different
+// accuracy numbers for identical underlying performance depending on which
+// code path happened to render it. -0.075 was the more recently and
+// explicitly calibrated value (tuned against real chess.com reference
+// games, see prior comment history), so that's the one kept here as the
+// single source of truth.
+export const accuracyFromAvgLoss = (avgLoss: number) =>
+  Math.max(0, Math.min(100, 103.1668 * Math.exp(-0.075 * avgLoss) - 3.1668));
+
+// Used when a move's real engine cpLoss isn't available (e.g. classification
+// came from a fallback path) — a representative win%-loss stand-in per
+// classification, so accuracy can still be estimated. This exact table was
+// independently duplicated with different numbers in four different
+// places (two backend files, the frontend, and the separate analyze-pgn
+// function) — guaranteed to silently disagree for identical underlying
+// moves. This is now the single source of truth.
+export const CLASSIFICATION_FALLBACK_LOSS: Record<EngineClassification, number> = {
+  checkmate: 0, brilliant: 0, great: 0, best: 0, excellent: 0.5, book: 0.7, good: 2,
+  inaccuracy: 8, mistake: 16, blunder: 33, missed_win: 25,
+};
+
+/** Estimated win%-loss for one reviewed move — real cpLoss when the engine
+ *  evaluated it, otherwise the classification's fallback severity. */
+export function estimatedLossForMove(m: {
+  classification: EngineClassification;
+  cpLoss?: number | null;
+  engineAvailable?: boolean;
+}): number {
+  if (m.cpLoss != null && m.engineAvailable) return m.cpLoss;
+  const base = CLASSIFICATION_FALLBACK_LOSS[m.classification] ?? 2;
+  const isGoodTierUnverified =
+    !m.engineAvailable && ["good", "book", "excellent", "best", "great"].includes(m.classification);
+  return Math.max(base, isGoodTierUnverified ? 3 : base);
+}
+
 class StockfishProcess {
   private proc: ChildProcessWithoutNullStreams | null = null;
   private buffer = "";
@@ -277,6 +316,24 @@ class StockfishProcess {
 let globalEngine: StockfishProcess | null = null;
 let engineInitPromise: Promise<void> | null = null;
 
+// The engine process communicates over a single stdin/stdout pipe using a
+// request/response protocol (sendAndWait) that is NOT safe for concurrent
+// callers — two evaluate() calls in flight at once would overwrite each
+// other's pending-response state. Every batch of positions is queued here
+// so concurrent callers (e.g. course generation, single-move analysis, and
+// bulk game review all running around the same time) are serialized safely
+// instead of corrupting each other's results.
+let engineQueue: Promise<unknown> = Promise.resolve();
+
+function withEngineQueue<T>(fn: () => Promise<T>): Promise<T> {
+  const result = engineQueue.then(fn, fn);
+  engineQueue = result.then(
+    () => undefined,
+    () => undefined,
+  );
+  return result;
+}
+
 async function getEngine(): Promise<StockfishProcess> {
   if (globalEngine && !globalEngine["dead"]) return globalEngine;
   if (globalEngine?.["dead"]) {
@@ -297,6 +354,14 @@ async function getEngine(): Promise<StockfishProcess> {
 }
 
 export async function evaluateAllPositions(
+  fens: string[],
+  depth: number = ANALYSIS_DEPTH,
+  onProgress?: (done: number, total: number) => void,
+): Promise<PositionEval[]> {
+  return withEngineQueue(() => evaluateAllPositionsUnqueued(fens, depth, onProgress));
+}
+
+async function evaluateAllPositionsUnqueued(
   fens: string[],
   depth: number = ANALYSIS_DEPTH,
   onProgress?: (done: number, total: number) => void,

@@ -133,7 +133,7 @@ function ScoutingWaitContent({ opponentRating }: { opponentRating?: number | nul
 
 export function OpponentAnalysis() {
   const [, navigate] = useLocation();
-  const { username } = useUser();
+  const { username, authUser } = useUser();
   const { data: eloData } = useEloProgress(username ?? undefined);
   const [inputUsername, setInputUsername] = useState('');
   const [loading, setLoading] = useState(false);
@@ -307,7 +307,8 @@ export function OpponentAnalysis() {
   };
 
   const handleGenerateCourses = async () => {
-    if (!result || !username || courseGenState === 'generating') return;
+    const requestingUser = username ?? authUser?.lichessUsername ?? null;
+    if (!result || !requestingUser || courseGenState === 'generating') return;
     setCourseGenState('generating');
     setCourseGenError(null);
 
@@ -318,10 +319,12 @@ export function OpponentAnalysis() {
         body: JSON.stringify({
           opponentUsername: result.username,
           weaknesses: result.weaknesses,
-          requestingUser: username,
         }),
       });
-      if (!startRes.ok) throw new Error('Failed to start course generation');
+      if (!startRes.ok) {
+        const errBody = await startRes.json().catch(() => ({}));
+        throw new Error((errBody as { error?: string }).error || 'Failed to start course generation');
+      }
       const { jobId } = await startRes.json() as { jobId: string };
 
       await new Promise<void>((resolve, reject) => {

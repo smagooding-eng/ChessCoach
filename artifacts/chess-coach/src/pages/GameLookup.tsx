@@ -117,10 +117,16 @@ function AnalysisSummaryPanel({
   analysis,
   turningPoints,
   game,
+  serverAccuracy,
 }: {
   analysis: MoveAnalysis[];
   turningPoints: TurningPoint[];
   game: H2HGame;
+  /** Backend-computed accuracy (analyzeGamePgn), using the single shared
+   *  formula — preferred over the local calculation below, which is kept
+   *  only as a fallback and is a fifth independent copy of this same
+   *  formula found during review. */
+  serverAccuracy?: { white: number; black: number } | null;
 }) {
   // Win-pct-loss fallback table for moves whose engine eval wasn't captured
   // in this older analysis snapshot. Numbers chosen to roughly mirror the
@@ -163,8 +169,8 @@ function AnalysisSummaryPanel({
 
   const wMoves = byColor('white');
   const bMoves = byColor('black');
-  const wAcc = calcAccuracy(wMoves);
-  const bAcc = calcAccuracy(bMoves);
+  const wAcc = serverAccuracy?.white ?? calcAccuracy(wMoves);
+  const bAcc = serverAccuracy?.black ?? calcAccuracy(bMoves);
   const wCounts = counts(wMoves);
   const bCounts = counts(bMoves);
 
@@ -272,6 +278,7 @@ export function GameLookup() {
 
   const [analysis, setAnalysis] = useState<MoveAnalysis[]>([]);
   const [turningPoints, setTurningPoints] = useState<TurningPoint[]>([]);
+  const [gameAccuracy, setGameAccuracy] = useState<{ white: number; black: number } | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisProgress, setAnalysisProgress] = useState(0);
 
@@ -441,6 +448,7 @@ export function GameLookup() {
     }
     tps.sort((a, b) => Math.abs(b.evalSwing) - Math.abs(a.evalSwing));
     setTurningPoints(tps.slice(0, 6));
+    setGameAccuracy({ white: data.whiteAccuracy, black: data.blackAccuracy });
     setAnalysisProgress(100);
     setAnalysis(results);
     setIsAnalyzing(false);
@@ -461,6 +469,7 @@ export function GameLookup() {
     setFlipped(false);
     setAnalysis([]);
     setTurningPoints([]);
+    setGameAccuracy(null);
     setIsAnalyzing(false);
     setIsPlaying(false);
     playRef.current = false;
@@ -738,7 +747,7 @@ export function GameLookup() {
 
               {analysis.length > 0 && (
                 <div className="border-l p-4 overflow-y-auto hide-scrollbar" style={{ borderColor: 'rgba(255,255,255,0.06)', maxHeight: 500 }}>
-                  <AnalysisSummaryPanel analysis={analysis} turningPoints={turningPoints} game={selectedGame} />
+                  <AnalysisSummaryPanel analysis={analysis} turningPoints={turningPoints} game={selectedGame} serverAccuracy={gameAccuracy} />
                 </div>
               )}
             </div>

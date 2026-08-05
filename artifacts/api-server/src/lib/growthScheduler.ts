@@ -1,9 +1,11 @@
 import cron from 'node-cron';
-import { db, growthCampaignsTable, usersTable, emailDripLogTable } from "@workspace/db";
-import { eq, and, lte, isNotNull, sql } from "drizzle-orm";
+import { db, growthCampaignsTable, usersTable, emailDripLogTable, gamesTable, backgroundJobsTable } from "@workspace/db";
+import { eq, and, lte, isNotNull, isNull, sql } from "drizzle-orm";
 import { executePostForCampaign, computeNextRun } from "./growthService";
 import { sendEmail } from "./email";
 import { logger } from "./logger";
+import { randomUUID } from "crypto";
+import { runBulkReviewJob } from "../routes/games";
 
 let schedulerStarted = false;
 
@@ -21,7 +23,51 @@ export function startGrowthScheduler() {
     await runEmailDrips();
   });
 
-  logger.info('[growth] Scheduler started (campaigns: every 15min, drips: every 6h)');
+  cron.schedule('*/15 * * * *', async () => {
+    logger.info('[review] Auto bulk-review tick');
+    await runAutoReviewTick();
+  });
+
+  logger.info('[growth] Scheduler started (campaigns: every 15min, drips: every 6h, auto-review: every 15min)');
+}
+
+// Gentle, throttled background review: each tick picks a small number of
+// users who have unreviewed games and reviews just a few games each, rather
+// than trying to clear entire backlogs at once. This is deliberately slow —
+// Stockfish review is CPU-heavy on a single shared vCPU (Render free tier),
+// and this competes with live site traffic. The much larger "Review All"
+// button (games.ts) is for when a user explicitly wants to trade some
+// temporary slowness for speed.
+const AUTO_REVIEW_USERS_PER_TICK = 5;
+const AUTO_REVIEW_GAMES_PER_USER_PER_TICK = 2;
+
+async function runAutoReviewTick() {
+  try {
+    const candidates = await db
+      .selectDistinct({ userId: gamesTable.userId })
+      .from(gamesTable)
+      .where(and(isNull(gamesTable.reviewData), isNotNull(gamesTable.userId)))
+      .orderBy(sql`RANDOM()`)
+      .limit(AUTO_REVIEW_USERS_PER_TICK);
+
+    for (const { userId } of candidates) {
+      if (!userId) continue;
+      try {
+        const jobId = randomUUID();
+        await db.insert(backgroundJobsTable).values({
+          id: jobId,
+          userId,
+          type: 'bulk_review',
+          status: 'pending',
+        });
+        await runBulkReviewJob(userId, jobId, logger, AUTO_REVIEW_GAMES_PER_USER_PER_TICK);
+      } catch (err: unknown) {
+        logger.error({ userId, error: err instanceof Error ? err.message : 'Unknown' }, '[review] Auto bulk-review failed for user');
+      }
+    }
+  } catch (err: unknown) {
+    logger.error({ error: err instanceof Error ? err.message : 'Unknown' }, '[review] Auto bulk-review tick failed');
+  }
 }
 
 async function runDueCampaigns() {
