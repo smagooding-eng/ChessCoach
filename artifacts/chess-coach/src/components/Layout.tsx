@@ -9,6 +9,8 @@ import { usePwaInstall } from '@/hooks/use-pwa-install';
 import { InstallGuide } from '@/components/InstallGuide';
 import { cn } from '@/lib/utils';
 import { AnimatePresence, motion } from 'framer-motion';
+import { BRASS } from '@/components/DesignSystem';
+import { KnightIcon, ScoutIcon, ChessClockIcon, AnalysisIcon, TacticsIcon, BotPawnIcon } from '@/components/ChessIcons';
 
 const CHESSCOM_GREEN = '#81b64c';
 const BG_DARK = '#262421';
@@ -19,18 +21,18 @@ const TEXT_MUTED = '#9e9b98';
 const BORDER_COLOR = 'rgba(129,182,76,0.06)';
 
 const PRIMARY_NAV = [
-  { href: '/',          label: 'Home',            icon: LayoutDashboard },
-  { href: '/opponents', label: 'Opponent Scout',  icon: Swords },
-  { href: '/games',     label: 'Games',           icon: History },
-  { href: '/analysis',  label: 'Analysis',        icon: BrainCircuit },
-  { href: '/puzzles',   label: 'Puzzles',         icon: Puzzle, badge: 'BETA' },
+  { href: '/',          label: 'Home',            icon: KnightIcon },
+  { href: '/opponents', label: 'Opponent Scout',  icon: ScoutIcon },
+  { href: '/games',     label: 'Games',           icon: ChessClockIcon },
+  { href: '/analysis',  label: 'Analysis',        icon: AnalysisIcon },
+  { href: '/puzzles',   label: 'Puzzles',         icon: TacticsIcon, badge: 'BETA' },
   { href: '/lookup',    label: 'Game Lookup',     icon: Search },
   { href: '/play',      label: 'Play Local',      icon: Play },
   { href: '/scan',      label: 'Scan Position',   icon: Camera, badge: 'NEW' },
 ];
 
 const SECONDARY_NAV = [
-  { href: '/practice',     label: 'Practice Bots',   icon: Bot },
+  { href: '/practice',     label: 'Practice Bots',   icon: BotPawnIcon },
   { href: '/import',       label: 'Import Games',    icon: Import },
   { href: '/courses',      label: 'Courses',         icon: GraduationCap, badge: 'BETA' },
   { href: '/endgames',     label: 'Endgames',        icon: Trophy,        badge: 'BETA' },
@@ -75,7 +77,7 @@ function SidebarLink({ item, isActive }: { item: typeof ALL_NAV[0]; isActive: bo
         <item.icon className="w-4 h-4 shrink-0" />
         {item.label}
         {badge && (
-          <span className="ml-auto px-1.5 py-px rounded text-[8px] font-black tracking-wider" style={{ background: 'rgba(234,166,49,0.15)', color: '#eaa631' }}>
+          <span className="ml-auto px-1.5 py-px rounded text-[8px] font-semibold tracking-wider" style={{ background: 'rgba(201,161,92,0.15)', color: '#c9a15c' }}>
             {badge}
           </span>
         )}
@@ -208,7 +210,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 </Link>
                 <Link href="/subscription" className="block">
                   <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors active:bg-white/5" style={{ color: TEXT_LIGHT }}>
-                    <Crown className="w-4.5 h-4.5" style={{ color: '#eaa631' }} />
+                    <Crown className="w-4.5 h-4.5" style={{ color: '#c9a15c' }} />
                     <span className="font-semibold text-sm">Subscription</span>
                     {isPremium && <span className="ml-auto text-[9px] font-black px-1.5 py-px rounded" style={{ background: 'rgba(129,182,76,0.15)', color: CHESSCOM_GREEN }}>PRO</span>}
                   </div>
@@ -234,7 +236,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           {subscription.status === 'free_trial' && subscription.trialDaysLeft != null && !authUser?.isAdmin && (
             <Link href="/subscription" className="block mb-3 mx-3 md:mx-0">
               <div className="flex items-center justify-between px-3.5 py-2 rounded-xl text-sm transition-colors"
-                style={{ background: 'rgba(234,166,49,0.1)', border: '1px solid rgba(234,166,49,0.2)', color: '#eaa631' }}>
+                style={{ background: 'rgba(201,161,92,0.1)', border: '1px solid rgba(201,161,92,0.2)', color: '#c9a15c' }}>
                 <span>
                   <Crown className="w-3.5 h-3.5 inline-block mr-1 -mt-0.5" />
                   Free trial: {subscription.trialDaysLeft} day{subscription.trialDaysLeft === 1 ? '' : 's'} left
@@ -314,7 +316,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                         <item.icon className="w-5 h-5" />
                         <span className="font-semibold text-sm">{item.label}</span>
                         {badge && (
-                          <span className="px-1.5 py-px rounded text-[9px] font-black tracking-wider" style={{ background: 'rgba(234,166,49,0.15)', color: '#eaa631' }}>
+                          <span className="px-1.5 py-px rounded text-[9px] font-semibold tracking-wider" style={{ background: 'rgba(201,161,92,0.15)', color: '#c9a15c' }}>
                             {badge}
                           </span>
                         )}

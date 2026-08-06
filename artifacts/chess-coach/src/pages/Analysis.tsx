@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { PageHero } from '@/components/DesignSystem';
+import { PageHero, PRIMARY_BTN_STYLE } from '@/components/DesignSystem';
 import { useLocation } from 'wouter';
 import { useMyAnalysisSummary, useMyWeaknesses } from '@/hooks/use-analysis';
 import { useUser } from '@/hooks/use-user';
@@ -179,8 +179,8 @@ export function Analysis() {
           <button
             onClick={handleAnalyze}
             disabled={isAnalyzing}
-            className="shrink-0 px-5 py-2.5 rounded-xl font-bold text-sm text-white flex items-center gap-2 transition-opacity hover:opacity-90 disabled:opacity-50"
-            style={{ background: CHESSCOM_GREEN }}
+            className="shrink-0 px-5 py-2.5 rounded-xl font-semibold text-sm text-white flex items-center gap-2 transition-all hover:scale-[1.02] disabled:opacity-50"
+            style={PRIMARY_BTN_STYLE}
           >
             {isAnalyzing ? (
               <><Loader2 className="w-4 h-4 animate-spin" /> Processing...</>
@@ -255,10 +255,10 @@ export function Analysis() {
                     </PieChart>
                   </ResponsiveContainer>
                   <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                    <span className="text-xl font-black leading-none" style={{ color: CHESSCOM_GREEN, letterSpacing: '-0.02em' }}>
+                    <span className="text-xl font-semibold leading-none" style={{ color: CHESSCOM_GREEN, letterSpacing: '-0.02em' }}>
                       {Math.round((summary.wins / Math.max(summary.totalGames, 1)) * 100)}%
                     </span>
-                    <span className="text-[9px] font-black uppercase tracking-[0.14em] mt-0.5" style={{ color: TEXT_MUTED }}>Win</span>
+                    <span className="text-[9px] font-semibold uppercase tracking-[0.14em] mt-0.5" style={{ color: TEXT_MUTED }}>Win</span>
                   </div>
                 </div>
 
@@ -276,11 +276,11 @@ export function Analysis() {
                     },
                   ].map((s) => (
                     <div key={s.label} className="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-md" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
-                      <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.14em]" style={{ color: TEXT_MUTED }}>
+                      <span className="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em]" style={{ color: TEXT_MUTED }}>
                         <span className="inline-block w-1.5 h-1.5 rounded-full" style={{ background: s.color }} />
                         {s.label}
                       </span>
-                      <span className="text-sm font-black tabular-nums" style={{ color: TEXT_LIGHT, letterSpacing: '-0.01em' }}>
+                      <span className="text-sm font-semibold tabular-nums" style={{ color: TEXT_LIGHT, letterSpacing: '-0.01em' }}>
                         {typeof s.value === 'number' ? s.value.toLocaleString() : s.value}
                       </span>
                     </div>
@@ -669,7 +669,7 @@ export function Analysis() {
                           </span>
                         </div>
                         <div className="flex items-baseline gap-1.5 mb-2">
-                          <span className="text-3xl font-black tabular-nums" style={{ color }}>
+                          <span className="text-3xl font-semibold tabular-nums" style={{ color }}>
                             {stat.moves > 0 ? stat.accuracy : '—'}
                           </span>
                           {stat.moves > 0 && (
@@ -700,7 +700,7 @@ export function Analysis() {
             );
           })()}
 
-          <h2 className="text-xl font-black mt-8 mb-4 flex items-center gap-2" style={{ color: TEXT_LIGHT }}>
+          <h2 className="text-xl font-semibold mt-8 mb-4 flex items-center gap-2" style={{ color: TEXT_LIGHT }}>
             <AlertTriangle className="w-5 h-5" style={{ color: '#ea9733' }} /> Identified Weaknesses
           </h2>
 
