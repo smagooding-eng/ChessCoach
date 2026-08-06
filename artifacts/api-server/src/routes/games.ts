@@ -1096,7 +1096,7 @@ router.post("/games/review-all", requireAuth, async (req, res): Promise<void> =>
 
 router.get("/games/review-all-status/:jobId", requireAuth, async (req, res): Promise<void> => {
   const [job] = await db.select().from(backgroundJobsTable).where(
-    and(eq(backgroundJobsTable.id, req.params.jobId), eq(backgroundJobsTable.userId, req.user!.id))
+    and(eq(backgroundJobsTable.id, req.params.jobId as string), eq(backgroundJobsTable.userId, req.user!.id))
   );
   if (!job) { res.status(404).json({ error: "Job not found" }); return; }
   res.setHeader("Cache-Control", "no-store");

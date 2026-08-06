@@ -83,7 +83,7 @@ router.get("/opponents/status/:jobId", async (req, res): Promise<void> => {
   const userId = req.user?.id;
   if (!userId) { res.status(401).json({ error: "Not authenticated" }); return; }
   const [job] = await db.select().from(backgroundJobsTable).where(
-    and(eq(backgroundJobsTable.id, req.params.jobId), eq(backgroundJobsTable.userId, userId))
+    and(eq(backgroundJobsTable.id, req.params.jobId as string), eq(backgroundJobsTable.userId, userId))
   );
   if (!job) {
     res.status(404).json({ error: "Job not found or expired" });
@@ -393,7 +393,7 @@ router.post("/opponents/generate-courses", requireAuth, async (req, res): Promis
 });
 
 router.get("/opponents/courses-job/:jobId", requireAuth, (req, res): void => {
-  const job = courseJobs.get(req.params.jobId);
+  const job = courseJobs.get(req.params.jobId as string);
   if (!job || job.userId !== req.user!.id) {
     res.status(404).json({ error: "Job not found or expired" });
     return;
