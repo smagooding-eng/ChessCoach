@@ -12,7 +12,7 @@ import { useMultiEloProgress } from '@/hooks/use-elo-progress';
 import { useLiveRatings, bestLiveRating } from '@/hooks/use-live-ratings';
 import { ImportPromptModal } from '@/components/ImportPromptModal';
 import { EmailVerifyBanner } from '@/components/EmailVerifyBanner';
-import { CHESSCOM_GREEN, BRASS, TEXT_LIGHT, TEXT_MUTED, t } from '@/components/DesignSystem';
+import { CHESSCOM_GREEN, BRASS, TEXT_LIGHT, TEXT_MUTED, t, PieceTile } from '@/components/DesignSystem';
 
 const BG_DARK = '#262421';
 const BG_CARD = 'linear-gradient(180deg, #383532 0%, #2a2825 100%)';
@@ -101,7 +101,7 @@ export function Dashboard() {
                 </div>
             }
             {chessPlayer?.title && (
-              <span className="absolute -bottom-1.5 -right-1.5 px-1.5 py-0.5 rounded-md text-[10px] font-semibold text-black leading-none shadow-lg" style={{ background: 'linear-gradient(180deg, #f5c460 0%, #e5a631 100%)' }}>
+              <span className="absolute -bottom-1.5 -right-1.5 px-1.5 py-0.5 rounded-md text-[10px] font-semibold text-black leading-none shadow-lg" style={{ background: `linear-gradient(180deg, #dbb877 0%, ${BRASS} 100%)` }}>
                 {chessPlayer.title}
               </span>
             )}
@@ -228,7 +228,8 @@ export function Dashboard() {
               Scan & get the best move instantly
             </p>
           </div>
-          <div className="shrink-0 w-10 h-10 rounded-xl flex items-center justify-center transition-all group-hover:translate-x-1" style={{ background: 'rgba(129,182,76,0.2)', border: '1px solid rgba(129,182,76,0.35)' }}>
+          <div className="shrink-0 w-10 h-10 rounded-xl flex items-center justify-center transition-all group-hover:translate-x-1"
+            style={{ background: '#211f1c', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.05), inset 0 2px 4px rgba(0,0,0,0.4)' }}>
             <ArrowUpRight className="w-5 h-5" style={{ color: CHESSCOM_GREEN }} />
           </div>
         </div>
@@ -244,27 +245,21 @@ export function Dashboard() {
           
           <div className="relative grid grid-cols-2 sm:grid-cols-4">
             {[
-              { label: 'Total Games', value: summary?.totalGames?.toLocaleString() || '0', icon: <Swords className="w-3.5 h-3.5" /> },
-              { label: 'Win Rate', value: `${winRate}%`, icon: <Trophy className="w-3.5 h-3.5" /> },
-              { label: 'Avg Rating', value: Math.round(summary?.avgRating || 0) || '—', icon: <Activity className="w-3.5 h-3.5" /> },
-              { label: 'Reviewed', value: reviewedCount, icon: <Award className="w-3.5 h-3.5" /> },
+              { label: 'Total Games', value: summary?.totalGames?.toLocaleString() || '0' },
+              { label: 'Win Rate', value: `${winRate}%` },
+              { label: 'Avg Rating', value: Math.round(summary?.avgRating || 0) || '—' },
+              { label: 'Reviewed', value: reviewedCount },
             ].map((s, i) => {
               const isLeftColMobile = i % 2 === 0;
               const isTopRowMobile = i < 2;
               return (
-                <div key={s.label} className="px-3 py-3 md:px-4 md:py-3.5 flex items-center gap-3"
+                <div key={s.label} className="px-3.5 py-3.5 md:px-4 md:py-4"
                   style={{
                     borderRight: isLeftColMobile ? '1px solid rgba(255,255,255,0.05)' : undefined,
                     borderBottom: isTopRowMobile ? '1px solid rgba(255,255,255,0.05)' : undefined,
                   }}>
-                  <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-                    style={{ background: 'rgba(129,182,76,0.15)', border: '1px solid rgba(129,182,76,0.3)', color: CHESSCOM_GREEN }}>
-                    {s.icon}
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.18em] leading-none mb-1" style={{ color: TEXT_MUTED }}>{s.label}</p>
-                    <p className="text-lg md:text-xl font-semibold leading-none truncate" style={{ color: TEXT_LIGHT, letterSpacing: '-0.02em' }}>{s.value}</p>
-                  </div>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.18em] leading-none mb-1.5" style={{ color: TEXT_MUTED }}>{s.label}</p>
+                  <p className={t.numeric} style={{ fontSize: '1.25rem', lineHeight: 1, color: TEXT_LIGHT }}>{s.value}</p>
                 </div>
               );
             })}
@@ -298,16 +293,16 @@ export function Dashboard() {
                 </div>
                 <div className="absolute inset-0 flex items-center justify-center">
                   <div className="text-center px-5 py-5 rounded-2xl max-w-xs"
-                    style={{ background: 'rgba(38,36,33,0.94)', border: `1px solid rgba(129,182,76,0.35)`, backdropFilter: 'blur(2px)', boxShadow: '0 8px 24px -8px rgba(0,0,0,0.6)' }}>
-                    <div className="inline-flex items-center justify-center w-10 h-10 rounded-xl mb-2.5" style={{ background: 'rgba(129,182,76,0.18)', border: '1px solid rgba(129,182,76,0.35)' }}>
-                      <Lock className="w-4 h-4" style={{ color: CHESSCOM_GREEN }} />
+                    style={{ background: 'rgba(38,36,33,0.94)', border: `1px solid rgba(201,161,92,0.35)`, backdropFilter: 'blur(2px)', boxShadow: '0 8px 24px -8px rgba(0,0,0,0.6)' }}>
+                    <div className="inline-flex items-center justify-center w-10 h-10 rounded-xl mb-2.5" style={{ background: '#211f1c', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.05), inset 0 2px 4px rgba(0,0,0,0.4)' }}>
+                      <Lock className="w-4 h-4" style={{ color: BRASS }} />
                     </div>
                     <p className="font-semibold text-sm mb-2.5" style={{ color: TEXT_LIGHT, letterSpacing: '-0.01em' }}>
                       Unlock your full breakdown and personalized training plan
                     </p>
                     <Link href="/subscription">
-                      <button className="mt-1 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl font-semibold text-xs text-white transition-all hover:scale-[1.02]"
-                        style={{ background: `linear-gradient(180deg, #95c45a 0%, ${CHESSCOM_GREEN} 100%)`, boxShadow: '0 4px 12px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.2)' }}>
+                      <button className="mt-1 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl font-semibold text-xs text-black transition-all hover:scale-[1.02]"
+                        style={{ background: `linear-gradient(180deg, #dbb877 0%, ${BRASS} 100%)`, boxShadow: '0 4px 12px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.25)' }}>
                         <Crown className="w-3.5 h-3.5" /> Upgrade to Pro
                       </button>
                     </Link>
@@ -527,27 +522,6 @@ const ImportIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 
 // Chess-piece illustration tile used at the head of each dashboard section.
 // Chunky green-gradient square with a bold white chess piece silhouette — like a chess.com puzzle/lesson card.
-function PieceTile({ piece, size = 44 }: { piece: '♚' | '♛' | '♜' | '♝' | '♞' | '♟'; size?: number }) {
-  return (
-    <div className="relative shrink-0 rounded-xl flex items-center justify-center overflow-hidden"
-      style={{
-        width: size, height: size,
-        background: 'linear-gradient(160deg, #8fc556 0%, #6a9c3c 55%, #4f7a2a 100%)',
-        boxShadow: '0 4px 10px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.25), inset 0 -2px 0 rgba(0,0,0,0.25), 0 0 0 1px rgba(0,0,0,0.4)',
-      }}>
-      <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(circle at 30% 25%, rgba(255,255,255,0.18), transparent 55%)' }} />
-      <span style={{
-        fontSize: Math.round(size * 0.72),
-        lineHeight: 1,
-        color: '#ffffff',
-        textShadow: '0 2px 3px rgba(0,0,0,0.45), 0 0 1px rgba(0,0,0,0.6)',
-        fontFamily: '"Segoe UI Symbol", "Apple Symbols", "DejaVu Sans", "Arial Unicode MS", sans-serif',
-        marginTop: -2,
-      }}>{piece}</span>
-    </div>
-  );
-}
-
 // Lightweight chess-board thumbnail (starting position) — purely decorative.
 // Mirrors chess.com's home-feed thumbnails: little green-and-cream board with pieces.
 function BoardThumb({ size = 56, flip = false }: { size?: number; flip?: boolean }) {
