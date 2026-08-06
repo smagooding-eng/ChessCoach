@@ -507,7 +507,7 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
   const totalRepeatMoves = Math.max((steps?.length ?? 1) - 1, 0);
   const [repeatStep, setRepeatStep] = useState(0);
   const [repeatPosition, setRepeatPosition] = useState(() => steps?.[0]?.fen ?? START_FEN);
-  const [repeatFeedback, setRepeatFeedback] = useState<'correct' | 'wrong' | null>(null);
+  const [repeatFeedback, setRepeatFeedback] = useState<'correct' | 'wrong' | 'invalid' | null>(null);
   const [repeatFirstTry, setRepeatFirstTry] = useState<boolean[]>(() => new Array(totalRepeatMoves).fill(true));
   const [repeatAttempts, setRepeatAttempts] = useState(0);
   const [repeatComplete, setRepeatComplete] = useState(false);
@@ -668,7 +668,7 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
     try {
       const chess = new Chess(steps[repeatStep].fen);
       const move = chess.move({ from: args.sourceSquare, to: args.targetSquare, promotion: 'q' });
-      if (!move) return false;
+      if (!move) { flashInvalid(); return false; }
 
       const normalize = (s: string) => s.replace(/[+#!?]/g, '').trim();
       const isCorrect = normalize(move.san) === normalize(expected) ||
@@ -706,6 +706,11 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
     }
   }, [repeatStep, repeatComplete, steps, repeatAttempts]);
 
+  const flashInvalid = useCallback(() => {
+    setRepeatFeedback('invalid');
+    setTimeout(() => setRepeatFeedback(f => (f === 'invalid' ? null : f)), 500);
+  }, []);
+
   const handleRepeatSquareClick = useCallback(({ square, piece }: { square: string; piece: { pieceType: string } | null }) => {
     if (repeatComplete || !steps) return;
     const nextMove = steps[repeatStep + 1];
@@ -717,16 +722,19 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
         setRepeatSelectedSq(null);
         return;
       }
-      if (piece) { setRepeatSelectedSq(square); } else { setRepeatSelectedSq(null); }
+      if (piece) { setRepeatSelectedSq(square); } else { setRepeatSelectedSq(null); flashInvalid(); }
       return;
     }
     if (piece) {
       try {
         const chess = new Chess(steps[repeatStep]?.fen ?? START_FEN);
         if (piece.pieceType[0].toLowerCase() === chess.turn()) setRepeatSelectedSq(square);
+        else flashInvalid();
       } catch { setRepeatSelectedSq(square); }
+    } else {
+      flashInvalid();
     }
-  }, [repeatComplete, steps, repeatStep, repeatUserColor, repeatSelectedSq, repeatLegalTargets, handleRepeatDrop]);
+  }, [repeatComplete, steps, repeatStep, repeatUserColor, repeatSelectedSq, repeatLegalTargets, handleRepeatDrop, flashInvalid]);
 
   useEffect(() => {
     if (tab !== 'repeat' || repeatComplete || !steps) return;
@@ -1278,6 +1286,12 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
                       <motion.div key="rw" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                         className="absolute inset-0 rounded-xl flex items-center justify-center bg-red-500/20 pointer-events-none">
                         <div className="bg-red-500 text-white font-black text-xl px-6 py-3 rounded-xl shadow-lg">✗ Try again</div>
+                      </motion.div>
+                    )}
+                    {repeatFeedback === 'invalid' && (
+                      <motion.div key="ri" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                        className="absolute inset-0 rounded-xl flex items-center justify-center pointer-events-none">
+                        <div className="bg-black/70 text-white/90 font-bold text-sm px-4 py-2 rounded-xl shadow-lg">Select one of your own pieces</div>
                       </motion.div>
                     )}
                   </AnimatePresence>

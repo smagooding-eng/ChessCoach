@@ -461,12 +461,13 @@ const SandboxBoard = React.memo(function SandboxBoard({ playerRating }: { player
     setThinking(true);
     if (botTimerRef.current) clearTimeout(botTimerRef.current);
     const delay = 300 + Math.random() * 500;
-    botTimerRef.current = setTimeout(() => {
+    botTimerRef.current = setTimeout(async () => {
       if (gameKeyRef.current !== gameVersion || chess.isGameOver() || chess.turn() === playerColor) {
         setThinking(false);
         return;
       }
-      const san = getBotMove(chess.fen(), bot);
+      const san = await getBotMove(chess.fen(), bot);
+      if (gameKeyRef.current !== gameVersion) { setThinking(false); return; }
       if (san) {
         try {
           chess.move(san);
@@ -912,7 +913,7 @@ export function GameReplay() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px] gap-4 xl:gap-6 flex-1 min-h-0 overflow-y-auto xl:overflow-hidden hide-scrollbar order-1 xl:order-none">
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px] gap-4 xl:gap-6 flex-1 min-h-0 overflow-y-auto overscroll-contain xl:overflow-hidden hide-scrollbar order-1 xl:order-none">
 
         {/* ── Left col: board + controls ── */}
         <div className="flex flex-col gap-2 md:gap-4 xl:min-h-0 xl:overflow-y-auto xl:pr-2 hide-scrollbar">
@@ -1494,7 +1495,7 @@ export function GameReplay() {
             </div>
           </div>
 
-          <div ref={moveListRef} className="flex-1 overflow-y-auto p-2 hide-scrollbar">
+          <div ref={moveListRef} className="flex-1 overflow-y-auto overscroll-contain p-2 hide-scrollbar">
             {/* Starting position */}
             <div
               onClick={() => { setCurrentMove(0); setPracticeMode(false); }}

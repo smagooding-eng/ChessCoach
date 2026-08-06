@@ -1554,12 +1554,13 @@ function cacheKeyFor(gamePgns: string[], skipOpeningPlies: number): string {
  */
 export async function findTeachableMistakes(
   gamePgns: string[],
-  opts?: { maxResults?: number; skipOpeningPlies?: number },
+  opts?: { maxResults?: number; skipOpeningPlies?: number; minPlyFraction?: number },
 ): Promise<TeachableMistake[]> {
   const maxResults = opts?.maxResults ?? 8;
   const skipOpeningPlies = opts?.skipOpeningPlies ?? 10;
+  const minPlyFraction = opts?.minPlyFraction;
 
-  const cacheKey = cacheKeyFor(gamePgns, skipOpeningPlies);
+  const cacheKey = cacheKeyFor(gamePgns, skipOpeningPlies) + `:${minPlyFraction ?? ""}`;
   const cached = teachableMistakeCache.get(cacheKey);
   if (cached) {
     return cached.slice(0, maxResults);
@@ -1578,6 +1579,19 @@ export async function findTeachableMistakes(
       }>;
       if (history.length < 4) continue;
 
+      // When minPlyFraction is set (endgame-only callers), the effective
+      // skip is relative to THIS game's actual length — e.g. "the last
+      // third" — rather than the shared fixed skipOpeningPlies, which for
+      // a short game (very common in casual/rapid/blitz — plenty of games
+      // end well under 20 full moves) could otherwise exceed the game's
+      // entire length and silently skip it altogether.
+      const effectiveSkip = minPlyFraction != null
+        ? Math.min(
+            Math.max(skipOpeningPlies, Math.floor(history.length * minPlyFraction)),
+            Math.max(0, history.length - 4), // always leave a few plies to examine
+          )
+        : skipOpeningPlies;
+
       // Replay from scratch to collect FEN before each ply.
       const replay = new Chess();
       const fens: string[] = [replay.fen()];
@@ -1588,7 +1602,7 @@ export async function findTeachableMistakes(
 
       const evals = await evaluateAllPositions(fens);
 
-      for (let ply = skipOpeningPlies; ply < history.length; ply++) {
+      for (let ply = effectiveSkip; ply < history.length; ply++) {
         const m = history[ply];
         const evalBefore = evals[ply];
         const evalAfter = evals[ply + 1];
@@ -2014,9 +2028,11 @@ export async function generateEndgameCourse(
   gamePgns?: string[],
 ): Promise<CourseOutput> {
   if (type === "personal_endgames" && gamePgns?.length) {
-    // Endgame mistakes only — approximate "endgame phase" as roughly the
-    // last third of the game by skipping straight past the opening/middlegame.
-    const mistakes = await findTeachableMistakes(gamePgns, { maxResults: 5, skipOpeningPlies: 40 });
+    // Endgame mistakes only — the last third of each individual game,
+    // computed relative to that game's own length (a fixed ply cutoff would
+    // silently exclude any game shorter than the cutoff, which is common
+    // for casual/rapid/blitz games decided well before move 20).
+    const mistakes = await findTeachableMistakes(gamePgns, { maxResults: 5, skipOpeningPlies: 10, minPlyFraction: 0.66 });
     if (mistakes.length > 0) {
       const lessons = await Promise.all(mistakes.map((m, i) => buildLessonFromMistake(m, i)));
       return {

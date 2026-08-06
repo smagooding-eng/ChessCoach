@@ -224,15 +224,15 @@ export async function seedPuzzlesIfNeeded(minCount = 15) {
       continue;
     }
 
-    await db.insert(puzzlesTable).values({
+    const [row] = await db.insert(puzzlesTable).values({
       lichessId: puzzle.lichessId,
       fen: puzzle.fen,
       moves: puzzle.moves,
       rating: puzzle.rating,
       themes: puzzle.themes,
       source: "lichess",
-    });
-    inserted++;
+    }).onConflictDoNothing().returning({ id: puzzlesTable.id });
+    if (row) inserted++;
   }
 
   // NOTE: the static VERIFIED_PUZZLES list above is intentionally small
@@ -280,16 +280,15 @@ export async function seedPuzzlesIfNeeded(minCount = 15) {
         continue;
       }
 
-      await db.insert(puzzlesTable).values({
+      const [row] = await db.insert(puzzlesTable).values({
         lichessId: data.puzzle.id,
         fen,
         moves: data.puzzle.solution.join(" "),
         rating: data.puzzle.rating,
         themes: data.puzzle.themes.join(","),
         source: "lichess",
-      });
-      inserted++;
-      dailyInserted++;
+      }).onConflictDoNothing().returning({ id: puzzlesTable.id });
+      if (row) { inserted++; dailyInserted++; }
     } catch {
       break;
     }

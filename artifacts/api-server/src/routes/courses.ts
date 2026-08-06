@@ -700,6 +700,23 @@ router.patch("/courses/:id/progress", async (req, res): Promise<void> => {
     return;
   }
 
+  // Previously unauthenticated entirely — anyone could mark any lesson in
+  // any user's course complete/incomplete.
+  const requesterUsername = (req.user?.chesscomUsername || req.user?.lichessUsername || "").toLowerCase();
+  if (!requesterUsername || requesterUsername !== course.username.toLowerCase()) {
+    res.status(403).json({ error: "You don't have access to this course" });
+    return;
+  }
+
+  const [lessonToUpdate] = await db
+    .select({ id: lessonsTable.id })
+    .from(lessonsTable)
+    .where(and(eq(lessonsTable.id, lessonId), eq(lessonsTable.courseId, id)));
+  if (!lessonToUpdate) {
+    res.status(404).json({ error: "Lesson not found in this course" });
+    return;
+  }
+
   await db
     .update(lessonsTable)
     .set({ completed: completed ? "true" : "false" })

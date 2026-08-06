@@ -227,10 +227,14 @@ function GameView({ bot, onBack, startFen, startColor }: { bot: BotConfig; onBac
     const currentGameId = gameIdRef.current;
     setThinking(true);
     clearBotTimeout();
-    botTimeoutRef.current = setTimeout(() => {
+    botTimeoutRef.current = setTimeout(async () => {
       if (gameIdRef.current !== currentGameId) return;
       const fenBefore = chess.fen();
-      const move = getBotMove(fenBefore, bot);
+      const move = await getBotMove(fenBefore, bot);
+      // The search yields internally, so re-check nothing changed underneath
+      // it (e.g. the user reset the game or navigated away) before applying
+      // the move.
+      if (gameIdRef.current !== currentGameId) return;
       if (move) {
         const r = chess.move(move);
         if (r) {
@@ -854,23 +858,36 @@ function findBotAboveRating(rating: number): BotConfig {
   return sorted[sorted.length - 1];
 }
 
-function getJumpInParams(): { fen: string; rating: number; color?: 'w' | 'b' } | null {
+function readJumpInParams(): { fen: string; rating: number; color?: 'w' | 'b' } | null {
   const params = new URLSearchParams(window.location.search);
   const fen = params.get('fen');
   if (!fen) return null;
   const rating = params.get('rating');
   const color = params.get('color');
-  window.history.replaceState({}, '', window.location.pathname);
   return { fen, rating: rating ? parseInt(rating, 10) : 1200, color: color === 'w' || color === 'b' ? color : undefined };
 }
 
 export function PracticeBots() {
-  const [jumpIn] = useState(getJumpInParams);
+  const [jumpIn] = useState(readJumpInParams);
   const [selectedBot, setSelectedBot] = useState<BotConfig | null>(() =>
     jumpIn ? findBotAboveRating(jumpIn.rating) : null
   );
   const [selectedOpening, setSelectedOpening] = useState<OpeningLine | null>(null);
   const [tab, setTab] = useState<'bots' | 'openings'>('bots');
+
+  // Strip the ?fen=&rating=&color= params from the URL exactly once, after
+  // mount — not as a side effect inside the useState initializer above.
+  // React.lazy + Suspense (used for route-level code splitting) doesn't
+  // guarantee a component's initial render only happens once while its
+  // chunk is loading; if the initializer both reads AND mutates the URL,
+  // a second invocation would find the URL already stripped by the first
+  // and silently return null, breaking "jump in" every time.
+  const strippedUrlRef = useRef(false);
+  useEffect(() => {
+    if (strippedUrlRef.current) return;
+    strippedUrlRef.current = true;
+    if (jumpIn) window.history.replaceState({}, '', window.location.pathname);
+  }, [jumpIn]);
 
   if (selectedBot) {
     return <GameView bot={selectedBot} onBack={() => setSelectedBot(null)} startFen={jumpIn?.fen} startColor={jumpIn?.color} />;

@@ -265,6 +265,11 @@ export function MistakeFixView({
                     flipped={flipped}
                     lastMove={current.lastMove}
                     moveQuality={current.quality}
+                    arrows={current.lastMove ? [{
+                      from: current.lastMove.from,
+                      to: current.lastMove.to,
+                      color: current.key === 'engine' ? 'rgba(52,211,153,0.9)' : 'rgba(248,113,113,0.9)',
+                    }] : undefined}
                   />
                 </div>
               )}

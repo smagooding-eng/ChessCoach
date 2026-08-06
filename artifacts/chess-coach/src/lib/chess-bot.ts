@@ -110,6 +110,19 @@ function evaluate(chess: Chess): number {
   return score;
 }
 
+// Cheap move ordering: captures and promotions first (better alpha-beta
+// pruning), everything else after. Using SAN string markers ('x' for
+// capture, '=' for promotion) avoids needing verbose move objects.
+function orderMoves(moves: string[]): string[] {
+  const captures: string[] = [];
+  const rest: string[] = [];
+  for (const m of moves) {
+    if (m.includes('x') || m.includes('=')) captures.push(m);
+    else rest.push(m);
+  }
+  return [...captures, ...rest];
+}
+
 const MATE_SCORE = 100000;
 
 function minimax(chess: Chess, depth: number, alpha: number, beta: number, maximizing: boolean): number {
@@ -121,7 +134,7 @@ function minimax(chess: Chess, depth: number, alpha: number, beta: number, maxim
     return evaluate(chess);
   }
 
-  const moves = chess.moves();
+  const moves = orderMoves(chess.moves());
 
   if (maximizing) {
     let maxEval = -Infinity;
@@ -233,7 +246,7 @@ export const BOTS: BotConfig[] = [
   },
 ];
 
-export function getBotMove(fen: string, bot: BotConfig): string | null {
+export async function getBotMove(fen: string, bot: BotConfig): Promise<string | null> {
   const chess = new Chess(fen);
   const moves = chess.moves();
   if (moves.length === 0) return null;
@@ -250,8 +263,18 @@ export function getBotMove(fen: string, bot: BotConfig): string | null {
   if (moves.length > 40) effectiveDepth = Math.min(effectiveDepth, 2);
   else if (moves.length > 30 && effectiveDepth > 3) effectiveDepth = 3;
 
-  const shuffled = [...moves].sort(() => Math.random() - 0.5);
+  // Shuffle within each ordering tier (captures/promotions vs the rest) so
+  // there's still variety among similarly-good moves, without losing the
+  // pruning benefit of trying captures first.
+  const ordered = orderMoves(moves);
+  const captureCount = ordered.findIndex(m => !m.includes('x') && !m.includes('='));
+  const splitAt = captureCount === -1 ? ordered.length : captureCount;
+  const shuffled = [
+    ...ordered.slice(0, splitAt).sort(() => Math.random() - 0.5),
+    ...ordered.slice(splitAt).sort(() => Math.random() - 0.5),
+  ];
 
+  let i = 0;
   for (const move of shuffled) {
     chess.move(move);
     const eval_ = minimax(chess, effectiveDepth - 1, -Infinity, Infinity, !maximizing);
@@ -260,6 +283,14 @@ export function getBotMove(fen: string, bot: BotConfig): string | null {
     if (maximizing ? eval_ > bestEval : eval_ < bestEval) {
       bestEval = eval_;
       bestMove = move;
+    }
+
+    // Yield to the browser every few root moves so a deep search can't
+    // fully block rendering/input for its whole duration — previously this
+    // ran as one uninterrupted synchronous block.
+    i++;
+    if (i % 4 === 0) {
+      await new Promise(resolve => setTimeout(resolve, 0));
     }
   }
 

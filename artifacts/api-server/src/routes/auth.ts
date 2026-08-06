@@ -196,7 +196,7 @@ router.post("/auth/register", async (req: Request, res: Response) => {
 
 router.get("/auth/verify-email", async (req: Request, res: Response) => {
   const token = typeof req.query.token === "string" ? req.query.token : "";
-  const origin = getOrigin(req);
+  const origin = FRONTEND_URL || getOrigin(req);
   if (!token) {
     res.redirect(origin + "/?verify=missing");
     return;
@@ -329,9 +329,10 @@ router.get("/auth/google/callback", async (req: Request, res: Response) => {
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
   const callbackOrigin = getOrigin(req);
+  const frontendOrigin = FRONTEND_URL || callbackOrigin;
 
   if (!code || !clientId || !clientSecret) {
-    res.redirect(callbackOrigin + "/?error=google_auth_failed");
+    res.redirect(frontendOrigin + "/?error=google_auth_failed");
     return;
   }
 
@@ -354,7 +355,7 @@ router.get("/auth/google/callback", async (req: Request, res: Response) => {
     });
 
     if (!tokenRes.ok) {
-      res.redirect(callbackOrigin + "/?error=google_auth_failed");
+      res.redirect(frontendOrigin + "/?error=google_auth_failed");
       return;
     }
 
@@ -365,7 +366,7 @@ router.get("/auth/google/callback", async (req: Request, res: Response) => {
     });
 
     if (!userInfoRes.ok) {
-      res.redirect(callbackOrigin + "/?error=google_auth_failed");
+      res.redirect(frontendOrigin + "/?error=google_auth_failed");
       return;
     }
 
@@ -441,10 +442,10 @@ router.get("/auth/google/callback", async (req: Request, res: Response) => {
     const sid = await createSession(sessionData);
     setSessionCookie(res, sid);
 
-    res.redirect(callbackOrigin + "/#token=" + sid);
+    res.redirect(frontendOrigin + "/#token=" + sid);
   } catch (err: any) {
     req.log?.error?.({ err }, "Google callback error");
-    res.redirect(callbackOrigin + "/?error=google_auth_failed");
+    res.redirect(frontendOrigin + "/?error=google_auth_failed");
   }
 });
 

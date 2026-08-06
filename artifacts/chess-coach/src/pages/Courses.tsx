@@ -11,7 +11,7 @@ import { PremiumGate } from '@/components/PremiumGate';
 import { cn } from '@/lib/utils';
 
 export function Courses() {
-  const { username } = useUser();
+  const { username, authUser } = useUser();
   const queryClient = useQueryClient();
   const { data, isLoading, refetch } = useMyCourses();
 
@@ -97,7 +97,8 @@ export function Courses() {
   }, [startPolling]);
 
   async function handleGenerate() {
-    if (!username || isGenerating) return;
+    const genUsername = username ?? authUser?.lichessUsername ?? null;
+    if (!genUsername || isGenerating) return;
     setIsGenerating(true);
     setGenError(null);
 
@@ -106,7 +107,7 @@ export function Courses() {
       const res = await apiFetch('/api/courses/generate-start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username }),
+        body: JSON.stringify({ username: genUsername }),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));

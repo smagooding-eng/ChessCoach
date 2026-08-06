@@ -120,7 +120,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           <h1 className="text-base font-black text-gradient">ChessScout.net</h1>
         </div>
 
-        <nav className="flex-1 px-2.5 py-2.5 space-y-0.5 overflow-y-auto">
+        <nav className="flex-1 px-2.5 py-2.5 space-y-0.5 overflow-y-auto overscroll-contain">
           <p className="text-[9px] font-black uppercase tracking-widest px-3 mb-1.5 mt-1" style={{ color: 'rgba(158,155,152,0.5)' }}>Main</p>
           {PRIMARY_NAV.map(item => (
             <SidebarLink key={item.href} item={item} isActive={location === item.href} />

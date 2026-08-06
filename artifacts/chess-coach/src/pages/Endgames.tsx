@@ -46,7 +46,7 @@ const API_TYPE_TO_TAB: Record<string, EndgameTab> = {
 };
 
 export function Endgames() {
-  const { username } = useUser();
+  const { username, authUser } = useUser();
   const queryClient = useQueryClient();
   const { data, isLoading, refetch } = useMyCourses();
 
@@ -146,7 +146,8 @@ export function Endgames() {
   };
 
   async function handleGenerate(apiType: string) {
-    if (!username || generatingType) return;
+    const genUsername = username ?? authUser?.lichessUsername ?? null;
+    if (!genUsername || generatingType) return;
     setGeneratingType(apiType);
     setGenError(null);
 
@@ -155,7 +156,7 @@ export function Endgames() {
       const res = await apiFetch('/api/courses/endgame/generate-start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, type: apiType }),
+        body: JSON.stringify({ username: genUsername, type: apiType }),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));

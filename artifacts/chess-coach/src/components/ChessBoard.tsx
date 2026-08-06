@@ -97,6 +97,9 @@ interface ChessBoardProps {
   premoveColor?: 'w' | 'b';
   premove?: { from: string; to: string } | null;
   onPremoveSet?: (premove: { from: string; to: string } | null) => void;
+  // Board arrows — e.g. the move actually played vs. the engine's
+  // preferred move, shown simultaneously in different colors.
+  arrows?: Array<{ from: string; to: string; color?: string }>;
 }
 
 export function ChessBoard({
@@ -111,6 +114,7 @@ export function ChessBoard({
   premoveColor,
   premove,
   onPremoveSet,
+  arrows,
 }: ChessBoardProps) {
   const position = normalizeFen(fen || START_FEN);
   const [selectedSquare, setSelectedSquare] = useState<string | null>(null);
@@ -324,6 +328,11 @@ export function ChessBoard({
             onPieceDrop: handlePieceDrop,
             squareStyles,
             onSquareClick: handleSquareClick,
+            arrows: arrows?.map(a => ({
+              startSquare: a.from,
+              endSquare: a.to,
+              color: a.color ?? 'rgba(255,170,0,0.8)',
+            })),
             boardStyle: {
               borderRadius: '10px',
               boxShadow: '0 30px 60px rgba(0,0,0,0.6)',

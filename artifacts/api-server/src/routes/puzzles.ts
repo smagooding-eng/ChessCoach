@@ -96,9 +96,9 @@ router.get("/puzzles/next", requireAuth, async (req: Request, res: Response) => 
         .orderBy(sql`RANDOM()`)
         .limit(1);
       puzzle = result[0];
-    }
-
-    if (!puzzle) {
+    } else {
+      // Nothing to exclude yet (brand new user) — any non-archived puzzle
+      // is fair game.
       const result = await db
         .select()
         .from(puzzlesTable)
@@ -220,8 +220,9 @@ router.get("/puzzles/my-puzzles", requireAuth, async (req: Request, res: Respons
     const userId = req.user!.id;
     const { storage } = await import("../lib/storage");
     const user = await storage.getUser(userId);
+    const primaryUsername = user?.chesscomUsername || user?.lichessUsername;
 
-    if (!user?.chesscomUsername) {
+    if (!primaryUsername) {
       res.json({ puzzles: [] });
       return;
     }
@@ -229,7 +230,7 @@ router.get("/puzzles/my-puzzles", requireAuth, async (req: Request, res: Respons
     const userGames = await db
       .select({ id: gamesTable.id })
       .from(gamesTable)
-      .where(eq(gamesTable.username, user.chesscomUsername))
+      .where(eq(gamesTable.username, primaryUsername.toLowerCase()))
       .limit(200);
 
     const userGameIds = userGames.map(g => g.id);
@@ -347,12 +348,19 @@ router.post("/puzzles/:id/solve", requireAuth, async (req: Request, res: Respons
     }
 
     if (puzzleSolved) {
-      await db.insert(puzzleAttemptsTable).values({
-        userId: req.user!.id,
-        puzzleId,
-        solved: true,
-        timeMs: timeMs ?? null,
-      });
+      await db.insert(puzzleAttemptsTable)
+        .values({ userId: req.user!.id, puzzleId, solved: true, timeMs: timeMs ?? null })
+        .onConflictDoUpdate({
+          target: [puzzleAttemptsTable.userId, puzzleAttemptsTable.puzzleId],
+          set: { solved: true, timeMs: timeMs ?? null, attemptedAt: new Date() },
+        });
+    } else if (!isCorrect) {
+      // Record the struggle even without a solve, so this puzzle isn't
+      // served back indefinitely — but never downgrade an already-solved
+      // puzzle back to unsolved if the user is just replaying it.
+      await db.insert(puzzleAttemptsTable)
+        .values({ userId: req.user!.id, puzzleId, solved: false, timeMs: timeMs ?? null })
+        .onConflictDoNothing();
     }
 
     res.json({
@@ -404,8 +412,9 @@ router.post("/puzzles/generate-from-games", requireAuth, async (req: Request, re
     const userId = req.user!.id;
     const { storage } = await import("../lib/storage");
     const user = await storage.getUser(userId);
-    if (!user?.chesscomUsername) {
-      res.status(400).json({ error: "No Chess.com username set" });
+    const primaryUsername = user?.chesscomUsername || user?.lichessUsername;
+    if (!primaryUsername) {
+      res.status(400).json({ error: "Link a Chess.com or Lichess username to your account first." });
       return;
     }
 
@@ -413,7 +422,7 @@ router.post("/puzzles/generate-from-games", requireAuth, async (req: Request, re
       .select()
       .from(gamesTable)
       .where(and(
-        eq(gamesTable.username, user.chesscomUsername),
+        eq(gamesTable.username, primaryUsername.toLowerCase()),
         eq(gamesTable.analyzed, true),
         sql`${gamesTable.reviewData} IS NOT NULL`,
       ))
@@ -435,7 +444,7 @@ router.post("/puzzles/generate-from-games", requireAuth, async (req: Request, re
       const reviewData = (game.reviewData as ReviewData | null) ?? null;
       if (!reviewData?.moves) continue;
 
-      const playerColor = game.whiteUsername?.toLowerCase() === user.chesscomUsername.toLowerCase() ? "white" : "black";
+      const playerColor = game.whiteUsername?.toLowerCase() === primaryUsername.toLowerCase() ? "white" : "black";
       const colorChar = playerColor === "white" ? "w" : "b";
 
       type FullMove = ReviewMove & { bestMove: string; fen: string };
@@ -652,9 +661,19 @@ async function fetchAndStoreLichessPuzzle(excludeIds: number[] = []) {
         rating: data.puzzle.rating,
         themes: data.puzzle.themes.join(","),
         source: "lichess",
-      }).returning();
+      }).onConflictDoNothing().returning();
 
-      return inserted;
+      if (inserted) return inserted;
+
+      // Lost a race with a concurrent request that inserted the same
+      // puzzle first — just return their row instead of erroring out.
+      const [raceWinner] = await db
+        .select()
+        .from(puzzlesTable)
+        .where(eq(puzzlesTable.lichessId, data.puzzle.id))
+        .limit(1);
+      if (raceWinner && !excludeIds.includes(raceWinner.id)) return raceWinner;
+      continue;
     } catch {
       continue;
     }

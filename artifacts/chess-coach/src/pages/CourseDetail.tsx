@@ -417,7 +417,7 @@ export function CourseDetail() {
               <List className="w-4 h-4" style={{ color: CHESSCOM_GREEN }} />
               <span className="font-bold text-sm text-white/80">Lessons</span>
             </div>
-            <div className="py-1 max-h-[70vh] overflow-y-auto">
+            <div className="py-1 max-h-[70vh] overflow-y-auto overscroll-contain">
               {sortedLessons.map((l, idx) => (
                 <button
                   key={l.id}
@@ -467,7 +467,7 @@ export function CourseDetail() {
                   animate={{ x: 0 }}
                   exit={{ x: '100%' }}
                   transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-                  className="absolute right-0 top-0 h-full w-72 overflow-y-auto"
+                  className="absolute right-0 top-0 h-full w-72 overflow-y-auto overscroll-contain"
                   style={{ backgroundColor: BG_DARK }}
                   onClick={e => e.stopPropagation()}
                 >

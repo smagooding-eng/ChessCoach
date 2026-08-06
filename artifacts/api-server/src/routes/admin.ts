@@ -351,7 +351,7 @@ router.get("/admin/users/:userId/usage", requireAdmin, async (req: Request, res:
     const [user] = await db.select().from(usersTable).where(sql`${usersTable.id} = ${userId}`);
     if (!user) { res.status(404).json({ error: "User not found" }); return; }
 
-    const username = user.chesscomUsername;
+    const username = user.chesscomUsername?.toLowerCase();
 
     const [gamesImported] = await db.select({ count: count() }).from(gamesTable)
       .where(username ? eq(gamesTable.username, username) : sql`false`);

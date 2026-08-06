@@ -25,7 +25,7 @@ const PIE_COLORS = [CHESSCOM_GREEN, '#dc4343', '#6b6966'];
 
 export function Analysis() {
   const [, navigate] = useLocation();
-  const { username } = useUser();
+  const { username, authUser } = useUser();
   const queryClient = useQueryClient();
   const { data: summary, isLoading: loadingSummary } = useMyAnalysisSummary();
   const { data: weaknessesData, isLoading: loadingWeaknesses } = useMyWeaknesses();
@@ -112,7 +112,8 @@ export function Analysis() {
   }, []);
 
   const handleAnalyze = async () => {
-    if (!username || isAnalyzing) return;
+    const analysisUsername = username ?? authUser?.lichessUsername ?? null;
+    if (!analysisUsername || isAnalyzing) return;
 
     setIsAnalyzing(true);
     setAnalyzeError(null);
@@ -122,7 +123,7 @@ export function Analysis() {
       const startRes = await apiFetch('/api/analysis/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username }),
+        body: JSON.stringify({ username: analysisUsername }),
       });
       if (!startRes.ok) {
         const j = await startRes.json().catch(() => ({})) as Record<string, unknown>;

@@ -59,7 +59,7 @@ function WinBar({ wins, losses, draws }: { wins: number; losses: number; draws: 
 
 export function OpeningDetail() {
   const { eco } = useParams<{ eco: string }>();
-  const { username } = useUser();
+  const { username, authUser } = useUser();
   const { data: openingsData } = useMyOpenings();
 
   // URL params: eco is URL-encoded opening name OR eco code
@@ -74,18 +74,19 @@ export function OpeningDetail() {
   }, [openingsData, decodedParam]);
 
   // Fetch opening detail (main line moves + sample games)
+  const detailUsername = username ?? authUser?.lichessUsername ?? null;
   const { data, isLoading, error } = useQuery<OpeningDetailData>({
-    queryKey: ['/api/games/openings/detail', username, decodedParam],
+    queryKey: ['/api/games/openings/detail', detailUsername, decodedParam],
     queryFn: async () => {
       const isEco = /^[A-E]\d{2}$/.test(decodedParam);
-      const params = new URLSearchParams({ username: username ?? '' });
+      const params = new URLSearchParams({ username: detailUsername ?? '' });
       if (isEco) params.set('eco', decodedParam);
       else params.set('opening', decodedParam);
       const res = await apiFetch(`/api/games/openings/detail?${params}`);
       if (!res.ok) throw new Error('Failed to load');
       return res.json();
     },
-    enabled: !!username && !!decodedParam,
+    enabled: !!detailUsername && !!decodedParam,
   });
 
   // Board step state
