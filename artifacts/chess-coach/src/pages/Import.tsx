@@ -405,13 +405,13 @@ export function Import() {
               </div>
             </div>
 
-            {(error || apiError) && (
+            {apiError && (
               <div className="p-4 bg-destructive/10 border border-destructive/20 text-destructive rounded-xl text-sm flex gap-3 items-start">
                 <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
                 <div>
                   <p className="font-bold mb-1">Import failed</p>
                   <p className="text-destructive/80 break-words">
-                    {apiError || (error?.message) || 'Failed to import games. Check that your username is correct and try again.'}
+                    {apiError || 'Failed to import games. Check that your username is correct and try again.'}
                   </p>
                 </div>
               </div>
