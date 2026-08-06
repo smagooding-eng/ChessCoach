@@ -178,7 +178,7 @@ export const BOTS: BotConfig[] = [
     depth: 1,
     blunderRate: 0.5,
     description: 'Just learned the rules last week. Makes lots of random moves.',
-    avatar: '/avatars/tommy.svg',
+    avatar: 'https://api.dicebear.com/9.x/personas/svg?seed=Tommy&backgroundColor=b6e3f4',
     personality: 'Beginner',
   },
   {
@@ -187,7 +187,7 @@ export const BOTS: BotConfig[] = [
     depth: 1,
     blunderRate: 0.3,
     description: 'Plays at the park on weekends. Knows the basics but misses tactics.',
-    avatar: '/avatars/rosa.svg',
+    avatar: 'https://api.dicebear.com/9.x/personas/svg?seed=Rosa&backgroundColor=ffd5dc',
     personality: 'Casual',
   },
   {
@@ -196,7 +196,7 @@ export const BOTS: BotConfig[] = [
     depth: 2,
     blunderRate: 0.2,
     description: 'School chess club regular. Captures free pieces and controls the center.',
-    avatar: '/avatars/derek.svg',
+    avatar: 'https://api.dicebear.com/9.x/personas/svg?seed=Derek&backgroundColor=c0aede',
     personality: 'Improving',
   },
   {
@@ -205,7 +205,7 @@ export const BOTS: BotConfig[] = [
     depth: 2,
     blunderRate: 0.1,
     description: 'Local club champion. Solid fundamentals — rarely hangs pieces.',
-    avatar: '/avatars/mia.svg',
+    avatar: 'https://api.dicebear.com/9.x/personas/svg?seed=Mia&backgroundColor=ffdfbf',
     personality: 'Club Player',
   },
   {
@@ -214,7 +214,7 @@ export const BOTS: BotConfig[] = [
     depth: 3,
     blunderRate: 0.08,
     description: 'Plays tournaments every month. Sees tactics 2-3 moves deep.',
-    avatar: '/avatars/viktor.svg',
+    avatar: 'https://api.dicebear.com/9.x/personas/svg?seed=Viktor&backgroundColor=d1d4f9',
     personality: 'Tournament',
   },
   {
@@ -223,7 +223,7 @@ export const BOTS: BotConfig[] = [
     depth: 3,
     blunderRate: 0.04,
     description: 'National-level competitor. Strong positional play and endgames.',
-    avatar: '/avatars/nadia.svg',
+    avatar: 'https://api.dicebear.com/9.x/personas/svg?seed=Nadia&backgroundColor=b6e3f4',
     personality: 'Advanced',
   },
   {
@@ -232,7 +232,7 @@ export const BOTS: BotConfig[] = [
     depth: 4,
     blunderRate: 0.02,
     description: 'Former state champion. Deep calculation and relentless pressure.',
-    avatar: '/avatars/chen.svg',
+    avatar: 'https://api.dicebear.com/9.x/personas/svg?seed=Chen&backgroundColor=c9a15c',
     personality: 'Expert',
   },
   {
@@ -241,7 +241,7 @@ export const BOTS: BotConfig[] = [
     depth: 4,
     blunderRate: 0.01,
     description: 'Near-master strength. Punishes the slightest inaccuracy.',
-    avatar: '/avatars/fischer.svg',
+    avatar: 'https://api.dicebear.com/9.x/personas/svg?seed=Fischer&backgroundColor=c9a15c',
     personality: 'Master',
   },
 ];
