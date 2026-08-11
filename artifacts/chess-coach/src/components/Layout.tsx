@@ -4,7 +4,11 @@ import { useUser } from '@/hooks/use-user';
 import { useChessPlayer } from '@/hooks/use-chess-player';
 import { useMultiEloProgress } from '@/hooks/use-elo-progress';
 import { useLiveRatings, bestLiveRating } from '@/hooks/use-live-ratings';
-import { LayoutDashboard, Import, History, BrainCircuit, GraduationCap, Swords, BookOpen, LogOut, MoreHorizontal, ChevronRight, Bot, Crown, Trophy, Play, Search, Download, Puzzle, User, Settings, CreditCard, Camera, Shield } from 'lucide-react';
+import { Crown, MoreHorizontal, ChevronRight } from 'lucide-react';
+import {
+  SearchLookup, PlayLocal, ScanPosition, ImportGames, CourseBishop, EndgameTrophy,
+  OpeningBook, PremiumCrown, AdminRook, SignOut, DownloadApp, ProfilePawn,
+} from '@/components/CustomIcons';
 import { usePwaInstall } from '@/hooks/use-pwa-install';
 import { InstallGuide } from '@/components/InstallGuide';
 import { cn } from '@/lib/utils';
@@ -20,28 +24,31 @@ const TEXT_LIGHT = '#e8e6e3';
 const TEXT_MUTED = '#9e9b98';
 const BORDER_COLOR = 'rgba(129,182,76,0.06)';
 
-const PRIMARY_NAV = [
+type NavIcon = React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
+interface NavItem { href: string; label: string; icon: NavIcon; badge?: string }
+
+const PRIMARY_NAV: NavItem[] = [
   { href: '/',          label: 'Home',            icon: KnightIcon },
   { href: '/opponents', label: 'Opponent Scout',  icon: ScoutIcon },
   { href: '/games',     label: 'Games',           icon: ChessClockIcon },
   { href: '/analysis',  label: 'Analysis',        icon: AnalysisIcon },
   { href: '/puzzles',   label: 'Puzzles',         icon: TacticsIcon, badge: 'BETA' },
-  { href: '/lookup',    label: 'Game Lookup',     icon: Search },
-  { href: '/play',      label: 'Play Local',      icon: Play },
-  { href: '/scan',      label: 'Scan Position',   icon: Camera, badge: 'NEW' },
+  { href: '/lookup',    label: 'Game Lookup',     icon: SearchLookup },
+  { href: '/play',      label: 'Play Local',      icon: PlayLocal },
+  { href: '/scan',      label: 'Scan Position',   icon: ScanPosition, badge: 'NEW' },
 ];
 
-const SECONDARY_NAV = [
+const SECONDARY_NAV: NavItem[] = [
   { href: '/practice',     label: 'Practice Bots',   icon: BotPawnIcon },
-  { href: '/import',       label: 'Import Games',    icon: Import },
-  { href: '/courses',      label: 'Courses',         icon: GraduationCap, badge: 'BETA' },
-  { href: '/endgames',     label: 'Endgames',        icon: Trophy,        badge: 'BETA' },
-  { href: '/openings',     label: 'Openings',        icon: BookOpen,      badge: 'BETA' },
-  { href: '/subscription', label: 'Subscription',    icon: Crown },
+  { href: '/import',       label: 'Import Games',    icon: ImportGames },
+  { href: '/courses',      label: 'Courses',         icon: CourseBishop, badge: 'BETA' },
+  { href: '/endgames',     label: 'Endgames',        icon: EndgameTrophy, badge: 'BETA' },
+  { href: '/openings',     label: 'Openings',        icon: OpeningBook,   badge: 'BETA' },
+  { href: '/subscription', label: 'Subscription',    icon: PremiumCrown },
 ];
 
-const ADMIN_NAV = [
-  { href: '/admin', label: 'Admin', icon: Shield },
+const ADMIN_NAV: NavItem[] = [
+  { href: '/admin', label: 'Admin', icon: AdminRook },
 ];
 
 const ALL_NAV = [...PRIMARY_NAV, ...SECONDARY_NAV, ...ADMIN_NAV];
@@ -156,12 +163,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
               </div>
             </Link>
             <Link href="/download" className="p-1.5 rounded transition-colors shrink-0 hover:bg-green-400/10" style={{ color: CHESSCOM_GREEN }} title="Download App">
-              <Download className="w-3.5 h-3.5" />
+              <DownloadApp className="w-3.5 h-3.5" />
             </Link>
             <button onClick={() => handleLogout()} className="p-1.5 rounded transition-colors shrink-0 hover:bg-red-400/10" style={{ color: TEXT_MUTED }} title="Sign out"
               onMouseEnter={e => (e.currentTarget.style.color = '#dc4343')}
               onMouseLeave={e => (e.currentTarget.style.color = TEXT_MUTED)}>
-              <LogOut className="w-3.5 h-3.5" />
+              <SignOut className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>
@@ -175,7 +182,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </Link>
           <div className="flex items-center gap-2">
             <Link href="/download" className="p-1.5 rounded active:scale-95 transition-all" style={{ color: CHESSCOM_GREEN }} title="Download App">
-              <Download className="w-5 h-5" />
+              <DownloadApp className="w-5 h-5" />
             </Link>
             <button onClick={() => setProfileOpen(o => !o)} className="flex items-center gap-2 active:opacity-70 transition-opacity">
               <div className="flex flex-col items-end gap-0.5">
@@ -204,7 +211,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
               <div className="px-3 py-2 space-y-0.5">
                 <Link href="/profile" className="block">
                   <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors active:bg-white/5" style={{ color: TEXT_LIGHT }}>
-                    <User className="w-4.5 h-4.5" style={{ color: TEXT_MUTED }} />
+                    <ProfilePawn className="w-4.5 h-4.5" style={{ color: TEXT_MUTED }} />
                     <span className="font-semibold text-sm">Profile</span>
                   </div>
                 </Link>
@@ -221,7 +228,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                     className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl active:bg-red-500/10 transition-colors"
                     style={{ color: '#dc4343' }}
                   >
-                    <LogOut className="w-4.5 h-4.5" />
+                    <SignOut className="w-4.5 h-4.5" />
                     <span className="font-semibold text-sm">Sign Out</span>
                   </button>
                 </div>
@@ -328,7 +335,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 <div className="mt-2 pt-2" style={{ borderTop: `1px solid ${BORDER_COLOR}` }}>
                   <Link href="/download" onClick={() => setMoreOpen(false)} className="block">
                     <div className="w-full flex items-center gap-3 px-3.5 py-3 rounded-xl active:bg-green-500/10 transition-colors" style={{ color: CHESSCOM_GREEN }}>
-                      <Download className="w-5 h-5" />
+                      <DownloadApp className="w-5 h-5" />
                       <span className="font-semibold text-sm">Download App</span>
                     </div>
                   </Link>
@@ -337,7 +344,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                     className="w-full flex items-center gap-3 px-3.5 py-3 rounded-xl active:bg-red-500/10 transition-colors"
                     style={{ color: '#dc4343' }}
                   >
-                    <LogOut className="w-5 h-5" />
+                    <SignOut className="w-5 h-5" />
                     <span className="font-semibold text-sm">Sign Out</span>
                   </button>
                 </div>

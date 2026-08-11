@@ -6,12 +6,12 @@ import React from 'react';
 // around an actual chess piece or board motif specific to what it
 // represents, not a borrowed generic symbol.
 
-type IconProps = { className?: string; style?: React.CSSProperties; strokeWidth?: number };
+type ChessIconProps = { className?: string; style?: React.CSSProperties; strokeWidth?: number };
 
 // Home — a knight's head in profile. The knight is the most immediately
 // recognizable chess silhouette to a non-player, making it a natural
 // "home base" mark for the app itself.
-export function KnightIcon({ className, style, strokeWidth = 1.6 }: IconProps) {
+export function KnightIcon({ className, style, strokeWidth = 1.6 }: ChessIconProps) {
   return (
     <svg viewBox="0 0 24 24" fill="none" className={className} style={style}>
       <path
@@ -25,7 +25,7 @@ export function KnightIcon({ className, style, strokeWidth = 1.6 }: IconProps) {
 
 // Opponent Scout — a king silhouette behind a spyglass ring, for "studying
 // an opponent" rather than the generic crossed-swords "battle" metaphor.
-export function ScoutIcon({ className, style, strokeWidth = 1.6 }: IconProps) {
+export function ScoutIcon({ className, style, strokeWidth = 1.6 }: ChessIconProps) {
   return (
     <svg viewBox="0 0 24 24" fill="none" className={className} style={style}>
       <path
@@ -42,7 +42,7 @@ export function ScoutIcon({ className, style, strokeWidth = 1.6 }: IconProps) {
 
 // Games — a chess clock (two stacked buttons on a rounded case), the
 // actual object tied to game history, instead of a generic clock-face icon.
-export function ChessClockIcon({ className, style, strokeWidth = 1.6 }: IconProps) {
+export function ChessClockIcon({ className, style, strokeWidth = 1.6 }: ChessIconProps) {
   return (
     <svg viewBox="0 0 24 24" fill="none" className={className} style={style}>
       <rect x="4" y="6" width="16" height="14" rx="2.5" stroke="currentColor" strokeWidth={strokeWidth} />
@@ -56,7 +56,7 @@ export function ChessClockIcon({ className, style, strokeWidth = 1.6 }: IconProp
 
 // Analysis — a queen silhouette (the most tactically far-reaching piece)
 // behind a small pulse/waveform line, for "deep engine analysis."
-export function AnalysisIcon({ className, style, strokeWidth = 1.6 }: IconProps) {
+export function AnalysisIcon({ className, style, strokeWidth = 1.6 }: ChessIconProps) {
   return (
     <svg viewBox="0 0 24 24" fill="none" className={className} style={style}>
       <path
@@ -73,7 +73,7 @@ export function AnalysisIcon({ className, style, strokeWidth = 1.6 }: IconProps)
 
 // Puzzles — a shattered/segmented rook (tactics break a position apart),
 // instead of a generic jigsaw-piece glyph.
-export function TacticsIcon({ className, style, strokeWidth = 1.6 }: IconProps) {
+export function TacticsIcon({ className, style, strokeWidth = 1.6 }: ChessIconProps) {
   return (
     <svg viewBox="0 0 24 24" fill="none" className={className} style={style}>
       <path d="M8 20h8M9 20l.4-2.6M15 20l-.4-2.6" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" />
@@ -88,7 +88,7 @@ export function TacticsIcon({ className, style, strokeWidth = 1.6 }: IconProps) 
 
 // Practice Bots — a pawn with small circuit-node marks, for "a
 // programmed opponent" without resorting to a generic robot-head glyph.
-export function BotPawnIcon({ className, style, strokeWidth = 1.6 }: IconProps) {
+export function BotPawnIcon({ className, style, strokeWidth = 1.6 }: ChessIconProps) {
   return (
     <svg viewBox="0 0 24 24" fill="none" className={className} style={style}>
       <path
