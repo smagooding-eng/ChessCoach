@@ -492,24 +492,25 @@ router.post("/puzzles/generate-from-games", requireAuth, async (req: Request, re
     interface ReviewMove {
       color?: string;
       classification?: string;
-      bestMove?: string;
+      betterMove?: string;
       fen?: string;
       moveNumber?: number;
     }
     interface ReviewData { moves?: ReviewMove[] }
 
     for (const game of reviewedGames) {
-      const reviewData = (game.reviewData as ReviewData | null) ?? null;
-      if (!reviewData?.moves) continue;
+      const rd = game.reviewData as ReviewData | ReviewMove[] | null;
+      const moves: ReviewMove[] | undefined = Array.isArray(rd) ? rd : rd?.moves;
+      if (!moves || moves.length === 0) continue;
 
       const playerColor = game.whiteUsername?.toLowerCase() === primaryUsername.toLowerCase() ? "white" : "black";
       const colorChar = playerColor === "white" ? "w" : "b";
 
-      type FullMove = ReviewMove & { bestMove: string; fen: string };
-      const candidateMoves: FullMove[] = reviewData.moves.filter((m): m is FullMove =>
+      type FullMove = ReviewMove & { betterMove: string; fen: string };
+      const candidateMoves: FullMove[] = moves.filter((m): m is FullMove =>
         (m.color === colorChar || m.color === playerColor) &&
         ["blunder", "mistake"].includes(m.classification ?? "") &&
-        typeof m.bestMove === "string" && m.bestMove.length > 0 &&
+        typeof m.betterMove === "string" && m.betterMove.length > 0 &&
         typeof m.fen === "string" && m.fen.length > 0,
       );
 
@@ -533,10 +534,10 @@ router.post("/puzzles/generate-from-games", requireAuth, async (req: Request, re
         type Candidate = { fen: string; solutionUci: string[]; _src: ReviewMove };
         const result = await verifyWithRetry<Candidate>(async (attempt) => {
           const candidate = attempt === 0 ? move : candidateMoves[mi + attempt];
-          if (!candidate || !candidate.bestMove || !candidate.fen) return null;
+          if (!candidate || !candidate.betterMove || !candidate.fen) return null;
           return {
             fen: candidate.fen,
-            solutionUci: String(candidate.bestMove).trim().split(/\s+/),
+            solutionUci: String(candidate.betterMove).trim().split(/\s+/),
             _src: candidate,
           };
         }, { attempts: 3, claims: { themes: [move.classification ?? "blunder"] } });

@@ -4,7 +4,7 @@ import { Chess } from 'chess.js';
 import { Chessboard } from 'react-chessboard';
 import { apiFetch } from '@/lib/api';
 import { useUser } from '@/hooks/use-user';
-import { Crown, RotateCcw, ChevronRight, Trophy, Target, Flame, Zap, Lightbulb, Loader2, Lock } from 'lucide-react';
+import { Crown, RotateCcw, ChevronRight, Trophy, Target, Flame, Zap, Lightbulb, Loader2, Lock, AlertTriangle } from 'lucide-react';
 import { useLocation, useSearch } from 'wouter';
 import { AnimatePresence, motion } from 'framer-motion';
 
@@ -84,6 +84,7 @@ export function Puzzles() {
   const [tab, setTab] = useState<'daily' | 'games'>('daily');
   const [gamePuzzles, setGamePuzzles] = useState<any[]>([]);
   const [generatingFromGames, setGeneratingFromGames] = useState(false);
+  const [gamesGenError, setGamesGenError] = useState<string | null>(null);
   const feedbackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [explanation, setExplanation] = useState<string | null>(null);
   const [loadingExplanation, setLoadingExplanation] = useState(false);
@@ -197,12 +198,21 @@ export function Puzzles() {
 
   const generateFromGames = useCallback(async () => {
     setGeneratingFromGames(true);
+    setGamesGenError(null);
     try {
       const res = await apiFetch('/api/puzzles/generate-from-games', { method: 'POST' });
+      const data = await res.json().catch(() => ({}));
       if (res.ok) {
+        if (data.generated === 0) {
+          setGamesGenError("No new puzzles found — this looks for blunders and mistakes in your reviewed games, so try reviewing more games first.");
+        }
         await fetchGamePuzzles();
+      } else {
+        setGamesGenError(data.error || 'Failed to generate puzzles. Please try again.');
       }
-    } catch {}
+    } catch {
+      setGamesGenError('Failed to generate puzzles. Please check your connection and try again.');
+    }
     setGeneratingFromGames(false);
   }, [fetchGamePuzzles]);
 
@@ -739,6 +749,14 @@ export function Puzzles() {
                 Generate
               </button>
             </div>
+
+            {gamesGenError && (
+              <div className="mb-4 px-3.5 py-2.5 rounded-xl text-sm flex items-start gap-2"
+                style={{ background: 'rgba(234,166,49,0.1)', border: '1px solid rgba(234,166,49,0.25)', color: '#eaa631' }}>
+                <AlertTriangle size={15} className="shrink-0 mt-0.5" />
+                <span>{gamesGenError}</span>
+              </div>
+            )}
 
             {gamePuzzles.length === 0 ? (
               <div className="text-center py-12">
