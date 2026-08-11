@@ -1382,7 +1382,7 @@ export function computeGroundedWeaknesses(
 ): AnalysisOutput | null {
   if (games.length < MIN_REVIEWED_GAMES_FOR_GROUNDED_WEAKNESSES) return null;
 
-  type FlatMove = { classification: string; moveIndex: number; gameId: number; opening: string | null };
+  type FlatMove = { classification: string; moveIndex: number; gameId: number; opening: string | null; san: string };
   const playerMoves: FlatMove[] = [];
 
   for (const g of games) {
@@ -1396,7 +1396,7 @@ export function computeGroundedWeaknesses(
       g.whiteUsername.toLowerCase() === username.toLowerCase() ? "white" : "black";
     for (const m of moves) {
       if (m.color !== userColor || typeof m.classification !== "string") continue;
-      playerMoves.push({ classification: m.classification, moveIndex: m.moveIndex ?? 0, gameId: g.id, opening: g.opening });
+      playerMoves.push({ classification: m.classification, moveIndex: m.moveIndex ?? 0, gameId: g.id, opening: g.opening, san: m.san ?? "?" });
     }
   }
 
@@ -1441,6 +1441,20 @@ export function computeGroundedWeaknesses(
   const toIndices = (gameIds: Iterable<number>, limit = 5): number[] =>
     Array.from(new Set(Array.from(gameIds).map((id) => gameIdToIndex.get(id)).filter((i): i is number => i != null))).slice(0, limit);
 
+  // Formats real, verified example moves as citations like "Game 3: 14...Qh4"
+  // — grounded in the actual reviewed games, never invented, unlike the
+  // GPT-narrated version used for opponent scouting.
+  const citeMoves = (moves: FlatMove[], limit = 3): string => {
+    const examples = moves.slice(0, limit).map((m) => {
+      const gameNum = (gameIdToIndex.get(m.gameId) ?? 0) + 1;
+      const fullMoveNum = Math.floor(m.moveIndex / 2) + 1;
+      const isWhite = m.moveIndex % 2 === 0;
+      const notation = isWhite ? `${fullMoveNum}.${m.san}` : `${fullMoveNum}...${m.san}`;
+      return `Game ${gameNum}: ${notation}`;
+    });
+    return examples.join("; ");
+  };
+
   const weaknesses: WeaknessResult[] = [];
 
   const phases: Array<"opening" | "middlegame" | "endgame"> = ["opening", "middlegame", "endgame"];
@@ -1450,13 +1464,14 @@ export function computeGroundedWeaknesses(
     const best = validPhases.reduce((a, b) => (phaseRate(a) < phaseRate(b) ? a : b));
     if (worst !== best && phaseRate(worst) > phaseRate(best) * 1.4 && phaseRate(worst) > 0.08) {
       const label = worst === "opening" ? "Opening Preparation" : worst === "middlegame" ? "Positional Play" : "Endgame Technique";
-      const contributingGameIds = playerMoves
-        .filter((m) => phaseOf(m.moveIndex) === worst && (m.classification === "blunder" || m.classification === "mistake"))
-        .map((m) => m.gameId);
+      const badPhaseMoves = playerMoves
+        .filter((m) => phaseOf(m.moveIndex) === worst && (m.classification === "blunder" || m.classification === "mistake"));
+      const contributingGameIds = badPhaseMoves.map((m) => m.gameId);
+      const citations = citeMoves(badPhaseMoves);
       weaknesses.push({
         category: label,
         severity: phaseRate(worst) > 0.25 ? "High" : phaseRate(worst) > 0.15 ? "Medium" : "Low",
-        description: `Across your ${games.length} reviewed games, ${Math.round(phaseRate(worst) * 100)}% of your ${worst} moves were inaccuracies or worse, versus ${Math.round(phaseRate(best) * 100)}% in the ${best}. This is your most costly phase.`,
+        description: `Across your ${games.length} reviewed games, ${Math.round(phaseRate(worst) * 100)}% of your ${worst} moves were inaccuracies or worse, versus ${Math.round(phaseRate(best) * 100)}% in the ${best}. This is your most costly phase.${citations ? ` Recent examples — ${citations}.` : ""}`,
         frequency: phaseRate(worst),
         examples: [],
         relatedGameIndices: toIndices(contributingGameIds),
@@ -1466,11 +1481,13 @@ export function computeGroundedWeaknesses(
 
   if (missedWins >= 3) {
     const rate = missedWins / games.length;
-    const contributingGameIds = playerMoves.filter((m) => m.classification === "missed_win").map((m) => m.gameId);
+    const missedWinMoves = playerMoves.filter((m) => m.classification === "missed_win");
+    const contributingGameIds = missedWinMoves.map((m) => m.gameId);
+    const citations = citeMoves(missedWinMoves);
     weaknesses.push({
       category: "Tactical Awareness",
       severity: rate > 0.15 ? "High" : rate > 0.08 ? "Medium" : "Low",
-      description: `You've let a winning position slip away in ${missedWins} of your last ${games.length} reviewed games (${Math.round(rate * 100)}%) — the engine confirms you were winning before a mistake handed back the advantage.`,
+      description: `You've let a winning position slip away in ${missedWins} of your last ${games.length} reviewed games (${Math.round(rate * 100)}%) — the engine confirms you were winning before a mistake handed back the advantage.${citations ? ` For example — ${citations}.` : ""}`,
       frequency: rate,
       examples: [],
       relatedGameIndices: toIndices(contributingGameIds),
@@ -1479,11 +1496,13 @@ export function computeGroundedWeaknesses(
 
   if (blunders >= 5) {
     const perGame = blunders / games.length;
-    const contributingGameIds = playerMoves.filter((m) => m.classification === "blunder").map((m) => m.gameId);
+    const blunderMoves = playerMoves.filter((m) => m.classification === "blunder");
+    const contributingGameIds = blunderMoves.map((m) => m.gameId);
+    const citations = citeMoves(blunderMoves);
     weaknesses.push({
       category: "Tactical Awareness",
       severity: perGame > 1 ? "High" : perGame > 0.5 ? "Medium" : "Low",
-      description: `You've blundered ${blunders} times across ${games.length} reviewed games — about ${perGame.toFixed(1)} per game on average.`,
+      description: `You've blundered ${blunders} times across ${games.length} reviewed games — about ${perGame.toFixed(1)} per game on average.${citations ? ` Recent blunders — ${citations}.` : ""}`,
       frequency: Math.min(1, perGame),
       examples: [],
       relatedGameIndices: toIndices(contributingGameIds),
@@ -1498,10 +1517,14 @@ export function computeGroundedWeaknesses(
   }
   if (worstOpening && worstOpening.rate > badMoveRate * 1.3 && worstOpening.rate > 0.12) {
     const contributingGameIds = openingGroups.get(worstOpening.name)?.games ?? new Set<number>();
+    const badOpeningMoves = playerMoves.filter(
+      (m) => m.opening === worstOpening!.name && (m.classification === "blunder" || m.classification === "mistake"),
+    );
+    const citations = citeMoves(badOpeningMoves);
     weaknesses.push({
       category: "Opening Preparation",
       severity: worstOpening.rate > 0.25 ? "High" : "Medium",
-      description: `In the ${worstOpening.name} (${worstOpening.gameCount} games), ${Math.round(worstOpening.rate * 100)}% of your moves were inaccuracies or worse — noticeably above your ${Math.round(badMoveRate * 100)}% overall rate.`,
+      description: `In the ${worstOpening.name} (${worstOpening.gameCount} games), ${Math.round(worstOpening.rate * 100)}% of your moves were inaccuracies or worse — noticeably above your ${Math.round(badMoveRate * 100)}% overall rate.${citations ? ` Examples — ${citations}.` : ""}`,
       frequency: worstOpening.gameCount / games.length,
       examples: [],
       relatedGameIndices: toIndices(contributingGameIds),
