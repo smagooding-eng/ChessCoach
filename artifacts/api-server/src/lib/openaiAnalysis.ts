@@ -1457,7 +1457,7 @@ export function computeGroundedWeaknesses(
         category: label,
         severity: phaseRate(worst) > 0.25 ? "High" : phaseRate(worst) > 0.15 ? "Medium" : "Low",
         description: `Across your ${games.length} reviewed games, ${Math.round(phaseRate(worst) * 100)}% of your ${worst} moves were inaccuracies or worse, versus ${Math.round(phaseRate(best) * 100)}% in the ${best}. This is your most costly phase.`,
-        frequency: phaseBad[worst],
+        frequency: phaseRate(worst),
         examples: [],
         relatedGameIndices: toIndices(contributingGameIds),
       });
@@ -1471,7 +1471,7 @@ export function computeGroundedWeaknesses(
       category: "Tactical Awareness",
       severity: rate > 0.15 ? "High" : rate > 0.08 ? "Medium" : "Low",
       description: `You've let a winning position slip away in ${missedWins} of your last ${games.length} reviewed games (${Math.round(rate * 100)}%) — the engine confirms you were winning before a mistake handed back the advantage.`,
-      frequency: missedWins,
+      frequency: rate,
       examples: [],
       relatedGameIndices: toIndices(contributingGameIds),
     });
@@ -1484,7 +1484,7 @@ export function computeGroundedWeaknesses(
       category: "Tactical Awareness",
       severity: perGame > 1 ? "High" : perGame > 0.5 ? "Medium" : "Low",
       description: `You've blundered ${blunders} times across ${games.length} reviewed games — about ${perGame.toFixed(1)} per game on average.`,
-      frequency: blunders,
+      frequency: Math.min(1, perGame),
       examples: [],
       relatedGameIndices: toIndices(contributingGameIds),
     });
@@ -1502,7 +1502,7 @@ export function computeGroundedWeaknesses(
       category: "Opening Preparation",
       severity: worstOpening.rate > 0.25 ? "High" : "Medium",
       description: `In the ${worstOpening.name} (${worstOpening.gameCount} games), ${Math.round(worstOpening.rate * 100)}% of your moves were inaccuracies or worse — noticeably above your ${Math.round(badMoveRate * 100)}% overall rate.`,
-      frequency: worstOpening.gameCount,
+      frequency: worstOpening.gameCount / games.length,
       examples: [],
       relatedGameIndices: toIndices(contributingGameIds),
     });
@@ -1721,6 +1721,13 @@ function buildContextPgn(mistake: TeachableMistake, useBestMove: boolean): strin
 }
 
 /** Ask GPT for just the prose explanation of a real, engine-verified mistake — grounded and validated. */
+const CATEGORY_CONCEPT_INTROS: Partial<Record<string, string>> = {
+  blunder: "A blunder is a move that hands your opponent a decisive advantage — usually by leaving a piece undefended, missing a threat, or overlooking a forced sequence. The best defense is a habit: before playing a move, check what your opponent's best reply would be.",
+  mistake: "A mistake is a move that's clearly worse than the best available option, even if it doesn't lose immediately — it might weaken your position, give up an important square, or miss a tactical opportunity. Spotting these takes a consistent habit of comparing candidate moves before committing.",
+  inaccuracy: "An inaccuracy is a small imprecision — the position is still fine, but a stronger move was available. These add up over a game, and noticing them is how strong players keep squeezing out advantages.",
+  missed_win: "A missed win happens when a position was objectively winning, but the move played let the advantage slip away. This usually means a more forcing option — a capture, a check, or a direct threat — was overlooked in favor of a slower plan.",
+};
+
 async function writeGroundedLessonContent(mistake: TeachableMistake): Promise<{ title: string; content: string }> {
   const factSheet = renderFactSheet(mistake.facts);
   const moveLabel = mistake.color === "white"
@@ -1739,20 +1746,27 @@ Engine's preferred move instead: ${fixLabel}
 Write valid JSON:
 {
   "title": "Short lesson title (max 60 chars), naming the pattern (e.g. 'Missed knight fork on move ${mistake.moveNumber}')",
-  "content": "## The Mistake\\n1-2 short paragraphs on why **${moveLabel}** was wrong, using ONLY the facts above (do not invent tactics, threats, or piece positions not listed in the facts).\\n\\n## The Fix\\n1-2 short paragraphs on why **${fixLabel}** was better, using ONLY the facts above. End with one takeaway sentence."
+  "content": "## The Concept\\n1-2 short, plain-language paragraphs explaining the GENERAL chess principle or pattern this mistake illustrates (e.g. what a hanging piece is, why king safety matters, how pawn structure affects piece activity) — written for someone learning the idea for the first time, with NO reference yet to this specific game or move.\\n\\n## The Mistake\\n1-2 short paragraphs on why **${moveLabel}** was wrong in THIS game, using ONLY the facts above (do not invent tactics, threats, or piece positions not listed in the facts).\\n\\n## The Fix\\n1-2 short paragraphs on why **${fixLabel}** was better, using ONLY the facts above. End with one takeaway sentence."
 }
 
-Rules: Only reference pieces, captures, and threats that appear in the engine facts above. Do not describe hanging pieces, tactics, or threats that aren't listed. Keep it concrete and specific to this position, not generic advice.`;
+Rules: The Concept section must be general chess teaching, not specific to this game — it's the "why this matters" a student reads before seeing their own mistake. The Mistake and Fix sections must only reference pieces, captures, and threats that appear in the engine facts above — do not describe hanging pieces, tactics, or threats that aren't listed. Keep all sections concrete, not vague.`;
 
   try {
     const response = await openai.chat.completions.create({
       model: "gpt-5.2",
-      max_completion_tokens: 900,
+      max_completion_tokens: 1100,
       messages: [{ role: "user", content: prompt }],
       response_format: { type: "json_object" },
     });
     const parsed = JSON.parse(response.choices[0]?.message?.content ?? "{}") as { title?: string; content?: string };
-    const check = parsed.content ? reconcileExplanation(parsed.content, mistake.facts) : { ok: false, reasons: ["empty"] };
+    // Only fact-check the position-specific sections — the Concept section
+    // is deliberately general chess teaching and may reference pieces or
+    // examples not present on this exact board, which would otherwise
+    // false-positive trip the hallucination checks below.
+    const factCheckedPortion = parsed.content?.split(/##\s*The Mistake/i)[1]
+      ? "## The Mistake" + parsed.content.split(/##\s*The Mistake/i)[1]
+      : parsed.content;
+    const check = factCheckedPortion ? reconcileExplanation(factCheckedPortion, mistake.facts) : { ok: false, reasons: ["empty"] };
     if (parsed.title && parsed.content && check.ok) {
       return { title: parsed.title, content: parsed.content };
     }
@@ -1764,9 +1778,10 @@ Rules: Only reference pieces, captures, and threats that appear in the engine fa
   // Deterministic, fact-only fallback — never wrong, just less prose-y.
   const mistakeExplanation = buildFallbackExplanation(mistake.facts, mistake.sanPlayed);
   const fallbackPros = buildFallbackProsCons(mistake.facts);
+  const conceptIntro = CATEGORY_CONCEPT_INTROS[mistake.facts.classification] ?? "Every move changes the balance of the position — some strengthen it, some weaken it, and spotting the difference is the core skill this lesson practices.";
   return {
     title: `${mistake.facts.classification === "blunder" ? "Blunder" : "Mistake"} on move ${mistake.moveNumber}`,
-    content: `## The Mistake\n**${moveLabel}** — ${mistakeExplanation}\n\n## The Fix\n**${fixLabel}** was the engine's preferred move instead. ${fallbackPros.cons.join(" ")}`,
+    content: `## The Concept\n${conceptIntro}\n\n## The Mistake\n**${moveLabel}** — ${mistakeExplanation}\n\n## The Fix\n**${fixLabel}** was the engine's preferred move instead. ${fallbackPros.cons.join(" ")}`,
   };
 }
 

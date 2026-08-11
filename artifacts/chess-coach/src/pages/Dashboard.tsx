@@ -222,10 +222,10 @@ export function Dashboard() {
               <Zap className="w-2.5 h-2.5" /> Coach
             </span>
             <h3 className="font-semibold text-lg md:text-2xl leading-tight" style={{ color: TEXT_LIGHT, letterSpacing: '-0.02em' }}>
-              Stuck in a game?
+              Seen a position worth studying?
             </h3>
             <p className="text-sm md:text-base font-bold mt-0.5" style={{ color: CHESSCOM_GREEN }}>
-              Scan & get the best move instantly
+              Snap a photo and explore it on the board
             </p>
           </div>
           <div className="shrink-0 w-10 h-10 rounded-xl flex items-center justify-center transition-all group-hover:translate-x-1"

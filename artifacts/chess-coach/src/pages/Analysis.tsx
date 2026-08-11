@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { PageHero, PRIMARY_BTN_STYLE } from '@/components/DesignSystem';
+import { PageHero, PRIMARY_BTN_STYLE, StatReadout, t } from '@/components/DesignSystem';
 import { useLocation } from 'wouter';
 import { useMyAnalysisSummary, useMyWeaknesses } from '@/hooks/use-analysis';
 import { useUser } from '@/hooks/use-user';
@@ -33,6 +33,7 @@ export function Analysis() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [statusMsg, setStatusMsg] = useState('');
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
+  const [tipsExpanded, setTipsExpanded] = useState(false);
   const mountedRef = useRef(true);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -326,184 +327,49 @@ export function Analysis() {
             </div>
           </div>
 
-          {summary.avgRating > 0 && (() => {
-            const tier = getTierForRating(summary.avgRating);
-            const tierIdx = ELO_TIERS.indexOf(tier);
-            const nextTier = ELO_TIERS[tierIdx + 1];
-            const progress = nextTier
-              ? Math.min(100, Math.round(((summary.avgRating - tier.min) / (tier.max - tier.min)) * 100))
-              : 100;
+          {summary.totalGames > 0 && (() => {
+            const totalDecided = summary.wins + summary.losses + summary.draws;
+            const winPct = totalDecided > 0 ? Math.round((summary.wins / totalDecided) * 100) : 0;
+            const topWeakness = weaknessesData?.weaknesses?.length
+              ? [...weaknessesData.weaknesses].sort((a, b) => {
+                  const order: Record<string, number> = { Critical: 0, High: 1, Medium: 2, Low: 3 };
+                  return (order[a.severity] ?? 4) - (order[b.severity] ?? 4);
+                })[0]
+              : null;
             return (
               <div className="rounded-xl overflow-hidden" style={{ background: BG_CARD, border: CARD_BORDER, boxShadow: CARD_SHADOW }}>
-                <div className="px-5 py-4 flex flex-col sm:flex-row items-start sm:items-center gap-3 justify-between" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                  <div className="flex items-center gap-2.5">
-                    <TrendingUp className="w-5 h-5" style={{ color: CHESSCOM_GREEN }} />
-                    <div>
-                      <h2 className="text-lg font-bold" style={{ color: TEXT_LIGHT }}>Level Up Tips</h2>
-                      <p className="text-xs mt-0.5" style={{ color: TEXT_MUTED }}>
-                        Based on your average rating of <span className="font-bold" style={{ color: TEXT_LIGHT }}>{summary.avgRating}</span>
+                <div className="px-5 py-4 flex flex-col sm:flex-row items-start sm:items-center gap-4 justify-between">
+                  <div>
+                    <p className={t.eyebrow} style={{ color: TEXT_MUTED }}>Scouting report</p>
+                    <h2 className="font-display text-lg font-semibold mt-0.5" style={{ color: TEXT_LIGHT }}>
+                      {username ?? 'Your'} — {summary.totalGames} games analyzed
+                    </h2>
+                    {topWeakness && (
+                      <p className="text-sm mt-1.5" style={{ color: TEXT_MUTED }}>
+                        Your biggest opportunity right now:{' '}
+                        <span className="font-semibold" style={{ color: TEXT_LIGHT }}>{topWeakness.category}</span>
                       </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2.5">
-                    <div className={`px-2.5 py-1 rounded-xl text-xs font-bold ${tier.bgColor} ${tier.color} border ${tier.borderColor}`}>
-                      {tier.icon} {tier.label}
-                    </div>
-                    {nextTier && (
-                      <>
-                        <ArrowUpRight className="w-3.5 h-3.5" style={{ color: TEXT_MUTED }} />
-                        <div className={`px-2.5 py-1 rounded-xl text-xs font-bold ${nextTier.bgColor} ${nextTier.color} border ${nextTier.borderColor} opacity-60`}>
-                          {nextTier.icon} {nextTier.label}
-                        </div>
-                      </>
                     )}
                   </div>
+                  <div className="flex flex-col items-start sm:items-end gap-2 shrink-0">
+                    <div className="flex gap-4">
+                      <StatReadout value={summary.wins} label="Wins" tone="positive" />
+                      <StatReadout value={summary.losses} label="Losses" tone="negative" />
+                      <StatReadout value={summary.draws} label="Draws" />
+                      <StatReadout value={summary.avgRating || '—'} label="Avg Rating" />
+                    </div>
+                  </div>
                 </div>
-
-                {nextTier && (
-                  <div className="px-5 py-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', background: 'rgba(255,255,255,0.015)' }}>
-                    <div className="flex items-center justify-between text-xs mb-1.5" style={{ color: TEXT_MUTED }}>
-                      <span>{tier.range}</span>
-                      <span>{nextTier.range}</span>
+                {totalDecided > 0 && (
+                  <div className="px-5 pb-4">
+                    <div className="flex w-full h-2 rounded-full overflow-hidden gap-0.5" style={{ background: BG_DARK }}>
+                      <div className="rounded-l-full" style={{ width: `${(summary.wins / totalDecided) * 100}%`, background: CHESSCOM_GREEN }} />
+                      <div style={{ width: `${(summary.draws / totalDecided) * 100}%`, background: 'rgba(255,255,255,0.15)' }} />
+                      <div className="rounded-r-full" style={{ width: `${(summary.losses / totalDecided) * 100}%`, background: '#c1493d' }} />
                     </div>
-                    <div className="h-1.5 rounded-full overflow-hidden" style={{ background: BG_DARK }}>
-                      <motion.div
-                        className="h-full rounded-full"
-                        style={{ background: CHESSCOM_GREEN }}
-                        initial={{ width: 0 }}
-                        animate={{ width: `${progress}%` }}
-                        transition={{ duration: 0.8, ease: 'easeOut' }}
-                      />
-                    </div>
-                    <p className="text-xs mt-1.5" style={{ color: TEXT_MUTED }}>
-                      <span className="font-bold" style={{ color: CHESSCOM_GREEN }}>{tier.max - summary.avgRating}</span> rating points to {nextTier.label}
-                    </p>
+                    <p className="text-xs mt-1.5" style={{ color: TEXT_MUTED }}>{winPct}% win rate</p>
                   </div>
                 )}
-
-                <div className="px-5 py-4">
-                  <p className="text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: 'rgba(158,155,152,0.5)' }}>
-                    Tips to reach {tier.nextTier}
-                  </p>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
-                    {tier.tips.map((tip, i) => (
-                      <motion.div
-                        key={i}
-                        initial={{ opacity: 0, x: -8 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: i * 0.08 }}
-                        className="flex gap-2.5 p-3 rounded-xl transition-colors"
-                        style={{ background: 'rgba(255,255,255,0.03)' }}
-                        onMouseEnter={e => (e.currentTarget.style.background = BG_CARD_HOVER)}
-                        onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.03)')}
-                      >
-                        <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" style={{ color: CHESSCOM_GREEN }} />
-                        <p className="text-sm leading-relaxed" style={{ color: 'rgba(232,230,227,0.8)' }}>{tip}</p>
-                      </motion.div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            );
-          })()}
-
-          {summary.monthlyTrend && summary.monthlyTrend.length > 0 && summary.monthlyTrend.some(p => p.games > 0) && (() => {
-            const trendData = summary.monthlyTrend!.map(p => {
-              const [y, m] = p.month.split('-');
-              const monthName = new Date(parseInt(y), parseInt(m) - 1, 1).toLocaleString('en-US', { month: 'short' });
-              return { ...p, label: monthName, winPct: Math.round((p.winRate || 0) * 100) };
-            });
-            return (
-              <div className="rounded-xl p-5" style={{ background: BG_CARD, border: CARD_BORDER, boxShadow: CARD_SHADOW }}>
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-base font-bold flex items-center gap-2" style={{ color: TEXT_LIGHT }}>
-                    <LineChart className="w-4 h-4" style={{ color: CHESSCOM_GREEN }} />
-                    Last 6 Months
-                  </h2>
-                  <span className="text-[11px] font-bold uppercase tracking-widest" style={{ color: TEXT_MUTED }}>Win rate trend</span>
-                </div>
-                <div className="h-44 -ml-3">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={trendData} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
-                      <defs>
-                        <linearGradient id="winGradient" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor={CHESSCOM_GREEN} stopOpacity={0.55} />
-                          <stop offset="100%" stopColor={CHESSCOM_GREEN} stopOpacity={0.02} />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
-                      <XAxis dataKey="label" tick={{ fill: TEXT_MUTED, fontSize: 11 }} axisLine={false} tickLine={false} />
-                      <YAxis domain={[0, 100]} tick={{ fill: TEXT_MUTED, fontSize: 11 }} axisLine={false} tickLine={false} width={32} unit="%" />
-                      <RechartsTooltip
-                        contentStyle={{ background: BG_DARK, border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, color: TEXT_LIGHT, fontSize: 12 }}
-                        labelStyle={{ color: TEXT_MUTED, fontWeight: 700 }}
-                        formatter={(value: number, _key, item: any) => {
-                          const p = item?.payload;
-                          if (!p) return [`${value}%`, 'Win rate'];
-                          return [`${value}% (${p.wins}W / ${p.losses}L / ${p.draws}D · ${p.games} games)`, 'Win rate'];
-                        }}
-                      />
-                      <Area type="monotone" dataKey="winPct" stroke={CHESSCOM_GREEN} strokeWidth={2.5} fill="url(#winGradient)" dot={{ r: 3, fill: CHESSCOM_GREEN, strokeWidth: 0 }} activeDot={{ r: 5 }} />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-            );
-          })()}
-
-          {summary.accuracyTrend && summary.accuracyTrend.length > 0 && (() => {
-            const accData = summary.accuracyTrend!.map(p => {
-              const [y, m] = p.month.split('-');
-              const monthName = new Date(parseInt(y), parseInt(m) - 1, 1).toLocaleString('en-US', { month: 'short' });
-              return { ...p, label: monthName };
-            });
-            const first = accData[0]?.accuracy ?? 0;
-            const last = accData[accData.length - 1]?.accuracy ?? 0;
-            const delta = last - first;
-            return (
-              <div className="rounded-xl p-5" style={{ background: BG_CARD, border: CARD_BORDER, boxShadow: CARD_SHADOW }}>
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-base font-bold flex items-center gap-2" style={{ color: TEXT_LIGHT }}>
-                    <TrendingUp className="w-4 h-4" style={{ color: CHESSCOM_GREEN }} />
-                    Accuracy Over Time
-                  </h2>
-                  {accData.length >= 2 && (
-                    <span
-                      className="text-[11px] font-bold uppercase tracking-widest"
-                      style={{ color: delta >= 0 ? CHESSCOM_GREEN : '#dc4343' }}
-                    >
-                      {delta >= 0 ? '+' : ''}{delta.toFixed(1)} pts since {accData[0].label}
-                    </span>
-                  )}
-                </div>
-                <p className="text-xs mb-3" style={{ color: TEXT_MUTED }}>
-                  Real engine-verified accuracy per month, from your reviewed games — not just win/loss counts.
-                </p>
-                <div className="h-44 -ml-3">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={accData} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
-                      <defs>
-                        <linearGradient id="accGradient" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor={CHESSCOM_GREEN} stopOpacity={0.55} />
-                          <stop offset="100%" stopColor={CHESSCOM_GREEN} stopOpacity={0.02} />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
-                      <XAxis dataKey="label" tick={{ fill: TEXT_MUTED, fontSize: 11 }} axisLine={false} tickLine={false} />
-                      <YAxis domain={[0, 100]} tick={{ fill: TEXT_MUTED, fontSize: 11 }} axisLine={false} tickLine={false} width={32} unit="%" />
-                      <RechartsTooltip
-                        contentStyle={{ background: BG_DARK, border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, color: TEXT_LIGHT, fontSize: 12 }}
-                        labelStyle={{ color: TEXT_MUTED, fontWeight: 700 }}
-                        formatter={(value: number, _key, item: any) => {
-                          const p = item?.payload;
-                          if (!p) return [`${value}%`, 'Accuracy'];
-                          return [`${value}% accuracy · ${p.blunderRate}% blunder rate (${p.moves} moves)`, 'Accuracy'];
-                        }}
-                      />
-                      <Area type="monotone" dataKey="accuracy" stroke={CHESSCOM_GREEN} strokeWidth={2.5} fill="url(#accGradient)" dot={{ r: 3, fill: CHESSCOM_GREEN, strokeWidth: 0 }} activeDot={{ r: 5 }} />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </div>
               </div>
             );
           })()}
@@ -806,6 +672,198 @@ export function Analysis() {
               </div>
             )}
           </div>
+          {summary.avgRating > 0 && (() => {
+            const tier = getTierForRating(summary.avgRating);
+            const tierIdx = ELO_TIERS.indexOf(tier);
+            const nextTier = ELO_TIERS[tierIdx + 1];
+            const progress = nextTier
+              ? Math.min(100, Math.round(((summary.avgRating - tier.min) / (tier.max - tier.min)) * 100))
+              : 100;
+            return (
+              <div className="rounded-xl overflow-hidden" style={{ background: BG_CARD, border: CARD_BORDER, boxShadow: CARD_SHADOW }}>
+                <div className="px-5 py-4 flex flex-col sm:flex-row items-start sm:items-center gap-3 justify-between" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                  <div className="flex items-center gap-2.5">
+                    <TrendingUp className="w-5 h-5" style={{ color: CHESSCOM_GREEN }} />
+                    <div>
+                      <h2 className="text-lg font-bold" style={{ color: TEXT_LIGHT }}>Level Up Tips</h2>
+                      <p className="text-xs mt-0.5" style={{ color: TEXT_MUTED }}>
+                        Based on your average rating of <span className="font-bold" style={{ color: TEXT_LIGHT }}>{summary.avgRating}</span>
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2.5">
+                    <div className={`px-2.5 py-1 rounded-xl text-xs font-bold ${tier.bgColor} ${tier.color} border ${tier.borderColor}`}>
+                      {tier.icon} {tier.label}
+                    </div>
+                    {nextTier && (
+                      <>
+                        <ArrowUpRight className="w-3.5 h-3.5" style={{ color: TEXT_MUTED }} />
+                        <div className={`px-2.5 py-1 rounded-xl text-xs font-bold ${nextTier.bgColor} ${nextTier.color} border ${nextTier.borderColor} opacity-60`}>
+                          {nextTier.icon} {nextTier.label}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => setTipsExpanded(v => !v)}
+                    className="p-1.5 rounded-lg transition-colors hover:bg-white/5 shrink-0"
+                    aria-label={tipsExpanded ? "Collapse tips" : "Expand tips"}
+                  >
+                    <ChevronDown className="w-4 h-4 transition-transform" style={{ color: TEXT_MUTED, transform: tipsExpanded ? 'rotate(180deg)' : 'none' }} />
+                  </button>
+                </div>
+
+                {tipsExpanded && (
+                  <>
+                {nextTier && (
+                  <div className="px-5 py-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', background: 'rgba(255,255,255,0.015)' }}>
+                    <div className="flex items-center justify-between text-xs mb-1.5" style={{ color: TEXT_MUTED }}>
+                      <span>{tier.range}</span>
+                      <span>{nextTier.range}</span>
+                    </div>
+                    <div className="h-1.5 rounded-full overflow-hidden" style={{ background: BG_DARK }}>
+                      <motion.div
+                        className="h-full rounded-full"
+                        style={{ background: CHESSCOM_GREEN }}
+                        initial={{ width: 0 }}
+                        animate={{ width: `${progress}%` }}
+                        transition={{ duration: 0.8, ease: 'easeOut' }}
+                      />
+                    </div>
+                    <p className="text-xs mt-1.5" style={{ color: TEXT_MUTED }}>
+                      <span className="font-bold" style={{ color: CHESSCOM_GREEN }}>{tier.max - summary.avgRating}</span> rating points to {nextTier.label}
+                    </p>
+                  </div>
+                )}
+
+                <div className="px-5 py-4">
+                  <p className="text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: 'rgba(158,155,152,0.5)' }}>
+                    Tips to reach {tier.nextTier}
+                  </p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                    {tier.tips.map((tip, i) => (
+                      <motion.div
+                        key={i}
+                        initial={{ opacity: 0, x: -8 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: i * 0.08 }}
+                        className="flex gap-2.5 p-3 rounded-xl transition-colors"
+                        style={{ background: 'rgba(255,255,255,0.03)' }}
+                        onMouseEnter={e => (e.currentTarget.style.background = BG_CARD_HOVER)}
+                        onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.03)')}
+                      >
+                        <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" style={{ color: CHESSCOM_GREEN }} />
+                        <p className="text-sm leading-relaxed" style={{ color: 'rgba(232,230,227,0.8)' }}>{tip}</p>
+                      </motion.div>
+                    ))}
+                  </div>
+                </div>
+                  </>
+                )}
+              </div>
+            );
+          })()}
+
+          {summary.monthlyTrend && summary.monthlyTrend.length > 0 && summary.monthlyTrend.some(p => p.games > 0) && (() => {
+            const trendData = summary.monthlyTrend!.map(p => {
+              const [y, m] = p.month.split('-');
+              const monthName = new Date(parseInt(y), parseInt(m) - 1, 1).toLocaleString('en-US', { month: 'short' });
+              return { ...p, label: monthName, winPct: Math.round((p.winRate || 0) * 100) };
+            });
+            return (
+              <div className="rounded-xl p-5" style={{ background: BG_CARD, border: CARD_BORDER, boxShadow: CARD_SHADOW }}>
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-base font-bold flex items-center gap-2" style={{ color: TEXT_LIGHT }}>
+                    <LineChart className="w-4 h-4" style={{ color: CHESSCOM_GREEN }} />
+                    Last 6 Months
+                  </h2>
+                  <span className="text-[11px] font-bold uppercase tracking-widest" style={{ color: TEXT_MUTED }}>Win rate trend</span>
+                </div>
+                <div className="h-44 -ml-3">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={trendData} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
+                      <defs>
+                        <linearGradient id="winGradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor={CHESSCOM_GREEN} stopOpacity={0.55} />
+                          <stop offset="100%" stopColor={CHESSCOM_GREEN} stopOpacity={0.02} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                      <XAxis dataKey="label" tick={{ fill: TEXT_MUTED, fontSize: 11 }} axisLine={false} tickLine={false} />
+                      <YAxis domain={[0, 100]} tick={{ fill: TEXT_MUTED, fontSize: 11 }} axisLine={false} tickLine={false} width={32} unit="%" />
+                      <RechartsTooltip
+                        contentStyle={{ background: BG_DARK, border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, color: TEXT_LIGHT, fontSize: 12 }}
+                        labelStyle={{ color: TEXT_MUTED, fontWeight: 700 }}
+                        formatter={(value: number, _key, item: any) => {
+                          const p = item?.payload;
+                          if (!p) return [`${value}%`, 'Win rate'];
+                          return [`${value}% (${p.wins}W / ${p.losses}L / ${p.draws}D · ${p.games} games)`, 'Win rate'];
+                        }}
+                      />
+                      <Area type="monotone" dataKey="winPct" stroke={CHESSCOM_GREEN} strokeWidth={2.5} fill="url(#winGradient)" dot={{ r: 3, fill: CHESSCOM_GREEN, strokeWidth: 0 }} activeDot={{ r: 5 }} />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            );
+          })()}
+
+          {summary.accuracyTrend && summary.accuracyTrend.length > 0 && (() => {
+            const accData = summary.accuracyTrend!.map(p => {
+              const [y, m] = p.month.split('-');
+              const monthName = new Date(parseInt(y), parseInt(m) - 1, 1).toLocaleString('en-US', { month: 'short' });
+              return { ...p, label: monthName };
+            });
+            const first = accData[0]?.accuracy ?? 0;
+            const last = accData[accData.length - 1]?.accuracy ?? 0;
+            const delta = last - first;
+            return (
+              <div className="rounded-xl p-5" style={{ background: BG_CARD, border: CARD_BORDER, boxShadow: CARD_SHADOW }}>
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-base font-bold flex items-center gap-2" style={{ color: TEXT_LIGHT }}>
+                    <TrendingUp className="w-4 h-4" style={{ color: CHESSCOM_GREEN }} />
+                    Accuracy Over Time
+                  </h2>
+                  {accData.length >= 2 && (
+                    <span
+                      className="text-[11px] font-bold uppercase tracking-widest"
+                      style={{ color: delta >= 0 ? CHESSCOM_GREEN : '#dc4343' }}
+                    >
+                      {delta >= 0 ? '+' : ''}{delta.toFixed(1)} pts since {accData[0].label}
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs mb-3" style={{ color: TEXT_MUTED }}>
+                  Real engine-verified accuracy per month, from your reviewed games — not just win/loss counts.
+                </p>
+                <div className="h-44 -ml-3">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={accData} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
+                      <defs>
+                        <linearGradient id="accGradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor={CHESSCOM_GREEN} stopOpacity={0.55} />
+                          <stop offset="100%" stopColor={CHESSCOM_GREEN} stopOpacity={0.02} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                      <XAxis dataKey="label" tick={{ fill: TEXT_MUTED, fontSize: 11 }} axisLine={false} tickLine={false} />
+                      <YAxis domain={[0, 100]} tick={{ fill: TEXT_MUTED, fontSize: 11 }} axisLine={false} tickLine={false} width={32} unit="%" />
+                      <RechartsTooltip
+                        contentStyle={{ background: BG_DARK, border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, color: TEXT_LIGHT, fontSize: 12 }}
+                        labelStyle={{ color: TEXT_MUTED, fontWeight: 700 }}
+                        formatter={(value: number, _key, item: any) => {
+                          const p = item?.payload;
+                          if (!p) return [`${value}%`, 'Accuracy'];
+                          return [`${value}% accuracy · ${p.blunderRate}% blunder rate (${p.moves} moves)`, 'Accuracy'];
+                        }}
+                      />
+                      <Area type="monotone" dataKey="accuracy" stroke={CHESSCOM_GREEN} strokeWidth={2.5} fill="url(#accGradient)" dot={{ r: 3, fill: CHESSCOM_GREEN, strokeWidth: 0 }} activeDot={{ r: 5 }} />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            );
+          })()}
         </>
       ) : null}
     </div>

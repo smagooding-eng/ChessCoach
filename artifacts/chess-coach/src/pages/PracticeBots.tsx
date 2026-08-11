@@ -242,7 +242,6 @@ function GameView({ bot, onBack, startFen, startColor }: { bot: BotConfig; onBac
           const newMove: MoveRecord = { san: r.san, fen: newFen, fenBefore, color: r.color, analysis: null };
           setMoves(prev => {
             const next = [...prev, newMove];
-            setSelectedMoveIdx(next.length - 1);
             deferAnalysis(fenBefore, r.san, next.length - 1);
             return next;
           });
