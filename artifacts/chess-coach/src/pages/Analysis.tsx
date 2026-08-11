@@ -5,7 +5,7 @@ import { useMyAnalysisSummary, useMyWeaknesses } from '@/hooks/use-analysis';
 import { useUser } from '@/hooks/use-user';
 import { useQueryClient } from '@tanstack/react-query';
 import { Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area, XAxis, YAxis, CartesianGrid } from 'recharts';
-import { BrainCircuit, AlertTriangle, Activity, ChevronRight, Loader2, TrendingUp, CheckCircle2, ArrowUpRight, BookOpen, Trophy, Target, Brain, Clock, Shield, Zap, Eye, LineChart } from 'lucide-react';
+import { BrainCircuit, AlertTriangle, Activity, ChevronRight, ChevronDown, Loader2, TrendingUp, CheckCircle2, ArrowUpRight, BookOpen, Trophy, Target, Brain, Clock, Shield, Zap, Eye, LineChart } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Chessboard } from 'react-chessboard';
 import { getTierForRating, ELO_TIERS } from '@/lib/elo-tips';
