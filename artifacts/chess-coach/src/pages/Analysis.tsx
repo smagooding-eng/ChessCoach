@@ -658,6 +658,15 @@ export function Analysis() {
                     <span className="text-xs font-bold tabular-nums" style={{ color: sevColor }}>{pct}%</span>
                   </div>
 
+                  <button
+                    onClick={(e) => { e.stopPropagation(); navigate(`/puzzles?weakness=${encodeURIComponent(weakness.category)}`); }}
+                    className="mt-3 w-full flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold transition-colors relative"
+                    style={{ background: 'rgba(129,182,76,0.1)', color: CHESSCOM_GREEN, border: '1px solid rgba(129,182,76,0.2)' }}
+                  >
+                    <Target className="w-3.5 h-3.5" />
+                    Practice puzzles for this
+                  </button>
+
                   <div className="mt-3 pt-3 flex items-center justify-between text-xs opacity-0 group-hover:opacity-100 transition-opacity" style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
                     <span style={{ color: CHESSCOM_GREEN }}>View examples & courses</span>
                     <ChevronRight className="w-3 h-3" style={{ color: CHESSCOM_GREEN }} />

@@ -5,7 +5,7 @@ import { Chessboard } from 'react-chessboard';
 import { apiFetch } from '@/lib/api';
 import { useUser } from '@/hooks/use-user';
 import { Crown, RotateCcw, ChevronRight, Trophy, Target, Flame, Zap, Lightbulb, Loader2, Lock } from 'lucide-react';
-import { useLocation } from 'wouter';
+import { useLocation, useSearch } from 'wouter';
 import { AnimatePresence, motion } from 'framer-motion';
 
 const BG_DARK = '#262421';
@@ -48,6 +48,8 @@ type PuzzleState = 'loading' | 'ready' | 'solving' | 'correct' | 'wrong' | 'show
 export function Puzzles() {
   const { authUser } = useUser();
   const [, navigate] = useLocation();
+  const search = useSearch();
+  const targetTheme = new URLSearchParams(search).get('theme') ?? new URLSearchParams(search).get('weakness');
   const [puzzle, setPuzzle] = useState<PuzzleData | null>(null);
   const [daily, setDaily] = useState<DailyInfo | null>(null);
   const [stats, setStats] = useState<PuzzleStats | null>(null);
@@ -109,8 +111,11 @@ export function Puzzles() {
     setLoadingExplanation(false);
 
     try {
-      const excludeParam = seenPuzzleIds.current.length > 0 ? `?exclude=${seenPuzzleIds.current.join(',')}` : '';
-      const res = await apiFetch(`/api/puzzles/next${excludeParam}`);
+      const params = new URLSearchParams();
+      if (seenPuzzleIds.current.length > 0) params.set('exclude', seenPuzzleIds.current.join(','));
+      if (targetTheme) params.set('weakness', targetTheme);
+      const qs = params.toString() ? `?${params.toString()}` : '';
+      const res = await apiFetch(`/api/puzzles/next${qs}`);
       if (res.status === 403) {
         const data = await res.json();
         if (data.error === 'daily_limit') {
@@ -457,6 +462,23 @@ export function Puzzles() {
             </div>
           )}
         </div>
+
+        {targetTheme && (
+          <div className="flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-xl mb-4"
+            style={{ background: 'rgba(129,182,76,0.1)', border: '1px solid rgba(129,182,76,0.25)' }}>
+            <span className="text-sm font-semibold flex items-center gap-2" style={{ color: TEXT_LIGHT }}>
+              <Target size={15} style={{ color: CHESSCOM_GREEN }} />
+              Practicing puzzles for: <span style={{ color: CHESSCOM_GREEN }}>{targetTheme}</span>
+            </span>
+            <button
+              onClick={() => navigate('/puzzles')}
+              className="text-xs font-semibold shrink-0"
+              style={{ color: TEXT_MUTED }}
+            >
+              Clear
+            </button>
+          </div>
+        )}
 
         <div className="flex gap-1 mb-4 p-1 rounded-xl" style={{ background: 'rgba(255,255,255,0.04)' }}>
           {(['daily', 'games'] as const).map(t => (

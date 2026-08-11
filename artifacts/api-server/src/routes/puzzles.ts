@@ -7,6 +7,45 @@ import { Chess } from "chess.js";
 const router: IRouter = Router();
 const FREE_DAILY_LIMIT = 5;
 
+// Maps a weakness category / theme group to the actual Lichess theme tags
+// to match against. Mirrors the grouping used when curating the imported
+// puzzle set, so "targeted" puzzles genuinely correspond to what's in the
+// database. Matched via ILIKE substring against the comma-separated themes
+// column, so e.g. "endgame" alone also correctly catches rookEndgame,
+// pawnEndgame, bishopEndgame, etc. (they all contain that substring).
+const THEME_GROUP_KEYWORDS: Record<string, string[]> = {
+  opening: ["opening"],
+  endgame: ["endgame"],
+  tactics: [
+    "fork", "pin", "skewer", "discoveredAttack", "discoveredCheck", "doubleCheck",
+    "deflection", "attraction", "sacrifice", "hangingPiece", "trappedPiece",
+    "xRayAttack", "zwischenzug", "intermezzo", "clearance", "interference",
+    "mateIn1", "mateIn2", "mateIn3", "mateIn4", "mateIn5", "backRankMate",
+    "smotheredMate",
+  ],
+  positional: [
+    "middlegame", "advantage", "positionalSacrifice", "quietMove",
+    "defensiveMove", "exposedKing", "kingsideAttack", "queensideAttack", "advancedPawn",
+  ],
+};
+
+// Maps the weakness category labels used elsewhere in the app (Analysis
+// page, opponent scouting) to a theme group above.
+const WEAKNESS_CATEGORY_TO_GROUP: Record<string, string> = {
+  "opening preparation": "opening",
+  "endgame technique": "endgame",
+  "tactical awareness": "tactics",
+  "positional play": "positional",
+  "defensive play": "positional",
+};
+
+function themeGroupCondition(group: string) {
+  const keywords = THEME_GROUP_KEYWORDS[group];
+  if (!keywords) return null;
+  const conditions = keywords.map((kw) => sql`${puzzlesTable.themes} ILIKE ${"%" + kw + "%"}`);
+  return sql`(${sql.join(conditions, sql` OR `)})`;
+}
+
 async function checkPremiumStatus(userId: string): Promise<boolean> {
   try {
     const { storage } = await import("../lib/storage");
@@ -84,6 +123,18 @@ router.get("/puzzles/next", requireAuth, async (req: Request, res: Response) => 
 
     const allExcluded = [...new Set([...attemptedIds, ...sessionExclude])];
 
+    // Optional weakness-targeted mode: ?theme=opening|endgame|tactics|positional
+    // or ?weakness=Opening%20Preparation (matches the category labels used
+    // on the Analysis page directly).
+    const themeParam = typeof req.query.theme === "string" ? req.query.theme : null;
+    const weaknessParam = typeof req.query.weakness === "string" ? req.query.weakness.toLowerCase() : null;
+    const targetGroup = themeParam && THEME_GROUP_KEYWORDS[themeParam]
+      ? themeParam
+      : weaknessParam && WEAKNESS_CATEGORY_TO_GROUP[weaknessParam]
+        ? WEAKNESS_CATEGORY_TO_GROUP[weaknessParam]
+        : null;
+    const themeCondition = targetGroup ? themeGroupCondition(targetGroup) : null;
+
     let puzzle;
     if (allExcluded.length > 0) {
       const result = await db
@@ -92,6 +143,7 @@ router.get("/puzzles/next", requireAuth, async (req: Request, res: Response) => 
         .where(and(
           eq(puzzlesTable.archived, false),
           sql`${puzzlesTable.id} NOT IN (${sql.join(allExcluded.map(id => sql`${id}`), sql`, `)})`,
+          ...(themeCondition ? [themeCondition] : []),
         ))
         .orderBy(sql`RANDOM()`)
         .limit(1);
@@ -102,13 +154,19 @@ router.get("/puzzles/next", requireAuth, async (req: Request, res: Response) => 
       const result = await db
         .select()
         .from(puzzlesTable)
-        .where(eq(puzzlesTable.archived, false))
+        .where(and(
+          eq(puzzlesTable.archived, false),
+          ...(themeCondition ? [themeCondition] : []),
+        ))
         .orderBy(sql`RANDOM()`)
         .limit(1);
       puzzle = result[0];
     }
 
     if (!puzzle) {
+      // Themed requests fall back to the general pool rather than hitting
+      // Lichess's live API for a specific theme (which would need its own
+      // query support) — better to serve something than nothing.
       const fetched = await fetchAndStoreLichessPuzzle(allExcluded);
       if (fetched) puzzle = fetched;
     }
@@ -614,13 +672,16 @@ router.post("/puzzles/seed", requireAuth, async (req: Request, res: Response) =>
 // Lichess's public puzzle database (database.lichess.org/#puzzles, several
 // million puzzles as a CSV) rather than fetching one at a time at runtime.
 async function fetchAndStoreLichessPuzzle(excludeIds: number[] = []) {
-  const MAX_ATTEMPTS = 5;
+  const MAX_ATTEMPTS = 8;
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
     try {
       const res = await fetch("https://lichess.org/api/puzzle/next", {
         headers: { Accept: "application/json" },
       });
-      if (!res.ok) return null;
+      if (!res.ok) {
+        if (res.status === 429) await new Promise(r => setTimeout(r, 300 + attempt * 200));
+        continue;
+      }
       const data: any = await res.json();
 
       if (!data.puzzle?.fen || !data.puzzle?.solution?.length) continue;
