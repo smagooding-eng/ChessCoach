@@ -9,7 +9,7 @@ import {
   Activity, AlertCircle, Bold, Brain, Camera, Check, CheckCircle2, ChevronDown, ChevronRight,
   Copy, CreditCard, Crown, Edit3, Eye, FileText, Gamepad2, Gift, GraduationCap, Heading1, Heading2,
   History, Image, Italic, Link as LinkIcon, List, ListOrdered, Loader2, LogOut, Mail, Megaphone,
-  Minus, Palette, Play, Redo2, RefreshCw, Send, Settings, Shield, Sparkles, Swords, Target, Trash2,
+  Minus, Palette, Play, Redo2, RefreshCw, Search, Send, Settings, Shield, Sparkles, Swords, Target, Trash2,
   Trophy, Type, Undo2, User, UserCheck, UserPlus, Users, X, Zap,
 } from 'lucide-react';
 
@@ -1950,6 +1950,16 @@ interface OutreachLead {
   createdAt: string;
 }
 
+interface RedditCandidate {
+  title: string;
+  selftext: string;
+  permalink: string;
+  author: string;
+  subreddit: string;
+  createdUtc: number;
+  numComments: number;
+}
+
 function OutreachStudio() {
   const [leads, setLeads] = useState<OutreachLead[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1960,6 +1970,13 @@ function OutreachStudio() {
   const [generatingId, setGeneratingId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [filter, setFilter] = useState<string>('all');
+  const [showSearch, setShowSearch] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('why do I keep losing');
+  const [searchSubreddit, setSearchSubreddit] = useState('chess');
+  const [searching, setSearching] = useState(false);
+  const [searchResults, setSearchResults] = useState<RedditCandidate[]>([]);
+  const [searchError, setSearchError] = useState('');
+  const [addedUrls, setAddedUrls] = useState<Set<string>>(new Set());
 
   const loadLeads = useCallback(async () => {
     setLoading(true);
@@ -1989,6 +2006,46 @@ function OutreachStudio() {
         loadLeads();
       }
     } catch { /* form stays populated so the admin can retry */ }
+  };
+
+  const searchReddit = async () => {
+    if (!searchQuery.trim()) return;
+    setSearching(true);
+    setSearchError('');
+    setSearchResults([]);
+    try {
+      const params = new URLSearchParams({ query: searchQuery.trim(), subreddit: searchSubreddit.trim() || 'chess' });
+      const res = await apiFetch(`/api/admin/outreach/search-reddit?${params}`, { credentials: 'include' });
+      const data = await res.json();
+      if (res.ok && Array.isArray(data.candidates)) {
+        setSearchResults(data.candidates);
+        if (data.candidates.length === 0) setSearchError('No matching posts found — try a different search term or subreddit.');
+      } else {
+        setSearchError(data.error || 'Search failed');
+      }
+    } catch {
+      setSearchError('Search failed — network error');
+    }
+    setSearching(false);
+  };
+
+  const addCandidateAsLead = async (candidate: RedditCandidate) => {
+    try {
+      const res = await apiFetch('/api/admin/outreach/leads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          platform: 'reddit',
+          sourceUrl: candidate.permalink,
+          context: candidate.selftext ? `${candidate.title}\n\n${candidate.selftext}` : candidate.title,
+        }),
+      });
+      if (res.ok) {
+        setAddedUrls((prev) => new Set(prev).add(candidate.permalink));
+        loadLeads();
+      }
+    } catch { /* candidate stays in results, admin can retry */ }
   };
 
   const generateDraft = async (id: string) => {
@@ -2046,17 +2103,95 @@ function OutreachStudio() {
           <Send className="w-5 h-5" style={{ color: CHESSCOM_GREEN }} />
           Outreach Studio
         </h2>
-        <button
-          onClick={() => setShowAddForm((v) => !v)}
-          className="px-3 py-1.5 rounded-lg text-xs font-bold"
-          style={{ background: CHESSCOM_GREEN, color: '#000' }}
-        >
-          {showAddForm ? 'Cancel' : '+ Add lead'}
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setShowSearch((v) => !v)}
+            className="px-3 py-1.5 rounded-lg text-xs font-bold"
+            style={{ background: 'rgba(255,255,255,0.06)', color: TEXT_LIGHT, border: '1px solid rgba(255,255,255,0.1)' }}
+          >
+            {showSearch ? 'Hide search' : '🔍 Search Reddit'}
+          </button>
+          <button
+            onClick={() => setShowAddForm((v) => !v)}
+            className="px-3 py-1.5 rounded-lg text-xs font-bold"
+            style={{ background: CHESSCOM_GREEN, color: '#000' }}
+          >
+            {showAddForm ? 'Cancel' : '+ Add lead'}
+          </button>
+        </div>
       </div>
       <p className="text-xs mb-4" style={{ color: TEXT_MUTED }}>
         Paste a real thread, tweet, or message where someone's asking a question your product actually answers. Generate a tailored reply, review it, copy it, and post it yourself — nothing here posts anything automatically.
       </p>
+
+      {showSearch && (
+        <div className="mb-5 p-4 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+          <p className="text-xs mb-3" style={{ color: TEXT_MUTED }}>
+            Read-only search of Reddit's public posts — nothing gets added to your queue until you click "Add as lead" on a specific result.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-2 mb-3">
+            <input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') searchReddit(); }}
+              placeholder="Search terms, e.g. 'why do I keep losing'"
+              className="flex-1 px-3 py-2 rounded-lg text-sm"
+              style={{ background: 'rgba(0,0,0,0.25)', color: TEXT_LIGHT, border: '1px solid rgba(255,255,255,0.1)' }}
+            />
+            <div className="flex gap-2">
+              <input
+                value={searchSubreddit}
+                onChange={(e) => setSearchSubreddit(e.target.value)}
+                placeholder="subreddit"
+                className="w-32 px-3 py-2 rounded-lg text-sm"
+                style={{ background: 'rgba(0,0,0,0.25)', color: TEXT_LIGHT, border: '1px solid rgba(255,255,255,0.1)' }}
+              />
+              <button
+                onClick={searchReddit}
+                disabled={searching || !searchQuery.trim()}
+                className="px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-1.5 disabled:opacity-40 shrink-0"
+                style={{ background: CHESSCOM_GREEN, color: '#000' }}
+              >
+                {searching ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Search className="w-3.5 h-3.5" />}
+                Search
+              </button>
+            </div>
+          </div>
+
+          {searchError && <p className="text-xs mb-2" style={{ color: '#e88930' }}>{searchError}</p>}
+
+          {searchResults.length > 0 && (
+            <div className="space-y-2 mt-3">
+              {searchResults.map((c) => {
+                const alreadyAdded = addedUrls.has(c.permalink);
+                return (
+                  <div key={c.permalink} className="p-3 rounded-lg" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-semibold" style={{ color: TEXT_LIGHT }}>{c.title}</p>
+                        <p className="text-[11px] mt-0.5" style={{ color: TEXT_MUTED }}>
+                          r/{c.subreddit} · u/{c.author} · {c.numComments} comments
+                        </p>
+                        {c.selftext && (
+                          <p className="text-xs mt-1.5 line-clamp-2" style={{ color: TEXT_MUTED }}>{c.selftext}</p>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => addCandidateAsLead(c)}
+                        disabled={alreadyAdded}
+                        className="px-3 py-1.5 rounded-lg text-xs font-bold shrink-0 disabled:opacity-50"
+                        style={{ background: alreadyAdded ? 'rgba(255,255,255,0.06)' : `${CHESSCOM_GREEN}18`, color: alreadyAdded ? TEXT_MUTED : CHESSCOM_GREEN }}
+                      >
+                        {alreadyAdded ? 'Added ✓' : '+ Add as lead'}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       {showAddForm && (
         <div className="mb-5 p-4 rounded-xl space-y-3" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>

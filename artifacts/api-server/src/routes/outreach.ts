@@ -14,6 +14,60 @@ function requireAdmin(req: Request, res: Response, next: (err?: unknown) => void
   next();
 }
 
+interface RedditCandidate {
+  title: string;
+  selftext: string;
+  permalink: string;
+  author: string;
+  subreddit: string;
+  createdUtc: number;
+  numComments: number;
+}
+
+// Read-only search against Reddit's public JSON search endpoint. This never
+// posts, comments, or writes anything — it only fetches public post data
+// for the admin to review. Reddit requires a descriptive User-Agent or it
+// aggressively rate-limits/blocks requests.
+router.get("/admin/outreach/search-reddit", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const query = (req.query.query as string || "").trim();
+    const subreddit = (req.query.subreddit as string || "chess").trim().replace(/^r\//, "");
+    if (!query) {
+      res.status(400).json({ error: "query is required" });
+      return;
+    }
+
+    const url = `https://www.reddit.com/r/${encodeURIComponent(subreddit)}/search.json?q=${encodeURIComponent(query)}&restrict_sr=1&sort=new&limit=15&t=month`;
+    const response = await fetch(url, {
+      headers: { "User-Agent": "ChessScoutOutreachTool/1.0 (admin lead search, read-only)" },
+    });
+
+    if (!response.ok) {
+      logger.warn({ status: response.status, subreddit, query }, "[outreach] Reddit search request failed");
+      res.status(502).json({ error: `Reddit returned ${response.status} — it may be rate-limiting or the subreddit name may be wrong` });
+      return;
+    }
+
+    const data = await response.json() as { data?: { children?: Array<{ data: Record<string, unknown> }> } };
+    const posts = data?.data?.children ?? [];
+
+    const candidates: RedditCandidate[] = posts.map((p) => ({
+      title: String(p.data.title ?? ""),
+      selftext: String(p.data.selftext ?? ""),
+      permalink: `https://www.reddit.com${p.data.permalink}`,
+      author: String(p.data.author ?? "unknown"),
+      subreddit: String(p.data.subreddit ?? subreddit),
+      createdUtc: Number(p.data.created_utc ?? 0),
+      numComments: Number(p.data.num_comments ?? 0),
+    })).filter((c) => c.title.length > 0);
+
+    res.json({ candidates });
+  } catch (err) {
+    logger.error({ err }, "[outreach] Reddit search failed");
+    res.status(500).json({ error: "Search failed — Reddit may be temporarily unreachable" });
+  }
+});
+
 const PRODUCT_INFO = `PRODUCT INFO — ChessScout.net:
 - Smart opponent scouting reports that expose weaknesses of any Chess.com or Lichess player
 - Move-by-move game analysis powered by Stockfish 17 + coaching, grounded in real engine data (not generic advice)
