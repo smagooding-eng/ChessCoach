@@ -23,7 +23,7 @@ router.get("/articles", async (_req: Request, res: Response) => {
 router.get("/articles/:slug", async (req: Request, res: Response) => {
   try {
     const [article] = await db.select().from(seoArticlesTable)
-      .where(and(eq(seoArticlesTable.slug, req.params.slug), eq(seoArticlesTable.published, true)));
+      .where(and(eq(seoArticlesTable.slug, req.params.slug as string), eq(seoArticlesTable.published, true)));
     if (!article) {
       res.status(404).json({ error: "Article not found" });
       return;

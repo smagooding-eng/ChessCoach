@@ -70,7 +70,7 @@ router.patch("/admin/outreach/leads/:id", requireAdmin, async (req: Request, res
     }
     const [lead] = await db.update(outreachLeadsTable)
       .set(updates)
-      .where(eq(outreachLeadsTable.id, req.params.id))
+      .where(eq(outreachLeadsTable.id, req.params.id as string))
       .returning();
     if (!lead) {
       res.status(404).json({ error: "Lead not found" });
@@ -84,7 +84,7 @@ router.patch("/admin/outreach/leads/:id", requireAdmin, async (req: Request, res
 
 router.delete("/admin/outreach/leads/:id", requireAdmin, async (req: Request, res: Response) => {
   try {
-    await db.delete(outreachLeadsTable).where(eq(outreachLeadsTable.id, req.params.id));
+    await db.delete(outreachLeadsTable).where(eq(outreachLeadsTable.id, req.params.id as string));
     res.json({ ok: true });
   } catch {
     res.status(500).json({ error: "Failed to delete lead" });
@@ -93,7 +93,7 @@ router.delete("/admin/outreach/leads/:id", requireAdmin, async (req: Request, re
 
 router.post("/admin/outreach/leads/:id/generate-draft", requireAdmin, async (req: Request, res: Response) => {
   try {
-    const [lead] = await db.select().from(outreachLeadsTable).where(eq(outreachLeadsTable.id, req.params.id));
+    const [lead] = await db.select().from(outreachLeadsTable).where(eq(outreachLeadsTable.id, req.params.id as string));
     if (!lead) {
       res.status(404).json({ error: "Lead not found" });
       return;
@@ -132,7 +132,7 @@ Return plain text only — just the reply itself, no preamble, no markdown forma
 
     const [updated] = await db.update(outreachLeadsTable)
       .set({ draftContent: draft, status: lead.status === "new" ? "drafted" : lead.status })
-      .where(eq(outreachLeadsTable.id, req.params.id))
+      .where(eq(outreachLeadsTable.id, req.params.id as string))
       .returning();
 
     res.json({ lead: updated });

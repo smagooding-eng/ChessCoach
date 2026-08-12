@@ -834,7 +834,7 @@ router.patch("/admin/seo-articles/:id", requireAdmin, async (req: Request, res: 
     }
     const [article] = await db.update(seoArticlesTable)
       .set({ published })
-      .where(eq(seoArticlesTable.id, req.params.id))
+      .where(eq(seoArticlesTable.id, req.params.id as string))
       .returning();
     if (!article) {
       res.status(404).json({ error: "Article not found" });
@@ -848,7 +848,7 @@ router.patch("/admin/seo-articles/:id", requireAdmin, async (req: Request, res: 
 
 router.delete("/admin/seo-articles/:id", requireAdmin, async (req: Request, res: Response) => {
   try {
-    await db.delete(seoArticlesTable).where(eq(seoArticlesTable.id, req.params.id));
+    await db.delete(seoArticlesTable).where(eq(seoArticlesTable.id, req.params.id as string));
     res.json({ ok: true });
   } catch {
     res.status(500).json({ error: "Failed to delete article" });
