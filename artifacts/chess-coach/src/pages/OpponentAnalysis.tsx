@@ -1,13 +1,14 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { PageHero } from '@/components/DesignSystem';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Swords, Search, Target, AlertTriangle, TrendingUp, ChevronDown, ChevronUp, ChevronRight, Loader2, User, Users, Zap, Clock, Star, BookOpen, CheckCircle2, GraduationCap, History, RefreshCw } from 'lucide-react';
+import { Swords, Search, Target, AlertTriangle, TrendingUp, ChevronDown, ChevronUp, ChevronRight, Loader2, User, Users, Zap, Clock, Star, BookOpen, CheckCircle2, GraduationCap, History, RefreshCw, Send } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
 import { useUser } from '@/hooks/use-user';
 import { apiFetch } from '@/lib/api';
 import { PremiumGate } from '@/components/PremiumGate';
 import { WaitTipCarousel } from '@/components/WaitTipCarousel';
 import { trackBackgroundJob } from '@/components/BackgroundJobsWatcher';
+import { encodeReport } from '@/pages/ScoutShare';
 import { useEloProgress } from '@/hooks/use-elo-progress';
 
 interface Profile {
@@ -141,6 +142,7 @@ export function OpponentAnalysis() {
   const [statusMsg, setStatusMsg] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<OpponentResult | null>(null);
+  const [challengeCopied, setChallengeCopied] = useState(false);
   const [expandedWeakness, setExpandedWeakness] = useState<number | null>(null);
   const mountedRef = useRef(true);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -534,7 +536,7 @@ export function OpponentAnalysis() {
                 </div>
               </div>
 
-              <div className="mt-5 pt-5 border-t border-border/50">
+              <div className="mt-5 pt-5 border-t border-border/50 flex flex-wrap gap-2">
                 <a
                   href={`https://www.chess.com/play/online/new?opponent=${result.username}`}
                   target="_blank"
@@ -544,6 +546,33 @@ export function OpponentAnalysis() {
                   <Swords className="w-4 h-4" />
                   Challenge {result.username} on Chess.com
                 </a>
+                <button
+                  onClick={async () => {
+                    const url = `${window.location.origin}/scout/${encodeReport({
+                      user: {
+                        username: result.username,
+                        gamesChecked: result.gamesAnalyzed,
+                        weaknesses: result.weaknesses.slice(0, 3).map((w) => ({
+                          category: w.category, severity: w.severity, description: w.description, frequency: w.frequency,
+                        })),
+                      },
+                      opponent: null,
+                    })}`;
+                    const shareData = { title: `A breakdown of ${result.username}'s chess patterns`, url };
+                    if (navigator.share) {
+                      try { await navigator.share(shareData); return; } catch { /* fall through to clipboard */ }
+                    }
+                    try {
+                      await navigator.clipboard.writeText(url);
+                      setChallengeCopied(true);
+                      setTimeout(() => setChallengeCopied(false), 2500);
+                    } catch { /* nothing more we can do */ }
+                  }}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl transition-colors text-sm font-bold border border-border/60 hover:border-border"
+                >
+                  <Send className="w-4 h-4" />
+                  {challengeCopied ? 'Link copied!' : `Send ${result.username} their own report`}
+                </button>
               </div>
 
               {/* Head-to-head section */}

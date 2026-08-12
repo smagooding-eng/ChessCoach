@@ -5,7 +5,8 @@ import { useMyCourses } from '@/hooks/use-courses';
 import { useMyGames } from '@/hooks/use-games';
 import { GameThumb } from '@/components/GameThumb';
 import { Link } from 'wouter';
-import { Swords, Trophy, Target, AlertTriangle, BookOpen, Clock, GraduationCap, TrendingUp, ChevronRight, Search, Play, Bot, Camera, Lock, Crown, Flame, Zap, Award, Activity, Sparkles, ArrowUpRight } from 'lucide-react';
+import { Swords, Trophy, Target, AlertTriangle, BookOpen, Clock, GraduationCap, TrendingUp, ChevronRight, Search, Play, Bot, Camera, Lock, Crown, Flame, Zap, Award, Activity, Sparkles, ArrowUpRight, Share2 } from 'lucide-react';
+import { encodeCard } from '@/pages/ShareCard';
 import { useUser } from '@/hooks/use-user';
 import { useChessPlayer } from '@/hooks/use-chess-player';
 import { useMultiEloProgress } from '@/hooks/use-elo-progress';
@@ -13,6 +14,7 @@ import { useLiveRatings, bestLiveRating } from '@/hooks/use-live-ratings';
 import { ImportPromptModal } from '@/components/ImportPromptModal';
 import { EmailVerifyBanner } from '@/components/EmailVerifyBanner';
 import { CHESSCOM_GREEN, BRASS, TEXT_LIGHT, TEXT_MUTED, t, PieceTile } from '@/components/DesignSystem';
+import { ReferralCard } from '@/pages/Profile';
 
 const BG_DARK = '#262421';
 const BG_CARD = 'linear-gradient(180deg, #383532 0%, #2a2825 100%)';
@@ -131,6 +133,26 @@ export function Dashboard() {
                     <span className="inline-flex items-baseline gap-1 px-2.5 py-1 rounded-md" style={{ background: `linear-gradient(135deg, rgba(129,182,76,0.28), rgba(129,182,76,0.18))`, border: `1px solid ${CHESSCOM_GREEN}`, boxShadow: '0 2px 8px rgba(129,182,76,0.25)' }}>
                       <span className="text-[9px] font-semibold uppercase tracking-[0.14em]" style={{ color: CHESSCOM_GREEN }}>Scout</span>
                       <span className={t.numeric} style={{ fontSize: '1rem', color: TEXT_LIGHT }}>{scoutElo}</span>
+                      <button
+                        onClick={async (e) => {
+                          e.preventDefault();
+                          const url = `${window.location.origin}/share/${encodeCard({
+                            type: 'milestone',
+                            username: username ?? 'A ChessScout user',
+                            newRating: scoutElo,
+                          })}`;
+                          const shareData = { title: `My Scout ELO is ${scoutElo}`, url };
+                          if (navigator.share) {
+                            try { await navigator.share(shareData); return; } catch { /* fall through to clipboard */ }
+                          }
+                          try { await navigator.clipboard.writeText(url); } catch { /* nothing more we can do */ }
+                        }}
+                        className="ml-0.5 opacity-60 hover:opacity-100 transition-opacity"
+                        style={{ color: CHESSCOM_GREEN }}
+                        aria-label="Share your Scout ELO"
+                      >
+                        <Share2 className="w-3 h-3" />
+                      </button>
                     </span>
                   );
                 })()}
@@ -191,6 +213,29 @@ export function Dashboard() {
         ) : (
           <p className="relative mt-3 text-sm" style={{ color: TEXT_MUTED }}>Import games to start coaching</p>
         )}
+
+        {(() => {
+          const trend = summary?.accuracyTrend;
+          if (!trend || trend.length < 2) return null;
+          const sorted = [...trend].sort((a, b) => (a.month < b.month ? -1 : 1));
+          const current = sorted[sorted.length - 1];
+          const prior = sorted[sorted.length - 2];
+          if (!current.moves || !prior.moves) return null;
+          const accuracyDelta = current.accuracy - prior.accuracy;
+          const blunderDelta = current.blunderRate - prior.blunderRate;
+          if (accuracyDelta === 0 && blunderDelta === 0) return null;
+          return (
+            <div className="relative mt-3 flex items-center gap-4 px-3 py-2 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
+              <span className="text-[10px] font-semibold uppercase tracking-[0.1em] shrink-0" style={{ color: TEXT_MUTED }}>vs last month</span>
+              <span className="text-xs font-bold" style={{ color: accuracyDelta > 0 ? CHESSCOM_GREEN : accuracyDelta < 0 ? '#dc4343' : TEXT_MUTED }}>
+                {accuracyDelta > 0 ? '↑' : accuracyDelta < 0 ? '↓' : '–'} {Math.abs(accuracyDelta)}% accuracy
+              </span>
+              <span className="text-xs font-bold" style={{ color: blunderDelta < 0 ? CHESSCOM_GREEN : blunderDelta > 0 ? '#dc4343' : TEXT_MUTED }}>
+                {blunderDelta < 0 ? '↓' : blunderDelta > 0 ? '↑' : '–'} {Math.abs(blunderDelta)}% blunder rate
+              </span>
+            </div>
+          );
+        })()}
 
         <div className="relative flex gap-2 mt-4">
           <Link href="/import" className="flex-1 px-3 py-2.5 rounded-lg font-semibold text-sm text-white flex items-center justify-center gap-2 transition-all hover:scale-[1.02] active:scale-[0.98]" style={{ background: `linear-gradient(180deg, #95c45a 0%, ${CHESSCOM_GREEN} 100%)`, boxShadow: `0 4px 12px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.2)` }}>
@@ -479,6 +524,8 @@ export function Dashboard() {
             </div>
           ) : null}
         </div>
+
+        {authUser && <ReferralCard isPremium={isPremium} />}
       </div>
     </div>
   );

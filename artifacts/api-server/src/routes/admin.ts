@@ -1,10 +1,12 @@
 import { Router, type IRouter, type Request, type Response } from "express";
-import { db, usersTable, pageViewsTable, gamesTable, weaknessesTable, coursesTable, lessonsTable, backgroundJobsTable, referralConversionsTable } from "@workspace/db";
-import { sql, count, gte, countDistinct, inArray, eq, and, isNotNull } from "drizzle-orm";
+import { db, usersTable, pageViewsTable, gamesTable, weaknessesTable, coursesTable, lessonsTable, backgroundJobsTable, referralConversionsTable, seoArticlesTable } from "@workspace/db";
+import { sql, count, gte, countDistinct, inArray, eq, and, isNotNull, desc } from "drizzle-orm";
 import { puzzleAttemptsTable } from "@workspace/db";
 import { sessionsTable } from "@workspace/db";
 import { getUncachableStripeClient } from "../lib/stripeClient";
 import { ADMIN_EMAILS } from "../lib/auth";
+import { generateNextSeoArticle } from "../lib/seoContentEngine";
+import { logger } from "../lib/logger";
 import OpenAI from "openai";
 
 const router: IRouter = Router();
@@ -801,6 +803,55 @@ router.get("/public/stats", async (_req: Request, res: Response) => {
     });
   } catch {
     res.json({ users: 0, gamesAnalyzed: 0, opponentsScouted: 0 });
+  }
+});
+
+router.get("/admin/seo-articles", requireAdmin, async (_req: Request, res: Response) => {
+  try {
+    const articles = await db.select().from(seoArticlesTable).orderBy(desc(seoArticlesTable.createdAt));
+    res.json({ articles });
+  } catch {
+    res.status(500).json({ error: "Failed to load articles" });
+  }
+});
+
+router.post("/admin/seo-articles/generate", requireAdmin, async (_req: Request, res: Response) => {
+  try {
+    const result = await generateNextSeoArticle();
+    res.json(result);
+  } catch (err) {
+    logger.error({ err }, "Manual SEO article generation failed");
+    res.status(500).json({ error: "Generation failed" });
+  }
+});
+
+router.patch("/admin/seo-articles/:id", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const { published } = req.body as { published?: boolean };
+    if (published === undefined) {
+      res.status(400).json({ error: "published is required" });
+      return;
+    }
+    const [article] = await db.update(seoArticlesTable)
+      .set({ published })
+      .where(eq(seoArticlesTable.id, req.params.id))
+      .returning();
+    if (!article) {
+      res.status(404).json({ error: "Article not found" });
+      return;
+    }
+    res.json({ article });
+  } catch {
+    res.status(500).json({ error: "Failed to update article" });
+  }
+});
+
+router.delete("/admin/seo-articles/:id", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    await db.delete(seoArticlesTable).where(eq(seoArticlesTable.id, req.params.id));
+    res.json({ ok: true });
+  } catch {
+    res.status(500).json({ error: "Failed to delete article" });
   }
 });
 

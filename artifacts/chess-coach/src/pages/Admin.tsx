@@ -5,7 +5,6 @@ import { useUser } from '@/hooks/use-user';
 import { apiFetch } from '@/lib/api';
 import { Link } from 'wouter';
 import { motion, AnimatePresence } from 'framer-motion';
-import GrowthEngine from '@/components/GrowthEngine';
 import {
   Activity, AlertCircle, Bold, Brain, Camera, Check, CheckCircle2, ChevronDown, ChevronRight,
   Copy, CreditCard, Crown, Edit3, Eye, FileText, Gamepad2, Gift, GraduationCap, Heading1, Heading2,
@@ -1792,7 +1791,9 @@ function AdminTicker() {
 
       <MarketingPanel />
 
-      <GrowthEngine />
+      <OutreachStudio />
+
+      <SeoArticlesPanel />
 
       <AnimatePresence>
         {showEmailModal && (
@@ -1927,6 +1928,400 @@ function MarketingPanel() {
           </div>
         )}
       </div>
+    </motion.div>
+  );
+}
+
+const OUTREACH_STATUS_COLORS: Record<string, string> = {
+  new: '#9e9b98',
+  drafted: '#e8c830',
+  posted: CHESSCOM_GREEN,
+  skipped: '#6b6864',
+};
+
+interface OutreachLead {
+  id: string;
+  platform: string;
+  sourceUrl: string | null;
+  context: string;
+  draftContent: string | null;
+  status: string;
+  notes: string | null;
+  createdAt: string;
+}
+
+function OutreachStudio() {
+  const [leads, setLeads] = useState<OutreachLead[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [newPlatform, setNewPlatform] = useState('reddit');
+  const [newUrl, setNewUrl] = useState('');
+  const [newContext, setNewContext] = useState('');
+  const [generatingId, setGeneratingId] = useState<string | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [filter, setFilter] = useState<string>('all');
+
+  const loadLeads = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await apiFetch('/api/admin/outreach/leads', { credentials: 'include' });
+      const data = await res.json();
+      if (res.ok && Array.isArray(data.leads)) setLeads(data.leads);
+    } catch { /* leave leads as-is on failure */ }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { loadLeads(); }, [loadLeads]);
+
+  const addLead = async () => {
+    if (!newContext.trim()) return;
+    try {
+      const res = await apiFetch('/api/admin/outreach/leads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ platform: newPlatform, sourceUrl: newUrl.trim() || undefined, context: newContext.trim() }),
+      });
+      if (res.ok) {
+        setNewUrl('');
+        setNewContext('');
+        setShowAddForm(false);
+        loadLeads();
+      }
+    } catch { /* form stays populated so the admin can retry */ }
+  };
+
+  const generateDraft = async (id: string) => {
+    setGeneratingId(id);
+    try {
+      const res = await apiFetch(`/api/admin/outreach/leads/${id}/generate-draft`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      const data = await res.json();
+      if (res.ok && data.lead) {
+        setLeads((prev) => prev.map((l) => (l.id === id ? data.lead : l)));
+      }
+    } catch { /* leave lead as-is, admin can retry */ }
+    setGeneratingId(null);
+  };
+
+  const updateStatus = async (id: string, status: string) => {
+    setLeads((prev) => prev.map((l) => (l.id === id ? { ...l, status } : l)));
+    try {
+      await apiFetch(`/api/admin/outreach/leads/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ status }),
+      });
+    } catch { /* optimistic update already applied; a refresh will resync */ }
+  };
+
+  const deleteLead = async (id: string) => {
+    setLeads((prev) => prev.filter((l) => l.id !== id));
+    try {
+      await apiFetch(`/api/admin/outreach/leads/${id}`, { method: 'DELETE', credentials: 'include' });
+    } catch { /* optimistic removal already applied */ }
+  };
+
+  const copyDraft = (id: string, text: string) => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopiedId(id);
+      setTimeout(() => setCopiedId(null), 2000);
+    }).catch(() => {});
+  };
+
+  const filteredLeads = filter === 'all' ? leads : leads.filter((l) => l.status === filter);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="rounded-2xl p-5"
+      style={{ background: BG_CARD, border: `1px solid rgba(255,255,255,0.08)` }}
+    >
+      <div className="flex items-center justify-between mb-1">
+        <h2 className="text-lg font-bold flex items-center gap-2" style={{ color: TEXT_LIGHT }}>
+          <Send className="w-5 h-5" style={{ color: CHESSCOM_GREEN }} />
+          Outreach Studio
+        </h2>
+        <button
+          onClick={() => setShowAddForm((v) => !v)}
+          className="px-3 py-1.5 rounded-lg text-xs font-bold"
+          style={{ background: CHESSCOM_GREEN, color: '#000' }}
+        >
+          {showAddForm ? 'Cancel' : '+ Add lead'}
+        </button>
+      </div>
+      <p className="text-xs mb-4" style={{ color: TEXT_MUTED }}>
+        Paste a real thread, tweet, or message where someone's asking a question your product actually answers. Generate a tailored reply, review it, copy it, and post it yourself — nothing here posts anything automatically.
+      </p>
+
+      {showAddForm && (
+        <div className="mb-5 p-4 rounded-xl space-y-3" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+          <select
+            value={newPlatform}
+            onChange={(e) => setNewPlatform(e.target.value)}
+            className="w-full px-3 py-2 rounded-lg text-sm"
+            style={{ background: 'rgba(0,0,0,0.25)', color: TEXT_LIGHT, border: '1px solid rgba(255,255,255,0.1)' }}
+          >
+            <option value="reddit">Reddit</option>
+            <option value="twitter">Twitter/X</option>
+            <option value="discord">Discord</option>
+            <option value="forum">Forum</option>
+            <option value="other">Other</option>
+          </select>
+          <input
+            value={newUrl}
+            onChange={(e) => setNewUrl(e.target.value)}
+            placeholder="Link to the post (optional)"
+            className="w-full px-3 py-2 rounded-lg text-sm"
+            style={{ background: 'rgba(0,0,0,0.25)', color: TEXT_LIGHT, border: '1px solid rgba(255,255,255,0.1)' }}
+          />
+          <textarea
+            value={newContext}
+            onChange={(e) => setNewContext(e.target.value)}
+            placeholder="Paste what they actually said/asked, verbatim..."
+            rows={4}
+            className="w-full px-3 py-2 rounded-lg text-sm resize-none"
+            style={{ background: 'rgba(0,0,0,0.25)', color: TEXT_LIGHT, border: '1px solid rgba(255,255,255,0.1)' }}
+          />
+          <button
+            onClick={addLead}
+            disabled={!newContext.trim()}
+            className="px-4 py-2 rounded-lg text-sm font-bold disabled:opacity-40"
+            style={{ background: CHESSCOM_GREEN, color: '#000' }}
+          >
+            Add to queue
+          </button>
+        </div>
+      )}
+
+      <div className="flex gap-1.5 mb-3">
+        {['all', 'new', 'drafted', 'posted', 'skipped'].map((f) => (
+          <button
+            key={f}
+            onClick={() => setFilter(f)}
+            className="px-2.5 py-1 rounded-md text-[11px] font-bold capitalize"
+            style={filter === f
+              ? { background: CHESSCOM_GREEN, color: '#000' }
+              : { background: 'rgba(255,255,255,0.05)', color: TEXT_MUTED }}
+          >
+            {f}
+          </button>
+        ))}
+      </div>
+
+      {loading ? (
+        <div className="py-8 text-center"><Loader2 className="w-5 h-5 animate-spin mx-auto" style={{ color: TEXT_MUTED }} /></div>
+      ) : filteredLeads.length === 0 ? (
+        <p className="text-sm py-6 text-center" style={{ color: TEXT_MUTED }}>No leads {filter !== 'all' ? `with status "${filter}"` : 'yet'}.</p>
+      ) : (
+        <div className="space-y-3">
+          {filteredLeads.map((lead) => (
+            <div key={lead.id} className="p-3.5 rounded-xl" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full" style={{ background: 'rgba(255,255,255,0.06)', color: TEXT_MUTED }}>{lead.platform}</span>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: `${OUTREACH_STATUS_COLORS[lead.status]}18`, color: OUTREACH_STATUS_COLORS[lead.status] }}>{lead.status}</span>
+                  {lead.sourceUrl && (
+                    <a href={lead.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] underline" style={{ color: TEXT_MUTED }}>source ↗</a>
+                  )}
+                </div>
+                <button onClick={() => deleteLead(lead.id)} className="p-1 rounded hover:bg-white/5" style={{ color: TEXT_MUTED }}>
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+              <p className="text-xs mb-3" style={{ color: TEXT_MUTED }}>{lead.context}</p>
+
+              {lead.draftContent && (
+                <div className="p-3 rounded-lg mb-3" style={{ background: 'rgba(129,182,76,0.06)', border: '1px solid rgba(129,182,76,0.15)' }}>
+                  <p className="text-sm whitespace-pre-wrap" style={{ color: TEXT_LIGHT }}>{lead.draftContent}</p>
+                </div>
+              )}
+
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => generateDraft(lead.id)}
+                  disabled={generatingId === lead.id}
+                  className="px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 disabled:opacity-50"
+                  style={{ background: 'rgba(255,255,255,0.06)', color: TEXT_LIGHT, border: '1px solid rgba(255,255,255,0.1)' }}
+                >
+                  {generatingId === lead.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+                  {lead.draftContent ? 'Regenerate draft' : 'Generate draft'}
+                </button>
+                {lead.draftContent && (
+                  <button
+                    onClick={() => copyDraft(lead.id, lead.draftContent!)}
+                    className="px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5"
+                    style={{ background: 'rgba(255,255,255,0.06)', color: TEXT_LIGHT, border: '1px solid rgba(255,255,255,0.1)' }}
+                  >
+                    <Copy className="w-3 h-3" /> {copiedId === lead.id ? 'Copied!' : 'Copy'}
+                  </button>
+                )}
+                {lead.status !== 'posted' && (
+                  <button onClick={() => updateStatus(lead.id, 'posted')} className="px-3 py-1.5 rounded-lg text-xs font-bold" style={{ background: `${CHESSCOM_GREEN}18`, color: CHESSCOM_GREEN }}>
+                    Mark posted
+                  </button>
+                )}
+                {lead.status !== 'skipped' && (
+                  <button onClick={() => updateStatus(lead.id, 'skipped')} className="px-3 py-1.5 rounded-lg text-xs font-bold" style={{ color: TEXT_MUTED }}>
+                    Skip
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </motion.div>
+  );
+}
+
+interface SeoArticle {
+  id: string;
+  slug: string;
+  title: string;
+  targetKeyword: string;
+  metaDescription: string;
+  published: boolean;
+  createdAt: string;
+}
+
+function SeoArticlesPanel() {
+  const [articles, setArticles] = useState<SeoArticle[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [generating, setGenerating] = useState(false);
+  const [generateMsg, setGenerateMsg] = useState('');
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  const loadArticles = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await apiFetch('/api/admin/seo-articles', { credentials: 'include' });
+      const data = await res.json();
+      if (res.ok && Array.isArray(data.articles)) setArticles(data.articles);
+    } catch { /* leave articles as-is on failure */ }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { loadArticles(); }, [loadArticles]);
+
+  const generateNow = async () => {
+    setGenerating(true);
+    setGenerateMsg('');
+    try {
+      const res = await apiFetch('/api/admin/seo-articles/generate', { method: 'POST', credentials: 'include' });
+      const data = await res.json();
+      if (res.ok && data.published) {
+        setGenerateMsg(`Published: ${data.slug}`);
+        loadArticles();
+      } else {
+        setGenerateMsg(data.reason || 'Nothing generated');
+      }
+    } catch {
+      setGenerateMsg('Generation failed — network error');
+    }
+    setGenerating(false);
+  };
+
+  const togglePublished = async (id: string, published: boolean) => {
+    setArticles((prev) => prev.map((a) => (a.id === id ? { ...a, published } : a)));
+    try {
+      await apiFetch(`/api/admin/seo-articles/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ published }),
+      });
+    } catch { /* optimistic update already applied */ }
+  };
+
+  const deleteArticle = async (id: string) => {
+    setArticles((prev) => prev.filter((a) => a.id !== id));
+    try {
+      await apiFetch(`/api/admin/seo-articles/${id}`, { method: 'DELETE', credentials: 'include' });
+    } catch { /* optimistic removal already applied */ }
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="rounded-2xl p-5"
+      style={{ background: BG_CARD, border: `1px solid rgba(255,255,255,0.08)` }}
+    >
+      <div className="flex items-center justify-between mb-1">
+        <h2 className="text-lg font-bold flex items-center gap-2" style={{ color: TEXT_LIGHT }}>
+          <FileText className="w-5 h-5" style={{ color: CHESSCOM_GREEN }} />
+          SEO Articles
+        </h2>
+        <button
+          onClick={generateNow}
+          disabled={generating}
+          className="px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 disabled:opacity-50"
+          style={{ background: CHESSCOM_GREEN, color: '#000' }}
+        >
+          {generating ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+          Generate now
+        </button>
+      </div>
+      <p className="text-xs mb-4" style={{ color: TEXT_MUTED }}>
+        Runs automatically once a week from a curated keyword queue. Use "Generate now" to publish the next one immediately instead of waiting.
+      </p>
+      {generateMsg && (
+        <p className="text-xs mb-3 px-3 py-2 rounded-lg" style={{ background: 'rgba(129,182,76,0.08)', color: CHESSCOM_GREEN }}>{generateMsg}</p>
+      )}
+
+      {loading ? (
+        <div className="py-8 text-center"><Loader2 className="w-5 h-5 animate-spin mx-auto" style={{ color: TEXT_MUTED }} /></div>
+      ) : articles.length === 0 ? (
+        <p className="text-sm py-6 text-center" style={{ color: TEXT_MUTED }}>No articles generated yet.</p>
+      ) : (
+        <div className="space-y-2">
+          {articles.map((a) => (
+            <div key={a.id} className="p-3.5 rounded-xl" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 flex-1 cursor-pointer" onClick={() => setExpandedId(expandedId === a.id ? null : a.id)}>
+                  <p className="text-sm font-semibold truncate" style={{ color: TEXT_LIGHT }}>{a.title}</p>
+                  <p className="text-[11px] mt-0.5" style={{ color: TEXT_MUTED }}>targeting: "{a.targetKeyword}"</p>
+                </div>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0" style={{
+                  background: a.published ? `${CHESSCOM_GREEN}18` : 'rgba(255,255,255,0.06)',
+                  color: a.published ? CHESSCOM_GREEN : TEXT_MUTED,
+                }}>
+                  {a.published ? 'Live' : 'Unpublished'}
+                </span>
+              </div>
+              {expandedId === a.id && (
+                <p className="text-xs mt-2 pt-2" style={{ color: TEXT_MUTED, borderTop: '1px solid rgba(255,255,255,0.06)' }}>{a.metaDescription}</p>
+              )}
+              <div className="flex flex-wrap gap-2 mt-3">
+                <a
+                  href={`/learn/${a.slug}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3 py-1.5 rounded-lg text-xs font-bold"
+                  style={{ background: 'rgba(255,255,255,0.06)', color: TEXT_LIGHT, border: '1px solid rgba(255,255,255,0.1)' }}
+                >
+                  View live ↗
+                </a>
+                <button
+                  onClick={() => togglePublished(a.id, !a.published)}
+                  className="px-3 py-1.5 rounded-lg text-xs font-bold"
+                  style={{ color: TEXT_MUTED, border: '1px solid rgba(255,255,255,0.1)' }}
+                >
+                  {a.published ? 'Unpublish' : 'Republish'}
+                </button>
+                <button onClick={() => deleteArticle(a.id)} className="p-1.5 rounded-lg hover:bg-white/5" style={{ color: TEXT_MUTED }}>
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </motion.div>
   );
 }

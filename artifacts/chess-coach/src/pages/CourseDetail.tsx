@@ -14,6 +14,8 @@ const BG_CARD = '#302e2b';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { apiFetch } from '@/lib/api';
+import { useUser } from '@/hooks/use-user';
+import { encodeCard } from '@/pages/ShareCard';
 
 // ── Markdown render helpers ────────────────────────────────────────────────────
 const MISTAKE_RED = '#dc4343';
@@ -332,6 +334,8 @@ export function CourseDetail() {
   const [currentIdx, setCurrentIdx] = useState<number>(0);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showFixLine, setShowFixLine] = useState(false);
+  const [showCompletionShare, setShowCompletionShare] = useState(false);
+  const { username } = useUser();
 
   const sortedLessons = [...(course?.lessons ?? [])].sort((a, b) => a.orderIndex - b.orderIndex);
   const lesson = sortedLessons[currentIdx];
@@ -350,6 +354,8 @@ export function CourseDetail() {
     await markComplete(courseId, lesson.id, completed);
     if (completed && !isLast) {
       setTimeout(() => setCurrentIdx(i => i + 1), 350);
+    } else if (completed && isLast) {
+      setShowCompletionShare(true);
     }
   };
 
@@ -612,6 +618,58 @@ export function CourseDetail() {
           </div>
         </div>
       )}
+
+      <AnimatePresence>
+        {showCompletionShare && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            style={{ background: 'rgba(0,0,0,0.7)' }}
+            onClick={() => setShowCompletionShare(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-sm rounded-2xl p-6 text-center"
+              style={{ background: '#302e2b', border: '1px solid rgba(255,255,255,0.08)' }}
+            >
+              <div className="text-4xl mb-3">🏆</div>
+              <h3 className="text-lg font-bold text-white mb-1">Course complete!</h3>
+              <p className="text-sm text-white/60 mb-5">
+                You just fixed a real weakness in your game. Worth sharing.
+              </p>
+              <div className="flex flex-col gap-2">
+                <button
+                  onClick={async () => {
+                    const url = `${window.location.origin}/share/${encodeCard({
+                      type: 'course',
+                      username: username ?? 'A ChessScout user',
+                      courseName: course?.title ?? 'a personalized course',
+                      weaknessFixed: course?.category ?? 'a real weakness',
+                      lessonsCompleted: course?.totalLessons ?? sortedLessons.length,
+                    })}`;
+                    const shareData = { title: 'I just completed a ChessScout course', url };
+                    if (navigator.share) {
+                      try { await navigator.share(shareData); return; } catch { /* fall through to clipboard */ }
+                    }
+                    try { await navigator.clipboard.writeText(url); } catch { /* nothing more we can do */ }
+                  }}
+                  className="w-full py-3 rounded-xl font-bold text-black transition-all hover:scale-[1.02]"
+                  style={{ background: CHESSCOM_GREEN }}
+                >
+                  Share this win
+                </button>
+                <button
+                  onClick={() => setShowCompletionShare(false)}
+                  className="w-full py-2.5 rounded-xl text-sm font-semibold text-white/50"
+                >
+                  Maybe later
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

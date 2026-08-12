@@ -6,6 +6,7 @@ import { apiFetch } from '@/lib/api';
 import { useUser } from '@/hooks/use-user';
 import { Crown, RotateCcw, ChevronRight, Trophy, Target, Flame, Zap, Lightbulb, Loader2, Lock, AlertTriangle } from 'lucide-react';
 import { useLocation, useSearch } from 'wouter';
+import { encodeCard } from '@/pages/ShareCard';
 import { AnimatePresence, motion } from 'framer-motion';
 
 const BG_DARK = '#262421';
@@ -730,6 +731,28 @@ export function Puzzles() {
                   </div>
                 ))}
               </div>
+            )}
+
+            {stats && stats.streak >= 3 && (
+              <button
+                onClick={async () => {
+                  const url = `${window.location.origin}/share/${encodeCard({
+                    type: 'streak',
+                    username: authUser?.chesscomUsername ?? authUser?.lichessUsername ?? 'A ChessScout user',
+                    streakDays: stats.streak,
+                    accuracy: stats.accuracy,
+                  })}`;
+                  const shareData = { title: `${stats.streak}-day puzzle streak on ChessScout`, url };
+                  if (navigator.share) {
+                    try { await navigator.share(shareData); return; } catch { /* fall through to clipboard */ }
+                  }
+                  try { await navigator.clipboard.writeText(url); } catch { /* nothing more we can do */ }
+                }}
+                className="mt-3 w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold"
+                style={{ background: 'rgba(245,158,11,0.1)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.25)' }}
+              >
+                <Flame size={15} /> Share your {stats.streak}-day streak
+              </button>
             )}
           </>
         )}

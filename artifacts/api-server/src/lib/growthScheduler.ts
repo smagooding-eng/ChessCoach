@@ -1,22 +1,17 @@
 import cron from 'node-cron';
-import { db, growthCampaignsTable, usersTable, emailDripLogTable, gamesTable, backgroundJobsTable } from "@workspace/db";
-import { eq, and, lte, isNotNull, isNull, sql } from "drizzle-orm";
-import { executePostForCampaign, computeNextRun } from "./growthService";
+import { db, usersTable, emailDripLogTable, gamesTable, backgroundJobsTable } from "@workspace/db";
+import { eq, and, lte, isNotNull, isNull, sql, count } from "drizzle-orm";
 import { sendEmail } from "./email";
 import { logger } from "./logger";
 import { randomUUID } from "crypto";
 import { runBulkReviewJob } from "../routes/games";
+import { generateNextSeoArticle } from "./seoContentEngine";
 
 let schedulerStarted = false;
 
 export function startGrowthScheduler() {
   if (schedulerStarted) return;
   schedulerStarted = true;
-
-  cron.schedule('*/15 * * * *', async () => {
-    logger.info('[growth] Campaign scheduler tick');
-    await runDueCampaigns();
-  });
 
   cron.schedule('0 */6 * * *', async () => {
     logger.info('[growth] Email drip check');
@@ -28,7 +23,24 @@ export function startGrowthScheduler() {
     await runAutoReviewTick();
   });
 
-  logger.info('[growth] Scheduler started (campaigns: every 15min, drips: every 6h, auto-review: every 15min)');
+  // Weekly, not more often — this is a slow, compounding content channel.
+  // Publishing one genuinely substantive article a week beats a burst of
+  // thin ones, both for actual usefulness and for how Google treats it.
+  cron.schedule('0 9 * * 1', async () => {
+    logger.info('[seo] Weekly article generation tick');
+    try {
+      const result = await generateNextSeoArticle();
+      if (result.published) {
+        logger.info({ slug: result.slug }, '[seo] Article published');
+      } else {
+        logger.info({ reason: result.reason }, '[seo] No article published this week');
+      }
+    } catch (err: unknown) {
+      logger.error({ error: err instanceof Error ? err.message : 'Unknown' }, '[seo] Weekly generation failed');
+    }
+  });
+
+  logger.info('[growth] Scheduler started (drips: every 6h, auto-review: every 15min, seo: weekly Mondays 9am)');
 }
 
 // Gentle, throttled background review: each tick picks a small number of
@@ -70,40 +82,11 @@ async function runAutoReviewTick() {
   }
 }
 
-async function runDueCampaigns() {
-  try {
-    const now = new Date();
-    const dueCampaigns = await db.select().from(growthCampaignsTable)
-      .where(and(
-        eq(growthCampaignsTable.status, 'active'),
-        lte(growthCampaignsTable.nextRunAt, now)
-      ));
-
-    for (const campaign of dueCampaigns) {
-      logger.info({ campaignId: campaign.id, name: campaign.name }, '[growth] Running campaign');
-      try {
-        const platforms = campaign.platforms as string[];
-        await executePostForCampaign(campaign.id, platforms, campaign.theme, campaign.customNote);
-
-        const nextRun = computeNextRun(campaign.frequency);
-        await db.update(growthCampaignsTable)
-          .set({ lastRunAt: now, nextRunAt: nextRun })
-          .where(eq(growthCampaignsTable.id, campaign.id));
-
-        logger.info({ campaignId: campaign.id, nextRun }, '[growth] Campaign completed');
-      } catch (err: unknown) {
-        logger.error({ campaignId: campaign.id, error: err instanceof Error ? err.message : 'Unknown' }, '[growth] Campaign failed');
-      }
-    }
-  } catch (err: unknown) {
-    logger.error({ error: err instanceof Error ? err.message : 'Unknown' }, '[growth] Scheduler error');
-  }
-}
-
 async function runEmailDrips() {
   try {
     await sendTrialExpiryReminders();
     await sendWinBackEmails();
+    await sendUnreviewedGamesReminder();
   } catch (err: unknown) {
     logger.error({ error: err instanceof Error ? err.message : 'Unknown' }, '[growth] Drip error');
   }
@@ -198,6 +181,87 @@ async function sendWinBackEmails() {
   } catch (err: unknown) {
     logger.error({ error: err instanceof Error ? err.message : 'Unknown' }, '[drip] Win-back check failed');
   }
+}
+
+// More specific than the generic win-back email: only fires for users who
+// have real, unreviewed games sitting in their account — a concrete reason
+// to come back rather than a generic "we miss you." Uses a slightly
+// shorter inactivity window than win-back since it's a lower-pressure,
+// more useful nudge.
+const MIN_UNREVIEWED_GAMES_FOR_REMINDER = 3;
+
+async function sendUnreviewedGamesReminder() {
+  try {
+    const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
+
+    const inactiveUsers = await db.select({
+      id: usersTable.id,
+      email: usersTable.email,
+      firstName: usersTable.firstName,
+      chesscomUsername: usersTable.chesscomUsername,
+      lichessUsername: usersTable.lichessUsername,
+    }).from(usersTable)
+      .where(and(
+        isNotNull(usersTable.email),
+        sql`${usersTable.lastLoginAt} IS NOT NULL`,
+        sql`${usersTable.lastLoginAt} < ${threeDaysAgo.toISOString()}`
+      ));
+
+    for (const user of inactiveUsers) {
+      if (!user.email) continue;
+      const username = (user.chesscomUsername || user.lichessUsername || '').toLowerCase();
+      if (!username) continue;
+
+      const [alreadySent] = await db.select().from(emailDripLogTable)
+        .where(and(
+          eq(emailDripLogTable.userId, user.id),
+          eq(emailDripLogTable.dripType, 'unreviewed_games')
+        ));
+      if (alreadySent) continue;
+
+      const [{ count: unreviewedCount }] = await db.select({ count: count() })
+        .from(gamesTable)
+        .where(and(eq(gamesTable.username, username), isNull(gamesTable.reviewData)));
+
+      if (unreviewedCount < MIN_UNREVIEWED_GAMES_FOR_REMINDER) continue;
+
+      try {
+        await sendEmail({
+          to: user.email,
+          subject: `♟️ You have ${unreviewedCount} unreviewed games waiting`,
+          html: unreviewedGamesHtml(user.firstName, unreviewedCount),
+        });
+        await db.insert(emailDripLogTable).values({ userId: user.id, dripType: 'unreviewed_games' });
+        logger.info({ userId: user.id, unreviewedCount }, '[drip] Unreviewed games reminder sent');
+      } catch (err: unknown) {
+        logger.error({ userId: user.id, error: err instanceof Error ? err.message : 'Unknown' }, '[drip] Unreviewed games send failed');
+      }
+    }
+  } catch (err: unknown) {
+    logger.error({ error: err instanceof Error ? err.message : 'Unknown' }, '[drip] Unreviewed games check failed');
+  }
+}
+
+function unreviewedGamesHtml(name: string | null, gameCount: number): string {
+  const n = name || 'there';
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background:#262421;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+<div style="max-width:600px;margin:0 auto;padding:40px 20px;">
+  <div style="text-align:center;margin-bottom:24px;"><h1 style="color:#81b64c;font-size:24px;margin:0;">♜ ChessScout.net</h1></div>
+  <div style="background:#302e2b;border-radius:12px;padding:32px;margin-bottom:24px;">
+    <h2 style="color:#e8e6e3;font-size:20px;margin:0 0 16px;">Hey ${n}, ${gameCount} of your games haven't been reviewed yet</h2>
+    <p style="color:#9e9b98;font-size:15px;line-height:1.6;margin:0 0 20px;">
+      That's ${gameCount} real games sitting there with mistakes we haven't broken down for you yet — patterns you might be repeating without knowing it.
+    </p>
+    <div style="text-align:center;margin:28px 0;">
+      <a href="https://chessscout.net/games" style="display:inline-block;background:#81b64c;color:#000;font-weight:700;font-size:15px;padding:14px 32px;border-radius:10px;text-decoration:none;">Review my games</a>
+    </div>
+    <p style="color:#6b6864;font-size:12px;line-height:1.6;margin:0;">
+      You're getting this because it's been a few days since your last visit. We only send this once.
+    </p>
+  </div>
+</div>
+</body></html>`;
 }
 
 function trialExpiryHtml(name: string | null): string {

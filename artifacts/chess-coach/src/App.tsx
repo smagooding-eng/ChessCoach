@@ -60,6 +60,10 @@ class ErrorBoundary extends Component<
 // Admin and ScanPosition) being bundled into the initial page load.
 const Setup = lazy(() => import("@/pages/Setup").then(m => ({ default: m.Setup })));
 const LandingPage = lazy(() => import("@/pages/LandingPage").then(m => ({ default: m.LandingPage })));
+const ScoutShare = lazy(() => import("@/pages/ScoutShare").then(m => ({ default: m.ScoutShare })));
+const ArticlesIndex = lazy(() => import("@/pages/Articles").then(m => ({ default: m.ArticlesIndex })));
+const ArticlePage = lazy(() => import("@/pages/Articles").then(m => ({ default: m.ArticlePage })));
+const ShareCard = lazy(() => import("@/pages/ShareCard").then(m => ({ default: m.ShareCard })));
 const DownloadPage = lazy(() => import("@/pages/Download"));
 const PrivacyPage = lazy(() => import("@/pages/Privacy"));
 const TermsPage = lazy(() => import("@/pages/Terms"));
@@ -220,6 +224,10 @@ function Router() {
   return (
     <><ScrollToTop /><PageTracker /><Switch>
       <Route path="/setup" component={LandingPage} />
+      <Route path="/scout/:data" component={ScoutShare} />
+      <Route path="/learn" component={ArticlesIndex} />
+      <Route path="/learn/:slug" component={ArticlePage} />
+      <Route path="/share/:data" component={ShareCard} />
       <Route path="/download" component={DownloadPage} />
       <Route path="/privacy" component={PrivacyPage} />
       <Route path="/terms" component={TermsPage} />
