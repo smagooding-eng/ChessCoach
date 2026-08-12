@@ -609,6 +609,226 @@ function InsightsResultCard({ delay = 0 }: { delay?: number }) {
   );
 }
 
+const SEVERITY_COLORS: Record<string, string> = {
+  Critical: '#dc4343',
+  High: '#e88930',
+  Medium: '#e8c830',
+  Low: '#7a9e5c',
+};
+
+interface QuickWeakness {
+  category: string;
+  severity: string;
+  description: string;
+  frequency: number;
+}
+interface ScoutSide {
+  username: string;
+  weaknesses: QuickWeakness[];
+  gamesChecked: number;
+}
+interface ScoutResponse {
+  user: ScoutSide;
+  opponent: ScoutSide | null;
+}
+
+function WeaknessMiniList({ side }: { side: ScoutSide }) {
+  return (
+    <div className="space-y-2">
+      {side.weaknesses.length === 0 ? (
+        <p className="text-[11px]" style={{ color: MUTED }}>No major patterns found in the games checked — solid play.</p>
+      ) : (
+        side.weaknesses.map((w) => {
+          const color = SEVERITY_COLORS[w.severity] ?? SEVERITY_COLORS.Medium;
+          return (
+            <div key={w.category} className="py-2 px-3 rounded-xl" style={{ background: `${color}08`, border: `1px solid ${color}25` }}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-1.5 h-1.5 rounded-full" style={{ background: color }} />
+                  <span className="text-xs font-bold" style={{ color: TEXT }}>{w.category}</span>
+                </div>
+                <span className="text-[10px] font-black px-2 py-0.5 rounded-full" style={{ background: `${color}18`, color }}>{w.severity}</span>
+              </div>
+              <p className="text-[11px] mt-1 ml-3.5" style={{ color: MUTED }}>{w.description}</p>
+            </div>
+          );
+        })
+      )}
+    </div>
+  );
+}
+
+function QuickScoutDemo({ onSignup }: { onSignup: () => void }) {
+  const [usernameInput, setUsernameInput] = useState('');
+  const [platform, setPlatform] = useState<'chesscom' | 'lichess'>('chesscom');
+  const [status, setStatus] = useState<'idle' | 'loading' | 'done' | 'error'>('idle');
+  const [errorMsg, setErrorMsg] = useState('');
+  const [result, setResult] = useState<ScoutResponse | null>(null);
+  const [loadingStep, setLoadingStep] = useState(0);
+
+  const loadingMessages = [
+    'Pulling your recent games…',
+    'Checking your last opponent too…',
+    'Running the engine over both…',
+    'Almost there…',
+  ];
+
+  useEffect(() => {
+    if (status !== 'loading') return;
+    setLoadingStep(0);
+    const interval = setInterval(() => {
+      setLoadingStep((s) => Math.min(s + 1, loadingMessages.length - 1));
+    }, 2200);
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status]);
+
+  const runScout = async () => {
+    const trimmed = usernameInput.trim();
+    if (!trimmed) return;
+    setStatus('loading');
+    setErrorMsg('');
+    try {
+      const res = await apiFetch('/api/public/quick-scout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: trimmed, platform }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setErrorMsg(data.error || 'Something went wrong. Please try again.');
+        setStatus('error');
+        return;
+      }
+      setResult(data);
+      setStatus('done');
+    } catch {
+      setErrorMsg('Could not reach the server. Please check your connection and try again.');
+      setStatus('error');
+    }
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+      className="rounded-xl p-5 sm:p-6"
+      style={{ background: CARD, border: '1px solid rgba(255,255,255,0.05)', boxShadow: `0 25px 80px rgba(0,0,0,0.5), 0 0 60px ${G}10` }}
+    >
+      <div className="flex items-center gap-2 mb-4">
+        <BarChart3 className="w-4 h-4" style={{ color: G }} />
+        <span className="text-[11px] font-black uppercase tracking-widest" style={{ color: G }}>See it work on your own games</span>
+      </div>
+
+      {status === 'idle' || status === 'error' ? (
+        <>
+          <div className="flex gap-2 mb-2">
+            <input
+              value={usernameInput}
+              onChange={(e) => setUsernameInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') runScout(); }}
+              placeholder="Your chess.com or lichess username"
+              className="flex-1 rounded-xl px-3.5 py-2.5 text-sm outline-none"
+              style={{ background: 'rgba(0,0,0,0.22)', border: '1px solid rgba(255,255,255,0.09)', color: TEXT }}
+            />
+          </div>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex gap-1 p-0.5 rounded-lg" style={{ background: 'rgba(255,255,255,0.04)' }}>
+              {(['chesscom', 'lichess'] as const).map((p) => (
+                <button
+                  key={p}
+                  onClick={() => setPlatform(p)}
+                  className="px-2.5 py-1 rounded-md text-[11px] font-bold transition-colors"
+                  style={platform === p ? { background: G, color: '#000' } : { color: MUTED }}
+                >
+                  {p === 'chesscom' ? 'Chess.com' : 'Lichess'}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={runScout}
+              disabled={!usernameInput.trim()}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-black transition-all disabled:opacity-40"
+              style={{ background: G, color: '#000' }}
+            >
+              <Search className="w-3.5 h-3.5" /> Scout Me
+            </button>
+          </div>
+          {status === 'error' && (
+            <p className="text-[11px]" style={{ color: '#dc4343' }}>{errorMsg}</p>
+          )}
+          <p className="text-[10px]" style={{ color: MUTED }}>Free, no signup needed for this part. Takes a few seconds.</p>
+        </>
+      ) : status === 'loading' ? (
+        <div className="py-8 flex flex-col items-center text-center">
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ duration: 1.2, repeat: Infinity, ease: 'linear' }}
+            className="w-8 h-8 rounded-full mb-4"
+            style={{ border: `3px solid rgba(255,255,255,0.1)`, borderTopColor: G }}
+          />
+          <AnimatePresence mode="wait">
+            <motion.p
+              key={loadingStep}
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              className="text-xs font-bold"
+              style={{ color: TEXT }}
+            >
+              {loadingMessages[loadingStep]}
+            </motion.p>
+          </AnimatePresence>
+        </div>
+      ) : result ? (
+        <div>
+          <div className="mb-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-black" style={{ color: TEXT }}>{result.user.username}</span>
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: 'rgba(255,255,255,0.05)', color: MUTED }}>
+                {result.user.gamesChecked} GAMES CHECKED
+              </span>
+            </div>
+            <WeaknessMiniList side={result.user} />
+          </div>
+
+          {result.opponent && (
+            <div className="mb-4 pt-4" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-black flex items-center gap-1.5" style={{ color: TEXT }}>
+                  <Crosshair className="w-3 h-3" style={{ color: G }} />
+                  Your last opponent: {result.opponent.username}
+                </span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: 'rgba(255,255,255,0.05)', color: MUTED }}>
+                  {result.opponent.gamesChecked} GAMES CHECKED
+                </span>
+              </div>
+              <WeaknessMiniList side={result.opponent} />
+            </div>
+          )}
+
+          <button
+            onClick={onSignup}
+            className="mt-2 w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-black transition-all"
+            style={{ background: G, color: '#000' }}
+          >
+            <UserPlus className="w-4 h-4" />
+            Sign up to unlock the full breakdown
+          </button>
+          <button
+            onClick={() => { setStatus('idle'); setResult(null); setUsernameInput(''); }}
+            className="mt-2 w-full text-center text-[11px] font-bold"
+            style={{ color: MUTED }}
+          >
+            Try another username
+          </button>
+        </div>
+      ) : null}
+    </motion.div>
+  );
+}
+
 export function LandingPage() {
   const [authOpen, setAuthOpen] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'register'>('register');
@@ -784,7 +1004,7 @@ export function LandingPage() {
             >
               <HeroBoard />
               <div className="w-full">
-                <InsightsResultCard delay={0.3} />
+                <QuickScoutDemo onSignup={openSignup} />
               </div>
             </motion.div>
           </div>
@@ -792,7 +1012,7 @@ export function LandingPage() {
           <div className="lg:hidden mt-10 max-w-md mx-auto flex flex-col items-center gap-10">
             <HeroBoard />
             <div className="w-full">
-              <InsightsResultCard delay={0.2} />
+              <QuickScoutDemo onSignup={openSignup} />
             </div>
           </div>
         </div>

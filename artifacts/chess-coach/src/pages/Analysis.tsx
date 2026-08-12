@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { PageHero, PRIMARY_BTN_STYLE, StatReadout, t } from '@/components/DesignSystem';
+import { trackBackgroundJob } from '@/components/BackgroundJobsWatcher';
 import { useLocation } from 'wouter';
 import { useMyAnalysisSummary, useMyWeaknesses } from '@/hooks/use-analysis';
 import { useUser } from '@/hooks/use-user';
@@ -38,6 +39,7 @@ export function Analysis() {
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const pollJob = (jobId: string) => {
+    trackBackgroundJob('analysis', jobId);
     return new Promise<void>((resolve, reject) => {
       intervalRef.current = setInterval(async () => {
         if (!mountedRef.current) {

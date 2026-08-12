@@ -8,6 +8,7 @@ import { motion } from 'framer-motion';
 import { BookOpen, GraduationCap, CheckCircle2, PlayCircle, AlertCircle, Filter, X } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { PremiumGate } from '@/components/PremiumGate';
+import { trackBackgroundJob } from '@/components/BackgroundJobsWatcher';
 import { cn } from '@/lib/utils';
 
 export function Courses() {
@@ -37,6 +38,7 @@ export function Courses() {
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const startPolling = useCallback((jobId: string) => {
+    trackBackgroundJob('courses', jobId);
     if (intervalRef.current) clearInterval(intervalRef.current);
     setIsGenerating(true);
     setGenError(null);

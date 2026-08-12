@@ -1,5 +1,6 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { PageHero } from '@/components/DesignSystem';
+import { trackBackgroundJob } from '@/components/BackgroundJobsWatcher';
 import { useMyCourses } from '@/hooks/use-courses';
 import { useUser } from '@/hooks/use-user';
 import { useQueryClient } from '@tanstack/react-query';
@@ -57,6 +58,7 @@ export function Endgames() {
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const startPolling = useCallback((jobId: string, apiType: string) => {
+    trackBackgroundJob('endgames', jobId);
     if (intervalRef.current) clearInterval(intervalRef.current);
     setGeneratingType(apiType);
     setGenError(null);

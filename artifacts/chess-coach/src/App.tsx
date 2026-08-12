@@ -4,6 +4,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { UserProvider } from "@/context/UserContext";
 import { ImportStatusWatcher } from "@/components/ImportStatusWatcher";
+import { BackgroundJobsWatcher } from "@/components/BackgroundJobsWatcher";
 import { Layout } from "@/components/Layout";
 import { useUser } from "@/hooks/use-user";
 import { useEffect, Component, Suspense, lazy, type ReactNode } from "react";
@@ -276,6 +277,7 @@ function App() {
                 <Router />
               </Suspense>
               <ImportStatusWatcher />
+              <BackgroundJobsWatcher />
             </WouterRouter>
             <Toaster />
           </TooltipProvider>

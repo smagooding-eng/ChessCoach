@@ -7,6 +7,7 @@ import { useUser } from '@/hooks/use-user';
 import { apiFetch } from '@/lib/api';
 import { PremiumGate } from '@/components/PremiumGate';
 import { WaitTipCarousel } from '@/components/WaitTipCarousel';
+import { trackBackgroundJob } from '@/components/BackgroundJobsWatcher';
 import { useEloProgress } from '@/hooks/use-elo-progress';
 
 interface Profile {
@@ -156,6 +157,7 @@ export function OpponentAnalysis() {
   const [loadingHistory, setLoadingHistory] = useState(false);
 
   const pollScoutJob = (jobId: string) => {
+    trackBackgroundJob('opponentScout', jobId);
     return new Promise<OpponentResult>((resolve, reject) => {
       intervalRef.current = setInterval(async () => {
         if (!mountedRef.current) {
@@ -326,6 +328,7 @@ export function OpponentAnalysis() {
         throw new Error((errBody as { error?: string }).error || 'Failed to start course generation');
       }
       const { jobId } = await startRes.json() as { jobId: string };
+      trackBackgroundJob('opponentCourses', jobId);
 
       await new Promise<void>((resolve, reject) => {
         courseIntervalRef.current = setInterval(async () => {

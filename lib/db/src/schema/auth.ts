@@ -53,6 +53,7 @@ export const pageViewsTable = pgTable("page_views", {
   path: varchar("path").notNull(),
   userId: varchar("user_id"),
   visitorId: varchar("visitor_id"),
+  ipAddress: varchar("ip_address"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

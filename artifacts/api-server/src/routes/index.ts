@@ -13,6 +13,7 @@ import storageRouter from "./storage";
 import puzzlesRouter from "./puzzles";
 import growthRouter from "./growth";
 import liveRouter from "./live";
+import publicScoutRouter from "./publicScout";
 import { requirePremium } from "../middlewares/authMiddleware";
 import { db, pageViewsTable } from "@workspace/db";
 
@@ -28,6 +29,7 @@ router.use("/storage", storageRouter);
 router.use(puzzlesRouter);
 router.use(growthRouter);
 router.use(liveRouter);
+router.use(publicScoutRouter);
 
 router.post("/track", async (req: Request, res: Response) => {
   try {
@@ -38,6 +40,7 @@ router.post("/track", async (req: Request, res: Response) => {
       path,
       userId: req.user?.id ?? null,
       visitorId: visitorId || `ip_${ip}`,
+      ipAddress: ip,
     });
     res.json({ ok: true });
   } catch {

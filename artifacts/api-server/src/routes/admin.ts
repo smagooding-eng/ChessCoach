@@ -48,6 +48,19 @@ router.get("/admin/stats", requireAdmin, async (_req: Request, res: Response) =>
     const now = new Date();
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
+    // Admin accounts' own page views shouldn't inflate visitor/traffic
+    // counts — testing across desktop, mobile, and the installed app all
+    // count as separate localStorage-based visitor IDs otherwise.
+    const allUsersForAdminCheck = await db
+      .select({ id: usersTable.id, email: usersTable.email, isAdmin: usersTable.isAdmin })
+      .from(usersTable);
+    const adminIdList = allUsersForAdminCheck
+      .filter((u) => u.isAdmin || (u.email && ADMIN_EMAILS.includes(u.email.toLowerCase())))
+      .map((u) => u.id);
+    const excludeAdmin = adminIdList.length > 0
+      ? sql`(${pageViewsTable.userId} IS NULL OR ${pageViewsTable.userId} NOT IN (${sql.join(adminIdList.map((id) => sql`${id}`), sql`, `)}))`
+      : sql`TRUE`;
+
     const [totalUsersResult] = await db
       .select({ count: count() })
       .from(usersTable);
@@ -59,21 +72,36 @@ router.get("/admin/stats", requireAdmin, async (_req: Request, res: Response) =>
 
     const [totalViewsResult] = await db
       .select({ count: count() })
-      .from(pageViewsTable);
+      .from(pageViewsTable)
+      .where(excludeAdmin);
 
     const [todayViewsResult] = await db
       .select({ count: count() })
       .from(pageViewsTable)
-      .where(gte(pageViewsTable.createdAt, todayStart));
+      .where(and(gte(pageViewsTable.createdAt, todayStart), excludeAdmin));
 
     const [totalUniqueResult] = await db
       .select({ count: countDistinct(pageViewsTable.visitorId) })
-      .from(pageViewsTable);
+      .from(pageViewsTable)
+      .where(excludeAdmin);
 
     const [todayUniqueResult] = await db
       .select({ count: countDistinct(pageViewsTable.visitorId) })
       .from(pageViewsTable)
-      .where(gte(pageViewsTable.createdAt, todayStart));
+      .where(and(gte(pageViewsTable.createdAt, todayStart), excludeAdmin));
+
+    // Cross-check against IP address — localStorage-based visitor IDs
+    // fragment across browsers/devices/incognito for the same real person,
+    // so this tends to run lower and is often the more trustworthy number.
+    const [totalUniqueByIpResult] = await db
+      .select({ count: countDistinct(pageViewsTable.ipAddress) })
+      .from(pageViewsTable)
+      .where(excludeAdmin);
+
+    const [todayUniqueByIpResult] = await db
+      .select({ count: countDistinct(pageViewsTable.ipAddress) })
+      .from(pageViewsTable)
+      .where(and(gte(pageViewsTable.createdAt, todayStart), excludeAdmin));
 
     let subBreakdown = { active: 0, trialing: 0, canceled: 0, pastDue: 0, total: 0 };
     try {
@@ -104,7 +132,7 @@ router.get("/admin/stats", requireAdmin, async (_req: Request, res: Response) =>
       db.select({ count: count() }).from(gamesTable).where(eq(gamesTable.analyzed, true)),
       db.select({ count: count() }).from(backgroundJobsTable).where(eq(backgroundJobsTable.type, 'scout')),
       db.select({ count: countDistinct(backgroundJobsTable.targetUsername) }).from(backgroundJobsTable).where(eq(backgroundJobsTable.type, 'scout')),
-      db.select({ count: count() }).from(pageViewsTable).where(eq(pageViewsTable.path, '/scan')),
+      db.select({ count: count() }).from(pageViewsTable).where(and(eq(pageViewsTable.path, '/scan'), excludeAdmin)),
     ]);
 
     const topPagesRows = await db
@@ -112,15 +140,22 @@ router.get("/admin/stats", requireAdmin, async (_req: Request, res: Response) =>
         path: pageViewsTable.path,
         views: count(),
         uniqueVisitors: countDistinct(pageViewsTable.visitorId),
+        uniqueByIp: countDistinct(pageViewsTable.ipAddress),
       })
       .from(pageViewsTable)
+      .where(excludeAdmin)
       .groupBy(pageViewsTable.path)
       .orderBy(sql`count(*) desc`)
       .limit(20);
 
     res.json({
       pageViews: { total: totalViewsResult.count, today: todayViewsResult.count },
-      uniqueVisitors: { total: totalUniqueResult.count, today: todayUniqueResult.count },
+      uniqueVisitors: {
+        total: totalUniqueResult.count,
+        today: todayUniqueResult.count,
+        totalByIp: totalUniqueByIpResult.count,
+        todayByIp: todayUniqueByIpResult.count,
+      },
       users: { total: totalUsersResult.count, today: todayUsersResult.count },
       subscriptions: subBreakdown,
       games: {
@@ -137,6 +172,7 @@ router.get("/admin/stats", requireAdmin, async (_req: Request, res: Response) =>
         path: r.path,
         views: r.views,
         uniqueVisitors: r.uniqueVisitors,
+        uniqueByIp: r.uniqueByIp,
       })),
     });
   } catch (err: any) {
