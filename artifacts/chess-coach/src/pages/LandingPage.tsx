@@ -201,7 +201,7 @@ function passwordChecks(pwd: string): PwdCheck[] {
   ];
 }
 
-function AuthModal({ open, onClose, initialMode, externalError }: { open: boolean; onClose: () => void; initialMode: 'login' | 'register'; externalError?: string }) {
+function AuthModal({ open, onClose, initialMode, externalError, onRegisterSuccess }: { open: boolean; onClose: () => void; initialMode: 'login' | 'register'; externalError?: string; onRegisterSuccess: (username: string | null, platform: 'chesscom' | 'lichess') => void }) {
   const [mode, setMode] = useState<'login' | 'register'>(initialMode);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -211,7 +211,6 @@ function AuthModal({ open, onClose, initialMode, externalError }: { open: boolea
   const [lichessUsername, setLichessUsername] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState(externalError || '');
-  const [onboarding, setOnboarding] = useState<{ username: string; platform: 'chesscom' | 'lichess' } | null>(null);
   const [emailTouched, setEmailTouched] = useState(false);
 
   useEffect(() => { setMode(initialMode); }, [initialMode]);
@@ -276,10 +275,11 @@ function AuthModal({ open, onClose, initialMode, externalError }: { open: boolea
       localStorage.removeItem('chessscout_ref');
       if (data.user?.chesscomUsername) login(data.user.chesscomUsername);
       await refreshAuth();
-      if (mode === 'register' && data.user?.chesscomUsername) {
-        setOnboarding({ username: data.user.chesscomUsername, platform: 'chesscom' });
-      } else if (mode === 'register' && data.user?.lichessUsername) {
-        setOnboarding({ username: data.user.lichessUsername, platform: 'lichess' });
+      if (mode === 'register') {
+        onRegisterSuccess(
+          data.user?.chesscomUsername || data.user?.lichessUsername || null,
+          data.user?.chesscomUsername ? 'chesscom' : 'lichess',
+        );
       } else {
         setLocation('/');
       }
@@ -302,16 +302,6 @@ function AuthModal({ open, onClose, initialMode, externalError }: { open: boolea
     document.addEventListener('keydown', handleKey);
     return () => document.removeEventListener('keydown', handleKey);
   }, [open, onClose]);
-
-  if (onboarding) {
-    return (
-      <OnboardingStartModal
-        username={onboarding.username}
-        platform={onboarding.platform}
-        onDone={() => { setOnboarding(null); onClose(); }}
-      />
-    );
-  }
 
   if (!open) return null;
 
@@ -887,6 +877,7 @@ export function LandingPage() {
   const [oauthError, setOauthError] = useState('');
   const { isAuthenticated, isAuthLoading } = useUser();
   const [, setLocation] = useLocation();
+  const [onboarding, setOnboarding] = useState<{ username: string | null; platform: 'chesscom' | 'lichess' } | null>(null);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -906,10 +897,16 @@ export function LandingPage() {
   }, []);
 
   useEffect(() => {
+    // Skip the auto-redirect while the onboarding modal is showing — a
+    // fresh registration flips isAuthenticated to true, and without this
+    // check this effect would fire and navigate away before the modal
+    // (which lives in this same component now) ever gets a chance to
+    // render, silently swallowing the whole onboarding flow.
+    if (onboarding) return;
     if (!isAuthLoading && isAuthenticated) {
       setLocation('/');
     }
-  }, [isAuthLoading, isAuthenticated, setLocation]);
+  }, [isAuthLoading, isAuthenticated, setLocation, onboarding]);
 
   const openSignup = () => { setAuthMode('register'); setAuthOpen(true); };
   const openLogin = () => { setAuthMode('login'); setAuthOpen(true); };
@@ -1265,7 +1262,20 @@ export function LandingPage() {
         </button>
       </div>
 
-      <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} initialMode={authMode} externalError={oauthError} />
+      <AuthModal
+        open={authOpen}
+        onClose={() => setAuthOpen(false)}
+        initialMode={authMode}
+        externalError={oauthError}
+        onRegisterSuccess={(username, platform) => { setAuthOpen(false); setOnboarding({ username, platform }); }}
+      />
+      {onboarding && (
+        <OnboardingStartModal
+          username={onboarding.username}
+          platform={onboarding.platform}
+          onDone={() => setOnboarding(null)}
+        />
+      )}
     </div>
   );
 }
