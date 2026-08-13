@@ -494,7 +494,7 @@ export function CourseDetail() {
   const progress = Math.round((course.completedLessons / course.totalLessons) * 100) || 0;
 
   return (
-    <div className="pb-20 max-w-4xl mx-auto space-y-2 md:space-y-4 px-3 md:px-0">
+    <div className="pb-20 max-w-7xl mx-auto space-y-2 md:space-y-4 px-3 md:px-0">
       {/* Compact back + course info header */}
       <div className="flex items-center gap-2 md:gap-3">
         <Link href="/courses" className="p-2 rounded-xl hover:bg-white/10 transition-colors text-white/50 hover:text-white">
@@ -641,37 +641,42 @@ export function CourseDetail() {
                 </div>
 
                 {/* Board (sticky on wide screens) + lesson content side by side */}
-                {/* Interactive board — sticky so it stays visible while scrolling to read the lesson text below, without shrinking to make room for a side column */}
-                {lesson && (
-                  <div className="sticky top-2 z-10">
-                    <LessonBoardPlayer
-                      pgn={lesson.examplePgn || lesson.drillFen || 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'}
-                      fixPgn={lesson.fixExamplePgn ?? null}
-                      showFixLine={showFixLine}
-                      title={lesson.title}
-                      drillFen={lesson.drillFen ?? null}
-                      drillExpectedMove={lesson.drillExpectedMove ?? null}
-                      drillHint={lesson.drillHint ?? null}
-                      content={lesson.content ?? null}
-                      extraChallenges={lesson.extraChallenges ?? null}
-                      conceptTitle={lesson.conceptTitle ?? null}
-                    />
-                  </div>
-                )}
+                <div className="xl:grid xl:grid-cols-[1fr_520px] xl:gap-5 xl:items-start">
+                  {/* Step-by-step lesson text with TTS — left column, scrolls independently at wide screens so the board never has to move */}
+                  {lesson && lesson.content && (
+                    <div
+                      className="rounded-xl p-3 md:p-4 mt-2 md:mt-3 xl:mt-0 order-2 xl:order-1 xl:max-h-[85vh] xl:overflow-y-auto"
+                      style={{ backgroundColor: BG_DARK }}
+                    >
+                      <LessonContentStepper
+                        key={lesson.id}
+                        content={lesson.content}
+                        lessonId={lesson.id}
+                        courseCategory={course?.category ?? ''}
+                        conceptTitle={lesson.conceptTitle}
+                        onStepChange={(stepText) => setShowFixLine(/##\s*The Fix/i.test(stepText))}
+                      />
+                    </div>
+                  )}
 
-                {/* Step-by-step lesson text with TTS */}
-                {lesson && lesson.content && (
-                  <div className="rounded-xl p-3 md:p-4 mt-2 md:mt-3" style={{ backgroundColor: BG_DARK }}>
-                    <LessonContentStepper
-                      key={lesson.id}
-                      content={lesson.content}
-                      lessonId={lesson.id}
-                      courseCategory={course?.category ?? ''}
-                      conceptTitle={lesson.conceptTitle}
-                      onStepChange={(stepText) => setShowFixLine(/##\s*The Fix/i.test(stepText))}
-                    />
-                  </div>
-                )}
+                  {/* Interactive board — right column at wide screens, kept at full natural size */}
+                  {lesson && (
+                    <div className="order-1 xl:order-2">
+                      <LessonBoardPlayer
+                        pgn={lesson.examplePgn || lesson.drillFen || 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'}
+                        fixPgn={lesson.fixExamplePgn ?? null}
+                        showFixLine={showFixLine}
+                        title={lesson.title}
+                        drillFen={lesson.drillFen ?? null}
+                        drillExpectedMove={lesson.drillExpectedMove ?? null}
+                        drillHint={lesson.drillHint ?? null}
+                        content={lesson.content ?? null}
+                        extraChallenges={lesson.extraChallenges ?? null}
+                        conceptTitle={lesson.conceptTitle ?? null}
+                      />
+                    </div>
+                  )}
+                </div>
 
                 {/* Navigation footer */}
                 <div className="mt-5 pt-4 flex flex-col gap-3" style={{ borderTop: '1px solid rgba(255,255,255,0.08)' }}>
