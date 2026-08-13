@@ -1234,7 +1234,7 @@ function reconstructPgnFromGames(lesson: CourseLesson, gamePgns: string[]): { pg
   return null;
 }
 
-function validateAndFixPgn(lesson: CourseLesson, gamePgns?: string[]): { pgn: string; fixPgn?: string; drillFen?: string } {
+function validateAndFixPgn(lesson: CourseLesson, gamePgns?: string[], fallbackPgn?: string): { pgn: string; fixPgn?: string; drillFen?: string } {
   const Chess = require("chess.js").Chess;
 
   if (gamePgns && gamePgns.length > 0) {
@@ -1327,14 +1327,14 @@ function validateAndFixPgn(lesson: CourseLesson, gamePgns?: string[]): { pgn: st
     } catch {}
   }
 
-  return { pgn: "1. e4 {White opens with the most popular first move.} e5 {Black mirrors, contesting the center.} 2. Nf3 {Developing a knight toward the center.} Nc6 {Defending the e5 pawn.} *" };
+  return { pgn: fallbackPgn ?? "1. e4 {White opens with the most popular first move.} e5 {Black mirrors, contesting the center.} 2. Nf3 {Developing a knight toward the center.} Nc6 {Defending the e5 pawn.} *" };
 }
 
-function ensureAllLessonsHavePgn(course: CourseOutput, gamePgns?: string[]): CourseOutput {
+function ensureAllLessonsHavePgn(course: CourseOutput, gamePgns?: string[], fallbackPgn?: string): CourseOutput {
   return {
     ...course,
     lessons: course.lessons.map(lesson => {
-      const result = validateAndFixPgn(lesson, gamePgns);
+      const result = validateAndFixPgn(lesson, gamePgns, fallbackPgn);
       return {
         ...lesson,
         examplePgn: result.pgn,
@@ -1709,6 +1709,37 @@ export async function findTeachableMistakes(
   return candidates.slice(0, maxResults);
 }
 
+/** Deterministic, fact-based description of what a move accomplishes —
+ * never an evaluative "this is objectively best" claim (which could be
+ * wrong), just an observable description (develops a piece, controls the
+ * center, captures material, etc.). No GPT call, no hallucination risk. */
+function describeMoveDeterministically(san: string, move: { piece: string; from: string; to: string; captured?: string; flags: string }): string {
+  const centralSquares = new Set(['d4', 'd5', 'e4', 'e5']);
+  const pieceNames: Record<string, string> = { p: 'pawn', n: 'knight', b: 'bishop', r: 'rook', q: 'queen', k: 'king' };
+  const pieceName = pieceNames[move.piece.toLowerCase()] ?? 'piece';
+  const flags = typeof move.flags === 'string' ? move.flags : '';
+
+  if (flags.includes('k') || flags.includes('q')) {
+    return 'Castles, tucking the king away and connecting the rooks.';
+  }
+  if (move.captured) {
+    return `Captures the ${pieceNames[move.captured.toLowerCase()] ?? 'piece'} on ${move.to}.`;
+  }
+  if (san.includes('+')) {
+    return 'Gives check, forcing an immediate response.';
+  }
+  if (move.piece.toLowerCase() === 'p' && centralSquares.has(move.to)) {
+    return 'Stakes a claim in the center with a pawn.';
+  }
+  if ((move.piece.toLowerCase() === 'n' || move.piece.toLowerCase() === 'b') && ['1', '8'].includes(move.from[1])) {
+    return `Develops the ${pieceName} off the back rank.`;
+  }
+  if (move.piece.toLowerCase() === 'q' && ['1', '8'].includes(move.from[1])) {
+    return 'Brings the queen into play.';
+  }
+  return `Continues development with the ${pieceName}.`;
+}
+
 /** Deterministically build the PGN context around a real mistake — no GPT involved. */
 function buildContextPgn(mistake: TeachableMistake, useBestMove: boolean): string {
   const Chess = require("chess.js").Chess;
@@ -1726,13 +1757,21 @@ function buildContextPgn(mistake: TeachableMistake, useBestMove: boolean): strin
     tokens.push(`${bestSan} {[FIX] ${bestSan} is the engine's preferred move here.}`);
     for (let i = 1; i < mistake.bestLineSan.length && i < 5; i++) {
       const san = mistake.bestLineSan[i];
-      try { replay.move(san); tokens.push(san); } catch { break; }
+      try {
+        const moveResult = replay.move(san);
+        const desc = describeMoveDeterministically(san, moveResult);
+        tokens.push(`${san} {${desc}}`);
+      } catch { break; }
     }
   } else {
     try { replay.move(mistake.sanPlayed); } catch { return `[FEN "${mistake.fenBeforeMistake}"]\n\n*`; }
     tokens.push(`${mistake.sanPlayed} {[MISTAKE] This is the move being reviewed.}`);
     for (const san of mistake.consequenceSan) {
-      try { replay.move(san); tokens.push(san); } catch { break; }
+      try {
+        const moveResult = replay.move(san);
+        const desc = describeMoveDeterministically(san, moveResult);
+        tokens.push(`${san} {${desc}}`);
+      } catch { break; }
     }
   }
 
@@ -2212,6 +2251,12 @@ export async function generateEndgameCourse(
   return generateEndgameCourseLLM(type, playerRating, gamePgns);
 }
 
+// A minimal, verified King+Pawn-vs-King position — used only as the very
+// last-resort fallback when an endgame lesson's generated position fails
+// all validation. Guarantees the board shown is always a genuine endgame
+// position, never a generic opening sequence, even in the worst case.
+const ENDGAME_FALLBACK_PGN = '[FEN "8/8/8/4k3/4P3/4K3/8/8 w - - 0 1"]\n\n*';
+
 async function generateEndgameCourseLLM(
   type: EndgameType,
   playerRating?: number,
@@ -2349,7 +2394,7 @@ Respond with valid JSON:
 
     const content = response.choices[0]?.message?.content ?? "{}";
     const parsed = JSON.parse(content) as CourseOutput;
-    return ensureAllLessonsHavePgn(parsed, gamePgns);
+    return ensureAllLessonsHavePgn(parsed, gamePgns, ENDGAME_FALLBACK_PGN);
   } catch (err) {
     logger.error({ err, type }, "Failed to generate endgame course");
     throw err;

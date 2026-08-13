@@ -1160,63 +1160,72 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
           )}
 
           {/* Controls */}
-          <div className="flex items-center justify-center gap-0.5 md:gap-1 px-2 py-2 md:px-4 md:py-3">
-            <button
-              onClick={() => { setIsPlaying(false); go(0); }}
-              disabled={isFirst}
-              className="p-2 md:p-2.5 rounded-xl text-white/50 hover:text-white hover:bg-white/10 transition-all disabled:opacity-20"
-            >
-              <SkipBack className="w-3.5 h-3.5 md:w-4 md:h-4" />
-            </button>
-            <button
-              onClick={() => go(currentStep - 1)}
-              disabled={isFirst}
-              className="p-2 md:p-2.5 rounded-xl text-white/50 hover:text-white hover:bg-white/10 transition-all disabled:opacity-20"
-            >
-              <ChevronLeft className="w-4 h-4 md:w-5 md:h-5" />
-            </button>
-            <button
-              onClick={() => {
-                if (isPlaying) { setIsPlaying(false); }
-                else if (isLast) { go(currentStep + 1); }
-                else { setIsPlaying(true); }
-              }}
-              className="flex items-center gap-1.5 md:gap-2 px-5 md:px-8 py-2 md:py-2.5 rounded-xl text-white font-bold text-sm transition-all hover:brightness-110 shadow-lg mx-1 md:mx-2"
-              style={{ backgroundColor: CHESSCOM_GREEN }}
-            >
-              {isPlaying ? (
-                <><Pause className="w-4 h-4" /> <span className="hidden md:inline">Pause</span></>
-              ) : isLast ? (
-                <><CheckCircle2 className="w-4 h-4" /> <span className="hidden md:inline">Done</span></>
-              ) : (
-                <><Play className="w-4 h-4" /> <span className="hidden md:inline">{currentStep === 0 ? 'Play' : 'Next'}</span></>
-              )}
-            </button>
+          <div className="flex flex-col items-center gap-2 px-2 py-3 md:px-4">
+            <div className="flex items-center justify-center gap-2 md:gap-3">
+              <div className="flex items-center rounded-full p-0.5" style={{ background: 'rgba(255,255,255,0.05)' }}>
+                <button
+                  onClick={() => { setIsPlaying(false); go(0); }}
+                  disabled={isFirst}
+                  className="p-2 md:p-2.5 rounded-full text-white/50 hover:text-white hover:bg-white/10 transition-all disabled:opacity-20"
+                >
+                  <SkipBack className="w-3.5 h-3.5 md:w-4 md:h-4" />
+                </button>
+                <button
+                  onClick={() => go(currentStep - 1)}
+                  disabled={isFirst}
+                  className="p-2 md:p-2.5 rounded-full text-white/50 hover:text-white hover:bg-white/10 transition-all disabled:opacity-20"
+                >
+                  <ChevronLeft className="w-4 h-4 md:w-5 md:h-5" />
+                </button>
+              </div>
+
+              <button
+                onClick={() => {
+                  if (isPlaying) { setIsPlaying(false); }
+                  else if (isLast) { go(currentStep + 1); }
+                  else { setIsPlaying(true); }
+                }}
+                className="flex items-center gap-1.5 md:gap-2 px-6 md:px-9 py-2.5 md:py-3 rounded-full text-white font-bold text-sm transition-all hover:brightness-110 shadow-lg"
+                style={{ backgroundColor: CHESSCOM_GREEN }}
+              >
+                {isPlaying ? (
+                  <><Pause className="w-4 h-4" /> <span className="hidden md:inline">Pause</span></>
+                ) : isLast ? (
+                  <><CheckCircle2 className="w-4 h-4" /> <span className="hidden md:inline">Done</span></>
+                ) : (
+                  <><Play className="w-4 h-4" /> <span className="hidden md:inline">{currentStep === 0 ? 'Play' : 'Next'}</span></>
+                )}
+              </button>
+
+              <div className="flex items-center rounded-full p-0.5" style={{ background: 'rgba(255,255,255,0.05)' }}>
+                <button
+                  onClick={() => go(currentStep + 1)}
+                  disabled={isLast}
+                  className="p-2 md:p-2.5 rounded-full text-white/50 hover:text-white hover:bg-white/10 transition-all disabled:opacity-20"
+                >
+                  <ChevronRight className="w-4 h-4 md:w-5 md:h-5" />
+                </button>
+                <button
+                  onClick={() => { setIsPlaying(false); go(totalSteps - 1); }}
+                  disabled={isLast}
+                  className="p-2 md:p-2.5 rounded-full text-white/50 hover:text-white hover:bg-white/10 transition-all disabled:opacity-20"
+                >
+                  <SkipForward className="w-3.5 h-3.5 md:w-4 md:h-4" />
+                </button>
+              </div>
+            </div>
+
             {mistakeIdx > 0 && currentStep < mistakeIdx && (
               <button
                 onClick={() => go(mistakeIdx)}
-                className="flex items-center gap-1 px-2 md:px-3 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap"
-                style={{ color: MISTAKE_RED, backgroundColor: 'rgba(220,67,67,0.12)' }}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all"
+                style={{ color: MISTAKE_RED, backgroundColor: 'rgba(220,67,67,0.12)', border: '1px solid rgba(220,67,67,0.25)' }}
                 title="Jump to mistake"
               >
                 <AlertTriangle className="w-3.5 h-3.5" />
-                <span className="hidden md:inline">Key Moment</span>
+                Jump to key moment
               </button>
             )}
-            <button
-              onClick={() => go(currentStep + 1)}
-              disabled={isLast}
-              className="p-2 md:p-2.5 rounded-xl text-white/50 hover:text-white hover:bg-white/10 transition-all disabled:opacity-20"
-            >
-              <ChevronRight className="w-4 h-4 md:w-5 md:h-5" />
-            </button>
-            <button
-              onClick={() => { setIsPlaying(false); go(totalSteps - 1); }}
-              disabled={isLast}
-              className="p-2 md:p-2.5 rounded-xl text-white/50 hover:text-white hover:bg-white/10 transition-all disabled:opacity-20"
-            >
-              <SkipForward className="w-3.5 h-3.5 md:w-4 md:h-4" />
-            </button>
           </div>
 
           {currentStep > 0 && steps[currentStep]?.fen && (
