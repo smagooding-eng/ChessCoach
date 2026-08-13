@@ -3,6 +3,7 @@ import { useUser } from '@/hooks/use-user';
 import { useLocation } from 'wouter';
 import { ArrowRight, Mail, Eye, EyeOff, UserPlus, LogIn, Search, BarChart3, Brain, TrendingUp, Check, X, Zap, Target, Crosshair, BookOpen, Gamepad2, Users, Star, Flame, Trophy, Sparkles, Download as DownloadIcon, Smartphone, Share2 } from 'lucide-react';
 import { encodeReport } from '@/pages/ScoutShare';
+import { OnboardingStartModal } from '@/components/OnboardingStartModal';
 import { motion, AnimatePresence } from 'framer-motion';
 import { apiFetch, apiUrl, setAuthToken } from '@/lib/api';
 
@@ -210,6 +211,7 @@ function AuthModal({ open, onClose, initialMode, externalError }: { open: boolea
   const [lichessUsername, setLichessUsername] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState(externalError || '');
+  const [onboarding, setOnboarding] = useState<{ username: string; platform: 'chesscom' | 'lichess' } | null>(null);
   const [emailTouched, setEmailTouched] = useState(false);
 
   useEffect(() => { setMode(initialMode); }, [initialMode]);
@@ -274,7 +276,13 @@ function AuthModal({ open, onClose, initialMode, externalError }: { open: boolea
       localStorage.removeItem('chessscout_ref');
       if (data.user?.chesscomUsername) login(data.user.chesscomUsername);
       await refreshAuth();
-      setLocation('/');
+      if (mode === 'register' && data.user?.chesscomUsername) {
+        setOnboarding({ username: data.user.chesscomUsername, platform: 'chesscom' });
+      } else if (mode === 'register' && data.user?.lichessUsername) {
+        setOnboarding({ username: data.user.lichessUsername, platform: 'lichess' });
+      } else {
+        setLocation('/');
+      }
     } catch {
       setError('Connection error. Please try again.');
     } finally {
@@ -294,6 +302,16 @@ function AuthModal({ open, onClose, initialMode, externalError }: { open: boolea
     document.addEventListener('keydown', handleKey);
     return () => document.removeEventListener('keydown', handleKey);
   }, [open, onClose]);
+
+  if (onboarding) {
+    return (
+      <OnboardingStartModal
+        username={onboarding.username}
+        platform={onboarding.platform}
+        onDone={() => { setOnboarding(null); onClose(); }}
+      />
+    );
+  }
 
   if (!open) return null;
 

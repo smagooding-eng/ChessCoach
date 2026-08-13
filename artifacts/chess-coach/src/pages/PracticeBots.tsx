@@ -9,6 +9,8 @@ import { AICoachCard, type AICoachTone } from '@/components/AICoachCard';
 import { ArrowLeft, RotateCcw, Flag, Clock, Trophy, Swords, Zap, ChevronRight, ChevronDown, ChevronUp, BookOpen, Check, X, Lightbulb } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
+import { apiFetch } from '@/lib/api';
+import { useLocation } from 'wouter';
 
 const QUALITY_TO_TONE: Record<string, AICoachTone> = {
   checkmate: 'gold',
@@ -164,7 +166,7 @@ function BotCard({ bot, onSelect }: { bot: BotConfig; onSelect: (b: BotConfig) =
   );
 }
 
-function GameView({ bot, onBack, startFen, startColor }: { bot: BotConfig; onBack: () => void; startFen?: string; startColor?: 'w' | 'b' }) {
+function GameView({ bot, onBack, startFen, startColor, isOnboarding }: { bot: BotConfig; onBack: () => void; startFen?: string; startColor?: 'w' | 'b'; isOnboarding?: boolean }) {
   const [playerColor, setPlayerColor] = useState<'w' | 'b'>(() => {
     if (startColor) return startColor;
     if (startFen) {
@@ -178,6 +180,23 @@ function GameView({ bot, onBack, startFen, startColor }: { bot: BotConfig; onBac
   const [result, setResult] = useState<GameResult>('playing');
   const [moves, setMoves] = useState<MoveRecord[]>([]);
   const [thinking, setThinking] = useState(false);
+  const [, navigate] = useLocation();
+  const [seededRating, setSeededRating] = useState<number | null>(null);
+  const seedRequestedRef = useRef(false);
+
+  useEffect(() => {
+    if (!isOnboarding || result === 'playing' || seedRequestedRef.current) return;
+    seedRequestedRef.current = true;
+    const outcome = result === 'win' ? 'win' : result === 'loss' ? 'loss' : 'draw';
+    apiFetch('/api/live/onboarding-seed', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ outcome }),
+    })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data?.rating) setSeededRating(data.rating); })
+      .catch(() => {});
+  }, [isOnboarding, result]);
   const [elapsedSec, setElapsedSec] = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const botTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -359,10 +378,19 @@ function GameView({ bot, onBack, startFen, startColor }: { bot: BotConfig; onBac
 
   return (
     <div className="space-y-3 pb-20 px-4 pt-4 md:px-0 md:pt-0">
-      <button onClick={onBack}
-        className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors text-sm">
-        <ArrowLeft className="w-4 h-4" /> All Bots
-      </button>
+      {isOnboarding ? (
+        <div className="rounded-xl p-3 flex items-center gap-2.5" style={{ background: 'rgba(129,182,76,0.08)', border: '1px solid rgba(129,182,76,0.2)' }}>
+          <div className="w-2 h-2 rounded-full shrink-0 animate-pulse" style={{ background: '#81b64c' }} />
+          <p className="text-xs text-muted-foreground">
+            We're pulling your last 20 games and running a full analysis in the background. Play this quick game against Mia while you wait — it sets your starting Scout ELO.
+          </p>
+        </div>
+      ) : (
+        <button onClick={onBack}
+          className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors text-sm">
+          <ArrowLeft className="w-4 h-4" /> All Bots
+        </button>
+      )}
 
       <div className="grid grid-cols-1 xl:grid-cols-[1fr_340px] gap-4">
         <div className="space-y-2.5">
@@ -514,6 +542,33 @@ function GameView({ bot, onBack, startFen, startColor }: { bot: BotConfig; onBac
                 <p className="text-xs text-muted-foreground">
                   vs {bot.name} ({bot.rating}) · {moves.length} moves · {formatTime(elapsedSec)}
                 </p>
+                {isOnboarding ? (
+                  <div className="pt-2 space-y-3">
+                    {seededRating ? (
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="rounded-xl p-4"
+                        style={{ background: 'rgba(129,182,76,0.1)', border: '1px solid rgba(129,182,76,0.25)' }}
+                      >
+                        <p className="text-xs font-semibold text-muted-foreground mb-1">Your starting Scout ELO</p>
+                        <p className="text-3xl font-black" style={{ color: '#81b64c' }}>{seededRating}</p>
+                      </motion.div>
+                    ) : (
+                      <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground py-2">
+                        <div className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                        Calculating your starting ELO...
+                      </div>
+                    )}
+                    <button
+                      onClick={() => navigate('/analysis')}
+                      disabled={!seededRating}
+                      className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-[#81b64c] text-white text-sm font-bold hover:opacity-90 transition-opacity disabled:opacity-50"
+                    >
+                      View My Game Analysis <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
                 <div className="flex gap-2 justify-center flex-wrap">
                   <button onClick={() => handleNewGame('w')}
                     className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#f0d9b5] text-[#2d2d2d] text-xs font-bold hover:opacity-90 transition-opacity">
@@ -524,6 +579,7 @@ function GameView({ bot, onBack, startFen, startColor }: { bot: BotConfig; onBac
                     <RotateCcw className="w-3 h-3" /> Play as Black
                   </button>
                 </div>
+                )}
               </motion.div>
             )}
           </AnimatePresence>
@@ -866,16 +922,22 @@ function readJumpInParams(): { fen: string; rating: number; color?: 'w' | 'b' } 
   return { fen, rating: rating ? parseInt(rating, 10) : 1200, color: color === 'w' || color === 'b' ? color : undefined };
 }
 
+function readOnboardingParam(): boolean {
+  return new URLSearchParams(window.location.search).get('onboarding') === 'true';
+}
+
 export function PracticeBots() {
   const [jumpIn] = useState(readJumpInParams);
+  const [isOnboarding] = useState(readOnboardingParam);
   const [selectedBot, setSelectedBot] = useState<BotConfig | null>(() =>
-    jumpIn ? findBotAboveRating(jumpIn.rating) : null
+    isOnboarding ? (BOTS.find(b => b.rating === 1200) ?? null) : jumpIn ? findBotAboveRating(jumpIn.rating) : null
   );
   const [selectedOpening, setSelectedOpening] = useState<OpeningLine | null>(null);
   const [tab, setTab] = useState<'bots' | 'openings'>('bots');
 
-  // Strip the ?fen=&rating=&color= params from the URL exactly once, after
-  // mount — not as a side effect inside the useState initializer above.
+  // Strip the ?fen=&rating=&color=&onboarding= params from the URL exactly
+  // once, after mount — not as a side effect inside the useState
+  // initializer above.
   // React.lazy + Suspense (used for route-level code splitting) doesn't
   // guarantee a component's initial render only happens once while its
   // chunk is loading; if the initializer both reads AND mutates the URL,
@@ -885,11 +947,11 @@ export function PracticeBots() {
   useEffect(() => {
     if (strippedUrlRef.current) return;
     strippedUrlRef.current = true;
-    if (jumpIn) window.history.replaceState({}, '', window.location.pathname);
-  }, [jumpIn]);
+    if (jumpIn || isOnboarding) window.history.replaceState({}, '', window.location.pathname);
+  }, [jumpIn, isOnboarding]);
 
   if (selectedBot) {
-    return <GameView bot={selectedBot} onBack={() => setSelectedBot(null)} startFen={jumpIn?.fen} startColor={jumpIn?.color} />;
+    return <GameView bot={selectedBot} onBack={() => setSelectedBot(null)} startFen={jumpIn?.fen} startColor={jumpIn?.color} isOnboarding={isOnboarding} />;
   }
 
   if (selectedOpening) {

@@ -326,6 +326,26 @@ async function seedRatingFromImports(userId: string, tc: TimeControlId): Promise
   return { rating: 1200, rd: 350, vol: DEFAULT_RATING.vol, gamesPlayed: 0 };
 }
 
+/**
+ * Seeds a new user's initial rating from the outcome of the onboarding
+ * practice-bot game (played against the 1200-rated bot), for users who
+ * don't yet have imported game history to seed from. Only applies if no
+ * real rating exists yet — never overwrites an established one. Uses a
+ * modest adjustment (not import-level confidence) and doesn't count as a
+ * played game, matching the same convention as import-based seeding.
+ */
+export async function seedRatingFromOnboardingGame(userId: string, outcome: 'win' | 'loss' | 'draw'): Promise<number> {
+  const delta = outcome === 'win' ? 80 : outcome === 'loss' ? -80 : 0;
+  const seeded = Math.max(600, Math.min(2400, 1200 + delta));
+
+  for (const tc of Object.keys(TIME_CONTROLS) as TimeControlId[]) {
+    const existing = await loadUserRating(userId, tc);
+    if (existing.gamesPlayed > 0) continue; // never overwrite an established rating
+    await saveUserRating(userId, tc, seeded, 300, DEFAULT_RATING.vol, 0);
+  }
+  return seeded;
+}
+
 function generateGameId() { return crypto.randomBytes(8).toString('hex'); }
 
 async function createGame(white: Player, black: Player, tc: TimeControlSpec, mode: Mode): Promise<LiveGame> {

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useLocation } from 'wouter';
 import { useUser } from '@/hooks/use-user';
 import { apiFetch } from '@/lib/api';
+import { OnboardingStartModal } from '@/components/OnboardingStartModal';
 
 const CHESSCOM_GREEN = '#81b64c';
 const BG_DARK = '#262421';
@@ -17,6 +18,7 @@ export function Welcome() {
   const [lichess, setLichess] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [onboarding, setOnboarding] = useState<{ username: string; platform: 'chesscom' | 'lichess' } | null>(null);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,7 +43,7 @@ export function Welcome() {
       if (!res.ok) throw new Error('Failed to save');
       if (cc) login(cc);
       await refreshAuth();
-      navigate('/', { replace: true } as never);
+      setOnboarding({ username: cc || lc, platform: cc ? 'chesscom' : 'lichess' });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save');
     } finally {
@@ -125,6 +127,14 @@ export function Welcome() {
           </button>
         </form>
       </div>
+
+      {onboarding && (
+        <OnboardingStartModal
+          username={onboarding.username}
+          platform={onboarding.platform}
+          onDone={() => setOnboarding(null)}
+        />
+      )}
     </div>
   );
 }

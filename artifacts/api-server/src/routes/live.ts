@@ -1,11 +1,25 @@
 import { Router, type IRouter, type Request, type Response } from 'express';
 import { requireAuth } from '../middlewares/authMiddleware';
-import { getUserRatings, listTimeControls, getActiveGameForUser, getUserLiveHistory } from '../lib/liveServer';
+import { getUserRatings, listTimeControls, getActiveGameForUser, getUserLiveHistory, seedRatingFromOnboardingGame } from '../lib/liveServer';
 
 const router: IRouter = Router();
 
 router.get('/live/time-controls', (_req: Request, res: Response) => {
   res.json({ timeControls: listTimeControls() });
+});
+
+router.post('/live/onboarding-seed', requireAuth, async (req: Request, res: Response) => {
+  const outcome = req.body?.outcome;
+  if (outcome !== 'win' && outcome !== 'loss' && outcome !== 'draw') {
+    res.status(400).json({ error: "outcome must be 'win', 'loss', or 'draw'" });
+    return;
+  }
+  try {
+    const rating = await seedRatingFromOnboardingGame(req.user!.id, outcome);
+    res.json({ rating });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to seed rating' });
+  }
 });
 
 router.get('/live/ratings', requireAuth, async (req: Request, res: Response) => {
