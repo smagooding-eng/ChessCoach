@@ -11,7 +11,6 @@ import { useUser } from '@/hooks/use-user';
 import { useChessPlayer } from '@/hooks/use-chess-player';
 import { useMultiEloProgress } from '@/hooks/use-elo-progress';
 import { useLiveRatings, bestLiveRating } from '@/hooks/use-live-ratings';
-import { ImportPromptModal } from '@/components/ImportPromptModal';
 import { EmailVerifyBanner } from '@/components/EmailVerifyBanner';
 import { CHESSCOM_GREEN, BRASS, TEXT_LIGHT, TEXT_MUTED, t, PieceTile } from '@/components/DesignSystem';
 import { ReferralCard } from '@/pages/Profile';
@@ -84,7 +83,6 @@ export function Dashboard() {
 
   return (
     <div className="space-y-4 md:space-y-5">
-      <ImportPromptModal />
       <EmailVerifyBanner />
 
       <div
