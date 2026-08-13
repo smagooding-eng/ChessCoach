@@ -166,6 +166,16 @@ export function Courses() {
     setFilterStatus('all');
   };
 
+  const archiveCourse = async (courseId: number) => {
+    try {
+      const res = await apiFetch(`/api/courses/${courseId}/archive`, { method: 'PATCH' });
+      if (res.ok) {
+        queryClient.invalidateQueries({ queryKey: ['/api/courses'] });
+        refetch();
+      }
+    } catch { /* course stays visible, user can retry */ }
+  };
+
   if (isLoading) return (
     <div className="flex justify-center py-20">
       <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
@@ -302,10 +312,19 @@ export function Courses() {
                   </div>
                 </div>
 
-                <Link href={`/courses/${course.id}`} className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl font-bold transition-all
-                  ${isComplete ? 'bg-secondary text-foreground hover:bg-secondary/80' : 'bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground'}`}>
-                  {isComplete ? 'Review Course' : <><PlayCircle className="w-5 h-5" /> Continue Learning</>}
-                </Link>
+                <div className="flex gap-2">
+                  <Link href={`/courses/${course.id}`} className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold transition-all
+                    ${isComplete ? 'bg-secondary text-foreground hover:bg-secondary/80' : 'bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground'}`}>
+                    {isComplete ? 'Review Course' : <><PlayCircle className="w-5 h-5" /> Continue Learning</>}
+                  </Link>
+                  <button
+                    onClick={() => archiveCourse(course.id)}
+                    title="Clear this course"
+                    className="px-3 rounded-xl border border-white/10 text-muted-foreground hover:text-foreground hover:border-white/20 transition-all"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
             </motion.div>
           );

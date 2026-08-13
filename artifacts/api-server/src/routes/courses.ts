@@ -718,6 +718,29 @@ router.get("/courses/:id", async (req, res): Promise<void> => {
   );
 });
 
+router.patch("/courses/:id/archive", async (req, res): Promise<void> => {
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) {
+    res.status(400).json({ error: "Invalid course id" });
+    return;
+  }
+
+  const [course] = await db.select().from(coursesTable).where(eq(coursesTable.id, id));
+  if (!course) {
+    res.status(404).json({ error: "Course not found" });
+    return;
+  }
+
+  const requesterUsername = (req.user?.chesscomUsername || req.user?.lichessUsername || "").toLowerCase();
+  if (!requesterUsername || requesterUsername !== course.username.toLowerCase()) {
+    res.status(403).json({ error: "You don't have access to this course" });
+    return;
+  }
+
+  await db.update(coursesTable).set({ archived: true }).where(eq(coursesTable.id, id));
+  res.json({ ok: true });
+});
+
 router.patch("/courses/:id/progress", async (req, res): Promise<void> => {
   const params = UpdateCourseProgressParams.safeParse(req.params);
   if (!params.success) {
@@ -772,10 +795,11 @@ router.patch("/courses/:id/progress", async (req, res): Promise<void> => {
     .where(eq(lessonsTable.courseId, id));
 
   const completedCount = lessons.filter((l) => l.completed === "true").length;
+  const isFullyComplete = lessons.length > 0 && completedCount === lessons.length;
 
   const [updatedCourse] = await db
     .update(coursesTable)
-    .set({ completedLessons: completedCount })
+    .set({ completedLessons: completedCount, archived: isFullyComplete })
     .where(eq(coursesTable.id, id))
     .returning();
 

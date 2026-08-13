@@ -978,16 +978,12 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
                 transition={{ duration: 0.15 }}
               >
                 <div className="rounded-xl px-3 py-2 md:px-4 md:py-3 shadow-sm" style={{
-                  background: step?.isMistake
-                    ? 'rgba(220,67,67,0.12)'
+                  background: BG_CARD,
+                  borderLeft: step?.isMistake
+                    ? `3px solid ${MISTAKE_RED}`
                     : step?.isFix
-                    ? 'rgba(129,182,76,0.12)'
-                    : BG_CARD,
-                  border: step?.isMistake
-                    ? '1px solid rgba(220,67,67,0.3)'
-                    : step?.isFix
-                    ? `1px solid rgba(129,182,76,0.3)`
-                    : '1px solid rgba(255,255,255,0.06)',
+                    ? `3px solid ${CHESSCOM_GREEN}`
+                    : '3px solid rgba(255,255,255,0.06)',
                 }}>
                   <div className="flex items-start gap-3">
                     {step?.isMistake ? (
