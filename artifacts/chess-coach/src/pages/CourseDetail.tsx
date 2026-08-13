@@ -3,7 +3,7 @@ import { useParams, Link } from 'wouter';
 import { useCourseDetail, useMarkLessonComplete } from '@/hooks/use-courses';
 import { LessonBoardPlayer } from '@/components/LessonBoardPlayer';
 import {
-  ArrowLeft, CheckCircle2, Target,
+  ArrowLeft, CheckCircle2, Target, X, Check,
   ChevronLeft, ChevronRight, Award, List,
   Volume2, VolumeX, BookOpen, Loader,
 } from 'lucide-react';
@@ -15,6 +15,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { apiFetch } from '@/lib/api';
 import { useUser } from '@/hooks/use-user';
+import { useMyWeaknesses } from '@/hooks/use-analysis';
 import { encodeCard } from '@/pages/ShareCard';
 
 // ── Markdown render helpers ────────────────────────────────────────────────────
@@ -27,6 +28,82 @@ function renderInline(text: string): React.ReactNode {
     part.startsWith('**') && part.endsWith('**')
       ? <strong key={i} className="font-bold" style={{ color: '#e8e6e3' }}>{part.slice(2, -2)}</strong>
       : <span key={i}>{part}</span>
+  );
+}
+
+const WEAKNESS_SEVERITY_COLORS: Record<string, string> = {
+  Critical: '#dc4343',
+  High: '#e88930',
+  Medium: '#e8c830',
+  Low: '#7a9e5c',
+};
+
+function LessonIntroCard({
+  conceptTitle,
+  conceptText,
+  courseCategory,
+  onStart,
+}: {
+  conceptTitle: string | null;
+  conceptText: string | null;
+  courseCategory: string;
+  onStart: () => void;
+}) {
+  const { data: weaknessData } = useMyWeaknesses();
+  const matchedWeakness = weaknessData?.weaknesses?.find(
+    (w) => w.category.toLowerCase() === courseCategory.toLowerCase()
+  );
+
+  if (!conceptText) return null;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="rounded-2xl p-5 md:p-6 mb-3"
+      style={{ background: 'linear-gradient(160deg, #302e2b 0%, #262421 100%)', border: '1px solid rgba(255,255,255,0.08)' }}
+    >
+      <div className="flex items-center gap-2 mb-3">
+        <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0"
+          style={{ background: `linear-gradient(160deg, ${CHESSCOM_GREEN}, #5f8a3a)` }}>
+          <BookOpen className="w-4 h-4 text-white" />
+        </div>
+        <h3 className="text-base md:text-lg font-bold text-white">
+          {conceptTitle || 'The Idea'}
+        </h3>
+      </div>
+
+      <p className="text-sm leading-relaxed text-white/75 mb-4">
+        {conceptText}
+      </p>
+
+      {matchedWeakness && (
+        <div className="rounded-xl p-3.5" style={{
+          background: `${WEAKNESS_SEVERITY_COLORS[matchedWeakness.severity] ?? CHESSCOM_GREEN}0F`,
+          border: `1px solid ${WEAKNESS_SEVERITY_COLORS[matchedWeakness.severity] ?? CHESSCOM_GREEN}30`,
+        }}>
+          <div className="flex items-center gap-2 mb-1.5">
+            <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full"
+              style={{
+                background: `${WEAKNESS_SEVERITY_COLORS[matchedWeakness.severity] ?? CHESSCOM_GREEN}20`,
+                color: WEAKNESS_SEVERITY_COLORS[matchedWeakness.severity] ?? CHESSCOM_GREEN,
+              }}>
+              {matchedWeakness.severity}
+            </span>
+            <span className="text-xs font-semibold text-white/60">How this shows up in your games</span>
+          </div>
+          <p className="text-sm leading-relaxed text-white/80">{matchedWeakness.description}</p>
+        </div>
+      )}
+
+      <button
+        onClick={onStart}
+        className="w-full mt-4 py-3 rounded-xl text-sm font-black text-white flex items-center justify-center gap-2 transition-transform hover:scale-[1.01]"
+        style={{ background: `linear-gradient(180deg, #95c45a 0%, ${CHESSCOM_GREEN} 100%)` }}
+      >
+        Start <ChevronRight className="w-4 h-4" />
+      </button>
+    </motion.div>
   );
 }
 
@@ -49,7 +126,7 @@ function renderParagraph(trimmed: string, key: number): React.ReactNode {
     }
 
     if (body) {
-      nodes.push(<p key={`${key}-b`} className="text-sm leading-relaxed mt-1.5" style={{ color: '#c8c5c1' }}>{renderInline(body)}</p>);
+      nodes.push(<p key={`${key}-b`} className="text-[15px] leading-[1.65] mt-1.5" style={{ color: '#d6d3cf' }}>{renderInline(body)}</p>);
     }
     return <React.Fragment key={key}>{nodes}</React.Fragment>;
   }
@@ -58,9 +135,9 @@ function renderParagraph(trimmed: string, key: number): React.ReactNode {
   const isList = lines.every(l => /^[-*•]\s/.test(l.trim()) || l.trim() === '');
   if (isList && lines.some(l => /^[-*•]\s/.test(l.trim()))) {
     return (
-      <ul key={key} className="space-y-2">
+      <ul key={key} className="space-y-2.5">
         {lines.filter(l => l.trim()).map((item, j) => (
-          <li key={j} className="flex items-start gap-2.5 text-sm leading-relaxed" style={{ color: '#c8c5c1' }}>
+          <li key={j} className="flex items-start gap-2.5 text-[15px] leading-[1.65]" style={{ color: '#d6d3cf' }}>
             <span className="mt-1 shrink-0" style={{ color: CHESSCOM_GREEN }}>▸</span>
             <span>{renderInline(item.replace(/^[-*•]\s*/, ''))}</span>
           </li>
@@ -69,7 +146,7 @@ function renderParagraph(trimmed: string, key: number): React.ReactNode {
     );
   }
 
-  return <p key={key} className="text-sm leading-relaxed" style={{ color: '#c8c5c1' }}>{renderInline(trimmed)}</p>;
+  return <p key={key} className="text-[15px] leading-[1.65]" style={{ color: '#d6d3cf' }}>{renderInline(trimmed)}</p>;
 }
 
 function renderStep(text: string): React.ReactNode {
@@ -80,12 +157,14 @@ function renderStep(text: string): React.ReactNode {
     const body = text.replace(/^#{1,3}\s*The Mistake\s*/im, '').trim();
     const paragraphs = body.split(/\n\n+/).filter(Boolean);
     return (
-      <div className="space-y-3">
-        <div className="rounded-xl p-4 space-y-2" style={{ background: 'rgba(220,67,67,0.1)', border: '1px solid rgba(220,67,67,0.25)' }}>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-lg" style={{ color: MISTAKE_RED }}>✗</span>
-            <h4 className="text-sm font-bold uppercase tracking-wider" style={{ color: MISTAKE_RED }}>The Mistake</h4>
+      <div className="rounded-2xl p-4 md:p-5" style={{ background: 'rgba(220,67,67,0.07)', border: '1px solid rgba(220,67,67,0.2)' }}>
+        <div className="flex items-center gap-2.5 mb-3">
+          <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0" style={{ background: 'rgba(220,67,67,0.18)' }}>
+            <X className="w-4 h-4" style={{ color: MISTAKE_RED }} />
           </div>
+          <h4 className="text-base font-bold" style={{ color: MISTAKE_RED }}>What went wrong</h4>
+        </div>
+        <div className="space-y-3">
           {paragraphs.map((p, i) => renderParagraph(p.trim(), 100 + i))}
         </div>
       </div>
@@ -96,12 +175,14 @@ function renderStep(text: string): React.ReactNode {
     const body = text.replace(/^#{1,3}\s*The Fix\s*/im, '').trim();
     const paragraphs = body.split(/\n\n+/).filter(Boolean);
     return (
-      <div className="space-y-3">
-        <div className="rounded-xl p-4 space-y-2" style={{ background: 'rgba(129,182,76,0.1)', border: `1px solid rgba(129,182,76,0.25)` }}>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-lg" style={{ color: CHESSCOM_GREEN }}>✓</span>
-            <h4 className="text-sm font-bold uppercase tracking-wider" style={{ color: CHESSCOM_GREEN }}>The Fix</h4>
+      <div className="rounded-2xl p-4 md:p-5" style={{ background: 'rgba(129,182,76,0.07)', border: `1px solid rgba(129,182,76,0.2)` }}>
+        <div className="flex items-center gap-2.5 mb-3">
+          <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0" style={{ background: 'rgba(129,182,76,0.18)' }}>
+            <Check className="w-4 h-4" style={{ color: CHESSCOM_GREEN }} />
           </div>
+          <h4 className="text-base font-bold" style={{ color: CHESSCOM_GREEN }}>The better move</h4>
+        </div>
+        <div className="space-y-3">
           {paragraphs.map((p, i) => renderParagraph(p.trim(), 200 + i))}
         </div>
       </div>
@@ -126,9 +207,24 @@ function toPlainText(md: string): string {
     .trim();
 }
 
-/** Split lesson content into logical step groups */
+/** Splits content into {heading, body} sections at each markdown heading. */
+function splitIntoSections(content: string): { heading: string | null; body: string }[] {
+  const parts = content.split(/\n(?=#{1,3}\s)/);
+  return parts.map((part) => {
+    const headingMatch = part.match(/^#{1,3}\s*(.+?)\s*\n([\s\S]*)$/);
+    if (headingMatch) {
+      return { heading: headingMatch[1].trim(), body: headingMatch[2].trim() };
+    }
+    return { heading: null, body: part.trim() };
+  }).filter((s) => s.body.length > 0 || s.heading);
+}
+
+/** Split lesson content into logical step groups, excluding the Concept
+ * section (that's shown separately as an intro, not as a numbered step). */
 function splitIntoSteps(content: string): string[] {
-  const raw = content.split(/\n\n+/).filter(s => s.trim().length > 0);
+  const sections = splitIntoSections(content).filter((s) => !/^The Concept$/i.test(s.heading ?? ''));
+  const withoutConcept = sections.map((s) => (s.heading ? `## ${s.heading}\n${s.body}` : s.body)).join('\n\n');
+  const raw = withoutConcept.split(/\n\n+/).filter(s => s.trim().length > 0);
   const grouped: string[] = [];
   for (let i = 0; i < raw.length; i++) {
     const trimmed = raw[i].trim();
@@ -143,10 +239,18 @@ function splitIntoSteps(content: string): string[] {
   return grouped.length > 0 ? grouped : [''];
 }
 
+/** Extracts just the Concept section's body text, if present. */
+function extractConceptText(content: string): string | null {
+  const section = splitIntoSections(content).find((s) => /^The Concept$/i.test(s.heading ?? ''));
+  return section?.body || null;
+}
+
 // ── Step-by-step lesson content component with TTS ────────────────────────────
-function LessonContentStepper({ content, lessonId, onStepChange }: { content: string; lessonId: number; onStepChange?: (stepText: string) => void }) {
+function LessonContentStepper({ content, lessonId, courseCategory, conceptTitle, onStepChange }: { content: string; lessonId: number; courseCategory: string; conceptTitle?: string | null; onStepChange?: (stepText: string) => void }) {
   const steps = useMemo(() => splitIntoSteps(content), [content]);
+  const conceptText = useMemo(() => extractConceptText(content), [content]);
   const [step, setStep] = useState(0);
+  const [showingIntro, setShowingIntro] = useState(!!conceptText);
   const [speaking, setSpeaking] = useState(false);
   const [loading, setLoading] = useState(false);
   const [autoRead, setAutoRead] = useState(false);
@@ -158,6 +262,7 @@ function LessonContentStepper({ content, lessonId, onStepChange }: { content: st
 
   useEffect(() => {
     setStep(0);
+    setShowingIntro(!!conceptText);
     stopReading();
     onStepChange?.(steps[0] ?? '');
   }, [lessonId]);
@@ -226,6 +331,17 @@ function LessonContentStepper({ content, lessonId, onStepChange }: { content: st
 
   if (steps.length === 0) return null;
 
+  if (showingIntro && conceptText) {
+    return (
+      <LessonIntroCard
+        conceptTitle={conceptTitle ?? null}
+        conceptText={conceptText}
+        courseCategory={courseCategory}
+        onStart={() => setShowingIntro(false)}
+      />
+    );
+  }
+
   return (
     <div className="space-y-3">
       {/* Controls bar */}
@@ -284,26 +400,25 @@ function LessonContentStepper({ content, lessonId, onStepChange }: { content: st
         </motion.div>
       </AnimatePresence>
 
-      {/* Navigation */}
+      {/* Step navigation */}
       {steps.length > 1 && (
-        <div className="flex items-center justify-between gap-3 pt-2">
+        <div className="flex items-center justify-between gap-3 pt-3 mt-1" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
           <button
             onClick={() => goTo(step - 1)}
             disabled={isFirst}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl hover:bg-white/10 transition-all disabled:opacity-20 text-white/50 hover:text-white"
+            className="flex items-center gap-1 pl-1.5 pr-3 py-1.5 text-xs font-semibold rounded-full transition-all disabled:opacity-0 text-white/60 hover:text-white hover:bg-white/10"
           >
-            <ChevronLeft className="w-3.5 h-3.5" /> Prev
+            <ChevronLeft className="w-4 h-4" /> Prev
           </button>
 
-          {/* Progress dots */}
-          <div className="flex items-center gap-1 flex-wrap justify-center">
+          <div className="flex items-center gap-1.5">
             {steps.map((_, i) => (
               <button
                 key={i}
                 onClick={() => goTo(i)}
                 className={cn(
                   'rounded-full transition-all',
-                  i === step ? 'w-5 h-1.5' : 'w-1.5 h-1.5 bg-white/15 hover:bg-white/30'
+                  i === step ? 'w-6 h-2' : 'w-2 h-2 bg-white/15 hover:bg-white/30'
                 )}
                 style={i === step ? { backgroundColor: CHESSCOM_GREEN } : undefined}
                 title={`Step ${i + 1}`}
@@ -314,9 +429,10 @@ function LessonContentStepper({ content, lessonId, onStepChange }: { content: st
           <button
             onClick={() => goTo(step + 1)}
             disabled={isLast}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl hover:bg-white/10 transition-all disabled:opacity-20 text-white/50 hover:text-white"
+            className="flex items-center gap-1 pr-1.5 pl-3 py-1.5 text-xs font-semibold rounded-full transition-all disabled:opacity-0"
+            style={{ color: isLast ? undefined : CHESSCOM_GREEN }}
           >
-            Next <ChevronRight className="w-3.5 h-3.5" />
+            Next <ChevronRight className="w-4 h-4" />
           </button>
         </div>
       )}
@@ -551,43 +667,48 @@ export function CourseDetail() {
                       key={lesson.id}
                       content={lesson.content}
                       lessonId={lesson.id}
+                      courseCategory={course?.category ?? ''}
+                      conceptTitle={lesson.conceptTitle}
                       onStepChange={(stepText) => setShowFixLine(/##\s*The Fix/i.test(stepText))}
                     />
                   </div>
                 )}
 
                 {/* Navigation footer */}
-                <div className="flex flex-col sm:flex-row justify-between items-center gap-3 mt-4">
-                  <button
-                    disabled={isFirst}
-                    onClick={() => setCurrentIdx(i => i - 1)}
-                    className="flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-bold text-white/50 hover:text-white hover:bg-white/10 transition-all disabled:opacity-20"
-                  >
-                    <ChevronLeft className="w-4 h-4" /> Previous
-                  </button>
-
+                <div className="mt-5 pt-4 flex flex-col gap-3" style={{ borderTop: '1px solid rgba(255,255,255,0.08)' }}>
                   <button
                     onClick={() => handleMarkComplete(!lesson?.completed)}
                     disabled={isUpdating}
                     className={cn(
-                      'flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold transition-all',
+                      'w-full flex items-center justify-center gap-2 py-3.5 rounded-xl text-sm font-black transition-all',
                       lesson?.completed
                         ? 'bg-white/10 text-white/60 hover:text-white hover:bg-white/15'
                         : 'text-white hover:brightness-110 shadow-lg'
                     )}
-                    style={!lesson?.completed ? { backgroundColor: CHESSCOM_GREEN } : undefined}
+                    style={!lesson?.completed ? { background: `linear-gradient(180deg, #95c45a 0%, ${CHESSCOM_GREEN} 100%)` } : undefined}
                   >
                     <CheckCircle2 className="w-4 h-4" />
                     {lesson?.completed ? 'Mark Incomplete' : (isLast ? 'Complete Course' : 'Complete & Next')}
                   </button>
 
-                  <button
-                    disabled={isLast}
-                    onClick={() => setCurrentIdx(i => i + 1)}
-                    className="flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-bold text-white/50 hover:text-white hover:bg-white/10 transition-all disabled:opacity-20"
-                  >
-                    Next <ChevronRight className="w-4 h-4" />
-                  </button>
+                  <div className="flex items-center justify-between">
+                    <button
+                      disabled={isFirst}
+                      onClick={() => setCurrentIdx(i => i - 1)}
+                      className="flex items-center gap-1.5 px-2 py-1.5 text-sm font-semibold rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition-all disabled:opacity-0"
+                    >
+                      <ChevronLeft className="w-4 h-4" /> Previous lesson
+                    </button>
+
+                    {!isLast && (
+                      <button
+                        onClick={() => setCurrentIdx(i => i + 1)}
+                        className="px-2 py-1.5 text-xs font-medium text-white/35 hover:text-white/60 transition-all"
+                      >
+                        Skip without completing →
+                      </button>
+                    )}
+                  </div>
                 </div>
               </motion.div>
             </AnimatePresence>
