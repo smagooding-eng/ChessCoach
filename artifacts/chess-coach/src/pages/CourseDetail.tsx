@@ -157,12 +157,10 @@ function renderStep(text: string): React.ReactNode {
     const body = text.replace(/^#{1,3}\s*The Mistake\s*/im, '').trim();
     const paragraphs = body.split(/\n\n+/).filter(Boolean);
     return (
-      <div className="rounded-2xl p-4 md:p-5" style={{ background: 'rgba(220,67,67,0.07)', border: '1px solid rgba(220,67,67,0.2)' }}>
-        <div className="flex items-center gap-2.5 mb-3">
-          <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0" style={{ background: 'rgba(220,67,67,0.18)' }}>
-            <X className="w-4 h-4" style={{ color: MISTAKE_RED }} />
-          </div>
-          <h4 className="text-base font-bold" style={{ color: MISTAKE_RED }}>What went wrong</h4>
+      <div className="pl-4" style={{ borderLeft: `3px solid ${MISTAKE_RED}` }}>
+        <div className="flex items-center gap-2 mb-2.5">
+          <X className="w-4 h-4" style={{ color: MISTAKE_RED }} />
+          <h4 className="text-sm font-bold" style={{ color: MISTAKE_RED }}>What went wrong</h4>
         </div>
         <div className="space-y-3">
           {paragraphs.map((p, i) => renderParagraph(p.trim(), 100 + i))}
@@ -175,12 +173,10 @@ function renderStep(text: string): React.ReactNode {
     const body = text.replace(/^#{1,3}\s*The Fix\s*/im, '').trim();
     const paragraphs = body.split(/\n\n+/).filter(Boolean);
     return (
-      <div className="rounded-2xl p-4 md:p-5" style={{ background: 'rgba(129,182,76,0.07)', border: `1px solid rgba(129,182,76,0.2)` }}>
-        <div className="flex items-center gap-2.5 mb-3">
-          <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0" style={{ background: 'rgba(129,182,76,0.18)' }}>
-            <Check className="w-4 h-4" style={{ color: CHESSCOM_GREEN }} />
-          </div>
-          <h4 className="text-base font-bold" style={{ color: CHESSCOM_GREEN }}>The better move</h4>
+      <div className="pl-4" style={{ borderLeft: `3px solid ${CHESSCOM_GREEN}` }}>
+        <div className="flex items-center gap-2 mb-2.5">
+          <Check className="w-4 h-4" style={{ color: CHESSCOM_GREEN }} />
+          <h4 className="text-sm font-bold" style={{ color: CHESSCOM_GREEN }}>The better move</h4>
         </div>
         <div className="space-y-3">
           {paragraphs.map((p, i) => renderParagraph(p.trim(), 200 + i))}
@@ -644,35 +640,40 @@ export function CourseDetail() {
                   )}
                 </div>
 
-                {/* Interactive board */}
-                {lesson && (
-                  <LessonBoardPlayer
-                    pgn={lesson.examplePgn || lesson.drillFen || 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'}
-                    fixPgn={lesson.fixExamplePgn ?? null}
-                    showFixLine={showFixLine}
-                    title={lesson.title}
-                    drillFen={lesson.drillFen ?? null}
-                    drillExpectedMove={lesson.drillExpectedMove ?? null}
-                    drillHint={lesson.drillHint ?? null}
-                    content={lesson.content ?? null}
-                    extraChallenges={lesson.extraChallenges ?? null}
-                    conceptTitle={lesson.conceptTitle ?? null}
-                  />
-                )}
+                {/* Board (sticky on wide screens) + lesson content side by side */}
+                <div className="xl:grid xl:grid-cols-[1fr_380px] xl:gap-4 xl:items-start">
+                  {/* Interactive board */}
+                  {lesson && (
+                    <div className="xl:sticky xl:top-4">
+                      <LessonBoardPlayer
+                        pgn={lesson.examplePgn || lesson.drillFen || 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'}
+                        fixPgn={lesson.fixExamplePgn ?? null}
+                        showFixLine={showFixLine}
+                        title={lesson.title}
+                        drillFen={lesson.drillFen ?? null}
+                        drillExpectedMove={lesson.drillExpectedMove ?? null}
+                        drillHint={lesson.drillHint ?? null}
+                        content={lesson.content ?? null}
+                        extraChallenges={lesson.extraChallenges ?? null}
+                        conceptTitle={lesson.conceptTitle ?? null}
+                      />
+                    </div>
+                  )}
 
-                {/* Step-by-step lesson text with TTS */}
-                {lesson && lesson.content && (
-                  <div className="rounded-xl p-3 md:p-4 mt-2 md:mt-3" style={{ backgroundColor: BG_DARK }}>
-                    <LessonContentStepper
-                      key={lesson.id}
-                      content={lesson.content}
-                      lessonId={lesson.id}
-                      courseCategory={course?.category ?? ''}
-                      conceptTitle={lesson.conceptTitle}
-                      onStepChange={(stepText) => setShowFixLine(/##\s*The Fix/i.test(stepText))}
-                    />
-                  </div>
-                )}
+                  {/* Step-by-step lesson text with TTS */}
+                  {lesson && lesson.content && (
+                    <div className="rounded-xl p-3 md:p-4 mt-2 xl:mt-0" style={{ backgroundColor: BG_DARK }}>
+                      <LessonContentStepper
+                        key={lesson.id}
+                        content={lesson.content}
+                        lessonId={lesson.id}
+                        courseCategory={course?.category ?? ''}
+                        conceptTitle={lesson.conceptTitle}
+                        onStepChange={(stepText) => setShowFixLine(/##\s*The Fix/i.test(stepText))}
+                      />
+                    </div>
+                  )}
+                </div>
 
                 {/* Navigation footer */}
                 <div className="mt-5 pt-4 flex flex-col gap-3" style={{ borderTop: '1px solid rgba(255,255,255,0.08)' }}>
