@@ -641,39 +641,37 @@ export function CourseDetail() {
                 </div>
 
                 {/* Board (sticky on wide screens) + lesson content side by side */}
-                <div className="xl:grid xl:grid-cols-[1fr_380px] xl:gap-4 xl:items-start">
-                  {/* Interactive board */}
-                  {lesson && (
-                    <div className="xl:sticky xl:top-4">
-                      <LessonBoardPlayer
-                        pgn={lesson.examplePgn || lesson.drillFen || 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'}
-                        fixPgn={lesson.fixExamplePgn ?? null}
-                        showFixLine={showFixLine}
-                        title={lesson.title}
-                        drillFen={lesson.drillFen ?? null}
-                        drillExpectedMove={lesson.drillExpectedMove ?? null}
-                        drillHint={lesson.drillHint ?? null}
-                        content={lesson.content ?? null}
-                        extraChallenges={lesson.extraChallenges ?? null}
-                        conceptTitle={lesson.conceptTitle ?? null}
-                      />
-                    </div>
-                  )}
+                {/* Interactive board — sticky so it stays visible while scrolling to read the lesson text below, without shrinking to make room for a side column */}
+                {lesson && (
+                  <div className="sticky top-2 z-10">
+                    <LessonBoardPlayer
+                      pgn={lesson.examplePgn || lesson.drillFen || 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'}
+                      fixPgn={lesson.fixExamplePgn ?? null}
+                      showFixLine={showFixLine}
+                      title={lesson.title}
+                      drillFen={lesson.drillFen ?? null}
+                      drillExpectedMove={lesson.drillExpectedMove ?? null}
+                      drillHint={lesson.drillHint ?? null}
+                      content={lesson.content ?? null}
+                      extraChallenges={lesson.extraChallenges ?? null}
+                      conceptTitle={lesson.conceptTitle ?? null}
+                    />
+                  </div>
+                )}
 
-                  {/* Step-by-step lesson text with TTS */}
-                  {lesson && lesson.content && (
-                    <div className="rounded-xl p-3 md:p-4 mt-2 xl:mt-0" style={{ backgroundColor: BG_DARK }}>
-                      <LessonContentStepper
-                        key={lesson.id}
-                        content={lesson.content}
-                        lessonId={lesson.id}
-                        courseCategory={course?.category ?? ''}
-                        conceptTitle={lesson.conceptTitle}
-                        onStepChange={(stepText) => setShowFixLine(/##\s*The Fix/i.test(stepText))}
-                      />
-                    </div>
-                  )}
-                </div>
+                {/* Step-by-step lesson text with TTS */}
+                {lesson && lesson.content && (
+                  <div className="rounded-xl p-3 md:p-4 mt-2 md:mt-3" style={{ backgroundColor: BG_DARK }}>
+                    <LessonContentStepper
+                      key={lesson.id}
+                      content={lesson.content}
+                      lessonId={lesson.id}
+                      courseCategory={course?.category ?? ''}
+                      conceptTitle={lesson.conceptTitle}
+                      onStepChange={(stepText) => setShowFixLine(/##\s*The Fix/i.test(stepText))}
+                    />
+                  </div>
+                )}
 
                 {/* Navigation footer */}
                 <div className="mt-5 pt-4 flex flex-col gap-3" style={{ borderTop: '1px solid rgba(255,255,255,0.08)' }}>
