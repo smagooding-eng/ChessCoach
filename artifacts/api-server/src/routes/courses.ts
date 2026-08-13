@@ -21,7 +21,7 @@ import type { Logger } from "pino";
 
 const router: IRouter = Router();
 
-interface RawLesson {
+export interface RawLesson {
   title: string;
   content: string;
   orderIndex: number;
@@ -39,12 +39,28 @@ interface RawLesson {
  * stripped (text-only downgrade) so the lesson stays useful while bad chess
  * data is removed. Returns the sanitized lesson list and a count of downgrades.
  */
-async function sanitizeLessons(lessons: RawLesson[], log?: Logger): Promise<{ lessons: RawLesson[]; downgraded: number }> {
+export async function sanitizeLessons(lessons: RawLesson[], log?: Logger): Promise<{ lessons: RawLesson[]; downgraded: number }> {
   let downgraded = 0;
   const sanitized: RawLesson[] = [];
   for (const lesson of lessons) {
     const next: RawLesson = { ...lesson };
     let changed = false;
+
+    // Cross-contamination guard: [FIX] must only ever appear in
+    // fixExamplePgn, and [MISTAKE] only in examplePgn. If a generation
+    // pass didn't follow the prompt's separation correctly and a tag
+    // leaked into the wrong field, the frontend would show a misleading
+    // green "best move" checkmark inside what's meant to be the mistake
+    // view (or vice versa). Strip rather than reject the whole lesson —
+    // the underlying move/comment is still valid, just mislabeled.
+    if (next.examplePgn && /\[FIX\]/i.test(next.examplePgn)) {
+      next.examplePgn = next.examplePgn.replace(/\[FIX\]\s*/gi, '');
+      changed = true;
+    }
+    if (next.fixExamplePgn && /\[MISTAKE\]/i.test(next.fixExamplePgn)) {
+      next.fixExamplePgn = next.fixExamplePgn.replace(/\[MISTAKE\]\s*/gi, '');
+      changed = true;
+    }
 
     // Re-check after each strip so we converge on a valid lesson.
     let verdict = verifyLesson({

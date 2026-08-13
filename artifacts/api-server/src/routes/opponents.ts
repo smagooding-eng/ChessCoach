@@ -5,6 +5,7 @@ import { fetchChessComGames, extractGameMetadata, fetchChessComProfile } from ".
 import { analyzePlayerGames, generateExploitCourseForOpponent } from "../lib/openaiAnalysis";
 import { randomUUID } from "crypto";
 import { requireAuth } from "../middlewares/authMiddleware";
+import { sanitizeLessons, type RawLesson } from "./courses";
 
 const router: IRouter = Router();
 
@@ -436,17 +437,19 @@ async function runCourseGeneration(
         examples: weakness.examples,
       }, relatedPgns);
 
+      const { lessons: safeLessons } = await sanitizeLessons(courseData.lessons as RawLesson[], log);
+
       const [course] = await db.insert(coursesTable).values({
         username,
         title: courseData.title,
         description: courseData.description,
         category: courseData.category,
         difficulty: courseData.difficulty,
-        totalLessons: courseData.lessons.length,
+        totalLessons: safeLessons.length,
         completedLessons: 0,
       }).returning();
 
-      for (const lesson of courseData.lessons) {
+      for (const lesson of safeLessons) {
         await db.insert(lessonsTable).values({
           courseId: course.id,
           title: lesson.title,
@@ -454,6 +457,7 @@ async function runCourseGeneration(
           orderIndex: lesson.orderIndex,
           completed: "false",
           examplePgn: lesson.examplePgn ?? null,
+          fixExamplePgn: lesson.fixExamplePgn ?? null,
           drillFen: lesson.drillFen ?? null,
           drillExpectedMove: lesson.drillExpectedMove ?? null,
           drillHint: lesson.drillHint ?? null,
