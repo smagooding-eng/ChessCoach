@@ -3,6 +3,7 @@ import { fetchChessComGames } from "../lib/chesscom";
 import { fetchLichessGames } from "../lib/lichess";
 import { quickAnalyzeGames, type QuickWeakness } from "../lib/quickScout";
 import { logger } from "../lib/logger";
+import { requireAuth } from "../middlewares/authMiddleware";
 
 const router: IRouter = Router();
 
@@ -67,7 +68,7 @@ async function fetchRecentPgnsAndOpponent(
   }
 }
 
-router.post("/public/quick-scout", async (req: Request, res: Response) => {
+router.post("/public/quick-scout", requireAuth, async (req: Request, res: Response) => {
   const ip = getIp(req);
   if (isRateLimited(ip)) {
     res.status(429).json({ error: "Too many requests. Please try again in a bit." });

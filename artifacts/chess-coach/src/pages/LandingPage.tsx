@@ -668,6 +668,7 @@ function WeaknessMiniList({ side }: { side: ScoutSide }) {
 }
 
 function QuickScoutDemo({ onSignup }: { onSignup: () => void }) {
+  const { isAuthenticated } = useUser();
   const [usernameInput, setUsernameInput] = useState('');
   const [platform, setPlatform] = useState<'chesscom' | 'lichess'>('chesscom');
   const [status, setStatus] = useState<'idle' | 'loading' | 'done' | 'error'>('idle');
@@ -716,6 +717,10 @@ function QuickScoutDemo({ onSignup }: { onSignup: () => void }) {
   const runScout = async () => {
     const trimmed = usernameInput.trim();
     if (!trimmed) return;
+    if (!isAuthenticated) {
+      onSignup();
+      return;
+    }
     setStatus('loading');
     setErrorMsg('');
     try {
@@ -788,7 +793,7 @@ function QuickScoutDemo({ onSignup }: { onSignup: () => void }) {
           {status === 'error' && (
             <p className="text-[11px]" style={{ color: '#dc4343' }}>{errorMsg}</p>
           )}
-          <p className="text-[10px]" style={{ color: MUTED }}>Free, no signup needed for this part. Takes a few seconds.</p>
+          <p className="text-[10px]" style={{ color: MUTED }}>Free account required. Takes a few seconds to see your results.</p>
         </>
       ) : status === 'loading' ? (
         <div className="py-8 flex flex-col items-center text-center">
