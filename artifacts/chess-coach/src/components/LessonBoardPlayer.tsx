@@ -107,15 +107,11 @@ function buildStepsFromContent(
   const fullMoveNumber = parseInt(fen.split(' ')[5]) || 1;
   const turnColor: 'w' | 'b' = fen.split(' ')[1] === 'b' ? 'b' : 'w';
 
-  // The Concept section (if present) has no specific chess move attached to
-  // it — it's general teaching, not tied to this position — so it would be
-  // silently skipped by the move-parsing loop below. It gets used as the
-  // comment for the initial "study this position" step instead, which
-  // already exists precisely for non-move content.
-  const conceptMatch = content.match(/##\s*The Concept\s*\n+([\s\S]*?)(?=\n+##|$)/i);
-  const introComment = conceptMatch
-    ? conceptMatch[1].trim().replace(/\*\*([^*]+)\*\*/g, '$1')
-    : 'Study this position.';
+  // The Concept section is shown separately in the lesson's left-panel
+  // intro card (see LessonIntroCard in CourseDetail.tsx) — showing it again
+  // here would duplicate the same text. Still strip it from the step
+  // sequence below so it doesn't also appear as a regular paragraph step.
+  const introComment = 'Study this position.';
 
   const steps: Step[] = [
     { fen, san: null, comment: introComment, moveNum: 0, fullMoveNumber, color: null },
@@ -312,14 +308,10 @@ function parsePgnSteps(pgn: string, content?: string | null, drillExpectedMove?:
       : 1;
     const startColor = startFen.split(' ')[1] === 'b' ? 1 : 0;
 
-    // The Concept section (general chess teaching, not tied to this specific
-    // position) has no move attached to it, so it can't come through as a
-    // PGN move comment — it's surfaced here instead, on the initial
-    // "before any moves" step.
-    const conceptMatch = content?.match(/##\s*The Concept\s*\n+([\s\S]*?)(?=\n+##|$)/i);
-    const introComment = conceptMatch
-      ? conceptMatch[1].trim().replace(/\*\*([^*]+)\*\*/g, '$1')
-      : (comments[0] || undefined);
+    // The Concept section is shown separately in the lesson's left-panel
+    // intro card, so it's intentionally not surfaced again here — using it
+    // again on this step would just duplicate the same text.
+    const introComment = comments[0] || undefined;
 
     const player = new Chess(startFen);
     const steps: Step[] = [
@@ -1160,8 +1152,8 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
           )}
 
           {/* Controls */}
-          <div className="flex flex-col items-center gap-2 px-2 py-3 md:px-4">
-            <div className="flex items-center justify-center gap-2 md:gap-3">
+          <div className="flex flex-col items-center gap-2 px-2 py-3 md:px-4 max-w-[480px] mx-auto w-full">
+            <div className="flex items-center justify-center gap-1.5 md:gap-3 flex-wrap">
               <div className="flex items-center rounded-full p-0.5" style={{ background: 'rgba(255,255,255,0.05)' }}>
                 <button
                   onClick={() => { setIsPlaying(false); go(0); }}

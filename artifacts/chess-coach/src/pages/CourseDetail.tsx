@@ -445,6 +445,7 @@ export function CourseDetail() {
 
   const [currentIdx, setCurrentIdx] = useState<number>(0);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [desktopSidebarCollapsed, setDesktopSidebarCollapsed] = useState(true);
   const [showFixLine, setShowFixLine] = useState(false);
   const [showCompletionShare, setShowCompletionShare] = useState(false);
   const { username } = useUser();
@@ -529,35 +530,73 @@ export function CourseDetail() {
         <div className="rounded-xl p-12 text-center text-white/50" style={{ backgroundColor: BG_DARK }}>No lessons available.</div>
       ) : (
         <div className="flex gap-4 items-start">
-          {/* Sidebar — lesson list */}
-          <div className="hidden lg:flex flex-col w-56 shrink-0 rounded-xl overflow-hidden" style={{ backgroundColor: BG_DARK }}>
-            <div className="px-4 py-3 flex items-center gap-2" style={{ backgroundColor: BG_CARD }}>
-              <List className="w-4 h-4" style={{ color: CHESSCOM_GREEN }} />
-              <span className="font-bold text-sm text-white/80">Lessons</span>
-            </div>
-            <div className="py-1 max-h-[70vh] overflow-y-auto overscroll-contain">
+          {/* Sidebar — lesson list, collapsed by default to leave more room for the board and text */}
+          {desktopSidebarCollapsed ? (
+            <div className="hidden lg:flex flex-col w-11 shrink-0 rounded-xl overflow-hidden items-center py-3 gap-3" style={{ backgroundColor: BG_DARK }}>
+              <button
+                onClick={() => setDesktopSidebarCollapsed(false)}
+                className="p-2 rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition-colors"
+                title="Show lesson list"
+              >
+                <List className="w-4 h-4" />
+              </button>
+              <div className="w-full h-px" style={{ backgroundColor: 'rgba(255,255,255,0.08)' }} />
               {sortedLessons.map((l, idx) => (
                 <button
                   key={l.id}
                   onClick={() => setCurrentIdx(idx)}
-                  className={cn(
-                    'w-full flex items-center gap-2.5 px-3 py-2.5 text-left text-sm transition-all',
-                    idx === currentIdx ? 'text-white' : 'text-white/50 hover:text-white/80 hover:bg-white/5'
-                  )}
-                  style={idx === currentIdx ? { backgroundColor: 'rgba(129, 182, 76, 0.15)' } : undefined}
+                  title={l.title}
+                  className="p-1 rounded-full transition-all"
                 >
                   {l.completed
-                    ? <CheckCircle2 className="w-4 h-4 shrink-0" style={{ color: CHESSCOM_GREEN }} />
+                    ? <CheckCircle2 className="w-4 h-4" style={{ color: CHESSCOM_GREEN }} />
                     : <div className={cn(
-                        'w-4 h-4 shrink-0 rounded-full border-2',
-                        idx === currentIdx ? 'border-white/50' : 'border-white/20'
+                        'w-4 h-4 rounded-full border-2',
+                        idx === currentIdx ? 'border-white' : 'border-white/20'
                       )} />
                   }
-                  <span className="line-clamp-2 leading-snug text-xs font-medium">{l.title}</span>
                 </button>
               ))}
             </div>
-          </div>
+          ) : (
+            <div className="hidden lg:flex flex-col w-56 shrink-0 rounded-xl overflow-hidden" style={{ backgroundColor: BG_DARK }}>
+              <div className="px-4 py-3 flex items-center justify-between gap-2" style={{ backgroundColor: BG_CARD }}>
+                <div className="flex items-center gap-2">
+                  <List className="w-4 h-4" style={{ color: CHESSCOM_GREEN }} />
+                  <span className="font-bold text-sm text-white/80">Lessons</span>
+                </div>
+                <button
+                  onClick={() => setDesktopSidebarCollapsed(true)}
+                  className="p-1 rounded-md text-white/40 hover:text-white hover:bg-white/10 transition-colors"
+                  title="Collapse"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="py-1 max-h-[70vh] overflow-y-auto overscroll-contain">
+                {sortedLessons.map((l, idx) => (
+                  <button
+                    key={l.id}
+                    onClick={() => setCurrentIdx(idx)}
+                    className={cn(
+                      'w-full flex items-center gap-2.5 px-3 py-2.5 text-left text-sm transition-all',
+                      idx === currentIdx ? 'text-white' : 'text-white/50 hover:text-white/80 hover:bg-white/5'
+                    )}
+                    style={idx === currentIdx ? { backgroundColor: 'rgba(129, 182, 76, 0.15)' } : undefined}
+                  >
+                    {l.completed
+                      ? <CheckCircle2 className="w-4 h-4 shrink-0" style={{ color: CHESSCOM_GREEN }} />
+                      : <div className={cn(
+                          'w-4 h-4 shrink-0 rounded-full border-2',
+                          idx === currentIdx ? 'border-white/50' : 'border-white/20'
+                        )} />
+                    }
+                    <span className="line-clamp-2 leading-snug text-xs font-medium">{l.title}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Mobile sidebar toggle */}
           <div className="lg:hidden fixed bottom-24 right-4 z-50">
