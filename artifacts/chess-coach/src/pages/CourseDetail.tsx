@@ -539,6 +539,8 @@ export function CourseDetail() {
                     drillExpectedMove={lesson.drillExpectedMove ?? null}
                     drillHint={lesson.drillHint ?? null}
                     content={lesson.content ?? null}
+                    extraChallenges={lesson.extraChallenges ?? null}
+                    conceptTitle={lesson.conceptTitle ?? null}
                   />
                 )}
 

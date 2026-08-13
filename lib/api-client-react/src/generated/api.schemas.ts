@@ -233,6 +233,18 @@ export interface Lesson {
   drillExpectedMove?: string | null;
   /** @nullable */
   drillHint?: string | null;
+  /** @nullable */
+  extraChallenges?: LessonChallenge[] | null;
+  /** @nullable */
+  conceptTitle?: string | null;
+}
+
+export interface LessonChallenge {
+  fen: string;
+  expectedMove: string;
+  hint: string;
+  /** @nullable */
+  contextPgn?: string | null;
 }
 
 export interface CourseWithLessons {

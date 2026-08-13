@@ -81,7 +81,15 @@ function readJobs(userId: string | null | undefined, type: JobType): Job[] {
     const raw = localStorage.getItem(JOB_CONFIG[type].storageKey + userId);
     if (!raw) return [];
     const parsed = JSON.parse(raw) as Job[];
-    return Array.isArray(parsed) ? parsed : [];
+    if (!Array.isArray(parsed)) return [];
+    // Dedupe by jobId — cleans up any duplicate entries that already
+    // accumulated in a user's localStorage before this fix, not just new ones.
+    const seen = new Set<string>();
+    return parsed.filter((job) => {
+      if (seen.has(job.jobId)) return false;
+      seen.add(job.jobId);
+      return true;
+    });
   } catch {
     return [];
   }
@@ -104,6 +112,8 @@ export function trackBackgroundJob(type: JobType, jobId: string) {
   try {
     const raw = sessionStorage.getItem('newBgJobs') || '[]';
     const arr = JSON.parse(raw) as Job[];
+    const alreadyQueued = arr.some((j) => j.jobId === jobId && j.type === type);
+    if (alreadyQueued) return;
     arr.push({ jobId, type, addedAt: Date.now() });
     sessionStorage.setItem('newBgJobs', JSON.stringify(arr));
     window.dispatchEvent(new CustomEvent('bg-jobs-changed'));
@@ -125,8 +135,18 @@ export function BackgroundJobsWatcher() {
       try {
         const raw = sessionStorage.getItem('newBgJobs');
         if (!raw) return;
-        const incoming = JSON.parse(raw) as Job[];
-        if (!Array.isArray(incoming) || incoming.length === 0) return;
+        const incomingRaw = JSON.parse(raw) as Job[];
+        if (!Array.isArray(incomingRaw) || incomingRaw.length === 0) return;
+        // Dedupe within the incoming batch itself first — trackBackgroundJob
+        // now prevents new duplicates, but this also cleans up any that
+        // already piled up in sessionStorage before that fix.
+        const seenInBatch = new Set<string>();
+        const incoming = incomingRaw.filter((job) => {
+          const key = `${job.type}:${job.jobId}`;
+          if (seenInBatch.has(key)) return false;
+          seenInBatch.add(key);
+          return true;
+        });
         const byType = new Map<JobType, Job[]>();
         for (const job of incoming) {
           if (!byType.has(job.type)) byType.set(job.type, []);
@@ -179,7 +199,11 @@ export function BackgroundJobsWatcher() {
             queryClient.invalidateQueries({ queryKey: qk });
           }
         }
-        setCompleted((prev) => [...prev, ...newlyDone]);
+        setCompleted((prev) => {
+          const existingIds = new Set(prev.map((j) => j.jobId));
+          const trulyNew = newlyDone.filter((j) => !existingIds.has(j.jobId));
+          return [...prev, ...trulyNew];
+        });
       }
     };
 

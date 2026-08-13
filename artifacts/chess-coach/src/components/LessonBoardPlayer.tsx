@@ -4,7 +4,7 @@ import { Chess } from 'chess.js';
 import {
   Play, Pause, SkipBack, SkipForward, ChevronLeft, ChevronRight,
   MessageSquare, Swords, CheckCircle2, Lightbulb, Eye, RotateCcw,
-  Trophy, Repeat2, Check, AlertTriangle,
+  Trophy, Repeat2, Check, AlertTriangle, GraduationCap,
 } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -107,11 +107,23 @@ function buildStepsFromContent(
   const fullMoveNumber = parseInt(fen.split(' ')[5]) || 1;
   const turnColor: 'w' | 'b' = fen.split(' ')[1] === 'b' ? 'b' : 'w';
 
+  // The Concept section (if present) has no specific chess move attached to
+  // it — it's general teaching, not tied to this position — so it would be
+  // silently skipped by the move-parsing loop below. It gets used as the
+  // comment for the initial "study this position" step instead, which
+  // already exists precisely for non-move content.
+  const conceptMatch = content.match(/##\s*The Concept\s*\n+([\s\S]*?)(?=\n+##|$)/i);
+  const introComment = conceptMatch
+    ? conceptMatch[1].trim().replace(/\*\*([^*]+)\*\*/g, '$1')
+    : 'Study this position.';
+
   const steps: Step[] = [
-    { fen, san: null, comment: 'Study this position.', moveNum: 0, fullMoveNumber, color: null },
+    { fen, san: null, comment: introComment, moveNum: 0, fullMoveNumber, color: null },
   ];
 
-  const contentParts = content.split(/\n\n+/).filter(s => s.trim().length > 0);
+  const contentParts = content
+    .replace(/##\s*The Concept\s*\n+[\s\S]*?(?=\n+##|$)/i, '')
+    .split(/\n\n+/).filter(s => s.trim().length > 0);
   const grouped: string[] = [];
   for (let i = 0; i < contentParts.length; i++) {
     const t = contentParts[i].trim();
@@ -300,9 +312,18 @@ function parsePgnSteps(pgn: string, content?: string | null, drillExpectedMove?:
       : 1;
     const startColor = startFen.split(' ')[1] === 'b' ? 1 : 0;
 
+    // The Concept section (general chess teaching, not tied to this specific
+    // position) has no move attached to it, so it can't come through as a
+    // PGN move comment — it's surfaced here instead, on the initial
+    // "before any moves" step.
+    const conceptMatch = content?.match(/##\s*The Concept\s*\n+([\s\S]*?)(?=\n+##|$)/i);
+    const introComment = conceptMatch
+      ? conceptMatch[1].trim().replace(/\*\*([^*]+)\*\*/g, '$1')
+      : (comments[0] || undefined);
+
     const player = new Chess(startFen);
     const steps: Step[] = [
-      { fen: startFen, san: null, comment: comments[0], moveNum: 0, fullMoveNumber: startFullMove, color: null },
+      { fen: startFen, san: null, comment: introComment ?? '', moveNum: 0, fullMoveNumber: startFullMove, color: null },
     ];
 
     for (let i = 0; i < history.length; i++) {
@@ -387,6 +408,13 @@ function parsePgnSteps(pgn: string, content?: string | null, drillExpectedMove?:
 type DrillState = 'idle' | 'correct' | 'wrong' | 'revealed';
 type Tab = 'lesson' | 'drill' | 'repeat';
 
+interface LessonChallengeProp {
+  fen: string;
+  expectedMove: string;
+  hint?: string | null;
+  contextPgn?: string | null;
+}
+
 interface LessonBoardPlayerProps {
   pgn: string;
   fixPgn?: string | null;
@@ -396,6 +424,8 @@ interface LessonBoardPlayerProps {
   drillExpectedMove?: string | null;
   drillHint?: string | null;
   content?: string | null;
+  extraChallenges?: LessonChallengeProp[] | null;
+  conceptTitle?: string | null;
 }
 
 function buildFrontendFixPgn(mistakePgn: string, drillExpectedMove: string | null | undefined): string | null {
@@ -462,7 +492,7 @@ function buildFrontendFixPgn(mistakePgn: string, drillExpectedMove: string | nul
   }
 }
 
-export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, drillExpectedMove, drillHint, content }: LessonBoardPlayerProps) {
+export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, drillExpectedMove, drillHint, content, extraChallenges, conceptTitle }: LessonBoardPlayerProps) {
   const [, navigate] = useLocation();
   const activePgn = useMemo(() => {
     if (showFixLine) {
@@ -501,7 +531,7 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
   const [drillState, setDrillState] = useState<DrillState>('idle');
   const [drillAttempts, setDrillAttempts] = useState(0);
   const [showHint, setShowHint] = useState(false);
-  const [drillPosition, setDrillPosition] = useState<string>(() => drillFen || '');
+  const [drillPosition, setDrillPosition] = useState<string>('');
 
   // ── Repeat drill state ───────────────────────────────────────────────────────
   const totalRepeatMoves = Math.max((steps?.length ?? 1) - 1, 0);
@@ -549,19 +579,60 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
     else if (btnBottom > containerBottom) container.scrollTop = btnBottom - container.clientHeight + 8;
   }, [currentStep]);
 
-  const hasDrill = !!(drillFen && drillExpectedMove);
+  const allChallenges = useMemo(() => {
+    const list: { fen: string; expectedMove: string; hint: string | null }[] = [];
+    if (drillFen && drillExpectedMove) {
+      list.push({ fen: drillFen, expectedMove: drillExpectedMove, hint: drillHint ?? null });
+    }
+    if (extraChallenges) {
+      for (const c of extraChallenges) {
+        if (c.fen && c.expectedMove) list.push({ fen: c.fen, expectedMove: c.expectedMove, hint: c.hint ?? null });
+      }
+    }
+    return list;
+  }, [drillFen, drillExpectedMove, drillHint, extraChallenges]);
+
+  const [currentChallengeIndex, setCurrentChallengeIndex] = useState(0);
+  const activeChallenge = allChallenges[currentChallengeIndex] ?? null;
+  const isMultiChallenge = allChallenges.length > 1;
+  const [showingConceptIntro, setShowingConceptIntro] = useState(isMultiChallenge);
+
+  const hasDrill = allChallenges.length > 0;
   const hasRepeat = (steps?.length ?? 0) > 1;
+
+  const drillMoveArrow = useMemo(() => {
+    if (!activeChallenge) return null;
+    try {
+      const chess = new Chess(activeChallenge.fen);
+      const move = chess.move(activeChallenge.expectedMove);
+      if (!move) return null;
+      return { from: move.from, to: move.to };
+    } catch {
+      return null;
+    }
+  }, [activeChallenge]);
 
   const [drillSelectedSq, setDrillSelectedSq] = useState<string | null>(null);
   const [repeatSelectedSq, setRepeatSelectedSq] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (activeChallenge) {
+      setDrillPosition(activeChallenge.fen);
+      setDrillState('idle');
+      setDrillAttempts(0);
+      setShowHint(false);
+      setDrillSelectedSq(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentChallengeIndex, activeChallenge?.fen]);
+
   const getDrillLegalTargets = useCallback((sq: string | null): string[] => {
-    if (!sq || !drillFen) return [];
+    if (!sq || !activeChallenge) return [];
     try {
-      const chess = new Chess(drillFen);
+      const chess = new Chess(activeChallenge.fen);
       return chess.moves({ square: sq as any, verbose: true }).map(m => m.to);
     } catch { return []; }
-  }, [drillFen]);
+  }, [activeChallenge]);
 
   const getRepeatLegalTargets = useCallback((sq: string | null): string[] => {
     if (!sq || !steps) return [];
@@ -591,17 +662,17 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
   // ── Drill handlers ───────────────────────────────────────────────────────────
   const handleDrillDrop = useCallback((args: { sourceSquare: string; targetSquare: string | null; piece: unknown }) => {
     if (drillState === 'correct' || drillState === 'revealed') return false;
-    if (!drillFen || !drillExpectedMove || !args.targetSquare) return false;
+    if (!activeChallenge || !args.targetSquare) return false;
     if (args.sourceSquare === args.targetSquare) return false;
 
     try {
-      const chess = new Chess(drillFen);
+      const chess = new Chess(activeChallenge.fen);
       const move = chess.move({ from: args.sourceSquare, to: args.targetSquare, promotion: 'q' });
       if (!move) return false;
 
       const normalize = (s: string) => s.replace(/[+#!?]/g, '').trim();
-      const isCorrect = normalize(move.san) === normalize(drillExpectedMove) ||
-        move.to === drillExpectedMove.slice(-2);
+      const isCorrect = normalize(move.san) === normalize(activeChallenge.expectedMove) ||
+        move.to === activeChallenge.expectedMove.slice(-2);
 
       setDrillAttempts(a => a + 1);
       if (isCorrect) {
@@ -616,10 +687,10 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
     } catch {
       return false;
     }
-  }, [drillFen, drillExpectedMove, drillState]);
+  }, [activeChallenge, drillState]);
 
   const handleDrillSquareClick = useCallback(({ square, piece }: { square: string; piece: { pieceType: string } | null }) => {
-    if (drillState === 'correct' || drillState === 'revealed' || !drillFen) return;
+    if (drillState === 'correct' || drillState === 'revealed' || !activeChallenge) return;
     if (drillSelectedSq) {
       if (square === drillSelectedSq) { setDrillSelectedSq(null); return; }
       if (drillLegalTargets.includes(square)) {
@@ -632,25 +703,31 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
     }
     if (piece) {
       try {
-        const chess = new Chess(drillFen);
+        const chess = new Chess(activeChallenge.fen);
         if (piece.pieceType[0].toLowerCase() === chess.turn()) setDrillSelectedSq(square);
       } catch { setDrillSelectedSq(square); }
     }
-  }, [drillState, drillFen, drillSelectedSq, drillLegalTargets, handleDrillDrop]);
+  }, [drillState, activeChallenge, drillSelectedSq, drillLegalTargets, handleDrillDrop]);
 
   const resetDrill = () => {
     setDrillState('idle');
     setDrillAttempts(0);
     setShowHint(false);
-    setDrillPosition(drillFen || '');
+    setDrillPosition(activeChallenge?.fen || '');
     setDrillSelectedSq(null);
   };
 
+  const goToNextChallenge = () => {
+    if (currentChallengeIndex < allChallenges.length - 1) {
+      setCurrentChallengeIndex(i => i + 1);
+    }
+  };
+
   const revealAnswer = () => {
-    if (!drillFen || !drillExpectedMove) return;
+    if (!activeChallenge) return;
     try {
-      const chess = new Chess(drillFen);
-      chess.move(drillExpectedMove);
+      const chess = new Chess(activeChallenge.fen);
+      chess.move(activeChallenge.expectedMove);
       setDrillPosition(chess.fen());
     } catch { /* ignore */ }
     setDrillState('revealed');
@@ -1366,33 +1443,91 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
       )}
 
       {/* ── DRILL TAB ─────────────────────────────────────────────────────── */}
-      {tab === 'drill' && hasDrill && (
+      {tab === 'drill' && hasDrill && showingConceptIntro && isMultiChallenge && (
+        <div className="flex flex-col">
+          <div className="px-2 pt-2 pb-0.5 md:px-3 md:pt-3 md:pb-1">
+            <div className="flex items-end gap-2">
+              <div className="w-9 h-9 rounded-full shrink-0 flex items-center justify-center"
+                style={{ background: `linear-gradient(160deg, ${CHESSCOM_GREEN}, #5f8a3a)`, boxShadow: '0 2px 8px rgba(0,0,0,0.25)' }}>
+                <GraduationCap className="w-5 h-5 text-white" />
+              </div>
+              <div className="relative flex-1 rounded-2xl rounded-bl-sm px-3 py-2 md:px-4 md:py-3 shadow-sm bg-white/95">
+                <p className="text-sm font-bold text-gray-900">
+                  {conceptTitle ? `Learn how to spot: ${conceptTitle}` : 'Learn this pattern before practicing it.'}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  {allChallenges.length} real positions from your own games, all sharing this same idea.
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="px-2 pb-1 max-w-[480px] mx-auto w-full">
+            <div className="relative rounded-xl overflow-hidden">
+              <Chessboard
+                options={{
+                  position: allChallenges[0]?.fen ?? '',
+                  allowDragging: false,
+                  boardOrientation: boardOrientation,
+                  boardStyle: { borderRadius: '6px', overflow: 'hidden' },
+                  darkSquareStyle: { backgroundColor: BOARD_DARK },
+                  lightSquareStyle: { backgroundColor: BOARD_LIGHT },
+                }}
+              />
+            </div>
+          </div>
+          <div className="px-3 py-3">
+            <button
+              onClick={() => setShowingConceptIntro(false)}
+              className="w-full py-3 rounded-xl text-sm font-black text-white flex items-center justify-center gap-2"
+              style={{ backgroundColor: CHESSCOM_GREEN }}
+            >
+              Start <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {tab === 'drill' && hasDrill && !(showingConceptIntro && isMultiChallenge) && (
         <div className="flex flex-col">
           {/* Commentary */}
           <div className="px-2 pt-2 pb-0.5 md:px-3 md:pt-3 md:pb-1">
-            <div className={cn(
-              'rounded-xl px-3 py-2 md:px-4 md:py-3 shadow-sm',
-              drillState === 'correct' ? 'bg-emerald-50 border border-emerald-200'
-                : drillState === 'revealed' ? 'bg-amber-50 border border-amber-200'
-                : 'bg-white/95'
-            )}>
-              <div className="flex items-start gap-3">
-                <div className="w-7 h-7 rounded-full bg-blue-500 flex items-center justify-center shrink-0 mt-0.5">
-                  <Swords className="w-3.5 h-3.5 text-white" />
-                </div>
-                <div>
-                  <p className="text-sm font-bold text-gray-900 mb-0.5">Find the best move</p>
-                  <p className="text-xs text-gray-500">
-                    {drillState === 'correct'
-                      ? `Excellent! ${drillExpectedMove} is correct!`
-                      : drillState === 'revealed'
-                      ? `The answer was ${drillExpectedMove}.`
-                      : 'Drag a piece on the board to make your move.'}
-                  </p>
-                  {drillAttempts > 0 && drillState !== 'correct' && drillState !== 'revealed' && (
-                    <p className="text-xs text-orange-600 mt-1 font-medium">{drillAttempts} attempt{drillAttempts > 1 ? 's' : ''} so far</p>
-                  )}
-                </div>
+            <div className="flex items-end gap-2">
+              <div className="w-9 h-9 rounded-full shrink-0 flex items-center justify-center"
+                style={{ background: `linear-gradient(160deg, ${CHESSCOM_GREEN}, #5f8a3a)`, boxShadow: '0 2px 8px rgba(0,0,0,0.25)' }}>
+                <GraduationCap className="w-5 h-5 text-white" />
+              </div>
+              <div className={cn(
+                'relative flex-1 rounded-2xl rounded-bl-sm px-3 py-2 md:px-4 md:py-3 shadow-sm',
+                drillState === 'correct' ? 'bg-emerald-50 border border-emerald-200'
+                  : drillState === 'revealed' ? 'bg-amber-50 border border-amber-200'
+                  : 'bg-white/95'
+              )}>
+                {isMultiChallenge && (
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                      Challenge {currentChallengeIndex + 1}/{allChallenges.length}
+                    </span>
+                    <div className="flex gap-1">
+                      {allChallenges.map((_, i) => (
+                        <div key={i} className={cn(
+                          'h-1 w-4 rounded-full',
+                          i < currentChallengeIndex ? 'bg-emerald-400' : i === currentChallengeIndex ? 'bg-blue-400' : 'bg-gray-200'
+                        )} />
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <p className="text-sm font-bold text-gray-900 mb-0.5">Find the best move</p>
+                <p className="text-xs text-gray-500">
+                  {drillState === 'correct'
+                    ? `Excellent! ${activeChallenge?.expectedMove} is correct!`
+                    : drillState === 'revealed'
+                    ? `The answer was ${activeChallenge?.expectedMove}.`
+                    : 'Drag a piece on the board to make your move.'}
+                </p>
+                {drillAttempts > 0 && drillState !== 'correct' && drillState !== 'revealed' && (
+                  <p className="text-xs text-orange-600 mt-1 font-medium">{drillAttempts} attempt{drillAttempts > 1 ? 's' : ''} so far</p>
+                )}
               </div>
             </div>
           </div>
@@ -1402,13 +1537,16 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
             <div className="relative">
               <Chessboard
                 options={{
-                  position: drillState === 'idle' || drillState === 'wrong' ? drillFen! : drillPosition,
+                  position: (drillState === 'idle' || drillState === 'wrong') ? (activeChallenge?.fen ?? '') : drillPosition,
                   allowDragging: drillState !== 'correct' && drillState !== 'revealed',
                   boardOrientation: boardOrientation,
                   dragActivationDistance: 8,
                   onPieceDrop: drillState === 'correct' || drillState === 'revealed' ? () => false : handleDrillDrop,
                   onSquareClick: handleDrillSquareClick,
                   squareStyles: drillSquareStyles,
+                  arrows: (drillState === 'correct' || drillState === 'revealed') && drillMoveArrow
+                    ? [{ startSquare: drillMoveArrow.from, endSquare: drillMoveArrow.to, color: drillState === 'correct' ? 'rgba(52,211,153,0.85)' : 'rgba(245,158,11,0.85)' }]
+                    : undefined,
                   boardStyle: { borderRadius: '6px', overflow: 'hidden', cursor: 'pointer' },
                   darkSquareStyle: { backgroundColor: BOARD_DARK },
                   lightSquareStyle: { backgroundColor: BOARD_LIGHT },
@@ -1439,31 +1577,49 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
                 <motion.div key="ok" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
                   className="flex items-center gap-3 p-3 rounded-xl bg-emerald-500/15 border border-emerald-500/30">
                   <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
-                  <div>
-                    <p className="text-sm font-bold text-emerald-400">Correct — {drillExpectedMove}!</p>
+                  <div className="flex-1">
+                    <p className="text-sm font-bold text-emerald-400">Correct — {activeChallenge?.expectedMove}!</p>
                     <p className="text-xs text-white/50 mt-0.5">Solved{drillAttempts > 1 ? ` in ${drillAttempts} attempts` : ' on first try'}.</p>
                   </div>
+                  {isMultiChallenge && currentChallengeIndex < allChallenges.length - 1 && (
+                    <button
+                      onClick={goToNextChallenge}
+                      className="shrink-0 px-4 py-2 rounded-lg text-sm font-bold text-white flex items-center gap-1.5"
+                      style={{ backgroundColor: CHESSCOM_GREEN }}
+                    >
+                      Next <ChevronRight className="w-4 h-4" />
+                    </button>
+                  )}
                 </motion.div>
               )}
               {drillState === 'revealed' && (
                 <motion.div key="rev" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
                   className="flex items-center gap-3 p-3 rounded-xl bg-amber-500/15 border border-amber-500/30">
                   <Eye className="w-5 h-5 text-amber-400 shrink-0" />
-                  <div>
-                    <p className="text-sm font-bold text-amber-400">Answer: {drillExpectedMove}</p>
+                  <div className="flex-1">
+                    <p className="text-sm font-bold text-amber-400">Answer: {activeChallenge?.expectedMove}</p>
                     <p className="text-xs text-white/50 mt-0.5">Study this move, then try again.</p>
                   </div>
+                  {isMultiChallenge && currentChallengeIndex < allChallenges.length - 1 && (
+                    <button
+                      onClick={goToNextChallenge}
+                      className="shrink-0 px-4 py-2 rounded-lg text-sm font-bold text-white flex items-center gap-1.5"
+                      style={{ backgroundColor: CHESSCOM_GREEN }}
+                    >
+                      Next <ChevronRight className="w-4 h-4" />
+                    </button>
+                  )}
                 </motion.div>
               )}
             </AnimatePresence>
 
-            {drillHint && drillState === 'idle' && (
+            {activeChallenge?.hint && drillState === 'idle' && (
               <div className="mt-2">
                 {showHint ? (
                   <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
                     className="flex items-start gap-2 p-3 rounded-xl bg-blue-500/10 border border-blue-500/20">
                     <Lightbulb className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
-                    <p className="text-xs text-blue-300">{drillHint}</p>
+                    <p className="text-xs text-blue-300">{activeChallenge.hint}</p>
                   </motion.div>
                 ) : (
                   <button

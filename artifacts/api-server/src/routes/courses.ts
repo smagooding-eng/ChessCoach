@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, coursesTable, lessonsTable, weaknessesTable, gamesTable, backgroundJobsTable } from "@workspace/db";
+import { db, coursesTable, lessonsTable, weaknessesTable, gamesTable, backgroundJobsTable, type LessonChallenge } from "@workspace/db";
 import { eq, desc, inArray, and, count } from "drizzle-orm";
 import {
   ListCoursesQueryParams,
@@ -30,6 +30,8 @@ interface RawLesson {
   drillFen?: string | null;
   drillExpectedMove?: string | null;
   drillHint?: string | null;
+  extraChallenges?: LessonChallenge[];
+  conceptTitle?: string | null;
 }
 
 /**
@@ -144,6 +146,26 @@ async function sanitizeLessons(lessons: RawLesson[], log?: Logger): Promise<{ le
       }
     }
 
+    if (next.extraChallenges && next.extraChallenges.length > 0) {
+      const validChallenges = next.extraChallenges.filter((challenge) => {
+        try {
+          const c = new Chess(challenge.fen);
+          const applied = c.move(challenge.expectedMove.trim());
+          return !!applied;
+        } catch {
+          return false;
+        }
+      });
+      if (validChallenges.length !== next.extraChallenges.length) {
+        log?.warn(
+          { title: lesson.title, before: next.extraChallenges.length, after: validChallenges.length },
+          "Some extra challenges failed legality check and were stripped",
+        );
+        changed = true;
+      }
+      next.extraChallenges = validChallenges.length > 0 ? validChallenges : undefined;
+    }
+
     if (changed) {
       downgraded++;
       log?.warn({ title: lesson.title }, "Lesson downgraded to text-only after verification failure");
@@ -220,6 +242,8 @@ async function runCourseGenerationJob(username: string, jobId: string, log: Logg
             drillFen: lesson.drillFen ?? null,
             drillExpectedMove: lesson.drillExpectedMove ?? null,
             drillHint: lesson.drillHint ?? null,
+            extraChallenges: lesson.extraChallenges ?? null,
+            conceptTitle: lesson.conceptTitle ?? null,
           });
         }
       } catch (err) {
@@ -436,6 +460,8 @@ router.post("/courses/generate", async (req, res): Promise<void> => {
           drillFen: lesson.drillFen ?? null,
           drillExpectedMove: lesson.drillExpectedMove ?? null,
           drillHint: lesson.drillHint ?? null,
+          extraChallenges: lesson.extraChallenges ?? null,
+          conceptTitle: lesson.conceptTitle ?? null,
         });
       }
 
@@ -516,6 +542,8 @@ async function runEndgameJob(
         drillFen: lesson.drillFen ?? null,
         drillExpectedMove: lesson.drillExpectedMove ?? null,
         drillHint: lesson.drillHint ?? null,
+        extraChallenges: lesson.extraChallenges ?? null,
+        conceptTitle: lesson.conceptTitle ?? null,
       });
     }
 

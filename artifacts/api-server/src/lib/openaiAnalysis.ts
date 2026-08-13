@@ -1069,6 +1069,13 @@ JSON format:
   }
 }
 
+interface LessonChallengeOutput {
+  fen: string;
+  expectedMove: string;
+  hint: string;
+  contextPgn?: string | null;
+}
+
 interface CourseLesson {
   title: string;
   content: string;
@@ -1078,6 +1085,8 @@ interface CourseLesson {
   drillFen?: string | null;
   drillExpectedMove?: string | null;
   drillHint?: string | null;
+  extraChallenges?: LessonChallengeOutput[];
+  conceptTitle?: string | null;
 }
 
 interface CourseOutput {
@@ -1751,6 +1760,71 @@ const CATEGORY_CONCEPT_INTROS: Partial<Record<string, string>> = {
   missed_win: "A missed win happens when a position was objectively winning, but the move played let the advantage slip away. This usually means a more forcing option — a capture, a check, or a direct threat — was overlooked in favor of a slower plan.",
 };
 
+// Rule-based tactical theme detection, grounded entirely in verified
+// engine facts (hung pieces, captures, checks) — never GPT-guessed. Used
+// to cluster 2-4 real mistakes that share a pattern into one themed,
+// multi-challenge lesson, similar to how "Remove the Defender" style
+// puzzle sets work, but built from the player's own real games instead
+// of a generic puzzle bank.
+type TacticalTheme = "hanging_piece" | "missed_capture" | "missed_check" | null;
+
+function detectTheme(mistake: TeachableMistake): TacticalTheme {
+  if (mistake.facts.hungPiece) return "hanging_piece";
+  if (mistake.bestMoveSan.includes("x")) return "missed_capture";
+  if (mistake.bestMoveSan.includes("+") || mistake.bestMoveSan.includes("#")) return "missed_check";
+  return null;
+}
+
+const THEME_CONCEPT_INTRO: Record<Exclude<TacticalTheme, null>, { title: string; intro: string }> = {
+  hanging_piece: {
+    title: "Spotting Hanging Pieces",
+    intro: "A piece is \"hanging\" when it isn't defended and can be captured for free. Before every move, it's worth a quick scan: which of my pieces could my opponent take without giving anything back? This one habit prevents a huge share of blunders at every level.",
+  },
+  missed_capture: {
+    title: "Finding the Best Capture",
+    intro: "Not every capture is worth making, but a strong capture that's available and overlooked is one of the most common ways a good position slips away. When scanning a position, checking every legal capture — even ones that don't look obviously best at first glance — catches opportunities that are easy to miss.",
+  },
+  missed_check: {
+    title: "Finding Forcing Moves",
+    intro: "Checks and forcing moves narrow your opponent's options and often reveal tactics that aren't visible otherwise. Before settling on a quiet move, it's worth asking: is there a check or a direct threat available that changes the position in my favor?",
+  },
+};
+
+/**
+ * Groups mistakes sharing a detected tactical theme into clusters of 2-4,
+ * leaving everything else as singleton groups (which render exactly like
+ * the original one-challenge-per-lesson behavior). This only groups real,
+ * verified mistakes — it never invents examples.
+ */
+function groupMistakesByTheme(mistakes: TeachableMistake[]): TeachableMistake[][] {
+  const byTheme = new Map<Exclude<TacticalTheme, null>, TeachableMistake[]>();
+  const singles: TeachableMistake[] = [];
+
+  for (const m of mistakes) {
+    const theme = detectTheme(m);
+    if (!theme) {
+      singles.push(m);
+      continue;
+    }
+    if (!byTheme.has(theme)) byTheme.set(theme, []);
+    byTheme.get(theme)!.push(m);
+  }
+
+  const groups: TeachableMistake[][] = [];
+  for (const [, themeMistakes] of byTheme) {
+    if (themeMistakes.length >= 2) {
+      groups.push(themeMistakes.slice(0, 4));
+    } else {
+      singles.push(...themeMistakes);
+    }
+  }
+  for (const m of singles) groups.push([m]);
+
+  // Keep original relative order using each group's earliest mistake.
+  groups.sort((a, b) => (a[0].gameIndex - b[0].gameIndex) || (a[0].moveNumber - b[0].moveNumber));
+  return groups;
+}
+
 async function writeGroundedLessonContent(mistake: TeachableMistake): Promise<{ title: string; content: string }> {
   const factSheet = renderFactSheet(mistake.facts);
   const moveLabel = mistake.color === "white"
@@ -1825,6 +1899,59 @@ async function buildLessonFromMistake(mistake: TeachableMistake, orderIndex: num
   };
 }
 
+/**
+ * Builds a lesson from a group of 1 or more mistakes sharing a tactical
+ * theme. A group of 1 behaves identically to buildLessonFromMistake
+ * (fully backward compatible). A group of 2+ produces a single themed
+ * lesson with a general concept intro plus a multi-challenge sequence —
+ * each challenge grounded in a different real mistake from the player's
+ * own games, not an invented example.
+ */
+async function buildLessonFromMistakeGroup(group: TeachableMistake[], orderIndex: number): Promise<CourseLesson> {
+  if (group.length === 1) {
+    return buildLessonFromMistake(group[0], orderIndex);
+  }
+
+  const primary = group[0];
+  const theme = detectTheme(primary);
+  const conceptInfo = theme ? THEME_CONCEPT_INTRO[theme] : null;
+  const { title, content } = await writeGroundedLessonContent(primary);
+
+  // Replace the auto-written "## The Concept" section with the shared
+  // theme intro so all challenges in this lesson point back to the same
+  // general idea, rather than one written for only the first example.
+  const conceptSection = conceptInfo
+    ? `## The Concept\n${conceptInfo.intro}`
+    : content.split(/##\s*The Mistake/i)[0].trim();
+  const restOfContent = content.includes("## The Mistake")
+    ? "## The Mistake" + content.split(/##\s*The Mistake/i)[1]
+    : content;
+
+  const extraChallenges: LessonChallengeOutput[] = group.slice(1).map((m) => ({
+    fen: m.fenBeforeMistake,
+    expectedMove: m.bestMoveSan,
+    hint: m.facts.hungPiece
+      ? `Watch out for the ${m.facts.hungPiece} — find the move that keeps it safe.`
+      : `Look for the engine's top idea in this position.`,
+    contextPgn: buildContextPgn(m, false),
+  }));
+
+  return {
+    title: conceptInfo ? conceptInfo.title : title,
+    content: `${conceptSection}\n\n${restOfContent}`,
+    orderIndex,
+    examplePgn: buildContextPgn(primary, false),
+    fixExamplePgn: buildContextPgn(primary, true),
+    drillFen: primary.fenBeforeMistake,
+    drillExpectedMove: primary.bestMoveSan,
+    drillHint: primary.facts.hungPiece
+      ? `Watch out for your ${primary.facts.hungPiece} — find the move that keeps it safe.`
+      : `Look for the engine's top idea in this position.`,
+    extraChallenges,
+    conceptTitle: conceptInfo?.title ?? null,
+  };
+}
+
 export async function generateExploitCourseForOpponent(
   opponentUsername: string,
   weakness: WeaknessResult,
@@ -1833,7 +1960,7 @@ export async function generateExploitCourseForOpponent(
   if (relatedGamePgns?.length) {
     const mistakes = await findTeachableMistakes(relatedGamePgns, { maxResults: 5 });
     if (mistakes.length > 0) {
-      const lessons = await Promise.all(mistakes.map((m, i) => buildLessonFromMistake(m, i)));
+      const lessons = await Promise.all(groupMistakesByTheme(mistakes).map((g, i) => buildLessonFromMistakeGroup(g, i)));
       return {
         title: `vs ${opponentUsername}: exploiting their ${weakness.category}`.slice(0, 60),
         description: `A course built from ${opponentUsername}'s actual games, targeting real moments where their ${weakness.category} showed up.`,
@@ -1928,7 +2055,7 @@ export async function generateCourseForWeakness(
   if (relatedGamePgns?.length) {
     const mistakes = await findTeachableMistakes(relatedGamePgns, { maxResults: 5 });
     if (mistakes.length > 0) {
-      const lessons = await Promise.all(mistakes.map((m, i) => buildLessonFromMistake(m, i)));
+      const lessons = await Promise.all(groupMistakesByTheme(mistakes).map((g, i) => buildLessonFromMistakeGroup(g, i)));
       return {
         title: `Fixing your ${weakness.category}`.slice(0, 60),
         description: `A course built from your own games, targeting the ${mistakes.length} clearest real moments where ${weakness.category.toLowerCase()} cost you.`,
@@ -2072,7 +2199,7 @@ export async function generateEndgameCourse(
     // for casual/rapid/blitz games decided well before move 20).
     const mistakes = await findTeachableMistakes(gamePgns, { maxResults: 5, skipOpeningPlies: 10, minPlyFraction: 0.66 });
     if (mistakes.length > 0) {
-      const lessons = await Promise.all(mistakes.map((m, i) => buildLessonFromMistake(m, i)));
+      const lessons = await Promise.all(groupMistakesByTheme(mistakes).map((g, i) => buildLessonFromMistakeGroup(g, i)));
       return {
         title: "Your Endgame Mistakes",
         description: `A course built from real endgame moments in your own games (${mistakes.length} verified mistakes).`,

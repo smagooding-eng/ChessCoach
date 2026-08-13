@@ -1,4 +1,4 @@
-import { pgTable, text, serial, timestamp, integer, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, timestamp, integer, boolean, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -15,6 +15,13 @@ export const coursesTable = pgTable("courses", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+export interface LessonChallenge {
+  fen: string;
+  expectedMove: string;
+  hint: string;
+  contextPgn?: string | null;
+}
+
 export const lessonsTable = pgTable("lessons", {
   id: serial("id").primaryKey(),
   courseId: integer("course_id").notNull().references(() => coursesTable.id),
@@ -27,6 +34,13 @@ export const lessonsTable = pgTable("lessons", {
   drillFen: text("drill_fen"),
   drillExpectedMove: text("drill_expected_move"),
   drillHint: text("drill_hint"),
+  // Additional real-game positions teaching the same concept as the
+  // primary drill above — when present, the lesson becomes a themed
+  // multi-challenge sequence (Challenge 1/N, 2/N, ...) instead of a
+  // single drill. Each entry is grounded in a different real mistake
+  // from the player's own games, same as the primary drill.
+  extraChallenges: jsonb("extra_challenges").$type<LessonChallenge[]>(),
+  conceptTitle: text("concept_title"),
   archived: boolean("archived").notNull().default(false),
 });
 

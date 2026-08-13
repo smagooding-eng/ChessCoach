@@ -457,6 +457,8 @@ async function runCourseGeneration(
           drillFen: lesson.drillFen ?? null,
           drillExpectedMove: lesson.drillExpectedMove ?? null,
           drillHint: lesson.drillHint ?? null,
+          extraChallenges: lesson.extraChallenges ?? null,
+          conceptTitle: lesson.conceptTitle ?? null,
         });
       }
 
