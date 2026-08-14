@@ -95,9 +95,9 @@ function MoveAnalysisPanel({ move, playerColor }: { move: MoveRecord; playerColo
       </p>
       <p>{summary}</p>
       {(pros.length > 0 || cons.length > 0) && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
           {pros.length > 0 && (
-            <div className="rounded-xl bg-emerald-500/8 border border-emerald-500/20 px-2.5 py-2">
+            <div className="pl-3" style={{ borderLeft: '3px solid #34d399' }}>
               <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-wide mb-1">Pros</p>
               <ul className="space-y-1">
                 {pros.map((p, i) => (
@@ -110,7 +110,7 @@ function MoveAnalysisPanel({ move, playerColor }: { move: MoveRecord; playerColo
             </div>
           )}
           {cons.length > 0 && (
-            <div className="rounded-xl bg-red-500/8 border border-red-500/20 px-2.5 py-2">
+            <div className="pl-3" style={{ borderLeft: '3px solid #ef4444' }}>
               <p className="text-[10px] font-bold text-red-400 uppercase tracking-wide mb-1">Cons</p>
               <ul className="space-y-1">
                 {cons.map((c, i) => (

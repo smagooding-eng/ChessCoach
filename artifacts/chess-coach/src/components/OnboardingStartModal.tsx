@@ -83,7 +83,7 @@ export function OnboardingStartModal({ username: initialUsername, platform: init
 
   const playNow = () => {
     onDone();
-    navigate('/practice-bots?onboarding=true');
+    navigate('/practice?onboarding=true');
   };
 
   const skip = () => {
