@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useLocation } from 'wouter';
 import { apiFetch } from '@/lib/api';
+import { trackBackgroundJob } from '@/components/BackgroundJobsWatcher';
 
 const CHESSCOM_GREEN = '#81b64c';
 const BG_CARD = '#302e2b';
@@ -72,7 +73,9 @@ export function OnboardingStartModal({ username: initialUsername, platform: init
           credentials: 'include',
           body: JSON.stringify({ username, platform, months: 3 }),
         });
-        await apiFetch('/api/games/review-all', { method: 'POST', credentials: 'include' });
+        const reviewRes = await apiFetch('/api/games/review-all', { method: 'POST', credentials: 'include' });
+        const reviewData = await reviewRes.json().catch(() => null) as { jobId?: string } | null;
+        if (reviewData?.jobId) trackBackgroundJob('gamesReview', reviewData.jobId);
         if (!cancelled) setStatus('ready');
       } catch {
         if (!cancelled) setStatus('error');

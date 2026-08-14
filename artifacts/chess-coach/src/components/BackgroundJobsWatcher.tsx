@@ -13,7 +13,7 @@ const TEXT_LIGHT = '#e8e6e3';
 const TEXT_MUTED = '#9e9b98';
 const BORDER = 'rgba(255,255,255,0.08)';
 
-export type JobType = 'courses' | 'analysis' | 'endgames' | 'opponentScout' | 'opponentCourses';
+export type JobType = 'courses' | 'analysis' | 'endgames' | 'opponentScout' | 'opponentCourses' | 'gamesReview';
 
 interface JobConfig {
   storageKey: string;
@@ -43,6 +43,15 @@ const JOB_CONFIG: Record<JobType, JobConfig> = {
     doneSubtitle: 'Your weakness breakdown has been updated.',
     ctaLabel: 'View analysis',
     ctaPath: '/analysis',
+  },
+  gamesReview: {
+    storageKey: 'pendingJobs:gamesReview:',
+    statusUrl: (id) => `/api/games/review-all-status/${id}`,
+    invalidateQueries: [['/api/games'], ['/api/analysis/summary'], ['/api/analysis/weaknesses']],
+    doneTitle: 'Your games are reviewed!',
+    doneSubtitle: 'Move-by-move analysis is ready to explore.',
+    ctaLabel: 'View reviews',
+    ctaPath: '/games',
   },
   endgames: {
     storageKey: 'pendingJobs:endgames:',
