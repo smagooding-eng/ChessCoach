@@ -383,6 +383,32 @@ router.post("/admin/users/delete", requireAdmin, async (req: Request, res: Respo
   }
 });
 
+router.post("/admin/users/:userId/premium-override", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.params;
+    const { enabled } = req.body as { enabled: boolean };
+    if (typeof enabled !== "boolean") {
+      res.status(400).json({ error: "enabled (boolean) required" });
+      return;
+    }
+
+    const [updated] = await db
+      .update(usersTable)
+      .set({ isPremiumOverride: enabled })
+      .where(eq(usersTable.id, userId))
+      .returning({ id: usersTable.id, email: usersTable.email, isPremiumOverride: usersTable.isPremiumOverride });
+
+    if (!updated) {
+      res.status(404).json({ error: "User not found" });
+      return;
+    }
+
+    res.json({ success: true, user: updated });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to update premium access", details: err.message });
+  }
+});
+
 router.get("/admin/users/:userId/usage", requireAdmin, async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
@@ -459,6 +485,7 @@ router.get("/admin/users/:userId/usage", requireAdmin, async (req: Request, res:
         referredByUserId: user.referredByUserId,
         createdAt: user.createdAt,
         lastLoginAt: user.lastLoginAt,
+        isPremiumOverride: user.isPremiumOverride,
       },
       usage: {
         gamesImported: gamesImported.count,

@@ -321,7 +321,7 @@ function AuthModal({ open, onClose, initialMode, externalError, onRegisterSucces
           initial={{ opacity: 0, scale: 0.95, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 20 }}
-          className="w-full max-w-md rounded-xl relative p-8"
+          className="w-full max-w-md rounded-xl relative p-8 max-h-[90vh] overflow-y-auto"
           style={{ background: CARD, border: `1px solid rgba(255,255,255,0.06)` }}
           onClick={(e) => e.stopPropagation()}
         >

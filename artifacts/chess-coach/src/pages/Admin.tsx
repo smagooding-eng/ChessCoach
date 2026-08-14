@@ -3,6 +3,7 @@ import { PageHero } from '@/components/DesignSystem';
 import { useLocation } from 'wouter';
 import { useUser } from '@/hooks/use-user';
 import { apiFetch } from '@/lib/api';
+import { cn } from '@/lib/utils';
 import { Link } from 'wouter';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -411,7 +412,7 @@ const FILTER_TABS: { key: UserFilter; label: string; color: string }[] = [
 ];
 
 interface UserUsage {
-  user: { id: string; email: string | null; firstName: string | null; chesscomUsername: string | null; inviteCode: string | null; referredByUserId: string | null; createdAt: string; lastLoginAt: string | null };
+  user: { id: string; email: string | null; firstName: string | null; chesscomUsername: string | null; inviteCode: string | null; referredByUserId: string | null; createdAt: string; lastLoginAt: string | null; isPremiumOverride: boolean };
   usage: { gamesImported: number; gamesReviewed: number; opponentsScouted: number; puzzlesSolved: number; puzzlesFailed: number; coursesGenerated: number; lessonsCompleted: number; pageViews: number };
   recentPages: { path: string; createdAt: string }[];
   referrals: { id: string; referredEmail: string | null; referredName: string | null; status: string; createdAt: string; convertedAt: string | null }[];
@@ -421,6 +422,8 @@ function UserDetailPanel({ userId, onBack }: { userId: string; onBack: () => voi
   const [data, setData] = useState<UserUsage | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [premiumOverride, setPremiumOverride] = useState(false);
+  const [togglingPremium, setTogglingPremium] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -430,10 +433,25 @@ function UserDetailPanel({ userId, onBack }: { userId: string; onBack: () => voi
         if (!r.ok) throw new Error('Failed to load');
         return r.json();
       })
-      .then(d => setData(d))
+      .then(d => { setData(d); setPremiumOverride(Boolean(d?.user?.isPremiumOverride)); })
       .catch(() => setError('Failed to load user stats'))
       .finally(() => setLoading(false));
   }, [userId]);
+
+  const togglePremiumOverride = async () => {
+    setTogglingPremium(true);
+    const next = !premiumOverride;
+    try {
+      const res = await apiFetch(`/api/admin/users/${userId}/premium-override`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ enabled: next }),
+      });
+      if (res.ok) setPremiumOverride(next);
+    } catch { /* leave state as-is on failure */ }
+    setTogglingPremium(false);
+  };
 
   if (loading) {
     return (
@@ -489,6 +507,17 @@ function UserDetailPanel({ userId, onBack }: { userId: string; onBack: () => voi
         </div>
         {user.inviteCode && <p className="text-[10px] text-amber-400/70 mt-1">Invite code: {user.inviteCode}</p>}
         {user.referredByUserId && <p className="text-[10px] text-emerald-400/70 mt-1">Referred by: {user.referredByUserId.slice(0, 8)}...</p>}
+        <button
+          onClick={togglePremiumOverride}
+          disabled={togglingPremium}
+          className={cn(
+            'mt-2 px-3 py-1.5 rounded-lg text-[11px] font-bold flex items-center gap-1.5 disabled:opacity-50',
+            premiumOverride ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30' : 'bg-primary/10 text-primary border border-primary/20'
+          )}
+        >
+          {togglingPremium ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+          {premiumOverride ? 'Pro access granted — click to revoke' : 'Grant free Pro access'}
+        </button>
       </div>
 
       <div className="grid grid-cols-4 gap-px bg-border/10 border-b border-border/20">
