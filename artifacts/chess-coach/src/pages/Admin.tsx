@@ -17,6 +17,7 @@ import {
 interface AdminStats {
   pageViews: { total: number; today: number };
   uniqueVisitors: { total: number; today: number; totalByIp: number; todayByIp: number };
+  funnel: { landingPageUniqueIps: number; signups: number; paying: number };
   users: { total: number; today: number };
   subscriptions: { active: number; trialing: number; canceled: number; pastDue: number; total: number };
   games: { total: number; today: number; analyzed: number };
@@ -297,6 +298,42 @@ export function Admin() {
             primary={stats.activity.positionScans}
             primaryLabel="Visits"
           />
+        </div>
+      )}
+
+      {stats && stats.funnel && (
+        <div
+          className="rounded-xl p-4"
+          style={{ background: BG_CARD, border: `1px solid rgba(255,255,255,0.05)` }}
+        >
+          <h2 className="text-base font-black mb-3" style={{ color: TEXT_LIGHT }}>
+            Conversion Funnel
+          </h2>
+          <div className="flex items-stretch gap-2">
+            {[
+              { label: 'Landing Page Visitors', value: stats.funnel.landingPageUniqueIps, sub: 'unique IPs' },
+              { label: 'Signed Up', value: stats.funnel.signups, sub: 'accounts' },
+              { label: 'Paying', value: stats.funnel.paying, sub: 'subscriptions' },
+            ].map((step, i, arr) => {
+              const prevValue = i === 0 ? step.value : arr[i - 1].value;
+              const pct = prevValue > 0 ? Math.round((step.value / prevValue) * 100) : 0;
+              return (
+                <div key={step.label} className="flex-1 flex items-center gap-2">
+                  <div className="flex-1 rounded-lg p-3 text-center" style={{ background: 'rgba(255,255,255,0.03)' }}>
+                    <p className="text-2xl font-black" style={{ color: CHESSCOM_GREEN }}>{step.value}</p>
+                    <p className="text-[10px] font-bold uppercase tracking-wider mt-1" style={{ color: TEXT_MUTED }}>{step.label}</p>
+                    <p className="text-[10px]" style={{ color: TEXT_MUTED }}>{step.sub}</p>
+                    {i > 0 && (
+                      <p className="text-[10px] font-bold mt-1" style={{ color: CHESSCOM_GREEN }}>{pct}% of previous step</p>
+                    )}
+                  </div>
+                  {i < arr.length - 1 && (
+                    <ChevronRight className="w-4 h-4 shrink-0" style={{ color: TEXT_MUTED }} />
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 

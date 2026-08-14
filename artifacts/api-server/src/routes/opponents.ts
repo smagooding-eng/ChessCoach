@@ -62,6 +62,18 @@ router.post("/opponents/start", async (req, res): Promise<void> => {
     }
   }
 
+  const { checkUsageLimit } = await import("../lib/accessControl");
+  const limitCheck = await checkUsageLimit(userId, "opponentScouts");
+  if (!limitCheck.allowed) {
+    res.status(403).json({
+      error: "usage_limit",
+      message: `Free plan includes scouting ${limitCheck.limit} opponents. Upgrade to Pro for unlimited opponent scouting!`,
+      used: limitCheck.used,
+      limit: limitCheck.limit,
+    });
+    return;
+  }
+
   const jobId = randomUUID();
   await db.insert(backgroundJobsTable).values({
     id: jobId,

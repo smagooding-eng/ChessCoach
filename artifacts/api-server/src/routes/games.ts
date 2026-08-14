@@ -174,6 +174,15 @@ router.post("/games/import", requireAuth, async (req, res): Promise<void> => {
   const userId = req.user!.id;
   const storedUsername = platformUsername.toLowerCase();
 
+  const { wouldExceedImportLimit } = await import("../lib/accessControl");
+  if (await wouldExceedImportLimit(userId, storedUsername)) {
+    res.status(402).json({
+      error: "You've reached the free plan's game import limit. Upgrade to import more games.",
+      upgradeRequired: true,
+    });
+    return;
+  }
+
   if (platform !== "chesscom" && platform !== "lichess") {
     res.status(400).json({ error: "platform must be 'chesscom' or 'lichess'" });
     return;
@@ -989,7 +998,7 @@ async function reviewOneGame(
   });
 
   await db.update(gamesTable)
-    .set({ reviewData: { ...reviewResult, _v2: true } as unknown as Record<string, unknown> })
+    .set({ reviewData: { ...reviewResult, _v2: true } as unknown as Record<string, unknown>, analyzed: true })
     .where(eq(gamesTable.id, game.id));
 }
 
@@ -1133,7 +1142,7 @@ async function runReviewJob(gameId: number, jobId: string, log: Logger): Promise
     });
 
     await db.update(gamesTable)
-      .set({ reviewData: { ...reviewResult, _v2: true } as unknown as Record<string, unknown> })
+      .set({ reviewData: { ...reviewResult, _v2: true } as unknown as Record<string, unknown>, analyzed: true })
       .where(eq(gamesTable.id, gameId));
 
     await db.update(backgroundJobsTable).set({

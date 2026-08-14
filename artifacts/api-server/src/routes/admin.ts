@@ -101,6 +101,11 @@ router.get("/admin/stats", requireAdmin, async (_req: Request, res: Response) =>
       .from(pageViewsTable)
       .where(excludeAdmin);
 
+    const [landingPageUniqueIpResult] = await db
+      .select({ count: countDistinct(pageViewsTable.ipAddress) })
+      .from(pageViewsTable)
+      .where(and(eq(pageViewsTable.path, '/'), excludeAdmin));
+
     const [todayUniqueByIpResult] = await db
       .select({ count: countDistinct(pageViewsTable.ipAddress) })
       .from(pageViewsTable)
@@ -158,6 +163,11 @@ router.get("/admin/stats", requireAdmin, async (_req: Request, res: Response) =>
         today: todayUniqueResult.count,
         totalByIp: totalUniqueByIpResult.count,
         todayByIp: todayUniqueByIpResult.count,
+      },
+      funnel: {
+        landingPageUniqueIps: landingPageUniqueIpResult.count,
+        signups: totalUsersResult.count,
+        paying: subBreakdown.active + subBreakdown.trialing,
       },
       users: { total: totalUsersResult.count, today: todayUsersResult.count },
       subscriptions: subBreakdown,
@@ -645,8 +655,8 @@ Return VALID JSON only:
 }`;
 
     const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      max_tokens: 2500,
+      model: "gpt-5.6-luna",
+      max_completion_tokens: 2500,
       messages: [{ role: "user", content: prompt }],
       response_format: { type: "json_object" },
     });

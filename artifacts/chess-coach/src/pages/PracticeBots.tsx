@@ -922,6 +922,10 @@ function readJumpInParams(): { fen: string; rating: number; color?: 'w' | 'b' } 
   return { fen, rating: rating ? parseInt(rating, 10) : 1200, color: color === 'w' || color === 'b' ? color : undefined };
 }
 
+function readInitialTabParam(): 'bots' | 'openings' {
+  return new URLSearchParams(window.location.search).get('tab') === 'openings' ? 'openings' : 'bots';
+}
+
 function readOnboardingParam(): boolean {
   return new URLSearchParams(window.location.search).get('onboarding') === 'true';
 }
@@ -933,7 +937,7 @@ export function PracticeBots() {
     isOnboarding ? (BOTS.find(b => b.rating === 1200) ?? null) : jumpIn ? findBotAboveRating(jumpIn.rating) : null
   );
   const [selectedOpening, setSelectedOpening] = useState<OpeningLine | null>(null);
-  const [tab, setTab] = useState<'bots' | 'openings'>('bots');
+  const [tab, setTab] = useState<'bots' | 'openings'>(readInitialTabParam);
 
   // Strip the ?fen=&rating=&color=&onboarding= params from the URL exactly
   // once, after mount — not as a side effect inside the useState

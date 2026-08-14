@@ -95,15 +95,14 @@ async function getTodayAttemptCount(userId: string): Promise<number> {
 router.get("/puzzles/next", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
-    const premium = await checkPremiumStatus(userId);
-
-    const todayCount = await getTodayAttemptCount(userId);
-    if (!premium && todayCount >= FREE_DAILY_LIMIT) {
+    const { checkUsageLimit } = await import("../lib/accessControl");
+    const limitCheck = await checkUsageLimit(userId, "puzzles");
+    if (!limitCheck.allowed) {
       res.status(403).json({
-        error: "daily_limit",
-        message: `Free users can solve ${FREE_DAILY_LIMIT} puzzles per day. Upgrade to Pro for unlimited puzzles!`,
-        used: todayCount,
-        limit: FREE_DAILY_LIMIT,
+        error: "usage_limit",
+        message: `Free plan includes ${limitCheck.limit} puzzles. Upgrade to Pro for unlimited puzzles!`,
+        used: limitCheck.used,
+        limit: limitCheck.limit,
       });
       return;
     }
@@ -208,9 +207,9 @@ router.get("/puzzles/next", requireAuth, async (req: Request, res: Response) => 
         explanation: puzzle.explanation ?? null,
       },
       daily: {
-        used: todayCount,
-        limit: premium ? null : FREE_DAILY_LIMIT,
-        premium,
+        used: limitCheck.used,
+        limit: limitCheck.limit === Infinity ? null : limitCheck.limit,
+        premium: limitCheck.limit === Infinity,
       },
     });
   } catch (err: any) {
@@ -256,7 +255,8 @@ router.get("/puzzles/stats", requireAuth, async (req: Request, res: Response) =>
 
     const total = totalResult?.count ?? 0;
     const solved = solvedResult?.count ?? 0;
-    const premium = await checkPremiumStatus(userId);
+    const { checkUsageLimit } = await import("../lib/accessControl");
+    const limitCheck = await checkUsageLimit(userId, "puzzles");
 
     res.json({
       total,
@@ -265,8 +265,9 @@ router.get("/puzzles/stats", requireAuth, async (req: Request, res: Response) =>
       accuracy: total > 0 ? Math.round((solved / total) * 100) : 0,
       streak,
       todayCount,
-      dailyLimit: premium ? null : FREE_DAILY_LIMIT,
-      premium,
+      dailyLimit: limitCheck.allowed && limitCheck.limit === Infinity ? null : limitCheck.limit,
+      used: limitCheck.used,
+      premium: limitCheck.limit === Infinity,
     });
   } catch {
     res.status(500).json({ error: "Failed to get puzzle stats" });

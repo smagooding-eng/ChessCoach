@@ -97,6 +97,13 @@ export function Openings() {
         subtitle={`${totalGames} games imported · click any opening to view stats & practice`}
       />
 
+      <button
+        onClick={() => navigate('/practice?tab=openings')}
+        className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground font-bold text-sm transition-all"
+      >
+        <BookOpen className="w-4 h-4" /> Practice Your Openings Against the Trainer Bot
+      </button>
+
       {openings.length === 0 ? (
         <div className="text-center py-24 text-muted-foreground border-2 border-dashed border-border rounded-xl">
           <BookOpen className="w-12 h-12 mx-auto mb-4 opacity-20" />

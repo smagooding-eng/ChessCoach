@@ -1117,7 +1117,7 @@ export function LandingPage() {
               { icon: Search, title: 'Scan Position', desc: 'Snap a photo of any position and explore it on an interactive board', accent: false },
               { icon: Gamepad2, title: 'Practice Bots', desc: '8 bot opponents from 400 to 2000 ELO with live move analysis', accent: false },
               { icon: TrendingUp, title: 'Track Progress', desc: 'See your improvement over time across openings, tactics, and endgames', accent: false },
-              { icon: Crosshair, title: 'Opponent Scout', desc: 'Prepare for specific opponents (optional) — useful for tournaments and rivals', accent: false },
+              { icon: Crosshair, title: 'Opponent Scout', desc: 'Prepare for specific opponents (optional) — useful for tournaments and rivals', accent: true },
             ].map((item, i) => (
               <motion.div
                 key={item.title}

@@ -302,6 +302,18 @@ router.post("/courses/generate-start", async (req, res): Promise<void> => {
     return;
   }
 
+  const { checkUsageLimit } = await import("../lib/accessControl");
+  const limitCheck = await checkUsageLimit(userId, "courses");
+  if (!limitCheck.allowed) {
+    res.status(403).json({
+      error: "usage_limit",
+      message: `Free plan includes ${limitCheck.limit} courses. Upgrade to Pro for unlimited courses!`,
+      used: limitCheck.used,
+      limit: limitCheck.limit,
+    });
+    return;
+  }
+
   const jobId = randomUUID();
   await db.insert(backgroundJobsTable).values({
     id: jobId,
@@ -603,6 +615,18 @@ router.post("/courses/endgame/generate-start", async (req, res): Promise<void> =
   );
   if (pending) {
     res.json({ jobId: pending.id });
+    return;
+  }
+
+  const { checkUsageLimit } = await import("../lib/accessControl");
+  const limitCheck = await checkUsageLimit(userId, "courses");
+  if (!limitCheck.allowed) {
+    res.status(403).json({
+      error: "usage_limit",
+      message: `Free plan includes ${limitCheck.limit} courses. Upgrade to Pro for unlimited courses!`,
+      used: limitCheck.used,
+      limit: limitCheck.limit,
+    });
     return;
   }
 

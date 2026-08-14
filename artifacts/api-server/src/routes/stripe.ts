@@ -98,20 +98,7 @@ router.get('/stripe/subscription', async (req: Request, res: Response) => {
       }
     }
 
-    if (user?.createdAt) {
-      const trial = getTrialInfo(user.createdAt);
-      if (trial.isActive) {
-        res.json({
-          subscription: null,
-          status: 'free_trial',
-          trialDaysLeft: trial.daysLeft,
-          trialEndsAt: trial.endsAt,
-        });
-        return;
-      }
-    }
-
-    res.json({ subscription: null, status: 'none' });
+    res.json({ subscription: null, status: 'free' });
   } catch (err: any) {
     res.status(500).json({ error: 'Failed to get subscription' });
   }

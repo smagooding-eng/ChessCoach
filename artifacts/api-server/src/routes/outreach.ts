@@ -173,8 +173,8 @@ Write a single, specific, genuine-sounding reply to this exact situation. It mus
 Return plain text only — just the reply itself, no preamble, no markdown formatting, no quotes around it.`;
 
     const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      max_tokens: 500,
+      model: "gpt-5.6-luna",
+      max_completion_tokens: 500,
       messages: [{ role: "user", content: prompt }],
     });
 

@@ -14,11 +14,12 @@ const PREMIUM_FEATURES = [
 ];
 
 const FREE_FEATURES = [
-  'Import games from chess.com',
+  'Import & review your first 20 games',
   'View game history & replay moves',
   'Basic performance dashboard',
-  'Practice against bots (all levels)',
+  'Practice against bots — unlimited',
   'Opening repertoire explorer',
+  '10 puzzles, 3 opponent scouting reports, 5 courses',
 ];
 
 interface PriceInfo {
@@ -150,31 +151,16 @@ export function Subscription() {
       <div className="flex flex-col items-center text-center mb-8">
         <PieceTile piece="♛" size={56} />
         <h1 className="text-2xl md:text-3xl font-black mt-3 mb-2" style={{ letterSpacing: '-0.02em' }}>
-          {subscription.status === 'free_trial'
-            ? 'Free Trial'
-            : isPremium ? 'Your Premium Plan' : 'Upgrade to Pro'}
+          {isPremium ? 'Your Premium Plan' : 'Upgrade to Pro'}
         </h1>
         <p className="text-muted-foreground max-w-lg mx-auto">
-          {subscription.status === 'free_trial'
-            ? `You have ${subscription.trialDaysLeft} day${subscription.trialDaysLeft === 1 ? '' : 's'} left in your free trial. Subscribe before it ends to keep all premium features.`
-            : isPremium
-              ? 'You have access to all premium features.'
-              : 'Your free trial has ended. Subscribe to ChessScout Pro to unlock all premium features.'}
+          {isPremium
+            ? 'You have access to all premium features.'
+            : "You're on the Free plan. Subscribe to ChessScout Pro to unlock unlimited puzzles, opponent scouting, and courses."}
         </p>
       </div>
 
-      {subscription.status === 'free_trial' && (
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mb-6 max-w-md mx-auto p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 text-center text-sm"
-        >
-          <Clock className="w-4 h-4 inline-block mr-1.5 -mt-0.5" />
-          {subscription.trialDaysLeft} day{subscription.trialDaysLeft === 1 ? '' : 's'} remaining in your free trial. Add your payment info below to continue after the trial.
-        </motion.div>
-      )}
-
-      {isPremium && subscription.status !== 'free_trial' ? (
+      {isPremium ? (
         <div className="max-w-md mx-auto">
           <div className="glass-panel rounded-xl p-6 mb-6">
             <div className="flex items-center gap-3 mb-4">

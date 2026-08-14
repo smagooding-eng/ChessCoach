@@ -819,7 +819,7 @@ Return ONLY this JSON, no markdown:
 
     async function callOnce(): Promise<ScanResp> {
       const r = await ai.chat.completions.create({
-        model: "gpt-5.2",
+        model: "gpt-5.6-terra",
         max_completion_tokens: 4000,
         messages: [{
           role: "user",
@@ -1058,7 +1058,7 @@ Return ONLY this JSON, no markdown:
       let aiBbox: { x1: number; y1: number; x2: number; y2: number } | null = null;
       try {
         const bboxResp = await ai.chat.completions.create({
-          model: "gpt-5.2",
+          model: "gpt-5.6-terra",
           max_completion_tokens: 200,
           messages: [{
             role: "user",
@@ -1142,7 +1142,7 @@ Return ONLY a JSON object mapping each square to its color, nothing else. Exampl
       async function colorPass(): Promise<Record<string, string>> {
         try {
           const r = await ai.chat.completions.create({
-            model: "gpt-5.2",
+            model: "gpt-5.6-terra",
             max_completion_tokens: 1500,
             messages: [{
               role: "user",

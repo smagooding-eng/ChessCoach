@@ -756,31 +756,6 @@ export function CourseDetail() {
               </motion.div>
             </AnimatePresence>
 
-            {/* Lesson dots / mini-progress */}
-            <div className="flex items-center justify-center gap-1.5 mt-3 flex-wrap">
-              {sortedLessons.map((l, idx) => (
-                <button
-                  key={l.id}
-                  onClick={() => setCurrentIdx(idx)}
-                  className={cn(
-                    'rounded-full transition-all',
-                    idx === currentIdx
-                      ? 'w-6 h-2'
-                      : l.completed
-                      ? 'w-2 h-2'
-                      : 'w-2 h-2 bg-white/15 hover:bg-white/30'
-                  )}
-                  style={
-                    idx === currentIdx
-                      ? { backgroundColor: CHESSCOM_GREEN }
-                      : l.completed
-                      ? { backgroundColor: 'rgba(129, 182, 76, 0.5)' }
-                      : undefined
-                  }
-                  title={`Lesson ${idx + 1}: ${l.title}`}
-                />
-              ))}
-            </div>
           </div>
         </div>
       )}

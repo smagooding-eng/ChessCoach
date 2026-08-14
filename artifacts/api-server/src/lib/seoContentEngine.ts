@@ -68,8 +68,8 @@ Return valid JSON only:
 
   try {
     const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      max_tokens: 2000,
+      model: "gpt-5.6-luna",
+      max_completion_tokens: 2000,
       messages: [{ role: "user", content: prompt }],
       response_format: { type: "json_object" },
     });

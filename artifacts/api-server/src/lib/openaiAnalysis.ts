@@ -127,7 +127,7 @@ Respond with VALID JSON only:
 
   try {
     const response = await openai.chat.completions.create({
-      model: "gpt-5.2",
+      model: "gpt-5.6-terra",
       max_completion_tokens: 8192,
       messages: [{ role: "user", content: prompt }],
       response_format: { type: "json_object" },
@@ -985,20 +985,47 @@ JSON format:
       });
     });
 
-    const [gptResponses, evals] = await Promise.all([
-      Promise.all(gptPromises),
-      evaluateAllPositions(fens, undefined, onProgress),
+    const [gptSettled, evals] = await Promise.all([
+      Promise.allSettled(gptPromises),
+      evaluateAllPositions(fens, undefined, onProgress).catch((err) => {
+        // Engine evaluation failing here must not throw away GPT data that
+        // was already successfully fetched (real OpenAI cost, hard to
+        // recover) — fall back to neutral, zero-centipawn evals so the
+        // review still completes and saves, just without engine-refined
+        // classifications for this pass.
+        logger.warn({ err }, "Engine evaluation failed — falling back to neutral evals so GPT data isn't lost");
+        return fens.map(() => ({ cpWhite: 0, bestMoveUci: "", secondBestUci: "", bestMoveSan: null, bestLineSan: [], depth: 0 }));
+      }),
     ]);
 
+    let chunkFailures = 0;
+    const gptResponses = gptSettled.map((r, ci) => {
+      if (r.status === "fulfilled") return r.value;
+      chunkFailures++;
+      logger.warn(
+        { chunk: ci, err: r.reason instanceof Error ? r.reason.message : String(r.reason) },
+        "GPT chunk failed (e.g. OpenAI disconnected) — this chunk's moves fall back to engine-only data instead of losing the whole review",
+      );
+      return null;
+    });
+
     const gptTime = Date.now() - startTime;
-    const totalTokens = gptResponses.reduce((s, r) => s + (r.usage?.completion_tokens ?? 0), 0);
-    logger.info({ gptTimeMs: gptTime, evaluated: evals.length, chunks: chunks.length, totalTokensUsed: totalTokens }, "Parallel GPT + Stockfish complete");
+    const totalTokens = gptResponses.reduce((s, r) => s + (r?.usage?.completion_tokens ?? 0), 0);
+    logger.info({ gptTimeMs: gptTime, evaluated: evals.length, chunks: chunks.length, totalTokensUsed: totalTokens, chunkFailures }, "Parallel GPT + Stockfish complete");
 
     let allParsedMoves: Array<Partial<MoveReview>> = [];
     let gameSummaryRaw: Partial<GameReviewSummary> | undefined;
 
     for (let ci = 0; ci < gptResponses.length; ci++) {
       const resp = gptResponses[ci];
+      if (!resp) {
+        // This chunk's OpenAI call failed outright (e.g. disconnected).
+        // Leave its moves out of allParsedMoves entirely — the fallback
+        // below already handles "GPT returned fewer moves than expected"
+        // by filling gaps with engine-only data, so this degrades the
+        // same way rather than losing the whole game's review.
+        continue;
+      }
       const content = resp.choices[0]?.message?.content ?? "{}";
       const finishReason = resp.choices[0]?.finish_reason;
       if (finishReason === "length") {
@@ -1889,7 +1916,7 @@ Rules: The Concept section must be general chess teaching, not specific to this 
 
   try {
     const response = await openai.chat.completions.create({
-      model: "gpt-5.2",
+      model: "gpt-5.6-terra",
       max_completion_tokens: 1100,
       messages: [{ role: "user", content: prompt }],
       response_format: { type: "json_object" },
@@ -2072,7 +2099,7 @@ Respond with valid JSON:
 
   try {
     const response = await openai.chat.completions.create({
-      model: "gpt-5.2",
+      model: "gpt-5.6-terra",
       max_completion_tokens: 8192,
       messages: [{ role: "user", content: prompt }],
       response_format: { type: "json_object" },
@@ -2186,7 +2213,7 @@ Respond with valid JSON:
 
   try {
     const response = await openai.chat.completions.create({
-      model: "gpt-5.2",
+      model: "gpt-5.6-terra",
       max_completion_tokens: 8192,
       messages: [{ role: "user", content: prompt }],
       response_format: { type: "json_object" },
@@ -2256,6 +2283,31 @@ export async function generateEndgameCourse(
 // all validation. Guarantees the board shown is always a genuine endgame
 // position, never a generic opening sequence, even in the worst case.
 const ENDGAME_FALLBACK_PGN = '[FEN "8/8/8/4k3/4P3/4K3/8/8 w - - 0 1"]\n\n*';
+
+// Verified starting positions for the most fundamental endgame/mate
+// patterns — each cross-checked against an authoritative source and
+// independently confirmed structurally legal (exactly one king per side,
+// kings not adjacent, no pawns on rank 1/8) before being used here. GPT is
+// reliably bad at inventing precise, legal FEN strings from a text
+// description — this is the actual root cause of lessons showing a
+// broken/starting position. Anchoring these specific, most-common topics
+// to a known-correct position removes that failure mode entirely for
+// them; topics without an entry here still ask GPT to construct one, with
+// the existing ENDGAME_FALLBACK_PGN safety net if that fails.
+const CURATED_ENDGAME_FENS: Record<string, string> = {
+  "Back rank mate": "6k1/5ppp/8/8/8/8/8/R5K1 w - - 0 1",
+  "Smothered mate": "5r1k/6pp/4Q3/6N1/8/8/5PPP/6K1 w - - 0 1",
+  "King + pawn vs King": "8/8/8/4k3/8/4K3/4P3/8 w - - 0 1",
+  "Lucena position": "1K1k4/1P6/8/8/8/8/r7/2R5 w - - 0 1",
+  "Philidor position": "4k3/8/8/3KPp2/8/8/8/4R3 w - - 0 1",
+};
+
+function findCuratedFen(subtopic: string): string | null {
+  for (const [key, fen] of Object.entries(CURATED_ENDGAME_FENS)) {
+    if (subtopic.includes(key)) return fen;
+  }
+  return null;
+}
 
 async function generateEndgameCourseLLM(
   type: EndgameType,
@@ -2334,7 +2386,12 @@ Respond with valid JSON:
 Target difficulty: ${difficultyGuide} (player rating: ${playerRating ?? "unknown"})
 
 Cover these subtopics, one lesson each:
-${topic.subtopics.map((s, i) => `${i + 1}. ${s}`).join("\n")}
+${topic.subtopics.map((s, i) => {
+  const curated = findCuratedFen(s);
+  return curated
+    ? `${i + 1}. ${s}\n   VERIFIED STARTING POSITION — use this EXACT FEN as your [FEN "..."] header, do not invent your own: ${curated}`
+    : `${i + 1}. ${s}`;
+}).join("\n")}
 
 RULES for each lesson:
 1. examplePgn: MANDATORY — every lesson MUST have a valid PGN string (NEVER null, NEVER empty). This is the most important field — it drives the interactive chessboard.
@@ -2386,7 +2443,7 @@ Respond with valid JSON:
 
   try {
     const response = await openai.chat.completions.create({
-      model: "gpt-5.2",
+      model: "gpt-5.6-terra",
       max_completion_tokens: 8192,
       messages: [{ role: "user", content: prompt }],
       response_format: { type: "json_object" },

@@ -321,8 +321,8 @@ export async function generatePuzzleExplanation(puzzle: { fen: string; moves: st
     }
 
     const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      max_tokens: 200,
+      model: "gpt-5.6-luna",
+      max_completion_tokens: 200,
       messages: [
         {
           role: "system",
