@@ -9,6 +9,7 @@ export const seoArticlesTable = pgTable("seo_articles", {
   metaDescription: text("meta_description").notNull(),
   content: text("content").notNull(), // markdown
   published: boolean("published").notNull().default(true),
+  sharedToFacebookAt: timestamp("shared_to_facebook_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

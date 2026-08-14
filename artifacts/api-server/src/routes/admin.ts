@@ -385,7 +385,7 @@ router.post("/admin/users/delete", requireAdmin, async (req: Request, res: Respo
 
 router.post("/admin/users/:userId/premium-override", requireAdmin, async (req: Request, res: Response) => {
   try {
-    const { userId } = req.params;
+    const userId = req.params.userId as string;
     const { enabled } = req.body as { enabled: boolean };
     if (typeof enabled !== "boolean") {
       res.status(400).json({ error: "enabled (boolean) required" });
