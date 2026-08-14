@@ -35,7 +35,7 @@ async function postPhotoToFacebook(imageUrl: string, caption: string): Promise<{
         }),
       }
     );
-    const body = await res.json().catch(() => ({}));
+    const body = await res.json().catch(() => ({})) as { error?: { message?: string } };
     if (!res.ok) {
       logger.error({ body }, "Facebook photo post failed");
       return { ok: false, error: body?.error?.message || "Facebook API error" };
@@ -62,7 +62,7 @@ async function postLinkToFacebook(link: string, message: string): Promise<{ ok: 
         }),
       }
     );
-    const body = await res.json().catch(() => ({}));
+    const body = await res.json().catch(() => ({})) as { error?: { message?: string } };
     if (!res.ok) {
       logger.error({ body }, "Facebook link post failed");
       return { ok: false, error: body?.error?.message || "Facebook API error" };
