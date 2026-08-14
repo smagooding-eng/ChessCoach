@@ -13,6 +13,7 @@ export const puzzlesTable = pgTable("puzzles", {
   moveNumber: integer("move_number"),
   explanation: text("explanation"),
   archived: boolean("archived").notNull().default(false),
+  postedToFacebook: boolean("posted_to_facebook").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
   // Partial (WHERE lichessId IS NOT NULL) since game-derived puzzles

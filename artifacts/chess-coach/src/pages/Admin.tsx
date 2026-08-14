@@ -1794,6 +1794,7 @@ function AdminTicker() {
       <OutreachStudio />
 
       <SeoArticlesPanel />
+      <FacebookAutoPostPanel />
 
       <AnimatePresence>
         {showEmailModal && (
@@ -2456,6 +2457,58 @@ function SeoArticlesPanel() {
             </div>
           ))}
         </div>
+      )}
+    </motion.div>
+  );
+}
+
+function FacebookAutoPostPanel() {
+  const [posting, setPosting] = useState(false);
+  const [postMsg, setPostMsg] = useState('');
+
+  const postNow = async () => {
+    setPosting(true);
+    setPostMsg('');
+    try {
+      const res = await apiFetch('/api/admin/facebook/post-now', { method: 'POST', credentials: 'include' });
+      const data = await res.json();
+      if (res.ok && data.posted) {
+        setPostMsg(`Posted a ${data.type}.`);
+      } else {
+        setPostMsg(data.reason || data.error || 'Nothing posted');
+      }
+    } catch {
+      setPostMsg('Post failed \u2014 network error');
+    }
+    setPosting(false);
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="rounded-2xl p-5"
+      style={{ background: BG_CARD, border: `1px solid rgba(255,255,255,0.08)` }}
+    >
+      <div className="flex items-center justify-between mb-1">
+        <h2 className="text-lg font-bold flex items-center gap-2" style={{ color: TEXT_LIGHT }}>
+          <span>\ud83d\udcd8</span> Facebook Auto-Post
+        </h2>
+        <button
+          onClick={postNow}
+          disabled={posting}
+          className="px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 disabled:opacity-50"
+          style={{ background: CHESSCOM_GREEN, color: '#000' }}
+        >
+          {posting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+          Post now
+        </button>
+      </div>
+      <p className="text-xs mb-3" style={{ color: TEXT_MUTED }}>
+        Runs automatically Mon/Wed/Fri at 2pm \u2014 mostly mate-in-2/3 puzzles from the curated set, occasionally promoting a published article. Requires FACEBOOK_PAGE_ID and FACEBOOK_PAGE_ACCESS_TOKEN to be set.
+      </p>
+      {postMsg && (
+        <p className="text-xs px-3 py-2 rounded-lg" style={{ background: 'rgba(129,182,76,0.08)', color: CHESSCOM_GREEN }}>{postMsg}</p>
       )}
     </motion.div>
   );

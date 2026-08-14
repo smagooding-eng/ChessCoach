@@ -6,6 +6,7 @@ import { sessionsTable } from "@workspace/db";
 import { getUncachableStripeClient } from "../lib/stripeClient";
 import { ADMIN_EMAILS } from "../lib/auth";
 import { generateNextSeoArticle } from "../lib/seoContentEngine";
+import { postShareableContentToFacebook } from "../lib/facebookPoster";
 import { logger } from "../lib/logger";
 import OpenAI from "openai";
 
@@ -852,6 +853,16 @@ router.delete("/admin/seo-articles/:id", requireAdmin, async (req: Request, res:
     res.json({ ok: true });
   } catch {
     res.status(500).json({ error: "Failed to delete article" });
+  }
+});
+
+router.post("/admin/facebook/post-now", requireAdmin, async (_req: Request, res: Response) => {
+  try {
+    const result = await postShareableContentToFacebook();
+    res.json(result);
+  } catch (err) {
+    logger.error({ err }, "Manual Facebook post failed");
+    res.status(500).json({ error: "Post failed" });
   }
 });
 
