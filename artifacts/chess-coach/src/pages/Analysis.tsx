@@ -11,7 +11,6 @@ import { motion } from 'framer-motion';
 import { Chessboard } from 'react-chessboard';
 import { getTierForRating, ELO_TIERS } from '@/lib/elo-tips';
 import { apiFetch } from '@/lib/api';
-import { PremiumGate } from '@/components/PremiumGate';
 
 const CHESSCOM_GREEN = '#81b64c';
 const BG_CARD = 'linear-gradient(180deg, #383532 0%, #2a2825 100%)';
@@ -172,7 +171,6 @@ export function Analysis() {
   }) || [];
 
   return (
-    <PremiumGate feature="Deep Game Analysis">
     <div className="space-y-5 pb-10 px-3 pt-3 md:px-0 md:pt-0">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-stretch gap-4">
         <div className="flex-1 min-w-0">
@@ -878,6 +876,5 @@ export function Analysis() {
         </>
       ) : null}
     </div>
-    </PremiumGate>
   );
 }

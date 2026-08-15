@@ -47,28 +47,6 @@ export function Dashboard() {
   const { data: coursesData } = useMyCourses();
   const { data: gamesData } = useMyGames(5);
 
-  const [coursesBeta, setCoursesBeta] = useState(true);
-  useEffect(() => {
-    let cancelled = false;
-    Promise.all([
-      apiFetch('/api/puzzles/quality').then(r => r.ok ? r.json() : null).catch(() => null),
-      apiFetch('/api/courses/quality').then(r => r.ok ? r.json() : null).catch(() => null),
-    ]).then(([puzzles, courses]) => {
-      if (cancelled) return;
-      const sources = [puzzles, courses].filter(Boolean) as Array<{ passRate?: number; passRateRecent?: number; window?: number }>;
-      if (sources.length === 0) return;
-      // Hide Beta only when EVERY source's rolling fresh-batch window
-      // sustains the promotion threshold.
-      const allPromoted = sources.every(s => {
-        const r = typeof s.passRateRecent === 'number' ? s.passRateRecent : (s.passRate ?? 0);
-        const w = typeof s.window === 'number' ? s.window : 0;
-        return r >= 0.95 && w >= 30;
-      });
-      setCoursesBeta(!allPromoted);
-    });
-    return () => { cancelled = true; };
-  }, []);
-
   if (loadingSummary) {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
@@ -226,10 +204,10 @@ export function Dashboard() {
             <div className="relative mt-3 flex items-center gap-4 px-3 py-2 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
               <span className="text-[10px] font-semibold uppercase tracking-[0.1em] shrink-0" style={{ color: TEXT_MUTED }}>vs last month</span>
               <span className="text-xs font-bold" style={{ color: accuracyDelta > 0 ? CHESSCOM_GREEN : accuracyDelta < 0 ? '#dc4343' : TEXT_MUTED }}>
-                {accuracyDelta > 0 ? '↑' : accuracyDelta < 0 ? '↓' : '–'} {Math.abs(accuracyDelta)}% accuracy
+                {accuracyDelta > 0 ? '↑' : accuracyDelta < 0 ? '↓' : '–'} {Math.abs(accuracyDelta).toFixed(1)}% accuracy
               </span>
               <span className="text-xs font-bold" style={{ color: blunderDelta < 0 ? CHESSCOM_GREEN : blunderDelta > 0 ? '#dc4343' : TEXT_MUTED }}>
-                {blunderDelta < 0 ? '↓' : blunderDelta > 0 ? '↑' : '–'} {Math.abs(blunderDelta)}% blunder rate
+                {blunderDelta < 0 ? '↓' : blunderDelta > 0 ? '↑' : '–'} {Math.abs(blunderDelta).toFixed(1)}% blunder rate
               </span>
             </div>
           );
@@ -313,46 +291,8 @@ export function Dashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 md:gap-4 px-3 md:px-0">
         <div className="lg:col-span-2 space-y-3 md:space-y-4">
 
-          <DashCard title="Key Weaknesses" visual={<PieceTile piece="♚" />} linkHref={isPremium ? "/analysis" : "/subscription"} linkText={isPremium ? "Full Analysis" : "Upgrade"}>
-            {!isPremium ? (
-              <div className="relative min-h-[180px]">
-                <div className="space-y-1.5 pointer-events-none select-none" style={{ filter: 'blur(6px)' }}>
-                  {[
-                    { sev: 'High', cat: 'Endgame Technique', desc: 'You convert only 38% of winning endgames…' },
-                    { sev: 'Medium', cat: 'Opening Repertoire', desc: 'Multiple losses in the same opening line…' },
-                    { sev: 'Medium', cat: 'Tactical Awareness', desc: 'Missed forks and pins recur across games…' },
-                  ].map((w, i) => {
-                    const sev = SEV_COLORS[w.sev as keyof typeof SEV_COLORS] ?? SEV_COLORS.Low;
-                    return (
-                      <div key={i} className="flex items-start gap-2.5 p-3 rounded-xl">
-                        <span className="mt-px px-1.5 py-px rounded text-[10px] font-bold shrink-0" style={{ background: sev.bg, color: sev.text }}>{w.sev}</span>
-                        <div className="min-w-0 flex-1">
-                          <p className="font-bold text-sm" style={{ color: TEXT_LIGHT }}>{w.cat}</p>
-                          <p className="text-xs line-clamp-1 mt-0.5" style={{ color: TEXT_MUTED }}>{w.desc}</p>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="text-center px-5 py-5 rounded-2xl max-w-xs"
-                    style={{ background: 'rgba(38,36,33,0.94)', border: `1px solid rgba(201,161,92,0.35)`, backdropFilter: 'blur(2px)', boxShadow: '0 8px 24px -8px rgba(0,0,0,0.6)' }}>
-                    <div className="inline-flex items-center justify-center w-10 h-10 rounded-xl mb-2.5" style={{ background: '#211f1c', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.05), inset 0 2px 4px rgba(0,0,0,0.4)' }}>
-                      <Lock className="w-4 h-4" style={{ color: BRASS }} />
-                    </div>
-                    <p className="font-semibold text-sm mb-2.5" style={{ color: TEXT_LIGHT, letterSpacing: '-0.01em' }}>
-                      Unlock your full breakdown and personalized training plan
-                    </p>
-                    <Link href="/subscription">
-                      <button className="mt-1 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl font-semibold text-xs text-black transition-all hover:scale-[1.02]"
-                        style={{ background: `linear-gradient(180deg, #dbb877 0%, ${BRASS} 100%)`, boxShadow: '0 4px 12px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.25)' }}>
-                        <Crown className="w-3.5 h-3.5" /> Upgrade to Pro
-                      </button>
-                    </Link>
-                  </div>
-                </div>
-              </div>
-            ) : weaknesses?.weaknesses?.length ? (
+          <DashCard title="Key Weaknesses" visual={<PieceTile piece="♚" />} linkHref="/analysis" linkText="Full Analysis">
+            {weaknesses?.weaknesses?.length ? (
               <div className="relative">
                 <div className="space-y-1.5">
                   {weaknesses.weaknesses.slice(0, 3).map((w) => {
@@ -490,9 +430,6 @@ export function Dashboard() {
                   <PieceTile piece="♝" />
                   <h2 className="text-base md:text-lg font-semibold flex items-center gap-2" style={{ color: TEXT_LIGHT, letterSpacing: '-0.01em' }}>
                     Courses
-                    {coursesBeta && (
-                      <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-[0.18em]" style={{ background: 'rgba(129,182,76,0.18)', color: CHESSCOM_GREEN, border: '1px solid rgba(129,182,76,0.3)' }}>Beta</span>
-                    )}
                   </h2>
                 </div>
                 <Link href="/courses" className="text-[10px] font-semibold uppercase tracking-[0.18em] flex items-center gap-0.5 hover:underline" style={{ color: CHESSCOM_GREEN }}>

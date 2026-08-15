@@ -7,7 +7,6 @@ import { Link } from 'wouter';
 import { motion } from 'framer-motion';
 import { BookOpen, GraduationCap, CheckCircle2, PlayCircle, AlertCircle, Filter, X } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
-import { PremiumGate } from '@/components/PremiumGate';
 import { trackBackgroundJob } from '@/components/BackgroundJobsWatcher';
 import { cn } from '@/lib/utils';
 
@@ -18,7 +17,6 @@ export function Courses() {
 
   const [isGenerating, setIsGenerating] = useState(false);
   const [genError, setGenError] = useState<string | null>(null);
-  const [showBeta, setShowBeta] = useState(true);
   const mountedRef = useRef(true);
 
   useEffect(() => {
@@ -183,11 +181,10 @@ export function Courses() {
   );
 
   return (
-    <PremiumGate feature="Personalized Courses">
     <div className="space-y-8 pb-20 px-4 pt-4 md:px-0 md:pt-0">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-stretch gap-4">
         <div className="flex-1 min-w-0">
-          <PageHero piece="♝" title={showBeta ? "My Courses (Beta)" : "My Courses"} subtitle="Personalized lesson plans based on your deep analysis." />
+          <PageHero piece="♝" title="My Courses" subtitle="Personalized lesson plans based on your deep analysis." />
         </div>
 
         <div className="flex flex-col items-end gap-2">
@@ -368,6 +365,5 @@ export function Courses() {
         )}
       </div>
     </div>
-    </PremiumGate>
   );
 }

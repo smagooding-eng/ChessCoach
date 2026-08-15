@@ -32,18 +32,18 @@ const PRIMARY_NAV: NavItem[] = [
   { href: '/opponents', label: 'Opponent Scout',  icon: ScoutIcon },
   { href: '/games',     label: 'Games',           icon: ChessClockIcon },
   { href: '/analysis',  label: 'Analysis',        icon: AnalysisIcon },
-  { href: '/puzzles',   label: 'Puzzles',         icon: TacticsIcon, badge: 'BETA' },
+  { href: '/puzzles',   label: 'Puzzles',         icon: TacticsIcon },
   { href: '/lookup',    label: 'Game Lookup',     icon: SearchLookup },
   { href: '/play',      label: 'Play Local',      icon: PlayLocal },
-  { href: '/scan',      label: 'Scan Position',   icon: ScanPosition, badge: 'NEW' },
+  { href: '/scan',      label: 'Scan Position',   icon: ScanPosition },
 ];
 
 const SECONDARY_NAV: NavItem[] = [
   { href: '/practice',     label: 'Practice Bots',   icon: BotPawnIcon },
   { href: '/import',       label: 'Import Games',    icon: ImportGames },
-  { href: '/courses',      label: 'Courses',         icon: CourseBishop, badge: 'BETA' },
-  { href: '/endgames',     label: 'Endgames',        icon: EndgameTrophy, badge: 'BETA' },
-  { href: '/openings',     label: 'Openings',        icon: OpeningBook,   badge: 'BETA' },
+  { href: '/courses',      label: 'Courses',         icon: CourseBishop },
+  { href: '/endgames',     label: 'Endgames',        icon: EndgameTrophy },
+  { href: '/openings',     label: 'Openings',        icon: OpeningBook },
   { href: '/subscription', label: 'Subscription',    icon: PremiumCrown },
 ];
 

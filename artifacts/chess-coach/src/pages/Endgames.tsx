@@ -11,7 +11,6 @@ import {
   BookOpen, Target, Sparkles, ChevronRight,
 } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
-import { PremiumGate } from '@/components/PremiumGate';
 import { cn } from '@/lib/utils';
 
 type EndgameTab = 'checkmate' | 'essential' | 'personal';
@@ -187,7 +186,6 @@ export function Endgames() {
   );
 
   return (
-    <PremiumGate feature="Endgame Training">
     <div className="space-y-6 pb-20 px-4 pt-4 md:px-0 md:pt-0">
       <PageHero piece="♚" title="Endgame Training" subtitle="Master the endgame — the most important phase of chess." />
 
@@ -344,6 +342,5 @@ export function Endgames() {
         </motion.div>
       </AnimatePresence>
     </div>
-    </PremiumGate>
   );
 }

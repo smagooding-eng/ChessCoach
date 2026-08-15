@@ -991,8 +991,14 @@ Return ONLY this JSON, no markdown:
       return total;
     }
 
-    // 3-pass parallel: per-square majority vote across the grids.
-    const passes = await Promise.all([callOnce(), callOnce(), callOnce()]);
+    // 3-pass parallel: per-square majority vote across the grids. Uses
+    // allSettled rather than all — a single call failing (rate limit,
+    // timeout, transient API error) shouldn't crash the whole scan when
+    // the other passes could still produce a usable result.
+    const settled = await Promise.allSettled([callOnce(), callOnce(), callOnce()]);
+    const passes = settled
+      .filter((s): s is PromiseFulfilledResult<ScanResp> => s.status === "fulfilled")
+      .map(s => s.value);
     const grids = passes.map(respToGrid).filter((g): g is string[][] => g !== null);
 
     if (grids.length === 0) {
