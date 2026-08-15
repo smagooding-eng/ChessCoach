@@ -18,21 +18,6 @@ export function Courses() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [genError, setGenError] = useState<string | null>(null);
   const mountedRef = useRef(true);
-
-  useEffect(() => {
-    let cancelled = false;
-    apiFetch('/api/courses/quality')
-      .then(r => r.ok ? r.json() : null)
-      .then(d => {
-        if (!cancelled && d) {
-          const recent = typeof d.passRateRecent === 'number' ? d.passRateRecent : d.passRate;
-          const window = typeof d.window === 'number' ? d.window : 0;
-          setShowBeta(!(recent >= 0.95 && window >= 30));
-        }
-      })
-      .catch(() => {});
-    return () => { cancelled = true; };
-  }, []);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const startPolling = useCallback((jobId: string) => {
