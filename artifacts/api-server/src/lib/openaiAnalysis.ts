@@ -658,6 +658,7 @@ function mergeReviewWithEngine(
     if (!fenBefore) {
       stillInBook = false;
       results.push({
+        fen: fenBefore,
         moveIndex: idx, san: om.san, color: om.color as "white" | "black",
         classification, explanation, betterMove, pros, cons, cpLoss: 0, engineAvailable: false,
       });
@@ -678,6 +679,7 @@ function mergeReviewWithEngine(
     } catch {
       stillInBook = false;
       results.push({
+        fen: fenBefore,
         moveIndex: idx, san: om.san, color: om.color as "white" | "black",
         classification, explanation, betterMove, pros, cons, cpLoss: 0, engineAvailable: false,
       });
@@ -686,6 +688,7 @@ function mergeReviewWithEngine(
 
     if (legalMoves.length <= 1) {
       results.push({
+        fen: fenBefore,
         moveIndex: idx, san: om.san, color: om.color as "white" | "black",
         classification: "book" as const, explanation: explanation || "Forced move — the only legal option.",
         betterMove: null, pros, cons: [], cpLoss: 0, engineAvailable: true,
@@ -699,6 +702,7 @@ function mergeReviewWithEngine(
     if (!evalBefore || !evalAfter) {
       stillInBook = false;
       results.push({
+        fen: fenBefore,
         moveIndex: idx, san: om.san, color: om.color as "white" | "black",
         classification, explanation, betterMove, pros, cons, cpLoss: 0, engineAvailable: false,
       });
@@ -807,6 +811,7 @@ function mergeReviewWithEngine(
     const bestLineSan = isBad ? (evalBefore.bestLineSan ?? []) : [];
 
     results.push({
+      fen: fenBefore,
       moveIndex: idx, san: om.san, color: om.color as "white" | "black",
       classification, explanation, betterMove, pros, cons,
       cpLoss: moveCpLoss, engineAvailable: true,
@@ -823,6 +828,10 @@ export interface MoveReview {
   moveIndex: number;
   san: string;
   color: "white" | "black";
+  /** FEN of the position BEFORE this move was played — needed by any
+   *  consumer that wants to show or replay this exact position (e.g.
+   *  puzzle generation from a player's own mistakes). */
+  fen?: string;
   classification: "checkmate" | "brilliant" | "great" | "best" | "excellent" | "good" | "book" | "inaccuracy" | "mistake" | "blunder" | "missed_win";
   explanation: string;
   betterMove: string | null;
