@@ -120,8 +120,26 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const activeMore = moreItems.find(i => location === i.href || location.startsWith(i.href + '/'));
   const isMoreActive = !!activeMore;
 
+  const [diag, setDiag] = useState<string | null>(null);
+  useEffect(() => {
+    if (sessionStorage.getItem('diag-dismissed')) return;
+    const standalone = window.matchMedia('(display-mode: standalone)').matches;
+    setDiag(
+      `w=${window.innerWidth} h=${window.innerHeight} dpr=${window.devicePixelRatio} ` +
+      `standalone=${standalone} ua=${navigator.userAgent.slice(0, 60)}`
+    );
+  }, []);
+
   return (
     <div className="min-h-screen flex flex-col md:flex-row" style={{ background: BG_DARK }}>
+      {diag && (
+        <div
+          onClick={() => { sessionStorage.setItem('diag-dismissed', '1'); setDiag(null); }}
+          style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 9999, background: '#000', color: '#0f0', fontSize: '10px', padding: '4px 8px', wordBreak: 'break-all', fontFamily: 'monospace' }}
+        >
+          {diag} (tap to dismiss)
+        </div>
+      )}
 
       <aside className="hidden md:flex w-52 h-screen sticky top-0 z-40 flex-col" style={{ background: BG_SIDEBAR, borderRight: `1px solid ${BORDER_COLOR}` }}>
         <div className="px-4 pt-4 pb-3 flex items-center gap-2" style={{ borderBottom: `1px solid ${BORDER_COLOR}` }}>
