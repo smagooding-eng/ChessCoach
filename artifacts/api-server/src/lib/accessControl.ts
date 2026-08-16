@@ -1,4 +1,4 @@
-import { db, gamesTable, puzzleAttemptsTable, backgroundJobsTable, coursesTable } from "@workspace/db";
+import { db, gamesTable, puzzleAttemptsTable, puzzlesTable, backgroundJobsTable, coursesTable } from "@workspace/db";
 import { eq, and, count } from "drizzle-orm";
 import { storage } from "./storage";
 
@@ -54,7 +54,8 @@ export async function checkUsageLimit(
     const [row] = await db
       .select({ c: count() })
       .from(puzzleAttemptsTable)
-      .where(eq(puzzleAttemptsTable.userId, userId));
+      .innerJoin(puzzlesTable, eq(puzzleAttemptsTable.puzzleId, puzzlesTable.id))
+      .where(and(eq(puzzleAttemptsTable.userId, userId), eq(puzzlesTable.source, "personal")));
     used = row?.c ?? 0;
   } else if (feature === "opponentScouts") {
     const [row] = await db

@@ -95,14 +95,16 @@ async function getTodayAttemptCount(userId: string): Promise<number> {
 router.get("/puzzles/next", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
-    const { checkUsageLimit } = await import("../lib/accessControl");
-    const limitCheck = await checkUsageLimit(userId, "puzzles");
-    if (!limitCheck.allowed) {
+    const { hasFullAccess } = await import("../lib/accessControl");
+    const { full: premium } = await hasFullAccess(userId);
+
+    const todayCount = await getTodayAttemptCount(userId);
+    if (!premium && todayCount >= FREE_DAILY_LIMIT) {
       res.status(403).json({
-        error: "usage_limit",
-        message: `Free plan includes ${limitCheck.limit} puzzles. Upgrade to Pro for unlimited puzzles!`,
-        used: limitCheck.used,
-        limit: limitCheck.limit,
+        error: "daily_limit",
+        message: `Free users can solve ${FREE_DAILY_LIMIT} puzzles per day. Upgrade to Pro for unlimited puzzles!`,
+        used: todayCount,
+        limit: FREE_DAILY_LIMIT,
       });
       return;
     }
@@ -207,9 +209,9 @@ router.get("/puzzles/next", requireAuth, async (req: Request, res: Response) => 
         explanation: puzzle.explanation ?? null,
       },
       daily: {
-        used: limitCheck.used,
-        limit: limitCheck.limit === Infinity ? null : limitCheck.limit,
-        premium: limitCheck.limit === Infinity,
+        used: todayCount,
+        limit: premium ? null : FREE_DAILY_LIMIT,
+        premium,
       },
     });
   } catch (err: any) {
@@ -255,8 +257,8 @@ router.get("/puzzles/stats", requireAuth, async (req: Request, res: Response) =>
 
     const total = totalResult?.count ?? 0;
     const solved = solvedResult?.count ?? 0;
-    const { checkUsageLimit } = await import("../lib/accessControl");
-    const limitCheck = await checkUsageLimit(userId, "puzzles");
+    const { hasFullAccess } = await import("../lib/accessControl");
+    const { full: premium } = await hasFullAccess(userId);
 
     res.json({
       total,
@@ -265,9 +267,9 @@ router.get("/puzzles/stats", requireAuth, async (req: Request, res: Response) =>
       accuracy: total > 0 ? Math.round((solved / total) * 100) : 0,
       streak,
       todayCount,
-      dailyLimit: limitCheck.allowed && limitCheck.limit === Infinity ? null : limitCheck.limit,
-      used: limitCheck.used,
-      premium: limitCheck.limit === Infinity,
+      dailyLimit: premium ? null : FREE_DAILY_LIMIT,
+      used: todayCount,
+      premium,
     });
   } catch {
     res.status(500).json({ error: "Failed to get puzzle stats" });
@@ -469,6 +471,18 @@ router.post("/puzzles/:id/explain", requireAuth, async (req: Request, res: Respo
 router.post("/puzzles/generate-from-games", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
+    const { checkUsageLimit } = await import("../lib/accessControl");
+    const limitCheck = await checkUsageLimit(userId, "puzzles");
+    if (!limitCheck.allowed) {
+      res.status(403).json({
+        error: "usage_limit",
+        message: `Free plan includes ${limitCheck.limit} game-derived puzzles. Upgrade to Pro for unlimited puzzles!`,
+        used: limitCheck.used,
+        limit: limitCheck.limit,
+      });
+      return;
+    }
+
     const { storage } = await import("../lib/storage");
     const user = await storage.getUser(userId);
     const primaryUsername = user?.chesscomUsername || user?.lichessUsername;
