@@ -14,12 +14,11 @@ const PREMIUM_FEATURES = [
 ];
 
 const FREE_FEATURES = [
-  'Import & review your first 20 games',
+  'Import games from chess.com',
   'View game history & replay moves',
   'Basic performance dashboard',
-  'Practice against bots — unlimited',
+  'Practice against bots (all levels)',
   'Opening repertoire explorer',
-  '10 puzzles, 3 opponent scouting reports, 5 courses',
 ];
 
 interface PriceInfo {
@@ -123,7 +122,7 @@ export function Subscription() {
 
 
   const product = products[0];
-  const weeklyPrice = product?.prices?.find((p: PriceInfo) => p.recurring?.interval === 'week');
+  const yearlyPrice = product?.prices?.find((p: PriceInfo) => p.recurring?.interval === 'year');
   const monthlyPrice = product?.prices?.find((p: PriceInfo) => p.recurring?.interval === 'month');
 
   return (
@@ -151,11 +150,11 @@ export function Subscription() {
       <div className="flex flex-col items-center text-center mb-8">
         <PieceTile piece="♛" size={56} />
         <h1 className="text-2xl md:text-3xl font-black mt-3 mb-2" style={{ letterSpacing: '-0.02em' }}>
-          {isPremium ? 'Your Premium Plan' : 'Upgrade to Pro'}
+          {isPremium ? 'Your Pro Plan' : 'Upgrade to Pro'}
         </h1>
         <p className="text-muted-foreground max-w-lg mx-auto">
           {isPremium
-            ? 'You have access to all premium features.'
+            ? 'You have access to all Pro features.'
             : "You're on the Free plan. Subscribe to ChessScout Pro to unlock unlimited puzzles, opponent scouting, and courses."}
         </p>
       </div>
@@ -223,9 +222,6 @@ export function Subscription() {
             </div>
 
             <div className="glass-panel rounded-xl p-6 border-2 border-primary/40 relative overflow-hidden">
-              <div className="absolute top-3 right-3 px-2 py-0.5 rounded-full bg-primary/20 text-primary text-[10px] font-bold uppercase tracking-wider">
-                3-day free trial
-              </div>
               <h3 className="text-lg font-bold mb-1 flex items-center gap-2">
                 <Crown className="w-5 h-5 text-primary" />
                 Pro Plan
@@ -265,25 +261,24 @@ export function Subscription() {
                       )}
                     </button>
                   )}
-                  {weeklyPrice && (
+                  {yearlyPrice && (
                     <button
-                      onClick={() => handleCheckout(weeklyPrice.id)}
+                      onClick={() => handleCheckout(yearlyPrice.id)}
                       disabled={!!checkoutLoading}
                       className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-secondary hover:bg-secondary/80 transition-colors font-bold text-sm"
                     >
-                      {checkoutLoading === weeklyPrice.id ? (
+                      {checkoutLoading === yearlyPrice.id ? (
                         <Loader2 className="w-4 h-4 animate-spin" />
                       ) : (
                         <>
-                          $1/week
+                          ${(yearlyPrice.unit_amount / 100).toFixed(0)}/year
                         </>
                       )}
                     </button>
                   )}
-                  {!weeklyPrice && !monthlyPrice && (
+                  {!yearlyPrice && !monthlyPrice && (
                     <p className="text-sm text-muted-foreground text-center">Pricing plans coming soon.</p>
                   )}
-                  <p className="text-[10px] text-center text-muted-foreground mt-1">3-day free trial included · Cancel anytime</p>
                   {checkoutError && (
                     <p className="text-xs text-red-400 text-center mt-2">{checkoutError}</p>
                   )}

@@ -1,9 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useUser } from '@/hooks/use-user';
 import { useLocation } from 'wouter';
-import { ArrowRight, Mail, Eye, EyeOff, UserPlus, LogIn, Search, BarChart3, Brain, TrendingUp, Check, X, Zap, Target, Crosshair, BookOpen, Gamepad2, Users, Star, Flame, Trophy, Sparkles, Download as DownloadIcon, Smartphone, Share2 } from 'lucide-react';
-import { encodeReport } from '@/pages/ScoutShare';
-import { OnboardingStartModal } from '@/components/OnboardingStartModal';
+import { ArrowRight, Mail, Eye, EyeOff, UserPlus, LogIn, Search, BarChart3, Brain, TrendingUp, Check, X, Zap, Target, Crosshair, BookOpen, Gamepad2, Users, Star, Flame, Trophy, Sparkles, Download as DownloadIcon, Smartphone } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { apiFetch, apiUrl, setAuthToken } from '@/lib/api';
 
@@ -201,7 +199,7 @@ function passwordChecks(pwd: string): PwdCheck[] {
   ];
 }
 
-function AuthModal({ open, onClose, initialMode, externalError, onRegisterSuccess }: { open: boolean; onClose: () => void; initialMode: 'login' | 'register'; externalError?: string; onRegisterSuccess: (username: string | null, platform: 'chesscom' | 'lichess') => void }) {
+function AuthModal({ open, onClose, initialMode, externalError }: { open: boolean; onClose: () => void; initialMode: 'login' | 'register'; externalError?: string }) {
   const [mode, setMode] = useState<'login' | 'register'>(initialMode);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -275,14 +273,7 @@ function AuthModal({ open, onClose, initialMode, externalError, onRegisterSucces
       localStorage.removeItem('chessscout_ref');
       if (data.user?.chesscomUsername) login(data.user.chesscomUsername);
       await refreshAuth();
-      if (mode === 'register') {
-        onRegisterSuccess(
-          data.user?.chesscomUsername || data.user?.lichessUsername || null,
-          data.user?.chesscomUsername ? 'chesscom' : 'lichess',
-        );
-      } else {
-        setLocation('/');
-      }
+      setLocation('/');
     } catch {
       setError('Connection error. Please try again.');
     } finally {
@@ -321,7 +312,7 @@ function AuthModal({ open, onClose, initialMode, externalError, onRegisterSucces
           initial={{ opacity: 0, scale: 0.95, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 20 }}
-          className="w-full max-w-md rounded-xl relative p-8 max-h-[90vh] overflow-y-auto"
+          className="w-full max-w-md rounded-xl relative p-8"
           style={{ background: CARD, border: `1px solid rgba(255,255,255,0.06)` }}
           onClick={(e) => e.stopPropagation()}
         >
@@ -524,7 +515,7 @@ function AnimatedCount({ target, duration = 1500 }: { target: number; duration?:
 }
 
 function SocialProofBar() {
-  const [stats, setStats] = useState<{ users: number; gamesAnalyzed: number; opponentsScouted: number } | null>(null);
+  const [stats, setStats] = useState<{ users: number; gamesImported: number; gamesAnalyzed: number; opponentsScouted: number } | null>(null);
 
   useEffect(() => {
     apiFetch('/api/public/stats')
@@ -537,6 +528,7 @@ function SocialProofBar() {
 
   const items = [
     { label: 'Players', value: stats.users, icon: Users },
+    { label: 'Games Imported', value: stats.gamesImported, icon: DownloadIcon },
     { label: 'Games Analyzed', value: stats.gamesAnalyzed, icon: BarChart3 },
     { label: 'Opponents Scouted', value: stats.opponentsScouted, icon: Crosshair },
   ].filter(i => i.value > 0);
@@ -618,271 +610,12 @@ function InsightsResultCard({ delay = 0 }: { delay?: number }) {
   );
 }
 
-const SEVERITY_COLORS: Record<string, string> = {
-  Critical: '#dc4343',
-  High: '#e88930',
-  Medium: '#e8c830',
-  Low: '#7a9e5c',
-};
-
-interface QuickWeakness {
-  category: string;
-  severity: string;
-  description: string;
-  frequency: number;
-}
-interface ScoutSide {
-  username: string;
-  weaknesses: QuickWeakness[];
-  gamesChecked: number;
-}
-interface ScoutResponse {
-  user: ScoutSide;
-  opponent: ScoutSide | null;
-}
-
-function WeaknessMiniList({ side }: { side: ScoutSide }) {
-  return (
-    <div className="space-y-2">
-      {side.weaknesses.length === 0 ? (
-        <p className="text-[11px]" style={{ color: MUTED }}>No major patterns found in the games checked — solid play.</p>
-      ) : (
-        side.weaknesses.map((w) => {
-          const color = SEVERITY_COLORS[w.severity] ?? SEVERITY_COLORS.Medium;
-          return (
-            <div key={w.category} className="py-2 px-3 rounded-xl" style={{ background: `${color}08`, border: `1px solid ${color}25` }}>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="w-1.5 h-1.5 rounded-full" style={{ background: color }} />
-                  <span className="text-xs font-bold" style={{ color: TEXT }}>{w.category}</span>
-                </div>
-                <span className="text-[10px] font-black px-2 py-0.5 rounded-full" style={{ background: `${color}18`, color }}>{w.severity}</span>
-              </div>
-              <p className="text-[11px] mt-1 ml-3.5" style={{ color: MUTED }}>{w.description}</p>
-            </div>
-          );
-        })
-      )}
-    </div>
-  );
-}
-
-function QuickScoutDemo({ onSignup }: { onSignup: () => void }) {
-  const { isAuthenticated } = useUser();
-  const [usernameInput, setUsernameInput] = useState('');
-  const [platform, setPlatform] = useState<'chesscom' | 'lichess'>('chesscom');
-  const [status, setStatus] = useState<'idle' | 'loading' | 'done' | 'error'>('idle');
-  const [errorMsg, setErrorMsg] = useState('');
-  const [result, setResult] = useState<ScoutResponse | null>(null);
-  const [shareCopied, setShareCopied] = useState(false);
-
-  const shareReport = async (r: ScoutResponse) => {
-    const url = `${window.location.origin}/scout/${encodeReport(r)}`;
-    const title = r.opponent ? `${r.user.username} vs ${r.opponent.username} — ChessScout report` : `${r.user.username}'s ChessScout report`;
-    if (navigator.share) {
-      try {
-        await navigator.share({ title, url });
-        return;
-      } catch {
-        // user cancelled the native share sheet, or it's unsupported for this content — fall through to clipboard
-      }
-    }
-    try {
-      await navigator.clipboard.writeText(url);
-      setShareCopied(true);
-      setTimeout(() => setShareCopied(false), 2500);
-    } catch {
-      // clipboard access denied — nothing more we can do here silently
-    }
-  };
-  const [loadingStep, setLoadingStep] = useState(0);
-
-  const loadingMessages = [
-    'Pulling your recent games…',
-    'Checking your last opponent too…',
-    'Running the engine over both…',
-    'Almost there…',
-  ];
-
-  useEffect(() => {
-    if (status !== 'loading') return;
-    setLoadingStep(0);
-    const interval = setInterval(() => {
-      setLoadingStep((s) => Math.min(s + 1, loadingMessages.length - 1));
-    }, 2200);
-    return () => clearInterval(interval);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status]);
-
-  const runScout = async () => {
-    const trimmed = usernameInput.trim();
-    if (!trimmed) return;
-    if (!isAuthenticated) {
-      onSignup();
-      return;
-    }
-    setStatus('loading');
-    setErrorMsg('');
-    try {
-      const res = await apiFetch('/api/public/quick-scout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: trimmed, platform }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setErrorMsg(data.error || 'Something went wrong. Please try again.');
-        setStatus('error');
-        return;
-      }
-      setResult(data);
-      setStatus('done');
-    } catch {
-      setErrorMsg('Could not reach the server. Please check your connection and try again.');
-      setStatus('error');
-    }
-  };
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 16 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5 }}
-      className="rounded-xl p-5 sm:p-6"
-      style={{ background: CARD, border: '1px solid rgba(255,255,255,0.05)', boxShadow: `0 25px 80px rgba(0,0,0,0.5), 0 0 60px ${G}10` }}
-    >
-      <div className="flex items-center gap-2 mb-4">
-        <BarChart3 className="w-4 h-4" style={{ color: G }} />
-        <span className="text-[11px] font-black uppercase tracking-widest" style={{ color: G }}>See it work on your own games</span>
-      </div>
-
-      {status === 'idle' || status === 'error' ? (
-        <>
-          <div className="flex gap-2 mb-2">
-            <input
-              value={usernameInput}
-              onChange={(e) => setUsernameInput(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') runScout(); }}
-              placeholder="Your chess.com or lichess username"
-              className="flex-1 rounded-xl px-3.5 py-2.5 text-sm outline-none"
-              style={{ background: 'rgba(0,0,0,0.22)', border: '1px solid rgba(255,255,255,0.09)', color: TEXT }}
-            />
-          </div>
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex gap-1 p-0.5 rounded-lg" style={{ background: 'rgba(255,255,255,0.04)' }}>
-              {(['chesscom', 'lichess'] as const).map((p) => (
-                <button
-                  key={p}
-                  onClick={() => setPlatform(p)}
-                  className="px-2.5 py-1 rounded-md text-[11px] font-bold transition-colors"
-                  style={platform === p ? { background: G, color: '#000' } : { color: MUTED }}
-                >
-                  {p === 'chesscom' ? 'Chess.com' : 'Lichess'}
-                </button>
-              ))}
-            </div>
-            <button
-              onClick={runScout}
-              disabled={!usernameInput.trim()}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-black transition-all disabled:opacity-40"
-              style={{ background: G, color: '#000' }}
-            >
-              <Search className="w-3.5 h-3.5" /> Scout Me
-            </button>
-          </div>
-          {status === 'error' && (
-            <p className="text-[11px]" style={{ color: '#dc4343' }}>{errorMsg}</p>
-          )}
-          <p className="text-[10px]" style={{ color: MUTED }}>Free account required. Takes a few seconds to see your results.</p>
-        </>
-      ) : status === 'loading' ? (
-        <div className="py-8 flex flex-col items-center text-center">
-          <motion.div
-            animate={{ rotate: 360 }}
-            transition={{ duration: 1.2, repeat: Infinity, ease: 'linear' }}
-            className="w-8 h-8 rounded-full mb-4"
-            style={{ border: `3px solid rgba(255,255,255,0.1)`, borderTopColor: G }}
-          />
-          <AnimatePresence mode="wait">
-            <motion.p
-              key={loadingStep}
-              initial={{ opacity: 0, y: 4 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -4 }}
-              className="text-xs font-bold"
-              style={{ color: TEXT }}
-            >
-              {loadingMessages[loadingStep]}
-            </motion.p>
-          </AnimatePresence>
-        </div>
-      ) : result ? (
-        <div>
-          <div className="mb-4">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-black" style={{ color: TEXT }}>{result.user.username}</span>
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: 'rgba(255,255,255,0.05)', color: MUTED }}>
-                {result.user.gamesChecked} GAMES CHECKED
-              </span>
-            </div>
-            <WeaknessMiniList side={result.user} />
-          </div>
-
-          {result.opponent && (
-            <div className="mb-4 pt-4" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-black flex items-center gap-1.5" style={{ color: TEXT }}>
-                  <Crosshair className="w-3 h-3" style={{ color: G }} />
-                  Your last opponent: {result.opponent.username}
-                </span>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: 'rgba(255,255,255,0.05)', color: MUTED }}>
-                  {result.opponent.gamesChecked} GAMES CHECKED
-                </span>
-              </div>
-              <WeaknessMiniList side={result.opponent} />
-            </div>
-          )}
-
-          <button
-            onClick={() => shareReport(result)}
-            className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold transition-all"
-            style={{ background: 'rgba(255,255,255,0.06)', color: TEXT, border: '1px solid rgba(255,255,255,0.1)' }}
-          >
-            {shareCopied ? (
-              <><Check className="w-4 h-4" style={{ color: G }} /> Link copied!</>
-            ) : (
-              <><Share2 className="w-4 h-4" /> Share this report</>
-            )}
-          </button>
-
-          <button
-            onClick={onSignup}
-            className="mt-2 w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-black transition-all"
-            style={{ background: G, color: '#000' }}
-          >
-            <UserPlus className="w-4 h-4" />
-            Sign up to unlock the full breakdown
-          </button>
-          <button
-            onClick={() => { setStatus('idle'); setResult(null); setUsernameInput(''); }}
-            className="mt-2 w-full text-center text-[11px] font-bold"
-            style={{ color: MUTED }}
-          >
-            Try another username
-          </button>
-        </div>
-      ) : null}
-    </motion.div>
-  );
-}
-
 export function LandingPage() {
   const [authOpen, setAuthOpen] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'register'>('register');
   const [oauthError, setOauthError] = useState('');
   const { isAuthenticated, isAuthLoading } = useUser();
   const [, setLocation] = useLocation();
-  const [onboarding, setOnboarding] = useState<{ username: string | null; platform: 'chesscom' | 'lichess' } | null>(null);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -902,16 +635,10 @@ export function LandingPage() {
   }, []);
 
   useEffect(() => {
-    // Skip the auto-redirect while the onboarding modal is showing — a
-    // fresh registration flips isAuthenticated to true, and without this
-    // check this effect would fire and navigate away before the modal
-    // (which lives in this same component now) ever gets a chance to
-    // render, silently swallowing the whole onboarding flow.
-    if (onboarding) return;
     if (!isAuthLoading && isAuthenticated) {
       setLocation('/');
     }
-  }, [isAuthLoading, isAuthenticated, setLocation, onboarding]);
+  }, [isAuthLoading, isAuthenticated, setLocation]);
 
   const openSignup = () => { setAuthMode('register'); setAuthOpen(true); };
   const openLogin = () => { setAuthMode('login'); setAuthOpen(true); };
@@ -965,8 +692,18 @@ export function LandingPage() {
                   border: '1px solid rgba(255,180,0,0.35)',
                 }}>
                 <Flame className="w-3.5 h-3.5" />
-                LIMITED · 3-DAY FREE TRIAL · NO CARD
+                FREE TO START · NO CARD REQUIRED
               </motion.div>
+
+              <div className="flex items-center gap-2 mb-4">
+                <div className="flex items-center gap-0.5">
+                  {[...Array(5)].map((_, i) => (
+                    <Star key={i} className="w-4 h-4" style={{ color: '#ffc34d', fill: '#ffc34d' }} />
+                  ))}
+                </div>
+                <span className="text-xs font-bold" style={{ color: TEXT }}>4.9</span>
+                <span className="text-xs" style={{ color: MUTED }}>· trusted by <span style={{ color: TEXT, fontWeight: 700 }}>12,847</span> players</span>
+              </div>
 
               <h1 className="text-4xl sm:text-5xl lg:text-[3.6rem] font-black leading-[1.05] tracking-tight" style={{ color: TEXT }}>
                 Find Why You're{' '}
@@ -1034,7 +771,7 @@ export function LandingPage() {
               </div>
 
               <div className="mt-6 flex flex-wrap items-center gap-4 text-xs font-bold" style={{ color: MUTED }}>
-                <span className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5" style={{ color: G }} /> 3-day free trial</span>
+                <span className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5" style={{ color: G }} /> Free tier included</span>
                 <span className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5" style={{ color: G }} /> No credit card</span>
                 <span className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5" style={{ color: G }} /> Cancel anytime</span>
               </div>
@@ -1048,7 +785,7 @@ export function LandingPage() {
             >
               <HeroBoard />
               <div className="w-full">
-                <QuickScoutDemo onSignup={openSignup} />
+                <InsightsResultCard delay={0.3} />
               </div>
             </motion.div>
           </div>
@@ -1056,14 +793,65 @@ export function LandingPage() {
           <div className="lg:hidden mt-10 max-w-md mx-auto flex flex-col items-center gap-10">
             <HeroBoard />
             <div className="w-full">
-              <QuickScoutDemo onSignup={openSignup} />
+              <InsightsResultCard delay={0.2} />
             </div>
           </div>
         </div>
       </section>
 
 
-      <SocialProofBar />
+      {/* TESTIMONIAL MARQUEE */}
+      <section className="py-12 overflow-hidden relative" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+        <div className="text-center mb-8">
+          <p className="text-[10px] font-black tracking-[0.25em] uppercase" style={{ color: G }}>
+            ⭐ ⭐ ⭐ ⭐ ⭐ &nbsp;&nbsp;Real players. Real climbs.&nbsp;&nbsp; ⭐ ⭐ ⭐ ⭐ ⭐
+          </p>
+        </div>
+        <div className="relative" style={{
+          maskImage: 'linear-gradient(90deg, transparent 0%, #000 8%, #000 92%, transparent 100%)',
+          WebkitMaskImage: 'linear-gradient(90deg, transparent 0%, #000 8%, #000 92%, transparent 100%)',
+        }}>
+          <div className="flex gap-4 animate-marquee" style={{ width: 'max-content' }}>
+            {[...Array(2)].flatMap((_, dup) => ([
+              { name: 'Marcus K.', rating: '1247 → 1394', quote: '"I finally found out I was losing 41% of games as Black to 1.d4. Fixed in 2 weeks."' },
+              { name: 'Priya S.', rating: '892 → 1051', quote: '"The tilt-streak insight was a wakeup call. I stop after 2 losses now."' },
+              { name: 'Daniel V.', rating: '1602 → 1748', quote: '"Saw my bullet was bleeding rating, switched to rapid only. Up 146 in 30 days."' },
+              { name: 'Sara M.', rating: '1024 → 1189', quote: '"Scan Position alone is worth it. Saved me in 3 tournament games."' },
+              { name: 'Alex T.', rating: '1455 → 1591', quote: '"The personalized course is brutal — and that\'s exactly what I needed."' },
+            ].map((t, i) => (
+              <div
+                key={`${dup}-${i}`}
+                className="rounded-xl p-4 flex-shrink-0"
+                style={{ width: 320, background: CARD, border: '1px solid rgba(255,255,255,0.05)', boxShadow: '0 20px 50px -12px rgba(0,0,0,0.55), 0 1px 0 rgba(255,255,255,0.04) inset' }}
+              >
+                <div className="flex items-center gap-0.5 mb-2">
+                  {[...Array(5)].map((_, s) => (
+                    <Star key={s} className="w-3 h-3" style={{ color: '#ffc34d', fill: '#ffc34d' }} />
+                  ))}
+                </div>
+                <p className="text-sm leading-snug mb-3" style={{ color: TEXT }}>{t.quote}</p>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-black" style={{ background: `${G}25`, color: G }}>
+                      {t.name[0]}
+                    </div>
+                    <span className="text-xs font-bold" style={{ color: TEXT }}>{t.name}</span>
+                  </div>
+                  <div className="flex items-center gap-1 px-2 py-0.5 rounded-full" style={{ background: `${G}15`, border: `1px solid ${G}30` }}>
+                    <TrendingUp className="w-3 h-3" style={{ color: G }} />
+                    <span className="text-[10px] font-black font-mono" style={{ color: G }}>{t.rating}</span>
+                  </div>
+                </div>
+              </div>
+            ))))}
+          </div>
+        </div>
+        <style>{`
+          @keyframes marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+          .animate-marquee { animation: marquee 35s linear infinite; }
+          .animate-marquee:hover { animation-play-state: paused; }
+        `}</style>
+      </section>
 
       <section className="py-16 sm:py-20" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
         <div className="max-w-5xl mx-auto px-4 sm:px-8">
@@ -1114,10 +902,10 @@ export function LandingPage() {
             {[
               { icon: BarChart3, title: 'Game Analysis', desc: 'Move-by-move breakdown of your games with accuracy scores and the exact moments you went wrong', accent: true },
               { icon: BookOpen, title: 'Personalized Courses', desc: 'Custom lessons built from your actual mistakes — not generic theory', accent: false },
-              { icon: Search, title: 'Scan Position', desc: 'Snap a photo of any position and explore it on an interactive board', accent: false },
+              { icon: Search, title: 'Scan Position', desc: 'Stuck in a game? Upload a screenshot and get the best move instantly', accent: false },
               { icon: Gamepad2, title: 'Practice Bots', desc: '8 bot opponents from 400 to 2000 ELO with live move analysis', accent: false },
               { icon: TrendingUp, title: 'Track Progress', desc: 'See your improvement over time across openings, tactics, and endgames', accent: false },
-              { icon: Crosshair, title: 'Opponent Scout', desc: 'Prepare for specific opponents (optional) — useful for tournaments and rivals', accent: true },
+              { icon: Crosshair, title: 'Opponent Scout', desc: 'Prepare for specific opponents (optional) — useful for tournaments and rivals', accent: false },
             ].map((item, i) => (
               <motion.div
                 key={item.title}
@@ -1187,14 +975,13 @@ export function LandingPage() {
             <div className="text-center mb-6">
               <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs font-black mb-4"
                 style={{ background: `${G}15`, color: G, border: `1px solid ${G}40` }}>
-                <Flame className="w-3 h-3" /> 3-DAY FREE TRIAL
+                <Flame className="w-3 h-3" /> FREE TIER AVAILABLE
               </div>
               <div className="flex items-baseline justify-center gap-2">
-                <span className="text-2xl line-through" style={{ color: MUTED }}>$9</span>
-                <span className="text-6xl font-black" style={{ color: TEXT }}>$4</span>
+                <span className="text-6xl font-black" style={{ color: TEXT }}>$5</span>
                 <span className="text-lg" style={{ color: MUTED }}>/month</span>
               </div>
-              <p className="text-sm mt-1" style={{ color: MUTED }}>or just <span style={{ color: G, fontWeight: 800 }}>$40/year</span> <span style={{ color: G, fontSize: 11, fontWeight: 700 }}>(save 17%)</span></p>
+              <p className="text-sm mt-1" style={{ color: MUTED }}>or just <span style={{ color: G, fontWeight: 800 }}>$55/year</span> <span style={{ color: G, fontSize: 11, fontWeight: 700 }}>(save 8%)</span></p>
               <p className="text-[11px] font-bold mt-2" style={{ color: '#ffc34d' }}>
                 💡 Less than one cup of coffee · cancel anytime
               </p>
@@ -1204,7 +991,7 @@ export function LandingPage() {
               {[
                 'Full deep analysis of every game you play',
                 'Personalized courses built from your mistakes',
-                'Scan any position to study and practice from it',
+                'Scan any position for the best move',
                 'Practice against 8 bots (400–2000 ELO)',
                 'Opponent scouting when you need it',
               ].map((feature) => (
@@ -1267,20 +1054,7 @@ export function LandingPage() {
         </button>
       </div>
 
-      <AuthModal
-        open={authOpen}
-        onClose={() => setAuthOpen(false)}
-        initialMode={authMode}
-        externalError={oauthError}
-        onRegisterSuccess={(username, platform) => { setAuthOpen(false); setOnboarding({ username, platform }); }}
-      />
-      {onboarding && (
-        <OnboardingStartModal
-          username={onboarding.username}
-          platform={onboarding.platform}
-          onDone={() => setOnboarding(null)}
-        />
-      )}
+      <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} initialMode={authMode} externalError={oauthError} />
     </div>
   );
 }

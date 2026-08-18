@@ -90,7 +90,7 @@ export default function PrivacyPage() {
             <ul className="list-disc pl-5 space-y-1.5">
               <li>To provide game analysis, coaching insights, and personalized training.</li>
               <li>To authenticate you and keep your account secure.</li>
-              <li>To process subscriptions and trial periods through Stripe.</li>
+              <li>To process subscriptions through Stripe.</li>
               <li>To send transactional emails (verification, billing receipts, account notices).</li>
               <li>To improve product features, fix bugs, and prevent abuse.</li>
             </ul>

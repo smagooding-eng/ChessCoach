@@ -4,6 +4,22 @@ import { getApiBase, getAuthToken } from "./lib/api";
 import App from "./App";
 import "./index.css";
 
+// Some standalone iOS PWAs (launched from the home screen) fail to honor
+// the viewport meta tag on the very first launch after being added to the
+// home screen, silently falling back to the browser's virtual "desktop"
+// viewport width (980px) instead of the device's real width. This forces
+// the browser to re-read and re-apply the tag, which is the standard,
+// documented workaround for this exact failure mode.
+(function forceViewportReapply() {
+  const meta = document.querySelector('meta[name="viewport"]');
+  if (!meta) return;
+  const content = meta.getAttribute("content");
+  meta.setAttribute("content", "width=device-width,initial-scale=1");
+  requestAnimationFrame(() => {
+    if (content) meta.setAttribute("content", content);
+  });
+})();
+
 const apiBase = getApiBase();
 if (apiBase) {
   setBaseUrl(apiBase);

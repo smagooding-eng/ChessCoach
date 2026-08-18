@@ -4,17 +4,11 @@ import { useUser } from '@/hooks/use-user';
 import { useChessPlayer } from '@/hooks/use-chess-player';
 import { useMultiEloProgress } from '@/hooks/use-elo-progress';
 import { useLiveRatings, bestLiveRating } from '@/hooks/use-live-ratings';
-import { Crown, MoreHorizontal, ChevronRight } from 'lucide-react';
-import {
-  SearchLookup, PlayLocal, ScanPosition, ImportGames, CourseBishop, EndgameTrophy,
-  OpeningBook, PremiumCrown, AdminRook, SignOut, DownloadApp, ProfilePawn,
-} from '@/components/CustomIcons';
+import { LayoutDashboard, Import, History, BrainCircuit, GraduationCap, Swords, BookOpen, LogOut, MoreHorizontal, ChevronRight, Bot, Crown, Trophy, Play, Search, Download, Puzzle, User, Settings, CreditCard, Camera, Shield } from 'lucide-react';
 import { usePwaInstall } from '@/hooks/use-pwa-install';
 import { InstallGuide } from '@/components/InstallGuide';
 import { cn } from '@/lib/utils';
 import { AnimatePresence, motion } from 'framer-motion';
-import { BRASS } from '@/components/DesignSystem';
-import { KnightIcon, ScoutIcon, ChessClockIcon, AnalysisIcon, TacticsIcon, BotPawnIcon } from '@/components/ChessIcons';
 
 const CHESSCOM_GREEN = '#81b64c';
 const BG_DARK = '#262421';
@@ -24,31 +18,28 @@ const TEXT_LIGHT = '#e8e6e3';
 const TEXT_MUTED = '#9e9b98';
 const BORDER_COLOR = 'rgba(129,182,76,0.06)';
 
-type NavIcon = React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
-interface NavItem { href: string; label: string; icon: NavIcon; badge?: string }
-
-const PRIMARY_NAV: NavItem[] = [
-  { href: '/',          label: 'Home',            icon: KnightIcon },
-  { href: '/opponents', label: 'Opponent Scout',  icon: ScoutIcon },
-  { href: '/games',     label: 'Games',           icon: ChessClockIcon },
-  { href: '/analysis',  label: 'Analysis',        icon: AnalysisIcon },
-  { href: '/puzzles',   label: 'Puzzles',         icon: TacticsIcon },
-  { href: '/lookup',    label: 'Game Lookup',     icon: SearchLookup },
-  { href: '/play',      label: 'Play Local',      icon: PlayLocal },
-  { href: '/scan',      label: 'Scan Position',   icon: ScanPosition },
+const PRIMARY_NAV = [
+  { href: '/',          label: 'Home',            icon: LayoutDashboard },
+  { href: '/opponents', label: 'Opponent Scout',  icon: Swords },
+  { href: '/games',     label: 'Games',           icon: History },
+  { href: '/analysis',  label: 'Analysis',        icon: BrainCircuit },
+  { href: '/puzzles',   label: 'Puzzles',         icon: Puzzle, badge: 'BETA' },
+  { href: '/lookup',    label: 'Game Lookup',     icon: Search },
+  { href: '/play',      label: 'Play Local',      icon: Play },
+  { href: '/scan',      label: 'Scan Position',   icon: Camera, badge: 'NEW' },
 ];
 
-const SECONDARY_NAV: NavItem[] = [
-  { href: '/practice',     label: 'Practice Bots',   icon: BotPawnIcon },
-  { href: '/import',       label: 'Import Games',    icon: ImportGames },
-  { href: '/courses',      label: 'Courses',         icon: CourseBishop },
-  { href: '/endgames',     label: 'Endgames',        icon: EndgameTrophy },
-  { href: '/openings',     label: 'Openings',        icon: OpeningBook },
-  { href: '/subscription', label: 'Subscription',    icon: PremiumCrown },
+const SECONDARY_NAV = [
+  { href: '/practice',     label: 'Practice Bots',   icon: Bot },
+  { href: '/import',       label: 'Import Games',    icon: Import },
+  { href: '/courses',      label: 'Courses',         icon: GraduationCap, badge: 'BETA' },
+  { href: '/endgames',     label: 'Endgames',        icon: Trophy,        badge: 'BETA' },
+  { href: '/openings',     label: 'Openings',        icon: BookOpen,      badge: 'BETA' },
+  { href: '/subscription', label: 'Subscription',    icon: Crown },
 ];
 
-const ADMIN_NAV: NavItem[] = [
-  { href: '/admin', label: 'Admin', icon: AdminRook },
+const ADMIN_NAV = [
+  { href: '/admin', label: 'Admin', icon: Shield },
 ];
 
 const ALL_NAV = [...PRIMARY_NAV, ...SECONDARY_NAV, ...ADMIN_NAV];
@@ -84,7 +75,7 @@ function SidebarLink({ item, isActive }: { item: typeof ALL_NAV[0]; isActive: bo
         <item.icon className="w-4 h-4 shrink-0" />
         {item.label}
         {badge && (
-          <span className="ml-auto px-1.5 py-px rounded text-[8px] font-semibold tracking-wider" style={{ background: 'rgba(201,161,92,0.15)', color: '#c9a15c' }}>
+          <span className="ml-auto px-1.5 py-px rounded text-[8px] font-black tracking-wider" style={{ background: 'rgba(234,166,49,0.15)', color: '#eaa631' }}>
             {badge}
           </span>
         )}
@@ -105,6 +96,21 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
   useEffect(() => { setMoreOpen(false); setProfileOpen(false); }, [location]);
 
+  // Fixes a confirmed iOS standalone-PWA bug: on first mount after sign-in,
+  // the browser can fall back to a 980px virtual viewport instead of the
+  // device's real width, incorrectly triggering the desktop (md:) layout.
+  // Forcing the viewport meta tag to be re-read fixes this — this is the
+  // standard, documented workaround for this exact failure mode.
+  useEffect(() => {
+    const meta = document.querySelector('meta[name="viewport"]');
+    if (!meta) return;
+    const content = meta.getAttribute("content");
+    meta.setAttribute("content", "width=device-width,initial-scale=1");
+    requestAnimationFrame(() => {
+      if (content) meta.setAttribute("content", content);
+    });
+  }, []);
+
   const ratings: number[] = [];
   if (multiElo.chesscom?.hasData) ratings.push(multiElo.chesscom.currentRating);
   if (multiElo.lichess?.hasData) ratings.push(multiElo.lichess.currentRating);
@@ -120,26 +126,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const activeMore = moreItems.find(i => location === i.href || location.startsWith(i.href + '/'));
   const isMoreActive = !!activeMore;
 
-  const [diag, setDiag] = useState<string | null>(null);
-  useEffect(() => {
-    if (sessionStorage.getItem('diag-dismissed')) return;
-    const standalone = window.matchMedia('(display-mode: standalone)').matches;
-    setDiag(
-      `w=${window.innerWidth} h=${window.innerHeight} dpr=${window.devicePixelRatio} ` +
-      `standalone=${standalone} ua=${navigator.userAgent.slice(0, 60)}`
-    );
-  }, []);
-
   return (
     <div className="min-h-screen flex flex-col md:flex-row" style={{ background: BG_DARK }}>
-      {diag && (
-        <div
-          onClick={() => { sessionStorage.setItem('diag-dismissed', '1'); setDiag(null); }}
-          style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 9999, background: '#000', color: '#0f0', fontSize: '10px', padding: '4px 8px', wordBreak: 'break-all', fontFamily: 'monospace' }}
-        >
-          {diag} (tap to dismiss)
-        </div>
-      )}
 
       <aside className="hidden md:flex w-52 h-screen sticky top-0 z-40 flex-col" style={{ background: BG_SIDEBAR, borderRight: `1px solid ${BORDER_COLOR}` }}>
         <div className="px-4 pt-4 pb-3 flex items-center gap-2" style={{ borderBottom: `1px solid ${BORDER_COLOR}` }}>
@@ -147,7 +135,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           <h1 className="text-base font-black text-gradient">ChessScout.net</h1>
         </div>
 
-        <nav className="flex-1 px-2.5 py-2.5 space-y-0.5 overflow-y-auto overscroll-contain">
+        <nav className="flex-1 px-2.5 py-2.5 space-y-0.5 overflow-y-auto">
           <p className="text-[9px] font-black uppercase tracking-widest px-3 mb-1.5 mt-1" style={{ color: 'rgba(158,155,152,0.5)' }}>Main</p>
           {PRIMARY_NAV.map(item => (
             <SidebarLink key={item.href} item={item} isActive={location === item.href} />
@@ -181,12 +169,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
               </div>
             </Link>
             <Link href="/download" className="p-1.5 rounded transition-colors shrink-0 hover:bg-green-400/10" style={{ color: CHESSCOM_GREEN }} title="Download App">
-              <DownloadApp className="w-3.5 h-3.5" />
+              <Download className="w-3.5 h-3.5" />
             </Link>
             <button onClick={() => handleLogout()} className="p-1.5 rounded transition-colors shrink-0 hover:bg-red-400/10" style={{ color: TEXT_MUTED }} title="Sign out"
               onMouseEnter={e => (e.currentTarget.style.color = '#dc4343')}
               onMouseLeave={e => (e.currentTarget.style.color = TEXT_MUTED)}>
-              <SignOut className="w-3.5 h-3.5" />
+              <LogOut className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>
@@ -200,7 +188,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </Link>
           <div className="flex items-center gap-2">
             <Link href="/download" className="p-1.5 rounded active:scale-95 transition-all" style={{ color: CHESSCOM_GREEN }} title="Download App">
-              <DownloadApp className="w-5 h-5" />
+              <Download className="w-5 h-5" />
             </Link>
             <button onClick={() => setProfileOpen(o => !o)} className="flex items-center gap-2 active:opacity-70 transition-opacity">
               <div className="flex flex-col items-end gap-0.5">
@@ -229,13 +217,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
               <div className="px-3 py-2 space-y-0.5">
                 <Link href="/profile" className="block">
                   <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors active:bg-white/5" style={{ color: TEXT_LIGHT }}>
-                    <ProfilePawn className="w-4.5 h-4.5" style={{ color: TEXT_MUTED }} />
+                    <User className="w-4.5 h-4.5" style={{ color: TEXT_MUTED }} />
                     <span className="font-semibold text-sm">Profile</span>
                   </div>
                 </Link>
                 <Link href="/subscription" className="block">
                   <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors active:bg-white/5" style={{ color: TEXT_LIGHT }}>
-                    <Crown className="w-4.5 h-4.5" style={{ color: '#c9a15c' }} />
+                    <Crown className="w-4.5 h-4.5" style={{ color: '#eaa631' }} />
                     <span className="font-semibold text-sm">Subscription</span>
                     {isPremium && <span className="ml-auto text-[9px] font-black px-1.5 py-px rounded" style={{ background: 'rgba(129,182,76,0.15)', color: CHESSCOM_GREEN }}>PRO</span>}
                   </div>
@@ -246,7 +234,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                     className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl active:bg-red-500/10 transition-colors"
                     style={{ color: '#dc4343' }}
                   >
-                    <SignOut className="w-4.5 h-4.5" />
+                    <LogOut className="w-4.5 h-4.5" />
                     <span className="font-semibold text-sm">Sign Out</span>
                   </button>
                 </div>
@@ -258,18 +246,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
       <main className="flex-1 min-h-screen overflow-x-hidden pb-20 md:pb-6 md:px-5 md:pt-5">
         <div className="md:max-w-5xl md:mx-auto">
-          {subscription.status === 'free_trial' && subscription.trialDaysLeft != null && !authUser?.isAdmin && (
-            <Link href="/subscription" className="block mb-3 mx-3 md:mx-0">
-              <div className="flex items-center justify-between px-3.5 py-2 rounded-xl text-sm transition-colors"
-                style={{ background: 'rgba(201,161,92,0.1)', border: '1px solid rgba(201,161,92,0.2)', color: '#c9a15c' }}>
-                <span>
-                  <Crown className="w-3.5 h-3.5 inline-block mr-1 -mt-0.5" />
-                  Free trial: {subscription.trialDaysLeft} day{subscription.trialDaysLeft === 1 ? '' : 's'} left
-                </span>
-                <span className="text-xs font-semibold opacity-70">Subscribe &rarr;</span>
-              </div>
-            </Link>
-          )}
           {children}
         </div>
       </main>
@@ -341,7 +317,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                         <item.icon className="w-5 h-5" />
                         <span className="font-semibold text-sm">{item.label}</span>
                         {badge && (
-                          <span className="px-1.5 py-px rounded text-[9px] font-semibold tracking-wider" style={{ background: 'rgba(201,161,92,0.15)', color: '#c9a15c' }}>
+                          <span className="px-1.5 py-px rounded text-[9px] font-black tracking-wider" style={{ background: 'rgba(234,166,49,0.15)', color: '#eaa631' }}>
                             {badge}
                           </span>
                         )}
@@ -353,7 +329,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 <div className="mt-2 pt-2" style={{ borderTop: `1px solid ${BORDER_COLOR}` }}>
                   <Link href="/download" onClick={() => setMoreOpen(false)} className="block">
                     <div className="w-full flex items-center gap-3 px-3.5 py-3 rounded-xl active:bg-green-500/10 transition-colors" style={{ color: CHESSCOM_GREEN }}>
-                      <DownloadApp className="w-5 h-5" />
+                      <Download className="w-5 h-5" />
                       <span className="font-semibold text-sm">Download App</span>
                     </div>
                   </Link>
@@ -362,7 +338,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                     className="w-full flex items-center gap-3 px-3.5 py-3 rounded-xl active:bg-red-500/10 transition-colors"
                     style={{ color: '#dc4343' }}
                   >
-                    <SignOut className="w-5 h-5" />
+                    <LogOut className="w-5 h-5" />
                     <span className="font-semibold text-sm">Sign Out</span>
                   </button>
                 </div>

@@ -1,18 +1,13 @@
 import { Router, type IRouter, type Request, type Response } from "express";
-import { db, usersTable, pageViewsTable, gamesTable, weaknessesTable, coursesTable, lessonsTable, backgroundJobsTable, referralConversionsTable, seoArticlesTable } from "@workspace/db";
-import { sql, count, gte, countDistinct, inArray, eq, and, isNotNull, desc } from "drizzle-orm";
+import { db, usersTable, pageViewsTable, gamesTable, weaknessesTable, coursesTable, lessonsTable, backgroundJobsTable, referralConversionsTable } from "@workspace/db";
+import { sql, count, gte, countDistinct, inArray, eq, and, isNotNull } from "drizzle-orm";
 import { puzzleAttemptsTable } from "@workspace/db";
 import { sessionsTable } from "@workspace/db";
 import { getUncachableStripeClient } from "../lib/stripeClient";
 import { ADMIN_EMAILS } from "../lib/auth";
-import { generateNextSeoArticle } from "../lib/seoContentEngine";
-import { postShareableContentToFacebook } from "../lib/facebookPoster";
-import { logger } from "../lib/logger";
 import OpenAI from "openai";
 
 const router: IRouter = Router();
-const FREE_TRIAL_DAYS = 3;
-
 function requireAdmin(req: Request, res: Response, next: Function) {
   if (!req.isAuthenticated() || !req.user?.isAdmin) {
     res.status(403).json({ error: "Admin access required" });
@@ -30,18 +25,7 @@ function computeUserStatus(email: string | null, createdAt: string | Date, strip
     return { tier: 'pro' as const, detail: daysSince };
   }
 
-  if (stripeSub && stripeSub.status === 'canceled') {
-    return { tier: 'free' as const, detail: Math.floor((Date.now() - new Date(createdAt).getTime()) / 86400000) };
-  }
-
-  const created = new Date(createdAt);
-  const elapsed = Date.now() - created.getTime();
-  const trialMs = FREE_TRIAL_DAYS * 86400000;
-  if (elapsed < trialMs) {
-    const daysLeft = Math.max(1, Math.ceil((trialMs - elapsed) / 86400000));
-    return { tier: 'trial' as const, detail: daysLeft };
-  }
-
+  const elapsed = Date.now() - new Date(createdAt).getTime();
   const daysSinceCreated = Math.floor(elapsed / 86400000);
   return { tier: 'free' as const, detail: daysSinceCreated };
 }
@@ -50,19 +34,6 @@ router.get("/admin/stats", requireAdmin, async (_req: Request, res: Response) =>
   try {
     const now = new Date();
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-
-    // Admin accounts' own page views shouldn't inflate visitor/traffic
-    // counts — testing across desktop, mobile, and the installed app all
-    // count as separate localStorage-based visitor IDs otherwise.
-    const allUsersForAdminCheck = await db
-      .select({ id: usersTable.id, email: usersTable.email, isAdmin: usersTable.isAdmin })
-      .from(usersTable);
-    const adminIdList = allUsersForAdminCheck
-      .filter((u) => u.isAdmin || (u.email && ADMIN_EMAILS.includes(u.email.toLowerCase())))
-      .map((u) => u.id);
-    const excludeAdmin = adminIdList.length > 0
-      ? sql`(${pageViewsTable.userId} IS NULL OR ${pageViewsTable.userId} NOT IN (${sql.join(adminIdList.map((id) => sql`${id}`), sql`, `)}))`
-      : sql`TRUE`;
 
     const [totalUsersResult] = await db
       .select({ count: count() })
@@ -75,41 +46,21 @@ router.get("/admin/stats", requireAdmin, async (_req: Request, res: Response) =>
 
     const [totalViewsResult] = await db
       .select({ count: count() })
-      .from(pageViewsTable)
-      .where(excludeAdmin);
+      .from(pageViewsTable);
 
     const [todayViewsResult] = await db
       .select({ count: count() })
       .from(pageViewsTable)
-      .where(and(gte(pageViewsTable.createdAt, todayStart), excludeAdmin));
+      .where(gte(pageViewsTable.createdAt, todayStart));
 
     const [totalUniqueResult] = await db
       .select({ count: countDistinct(pageViewsTable.visitorId) })
-      .from(pageViewsTable)
-      .where(excludeAdmin);
+      .from(pageViewsTable);
 
     const [todayUniqueResult] = await db
       .select({ count: countDistinct(pageViewsTable.visitorId) })
       .from(pageViewsTable)
-      .where(and(gte(pageViewsTable.createdAt, todayStart), excludeAdmin));
-
-    // Cross-check against IP address — localStorage-based visitor IDs
-    // fragment across browsers/devices/incognito for the same real person,
-    // so this tends to run lower and is often the more trustworthy number.
-    const [totalUniqueByIpResult] = await db
-      .select({ count: countDistinct(pageViewsTable.ipAddress) })
-      .from(pageViewsTable)
-      .where(excludeAdmin);
-
-    const [landingPageUniqueIpResult] = await db
-      .select({ count: countDistinct(pageViewsTable.ipAddress) })
-      .from(pageViewsTable)
-      .where(and(eq(pageViewsTable.path, '/'), excludeAdmin));
-
-    const [todayUniqueByIpResult] = await db
-      .select({ count: countDistinct(pageViewsTable.ipAddress) })
-      .from(pageViewsTable)
-      .where(and(gte(pageViewsTable.createdAt, todayStart), excludeAdmin));
+      .where(gte(pageViewsTable.createdAt, todayStart));
 
     let subBreakdown = { active: 0, trialing: 0, canceled: 0, pastDue: 0, total: 0 };
     try {
@@ -140,7 +91,7 @@ router.get("/admin/stats", requireAdmin, async (_req: Request, res: Response) =>
       db.select({ count: count() }).from(gamesTable).where(eq(gamesTable.analyzed, true)),
       db.select({ count: count() }).from(backgroundJobsTable).where(eq(backgroundJobsTable.type, 'scout')),
       db.select({ count: countDistinct(backgroundJobsTable.targetUsername) }).from(backgroundJobsTable).where(eq(backgroundJobsTable.type, 'scout')),
-      db.select({ count: count() }).from(pageViewsTable).where(and(eq(pageViewsTable.path, '/scan'), excludeAdmin)),
+      db.select({ count: count() }).from(pageViewsTable).where(eq(pageViewsTable.path, '/scan')),
     ]);
 
     const topPagesRows = await db
@@ -148,27 +99,15 @@ router.get("/admin/stats", requireAdmin, async (_req: Request, res: Response) =>
         path: pageViewsTable.path,
         views: count(),
         uniqueVisitors: countDistinct(pageViewsTable.visitorId),
-        uniqueByIp: countDistinct(pageViewsTable.ipAddress),
       })
       .from(pageViewsTable)
-      .where(excludeAdmin)
       .groupBy(pageViewsTable.path)
       .orderBy(sql`count(*) desc`)
       .limit(20);
 
     res.json({
       pageViews: { total: totalViewsResult.count, today: todayViewsResult.count },
-      uniqueVisitors: {
-        total: totalUniqueResult.count,
-        today: todayUniqueResult.count,
-        totalByIp: totalUniqueByIpResult.count,
-        todayByIp: todayUniqueByIpResult.count,
-      },
-      funnel: {
-        landingPageUniqueIps: landingPageUniqueIpResult.count,
-        signups: totalUsersResult.count,
-        paying: subBreakdown.active + subBreakdown.trialing,
-      },
+      uniqueVisitors: { total: totalUniqueResult.count, today: todayUniqueResult.count },
       users: { total: totalUsersResult.count, today: todayUsersResult.count },
       subscriptions: subBreakdown,
       games: {
@@ -185,7 +124,6 @@ router.get("/admin/stats", requireAdmin, async (_req: Request, res: Response) =>
         path: r.path,
         views: r.views,
         uniqueVisitors: r.uniqueVisitors,
-        uniqueByIp: r.uniqueByIp,
       })),
     });
   } catch (err: any) {
@@ -308,13 +246,7 @@ router.post("/admin/users/delete", requireAdmin, async (req: Request, res: Respo
     }
 
     const usersToDelete = await db
-      .select({
-        id: usersTable.id,
-        email: usersTable.email,
-        stripeCustomerId: usersTable.stripeCustomerId,
-        chesscomUsername: usersTable.chesscomUsername,
-        lichessUsername: usersTable.lichessUsername,
-      })
+      .select({ id: usersTable.id, email: usersTable.email, stripeCustomerId: usersTable.stripeCustomerId })
       .from(usersTable)
       .where(inArray(usersTable.id, userIds));
 
@@ -331,14 +263,6 @@ router.post("/admin/users/delete", requireAdmin, async (req: Request, res: Respo
       res.status(404).json({ error: "No matching users found" });
       return;
     }
-
-    // Usernames tied to these accounts — games/weaknesses/courses are keyed
-    // by username (string), not userId, since they mirror imported
-    // chess.com/lichess data rather than the internal user record.
-    const usernames = Array.from(new Set(
-      usersToDelete.flatMap(u => [u.chesscomUsername, u.lichessUsername].filter((s): s is string => !!s))
-        .map(s => s.toLowerCase())
-    ));
 
     try {
       const stripe = await getUncachableStripeClient();
@@ -357,35 +281,8 @@ router.post("/admin/users/delete", requireAdmin, async (req: Request, res: Respo
     await db.delete(puzzleAttemptsTable).where(inArray(puzzleAttemptsTable.userId, ids));
     await db.delete(backgroundJobsTable).where(inArray(backgroundJobsTable.userId, ids));
     await db.delete(pageViewsTable).where(inArray(pageViewsTable.userId, ids));
-    await db.delete(referralConversionsTable).where(
-      sql`${referralConversionsTable.referrerUserId} IN (${sql.join(ids.map(id => sql`${id}`), sql`, `)})
-          OR ${referralConversionsTable.referredUserId} IN (${sql.join(ids.map(id => sql`${id}`), sql`, `)})`
-    );
 
-    if (usernames.length > 0) {
-      // Lessons must go before courses — lessonsTable.courseId is a real DB
-      // foreign key to coursesTable.id with no cascade, so deleting a course
-      // that still has lessons referencing it would fail outright.
-      const coursesToDelete = await db
-        .select({ id: coursesTable.id })
-        .from(coursesTable)
-        .where(inArray(coursesTable.username, usernames));
-      const courseIds = coursesToDelete.map(c => c.id);
-      if (courseIds.length > 0) {
-        await db.delete(lessonsTable).where(inArray(lessonsTable.courseId, courseIds));
-      }
-      await db.delete(coursesTable).where(inArray(coursesTable.username, usernames));
-      await db.delete(weaknessesTable).where(inArray(weaknessesTable.username, usernames));
-      await db.delete(gamesTable).where(inArray(gamesTable.userId, ids));
-    }
-
-    // sessionsTable isn't cleaned up here — it has no userId column (the
-    // association lives inside an opaque JSONB session blob), and stale
-    // sessions already expire naturally via their `expire` timestamp, so a
-    // deleted user's session simply stops authenticating rather than
-    // lingering as a real orphaned-data concern.
-
-    await db.delete(usersTable).where(inArray(usersTable.id, ids));
+    const deletedResult = await db.delete(usersTable).where(inArray(usersTable.id, ids));
 
     res.json({ success: true, deleted: ids.length });
   } catch (err: any) {
@@ -426,7 +323,7 @@ router.get("/admin/users/:userId/usage", requireAdmin, async (req: Request, res:
     const [user] = await db.select().from(usersTable).where(sql`${usersTable.id} = ${userId}`);
     if (!user) { res.status(404).json({ error: "User not found" }); return; }
 
-    const username = user.chesscomUsername?.toLowerCase();
+    const username = user.chesscomUsername;
 
     const [gamesImported] = await db.select({ count: count() }).from(gamesTable)
       .where(username ? eq(gamesTable.username, username) : sql`false`);
@@ -613,7 +510,8 @@ router.post("/admin/marketing/generate", requireAdmin, async (req: Request, res:
     }
 
     const openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
+      baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+      apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
     });
 
     const prompt = `You are a marketing copywriter for ChessScout.net — a smart chess coaching app.
@@ -655,8 +553,8 @@ Return VALID JSON only:
 }`;
 
     const response = await openai.chat.completions.create({
-      model: "gpt-5.6-luna",
-      max_completion_tokens: 2500,
+      model: "gpt-4o-mini",
+      max_tokens: 2500,
       messages: [{ role: "user", content: prompt }],
       response_format: { type: "json_object" },
     });
@@ -829,77 +727,20 @@ router.get("/admin/coach-alignment", requireAdmin, async (req: Request, res: Res
 router.get("/public/stats", async (_req: Request, res: Response) => {
   try {
     const [usersResult] = await db.select({ count: count() }).from(usersTable);
+    const [gamesImportedResult] = await db.select({ count: count() }).from(gamesTable);
     const [gamesResult] = await db.select({ count: count() }).from(gamesTable)
-      .where(isNotNull(gamesTable.reviewData));
+      .where(eq(gamesTable.analyzed, true));
     const [scoutsResult] = await db.select({ count: count() }).from(backgroundJobsTable)
       .where(and(eq(backgroundJobsTable.type, "scout"), eq(backgroundJobsTable.status, "done")));
 
     res.json({
       users: usersResult.count,
+      gamesImported: gamesImportedResult.count,
       gamesAnalyzed: gamesResult.count,
       opponentsScouted: scoutsResult.count,
     });
   } catch {
-    res.json({ users: 0, gamesAnalyzed: 0, opponentsScouted: 0 });
-  }
-});
-
-router.get("/admin/seo-articles", requireAdmin, async (_req: Request, res: Response) => {
-  try {
-    const articles = await db.select().from(seoArticlesTable).orderBy(desc(seoArticlesTable.createdAt));
-    res.json({ articles });
-  } catch {
-    res.status(500).json({ error: "Failed to load articles" });
-  }
-});
-
-router.post("/admin/seo-articles/generate", requireAdmin, async (_req: Request, res: Response) => {
-  try {
-    const result = await generateNextSeoArticle();
-    res.json(result);
-  } catch (err) {
-    logger.error({ err }, "Manual SEO article generation failed");
-    res.status(500).json({ error: "Generation failed" });
-  }
-});
-
-router.patch("/admin/seo-articles/:id", requireAdmin, async (req: Request, res: Response) => {
-  try {
-    const { published } = req.body as { published?: boolean };
-    if (published === undefined) {
-      res.status(400).json({ error: "published is required" });
-      return;
-    }
-    const [article] = await db.update(seoArticlesTable)
-      .set({ published })
-      .where(eq(seoArticlesTable.id, req.params.id as string))
-      .returning();
-    if (!article) {
-      res.status(404).json({ error: "Article not found" });
-      return;
-    }
-    res.json({ article });
-  } catch {
-    res.status(500).json({ error: "Failed to update article" });
-  }
-});
-
-router.delete("/admin/seo-articles/:id", requireAdmin, async (req: Request, res: Response) => {
-  try {
-    await db.delete(seoArticlesTable).where(eq(seoArticlesTable.id, req.params.id as string));
-    res.json({ ok: true });
-  } catch {
-    res.status(500).json({ error: "Failed to delete article" });
-  }
-});
-
-router.post("/admin/facebook/post-now", requireAdmin, async (_req: Request, res: Response) => {
-  try {
-    const result = await postShareableContentToFacebook();
-    res.json(result);
-  } catch (err) {
-    logger.error({ err }, "Manual Facebook post failed");
-    res.status(500).json({ error: "Post failed" });
+    res.json({ users: 0, gamesImported: 0, gamesAnalyzed: 0, opponentsScouted: 0 });
   }
 });
 

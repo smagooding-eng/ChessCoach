@@ -79,14 +79,11 @@ export default function TermsPage() {
             </ul>
           </Section>
 
-          <Section title="Subscriptions, trials, and billing">
+          <Section title="Subscriptions and billing">
             <ul className="list-disc pl-5 space-y-1.5">
               <li>
-                Premium features are available through a paid subscription processed by Stripe.
-              </li>
-              <li>
-                Free trials, where offered, automatically convert to a paid subscription unless
-                cancelled before the trial ends.
+                ChessScout offers a free tier and a paid Pro subscription. Pro features are
+                available through a paid subscription processed by Stripe.
               </li>
               <li>
                 You can cancel your subscription at any time from the Subscription page; access

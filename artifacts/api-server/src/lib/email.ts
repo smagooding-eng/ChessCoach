@@ -13,6 +13,23 @@ function getResend(): Resend {
 
 const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'ChessScout <hello@chessscout.net>';
 
+// Free email providers can never be verified as a Resend sending domain —
+// you don't control their DNS. If RESEND_FROM_EMAIL is accidentally set to
+// one of these (e.g. a personal Gmail address instead of a domain you own),
+// every send will fail with a confusing Resend error. Catch it here with a
+// clear, actionable message instead.
+const FREE_EMAIL_PROVIDERS = ['gmail.com', 'yahoo.com', 'outlook.com', 'hotmail.com', 'icloud.com', 'aol.com'];
+function validateFromEmail() {
+  const match = FROM_EMAIL.match(/@([^\s>]+)/);
+  const domain = match?.[1]?.toLowerCase();
+  if (domain && FREE_EMAIL_PROVIDERS.includes(domain)) {
+    throw new Error(
+      `RESEND_FROM_EMAIL is set to a "${domain}" address, which can never be verified as a sending domain — ` +
+      `you don't own its DNS. Set RESEND_FROM_EMAIL to an address on a domain you control and have verified in Resend (e.g. hello@chessscout.net).`
+    );
+  }
+}
+
 export interface SendEmailOptions {
   to: string | string[];
   subject: string;
@@ -22,6 +39,7 @@ export interface SendEmailOptions {
 }
 
 export async function sendEmail(options: SendEmailOptions) {
+  validateFromEmail();
   const resend = getResend();
   const { data, error } = await resend.emails.send({
     from: FROM_EMAIL,
