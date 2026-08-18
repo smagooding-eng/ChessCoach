@@ -9,7 +9,6 @@ import { useMyCourses } from '@/hooks/use-courses';
 import { Link, useLocation } from 'wouter';
 import { apiFetch } from '@/lib/api';
 import { motion, AnimatePresence } from 'framer-motion';
-import GrowthEngine from '@/components/GrowthEngine';
 import {
   User, Mail, Crown, LogOut, ChevronRight, Trophy, Swords, Target,
   GraduationCap, Settings, Shield, Edit3, Check, X, Eye, Users, CreditCard,
@@ -1448,8 +1447,6 @@ function AdminTicker() {
 
       <MarketingPanel />
 
-      <GrowthEngine />
-
       <AnimatePresence>
         {showEmailModal && (
           <EmailComposerModal
@@ -1595,7 +1592,7 @@ interface ReferralData {
   referrals: { id: string; status: string; createdAt: string; convertedAt: string | null; referredName: string }[];
 }
 
-function ReferralCard({ isPremium }: { isPremium: boolean }) {
+export function ReferralCard({ isPremium }: { isPremium: boolean }) {
   const [data, setData] = useState<ReferralData | null>(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);

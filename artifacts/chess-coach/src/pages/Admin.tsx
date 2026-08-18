@@ -461,6 +461,9 @@ function UserDetailPanel({ userId, onBack }: { userId: string; onBack: () => voi
   const [error, setError] = useState('');
   const [premiumOverride, setPremiumOverride] = useState(false);
   const [togglingPremium, setTogglingPremium] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
 
   useEffect(() => {
     setLoading(true);
@@ -488,6 +491,34 @@ function UserDetailPanel({ userId, onBack }: { userId: string; onBack: () => voi
       if (res.ok) setPremiumOverride(next);
     } catch { /* leave state as-is on failure */ }
     setTogglingPremium(false);
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!confirmingDelete) {
+      setConfirmingDelete(true);
+      return;
+    }
+    setDeleting(true);
+    setDeleteError('');
+    try {
+      const res = await apiFetch('/api/admin/users/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ userIds: [userId] }),
+      });
+      if (res.ok) {
+        onBack();
+      } else {
+        const body = await res.json().catch(() => ({}));
+        setDeleteError(body.error || 'Failed to delete account');
+        setConfirmingDelete(false);
+      }
+    } catch {
+      setDeleteError('Connection error — account was not deleted');
+      setConfirmingDelete(false);
+    }
+    setDeleting(false);
   };
 
   if (loading) {
@@ -555,6 +586,29 @@ function UserDetailPanel({ userId, onBack }: { userId: string; onBack: () => voi
           {togglingPremium ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
           {premiumOverride ? 'Pro access granted — click to revoke' : 'Grant free Pro access'}
         </button>
+
+        <div className="mt-2 flex items-center gap-2 flex-wrap">
+          <button
+            onClick={handleDeleteAccount}
+            disabled={deleting}
+            className={cn(
+              'px-3 py-1.5 rounded-lg text-[11px] font-bold flex items-center gap-1.5 disabled:opacity-50',
+              confirmingDelete ? 'bg-red-500/20 text-red-400 border border-red-500/40' : 'bg-red-500/5 text-red-400/80 border border-red-500/15'
+            )}
+          >
+            {deleting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
+            {confirmingDelete ? 'Click again to confirm delete' : 'Delete account'}
+          </button>
+          {confirmingDelete && !deleting && (
+            <button
+              onClick={() => setConfirmingDelete(false)}
+              className="px-3 py-1.5 rounded-lg text-[11px] font-bold bg-background/40 text-muted-foreground border border-border/30"
+            >
+              Cancel
+            </button>
+          )}
+        </div>
+        {deleteError && <p className="text-[10px] text-red-400 mt-1.5">{deleteError}</p>}
       </div>
 
       <div className="grid grid-cols-4 gap-px bg-border/10 border-b border-border/20">
