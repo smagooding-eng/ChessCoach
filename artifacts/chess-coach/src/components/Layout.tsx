@@ -96,35 +96,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
   useEffect(() => { setMoreOpen(false); setProfileOpen(false); }, [location]);
 
-  // Fixes a confirmed iOS standalone-PWA bug: on first mount after sign-in,
-  // the browser can fall back to a 980px virtual viewport instead of the
-  // device's real width, incorrectly triggering the desktop (md:) layout.
-  // A prior attempt (toggling the existing meta tag's content attribute)
-  // did not resolve this — WebKit largely reads the viewport meta tag once
-  // at initial parse and often ignores later attribute changes on the same
-  // element. This instead removes the tag entirely and inserts a fresh one,
-  // forcing a genuine re-parse.
-  const [diag, setDiag] = useState<string | null>(null);
-  useEffect(() => {
-    if (sessionStorage.getItem('viewport-diag-dismissed')) return;
-    const before = window.innerWidth;
-
-    const old = document.querySelector('meta[name="viewport"]');
-    const content = old?.getAttribute('content') || 'width=device-width,initial-scale=1';
-    if (old) old.remove();
-    const fresh = document.createElement('meta');
-    fresh.setAttribute('name', 'viewport');
-    fresh.setAttribute('content', content);
-    document.head.appendChild(fresh);
-
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        const after = window.innerWidth;
-        setDiag(`before=${before} after=${after} standalone=${window.matchMedia('(display-mode: standalone)').matches}`);
-      });
-    });
-  }, []);
-
   const ratings: number[] = [];
   if (multiElo.chesscom?.hasData) ratings.push(multiElo.chesscom.currentRating);
   if (multiElo.lichess?.hasData) ratings.push(multiElo.lichess.currentRating);
@@ -142,15 +113,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen flex flex-col md:flex-row" style={{ background: BG_DARK }}>
-      {diag && (
-        <div
-          onClick={() => { sessionStorage.setItem('viewport-diag-dismissed', '1'); setDiag(null); }}
-          style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 9999, background: '#000', color: '#0f0', fontSize: '10px', padding: '4px 8px', wordBreak: 'break-all', fontFamily: 'monospace' }}
-        >
-          {diag} (tap to dismiss)
-        </div>
-      )}
-
       <aside className="hidden md:flex w-52 h-screen sticky top-0 z-40 flex-col" style={{ background: BG_SIDEBAR, borderRight: `1px solid ${BORDER_COLOR}` }}>
         <div className="px-4 pt-4 pb-3 flex items-center gap-2" style={{ borderBottom: `1px solid ${BORDER_COLOR}` }}>
           <img src={`${import.meta.env.BASE_URL}images/logo.svg`} alt="ChessScout.net" className="w-7 h-7 object-contain" />
