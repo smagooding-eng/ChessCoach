@@ -524,10 +524,9 @@ function SocialProofBar() {
       .catch(() => {});
   }, []);
 
-  if (!stats || (stats.users < 2 && stats.gamesAnalyzed < 5)) return null;
+  if (!stats || stats.gamesAnalyzed < 5) return null;
 
   const items = [
-    { label: 'Players', value: stats.users, icon: Users },
     { label: 'Games Imported', value: stats.gamesImported, icon: DownloadIcon },
     { label: 'Games Analyzed', value: stats.gamesAnalyzed, icon: BarChart3 },
     { label: 'Opponents Scouted', value: stats.opponentsScouted, icon: Crosshair },
@@ -788,6 +787,8 @@ export function LandingPage() {
           </div>
         </div>
       </section>
+
+      <SocialProofBar />
 
       <section className="py-16 sm:py-20" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
         <div className="max-w-5xl mx-auto px-4 sm:px-8">
