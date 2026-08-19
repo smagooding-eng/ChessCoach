@@ -180,10 +180,12 @@ router.post('/stripe/portal', async (req: Request, res: Response) => {
 });
 
 router.get('/stripe/products', async (_req: Request, res: Response) => {
+  let debugInfo: any = {};
   try {
     try {
       const stripe = await getUncachableStripeClient();
       const products = await stripe.products.list({ active: true, limit: 10 });
+      debugInfo.liveProductCount = products.data.length;
       if (products.data.length > 0) {
         const result = [];
         for (const product of products.data) {
@@ -206,13 +208,21 @@ router.get('/stripe/products', async (_req: Request, res: Response) => {
         return;
       }
     } catch (stripeErr: any) {
-      console.error('Live Stripe products fetch failed, using cache:', stripeErr.message);
+      debugInfo.liveStripeError = {
+        message: stripeErr.message,
+        type: stripeErr.type,
+        code: stripeErr.code,
+        statusCode: stripeErr.statusCode,
+      };
     }
 
     let rows: any[] = [];
     try {
       rows = await storage.listProductsWithPrices();
-    } catch {}
+    } catch (cacheErr: any) {
+      debugInfo.cacheError = cacheErr.message;
+    }
+    debugInfo.cacheRowCount = rows.length;
 
     if (rows.length > 0) {
       const productsMap = new Map<string, any>();
@@ -240,10 +250,10 @@ router.get('/stripe/products', async (_req: Request, res: Response) => {
       return;
     }
 
-    res.json({ data: [] });
+    res.json({ data: [], _debug: debugInfo });
   } catch (err: any) {
     console.error('Products list error:', err.message);
-    res.status(500).json({ error: 'Failed to list products' });
+    res.status(500).json({ error: 'Failed to list products', _debug: { ...debugInfo, outerError: err.message } });
   }
 });
 
