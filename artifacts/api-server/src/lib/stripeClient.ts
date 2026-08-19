@@ -18,6 +18,8 @@ export async function getUncachableStripeClient() {
   const { secretKey } = await getCredentials();
   return new Stripe(secretKey, {
     apiVersion: '2025-08-27.basil' as any,
+    maxNetworkRetries: 3,
+    timeout: 20000,
   });
 }
 
