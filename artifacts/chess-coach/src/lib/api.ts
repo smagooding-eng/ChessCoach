@@ -60,3 +60,24 @@ export function apiFetch(path: string, init?: RequestInit): Promise<Response> {
     },
   });
 }
+
+// Always hits the current origin (Vercel), never VITE_API_URL / Render.
+// Use this only for routes that are deliberately implemented as Vercel
+// serverless functions instead of on the Render backend — currently just
+// the Stripe products/checkout routes, added to work around Render free
+// tier's outbound-connectivity restrictions to Stripe.
+export function apiFetchLocal(path: string, init?: RequestInit): Promise<Response> {
+  const token = getAuthToken();
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+  return fetch(path, {
+    ...init,
+    credentials: 'include',
+    headers: {
+      ...headers,
+      ...(init?.headers as Record<string, string> || {}),
+    },
+  });
+}
