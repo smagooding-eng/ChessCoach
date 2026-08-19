@@ -4,7 +4,7 @@ import { useUser } from '@/hooks/use-user';
 import { useLocation } from 'wouter';
 import { Crown, Check, Zap, BrainCircuit, GraduationCap, Swords, Volume2, Loader2, ExternalLink, Clock } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { apiFetch } from '@/lib/api';
+import { apiFetch, apiFetchLocal } from '@/lib/api';
 
 const PREMIUM_FEATURES = [
   { icon: BrainCircuit, label: 'Deep Game Analysis', desc: 'In-depth analysis of every game you play' },
@@ -55,7 +55,11 @@ export function Subscription() {
   }, [isSuccess, refreshSubscription]);
 
   useEffect(() => {
-    apiFetch('/api/stripe/products', { credentials: 'include' })
+    // NOTE: uses apiFetchLocal (always same-origin/Vercel), not apiFetch
+    // (which points at Render). This route is a Vercel serverless function
+    // added to work around Render free tier's outbound-connectivity issue
+    // reaching Stripe. See artifacts/chess-coach/api/stripe/products.ts.
+    apiFetchLocal('/api/stripe/products', { credentials: 'include' })
       .then(res => res.ok ? res.json() : null)
       .then(data => {
         if (data?.data) setProducts(data.data);
