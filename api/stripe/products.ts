@@ -1,11 +1,18 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import Stripe from 'stripe';
+import https from 'https';
 
-// This route intentionally lives on Vercel instead of the Render backend.
-// Render's free tier has documented outbound-connectivity restrictions that
-// cause GET /api/stripe/products to fail with a StripeConnectionError, even
-// with a valid sk_live_ key. Vercel serverless functions don't have that
-// restriction, so this calls Stripe directly with no DB fallback needed.
+// Root cause found: the Stripe Node SDK's default HTTP agent keeps TCP
+// connections alive and reuses them across invocations. In serverless
+// environments (Vercel Functions, Render's container model), the
+// container can freeze/thaw between requests, and the agent tries to
+// reuse a socket that's already dead server-side -- which surfaces as a
+// generic StripeConnectionError. Confirmed via: (1) raw curl from a
+// normal machine works fine with the same key, (2) zero GET requests
+// from this account ever reached Stripe's logs from either Render or
+// Vercel. Disabling keep-alive forces a fresh connection every request,
+// which avoids the stale-socket reuse entirely.
+const noKeepAliveAgent = new https.Agent({ keepAlive: false });
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') {
@@ -22,6 +29,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const stripe = new Stripe(secretKey, {
       apiVersion: '2025-08-27.basil' as any,
+      httpAgent: noKeepAliveAgent,
+      maxNetworkRetries: 2,
+      timeout: 15000,
     });
 
     const products = await stripe.products.list({ active: true, limit: 10 });
