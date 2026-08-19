@@ -695,16 +695,6 @@ export function LandingPage() {
                 FREE TO START · NO CARD REQUIRED
               </motion.div>
 
-              <div className="flex items-center gap-2 mb-4">
-                <div className="flex items-center gap-0.5">
-                  {[...Array(5)].map((_, i) => (
-                    <Star key={i} className="w-4 h-4" style={{ color: '#ffc34d', fill: '#ffc34d' }} />
-                  ))}
-                </div>
-                <span className="text-xs font-bold" style={{ color: TEXT }}>4.9</span>
-                <span className="text-xs" style={{ color: MUTED }}>· trusted by <span style={{ color: TEXT, fontWeight: 700 }}>12,847</span> players</span>
-              </div>
-
               <h1 className="text-4xl sm:text-5xl lg:text-[3.6rem] font-black leading-[1.05] tracking-tight" style={{ color: TEXT }}>
                 Find Why You're{' '}
                 <br className="hidden sm:block" />
@@ -797,60 +787,6 @@ export function LandingPage() {
             </div>
           </div>
         </div>
-      </section>
-
-
-      {/* TESTIMONIAL MARQUEE */}
-      <section className="py-12 overflow-hidden relative" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
-        <div className="text-center mb-8">
-          <p className="text-[10px] font-black tracking-[0.25em] uppercase" style={{ color: G }}>
-            ⭐ ⭐ ⭐ ⭐ ⭐ &nbsp;&nbsp;Real players. Real climbs.&nbsp;&nbsp; ⭐ ⭐ ⭐ ⭐ ⭐
-          </p>
-        </div>
-        <div className="relative" style={{
-          maskImage: 'linear-gradient(90deg, transparent 0%, #000 8%, #000 92%, transparent 100%)',
-          WebkitMaskImage: 'linear-gradient(90deg, transparent 0%, #000 8%, #000 92%, transparent 100%)',
-        }}>
-          <div className="flex gap-4 animate-marquee" style={{ width: 'max-content' }}>
-            {[...Array(2)].flatMap((_, dup) => ([
-              { name: 'Marcus K.', rating: '1247 → 1394', quote: '"I finally found out I was losing 41% of games as Black to 1.d4. Fixed in 2 weeks."' },
-              { name: 'Priya S.', rating: '892 → 1051', quote: '"The tilt-streak insight was a wakeup call. I stop after 2 losses now."' },
-              { name: 'Daniel V.', rating: '1602 → 1748', quote: '"Saw my bullet was bleeding rating, switched to rapid only. Up 146 in 30 days."' },
-              { name: 'Sara M.', rating: '1024 → 1189', quote: '"Scan Position alone is worth it. Saved me in 3 tournament games."' },
-              { name: 'Alex T.', rating: '1455 → 1591', quote: '"The personalized course is brutal — and that\'s exactly what I needed."' },
-            ].map((t, i) => (
-              <div
-                key={`${dup}-${i}`}
-                className="rounded-xl p-4 flex-shrink-0"
-                style={{ width: 320, background: CARD, border: '1px solid rgba(255,255,255,0.05)', boxShadow: '0 20px 50px -12px rgba(0,0,0,0.55), 0 1px 0 rgba(255,255,255,0.04) inset' }}
-              >
-                <div className="flex items-center gap-0.5 mb-2">
-                  {[...Array(5)].map((_, s) => (
-                    <Star key={s} className="w-3 h-3" style={{ color: '#ffc34d', fill: '#ffc34d' }} />
-                  ))}
-                </div>
-                <p className="text-sm leading-snug mb-3" style={{ color: TEXT }}>{t.quote}</p>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-black" style={{ background: `${G}25`, color: G }}>
-                      {t.name[0]}
-                    </div>
-                    <span className="text-xs font-bold" style={{ color: TEXT }}>{t.name}</span>
-                  </div>
-                  <div className="flex items-center gap-1 px-2 py-0.5 rounded-full" style={{ background: `${G}15`, border: `1px solid ${G}30` }}>
-                    <TrendingUp className="w-3 h-3" style={{ color: G }} />
-                    <span className="text-[10px] font-black font-mono" style={{ color: G }}>{t.rating}</span>
-                  </div>
-                </div>
-              </div>
-            ))))}
-          </div>
-        </div>
-        <style>{`
-          @keyframes marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
-          .animate-marquee { animation: marquee 35s linear infinite; }
-          .animate-marquee:hover { animation-play-state: paused; }
-        `}</style>
       </section>
 
       <section className="py-16 sm:py-20" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
