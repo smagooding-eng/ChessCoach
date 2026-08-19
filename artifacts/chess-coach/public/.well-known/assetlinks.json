@@ -1,0 +1,11 @@
+[{
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": {
+    "namespace": "android_app",
+    "package_name": "net.chessscout.app",
+    "sha256_cert_fingerprints": [
+      "4C:56:63:75:8D:FE:59:0C:F1:6B:F7:1B:96:10:A8:89:46:40:02:F2:7C:AD:07:75:B5:20:A3:D2:E0:11:07:76",
+      "B9:E5:5D:EA:91:25:2D:30:B4:E3:99:90:C1:76:74:EE:8E:3E:94:11:EE:E9:98:78:9A:80:9E:EF:8F:7A:05:83"
+    ]
+  }
+}]
