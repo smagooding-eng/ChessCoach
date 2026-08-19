@@ -2,17 +2,17 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import Stripe from 'stripe';
 import https from 'https';
 
-// Root cause found: the Stripe Node SDK's default HTTP agent keeps TCP
-// connections alive and reuses them across invocations. In serverless
-// environments (Vercel Functions, Render's container model), the
-// container can freeze/thaw between requests, and the agent tries to
-// reuse a socket that's already dead server-side -- which surfaces as a
-// generic StripeConnectionError. Confirmed via: (1) raw curl from a
-// normal machine works fine with the same key, (2) zero GET requests
-// from this account ever reached Stripe's logs from either Render or
-// Vercel. Disabling keep-alive forces a fresh connection every request,
-// which avoids the stale-socket reuse entirely.
-const noKeepAliveAgent = new https.Agent({ keepAlive: false });
+// Previous fix (disabling keep-alive) did NOT resolve the
+// StripeConnectionError, which rules out stale-socket reuse.
+// Next theory: Node's DNS resolver can prefer an IPv6 route to
+// api.stripe.com that this hosting environment can't actually reach,
+// while curl (used to confirm connectivity manually) defaulted to a
+// working IPv4 route with the same key on the same physical network
+// path. Forcing family: 4 makes Node use IPv4 only for this client.
+const ipv4OnlyAgent = new https.Agent({
+  keepAlive: false,
+  family: 4,
+});
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') {
@@ -29,7 +29,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const stripe = new Stripe(secretKey, {
       apiVersion: '2025-08-27.basil' as any,
-      httpAgent: noKeepAliveAgent,
+      httpAgent: ipv4OnlyAgent,
       maxNetworkRetries: 2,
       timeout: 15000,
     });
