@@ -8,7 +8,6 @@ import { LayoutDashboard, Import, History, BrainCircuit, GraduationCap, Swords, 
 import { usePwaInstall } from '@/hooks/use-pwa-install';
 import { InstallGuide } from '@/components/InstallGuide';
 import { cn } from '@/lib/utils';
-import { forceViewportRecalc } from '@/lib/viewport-fix';
 import { AnimatePresence, motion } from 'framer-motion';
 
 const CHESSCOM_GREEN = '#81b64c';
@@ -24,7 +23,7 @@ const PRIMARY_NAV = [
   { href: '/opponents', label: 'Opponent Scout',  icon: Swords },
   { href: '/games',     label: 'Games',           icon: History },
   { href: '/analysis',  label: 'Analysis',        icon: BrainCircuit },
-  { href: '/puzzles',   label: 'Puzzles',         icon: Puzzle },
+  { href: '/puzzles',   label: 'Puzzles',         icon: Puzzle, badge: 'BETA' },
   { href: '/lookup',    label: 'Game Lookup',     icon: Search },
   { href: '/play',      label: 'Play Local',      icon: Play },
   { href: '/scan',      label: 'Scan Position',   icon: Camera, badge: 'NEW' },
@@ -33,9 +32,9 @@ const PRIMARY_NAV = [
 const SECONDARY_NAV = [
   { href: '/practice',     label: 'Practice Bots',   icon: Bot },
   { href: '/import',       label: 'Import Games',    icon: Import },
-  { href: '/courses',      label: 'Courses',         icon: GraduationCap },
-  { href: '/endgames',     label: 'Endgames',        icon: Trophy },
-  { href: '/openings',     label: 'Openings',        icon: BookOpen },
+  { href: '/courses',      label: 'Courses',         icon: GraduationCap, badge: 'BETA' },
+  { href: '/endgames',     label: 'Endgames',        icon: Trophy,        badge: 'BETA' },
+  { href: '/openings',     label: 'Openings',        icon: BookOpen,      badge: 'BETA' },
   { href: '/subscription', label: 'Subscription',    icon: Crown },
 ];
 
@@ -97,17 +96,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
   useEffect(() => { setMoreOpen(false); setProfileOpen(false); }, [location]);
 
-  // General-purpose safety net for any first-mount viewport glitch. The
-  // OAuth-specific case (the actual root cause identified for the
-  // desktop-mode-after-Google-sign-in bug) is handled with a longer retry
-  // schedule directly in UserContext.tsx, right when the OAuth redirect
-  // token is detected -- see forceViewportRecalcWithRetries there.
-  useEffect(() => {
-    forceViewportRecalc();
-    const retryTimer = setTimeout(forceViewportRecalc, 300);
-    return () => clearTimeout(retryTimer);
-  }, []);
-
   const ratings: number[] = [];
   if (multiElo.chesscom?.hasData) ratings.push(multiElo.chesscom.currentRating);
   if (multiElo.lichess?.hasData) ratings.push(multiElo.lichess.currentRating);
@@ -125,7 +113,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen flex flex-col md:flex-row" style={{ background: BG_DARK }}>
-
       <aside className="hidden md:flex w-52 h-screen sticky top-0 z-40 flex-col" style={{ background: BG_SIDEBAR, borderRight: `1px solid ${BORDER_COLOR}` }}>
         <div className="px-4 pt-4 pb-3 flex items-center gap-2" style={{ borderBottom: `1px solid ${BORDER_COLOR}` }}>
           <img src={`${import.meta.env.BASE_URL}images/logo.svg`} alt="ChessScout.net" className="w-7 h-7 object-contain" />
