@@ -8,6 +8,7 @@ import { LayoutDashboard, Import, History, BrainCircuit, GraduationCap, Swords, 
 import { usePwaInstall } from '@/hooks/use-pwa-install';
 import { InstallGuide } from '@/components/InstallGuide';
 import { cn } from '@/lib/utils';
+import { forceViewportRecalc } from '@/lib/viewport-fix';
 import { AnimatePresence, motion } from 'framer-motion';
 
 const CHESSCOM_GREEN = '#81b64c';
@@ -96,34 +97,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
   useEffect(() => { setMoreOpen(false); setProfileOpen(false); }, [location]);
 
-  // Fixes a confirmed bug: on first mount after sign-in, the browser can
-  // briefly compute layout against an incorrect viewport width (e.g. a
-  // fallback ~980px virtual viewport) instead of the device's real width,
-  // incorrectly triggering the desktop (md:) Tailwind breakpoint. Because
-  // this layout is driven entirely by CSS media queries, the browser has to
-  // actually be forced to recompute them -- toggling the viewport meta tag
-  // alone was a known iOS Safari fix, but doesn't reliably force recomputation
-  // in Android's TWA/WebView layout engine, which is why this was still
-  // reproducing there. This version layers on a resize event dispatch and a
-  // forced reflow (both are cheap, standard ways to force various rendering
-  // engines to reevaluate viewport-based CSS), plus a delayed second pass as
-  // a safety net in case the first pass runs before the engine has fully
-  // settled after the sign-in navigation.
+  // General-purpose safety net for any first-mount viewport glitch. The
+  // OAuth-specific case (the actual root cause identified for the
+  // desktop-mode-after-Google-sign-in bug) is handled with a longer retry
+  // schedule directly in UserContext.tsx, right when the OAuth redirect
+  // token is detected -- see forceViewportRecalcWithRetries there.
   useEffect(() => {
-    const forceViewportRecalc = () => {
-      const meta = document.querySelector('meta[name="viewport"]');
-      if (meta) {
-        const content = meta.getAttribute("content");
-        meta.setAttribute("content", "width=device-width,initial-scale=1");
-        requestAnimationFrame(() => {
-          if (content) meta.setAttribute("content", content);
-        });
-      }
-      // Force a synchronous reflow, then nudge any resize-based listeners.
-      void document.documentElement.offsetHeight;
-      window.dispatchEvent(new Event('resize'));
-    };
-
     forceViewportRecalc();
     const retryTimer = setTimeout(forceViewportRecalc, 300);
     return () => clearTimeout(retryTimer);

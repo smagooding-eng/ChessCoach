@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { apiFetch, setAuthToken, getAuthToken } from '@/lib/api';
+import { forceViewportRecalcWithRetries } from '@/lib/viewport-fix';
 
 interface AuthUser {
   id: string;
@@ -74,6 +75,13 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         if (hashToken) {
           setAuthToken(hashToken);
           window.history.replaceState(null, '', window.location.pathname + window.location.search);
+          // We just landed back from an external-domain OAuth redirect
+          // (Google sign-in). On Android TWAs this is a Custom-Tabs-back-
+          // to-trusted-mode transition, which can leave the layout viewport
+          // briefly wrong. Run the recalc on a longer retry schedule than
+          // a normal mount, since this transition can settle slower than a
+          // typical React re-render.
+          forceViewportRecalcWithRetries();
         }
       }
 
