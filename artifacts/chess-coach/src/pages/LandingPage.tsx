@@ -325,7 +325,7 @@ function AuthModal({ open, onClose, initialMode, externalError }: { open: boolea
               {mode === 'login' ? 'Welcome Back' : 'Analyze My Games Free'}
             </h2>
             <p className="text-sm mt-1" style={{ color: MUTED }}>
-              {mode === 'login' ? 'Sign in to your account' : '3 days free, then $4/month'}
+              {mode === 'login' ? 'Sign in to your account' : 'Free to start — upgrade to Pro anytime'}
             </p>
             {mode === 'register' && (
               <p className="text-xs font-bold mt-1.5 flex items-center justify-center gap-1" style={{ color: G }}>
