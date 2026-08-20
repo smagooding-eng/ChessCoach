@@ -96,6 +96,39 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
   useEffect(() => { setMoreOpen(false); setProfileOpen(false); }, [location]);
 
+  // Fixes a confirmed bug: on first mount after sign-in, the browser can
+  // briefly compute layout against an incorrect viewport width (e.g. a
+  // fallback ~980px virtual viewport) instead of the device's real width,
+  // incorrectly triggering the desktop (md:) Tailwind breakpoint. Because
+  // this layout is driven entirely by CSS media queries, the browser has to
+  // actually be forced to recompute them -- toggling the viewport meta tag
+  // alone was a known iOS Safari fix, but doesn't reliably force recomputation
+  // in Android's TWA/WebView layout engine, which is why this was still
+  // reproducing there. This version layers on a resize event dispatch and a
+  // forced reflow (both are cheap, standard ways to force various rendering
+  // engines to reevaluate viewport-based CSS), plus a delayed second pass as
+  // a safety net in case the first pass runs before the engine has fully
+  // settled after the sign-in navigation.
+  useEffect(() => {
+    const forceViewportRecalc = () => {
+      const meta = document.querySelector('meta[name="viewport"]');
+      if (meta) {
+        const content = meta.getAttribute("content");
+        meta.setAttribute("content", "width=device-width,initial-scale=1");
+        requestAnimationFrame(() => {
+          if (content) meta.setAttribute("content", content);
+        });
+      }
+      // Force a synchronous reflow, then nudge any resize-based listeners.
+      void document.documentElement.offsetHeight;
+      window.dispatchEvent(new Event('resize'));
+    };
+
+    forceViewportRecalc();
+    const retryTimer = setTimeout(forceViewportRecalc, 300);
+    return () => clearTimeout(retryTimer);
+  }, []);
+
   const ratings: number[] = [];
   if (multiElo.chesscom?.hasData) ratings.push(multiElo.chesscom.currentRating);
   if (multiElo.lichess?.hasData) ratings.push(multiElo.lichess.currentRating);
@@ -113,6 +146,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen flex flex-col md:flex-row" style={{ background: BG_DARK }}>
+
       <aside className="hidden md:flex w-52 h-screen sticky top-0 z-40 flex-col" style={{ background: BG_SIDEBAR, borderRight: `1px solid ${BORDER_COLOR}` }}>
         <div className="px-4 pt-4 pb-3 flex items-center gap-2" style={{ borderBottom: `1px solid ${BORDER_COLOR}` }}>
           <img src={`${import.meta.env.BASE_URL}images/logo.svg`} alt="ChessScout.net" className="w-7 h-7 object-contain" />
