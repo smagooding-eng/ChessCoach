@@ -9,6 +9,7 @@ import { useMyCourses } from '@/hooks/use-courses';
 import { Link, useLocation } from 'wouter';
 import { apiFetch } from '@/lib/api';
 import { motion, AnimatePresence } from 'framer-motion';
+import GrowthEngine from '@/components/GrowthEngine';
 import {
   User, Mail, Crown, LogOut, ChevronRight, Trophy, Swords, Target,
   GraduationCap, Settings, Shield, Edit3, Check, X, Eye, Users, CreditCard,
@@ -418,7 +419,6 @@ const CHESS_IMAGES = {
   opening: 'https://images.unsplash.com/photo-1604948501466-4e9c339b9c24?w=600&h=300&fit=crop&q=80',
   tournament: 'https://images.unsplash.com/photo-1580541832626-2a7131ee809f?w=600&h=300&fit=crop&q=80',
   clock: 'https://images.unsplash.com/photo-1611195974226-a6a9be9dd763?w=600&h=300&fit=crop&q=80',
-  checkmate: 'https://images.unsplash.com/photo-1708627535997-a6e7fae7b43b?w=600&h=300&fit=crop&q=80',
   study: 'https://images.unsplash.com/photo-1523875194681-bedd468c58bf?w=600&h=300&fit=crop&q=80',
   grandmaster: 'https://images.unsplash.com/photo-1538221566857-f4d2be2b69c2?w=600&h=300&fit=crop&q=80',
 };
@@ -436,33 +436,152 @@ const EMAIL_TEMPLATES = [
     html: `<img src="${CHESS_IMAGES.board}" alt="Chess board" style="${imgStyle}" />
 <h2 style="color:#81b64c;margin:0 0 8px;">Welcome to ChessScout! ♜</h2>
 <p style="color:#9e9b98;font-size:13px;margin:0 0 20px;">The smartest way to prepare for your opponents</p>
-<p>You've just joined the chess tool that serious players use to gain an edge before every game. ChessScout analyzes your opponents so you don't have to.</p>
+<p>You've just joined the chess tool serious players use to gain an edge before every game. ChessScout scouts your opponents so you don't have to.</p>
 ${divider}
 <h3 style="color:#81b64c;font-size:16px;margin:0 0 12px;">Here's what you can do right now:</h3>
 <table style="width:100%;border-collapse:collapse;">
 <tr><td style="padding:8px 0;vertical-align:top;width:30px;color:#81b64c;font-size:18px;">🔍</td><td style="padding:8px 0;"><strong style="color:#e8e6e3;">Opponent Scout</strong><br/><span style="color:#9e9b98;font-size:13px;">Deep analysis of any player's openings, weaknesses &amp; tendencies</span></td></tr>
-<tr><td style="padding:8px 0;vertical-align:top;width:30px;color:#81b64c;font-size:18px;">♟️</td><td style="padding:8px 0;"><strong style="color:#e8e6e3;">Deep Game Analysis</strong><br/><span style="color:#9e9b98;font-size:13px;">Import your games and get move-by-move coaching insights</span></td></tr>
-<tr><td style="padding:8px 0;vertical-align:top;width:30px;color:#81b64c;font-size:18px;">🧩</td><td style="padding:8px 0;"><strong style="color:#e8e6e3;">Puzzles</strong><br/><span style="color:#9e9b98;font-size:13px;">Daily puzzles plus custom ones generated from your own mistakes</span></td></tr>
-<tr><td style="padding:8px 0;vertical-align:top;width:30px;color:#81b64c;font-size:18px;">🤖</td><td style="padding:8px 0;"><strong style="color:#e8e6e3;">Practice Bots</strong><br/><span style="color:#9e9b98;font-size:13px;">Train against bots calibrated to different rating levels — unlimited, always free</span></td></tr>
+<tr><td style="padding:8px 0;vertical-align:top;width:30px;color:#81b64c;font-size:18px;">♟️</td><td style="padding:8px 0;"><strong style="color:#e8e6e3;">Game Lookup</strong><br/><span style="color:#9e9b98;font-size:13px;">Review any Chess.com game with deep move analysis</span></td></tr>
+<tr><td style="padding:8px 0;vertical-align:top;width:30px;color:#81b64c;font-size:18px;">🧩</td><td style="padding:8px 0;"><strong style="color:#e8e6e3;">Daily Puzzles</strong><br/><span style="color:#9e9b98;font-size:13px;">Unlimited tactics training, free — sharpen your pattern recognition daily</span></td></tr>
+<tr><td style="padding:8px 0;vertical-align:top;width:30px;color:#81b64c;font-size:18px;">🤖</td><td style="padding:8px 0;"><strong style="color:#e8e6e3;">Practice Bots</strong><br/><span style="color:#9e9b98;font-size:13px;">Train against bots calibrated to different rating levels</span></td></tr>
 </table>
 ${divider}
 <p style="text-align:center;"><a href="https://chessscout.net" style="${btnStyle}">Start Scouting Your Opponents →</a></p>
-<p style="text-align:center;margin-top:12px;"><span style="color:#9e9b98;font-size:12px;">Free plan includes 10 puzzles, 3 opponent scouting reports, 5 courses, and unlimited bots — no card required</span></p>`,
+<p style="text-align:center;margin-top:12px;"><span style="color:#9e9b98;font-size:12px;">Free forever: unlimited daily puzzles, 3 opponent scouts, 5 courses &amp; unlimited bots</span></p>`,
   },
   {
     name: '⭐ Upgrade to Pro',
     subject: 'Unlock the Full Power of ChessScout Pro',
     html: `<img src="${CHESS_IMAGES.king}" alt="Chess king" style="${imgStyle}" />
+<div style="text-align:center;margin-bottom:20px;">${badge('PRO')}</div>
+<h2 style="color:#81b64c;text-align:center;margin:0 0 8px;">Level Up Your Game</h2>
+<p style="text-align:center;color:#9e9b98;margin:0 0 24px;">You've been using ChessScout — here's what Pro adds.</p>
+<div style="background:#262421;border-radius:8px;padding:20px;margin-bottom:20px;">
+<h3 style="color:#e8e6e3;margin:0 0 16px;font-size:15px;">Pro members get:</h3>
+<table style="width:100%;border-collapse:collapse;">
+<tr><td style="padding:6px 0;color:#81b64c;">✓</td><td style="padding:6px 0;"><strong>Unlimited Opponent Scouting</strong> — Deep weakness reports on any player</td></tr>
+<tr><td style="padding:6px 0;color:#81b64c;">✓</td><td style="padding:6px 0;"><strong>Deep Game Analysis</strong> — Move-by-move engine eval</td></tr>
+<tr><td style="padding:6px 0;color:#81b64c;">✓</td><td style="padding:6px 0;"><strong>Unlimited Personalized Courses</strong> — Built from your own games</td></tr>
+<tr><td style="padding:6px 0;color:#81b64c;">✓</td><td style="padding:6px 0;"><strong>Unlimited My Game Puzzles</strong> — Blunders turned into training</td></tr>
+<tr><td style="padding:6px 0;color:#81b64c;">✓</td><td style="padding:6px 0;"><strong>Coach Explanations</strong> — Understand every puzzle &amp; position</td></tr>
+<tr><td style="padding:6px 0;color:#81b64c;">✓</td><td style="padding:6px 0;"><strong>Unlimited Game Imports</strong> — No 20-game cap</td></tr>
+</table>
+</div>
+<div style="text-align:center;background:linear-gradient(135deg,rgba(129,182,76,0.1),rgba(129,182,76,0.05));border:1px solid rgba(129,182,76,0.2);border-radius:8px;padding:20px;margin-bottom:20px;">
+<p style="color:#e8e6e3;font-size:22px;font-weight:700;margin:0;">$5<span style="font-size:14px;font-weight:400;color:#9e9b98;">/month</span> &nbsp;or&nbsp; $55<span style="font-size:14px;font-weight:400;color:#9e9b98;">/year</span></p>
+<p style="color:#81b64c;font-size:13px;margin:4px 0 0;">Cancel anytime — no long-term commitment</p>
+</div>
+<p style="text-align:center;"><a href="https://chessscout.net/subscription" style="${btnStyle}">Upgrade to Pro →</a></p>`,
+  },
+  {
+    name: '🚀 New Feature',
+    subject: 'New on ChessScout: [Feature Name]',
+    html: `<img src="${CHESS_IMAGES.strategy}" alt="Chess strategy" style="${imgStyle}" />
+<div style="margin-bottom:16px;">${badge('NEW')}</div>
+<h2 style="color:#81b64c;margin:0 0 8px;">Introducing [Feature Name]</h2>
+<p style="color:#9e9b98;font-size:13px;margin:0 0 20px;">Just shipped — live now for all ChessScout users</p>
+<p>We've been building something that changes how you prepare for games:</p>
+${divider}
+<h3 style="color:#e8e6e3;font-size:16px;margin:0 0 8px;">[Feature Name]</h3>
+<p>[What it does, why it matters, how it helps their chess]</p>
+<p>[Optional: add a screenshot or demo image here using the image button]</p>
+${divider}
+<p style="text-align:center;"><a href="https://chessscout.net" style="${btnStyle}">Try [Feature Name] →</a></p>`,
+  },
+  {
+    name: '🧩 Weekly Puzzle Challenge',
+    subject: 'This Week\'s Puzzle Challenge — Can You Solve It?',
+    html: `<img src="${CHESS_IMAGES.pieces}" alt="Chess pieces" style="${imgStyle}" />
+<h2 style="color:#81b64c;margin:0 0 8px;">Weekly Puzzle Challenge ♜</h2>
+<p style="color:#9e9b98;font-size:13px;margin:0 0 20px;">Test your tactical vision</p>
+<div style="background:#262421;border-radius:8px;padding:20px;text-align:center;margin-bottom:20px;">
+<p style="font-size:48px;margin:0;line-height:1;">♚♛♜♝♞♟</p>
+<p style="color:#e8e6e3;font-size:15px;margin:12px 0 0;">This week's puzzles focus on:<br/><strong style="color:#81b64c;font-size:18px;">[Theme: e.g. Knight Forks, Back Rank Mates]</strong></p>
+</div>
+<p>We've curated a set of puzzles this week targeting one of the most common tactical patterns. Whether you're rated 800 or 2000, these will sharpen your pattern recognition.</p>
+${divider}
+<table style="width:100%;border-collapse:collapse;">
+<tr><td style="padding:6px 0;color:#81b64c;">🥉</td><td style="padding:6px 0;"><strong>Beginner</strong> — 5 puzzles (800-1200)</td></tr>
+<tr><td style="padding:6px 0;color:#81b64c;">🥈</td><td style="padding:6px 0;"><strong>Intermediate</strong> — 5 puzzles (1200-1600)</td></tr>
+<tr><td style="padding:6px 0;color:#81b64c;">🥇</td><td style="padding:6px 0;"><strong>Advanced</strong> — 5 puzzles (1600+)</td></tr>
+</table>
+${divider}
+<p style="text-align:center;"><a href="https://chessscout.net/puzzles" style="${btnStyle}">Solve Today's Puzzles →</a></p>
+<p style="text-align:center;margin-top:8px;color:#9e9b98;font-size:12px;">Daily puzzles are unlimited and free — no cap, no catch</p>`,
+  },
+  {
+    name: '📊 Your Weekly Stats',
+    subject: 'Your ChessScout Week in Review',
+    html: `<img src="${CHESS_IMAGES.study}" alt="Chess study" style="${imgStyle}" />
+<h2 style="color:#81b64c;margin:0 0 8px;">Your Week in Review ♜</h2>
+<p style="color:#9e9b98;font-size:13px;margin:0 0 20px;">Here's how you improved this week</p>
+<div style="display:flex;gap:12px;margin-bottom:20px;">
+<div style="flex:1;background:#262421;border-radius:8px;padding:16px;text-align:center;">
+<p style="color:#81b64c;font-size:28px;font-weight:700;margin:0;">[X]</p>
+<p style="color:#9e9b98;font-size:11px;margin:4px 0 0;text-transform:uppercase;">Puzzles Solved</p>
+</div>
+<div style="flex:1;background:#262421;border-radius:8px;padding:16px;text-align:center;">
+<p style="color:#81b64c;font-size:28px;font-weight:700;margin:0;">[X]</p>
+<p style="color:#9e9b98;font-size:11px;margin:4px 0 0;text-transform:uppercase;">Games Reviewed</p>
+</div>
+<div style="flex:1;background:#262421;border-radius:8px;padding:16px;text-align:center;">
+<p style="color:#81b64c;font-size:28px;font-weight:700;margin:0;">[X]</p>
+<p style="color:#9e9b98;font-size:11px;margin:4px 0 0;text-transform:uppercase;">Scouts Run</p>
+</div>
+</div>
+<p>Keep the momentum going. Consistency drives chess improvement — even a few puzzles a day builds pattern recognition that shows up directly in your games.</p>
+${divider}
+<p style="text-align:center;"><a href="https://chessscout.net" style="${btnStyle}">Continue Training →</a></p>`,
+  },
+  {
+    name: '🏆 Tournament Prep',
+    subject: 'Prepare Like a Pro — Tournament Prep with ChessScout',
+    html: `<img src="${CHESS_IMAGES.tournament}" alt="Chess tournament" style="${imgStyle}" />
+<h2 style="color:#81b64c;margin:0 0 8px;">Tournament Prep Mode ♜</h2>
+<p style="color:#9e9b98;font-size:13px;margin:0 0 20px;">Get the edge before your next rated game</p>
+<p>Got a tournament coming up? Here's the preparation routine ChessScout users rely on:</p>
+${divider}
+<h3 style="color:#e8e6e3;font-size:15px;margin:0 0 12px;">Your Pre-Game Checklist:</h3>
+<table style="width:100%;border-collapse:collapse;">
+<tr><td style="padding:8px 0;vertical-align:top;width:30px;color:#81b64c;font-size:16px;">1.</td><td style="padding:8px 0;"><strong style="color:#e8e6e3;">Scout Your Opponent</strong><br/><span style="color:#9e9b98;font-size:13px;">Enter their username → get a full opening repertoire breakdown, weaknesses, and tendencies</span></td></tr>
+<tr><td style="padding:8px 0;vertical-align:top;width:30px;color:#81b64c;font-size:16px;">2.</td><td style="padding:8px 0;"><strong style="color:#e8e6e3;">Review Their Recent Games</strong><br/><span style="color:#9e9b98;font-size:13px;">Use Game Lookup to see how they handle critical positions</span></td></tr>
+<tr><td style="padding:8px 0;vertical-align:top;width:30px;color:#81b64c;font-size:16px;">3.</td><td style="padding:8px 0;"><strong style="color:#e8e6e3;">Warm Up with Puzzles</strong><br/><span style="color:#9e9b98;font-size:13px;">Sharpen your tactical vision right before the round</span></td></tr>
+<tr><td style="padding:8px 0;vertical-align:top;width:30px;color:#81b64c;font-size:16px;">4.</td><td style="padding:8px 0;"><strong style="color:#e8e6e3;">Review Your Own Games</strong><br/><span style="color:#9e9b98;font-size:13px;">Learn from recent losses so you don't repeat the same mistake twice</span></td></tr>
+</table>
+${divider}
+<p style="text-align:center;"><a href="https://chessscout.net/scout" style="${btnStyle}">Scout an Opponent Now →</a></p>`,
+  },
+  {
+    name: '💡 Chess Tips',
+    subject: 'Chess Tip: [Topic] — Improve Your Game Today',
+    html: `<img src="${CHESS_IMAGES.opening}" alt="Chess opening" style="${imgStyle}" />
+<div style="margin-bottom:16px;">${badge('CHESS TIP')}</div>
+<h2 style="color:#81b64c;margin:0 0 8px;">[Topic Title]</h2>
+<p style="color:#9e9b98;font-size:13px;margin:0 0 20px;">A quick lesson to boost your rating</p>
+<p>[2-3 practical, actionable paragraphs on the concept.]</p>
+<div style="background:#262421;border-radius:8px;padding:16px;margin:20px 0;border-left:3px solid #81b64c;">
+<p style="color:#81b64c;font-size:13px;font-weight:600;margin:0 0 6px;">💡 KEY TAKEAWAY</p>
+<p style="color:#e8e6e3;margin:0;font-size:14px;">[One memorable sentence summarizing the tip]</p>
+</div>
+<p>Put it into practice: head to ChessScout and look for positions where this concept applies in your own games.</p>
+${divider}
+<p style="text-align:center;"><a href="https://chessscout.net" style="${btnStyle}">Apply This in Your Games →</a></p>
+<p style="text-align:center;margin-top:8px;"><a href="https://chessscout.net/puzzles" style="${btnAlt}">Practice Puzzles →</a></p>`,
+  },
+  {
+    name: '🔥 Upgrade Reminder',
+    subject: 'Unlock the Full ChessScout Experience',
+    html: `<img src="${CHESS_IMAGES.clock}" alt="Chess clock" style="${imgStyle}" />
 <h2 style="color:#81b64c;margin:0 0 8px;">Ready to Level Up? ♜</h2>
 <p style="color:#9e9b98;font-size:13px;margin:0 0 20px;">You've been using ChessScout's free tier — here's what Pro unlocks</p>
 <p>Here's what you'll get with ChessScout Pro:</p>
 <div style="background:#262421;border-radius:8px;padding:16px;margin:20px 0;">
 <table style="width:100%;border-collapse:collapse;">
-<tr><td style="padding:6px 0;color:#81b64c;">✓</td><td style="padding:6px 0;color:#9e9b98;">Unlimited puzzles (free tier: 10 total)</td></tr>
-<tr><td style="padding:6px 0;color:#81b64c;">✓</td><td style="padding:6px 0;color:#9e9b98;">Unlimited opponent scouting reports</td></tr>
-<tr><td style="padding:6px 0;color:#81b64c;">✓</td><td style="padding:6px 0;color:#9e9b98;">Coach move explanations</td></tr>
-<tr><td style="padding:6px 0;color:#81b64c;">✓</td><td style="padding:6px 0;color:#9e9b98;">Unlimited personalized courses</td></tr>
-<tr><td style="padding:6px 0;color:#81b64c;">✓</td><td style="padding:6px 0;color:#9e9b98;">Unlimited game imports</td></tr>
+<tr><td style="padding:6px 0;color:#81b64c;">✓</td><td style="padding:6px 0;color:#9e9b98;">Unlimited opponent scouting reports (free: 3)</td></tr>
+<tr><td style="padding:6px 0;color:#81b64c;">✓</td><td style="padding:6px 0;color:#9e9b98;">Unlimited personalized courses (free: 5)</td></tr>
+<tr><td style="padding:6px 0;color:#81b64c;">✓</td><td style="padding:6px 0;color:#9e9b98;">Unlimited My Game Puzzles (free: 10 total)</td></tr>
+<tr><td style="padding:6px 0;color:#81b64c;">✓</td><td style="padding:6px 0;color:#9e9b98;">Unlimited game imports (free: 20 total)</td></tr>
+<tr><td style="padding:6px 0;color:#81b64c;">✓</td><td style="padding:6px 0;color:#9e9b98;">Coach move explanations on every puzzle</td></tr>
 </table>
 </div>
 <div style="text-align:center;background:linear-gradient(135deg,rgba(129,182,76,0.1),rgba(129,182,76,0.05));border:1px solid rgba(129,182,76,0.2);border-radius:8px;padding:20px;margin-bottom:20px;">
@@ -473,86 +592,119 @@ ${divider}
 <p style="text-align:center;"><a href="https://chessscout.net/subscription" style="${btnStyle}">Upgrade to Pro →</a></p>`,
   },
   {
-    name: '🚀 New Feature',
-    subject: 'New on ChessScout: [Feature Name]',
-    html: `<img src="${CHESS_IMAGES.strategy}" alt="Chess strategy" style="${imgStyle}" />
-${badge('NEW')}
-<h2 style="color:#81b64c;margin:12px 0 8px;">[Feature Name] is Here ♞</h2>
-<p style="color:#9e9b98;font-size:13px;margin:0 0 20px;">[One-line description of what it does and why it matters]</p>
-<p>[2-3 sentences explaining the feature, what problem it solves, and how to find it in the app.]</p>
-${divider}
-<p style="text-align:center;"><a href="https://chessscout.net" style="${btnStyle}">Try It Now →</a></p>`,
-  },
-  {
-    name: '🧩 Weekly Puzzle Challenge',
-    subject: 'Your Weekly Puzzle Challenge Is Ready',
-    html: `<img src="${CHESS_IMAGES.checkmate}" alt="Chess puzzle" style="${imgStyle}" />
-<h2 style="color:#81b64c;margin:0 0 8px;">This Week's Puzzle Challenge ♞</h2>
-<p style="color:#9e9b98;font-size:13px;margin:0 0 20px;">Sharpen your tactics in five minutes a day</p>
-<p>A fresh set of puzzles is waiting for you — tuned to your rating and drawn from real games. Keep your streak alive.</p>
-${divider}
-<p style="text-align:center;"><a href="https://chessscout.net/puzzles" style="${btnStyle}">Solve Today's Puzzles →</a></p>
-<p style="text-align:center;margin-top:12px;"><span style="color:#9e9b98;font-size:12px;">Pro members also get puzzles generated from their own recent mistakes</span></p>`,
-  },
-  {
-    name: '📊 Your Weekly Stats',
-    subject: 'Your Chess Week in Review',
-    html: `<img src="${CHESS_IMAGES.study}" alt="Chess analysis" style="${imgStyle}" />
-<h2 style="color:#81b64c;margin:0 0 8px;">Your Weekly Recap ♛</h2>
-<p style="color:#9e9b98;font-size:13px;margin:0 0 20px;">Here's how your chess week went</p>
-<p>Log in to see your accuracy trend, blunder rate, and the openings that gave you the most trouble this week — plus a fresh set of key weaknesses to work on.</p>
-${divider}
-<p style="text-align:center;"><a href="https://chessscout.net" style="${btnStyle}">View Your Stats →</a></p>`,
-  },
-  {
-    name: '🏆 Tournament Prep',
-    subject: 'Playing in a Tournament Soon? Prep With ChessScout',
-    html: `<img src="${CHESS_IMAGES.tournament}" alt="Chess tournament" style="${imgStyle}" />
-<h2 style="color:#81b64c;margin:0 0 8px;">Walk In Prepared ♜</h2>
-<p style="color:#9e9b98;font-size:13px;margin:0 0 20px;">Know your opponent before you sit down</p>
-<p>If you know who you're facing next, scout them first. ChessScout builds a full report on their openings, tendencies, and weak spots — the same prep top players use.</p>
-${divider}
-<p style="text-align:center;"><a href="https://chessscout.net/opponents" style="${btnStyle}">Scout an Opponent →</a></p>`,
-  },
-  {
-    name: '💡 Chess Tips',
-    subject: 'A Quick Chess Tip to Level Up Your Game',
-    html: `<img src="${CHESS_IMAGES.pieces}" alt="Chess pieces" style="${imgStyle}" />
-<h2 style="color:#81b64c;margin:0 0 8px;">Tip of the Week ♝</h2>
-<p style="color:#9e9b98;font-size:13px;margin:0 0 20px;">[Short, punchy tip headline]</p>
-<p>[2-4 sentences with a concrete, actionable chess tip — an opening idea, a tactical pattern, or an endgame technique.]</p>
-${divider}
-<p style="text-align:center;"><a href="https://chessscout.net/analysis" style="${btnStyle}">See This In Your Own Games →</a></p>`,
-  },
-  {
     name: '📬 Win of the Week',
-    subject: 'Your Best Game This Week — Take a Look',
-    html: `<img src="${CHESS_IMAGES.checkmate}" alt="Chess victory" style="${imgStyle}" />
-<h2 style="color:#81b64c;margin:0 0 8px;">Nice Win! ♚</h2>
-<p style="color:#9e9b98;font-size:13px;margin:0 0 20px;">We spotted a strong game in your recent history</p>
-<p>One of your recent games stood out — clean tactics, solid technique, a real step up. Take a look at the full breakdown and see exactly what you did right.</p>
+    subject: 'Win of the Week — Brilliant Games from ChessScout Users',
+    html: `<img src="${CHESS_IMAGES.grandmaster}" alt="Chess grandmaster" style="${imgStyle}" />
+<div style="margin-bottom:16px;">${badge('WIN OF THE WEEK')}</div>
+<h2 style="color:#81b64c;margin:0 0 8px;">Community Spotlight ♜</h2>
+<p style="color:#9e9b98;font-size:13px;margin:0 0 20px;">A brilliant game from a ChessScout player</p>
+<div style="background:#262421;border-radius:8px;padding:20px;margin-bottom:20px;">
+<h3 style="color:#e8e6e3;font-size:15px;margin:0 0 8px;">🏅 [Player Username]</h3>
+<p style="color:#9e9b98;font-size:13px;margin:0 0 12px;">[Rating] | [Time Control] | [Result]</p>
+<p>[What made it brilliant — key moments, the decisive combination]</p>
+<p style="color:#81b64c;font-size:13px;margin:12px 0 0;">Key moment: [Describe the critical position or move]</p>
+</div>
+<p>Want your game featured? Play your best chess and analyze it on ChessScout — we pick a favorite every week.</p>
 ${divider}
-<p style="text-align:center;"><a href="https://chessscout.net/games" style="${btnStyle}">Review the Game →</a></p>`,
+<p style="text-align:center;">
+<a href="https://chessscout.net/game-lookup" style="${btnStyle}">Review Your Games →</a>
+</p>`,
   },
   {
     name: '🎯 Re-engagement',
-    subject: "It's Been a While — Your Chess Progress Is Waiting",
-    html: `<img src="${CHESS_IMAGES.opening}" alt="Chess opening" style="${imgStyle}" />
-<h2 style="color:#81b64c;margin:0 0 8px;">We Miss You at the Board ♞</h2>
-<p style="color:#9e9b98;font-size:13px;margin:0 0 20px;">Pick up right where you left off</p>
-<p>It's been a bit since your last visit. Your stats, puzzles, and weakness reports are all still here — ready whenever you are.</p>
-${divider}
-<p style="text-align:center;"><a href="https://chessscout.net" style="${btnStyle}">Jump Back In →</a></p>`,
+    subject: 'We Miss You — Your Chess Is Waiting',
+    html: `<img src="${CHESS_IMAGES.board}" alt="Chess board" style="${imgStyle}" />
+<h2 style="color:#81b64c;margin:0 0 8px;">It's Been a While ♜</h2>
+<p style="color:#9e9b98;font-size:13px;margin:0 0 20px;">Your chess improvement doesn't have to stop</p>
+<p>We noticed you haven't been on ChessScout in a while. Even a few minutes of daily puzzle practice can make a real difference in your games.</p>
+<div style="background:#262421;border-radius:8px;padding:20px;margin:20px 0;">
+<h3 style="color:#e8e6e3;font-size:15px;margin:0 0 16px;">Quick ways to jump back in:</h3>
+<table style="width:100%;border-collapse:collapse;">
+<tr><td style="padding:8px 0;vertical-align:top;width:30px;font-size:16px;">⚡</td><td style="padding:8px 0;"><strong style="color:#e8e6e3;">2 minutes</strong> — Solve a daily puzzle</td></tr>
+<tr><td style="padding:8px 0;vertical-align:top;width:30px;font-size:16px;">🎯</td><td style="padding:8px 0;"><strong style="color:#e8e6e3;">5 minutes</strong> — Scout your next opponent</td></tr>
+<tr><td style="padding:8px 0;vertical-align:top;width:30px;font-size:16px;">📖</td><td style="padding:8px 0;"><strong style="color:#e8e6e3;">10 minutes</strong> — Review a recent game with the coach</td></tr>
+<tr><td style="padding:8px 0;vertical-align:top;width:30px;font-size:16px;">🤖</td><td style="padding:8px 0;"><strong style="color:#e8e6e3;">15 minutes</strong> — Play a practice bot match</td></tr>
+</table>
+</div>
+<p style="text-align:center;"><a href="https://chessscout.net" style="${btnStyle}">Get Back to Chess →</a></p>`,
   },
   {
     name: '📚 Opening Guide',
-    subject: 'Master a New Opening This Week',
-    html: `<img src="${CHESS_IMAGES.opening}" alt="Chess opening book" style="${imgStyle}" />
-<h2 style="color:#81b64c;margin:0 0 8px;">Expand Your Repertoire ♝</h2>
-<p style="color:#9e9b98;font-size:13px;margin:0 0 20px;">[Opening name] — a strong choice worth learning</p>
-<p>[2-3 sentences introducing the opening — the key idea, a typical plan, and why it suits the reader's style.]</p>
+    subject: 'Master This Opening — Free Guide Inside',
+    html: `<img src="${CHESS_IMAGES.opening}" alt="Chess opening position" style="${imgStyle}" />
+<div style="margin-bottom:16px;">${badge('OPENING GUIDE')}</div>
+<h2 style="color:#81b64c;margin:0 0 8px;">[Opening Name]: A Complete Guide</h2>
+<p style="color:#9e9b98;font-size:13px;margin:0 0 20px;">Key ideas, traps, and plans</p>
+<p>[Why this opening is worth learning, who plays it, what level it suits]</p>
 ${divider}
-<p style="text-align:center;"><a href="https://chessscout.net/openings" style="${btnStyle}">Explore Openings →</a></p>`,
+<h3 style="color:#e8e6e3;font-size:15px;margin:0 0 12px;">Key Ideas:</h3>
+<table style="width:100%;border-collapse:collapse;">
+<tr><td style="padding:6px 0;color:#81b64c;">♟</td><td style="padding:6px 0;"><strong>[Idea 1]</strong> — [Brief explanation]</td></tr>
+<tr><td style="padding:6px 0;color:#81b64c;">♟</td><td style="padding:6px 0;"><strong>[Idea 2]</strong> — [Brief explanation]</td></tr>
+<tr><td style="padding:6px 0;color:#81b64c;">♟</td><td style="padding:6px 0;"><strong>[Idea 3]</strong> — [Brief explanation]</td></tr>
+</table>
+<div style="background:#262421;border-radius:8px;padding:16px;margin:20px 0;border-left:3px solid #81b64c;">
+<p style="color:#81b64c;font-size:13px;font-weight:600;margin:0 0 6px;">⚠️ COMMON TRAP</p>
+<p style="color:#e8e6e3;margin:0;font-size:14px;">[A common trap or mistake in this opening]</p>
+</div>
+<p>Use Opponent Scout to see if your next opponent plays this — and how well they handle the key positions.</p>
+${divider}
+<p style="text-align:center;"><a href="https://chessscout.net/scout" style="${btnStyle}">Scout Opponents Playing This →</a></p>`,
+  },
+  {
+    name: '🎄 Holiday / Seasonal',
+    subject: 'Happy Holidays from ChessScout ♜',
+    html: `<img src="${CHESS_IMAGES.pieces}" alt="Chess pieces" style="${imgStyle}" />
+<h2 style="color:#81b64c;margin:0 0 8px;">Happy Holidays! 🎉♜</h2>
+<p style="color:#9e9b98;font-size:13px;margin:0 0 20px;">From the ChessScout team to you</p>
+<p>Wishing you a wonderful holiday season! While you're relaxing, why not squeeze in some chess?</p>
+<div style="background:#262421;border-radius:8px;padding:20px;margin:20px 0;text-align:center;">
+<p style="font-size:36px;margin:0;">♜ 🎁 ♝</p>
+<p style="color:#81b64c;font-size:16px;font-weight:600;margin:12px 0 4px;">Holiday Special</p>
+<p style="color:#e8e6e3;font-size:14px;margin:0;">[Any special offer, discount, or holiday puzzle set]</p>
+</div>
+<p>From all of us at ChessScout — thank you for being part of the community. Here's to more brilliant moves in the new year!</p>
+${divider}
+<p style="text-align:center;"><a href="https://chessscout.net" style="${btnStyle}">Play Some Chess →</a></p>`,
+  },
+  {
+    name: '📢 Announcement',
+    subject: '[Announcement Title] — Important Update from ChessScout',
+    html: `<div style="text-align:center;margin-bottom:20px;">${badge('ANNOUNCEMENT')}</div>
+<h2 style="color:#81b64c;text-align:center;margin:0 0 8px;">[Announcement Title]</h2>
+<p style="color:#9e9b98;font-size:13px;text-align:center;margin:0 0 24px;">[Subtitle or date]</p>
+${divider}
+<p>[Main announcement — keep it clear and concise]</p>
+<p>[What this means for users — how it affects them, what they need to do]</p>
+<div style="background:#262421;border-radius:8px;padding:16px;margin:20px 0;border-left:3px solid #81b64c;">
+<p style="color:#81b64c;font-size:13px;font-weight:600;margin:0 0 6px;">WHAT YOU NEED TO KNOW</p>
+<p style="color:#e8e6e3;margin:0;font-size:14px;">[Key takeaway or action item]</p>
+</div>
+<p>Questions? Just reply to this email — we read every message.</p>
+${divider}
+<p style="text-align:center;"><a href="https://chessscout.net" style="${btnStyle}">Visit ChessScout →</a></p>`,
+  },
+  {
+    name: '🧪 Feedback Request',
+    subject: 'Quick Question — Help Us Make ChessScout Better',
+    html: `<img src="${CHESS_IMAGES.study}" alt="Chess study" style="${imgStyle}" />
+<h2 style="color:#81b64c;margin:0 0 8px;">We'd Love Your Feedback ♜</h2>
+<p style="color:#9e9b98;font-size:13px;margin:0 0 20px;">Help us build the chess tool you actually want</p>
+<p>Hey there! We're always working to make ChessScout better, and your input matters more than you'd think.</p>
+<p>Quick question:</p>
+<div style="background:#262421;border-radius:8px;padding:20px;margin:20px 0;text-align:center;">
+<p style="color:#81b64c;font-size:16px;font-weight:600;margin:0 0 8px;">[Your Question Here]</p>
+<p style="color:#9e9b98;font-size:13px;margin:0;">Just reply to this email with your answer — takes 30 seconds</p>
+</div>
+<p>Some ideas we're considering:</p>
+<table style="width:100%;border-collapse:collapse;">
+<tr><td style="padding:6px 0;color:#81b64c;">→</td><td style="padding:6px 0;">[Idea 1]</td></tr>
+<tr><td style="padding:6px 0;color:#81b64c;">→</td><td style="padding:6px 0;">[Idea 2]</td></tr>
+<tr><td style="padding:6px 0;color:#81b64c;">→</td><td style="padding:6px 0;">[Idea 3]</td></tr>
+</table>
+${divider}
+<p style="color:#9e9b98;font-size:13px;">Your feedback directly shapes what we build next. Thank you!</p>
+<p style="text-align:center;"><a href="https://chessscout.net" style="${btnAlt}">Visit ChessScout →</a></p>`,
   },
 ];
 
@@ -1295,6 +1447,8 @@ function AdminTicker() {
 
       <MarketingPanel />
 
+      <GrowthEngine />
+
       <AnimatePresence>
         {showEmailModal && (
           <EmailComposerModal
@@ -1440,7 +1594,7 @@ interface ReferralData {
   referrals: { id: string; status: string; createdAt: string; convertedAt: string | null; referredName: string }[];
 }
 
-export function ReferralCard({ isPremium }: { isPremium: boolean }) {
+function ReferralCard({ isPremium }: { isPremium: boolean }) {
   const [data, setData] = useState<ReferralData | null>(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
