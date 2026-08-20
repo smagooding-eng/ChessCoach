@@ -23,7 +23,7 @@ const PRIMARY_NAV = [
   { href: '/opponents', label: 'Opponent Scout',  icon: Swords },
   { href: '/games',     label: 'Games',           icon: History },
   { href: '/analysis',  label: 'Analysis',        icon: BrainCircuit },
-  { href: '/puzzles',   label: 'Puzzles',         icon: Puzzle, badge: 'BETA' },
+  { href: '/puzzles',   label: 'Puzzles',         icon: Puzzle },
   { href: '/lookup',    label: 'Game Lookup',     icon: Search },
   { href: '/play',      label: 'Play Local',      icon: Play },
   { href: '/scan',      label: 'Scan Position',   icon: Camera, badge: 'NEW' },
@@ -32,9 +32,9 @@ const PRIMARY_NAV = [
 const SECONDARY_NAV = [
   { href: '/practice',     label: 'Practice Bots',   icon: Bot },
   { href: '/import',       label: 'Import Games',    icon: Import },
-  { href: '/courses',      label: 'Courses',         icon: GraduationCap, badge: 'BETA' },
-  { href: '/endgames',     label: 'Endgames',        icon: Trophy,        badge: 'BETA' },
-  { href: '/openings',     label: 'Openings',        icon: BookOpen,      badge: 'BETA' },
+  { href: '/courses',      label: 'Courses',         icon: GraduationCap },
+  { href: '/endgames',     label: 'Endgames',        icon: Trophy },
+  { href: '/openings',     label: 'Openings',        icon: BookOpen },
   { href: '/subscription', label: 'Subscription',    icon: Crown },
 ];
 

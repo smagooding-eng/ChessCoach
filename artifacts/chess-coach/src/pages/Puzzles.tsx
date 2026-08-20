@@ -4,7 +4,7 @@ import { Chess } from 'chess.js';
 import { Chessboard } from 'react-chessboard';
 import { apiFetch } from '@/lib/api';
 import { useUser } from '@/hooks/use-user';
-import { Crown, RotateCcw, ChevronRight, Trophy, Target, Flame, Zap, Lightbulb, Loader2, Lock, AlertTriangle } from 'lucide-react';
+import { Crown, RotateCcw, ChevronRight, Trophy, Target, Flame, Zap, Lightbulb, Loader2, Lock } from 'lucide-react';
 import { useLocation, useSearch } from 'wouter';
 import { encodeCard } from '@/pages/ShareCard';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -16,6 +16,21 @@ const TEXT_LIGHT = '#e8e6e3';
 const TEXT_MUTED = '#9e9b98';
 const CARD_SHADOW = '0 18px 50px -16px rgba(0,0,0,0.6), 0 4px 16px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04)';
 const CARD_BORDER = '1px solid rgba(129,182,76,0.08)';
+
+// Options for the "Puzzle Type" filter row. value='' means no filter (any
+// puzzle). Values map to Lichess theme tags, matched via the backend's
+// ?puzzleTheme= exact-tag filter.
+const PUZZLE_TYPE_OPTIONS: { value: string; label: string }[] = [
+  { value: '', label: 'All' },
+  { value: 'mateIn1', label: 'Mate in 1' },
+  { value: 'mateIn2', label: 'Mate in 2' },
+  { value: 'mateIn3', label: 'Mate in 3' },
+  { value: 'mateIn4', label: 'Mate in 4+' },
+  { value: 'fork', label: 'Fork' },
+  { value: 'pin', label: 'Pin' },
+  { value: 'skewer', label: 'Skewer' },
+  { value: 'endgame', label: 'Endgame' },
+];
 
 interface PuzzleData {
   id: number;
@@ -64,10 +79,9 @@ export function Puzzles() {
   const [selectedSquare, setSelectedSquare] = useState<string | null>(null);
   const startTimeRef = useRef<number>(0);
 
-  const [tab, setTab] = useState<'daily' | 'games'>('daily');
-  const [gamePuzzles, setGamePuzzles] = useState<any[]>([]);
-  const [generatingFromGames, setGeneratingFromGames] = useState(false);
-  const [gamesGenError, setGamesGenError] = useState<string | null>(null);
+  // "My Game Puzzles" tab removed -- Daily Puzzles is now the only mode,
+  // with an added puzzle-type filter (mate in N, etc) below instead.
+  const [puzzleTheme, setPuzzleTheme] = useState<string>('');
   const feedbackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [explanation, setExplanation] = useState<string | null>(null);
   const [loadingExplanation, setLoadingExplanation] = useState(false);
@@ -98,6 +112,7 @@ export function Puzzles() {
       const params = new URLSearchParams();
       if (seenPuzzleIds.current.length > 0) params.set('exclude', seenPuzzleIds.current.join(','));
       if (targetTheme) params.set('weakness', targetTheme);
+      if (puzzleTheme) params.set('puzzleTheme', puzzleTheme);
       const qs = params.toString() ? `?${params.toString()}` : '';
       const res = await apiFetch(`/api/puzzles/next${qs}`);
       if (res.status === 403) {
@@ -125,79 +140,12 @@ export function Puzzles() {
     } catch {
       setState('no_puzzles');
     }
-  }, []);
-
-  const loadPuzzleById = useCallback(async (puzzleId: number) => {
-    setState('loading');
-    setFeedback(null);
-    setShowHint(false);
-    setLastMove(null);
-    setSolutionMoves([]);
-    setCurrentMoveIndex(0);
-
-    try {
-      const res = await apiFetch(`/api/puzzles/${puzzleId}`);
-      if (!res.ok) {
-        setState('no_puzzles');
-        return;
-      }
-      const data = await res.json();
-      setPuzzle({
-        id: data.id,
-        fen: data.fen ?? '',
-        rating: data.rating,
-        themes: data.themes,
-        source: data.source ?? 'game',
-      });
-      setSolutionMoves(data.moves ? data.moves.split(' ') : []);
-
-      const chess = new Chess(data.fen);
-      setGame(chess);
-      setState('ready');
-      startTimeRef.current = Date.now();
-    } catch {
-      setState('no_puzzles');
-    }
-  }, []);
+  }, [puzzleTheme]);
 
   useEffect(() => {
     fetchNextPuzzle();
     fetchStats();
   }, [fetchNextPuzzle, fetchStats]);
-
-  const fetchGamePuzzles = useCallback(async () => {
-    try {
-      const res = await apiFetch('/api/puzzles/my-puzzles');
-      if (res.ok) {
-        const data = await res.json();
-        setGamePuzzles(data.puzzles);
-      }
-    } catch {}
-  }, []);
-
-  useEffect(() => {
-    if (tab === 'games') fetchGamePuzzles();
-  }, [tab, fetchGamePuzzles]);
-
-  const generateFromGames = useCallback(async () => {
-    setGeneratingFromGames(true);
-    setGamesGenError(null);
-    try {
-      const res = await apiFetch('/api/puzzles/generate-from-games', { method: 'POST' });
-      const data = await res.json().catch(() => ({}));
-      if (res.ok) {
-        if (data.generated === 0) {
-          setGamesGenError("No new puzzles found — this looks for blunders and mistakes in your reviewed games, so try reviewing more games first.");
-        }
-        await fetchGamePuzzles();
-      } else {
-        setGamesGenError(data.error || 'Failed to generate puzzles. Please try again.');
-      }
-    } catch {
-      setGamesGenError('Failed to generate puzzles. Please check your connection and try again.');
-    }
-    setGeneratingFromGames(false);
-  }, [fetchGamePuzzles]);
 
   const boardOrientation = useMemo(() => {
     if (!puzzle?.fen) return 'white';
@@ -470,23 +418,24 @@ export function Puzzles() {
           </div>
         )}
 
-        <div className="flex gap-1 mb-4 p-1 rounded-xl" style={{ background: 'rgba(255,255,255,0.04)' }}>
-          {(['daily', 'games'] as const).map(t => (
+        <div className="flex gap-1.5 mb-4 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
+          {PUZZLE_TYPE_OPTIONS.map(opt => (
             <button
-              key={t}
-              onClick={() => setTab(t)}
-              className="flex-1 py-2 px-3 rounded-xl text-sm font-bold transition-all"
+              key={opt.value}
+              onClick={() => setPuzzleTheme(opt.value)}
+              className="shrink-0 px-3 py-1.5 rounded-xl text-xs font-bold transition-all"
               style={{
-                background: tab === t ? CHESSCOM_GREEN : 'transparent',
-                color: tab === t ? '#000' : TEXT_MUTED,
+                background: puzzleTheme === opt.value ? CHESSCOM_GREEN : 'rgba(255,255,255,0.04)',
+                color: puzzleTheme === opt.value ? '#000' : TEXT_MUTED,
+                border: puzzleTheme === opt.value ? 'none' : '1px solid rgba(255,255,255,0.06)',
               }}
             >
-              {t === 'daily' ? 'Daily Puzzles' : 'My Game Puzzles'}
+              {opt.label}
             </button>
           ))}
         </div>
 
-        {tab === 'daily' && (
+        {(
           <>
             {daily && !daily.premium && daily.limit && state !== 'limit_reached' && (
               <div className="flex items-center justify-between px-3 py-2 rounded-xl mb-3"
@@ -734,81 +683,6 @@ export function Puzzles() {
               </button>
             )}
           </>
-        )}
-
-        {tab === 'games' && (
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <p className="text-sm" style={{ color: TEXT_MUTED }}>
-                Puzzles generated from your analyzed games
-              </p>
-              <button
-                onClick={generateFromGames}
-                disabled={generatingFromGames}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all disabled:opacity-50"
-                style={{ background: CHESSCOM_GREEN, color: '#000' }}>
-                {generatingFromGames ? <Loader2 size={14} className="animate-spin" /> : <Zap size={14} />}
-                Generate
-              </button>
-            </div>
-
-            {gamesGenError && (
-              <div className="mb-4 px-3.5 py-2.5 rounded-xl text-sm flex items-start gap-2"
-                style={{ background: 'rgba(234,166,49,0.1)', border: '1px solid rgba(234,166,49,0.25)', color: '#eaa631' }}>
-                <AlertTriangle size={15} className="shrink-0 mt-0.5" />
-                <span>{gamesGenError}</span>
-              </div>
-            )}
-
-            {gamePuzzles.length === 0 ? (
-              <div className="text-center py-12">
-                <div className="w-14 h-14 rounded-xl flex items-center justify-center mx-auto mb-3"
-                  style={{ background: 'rgba(129,182,76,0.1)' }}>
-                  <Target size={24} style={{ color: CHESSCOM_GREEN }} />
-                </div>
-                <p className="text-sm font-medium mb-1" style={{ color: TEXT_LIGHT }}>No game puzzles yet</p>
-                <p className="text-xs mb-4" style={{ color: TEXT_MUTED }}>
-                  Analyze your games first, then generate puzzles from your mistakes
-                </p>
-                <button
-                  onClick={generateFromGames}
-                  disabled={generatingFromGames}
-                  className="px-4 py-2 rounded-xl text-sm font-bold"
-                  style={{ background: CHESSCOM_GREEN, color: '#000' }}>
-                  Generate Puzzles
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {gamePuzzles.map(p => (
-                  <button
-                    key={p.id}
-                    onClick={() => {
-                      setTab('daily');
-                      loadPuzzleById(p.id);
-                    }}
-                    className="w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all hover:scale-[1.01]"
-                    style={{ background: BG_CARD }}>
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-xl flex items-center justify-center text-lg"
-                        style={{ background: p.solved ? 'rgba(74,222,128,0.15)' : 'rgba(255,255,255,0.06)' }}>
-                        {p.solved ? '✓' : '♟'}
-                      </div>
-                      <div className="text-left">
-                        <div className="text-sm font-bold" style={{ color: TEXT_LIGHT }}>
-                          Rating {p.rating}
-                        </div>
-                        <div className="text-xs" style={{ color: TEXT_MUTED }}>
-                          {p.themes.map((t: string) => themeLabels[t] || t).join(', ')}
-                        </div>
-                      </div>
-                    </div>
-                    <ChevronRight size={16} style={{ color: TEXT_MUTED }} />
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
         )}
       </div>
     </div>

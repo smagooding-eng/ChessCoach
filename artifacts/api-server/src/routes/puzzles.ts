@@ -136,6 +136,15 @@ router.get("/puzzles/next", requireAuth, async (req: Request, res: Response) => 
         : null;
     const themeCondition = targetGroup ? themeGroupCondition(targetGroup) : null;
 
+    // Optional exact puzzle-type filter: ?puzzleTheme=mateIn2 (or fork, pin,
+    // etc). Distinct from the broad ?theme= groups above -- this matches a
+    // single specific Lichess theme tag exactly, for the "Puzzle Type"
+    // picker on the Puzzles page (e.g. Mate in 1/2/3).
+    const puzzleThemeParam = typeof req.query.puzzleTheme === "string" ? req.query.puzzleTheme : null;
+    const exactThemeCondition = puzzleThemeParam
+      ? sql`${puzzlesTable.themes} ILIKE ${"%" + puzzleThemeParam + "%"}`
+      : null;
+
     let puzzle;
     if (allExcluded.length > 0) {
       const result = await db
@@ -145,6 +154,7 @@ router.get("/puzzles/next", requireAuth, async (req: Request, res: Response) => 
           eq(puzzlesTable.archived, false),
           sql`${puzzlesTable.id} NOT IN (${sql.join(allExcluded.map(id => sql`${id}`), sql`, `)})`,
           ...(themeCondition ? [themeCondition] : []),
+          ...(exactThemeCondition ? [exactThemeCondition] : []),
         ))
         .orderBy(sql`RANDOM()`)
         .limit(1);
@@ -158,6 +168,7 @@ router.get("/puzzles/next", requireAuth, async (req: Request, res: Response) => 
         .where(and(
           eq(puzzlesTable.archived, false),
           ...(themeCondition ? [themeCondition] : []),
+          ...(exactThemeCondition ? [exactThemeCondition] : []),
         ))
         .orderBy(sql`RANDOM()`)
         .limit(1);
