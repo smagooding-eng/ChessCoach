@@ -188,6 +188,16 @@ router.get("/puzzles/next", requireAuth, async (req: Request, res: Response) => 
       return;
     }
 
+    // IMPORTANT: this puzzle data follows the standard Lichess export
+    // format, where the FIRST move in `moves` is the historical blunder
+    // move that was actually played in-game (not something to "solve") --
+    // the real puzzle begins at the second move. We auto-apply that first
+    // move server-side and serve the resulting position + the remaining
+    // moves as "the puzzle", so the side shown as "to move" is always the
+    // side that actually finds the tactic / delivers the mate, matching
+    // what a player expects and what filters like "Mate in 2" imply.
+    let solverFen: string;
+    let solverMoves: string;
     try {
       const validationChess = new Chess(puzzle.fen);
       const firstMove = puzzle.moves.split(" ")[0];
@@ -197,6 +207,15 @@ router.get("/puzzles/next", requireAuth, async (req: Request, res: Response) => 
       const result = validationChess.move({ from, to, promotion: promo });
       if (!result) {
         req.log.warn({ puzzleId: puzzle.id }, "Skipping invalid puzzle - first move illegal");
+        await db.delete(puzzlesTable).where(eq(puzzlesTable.id, puzzle.id));
+        res.redirect(307, `/api/puzzles/next${req.url.includes("?") ? "&" + req.url.split("?")[1] : ""}`);
+        return;
+      }
+      solverFen = validationChess.fen();
+      solverMoves = puzzle.moves.split(" ").slice(1).join(" ");
+      if (!solverMoves) {
+        // Nothing left to solve after stripping the setup move -- skip.
+        req.log.warn({ puzzleId: puzzle.id }, "Skipping puzzle - no solver moves after setup move");
         await db.delete(puzzlesTable).where(eq(puzzlesTable.id, puzzle.id));
         res.redirect(307, `/api/puzzles/next${req.url.includes("?") ? "&" + req.url.split("?")[1] : ""}`);
         return;
@@ -211,8 +230,8 @@ router.get("/puzzles/next", requireAuth, async (req: Request, res: Response) => 
     res.json({
       puzzle: {
         id: puzzle.id,
-        fen: puzzle.fen,
-        moves: puzzle.moves,
+        fen: solverFen,
+        moves: solverMoves,
         rating: puzzle.rating,
         themes: puzzle.themes?.split(",").filter(Boolean) ?? [],
         source: puzzle.source,
@@ -367,10 +386,32 @@ router.get("/puzzles/:id", requireAuth, async (req: Request, res: Response) => {
       return;
     }
 
+    // Same fix as /puzzles/next: strip the historical setup move so the
+    // fen shown and moves returned always start from the actual solver's
+    // turn, not the opponent's blunder move.
+    let solverFen = puzzle.fen;
+    let solverMoves = puzzle.moves;
+    try {
+      const validationChess = new Chess(puzzle.fen);
+      const rawMoves = puzzle.moves.split(" ");
+      const firstMove = rawMoves[0];
+      const from = firstMove.slice(0, 2);
+      const to = firstMove.slice(2, 4);
+      const promo = firstMove.length > 4 ? firstMove[4] : undefined;
+      const result = validationChess.move({ from, to, promotion: promo });
+      if (result && rawMoves.length > 1) {
+        solverFen = validationChess.fen();
+        solverMoves = rawMoves.slice(1).join(" ");
+      }
+    } catch {
+      // Fall back to raw fen/moves if the setup move can't be applied for
+      // any reason -- better to serve something than a 500 here.
+    }
+
     res.json({
       id: puzzle.id,
-      fen: puzzle.fen,
-      moves: puzzle.moves,
+      fen: solverFen,
+      moves: solverMoves,
       rating: puzzle.rating,
       themes: puzzle.themes?.split(",").filter(Boolean) ?? [],
       source: puzzle.source,
@@ -401,7 +442,11 @@ router.post("/puzzles/:id/solve", requireAuth, async (req: Request, res: Respons
       return;
     }
 
-    const solutionMoves = puzzle.moves.split(" ");
+    // Matches what /puzzles/next now serves: the stored `moves` still
+    // includes the historical setup move at index 0, so it must be
+    // stripped here too, or move indices would be off by one relative to
+    // what the client is tracking.
+    const solutionMoves = puzzle.moves.split(" ").slice(1);
     const idx = typeof moveIndex === "number" ? moveIndex : 0;
     const expectedMove = solutionMoves[idx]?.toLowerCase();
     const playedMove = move.toLowerCase();

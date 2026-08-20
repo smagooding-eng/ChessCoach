@@ -441,13 +441,13 @@ ${divider}
 <h3 style="color:#81b64c;font-size:16px;margin:0 0 12px;">Here's what you can do right now:</h3>
 <table style="width:100%;border-collapse:collapse;">
 <tr><td style="padding:8px 0;vertical-align:top;width:30px;color:#81b64c;font-size:18px;">🔍</td><td style="padding:8px 0;"><strong style="color:#e8e6e3;">Opponent Scout</strong><br/><span style="color:#9e9b98;font-size:13px;">Deep analysis of any player's openings, weaknesses &amp; tendencies</span></td></tr>
-<tr><td style="padding:8px 0;vertical-align:top;width:30px;color:#81b64c;font-size:18px;">♟️</td><td style="padding:8px 0;"><strong style="color:#e8e6e3;">Deep Game Analysis</strong><br/><span style="color:#9e9b98;font-size:13px;">Import your games and get move-by-move coaching insights</span></td></tr>
-<tr><td style="padding:8px 0;vertical-align:top;width:30px;color:#81b64c;font-size:18px;">🧩</td><td style="padding:8px 0;"><strong style="color:#e8e6e3;">Puzzles</strong><br/><span style="color:#9e9b98;font-size:13px;">Daily puzzles plus custom ones generated from your own mistakes</span></td></tr>
+<tr><td style="padding:8px 0;vertical-align:top;width:30px;color:#81b64c;font-size:18px;">♟️</td><td style="padding:8px 0;"><strong style="color:#e8e6e3;">Game Lookup</strong><br/><span style="color:#9e9b98;font-size:13px;">Review any Chess.com game with move-by-move replay</span></td></tr>
+<tr><td style="padding:8px 0;vertical-align:top;width:30px;color:#81b64c;font-size:18px;">🧩</td><td style="padding:8px 0;"><strong style="color:#e8e6e3;">Puzzles</strong><br/><span style="color:#9e9b98;font-size:13px;">Unlimited daily puzzles, filterable by type — mate in 2, forks, pins &amp; more</span></td></tr>
 <tr><td style="padding:8px 0;vertical-align:top;width:30px;color:#81b64c;font-size:18px;">🤖</td><td style="padding:8px 0;"><strong style="color:#e8e6e3;">Practice Bots</strong><br/><span style="color:#9e9b98;font-size:13px;">Train against bots calibrated to different rating levels — unlimited, always free</span></td></tr>
 </table>
 ${divider}
 <p style="text-align:center;"><a href="https://chessscout.net" style="${btnStyle}">Start Scouting Your Opponents →</a></p>
-<p style="text-align:center;margin-top:12px;"><span style="color:#9e9b98;font-size:12px;">Free plan includes 10 puzzles, 3 opponent scouting reports, 5 courses, and unlimited bots — no card required</span></p>`,
+<p style="text-align:center;margin-top:12px;"><span style="color:#9e9b98;font-size:12px;">Free plan includes unlimited daily puzzles, 3 opponent scouting reports, 5 courses, and unlimited bots — no card required</span></p>`,
   },
   {
     name: '⭐ Upgrade to Pro',
@@ -458,7 +458,7 @@ ${divider}
 <p>Here's what you'll get with ChessScout Pro:</p>
 <div style="background:#262421;border-radius:8px;padding:16px;margin:20px 0;">
 <table style="width:100%;border-collapse:collapse;">
-<tr><td style="padding:6px 0;color:#81b64c;">✓</td><td style="padding:6px 0;color:#9e9b98;">Unlimited puzzles (free tier: 10 total)</td></tr>
+<tr><td style="padding:6px 0;color:#81b64c;">✓</td><td style="padding:6px 0;color:#9e9b98;">TTS coach narration on every puzzle &amp; lesson</td></tr>
 <tr><td style="padding:6px 0;color:#81b64c;">✓</td><td style="padding:6px 0;color:#9e9b98;">Unlimited opponent scouting reports</td></tr>
 <tr><td style="padding:6px 0;color:#81b64c;">✓</td><td style="padding:6px 0;color:#9e9b98;">Coach move explanations</td></tr>
 <tr><td style="padding:6px 0;color:#81b64c;">✓</td><td style="padding:6px 0;color:#9e9b98;">Unlimited personalized courses</td></tr>
@@ -492,7 +492,7 @@ ${divider}
 <p>A fresh set of puzzles is waiting for you — tuned to your rating and drawn from real games. Keep your streak alive.</p>
 ${divider}
 <p style="text-align:center;"><a href="https://chessscout.net/puzzles" style="${btnStyle}">Solve Today's Puzzles →</a></p>
-<p style="text-align:center;margin-top:12px;"><span style="color:#9e9b98;font-size:12px;">Pro members also get puzzles generated from their own recent mistakes</span></p>`,
+<p style="text-align:center;margin-top:12px;"><span style="color:#9e9b98;font-size:12px;">Tip: filter by puzzle type on the Puzzles page — mate in 1, 2, 3 and more</span></p>`,
   },
   {
     name: '📊 Your Weekly Stats',
