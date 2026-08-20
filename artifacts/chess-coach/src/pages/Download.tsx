@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { Link } from 'wouter';
-import { ArrowLeft, Download as DownloadIcon, Smartphone, ShieldCheck, Sparkles, Check } from 'lucide-react';
+import { ArrowLeft, Smartphone, ShieldCheck, Sparkles, Check } from 'lucide-react';
 
 const G = '#81b64c';
 const BG = '#262421';
@@ -8,12 +8,9 @@ const CARD = '#302e2b';
 const TEXT = '#e8e6e3';
 const MUTED = '#9e9b98';
 
-const APP_HREF = `${import.meta.env.BASE_URL}chessscout.apk`;
-const APP_FILENAME = 'ChessScout.apk';
+const PLAY_STORE_HREF = 'https://play.google.com/store/apps/details?id=net.chessscout.app';
 
 export default function DownloadPage() {
-  const [version] = useState('1.0.0');
-
   useEffect(() => {
     document.title = 'Download the ChessScout App';
   }, []);
@@ -60,33 +57,36 @@ export default function DownloadPage() {
             </div>
             <div className="flex-1 text-center sm:text-left">
               <p className="text-xs font-black uppercase tracking-widest mb-1" style={{ color: MUTED }}>
-                ChessScout for Android · v{version}
+                ChessScout for Android
               </p>
               <h2 className="text-xl sm:text-2xl font-black mb-1" style={{ color: TEXT }}>
                 ChessScout
               </h2>
               <p className="text-sm" style={{ color: MUTED }}>
-                Direct download · works on Android 8.0 and above
+                Available on Google Play · works on Android 8.0 and above
               </p>
             </div>
             <a
-              href={APP_HREF}
-              download={APP_FILENAME}
+              href={PLAY_STORE_HREF}
+              target="_blank"
+              rel="noopener noreferrer"
               className="group inline-flex items-center gap-2 px-6 py-3.5 rounded-xl font-black text-sm transition-all shrink-0"
               style={{ background: G, color: '#fff', boxShadow: `0 12px 30px -6px ${G}66` }}
               onMouseEnter={e => { e.currentTarget.style.background = '#6fa23e'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
               onMouseLeave={e => { e.currentTarget.style.background = G; e.currentTarget.style.transform = 'translateY(0)'; }}
             >
-              <DownloadIcon className="w-4 h-4" />
-              Download App
+              <svg className="w-4 h-4" viewBox="0 0 512 512" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                <path d="M325.3 234.3L104.6 13l280.8 161.2-60.1 60.1zM47 0C34 6.8 25.3 19.2 25.3 35.3v441.3c0 16.1 8.7 28.5 21.7 35.3l256.6-256L47 0zm425.2 225.6l-58.9-34.1-65.7 64.5 65.7 64.5 60.1-34.1c18-14.3 18-46.5-1.2-60.8zM104.6 499l280.8-161.2-60.1-60.1L104.6 499z"/>
+              </svg>
+              Download from Google Play
             </a>
           </div>
 
           <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-3">
             {[
-              { icon: ShieldCheck, label: 'Verified build' },
+              { icon: ShieldCheck, label: 'Google Play verified' },
               { icon: Sparkles,    label: 'Full feature parity' },
-              { icon: Smartphone,  label: 'No Play Store needed' },
+              { icon: Smartphone,  label: 'Automatic updates' },
             ].map((f, i) => (
               <div key={i} className="flex items-center gap-2 px-3 py-2 rounded-xl"
                 style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
@@ -99,26 +99,7 @@ export default function DownloadPage() {
 
         <div className="rounded-xl p-5 sm:p-6"
           style={{ background: CARD, border: '1px solid rgba(255,255,255,0.06)' }}>
-          <h3 className="text-sm font-black mb-3 tracking-wide" style={{ color: TEXT }}>
-            Install instructions
-          </h3>
-          <ol className="space-y-2.5 text-sm" style={{ color: MUTED }}>
-            {[
-              'Tap "Download App" above. The file will save to your Downloads folder.',
-              'Open the file. Android may ask permission to install from this source — tap Settings and allow it.',
-              'Tap Install. When it finishes, open the app and sign in with your ChessScout account.',
-            ].map((step, i) => (
-              <li key={i} className="flex items-start gap-2.5">
-                <div className="w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-0.5"
-                  style={{ background: `${G}22`, color: G }}>
-                  <span className="text-[11px] font-black">{i + 1}</span>
-                </div>
-                <span>{step}</span>
-              </li>
-            ))}
-          </ol>
-
-          <div className="mt-5 flex items-start gap-2 p-3 rounded-xl"
+          <div className="flex items-start gap-2 p-3 rounded-xl"
             style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
             <Check className="w-4 h-4 mt-0.5 shrink-0" style={{ color: G }} />
             <p className="text-xs" style={{ color: MUTED }}>

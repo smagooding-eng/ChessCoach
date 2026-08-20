@@ -461,9 +461,6 @@ function UserDetailPanel({ userId, onBack }: { userId: string; onBack: () => voi
   const [error, setError] = useState('');
   const [premiumOverride, setPremiumOverride] = useState(false);
   const [togglingPremium, setTogglingPremium] = useState(false);
-  const [confirmingDelete, setConfirmingDelete] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const [deleteError, setDeleteError] = useState('');
 
   useEffect(() => {
     setLoading(true);
@@ -491,34 +488,6 @@ function UserDetailPanel({ userId, onBack }: { userId: string; onBack: () => voi
       if (res.ok) setPremiumOverride(next);
     } catch { /* leave state as-is on failure */ }
     setTogglingPremium(false);
-  };
-
-  const handleDeleteAccount = async () => {
-    if (!confirmingDelete) {
-      setConfirmingDelete(true);
-      return;
-    }
-    setDeleting(true);
-    setDeleteError('');
-    try {
-      const res = await apiFetch('/api/admin/users/delete', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ userIds: [userId] }),
-      });
-      if (res.ok) {
-        onBack();
-      } else {
-        const body = await res.json().catch(() => ({}));
-        setDeleteError(body.error || 'Failed to delete account');
-        setConfirmingDelete(false);
-      }
-    } catch {
-      setDeleteError('Connection error — account was not deleted');
-      setConfirmingDelete(false);
-    }
-    setDeleting(false);
   };
 
   if (loading) {
@@ -586,29 +555,6 @@ function UserDetailPanel({ userId, onBack }: { userId: string; onBack: () => voi
           {togglingPremium ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
           {premiumOverride ? 'Pro access granted — click to revoke' : 'Grant free Pro access'}
         </button>
-
-        <div className="mt-2 flex items-center gap-2 flex-wrap">
-          <button
-            onClick={handleDeleteAccount}
-            disabled={deleting}
-            className={cn(
-              'px-3 py-1.5 rounded-lg text-[11px] font-bold flex items-center gap-1.5 disabled:opacity-50',
-              confirmingDelete ? 'bg-red-500/20 text-red-400 border border-red-500/40' : 'bg-red-500/5 text-red-400/80 border border-red-500/15'
-            )}
-          >
-            {deleting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
-            {confirmingDelete ? 'Click again to confirm delete' : 'Delete account'}
-          </button>
-          {confirmingDelete && !deleting && (
-            <button
-              onClick={() => setConfirmingDelete(false)}
-              className="px-3 py-1.5 rounded-lg text-[11px] font-bold bg-background/40 text-muted-foreground border border-border/30"
-            >
-              Cancel
-            </button>
-          )}
-        </div>
-        {deleteError && <p className="text-[10px] text-red-400 mt-1.5">{deleteError}</p>}
       </div>
 
       <div className="grid grid-cols-4 gap-px bg-border/10 border-b border-border/20">
@@ -658,10 +604,10 @@ function UserDetailPanel({ userId, onBack }: { userId: string; onBack: () => voi
   );
 }
 
-function UserListPanel({ onClose, onEmailUsers }: { onClose: () => void; onEmailUsers: (emails: string[]) => void }) {
+function UserListPanel({ onClose, onEmailUsers, initialFilter = 'all' }: { onClose: () => void; onEmailUsers: (emails: string[]) => void; initialFilter?: UserFilter }) {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<UserFilter>('all');
+  const [filter, setFilter] = useState<UserFilter>(initialFilter);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [deleting, setDeleting] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
@@ -1765,6 +1711,7 @@ ${sanitized}
 function AdminTicker() {
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [showUsers, setShowUsers] = useState(false);
+  const [usersFilter, setUsersFilter] = useState<UserFilter>('all');
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [emailRecipients, setEmailRecipients] = useState<string[]>([]);
   const [clearing, setClearing] = useState(false);
@@ -1849,7 +1796,7 @@ function AdminTicker() {
             <p className="text-[10px] text-muted-foreground/60 mt-0.5">{(stats.uniqueVisitors?.today ?? stats.pageViews.today)} today</p>
           </div>
           <button
-            onClick={() => setShowUsers(v => !v)}
+            onClick={() => { setUsersFilter('all'); setShowUsers(true); }}
             className="p-4 text-center hover:bg-emerald-400/5 transition-colors cursor-pointer"
           >
             <div className="w-8 h-8 bg-emerald-400/10 rounded-xl flex items-center justify-center mx-auto mb-2">
@@ -1859,21 +1806,24 @@ function AdminTicker() {
             <p className="text-xs text-emerald-400 font-medium underline decoration-dotted underline-offset-2">Users</p>
             <p className="text-[10px] text-muted-foreground/60 mt-0.5">{stats.users.today} today</p>
           </button>
-          <div className="p-4 text-center">
+          <button
+            onClick={() => { setUsersFilter('pro'); setShowUsers(true); }}
+            className="p-4 text-center hover:bg-primary/5 transition-colors cursor-pointer"
+          >
             <div className="w-8 h-8 bg-primary/10 rounded-xl flex items-center justify-center mx-auto mb-2">
               <CreditCard className="w-4 h-4 text-primary" />
             </div>
             <p className="text-xl font-black text-foreground">{stats.subscriptions.total.toLocaleString()}</p>
             <p className="text-xs text-muted-foreground font-medium">Subscriptions</p>
             <div className="text-[10px] text-muted-foreground/60 mt-0.5 space-y-0.5">
-              {stats.subscriptions.active > 0 && <p className="text-emerald-400">{stats.subscriptions.active} paid</p>}
+              {stats.subscriptions.active > 0 && <p className="text-emerald-400 underline decoration-dotted underline-offset-2">{stats.subscriptions.active} paid</p>}
               {stats.subscriptions.trialing > 0 && <p className="text-blue-400">{stats.subscriptions.trialing} trial</p>}
               {stats.subscriptions.pastDue > 0 && <p className="text-orange-400">{stats.subscriptions.pastDue} past due</p>}
             </div>
-          </div>
+          </button>
         </div>
         <AnimatePresence>
-          {showUsers && <UserListPanel onClose={() => setShowUsers(false)} onEmailUsers={handleEmailUsers} />}
+          {showUsers && <UserListPanel key={usersFilter} onClose={() => setShowUsers(false)} onEmailUsers={handleEmailUsers} initialFilter={usersFilter} />}
         </AnimatePresence>
       </motion.div>
 
