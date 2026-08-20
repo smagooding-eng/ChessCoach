@@ -1,6 +1,7 @@
 import { db, gamesTable, puzzleAttemptsTable, puzzlesTable, backgroundJobsTable, coursesTable } from "@workspace/db";
 import { eq, and, count } from "drizzle-orm";
 import { storage } from "./storage";
+import { ADMIN_EMAILS } from "./auth";
 
 export const FREE_TIER_LIMITS = {
   puzzles: 10,
@@ -21,7 +22,7 @@ export const FREE_TIER_LIMITS = {
 export async function hasFullAccess(userId: string): Promise<{ full: boolean; user: Awaited<ReturnType<typeof storage.getUser>> | null }> {
   const user = await storage.getUser(userId);
   if (!user) return { full: false, user: null };
-  if (user.isAdmin) return { full: true, user };
+  if (user.isAdmin || ADMIN_EMAILS.includes(user.email?.toLowerCase?.() ?? "")) return { full: true, user };
   if (user.isPremiumOverride) return { full: true, user };
 
   if (user.stripeCustomerId) {
