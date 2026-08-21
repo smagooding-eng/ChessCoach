@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo, useRef, useEffect, Component, type ReactNode } from 'react';
-import { Chessboard } from 'react-chessboard';
+import { Chessboard, defaultPieces } from 'react-chessboard';
 import { Chess } from 'chess.js';
 import { normalizeFen } from '@/lib/utils';
 import { useSettings } from '@/context/SettingsContext';
@@ -117,7 +117,7 @@ export function ChessBoard({
   onPremoveSet,
   arrows,
 }: ChessBoardProps) {
-  const { confirmMoves, boardColors, showCoordinates } = useSettings();
+  const { confirmMoves, boardColors, showCoordinates, pieceFilter } = useSettings();
   const confirmMovesRef = useRef(confirmMoves);
   confirmMovesRef.current = confirmMoves;
   const position = normalizeFen(fen || START_FEN);
@@ -134,6 +134,21 @@ export function ChessBoard({
   // board immediately for feedback) but not actually committed via
   // onMovePlayed until the player taps Confirm.
   const [pendingMove, setPendingMove] = useState<{ from: string; to: string; san: string; isCorrect: boolean; tempFen: string } | null>(null);
+
+  // Wraps the library's real default piece renderers with a CSS filter via
+  // svgStyle -- this only touches the piece SVGs, never the squares, so it
+  // can't undo the separate board color setting. Skipped entirely when no
+  // tint is selected (avoids the wrapper overhead for the common case).
+  const tintedPieces = useMemo(() => {
+    if (pieceFilter === 'none') return undefined;
+    const wrapped: typeof defaultPieces = {};
+    for (const [key, PieceComponent] of Object.entries(defaultPieces)) {
+      wrapped[key] = (props) => (
+        <PieceComponent {...props} svgStyle={{ ...props?.svgStyle, filter: pieceFilter }} />
+      );
+    }
+    return wrapped;
+  }, [pieceFilter]);
 
   useEffect(() => {
     return () => { if (feedbackTimerRef.current) clearTimeout(feedbackTimerRef.current); };
@@ -368,6 +383,7 @@ export function ChessBoard({
             },
             lightSquareStyle: { backgroundColor: boardColors.light },
             darkSquareStyle: { backgroundColor: boardColors.dark },
+            pieces: tintedPieces,
             animationDurationInMs: 150,
           }}
         />
