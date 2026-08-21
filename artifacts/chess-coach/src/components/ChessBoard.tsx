@@ -389,23 +389,32 @@ export function ChessBoard({
         />
       </BoardErrorBoundary>
 
-      {/* Confirm-move overlay -- only shown when "Confirm Moves" setting
-          is on and a legal move has just been made but not yet committed. */}
+      {/* Confirm-move overlay -- styled like the top of a chess clock: a
+          chunky, domed paddle button you press down on to confirm your
+          move, matching the physical tactile feel of pressing a clock
+          after moving. Cancel stays as a small, unobtrusive secondary
+          action off to the side. */}
       {pendingMove && (
-        <div className="absolute -bottom-16 left-0 right-0 flex items-center justify-center gap-3 z-20">
+        <div className="absolute -bottom-20 left-0 right-0 flex items-end justify-center gap-3 z-20">
           <button
             onClick={cancelPendingMove}
-            className="px-5 py-3 rounded-2xl font-black text-sm shadow-xl transition-transform active:scale-95"
+            className="mb-2 w-9 h-9 rounded-full flex items-center justify-center shadow-lg transition-transform active:scale-90"
             style={{ background: 'rgba(255,255,255,0.1)', color: '#e8e6e3', border: '1px solid rgba(255,255,255,0.15)' }}
+            title="Cancel"
           >
-            Cancel
+            <span className="text-sm font-black">✕</span>
           </button>
           <button
             onClick={confirmPendingMove}
-            className="px-8 py-3 rounded-2xl font-black text-sm shadow-xl transition-transform active:scale-95"
-            style={{ background: 'linear-gradient(180deg, #95c45a 0%, #81b64c 100%)', color: '#fff' }}
+            className="relative w-40 h-16 rounded-[28px] font-black text-sm tracking-wide transition-all active:scale-95 active:translate-y-0.5"
+            style={{
+              background: 'linear-gradient(180deg, #a8d876 0%, #81b64c 45%, #5f8f36 100%)',
+              color: '#fff',
+              boxShadow: '0 6px 0 #4a7028, 0 10px 20px rgba(0,0,0,0.4), inset 0 1px 1px rgba(255,255,255,0.4)',
+              border: '1px solid rgba(0,0,0,0.15)',
+            }}
           >
-            Confirm Move ✓
+            <span className="drop-shadow-sm">CONFIRM</span>
           </button>
         </div>
       )}

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useParams, Link, useLocation } from 'wouter';
 import { useGameViewer } from '@/hooks/use-games';
+import { EvalBar, MaterialStrip } from '@/components/GameStatusStrip';
 import { ChessBoard } from '@/components/ChessBoard';
 import { Chess } from 'chess.js';
 import { normalizeFen } from '@/lib/utils';
@@ -982,6 +983,7 @@ export function GameReplay() {
                     so the board occupies the same vertical position whether or
                     not the move is classified as bad. */}
                 <div aria-hidden className="h-[34px] invisible" />
+                <MaterialStrip fen={currentFen} color={flipped ? 'w' : 'b'} className="px-1" />
                 <ChessBoard
                   fen={currentFen}
                   flipped={flipped}
@@ -991,6 +993,8 @@ export function GameReplay() {
                   lastMove={lastMove}
                   moveQuality={currentReview?.classification ?? null}
                 />
+                <MaterialStrip fen={currentFen} color={flipped ? 'b' : 'w'} className="px-1" />
+                <EvalBar fen={currentFen} />
               </div>
             )}
           </div>
