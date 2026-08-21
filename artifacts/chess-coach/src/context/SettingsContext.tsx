@@ -1,11 +1,11 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
-export type BoardTheme = 'classic' | 'green' | 'blue' | 'gray' | 'purple' | 'crimson' | 'teal' | 'coal' | 'sunset';
-export type PieceStyle = 'classic' | 'glossy' | 'outlined' | 'ocean' | 'crimson' | 'emerald' | 'royal' | 'flat';
+export type BoardTheme = 'classic' | 'green' | 'blue' | 'gray' | 'purple' | 'crimson' | 'teal' | 'coal' | 'sunset' | 'custom';
+export type PieceStyle = 'classic' | 'glossy' | 'outlined' | 'ocean' | 'crimson' | 'emerald' | 'royal' | 'flat' | 'custom';
 export type PromotionChoice = 'queen' | 'ask';
 export type BoardSize = 'compact' | 'standard' | 'large';
 
-export const BOARD_THEMES: Record<BoardTheme, { light: string; dark: string; label: string }> = {
+export const BOARD_THEMES: Record<Exclude<BoardTheme, 'custom'>, { light: string; dark: string; label: string }> = {
   classic: { light: '#f0d9b5', dark: '#b58863', label: 'Classic Wood' },
   green:   { light: '#eeeed2', dark: '#769656', label: 'Green' },
   blue:    { light: '#dee3e6', dark: '#8ca2ad', label: 'Ocean Blue' },
@@ -17,12 +17,7 @@ export const BOARD_THEMES: Record<BoardTheme, { light: string; dark: string; lab
   sunset:  { light: '#fbe8c9', dark: '#c8813a', label: 'Sunset' },
 };
 
-// Piece styles combine a real fill-color change with a distinct visual
-// finish (outline/glossy/flat), applied via svgStyle CSS on top of the
-// color override -- this library ships exactly one piece artwork set (no
-// alternate shapes available), so "style" here means color + finish, not
-// different piece shapes.
-export const PIECE_STYLES: Record<PieceStyle, { light: string; dark: string; label: string; finish: React.CSSProperties }> = {
+export const PIECE_STYLES: Record<Exclude<PieceStyle, 'custom'>, { light: string; dark: string; label: string; finish: React.CSSProperties }> = {
   classic:  { light: '#ffffff', dark: '#2b2b2b', label: 'Classic',  finish: {} },
   glossy:   { light: '#ffffff', dark: '#2b2b2b', label: 'Glossy',   finish: { filter: 'drop-shadow(0 2px 1px rgba(0,0,0,0.35)) brightness(1.08) contrast(1.1)' } },
   outlined: { light: '#ffffff', dark: '#1a1a1a', label: 'Outlined', finish: { filter: 'drop-shadow(0 0 0.5px #000) drop-shadow(0 0 0.5px #000) drop-shadow(0 0 0.5px #000)' } },
@@ -39,9 +34,20 @@ export const BOARD_SIZES: Record<BoardSize, { maxWidth: number; label: string }>
   large:    { maxWidth: 720, label: 'Large' },
 };
 
+interface ColorPair { light: string; dark: string }
+
+export interface SavedTheme {
+  id: string;
+  name: string;
+  boardColors: ColorPair;
+  pieceColors: ColorPair;
+}
+
 interface Settings {
   boardTheme: BoardTheme;
   pieceStyle: PieceStyle;
+  boardCustomColors: ColorPair;
+  pieceCustomColors: ColorPair;
   confirmMoves: boolean;
   showCoordinates: boolean;
   soundEnabled: boolean;
@@ -49,9 +55,11 @@ interface Settings {
   boardSize: BoardSize;
 }
 
-const DEFAULT_SETTINGS: Settings = {
+const APP_DEFAULT_SETTINGS: Settings = {
   boardTheme: 'green',
   pieceStyle: 'classic',
+  boardCustomColors: { light: '#eeeed2', dark: '#769656' },
+  pieceCustomColors: { light: '#ffffff', dark: '#2b2b2b' },
   confirmMoves: false,
   showCoordinates: true,
   soundEnabled: true,
@@ -60,54 +68,124 @@ const DEFAULT_SETTINGS: Settings = {
 };
 
 const STORAGE_KEY = 'chessscout_settings';
+const DEFAULT_KEY = 'chessscout_user_default';
+const THEMES_KEY = 'chessscout_saved_themes';
 
 interface SettingsContextValue extends Settings {
   setBoardTheme: (t: BoardTheme) => void;
   setPieceStyle: (t: PieceStyle) => void;
+  setBoardCustomColor: (which: 'light' | 'dark', color: string) => void;
+  setPieceCustomColor: (which: 'light' | 'dark', color: string) => void;
   setConfirmMoves: (v: boolean) => void;
   setShowCoordinates: (v: boolean) => void;
   setSoundEnabled: (v: boolean) => void;
   setPromotionChoice: (v: PromotionChoice) => void;
   setBoardSize: (v: BoardSize) => void;
-  boardColors: { light: string; dark: string };
-  pieceColors: { light: string; dark: string; finish: React.CSSProperties };
+  boardColors: ColorPair;
+  pieceColors: ColorPair & { finish: React.CSSProperties };
   boardMaxWidth: number;
+  savedThemes: SavedTheme[];
+  saveCurrentAsTheme: (name: string) => void;
+  applyTheme: (theme: SavedTheme) => void;
+  deleteTheme: (id: string) => void;
+  setAsMyDefault: () => void;
+  hasCustomDefault: boolean;
+  revertToDefault: () => void;
 }
 
 const SettingsContext = createContext<SettingsContextValue | null>(null);
 
+function loadJSON<T>(key: string, fallback: T): T {
+  try {
+    const raw = localStorage.getItem(key);
+    if (raw) return { ...(fallback as any), ...JSON.parse(raw) };
+  } catch {}
+  return fallback;
+}
+
 export function SettingsProvider({ children }: { children: React.ReactNode }) {
-  const [settings, setSettings] = useState<Settings>(() => {
+  const [userDefault, setUserDefault] = useState<Settings | null>(() => {
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        // Migrate old key name from an earlier version of this feature.
-        if (parsed.pieceTint && !parsed.pieceStyle) parsed.pieceStyle = 'classic';
-        return { ...DEFAULT_SETTINGS, ...parsed };
-      }
-    } catch {}
-    return DEFAULT_SETTINGS;
+      const raw = localStorage.getItem(DEFAULT_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  const [settings, setSettings] = useState<Settings>(() =>
+    loadJSON(STORAGE_KEY, userDefault ?? APP_DEFAULT_SETTINGS)
+  );
+
+  const [savedThemes, setSavedThemes] = useState<SavedTheme[]>(() => {
+    try {
+      const raw = localStorage.getItem(THEMES_KEY);
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
   });
 
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
-    } catch {}
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(settings)); } catch {}
   }, [settings]);
+
+  useEffect(() => {
+    try { localStorage.setItem(THEMES_KEY, JSON.stringify(savedThemes)); } catch {}
+  }, [savedThemes]);
+
+  const resolvedBoardColors: ColorPair =
+    settings.boardTheme === 'custom' ? settings.boardCustomColors : BOARD_THEMES[settings.boardTheme];
+  const resolvedPieceStyle =
+    settings.pieceStyle === 'custom'
+      ? { ...settings.pieceCustomColors, finish: {} as React.CSSProperties }
+      : { ...PIECE_STYLES[settings.pieceStyle] };
 
   const value: SettingsContextValue = {
     ...settings,
     setBoardTheme: (t) => setSettings((s) => ({ ...s, boardTheme: t })),
     setPieceStyle: (t) => setSettings((s) => ({ ...s, pieceStyle: t })),
+    setBoardCustomColor: (which, color) =>
+      setSettings((s) => ({ ...s, boardTheme: 'custom', boardCustomColors: { ...s.boardCustomColors, [which]: color } })),
+    setPieceCustomColor: (which, color) =>
+      setSettings((s) => ({ ...s, pieceStyle: 'custom', pieceCustomColors: { ...s.pieceCustomColors, [which]: color } })),
     setConfirmMoves: (v) => setSettings((s) => ({ ...s, confirmMoves: v })),
     setShowCoordinates: (v) => setSettings((s) => ({ ...s, showCoordinates: v })),
     setSoundEnabled: (v) => setSettings((s) => ({ ...s, soundEnabled: v })),
     setPromotionChoice: (v) => setSettings((s) => ({ ...s, promotionChoice: v })),
     setBoardSize: (v) => setSettings((s) => ({ ...s, boardSize: v })),
-    boardColors: BOARD_THEMES[settings.boardTheme],
-    pieceColors: PIECE_STYLES[settings.pieceStyle],
+    boardColors: resolvedBoardColors,
+    pieceColors: resolvedPieceStyle,
     boardMaxWidth: BOARD_SIZES[settings.boardSize].maxWidth,
+    savedThemes,
+    saveCurrentAsTheme: (name) => {
+      const theme: SavedTheme = {
+        id: `${Date.now()}`,
+        name: name.trim() || 'My Theme',
+        boardColors: resolvedBoardColors,
+        pieceColors: { light: resolvedPieceStyle.light, dark: resolvedPieceStyle.dark },
+      };
+      setSavedThemes((prev) => [...prev, theme]);
+    },
+    applyTheme: (theme) => {
+      setSettings((s) => ({
+        ...s,
+        boardTheme: 'custom',
+        boardCustomColors: theme.boardColors,
+        pieceStyle: 'custom',
+        pieceCustomColors: theme.pieceColors,
+      }));
+    },
+    deleteTheme: (id) => setSavedThemes((prev) => prev.filter((t) => t.id !== id)),
+    setAsMyDefault: () => {
+      setUserDefault(settings);
+      try { localStorage.setItem(DEFAULT_KEY, JSON.stringify(settings)); } catch {}
+    },
+    hasCustomDefault: userDefault !== null,
+    revertToDefault: () => {
+      const target = userDefault ?? APP_DEFAULT_SETTINGS;
+      setSettings(target);
+    },
   };
 
   return <SettingsContext.Provider value={value}>{children}</SettingsContext.Provider>;
@@ -119,8 +197,6 @@ export function useSettings() {
   return ctx;
 }
 
-// Tiny synthesized move/capture sound via Web Audio -- no external audio
-// files needed, so nothing to source, host, or verify.
 let audioCtx: AudioContext | null = null;
 export function playMoveSound(kind: 'move' | 'capture' = 'move') {
   try {
