@@ -36,6 +36,7 @@ const SECONDARY_NAV = [
   { href: '/endgames',     label: 'Endgames',        icon: Trophy },
   { href: '/openings',     label: 'Openings',        icon: BookOpen },
   { href: '/subscription', label: 'Subscription',    icon: Crown },
+  { href: '/settings',     label: 'Settings',        icon: Settings },
 ];
 
 const ADMIN_NAV = [

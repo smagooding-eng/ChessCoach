@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { PieceTile } from '@/components/DesignSystem';
+import { MaterialStrip } from '@/components/GameStatusStrip';
 import { Chess } from 'chess.js';
 import { ChessBoard, type MoveQuality } from '@/components/ChessBoard';
 import { normalizeFen } from '@/lib/utils';
@@ -451,6 +452,10 @@ function GameView({ bot, onBack, startFen, startColor, isOnboarding }: { bot: Bo
 
         <div className="space-y-3">
           <EvalBar evalScore={currentEval} />
+          <div className="flex items-center justify-between px-1">
+            <MaterialStrip fen={fen} color={playerColor === 'w' ? 'b' : 'w'} />
+            <MaterialStrip fen={fen} color={playerColor} />
+          </div>
 
           {analysisMove && (
             <div>

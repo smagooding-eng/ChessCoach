@@ -2,6 +2,7 @@ import React, { useState, useCallback, useMemo, useRef, useEffect, Component, ty
 import { Chessboard } from 'react-chessboard';
 import { Chess } from 'chess.js';
 import { normalizeFen } from '@/lib/utils';
+import { useSettings } from '@/context/SettingsContext';
 
 class BoardErrorBoundary extends Component<
   { children: ReactNode; position: string; renderKey: number },
@@ -116,6 +117,9 @@ export function ChessBoard({
   onPremoveSet,
   arrows,
 }: ChessBoardProps) {
+  const { confirmMoves, boardColors, showCoordinates } = useSettings();
+  const confirmMovesRef = useRef(confirmMoves);
+  confirmMovesRef.current = confirmMoves;
   const position = normalizeFen(fen || START_FEN);
   const [selectedSquare, setSelectedSquare] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<'correct' | 'wrong' | null>(null);
@@ -126,6 +130,10 @@ export function ChessBoard({
   positionRef.current = position;
   const expectedMoveSanRef = useRef(expectedMoveSan);
   expectedMoveSanRef.current = expectedMoveSan;
+  // When "Confirm Moves" is on, a legal move is staged here (shown on the
+  // board immediately for feedback) but not actually committed via
+  // onMovePlayed until the player taps Confirm.
+  const [pendingMove, setPendingMove] = useState<{ from: string; to: string; san: string; isCorrect: boolean; tempFen: string } | null>(null);
 
   useEffect(() => {
     return () => { if (feedbackTimerRef.current) clearTimeout(feedbackTimerRef.current); };
@@ -136,7 +144,18 @@ export function ChessBoard({
     setPrevPosition(position);
     setSelectedSquare(null);
     setFeedback(null);
+    setPendingMove(null);
   }
+
+  const confirmPendingMove = useCallback(() => {
+    if (!pendingMove) return;
+    onMovePlayedRef.current?.(pendingMove.san, pendingMove.isCorrect);
+    setPendingMove(null);
+  }, [pendingMove]);
+
+  const cancelPendingMove = useCallback(() => {
+    setPendingMove(null);
+  }, []);
 
   const legalMoveInfo = useMemo(() => {
     if (!selectedSquare || !practiceMode) return { targets: [] as string[], captures: new Set<string>() };
@@ -166,6 +185,12 @@ export function ChessBoard({
         if (feedbackTimerRef.current) clearTimeout(feedbackTimerRef.current);
         feedbackTimerRef.current = setTimeout(() => setFeedback(null), 900);
       }
+      if (confirmMovesRef.current && !expected) {
+        // Stage it -- board shows the move happened, but it isn't
+        // committed to the game yet until the player confirms.
+        setPendingMove({ from, to, san, isCorrect, tempFen: chess.fen() });
+        return true;
+      }
       onMovePlayedRef.current?.(san, isCorrect);
       return true;
     } catch {
@@ -192,6 +217,7 @@ export function ChessBoard({
 
   const canDragPiece = useCallback(({ piece }: { piece: { pieceType: string } | null }) => {
     if (!piece) return false;
+    if (pendingMove) return false;
     if (practiceMode) {
       try {
         const chess = new Chess(positionRef.current);
@@ -205,7 +231,7 @@ export function ChessBoard({
       return premoveColor ? pc === premoveColor : true;
     }
     return false;
-  }, [practiceMode, premoveMode, premoveColor]);
+  }, [practiceMode, premoveMode, premoveColor, pendingMove]);
 
   const selectedSquareRef = useRef(selectedSquare);
   selectedSquareRef.current = selectedSquare;
@@ -213,6 +239,7 @@ export function ChessBoard({
   legalTargetsRef.current = legalTargets;
 
   const handleSquareClick = useCallback(({ square, piece }: { square: string; piece: { pieceType: string } | null }) => {
+    if (pendingMove) return;
     if (premoveMode && !practiceMode) {
       const sel = selectedSquareRef.current;
       if (sel) {
@@ -263,7 +290,7 @@ export function ChessBoard({
         setSelectedSquare(square);
       }
     }
-  }, [practiceMode, tryMove]);
+  }, [practiceMode, tryMove, pendingMove]);
 
   // Build square styles
   const squareStyles = useMemo(() => {
@@ -320,14 +347,15 @@ export function ChessBoard({
       <BoardErrorBoundary position={position} renderKey={boardKeyRef.current}>
         <Chessboard
           options={{
-            position,
+            position: pendingMove ? pendingMove.tempFen : position,
             boardOrientation: flipped ? 'black' : 'white',
-            allowDragging: practiceMode || premoveMode,
+            allowDragging: (practiceMode || premoveMode) && !pendingMove,
             dragActivationDistance: 8,
             canDragPiece,
             onPieceDrop: handlePieceDrop,
             squareStyles,
             onSquareClick: handleSquareClick,
+            showNotation: showCoordinates,
             arrows: arrows?.map(a => ({
               startSquare: a.from,
               endSquare: a.to,
@@ -336,14 +364,35 @@ export function ChessBoard({
             boardStyle: {
               borderRadius: '10px',
               boxShadow: '0 30px 60px rgba(0,0,0,0.6)',
-              cursor: (practiceMode || premoveMode) ? 'pointer' : 'default',
+              cursor: (practiceMode || premoveMode) && !pendingMove ? 'pointer' : 'default',
             },
-            lightSquareStyle: { backgroundColor: '#f0d9b5' },
-            darkSquareStyle: { backgroundColor: '#b58863' },
+            lightSquareStyle: { backgroundColor: boardColors.light },
+            darkSquareStyle: { backgroundColor: boardColors.dark },
             animationDurationInMs: 150,
           }}
         />
       </BoardErrorBoundary>
+
+      {/* Confirm-move overlay -- only shown when "Confirm Moves" setting
+          is on and a legal move has just been made but not yet committed. */}
+      {pendingMove && (
+        <div className="absolute -bottom-16 left-0 right-0 flex items-center justify-center gap-3 z-20">
+          <button
+            onClick={cancelPendingMove}
+            className="px-5 py-3 rounded-2xl font-black text-sm shadow-xl transition-transform active:scale-95"
+            style={{ background: 'rgba(255,255,255,0.1)', color: '#e8e6e3', border: '1px solid rgba(255,255,255,0.15)' }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={confirmPendingMove}
+            className="px-8 py-3 rounded-2xl font-black text-sm shadow-xl transition-transform active:scale-95"
+            style={{ background: 'linear-gradient(180deg, #95c45a 0%, #81b64c 100%)', color: '#fff' }}
+          >
+            Confirm Move ✓
+          </button>
+        </div>
+      )}
       {/* Practice feedback overlay */}
       {feedback && (
         <div className={`absolute inset-0 rounded-[10px] pointer-events-none flex items-center justify-center

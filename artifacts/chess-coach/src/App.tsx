@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { UserProvider } from "@/context/UserContext";
+import { SettingsProvider } from "@/context/SettingsContext";
 import { ImportStatusWatcher } from "@/components/ImportStatusWatcher";
 import { BackgroundJobsWatcher } from "@/components/BackgroundJobsWatcher";
 import { Layout } from "@/components/Layout";
@@ -65,6 +66,7 @@ const ArticlesIndex = lazy(() => import("@/pages/Articles").then(m => ({ default
 const ArticlePage = lazy(() => import("@/pages/Articles").then(m => ({ default: m.ArticlePage })));
 const ShareCard = lazy(() => import("@/pages/ShareCard").then(m => ({ default: m.ShareCard })));
 const DownloadPage = lazy(() => import("@/pages/Download"));
+const SettingsPage = lazy(() => import("@/pages/Settings"));
 const PrivacyPage = lazy(() => import("@/pages/Privacy"));
 const TermsPage = lazy(() => import("@/pages/Terms"));
 const Dashboard = lazy(() => import("@/pages/Dashboard").then(m => ({ default: m.Dashboard })));
@@ -229,6 +231,7 @@ function Router() {
       <Route path="/learn/:slug" component={ArticlePage} />
       <Route path="/share/:data" component={ShareCard} />
       <Route path="/download" component={DownloadPage} />
+      <Route path="/settings" component={SettingsPage} />
       <Route path="/privacy" component={PrivacyPage} />
       <Route path="/terms" component={TermsPage} />
       <Route path="/welcome" component={PWelcome} />
@@ -279,16 +282,18 @@ function App() {
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <UserProvider>
-          <TooltipProvider>
-            <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-              <Suspense fallback={<PageLoadingFallback />}>
-                <Router />
-              </Suspense>
-              <ImportStatusWatcher />
-              <BackgroundJobsWatcher />
-            </WouterRouter>
-            <Toaster />
-          </TooltipProvider>
+          <SettingsProvider>
+            <TooltipProvider>
+              <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+                <Suspense fallback={<PageLoadingFallback />}>
+                  <Router />
+                </Suspense>
+                <ImportStatusWatcher />
+                <BackgroundJobsWatcher />
+              </WouterRouter>
+              <Toaster />
+            </TooltipProvider>
+          </SettingsProvider>
         </UserProvider>
       </QueryClientProvider>
     </ErrorBoundary>

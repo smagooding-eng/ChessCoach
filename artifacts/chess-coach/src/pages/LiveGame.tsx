@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ChessBoard } from '@/components/ChessBoard';
+import { EvalBar, MaterialStrip } from '@/components/GameStatusStrip';
 import { Chess } from 'chess.js';
 import type { useLivePlay } from '@/hooks/use-live-play';
 import { Flag, ArrowLeft, Trophy, Clock, Handshake, X, WifiOff, BookOpen } from 'lucide-react';
@@ -177,6 +178,7 @@ export function LiveGame({ live, onLeave }: { live: ReturnType<typeof useLivePla
       </button>
 
       <PlayerStrip p={top} ms={topMs} active={topActive} isYou={false} />
+      <MaterialStrip fen={game.fen} color={youAreWhite ? 'b' : 'w'} className="px-1" />
 
       {opponentDisconnect && opponentDisconnect.side !== color && (
         <div className="rounded-lg px-3 py-2 text-xs flex items-center gap-2"
@@ -184,6 +186,8 @@ export function LiveGame({ live, onLeave }: { live: ReturnType<typeof useLivePla
           <WifiOff className="w-3.5 h-3.5" /> Opponent disconnected. They have ~{Math.max(0, Math.ceil((opponentDisconnect.until - Date.now()) / 1000))}s to reconnect.
         </div>
       )}
+
+      <EvalBar fen={game.fen} />
 
       <ChessBoard
         fen={game.fen}
@@ -207,6 +211,7 @@ export function LiveGame({ live, onLeave }: { live: ReturnType<typeof useLivePla
         </div>
       )}
 
+      <MaterialStrip fen={game.fen} color={youAreWhite ? 'w' : 'b'} className="px-1" />
       <PlayerStrip p={bottom} ms={bottomMs} active={bottomActive} isYou={true} />
 
       {opponentOfferedDraw && (
