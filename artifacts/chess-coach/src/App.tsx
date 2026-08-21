@@ -67,6 +67,7 @@ const ArticlePage = lazy(() => import("@/pages/Articles").then(m => ({ default: 
 const ShareCard = lazy(() => import("@/pages/ShareCard").then(m => ({ default: m.ShareCard })));
 const DownloadPage = lazy(() => import("@/pages/Download"));
 const SettingsPage = lazy(() => import("@/pages/Settings"));
+const ScanArchivePage = lazy(() => import("@/pages/ScanArchive"));
 const PrivacyPage = lazy(() => import("@/pages/Privacy"));
 const TermsPage = lazy(() => import("@/pages/Terms"));
 const Dashboard = lazy(() => import("@/pages/Dashboard").then(m => ({ default: m.Dashboard })));
@@ -232,6 +233,7 @@ function Router() {
       <Route path="/share/:data" component={ShareCard} />
       <Route path="/download" component={DownloadPage} />
       <Route path="/settings" component={SettingsPage} />
+      <Route path="/scan-archive" component={ScanArchivePage} />
       <Route path="/privacy" component={PrivacyPage} />
       <Route path="/terms" component={TermsPage} />
       <Route path="/welcome" component={PWelcome} />

@@ -8,3 +8,4 @@ export * from "./growth";
 export * from "./live";
 export * from "./outreach";
 export * from "./seoContent";
+export * from "./scannedPositions";

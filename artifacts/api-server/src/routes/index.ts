@@ -15,6 +15,7 @@ import liveRouter from "./live";
 import publicScoutRouter from "./publicScout";
 import outreachRouter from "./outreach";
 import articlesRouter from "./articles";
+import scannedPositionsRouter from "./scannedPositions";
 import { requirePremium } from "../middlewares/authMiddleware";
 import { db, pageViewsTable } from "@workspace/db";
 
@@ -32,6 +33,7 @@ router.use(liveRouter);
 router.use(publicScoutRouter);
 router.use(outreachRouter);
 router.use(articlesRouter);
+router.use(scannedPositionsRouter);
 
 router.post("/track", async (req: Request, res: Response) => {
   try {

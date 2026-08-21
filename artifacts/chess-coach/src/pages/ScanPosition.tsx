@@ -1,9 +1,10 @@
 import React, { useState, useRef, useCallback } from 'react';
+import { Link } from 'wouter';
 import { PieceTile } from '@/components/DesignSystem';
 import { Chess } from 'chess.js';
 import { ChessBoard } from '@/components/ChessBoard';
 import { apiFetch } from '@/lib/api';
-import { Camera, Upload, RotateCcw, Swords, Compass, AlertCircle, X, FlipVertical, Wand2, Trash2, ArrowLeft } from 'lucide-react';
+import { Camera, Upload, RotateCcw, Swords, Compass, AlertCircle, X, FlipVertical, Wand2, Trash2, ArrowLeft, Archive, Check, Loader2 } from 'lucide-react';
 
 const PIECE_GLYPH: Record<string, string> = {
   K: '♔', Q: '♕', R: '♖', B: '♗', N: '♘', P: '♙',
@@ -174,6 +175,7 @@ export function ScanPosition() {
   const [builderPiece, setBuilderPiece] = useState<string | null>('P');
   const [builderTurn, setBuilderTurn] = useState<'w' | 'b'>('w');
   const [builderError, setBuilderError] = useState('');
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
@@ -281,6 +283,25 @@ export function ScanPosition() {
     } catch {}
   }, [fen]);
 
+  const saveToArchive = useCallback(async () => {
+    if (!fen || saveState === 'saving') return;
+    setSaveState('saving');
+    try {
+      const res = await apiFetch('/api/scanned-positions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fen }),
+      });
+      if (res.ok) {
+        setSaveState('saved');
+      } else {
+        setSaveState('error');
+      }
+    } catch {
+      setSaveState('error');
+    }
+  }, [fen, saveState]);
+
   const resetAll = useCallback(() => {
     setState('idle');
     setError('');
@@ -295,6 +316,7 @@ export function ScanPosition() {
     setMode('preview');
     setFlipped(false);
     setGameStatus(null);
+    setSaveState('idle');
   }, []);
 
   const goToPlayAI = useCallback((fromFen?: string) => {
@@ -319,6 +341,10 @@ export function ScanPosition() {
         <p className="text-sm text-white/40 mt-1">
           Upload a chess board screenshot and jump into the position
         </p>
+        <Link href="/scan-archive" className="inline-flex items-center gap-1.5 mt-3 text-xs font-bold" style={{ color: '#81b64c' }}>
+          <Archive className="w-3.5 h-3.5" />
+          View Saved Positions
+        </Link>
       </div>
 
       {state === 'idle' && (
@@ -492,6 +518,22 @@ export function ScanPosition() {
               Play Bot
             </button>
           </div>
+
+          <button
+            onClick={saveToArchive}
+            disabled={saveState === 'saving' || saveState === 'saved'}
+            className="w-full py-2.5 rounded-xl font-bold text-sm transition-all active:scale-[0.97] flex items-center justify-center gap-2 disabled:opacity-70"
+            style={{
+              background: saveState === 'saved' ? 'rgba(129,182,76,0.1)' : 'rgba(255,255,255,0.05)',
+              color: saveState === 'saved' ? '#81b64c' : '#e8e6e3',
+              border: saveState === 'saved' ? '1px solid rgba(129,182,76,0.3)' : '1px solid rgba(255,255,255,0.1)',
+            }}
+          >
+            {saveState === 'saving' && <Loader2 className="w-4 h-4 animate-spin" />}
+            {saveState === 'saved' && <Check className="w-4 h-4" />}
+            {(saveState === 'idle' || saveState === 'error') && <Archive className="w-4 h-4" />}
+            {saveState === 'saved' ? 'Saved to Archive' : saveState === 'error' ? 'Save Failed — Tap to Retry' : 'Save to Archive'}
+          </button>
 
           <button
             onClick={resetAll}
