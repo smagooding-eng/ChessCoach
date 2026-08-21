@@ -2,7 +2,7 @@ import React, { useState, useCallback, useMemo, useRef, useEffect, Component, ty
 import { Chessboard, defaultPieces } from 'react-chessboard';
 import { Chess } from 'chess.js';
 import { normalizeFen } from '@/lib/utils';
-import { useSettings } from '@/context/SettingsContext';
+import { useSettings, playMoveSound } from '@/context/SettingsContext';
 
 class BoardErrorBoundary extends Component<
   { children: ReactNode; position: string; renderKey: number },
@@ -117,9 +117,13 @@ export function ChessBoard({
   onPremoveSet,
   arrows,
 }: ChessBoardProps) {
-  const { confirmMoves, boardColors, showCoordinates, pieceFilter } = useSettings();
+  const { confirmMoves, boardColors, showCoordinates, pieceColors, soundEnabled, promotionChoice, boardMaxWidth } = useSettings();
   const confirmMovesRef = useRef(confirmMoves);
   confirmMovesRef.current = confirmMoves;
+  const soundEnabledRef = useRef(soundEnabled);
+  soundEnabledRef.current = soundEnabled;
+  const promotionChoiceRef = useRef(promotionChoice);
+  promotionChoiceRef.current = promotionChoice;
   const position = normalizeFen(fen || START_FEN);
   const [selectedSquare, setSelectedSquare] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<'correct' | 'wrong' | null>(null);
@@ -134,21 +138,25 @@ export function ChessBoard({
   // board immediately for feedback) but not actually committed via
   // onMovePlayed until the player taps Confirm.
   const [pendingMove, setPendingMove] = useState<{ from: string; to: string; san: string; isCorrect: boolean; tempFen: string } | null>(null);
+  const [promotionPending, setPromotionPending] = useState<{ from: string; to: string } | null>(null);
 
-  // Wraps the library's real default piece renderers with a CSS filter via
-  // svgStyle -- this only touches the piece SVGs, never the squares, so it
-  // can't undo the separate board color setting. Skipped entirely when no
-  // tint is selected (avoids the wrapper overhead for the common case).
+  // Wraps the library's real default piece renderers with a direct `fill`
+  // color override -- a real color change, not a CSS filter (filters like
+  // hue-rotate barely affect near-grayscale source art, which is why an
+  // earlier filter-based attempt at this wasn't visibly noticeable).
+  // Skipped entirely for the Classic style (avoids wrapper overhead).
   const tintedPieces = useMemo(() => {
-    if (pieceFilter === 'none') return undefined;
+    if (pieceColors.light === '#ffffff' && pieceColors.dark === '#2b2b2b' && Object.keys(pieceColors.finish).length === 0) return undefined;
     const wrapped: typeof defaultPieces = {};
     for (const [key, PieceComponent] of Object.entries(defaultPieces)) {
+      const isWhitePiece = key.startsWith('w');
+      const fill = isWhitePiece ? pieceColors.light : pieceColors.dark;
       wrapped[key] = (props) => (
-        <PieceComponent {...props} svgStyle={{ ...props?.svgStyle, filter: pieceFilter }} />
+        <PieceComponent {...props} fill={fill} svgStyle={{ ...props?.svgStyle, ...pieceColors.finish }} />
       );
     }
     return wrapped;
-  }, [pieceFilter]);
+  }, [pieceColors]);
 
   useEffect(() => {
     return () => { if (feedbackTimerRef.current) clearTimeout(feedbackTimerRef.current); };
@@ -160,6 +168,7 @@ export function ChessBoard({
     setSelectedSquare(null);
     setFeedback(null);
     setPendingMove(null);
+    setPromotionPending(null);
   }
 
   const confirmPendingMove = useCallback(() => {
@@ -187,11 +196,12 @@ export function ChessBoard({
 
   const legalTargets = legalMoveInfo.targets;
 
-  const tryMove = useCallback((from: string, to: string): boolean => {
+  const finishMove = useCallback((from: string, to: string, promotion: string) => {
     try {
       const chess = new Chess(positionRef.current);
-      const move = chess.move({ from, to, promotion: 'q' });
+      const move = chess.move({ from, to, promotion });
       if (!move) return false;
+      if (soundEnabledRef.current) playMoveSound(move.captured ? 'capture' : 'move');
       const san = move.san;
       const expected = expectedMoveSanRef.current;
       const isCorrect = !expected || san === expected;
@@ -201,8 +211,6 @@ export function ChessBoard({
         feedbackTimerRef.current = setTimeout(() => setFeedback(null), 900);
       }
       if (confirmMovesRef.current && !expected) {
-        // Stage it -- board shows the move happened, but it isn't
-        // committed to the game yet until the player confirms.
         setPendingMove({ from, to, san, isCorrect, tempFen: chess.fen() });
         return true;
       }
@@ -212,6 +220,31 @@ export function ChessBoard({
       return false;
     }
   }, []);
+
+  const tryMove = useCallback((from: string, to: string): boolean => {
+    try {
+      // Detect promotion up front so we can ask which piece, if that
+      // setting is on, before actually committing the move.
+      const probe = new Chess(positionRef.current);
+      const piece = probe.get(from as any);
+      const isPromotion = piece?.type === 'p' && (to[1] === '8' || to[1] === '1');
+      if (isPromotion && promotionChoiceRef.current === 'ask') {
+        const legal = probe.moves({ square: from as any, verbose: true }).some((m: any) => m.to === to);
+        if (!legal) return false;
+        setPromotionPending({ from, to });
+        return true;
+      }
+      return finishMove(from, to, 'q');
+    } catch {
+      return false;
+    }
+  }, [finishMove]);
+
+  const choosePromotion = useCallback((piece: 'q' | 'r' | 'b' | 'n') => {
+    if (!promotionPending) return;
+    finishMove(promotionPending.from, promotionPending.to, piece);
+    setPromotionPending(null);
+  }, [promotionPending, finishMove]);
 
   const handlePieceDrop = useCallback(({ sourceSquare, targetSquare, piece }: { piece: { pieceType: string } | null; sourceSquare: string; targetSquare: string | null }) => {
     if (!targetSquare) return false;
@@ -232,7 +265,7 @@ export function ChessBoard({
 
   const canDragPiece = useCallback(({ piece }: { piece: { pieceType: string } | null }) => {
     if (!piece) return false;
-    if (pendingMove) return false;
+    if (pendingMove || promotionPending) return false;
     if (practiceMode) {
       try {
         const chess = new Chess(positionRef.current);
@@ -246,7 +279,7 @@ export function ChessBoard({
       return premoveColor ? pc === premoveColor : true;
     }
     return false;
-  }, [practiceMode, premoveMode, premoveColor, pendingMove]);
+  }, [practiceMode, premoveMode, premoveColor, pendingMove, promotionPending]);
 
   const selectedSquareRef = useRef(selectedSquare);
   selectedSquareRef.current = selectedSquare;
@@ -254,7 +287,7 @@ export function ChessBoard({
   legalTargetsRef.current = legalTargets;
 
   const handleSquareClick = useCallback(({ square, piece }: { square: string; piece: { pieceType: string } | null }) => {
-    if (pendingMove) return;
+    if (pendingMove || promotionPending) return;
     if (premoveMode && !practiceMode) {
       const sel = selectedSquareRef.current;
       if (sel) {
@@ -305,7 +338,7 @@ export function ChessBoard({
         setSelectedSquare(square);
       }
     }
-  }, [practiceMode, tryMove, pendingMove]);
+  }, [practiceMode, tryMove, pendingMove, promotionPending]);
 
   // Build square styles
   const squareStyles = useMemo(() => {
@@ -358,13 +391,13 @@ export function ChessBoard({
   const boardKeyRef = useRef(0);
 
   return (
-    <div className="relative w-full max-w-[580px] mx-auto">
+    <div className="relative w-full mx-auto" style={{ maxWidth: boardMaxWidth }}>
       <BoardErrorBoundary position={position} renderKey={boardKeyRef.current}>
         <Chessboard
           options={{
             position: pendingMove ? pendingMove.tempFen : position,
             boardOrientation: flipped ? 'black' : 'white',
-            allowDragging: (practiceMode || premoveMode) && !pendingMove,
+            allowDragging: (practiceMode || premoveMode) && !pendingMove && !promotionPending,
             dragActivationDistance: 8,
             canDragPiece,
             onPieceDrop: handlePieceDrop,
@@ -389,32 +422,61 @@ export function ChessBoard({
         />
       </BoardErrorBoundary>
 
-      {/* Confirm-move overlay -- styled like the top of a chess clock: a
-          chunky, domed paddle button you press down on to confirm your
-          move, matching the physical tactile feel of pressing a clock
-          after moving. Cancel stays as a small, unobtrusive secondary
-          action off to the side. */}
+      {/* Confirm-move bar -- in normal document flow (not absolutely
+          positioned) so it pushes content below the board down instead of
+          covering it. Styled as an aerial-view chess clock top: a wide
+          rectangular block split by a center seam into two paddle halves,
+          like the reference clocks. */}
+      {/* Promotion piece picker -- only shown when "Ask on Promotion" is
+          on and a pawn just reached the back rank. */}
+      {promotionPending && (
+        <div className="mt-3 flex items-center justify-center gap-2">
+          {(['q', 'r', 'b', 'n'] as const).map((p) => (
+            <button
+              key={p}
+              onClick={() => choosePromotion(p)}
+              className="w-14 h-14 rounded-xl flex items-center justify-center text-3xl transition-transform active:scale-90"
+              style={{ background: '#302e2b', border: '1px solid rgba(129,182,76,0.4)' }}
+              title={{ q: 'Queen', r: 'Rook', b: 'Bishop', n: 'Knight' }[p]}
+            >
+              {{ q: '♛', r: '♜', b: '♝', n: '♞' }[p]}
+            </button>
+          ))}
+        </div>
+      )}
+
       {pendingMove && (
-        <div className="absolute -bottom-20 left-0 right-0 flex items-end justify-center gap-3 z-20">
+        <div className="mt-3 flex items-stretch gap-2">
           <button
             onClick={cancelPendingMove}
-            className="mb-2 w-9 h-9 rounded-full flex items-center justify-center shadow-lg transition-transform active:scale-90"
-            style={{ background: 'rgba(255,255,255,0.1)', color: '#e8e6e3', border: '1px solid rgba(255,255,255,0.15)' }}
+            className="w-12 shrink-0 rounded-xl flex items-center justify-center transition-transform active:scale-95"
+            style={{ background: 'rgba(255,255,255,0.08)', color: '#e8e6e3', border: '1px solid rgba(255,255,255,0.15)' }}
             title="Cancel"
           >
-            <span className="text-sm font-black">✕</span>
+            <span className="text-base font-black">✕</span>
           </button>
           <button
             onClick={confirmPendingMove}
-            className="relative w-40 h-16 rounded-[28px] font-black text-sm tracking-wide transition-all active:scale-95 active:translate-y-0.5"
+            className="relative flex-1 h-14 rounded-xl overflow-hidden flex transition-transform active:scale-[0.98]"
             style={{
-              background: 'linear-gradient(180deg, #a8d876 0%, #81b64c 45%, #5f8f36 100%)',
-              color: '#fff',
-              boxShadow: '0 6px 0 #4a7028, 0 10px 20px rgba(0,0,0,0.4), inset 0 1px 1px rgba(255,255,255,0.4)',
-              border: '1px solid rgba(0,0,0,0.15)',
+              boxShadow: '0 4px 0 #2a2a2a, 0 8px 16px rgba(0,0,0,0.4)',
+              border: '1px solid rgba(0,0,0,0.25)',
             }}
           >
-            <span className="drop-shadow-sm">CONFIRM</span>
+            <span
+              className="flex-1 flex items-center justify-center font-black text-xs tracking-wider"
+              style={{ background: 'linear-gradient(180deg, #3a3a3a 0%, #232323 100%)', color: 'rgba(255,255,255,0.5)' }}
+            >
+              MOVE
+            </span>
+            <span
+              className="flex-1 flex items-center justify-center font-black text-xs tracking-wider"
+              style={{ background: 'linear-gradient(180deg, #a8d876 0%, #81b64c 55%, #5f8f36 100%)', color: '#fff' }}
+            >
+              CONFIRM
+            </span>
+            {/* center seam */}
+            <div className="absolute left-1/2 top-0 bottom-0 w-[2px] -translate-x-1/2" style={{ background: 'rgba(0,0,0,0.35)' }} />
           </button>
         </div>
       )}

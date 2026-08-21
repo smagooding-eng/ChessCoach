@@ -1,6 +1,6 @@
 import { Link } from 'wouter';
 import { ArrowLeft, Check } from 'lucide-react';
-import { useSettings, BOARD_THEMES, PIECE_TINTS, type BoardTheme, type PieceTint } from '@/context/SettingsContext';
+import { useSettings, BOARD_THEMES, PIECE_STYLES, BOARD_SIZES, type BoardTheme, type PieceStyle, type BoardSize } from '@/context/SettingsContext';
 
 const CHESSCOM_GREEN = '#81b64c';
 const TEXT_LIGHT = '#e8e6e3';
@@ -18,8 +18,8 @@ function SwatchButton({ active, onClick, children, label }: { active: boolean; o
       }}
     >
       {children}
-      <span className="text-xs font-bold flex items-center gap-1" style={{ color: active ? CHESSCOM_GREEN : TEXT_MUTED }}>
-        {active && <Check className="w-3 h-3" />} {label}
+      <span className="text-[11px] font-bold flex items-center gap-1 text-center leading-tight" style={{ color: active ? CHESSCOM_GREEN : TEXT_MUTED }}>
+        {active && <Check className="w-3 h-3 shrink-0" />} {label}
       </span>
     </button>
   );
@@ -52,9 +52,12 @@ function ToggleRow({ label, description, checked, onChange }: { label: string; d
 export default function SettingsPage() {
   const {
     boardTheme, setBoardTheme,
-    pieceTint, setPieceTint,
+    pieceStyle, setPieceStyle,
     confirmMoves, setConfirmMoves,
     showCoordinates, setShowCoordinates,
+    soundEnabled, setSoundEnabled,
+    promotionChoice, setPromotionChoice,
+    boardSize, setBoardSize,
   } = useSettings();
 
   return (
@@ -88,13 +91,33 @@ export default function SettingsPage() {
       </section>
 
       <section>
-        <h2 className="text-sm font-black uppercase tracking-wide mb-3" style={{ color: TEXT_MUTED }}>Piece Style</h2>
+        <h2 className="text-sm font-black uppercase tracking-wide mb-1" style={{ color: TEXT_MUTED }}>Piece Style</h2>
+        <p className="text-xs mb-3" style={{ color: TEXT_MUTED }}>Color and finish for the pieces themselves</p>
         <div className="grid grid-cols-4 gap-2">
-          {(Object.keys(PIECE_TINTS) as PieceTint[]).map((key) => {
-            const t = PIECE_TINTS[key];
+          {(Object.keys(PIECE_STYLES) as PieceStyle[]).map((key) => {
+            const t = PIECE_STYLES[key];
             return (
-              <SwatchButton key={key} active={pieceTint === key} onClick={() => setPieceTint(key)} label={t.label}>
-                <span className="text-3xl leading-none" style={{ filter: t.filter }}>♞</span>
+              <SwatchButton key={key} active={pieceStyle === key} onClick={() => setPieceStyle(key)} label={t.label}>
+                <div className="flex items-center gap-0.5">
+                  <span className="text-2xl leading-none" style={{ color: t.light, WebkitTextStroke: '1px #555', ...t.finish }}>♞</span>
+                  <span className="text-2xl leading-none" style={{ color: t.dark, WebkitTextStroke: '1px #999', ...t.finish }}>♞</span>
+                </div>
+              </SwatchButton>
+            );
+          })}
+        </div>
+      </section>
+
+      <section>
+        <h2 className="text-sm font-black uppercase tracking-wide mb-3" style={{ color: TEXT_MUTED }}>Board Size</h2>
+        <div className="grid grid-cols-3 gap-2">
+          {(Object.keys(BOARD_SIZES) as BoardSize[]).map((key) => {
+            const t = BOARD_SIZES[key];
+            return (
+              <SwatchButton key={key} active={boardSize === key} onClick={() => setBoardSize(key)} label={t.label}>
+                <div className="w-full flex items-center justify-center h-8">
+                  <div className="rounded" style={{ width: `${20 + (t.maxWidth / 720) * 24}px`, height: `${20 + (t.maxWidth / 720) * 24}px`, background: 'rgba(129,182,76,0.3)', border: '1px solid rgba(129,182,76,0.5)' }} />
+                </div>
               </SwatchButton>
             );
           })}
@@ -115,11 +138,19 @@ export default function SettingsPage() {
           checked={showCoordinates}
           onChange={setShowCoordinates}
         />
+        <ToggleRow
+          label="Ask on Promotion"
+          description="Choose which piece to promote to, instead of always auto-queening"
+          checked={promotionChoice === 'ask'}
+          onChange={(v) => setPromotionChoice(v ? 'ask' : 'queen')}
+        />
+        <ToggleRow
+          label="Move Sounds"
+          description="Play a short sound when a move or capture is made"
+          checked={soundEnabled}
+          onChange={setSoundEnabled}
+        />
       </section>
-
-      <p className="text-xs text-center pt-2" style={{ color: TEXT_MUTED }}>
-        More settings — move sound effects, underpromotion choice, board size — coming soon.
-      </p>
     </div>
   );
 }
