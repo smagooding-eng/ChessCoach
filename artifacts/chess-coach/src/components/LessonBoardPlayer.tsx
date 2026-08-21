@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { Chessboard } from 'react-chessboard';
+import { Chessboard, defaultPieces } from 'react-chessboard';
+import { useSettings } from '@/context/SettingsContext';
 import { Chess } from 'chess.js';
 import {
   Play, Pause, SkipBack, SkipForward, ChevronLeft, ChevronRight,
@@ -486,6 +487,21 @@ function buildFrontendFixPgn(mistakePgn: string, drillExpectedMove: string | nul
 
 export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, drillExpectedMove, drillHint, content, extraChallenges, conceptTitle }: LessonBoardPlayerProps) {
   const [, navigate] = useLocation();
+  const { boardColors, pieceColors, showCoordinates } = useSettings();
+  const BOARD_LIGHT = boardColors.light;
+  const BOARD_DARK = boardColors.dark;
+  const tintedPieces = useMemo(() => {
+    if (pieceColors.light === '#ffffff' && pieceColors.dark === '#2b2b2b' && Object.keys(pieceColors.finish).length === 0) return undefined;
+    const wrapped: typeof defaultPieces = {};
+    for (const [key, PieceComponent] of Object.entries(defaultPieces)) {
+      const isWhitePiece = key.startsWith('w');
+      const fill = isWhitePiece ? pieceColors.light : pieceColors.dark;
+      wrapped[key] = (props) => (
+        <PieceComponent {...props} fill={fill} svgStyle={{ ...props?.svgStyle, ...pieceColors.finish }} />
+      );
+    }
+    return wrapped;
+  }, [pieceColors]);
   const activePgn = useMemo(() => {
     if (showFixLine) {
       if (fixPgn) return fixPgn;
@@ -864,6 +880,8 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
               boardStyle: { borderRadius: '6px', overflow: 'hidden' },
               darkSquareStyle: { backgroundColor: BOARD_DARK },
               lightSquareStyle: { backgroundColor: BOARD_LIGHT },
+              pieces: tintedPieces,
+              showNotation: showCoordinates,
             }}
           />
         </div>
@@ -1033,6 +1051,8 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
                   boardStyle: { borderRadius: '6px', overflow: 'hidden' },
                   darkSquareStyle: { backgroundColor: BOARD_DARK },
                   lightSquareStyle: { backgroundColor: BOARD_LIGHT },
+              pieces: tintedPieces,
+              showNotation: showCoordinates,
                   animationDurationInMs: 180,
                   squareStyles: boardSquareStyles,
                 }}
@@ -1346,6 +1366,8 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
                       boardStyle: { borderRadius: '6px', overflow: 'hidden', cursor: 'pointer' },
                       darkSquareStyle: { backgroundColor: BOARD_DARK },
                       lightSquareStyle: { backgroundColor: BOARD_LIGHT },
+              pieces: tintedPieces,
+              showNotation: showCoordinates,
                       animationDurationInMs: 180,
                     }}
                   />
@@ -1468,6 +1490,8 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
                   boardStyle: { borderRadius: '6px', overflow: 'hidden' },
                   darkSquareStyle: { backgroundColor: BOARD_DARK },
                   lightSquareStyle: { backgroundColor: BOARD_LIGHT },
+              pieces: tintedPieces,
+              showNotation: showCoordinates,
                 }}
               />
             </div>
@@ -1547,6 +1571,8 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
                   boardStyle: { borderRadius: '6px', overflow: 'hidden', cursor: 'pointer' },
                   darkSquareStyle: { backgroundColor: BOARD_DARK },
                   lightSquareStyle: { backgroundColor: BOARD_LIGHT },
+              pieces: tintedPieces,
+              showNotation: showCoordinates,
                   animationDurationInMs: 180,
                 }}
               />

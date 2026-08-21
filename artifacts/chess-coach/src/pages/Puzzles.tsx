@@ -1,13 +1,15 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { PieceTile } from '@/components/DesignSystem';
 import { Chess } from 'chess.js';
-import { Chessboard } from 'react-chessboard';
+import { Chessboard, defaultPieces } from 'react-chessboard';
 import { apiFetch } from '@/lib/api';
 import { useUser } from '@/hooks/use-user';
 import { Crown, RotateCcw, ChevronRight, Trophy, Target, Flame, Zap, Lightbulb, Loader2, Lock } from 'lucide-react';
 import { useLocation, useSearch } from 'wouter';
 import { encodeCard } from '@/pages/ShareCard';
 import { AnimatePresence, motion } from 'framer-motion';
+import { useSettings, playMoveSound } from '@/context/SettingsContext';
+import { EvalBar, MaterialStrip } from '@/components/GameStatusStrip';
 
 const BG_DARK = '#262421';
 const BG_CARD = 'linear-gradient(180deg, #383532 0%, #2a2825 100%)';
@@ -63,6 +65,7 @@ type PuzzleState = 'loading' | 'ready' | 'solving' | 'correct' | 'wrong' | 'show
 
 export function Puzzles() {
   const { authUser } = useUser();
+  const { boardColors, pieceColors, showCoordinates, soundEnabled, boardMaxWidth } = useSettings();
   const [, navigate] = useLocation();
   const search = useSearch();
   const targetTheme = new URLSearchParams(search).get('theme') ?? new URLSearchParams(search).get('weakness');
@@ -163,6 +166,7 @@ export function Puzzles() {
       const gameCopy = new Chess(game.fen());
       const move = gameCopy.move({ from, to, promotion: 'q' });
       if (!move) return false;
+      if (soundEnabled) playMoveSound(move.captured ? 'capture' : 'move');
 
       const uciMove = from + to + (move.flags.includes('p') ? 'q' : '');
 
@@ -233,7 +237,7 @@ export function Puzzles() {
     } catch {
       return false;
     }
-  }, [game, puzzle, state, currentMoveIndex, fetchStats]);
+  }, [game, puzzle, state, currentMoveIndex, fetchStats, soundEnabled]);
 
   const handlePieceDrop = useCallback(({ sourceSquare, targetSquare }: { piece: unknown; sourceSquare: string; targetSquare: string | null }): boolean => {
     if (!targetSquare) return false;
@@ -254,6 +258,22 @@ export function Puzzles() {
   }, [selectedSquare, game, state]);
 
   const legalTargets = legalMoveInfo.targets;
+
+  // Same fill-based piece tinting used in the shared ChessBoard component --
+  // duplicated here since this page renders react-chessboard directly
+  // rather than through that shared wrapper.
+  const tintedPieces = useMemo(() => {
+    if (pieceColors.light === '#ffffff' && pieceColors.dark === '#2b2b2b' && Object.keys(pieceColors.finish).length === 0) return undefined;
+    const wrapped: typeof defaultPieces = {};
+    for (const [key, PieceComponent] of Object.entries(defaultPieces)) {
+      const isWhitePiece = key.startsWith('w');
+      const fill = isWhitePiece ? pieceColors.light : pieceColors.dark;
+      wrapped[key] = (props) => (
+        <PieceComponent {...props} fill={fill} svgStyle={{ ...props?.svgStyle, ...pieceColors.finish }} />
+      );
+    }
+    return wrapped;
+  }, [pieceColors]);
 
   const handleSquareClick = useCallback(({ square, piece }: { square: string; piece: { pieceType: string } | null }) => {
     if (state !== 'ready' || !game) return;
@@ -523,7 +543,8 @@ export function Puzzles() {
                   </span>
                 </div>
 
-                <div className="relative w-full max-w-[500px] mx-auto mb-4">
+                <div className="relative w-full mx-auto mb-4" style={{ maxWidth: boardMaxWidth }}>
+                  <MaterialStrip fen={game?.fen() ?? ''} color={boardOrientation === 'white' ? 'b' : 'w'} className="px-1 mb-1.5" />
                   <Chessboard
                     options={{
                       position: game.fen(),
@@ -534,12 +555,14 @@ export function Puzzles() {
                       onPieceDrop: handlePieceDrop,
                       onSquareClick: handleSquareClick,
                       squareStyles,
+                      showNotation: showCoordinates,
                       boardStyle: {
                         borderRadius: '10px',
                         boxShadow: '0 20px 50px rgba(0,0,0,0.5)',
                       },
-                      lightSquareStyle: { backgroundColor: '#f0d9b5' },
-                      darkSquareStyle: { backgroundColor: '#b58863' },
+                      lightSquareStyle: { backgroundColor: boardColors.light },
+                      darkSquareStyle: { backgroundColor: boardColors.dark },
+                      pieces: tintedPieces,
                       animationDurationInMs: 150,
                     }}
                   />
@@ -559,6 +582,10 @@ export function Puzzles() {
                       </motion.div>
                     )}
                   </AnimatePresence>
+                  <MaterialStrip fen={game?.fen() ?? ''} color={boardOrientation === 'white' ? 'w' : 'b'} className="px-1 mt-1.5" />
+                  <div className="mt-2 px-1">
+                    <EvalBar fen={game?.fen() ?? ''} />
+                  </div>
                 </div>
 
                 <div className="flex items-center justify-center gap-3">
