@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import { useUser } from '@/context/UserContext';
 
 export type BoardTheme = 'classic' | 'green' | 'blue' | 'gray' | 'purple' | 'crimson' | 'teal' | 'coal' | 'sunset' | 'custom';
 export type PieceStyle = 'classic' | 'glossy' | 'outlined' | 'ocean' | 'crimson' | 'emerald' | 'royal' | 'flat' | 'custom';
@@ -82,9 +83,19 @@ const APP_DEFAULT_SETTINGS: Settings = {
   boardSize: 'standard',
 };
 
+// Base key names -- actual storage keys are these suffixed with the
+// current account's user id (see scopedKey below). This is the fix for
+// settings leaking between accounts on a shared device/browser:
+// localStorage is scoped to the browser, not the logged-in account, so
+// without per-user keys, switching accounts on the same device would
+// show one person's board/piece choices to another.
 const STORAGE_KEY = 'chessscout_settings';
 const DEFAULT_KEY = 'chessscout_user_default';
 const THEMES_KEY = 'chessscout_saved_themes';
+
+function scopedKey(base: string, userId: string): string {
+  return `${base}_${userId}`;
+}
 
 interface SettingsContextValue extends Settings {
   setBoardTheme: (t: BoardTheme) => void;
@@ -120,35 +131,47 @@ function loadJSON<T>(key: string, fallback: T): T {
 }
 
 export function SettingsProvider({ children }: { children: React.ReactNode }) {
-  const [userDefault, setUserDefault] = useState<Settings | null>(() => {
-    try {
-      const raw = localStorage.getItem(DEFAULT_KEY);
-      return raw ? JSON.parse(raw) : null;
-    } catch {
-      return null;
-    }
-  });
+  // Anonymous/logged-out browsing (e.g. scanning a position before
+  // signing in) gets its own isolated "guest" bucket -- never shared with
+  // any real account, and never leaked into once someone actually logs in.
+  const { authUser } = useUser();
+  const userId = authUser?.id ?? 'guest';
 
-  const [settings, setSettings] = useState<Settings>(() =>
-    loadJSON(STORAGE_KEY, userDefault ?? APP_DEFAULT_SETTINGS)
-  );
+  const [userDefault, setUserDefault] = useState<Settings | null>(null);
+  const [settings, setSettings] = useState<Settings>(APP_DEFAULT_SETTINGS);
+  const [savedThemes, setSavedThemes] = useState<SavedTheme[]>([]);
+  const loadedUserIdRef = useRef<string | null>(null);
 
-  const [savedThemes, setSavedThemes] = useState<SavedTheme[]>(() => {
+  // (Re)load this specific account's settings whenever the logged-in user
+  // changes -- covers both the initial load once auth resolves, and
+  // switching accounts on the same device without a full page reload.
+  useEffect(() => {
+    if (loadedUserIdRef.current === userId) return;
+    loadedUserIdRef.current = userId;
+
+    let loadedDefault: Settings | null = null;
     try {
-      const raw = localStorage.getItem(THEMES_KEY);
-      return raw ? JSON.parse(raw) : [];
+      const raw = localStorage.getItem(scopedKey(DEFAULT_KEY, userId));
+      loadedDefault = raw ? JSON.parse(raw) : null;
+    } catch {}
+    setUserDefault(loadedDefault);
+    setSettings(loadJSON(scopedKey(STORAGE_KEY, userId), loadedDefault ?? APP_DEFAULT_SETTINGS));
+
+    try {
+      const raw = localStorage.getItem(scopedKey(THEMES_KEY, userId));
+      setSavedThemes(raw ? JSON.parse(raw) : []);
     } catch {
-      return [];
+      setSavedThemes([]);
     }
-  });
+  }, [userId]);
 
   useEffect(() => {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(settings)); } catch {}
-  }, [settings]);
+    try { localStorage.setItem(scopedKey(STORAGE_KEY, userId), JSON.stringify(settings)); } catch {}
+  }, [settings, userId]);
 
   useEffect(() => {
-    try { localStorage.setItem(THEMES_KEY, JSON.stringify(savedThemes)); } catch {}
-  }, [savedThemes]);
+    try { localStorage.setItem(scopedKey(THEMES_KEY, userId), JSON.stringify(savedThemes)); } catch {}
+  }, [savedThemes, userId]);
 
   const resolvedBoardColors: ColorPair =
     settings.boardTheme === 'custom' ? settings.boardCustomColors : BOARD_THEMES[settings.boardTheme];
@@ -196,7 +219,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     deleteTheme: (id) => setSavedThemes((prev) => prev.filter((t) => t.id !== id)),
     setAsMyDefault: () => {
       setUserDefault(settings);
-      try { localStorage.setItem(DEFAULT_KEY, JSON.stringify(settings)); } catch {}
+      try { localStorage.setItem(scopedKey(DEFAULT_KEY, userId), JSON.stringify(settings)); } catch {}
     },
     hasCustomDefault: userDefault !== null,
     revertToDefault: () => {
