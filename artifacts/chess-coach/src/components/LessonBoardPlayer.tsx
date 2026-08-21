@@ -487,10 +487,19 @@ function buildFrontendFixPgn(mistakePgn: string, drillExpectedMove: string | nul
 
 export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, drillExpectedMove, drillHint, content, extraChallenges, conceptTitle }: LessonBoardPlayerProps) {
   const [, navigate] = useLocation();
-  const { boardColors, pieceColors, showCoordinates } = useSettings();
+  const { boardColors, pieceColors, pieceShape, showCoordinates } = useSettings();
   const BOARD_LIGHT = boardColors.light;
   const BOARD_DARK = boardColors.dark;
   const tintedPieces = useMemo(() => {
+    if (pieceShape === 'cburnett') {
+      const wrapped: typeof defaultPieces = {};
+      for (const key of Object.keys(defaultPieces)) {
+        wrapped[key] = ({ svgStyle }) => (
+          <img src={`/pieces/cburnett/${key}.svg`} alt={key} style={{ width: '100%', height: '100%', ...svgStyle }} />
+        );
+      }
+      return wrapped;
+    }
     if (pieceColors.light === '#ffffff' && pieceColors.dark === '#2b2b2b' && Object.keys(pieceColors.finish).length === 0) return undefined;
     const wrapped: typeof defaultPieces = {};
     for (const [key, PieceComponent] of Object.entries(defaultPieces)) {
@@ -501,7 +510,7 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
       );
     }
     return wrapped;
-  }, [pieceColors]);
+  }, [pieceColors, pieceShape]);
   const activePgn = useMemo(() => {
     if (showFixLine) {
       if (fixPgn) return fixPgn;

@@ -2,8 +2,21 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 
 export type BoardTheme = 'classic' | 'green' | 'blue' | 'gray' | 'purple' | 'crimson' | 'teal' | 'coal' | 'sunset' | 'custom';
 export type PieceStyle = 'classic' | 'glossy' | 'outlined' | 'ocean' | 'crimson' | 'emerald' | 'royal' | 'flat' | 'custom';
+export type PieceShape = 'default' | 'cburnett';
 export type PromotionChoice = 'queen' | 'ask';
 export type BoardSize = 'compact' | 'standard' | 'large';
+
+// Cburnett is a real, distinct piece artwork set (not just a recolor of
+// the default) -- the same set Lichess uses by default. Licensed CC-BY-SA
+// 3.0 / GPLv2+ by Colin M.L. Burnett (per lichess-org/lila's own
+// COPYING.md), which permits commercial use with attribution. Because
+// it's static SVG artwork with color baked in, the Piece Style color
+// picker doesn't apply on top of it -- shape and color are independent
+// choices, but this shape brings its own coloring.
+export const PIECE_SHAPES: Record<PieceShape, { label: string; attribution: string | null }> = {
+  default:  { label: 'Default', attribution: null },
+  cburnett: { label: 'Cburnett', attribution: 'Piece set "Cburnett" by Colin M.L. Burnett, CC BY-SA 3.0 / GPLv2+' },
+};
 
 export const BOARD_THEMES: Record<Exclude<BoardTheme, 'custom'>, { light: string; dark: string; label: string }> = {
   classic: { light: '#f0d9b5', dark: '#b58863', label: 'Classic Wood' },
@@ -46,6 +59,7 @@ export interface SavedTheme {
 interface Settings {
   boardTheme: BoardTheme;
   pieceStyle: PieceStyle;
+  pieceShape: PieceShape;
   boardCustomColors: ColorPair;
   pieceCustomColors: ColorPair;
   confirmMoves: boolean;
@@ -58,6 +72,7 @@ interface Settings {
 const APP_DEFAULT_SETTINGS: Settings = {
   boardTheme: 'green',
   pieceStyle: 'classic',
+  pieceShape: 'default',
   boardCustomColors: { light: '#eeeed2', dark: '#769656' },
   pieceCustomColors: { light: '#ffffff', dark: '#2b2b2b' },
   confirmMoves: false,
@@ -74,6 +89,7 @@ const THEMES_KEY = 'chessscout_saved_themes';
 interface SettingsContextValue extends Settings {
   setBoardTheme: (t: BoardTheme) => void;
   setPieceStyle: (t: PieceStyle) => void;
+  setPieceShape: (t: PieceShape) => void;
   setBoardCustomColor: (which: 'light' | 'dark', color: string) => void;
   setPieceCustomColor: (which: 'light' | 'dark', color: string) => void;
   setConfirmMoves: (v: boolean) => void;
@@ -145,6 +161,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     ...settings,
     setBoardTheme: (t) => setSettings((s) => ({ ...s, boardTheme: t })),
     setPieceStyle: (t) => setSettings((s) => ({ ...s, pieceStyle: t })),
+    setPieceShape: (t) => setSettings((s) => ({ ...s, pieceShape: t })),
     setBoardCustomColor: (which, color) =>
       setSettings((s) => ({ ...s, boardTheme: 'custom', boardCustomColors: { ...s.boardCustomColors, [which]: color } })),
     setPieceCustomColor: (which, color) =>

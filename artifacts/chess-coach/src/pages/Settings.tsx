@@ -2,8 +2,8 @@ import { useState } from 'react';
 import { Link } from 'wouter';
 import { ArrowLeft, Check, Save, Trash2, RotateCcw, Star } from 'lucide-react';
 import {
-  useSettings, BOARD_THEMES, PIECE_STYLES, BOARD_SIZES,
-  type BoardTheme, type PieceStyle, type BoardSize, type SavedTheme,
+  useSettings, BOARD_THEMES, PIECE_STYLES, PIECE_SHAPES, BOARD_SIZES,
+  type BoardTheme, type PieceStyle, type PieceShape, type BoardSize, type SavedTheme,
 } from '@/context/SettingsContext';
 
 const CHESSCOM_GREEN = '#81b64c';
@@ -71,6 +71,7 @@ export default function SettingsPage() {
   const {
     boardTheme, setBoardTheme,
     pieceStyle, setPieceStyle,
+    pieceShape, setPieceShape,
     boardCustomColors, setBoardCustomColor,
     pieceCustomColors, setPieceCustomColor,
     confirmMoves, setConfirmMoves,
@@ -150,8 +151,27 @@ export default function SettingsPage() {
       </section>
 
       <section>
+        <h2 className="text-sm font-black uppercase tracking-wide mb-1" style={{ color: TEXT_MUTED }}>Piece Shape</h2>
+        <p className="text-xs mb-3" style={{ color: TEXT_MUTED }}>Real alternate artwork, not just a recolor</p>
+        <div className="grid grid-cols-2 gap-2 mb-2">
+          {(Object.keys(PIECE_SHAPES) as PieceShape[]).map((key) => (
+            <SwatchButton key={key} active={pieceShape === key} onClick={() => setPieceShape(key)} label={PIECE_SHAPES[key].label}>
+              <div className="flex items-center gap-1">
+                <span className="text-3xl leading-none" style={key === 'cburnett' ? { fontFamily: 'serif' } : {}}>♞</span>
+              </div>
+            </SwatchButton>
+          ))}
+        </div>
+        {pieceShape !== 'default' && PIECE_SHAPES[pieceShape].attribution && (
+          <p className="text-[10px]" style={{ color: TEXT_MUTED }}>{PIECE_SHAPES[pieceShape].attribution}</p>
+        )}
+      </section>
+
+      <section>
         <h2 className="text-sm font-black uppercase tracking-wide mb-1" style={{ color: TEXT_MUTED }}>Piece Style</h2>
-        <p className="text-xs mb-3" style={{ color: TEXT_MUTED }}>Color and finish for the pieces themselves</p>
+        <p className="text-xs mb-3" style={{ color: TEXT_MUTED }}>
+          Color and finish for the pieces themselves{pieceShape !== 'default' ? ' — not used with a non-default shape' : ''}
+        </p>
         <div className="grid grid-cols-4 gap-2 mb-3">
           {(Object.keys(PIECE_STYLES) as Exclude<PieceStyle, 'custom'>[]).map((key) => {
             const t = PIECE_STYLES[key];

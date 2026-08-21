@@ -117,7 +117,7 @@ export function ChessBoard({
   onPremoveSet,
   arrows,
 }: ChessBoardProps) {
-  const { confirmMoves, boardColors, showCoordinates, pieceColors, soundEnabled, promotionChoice, boardMaxWidth } = useSettings();
+  const { confirmMoves, boardColors, showCoordinates, pieceColors, pieceShape, soundEnabled, promotionChoice, boardMaxWidth } = useSettings();
   const confirmMovesRef = useRef(confirmMoves);
   confirmMovesRef.current = confirmMoves;
   const soundEnabledRef = useRef(soundEnabled);
@@ -146,6 +146,18 @@ export function ChessBoard({
   // earlier filter-based attempt at this wasn't visibly noticeable).
   // Skipped entirely for the Classic style (avoids wrapper overhead).
   const tintedPieces = useMemo(() => {
+    if (pieceShape === 'cburnett') {
+      // Real, distinct artwork set (not the library's default shapes).
+      // Static SVG files with color baked in, so the color picker
+      // doesn't apply on top of this -- shape and color are independent.
+      const wrapped: typeof defaultPieces = {};
+      for (const key of Object.keys(defaultPieces)) {
+        wrapped[key] = ({ svgStyle }) => (
+          <img src={`/pieces/cburnett/${key}.svg`} alt={key} style={{ width: '100%', height: '100%', ...svgStyle }} />
+        );
+      }
+      return wrapped;
+    }
     if (pieceColors.light === '#ffffff' && pieceColors.dark === '#2b2b2b' && Object.keys(pieceColors.finish).length === 0) return undefined;
     const wrapped: typeof defaultPieces = {};
     for (const [key, PieceComponent] of Object.entries(defaultPieces)) {
@@ -156,7 +168,7 @@ export function ChessBoard({
       );
     }
     return wrapped;
-  }, [pieceColors]);
+  }, [pieceColors, pieceShape]);
 
   useEffect(() => {
     return () => { if (feedbackTimerRef.current) clearTimeout(feedbackTimerRef.current); };

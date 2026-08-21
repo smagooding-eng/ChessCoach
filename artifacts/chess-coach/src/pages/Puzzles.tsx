@@ -65,7 +65,7 @@ type PuzzleState = 'loading' | 'ready' | 'solving' | 'correct' | 'wrong' | 'show
 
 export function Puzzles() {
   const { authUser } = useUser();
-  const { boardColors, pieceColors, showCoordinates, soundEnabled, boardMaxWidth } = useSettings();
+  const { boardColors, pieceColors, pieceShape, showCoordinates, soundEnabled, boardMaxWidth } = useSettings();
   const [, navigate] = useLocation();
   const search = useSearch();
   const targetTheme = new URLSearchParams(search).get('theme') ?? new URLSearchParams(search).get('weakness');
@@ -263,6 +263,15 @@ export function Puzzles() {
   // duplicated here since this page renders react-chessboard directly
   // rather than through that shared wrapper.
   const tintedPieces = useMemo(() => {
+    if (pieceShape === 'cburnett') {
+      const wrapped: typeof defaultPieces = {};
+      for (const key of Object.keys(defaultPieces)) {
+        wrapped[key] = ({ svgStyle }) => (
+          <img src={`/pieces/cburnett/${key}.svg`} alt={key} style={{ width: '100%', height: '100%', ...svgStyle }} />
+        );
+      }
+      return wrapped;
+    }
     if (pieceColors.light === '#ffffff' && pieceColors.dark === '#2b2b2b' && Object.keys(pieceColors.finish).length === 0) return undefined;
     const wrapped: typeof defaultPieces = {};
     for (const [key, PieceComponent] of Object.entries(defaultPieces)) {
@@ -273,7 +282,7 @@ export function Puzzles() {
       );
     }
     return wrapped;
-  }, [pieceColors]);
+  }, [pieceColors, pieceShape]);
 
   const handleSquareClick = useCallback(({ square, piece }: { square: string; piece: { pieceType: string } | null }) => {
     if (state !== 'ready' || !game) return;
