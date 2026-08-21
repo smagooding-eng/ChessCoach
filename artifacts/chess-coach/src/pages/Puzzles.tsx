@@ -34,6 +34,17 @@ const PUZZLE_TYPE_OPTIONS: { value: string; label: string }[] = [
   { value: 'endgame', label: 'Endgame' },
 ];
 
+// ELO/rating band filter options. value is "min-max" (max='' means no
+// upper bound), parsed when building the fetch request.
+const RATING_BAND_OPTIONS: { value: string; label: string }[] = [
+  { value: '', label: 'All Ratings' },
+  { value: '0-800', label: 'Under 800' },
+  { value: '800-1200', label: '800-1200' },
+  { value: '1200-1600', label: '1200-1600' },
+  { value: '1600-2000', label: '1600-2000' },
+  { value: '2000-', label: '2000+' },
+];
+
 interface PuzzleData {
   id: number;
   fen: string;
@@ -85,6 +96,7 @@ export function Puzzles() {
   // "My Game Puzzles" tab removed -- Daily Puzzles is now the only mode,
   // with an added puzzle-type filter (mate in N, etc) below instead.
   const [puzzleTheme, setPuzzleTheme] = useState<string>('');
+  const [ratingBand, setRatingBand] = useState<string>('');
   const feedbackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [explanation, setExplanation] = useState<string | null>(null);
   const [loadingExplanation, setLoadingExplanation] = useState(false);
@@ -116,6 +128,11 @@ export function Puzzles() {
       if (seenPuzzleIds.current.length > 0) params.set('exclude', seenPuzzleIds.current.join(','));
       if (targetTheme) params.set('weakness', targetTheme);
       if (puzzleTheme) params.set('puzzleTheme', puzzleTheme);
+      if (ratingBand) {
+        const [min, max] = ratingBand.split('-');
+        if (min) params.set('minRating', min);
+        if (max) params.set('maxRating', max);
+      }
       const qs = params.toString() ? `?${params.toString()}` : '';
       const res = await apiFetch(`/api/puzzles/next${qs}`);
       if (res.status === 403) {
@@ -143,7 +160,7 @@ export function Puzzles() {
     } catch {
       setState('no_puzzles');
     }
-  }, [puzzleTheme]);
+  }, [puzzleTheme, ratingBand]);
 
   useEffect(() => {
     fetchNextPuzzle();
@@ -457,6 +474,23 @@ export function Puzzles() {
                 background: puzzleTheme === opt.value ? CHESSCOM_GREEN : 'rgba(255,255,255,0.04)',
                 color: puzzleTheme === opt.value ? '#000' : TEXT_MUTED,
                 border: puzzleTheme === opt.value ? 'none' : '1px solid rgba(255,255,255,0.06)',
+              }}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex gap-1.5 mb-4 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
+          {RATING_BAND_OPTIONS.map(opt => (
+            <button
+              key={opt.value}
+              onClick={() => setRatingBand(opt.value)}
+              className="shrink-0 px-3 py-1.5 rounded-xl text-xs font-bold transition-all"
+              style={{
+                background: ratingBand === opt.value ? CHESSCOM_GREEN : 'rgba(255,255,255,0.04)',
+                color: ratingBand === opt.value ? '#000' : TEXT_MUTED,
+                border: ratingBand === opt.value ? 'none' : '1px solid rgba(255,255,255,0.06)',
               }}
             >
               {opt.label}

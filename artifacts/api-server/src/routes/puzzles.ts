@@ -145,6 +145,14 @@ router.get("/puzzles/next", requireAuth, async (req: Request, res: Response) => 
       ? sql`${puzzlesTable.themes} ILIKE ${"%" + puzzleThemeParam + "%"}`
       : null;
 
+    // Optional ELO/rating range filter: ?minRating=1200&maxRating=1600
+    const minRatingParam = typeof req.query.minRating === "string" ? parseInt(req.query.minRating, 10) : null;
+    const maxRatingParam = typeof req.query.maxRating === "string" ? parseInt(req.query.maxRating, 10) : null;
+    const ratingConditions = [
+      ...(minRatingParam && !isNaN(minRatingParam) ? [sql`${puzzlesTable.rating} >= ${minRatingParam}`] : []),
+      ...(maxRatingParam && !isNaN(maxRatingParam) ? [sql`${puzzlesTable.rating} <= ${maxRatingParam}`] : []),
+    ];
+
     let puzzle;
     if (allExcluded.length > 0) {
       const result = await db
@@ -155,6 +163,7 @@ router.get("/puzzles/next", requireAuth, async (req: Request, res: Response) => 
           sql`${puzzlesTable.id} NOT IN (${sql.join(allExcluded.map(id => sql`${id}`), sql`, `)})`,
           ...(themeCondition ? [themeCondition] : []),
           ...(exactThemeCondition ? [exactThemeCondition] : []),
+          ...ratingConditions,
         ))
         .orderBy(sql`RANDOM()`)
         .limit(1);
@@ -169,6 +178,7 @@ router.get("/puzzles/next", requireAuth, async (req: Request, res: Response) => 
           eq(puzzlesTable.archived, false),
           ...(themeCondition ? [themeCondition] : []),
           ...(exactThemeCondition ? [exactThemeCondition] : []),
+          ...ratingConditions,
         ))
         .orderBy(sql`RANDOM()`)
         .limit(1);

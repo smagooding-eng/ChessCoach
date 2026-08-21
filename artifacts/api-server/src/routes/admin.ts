@@ -382,6 +382,32 @@ router.get("/admin/users/:userId/usage", requireAdmin, async (req: Request, res:
       };
     });
 
+    let payments: { totalPaidCents: number; currency: string; count: number; history: { id: string; amountCents: number; currency: string; status: string; description: string | null; createdAt: string }[] } | null = null;
+    if (user.stripeCustomerId) {
+      try {
+        const stripe = await getUncachableStripeClient();
+        const charges = await stripe.charges.list({ customer: user.stripeCustomerId, limit: 100 });
+        const succeeded = charges.data.filter((c) => c.status === "succeeded" && !c.refunded);
+        payments = {
+          totalPaidCents: succeeded.reduce((sum, c) => sum + c.amount, 0),
+          currency: succeeded[0]?.currency ?? "usd",
+          count: succeeded.length,
+          history: succeeded
+            .sort((a, b) => b.created - a.created)
+            .map((c) => ({
+              id: c.id,
+              amountCents: c.amount,
+              currency: c.currency,
+              status: c.status,
+              description: c.description,
+              createdAt: new Date(c.created * 1000).toISOString(),
+            })),
+        };
+      } catch (stripeErr: any) {
+        console.error("Failed to fetch Stripe payment history:", stripeErr.message);
+      }
+    }
+
     res.json({
       user: {
         id: user.id,
@@ -404,6 +430,7 @@ router.get("/admin/users/:userId/usage", requireAdmin, async (req: Request, res:
         lessonsCompleted: lessonsCompleted.count,
         pageViews: pageViewCount.count,
       },
+      payments,
       recentPages,
       referrals: referralDetails,
     });

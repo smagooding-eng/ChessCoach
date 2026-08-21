@@ -451,8 +451,13 @@ const FILTER_TABS: { key: UserFilter; label: string; color: string }[] = [
 interface UserUsage {
   user: { id: string; email: string | null; firstName: string | null; chesscomUsername: string | null; inviteCode: string | null; referredByUserId: string | null; createdAt: string; lastLoginAt: string | null; isPremiumOverride: boolean };
   usage: { gamesImported: number; gamesReviewed: number; opponentsScouted: number; puzzlesSolved: number; puzzlesFailed: number; coursesGenerated: number; lessonsCompleted: number; pageViews: number };
+  payments: { totalPaidCents: number; currency: string; count: number; history: { id: string; amountCents: number; currency: string; status: string; description: string | null; createdAt: string }[] } | null;
   recentPages: { path: string; createdAt: string }[];
   referrals: { id: string; referredEmail: string | null; referredName: string | null; status: string; createdAt: string; convertedAt: string | null }[];
+}
+
+function formatCents(cents: number, currency: string): string {
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: currency.toUpperCase() }).format(cents / 100);
 }
 
 function UserDetailPanel({ userId, onBack }: { userId: string; onBack: () => void }) {
@@ -541,7 +546,7 @@ function UserDetailPanel({ userId, onBack }: { userId: string; onBack: () => voi
     );
   }
 
-  const { user, usage, recentPages, referrals } = data;
+  const { user, usage, payments, recentPages, referrals } = data;
   const statItems = [
     { label: 'Games Imported', value: usage.gamesImported, color: 'text-blue-400', bg: 'bg-blue-400/10', icon: Swords },
     { label: 'Games Reviewed', value: usage.gamesReviewed, color: 'text-emerald-400', bg: 'bg-emerald-400/10', icon: Eye },
@@ -622,6 +627,33 @@ function UserDetailPanel({ userId, onBack }: { userId: string; onBack: () => voi
           </div>
         ))}
       </div>
+
+      {payments && payments.count > 0 && (
+        <div className="px-4 py-3 border-b border-border/20">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Total Payments</p>
+            <p className="text-sm font-black text-primary">
+              {formatCents(payments.totalPaidCents, payments.currency)}
+              <span className="text-[10px] text-muted-foreground font-normal ml-1">({payments.count} payment{payments.count === 1 ? '' : 's'})</span>
+            </p>
+          </div>
+          <div className="space-y-1 max-h-32 overflow-y-auto">
+            {payments.history.map((p) => (
+              <div key={p.id} className="flex items-center justify-between text-[11px]">
+                <span className="text-muted-foreground truncate flex-1">
+                  {new Date(p.createdAt).toLocaleDateString()} — {p.description || 'Payment'}
+                </span>
+                <span className="text-foreground font-bold shrink-0 ml-2">{formatCents(p.amountCents, p.currency)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      {payments && payments.count === 0 && (
+        <div className="px-4 py-3 border-b border-border/20">
+          <p className="text-[10px] text-muted-foreground text-center">No payments on record for this account</p>
+        </div>
+      )}
 
       {recentPages.length > 0 && (
         <div className="px-4 py-3 border-b border-border/20">
