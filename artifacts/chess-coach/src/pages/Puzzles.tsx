@@ -266,7 +266,7 @@ export function Puzzles() {
     if (pieceShape === 'cburnett') {
       const wrapped: typeof defaultPieces = {};
       for (const key of Object.keys(defaultPieces)) {
-        wrapped[key] = ({ svgStyle }) => (
+        wrapped[key] = ({ svgStyle } = {}) => (
           <img src={`/pieces/cburnett/${key}.svg`} alt={key} style={{ width: '100%', height: '100%', ...svgStyle }} />
         );
       }
