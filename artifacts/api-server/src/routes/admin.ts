@@ -173,6 +173,32 @@ router.get("/admin/users", requireAdmin, async (_req: Request, res: Response) =>
       }
     } catch {}
 
+    // Total lifetime payments per subscriber -- scoped only to customer
+    // IDs that actually have/had a subscription (from subMap above),
+    // not every user, to keep this fast rather than one Stripe call per
+    // account regardless of whether they've ever paid anything.
+    let paymentTotalsMap: Record<string, { totalCents: number; currency: string; count: number }> = {};
+    try {
+      const stripe = await getUncachableStripeClient();
+      const subscriberCustomerIds = Object.keys(subMap);
+      const chargeResults = await Promise.all(
+        subscriberCustomerIds.map((custId) =>
+          stripe.charges.list({ customer: custId, limit: 100 }).catch(() => null)
+        )
+      );
+      subscriberCustomerIds.forEach((custId, i) => {
+        const result = chargeResults[i];
+        if (!result) return;
+        const succeeded = result.data.filter((c) => c.status === "succeeded" && !c.refunded);
+        if (succeeded.length === 0) return;
+        paymentTotalsMap[custId] = {
+          totalCents: succeeded.reduce((sum, c) => sum + c.amount, 0),
+          currency: succeeded[0].currency,
+          count: succeeded.length,
+        };
+      });
+    } catch {}
+
     const referralCounts = await db.select({
       referrerUserId: referralConversionsTable.referrerUserId,
       total: count(),
@@ -186,6 +212,7 @@ router.get("/admin/users", requireAdmin, async (_req: Request, res: Response) =>
       const status = computeUserStatus(u.email, u.createdAt, stripeSub);
       const lastLogin = u.lastLoginAt;
       const daysSinceLogin = lastLogin ? Math.floor((Date.now() - new Date(lastLogin).getTime()) / 86400000) : null;
+      const payments = u.stripeCustomerId ? paymentTotalsMap[u.stripeCustomerId] ?? null : null;
       return {
         id: u.id,
         email: u.email,
@@ -199,12 +226,107 @@ router.get("/admin/users", requireAdmin, async (_req: Request, res: Response) =>
         inviteCode: u.inviteCode,
         referredByUserId: u.referredByUserId,
         referralCount: refCountMap[u.id] ?? 0,
+        totalPaidCents: payments?.totalCents ?? null,
+        paidCurrency: payments?.currency ?? null,
+        paymentCount: payments?.count ?? 0,
       };
     });
 
     res.json({ users: enrichedUsers });
   } catch {
     res.status(500).json({ error: "Failed to fetch users" });
+  }
+});
+
+// Subscribers list sourced directly from Stripe -- not from the local DB.
+// This means it shows real subscribers even if their local account's
+// stripeCustomerId link is broken or missing (a real, previously-seen
+// data-migration issue), because it never depends on that link to find
+// them in the first place. Local account info is attached for
+// convenience where a match can be found, but isn't required.
+router.get("/admin/subscribers", requireAdmin, async (_req: Request, res: Response) => {
+  try {
+    const stripe = await getUncachableStripeClient();
+    const allStatuses: Array<'active' | 'past_due' | 'trialing' | 'canceled' | 'unpaid'> = ['active', 'past_due', 'trialing', 'canceled', 'unpaid'];
+    const results = await Promise.all(
+      allStatuses.map(status => stripe.subscriptions.list({ status, limit: 100, expand: ['data.customer'] }))
+    );
+
+    const priority = ['active', 'past_due', 'trialing', 'canceled', 'unpaid'];
+    const subsByCustomer: Record<string, {
+      customerId: string; customerName: string | null; customerEmail: string | null;
+      status: string; planInterval: string | null; planAmountCents: number | null; created: number;
+    }> = {};
+
+    for (const result of results) {
+      for (const sub of result.data) {
+        const cust = sub.customer;
+        const custId = typeof cust === 'string' ? cust : cust?.id;
+        if (!custId) continue;
+        const existing = subsByCustomer[custId];
+        if (!existing || priority.indexOf(sub.status) < priority.indexOf(existing.status)) {
+          const item = sub.items?.data?.[0];
+          subsByCustomer[custId] = {
+            customerId: custId,
+            customerName: typeof cust === 'object' && !('deleted' in cust) ? cust.name ?? null : null,
+            customerEmail: typeof cust === 'object' && !('deleted' in cust) ? cust.email ?? null : null,
+            status: sub.status,
+            planInterval: item?.price?.recurring?.interval ?? null,
+            planAmountCents: item?.price?.unit_amount ?? null,
+            created: sub.created,
+          };
+        }
+      }
+    }
+
+    const customerIds = Object.keys(subsByCustomer);
+
+    const chargeResults = await Promise.all(
+      customerIds.map((custId) => stripe.charges.list({ customer: custId, limit: 100 }).catch(() => null))
+    );
+    const paymentTotals: Record<string, { totalCents: number; currency: string; count: number }> = {};
+    customerIds.forEach((custId, i) => {
+      const result = chargeResults[i];
+      const succeeded = result ? result.data.filter((c) => c.status === "succeeded" && !c.refunded) : [];
+      paymentTotals[custId] = {
+        totalCents: succeeded.reduce((sum, c) => sum + c.amount, 0),
+        currency: succeeded[0]?.currency ?? "usd",
+        count: succeeded.length,
+      };
+    });
+
+    const localUsers = customerIds.length > 0
+      ? await db.select({
+          id: usersTable.id, email: usersTable.email,
+          chesscomUsername: usersTable.chesscomUsername, firstName: usersTable.firstName,
+          stripeCustomerId: usersTable.stripeCustomerId,
+        }).from(usersTable).where(inArray(usersTable.stripeCustomerId, customerIds))
+      : [];
+    const localByCustomerId: Record<string, typeof localUsers[number]> = {};
+    for (const u of localUsers) if (u.stripeCustomerId) localByCustomerId[u.stripeCustomerId] = u;
+
+    const subscribers = customerIds
+      .map((custId) => {
+        const sub = subsByCustomer[custId];
+        const local = localByCustomerId[custId];
+        const payments = paymentTotals[custId];
+        return {
+          ...sub,
+          totalPaidCents: payments.totalCents,
+          paidCurrency: payments.currency,
+          paymentCount: payments.count,
+          linkedToLocalAccount: !!local,
+          localUserId: local?.id ?? null,
+          localEmail: local?.email ?? null,
+          localChesscomUsername: local?.chesscomUsername ?? null,
+          localFirstName: local?.firstName ?? null,
+        };
+      })
+      .sort((a, b) => b.created - a.created);
+
+    res.json({ subscribers });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to fetch subscribers from Stripe", details: err.message });
   }
 });
 
@@ -383,6 +505,8 @@ router.get("/admin/users/:userId/usage", requireAdmin, async (req: Request, res:
     });
 
     let payments: { totalPaidCents: number; currency: string; count: number; history: { id: string; amountCents: number; currency: string; status: string; description: string | null; createdAt: string }[] } | null = null;
+    let paymentsError: string | null = null;
+    const hasStripeCustomer = !!user.stripeCustomerId;
     if (user.stripeCustomerId) {
       try {
         const stripe = await getUncachableStripeClient();
@@ -405,6 +529,7 @@ router.get("/admin/users/:userId/usage", requireAdmin, async (req: Request, res:
         };
       } catch (stripeErr: any) {
         console.error("Failed to fetch Stripe payment history:", stripeErr.message);
+        paymentsError = stripeErr.message;
       }
     }
 
@@ -431,6 +556,8 @@ router.get("/admin/users/:userId/usage", requireAdmin, async (req: Request, res:
         pageViews: pageViewCount.count,
       },
       payments,
+      paymentsError,
+      hasStripeCustomer,
       recentPages,
       referrals: referralDetails,
     });

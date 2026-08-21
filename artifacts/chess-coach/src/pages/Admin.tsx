@@ -452,6 +452,8 @@ interface UserUsage {
   user: { id: string; email: string | null; firstName: string | null; chesscomUsername: string | null; inviteCode: string | null; referredByUserId: string | null; createdAt: string; lastLoginAt: string | null; isPremiumOverride: boolean };
   usage: { gamesImported: number; gamesReviewed: number; opponentsScouted: number; puzzlesSolved: number; puzzlesFailed: number; coursesGenerated: number; lessonsCompleted: number; pageViews: number };
   payments: { totalPaidCents: number; currency: string; count: number; history: { id: string; amountCents: number; currency: string; status: string; description: string | null; createdAt: string }[] } | null;
+  paymentsError: string | null;
+  hasStripeCustomer: boolean;
   recentPages: { path: string; createdAt: string }[];
   referrals: { id: string; referredEmail: string | null; referredName: string | null; status: string; createdAt: string; convertedAt: string | null }[];
 }
@@ -546,7 +548,7 @@ function UserDetailPanel({ userId, onBack }: { userId: string; onBack: () => voi
     );
   }
 
-  const { user, usage, payments, recentPages, referrals } = data;
+  const { user, usage, payments, paymentsError, hasStripeCustomer, recentPages, referrals } = data;
   const statItems = [
     { label: 'Games Imported', value: usage.gamesImported, color: 'text-blue-400', bg: 'bg-blue-400/10', icon: Swords },
     { label: 'Games Reviewed', value: usage.gamesReviewed, color: 'text-emerald-400', bg: 'bg-emerald-400/10', icon: Eye },
@@ -628,32 +630,40 @@ function UserDetailPanel({ userId, onBack }: { userId: string; onBack: () => voi
         ))}
       </div>
 
-      {payments && payments.count > 0 && (
-        <div className="px-4 py-3 border-b border-border/20">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Total Payments</p>
-            <p className="text-sm font-black text-primary">
-              {formatCents(payments.totalPaidCents, payments.currency)}
-              <span className="text-[10px] text-muted-foreground font-normal ml-1">({payments.count} payment{payments.count === 1 ? '' : 's'})</span>
-            </p>
-          </div>
-          <div className="space-y-1 max-h-32 overflow-y-auto">
-            {payments.history.map((p) => (
-              <div key={p.id} className="flex items-center justify-between text-[11px]">
-                <span className="text-muted-foreground truncate flex-1">
-                  {new Date(p.createdAt).toLocaleDateString()} — {p.description || 'Payment'}
-                </span>
-                <span className="text-foreground font-bold shrink-0 ml-2">{formatCents(p.amountCents, p.currency)}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-      {payments && payments.count === 0 && (
-        <div className="px-4 py-3 border-b border-border/20">
-          <p className="text-[10px] text-muted-foreground text-center">No payments on record for this account</p>
-        </div>
-      )}
+      <div className="px-4 py-3 border-b border-border/20">
+        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2">Payment History</p>
+        {!hasStripeCustomer && (
+          <p className="text-[11px] text-amber-400/80">
+            No Stripe customer linked to this account — this user has never started checkout, or their account wasn't linked during a data migration.
+          </p>
+        )}
+        {hasStripeCustomer && paymentsError && (
+          <p className="text-[11px] text-red-400/80">Failed to load from Stripe: {paymentsError}</p>
+        )}
+        {hasStripeCustomer && !paymentsError && payments && payments.count === 0 && (
+          <p className="text-[11px] text-muted-foreground">Stripe customer linked, but no successful payments on record.</p>
+        )}
+        {hasStripeCustomer && !paymentsError && payments && payments.count > 0 && (
+          <>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-sm font-black text-primary">
+                {formatCents(payments.totalPaidCents, payments.currency)}
+                <span className="text-[10px] text-muted-foreground font-normal ml-1">({payments.count} payment{payments.count === 1 ? '' : 's'})</span>
+              </p>
+            </div>
+            <div className="space-y-1 max-h-32 overflow-y-auto">
+              {payments.history.map((p) => (
+                <div key={p.id} className="flex items-center justify-between text-[11px]">
+                  <span className="text-muted-foreground truncate flex-1">
+                    {new Date(p.createdAt).toLocaleDateString()} — {p.description || 'Payment'}
+                  </span>
+                  <span className="text-foreground font-bold shrink-0 ml-2">{formatCents(p.amountCents, p.currency)}</span>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
 
       {recentPages.length > 0 && (
         <div className="px-4 py-3 border-b border-border/20">
@@ -687,6 +697,124 @@ function UserDetailPanel({ userId, onBack }: { userId: string; onBack: () => voi
         </div>
       )}
     </div>
+  );
+}
+
+interface StripeSubscriber {
+  customerId: string;
+  customerName: string | null;
+  customerEmail: string | null;
+  status: string;
+  planInterval: string | null;
+  planAmountCents: number | null;
+  created: number;
+  totalPaidCents: number;
+  paidCurrency: string;
+  paymentCount: number;
+  linkedToLocalAccount: boolean;
+  localUserId: string | null;
+  localEmail: string | null;
+  localChesscomUsername: string | null;
+  localFirstName: string | null;
+}
+
+function formatSubCents(cents: number, currency: string): string {
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: currency.toUpperCase() }).format(cents / 100);
+}
+
+const SUB_STATUS_STYLE: Record<string, { label: string; color: string; bg: string }> = {
+  active:   { label: 'Active',   color: 'text-emerald-400', bg: 'bg-emerald-400/10' },
+  trialing: { label: 'Trial',    color: 'text-blue-400',    bg: 'bg-blue-400/10' },
+  past_due: { label: 'Past Due', color: 'text-orange-400',  bg: 'bg-orange-400/10' },
+  canceled: { label: 'Canceled', color: 'text-muted-foreground', bg: 'bg-white/5' },
+  unpaid:   { label: 'Unpaid',   color: 'text-red-400',     bg: 'bg-red-400/10' },
+};
+
+function SubscribersPanel({ onClose }: { onClose: () => void }) {
+  const [subscribers, setSubscribers] = useState<StripeSubscriber[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    apiFetch('/api/admin/subscribers', { credentials: 'include' })
+      .then(async (r) => {
+        const d = await r.json().catch(() => null);
+        if (r.ok && d?.subscribers) {
+          setSubscribers(d.subscribers);
+        } else {
+          setError(d?.details || d?.error || 'Failed to load subscribers');
+        }
+      })
+      .catch(() => setError('Failed to load subscribers'))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const totalRevenueCents = subscribers.reduce((sum, s) => sum + s.totalPaidCents, 0);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, height: 0 }}
+      animate={{ opacity: 1, height: 'auto' }}
+      exit={{ opacity: 0, height: 0 }}
+      className="overflow-hidden border-t border-border/20"
+    >
+      <div className="px-4 py-3 bg-primary/5 border-b border-primary/15 flex items-center justify-between sticky top-0 z-10">
+        <div>
+          <p className="text-xs font-bold text-primary">Subscribers (from Stripe)</p>
+          <p className="text-[10px] text-muted-foreground">
+            {subscribers.length} customer{subscribers.length === 1 ? '' : 's'} · {formatSubCents(totalRevenueCents, subscribers[0]?.paidCurrency ?? 'usd')} total lifetime revenue
+          </p>
+        </div>
+        <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+
+      {loading ? (
+        <div className="p-8 flex justify-center"><Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /></div>
+      ) : error ? (
+        <p className="p-4 text-xs text-red-400">{error}</p>
+      ) : subscribers.length === 0 ? (
+        <p className="p-4 text-xs text-muted-foreground text-center">No subscribers found in Stripe.</p>
+      ) : (
+        <div className="max-h-[420px] overflow-y-auto divide-y divide-border/10">
+          {subscribers.map((s) => {
+            const statusStyle = SUB_STATUS_STYLE[s.status] ?? { label: s.status, color: 'text-muted-foreground', bg: 'bg-white/5' };
+            const displayName = s.customerName || s.localFirstName || s.localChesscomUsername || s.customerEmail || s.localEmail || 'Unnamed Customer';
+            return (
+              <div key={s.customerId} className="px-4 py-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold text-foreground truncate">{displayName}</p>
+                    {(s.customerEmail || s.localEmail) && (
+                      <p className="text-[11px] text-muted-foreground truncate">{s.customerEmail || s.localEmail}</p>
+                    )}
+                  </div>
+                  <span className={cn('shrink-0 px-2 py-0.5 rounded-lg text-[10px] font-bold', statusStyle.color, statusStyle.bg)}>
+                    {statusStyle.label}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between mt-1.5 text-[11px]">
+                  <span className="text-muted-foreground">
+                    {s.planAmountCents ? formatSubCents(s.planAmountCents, s.paidCurrency) : '—'}
+                    {s.planInterval ? `/${s.planInterval}` : ''}
+                    {' · since '}{new Date(s.created * 1000).toLocaleDateString()}
+                  </span>
+                  <span className="font-bold text-primary">
+                    {formatSubCents(s.totalPaidCents, s.paidCurrency)} paid
+                  </span>
+                </div>
+                {!s.linkedToLocalAccount && (
+                  <p className="text-[10px] text-amber-400/80 mt-1">
+                    ⚠ Not linked to a local account — this customer exists in Stripe but doesn't match any user's stripeCustomerId.
+                  </p>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </motion.div>
   );
 }
 
@@ -1797,6 +1925,7 @@ ${sanitized}
 function AdminTicker() {
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [showUsers, setShowUsers] = useState(false);
+  const [showSubscribers, setShowSubscribers] = useState(false);
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [emailRecipients, setEmailRecipients] = useState<string[]>([]);
   const [clearing, setClearing] = useState(false);
@@ -1891,21 +2020,25 @@ function AdminTicker() {
             <p className="text-xs text-emerald-400 font-medium underline decoration-dotted underline-offset-2">Users</p>
             <p className="text-[10px] text-muted-foreground/60 mt-0.5">{stats.users.today} today</p>
           </button>
-          <div className="p-4 text-center">
+          <button
+            onClick={() => setShowSubscribers(v => !v)}
+            className="p-4 text-center hover:bg-primary/5 transition-colors cursor-pointer"
+          >
             <div className="w-8 h-8 bg-primary/10 rounded-xl flex items-center justify-center mx-auto mb-2">
               <CreditCard className="w-4 h-4 text-primary" />
             </div>
             <p className="text-xl font-black text-foreground">{stats.subscriptions.total.toLocaleString()}</p>
-            <p className="text-xs text-muted-foreground font-medium">Subscriptions</p>
+            <p className="text-xs text-muted-foreground font-medium underline decoration-dotted underline-offset-2">Subscriptions</p>
             <div className="text-[10px] text-muted-foreground/60 mt-0.5 space-y-0.5">
               {stats.subscriptions.active > 0 && <p className="text-emerald-400">{stats.subscriptions.active} paid</p>}
               {stats.subscriptions.trialing > 0 && <p className="text-blue-400">{stats.subscriptions.trialing} trial</p>}
               {stats.subscriptions.pastDue > 0 && <p className="text-orange-400">{stats.subscriptions.pastDue} past due</p>}
             </div>
-          </div>
+          </button>
         </div>
         <AnimatePresence>
           {showUsers && <UserListPanel onClose={() => setShowUsers(false)} onEmailUsers={handleEmailUsers} />}
+          {showSubscribers && <SubscribersPanel onClose={() => setShowSubscribers(false)} />}
         </AnimatePresence>
       </motion.div>
 
