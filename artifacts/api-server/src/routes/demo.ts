@@ -14,7 +14,7 @@ async function fetchTotals(username: string, platform: "chesscom" | "lichess"): 
         headers: { "User-Agent": "ChessCoach/1.0" },
       });
       if (!res.ok) return null;
-      const stats = await res.json();
+      const stats = await res.json() as any;
       let wins = 0, losses = 0, draws = 0;
       for (const key of ["chess_bullet", "chess_blitz", "chess_rapid", "chess_daily"]) {
         const record = stats[key]?.record;
@@ -30,7 +30,7 @@ async function fetchTotals(username: string, platform: "chesscom" | "lichess"): 
         headers: { Accept: "application/json" },
       });
       if (!res.ok) return null;
-      const profile = await res.json();
+      const profile = await res.json() as any;
       const count = profile?.count;
       if (!count) return null;
       return { total: count.all ?? 0, wins: count.win ?? 0, losses: count.loss ?? 0 };
