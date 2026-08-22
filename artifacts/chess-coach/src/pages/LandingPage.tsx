@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useUser } from '@/hooks/use-user';
 import { useLocation, Link } from 'wouter';
+import { HeroDemo } from '@/components/HeroDemo';
 import { ArrowRight, Mail, Eye, EyeOff, UserPlus, LogIn, Search, BarChart3, Brain, TrendingUp, Check, X, Zap, Target, Crosshair, BookOpen, Gamepad2, Users, Star, Flame, Trophy, Sparkles, Download as DownloadIcon, Smartphone } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { apiFetch, apiUrl, setAuthToken } from '@/lib/api';
@@ -658,12 +659,12 @@ export function LandingPage() {
               onMouseEnter={e => (e.currentTarget.style.color = TEXT)} onMouseLeave={e => (e.currentTarget.style.color = MUTED)}>
               <Smartphone className="w-3.5 h-3.5" /> Download
             </a>
-            <a href="#pricing"
+            <Link href="/pricing"
               className="hidden sm:inline-flex text-sm font-medium transition-colors"
               style={{ color: MUTED }}
               onMouseEnter={e => (e.currentTarget.style.color = TEXT)} onMouseLeave={e => (e.currentTarget.style.color = MUTED)}>
               Pricing
-            </a>
+            </Link>
             <button onClick={openLogin} className="text-sm font-medium transition-colors" style={{ color: MUTED }}
               onMouseEnter={e => (e.currentTarget.style.color = TEXT)} onMouseLeave={e => (e.currentTarget.style.color = MUTED)}>
               Sign In
@@ -734,7 +735,7 @@ export function LandingPage() {
               </p>
 
               <p className="mt-4 text-sm font-bold max-w-lg" style={{ color: TEXT }}>
-                Most players lose for the same 2–3 reasons. We'll show you yours.
+                Stuck at the same rating? Most players plateau for the same 2-3 reasons. We'll show you yours.
               </p>
 
               <div className="mt-8 flex flex-col sm:flex-row gap-3">
@@ -763,6 +764,10 @@ export function LandingPage() {
                   <DownloadIcon className="w-3.5 h-3.5" />
                   Download App
                 </a>
+              </div>
+
+              <div className="mt-6 max-w-lg">
+                <HeroDemo onUpgradeClick={openSignup} />
               </div>
 
               <div className="mt-6 flex flex-wrap items-center gap-4 text-xs font-bold" style={{ color: MUTED }}>
@@ -835,18 +840,53 @@ export function LandingPage() {
       <section className="py-16 sm:py-20" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
         <div className="max-w-5xl mx-auto px-4 sm:px-8">
           <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} className="text-center mb-12">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full mb-4 text-[11px] font-black tracking-wider"
+              style={{ background: `${G}15`, color: G, border: `1px solid ${G}30` }}>
+              NOBODY ELSE HAS THIS
+            </div>
+            <h2 className="text-2xl sm:text-3xl font-black" style={{ color: TEXT }}>
+              Only on ChessScout
+            </h2>
+          </motion.div>
+
+          <div className="grid sm:grid-cols-2 gap-5">
+            {[
+              { icon: Search, title: 'Scan Position', desc: 'See a position anywhere — your game, a book, a stream — snap a photo and practice it out from any position. Play it against a bot or explore every line. No one else lets you do this.' },
+              { icon: Gamepad2, title: 'Practice Bots', desc: '8 bot opponents from 400 to 2000 ELO with live move analysis as you play — build new habits in real games, not just puzzles.' },
+            ].map((item, i) => (
+              <motion.div
+                key={item.title}
+                initial={{ opacity: 0, y: 16 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: i * 0.1 }}
+                className="rounded-2xl p-7"
+                style={{ background: `linear-gradient(180deg, ${G}0f 0%, ${G}05 100%)`, border: `1.5px solid ${G}35`, boxShadow: `0 24px 60px -14px ${G}20` }}
+              >
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-4" style={{ background: `${G}20` }}>
+                  <item.icon className="w-6 h-6" style={{ color: G }} />
+                </div>
+                <h3 className="text-lg font-black mb-2" style={{ color: TEXT }}>{item.title}</h3>
+                <p className="text-sm leading-relaxed" style={{ color: MUTED }}>{item.desc}</p>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="py-16 sm:py-20" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+        <div className="max-w-5xl mx-auto px-4 sm:px-8">
+          <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} className="text-center mb-12">
             <h2 className="text-2xl sm:text-3xl font-black" style={{ color: TEXT }}>
               Built To Make You Better
             </h2>
             <p className="mt-2 text-sm" style={{ color: MUTED }}>Every tool starts with your games and your mistakes</p>
           </motion.div>
 
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {[
               { icon: BarChart3, title: 'Game Analysis', desc: 'Move-by-move breakdown of your games with accuracy scores and the exact moments you went wrong', accent: true, unique: false },
               { icon: BookOpen, title: 'Personalized Courses', desc: 'Custom lessons built from your actual mistakes — not generic theory', accent: false, unique: false },
-              { icon: Search, title: 'Scan Position', desc: 'Stuck in a game? Upload a screenshot and get the best move instantly', accent: true, unique: true },
-              { icon: Gamepad2, title: 'Practice Bots', desc: '8 bot opponents from 400 to 2000 ELO with live move analysis', accent: true, unique: true },
               { icon: TrendingUp, title: 'Track Progress', desc: 'See your improvement over time across openings, tactics, and endgames', accent: false, unique: false },
               { icon: Crosshair, title: 'Opponent Scout', desc: 'Prepare for specific opponents (optional) — useful for tournaments and rivals', accent: false, unique: false },
             ].map((item, i) => (
@@ -899,18 +939,6 @@ export function LandingPage() {
           </div>
         </div>
       </section>
-
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify({
-        '@context': 'https://schema.org',
-        '@type': 'FAQPage',
-        mainEntity: [
-          { '@type': 'Question', name: 'How is this different from Chess.com game review?', acceptedAnswer: { '@type': 'Answer', text: 'Chess.com reviews one game at a time. ChessScout looks across all your games to find the mistake you keep making — not just what happened in this one.' } },
-          { '@type': 'Question', name: 'What does the free tier include?', acceptedAnswer: { '@type': 'Answer', text: 'Unlimited daily puzzles, 3 opponent scouts, 5 courses, unlimited practice bots, and your first 20 imported games — no card required.' } },
-          { '@type': 'Question', name: 'Will I understand the analysis at my level?', acceptedAnswer: { '@type': 'Answer', text: 'Yes. Explanations are written in plain language, not engine notation — built for players working on real improvement, not just engine output.' } },
-          { '@type': 'Question', name: 'Does it work with Lichess?', acceptedAnswer: { '@type': 'Answer', text: 'Yes, both Chess.com and Lichess are supported.' } },
-          { '@type': 'Question', name: 'Can I cancel anytime?', acceptedAnswer: { '@type': 'Answer', text: 'Yes, cancel anytime from your account settings — no phone call, no retention flow.' } },
-        ],
-      }) }} />
 
       <section id="pricing" className="py-16 sm:py-20" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
         <div className="max-w-lg mx-auto px-4 sm:px-8">
@@ -1029,7 +1057,7 @@ export function LandingPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-8">
           <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 mb-4 text-xs" style={{ color: MUTED }}>
             <Link href="/learn" className="hover:underline">Learn</Link>
-            <Link href="/about" className="hover:underline">About</Link>
+            <Link href="/pricing" className="hover:underline">Pricing</Link>
             <Link href="/privacy" className="hover:underline">Privacy</Link>
             <Link href="/terms" className="hover:underline">Terms</Link>
           </div>

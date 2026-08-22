@@ -70,8 +70,8 @@ const SettingsPage = lazy(() => import("@/pages/Settings"));
 const ScanArchivePage = lazy(() => import("@/pages/ScanArchive"));
 const PrivacyPage = lazy(() => import("@/pages/Privacy"));
 const TermsPage = lazy(() => import("@/pages/Terms"));
-const AboutPage = lazy(() => import("@/pages/About"));
 const VsAimchessPage = lazy(() => import("@/pages/VsAimchess"));
+const PricingPage = lazy(() => import("@/pages/Pricing"));
 const VsImproveMyChessPage = lazy(() => import("@/pages/VsImproveMyChess"));
 const VsFreeAnalysisPage = lazy(() => import("@/pages/VsFreeAnalysis"));
 const Dashboard = lazy(() => import("@/pages/Dashboard").then(m => ({ default: m.Dashboard })));
@@ -240,8 +240,8 @@ function Router() {
       <Route path="/scan-archive" component={ScanArchivePage} />
       <Route path="/privacy" component={PrivacyPage} />
       <Route path="/terms" component={TermsPage} />
-      <Route path="/about" component={AboutPage} />
       <Route path="/vs/aimchess" component={VsAimchessPage} />
+      <Route path="/pricing" component={PricingPage} />
       <Route path="/vs/improve-my-chess" component={VsImproveMyChessPage} />
       <Route path="/vs/free-chess-analysis" component={VsFreeAnalysisPage} />
       <Route path="/welcome" component={PWelcome} />
