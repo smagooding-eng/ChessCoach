@@ -731,11 +731,15 @@ export function LandingPage() {
               <style>{`@keyframes shimmer { to { background-position: 200% center; } }`}</style>
 
               <p className="mt-5 text-base sm:text-lg leading-relaxed max-w-lg" style={{ color: MUTED }}>
-                Upload or import your games. We'll show your biggest mistakes, patterns, and exactly how to fix them.
+                Upload your Chess.com or Lichess games. We'll show your biggest mistakes, patterns, and exactly how to fix them.
               </p>
 
               <p className="mt-4 text-sm font-bold max-w-lg" style={{ color: TEXT }}>
                 Stuck at the same rating? Most players plateau for the same 2-3 reasons. We'll show you yours.
+              </p>
+
+              <p className="mt-2 text-xs max-w-lg" style={{ color: MUTED }}>
+                For club players 400–2000 ELO. Not for titled players or grandmasters.
               </p>
 
               <div className="mt-8 flex flex-col sm:flex-row gap-3">
@@ -885,10 +889,10 @@ export function LandingPage() {
 
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {[
-              { icon: BarChart3, title: 'Game Analysis', desc: 'Move-by-move breakdown of your games with accuracy scores and the exact moments you went wrong', accent: true, unique: false },
-              { icon: BookOpen, title: 'Personalized Courses', desc: 'Custom lessons built from your actual mistakes — not generic theory', accent: false, unique: false },
-              { icon: TrendingUp, title: 'Track Progress', desc: 'See your improvement over time across openings, tactics, and endgames', accent: false, unique: false },
-              { icon: Crosshair, title: 'Opponent Scout', desc: 'Prepare for specific opponents (optional) — useful for tournaments and rivals', accent: false, unique: false },
+              { icon: BarChart3, title: 'See Exactly Where You Went Wrong', desc: 'Move-by-move breakdown of your games with accuracy scores and the exact moments you went wrong', accent: true, unique: false },
+              { icon: BookOpen, title: 'Practice the Mistakes You Actually Make', desc: 'Custom lessons built from your actual mistakes — not generic theory', accent: false, unique: false },
+              { icon: TrendingUp, title: 'Watch Your Rating Climb Over Time', desc: 'See your improvement over time across openings, tactics, and endgames', accent: false, unique: false },
+              { icon: Crosshair, title: 'Prepare for Your Next Tournament', desc: 'Prepare for specific opponents — useful for tournaments and rivals', accent: false, unique: false },
             ].map((item, i) => (
               <motion.div
                 key={item.title}
@@ -1058,6 +1062,9 @@ export function LandingPage() {
           <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 mb-4 text-xs" style={{ color: MUTED }}>
             <Link href="/learn" className="hover:underline">Learn</Link>
             <Link href="/pricing" className="hover:underline">Pricing</Link>
+            <Link href="/vs/aimchess" className="hover:underline">vs Aimchess</Link>
+            <Link href="/vs/improve-my-chess" className="hover:underline">vs Improve My Chess</Link>
+            <Link href="/vs/free-chess-analysis" className="hover:underline">vs Free Analysis</Link>
             <Link href="/privacy" className="hover:underline">Privacy</Link>
             <Link href="/terms" className="hover:underline">Terms</Link>
           </div>

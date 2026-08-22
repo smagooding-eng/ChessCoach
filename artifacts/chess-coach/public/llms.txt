@@ -1,0 +1,28 @@
+# ChessScout.net
+
+> AI-powered chess coaching that finds the mistakes you keep making across all your games, not just one game at a time.
+
+ChessScout imports your games from Chess.com or Lichess and finds recurring patterns — the same blunder type, the same weak opening, the same time-trouble collapse — showing up across many games, not just a single-game review.
+
+## Pricing
+
+- Free: unlimited daily puzzles, 3 opponent scouts, 5 personalized courses, unlimited practice bots, first 20 games imported
+- Pro: $5/month or $55/year — unlimited everything, full cross-game pattern analysis
+- No free trial, no credit card required for the free tier, cancel anytime
+
+## Key features
+
+- Cross-game pattern analysis: finds recurring mistakes across your whole game history, not just one game
+- Scan Position: photograph any chess position (your game, a book, a stream) and practice it out from that exact position — no other chess tool offers this
+- Practice Bots: 8 bot opponents from 400–2000 ELO with live move-quality feedback
+- Opponent Scout: prepare for a specific opponent before you play them
+- Personalized Courses: lessons built from your own recurring mistakes, not generic theory
+- Daily Puzzles: filterable by type (mate in 1/2/3, forks, pins, skewers, endgames)
+
+## Links
+
+- Pricing: https://chessscout.net/pricing
+- Learn (chess improvement articles): https://chessscout.net/learn
+- ChessScout vs Aimchess: https://chessscout.net/vs/aimchess
+- ChessScout vs Improve My Chess: https://chessscout.net/vs/improve-my-chess
+- ChessScout vs free Chess.com/Lichess analysis: https://chessscout.net/vs/free-chess-analysis

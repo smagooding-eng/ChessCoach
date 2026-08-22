@@ -110,6 +110,9 @@ export function ArticlePage() {
       <h1 className="font-display text-2xl md:text-3xl font-semibold" style={{ color: TEXT_LIGHT, letterSpacing: '-0.01em' }}>
         {article.title}
       </h1>
+      <p className="text-xs mt-2" style={{ color: CHESSCOM_GREEN }}>
+        Published {new Date(article.createdAt).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })}
+      </p>
       <div className="mt-6">{renderMarkdown(article.content)}</div>
 
       <div className="mt-10 p-5 rounded-2xl text-center" style={{ background: 'linear-gradient(180deg, #383532 0%, #2a2825 100%)', border: '1px solid rgba(255,255,255,0.06)' }}>
@@ -157,6 +160,9 @@ export function ArticlesIndex() {
               className="block p-4 rounded-2xl transition-colors"
               style={{ background: 'linear-gradient(180deg, #383532 0%, #2a2825 100%)', border: '1px solid rgba(255,255,255,0.06)' }}>
               <h2 className="font-display text-base font-semibold" style={{ color: TEXT_LIGHT }}>{a.title}</h2>
+              <p className="text-[11px] mt-0.5" style={{ color: CHESSCOM_GREEN }}>
+                Published {new Date(a.createdAt).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })}
+              </p>
               <p className="text-xs mt-1" style={{ color: TEXT_MUTED }}>{a.metaDescription}</p>
             </Link>
           ))
