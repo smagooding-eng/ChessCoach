@@ -1,10 +1,11 @@
 import { Router, type IRouter, type Request, type Response } from "express";
-import { db, usersTable, pageViewsTable, gamesTable, weaknessesTable, coursesTable, lessonsTable, backgroundJobsTable, referralConversionsTable } from "@workspace/db";
-import { sql, count, gte, countDistinct, inArray, eq, and, isNotNull } from "drizzle-orm";
+import { db, usersTable, pageViewsTable, gamesTable, weaknessesTable, coursesTable, lessonsTable, backgroundJobsTable, referralConversionsTable, seoArticlesTable } from "@workspace/db";
+import { sql, count, gte, countDistinct, inArray, eq, and, isNotNull, desc } from "drizzle-orm";
 import { puzzleAttemptsTable } from "@workspace/db";
 import { sessionsTable } from "@workspace/db";
 import { getUncachableStripeClient } from "../lib/stripeClient";
 import { ADMIN_EMAILS } from "../lib/auth";
+import { generateNextSeoArticle } from "../lib/seoContentEngine";
 import OpenAI from "openai";
 
 const router: IRouter = Router();
@@ -327,6 +328,56 @@ router.get("/admin/subscribers", requireAdmin, async (_req: Request, res: Respon
     res.json({ subscribers });
   } catch (err: any) {
     res.status(500).json({ error: "Failed to fetch subscribers from Stripe", details: err.message });
+  }
+});
+
+// SEO articles -- these were missing entirely, which is why manual
+// generation was silently failing (the frontend panel calls these exact
+// paths, but nothing on the backend answered them until now).
+router.get("/admin/seo-articles", requireAdmin, async (_req: Request, res: Response) => {
+  try {
+    const articles = await db
+      .select()
+      .from(seoArticlesTable)
+      .orderBy(desc(seoArticlesTable.createdAt))
+      .limit(200);
+    res.json({ articles });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to fetch SEO articles", details: err.message });
+  }
+});
+
+router.post("/admin/seo-articles/generate", requireAdmin, async (_req: Request, res: Response) => {
+  try {
+    const result = await generateNextSeoArticle();
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ published: false, reason: err.message || "Generation failed" });
+  }
+});
+
+router.patch("/admin/seo-articles/:id", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { published } = req.body as { published?: boolean };
+    if (typeof published !== "boolean") {
+      res.status(400).json({ error: "published (boolean) is required" });
+      return;
+    }
+    await db.update(seoArticlesTable).set({ published }).where(eq(seoArticlesTable.id, id));
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to update article", details: err.message });
+  }
+});
+
+router.delete("/admin/seo-articles/:id", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    await db.delete(seoArticlesTable).where(eq(seoArticlesTable.id, id));
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to delete article", details: err.message });
   }
 });
 
