@@ -358,7 +358,7 @@ router.post("/admin/seo-articles/generate", requireAdmin, async (_req: Request, 
 
 router.patch("/admin/seo-articles/:id", requireAdmin, async (req: Request, res: Response) => {
   try {
-    const { id } = req.params;
+    const id = req.params.id as string;
     const { published } = req.body as { published?: boolean };
     if (typeof published !== "boolean") {
       res.status(400).json({ error: "published (boolean) is required" });
@@ -373,7 +373,7 @@ router.patch("/admin/seo-articles/:id", requireAdmin, async (req: Request, res: 
 
 router.delete("/admin/seo-articles/:id", requireAdmin, async (req: Request, res: Response) => {
   try {
-    const { id } = req.params;
+    const id = req.params.id as string;
     await db.delete(seoArticlesTable).where(eq(seoArticlesTable.id, id));
     res.json({ success: true });
   } catch (err: any) {
