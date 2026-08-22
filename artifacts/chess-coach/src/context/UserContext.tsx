@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { analytics } from '@heycatch/sdk';
 import { apiFetch, setAuthToken, getAuthToken } from '@/lib/api';
 
 interface AuthUser {
@@ -81,6 +82,19 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json() as { user: AuthUser | null };
       setAuthUser(data.user ?? null);
+      if (data.user) {
+        // HeyCatch identity -- id is the stable internal user id, never
+        // an email/token. Email and name live in properties so the
+        // dashboard can show a real name instead of an opaque id.
+        analytics.setIdentity(
+          data.user.id,
+          {
+            email: data.user.email ?? undefined,
+            name: data.user.firstName ?? data.user.chesscomUsername ?? undefined,
+            plan: 'free',
+          },
+        );
+      }
       if (data.user?.chesscomUsername && !localStorage.getItem('chessCoachUsername')) {
         localStorage.setItem('chessCoachUsername', data.user.chesscomUsername);
         setUsername(data.user.chesscomUsername);
@@ -112,6 +126,9 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
             trialDaysLeft: data.trialDaysLeft,
             trialEndsAt: data.trialEndsAt,
           });
+          if (data.status === 'active' || data.status === 'trialing') {
+            analytics.setPersonProperties({ plan: data.status === 'trialing' ? 'trial' : 'pro' });
+          }
         }
       })
       .catch(() => {})
@@ -138,6 +155,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     try {
       await apiFetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
     } catch {}
+    analytics.resetIdentity();
     setAuthToken(null);
     localStorage.removeItem('chessCoachUsername');
     setUsername(null);

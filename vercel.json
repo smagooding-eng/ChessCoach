@@ -3,6 +3,9 @@
   "buildCommand": "pnpm run typecheck && pnpm --filter @workspace/chess-coach run build",
   "outputDirectory": "artifacts/chess-coach/dist/public",
   "framework": null,
+  "redirects": [
+    { "source": "/:l([a-z0-9])", "destination": "/?utm_source=heycatch&utm_campaign=:l", "permanent": false }
+  ],
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
   ]
