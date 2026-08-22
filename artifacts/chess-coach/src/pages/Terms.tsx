@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { Link } from 'wouter';
 import { ArrowLeft, FileText } from 'lucide-react';
+import { setPageMeta } from '@/lib/pageMeta';
 
 const G = '#81b64c';
 const BG = '#262421';
@@ -13,7 +14,11 @@ const CONTACT_EMAIL = 'smagooding@gmail.com';
 
 export default function TermsPage() {
   useEffect(() => {
-    document.title = 'Terms of Service — ChessScout';
+    setPageMeta(
+      'Terms of Service — ChessScout',
+      'The terms governing your use of ChessScout.net.',
+      '/terms',
+    );
   }, []);
 
   return (

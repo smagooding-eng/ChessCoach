@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { Link } from 'wouter';
 import { ArrowLeft, ShieldCheck } from 'lucide-react';
+import { setPageMeta } from '@/lib/pageMeta';
 
 const G = '#81b64c';
 const BG = '#262421';
@@ -13,7 +14,11 @@ const CONTACT_EMAIL = 'smagooding@gmail.com';
 
 export default function PrivacyPage() {
   useEffect(() => {
-    document.title = 'Privacy Policy — ChessScout';
+    setPageMeta(
+      'Privacy Policy — ChessScout',
+      'How ChessScout.net collects, uses, and protects your data.',
+      '/privacy',
+    );
   }, []);
 
   return (

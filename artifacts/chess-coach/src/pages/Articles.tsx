@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'wouter';
 import { PageHero, CHESSCOM_GREEN, TEXT_LIGHT, TEXT_MUTED } from '@/components/DesignSystem';
 import { apiFetch } from '@/lib/api';
+import { setPageMeta } from '@/lib/pageMeta';
 import { Loader2, ArrowRight, ArrowLeft } from 'lucide-react';
 
 interface ArticleSummary {
@@ -79,7 +80,13 @@ export function ArticlePage() {
   }, [params.slug]);
 
   useEffect(() => {
-    if (article) document.title = `${article.title} | ChessScout.net`;
+    if (article) {
+      setPageMeta(
+        `${article.title} | ChessScout.net`,
+        article.metaDescription,
+        `/learn/${article.slug}`,
+      );
+    }
   }, [article]);
 
   if (loading) {
@@ -119,6 +126,14 @@ export function ArticlePage() {
 export function ArticlesIndex() {
   const [articles, setArticles] = useState<ArticleSummary[]>([]);
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setPageMeta(
+      'Chess Improvement Articles — ChessScout.net',
+      'Practical chess improvement articles on blunders, time trouble, and opening mistakes.',
+      '/learn',
+    );
+  }, []);
 
   useEffect(() => {
     apiFetch('/api/articles')

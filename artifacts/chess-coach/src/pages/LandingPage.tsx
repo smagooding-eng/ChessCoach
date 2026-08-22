@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useUser } from '@/hooks/use-user';
-import { useLocation } from 'wouter';
+import { useLocation, Link } from 'wouter';
 import { ArrowRight, Mail, Eye, EyeOff, UserPlus, LogIn, Search, BarChart3, Brain, TrendingUp, Check, X, Zap, Target, Crosshair, BookOpen, Gamepad2, Users, Star, Flame, Trophy, Sparkles, Download as DownloadIcon, Smartphone } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { apiFetch, apiUrl, setAuthToken } from '@/lib/api';
@@ -658,6 +658,12 @@ export function LandingPage() {
               onMouseEnter={e => (e.currentTarget.style.color = TEXT)} onMouseLeave={e => (e.currentTarget.style.color = MUTED)}>
               <Smartphone className="w-3.5 h-3.5" /> Download
             </a>
+            <a href="#pricing"
+              className="hidden sm:inline-flex text-sm font-medium transition-colors"
+              style={{ color: MUTED }}
+              onMouseEnter={e => (e.currentTarget.style.color = TEXT)} onMouseLeave={e => (e.currentTarget.style.color = MUTED)}>
+              Pricing
+            </a>
             <button onClick={openLogin} className="text-sm font-medium transition-colors" style={{ color: MUTED }}
               onMouseEnter={e => (e.currentTarget.style.color = TEXT)} onMouseLeave={e => (e.currentTarget.style.color = MUTED)}>
               Sign In
@@ -837,12 +843,12 @@ export function LandingPage() {
 
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {[
-              { icon: BarChart3, title: 'Game Analysis', desc: 'Move-by-move breakdown of your games with accuracy scores and the exact moments you went wrong', accent: true },
-              { icon: BookOpen, title: 'Personalized Courses', desc: 'Custom lessons built from your actual mistakes — not generic theory', accent: false },
-              { icon: Search, title: 'Scan Position', desc: 'Stuck in a game? Upload a screenshot and get the best move instantly', accent: false },
-              { icon: Gamepad2, title: 'Practice Bots', desc: '8 bot opponents from 400 to 2000 ELO with live move analysis', accent: false },
-              { icon: TrendingUp, title: 'Track Progress', desc: 'See your improvement over time across openings, tactics, and endgames', accent: false },
-              { icon: Crosshair, title: 'Opponent Scout', desc: 'Prepare for specific opponents (optional) — useful for tournaments and rivals', accent: false },
+              { icon: BarChart3, title: 'Game Analysis', desc: 'Move-by-move breakdown of your games with accuracy scores and the exact moments you went wrong', accent: true, unique: false },
+              { icon: BookOpen, title: 'Personalized Courses', desc: 'Custom lessons built from your actual mistakes — not generic theory', accent: false, unique: false },
+              { icon: Search, title: 'Scan Position', desc: 'Stuck in a game? Upload a screenshot and get the best move instantly', accent: true, unique: true },
+              { icon: Gamepad2, title: 'Practice Bots', desc: '8 bot opponents from 400 to 2000 ELO with live move analysis', accent: true, unique: true },
+              { icon: TrendingUp, title: 'Track Progress', desc: 'See your improvement over time across openings, tactics, and endgames', accent: false, unique: false },
+              { icon: Crosshair, title: 'Opponent Scout', desc: 'Prepare for specific opponents (optional) — useful for tournaments and rivals', accent: false, unique: false },
             ].map((item, i) => (
               <motion.div
                 key={item.title}
@@ -850,12 +856,18 @@ export function LandingPage() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: i * 0.06 }}
-                className="rounded-xl p-5 transition-colors"
+                className="relative rounded-xl p-5 transition-colors"
                 style={{
                   background: item.accent ? `${G}08` : CARD,
                   border: item.accent ? `1px solid ${G}30` : '1px solid rgba(255,255,255,0.04)',
                 }}
               >
+                {item.unique && (
+                  <span className="absolute top-3 right-3 px-2 py-0.5 rounded-md text-[9px] font-black tracking-wide"
+                    style={{ background: `${G}20`, color: G }}>
+                    NOBODY ELSE HAS THIS
+                  </span>
+                )}
                 <item.icon className="w-5 h-5 mb-3" style={{ color: item.accent ? G : MUTED }} />
                 <h3 className="text-sm font-bold mb-1" style={{ color: TEXT }}>{item.title}</h3>
                 <p className="text-xs leading-relaxed" style={{ color: MUTED }}>{item.desc}</p>
@@ -866,6 +878,41 @@ export function LandingPage() {
       </section>
 
       <section className="py-16 sm:py-20" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+        <div className="max-w-2xl mx-auto px-4 sm:px-8">
+          <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} className="text-center mb-10">
+            <h2 className="text-2xl sm:text-3xl font-black" style={{ color: TEXT }}>Questions</h2>
+          </motion.div>
+          <div className="space-y-4">
+            {[
+              { q: 'How is this different from Chess.com game review?', a: 'Chess.com reviews one game at a time. ChessScout looks across all your games to find the mistake you keep making — not just what happened in this one.' },
+              { q: 'What does the free tier include?', a: 'Unlimited daily puzzles, 3 opponent scouts, 5 courses, unlimited practice bots, and your first 20 imported games — no card required.' },
+              { q: 'Will I understand the analysis at my level?', a: 'Yes. Explanations are written in plain language, not engine notation — built for players working on real improvement, not just engine output.' },
+              { q: 'Does it work with Lichess?', a: 'Yes, both Chess.com and Lichess are supported.' },
+              { q: 'Can I cancel anytime?', a: 'Yes, cancel anytime from your account settings — no phone call, no retention flow.' },
+            ].map((item) => (
+              <motion.div key={item.q} initial={{ opacity: 0, y: 12 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
+                className="rounded-xl p-5" style={{ background: CARD, border: '1px solid rgba(255,255,255,0.04)' }}>
+                <h3 className="text-sm font-bold mb-1.5" style={{ color: TEXT }}>{item.q}</h3>
+                <p className="text-sm leading-relaxed" style={{ color: MUTED }}>{item.a}</p>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify({
+        '@context': 'https://schema.org',
+        '@type': 'FAQPage',
+        mainEntity: [
+          { '@type': 'Question', name: 'How is this different from Chess.com game review?', acceptedAnswer: { '@type': 'Answer', text: 'Chess.com reviews one game at a time. ChessScout looks across all your games to find the mistake you keep making — not just what happened in this one.' } },
+          { '@type': 'Question', name: 'What does the free tier include?', acceptedAnswer: { '@type': 'Answer', text: 'Unlimited daily puzzles, 3 opponent scouts, 5 courses, unlimited practice bots, and your first 20 imported games — no card required.' } },
+          { '@type': 'Question', name: 'Will I understand the analysis at my level?', acceptedAnswer: { '@type': 'Answer', text: 'Yes. Explanations are written in plain language, not engine notation — built for players working on real improvement, not just engine output.' } },
+          { '@type': 'Question', name: 'Does it work with Lichess?', acceptedAnswer: { '@type': 'Answer', text: 'Yes, both Chess.com and Lichess are supported.' } },
+          { '@type': 'Question', name: 'Can I cancel anytime?', acceptedAnswer: { '@type': 'Answer', text: 'Yes, cancel anytime from your account settings — no phone call, no retention flow.' } },
+        ],
+      }) }} />
+
+      <section id="pricing" className="py-16 sm:py-20" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
         <div className="max-w-lg mx-auto px-4 sm:px-8">
           <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} className="text-center mb-10">
             <p className="text-xs font-black uppercase tracking-widest mb-3" style={{ color: G }}>
@@ -914,6 +961,10 @@ export function LandingPage() {
                 style={{ background: `${G}15`, color: G, border: `1px solid ${G}40` }}>
                 <Flame className="w-3 h-3" /> FREE TIER AVAILABLE
               </div>
+              <p className="text-[11px] mb-4" style={{ color: MUTED }}>
+                Free: unlimited daily puzzles, 3 opponent scouts, 5 courses, unlimited practice bots, first 20 games imported.
+                <br />Pro unlocks unlimited scouts, courses, imports, and full game analysis.
+              </p>
               <div className="flex items-baseline justify-center gap-2">
                 <span className="text-6xl font-black" style={{ color: TEXT }}>$5</span>
                 <span className="text-lg" style={{ color: MUTED }}>/month</span>
@@ -974,9 +1025,15 @@ export function LandingPage() {
         </div>
       </section>
 
-      <footer style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }} className="py-8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-8 text-center">
-          <p className="text-xs" style={{ color: MUTED }}>
+      <footer style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }} className="py-10">
+        <div className="max-w-7xl mx-auto px-4 sm:px-8">
+          <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 mb-4 text-xs" style={{ color: MUTED }}>
+            <Link href="/learn" className="hover:underline">Learn</Link>
+            <Link href="/about" className="hover:underline">About</Link>
+            <Link href="/privacy" className="hover:underline">Privacy</Link>
+            <Link href="/terms" className="hover:underline">Terms</Link>
+          </div>
+          <p className="text-xs text-center" style={{ color: MUTED }}>
             ChessScout.net &middot; Improve your game, one move at a time.
           </p>
         </div>
