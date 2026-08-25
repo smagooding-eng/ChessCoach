@@ -48,7 +48,8 @@ const RATING_BAND_OPTIONS: { value: string; label: string }[] = [
   { value: '800-1200', label: '800-1200' },
   { value: '1200-1600', label: '1200-1600' },
   { value: '1600-2000', label: '1600-2000' },
-  { value: '2000-', label: '2000+' },
+  { value: '2000-2500', label: '2000-2500' },
+  { value: '2500-', label: '2500+' },
 ];
 
 interface PuzzleData {
@@ -135,7 +136,9 @@ export function Puzzles() {
       if (seenPuzzleIds.current.length > 0) params.set('exclude', seenPuzzleIds.current.join(','));
       if (targetTheme) params.set('weakness', targetTheme);
       if (puzzleTheme) params.set('puzzleTheme', puzzleTheme);
-      if (puzzleTheme === 'sacrifice' && sacrificePiece) params.set('pieceType', sacrificePiece);
+      if (puzzleTheme === 'sacrifice' || puzzleTheme.startsWith('mateIn')) {
+        if (sacrificePiece) params.set('pieceType', sacrificePiece);
+      }
       if (ratingBand) {
         const [min, max] = ratingBand.split('-');
         if (min) params.set('minRating', min);
@@ -480,7 +483,7 @@ export function Puzzles() {
           {PUZZLE_TYPE_OPTIONS.map(opt => (
             <button
               key={opt.value}
-              onClick={() => { setPuzzleTheme(opt.value); if (opt.value !== 'sacrifice') setSacrificePiece(''); }}
+              onClick={() => { setPuzzleTheme(opt.value); if (opt.value !== 'sacrifice' && !opt.value.startsWith('mateIn')) setSacrificePiece(''); }}
               className="shrink-0 px-3 py-1.5 rounded-xl text-xs font-bold transition-all"
               style={{
                 background: puzzleTheme === opt.value ? CHESSCOM_GREEN : 'rgba(255,255,255,0.04)',
@@ -493,26 +496,31 @@ export function Puzzles() {
           ))}
         </div>
 
-        {puzzleTheme === 'sacrifice' && (
-          <div className="flex gap-1.5 mb-4 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
-            {[
-              { value: '', label: 'Any Piece' },
-              { value: 'queen', label: 'Queen Sac' },
-              { value: 'rook', label: 'Rook Sac' },
-            ].map(opt => (
-              <button
-                key={opt.value}
-                onClick={() => setSacrificePiece(opt.value)}
-                className="shrink-0 px-3 py-1.5 rounded-xl text-xs font-bold transition-all"
-                style={{
-                  background: sacrificePiece === opt.value ? '#c9a24b' : 'rgba(255,255,255,0.04)',
-                  color: sacrificePiece === opt.value ? '#000' : TEXT_MUTED,
-                  border: sacrificePiece === opt.value ? 'none' : '1px solid rgba(255,255,255,0.06)',
-                }}
-              >
-                {opt.label}
-              </button>
-            ))}
+        {(puzzleTheme === 'sacrifice' || puzzleTheme.startsWith('mateIn')) && (
+          <div className="mb-4">
+            {puzzleTheme.startsWith('mateIn') && (
+              <p className="text-[11px] font-bold mb-1.5" style={{ color: TEXT_MUTED }}>Mates that are also sacrifices</p>
+            )}
+            <div className="flex gap-1.5 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
+              {[
+                { value: '', label: 'Any Piece' },
+                { value: 'queen', label: 'Queen Sac' },
+                { value: 'rook', label: 'Rook Sac' },
+              ].map(opt => (
+                <button
+                  key={opt.value}
+                  onClick={() => setSacrificePiece(opt.value)}
+                  className="shrink-0 px-3 py-1.5 rounded-xl text-xs font-bold transition-all"
+                  style={{
+                    background: sacrificePiece === opt.value ? '#c9a24b' : 'rgba(255,255,255,0.04)',
+                    color: sacrificePiece === opt.value ? '#000' : TEXT_MUTED,
+                    border: sacrificePiece === opt.value ? 'none' : '1px solid rgba(255,255,255,0.06)',
+                  }}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
           </div>
         )}
 

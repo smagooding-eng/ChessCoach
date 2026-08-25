@@ -159,6 +159,11 @@ router.get("/puzzles/next", requireAuth, async (req: Request, res: Response) => 
     // pool of candidates rather than a single random pick.
     const pieceTypeParam = typeof req.query.pieceType === "string" ? req.query.pieceType : null;
     const needsPieceTypeCheck = pieceTypeParam === "queen" || pieceTypeParam === "rook";
+    // Requiring a piece type only makes sense for sacrifice puzzles, so
+    // this always requires the 'sacrifice' theme tag on top of whatever
+    // else is selected (e.g. mateIn2 + queen -> mates that are ALSO
+    // queen sacrifices, not just any mate).
+    const sacrificeThemeCondition = needsPieceTypeCheck ? sql`${puzzlesTable.themes} ILIKE ${"%sacrifice%"}` : null;
 
     let puzzle;
     if (needsPieceTypeCheck) {
@@ -173,6 +178,7 @@ router.get("/puzzles/next", requireAuth, async (req: Request, res: Response) => 
           ...(excludeCondition ? [excludeCondition] : []),
           ...(themeCondition ? [themeCondition] : []),
           ...(exactThemeCondition ? [exactThemeCondition] : []),
+          ...(sacrificeThemeCondition ? [sacrificeThemeCondition] : []),
           ...ratingConditions,
         ))
         .orderBy(sql`RANDOM()`)
