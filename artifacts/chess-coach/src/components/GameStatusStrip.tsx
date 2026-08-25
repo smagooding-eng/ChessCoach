@@ -67,8 +67,11 @@ function computeMaterial(fen: string) {
 }
 
 // Shows the pieces a given side has captured from their opponent, plus
-// a "+N" point lead when that side is ahead on material.
-export function MaterialStrip({ fen, color, className }: { fen: string; color: 'w' | 'b'; className?: string }) {
+// a "+N" point lead when that side is ahead on material. `vertical`
+// stacks the pieces top-to-bottom instead of the default horizontal
+// row -- added for side-column layouts (e.g. Local Play) without
+// changing behavior for any existing horizontal caller.
+export function MaterialStrip({ fen, color, className, vertical = false }: { fen: string; color: 'w' | 'b'; className?: string; vertical?: boolean }) {
   const { capturedByWhite, capturedByBlack, materialDiff } = useMemo(() => {
     try {
       return computeMaterial(fen);
@@ -79,6 +82,21 @@ export function MaterialStrip({ fen, color, className }: { fen: string; color: '
 
   const pieces = color === 'w' ? capturedByWhite : capturedByBlack;
   const diff = color === 'w' ? materialDiff : -materialDiff;
+
+  if (vertical) {
+    return (
+      <div className={`flex flex-col items-center gap-0.5 ${className ?? ''}`} style={{ minWidth: 20 }}>
+        {diff > 0 && (
+          <span className="text-[11px] font-mono font-bold text-emerald-400 mb-0.5">+{diff}</span>
+        )}
+        {pieces.map((p, i) => (
+          <span key={i} className="text-sm leading-none opacity-80" style={{ color: color === 'w' ? '#e8e0d0' : '#3a3a3a', WebkitTextStroke: color === 'w' ? '0.5px #555' : '0.5px #ccc' }}>
+            {PIECE_GLYPHS[p]}
+          </span>
+        ))}
+      </div>
+    );
+  }
 
   if (pieces.length === 0 && diff <= 0) return <div className={className} style={{ minHeight: 18 }} />;
 
