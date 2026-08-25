@@ -104,8 +104,26 @@ function readJobs(userId: string | null | undefined, type: JobType): Job[] {
   }
 }
 
-function writeJobs(userId: string, type: JobType, jobs: Job[]) {
+function writeJobs(userId: string, type: JobType, jobs: Job[], skipEventIfUnchanged?: Job[]) {
   const key = JOB_CONFIG[type].storageKey + userId;
+  // Only dispatch 'bg-jobs-changed' if the job list actually changed --
+  // previously this fired on every single write, including routine
+  // "still pending, nothing new" writes at the end of every tick. Since
+  // this loop runs once per job type (up to 6x per tick), that meant up
+  // to 6 self-triggered re-ticks per poll with no re-entrancy guard,
+  // letting overlapping tick() calls independently detect the same
+  // completed job and each re-add it to the completed list -- so a
+  // notification the user had just dismissed could pop back up moments
+  // later from an in-flight overlapping call finishing late.
+  if (skipEventIfUnchanged) {
+    const before = skipEventIfUnchanged.map(j => j.jobId).sort().join(',');
+    const after = jobs.map(j => j.jobId).sort().join(',');
+    if (before === after) {
+      if (jobs.length === 0) localStorage.removeItem(key);
+      else localStorage.setItem(key, JSON.stringify(jobs));
+      return;
+    }
+  }
   if (jobs.length === 0) localStorage.removeItem(key);
   else localStorage.setItem(key, JSON.stringify(jobs));
   window.dispatchEvent(new CustomEvent('bg-jobs-changed'));
@@ -171,48 +189,56 @@ export function BackgroundJobsWatcher() {
       } catch { /* ignore */ }
     };
 
+    const isTickingRef = { current: false };
+
     const tick = async () => {
-      migrateSessionJobs();
-      const allTypes = Object.keys(JOB_CONFIG) as JobType[];
-      const newlyDone: (Job & { config: JobConfig })[] = [];
+      if (isTickingRef.current) return;
+      isTickingRef.current = true;
+      try {
+        migrateSessionJobs();
+        const allTypes = Object.keys(JOB_CONFIG) as JobType[];
+        const newlyDone: (Job & { config: JobConfig })[] = [];
 
-      for (const type of allTypes) {
-        const jobs = readJobs(userId, type);
-        if (jobs.length === 0) continue;
-        const stillPending: Job[] = [];
+        for (const type of allTypes) {
+          const jobs = readJobs(userId, type);
+          if (jobs.length === 0) continue;
+          const stillPending: Job[] = [];
 
-        for (const job of jobs) {
-          try {
-            const r = await apiFetch(JOB_CONFIG[type].statusUrl(job.jobId), { credentials: 'include' });
-            if (!r.ok) {
-              if (Date.now() - job.addedAt < 30 * 60 * 1000) stillPending.push(job);
-              continue;
-            }
-            const data = await r.json() as { status: string };
-            if (data.status === 'pending' || data.status === 'processing') {
+          for (const job of jobs) {
+            try {
+              const r = await apiFetch(JOB_CONFIG[type].statusUrl(job.jobId), { credentials: 'include' });
+              if (!r.ok) {
+                if (Date.now() - job.addedAt < 30 * 60 * 1000) stillPending.push(job);
+                continue;
+              }
+              const data = await r.json() as { status: string };
+              if (data.status === 'pending' || data.status === 'processing') {
+                stillPending.push(job);
+              } else if (data.status === 'done') {
+                newlyDone.push({ ...job, config: JOB_CONFIG[type] });
+              }
+              // any other status (error) — drop silently, user can retry from the originating page
+            } catch {
               stillPending.push(job);
-            } else if (data.status === 'done') {
-              newlyDone.push({ ...job, config: JOB_CONFIG[type] });
             }
-            // any other status (error) — drop silently, user can retry from the originating page
-          } catch {
-            stillPending.push(job);
           }
+          writeJobs(userId, type, stillPending, jobs);
         }
-        writeJobs(userId, type, stillPending);
-      }
 
-      if (newlyDone.length > 0) {
-        for (const job of newlyDone) {
-          for (const qk of job.config.invalidateQueries) {
-            queryClient.invalidateQueries({ queryKey: qk });
+        if (newlyDone.length > 0) {
+          for (const job of newlyDone) {
+            for (const qk of job.config.invalidateQueries) {
+              queryClient.invalidateQueries({ queryKey: qk });
+            }
           }
+          setCompleted((prev) => {
+            const existingIds = new Set(prev.map((j) => j.jobId));
+            const trulyNew = newlyDone.filter((j) => !existingIds.has(j.jobId));
+            return [...prev, ...trulyNew];
+          });
         }
-        setCompleted((prev) => {
-          const existingIds = new Set(prev.map((j) => j.jobId));
-          const trulyNew = newlyDone.filter((j) => !existingIds.has(j.jobId));
-          return [...prev, ...trulyNew];
-        });
+      } finally {
+        isTickingRef.current = false;
       }
     };
 
