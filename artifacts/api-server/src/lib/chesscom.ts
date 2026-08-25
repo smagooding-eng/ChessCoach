@@ -18,6 +18,41 @@ export interface ChessComProfile {
   };
 }
 
+export interface LeaderboardPlayer {
+  username: string;
+  rating: number;
+  rank: number;
+}
+
+// Real, live top players from Chess.com's public leaderboard -- not a
+// hardcoded list, since names/ratings would go stale immediately and I'd
+// have no way to verify them were accurate to begin with. Refreshes
+// every 5 minutes per Chess.com's own API notes, so caching briefly here
+// is reasonable rather than hitting it on every single page load.
+let leaderboardCache: { players: LeaderboardPlayer[]; fetchedAt: number } | null = null;
+const LEADERBOARD_CACHE_MS = 5 * 60 * 1000;
+
+export async function fetchChessComTopPlayers(limit: number = 25): Promise<LeaderboardPlayer[]> {
+  if (leaderboardCache && Date.now() - leaderboardCache.fetchedAt < LEADERBOARD_CACHE_MS) {
+    return leaderboardCache.players.slice(0, limit);
+  }
+  try {
+    const res = await fetch("https://api.chess.com/pub/leaderboards", {
+      headers: { "User-Agent": "ChessCoach/1.0" },
+    });
+    if (!res.ok) return leaderboardCache?.players.slice(0, limit) ?? [];
+    const data = await res.json();
+    const raw = data.live_rapid ?? data.live_blitz ?? [];
+    const players: LeaderboardPlayer[] = raw
+      .slice(0, 25)
+      .map((p: any) => ({ username: p.username, rating: p.score, rank: p.rank }));
+    leaderboardCache = { players, fetchedAt: Date.now() };
+    return players.slice(0, limit);
+  } catch {
+    return leaderboardCache?.players.slice(0, limit) ?? [];
+  }
+}
+
 export async function fetchChessComProfile(username: string): Promise<ChessComProfile | null> {
   const lower = username.toLowerCase();
   try {

@@ -117,7 +117,7 @@ export function ChessBoard({
   onPremoveSet,
   arrows,
 }: ChessBoardProps) {
-  const { confirmMoves, boardColors, showCoordinates, pieceColors, pieceShape, soundEnabled, promotionChoice, boardMaxWidth } = useSettings();
+  const { confirmMoves, boardColors, boardTextureCss, showCoordinates, pieceColors, pieceShape, soundEnabled, promotionChoice, boardMaxWidth } = useSettings();
   const confirmMovesRef = useRef(confirmMoves);
   confirmMovesRef.current = confirmMoves;
   const soundEnabledRef = useRef(soundEnabled);
@@ -426,8 +426,8 @@ export function ChessBoard({
               boxShadow: '0 30px 60px rgba(0,0,0,0.6)',
               cursor: (practiceMode || premoveMode) && !pendingMove ? 'pointer' : 'default',
             },
-            lightSquareStyle: { backgroundColor: boardColors.light },
-            darkSquareStyle: { backgroundColor: boardColors.dark },
+            lightSquareStyle: { backgroundColor: boardColors.light, backgroundImage: boardTextureCss.backgroundImage, backgroundSize: boardTextureCss.backgroundSize },
+            darkSquareStyle: { backgroundColor: boardColors.dark, backgroundImage: boardTextureCss.backgroundImage, backgroundSize: boardTextureCss.backgroundSize },
             pieces: tintedPieces,
             animationDurationInMs: 150,
           }}

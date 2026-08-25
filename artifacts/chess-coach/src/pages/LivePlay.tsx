@@ -134,7 +134,7 @@ export function LivePlay() {
         style={{ background: 'linear-gradient(180deg, #383532 0%, #2a2825 100%)', border: '1px solid rgba(255,255,255,0.06)' }}>
         <div className="flex items-center gap-2 mb-3">
           <Trophy className="w-4 h-4" style={{ color: CHESSCOM_GREEN }} />
-          <h2 className="text-sm font-black uppercase tracking-[0.14em]" style={{ color: TEXT_LIGHT }}>Your ChessScout Ratings</h2>
+          <h2 className="text-sm font-black uppercase tracking-[0.14em]" style={{ color: TEXT_LIGHT }}>Your ChessScout.net Ratings</h2>
         </div>
         <div className="grid grid-cols-3 gap-3">
           {TC_OPTIONS.map(opt => {

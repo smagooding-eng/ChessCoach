@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { UserProvider } from "@/context/UserContext";
-import { SettingsProvider } from "@/context/SettingsContext";
+import { SettingsProvider, useSettings } from "@/context/SettingsContext";
 import { ImportStatusWatcher } from "@/components/ImportStatusWatcher";
 import { BackgroundJobsWatcher } from "@/components/BackgroundJobsWatcher";
 import { Layout } from "@/components/Layout";
@@ -94,6 +94,7 @@ const GameLookup = lazy(() => import("@/pages/GameLookup").then(m => ({ default:
 const Subscription = lazy(() => import("@/pages/Subscription").then(m => ({ default: m.Subscription })));
 const Profile = lazy(() => import("@/pages/Profile").then(m => ({ default: m.Profile })));
 const Puzzles = lazy(() => import("@/pages/Puzzles").then(m => ({ default: m.Puzzles })));
+const SolvedPuzzles = lazy(() => import("@/pages/SolvedPuzzles"));
 const ScanPosition = lazy(() => import("@/pages/ScanPosition").then(m => ({ default: m.ScanPosition })));
 const Admin = lazy(() => import("@/pages/Admin").then(m => ({ default: m.Admin })));
 const Welcome = lazy(() => import("@/pages/Welcome").then(m => ({ default: m.Welcome })));
@@ -182,6 +183,7 @@ const PGameLookup    = () => <ProtectedRoute component={GameLookup} />;
 const PSubscription  = () => <ProtectedRoute component={Subscription} />;
 const PProfile       = () => <ProtectedRoute component={Profile} />;
 const PPuzzles       = () => <ProtectedRoute component={Puzzles} />;
+const PSolvedPuzzles = () => <ProtectedRoute component={SolvedPuzzles} />;
 const PScanPosition  = () => <ProtectedRoute component={ScanPosition} />;
 const PAdmin         = () => <ProtectedRoute component={Admin} />;
 const PWelcome       = () => <ProtectedRoute component={Welcome} skipWelcomeRedirect />;
@@ -265,6 +267,7 @@ function Router() {
       <Route path="/live/history"    component={PLiveHistory} />
       <Route path="/lookup"          component={PGameLookup} />
       <Route path="/puzzles"          component={PPuzzles} />
+      <Route path="/puzzles/solved"   component={PSolvedPuzzles} />
       <Route path="/scan"             component={PScanPosition} />
       <Route path="/admin"            component={PAdmin} />
       <Route path="/subscription"    component={PSubscription} />
@@ -287,22 +290,33 @@ function PageLoadingFallback() {
   );
 }
 
+function AppBackgroundWrapper({ children }: { children: React.ReactNode }) {
+  const { appBackgroundCss } = useSettings();
+  return (
+    <div style={{ minHeight: '100vh', ...appBackgroundCss }}>
+      {children}
+    </div>
+  );
+}
+
 function App() {
   return (
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <UserProvider>
           <SettingsProvider>
-            <TooltipProvider>
-              <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-                <Suspense fallback={<PageLoadingFallback />}>
-                  <Router />
-                </Suspense>
-                <ImportStatusWatcher />
-                <BackgroundJobsWatcher />
-              </WouterRouter>
-              <Toaster />
-            </TooltipProvider>
+            <AppBackgroundWrapper>
+              <TooltipProvider>
+                <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+                  <Suspense fallback={<PageLoadingFallback />}>
+                    <Router />
+                  </Suspense>
+                  <ImportStatusWatcher />
+                  <BackgroundJobsWatcher />
+                </WouterRouter>
+                <Toaster />
+              </TooltipProvider>
+            </AppBackgroundWrapper>
           </SettingsProvider>
         </UserProvider>
       </QueryClientProvider>

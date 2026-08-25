@@ -12,7 +12,7 @@ const PLAY_STORE_HREF = 'https://play.google.com/store/apps/details?id=net.chess
 
 export default function DownloadPage() {
   useEffect(() => {
-    document.title = 'Download the ChessScout App';
+    document.title = 'Download the ChessScout.net App';
   }, []);
 
   return (
@@ -37,10 +37,10 @@ export default function DownloadPage() {
             <Smartphone className="w-3.5 h-3.5" /> ANDROID APP
           </div>
           <h1 className="text-4xl sm:text-5xl font-black leading-[1.05] tracking-tight mb-4" style={{ color: TEXT }}>
-            Get the <span style={{ color: G }}>ChessScout</span> App
+            Get the <span style={{ color: G }}>ChessScout.net</span> App
           </h1>
           <p className="text-base sm:text-lg max-w-xl mx-auto" style={{ color: MUTED }}>
-            Install the official ChessScout app on your Android device to analyze games, scan positions, and train on the go.
+            Install the official ChessScout.net app on your Android device to analyze games, scan positions, and train on the go.
           </p>
         </div>
 
@@ -57,10 +57,10 @@ export default function DownloadPage() {
             </div>
             <div className="flex-1 text-center sm:text-left">
               <p className="text-xs font-black uppercase tracking-widest mb-1" style={{ color: MUTED }}>
-                ChessScout for Android
+                ChessScout.net for Android
               </p>
               <h2 className="text-xl sm:text-2xl font-black mb-1" style={{ color: TEXT }}>
-                ChessScout
+                ChessScout.net
               </h2>
               <p className="text-sm" style={{ color: MUTED }}>
                 Available on Google Play · works on Android 8.0 and above

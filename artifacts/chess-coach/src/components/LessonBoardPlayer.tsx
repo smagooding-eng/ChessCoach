@@ -487,9 +487,11 @@ function buildFrontendFixPgn(mistakePgn: string, drillExpectedMove: string | nul
 
 export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, drillExpectedMove, drillHint, content, extraChallenges, conceptTitle }: LessonBoardPlayerProps) {
   const [, navigate] = useLocation();
-  const { boardColors, pieceColors, pieceShape, showCoordinates } = useSettings();
+  const { boardColors, boardTextureCss, pieceColors, pieceShape, showCoordinates } = useSettings();
   const BOARD_LIGHT = boardColors.light;
   const BOARD_DARK = boardColors.dark;
+  const BOARD_TEXTURE_IMAGE = boardTextureCss.backgroundImage;
+  const BOARD_TEXTURE_SIZE = boardTextureCss.backgroundSize;
   const tintedPieces = useMemo(() => {
     if (pieceShape === 'cburnett') {
       const wrapped: typeof defaultPieces = {};
@@ -887,8 +889,8 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
               position: fallbackFen,
               allowDragging: false,
               boardStyle: { borderRadius: '6px', overflow: 'hidden' },
-              darkSquareStyle: { backgroundColor: BOARD_DARK },
-              lightSquareStyle: { backgroundColor: BOARD_LIGHT },
+              darkSquareStyle: { backgroundColor: BOARD_DARK, backgroundImage: BOARD_TEXTURE_IMAGE, backgroundSize: BOARD_TEXTURE_SIZE },
+              lightSquareStyle: { backgroundColor: BOARD_LIGHT, backgroundImage: BOARD_TEXTURE_IMAGE, backgroundSize: BOARD_TEXTURE_SIZE },
               pieces: tintedPieces,
               showNotation: showCoordinates,
             }}
@@ -1058,8 +1060,8 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
                   allowDragging: false,
                   boardOrientation: boardOrientation,
                   boardStyle: { borderRadius: '6px', overflow: 'hidden' },
-                  darkSquareStyle: { backgroundColor: BOARD_DARK },
-                  lightSquareStyle: { backgroundColor: BOARD_LIGHT },
+                  darkSquareStyle: { backgroundColor: BOARD_DARK, backgroundImage: BOARD_TEXTURE_IMAGE, backgroundSize: BOARD_TEXTURE_SIZE },
+                  lightSquareStyle: { backgroundColor: BOARD_LIGHT, backgroundImage: BOARD_TEXTURE_IMAGE, backgroundSize: BOARD_TEXTURE_SIZE },
               pieces: tintedPieces,
               showNotation: showCoordinates,
                   animationDurationInMs: 180,
@@ -1373,8 +1375,8 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
                       onSquareClick: handleRepeatSquareClick,
                       squareStyles: repeatSquareStyles,
                       boardStyle: { borderRadius: '6px', overflow: 'hidden', cursor: 'pointer' },
-                      darkSquareStyle: { backgroundColor: BOARD_DARK },
-                      lightSquareStyle: { backgroundColor: BOARD_LIGHT },
+                      darkSquareStyle: { backgroundColor: BOARD_DARK, backgroundImage: BOARD_TEXTURE_IMAGE, backgroundSize: BOARD_TEXTURE_SIZE },
+                      lightSquareStyle: { backgroundColor: BOARD_LIGHT, backgroundImage: BOARD_TEXTURE_IMAGE, backgroundSize: BOARD_TEXTURE_SIZE },
               pieces: tintedPieces,
               showNotation: showCoordinates,
                       animationDurationInMs: 180,
@@ -1497,8 +1499,8 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
                   allowDragging: false,
                   boardOrientation: boardOrientation,
                   boardStyle: { borderRadius: '6px', overflow: 'hidden' },
-                  darkSquareStyle: { backgroundColor: BOARD_DARK },
-                  lightSquareStyle: { backgroundColor: BOARD_LIGHT },
+                  darkSquareStyle: { backgroundColor: BOARD_DARK, backgroundImage: BOARD_TEXTURE_IMAGE, backgroundSize: BOARD_TEXTURE_SIZE },
+                  lightSquareStyle: { backgroundColor: BOARD_LIGHT, backgroundImage: BOARD_TEXTURE_IMAGE, backgroundSize: BOARD_TEXTURE_SIZE },
               pieces: tintedPieces,
               showNotation: showCoordinates,
                 }}
@@ -1578,8 +1580,8 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
                     ? [{ startSquare: drillMoveArrow.from, endSquare: drillMoveArrow.to, color: drillState === 'correct' ? 'rgba(52,211,153,0.85)' : 'rgba(245,158,11,0.85)' }]
                     : undefined,
                   boardStyle: { borderRadius: '6px', overflow: 'hidden', cursor: 'pointer' },
-                  darkSquareStyle: { backgroundColor: BOARD_DARK },
-                  lightSquareStyle: { backgroundColor: BOARD_LIGHT },
+                  darkSquareStyle: { backgroundColor: BOARD_DARK, backgroundImage: BOARD_TEXTURE_IMAGE, backgroundSize: BOARD_TEXTURE_SIZE },
+                  lightSquareStyle: { backgroundColor: BOARD_LIGHT, backgroundImage: BOARD_TEXTURE_IMAGE, backgroundSize: BOARD_TEXTURE_SIZE },
               pieces: tintedPieces,
               showNotation: showCoordinates,
                   animationDurationInMs: 180,

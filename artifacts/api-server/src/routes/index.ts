@@ -17,6 +17,7 @@ import outreachRouter from "./outreach";
 import articlesRouter from "./articles";
 import scannedPositionsRouter from "./scannedPositions";
 import demoRouter from "./demo";
+import landingFunnelRouter from "./landingFunnel";
 import { requirePremium } from "../middlewares/authMiddleware";
 import { db, pageViewsTable } from "@workspace/db";
 
@@ -36,6 +37,7 @@ router.use(outreachRouter);
 router.use(articlesRouter);
 router.use(scannedPositionsRouter);
 router.use(demoRouter);
+router.use(landingFunnelRouter);
 
 router.post("/track", async (req: Request, res: Response) => {
   try {

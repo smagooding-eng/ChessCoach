@@ -2,8 +2,8 @@ import { useState } from 'react';
 import { Link } from 'wouter';
 import { ArrowLeft, Check, Save, Trash2, RotateCcw, Star } from 'lucide-react';
 import {
-  useSettings, BOARD_THEMES, PIECE_STYLES, PIECE_SHAPES, BOARD_SIZES,
-  type BoardTheme, type PieceStyle, type PieceShape, type BoardSize, type SavedTheme,
+  useSettings, BOARD_THEMES, BOARD_TEXTURES, PIECE_STYLES, PIECE_SHAPES, BOARD_SIZES, APP_BACKGROUNDS,
+  type BoardTheme, type BoardTexture, type PieceStyle, type PieceShape, type BoardSize, type AppBackground, type SavedTheme,
 } from '@/context/SettingsContext';
 
 const CHESSCOM_GREEN = '#81b64c';
@@ -54,13 +54,7 @@ function ColorPickerRow({ label, value, onChange }: { label: string; value: stri
       <div className="flex items-center gap-2">
         <span className="text-xs font-mono" style={{ color: TEXT_MUTED }}>{value}</span>
         <div className="relative w-9 h-9 rounded-lg overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.15)' }}>
-          <input
-            type="color"
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
-            className="absolute -inset-1 w-12 h-12 cursor-pointer"
-            style={{ background: value }}
-          />
+          <input type="color" value={value} onChange={(e) => onChange(e.target.value)} className="absolute -inset-1 w-12 h-12 cursor-pointer" style={{ background: value }} />
         </div>
       </div>
     </label>
@@ -70,8 +64,10 @@ function ColorPickerRow({ label, value, onChange }: { label: string; value: stri
 export default function SettingsPage() {
   const {
     boardTheme, setBoardTheme,
+    boardTexture, setBoardTexture,
     pieceStyle, setPieceStyle,
     pieceShape, setPieceShape,
+    appBackground, setAppBackground,
     boardCustomColors, setBoardCustomColor,
     pieceCustomColors, setPieceCustomColor,
     confirmMoves, setConfirmMoves,
@@ -118,7 +114,7 @@ export default function SettingsPage() {
 
       <div>
         <h1 className="text-2xl font-black" style={{ color: TEXT_LIGHT }}>Settings</h1>
-        <p className="text-sm mt-1" style={{ color: TEXT_MUTED }}>Customize how ChessScout looks and plays</p>
+        <p className="text-sm mt-1" style={{ color: TEXT_MUTED }}>Customize how ChessScout.net looks and plays</p>
       </div>
 
       <section>
@@ -143,11 +139,26 @@ export default function SettingsPage() {
           </SwatchButton>
         </div>
         {boardTheme === 'custom' && (
-          <div className="space-y-2">
+          <div className="space-y-2 mb-3">
             <ColorPickerRow label="Light Squares" value={boardCustomColors.light} onChange={(c) => setBoardCustomColor('light', c)} />
             <ColorPickerRow label="Dark Squares" value={boardCustomColors.dark} onChange={(c) => setBoardCustomColor('dark', c)} />
           </div>
         )}
+      </section>
+
+      <section>
+        <h2 className="text-sm font-black uppercase tracking-wide mb-1" style={{ color: TEXT_MUTED }}>Board Texture</h2>
+        <p className="text-xs mb-3" style={{ color: TEXT_MUTED }}>A subtle surface pattern on top of your board color</p>
+        <div className="grid grid-cols-4 gap-2">
+          {(Object.keys(BOARD_TEXTURES) as BoardTexture[]).map((key) => {
+            const t = BOARD_TEXTURES[key];
+            return (
+              <SwatchButton key={key} active={boardTexture === key} onClick={() => setBoardTexture(key)} label={t.label}>
+                <div className="w-full aspect-square rounded-lg" style={{ background: '#769656', backgroundImage: t.backgroundImage, backgroundSize: t.backgroundSize, border: '1px solid rgba(255,255,255,0.1)' }} />
+              </SwatchButton>
+            );
+          })}
+        </div>
       </section>
 
       <section>
@@ -156,9 +167,7 @@ export default function SettingsPage() {
         <div className="grid grid-cols-2 gap-2 mb-2">
           {(Object.keys(PIECE_SHAPES) as PieceShape[]).map((key) => (
             <SwatchButton key={key} active={pieceShape === key} onClick={() => setPieceShape(key)} label={PIECE_SHAPES[key].label}>
-              <div className="flex items-center gap-1">
-                <span className="text-3xl leading-none" style={key === 'cburnett' ? { fontFamily: 'serif' } : {}}>♞</span>
-              </div>
+              <span className="text-3xl leading-none">♞</span>
             </SwatchButton>
           ))}
         </div>
@@ -197,6 +206,21 @@ export default function SettingsPage() {
             <ColorPickerRow label="Black Pieces" value={pieceCustomColors.dark} onChange={(c) => setPieceCustomColor('dark', c)} />
           </div>
         )}
+      </section>
+
+      <section>
+        <h2 className="text-sm font-black uppercase tracking-wide mb-1" style={{ color: TEXT_MUTED }}>App Background</h2>
+        <p className="text-xs mb-3" style={{ color: TEXT_MUTED }}>A subtle tint behind the whole app, not just the board</p>
+        <div className="grid grid-cols-4 gap-2">
+          {(Object.keys(APP_BACKGROUNDS) as AppBackground[]).map((key) => {
+            const t = APP_BACKGROUNDS[key];
+            return (
+              <SwatchButton key={key} active={appBackground === key} onClick={() => setAppBackground(key)} label={t.label}>
+                <div className="w-full aspect-square rounded-lg" style={{ background: '#141413', ...t.css, border: '1px solid rgba(255,255,255,0.1)' }} />
+              </SwatchButton>
+            );
+          })}
+        </div>
       </section>
 
       <section>

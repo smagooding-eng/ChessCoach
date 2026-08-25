@@ -16,6 +16,8 @@ import { useLocation } from 'wouter';
 const QUALITY_TO_TONE: Record<string, AICoachTone> = {
   checkmate: 'gold',
   brilliant: 'info',
+  great: 'info',
+  best: 'positive',
   excellent: 'positive',
   good: 'positive',
   book: 'neutral',
@@ -41,6 +43,8 @@ const TIER_COLORS: Record<string, string> = {
 const QUALITY_CFG: Record<string, { label: string; icon: string; bg: string; text: string; border: string; dot: string }> = {
   checkmate:  { label: 'Checkmate!', icon: '♚', bg: 'bg-amber-500/10', text: 'text-amber-400', border: 'border-amber-500/30', dot: 'bg-amber-400' },
   brilliant:  { label: 'Brilliant!!', icon: '✦', bg: 'bg-cyan-500/10', text: 'text-cyan-400', border: 'border-cyan-500/30', dot: 'bg-cyan-400' },
+  great:      { label: 'Great!', icon: '!', bg: 'bg-sky-500/10', text: 'text-sky-400', border: 'border-sky-500/30', dot: 'bg-sky-400' },
+  best:       { label: 'Best Move', icon: '!', bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/30', dot: 'bg-emerald-400' },
   excellent:  { label: 'Excellent!', icon: '!', bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/30', dot: 'bg-emerald-400' },
   good:       { label: 'Good', icon: '✓', bg: 'bg-green-500/10', text: 'text-green-400', border: 'border-green-500/30', dot: 'bg-green-400' },
   book:       { label: 'Book Move', icon: '📖', bg: 'bg-blue-500/10', text: 'text-blue-400', border: 'border-blue-500/30', dot: 'bg-blue-400' },
@@ -313,6 +317,7 @@ function GameView({ bot, onBack, startFen, startColor, isOnboarding }: { bot: Bo
   }, [chess, checkGameEnd, makeBotMove, clearBotTimeout, deferAnalysis]);
 
   const handleResign = () => {
+    if (!window.confirm('Resign this game? This counts as a loss.')) return;
     clearBotTimeout();
     setResult('loss');
     setThinking(false);
@@ -931,6 +936,17 @@ function readInitialTabParam(): 'bots' | 'openings' {
   return new URLSearchParams(window.location.search).get('tab') === 'openings' ? 'openings' : 'bots';
 }
 
+function readInitialOpeningParam(): OpeningLine | null {
+  const eco = new URLSearchParams(window.location.search).get('eco');
+  if (!eco) return null;
+  // Only ~9 openings are curated for the trainer, so a user's actual game
+  // history (which can reference any ECO code) often won't have an exact
+  // match here -- that's fine, readInitialTabParam still lands them on
+  // the Opening Trainer tab to browse what is available rather than a
+  // dead end.
+  return OPENINGS.find(o => o.eco === eco) ?? null;
+}
+
 function readOnboardingParam(): boolean {
   return new URLSearchParams(window.location.search).get('onboarding') === 'true';
 }
@@ -941,8 +957,8 @@ export function PracticeBots() {
   const [selectedBot, setSelectedBot] = useState<BotConfig | null>(() =>
     isOnboarding ? (BOTS.find(b => b.rating === 1200) ?? null) : jumpIn ? findBotAboveRating(jumpIn.rating) : null
   );
-  const [selectedOpening, setSelectedOpening] = useState<OpeningLine | null>(null);
-  const [tab, setTab] = useState<'bots' | 'openings'>(readInitialTabParam);
+  const [selectedOpening, setSelectedOpening] = useState<OpeningLine | null>(readInitialOpeningParam);
+  const [tab, setTab] = useState<'bots' | 'openings'>(() => readInitialOpeningParam() ? 'openings' : readInitialTabParam());
 
   // Strip the ?fen=&rating=&color=&onboarding= params from the URL exactly
   // once, after mount — not as a side effect inside the useState

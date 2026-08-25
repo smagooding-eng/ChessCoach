@@ -23,7 +23,7 @@ const CARD_SHADOW = '0 18px 50px -16px rgba(0,0,0,0.6), 0 4px 16px rgba(0,0,0,0.
 const CARD_BORDER = '1px solid rgba(129,182,76,0.08)';
 const PIE_COLORS = [CHESSCOM_GREEN, '#dc4343', '#6b6966'];
 
-export function Analysis() {
+export function Analysis({ hideHeader = false }: { hideHeader?: boolean } = {}) {
   const [, navigate] = useLocation();
   const { username, authUser } = useUser();
   const queryClient = useQueryClient();
@@ -174,7 +174,9 @@ export function Analysis() {
     <div className="space-y-5 pb-10 px-3 pt-3 md:px-0 md:pt-0">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-stretch gap-4">
         <div className="flex-1 min-w-0">
-          <PageHero piece="♚" title="Deep Analysis" subtitle="Our coach engine processes all your games to detect recurring patterns, blunders, and strategic leaks." />
+          {!hideHeader && (
+            <PageHero piece="♚" title="Deep Analysis" subtitle="Our coach engine processes all your games to detect recurring patterns, blunders, and strategic leaks." />
+          )}
         </div>
         <div className="flex items-center">
           <button

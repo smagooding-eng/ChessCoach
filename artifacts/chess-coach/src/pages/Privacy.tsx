@@ -15,7 +15,7 @@ const CONTACT_EMAIL = 'smagooding@gmail.com';
 export default function PrivacyPage() {
   useEffect(() => {
     setPageMeta(
-      'Privacy Policy — ChessScout',
+      'Privacy Policy — ChessScout.net',
       'How ChessScout.net collects, uses, and protects your data.',
       '/privacy',
     );
@@ -61,7 +61,7 @@ export default function PrivacyPage() {
           style={{ background: CARD, border: '1px solid rgba(255,255,255,0.06)', color: TEXT }}
         >
           <Section title="Who we are">
-            ChessScout (the "Service", "we", "us") is a chess coaching and analysis tool that
+            ChessScout.net (the "Service", "we", "us") is a chess coaching and analysis tool that
             helps players review their games, identify weaknesses, and improve. This Privacy
             Policy explains what information we collect, how we use it, and the choices you have.
           </Section>
@@ -154,7 +154,7 @@ export default function PrivacyPage() {
 
         <div className="mt-8 text-center">
           <Link href="/" className="text-xs font-bold" style={{ color: MUTED }}>
-            ← Back to ChessScout
+            ← Back to ChessScout.net
           </Link>
         </div>
       </main>

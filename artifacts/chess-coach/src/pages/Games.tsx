@@ -11,8 +11,11 @@ import { Search, Play, Filter, BookOpen, Sparkles, Users, RefreshCw } from 'luci
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { GameThumb } from '@/components/GameThumb';
+import { Import } from '@/pages/Import';
+import { Analysis } from '@/pages/Analysis';
 
 export function Games() {
+  const [tab, setTab] = useState<'games' | 'import' | 'analysis'>('games');
   const [pageSize, setPageSize] = useState(100);
   const [filter, setFilter] = useState('all');
   const [platformFilter, setPlatformFilter] = useState<'all' | 'chesscom' | 'lichess' | 'chessscout'>('all');
@@ -110,7 +113,7 @@ export function Games() {
     });
   }, [games, filter, search]);
 
-  if (isLoading) {
+  if (tab === 'games' && isLoading) {
     return (
       <div className="flex flex-col items-center justify-center py-20 gap-3">
         <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
@@ -119,7 +122,7 @@ export function Games() {
     );
   }
 
-  if (isError) {
+  if (tab === 'games' && isError) {
     return (
       <div className="flex flex-col items-center justify-center py-20 gap-4">
         <div className="w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center">
@@ -170,8 +173,32 @@ export function Games() {
 
   return (
     <div className="space-y-5 px-4 pt-4 md:px-0 md:pt-0 pb-10">
-      <PageHero piece="♜" title="My Games" subtitle="View and replay your imported chess games." />
+      <PageHero piece="♜" title="My Games" subtitle="Import, review, and analyze your chess games — all in one place." />
 
+      <div className="inline-flex p-1 rounded-xl bg-secondary/50 border border-border/40 gap-1">
+        {([
+          { key: 'games', label: 'Games' },
+          { key: 'import', label: 'Import' },
+          { key: 'analysis', label: 'Analysis' },
+        ] as const).map((t) => (
+          <button
+            key={t.key}
+            onClick={() => setTab(t.key)}
+            className={cn(
+              'px-4 py-2 rounded-xl text-sm font-bold transition-all',
+              tab === t.key ? 'bg-primary text-primary-foreground shadow' : 'text-muted-foreground hover:text-foreground'
+            )}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'import' && <Import />}
+      {tab === 'analysis' && <Analysis hideHeader />}
+
+      {tab === 'games' && (
+      <>
       {unreviewedCount > 0 && (
         <div className="glass-card rounded-xl p-3.5 flex flex-col sm:flex-row items-start sm:items-center gap-3 border border-primary/20">
           <Sparkles className="w-4 h-4 text-primary shrink-0 hidden sm:block" />
@@ -232,7 +259,7 @@ export function Games() {
           <option value="all">All Platforms</option>
           <option value="chesscom">Chess.com</option>
           <option value="lichess">Lichess</option>
-          <option value="chessscout">ChessScout Live</option>
+          <option value="chessscout">ChessScout.net Live</option>
         </select>
         <select
           value={filter}
@@ -339,7 +366,7 @@ export function Games() {
                               <span className={cn(
                                 'inline-flex items-center gap-0.5 px-1 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider',
                                 cls,
-                              )} title={plat === 'chessscout' ? 'ChessScout Live' : plat === 'lichess' ? 'Lichess' : 'Chess.com'}>
+                              )} title={plat === 'chessscout' ? 'ChessScout.net Live' : plat === 'lichess' ? 'Lichess' : 'Chess.com'}>
                                 {label}
                               </span>
                             );
@@ -385,6 +412,8 @@ export function Games() {
           </button>
         )}
         </>
+      )}
+      </>
       )}
     </div>
   );

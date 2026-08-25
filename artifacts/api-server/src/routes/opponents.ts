@@ -1,13 +1,26 @@
 import { Router, type IRouter } from "express";
 import { db, gamesTable, coursesTable, lessonsTable, backgroundJobsTable } from "@workspace/db";
 import { sql, eq, and, desc } from "drizzle-orm";
-import { fetchChessComGames, extractGameMetadata, fetchChessComProfile } from "../lib/chesscom";
+import { fetchChessComGames, extractGameMetadata, fetchChessComProfile, fetchChessComTopPlayers } from "../lib/chesscom";
 import { analyzePlayerGames, generateExploitCourseForOpponent } from "../lib/openaiAnalysis";
 import { randomUUID } from "crypto";
 import { requireAuth } from "../middlewares/authMiddleware";
 import { sanitizeLessons, type RawLesson } from "./courses";
 
 const router: IRouter = Router();
+
+// Real, live data from Chess.com's own public leaderboard -- not
+// hardcoded names, since those would go stale and I'd have no way to
+// verify accuracy. Public/no auth since it's the same data anyone can
+// see on chess.com itself.
+router.get("/opponents/top-players", async (_req, res) => {
+  try {
+    const players = await fetchChessComTopPlayers(25);
+    res.json({ players });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to fetch leaderboard", players: [] });
+  }
+});
 
 type CourseJobStatus = "pending" | "done" | "error";
 interface CourseJob {

@@ -132,8 +132,8 @@ export function HeroDemo({ onUpgradeClick }: { onUpgradeClick: () => void }) {
                   key={p}
                   onClick={() => setPlatform(p)}
                   disabled={state === 'loading' || state === 'analyzing'}
-                  className="px-3 py-2.5 text-xs font-bold transition-colors"
-                  style={{ background: platform === p ? G : 'transparent', color: platform === p ? '#000' : MUTED }}
+                  className="flex-1 flex items-center justify-center px-4 py-2.5 text-xs font-bold text-center transition-colors"
+                  style={{ background: platform === p ? G : 'transparent', color: platform === p ? '#000' : MUTED, minWidth: '92px' }}
                 >
                   {p === 'chesscom' ? 'Chess.com' : 'Lichess'}
                 </button>

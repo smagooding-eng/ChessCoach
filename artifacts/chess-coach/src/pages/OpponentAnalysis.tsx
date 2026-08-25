@@ -137,6 +137,15 @@ export function OpponentAnalysis() {
   const { username, authUser } = useUser();
   const { data: eloData } = useEloProgress(username ?? undefined);
   const [inputUsername, setInputUsername] = useState('');
+  const [topPlayers, setTopPlayers] = useState<{ username: string; rating: number; rank: number }[]>([]);
+  const [showTopPlayers, setShowTopPlayers] = useState(false);
+
+  useEffect(() => {
+    apiFetch('/api/opponents/top-players')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => setTopPlayers(d?.players ?? []))
+      .catch(() => {});
+  }, []);
   const [loading, setLoading] = useState(false);
   const [statusMsg, setStatusMsg] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
@@ -390,6 +399,37 @@ export function OpponentAnalysis() {
           {loading ? 'Scouting…' : 'Scout'}
         </button>
       </form>
+
+      {topPlayers.length > 0 && (
+        <div className="max-w-lg -mt-4">
+          <button
+            type="button"
+            onClick={() => setShowTopPlayers(v => !v)}
+            className="text-xs font-bold text-primary flex items-center gap-1"
+          >
+            {showTopPlayers ? 'Hide' : 'Or pick from the'} top 25 live players
+            <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showTopPlayers ? 'rotate-180' : ''}`} />
+          </button>
+          {showTopPlayers && (
+            <div className="mt-2 max-h-56 overflow-y-auto rounded-xl border border-border/50 bg-secondary/40 divide-y divide-border/30">
+              {topPlayers.map((p) => (
+                <button
+                  key={p.username}
+                  type="button"
+                  onClick={() => { setInputUsername(p.username); setShowTopPlayers(false); }}
+                  className="w-full flex items-center justify-between px-3.5 py-2 text-sm hover:bg-secondary/70 transition-colors text-left"
+                >
+                  <span className="flex items-center gap-2">
+                    <span className="text-[10px] font-bold text-muted-foreground w-5">#{p.rank}</span>
+                    <span className="font-semibold text-foreground">{p.username}</span>
+                  </span>
+                  <span className="text-xs font-bold text-primary">{p.rating}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Scout History */}
       {scoutHistory.length > 0 && !loading && (

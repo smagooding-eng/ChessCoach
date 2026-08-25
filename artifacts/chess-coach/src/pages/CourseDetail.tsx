@@ -784,12 +784,12 @@ export function CourseDetail() {
                   onClick={async () => {
                     const url = `${window.location.origin}/share/${encodeCard({
                       type: 'course',
-                      username: username ?? 'A ChessScout user',
+                      username: username ?? 'A ChessScout.net user',
                       courseName: course?.title ?? 'a personalized course',
                       weaknessFixed: course?.category ?? 'a real weakness',
                       lessonsCompleted: course?.totalLessons ?? sortedLessons.length,
                     })}`;
-                    const shareData = { title: 'I just completed a ChessScout course', url };
+                    const shareData = { title: 'I just completed a ChessScout.net course', url };
                     if (navigator.share) {
                       try { await navigator.share(shareData); return; } catch { /* fall through to clipboard */ }
                     }

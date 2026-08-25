@@ -184,7 +184,7 @@ function ThinkingDot({ delay }: { delay: number }) {
 }
 
 function CoachAvatar() {
-  // Stylized chess knight + spark — distinctive to ChessScout coach.
+  // Stylized chess knight + spark — distinctive to ChessScout.net coach.
   return (
     <svg viewBox="0 0 24 24" className="w-5 h-5 text-foreground/95" fill="none">
       <defs>

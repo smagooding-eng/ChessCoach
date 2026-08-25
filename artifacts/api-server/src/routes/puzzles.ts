@@ -153,8 +153,56 @@ router.get("/puzzles/next", requireAuth, async (req: Request, res: Response) => 
       ...(maxRatingParam && !isNaN(maxRatingParam) ? [sql`${puzzlesTable.rating} <= ${maxRatingParam}`] : []),
     ];
 
+    // Optional piece-type filter for sacrifice puzzles -- Lichess's
+    // "sacrifice" theme tag doesn't distinguish which piece was given up,
+    // so this checks the actual first solving move's piece type against a
+    // pool of candidates rather than a single random pick.
+    const pieceTypeParam = typeof req.query.pieceType === "string" ? req.query.pieceType : null;
+    const needsPieceTypeCheck = pieceTypeParam === "queen" || pieceTypeParam === "rook";
+
     let puzzle;
-    if (allExcluded.length > 0) {
+    if (needsPieceTypeCheck) {
+      const excludeCondition = allExcluded.length > 0
+        ? sql`${puzzlesTable.id} NOT IN (${sql.join(allExcluded.map(id => sql`${id}`), sql`, `)})`
+        : null;
+      const candidates = await db
+        .select()
+        .from(puzzlesTable)
+        .where(and(
+          eq(puzzlesTable.archived, false),
+          ...(excludeCondition ? [excludeCondition] : []),
+          ...(themeCondition ? [themeCondition] : []),
+          ...(exactThemeCondition ? [exactThemeCondition] : []),
+          ...ratingConditions,
+        ))
+        .orderBy(sql`RANDOM()`)
+        .limit(40);
+
+      const targetPiece = pieceTypeParam === "queen" ? "q" : "r";
+      for (const candidate of candidates) {
+        try {
+          const rawMoves = candidate.moves.split(" ");
+          if (rawMoves.length < 2) continue;
+          const afterSetup = new Chess(candidate.fen);
+          afterSetup.move({ from: rawMoves[0].slice(0, 2), to: rawMoves[0].slice(2, 4), promotion: rawMoves[0].length > 4 ? rawMoves[0][4] : undefined });
+          const firstSolvingMove = rawMoves[1];
+          const fromSquare = firstSolvingMove.slice(0, 2);
+          const piece = afterSetup.get(fromSquare as any);
+          if (piece?.type === targetPiece) {
+            puzzle = candidate;
+            break;
+          }
+        } catch {
+          continue;
+        }
+      }
+      // Fall through to the normal random pick below if no match was
+      // found in the pool -- better to serve any sacrifice puzzle than
+      // nothing, and the pool is randomized each time so retrying (e.g.
+      // hitting "Next Puzzle") has a real chance of finding a match.
+    }
+
+    if (!puzzle && allExcluded.length > 0) {
       const result = await db
         .select()
         .from(puzzlesTable)
@@ -168,7 +216,7 @@ router.get("/puzzles/next", requireAuth, async (req: Request, res: Response) => 
         .orderBy(sql`RANDOM()`)
         .limit(1);
       puzzle = result[0];
-    } else {
+    } else if (!puzzle) {
       // Nothing to exclude yet (brand new user) — any non-archived puzzle
       // is fair game.
       const result = await db
@@ -313,6 +361,46 @@ router.get("/puzzles/stats", requireAuth, async (req: Request, res: Response) =>
     });
   } catch {
     res.status(500).json({ error: "Failed to get puzzle stats" });
+  }
+});
+
+// Archive of puzzles this user has already solved -- built on top of the
+// existing puzzle_attempts tracking, not a new table. Supports revisiting
+// past solves.
+router.get("/puzzles/solved", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user!.id;
+    const limit = Math.min(parseInt(req.query.limit as string, 10) || 50, 200);
+
+    const solved = await db
+      .select({
+        puzzleId: puzzleAttemptsTable.puzzleId,
+        attemptedAt: puzzleAttemptsTable.attemptedAt,
+        timeMs: puzzleAttemptsTable.timeMs,
+        fen: puzzlesTable.fen,
+        moves: puzzlesTable.moves,
+        rating: puzzlesTable.rating,
+        themes: puzzlesTable.themes,
+      })
+      .from(puzzleAttemptsTable)
+      .innerJoin(puzzlesTable, eq(puzzleAttemptsTable.puzzleId, puzzlesTable.id))
+      .where(and(eq(puzzleAttemptsTable.userId, userId), eq(puzzleAttemptsTable.solved, true)))
+      .orderBy(desc(puzzleAttemptsTable.attemptedAt))
+      .limit(limit);
+
+    res.json({
+      puzzles: solved.map(p => ({
+        id: p.puzzleId,
+        fen: p.fen,
+        moves: p.moves,
+        rating: p.rating,
+        themes: p.themes?.split(",").filter(Boolean) ?? [],
+        solvedAt: p.attemptedAt,
+        timeMs: p.timeMs,
+      })),
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to load solved puzzles", details: err.message });
   }
 });
 

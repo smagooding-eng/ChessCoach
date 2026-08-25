@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useLocation } from 'wouter';
 import { apiFetch } from '@/lib/api';
 import { trackBackgroundJob } from '@/components/BackgroundJobsWatcher';
+import { trackFunnelEvent } from '@/lib/funnelTracking';
 
 const CHESSCOM_GREEN = '#81b64c';
 const BG_CARD = '#302e2b';
@@ -85,11 +86,13 @@ export function OnboardingStartModal({ username: initialUsername, platform: init
   }, [status, username, platform]);
 
   const playNow = () => {
+    trackFunnelEvent('mia_started');
     onDone();
     navigate('/practice?onboarding=true');
   };
 
   const skip = () => {
+    trackFunnelEvent('mia_skipped');
     onDone();
     navigate('/', { replace: true } as never);
   };

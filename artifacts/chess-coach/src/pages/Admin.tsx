@@ -11,7 +11,7 @@ import {
   Copy, CreditCard, Crown, Edit3, Eye, FileText, Gamepad2, Gift, GraduationCap, Heading1, Heading2,
   History, Image, Italic, Link as LinkIcon, List, ListOrdered, Loader2, LogOut, Mail, Megaphone,
   Minus, Palette, Play, Redo2, RefreshCw, Search, Send, Settings, Shield, Sparkles, Swords, Target, Trash2,
-  Trophy, Type, Undo2, User, UserCheck, UserPlus, Users, X, Zap,
+  Trophy, Type, Undo2, User, UserCheck, UserPlus, Users, X, Zap, TrendingUp,
 } from 'lucide-react';
 
 interface AdminStats {
@@ -730,6 +730,151 @@ const SUB_STATUS_STYLE: Record<string, { label: string; color: string; bg: strin
   unpaid:   { label: 'Unpaid',   color: 'text-red-400',     bg: 'bg-red-400/10' },
 };
 
+// Separate, standalone section -- deliberately not merged into the
+// existing Users/Subscriptions stats grid above. Tracks the landing page
+// funnel specifically: view -> played Mia / skipped Mia -> clicked signup
+// -> completed signup, plus how many visitors left without doing anything.
+// Every pro user's unique referral code with how many people signed up
+// through it and how many of those went Pro themselves.
+function ReferralCodesPanel() {
+  const [codes, setCodes] = useState<{ userId: string; email: string | null; displayName: string; inviteCode: string; referred: number; converted: number }[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [expanded, setExpanded] = useState(false);
+
+  useEffect(() => {
+    apiFetch('/api/admin/referral-codes', { credentials: 'include' })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => setCodes(d?.codes ?? []))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const totalReferred = codes.reduce((sum, c) => sum + c.referred, 0);
+  const totalConverted = codes.reduce((sum, c) => sum + c.converted, 0);
+  const visibleCodes = expanded ? codes : codes.slice(0, 8);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="rounded-xl border border-border/40 bg-card overflow-hidden"
+    >
+      <div className="px-5 py-3 border-b border-border/30 bg-blue-500/5 flex items-center justify-between">
+        <h3 className="text-sm font-bold text-blue-400 flex items-center gap-2">
+          <Gift className="w-4 h-4" /> Referral Codes
+        </h3>
+        {!loading && (
+          <p className="text-[11px] text-muted-foreground">
+            {codes.length} codes &middot; {totalReferred} referred &middot; {totalConverted} converted
+          </p>
+        )}
+      </div>
+      <div className="p-2">
+        {loading ? (
+          <div className="flex justify-center py-6"><Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /></div>
+        ) : codes.length === 0 ? (
+          <p className="text-xs text-muted-foreground text-center py-4">No referral codes issued yet — codes are created automatically when a user's subscription first goes active.</p>
+        ) : (
+          <>
+            <div className="divide-y divide-border/20">
+              {visibleCodes.map((c) => (
+                <div key={c.userId} className="flex items-center justify-between gap-3 px-3 py-2.5">
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold text-foreground truncate">{c.displayName}</p>
+                    <p className="text-[11px] font-mono text-muted-foreground">{c.inviteCode}</p>
+                  </div>
+                  <div className="flex items-center gap-4 shrink-0 text-right">
+                    <div>
+                      <p className="text-sm font-black text-foreground">{c.referred}</p>
+                      <p className="text-[9px] text-muted-foreground uppercase tracking-wide">Referred</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-black text-primary">{c.converted}</p>
+                      <p className="text-[9px] text-muted-foreground uppercase tracking-wide">Converted</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            {codes.length > 8 && (
+              <button
+                onClick={() => setExpanded(v => !v)}
+                className="w-full text-center text-xs font-bold text-primary py-2"
+              >
+                {expanded ? 'Show less' : `Show all ${codes.length}`}
+              </button>
+            )}
+          </>
+        )}
+      </div>
+    </motion.div>
+  );
+}
+
+function LandingFunnelPanel() {
+  const [data, setData] = useState<{
+    landingViews: number; miaStarted: number; miaSkipped: number;
+    signupClicked: number; signupCompleted: number; leftWithoutAction: number;
+  } | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [days, setDays] = useState(30);
+
+  useEffect(() => {
+    setLoading(true);
+    apiFetch(`/api/admin/landing-funnel?days=${days}`, { credentials: 'include' })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => setData(d))
+      .finally(() => setLoading(false));
+  }, [days]);
+
+  const rows = data ? [
+    { label: 'Landing page views', value: data.landingViews, color: 'text-foreground' },
+    { label: 'Played Mia', value: data.miaStarted, color: 'text-emerald-400' },
+    { label: 'Skipped Mia', value: data.miaSkipped, color: 'text-orange-400' },
+    { label: 'Clicked Sign Up', value: data.signupClicked, color: 'text-blue-400' },
+    { label: 'Completed Sign Up', value: data.signupCompleted, color: 'text-primary' },
+    { label: 'Left without any action', value: data.leftWithoutAction, color: 'text-red-400' },
+  ] : [];
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="rounded-xl border border-border/40 bg-card overflow-hidden"
+    >
+      <div className="px-5 py-3 border-b border-border/30 bg-purple-500/5 flex items-center justify-between">
+        <h3 className="text-sm font-bold text-purple-400 flex items-center gap-2">
+          <TrendingUp className="w-4 h-4" /> Landing Page Funnel
+        </h3>
+        <select
+          value={days}
+          onChange={(e) => setDays(Number(e.target.value))}
+          className="text-xs bg-background border border-border/40 rounded-lg px-2 py-1"
+        >
+          <option value={7}>Last 7 days</option>
+          <option value={30}>Last 30 days</option>
+          <option value={90}>Last 90 days</option>
+        </select>
+      </div>
+      <div className="p-4">
+        {loading ? (
+          <div className="flex justify-center py-6"><Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /></div>
+        ) : !data ? (
+          <p className="text-xs text-muted-foreground text-center py-4">Failed to load funnel data.</p>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            {rows.map((r) => (
+              <div key={r.label} className="p-3 rounded-xl bg-white/5 border border-white/5">
+                <p className={cn('text-2xl font-black', r.color)}>{r.value.toLocaleString()}</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">{r.label}</p>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </motion.div>
+  );
+}
+
 function SubscribersPanel({ onClose }: { onClose: () => void }) {
   const [subscribers, setSubscribers] = useState<StripeSubscriber[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1051,11 +1196,11 @@ const badge = (text: string) => `<span style="display:inline-block;background:#8
 const EMAIL_TEMPLATES = [
   {
     name: '👋 Welcome',
-    subject: 'Welcome to ChessScout — Your Chess Edge Starts Now',
+    subject: 'Welcome to ChessScout.net — Your Chess Edge Starts Now',
     html: `<img src="${CHESS_IMAGES.board}" alt="Chess board" style="${imgStyle}" />
-<h2 style="color:#81b64c;margin:0 0 8px;">Welcome to ChessScout! ♜</h2>
+<h2 style="color:#81b64c;margin:0 0 8px;">Welcome to ChessScout.net! ♜</h2>
 <p style="color:#9e9b98;font-size:13px;margin:0 0 20px;">The smartest way to prepare for your opponents</p>
-<p>You've just joined the chess tool that top players use to gain an edge before every game. ChessScout analyzes your opponents so you don't have to.</p>
+<p>You've just joined the chess tool that top players use to gain an edge before every game. ChessScout.net analyzes your opponents so you don't have to.</p>
 ${divider}
 <h3 style="color:#81b64c;font-size:16px;margin:0 0 12px;">Here's what you can do right now:</h3>
 <table style="width:100%;border-collapse:collapse;">
@@ -1070,11 +1215,11 @@ ${divider}
   },
   {
     name: '⭐ Upgrade to Pro',
-    subject: 'Unlock the Full Power of ChessScout Pro',
+    subject: 'Unlock the Full Power of ChessScout.net Pro',
     html: `<img src="${CHESS_IMAGES.king}" alt="Chess king" style="${imgStyle}" />
 <div style="text-align:center;margin-bottom:20px;">${badge('PRO')}</div>
 <h2 style="color:#81b64c;text-align:center;margin:0 0 8px;">Level Up Your Game</h2>
-<p style="text-align:center;color:#9e9b98;margin:0 0 24px;">You've been using ChessScout — here's what you're missing.</p>
+<p style="text-align:center;color:#9e9b98;margin:0 0 24px;">You've been using ChessScout.net — here's what you're missing.</p>
 <div style="background:#262421;border-radius:8px;padding:20px;margin-bottom:20px;">
 <h3 style="color:#e8e6e3;margin:0 0 16px;font-size:15px;">Pro members get:</h3>
 <table style="width:100%;border-collapse:collapse;">
@@ -1094,11 +1239,11 @@ ${divider}
   },
   {
     name: '🚀 New Feature',
-    subject: 'New on ChessScout: [Feature Name]',
+    subject: 'New on ChessScout.net: [Feature Name]',
     html: `<img src="${CHESS_IMAGES.strategy}" alt="Chess strategy" style="${imgStyle}" />
 <div style="margin-bottom:16px;">${badge('NEW')}</div>
 <h2 style="color:#81b64c;margin:0 0 8px;">Introducing [Feature Name]</h2>
-<p style="color:#9e9b98;font-size:13px;margin:0 0 20px;">Just shipped — available now for all ChessScout users</p>
+<p style="color:#9e9b98;font-size:13px;margin:0 0 20px;">Just shipped — available now for all ChessScout.net users</p>
 <p>We've been working on something we think will change how you prepare for games:</p>
 ${divider}
 <h3 style="color:#e8e6e3;font-size:16px;margin:0 0 8px;">[Feature Name]</h3>
@@ -1130,7 +1275,7 @@ ${divider}
   },
   {
     name: '📊 Your Weekly Stats',
-    subject: 'Your ChessScout Week in Review',
+    subject: 'Your ChessScout.net Week in Review',
     html: `<img src="${CHESS_IMAGES.study}" alt="Chess study" style="${imgStyle}" />
 <h2 style="color:#81b64c;margin:0 0 8px;">Your Week in Review ♜</h2>
 <p style="color:#9e9b98;font-size:13px;margin:0 0 20px;">Here's how you've been improving</p>
@@ -1154,11 +1299,11 @@ ${divider}
   },
   {
     name: '🏆 Tournament Prep',
-    subject: 'Prepare Like a Pro — Tournament Prep with ChessScout',
+    subject: 'Prepare Like a Pro — Tournament Prep with ChessScout.net',
     html: `<img src="${CHESS_IMAGES.tournament}" alt="Chess tournament" style="${imgStyle}" />
 <h2 style="color:#81b64c;margin:0 0 8px;">Tournament Prep Mode ♜</h2>
 <p style="color:#9e9b98;font-size:13px;margin:0 0 20px;">Get the edge before your next rated game</p>
-<p>Got a tournament coming up? Here's how ChessScout gives you the preparation edge that GMs use:</p>
+<p>Got a tournament coming up? Here's how ChessScout.net gives you the preparation edge that GMs use:</p>
 ${divider}
 <h3 style="color:#e8e6e3;font-size:15px;margin:0 0 12px;">Your Pre-Game Checklist:</h3>
 <table style="width:100%;border-collapse:collapse;">
@@ -1182,7 +1327,7 @@ ${divider}
 <p style="color:#81b64c;font-size:13px;font-weight:600;margin:0 0 6px;">💡 KEY TAKEAWAY</p>
 <p style="color:#e8e6e3;margin:0;font-size:14px;">[One sentence summary of the tip that's easy to remember]</p>
 </div>
-<p>Want to put this into practice? Head to ChessScout and look for positions where this concept applies in your own games.</p>
+<p>Want to put this into practice? Head to ChessScout.net and look for positions where this concept applies in your own games.</p>
 ${divider}
 <p style="text-align:center;"><a href="https://chessscout.net" style="${btnStyle}">Apply This in Your Games →</a></p>
 <p style="text-align:center;margin-top:8px;"><a href="https://chessscout.net/puzzles" style="${btnAlt}">Practice Puzzles →</a></p>`,
@@ -1193,7 +1338,7 @@ ${divider}
     html: `<img src="${CHESS_IMAGES.clock}" alt="Chess clock" style="${imgStyle}" />
 <h2 style="color:#81b64c;margin:0 0 8px;">Your Free Trial is Almost Over ♜</h2>
 <p style="color:#9e9b98;font-size:13px;margin:0 0 20px;">Keep your edge — upgrade before it expires</p>
-<p>You've been using ChessScout Pro features during your trial. Here's what you'll lose access to if you don't subscribe:</p>
+<p>You've been using ChessScout.net Pro features during your trial. Here's what you'll lose access to if you don't subscribe:</p>
 <div style="background:#262421;border-radius:8px;padding:16px;margin:20px 0;">
 <table style="width:100%;border-collapse:collapse;">
 <tr><td style="padding:6px 0;color:#ff6b6b;">✗</td><td style="padding:6px 0;color:#9e9b98;">Unlimited puzzles → Back to 5/day</td></tr>
@@ -1212,18 +1357,18 @@ ${divider}
   },
   {
     name: '📬 Win of the Week',
-    subject: 'Win of the Week — Brilliant Games from ChessScout Users',
+    subject: 'Win of the Week — Brilliant Games from ChessScout.net Users',
     html: `<img src="${CHESS_IMAGES.grandmaster}" alt="Chess grandmaster" style="${imgStyle}" />
 <div style="margin-bottom:16px;">${badge('WIN OF THE WEEK')}</div>
 <h2 style="color:#81b64c;margin:0 0 8px;">Community Spotlight ♜</h2>
-<p style="color:#9e9b98;font-size:13px;margin:0 0 20px;">Brilliant games from ChessScout players</p>
+<p style="color:#9e9b98;font-size:13px;margin:0 0 20px;">Brilliant games from ChessScout.net players</p>
 <div style="background:#262421;border-radius:8px;padding:20px;margin-bottom:20px;">
 <h3 style="color:#e8e6e3;font-size:15px;margin:0 0 8px;">🏅 [Player Username]</h3>
 <p style="color:#9e9b98;font-size:13px;margin:0 0 12px;">[Rating] | [Time Control] | [Result]</p>
 <p>[Describe the game — what made it brilliant, key moments, the decisive combination]</p>
 <p style="color:#81b64c;font-size:13px;margin:12px 0 0;">Key moment: [Describe the critical position or move]</p>
 </div>
-<p>Want your game featured? Play your best chess and analyze your games on ChessScout — we pick our favorites each week!</p>
+<p>Want your game featured? Play your best chess and analyze your games on ChessScout.net — we pick our favorites each week!</p>
 ${divider}
 <p style="text-align:center;">
 <a href="https://chessscout.net/game-lookup" style="${btnStyle}">Review Your Games →</a>
@@ -1235,7 +1380,7 @@ ${divider}
     html: `<img src="${CHESS_IMAGES.board}" alt="Chess board" style="${imgStyle}" />
 <h2 style="color:#81b64c;margin:0 0 8px;">It's Been a While ♜</h2>
 <p style="color:#9e9b98;font-size:13px;margin:0 0 20px;">Your chess improvement doesn't have to stop</p>
-<p>We noticed you haven't been on ChessScout recently. Even a few minutes of daily puzzle practice can make a noticeable difference in your games.</p>
+<p>We noticed you haven't been on ChessScout.net recently. Even a few minutes of daily puzzle practice can make a noticeable difference in your games.</p>
 <div style="background:#262421;border-radius:8px;padding:20px;margin:20px 0;">
 <h3 style="color:#e8e6e3;font-size:15px;margin:0 0 16px;">Quick ways to jump back in:</h3>
 <table style="width:100%;border-collapse:collapse;">
@@ -1266,29 +1411,29 @@ ${divider}
 <p style="color:#81b64c;font-size:13px;font-weight:600;margin:0 0 6px;">⚠️ COMMON TRAP</p>
 <p style="color:#e8e6e3;margin:0;font-size:14px;">[Describe a common trap or mistake in this opening]</p>
 </div>
-<p>Use ChessScout's Opponent Scout to see if your opponents play this opening — and how well they handle the key positions.</p>
+<p>Use ChessScout.net's Opponent Scout to see if your opponents play this opening — and how well they handle the key positions.</p>
 ${divider}
 <p style="text-align:center;"><a href="https://chessscout.net/scout" style="${btnStyle}">Scout Opponents Playing This →</a></p>`,
   },
   {
     name: '🎄 Holiday / Seasonal',
-    subject: 'Happy Holidays from ChessScout ♜',
+    subject: 'Happy Holidays from ChessScout.net ♜',
     html: `<img src="${CHESS_IMAGES.pieces}" alt="Chess pieces" style="${imgStyle}" />
 <h2 style="color:#81b64c;margin:0 0 8px;">Happy Holidays! 🎉♜</h2>
-<p style="color:#9e9b98;font-size:13px;margin:0 0 20px;">From the ChessScout team to you</p>
+<p style="color:#9e9b98;font-size:13px;margin:0 0 20px;">From the ChessScout.net team to you</p>
 <p>Wishing you a wonderful holiday season! While you're relaxing, why not squeeze in some chess?</p>
 <div style="background:#262421;border-radius:8px;padding:20px;margin:20px 0;text-align:center;">
 <p style="font-size:36px;margin:0;">♜ 🎁 ♝</p>
 <p style="color:#81b64c;font-size:16px;font-weight:600;margin:12px 0 4px;">Holiday Special</p>
 <p style="color:#e8e6e3;font-size:14px;margin:0;">[Describe any special offer, discount, or holiday puzzle set]</p>
 </div>
-<p>From all of us at ChessScout — thank you for being part of our community. Here's to more brilliant moves in the new year!</p>
+<p>From all of us at ChessScout.net — thank you for being part of our community. Here's to more brilliant moves in the new year!</p>
 ${divider}
 <p style="text-align:center;"><a href="https://chessscout.net" style="${btnStyle}">Play Some Chess →</a></p>`,
   },
   {
     name: '📢 Announcement',
-    subject: '[Announcement Title] — Important Update from ChessScout',
+    subject: '[Announcement Title] — Important Update from ChessScout.net',
     html: `<div style="text-align:center;margin-bottom:20px;">${badge('ANNOUNCEMENT')}</div>
 <h2 style="color:#81b64c;text-align:center;margin:0 0 8px;">[Announcement Title]</h2>
 <p style="color:#9e9b98;font-size:13px;text-align:center;margin:0 0 24px;">[Subtitle or date]</p>
@@ -1301,15 +1446,15 @@ ${divider}
 </div>
 <p>Questions? Just reply to this email — we read every message.</p>
 ${divider}
-<p style="text-align:center;"><a href="https://chessscout.net" style="${btnStyle}">Visit ChessScout →</a></p>`,
+<p style="text-align:center;"><a href="https://chessscout.net" style="${btnStyle}">Visit ChessScout.net →</a></p>`,
   },
   {
     name: '🧪 Feedback Request',
-    subject: 'Quick Question — Help Us Make ChessScout Better',
+    subject: 'Quick Question — Help Us Make ChessScout.net Better',
     html: `<img src="${CHESS_IMAGES.study}" alt="Chess study" style="${imgStyle}" />
 <h2 style="color:#81b64c;margin:0 0 8px;">We'd Love Your Feedback ♜</h2>
 <p style="color:#9e9b98;font-size:13px;margin:0 0 20px;">Help us build the chess tool you actually want</p>
-<p>Hey there! We're always working to make ChessScout better, and your input matters more than you know.</p>
+<p>Hey there! We're always working to make ChessScout.net better, and your input matters more than you know.</p>
 <p>We have a quick question:</p>
 <div style="background:#262421;border-radius:8px;padding:20px;margin:20px 0;text-align:center;">
 <p style="color:#81b64c;font-size:16px;font-weight:600;margin:0 0 8px;">[Your Question Here]</p>
@@ -1323,7 +1468,7 @@ ${divider}
 </table>
 ${divider}
 <p style="color:#9e9b98;font-size:13px;">Your feedback directly shapes what we build next. Thank you!</p>
-<p style="text-align:center;"><a href="https://chessscout.net" style="${btnAlt}">Visit ChessScout →</a></p>`,
+<p style="text-align:center;"><a href="https://chessscout.net" style="${btnAlt}">Visit ChessScout.net →</a></p>`,
   },
 ];
 
@@ -1360,7 +1505,7 @@ function EmailComposerModal({ onClose, initialRecipients }: { onClose: () => voi
 
   const insertButton = () => {
     const url = prompt('Button URL:', 'https://chessscout.net');
-    const text = prompt('Button text:', 'Visit ChessScout');
+    const text = prompt('Button text:', 'Visit ChessScout.net');
     if (url && text) {
       execCmd('insertHTML', `<p><a href="${url}" style="display:inline-block;background:#81b64c;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:600;">${text}</a></p>`);
     }
@@ -2041,6 +2186,9 @@ function AdminTicker() {
           {showSubscribers && <SubscribersPanel onClose={() => setShowSubscribers(false)} />}
         </AnimatePresence>
       </motion.div>
+
+      <LandingFunnelPanel />
+      <ReferralCodesPanel />
 
       <motion.div
         initial={{ opacity: 0, y: 10 }}

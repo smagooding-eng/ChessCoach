@@ -10,7 +10,7 @@ const BORDER_COLOR = 'rgba(129,182,76,0.06)';
 function IOSGuide() {
   return (
     <div className="space-y-4">
-      <p className="text-sm" style={{ color: TEXT_LIGHT }}>To install ChessScout on your iPhone or iPad:</p>
+      <p className="text-sm" style={{ color: TEXT_LIGHT }}>To install ChessScout.net on your iPhone or iPad:</p>
       <div className="space-y-3">
         <Step num={1}>
           Tap the <Share className="w-4 h-4 inline-block mx-1 -mt-0.5" style={{ color: CHESSCOM_GREEN }} /> <strong>Share</strong> button in Safari's toolbar
@@ -30,7 +30,7 @@ function IOSGuide() {
 function AndroidGuide() {
   return (
     <div className="space-y-4">
-      <p className="text-sm" style={{ color: TEXT_LIGHT }}>To install ChessScout on your Android device:</p>
+      <p className="text-sm" style={{ color: TEXT_LIGHT }}>To install ChessScout.net on your Android device:</p>
       <div className="space-y-3">
         <Step num={1}>
           Tap the <MoreVertical className="w-4 h-4 inline-block mx-1 -mt-0.5" style={{ color: CHESSCOM_GREEN }} /> <strong>menu</strong> button (three dots) in Chrome
@@ -49,7 +49,7 @@ function AndroidGuide() {
 function DesktopGuide() {
   return (
     <div className="space-y-4">
-      <p className="text-sm" style={{ color: TEXT_LIGHT }}>To install ChessScout on your computer:</p>
+      <p className="text-sm" style={{ color: TEXT_LIGHT }}>To install ChessScout.net on your computer:</p>
       <div className="space-y-3">
         <Step num={1}>
           In Chrome, click the <Download className="w-4 h-4 inline-block mx-1 -mt-0.5" style={{ color: CHESSCOM_GREEN }} /> <strong>install icon</strong> in the address bar (right side)
@@ -92,7 +92,7 @@ export function InstallGuide({ platform, onClose, onDismiss }: {
         <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: `1px solid ${BORDER_COLOR}` }}>
           <div className="flex items-center gap-2">
             <PlusSquare className="w-5 h-5" style={{ color: CHESSCOM_GREEN }} />
-            <h3 className="font-bold text-sm" style={{ color: TEXT_LIGHT }}>Install ChessScout</h3>
+            <h3 className="font-bold text-sm" style={{ color: TEXT_LIGHT }}>Install ChessScout.net</h3>
           </div>
           <button onClick={onClose} className="p-1 rounded hover:bg-white/5 transition-colors">
             <X className="w-4 h-4" style={{ color: TEXT_MUTED }} />

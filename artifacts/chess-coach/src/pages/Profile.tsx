@@ -432,11 +432,11 @@ const badge = (text: string) => `<span style="display:inline-block;background:#8
 const EMAIL_TEMPLATES = [
   {
     name: '👋 Welcome',
-    subject: 'Welcome to ChessScout — Your Chess Edge Starts Now',
+    subject: 'Welcome to ChessScout.net — Your Chess Edge Starts Now',
     html: `<img src="${CHESS_IMAGES.board}" alt="Chess board" style="${imgStyle}" />
-<h2 style="color:#81b64c;margin:0 0 8px;">Welcome to ChessScout! ♜</h2>
+<h2 style="color:#81b64c;margin:0 0 8px;">Welcome to ChessScout.net! ♜</h2>
 <p style="color:#9e9b98;font-size:13px;margin:0 0 20px;">The smartest way to prepare for your opponents</p>
-<p>You've just joined the chess tool that serious players use to gain an edge before every game. ChessScout analyzes your opponents so you don't have to.</p>
+<p>You've just joined the chess tool that serious players use to gain an edge before every game. ChessScout.net analyzes your opponents so you don't have to.</p>
 ${divider}
 <h3 style="color:#81b64c;font-size:16px;margin:0 0 12px;">Here's what you can do right now:</h3>
 <table style="width:100%;border-collapse:collapse;">
@@ -451,11 +451,11 @@ ${divider}
   },
   {
     name: '⭐ Upgrade to Pro',
-    subject: 'Unlock the Full Power of ChessScout Pro',
+    subject: 'Unlock the Full Power of ChessScout.net Pro',
     html: `<img src="${CHESS_IMAGES.king}" alt="Chess king" style="${imgStyle}" />
 <h2 style="color:#81b64c;margin:0 0 8px;">Ready to Level Up? ♜</h2>
-<p style="color:#9e9b98;font-size:13px;margin:0 0 20px;">You've been using ChessScout's free tier — here's what Pro unlocks</p>
-<p>Here's what you'll get with ChessScout Pro:</p>
+<p style="color:#9e9b98;font-size:13px;margin:0 0 20px;">You've been using ChessScout.net's free tier — here's what Pro unlocks</p>
+<p>Here's what you'll get with ChessScout.net Pro:</p>
 <div style="background:#262421;border-radius:8px;padding:16px;margin:20px 0;">
 <table style="width:100%;border-collapse:collapse;">
 <tr><td style="padding:6px 0;color:#81b64c;">✓</td><td style="padding:6px 0;color:#9e9b98;">TTS coach narration on every puzzle &amp; lesson</td></tr>
@@ -474,7 +474,7 @@ ${divider}
   },
   {
     name: '🚀 New Feature',
-    subject: 'New on ChessScout: [Feature Name]',
+    subject: 'New on ChessScout.net: [Feature Name]',
     html: `<img src="${CHESS_IMAGES.strategy}" alt="Chess strategy" style="${imgStyle}" />
 ${badge('NEW')}
 <h2 style="color:#81b64c;margin:12px 0 8px;">[Feature Name] is Here ♞</h2>
@@ -506,11 +506,11 @@ ${divider}
   },
   {
     name: '🏆 Tournament Prep',
-    subject: 'Playing in a Tournament Soon? Prep With ChessScout',
+    subject: 'Playing in a Tournament Soon? Prep With ChessScout.net',
     html: `<img src="${CHESS_IMAGES.tournament}" alt="Chess tournament" style="${imgStyle}" />
 <h2 style="color:#81b64c;margin:0 0 8px;">Walk In Prepared ♜</h2>
 <p style="color:#9e9b98;font-size:13px;margin:0 0 20px;">Know your opponent before you sit down</p>
-<p>If you know who you're facing next, scout them first. ChessScout builds a full report on their openings, tendencies, and weak spots — the same prep top players use.</p>
+<p>If you know who you're facing next, scout them first. ChessScout.net builds a full report on their openings, tendencies, and weak spots — the same prep top players use.</p>
 ${divider}
 <p style="text-align:center;"><a href="https://chessscout.net/opponents" style="${btnStyle}">Scout an Opponent →</a></p>`,
   },
@@ -589,7 +589,7 @@ function EmailComposerModal({ onClose, initialRecipients }: { onClose: () => voi
 
   const insertButton = () => {
     const url = prompt('Button URL:', 'https://chessscout.net');
-    const text = prompt('Button text:', 'Visit ChessScout');
+    const text = prompt('Button text:', 'Visit ChessScout.net');
     if (url && text) {
       execCmd('insertHTML', `<p><a href="${url}" style="display:inline-block;background:#81b64c;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:600;">${text}</a></p>`);
     }
@@ -1440,7 +1440,7 @@ interface ReferralData {
   referrals: { id: string; status: string; createdAt: string; convertedAt: string | null; referredName: string }[];
 }
 
-export function ReferralCard({ isPremium }: { isPremium: boolean }) {
+export function ReferralCard({ isPremium, compact = false }: { isPremium: boolean; compact?: boolean }) {
   const [data, setData] = useState<ReferralData | null>(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
@@ -1466,6 +1466,39 @@ export function ReferralCard({ isPremium }: { isPremium: boolean }) {
     }
   };
 
+  if (compact) {
+    return (
+      <motion.div
+        variants={{ hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0 } }}
+        className="bg-card border border-border/50 rounded-xl overflow-hidden"
+      >
+        {!isPremium || !data?.isPaid ? (
+          <Link href="/subscription" className="flex items-center gap-3 px-4 py-3 group">
+            <Gift className="w-4 h-4 text-primary shrink-0" />
+            <p className="flex-1 text-xs font-bold text-foreground">Go Pro to unlock referrals</p>
+            <ChevronRight className="w-3.5 h-3.5 text-primary opacity-60 group-hover:opacity-100 transition-opacity" />
+          </Link>
+        ) : (
+          <div className="flex items-center gap-2 px-4 py-3">
+            <Gift className="w-4 h-4 text-primary shrink-0" />
+            <p className="flex-1 text-xs font-bold text-foreground truncate">
+              {data?.totalReferred ?? 0} referred &middot; {data?.totalConverted ?? 0} went Pro
+            </p>
+            <button
+              onClick={handleCopy}
+              className={`shrink-0 px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition-all flex items-center gap-1 ${
+                copied ? 'bg-emerald-500/15 text-emerald-400' : 'bg-primary/10 text-primary hover:bg-primary/20'
+              }`}
+            >
+              {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+              {copied ? 'Copied' : 'Copy Link'}
+            </button>
+          </div>
+        )}
+      </motion.div>
+    );
+  }
+
   return (
     <motion.div
       variants={{ hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0 } }}
@@ -1484,7 +1517,7 @@ export function ReferralCard({ isPremium }: { isPremium: boolean }) {
             </div>
             <p className="text-sm font-bold text-foreground mb-1">Unlock Referrals</p>
             <p className="text-xs text-muted-foreground mb-3">
-              Become a Pro subscriber to get your personal referral link and invite friends to ChessScout.
+              Become a Pro subscriber to get your personal referral link and invite friends to ChessScout.net.
             </p>
             <Link href="/subscription" className="inline-flex items-center gap-1.5 text-xs font-bold text-primary hover:text-primary/80 transition-colors">
               Upgrade to Pro <ChevronRight className="w-3 h-3" />
@@ -1699,7 +1732,7 @@ export function Profile() {
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <Trophy className="w-4 h-4" style={{ color: G }} />
-              <h3 className="text-sm font-black uppercase tracking-[0.14em]" style={{ color: TEXT }}>ChessScout Live ELO</h3>
+              <h3 className="text-sm font-black uppercase tracking-[0.14em]" style={{ color: TEXT }}>ChessScout.net Live ELO</h3>
             </div>
             <Link href="/live"><a className="text-[11px] font-black uppercase tracking-[0.14em]" style={{ color: G }}>Play Live →</a></Link>
           </div>

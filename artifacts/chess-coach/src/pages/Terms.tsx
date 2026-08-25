@@ -15,7 +15,7 @@ const CONTACT_EMAIL = 'smagooding@gmail.com';
 export default function TermsPage() {
   useEffect(() => {
     setPageMeta(
-      'Terms of Service — ChessScout',
+      'Terms of Service — ChessScout.net',
       'The terms governing your use of ChessScout.net.',
       '/terms',
     );
@@ -61,18 +61,18 @@ export default function TermsPage() {
           style={{ background: CARD, border: '1px solid rgba(255,255,255,0.06)', color: TEXT }}
         >
           <Section title="Acceptance of terms">
-            By creating an account or using ChessScout (the "Service"), you agree to these Terms
+            By creating an account or using ChessScout.net (the "Service"), you agree to these Terms
             of Service. If you do not agree, please do not use the Service.
           </Section>
 
           <Section title="The service">
-            ChessScout provides chess coaching tools, including game import and analysis,
+            ChessScout.net provides chess coaching tools, including game import and analysis,
             weakness identification, opening trainers, and related features. Features may change,
             be added, or removed over time.
           </Section>
 
           <Section title="Eligibility">
-            You must be at least 13 years old to use the Service. By using ChessScout you confirm
+            You must be at least 13 years old to use the Service. By using ChessScout.net you confirm
             that you meet this requirement and that the information you provide is accurate.
           </Section>
 
@@ -87,7 +87,7 @@ export default function TermsPage() {
           <Section title="Subscriptions and billing">
             <ul className="list-disc pl-5 space-y-1.5">
               <li>
-                ChessScout offers a free tier and a paid Pro subscription. Pro features are
+                ChessScout.net offers a free tier and a paid Pro subscription. Pro features are
                 available through a paid subscription processed by Stripe.
               </li>
               <li>
@@ -113,12 +113,12 @@ export default function TermsPage() {
           </Section>
 
           <Section title="Third-party services">
-            ChessScout integrates with third parties such as Chess.com, Lichess, Google, and
+            ChessScout.net integrates with third parties such as Chess.com, Lichess, Google, and
             Stripe. Your use of those services is governed by their own terms and policies.
           </Section>
 
           <Section title="Intellectual property">
-            All content, software, and design elements of ChessScout are owned by us or our
+            All content, software, and design elements of ChessScout.net are owned by us or our
             licensors and are protected by intellectual property laws. You retain ownership of
             content you submit, but grant us a limited license to use it to operate the Service.
           </Section>
@@ -130,7 +130,7 @@ export default function TermsPage() {
           </Section>
 
           <Section title="Limitation of liability">
-            To the maximum extent permitted by law, ChessScout and its operators will not be
+            To the maximum extent permitted by law, ChessScout.net and its operators will not be
             liable for any indirect, incidental, special, consequential, or punitive damages, or
             any loss of data, profits, or goodwill arising from your use of the Service. Our
             total liability will not exceed the amount you paid us in the prior 12 months.
@@ -163,7 +163,7 @@ export default function TermsPage() {
 
         <div className="mt-8 text-center">
           <Link href="/" className="text-xs font-bold" style={{ color: MUTED }}>
-            ← Back to ChessScout
+            ← Back to ChessScout.net
           </Link>
         </div>
       </main>

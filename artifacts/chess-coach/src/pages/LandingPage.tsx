@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useUser } from '@/hooks/use-user';
 import { useLocation, Link } from 'wouter';
 import { HeroDemo } from '@/components/HeroDemo';
+import { trackFunnelEvent } from '@/lib/funnelTracking';
 import { ArrowRight, Mail, Eye, EyeOff, UserPlus, LogIn, Search, BarChart3, Brain, TrendingUp, Check, X, Zap, Target, Crosshair, BookOpen, Gamepad2, Users, Star, Flame, Trophy, Sparkles, Download as DownloadIcon, Smartphone } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { apiFetch, apiUrl, setAuthToken } from '@/lib/api';
@@ -270,6 +271,7 @@ function AuthModal({ open, onClose, initialMode, externalError }: { open: boolea
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error || 'Something went wrong'); return; }
+      if (mode === 'register') trackFunnelEvent('signup_completed');
       if (data.token) setAuthToken(data.token);
       localStorage.removeItem('chessscout_ref');
       if (data.user?.chesscomUsername) login(data.user.chesscomUsername);
@@ -618,6 +620,10 @@ export function LandingPage() {
   const [, setLocation] = useLocation();
 
   useEffect(() => {
+    trackFunnelEvent('landing_view');
+  }, []);
+
+  useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const ref = params.get('ref');
     if (ref) localStorage.setItem('chessscout_ref', ref);
@@ -640,7 +646,7 @@ export function LandingPage() {
     }
   }, [isAuthLoading, isAuthenticated, setLocation]);
 
-  const openSignup = () => { setAuthMode('register'); setAuthOpen(true); };
+  const openSignup = () => { trackFunnelEvent('signup_clicked'); setAuthMode('register'); setAuthOpen(true); };
   const openLogin = () => { setAuthMode('login'); setAuthOpen(true); };
 
   return (
@@ -849,7 +855,7 @@ export function LandingPage() {
               NOBODY ELSE HAS THIS
             </div>
             <h2 className="text-2xl sm:text-3xl font-black" style={{ color: TEXT }}>
-              Only on ChessScout
+              Only on ChessScout.net
             </h2>
           </motion.div>
 
@@ -928,7 +934,7 @@ export function LandingPage() {
           </motion.div>
           <div className="space-y-4">
             {[
-              { q: 'How is this different from Chess.com game review?', a: 'Chess.com reviews one game at a time. ChessScout looks across all your games to find the mistake you keep making — not just what happened in this one.' },
+              { q: 'How is this different from Chess.com game review?', a: 'Chess.com reviews one game at a time. ChessScout.net looks across all your games to find the mistake you keep making — not just what happened in this one.' },
               { q: 'What does the free tier include?', a: 'Unlimited daily puzzles, 3 opponent scouts, 5 courses, unlimited practice bots, and your first 20 imported games — no card required.' },
               { q: 'Will I understand the analysis at my level?', a: 'Yes. Explanations are written in plain language, not engine notation — built for players working on real improvement, not just engine output.' },
               { q: 'Does it work with Lichess?', a: 'Yes, both Chess.com and Lichess are supported.' },

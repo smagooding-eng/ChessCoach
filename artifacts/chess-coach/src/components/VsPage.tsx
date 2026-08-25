@@ -47,7 +47,7 @@ export function VsPage({ competitorName, title, metaDescription, canonicalPath, 
         </Link>
 
         <h1 className="text-3xl font-black mb-4" style={{ color: TEXT }}>
-          ChessScout vs {competitorName}
+          ChessScout.net vs {competitorName}
         </h1>
         <p className="text-sm leading-relaxed mb-8" style={{ color: MUTED }}>{intro}</p>
 
@@ -56,7 +56,7 @@ export function VsPage({ competitorName, title, metaDescription, canonicalPath, 
             <thead>
               <tr style={{ background: CARD }}>
                 <th className="text-left p-3 font-bold" style={{ color: TEXT }}>Feature</th>
-                <th className="p-3 font-bold text-center" style={{ color: G }}>ChessScout</th>
+                <th className="p-3 font-bold text-center" style={{ color: G }}>ChessScout.net</th>
                 <th className="p-3 font-bold text-center" style={{ color: MUTED }}>{competitorName}</th>
               </tr>
             </thead>
@@ -79,7 +79,7 @@ export function VsPage({ competitorName, title, metaDescription, canonicalPath, 
         <Link href="/"
           className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-black"
           style={{ background: G, color: '#fff' }}>
-          Try ChessScout Free <ArrowRight className="w-4 h-4" />
+          Try ChessScout.net Free <ArrowRight className="w-4 h-4" />
         </Link>
       </div>
     </div>

@@ -5,7 +5,7 @@ import { Chessboard, defaultPieces } from 'react-chessboard';
 import { apiFetch } from '@/lib/api';
 import { useUser } from '@/hooks/use-user';
 import { Crown, RotateCcw, ChevronRight, Trophy, Target, Flame, Zap, Lightbulb, Loader2, Lock } from 'lucide-react';
-import { useLocation, useSearch } from 'wouter';
+import { useLocation, useSearch, Link } from 'wouter';
 import { encodeCard } from '@/pages/ShareCard';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useSettings, playMoveSound } from '@/context/SettingsContext';
@@ -31,7 +31,13 @@ const PUZZLE_TYPE_OPTIONS: { value: string; label: string }[] = [
   { value: 'fork', label: 'Fork' },
   { value: 'pin', label: 'Pin' },
   { value: 'skewer', label: 'Skewer' },
+  { value: 'sacrifice', label: 'Sacrifice' },
+  { value: 'discoveredAttack', label: 'Discovered Attack' },
+  { value: 'hangingPiece', label: 'Hanging Piece' },
+  { value: 'crushing', label: 'Crushing' },
   { value: 'endgame', label: 'Endgame' },
+  { value: 'middlegame', label: 'Middlegame' },
+  { value: 'opening', label: 'Opening' },
 ];
 
 // ELO/rating band filter options. value is "min-max" (max='' means no
@@ -76,7 +82,7 @@ type PuzzleState = 'loading' | 'ready' | 'solving' | 'correct' | 'wrong' | 'show
 
 export function Puzzles() {
   const { authUser } = useUser();
-  const { boardColors, pieceColors, pieceShape, showCoordinates, soundEnabled, boardMaxWidth } = useSettings();
+  const { boardColors, boardTextureCss, pieceColors, pieceShape, showCoordinates, soundEnabled, boardMaxWidth } = useSettings();
   const [, navigate] = useLocation();
   const search = useSearch();
   const targetTheme = new URLSearchParams(search).get('theme') ?? new URLSearchParams(search).get('weakness');
@@ -96,6 +102,7 @@ export function Puzzles() {
   // "My Game Puzzles" tab removed -- Daily Puzzles is now the only mode,
   // with an added puzzle-type filter (mate in N, etc) below instead.
   const [puzzleTheme, setPuzzleTheme] = useState<string>('');
+  const [sacrificePiece, setSacrificePiece] = useState<string>('');
   const [ratingBand, setRatingBand] = useState<string>('');
   const feedbackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [explanation, setExplanation] = useState<string | null>(null);
@@ -128,6 +135,7 @@ export function Puzzles() {
       if (seenPuzzleIds.current.length > 0) params.set('exclude', seenPuzzleIds.current.join(','));
       if (targetTheme) params.set('weakness', targetTheme);
       if (puzzleTheme) params.set('puzzleTheme', puzzleTheme);
+      if (puzzleTheme === 'sacrifice' && sacrificePiece) params.set('pieceType', sacrificePiece);
       if (ratingBand) {
         const [min, max] = ratingBand.split('-');
         if (min) params.set('minRating', min);
@@ -160,7 +168,7 @@ export function Puzzles() {
     } catch {
       setState('no_puzzles');
     }
-  }, [puzzleTheme, ratingBand]);
+  }, [puzzleTheme, ratingBand, sacrificePiece]);
 
   useEffect(() => {
     fetchNextPuzzle();
@@ -447,6 +455,10 @@ export function Puzzles() {
           )}
         </div>
 
+        <Link href="/puzzles/solved" className="inline-flex items-center gap-1.5 mb-4 text-xs font-bold" style={{ color: CHESSCOM_GREEN }}>
+          View Solved Puzzles Archive
+        </Link>
+
         {targetTheme && (
           <div className="flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-xl mb-4"
             style={{ background: 'rgba(129,182,76,0.1)', border: '1px solid rgba(129,182,76,0.25)' }}>
@@ -468,7 +480,7 @@ export function Puzzles() {
           {PUZZLE_TYPE_OPTIONS.map(opt => (
             <button
               key={opt.value}
-              onClick={() => setPuzzleTheme(opt.value)}
+              onClick={() => { setPuzzleTheme(opt.value); if (opt.value !== 'sacrifice') setSacrificePiece(''); }}
               className="shrink-0 px-3 py-1.5 rounded-xl text-xs font-bold transition-all"
               style={{
                 background: puzzleTheme === opt.value ? CHESSCOM_GREEN : 'rgba(255,255,255,0.04)',
@@ -480,6 +492,29 @@ export function Puzzles() {
             </button>
           ))}
         </div>
+
+        {puzzleTheme === 'sacrifice' && (
+          <div className="flex gap-1.5 mb-4 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
+            {[
+              { value: '', label: 'Any Piece' },
+              { value: 'queen', label: 'Queen Sac' },
+              { value: 'rook', label: 'Rook Sac' },
+            ].map(opt => (
+              <button
+                key={opt.value}
+                onClick={() => setSacrificePiece(opt.value)}
+                className="shrink-0 px-3 py-1.5 rounded-xl text-xs font-bold transition-all"
+                style={{
+                  background: sacrificePiece === opt.value ? '#c9a24b' : 'rgba(255,255,255,0.04)',
+                  color: sacrificePiece === opt.value ? '#000' : TEXT_MUTED,
+                  border: sacrificePiece === opt.value ? 'none' : '1px solid rgba(255,255,255,0.06)',
+                }}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        )}
 
         <div className="flex gap-1.5 mb-4 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
           {RATING_BAND_OPTIONS.map(opt => (
@@ -528,7 +563,7 @@ export function Puzzles() {
                 </div>
                 <h2 className="text-lg font-bold mb-2" style={{ color: TEXT_LIGHT }}>Daily Limit Reached</h2>
                 <p className="text-sm mb-6 max-w-xs" style={{ color: TEXT_MUTED }}>
-                  Free users get {daily?.limit ?? 5} puzzles per day. Upgrade to ChessScout Pro for unlimited puzzles!
+                  Free users get {daily?.limit ?? 5} puzzles per day. Upgrade to ChessScout.net Pro for unlimited puzzles!
                 </p>
                 <button onClick={() => navigate('/subscription')}
                   className="flex items-center gap-2 px-6 py-3 rounded-xl font-bold transition-all hover:scale-105"
@@ -603,8 +638,8 @@ export function Puzzles() {
                         borderRadius: '10px',
                         boxShadow: '0 20px 50px rgba(0,0,0,0.5)',
                       },
-                      lightSquareStyle: { backgroundColor: boardColors.light },
-                      darkSquareStyle: { backgroundColor: boardColors.dark },
+                      lightSquareStyle: { backgroundColor: boardColors.light, backgroundImage: boardTextureCss.backgroundImage, backgroundSize: boardTextureCss.backgroundSize },
+                      darkSquareStyle: { backgroundColor: boardColors.dark, backgroundImage: boardTextureCss.backgroundImage, backgroundSize: boardTextureCss.backgroundSize },
                       pieces: tintedPieces,
                       animationDurationInMs: 150,
                     }}
@@ -638,6 +673,21 @@ export function Puzzles() {
                       className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold transition-all"
                       style={{ background: 'rgba(255,255,255,0.06)', color: showHint ? '#fbbf24' : TEXT_MUTED }}>
                       <Lightbulb size={16} />Hint
+                    </button>
+                  )}
+
+                  {(state === 'ready' || state === 'solving') && puzzle && (
+                    <button
+                      onClick={() => {
+                        setGame(new Chess(puzzle.fen));
+                        setCurrentMoveIndex(0);
+                        setLastMove(null);
+                        setFeedback(null);
+                        setState('ready');
+                      }}
+                      className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold transition-all"
+                      style={{ background: 'rgba(255,255,255,0.08)', color: TEXT_MUTED }}>
+                      <RotateCcw size={16} />Retry
                     </button>
                   )}
 
@@ -736,11 +786,11 @@ export function Puzzles() {
                 onClick={async () => {
                   const url = `${window.location.origin}/share/${encodeCard({
                     type: 'streak',
-                    username: authUser?.chesscomUsername ?? authUser?.lichessUsername ?? 'A ChessScout user',
+                    username: authUser?.chesscomUsername ?? authUser?.lichessUsername ?? 'A ChessScout.net user',
                     streakDays: stats.streak,
                     accuracy: stats.accuracy,
                   })}`;
-                  const shareData = { title: `${stats.streak}-day puzzle streak on ChessScout`, url };
+                  const shareData = { title: `${stats.streak}-day puzzle streak on ChessScout.net`, url };
                   if (navigator.share) {
                     try { await navigator.share(shareData); return; } catch { /* fall through to clipboard */ }
                   }

@@ -37,7 +37,7 @@ export function PremiumGate({ children, feature }: PremiumGateProps) {
       </div>
       <h2 className="text-xl font-bold mb-2" style={{ color: TEXT_LIGHT }}>Premium subscription required</h2>
       <p className="mb-2 max-w-sm text-sm" style={{ color: TEXT_MUTED }}>
-        {feature} is a premium feature. Subscribe to ChessScout Pro to unlock it.
+        {feature} is a premium feature. Subscribe to ChessScout.net Pro to unlock it.
       </p>
       <p className="mb-6 max-w-sm text-xs" style={{ color: TEXT_MUTED }}>
         Includes a 3-day free trial — cancel anytime.

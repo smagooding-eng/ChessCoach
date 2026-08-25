@@ -138,7 +138,7 @@ export function Subscription() {
           className="mb-6 p-4 rounded-xl bg-green-500/10 border border-green-500/30 text-green-400 text-center"
         >
           <Check className="w-5 h-5 inline-block mr-2" />
-          Welcome to ChessScout Pro! Your subscription is now active.
+          Welcome to ChessScout.net Pro! Your subscription is now active.
         </motion.div>
       )}
       {isCanceled && (
@@ -159,7 +159,7 @@ export function Subscription() {
         <p className="text-muted-foreground max-w-lg mx-auto">
           {isPremium
             ? 'You have access to all Pro features.'
-            : "You're on the Free plan. Subscribe to ChessScout Pro to unlock unlimited puzzles, opponent scouting, and courses."}
+            : "You're on the Free plan. Subscribe to ChessScout.net Pro to unlock unlimited puzzles, opponent scouting, and courses."}
         </p>
       </div>
 
@@ -171,7 +171,7 @@ export function Subscription() {
                 <Crown className="w-5 h-5 text-primary" />
               </div>
               <div>
-                <h3 className="font-bold text-lg">ChessScout Pro</h3>
+                <h3 className="font-bold text-lg">ChessScout.net Pro</h3>
                 <p className="text-sm text-muted-foreground capitalize">
                   Status: <span className="text-primary font-bold">{subscription.status}</span>
                 </p>

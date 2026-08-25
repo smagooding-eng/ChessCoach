@@ -30,7 +30,25 @@ function readJobs(userId: string | null | undefined): Job[] {
   }
 }
 
-function writeJobs(userId: string, jobs: Job[]) {
+function writeJobs(userId: string, jobs: Job[], skipEventIfUnchanged?: Job[]) {
+  // Only dispatch 'import-jobs-changed' if the job list actually changed.
+  // Previously this fired on every single write -- including routine
+  // "still pending, nothing new" writes at the end of every tick -- which
+  // meant every tick's own writeJobs call re-triggered another tick via
+  // the event listener below, with no re-entrancy guard. That let
+  // multiple overlapping tick() calls independently detect the same
+  // completed import and each call setBannerVisible(true), so a banner
+  // the user had just dismissed could pop back up moments later from an
+  // in-flight overlapping call finishing late.
+  if (skipEventIfUnchanged) {
+    const before = skipEventIfUnchanged.map(j => j.jobId).sort().join(',');
+    const after = jobs.map(j => j.jobId).sort().join(',');
+    if (before === after) {
+      if (jobs.length === 0) localStorage.removeItem(STORAGE_KEY_PREFIX + userId);
+      else localStorage.setItem(STORAGE_KEY_PREFIX + userId, JSON.stringify(jobs));
+      return;
+    }
+  }
   if (jobs.length === 0) localStorage.removeItem(STORAGE_KEY_PREFIX + userId);
   else localStorage.setItem(STORAGE_KEY_PREFIX + userId, JSON.stringify(jobs));
   window.dispatchEvent(new CustomEvent('import-jobs-changed'));
@@ -76,43 +94,51 @@ export function ImportStatusWatcher() {
       } catch { /* ignore */ }
     };
 
+    const isTickingRef = { current: false };
+
     const tick = async () => {
-      migrateSessionJobs();
-      const jobs = readJobs(userId);
-      if (jobs.length === 0) return;
+      if (isTickingRef.current) return;
+      isTickingRef.current = true;
+      try {
+        migrateSessionJobs();
+        const jobs = readJobs(userId);
+        if (jobs.length === 0) return;
 
-      const stillPending: Job[] = [];
-      const newlyDone: Job[] = [];
+        const stillPending: Job[] = [];
+        const newlyDone: Job[] = [];
 
-      for (const job of jobs) {
-        try {
-          const r = await apiFetch(`/api/games/import-status/${job.jobId}`, { credentials: 'include' });
-          if (!r.ok) {
-            // 404 etc — drop it after 30 min
-            if (Date.now() - job.addedAt < 30 * 60 * 1000) stillPending.push(job);
-            continue;
-          }
-          const data = await r.json() as { status: string };
-          if (data.status === 'pending') {
+        for (const job of jobs) {
+          try {
+            const r = await apiFetch(`/api/games/import-status/${job.jobId}`, { credentials: 'include' });
+            if (!r.ok) {
+              // 404 etc — drop it after 30 min
+              if (Date.now() - job.addedAt < 30 * 60 * 1000) stillPending.push(job);
+              continue;
+            }
+            const data = await r.json() as { status: string };
+            if (data.status === 'pending') {
+              stillPending.push(job);
+            } else if (data.status === 'done') {
+              newlyDone.push(job);
+            } else {
+              // error — drop it silently (the user can retry from Import page)
+            }
+          } catch {
             stillPending.push(job);
-          } else if (data.status === 'done') {
-            newlyDone.push(job);
-          } else {
-            // error — drop it silently (the user can retry from Import page)
           }
-        } catch {
-          stillPending.push(job);
         }
-      }
 
-      writeJobs(userId, stillPending);
+        writeJobs(userId, stillPending, jobs);
 
-      if (newlyDone.length > 0) {
-        invalidateEloCache();
-        queryClient.invalidateQueries({ queryKey: ['/api/games'] });
-        queryClient.invalidateQueries({ queryKey: ['/api/analysis/summary'] });
-        setCompleted(prev => [...prev, ...newlyDone]);
-        setBannerVisible(true);
+        if (newlyDone.length > 0) {
+          invalidateEloCache();
+          queryClient.invalidateQueries({ queryKey: ['/api/games'] });
+          queryClient.invalidateQueries({ queryKey: ['/api/analysis/summary'] });
+          setCompleted(prev => [...prev, ...newlyDone]);
+          setBannerVisible(true);
+        }
+      } finally {
+        isTickingRef.current = false;
       }
     };
 

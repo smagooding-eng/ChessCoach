@@ -34,7 +34,7 @@ export default function PricingPage() {
   useEffect(() => {
     setPageMeta(
       'Pricing — ChessScout.net',
-      'ChessScout pricing: free tier and $5/month or $55/year Pro plan. See exactly what\'s included at each tier.',
+      'ChessScout.net pricing: free tier and $5/month or $55/year Pro plan. See exactly what\'s included at each tier.',
       '/pricing',
     );
   }, []);
@@ -91,7 +91,7 @@ export default function PricingPage() {
         </div>
 
         <h2 className="text-xl font-black mb-4 text-center" style={{ color: TEXT }}>
-          ChessScout vs Free Chess.com Review
+          ChessScout.net vs Free Chess.com Review
         </h2>
         <div className="rounded-xl overflow-hidden mb-4" style={{ border: '1px solid rgba(255,255,255,0.08)' }}>
           <table className="w-full text-sm">
@@ -99,8 +99,8 @@ export default function PricingPage() {
               <tr style={{ background: CARD }}>
                 <th className="text-left p-3 font-bold" style={{ color: TEXT }}>Feature</th>
                 <th className="p-3 font-bold text-center" style={{ color: MUTED }}>Free Chess.com Review</th>
-                <th className="p-3 font-bold text-center" style={{ color: TEXT }}>ChessScout Free</th>
-                <th className="p-3 font-bold text-center" style={{ color: G }}>ChessScout Pro</th>
+                <th className="p-3 font-bold text-center" style={{ color: TEXT }}>ChessScout.net Free</th>
+                <th className="p-3 font-bold text-center" style={{ color: G }}>ChessScout.net Pro</th>
               </tr>
             </thead>
             <tbody>
@@ -117,7 +117,7 @@ export default function PricingPage() {
         </div>
 
         <p className="text-xs text-center mb-10" style={{ color: MUTED }}>
-          Chess.com's own game review is genuinely good for a single game. ChessScout is built for a different question: what mistake do you keep making across all your games.
+          Chess.com's own game review is genuinely good for a single game. ChessScout.net is built for a different question: what mistake do you keep making across all your games.
         </p>
 
         <div className="text-center">

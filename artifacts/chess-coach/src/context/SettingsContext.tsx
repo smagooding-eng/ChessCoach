@@ -2,7 +2,9 @@ import React, { createContext, useContext, useState, useEffect, useRef } from 'r
 import { useUser } from '@/context/UserContext';
 
 export type BoardTheme = 'classic' | 'green' | 'blue' | 'gray' | 'purple' | 'crimson' | 'teal' | 'coal' | 'sunset' | 'custom';
-export type PieceStyle = 'classic' | 'glossy' | 'outlined' | 'ocean' | 'crimson' | 'emerald' | 'royal' | 'flat' | 'custom';
+export type BoardTexture = 'flat' | 'wood' | 'marble' | 'felt';
+export type AppBackground = 'default' | 'warm-gradient' | 'cool-gradient' | 'noise';
+export type PieceStyle = 'classic' | 'glossy' | 'outlined' | 'ocean' | 'crimson' | 'emerald' | 'royal' | 'flat' | 'depth' | 'custom';
 export type PieceShape = 'default' | 'cburnett';
 export type PromotionChoice = 'queen' | 'ask';
 export type BoardSize = 'compact' | 'standard' | 'large';
@@ -31,6 +33,34 @@ export const BOARD_THEMES: Record<Exclude<BoardTheme, 'custom'>, { light: string
   sunset:  { light: '#fbe8c9', dark: '#c8813a', label: 'Sunset' },
 };
 
+// CSS-only textures (no image assets exist to source/verify, so these are
+// gradient/pattern-based rather than photographic). Applied as an overlay
+// backgroundImage on top of the existing solid boardColors, so texture and
+// color stay independent choices.
+export const BOARD_TEXTURES: Record<BoardTexture, { label: string; backgroundImage: string; backgroundSize?: string }> = {
+  flat:   { label: 'Flat', backgroundImage: 'none' },
+  wood:   {
+    label: 'Wood Grain',
+    backgroundImage: 'repeating-linear-gradient(90deg, rgba(0,0,0,0.06) 0px, rgba(0,0,0,0.06) 1px, transparent 1px, transparent 3px), repeating-linear-gradient(0deg, rgba(255,255,255,0.03) 0px, transparent 2px, rgba(0,0,0,0.03) 4px, transparent 6px)',
+  },
+  marble: {
+    label: 'Marble',
+    backgroundImage: 'radial-gradient(circle at 20% 30%, rgba(255,255,255,0.08) 0%, transparent 35%), radial-gradient(circle at 75% 65%, rgba(0,0,0,0.06) 0%, transparent 40%), radial-gradient(circle at 45% 85%, rgba(255,255,255,0.05) 0%, transparent 30%)',
+  },
+  felt:   {
+    label: 'Felt',
+    backgroundImage: 'radial-gradient(rgba(0,0,0,0.05) 1px, transparent 1px)',
+    backgroundSize: '3px 3px',
+  },
+};
+
+export const APP_BACKGROUNDS: Record<AppBackground, { label: string; css: React.CSSProperties }> = {
+  default:       { label: 'Default', css: {} },
+  'warm-gradient': { label: 'Warm', css: { backgroundImage: 'radial-gradient(circle at 15% 0%, rgba(201,162,75,0.08) 0%, transparent 45%), radial-gradient(circle at 85% 100%, rgba(129,182,76,0.05) 0%, transparent 40%)' } },
+  'cool-gradient': { label: 'Cool', css: { backgroundImage: 'radial-gradient(circle at 15% 0%, rgba(107,164,232,0.08) 0%, transparent 45%), radial-gradient(circle at 85% 100%, rgba(199,125,212,0.05) 0%, transparent 40%)' } },
+  noise:         { label: 'Textured', css: { backgroundImage: 'radial-gradient(rgba(255,255,255,0.015) 1px, transparent 1px)', backgroundSize: '3px 3px' } },
+};
+
 export const PIECE_STYLES: Record<Exclude<PieceStyle, 'custom'>, { light: string; dark: string; label: string; finish: React.CSSProperties }> = {
   classic:  { light: '#ffffff', dark: '#2b2b2b', label: 'Classic',  finish: {} },
   glossy:   { light: '#ffffff', dark: '#2b2b2b', label: 'Glossy',   finish: { filter: 'drop-shadow(0 2px 1px rgba(0,0,0,0.35)) brightness(1.08) contrast(1.1)' } },
@@ -40,6 +70,7 @@ export const PIECE_STYLES: Record<Exclude<PieceStyle, 'custom'>, { light: string
   emerald:  { light: '#e8fff2', dark: '#166b45', label: 'Emerald',  finish: { filter: 'drop-shadow(0 1px 1px rgba(0,0,0,0.3))' } },
   royal:    { light: '#f3e9ff', dark: '#4a1c7a', label: 'Royal',    finish: { filter: 'drop-shadow(0 1px 1px rgba(0,0,0,0.3))' } },
   flat:     { light: '#f2f2f2', dark: '#232323', label: 'Flat',     finish: { filter: 'contrast(0.92) saturate(0.85)' } },
+  depth:    { light: '#ffffff', dark: '#2b2b2b', label: 'Depth',    finish: { filter: 'drop-shadow(0 3px 2px rgba(0,0,0,0.5)) drop-shadow(0 1px 0 rgba(255,255,255,0.15)) brightness(1.05)' } },
 };
 
 export const BOARD_SIZES: Record<BoardSize, { maxWidth: number; label: string }> = {
@@ -59,8 +90,10 @@ export interface SavedTheme {
 
 interface Settings {
   boardTheme: BoardTheme;
+  boardTexture: BoardTexture;
   pieceStyle: PieceStyle;
   pieceShape: PieceShape;
+  appBackground: AppBackground;
   boardCustomColors: ColorPair;
   pieceCustomColors: ColorPair;
   confirmMoves: boolean;
@@ -72,8 +105,10 @@ interface Settings {
 
 const APP_DEFAULT_SETTINGS: Settings = {
   boardTheme: 'green',
+  boardTexture: 'flat',
   pieceStyle: 'classic',
   pieceShape: 'default',
+  appBackground: 'default',
   boardCustomColors: { light: '#eeeed2', dark: '#769656' },
   pieceCustomColors: { light: '#ffffff', dark: '#2b2b2b' },
   confirmMoves: false,
@@ -99,8 +134,10 @@ function scopedKey(base: string, userId: string): string {
 
 interface SettingsContextValue extends Settings {
   setBoardTheme: (t: BoardTheme) => void;
+  setBoardTexture: (t: BoardTexture) => void;
   setPieceStyle: (t: PieceStyle) => void;
   setPieceShape: (t: PieceShape) => void;
+  setAppBackground: (t: AppBackground) => void;
   setBoardCustomColor: (which: 'light' | 'dark', color: string) => void;
   setPieceCustomColor: (which: 'light' | 'dark', color: string) => void;
   setConfirmMoves: (v: boolean) => void;
@@ -109,6 +146,8 @@ interface SettingsContextValue extends Settings {
   setPromotionChoice: (v: PromotionChoice) => void;
   setBoardSize: (v: BoardSize) => void;
   boardColors: ColorPair;
+  boardTextureCss: { backgroundImage: string; backgroundSize?: string };
+  appBackgroundCss: React.CSSProperties;
   pieceColors: ColorPair & { finish: React.CSSProperties };
   boardMaxWidth: number;
   savedThemes: SavedTheme[];
@@ -183,8 +222,10 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const value: SettingsContextValue = {
     ...settings,
     setBoardTheme: (t) => setSettings((s) => ({ ...s, boardTheme: t })),
+    setBoardTexture: (t) => setSettings((s) => ({ ...s, boardTexture: t })),
     setPieceStyle: (t) => setSettings((s) => ({ ...s, pieceStyle: t })),
     setPieceShape: (t) => setSettings((s) => ({ ...s, pieceShape: t })),
+    setAppBackground: (t) => setSettings((s) => ({ ...s, appBackground: t })),
     setBoardCustomColor: (which, color) =>
       setSettings((s) => ({ ...s, boardTheme: 'custom', boardCustomColors: { ...s.boardCustomColors, [which]: color } })),
     setPieceCustomColor: (which, color) =>
@@ -195,6 +236,8 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     setPromotionChoice: (v) => setSettings((s) => ({ ...s, promotionChoice: v })),
     setBoardSize: (v) => setSettings((s) => ({ ...s, boardSize: v })),
     boardColors: resolvedBoardColors,
+    boardTextureCss: BOARD_TEXTURES[settings.boardTexture],
+    appBackgroundCss: APP_BACKGROUNDS[settings.appBackground].css,
     pieceColors: resolvedPieceStyle,
     boardMaxWidth: BOARD_SIZES[settings.boardSize].maxWidth,
     savedThemes,

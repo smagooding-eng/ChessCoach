@@ -378,7 +378,7 @@ export function LiveHistory() {
 
   return (
     <div className="space-y-5 px-4 pt-4 md:px-0 md:pt-0 pb-10">
-      <PageHero piece="♞" title="ChessScout Live" subtitle="Your live match history and rating progression by time control." />
+      <PageHero piece="♞" title="ChessScout.net Live" subtitle="Your live match history and rating progression by time control." />
 
       <div className="flex flex-wrap items-center gap-2">
         <Link href="/live" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-primary/15 text-primary hover:bg-primary/25 border border-primary/30 transition-colors">

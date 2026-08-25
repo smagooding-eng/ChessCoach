@@ -9,3 +9,4 @@ export * from "./live";
 export * from "./outreach";
 export * from "./seoContent";
 export * from "./scannedPositions";
+export * from "./landingFunnel";

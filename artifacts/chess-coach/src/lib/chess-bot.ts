@@ -404,13 +404,24 @@ export function analyzeMoveQuality(fenBefore: string, san: string): MoveAnalysis
     quality = 'book';
   } else if (isBest && cpLoss === 0 && isComplexPosition && (isSacrifice || inCheck || evalSwing > 80)) {
     quality = 'brilliant';
-  } else if (isBest && cpLoss === 0 && movesWithin30 <= 3 && !isOpening) {
+  } else if (isBest && cpLoss === 0 && movesWithin30 <= 1 && !isOpening && moves.length > 2) {
+    // "Great": the only move that holds the position -- everything else
+    // in the position would have given up most of the advantage.
+    quality = 'great';
+  } else if (isBest && cpLoss === 0) {
+    // The engine's literal top choice, but not sacrificial/forced enough
+    // to be Brilliant or Great. This used to fall through to 'good' below,
+    // which meant the single objectively-best move in a position could
+    // get the same label as an ordinary solid move -- a real gap against
+    // how every major site (chess.com, Lichess, etc.) labels this.
+    quality = 'best';
+  } else if (cpLoss <= 50) {
     quality = 'excellent';
-  } else if (cpLoss <= 15) {
+  } else if (cpLoss <= 100) {
     quality = 'good';
-  } else if (cpLoss <= 60) {
+  } else if (cpLoss <= 300) {
     quality = 'inaccuracy';
-  } else if (cpLoss <= 200) {
+  } else if (cpLoss <= 500) {
     quality = 'mistake';
   } else {
     quality = 'blunder';
@@ -441,6 +452,8 @@ export function analyzeMoveQuality(fenBefore: string, san: string): MoveAnalysis
 
   if (pros.length === 0) {
     if (quality === 'brilliant') pros.push('Only strong move in a sharp position');
+    else if (quality === 'great') pros.push('The only move that holds the position');
+    else if (quality === 'best') pros.push('The engine\'s top choice');
     else if (quality === 'excellent') pros.push('Strong continuation');
     else if (quality === 'good') pros.push('Solid move');
     else if (quality === 'book') pros.push('Standard opening move');
@@ -449,6 +462,8 @@ export function analyzeMoveQuality(fenBefore: string, san: string): MoveAnalysis
   let summary = '';
   switch (quality) {
     case 'brilliant': summary = 'A difficult move to find — the best in a complex position!'; break;
+    case 'great': summary = 'The only move that keeps your position together here.'; break;
+    case 'best': summary = 'The engine\'s top choice in this position.'; break;
     case 'excellent': summary = 'A strong choice that keeps the advantage.'; break;
     case 'good': summary = 'A solid move. Close to the best option.'; break;
     case 'book': summary = 'A well-known opening move. Good theory.'; break;

@@ -96,7 +96,7 @@ export function Dashboard() {
             </div>
 
             {(multiElo.chesscom?.hasData || multiElo.lichess?.hasData) ? (
-              <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+              <div className="mt-1.5">
                 {(() => {
                   const ratings: number[] = [];
                   if (multiElo.chesscom?.hasData) ratings.push(multiElo.chesscom.currentRating);
@@ -106,15 +106,15 @@ export function Dashboard() {
                     ? liveBest.rating
                     : Math.round(ratings.reduce((a, b) => a + b, 0) / ratings.length);
                   return (
-                    <span className="inline-flex items-baseline gap-1 px-2.5 py-1 rounded-md" style={{ background: `linear-gradient(135deg, rgba(129,182,76,0.28), rgba(129,182,76,0.18))`, border: `1px solid ${CHESSCOM_GREEN}`, boxShadow: '0 2px 8px rgba(129,182,76,0.25)' }}>
+                    <div className="flex items-baseline gap-2 flex-wrap">
                       <span className="text-[9px] font-semibold uppercase tracking-[0.14em]" style={{ color: CHESSCOM_GREEN }}>Scout</span>
-                      <span className={t.numeric} style={{ fontSize: '1rem', color: TEXT_LIGHT }}>{scoutElo}</span>
+                      <span className="text-2xl font-black leading-none" style={{ color: TEXT_LIGHT }}>{scoutElo}</span>
                       <button
                         onClick={async (e) => {
                           e.preventDefault();
                           const url = `${window.location.origin}/share/${encodeCard({
                             type: 'milestone',
-                            username: username ?? 'A ChessScout user',
+                            username: username ?? 'A ChessScout.net user',
                             newRating: scoutElo,
                           })}`;
                           const shareData = { title: `My Scout ELO is ${scoutElo}`, url };
@@ -123,37 +123,27 @@ export function Dashboard() {
                           }
                           try { await navigator.clipboard.writeText(url); } catch { /* nothing more we can do */ }
                         }}
-                        className="ml-0.5 opacity-60 hover:opacity-100 transition-opacity"
+                        className="opacity-50 hover:opacity-100 transition-opacity"
                         style={{ color: CHESSCOM_GREEN }}
                         aria-label="Share your Scout ELO"
                       >
-                        <Share2 className="w-3 h-3" />
+                        <Share2 className="w-3.5 h-3.5" />
                       </button>
-                    </span>
+                    </div>
                   );
                 })()}
-                {multiElo.chesscom?.hasData && (
-                  <span className="inline-flex items-baseline gap-1 px-2 py-1 rounded-md" style={{ background: 'rgba(129,182,76,0.08)', border: '1px solid rgba(129,182,76,0.2)' }}>
-                    <span className="text-[9px] font-semibold uppercase tracking-[0.14em]" style={{ color: CHESSCOM_GREEN }}>CC</span>
-                    <span className="text-sm font-semibold" style={{ color: TEXT_LIGHT, letterSpacing: '-0.01em' }}>{multiElo.chesscom.currentRating}</span>
-                    {multiElo.chesscom.delta !== 0 && (
-                      <span className="text-[10px] font-semibold" style={{ color: multiElo.chesscom.delta > 0 ? CHESSCOM_GREEN : '#dc4343' }}>
-                        {multiElo.chesscom.delta > 0 ? '+' : '−'}{Math.abs(multiElo.chesscom.delta)}
-                      </span>
-                    )}
-                  </span>
-                )}
-                {multiElo.lichess?.hasData && (
-                  <span className="inline-flex items-baseline gap-1 px-2 py-1 rounded-md" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}>
-                    <span className="text-[9px] font-semibold uppercase tracking-[0.14em]" style={{ color: '#b0b0b0' }}>LC</span>
-                    <span className="text-sm font-semibold" style={{ color: TEXT_LIGHT, letterSpacing: '-0.01em' }}>{multiElo.lichess.currentRating}</span>
-                    {multiElo.lichess.delta !== 0 && (
-                      <span className="text-[10px] font-semibold" style={{ color: multiElo.lichess.delta > 0 ? CHESSCOM_GREEN : '#dc4343' }}>
-                        {multiElo.lichess.delta > 0 ? '+' : '−'}{Math.abs(multiElo.lichess.delta)}
-                      </span>
-                    )}
-                  </span>
-                )}
+                <div className="flex items-center gap-2.5 mt-0.5">
+                  {multiElo.chesscom?.hasData && (
+                    <span className="text-[11px]" style={{ color: TEXT_MUTED }}>
+                      Chess.com <span className="font-bold" style={{ color: TEXT_LIGHT }}>{multiElo.chesscom.currentRating}</span>
+                    </span>
+                  )}
+                  {multiElo.lichess?.hasData && (
+                    <span className="text-[11px]" style={{ color: TEXT_MUTED }}>
+                      Lichess <span className="font-bold" style={{ color: TEXT_LIGHT }}>{multiElo.lichess.currentRating}</span>
+                    </span>
+                  )}
+                </div>
               </div>
             ) : chessPlayer?.rating ? (
               <div className="flex items-baseline gap-1.5 mt-1.5">
@@ -166,19 +156,30 @@ export function Dashboard() {
 
         {summary?.totalGames ? (
           <div className="relative mt-4">
-            <div className="flex items-baseline justify-between mb-1.5 gap-2">
+            <div className="flex items-baseline justify-between mb-1.5 gap-2 flex-wrap">
               <span className="text-[11px] font-bold truncate" style={{ color: TEXT_MUTED }}>
-                <span style={{ color: TEXT_LIGHT }}>{summary.totalGames.toLocaleString()}</span> games
-              </span>
-              <span className="text-[11px] font-bold whitespace-nowrap" style={{ color: TEXT_MUTED }}>
+                <span style={{ color: TEXT_LIGHT }}>{summary.totalGames.toLocaleString()}</span> games ·{' '}
                 <span style={{ color: CHESSCOM_GREEN }}>{summary.wins.toLocaleString()}W</span>
                 {' · '}
                 <span style={{ color: TEXT_LIGHT }}>{summary.draws.toLocaleString()}D</span>
                 {' · '}
                 <span style={{ color: '#dc4343' }}>{summary.losses.toLocaleString()}L</span>
-                {' · '}
-                <span style={{ color: CHESSCOM_GREEN }}>{winRate}%</span>
               </span>
+              {(() => {
+                const trend = summary?.accuracyTrend;
+                if (!trend || trend.length < 2) return null;
+                const sorted = [...trend].sort((a, b) => (a.month < b.month ? -1 : 1));
+                const current = sorted[sorted.length - 1];
+                const prior = sorted[sorted.length - 2];
+                if (!current.moves || !prior.moves) return null;
+                const accuracyDelta = current.accuracy - prior.accuracy;
+                if (accuracyDelta === 0) return null;
+                return (
+                  <span className="text-[11px] font-bold whitespace-nowrap" style={{ color: accuracyDelta > 0 ? CHESSCOM_GREEN : '#dc4343' }}>
+                    {accuracyDelta > 0 ? '↑' : '↓'} {Math.abs(accuracyDelta).toFixed(1)}% accuracy vs last month
+                  </span>
+                );
+              })()}
             </div>
             <div className="flex h-2 rounded-full overflow-hidden gap-0.5" style={{ boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.5), 0 1px 0 rgba(255,255,255,0.04)' }}>
               <div className="relative" style={{ width: `${(summary.wins / summary.totalGames) * 100}%`, background: `linear-gradient(180deg, #a8d567 0%, ${CHESSCOM_GREEN} 100%)`, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.25)' }} />
@@ -189,29 +190,6 @@ export function Dashboard() {
         ) : (
           <p className="relative mt-3 text-sm" style={{ color: TEXT_MUTED }}>Import games to start coaching</p>
         )}
-
-        {(() => {
-          const trend = summary?.accuracyTrend;
-          if (!trend || trend.length < 2) return null;
-          const sorted = [...trend].sort((a, b) => (a.month < b.month ? -1 : 1));
-          const current = sorted[sorted.length - 1];
-          const prior = sorted[sorted.length - 2];
-          if (!current.moves || !prior.moves) return null;
-          const accuracyDelta = current.accuracy - prior.accuracy;
-          const blunderDelta = current.blunderRate - prior.blunderRate;
-          if (accuracyDelta === 0 && blunderDelta === 0) return null;
-          return (
-            <div className="relative mt-3 flex items-center gap-4 px-3 py-2 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
-              <span className="text-[10px] font-semibold uppercase tracking-[0.1em] shrink-0" style={{ color: TEXT_MUTED }}>vs last month</span>
-              <span className="text-xs font-bold" style={{ color: accuracyDelta > 0 ? CHESSCOM_GREEN : accuracyDelta < 0 ? '#dc4343' : TEXT_MUTED }}>
-                {accuracyDelta > 0 ? '↑' : accuracyDelta < 0 ? '↓' : '–'} {Math.abs(accuracyDelta).toFixed(1)}% accuracy
-              </span>
-              <span className="text-xs font-bold" style={{ color: blunderDelta < 0 ? CHESSCOM_GREEN : blunderDelta > 0 ? '#dc4343' : TEXT_MUTED }}>
-                {blunderDelta < 0 ? '↓' : blunderDelta > 0 ? '↑' : '–'} {Math.abs(blunderDelta).toFixed(1)}% blunder rate
-              </span>
-            </div>
-          );
-        })()}
 
         <div className="relative flex gap-2 mt-4">
           <Link href="/import" className="flex-1 px-3 py-2.5 rounded-lg font-semibold text-sm text-white flex items-center justify-center gap-2 transition-all hover:scale-[1.02] active:scale-[0.98]" style={{ background: `linear-gradient(180deg, #95c45a 0%, ${CHESSCOM_GREEN} 100%)`, boxShadow: `0 4px 12px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.2)` }}>
@@ -256,37 +234,103 @@ export function Dashboard() {
         </div>
       </Link>
 
-      <div className="px-3 md:px-0">
-        <div className="relative overflow-hidden rounded-2xl"
+      <Link href="/opponents" className="block px-3 md:px-0">
+        <div className="relative overflow-hidden rounded-2xl p-4 md:p-5 transition-colors group cursor-pointer"
+          style={{
+            background: 'linear-gradient(180deg, #383532 0%, #2a2825 100%)',
+            border: `1px solid rgba(129,182,76,0.3)`,
+            boxShadow: '0 18px 50px -16px rgba(0,0,0,0.6), 0 4px 16px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04)',
+          }}
+          onMouseEnter={e => (e.currentTarget.style.borderColor = 'rgba(129,182,76,0.5)')}
+          onMouseLeave={e => (e.currentTarget.style.borderColor = 'rgba(129,182,76,0.3)')}>
+
+          <div className="relative flex items-center gap-3 mb-2.5">
+            <PieceTile piece="♞" size={48} />
+            <div className="flex-1 min-w-0">
+              <span className="inline-block text-[10px] font-semibold uppercase tracking-[0.18em]" style={{ color: CHESSCOM_GREEN }}>#1 Feature</span>
+              <h3 className="font-semibold text-base leading-tight" style={{ color: TEXT_LIGHT, letterSpacing: '-0.01em' }}>Opponent Scout</h3>
+            </div>
+            <ChevronRight className="w-4 h-4 shrink-0 opacity-40 group-hover:opacity-80 transition-opacity" style={{ color: CHESSCOM_GREEN }} />
+          </div>
+          <p className="relative text-xs leading-relaxed" style={{ color: TEXT_MUTED }}>
+            Smart scouting report on any Chess.com player. Find weaknesses, tendencies, and prep lines before your next match.
+          </p>
+        </div>
+      </Link>
+
+      <div className="grid grid-cols-2 gap-3 px-3 md:px-0">
+        <Link href="/practice" className="block">
+          <div className="relative overflow-hidden rounded-2xl p-4 flex flex-col items-start gap-2 transition-colors group cursor-pointer h-full"
+            style={{
+              background: 'linear-gradient(180deg, #383532 0%, #2a2825 100%)',
+              border: '1px solid rgba(255,255,255,0.06)',
+              boxShadow: '0 18px 50px -16px rgba(0,0,0,0.6), 0 4px 16px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04)',
+            }}>
+            <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: 'rgba(129,182,76,0.15)' }}>
+              <Bot className="w-4.5 h-4.5" style={{ color: CHESSCOM_GREEN }} />
+            </div>
+            <div className="flex-1">
+              <h3 className="font-semibold text-sm" style={{ color: TEXT_LIGHT }}>Practice Bots</h3>
+              <p className="text-xs mt-0.5" style={{ color: TEXT_MUTED }}>8 opponents, 400–2000 ELO</p>
+            </div>
+          </div>
+        </Link>
+        <Link href="/practice?tab=openings" className="block">
+          <div className="relative overflow-hidden rounded-2xl p-4 flex flex-col items-start gap-2 transition-colors group cursor-pointer h-full"
+            style={{
+              background: 'linear-gradient(180deg, #383532 0%, #2a2825 100%)',
+              border: '1px solid rgba(255,255,255,0.06)',
+              boxShadow: '0 18px 50px -16px rgba(0,0,0,0.6), 0 4px 16px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04)',
+            }}>
+            <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: 'rgba(129,182,76,0.15)' }}>
+              <BookOpen className="w-4.5 h-4.5" style={{ color: CHESSCOM_GREEN }} />
+            </div>
+            <div className="flex-1">
+              <h3 className="font-semibold text-sm" style={{ color: TEXT_LIGHT }}>Opening Trainer</h3>
+              <p className="text-xs mt-0.5" style={{ color: TEXT_MUTED }}>Drill lines move-by-move</p>
+            </div>
+          </div>
+        </Link>
+      </div>
+
+      <Link href="/analysis" className="block px-3 md:px-0">
+        <div className="relative overflow-hidden rounded-2xl transition-all hover:scale-[1.01] active:scale-[0.99]"
           style={{
             background: 'linear-gradient(180deg, #383532 0%, #2a2825 100%)',
             border: '1px solid rgba(255,255,255,0.06)',
             boxShadow: '0 18px 50px -16px rgba(0,0,0,0.6), 0 4px 16px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04)',
           }}>
-          
+
           <div className="relative grid grid-cols-2 sm:grid-cols-4">
             {[
-              { label: 'Total Games', value: summary?.totalGames?.toLocaleString() || '0' },
-              { label: 'Win Rate', value: `${winRate}%` },
-              { label: 'Avg Rating', value: Math.round(summary?.avgRating || 0) || '—' },
-              { label: 'Reviewed', value: reviewedCount },
+              { label: 'Total Games', value: summary?.totalGames?.toLocaleString() || '0', icon: Trophy, color: '#c9a24b' },
+              { label: 'Win Rate', value: `${winRate}%`, icon: Target, color: CHESSCOM_GREEN },
+              { label: 'Avg Rating', value: Math.round(summary?.avgRating || 0) || '—', icon: TrendingUp, color: '#6ba4e8' },
+              { label: 'Reviewed', value: reviewedCount, icon: Activity, color: '#c77dd4' },
             ].map((s, i) => {
               const isLeftColMobile = i % 2 === 0;
               const isTopRowMobile = i < 2;
               return (
-                <div key={s.label} className="px-3.5 py-3.5 md:px-4 md:py-4"
+                <div key={s.label} className="relative px-3.5 py-4 md:px-4 md:py-4.5 overflow-hidden"
                   style={{
                     borderRight: isLeftColMobile ? '1px solid rgba(255,255,255,0.05)' : undefined,
                     borderBottom: isTopRowMobile ? '1px solid rgba(255,255,255,0.05)' : undefined,
                   }}>
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.18em] leading-none mb-1.5" style={{ color: TEXT_MUTED }}>{s.label}</p>
-                  <p className={t.numeric} style={{ fontSize: '1.25rem', lineHeight: 1, color: TEXT_LIGHT }}>{s.value}</p>
+                  <div className="absolute -top-3 -right-3 w-16 h-16 rounded-full opacity-[0.07]" style={{ background: s.color }} />
+                  <div className="relative w-7 h-7 rounded-lg flex items-center justify-center mb-2" style={{ background: `${s.color}20` }}>
+                    <s.icon className="w-3.5 h-3.5" style={{ color: s.color }} />
+                  </div>
+                  <p className="relative text-[10px] font-semibold uppercase tracking-[0.18em] leading-none mb-1.5" style={{ color: TEXT_MUTED }}>{s.label}</p>
+                  <p className={t.numeric} style={{ position: 'relative', fontSize: '1.35rem', lineHeight: 1, color: TEXT_LIGHT }}>{s.value}</p>
                 </div>
               );
             })}
           </div>
+          <div className="relative flex items-center justify-center gap-1 py-2.5 text-[11px] font-bold" style={{ color: CHESSCOM_GREEN, borderTop: '1px solid rgba(255,255,255,0.05)', background: 'rgba(129,182,76,0.04)' }}>
+            See Full Analysis <ChevronRight className="w-3 h-3" />
+          </div>
         </div>
-      </div>
+      </Link>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 md:gap-4 px-3 md:px-0">
         <div className="lg:col-span-2 space-y-3 md:space-y-4">
@@ -361,61 +405,23 @@ export function Dashboard() {
         </div>
 
         <div className="space-y-3 md:space-y-4">
-          <Link href="/opponents" className="block">
-            <div className="relative overflow-hidden rounded-2xl p-4 md:p-5 transition-colors group cursor-pointer"
+          <Link href="/play" className="block">
+            <div className="relative overflow-hidden rounded-2xl p-4 md:p-5 flex items-center gap-3 transition-colors group cursor-pointer"
               style={{
                 background: 'linear-gradient(180deg, #383532 0%, #2a2825 100%)',
-                border: `1px solid rgba(129,182,76,0.3)`,
+                border: '1px solid rgba(255,255,255,0.06)',
                 boxShadow: '0 18px 50px -16px rgba(0,0,0,0.6), 0 4px 16px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04)',
-              }}
-              onMouseEnter={e => (e.currentTarget.style.borderColor = 'rgba(129,182,76,0.5)')}
-              onMouseLeave={e => (e.currentTarget.style.borderColor = 'rgba(129,182,76,0.3)')}>
-              
-              <div className="relative flex items-center gap-3 mb-2.5">
-                <PieceTile piece="♞" size={48} />
-                <div className="flex-1 min-w-0">
-                  <span className="inline-block text-[10px] font-semibold uppercase tracking-[0.18em]" style={{ color: CHESSCOM_GREEN }}>#1 Feature</span>
-                  <h3 className="font-semibold text-base leading-tight" style={{ color: TEXT_LIGHT, letterSpacing: '-0.01em' }}>Opponent Scout</h3>
-                </div>
-                <ChevronRight className="w-4 h-4 shrink-0 opacity-40 group-hover:opacity-80 transition-opacity" style={{ color: CHESSCOM_GREEN }} />
+              }}>
+              <div className="shrink-0 w-11 h-11 rounded-xl flex items-center justify-center" style={{ background: 'rgba(129,182,76,0.15)' }}>
+                <Play className="w-5 h-5" style={{ color: CHESSCOM_GREEN }} />
               </div>
-              <p className="relative text-xs leading-relaxed" style={{ color: TEXT_MUTED }}>
-                Smart scouting report on any Chess.com player. Find weaknesses, tendencies, and prep lines before your next match.
-              </p>
+              <div className="flex-1 min-w-0">
+                <h3 className="font-semibold text-sm" style={{ color: TEXT_LIGHT }}>Play Local</h3>
+                <p className="text-xs" style={{ color: TEXT_MUTED }}>Pass-and-play on this device with a friend</p>
+              </div>
+              <ChevronRight className="w-4 h-4 shrink-0 opacity-40 group-hover:opacity-80 transition-opacity" style={{ color: CHESSCOM_GREEN }} />
             </div>
           </Link>
-
-          <div className="relative overflow-hidden rounded-2xl p-4 md:p-5 space-y-1"
-            style={{
-              background: 'linear-gradient(180deg, #383532 0%, #2a2825 100%)',
-              border: '1px solid rgba(255,255,255,0.06)',
-              boxShadow: '0 18px 50px -16px rgba(0,0,0,0.6), 0 4px 16px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04)',
-            }}>
-            
-            <div className="relative flex items-center gap-3 mb-3">
-              <PieceTile piece="♛" />
-              <h2 className="text-base md:text-lg font-semibold" style={{ color: TEXT_LIGHT, letterSpacing: '-0.01em' }}>Quick Actions</h2>
-            </div>
-            {[
-              { href: '/opponents', label: 'Scout an Opponent', icon: <Swords className="w-4 h-4" /> },
-              { href: '/lookup', label: 'Game Lookup', icon: <Search className="w-4 h-4" /> },
-              { href: '/play', label: 'Play Local', icon: <Play className="w-4 h-4" /> },
-              { href: '/practice', label: 'Practice vs Bots', icon: <Bot className="w-4 h-4" /> },
-              { href: '/import', label: 'Import Games', icon: <ImportIcon /> },
-              { href: '/analysis', label: 'Run Deep Analysis', icon: <Target className="w-4 h-4" /> },
-            ].map(action => (
-              <Link key={action.href} href={action.href} className="block">
-                <div className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl transition-colors text-sm font-medium group"
-                  style={{ color: TEXT_MUTED }}
-                  onMouseEnter={e => { e.currentTarget.style.color = CHESSCOM_GREEN; e.currentTarget.style.background = 'rgba(129,182,76,0.08)'; }}
-                  onMouseLeave={e => { e.currentTarget.style.color = TEXT_MUTED; e.currentTarget.style.background = 'transparent'; }}>
-                  <span>{action.icon}</span>
-                  {action.label}
-                  <ChevronRight className="w-3 h-3 ml-auto opacity-0 group-hover:opacity-60 transition-opacity" />
-                </div>
-              </Link>
-            ))}
-          </div>
 
           {coursesData?.courses?.length ? (
             <div className="relative overflow-hidden rounded-2xl p-4 md:p-5"
@@ -460,7 +466,7 @@ export function Dashboard() {
           ) : null}
         </div>
 
-        {authUser && <ReferralCard isPremium={isPremium} />}
+        {authUser && <ReferralCard isPremium={isPremium} compact />}
       </div>
     </div>
   );

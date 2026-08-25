@@ -334,6 +334,62 @@ router.get("/admin/subscribers", requireAdmin, async (_req: Request, res: Respon
 // SEO articles -- these were missing entirely, which is why manual
 // generation was silently failing (the frontend panel calls these exact
 // paths, but nothing on the backend answered them until now).
+// Every pro user's unique referral code (auto-generated when their
+// subscription first went active), with how many people signed up
+// through it and how many of those went Pro themselves. Separate from
+// the per-user drill-down in /admin/users/:userId -- this is the
+// all-codes-at-once view.
+router.get("/admin/referral-codes", requireAdmin, async (_req: Request, res: Response) => {
+  try {
+    const codedUsers = await db
+      .select({
+        id: usersTable.id,
+        email: usersTable.email,
+        firstName: usersTable.firstName,
+        chesscomUsername: usersTable.chesscomUsername,
+        inviteCode: usersTable.inviteCode,
+      })
+      .from(usersTable)
+      .where(isNotNull(usersTable.inviteCode));
+
+    if (codedUsers.length === 0) {
+      res.json({ codes: [] });
+      return;
+    }
+
+    const referrerIds = codedUsers.map((u) => u.id);
+    const conversions = await db
+      .select({
+        referrerUserId: referralConversionsTable.referrerUserId,
+        status: referralConversionsTable.status,
+      })
+      .from(referralConversionsTable)
+      .where(inArray(referralConversionsTable.referrerUserId, referrerIds));
+
+    const statsByReferrer: Record<string, { referred: number; converted: number }> = {};
+    for (const c of conversions) {
+      if (!statsByReferrer[c.referrerUserId]) statsByReferrer[c.referrerUserId] = { referred: 0, converted: 0 };
+      statsByReferrer[c.referrerUserId].referred++;
+      if (c.status === "converted") statsByReferrer[c.referrerUserId].converted++;
+    }
+
+    const codes = codedUsers
+      .map((u) => ({
+        userId: u.id,
+        email: u.email,
+        displayName: u.firstName || u.chesscomUsername || u.email || "Unknown",
+        inviteCode: u.inviteCode,
+        referred: statsByReferrer[u.id]?.referred ?? 0,
+        converted: statsByReferrer[u.id]?.converted ?? 0,
+      }))
+      .sort((a, b) => b.converted - a.converted || b.referred - a.referred);
+
+    res.json({ codes });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to fetch referral codes", details: err.message });
+  }
+});
+
 router.get("/admin/seo-articles", requireAdmin, async (_req: Request, res: Response) => {
   try {
     const articles = await db
