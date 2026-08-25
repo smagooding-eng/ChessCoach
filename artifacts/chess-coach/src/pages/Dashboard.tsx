@@ -86,18 +86,18 @@ export function Dashboard() {
           </div>
 
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <h1 className="font-display text-xl md:text-2xl font-semibold truncate leading-none" style={{ color: TEXT_LIGHT, letterSpacing: '-0.015em' }}>{username}</h1>
-              {isPremium && (
-                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-semibold uppercase tracking-[0.14em] text-black" style={{ background: `linear-gradient(135deg, ${BRASS}, #b3854a)` }}>
-                  <Crown className="w-2.5 h-2.5" /> Pro
-                </span>
-              )}
-            </div>
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <h1 className="font-display text-lg font-semibold truncate leading-none" style={{ color: TEXT_LIGHT, letterSpacing: '-0.015em' }}>{username}</h1>
+                {isPremium && (
+                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-semibold uppercase tracking-[0.14em] text-black shrink-0" style={{ background: `linear-gradient(135deg, ${BRASS}, #b3854a)` }}>
+                    <Crown className="w-2.5 h-2.5" /> Pro
+                  </span>
+                )}
+              </div>
 
-            {(multiElo.chesscom?.hasData || multiElo.lichess?.hasData) ? (
-              <div className="mt-1.5">
-                {(() => {
+              {(multiElo.chesscom?.hasData || multiElo.lichess?.hasData) ? (
+                (() => {
                   const ratings: number[] = [];
                   if (multiElo.chesscom?.hasData) ratings.push(multiElo.chesscom.currentRating);
                   if (multiElo.lichess?.hasData) ratings.push(multiElo.lichess.currentRating);
@@ -106,82 +106,56 @@ export function Dashboard() {
                     ? liveBest.rating
                     : Math.round(ratings.reduce((a, b) => a + b, 0) / ratings.length);
                   return (
-                    <div className="flex items-baseline gap-2 flex-wrap">
-                      <span className="text-[9px] font-semibold uppercase tracking-[0.14em]" style={{ color: CHESSCOM_GREEN }}>Scout</span>
-                      <span className="text-2xl font-black leading-none" style={{ color: TEXT_LIGHT }}>{scoutElo}</span>
-                      <button
-                        onClick={async (e) => {
-                          e.preventDefault();
-                          const url = `${window.location.origin}/share/${encodeCard({
-                            type: 'milestone',
-                            username: username ?? 'A ChessScout.net user',
-                            newRating: scoutElo,
-                          })}`;
-                          const shareData = { title: `My Scout ELO is ${scoutElo}`, url };
-                          if (navigator.share) {
-                            try { await navigator.share(shareData); return; } catch { /* fall through to clipboard */ }
-                          }
-                          try { await navigator.clipboard.writeText(url); } catch { /* nothing more we can do */ }
-                        }}
-                        className="opacity-50 hover:opacity-100 transition-opacity"
-                        style={{ color: CHESSCOM_GREEN }}
-                        aria-label="Share your Scout ELO"
-                      >
-                        <Share2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
+                    <button
+                      onClick={async (e) => {
+                        e.preventDefault();
+                        const url = `${window.location.origin}/share/${encodeCard({
+                          type: 'milestone',
+                          username: username ?? 'A ChessScout.net user',
+                          newRating: scoutElo,
+                        })}`;
+                        const shareData = { title: `My Scout ELO is ${scoutElo}`, url };
+                        if (navigator.share) {
+                          try { await navigator.share(shareData); return; } catch { /* fall through to clipboard */ }
+                        }
+                        try { await navigator.clipboard.writeText(url); } catch { /* nothing more we can do */ }
+                      }}
+                      className="shrink-0 flex items-baseline gap-1"
+                    >
+                      <span className="text-[9px] font-semibold uppercase tracking-[0.12em]" style={{ color: CHESSCOM_GREEN }}>Scout</span>
+                      <span className="text-lg font-black leading-none" style={{ color: TEXT_LIGHT }}>{scoutElo}</span>
+                    </button>
                   );
-                })()}
-                <div className="flex items-center gap-2.5 mt-0.5">
-                  {multiElo.chesscom?.hasData && (
-                    <span className="text-[11px]" style={{ color: TEXT_MUTED }}>
-                      Chess.com <span className="font-bold" style={{ color: TEXT_LIGHT }}>{multiElo.chesscom.currentRating}</span>
-                    </span>
-                  )}
-                  {multiElo.lichess?.hasData && (
-                    <span className="text-[11px]" style={{ color: TEXT_MUTED }}>
-                      Lichess <span className="font-bold" style={{ color: TEXT_LIGHT }}>{multiElo.lichess.currentRating}</span>
-                    </span>
-                  )}
-                </div>
+                })()
+              ) : chessPlayer?.rating ? (
+                <span className="shrink-0 text-base font-semibold" style={{ color: TEXT_LIGHT }}>{chessPlayer.rating} <span className="text-[10px] font-semibold uppercase" style={{ color: CHESSCOM_GREEN }}>ELO</span></span>
+              ) : null}
+            </div>
+
+            {(multiElo.chesscom?.hasData || multiElo.lichess?.hasData) && (
+              <div className="flex items-center gap-2 mt-0.5">
+                {multiElo.chesscom?.hasData && (
+                  <span className="text-[10px]" style={{ color: TEXT_MUTED }}>Chess.com {multiElo.chesscom.currentRating}</span>
+                )}
+                {multiElo.lichess?.hasData && (
+                  <span className="text-[10px]" style={{ color: TEXT_MUTED }}>Lichess {multiElo.lichess.currentRating}</span>
+                )}
               </div>
-            ) : chessPlayer?.rating ? (
-              <div className="flex items-baseline gap-1.5 mt-1.5">
-                <span className="text-lg font-semibold leading-none" style={{ color: TEXT_LIGHT, letterSpacing: '-0.01em' }}>{chessPlayer.rating}</span>
-                <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: CHESSCOM_GREEN }}>ELO</span>
-              </div>
-            ) : null}
+            )}
           </div>
         </div>
 
         {summary?.totalGames ? (
-          <div className="relative mt-4">
-            <div className="flex items-baseline justify-between mb-1.5 gap-2 flex-wrap">
-              <span className="text-[11px] font-bold truncate" style={{ color: TEXT_MUTED }}>
-                <span style={{ color: TEXT_LIGHT }}>{summary.totalGames.toLocaleString()}</span> games ·{' '}
-                <span style={{ color: CHESSCOM_GREEN }}>{summary.wins.toLocaleString()}W</span>
-                {' · '}
-                <span style={{ color: TEXT_LIGHT }}>{summary.draws.toLocaleString()}D</span>
-                {' · '}
-                <span style={{ color: '#dc4343' }}>{summary.losses.toLocaleString()}L</span>
-              </span>
-              {(() => {
-                const trend = summary?.accuracyTrend;
-                if (!trend || trend.length < 2) return null;
-                const sorted = [...trend].sort((a, b) => (a.month < b.month ? -1 : 1));
-                const current = sorted[sorted.length - 1];
-                const prior = sorted[sorted.length - 2];
-                if (!current.moves || !prior.moves) return null;
-                const accuracyDelta = current.accuracy - prior.accuracy;
-                if (accuracyDelta === 0) return null;
-                return (
-                  <span className="text-[11px] font-bold whitespace-nowrap" style={{ color: accuracyDelta > 0 ? CHESSCOM_GREEN : '#dc4343' }}>
-                    {accuracyDelta > 0 ? '↑' : '↓'} {Math.abs(accuracyDelta).toFixed(1)}% accuracy vs last month
-                  </span>
-                );
-              })()}
-            </div>
-            <div className="flex h-2 rounded-full overflow-hidden gap-0.5" style={{ boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.5), 0 1px 0 rgba(255,255,255,0.04)' }}>
+          <div className="relative mt-3.5">
+            <p className="text-[11px] font-bold mb-1.5" style={{ color: TEXT_MUTED }}>
+              <span style={{ color: TEXT_LIGHT }}>{summary.totalGames.toLocaleString()}</span> games ·{' '}
+              <span style={{ color: CHESSCOM_GREEN }}>{summary.wins.toLocaleString()}W</span>
+              {' · '}
+              <span style={{ color: TEXT_LIGHT }}>{summary.draws.toLocaleString()}D</span>
+              {' · '}
+              <span style={{ color: '#dc4343' }}>{summary.losses.toLocaleString()}L</span>
+            </p>
+            <div className="flex h-1.5 rounded-full overflow-hidden gap-0.5" style={{ boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.5), 0 1px 0 rgba(255,255,255,0.04)' }}>
               <div className="relative" style={{ width: `${(summary.wins / summary.totalGames) * 100}%`, background: `linear-gradient(180deg, #a8d567 0%, ${CHESSCOM_GREEN} 100%)`, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.25)' }} />
               <div style={{ width: `${(summary.draws / summary.totalGames) * 100}%`, background: 'linear-gradient(180deg, #c0bdba 0%, #8a8784 100%)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.18)' }} />
               <div style={{ width: `${(summary.losses / summary.totalGames) * 100}%`, background: 'linear-gradient(180deg, #ec6b6b 0%, #c93535 100%)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.2)' }} />
@@ -191,11 +165,11 @@ export function Dashboard() {
           <p className="relative mt-3 text-sm" style={{ color: TEXT_MUTED }}>Import games to start coaching</p>
         )}
 
-        <div className="relative flex gap-2 mt-4">
-          <Link href="/import" className="flex-1 px-3 py-2.5 rounded-lg font-semibold text-sm text-white flex items-center justify-center gap-2 transition-all hover:scale-[1.02] active:scale-[0.98]" style={{ background: `linear-gradient(180deg, #95c45a 0%, ${CHESSCOM_GREEN} 100%)`, boxShadow: `0 4px 12px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.2)` }}>
+        <div className="relative flex gap-2 mt-3.5">
+          <Link href="/import" className="flex-1 px-3 py-2 rounded-lg font-semibold text-sm text-white flex items-center justify-center gap-2 transition-all hover:scale-[1.02] active:scale-[0.98]" style={{ background: `linear-gradient(180deg, #95c45a 0%, ${CHESSCOM_GREEN} 100%)`, boxShadow: `0 4px 12px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.2)` }}>
             <ImportIcon /> Import
           </Link>
-          <Link href="/opponents" className="flex-1 px-3 py-2.5 rounded-lg font-semibold text-sm flex items-center justify-center gap-2 transition-all hover:scale-[1.02] active:scale-[0.98]" style={{ background: 'rgba(255,255,255,0.07)', color: TEXT_LIGHT, border: '1px solid rgba(255,255,255,0.1)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)' }}>
+          <Link href="/opponents" className="flex-1 px-3 py-2 rounded-lg font-semibold text-sm flex items-center justify-center gap-2 transition-all hover:scale-[1.02] active:scale-[0.98]" style={{ background: 'rgba(255,255,255,0.07)', color: TEXT_LIGHT, border: '1px solid rgba(255,255,255,0.1)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)' }}>
             <Swords className="w-4 h-4" style={{ color: CHESSCOM_GREEN }} /> Scout
           </Link>
         </div>
@@ -303,30 +277,29 @@ export function Dashboard() {
 
           <div className="relative grid grid-cols-2 sm:grid-cols-4">
             {[
-              { label: 'Total Games', value: summary?.totalGames?.toLocaleString() || '0', icon: Trophy, color: '#c9a24b' },
-              { label: 'Win Rate', value: `${winRate}%`, icon: Target, color: CHESSCOM_GREEN },
-              { label: 'Avg Rating', value: Math.round(summary?.avgRating || 0) || '—', icon: TrendingUp, color: '#6ba4e8' },
-              { label: 'Reviewed', value: reviewedCount, icon: Activity, color: '#c77dd4' },
+              { label: 'Total Games', value: summary?.totalGames?.toLocaleString() || '0', icon: Trophy },
+              { label: 'Win Rate', value: `${winRate}%`, icon: Target },
+              { label: 'Avg Rating', value: Math.round(summary?.avgRating || 0) || '—', icon: TrendingUp },
+              { label: 'Reviewed', value: reviewedCount, icon: Activity },
             ].map((s, i) => {
               const isLeftColMobile = i % 2 === 0;
               const isTopRowMobile = i < 2;
               return (
-                <div key={s.label} className="relative px-3.5 py-4 md:px-4 md:py-4.5 overflow-hidden"
+                <div key={s.label} className="px-3 py-2.5"
                   style={{
                     borderRight: isLeftColMobile ? '1px solid rgba(255,255,255,0.05)' : undefined,
                     borderBottom: isTopRowMobile ? '1px solid rgba(255,255,255,0.05)' : undefined,
                   }}>
-                  <div className="absolute -top-3 -right-3 w-16 h-16 rounded-full opacity-[0.07]" style={{ background: s.color }} />
-                  <div className="relative w-7 h-7 rounded-lg flex items-center justify-center mb-2" style={{ background: `${s.color}20` }}>
-                    <s.icon className="w-3.5 h-3.5" style={{ color: s.color }} />
+                  <div className="flex items-center gap-1 mb-0.5">
+                    <s.icon className="w-3 h-3" style={{ color: TEXT_MUTED }} />
+                    <p className="text-[9px] font-semibold uppercase tracking-[0.14em] leading-none" style={{ color: TEXT_MUTED }}>{s.label}</p>
                   </div>
-                  <p className="relative text-[10px] font-semibold uppercase tracking-[0.18em] leading-none mb-1.5" style={{ color: TEXT_MUTED }}>{s.label}</p>
-                  <p className={t.numeric} style={{ position: 'relative', fontSize: '1.35rem', lineHeight: 1, color: TEXT_LIGHT }}>{s.value}</p>
+                  <p className={t.numeric} style={{ fontSize: '1.05rem', lineHeight: 1.3, color: TEXT_LIGHT }}>{s.value}</p>
                 </div>
               );
             })}
           </div>
-          <div className="relative flex items-center justify-center gap-1 py-2.5 text-[11px] font-bold" style={{ color: CHESSCOM_GREEN, borderTop: '1px solid rgba(255,255,255,0.05)', background: 'rgba(129,182,76,0.04)' }}>
+          <div className="relative flex items-center justify-center gap-1 py-2 text-[11px] font-bold" style={{ color: CHESSCOM_GREEN, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
             See Full Analysis <ChevronRight className="w-3 h-3" />
           </div>
         </div>
