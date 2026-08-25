@@ -512,6 +512,24 @@ router.get("/auth/referrals", async (req: Request, res: Response) => {
       }
     }
 
+    // Generate a code here too if the user is paid but doesn't have one
+    // yet. The other generation path (in the Stripe subscription-status
+    // poll) only fires for a literal 'active' Stripe subscription status,
+    // which never applies to isPremiumOverride-based access (e.g. an
+    // admin-granted free Pro account) -- those users were correctly shown
+    // the unlocked referral UI via the broader isPaid check above, but
+    // never actually got a code generated, so there was nothing to copy.
+    if (isPaid && user && !user.inviteCode) {
+      try {
+        const newCode = crypto.randomBytes(4).toString("hex").toUpperCase();
+        await db.update(usersTable).set({ inviteCode: newCode }).where(eq(usersTable.id, userId));
+        user.inviteCode = newCode;
+      } catch {
+        // Unique constraint collision (astronomically unlikely) -- next
+        // load of this page will just retry.
+      }
+    }
+
     const referrals = await db.select({
       id: referralConversionsTable.id,
       referredUserId: referralConversionsTable.referredUserId,
