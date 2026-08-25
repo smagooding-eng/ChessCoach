@@ -56,11 +56,9 @@ router.post("/track", async (req: Request, res: Response) => {
   }
 });
 
-router.use("/analysis", requirePremium);
 router.use(analysisRouter);
 router.use("/courses", requirePremium);
 router.use(coursesRouter);
-router.use("/opponents", requirePremium);
 router.use(opponentsRouter);
 router.use("/tts", requirePremium);
 router.use(ttsRouter);

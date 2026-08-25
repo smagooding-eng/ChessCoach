@@ -60,8 +60,6 @@ export function requireAuth(
   next();
 }
 
-const FREE_TRIAL_DAYS = 3;
-
 export async function requirePremium(
   req: Request,
   res: Response,
@@ -98,15 +96,6 @@ export async function requirePremium(
         } catch {}
       }
       if (sub && ["active", "trialing"].includes(sub.status as string)) {
-        next();
-        return;
-      }
-    }
-
-    if (user?.createdAt) {
-      const created = new Date(user.createdAt);
-      const elapsed = Date.now() - created.getTime();
-      if (elapsed < FREE_TRIAL_DAYS * 24 * 60 * 60 * 1000) {
         next();
         return;
       }

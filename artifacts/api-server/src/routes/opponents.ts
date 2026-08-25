@@ -4,7 +4,7 @@ import { sql, eq, and, desc } from "drizzle-orm";
 import { fetchChessComGames, extractGameMetadata, fetchChessComProfile, fetchChessComTopPlayers } from "../lib/chesscom";
 import { analyzePlayerGames, generateExploitCourseForOpponent } from "../lib/openaiAnalysis";
 import { randomUUID } from "crypto";
-import { requireAuth } from "../middlewares/authMiddleware";
+import { requireAuth, requirePremium } from "../middlewares/authMiddleware";
 import { sanitizeLessons, type RawLesson } from "./courses";
 
 const router: IRouter = Router();
@@ -75,16 +75,21 @@ router.post("/opponents/start", async (req, res): Promise<void> => {
     }
   }
 
-  const { checkUsageLimit } = await import("../lib/accessControl");
-  const limitCheck = await checkUsageLimit(userId, "opponentScouts");
-  if (!limitCheck.allowed) {
-    res.status(403).json({
-      error: "usage_limit",
-      message: `Free plan includes scouting ${limitCheck.limit} opponents. Upgrade to Pro for unlimited opponent scouting!`,
-      used: limitCheck.used,
-      limit: limitCheck.limit,
-    });
-    return;
+  const { hasFullAccess } = await import("../lib/accessControl");
+  const { full: isFullAccess } = await hasFullAccess(userId);
+
+  if (!isFullAccess) {
+    const { checkUsageLimit } = await import("../lib/accessControl");
+    const limitCheck = await checkUsageLimit(userId, "opponentScouts");
+    if (!limitCheck.allowed) {
+      res.status(403).json({
+        error: "usage_limit",
+        message: `Free plan includes ${limitCheck.limit} basic opponent scout. Upgrade to Pro for unlimited scouts with full weakness analysis!`,
+        used: limitCheck.used,
+        limit: limitCheck.limit,
+      });
+      return;
+    }
   }
 
   const jobId = randomUUID();
@@ -98,9 +103,9 @@ router.post("/opponents/start", async (req, res): Promise<void> => {
 
   res.json({ jobId });
 
-  req.log.info({ target, jobId }, "Analyzing opponent (background)");
+  req.log.info({ target, jobId, isFullAccess }, "Analyzing opponent (background)");
 
-  runAnalysis(target, requestingUser, jobId, req.log).catch((err) => {
+  runAnalysis(target, requestingUser, jobId, req.log, isFullAccess).catch((err) => {
     req.log.error({ err, jobId }, "Background analysis failed");
   });
 });
@@ -219,6 +224,7 @@ async function runAnalysis(
   requestingUser: string | null,
   jobId: string,
   log: import("pino").Logger,
+  isFullAccess: boolean,
 ): Promise<void> {
   try {
     const [profileResult, gamesResult] = await Promise.allSettled([
@@ -255,15 +261,23 @@ async function runAnalysis(
       };
     });
 
-    const analysis = await analyzePlayerGames(target, gameSummaries, { isOpponentScout: true });
-
-    if (!analysis || !Array.isArray(analysis.weaknesses)) {
-      await db.update(backgroundJobsTable).set({
-        status: "error",
-        error: "Analysis returned an unexpected response. Please try again.",
-        completedAt: new Date(),
-      }).where(eq(backgroundJobsTable.id, jobId));
-      return;
+    // The expensive, OpenAI-powered weakness analysis only runs for
+    // full-access (Pro/admin) users. Free/basic scouts skip this call
+    // entirely -- real cost savings, not just hiding the result -- and
+    // get the stats below instead (record, top openings, head-to-head),
+    // which were always computed independently of the AI call anyway.
+    let weaknesses: OpponentWeakness[] = [];
+    if (isFullAccess) {
+      const analysis = await analyzePlayerGames(target, gameSummaries, { isOpponentScout: true });
+      if (!analysis || !Array.isArray(analysis.weaknesses)) {
+        await db.update(backgroundJobsTable).set({
+          status: "error",
+          error: "Analysis returned an unexpected response. Please try again.",
+          completedAt: new Date(),
+        }).where(eq(backgroundJobsTable.id, jobId));
+        return;
+      }
+      weaknesses = analysis.weaknesses;
     }
 
     let wins = 0, losses = 0, draws = 0;
@@ -332,7 +346,8 @@ async function runAnalysis(
       wins,
       losses,
       draws,
-      weaknesses: analysis.weaknesses,
+      weaknesses,
+      isFullAccess,
       topOpenings,
       headToHead,
       gamePgns,
@@ -364,7 +379,7 @@ interface OpponentWeakness {
   relatedGameIndices?: number[];
 }
 
-router.post("/opponents/generate-courses", requireAuth, async (req, res): Promise<void> => {
+router.post("/opponents/generate-courses", requireAuth, requirePremium, async (req, res): Promise<void> => {
   const { opponentUsername, weaknesses } = req.body as {
     opponentUsername?: string;
     weaknesses?: OpponentWeakness[];

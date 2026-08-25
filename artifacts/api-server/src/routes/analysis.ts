@@ -1,5 +1,6 @@
 import { Router, type IRouter } from "express";
 import type { Request, Response } from "express";
+import { requirePremium } from "../middlewares/authMiddleware";
 import { db, gamesTable, weaknessesTable, coursesTable, backgroundJobsTable } from "@workspace/db";
 import { eq, desc, and, inArray, sql } from "drizzle-orm";
 import {
@@ -20,7 +21,7 @@ import sharp from "sharp";
 
 const router: IRouter = Router();
 
-async function runAnalysisJob(username: string, jobId: string, log: Logger): Promise<void> {
+async function runAnalysisJob(username: string, jobId: string, log: Logger, userId: string): Promise<void> {
   try {
     const games = await db
       .select()
@@ -73,7 +74,24 @@ async function runAnalysisJob(username: string, jobId: string, log: Logger): Pro
       .limit(500);
 
     const grounded = computeGroundedWeaknesses(username, allReviewed);
-    const analysis = grounded ?? await analyzePlayerGames(username, gameSummaries);
+    // Free users get the grounded (stats-based, zero OpenAI cost) weakness
+    // detection only -- if there isn't enough reviewed-game data for it
+    // yet, they see a "review more games" prompt rather than silently
+    // falling back to the paid AI analysis. Pro users keep the existing
+    // behavior: prefer grounded when available, fall back to full AI
+    // analysis otherwise.
+    const { hasFullAccess } = await import("../lib/accessControl");
+    const { full: isFullAccess } = await hasFullAccess(userId);
+    const analysis = grounded ?? (isFullAccess ? await analyzePlayerGames(username, gameSummaries) : null);
+
+    if (!analysis) {
+      await db.update(backgroundJobsTable).set({
+        status: "error",
+        error: "Not enough reviewed games yet for a weakness report. Review a few more games, or upgrade to Pro for full analysis.",
+        completedAt: new Date(),
+      }).where(eq(backgroundJobsTable.id, jobId));
+      return;
+    }
     const indexSourceGames = grounded ? allReviewed : games;
 
     await db.delete(weaknessesTable).where(eq(weaknessesTable.username, username.toLowerCase()));
@@ -162,7 +180,7 @@ router.post("/analysis/start", async (req, res): Promise<void> => {
   });
 
   res.json({ jobId });
-  runAnalysisJob(username.toLowerCase(), jobId, req.log).catch(() => {});
+  runAnalysisJob(username.toLowerCase(), jobId, req.log, userId).catch(() => {});
 });
 
 router.get("/analysis/status/:jobId", async (req, res): Promise<void> => {
@@ -212,7 +230,7 @@ router.get("/analysis/active-job", async (req, res): Promise<void> => {
   res.json({ job: { id: job.id, status: job.status, error: job.error, createdAt: job.createdAt.toISOString() } });
 });
 
-router.post("/analysis/analyze", async (req, res): Promise<void> => {
+router.post("/analysis/analyze", requirePremium, async (req, res): Promise<void> => {
   const parsed = AnalyzeGamesBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
@@ -728,7 +746,7 @@ router.get("/analysis/weaknesses/:id", async (req, res): Promise<void> => {
   });
 });
 
-router.post("/analysis/scan-position", async (req: Request, res: Response): Promise<void> => {
+router.post("/analysis/scan-position", requirePremium, async (req: Request, res: Response): Promise<void> => {
   try {
     const { image } = req.body as { image: string };
     if (!image) {

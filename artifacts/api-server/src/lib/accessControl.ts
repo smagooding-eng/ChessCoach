@@ -5,7 +5,7 @@ import { ADMIN_EMAILS } from "./auth";
 
 export const FREE_TIER_LIMITS = {
   puzzles: 10,
-  opponentScouts: 3,
+  opponentScouts: 1,
   courses: 5,
   initialGameImport: 20,
 } as const;
