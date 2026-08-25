@@ -4,7 +4,7 @@ import { Chess } from 'chess.js';
 import { Chessboard, defaultPieces } from 'react-chessboard';
 import { apiFetch } from '@/lib/api';
 import { useUser } from '@/hooks/use-user';
-import { Crown, RotateCcw, ChevronRight, Trophy, Target, Flame, Zap, Lightbulb, Loader2, Lock } from 'lucide-react';
+import { Crown, RotateCcw, ChevronRight, Trophy, Target, Flame, Zap, Lightbulb, Loader2, Lock, Share2 } from 'lucide-react';
 import { useLocation, useSearch, Link } from 'wouter';
 import { encodeCard } from '@/pages/ShareCard';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -676,7 +676,7 @@ export function Puzzles() {
                     </button>
                   )}
 
-                  {(state === 'ready' || state === 'solving') && puzzle && (
+                  {(state === 'ready' || state === 'solving' || state === 'correct') && puzzle && (
                     <button
                       onClick={() => {
                         setGame(new Chess(puzzle.fen));
@@ -699,6 +699,27 @@ export function Puzzles() {
                       className="flex items-center gap-1.5 px-6 py-2.5 rounded-xl text-sm font-bold transition-all hover:scale-105"
                       style={{ background: CHESSCOM_GREEN, color: '#000' }}>
                       <ChevronRight size={16} />Next Puzzle
+                    </button>
+                  )}
+
+                  {state === 'correct' && puzzle && (
+                    <button
+                      onClick={async () => {
+                        const url = `${window.location.origin}/share/${encodeCard({
+                          type: 'puzzle',
+                          username: authUser?.chesscomUsername ?? authUser?.lichessUsername ?? 'A ChessScout.net user',
+                          rating: puzzle.rating,
+                          themes: puzzle.themes ?? [],
+                        })}`;
+                        const shareData = { title: `I solved a ${puzzle.rating}-rated puzzle on ChessScout.net`, url };
+                        if (navigator.share) {
+                          try { await navigator.share(shareData); return; } catch { /* fall through to clipboard */ }
+                        }
+                        try { await navigator.clipboard.writeText(url); } catch { /* nothing more we can do */ }
+                      }}
+                      className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-bold transition-all"
+                      style={{ background: 'rgba(255,255,255,0.08)', color: TEXT_MUTED }}>
+                      <Share2 size={16} />Share
                     </button>
                   )}
 
