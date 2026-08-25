@@ -3,6 +3,7 @@ import { Chessboard, defaultPieces } from 'react-chessboard';
 import { Chess } from 'chess.js';
 import { normalizeFen } from '@/lib/utils';
 import { useSettings, playMoveSound } from '@/context/SettingsContext';
+import { Trophy, X } from 'lucide-react';
 
 class BoardErrorBoundary extends Component<
   { children: ReactNode; position: string; renderKey: number },
@@ -140,6 +141,51 @@ export function ChessBoard({
   const promotionChoiceRef = useRef(promotionChoice);
   promotionChoiceRef.current = promotionChoice;
   const position = normalizeFen(fen || START_FEN);
+
+  // Checkmate indicator, computed directly from the current position --
+  // works automatically in every context ChessBoard is used (Local Play,
+  // Practice Bots, Game Review, Live Game) with zero extra wiring needed
+  // from callers, since it only depends on the fen prop already passed
+  // everywhere. Finds both kings' squares so a badge can render directly
+  // on the board itself instead of a separate result banner elsewhere.
+  const checkmateInfo = useMemo(() => {
+    try {
+      const c = new Chess(position);
+      if (!c.isCheckmate()) return null;
+      const losingColor = c.turn(); // side to move when checkmated = the losing side
+      const winningColor = losingColor === 'w' ? 'b' : 'w';
+      const board = c.board();
+      let losingKingSquare: string | null = null;
+      let winningKingSquare: string | null = null;
+      for (let r = 0; r < 8; r++) {
+        for (let f = 0; f < 8; f++) {
+          const sq = board[r][f];
+          if (sq?.type === 'k') {
+            const square = `${'abcdefgh'[f]}${8 - r}`;
+            if (sq.color === losingColor) losingKingSquare = square;
+            else winningKingSquare = square;
+          }
+        }
+      }
+      if (!losingKingSquare || !winningKingSquare) return null;
+      return { losingKingSquare, winningKingSquare };
+    } catch {
+      return null;
+    }
+  }, [position]);
+
+  // Converts a square like "e1" into a percentage-based position within
+  // the board container, accounting for board orientation -- percentage
+  // based so it scales correctly at any board size without needing to
+  // know pixel dimensions.
+  function squareToPercent(square: string): { left: string; top: string } {
+    const file = square.charCodeAt(0) - 97; // 'a' -> 0
+    const rank = parseInt(square[1], 10) - 1; // '1' -> 0
+    const col = flipped ? 7 - file : file;
+    const row = flipped ? rank : 7 - rank;
+    return { left: `${col * 12.5}%`, top: `${row * 12.5}%` };
+  }
+
   const [selectedSquare, setSelectedSquare] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<'correct' | 'wrong' | null>(null);
   const feedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -448,6 +494,40 @@ export function ChessBoard({
           }}
         />
       </BoardErrorBoundary>
+
+      {/* Checkmate indicator directly on the board -- green on the
+          winning king's square, red on the losing king's, instead of a
+          separate result banner elsewhere that's easy to miss. */}
+      {checkmateInfo && (
+        <>
+          <div
+            className="absolute pointer-events-none flex items-center justify-center"
+            style={{
+              ...squareToPercent(checkmateInfo.winningKingSquare),
+              width: '12.5%',
+              height: '12.5%',
+            }}
+          >
+            <div className="w-[55%] h-[55%] rounded-full flex items-center justify-center"
+              style={{ background: 'rgba(34,197,94,0.92)', boxShadow: '0 0 0 3px rgba(255,255,255,0.5), 0 4px 12px rgba(0,0,0,0.5)' }}>
+              <Trophy className="w-[55%] h-[55%] text-white" strokeWidth={2.5} />
+            </div>
+          </div>
+          <div
+            className="absolute pointer-events-none flex items-center justify-center"
+            style={{
+              ...squareToPercent(checkmateInfo.losingKingSquare),
+              width: '12.5%',
+              height: '12.5%',
+            }}
+          >
+            <div className="w-[55%] h-[55%] rounded-full flex items-center justify-center"
+              style={{ background: 'rgba(220,38,38,0.92)', boxShadow: '0 0 0 3px rgba(255,255,255,0.5), 0 4px 12px rgba(0,0,0,0.5)' }}>
+              <X className="w-[55%] h-[55%] text-white" strokeWidth={3} />
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Confirm-move bar -- in normal document flow (not absolutely
           positioned) so it pushes content below the board down instead of
