@@ -41,7 +41,7 @@ export async function fetchChessComTopPlayers(limit: number = 25): Promise<Leade
       headers: { "User-Agent": "ChessCoach/1.0" },
     });
     if (!res.ok) return leaderboardCache?.players.slice(0, limit) ?? [];
-    const data = await res.json();
+    const data = await res.json() as any;
     const raw = data.live_rapid ?? data.live_blitz ?? [];
     const players: LeaderboardPlayer[] = raw
       .slice(0, 25)
