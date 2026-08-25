@@ -209,6 +209,7 @@ function AuthModal({ open, onClose, initialMode, externalError }: { open: boolea
   const [firstName, setFirstName] = useState('');
   const [chesscomUsername, setChesscomUsername] = useState('');
   const [lichessUsername, setLichessUsername] = useState('');
+  const [referralCodeInput, setReferralCodeInput] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState(externalError || '');
   const [emailTouched, setEmailTouched] = useState(false);
@@ -225,6 +226,8 @@ function AuthModal({ open, onClose, initialMode, externalError }: { open: boolea
     const params = new URLSearchParams(window.location.search);
     const ref = params.get('ref');
     if (ref) localStorage.setItem('chessscout_ref', ref);
+    const stored = localStorage.getItem('chessscout_ref');
+    if (stored) setReferralCodeInput(stored);
   }, []);
 
   useEffect(() => {
@@ -260,7 +263,7 @@ function AuthModal({ open, onClose, initialMode, externalError }: { open: boolea
         if (firstName.trim()) body.firstName = firstName.trim();
         if (chesscomUsername.trim()) body.chesscomUsername = chesscomUsername.trim();
         if (lichessUsername.trim()) body.lichessUsername = lichessUsername.trim();
-        const ref = localStorage.getItem('chessscout_ref') || '';
+        const ref = referralCodeInput.trim().toUpperCase();
         if (ref) body.referralCode = ref;
       }
       const res = await apiFetch(endpoint, {
@@ -454,6 +457,21 @@ function AuthModal({ open, onClose, initialMode, externalError }: { open: boolea
                   style={{ background: 'rgba(255,255,255,0.05)', border: '2px solid rgba(255,255,255,0.08)', color: TEXT }}
                   onFocus={e => (e.target.style.borderColor = G)}
                   onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.08)')} />
+              </div>
+            )}
+            {mode === 'register' && (
+              <div>
+                <label className="block text-xs font-medium mb-1 ml-1" style={{ color: TEXT }}>
+                  Referral Code <span style={{ color: MUTED }}>(optional)</span>
+                </label>
+                <input type="text" value={referralCodeInput} onChange={(e) => setReferralCodeInput(e.target.value.toUpperCase())} placeholder="e.g. A1B2C3D4"
+                  className="w-full px-4 py-3 rounded-xl text-sm outline-none transition-all font-mono tracking-wider"
+                  style={{ background: 'rgba(255,255,255,0.05)', border: '2px solid rgba(255,255,255,0.08)', color: TEXT }}
+                  onFocus={e => (e.target.style.borderColor = G)}
+                  onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.08)')} />
+                {referralCodeInput && (
+                  <p className="text-[11px] mt-1 ml-1" style={{ color: G }}>Got it — a friend's referral will be credited.</p>
+                )}
               </div>
             )}
             <button type="submit" disabled={loading}

@@ -1444,6 +1444,7 @@ export function ReferralCard({ isPremium, compact = false }: { isPremium: boolea
   const [data, setData] = useState<ReferralData | null>(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
+  const [codeCopied, setCodeCopied] = useState(false);
 
   useEffect(() => {
     apiFetch('/api/auth/referrals', { credentials: 'include' })
@@ -1463,6 +1464,14 @@ export function ReferralCard({ isPremium, compact = false }: { isPremium: boolea
       navigator.clipboard.writeText(referralLink);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  const handleCopyCode = () => {
+    if (data?.inviteCode) {
+      navigator.clipboard.writeText(data.inviteCode);
+      setCodeCopied(true);
+      setTimeout(() => setCodeCopied(false), 2000);
     }
   };
 
@@ -1525,6 +1534,31 @@ export function ReferralCard({ isPremium, compact = false }: { isPremium: boolea
           </div>
         ) : (
           <div className="space-y-4">
+            {data?.inviteCode && (
+              <div>
+                <p className="text-xs text-muted-foreground mb-2">Your referral code</p>
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 bg-background/60 border border-primary/30 rounded-xl px-4 py-3 text-center">
+                    <span className="text-2xl font-black font-mono tracking-[0.2em] text-foreground">{data.inviteCode}</span>
+                  </div>
+                  <button
+                    onClick={handleCopyCode}
+                    className={`shrink-0 px-4 py-3 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                      codeCopied
+                        ? 'bg-emerald-500/15 text-emerald-400'
+                        : 'bg-primary/10 text-primary hover:bg-primary/20'
+                    }`}
+                  >
+                    {codeCopied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                    {codeCopied ? 'Copied!' : 'Copy'}
+                  </button>
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-1.5">
+                  Friends enter this at signup, or use your link below.
+                </p>
+              </div>
+            )}
+
             {referralLink && (
               <div>
                 <p className="text-xs text-muted-foreground mb-2">Your referral link</p>
