@@ -5,7 +5,7 @@ import { useMyCourses } from '@/hooks/use-courses';
 import { useMyGames } from '@/hooks/use-games';
 import { GameThumb } from '@/components/GameThumb';
 import { Link } from 'wouter';
-import { Swords, Trophy, Target, AlertTriangle, BookOpen, Clock, GraduationCap, TrendingUp, ChevronRight, Search, Play, Bot, Camera, Lock, Crown, Flame, Zap, Award, Activity, Sparkles, ArrowUpRight, Share2 } from 'lucide-react';
+import { Swords, Trophy, Target, AlertTriangle, BookOpen, Clock, GraduationCap, TrendingUp, ChevronRight, Search, Play, Bot, Camera, Lock, Crown, Flame, Zap, Award, Activity, Sparkles, ArrowUpRight, Share2, Puzzle } from 'lucide-react';
 import { encodeCard } from '@/pages/ShareCard';
 import { useUser } from '@/hooks/use-user';
 import { useChessPlayer } from '@/hooks/use-chess-player';
@@ -233,6 +233,41 @@ export function Dashboard() {
       </Link>
 
       <div className="grid grid-cols-2 gap-3 px-3 md:px-0">
+        <Link href="/play" className="block">
+          <div className="relative overflow-hidden rounded-2xl p-4 flex flex-col items-start gap-2 transition-colors group cursor-pointer h-full"
+            style={{
+              background: 'linear-gradient(180deg, #383532 0%, #2a2825 100%)',
+              border: `1px solid rgba(129,182,76,0.35)`,
+              boxShadow: '0 18px 50px -16px rgba(0,0,0,0.6), 0 4px 16px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04)',
+            }}>
+            <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: 'rgba(129,182,76,0.15)' }}>
+              <Play className="w-4.5 h-4.5" style={{ color: CHESSCOM_GREEN }} />
+            </div>
+            <div className="flex-1">
+              <h3 className="font-semibold text-sm" style={{ color: TEXT_LIGHT }}>Local Play</h3>
+              <p className="text-xs mt-0.5" style={{ color: TEXT_MUTED }}>Pass-and-play with a friend, real clocks</p>
+            </div>
+          </div>
+        </Link>
+        <Link href="/puzzles" className="block">
+          <div className="relative overflow-hidden rounded-2xl p-4 flex flex-col items-start gap-2 transition-colors group cursor-pointer h-full"
+            style={{
+              background: 'linear-gradient(180deg, #383532 0%, #2a2825 100%)',
+              border: `1px solid rgba(129,182,76,0.35)`,
+              boxShadow: '0 18px 50px -16px rgba(0,0,0,0.6), 0 4px 16px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04)',
+            }}>
+            <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: 'rgba(129,182,76,0.15)' }}>
+              <Puzzle className="w-4.5 h-4.5" style={{ color: CHESSCOM_GREEN }} />
+            </div>
+            <div className="flex-1">
+              <h3 className="font-semibold text-sm" style={{ color: TEXT_LIGHT }}>Puzzles</h3>
+              <p className="text-xs mt-0.5" style={{ color: TEXT_MUTED }}>Daily puzzles, filter by theme and rating</p>
+            </div>
+          </div>
+        </Link>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 px-3 md:px-0">
         <Link href="/practice" className="block">
           <div className="relative overflow-hidden rounded-2xl p-4 flex flex-col items-start gap-2 transition-colors group cursor-pointer h-full"
             style={{
@@ -378,24 +413,6 @@ export function Dashboard() {
         </div>
 
         <div className="space-y-3 md:space-y-4">
-          <Link href="/play" className="block">
-            <div className="relative overflow-hidden rounded-2xl p-4 md:p-5 flex items-center gap-3 transition-colors group cursor-pointer"
-              style={{
-                background: 'linear-gradient(180deg, #383532 0%, #2a2825 100%)',
-                border: '1px solid rgba(255,255,255,0.06)',
-                boxShadow: '0 18px 50px -16px rgba(0,0,0,0.6), 0 4px 16px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04)',
-              }}>
-              <div className="shrink-0 w-11 h-11 rounded-xl flex items-center justify-center" style={{ background: 'rgba(129,182,76,0.15)' }}>
-                <Play className="w-5 h-5" style={{ color: CHESSCOM_GREEN }} />
-              </div>
-              <div className="flex-1 min-w-0">
-                <h3 className="font-semibold text-sm" style={{ color: TEXT_LIGHT }}>Play Local</h3>
-                <p className="text-xs" style={{ color: TEXT_MUTED }}>Pass-and-play on this device with a friend</p>
-              </div>
-              <ChevronRight className="w-4 h-4 shrink-0 opacity-40 group-hover:opacity-80 transition-opacity" style={{ color: CHESSCOM_GREEN }} />
-            </div>
-          </Link>
-
           {coursesData?.courses?.length ? (
             <div className="relative overflow-hidden rounded-2xl p-4 md:p-5"
               style={{
