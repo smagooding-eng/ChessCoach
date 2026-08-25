@@ -1,12 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useParams, Link } from 'wouter';
 import { PageHero, CHESSCOM_GREEN, TEXT_LIGHT, TEXT_MUTED, BRASS } from '@/components/DesignSystem';
-import { Download, UserPlus, Loader2, Trophy, Flame, TrendingUp } from 'lucide-react';
+import { Download, UserPlus, Loader2, Trophy, Flame, TrendingUp, Puzzle } from 'lucide-react';
 
 export type ShareableCard =
   | { type: 'course'; username: string; courseName: string; weaknessFixed: string; lessonsCompleted: number }
   | { type: 'milestone'; username: string; oldRating?: number; newRating: number }
-  | { type: 'streak'; username: string; streakDays: number; accuracy?: number };
+  | { type: 'streak'; username: string; streakDays: number; accuracy?: number }
+  | { type: 'puzzle'; username: string; rating: number; themes: string[] };
 
 function decodeCard(encoded: string): ShareableCard | null {
   try {
@@ -53,6 +54,27 @@ function CardContent({ card }: { card: ShareableCard }) {
           <p className="text-sm mt-2" style={{ color: CHESSCOM_GREEN }}>
             {gain >= 0 ? `+${gain}` : gain} from {card.oldRating}
           </p>
+        )}
+      </div>
+    );
+  }
+  if (card.type === 'puzzle') {
+    return (
+      <div className="text-center py-6">
+        <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl mb-4"
+          style={{ background: '#211f1c', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.05), inset 0 2px 4px rgba(0,0,0,0.4)' }}>
+          <Puzzle className="w-6 h-6" style={{ color: CHESSCOM_GREEN }} />
+        </div>
+        <p className="text-sm font-semibold" style={{ color: TEXT_MUTED }}>{card.username} solved a</p>
+        <p className="font-display text-3xl font-semibold mt-1" style={{ color: TEXT_LIGHT }}>{card.rating} rated puzzle</p>
+        {card.themes.length > 0 && (
+          <div className="flex items-center justify-center gap-1.5 flex-wrap mt-3 px-4">
+            {card.themes.slice(0, 3).map((theme) => (
+              <span key={theme} className="px-2 py-0.5 rounded-md text-[10px] font-semibold" style={{ background: 'rgba(129,182,76,0.15)', color: CHESSCOM_GREEN }}>
+                {theme}
+              </span>
+            ))}
+          </div>
         )}
       </div>
     );
