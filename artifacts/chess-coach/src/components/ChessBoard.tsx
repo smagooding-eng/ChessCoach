@@ -101,6 +101,11 @@ interface ChessBoardProps {
   // Board arrows — e.g. the move actually played vs. the engine's
   // preferred move, shown simultaneously in different colors.
   arrows?: Array<{ from: string; to: string; color?: string }>;
+  // Overrides the user's normal Settings board-size preference for
+  // special contexts (e.g. a dedicated fullscreen game view) where the
+  // board should genuinely dominate the screen regardless of their
+  // general in-app size choice. Accepts any valid CSS max-width value.
+  maxWidthOverride?: string | number;
 }
 
 export function ChessBoard({
@@ -116,8 +121,10 @@ export function ChessBoard({
   premove,
   onPremoveSet,
   arrows,
+  maxWidthOverride,
 }: ChessBoardProps) {
-  const { confirmMoves, boardColors, boardTextureCss, showCoordinates, pieceColors, pieceShape, soundEnabled, promotionChoice, boardMaxWidth } = useSettings();
+  const { confirmMoves, boardColors, boardTextureCss, showCoordinates, pieceColors, pieceShape, soundEnabled, promotionChoice, boardMaxWidth: settingsMaxWidth } = useSettings();
+  const boardMaxWidth = maxWidthOverride ?? settingsMaxWidth;
   const confirmMovesRef = useRef(confirmMoves);
   confirmMovesRef.current = confirmMoves;
   const soundEnabledRef = useRef(soundEnabled);

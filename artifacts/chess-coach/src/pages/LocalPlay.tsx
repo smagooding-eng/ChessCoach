@@ -203,6 +203,8 @@ export function LocalPlay() {
 
   // A clock renders as an actionable button once it's the side that
   // needs to submit -- tapping it stops your time and starts theirs.
+  // Styled like the chess-clock paddle buttons used for Confirm Move
+  // elsewhere in the app: chunky, physical-feeling, strong drop shadow.
   function ClockButton({ side }: { side: 'w' | 'b' }) {
     const isActive = clockActive === side && result === 'playing';
     const canSubmit = isActive && awaitingSubmit;
@@ -212,14 +214,26 @@ export function LocalPlay() {
         onClick={() => submitClock(side)}
         disabled={!canSubmit}
         className={cn(
-          'px-3 py-1.5 rounded-xl font-mono font-bold text-lg flex-1 text-left transition-colors',
-          isActive ? 'bg-primary/20 text-primary' : 'text-muted-foreground',
-          canSubmit && 'ring-2 ring-primary/60 cursor-pointer active:scale-[0.98]',
+          'flex-1 rounded-2xl font-mono font-black text-left transition-transform',
+          fullscreen ? 'px-5 py-4' : 'px-3 py-2.5',
+          canSubmit && 'active:scale-[0.97] active:translate-y-0.5',
         )}
+        style={{
+          background: isActive
+            ? 'linear-gradient(180deg, #a8d876 0%, #81b64c 55%, #5f8f36 100%)'
+            : 'linear-gradient(180deg, #3a3a3a 0%, #232323 100%)',
+          color: isActive ? '#fff' : 'rgba(255,255,255,0.45)',
+          boxShadow: isActive
+            ? '0 4px 0 #4a7028, 0 8px 16px rgba(0,0,0,0.4), inset 0 1px 1px rgba(255,255,255,0.3)'
+            : '0 4px 0 #141414, 0 8px 16px rgba(0,0,0,0.4)',
+          border: '1px solid rgba(0,0,0,0.25)',
+        }}
       >
-        <span className="text-xs font-normal mr-2">{side === 'w' ? 'White' : 'Black'}</span>
-        {formatClock(time)}
-        {canSubmit && <Hand className="w-3.5 h-3.5 inline ml-2 -mt-1" />}
+        <span className={cn('font-normal block opacity-80', fullscreen ? 'text-xs mb-0.5' : 'text-[10px]')}>
+          {side === 'w' ? 'White' : 'Black'}
+        </span>
+        <span className={fullscreen ? 'text-3xl' : 'text-lg'}>{formatClock(time)}</span>
+        {canSubmit && <Hand className={cn('inline ml-2', fullscreen ? 'w-5 h-5 -mt-2' : 'w-3.5 h-3.5 -mt-1')} />}
       </button>
     );
   }
@@ -247,17 +261,23 @@ export function LocalPlay() {
         )}
       </div>
 
-      <div className="flex flex-col items-center gap-2 max-w-[640px] mx-auto">
+      <div className={cn(
+        'flex flex-col items-center gap-2 mx-auto w-full',
+        fullscreen ? 'flex-1 justify-center' : 'max-w-[640px]',
+      )}>
         {/* Black's side — rotated 180° so the player across can read it */}
-        <div className="w-full rotate-180">
+        <div className={cn('w-full rotate-180', fullscreen && 'max-w-[min(92vw,80vh)]')}>
           <div className="flex items-center gap-2 w-full">
             {hasTimer && <ClockButton side="b" />}
             {result === 'playing' && (
               <button
                 onClick={() => resign('b')}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-medium hover:bg-red-500/20 transition-colors shrink-0"
+                className={cn(
+                  'flex items-center gap-1.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 font-medium hover:bg-red-500/20 transition-colors shrink-0',
+                  fullscreen ? 'px-4 py-3 text-sm' : 'px-3 py-2 text-xs',
+                )}
               >
-                <Flag className="w-3.5 h-3.5" /> Resign
+                <Flag className={fullscreen ? 'w-4 h-4' : 'w-3.5 h-3.5'} /> Resign
               </button>
             )}
             {!hasTimer && result === 'playing' && chess.turn() === 'b' && (
@@ -272,29 +292,38 @@ export function LocalPlay() {
           </p>
         )}
 
-        {/* Board, centered, with vertical material columns flanking it */}
-        <div className="w-full flex items-stretch justify-center gap-2">
+        {/* Board, centered, with vertical material columns flanking it.
+            In fullscreen, sized to genuinely fill most of the viewport
+            (bounded by both width and height so it never overflows on
+            short/wide or tall/narrow screens) via maxWidthOverride,
+            bypassing the user's normal in-app board-size preference for
+            this dedicated full-screen context specifically. */}
+        <div className={cn('w-full flex items-stretch justify-center gap-2', fullscreen && 'max-w-[min(92vw,80vh)]')}>
           <MaterialStrip fen={fen} color="b" vertical className="pt-2" />
           <div className="flex-1 min-w-0 local-play-board">
             <ChessBoard
               fen={fen}
               practiceMode={result === 'playing'}
               onMovePlayed={handleMove}
+              maxWidthOverride={fullscreen ? 'min(92vw, 80vh)' : undefined}
             />
           </div>
           <MaterialStrip fen={fen} color="w" vertical className="pt-2" />
         </div>
 
         {/* White's side — normal orientation */}
-        <div className="w-full">
+        <div className={cn('w-full', fullscreen && 'max-w-[min(92vw,80vh)]')}>
           <div className="flex items-center gap-2 w-full">
             {hasTimer && <ClockButton side="w" />}
             {result === 'playing' && (
               <button
                 onClick={() => resign('w')}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-medium hover:bg-red-500/20 transition-colors shrink-0"
+                className={cn(
+                  'flex items-center gap-1.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 font-medium hover:bg-red-500/20 transition-colors shrink-0',
+                  fullscreen ? 'px-4 py-3 text-sm' : 'px-3 py-2 text-xs',
+                )}
               >
-                <Flag className="w-3.5 h-3.5" /> Resign
+                <Flag className={fullscreen ? 'w-4 h-4' : 'w-3.5 h-3.5'} /> Resign
               </button>
             )}
             {!hasTimer && result === 'playing' && chess.turn() === 'w' && (
@@ -331,7 +360,10 @@ export function LocalPlay() {
           )}
         </AnimatePresence>
 
-        {/* Move list */}
+        {/* Move list -- hidden in fullscreen so the board and clocks
+            genuinely dominate the screen instead of competing with it
+            for vertical space; still available in normal mode. */}
+        {!fullscreen && (
         <div className="glass-card rounded-xl overflow-hidden w-full">
           <div className="px-3 py-2 border-b border-border/30">
             <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Moves</p>
@@ -352,13 +384,14 @@ export function LocalPlay() {
             )}
           </div>
         </div>
+        )}
       </div>
     </>
   );
 
   if (fullscreen) {
     return (
-      <div className="fixed inset-0 z-[70] overflow-y-auto bg-background space-y-3 pb-10 px-4 pt-4">
+      <div className="fixed inset-0 z-[70] flex flex-col overflow-y-auto bg-background px-4 pt-4 pb-4">
         {gameContent}
       </div>
     );
