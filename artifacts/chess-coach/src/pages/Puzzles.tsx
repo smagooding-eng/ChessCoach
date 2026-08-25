@@ -104,6 +104,7 @@ export function Puzzles() {
   // with an added puzzle-type filter (mate in N, etc) below instead.
   const [puzzleTheme, setPuzzleTheme] = useState<string>('');
   const [sacrificePiece, setSacrificePiece] = useState<string>('');
+  const [pieceTypeMismatch, setPieceTypeMismatch] = useState(false);
   const [ratingBand, setRatingBand] = useState<string>('');
   const feedbackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [explanation, setExplanation] = useState<string | null>(null);
@@ -161,6 +162,7 @@ export function Puzzles() {
       const data = await res.json();
       setPuzzle(data.puzzle);
       setDaily(data.daily);
+      setPieceTypeMismatch(data.pieceTypeMatched === false);
       setSolutionMoves(data.puzzle.moves ? data.puzzle.moves.split(' ') : []);
       seenPuzzleIds.current.push(data.puzzle.id);
 
@@ -593,6 +595,11 @@ export function Puzzles() {
 
             {(state === 'ready' || state === 'correct' || state === 'wrong' || state === 'solving' || state === 'showing_solution') && puzzle && game && (
               <>
+                {pieceTypeMismatch && (
+                  <div className="mb-3 px-3 py-2 rounded-xl text-xs font-medium" style={{ background: 'rgba(234,151,51,0.1)', color: '#ea9733', border: '1px solid rgba(234,151,51,0.25)' }}>
+                    Couldn't find an exact {sacrificePiece} sacrifice match right now — showing the closest puzzle instead. Try "Next Puzzle" for another attempt.
+                  </div>
+                )}
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-medium px-2 py-0.5 rounded"

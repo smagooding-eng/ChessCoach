@@ -165,8 +165,11 @@ router.get("/puzzles/next", requireAuth, async (req: Request, res: Response) => 
     // queen sacrifices, not just any mate).
     const sacrificeThemeCondition = needsPieceTypeCheck ? sql`${puzzlesTable.themes} ILIKE ${"%sacrifice%"}` : null;
 
+    let pieceTypeMatched: boolean | null = null;
+
     let puzzle;
     if (needsPieceTypeCheck) {
+      pieceTypeMatched = false;
       const excludeCondition = allExcluded.length > 0
         ? sql`${puzzlesTable.id} NOT IN (${sql.join(allExcluded.map(id => sql`${id}`), sql`, `)})`
         : null;
@@ -182,20 +185,45 @@ router.get("/puzzles/next", requireAuth, async (req: Request, res: Response) => 
           ...ratingConditions,
         ))
         .orderBy(sql`RANDOM()`)
-        .limit(40);
+        .limit(120);
 
       const targetPiece = pieceTypeParam === "queen" ? "q" : "r";
       for (const candidate of candidates) {
         try {
           const rawMoves = candidate.moves.split(" ");
           if (rawMoves.length < 2) continue;
-          const afterSetup = new Chess(candidate.fen);
-          afterSetup.move({ from: rawMoves[0].slice(0, 2), to: rawMoves[0].slice(2, 4), promotion: rawMoves[0].length > 4 ? rawMoves[0][4] : undefined });
-          const firstSolvingMove = rawMoves[1];
-          const fromSquare = firstSolvingMove.slice(0, 2);
-          const piece = afterSetup.get(fromSquare as any);
-          if (piece?.type === targetPiece) {
+          const replay = new Chess(candidate.fen);
+          // moves[0] is the setup/blunder move (already established
+          // elsewhere in this route), so the solver's actual moves start
+          // at index 1. A sacrifice can happen on ANY move in the
+          // solution, not just the first one -- checking only the first
+          // move (the earlier version of this check) missed real matches
+          // whenever the sacrifice came later in the combination, which
+          // is common for longer mate sequences specifically.
+          let found = false;
+          for (let i = 0; i < rawMoves.length; i++) {
+            const uci = rawMoves[i];
+            const from = uci.slice(0, 2);
+            const to = uci.slice(2, 4);
+            const promotion = uci.length > 4 ? uci[4] : undefined;
+            if (i > 0) {
+              // Check this solving move's piece BEFORE applying it.
+              const piece = replay.get(from as any);
+              if (piece?.type === targetPiece) {
+                found = true;
+                break;
+              }
+            }
+            try {
+              replay.move({ from, to, promotion });
+            } catch {
+              found = false;
+              break;
+            }
+          }
+          if (found) {
             puzzle = candidate;
+            pieceTypeMatched = true;
             break;
           }
         } catch {
@@ -292,6 +320,7 @@ router.get("/puzzles/next", requireAuth, async (req: Request, res: Response) => 
     }
 
     res.json({
+      pieceTypeMatched,
       puzzle: {
         id: puzzle.id,
         fen: solverFen,
