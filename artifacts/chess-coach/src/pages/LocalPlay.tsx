@@ -2,8 +2,9 @@ import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { PageHero } from '@/components/DesignSystem';
 import { Chess } from 'chess.js';
 import { ChessBoard } from '@/components/ChessBoard';
+import { MaterialStrip } from '@/components/GameStatusStrip';
 import { motion, AnimatePresence } from 'framer-motion';
-import { RotateCcw, Flag, Clock, Play, ArrowLeft, Trophy, Handshake } from 'lucide-react';
+import { RotateCcw, Flag, Clock, Play, ArrowLeft, Trophy, Handshake, Hand } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 type TimeControl = { label: string; seconds: number } | { label: string; seconds: null };
@@ -41,6 +42,21 @@ export function LocalPlay() {
   const [moves, setMoves] = useState<MoveRecord[]>([]);
   const [whiteTime, setWhiteTime] = useState(300);
   const [blackTime, setBlackTime] = useState(300);
+  // Whose clock is actively counting down -- distinct from chess.js's own
+  // turn tracking. On a real physical clock, moving the piece advances
+  // whose *turn* it is immediately, but your own clock keeps running
+  // until you press it. clockActive models that: it only changes when a
+  // player explicitly taps their own (currently running) clock.
+  const [clockActive, setClockActive] = useState<'w' | 'b'>('w');
+  // True right after a move is played and before the mover has tapped
+  // their clock to submit it -- the board has already updated, but time
+  // hasn't switched sides yet.
+  const [awaitingSubmit, setAwaitingSubmit] = useState(false);
+  // Game view opens fullscreen (covering the app header/nav) the moment
+  // a time control is picked. Exit returns to the normal in-app layout
+  // without resetting the game -- same component state either way, just
+  // rendered with or without the fixed fullscreen wrapper.
+  const [fullscreen, setFullscreen] = useState(true);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const moveListRef = useRef<HTMLDivElement>(null);
 
@@ -52,6 +68,9 @@ export function LocalPlay() {
     setMoves([]);
     setWhiteTime(tc.seconds ?? 0);
     setBlackTime(tc.seconds ?? 0);
+    setClockActive('w');
+    setAwaitingSubmit(false);
+    setFullscreen(true);
     setGameStarted(true);
   };
 
@@ -63,14 +82,19 @@ export function LocalPlay() {
     setFen(chess.fen());
     setResult('playing');
     setMoves([]);
+    setClockActive('w');
+    setAwaitingSubmit(false);
+    setFullscreen(true);
   };
 
+  // Timer only runs for clockActive's side, and only when not paused
+  // waiting for the mover to tap their clock.
   useEffect(() => {
     if (!gameStarted || result !== 'playing' || !timeControl || timeControl.seconds === null) return;
+    if (awaitingSubmit) return;
 
     timerRef.current = setInterval(() => {
-      const turn = chess.turn();
-      if (turn === 'w') {
+      if (clockActive === 'w') {
         setWhiteTime(prev => {
           if (prev <= 1) {
             setResult('black');
@@ -92,7 +116,7 @@ export function LocalPlay() {
     }, 1000);
 
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
-  }, [gameStarted, result, fen, timeControl]);
+  }, [gameStarted, result, timeControl, clockActive, awaitingSubmit]);
 
   useEffect(() => {
     if (moveListRef.current) {
@@ -100,7 +124,10 @@ export function LocalPlay() {
     }
   }, [moves]);
 
+  const hasTimer = timeControl && timeControl.seconds !== null;
+
   const handleMove = useCallback((san: string) => {
+    const moverColor = chess.turn();
     const moveResult = chess.move(san);
     if (!moveResult) return;
 
@@ -114,8 +141,25 @@ export function LocalPlay() {
       } else {
         setResult('draw');
       }
+      return;
     }
-  }, [chess]);
+
+    // Timed games: the mover's own clock keeps running (paused from
+    // ticking further, but not switched) until they tap it to submit.
+    // Untimed games have no clock to submit, so turns just proceed
+    // normally with no extra step.
+    if (hasTimer) {
+      setClockActive(moverColor);
+      setAwaitingSubmit(true);
+    }
+  }, [chess, hasTimer]);
+
+  const submitClock = (side: 'w' | 'b') => {
+    if (result !== 'playing' || !awaitingSubmit) return;
+    if (clockActive !== side) return; // only the side whose clock is running can submit it
+    setClockActive(side === 'w' ? 'b' : 'w');
+    setAwaitingSubmit(false);
+  };
 
   const resign = (color: 'w' | 'b') => {
     if (timerRef.current) clearInterval(timerRef.current);
@@ -157,28 +201,57 @@ export function LocalPlay() {
     });
   }
 
-  const hasTimer = timeControl && timeControl.seconds !== null;
-
-  return (
-    <div className="space-y-3 pb-20 px-4 pt-4 md:px-0 md:pt-0">
-      <button onClick={resetGame}
-        className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors text-sm">
-        <ArrowLeft className="w-4 h-4" /> New Game
+  // A clock renders as an actionable button once it's the side that
+  // needs to submit -- tapping it stops your time and starts theirs.
+  function ClockButton({ side }: { side: 'w' | 'b' }) {
+    const isActive = clockActive === side && result === 'playing';
+    const canSubmit = isActive && awaitingSubmit;
+    const time = side === 'w' ? whiteTime : blackTime;
+    return (
+      <button
+        onClick={() => submitClock(side)}
+        disabled={!canSubmit}
+        className={cn(
+          'px-3 py-1.5 rounded-xl font-mono font-bold text-lg flex-1 text-left transition-colors',
+          isActive ? 'bg-primary/20 text-primary' : 'text-muted-foreground',
+          canSubmit && 'ring-2 ring-primary/60 cursor-pointer active:scale-[0.98]',
+        )}
+      >
+        <span className="text-xs font-normal mr-2">{side === 'w' ? 'White' : 'Black'}</span>
+        {formatClock(time)}
+        {canSubmit && <Hand className="w-3.5 h-3.5 inline ml-2 -mt-1" />}
       </button>
+    );
+  }
 
-      <div className="flex flex-col items-center gap-2 max-w-[580px] mx-auto">
+  const gameContent = (
+    <>
+      <div className="flex items-center justify-between gap-2">
+        {fullscreen ? (
+          <button onClick={() => setFullscreen(false)}
+            className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors text-sm font-bold px-3 py-1.5 rounded-lg"
+            style={{ background: 'rgba(255,255,255,0.06)' }}>
+            <ArrowLeft className="w-4 h-4" /> Exit
+          </button>
+        ) : (
+          <>
+            <button onClick={resetGame}
+              className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors text-sm">
+              <ArrowLeft className="w-4 h-4" /> New Game
+            </button>
+            <button onClick={() => setFullscreen(true)}
+              className="text-xs font-bold px-3 py-1.5 rounded-lg text-primary" style={{ background: 'rgba(129,182,76,0.1)' }}>
+              Fullscreen
+            </button>
+          </>
+        )}
+      </div>
+
+      <div className="flex flex-col items-center gap-2 max-w-[640px] mx-auto">
         {/* Black's side — rotated 180° so the player across can read it */}
         <div className="w-full rotate-180">
           <div className="flex items-center gap-2 w-full">
-            {hasTimer && (
-              <div className={cn(
-                'px-3 py-1.5 rounded-xl font-mono font-bold text-lg flex-1',
-                chess.turn() === 'b' && result === 'playing' ? 'bg-primary/20 text-primary' : 'text-muted-foreground'
-              )}>
-                <span className="text-xs font-normal mr-2">Black</span>
-                {formatClock(blackTime)}
-              </div>
-            )}
+            {hasTimer && <ClockButton side="b" />}
             {result === 'playing' && (
               <button
                 onClick={() => resign('b')}
@@ -193,27 +266,29 @@ export function LocalPlay() {
           </div>
         </div>
 
-        {/* Board with black pieces rotated */}
-        <div className="w-full local-play-board">
-          <ChessBoard
-            fen={fen}
-            practiceMode={result === 'playing'}
-            onMovePlayed={handleMove}
-          />
+        {hasTimer && awaitingSubmit && result === 'playing' && (
+          <p className="text-[11px] text-primary font-medium -mt-1" style={{ transform: clockActive === 'b' ? 'scaleY(-1)' : undefined }}>
+            {clockActive === 'w' ? 'White' : 'Black'}: tap your clock to pass the turn
+          </p>
+        )}
+
+        {/* Board, centered, with vertical material columns flanking it */}
+        <div className="w-full flex items-stretch justify-center gap-2">
+          <MaterialStrip fen={fen} color="b" vertical className="pt-2" />
+          <div className="flex-1 min-w-0 local-play-board">
+            <ChessBoard
+              fen={fen}
+              practiceMode={result === 'playing'}
+              onMovePlayed={handleMove}
+            />
+          </div>
+          <MaterialStrip fen={fen} color="w" vertical className="pt-2" />
         </div>
 
         {/* White's side — normal orientation */}
         <div className="w-full">
           <div className="flex items-center gap-2 w-full">
-            {hasTimer && (
-              <div className={cn(
-                'px-3 py-1.5 rounded-xl font-mono font-bold text-lg flex-1',
-                chess.turn() === 'w' && result === 'playing' ? 'bg-primary/20 text-primary' : 'text-muted-foreground'
-              )}>
-                <span className="text-xs font-normal mr-2">White</span>
-                {formatClock(whiteTime)}
-              </div>
-            )}
+            {hasTimer && <ClockButton side="w" />}
             {result === 'playing' && (
               <button
                 onClick={() => resign('w')}
@@ -278,6 +353,20 @@ export function LocalPlay() {
           </div>
         </div>
       </div>
+    </>
+  );
+
+  if (fullscreen) {
+    return (
+      <div className="fixed inset-0 z-[70] overflow-y-auto bg-background space-y-3 pb-10 px-4 pt-4">
+        {gameContent}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3 pb-20 px-4 pt-4 md:px-0 md:pt-0">
+      {gameContent}
     </div>
   );
 }
