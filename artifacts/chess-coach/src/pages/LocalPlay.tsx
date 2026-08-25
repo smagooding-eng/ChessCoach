@@ -322,7 +322,7 @@ export function LocalPlay() {
             board, so nothing eats into its width. suppressConfirmMoves
             avoids the generic ChessBoard confirm-move overlay firing on
             top of Local Play's own clock-tap confirmation. */}
-        <div className={cn('w-full', fullscreen && '-mx-4 w-screen')}>
+        <div className={cn('w-full local-play-board', fullscreen && '-mx-4 w-screen')}>
           <ChessBoard
             fen={fen}
             practiceMode={result === 'playing'}
