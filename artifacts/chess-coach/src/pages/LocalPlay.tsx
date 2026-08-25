@@ -118,6 +118,19 @@ export function LocalPlay() {
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [gameStarted, result, timeControl, clockActive, awaitingSubmit]);
 
+  // Mobile browsers tint the system status bar/URL bar to match
+  // <meta name="theme-color">, which is normally the app's brand green
+  // (#81b64c) -- that shows as a persistent green bar above a fullscreen
+  // game. Swap it to match the dark game background while fullscreen,
+  // restore the real value on exit or unmount.
+  useEffect(() => {
+    if (!fullscreen || !gameStarted) return;
+    const meta = document.querySelector('meta[name="theme-color"]');
+    const original = meta?.getAttribute('content') ?? '#81b64c';
+    meta?.setAttribute('content', '#141413');
+    return () => { meta?.setAttribute('content', original); };
+  }, [fullscreen, gameStarted]);
+
   useEffect(() => {
     if (moveListRef.current) {
       moveListRef.current.scrollTop = moveListRef.current.scrollHeight;
@@ -205,6 +218,8 @@ export function LocalPlay() {
   // needs to submit -- tapping it stops your time and starts theirs.
   // Styled like the chess-clock paddle buttons used for Confirm Move
   // elsewhere in the app: chunky, physical-feeling, strong drop shadow.
+  // Captured material for that side renders as a horizontal strip under
+  // the time, inside the same button.
   function ClockButton({ side }: { side: 'w' | 'b' }) {
     const isActive = clockActive === side && result === 'playing';
     const canSubmit = isActive && awaitingSubmit;
@@ -215,7 +230,7 @@ export function LocalPlay() {
         disabled={!canSubmit}
         className={cn(
           'flex-1 rounded-2xl font-mono font-black text-left transition-transform',
-          fullscreen ? 'px-5 py-4' : 'px-3 py-2.5',
+          fullscreen ? 'px-6 py-5' : 'px-3 py-2.5',
           canSubmit && 'active:scale-[0.97] active:translate-y-0.5',
         )}
         style={{
@@ -229,11 +244,16 @@ export function LocalPlay() {
           border: '1px solid rgba(0,0,0,0.25)',
         }}
       >
-        <span className={cn('font-normal block opacity-80', fullscreen ? 'text-xs mb-0.5' : 'text-[10px]')}>
+        <span className={cn('font-normal block opacity-80', fullscreen ? 'text-sm mb-0.5' : 'text-[10px]')}>
           {side === 'w' ? 'White' : 'Black'}
         </span>
-        <span className={fullscreen ? 'text-3xl' : 'text-lg'}>{formatClock(time)}</span>
-        {canSubmit && <Hand className={cn('inline ml-2', fullscreen ? 'w-5 h-5 -mt-2' : 'w-3.5 h-3.5 -mt-1')} />}
+        <span className={fullscreen ? 'text-4xl' : 'text-lg'}>{formatClock(time)}</span>
+        {canSubmit && <Hand className={cn('inline ml-2', fullscreen ? 'w-6 h-6 -mt-3' : 'w-3.5 h-3.5 -mt-1')} />}
+        {fullscreen && (
+          <div className="mt-1">
+            <MaterialStrip fen={fen} color={side} />
+          </div>
+        )}
       </button>
     );
   }
@@ -266,7 +286,7 @@ export function LocalPlay() {
         fullscreen ? 'flex-1 justify-center' : 'max-w-[640px]',
       )}>
         {/* Black's side — rotated 180° so the player across can read it */}
-        <div className={cn('w-full rotate-180', fullscreen && 'max-w-[min(92vw,80vh)]')}>
+        <div className="w-full rotate-180">
           <div className="flex items-center gap-2 w-full">
             {hasTimer && <ClockButton side="b" />}
             {result === 'playing' && (
@@ -292,27 +312,28 @@ export function LocalPlay() {
           </p>
         )}
 
-        {/* Board, centered, with vertical material columns flanking it.
-            In fullscreen, sized to genuinely fill most of the viewport
-            (bounded by both width and height so it never overflows on
-            short/wide or tall/narrow screens) via maxWidthOverride,
-            bypassing the user's normal in-app board-size preference for
-            this dedicated full-screen context specifically. */}
-        <div className={cn('w-full flex items-stretch justify-center gap-2', fullscreen && 'max-w-[min(92vw,80vh)]')}>
-          <MaterialStrip fen={fen} color="b" vertical className="pt-2" />
-          <div className="flex-1 min-w-0 local-play-board">
-            <ChessBoard
-              fen={fen}
-              practiceMode={result === 'playing'}
-              onMovePlayed={handleMove}
-              maxWidthOverride={fullscreen ? 'min(92vw, 80vh)' : undefined}
-            />
-          </div>
-          <MaterialStrip fen={fen} color="w" vertical className="pt-2" />
+        {/* Board, centered and genuinely edge-to-edge in fullscreen --
+            escapes the outer wrapper's horizontal padding via negative
+            margin, and uses the full viewport width (bounded by height
+            too, so it never overflows on short/wide screens) via
+            maxWidthOverride, bypassing the user's normal in-app
+            board-size preference for this dedicated context. Material
+            now renders inside each clock button instead of flanking the
+            board, so nothing eats into its width. suppressConfirmMoves
+            avoids the generic ChessBoard confirm-move overlay firing on
+            top of Local Play's own clock-tap confirmation. */}
+        <div className={cn('w-full', fullscreen && '-mx-4 w-screen')}>
+          <ChessBoard
+            fen={fen}
+            practiceMode={result === 'playing'}
+            onMovePlayed={handleMove}
+            maxWidthOverride={fullscreen ? 'min(100vw, 62vh)' : undefined}
+            suppressConfirmMoves={fullscreen}
+          />
         </div>
 
         {/* White's side — normal orientation */}
-        <div className={cn('w-full', fullscreen && 'max-w-[min(92vw,80vh)]')}>
+        <div className="w-full">
           <div className="flex items-center gap-2 w-full">
             {hasTimer && <ClockButton side="w" />}
             {result === 'playing' && (

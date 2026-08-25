@@ -106,6 +106,11 @@ interface ChessBoardProps {
   // board should genuinely dominate the screen regardless of their
   // general in-app size choice. Accepts any valid CSS max-width value.
   maxWidthOverride?: string | number;
+  // Suppresses ChessBoard's own generic confirm-move staging even if the
+  // user has that setting on globally -- for contexts that have their
+  // own dedicated confirmation mechanic (e.g. Local Play's tap-your-clock
+  // flow), where showing both at once would be redundant/conflicting.
+  suppressConfirmMoves?: boolean;
 }
 
 export function ChessBoard({
@@ -122,11 +127,14 @@ export function ChessBoard({
   onPremoveSet,
   arrows,
   maxWidthOverride,
+  suppressConfirmMoves = false,
 }: ChessBoardProps) {
   const { confirmMoves, boardColors, boardTextureCss, showCoordinates, pieceColors, pieceShape, soundEnabled, promotionChoice, boardMaxWidth: settingsMaxWidth } = useSettings();
   const boardMaxWidth = maxWidthOverride ?? settingsMaxWidth;
   const confirmMovesRef = useRef(confirmMoves);
   confirmMovesRef.current = confirmMoves;
+  const suppressConfirmMovesRef = useRef(suppressConfirmMoves);
+  suppressConfirmMovesRef.current = suppressConfirmMoves;
   const soundEnabledRef = useRef(soundEnabled);
   soundEnabledRef.current = soundEnabled;
   const promotionChoiceRef = useRef(promotionChoice);
@@ -229,7 +237,7 @@ export function ChessBoard({
         if (feedbackTimerRef.current) clearTimeout(feedbackTimerRef.current);
         feedbackTimerRef.current = setTimeout(() => setFeedback(null), 900);
       }
-      if (confirmMovesRef.current && !expected) {
+      if (confirmMovesRef.current && !suppressConfirmMovesRef.current && !expected) {
         setPendingMove({ from, to, san, isCorrect, tempFen: chess.fen() });
         return true;
       }
