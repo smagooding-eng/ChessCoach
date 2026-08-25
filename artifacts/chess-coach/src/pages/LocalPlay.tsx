@@ -52,6 +52,11 @@ export function LocalPlay() {
   // their clock to submit it -- the board has already updated, but time
   // hasn't switched sides yet.
   const [awaitingSubmit, setAwaitingSubmit] = useState(false);
+  // For timed games, the clock doesn't run at all until White explicitly
+  // taps it once to start -- matching a real physical chess clock, where
+  // someone presses the button before the first move is even made.
+  // Untimed games have no clock to start, so this is irrelevant there.
+  const [clockStarted, setClockStarted] = useState(false);
   // Game view opens fullscreen (covering the app header/nav) the moment
   // a time control is picked. Exit returns to the normal in-app layout
   // without resetting the game -- same component state either way, just
@@ -70,6 +75,7 @@ export function LocalPlay() {
     setBlackTime(tc.seconds ?? 0);
     setClockActive('w');
     setAwaitingSubmit(false);
+    setClockStarted(false);
     setFullscreen(true);
     setGameStarted(true);
   };
@@ -84,14 +90,15 @@ export function LocalPlay() {
     setMoves([]);
     setClockActive('w');
     setAwaitingSubmit(false);
+    setClockStarted(false);
     setFullscreen(true);
   };
 
-  // Timer only runs for clockActive's side, and only when not paused
-  // waiting for the mover to tap their clock.
+  // Timer only runs for clockActive's side, only once White has started
+  // it, and only when not paused waiting for the mover to tap their clock.
   useEffect(() => {
     if (!gameStarted || result !== 'playing' || !timeControl || timeControl.seconds === null) return;
-    if (awaitingSubmit) return;
+    if (!clockStarted || awaitingSubmit) return;
 
     timerRef.current = setInterval(() => {
       if (clockActive === 'w') {
@@ -116,7 +123,7 @@ export function LocalPlay() {
     }, 1000);
 
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
-  }, [gameStarted, result, timeControl, clockActive, awaitingSubmit]);
+  }, [gameStarted, result, timeControl, clockActive, awaitingSubmit, clockStarted]);
 
   // Mobile browsers tint the system status bar/URL bar to match
   // <meta name="theme-color">, which is normally the app's brand green
@@ -174,6 +181,14 @@ export function LocalPlay() {
     setAwaitingSubmit(false);
   };
 
+  // White taps their own clock once before the very first move to start
+  // it running -- a separate action from submitClock, which only applies
+  // mid-game after a move has actually been made.
+  const startClock = () => {
+    if (result !== 'playing' || clockStarted) return;
+    setClockStarted(true);
+  };
+
   const resign = (color: 'w' | 'b') => {
     if (timerRef.current) clearInterval(timerRef.current);
     setResult(color === 'w' ? 'black' : 'white');
@@ -222,33 +237,37 @@ export function LocalPlay() {
   // the time, inside the same button.
   function ClockButton({ side }: { side: 'w' | 'b' }) {
     const isActive = clockActive === side && result === 'playing';
-    const canSubmit = isActive && awaitingSubmit;
+    const canSubmit = isActive && awaitingSubmit && clockStarted;
+    // White's clock before the game has started ticking -- tapping it
+    // here starts the game clock rather than submitting a move.
+    const needsStart = side === 'w' && !clockStarted && result === 'playing';
+    const isTappable = canSubmit || needsStart;
     const time = side === 'w' ? whiteTime : blackTime;
     return (
       <button
-        onClick={() => submitClock(side)}
-        disabled={!canSubmit}
+        onClick={() => (needsStart ? startClock() : submitClock(side))}
+        disabled={!isTappable}
         className={cn(
           'flex-1 rounded-2xl font-mono font-black text-left transition-transform',
           fullscreen ? 'px-6 py-5' : 'px-3 py-2.5',
-          canSubmit && 'active:scale-[0.97] active:translate-y-0.5',
+          isTappable && 'active:scale-[0.97] active:translate-y-0.5',
         )}
         style={{
-          background: isActive
+          background: (isActive || needsStart)
             ? 'linear-gradient(180deg, #a8d876 0%, #81b64c 55%, #5f8f36 100%)'
             : 'linear-gradient(180deg, #3a3a3a 0%, #232323 100%)',
-          color: isActive ? '#fff' : 'rgba(255,255,255,0.45)',
-          boxShadow: isActive
+          color: (isActive || needsStart) ? '#fff' : 'rgba(255,255,255,0.45)',
+          boxShadow: (isActive || needsStart)
             ? '0 4px 0 #4a7028, 0 8px 16px rgba(0,0,0,0.4), inset 0 1px 1px rgba(255,255,255,0.3)'
             : '0 4px 0 #141414, 0 8px 16px rgba(0,0,0,0.4)',
           border: '1px solid rgba(0,0,0,0.25)',
         }}
       >
         <span className={cn('font-normal block opacity-80', fullscreen ? 'text-sm mb-0.5' : 'text-[10px]')}>
-          {side === 'w' ? 'White' : 'Black'}
+          {needsStart ? 'Tap to start' : (side === 'w' ? 'White' : 'Black')}
         </span>
         <span className={fullscreen ? 'text-4xl' : 'text-lg'}>{formatClock(time)}</span>
-        {canSubmit && <Hand className={cn('inline ml-2', fullscreen ? 'w-6 h-6 -mt-3' : 'w-3.5 h-3.5 -mt-1')} />}
+        {isTappable && <Hand className={cn('inline ml-2', fullscreen ? 'w-6 h-6 -mt-3' : 'w-3.5 h-3.5 -mt-1')} />}
         {fullscreen && (
           <div className="mt-1">
             <MaterialStrip fen={fen} color={side} />
@@ -306,7 +325,13 @@ export function LocalPlay() {
           </div>
         </div>
 
-        {hasTimer && awaitingSubmit && result === 'playing' && (
+        {hasTimer && !clockStarted && result === 'playing' && (
+          <p className="text-[11px] text-primary font-medium -mt-1">
+            White: tap your clock to start the game
+          </p>
+        )}
+
+        {hasTimer && clockStarted && awaitingSubmit && result === 'playing' && (
           <p className="text-[11px] text-primary font-medium -mt-1" style={{ transform: clockActive === 'b' ? 'scaleY(-1)' : undefined }}>
             {clockActive === 'w' ? 'White' : 'Black'}: tap your clock to pass the turn
           </p>
@@ -325,7 +350,7 @@ export function LocalPlay() {
         <div className={cn('w-full local-play-board', fullscreen && '-mx-4 w-screen')}>
           <ChessBoard
             fen={fen}
-            practiceMode={result === 'playing'}
+            practiceMode={result === 'playing' && (!hasTimer || clockStarted)}
             onMovePlayed={handleMove}
             maxWidthOverride={fullscreen ? 'min(100vw, 62vh)' : undefined}
             suppressConfirmMoves={fullscreen}
