@@ -127,7 +127,7 @@ Respond with VALID JSON only:
 
   try {
     const response = await openai.chat.completions.create({
-      model: "gpt-5.6-terra",
+      model: "gpt-5.6-luna",
       max_completion_tokens: 8192,
       messages: [{ role: "user", content: prompt }],
       response_format: { type: "json_object" },
@@ -559,7 +559,7 @@ Respond with valid JSON:
 
   try {
     const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: "gpt-5.6-luna",
       max_completion_tokens: 512,
       messages: [{ role: "user", content: prompt }],
       response_format: { type: "json_object" },
@@ -987,7 +987,7 @@ JSON format:
       const chunkTokens = Math.min(16384, Math.max(4096, chunkMoveCount * 350 + (includeSummary ? 1500 : 0)));
       const prompt = buildChunkPrompt(chunk.details, chunk.start, chunk.end, includeSummary);
       return openai.chat.completions.create({
-        model: "gpt-4o",
+        model: "gpt-5.6-luna",
         max_completion_tokens: chunkTokens,
         messages: [{ role: "user", content: prompt }],
         response_format: { type: "json_object" },
@@ -1925,7 +1925,7 @@ Rules: The Concept section must be general chess teaching, not specific to this 
 
   try {
     const response = await openai.chat.completions.create({
-      model: "gpt-5.6-terra",
+      model: "gpt-5.6-luna",
       max_completion_tokens: 1100,
       messages: [{ role: "user", content: prompt }],
       response_format: { type: "json_object" },
@@ -2108,7 +2108,7 @@ Respond with valid JSON:
 
   try {
     const response = await openai.chat.completions.create({
-      model: "gpt-5.6-terra",
+      model: "gpt-5.6-luna",
       max_completion_tokens: 8192,
       messages: [{ role: "user", content: prompt }],
       response_format: { type: "json_object" },
@@ -2222,7 +2222,7 @@ Respond with valid JSON:
 
   try {
     const response = await openai.chat.completions.create({
-      model: "gpt-5.6-terra",
+      model: "gpt-5.6-luna",
       max_completion_tokens: 8192,
       messages: [{ role: "user", content: prompt }],
       response_format: { type: "json_object" },
@@ -2452,7 +2452,7 @@ Respond with valid JSON:
 
   try {
     const response = await openai.chat.completions.create({
-      model: "gpt-5.6-terra",
+      model: "gpt-5.6-luna",
       max_completion_tokens: 8192,
       messages: [{ role: "user", content: prompt }],
       response_format: { type: "json_object" },
