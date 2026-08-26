@@ -24,7 +24,26 @@ const PIECE_GLYPHS: Record<string, string> = {
 // correctly every time, at the cost of not respecting the user's
 // personal piece-style/board-theme settings (a fine tradeoff for a
 // public, unauthenticated share image that others will see).
-function StaticBoard({ fen }: { fen: string }) {
+// Draws the board onto an offscreen canvas and returns it as a data URL
+// image, rather than rendering live DOM squares/glyphs. Two earlier
+// approaches both had real problems: the interactive ChessBoard's SVG
+// pieces didn't get captured by html2canvas at all (blank output), and a
+// DOM+CSS Unicode-glyph board had unpredictable clipping since font
+// glyph metrics don't line up neatly with a square div's box. Drawing on
+// a canvas gives full, precise control over exactly where the glyph
+// lands and how big it is, and the resulting <img> with a data: URL is
+// about the simplest, most reliably captured element type there is --
+// no live SVG, no live canvas, no DOM font layout for html2canvas to
+// misinterpret.
+function renderBoardToDataUrl(fen: string, size = 640): string | null {
+  if (typeof document === 'undefined') return null;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return null;
+
+  const square = size / 8;
   let grid: (string | null)[][] = Array.from({ length: 8 }, () => Array(8).fill(null));
   try {
     const chess = new Chess(fen);
@@ -36,42 +55,54 @@ function StaticBoard({ fen }: { fen: string }) {
       }
     }
   } catch {
-    // leave grid empty on a bad FEN rather than throwing
+    // leave grid empty on a bad FEN
   }
 
-  return (
-    <div className="flex flex-col w-full" style={{ aspectRatio: '1 / 1' }}>
-      {grid.map((row, r) => (
-        <div key={r} className="flex" style={{ flex: 1 }}>
-          {row.map((piece, f) => {
-            const isLight = (r + f) % 2 === 0;
-            return (
-              <div
-                key={`${r}-${f}`}
-                className="flex items-center justify-center"
-                style={{
-                  flex: 1,
-                  background: isLight ? '#eeeed2' : '#769656',
-                  fontSize: 'min(8vw, 32px)',
-                  lineHeight: 1,
-                }}
-              >
-                {piece && (
-                  <span style={{
-                    color: piece[0] === 'w' ? '#ffffff' : '#1a1a1a',
-                    filter: piece[0] === 'w' ? 'drop-shadow(0 0 1px #333)' : 'none',
-                    fontFamily: '"Segoe UI Symbol", "Noto Sans Symbols", "DejaVu Sans", Arial, sans-serif',
-                  }}>
-                    {PIECE_GLYPHS[piece]}
-                  </span>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      ))}
-    </div>
-  );
+  for (let r = 0; r < 8; r++) {
+    for (let f = 0; f < 8; f++) {
+      const isLight = (r + f) % 2 === 0;
+      ctx.fillStyle = isLight ? '#eeeed2' : '#769656';
+      ctx.fillRect(f * square, r * square, square, square);
+
+      const piece = grid[r][f];
+      if (!piece) continue;
+
+      ctx.font = `${Math.round(square * 0.7)}px "Segoe UI Symbol", "Noto Sans Symbols", "DejaVu Sans", Arial, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      const cx = f * square + square / 2;
+      const cy = r * square + square / 2 + square * 0.03; // slight optical correction, glyphs sit a touch high
+      if (piece[0] === 'w') {
+        // Dark outline behind a white fill, so white pieces stay
+        // legible on light squares -- the proper way to do this on
+        // canvas (stroke first, then fill), not stacking two fills.
+        ctx.lineWidth = Math.max(1, square * 0.035);
+        ctx.strokeStyle = '#2a2a2a';
+        ctx.strokeText(PIECE_GLYPHS[piece], cx, cy);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText(PIECE_GLYPHS[piece], cx, cy);
+      } else {
+        ctx.fillStyle = '#1a1a1a';
+        ctx.fillText(PIECE_GLYPHS[piece], cx, cy);
+      }
+    }
+  }
+
+  return canvas.toDataURL('image/png');
+}
+
+function StaticBoard({ fen }: { fen: string }) {
+  const [imgSrc, setImgSrc] = useState<string | null>(null);
+
+  useEffect(() => {
+    setImgSrc(renderBoardToDataUrl(fen));
+  }, [fen]);
+
+  if (!imgSrc) {
+    return <div className="w-full" style={{ aspectRatio: '1 / 1', background: '#769656' }} />;
+  }
+
+  return <img src={imgSrc} alt="Chess position" className="w-full block" style={{ aspectRatio: '1 / 1' }} />;
 }
 
 function decodeCard(encoded: string): ShareableCard | null {
