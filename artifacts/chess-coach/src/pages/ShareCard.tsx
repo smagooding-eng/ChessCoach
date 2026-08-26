@@ -40,29 +40,36 @@ function StaticBoard({ fen }: { fen: string }) {
   }
 
   return (
-    <div className="grid grid-cols-8 w-full" style={{ aspectRatio: '1 / 1' }}>
-      {grid.map((row, r) =>
-        row.map((piece, f) => {
-          const isLight = (r + f) % 2 === 0;
-          return (
-            <div
-              key={`${r}-${f}`}
-              className="flex items-center justify-center"
-              style={{
-                background: isLight ? '#eeeed2' : '#769656',
-                fontSize: 'min(8vw, 32px)',
-                lineHeight: 1,
-              }}
-            >
-              {piece && (
-                <span style={{ color: piece[0] === 'w' ? '#ffffff' : '#1a1a1a', filter: piece[0] === 'w' ? 'drop-shadow(0 0 1px #333)' : 'none' }}>
-                  {PIECE_GLYPHS[piece]}
-                </span>
-              )}
-            </div>
-          );
-        })
-      )}
+    <div className="flex flex-col w-full" style={{ aspectRatio: '1 / 1' }}>
+      {grid.map((row, r) => (
+        <div key={r} className="flex" style={{ flex: 1 }}>
+          {row.map((piece, f) => {
+            const isLight = (r + f) % 2 === 0;
+            return (
+              <div
+                key={`${r}-${f}`}
+                className="flex items-center justify-center"
+                style={{
+                  flex: 1,
+                  background: isLight ? '#eeeed2' : '#769656',
+                  fontSize: 'min(8vw, 32px)',
+                  lineHeight: 1,
+                }}
+              >
+                {piece && (
+                  <span style={{
+                    color: piece[0] === 'w' ? '#ffffff' : '#1a1a1a',
+                    filter: piece[0] === 'w' ? 'drop-shadow(0 0 1px #333)' : 'none',
+                    fontFamily: '"Segoe UI Symbol", "Noto Sans Symbols", "DejaVu Sans", Arial, sans-serif',
+                  }}>
+                    {PIECE_GLYPHS[piece]}
+                  </span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      ))}
     </div>
   );
 }
@@ -198,6 +205,13 @@ export function ShareCard() {
     if (!captureRef.current) return;
     setDownloading(true);
     try {
+      // html2canvas doesn't reliably wait for web fonts to finish loading
+      // before it snapshots the DOM -- a well-documented cause of glyphs
+      // (including our Unicode chess pieces) rendering blank in the
+      // captured image even though they display correctly on screen.
+      if (document.fonts?.ready) {
+        try { await document.fonts.ready; } catch { /* proceed regardless */ }
+      }
       const html2canvas = (await import('html2canvas')).default;
       const canvas = await html2canvas(captureRef.current, { backgroundColor: '#262421', scale: 2, useCORS: true });
       const link = document.createElement('a');
