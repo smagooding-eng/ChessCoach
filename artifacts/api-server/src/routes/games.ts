@@ -35,6 +35,22 @@ async function runImportJob(opts: ImportJobOptions): Promise<{ imported: number;
   let imported = 0;
   let updated = 0;
 
+  // Free-tier import cap enforced here, directly at the point where new
+  // games actually get inserted -- not just a pre-check gate before the
+  // fetch starts. A pre-check alone (reject if ALREADY at 20+) doesn't
+  // stop a brand-new user's very FIRST import from pulling in hundreds
+  // of games in one batch, since their count starts at 0. Fixing it here
+  // means it's correctly enforced regardless of which route calls this
+  // function, present or future.
+  const { hasFullAccess } = await import("../lib/accessControl");
+  const { full: isFullAccess } = await hasFullAccess(userId);
+  const FREE_IMPORT_LIMIT = 20;
+  let remainingImportSlots = Infinity;
+  if (!isFullAccess) {
+    const [{ value: currentCount }] = await db.select({ value: count() }).from(gamesTable).where(eq(gamesTable.userId, userId));
+    remainingImportSlots = Math.max(0, FREE_IMPORT_LIMIT - Number(currentCount));
+  }
+
   if (platform === "lichess") {
     let lichessGames;
     try {
@@ -45,6 +61,7 @@ async function runImportJob(opts: ImportJobOptions): Promise<{ imported: number;
     }
 
     for (const game of lichessGames) {
+      if (imported >= remainingImportSlots) break;
       try {
         if (!game.pgn) continue;
         const meta = extractLichessGameMetadata(game, platformUsername);
@@ -79,6 +96,7 @@ async function runImportJob(opts: ImportJobOptions): Promise<{ imported: number;
     }
 
     for (const game of games) {
+      if (imported >= remainingImportSlots) break;
       try {
         if (!game.pgn) continue;
         const meta = extractGameMetadata(game, platformUsername);
@@ -174,7 +192,7 @@ router.post("/games/import", requireAuth, async (req, res): Promise<void> => {
   const userId = req.user!.id;
   const storedUsername = platformUsername.toLowerCase();
 
-  const { wouldExceedImportLimit } = await import("../lib/accessControl");
+  const { wouldExceedImportLimit, hasFullAccess } = await import("../lib/accessControl");
   if (await wouldExceedImportLimit(userId, storedUsername)) {
     res.status(402).json({
       error: "usage_limit",
@@ -182,6 +200,18 @@ router.post("/games/import", requireAuth, async (req, res): Promise<void> => {
       upgradeRequired: true,
     });
     return;
+  }
+
+  // Same batch-size cap as runImportJob -- the check above only rejects
+  // a request if the user is ALREADY at the limit, it doesn't cap how
+  // many NEW games a single import call can pull in, so a brand-new
+  // free user's very first import could still exceed 20 in one go.
+  const { full: isFullAccess } = await hasFullAccess(userId);
+  const FREE_IMPORT_LIMIT = 20;
+  let remainingImportSlots = Infinity;
+  if (!isFullAccess) {
+    const [{ value: currentCount }] = await db.select({ value: count() }).from(gamesTable).where(eq(gamesTable.userId, userId));
+    remainingImportSlots = Math.max(0, FREE_IMPORT_LIMIT - Number(currentCount));
   }
 
   if (platform !== "chesscom" && platform !== "lichess") {
@@ -205,6 +235,7 @@ router.post("/games/import", requireAuth, async (req, res): Promise<void> => {
     }
 
     for (const game of lichessGames) {
+      if (imported >= remainingImportSlots) break;
       try {
         if (!game.pgn) continue;
         const meta = extractLichessGameMetadata(game, platformUsername);
@@ -252,6 +283,7 @@ router.post("/games/import", requireAuth, async (req, res): Promise<void> => {
     }
 
     for (const game of games) {
+      if (imported >= remainingImportSlots) break;
       try {
         const meta = extractGameMetadata(game, platformUsername);
 
