@@ -416,7 +416,13 @@ export function Games() {
             );
           })}
         </div>
-        {hasMore && (
+        {hasMore && isViewLimited && games.length >= (viewLimit ?? 20) ? (
+          <UpgradeNudge
+            headline={`Want to load the other ${total - games.length} games?`}
+            subtext={`Free plan shows your ${viewLimit ?? 20} most recent games. Upgrade to Pro now to see your full history.`}
+            compact
+          />
+        ) : hasMore && (
           <button
             onClick={() => setPageSize(p => p + 500)}
             className="w-full py-3 text-sm font-medium text-primary hover:text-primary/80 bg-secondary/50 hover:bg-secondary/70 rounded-xl border border-border transition-colors"
