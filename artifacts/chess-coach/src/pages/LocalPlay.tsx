@@ -2,6 +2,7 @@ import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { PageHero } from '@/components/DesignSystem';
 import { Chess } from 'chess.js';
 import { ChessBoard } from '@/components/ChessBoard';
+import { useSettings } from '@/context/SettingsContext';
 import { MaterialStrip } from '@/components/GameStatusStrip';
 import { motion, AnimatePresence } from 'framer-motion';
 import { RotateCcw, Flag, Clock, Play, ArrowLeft, Trophy, Handshake, Hand } from 'lucide-react';
@@ -34,6 +35,7 @@ interface MoveRecord {
 }
 
 export function LocalPlay() {
+  const { confirmMoves } = useSettings();
   const [timeControl, setTimeControl] = useState<TimeControl | null>(null);
   const [gameStarted, setGameStarted] = useState(false);
   const [chess] = useState(() => new Chess());
@@ -164,15 +166,22 @@ export function LocalPlay() {
       return;
     }
 
-    // Timed games: the mover's own clock keeps running (paused from
-    // ticking further, but not switched) until they tap it to submit.
-    // Untimed games have no clock to submit, so turns just proceed
-    // normally with no extra step.
+    // Timed games: when Confirm Moves is on, the clock doubles as the
+    // confirmation step -- the mover's own clock keeps running until
+    // they tap it to submit, same as a real physical chess clock. When
+    // the setting is off, the clock just auto-advances immediately on
+    // move, no extra tap needed. Untimed games have no clock at all, so
+    // they use ChessBoard's own generic confirm-move overlay instead
+    // (see suppressConfirmMoves={hasTimer} below).
     if (hasTimer) {
-      setClockActive(moverColor);
-      setAwaitingSubmit(true);
+      if (confirmMoves) {
+        setClockActive(moverColor);
+        setAwaitingSubmit(true);
+      } else {
+        setClockActive(moverColor === 'w' ? 'b' : 'w');
+      }
     }
-  }, [chess, hasTimer]);
+  }, [chess, hasTimer, confirmMoves]);
 
   const submitClock = (side: 'w' | 'b') => {
     if (result !== 'playing' || !awaitingSubmit) return;
@@ -364,7 +373,7 @@ export function LocalPlay() {
             practiceMode={result === 'playing' && (!hasTimer || clockStarted)}
             onMovePlayed={handleMove}
             maxWidthOverride={fullscreen ? 'min(100vw, 62vh)' : undefined}
-            suppressConfirmMoves={fullscreen}
+            suppressConfirmMoves={hasTimer}
           />
         </div>
 
