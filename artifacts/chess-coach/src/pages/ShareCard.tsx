@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useParams, Link } from 'wouter';
 import { PageHero, CHESSCOM_GREEN, TEXT_LIGHT, TEXT_MUTED, BRASS } from '@/components/DesignSystem';
-import { ChessBoard } from '@/components/ChessBoard';
+import { Chess } from 'chess.js';
 import { Download, UserPlus, Loader2, Trophy, Flame, TrendingUp, Puzzle } from 'lucide-react';
 
 export type ShareableCard =
@@ -10,6 +10,62 @@ export type ShareableCard =
   | { type: 'streak'; username: string; streakDays: number; accuracy?: number }
   | { type: 'puzzle'; username: string; rating: number; themes: string[] }
   | { type: 'puzzle_position'; fen: string; rating: number; themes: string[] };
+
+const PIECE_GLYPHS: Record<string, string> = {
+  wk: '♔', wq: '♕', wr: '♖', wb: '♗', wn: '♘', wp: '♙',
+  bk: '♚', bq: '♛', br: '♜', bb: '♝', bn: '♞', bp: '♟',
+};
+
+// A plain HTML/CSS static board, deliberately NOT the interactive
+// ChessBoard component. That component's pieces are rendered via
+// react-chessboard's SVG-based system, which html2canvas does not
+// reliably capture -- it was producing blank boards in downloaded share
+// images. Unicode glyphs are plain text, which html2canvas renders
+// correctly every time, at the cost of not respecting the user's
+// personal piece-style/board-theme settings (a fine tradeoff for a
+// public, unauthenticated share image that others will see).
+function StaticBoard({ fen }: { fen: string }) {
+  let grid: (string | null)[][] = Array.from({ length: 8 }, () => Array(8).fill(null));
+  try {
+    const chess = new Chess(fen);
+    const board = chess.board();
+    for (let r = 0; r < 8; r++) {
+      for (let f = 0; f < 8; f++) {
+        const sq = board[r][f];
+        grid[r][f] = sq ? `${sq.color}${sq.type}` : null;
+      }
+    }
+  } catch {
+    // leave grid empty on a bad FEN rather than throwing
+  }
+
+  return (
+    <div className="grid grid-cols-8 w-full" style={{ aspectRatio: '1 / 1' }}>
+      {grid.map((row, r) =>
+        row.map((piece, f) => {
+          const isLight = (r + f) % 2 === 0;
+          return (
+            <div
+              key={`${r}-${f}`}
+              className="flex items-center justify-center"
+              style={{
+                background: isLight ? '#eeeed2' : '#769656',
+                fontSize: 'min(8vw, 32px)',
+                lineHeight: 1,
+              }}
+            >
+              {piece && (
+                <span style={{ color: piece[0] === 'w' ? '#ffffff' : '#1a1a1a', filter: piece[0] === 'w' ? 'drop-shadow(0 0 1px #333)' : 'none' }}>
+                  {PIECE_GLYPHS[piece]}
+                </span>
+              )}
+            </div>
+          );
+        })
+      )}
+    </div>
+  );
+}
 
 function decodeCard(encoded: string): ShareableCard | null {
   try {
@@ -72,7 +128,7 @@ function CardContent({ card }: { card: ShareableCard }) {
           Can you find the winning move?
         </p>
         <div className="max-w-[280px] mx-auto rounded-xl overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.1)' }}>
-          <ChessBoard fen={card.fen} practiceMode={false} />
+          <StaticBoard fen={card.fen} />
         </div>
         <p className="text-sm font-semibold mt-4" style={{ color: TEXT_LIGHT }}>{card.rating}-rated puzzle</p>
         {card.themes.length > 0 && (
