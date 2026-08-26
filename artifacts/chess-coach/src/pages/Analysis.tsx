@@ -223,7 +223,7 @@ export function Analysis({ hideHeader = false }: { hideHeader?: boolean } = {}) 
           initial={{ opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}
           className="p-3.5 rounded-xl flex items-center gap-2 text-sm"
-          style={{ background: 'rgba(220,67,67,0.1)', border: '1px solid rgba(220,67,67,0.25)', color: '#dc4343' }}
+          style={{ background: 'rgba(220,67,67,0.35)', border: '1px solid rgba(220,67,67,0.6)', color: '#ffffff' }}
         >
           <AlertTriangle className="w-4 h-4 shrink-0" />
           {analyzeError}

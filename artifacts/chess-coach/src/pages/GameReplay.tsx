@@ -73,17 +73,17 @@ type GameSummary = {
 };
 
 const CLASS_CFG: Record<Classification, { badge: string; color: string; full: string }> = {
-  checkmate:   { badge: '♚#', color: 'text-yellow-200 bg-gradient-to-br from-yellow-400/30 to-amber-600/25 border-yellow-300/60 shadow-[0_0_12px_rgba(250,204,21,0.35)]', full: 'Checkmate — Game Won' },
-  brilliant:   { badge: '!!', color: 'text-cyan-400 bg-cyan-400/15 border-cyan-400/30',           full: 'Brilliant Move' },
-  great:       { badge: '!',  color: 'text-sky-400 bg-sky-400/15 border-sky-400/30',              full: 'Great Move' },
-  best:        { badge: '!',  color: 'text-emerald-400 bg-emerald-400/15 border-emerald-400/30',  full: 'Best Move' },
-  excellent:   { badge: '!',  color: 'text-teal-400 bg-teal-400/15 border-teal-400/30',           full: 'Excellent Move' },
-  good:        { badge: '!',  color: 'text-green-400 bg-green-400/15 border-green-400/30',        full: 'Good Move' },
-  book:        { badge: '📖', color: 'text-blue-400 bg-blue-400/15 border-blue-400/30',           full: 'Book Move' },
-  inaccuracy:  { badge: '?!', color: 'text-yellow-400 bg-yellow-400/15 border-yellow-400/30',     full: 'Inaccuracy' },
-  mistake:     { badge: '?',  color: 'text-orange-400 bg-orange-400/15 border-orange-400/30',     full: 'Mistake' },
-  blunder:     { badge: '??', color: 'text-rose-400 bg-rose-400/15 border-rose-400/30',           full: 'Blunder' },
-  missed_win:  { badge: '✗',  color: 'text-red-400 bg-red-400/15 border-red-400/30',             full: 'Missed Win' },
+  checkmate:   { badge: '♚#', color: 'text-black bg-gradient-to-br from-yellow-300 to-amber-500 border-yellow-200 shadow-[0_0_12px_rgba(250,204,21,0.5)]', full: 'Checkmate — Game Won' },
+  brilliant:   { badge: '!!', color: 'text-white bg-cyan-500 border-cyan-300',       full: 'Brilliant Move' },
+  great:       { badge: '!',  color: 'text-white bg-sky-500 border-sky-300',        full: 'Great Move' },
+  best:        { badge: '!',  color: 'text-white bg-emerald-500 border-emerald-300', full: 'Best Move' },
+  excellent:   { badge: '!',  color: 'text-white bg-teal-500 border-teal-300',      full: 'Excellent Move' },
+  good:        { badge: '!',  color: 'text-white bg-green-500 border-green-300',    full: 'Good Move' },
+  book:        { badge: '📖', color: 'text-white bg-blue-500 border-blue-300',      full: 'Book Move' },
+  inaccuracy:  { badge: '?!', color: 'text-black bg-yellow-400 border-yellow-200',  full: 'Inaccuracy' },
+  mistake:     { badge: '?',  color: 'text-white bg-orange-500 border-orange-300',  full: 'Mistake' },
+  blunder:     { badge: '??', color: 'text-white bg-rose-500 border-rose-300',      full: 'Blunder' },
+  missed_win:  { badge: '✗',  color: 'text-white bg-red-500 border-red-300',        full: 'Missed Win' },
 };
 
 function GameRatingPanel({
@@ -1011,7 +1011,7 @@ export function GameReplay() {
                 <ChevronLeft className="w-5 h-5 md:w-4 md:h-4" />
               </button>
               <button onClick={() => setIsPlaying(p => !p)}
-                className="px-3.5 py-2.5 md:px-4 md:py-2.5 rounded-xl bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground transition-colors active:scale-90">
+                className="px-3.5 py-2.5 md:px-4 md:py-2.5 rounded-xl bg-primary text-primary-foreground hover:opacity-90 transition-opacity active:scale-90 font-bold">
                 {isPlaying ? <Pause className="w-5 h-5 md:w-4 md:h-4" /> : <Play className="w-5 h-5 md:w-4 md:h-4" />}
               </button>
               <button onClick={() => setCurrentMove(p => Math.min(maxMoves, p + 1))} disabled={currentMove >= maxMoves}
@@ -1036,7 +1036,7 @@ export function GameReplay() {
                 onClick={() => { setPracticeMode(p => !p); setIsPlaying(false); }}
                 className={`p-2.5 md:px-3 md:py-2 rounded-xl text-xs font-bold transition-colors border active:scale-90
                   ${practiceMode
-                    ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+                    ? 'bg-emerald-500/30 text-emerald-300 border-emerald-500/60'
                     : 'bg-secondary border-border hover:border-primary/40 hover:text-primary'}`}>
                 <span className="flex items-center gap-1">
                   <Zap className="w-5 h-5 md:w-3.5 md:h-3.5" />
@@ -1049,7 +1049,7 @@ export function GameReplay() {
                 disabled={reviewing || reviewMoves.length > 0}
                 className={`p-2.5 md:px-3 md:py-2 rounded-xl text-xs font-bold transition-colors border flex items-center gap-1 md:gap-1.5 active:scale-90
                   ${reviewMoves.length > 0
-                    ? 'bg-primary/15 text-primary border-primary/30'
+                    ? 'bg-primary/30 text-primary border-primary/60'
                     : 'bg-secondary border-border hover:border-primary/40 hover:text-primary disabled:opacity-50'}`}>
                 {reviewing
                   ? <div className="w-5 h-5 md:w-3.5 md:h-3.5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
@@ -1114,21 +1114,6 @@ export function GameReplay() {
                   <>
                     <div className="flex items-start justify-between gap-2">
                       <p className="flex-1">{currentReview.explanation}</p>
-                      {currentReview.coachStatus && (
-                        <span
-                          title={currentReview.coachStatus === 'engine-aligned'
-                            ? 'Coach text validated against the engine fact sheet.'
-                            : 'Engine-derived fallback (LLM text was disregarded as inconsistent with the engine).'}
-                          className={`shrink-0 inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border ${
-                            currentReview.coachStatus === 'engine-aligned'
-                              ? 'text-emerald-400 bg-emerald-400/10 border-emerald-400/30'
-                              : 'text-amber-400 bg-amber-400/10 border-amber-400/30'
-                          }`}
-                        >
-                          <span aria-hidden>{currentReview.coachStatus === 'engine-aligned' ? '✓' : '⚙'}</span>
-                          {currentReview.coachStatus === 'engine-aligned' ? 'Engine-aligned' : 'Engine fallback'}
-                        </span>
-                      )}
                     </div>
 
                       {/* Pros & Cons — clean inline list, no boxed containers */}
@@ -1151,7 +1136,7 @@ export function GameReplay() {
 
                       {/* Better move suggestion */}
                       {isBad && currentReview.betterMove && (
-                        <div className="flex items-start gap-2.5 rounded-xl bg-amber-500/8 border border-amber-500/20 px-3 py-2.5">
+                        <div className="flex items-start gap-2.5 rounded-xl bg-amber-500/20 border border-amber-500/45 px-3 py-2.5">
                           <Lightbulb className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
                           <div className="text-xs">
                             <span className="text-amber-400 font-bold text-[11px] uppercase tracking-wide block mb-0.5">Better move</span>
@@ -1175,8 +1160,8 @@ export function GameReplay() {
                       const prevFen = currentMove <= 1 ? gameStartFen : (moves[currentMove - 2]?.fen ?? currentFen);
                       navigate(`/practice?fen=${encodeURIComponent(prevFen)}&rating=${opponentRating}&color=${playerColor}`);
                     }}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all active:scale-95 border border-primary/30 hover:border-primary/50 mt-1"
-                    style={{ background: 'rgba(129,182,76,0.1)', color: '#81b64c' }}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-black transition-all active:scale-95 mt-1"
+                    style={{ background: 'linear-gradient(180deg, #a8d876 0%, #81b64c 55%, #5f8f36 100%)', color: '#fff', boxShadow: '0 3px 0 #4a7028, 0 6px 12px rgba(0,0,0,0.3)' }}
                   >
                     <Swords className="w-4 h-4" />
                     Jump in from here
@@ -1352,7 +1337,7 @@ export function GameReplay() {
 
           {/* Review error */}
           {reviewError && (
-            <div className="glass-card rounded-xl px-4 py-3 border border-rose-500/30 bg-rose-500/5 text-sm text-rose-400 flex items-center justify-between gap-3">
+            <div className="glass-card rounded-xl px-4 py-3 border border-rose-500/50 bg-rose-500/20 text-sm text-rose-300 font-medium flex items-center justify-between gap-3">
               <span>{reviewError}</span>
               <button onClick={() => { setReviewError(null); handleReview(true); }}
                 className="text-xs font-bold underline underline-offset-2 hover:no-underline">Retry</button>
@@ -1491,7 +1476,7 @@ export function GameReplay() {
             <h3 className="font-bold text-sm">Move List</h3>
             <div className="flex items-center gap-2">
               {reviewMoves.length > 0 && (
-                <span className="text-[10px] text-primary font-bold px-2 py-0.5 bg-primary/10 rounded-full border border-primary/20">
+                <span className="text-[10px] text-primary-foreground font-bold px-2 py-0.5 bg-primary rounded-full">
                   {reviewMoves.filter(m => ['blunder', 'mistake', 'inaccuracy', 'missed_win'].includes(m.classification)).length} errors
                 </span>
               )}

@@ -53,7 +53,7 @@ export function LivePlay() {
           </div>
           <button onClick={live.cancel}
             className="inline-flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm"
-            style={{ background: 'rgba(220,67,67,0.15)', color: '#dc4343', border: '1px solid rgba(220,67,67,0.3)' }}>
+            style={{ background: 'rgba(220,67,67,0.35)', color: '#ffffff', border: '1px solid rgba(220,67,67,0.6)' }}>
             <X className="w-4 h-4" /> Cancel
           </button>
         </div>
@@ -119,7 +119,7 @@ export function LivePlay() {
       )}
 
       {live.error && (
-        <div className="text-sm rounded-lg px-3 py-2" style={{ background: 'rgba(220,67,67,0.1)', color: '#dc4343', border: '1px solid rgba(220,67,67,0.3)' }}>
+        <div className="text-sm rounded-lg px-3 py-2" style={{ background: 'rgba(220,67,67,0.35)', color: '#ffffff', border: '1px solid rgba(220,67,67,0.6)' }}>
           {live.error}
         </div>
       )}

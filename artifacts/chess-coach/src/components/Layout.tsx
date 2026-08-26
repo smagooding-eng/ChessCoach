@@ -76,7 +76,7 @@ function SidebarLink({ item, isActive }: { item: typeof ALL_NAV[0]; isActive: bo
         <item.icon className="w-4 h-4 shrink-0" />
         {item.label}
         {badge && (
-          <span className="ml-auto px-1.5 py-px rounded text-[8px] font-black tracking-wider" style={{ background: 'rgba(234,166,49,0.15)', color: '#eaa631' }}>
+          <span className="ml-auto px-1.5 py-px rounded text-[8px] font-black tracking-wider" style={{ background: 'rgba(234,166,49,0.35)', color: '#ffffff' }}>
             {badge}
           </span>
         )}
@@ -302,7 +302,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                         <item.icon className="w-5 h-5" />
                         <span className="font-semibold text-sm">{item.label}</span>
                         {badge && (
-                          <span className="px-1.5 py-px rounded text-[9px] font-black tracking-wider" style={{ background: 'rgba(234,166,49,0.15)', color: '#eaa631' }}>
+                          <span className="px-1.5 py-px rounded text-[9px] font-black tracking-wider" style={{ background: 'rgba(234,166,49,0.35)', color: '#ffffff' }}>
                             {badge}
                           </span>
                         )}

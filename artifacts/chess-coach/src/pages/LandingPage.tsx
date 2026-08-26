@@ -366,7 +366,7 @@ function AuthModal({ open, onClose, initialMode, externalError }: { open: boolea
           )}
 
           {error && (
-            <div className="mb-4 p-3 rounded-xl text-sm" style={{ background: 'rgba(220,67,67,0.1)', border: '1px solid rgba(220,67,67,0.25)', color: '#ef6b6b' }}>{error}</div>
+            <div className="mb-4 p-3 rounded-xl text-sm" style={{ background: 'rgba(220,67,67,0.35)', border: '1px solid rgba(220,67,67,0.6)', color: '#ffffff' }}>{error}</div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-3">

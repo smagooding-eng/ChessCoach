@@ -189,7 +189,7 @@ export function Admin() {
       {error && (
         <div
           className="rounded-xl p-3 text-sm"
-          style={{ background: 'rgba(220,67,67,0.1)', border: '1px solid rgba(220,67,67,0.3)', color: '#dc4343' }}
+          style={{ background: 'rgba(220,67,67,0.35)', border: '1px solid rgba(220,67,67,0.6)', color: '#ffffff' }}
         >
           {error}
         </div>

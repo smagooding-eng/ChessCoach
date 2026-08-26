@@ -66,17 +66,17 @@ type TurningPoint = {
 };
 
 const CLASS_CFG: Record<Classification, { badge: string; color: string; full: string }> = {
-  checkmate:   { badge: '♚#', color: 'text-yellow-200 bg-gradient-to-br from-yellow-400/30 to-amber-600/25 border-yellow-300/60 shadow-[0_0_12px_rgba(250,204,21,0.35)]', full: 'Checkmate — Game Won' },
-  brilliant:   { badge: '!!', color: 'text-cyan-400 bg-cyan-400/15 border-cyan-400/30',           full: 'Brilliant Move' },
-  great:       { badge: '!',  color: 'text-sky-400 bg-sky-400/15 border-sky-400/30',              full: 'Great Move' },
-  best:        { badge: '!',  color: 'text-emerald-400 bg-emerald-400/15 border-emerald-400/30',  full: 'Best Move' },
-  excellent:   { badge: '!',  color: 'text-teal-400 bg-teal-400/15 border-teal-400/30',           full: 'Excellent Move' },
-  good:        { badge: '!',  color: 'text-green-400 bg-green-400/15 border-green-400/30',        full: 'Good Move' },
-  book:        { badge: '📖', color: 'text-blue-400 bg-blue-400/15 border-blue-400/30',           full: 'Book Move' },
-  inaccuracy:  { badge: '?!', color: 'text-yellow-400 bg-yellow-400/15 border-yellow-400/30',     full: 'Inaccuracy' },
-  mistake:     { badge: '?',  color: 'text-orange-400 bg-orange-400/15 border-orange-400/30',     full: 'Mistake' },
-  blunder:     { badge: '??', color: 'text-rose-400 bg-rose-400/15 border-rose-400/30',           full: 'Blunder' },
-  missed_win:  { badge: '✗',  color: 'text-red-400 bg-red-400/15 border-red-400/30',             full: 'Missed Win' },
+  checkmate:   { badge: '♚#', color: 'text-black bg-gradient-to-br from-yellow-300 to-amber-500 border-yellow-200 shadow-[0_0_12px_rgba(250,204,21,0.5)]', full: 'Checkmate — Game Won' },
+  brilliant:   { badge: '!!', color: 'text-white bg-cyan-500 border-cyan-300',       full: 'Brilliant Move' },
+  great:       { badge: '!',  color: 'text-white bg-sky-500 border-sky-300',        full: 'Great Move' },
+  best:        { badge: '!',  color: 'text-white bg-emerald-500 border-emerald-300', full: 'Best Move' },
+  excellent:   { badge: '!',  color: 'text-white bg-teal-500 border-teal-300',      full: 'Excellent Move' },
+  good:        { badge: '!',  color: 'text-white bg-green-500 border-green-300',    full: 'Good Move' },
+  book:        { badge: '📖', color: 'text-white bg-blue-500 border-blue-300',      full: 'Book Move' },
+  inaccuracy:  { badge: '?!', color: 'text-black bg-yellow-400 border-yellow-200',  full: 'Inaccuracy' },
+  mistake:     { badge: '?',  color: 'text-white bg-orange-500 border-orange-300',  full: 'Mistake' },
+  blunder:     { badge: '??', color: 'text-white bg-rose-500 border-rose-300',      full: 'Blunder' },
+  missed_win:  { badge: '✗',  color: 'text-white bg-red-500 border-red-300',        full: 'Missed Win' },
 };
 
 function formatTimeControl(tc: string): string {
@@ -849,7 +849,7 @@ export function GameLookup() {
         )}
 
         {error && (
-          <div className="rounded-xl p-3 text-sm border" style={{ background: 'rgba(220,67,67,0.1)', borderColor: 'rgba(220,67,67,0.3)', color: MISTAKE_RED }}>
+          <div className="rounded-xl p-3 text-sm border" style={{ background: 'rgba(220,67,67,0.35)', borderColor: 'rgba(220,67,67,0.6)', color: '#ffffff' }}>
             {error}
           </div>
         )}

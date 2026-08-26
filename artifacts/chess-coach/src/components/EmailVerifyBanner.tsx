@@ -53,8 +53,8 @@ export function EmailVerifyBanner() {
 
   return (
     <div className="rounded-xl px-4 py-3 flex items-start gap-3"
-      style={{ background: 'rgba(234,193,51,0.1)', border: '1px solid rgba(234,193,51,0.3)' }}>
-      <div className="rounded-lg p-1.5" style={{ background: 'rgba(234,193,51,0.15)', color: WARN }}>
+      style={{ background: 'rgba(234,193,51,0.35)', border: '1px solid rgba(234,193,51,0.6)' }}>
+      <div className="rounded-lg p-1.5" style={{ background: 'rgba(234,193,51,0.35)', color: WARN }}>
         <Mail className="w-4 h-4" />
       </div>
       <div className="flex-1 min-w-0">

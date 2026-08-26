@@ -112,7 +112,7 @@ export function ImportPromptModal() {
 
         {error && (
           <div className="rounded-lg px-3 py-2 text-xs"
-            style={{ background: 'rgba(220,67,67,0.1)', color: '#dc4343', border: '1px solid rgba(220,67,67,0.3)' }}>
+            style={{ background: 'rgba(220,67,67,0.35)', color: '#ffffff', border: '1px solid rgba(220,67,67,0.6)' }}>
             {error}
           </div>
         )}

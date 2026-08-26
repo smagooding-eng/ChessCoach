@@ -1159,7 +1159,7 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
               <button
                 onClick={() => go(mistakeIdx)}
                 className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all"
-                style={{ color: MISTAKE_RED, backgroundColor: 'rgba(220,67,67,0.12)', border: '1px solid rgba(220,67,67,0.25)' }}
+                style={{ color: '#ffffff', backgroundColor: 'rgba(220,67,67,0.35)', border: '1px solid rgba(220,67,67,0.6)' }}
                 title="Jump to mistake"
               >
                 <AlertTriangle className="w-3.5 h-3.5" />

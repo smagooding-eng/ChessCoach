@@ -1851,7 +1851,7 @@ export function Profile() {
           onMouseEnter={e => (e.currentTarget.style.background = 'rgba(220,67,67,0.06)')}
           onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
         >
-          <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: 'rgba(220,67,67,0.12)', border: '1px solid rgba(220,67,67,0.25)' }}>
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: 'rgba(220,67,67,0.35)', border: '1px solid rgba(220,67,67,0.6)' }}>
             <LogOut className="w-4 h-4" style={{ color: '#dc4343' }} />
           </div>
           <p className="text-sm font-bold" style={{ color: '#dc4343' }}>Sign Out</p>

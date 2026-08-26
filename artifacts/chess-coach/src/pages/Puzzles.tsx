@@ -579,7 +579,7 @@ export function Puzzles() {
             {(state === 'ready' || state === 'correct' || state === 'wrong' || state === 'solving' || state === 'showing_solution') && puzzle && game && (
               <>
                 {pieceTypeMismatch && (
-                  <div className="mb-3 px-3 py-2 rounded-xl text-xs font-medium" style={{ background: 'rgba(234,151,51,0.1)', color: '#ea9733', border: '1px solid rgba(234,151,51,0.25)' }}>
+                  <div className="mb-3 px-3 py-2 rounded-xl text-xs font-medium" style={{ background: 'rgba(234,151,51,0.35)', color: '#ffffff', border: '1px solid rgba(234,151,51,0.6)' }}>
                     Couldn't find an exact {sacrificePiece} sacrifice match right now — showing the closest puzzle instead. Try "Next Puzzle" for another attempt.
                   </div>
                 )}
@@ -811,8 +811,8 @@ export function Puzzles() {
                   }
                   try { await navigator.clipboard.writeText(url); } catch { /* nothing more we can do */ }
                 }}
-                className="mt-3 w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold"
-                style={{ background: 'rgba(245,158,11,0.1)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.25)' }}
+                className="mt-3 w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-black"
+                style={{ background: 'linear-gradient(180deg, #fbbf46 0%, #f59e0b 55%, #c9800a 100%)', color: '#000', boxShadow: '0 3px 0 #92620a, 0 6px 12px rgba(0,0,0,0.3)' }}
               >
                 <Flame size={15} /> Share your {stats.streak}-day streak
               </button>
