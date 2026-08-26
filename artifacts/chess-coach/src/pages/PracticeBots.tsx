@@ -447,8 +447,9 @@ function GameView({ bot, onBack, startFen, startColor, isOnboarding }: { bot: Bo
               )}
               {result === 'playing' && (
                 <button onClick={handleResign}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-bold hover:bg-red-500/20 transition-colors">
-                  <Flag className="w-3 h-3" /> Resign
+                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl font-black text-xs transition-transform active:scale-[0.97]"
+                  style={{ background: 'linear-gradient(180deg, #e05a5a 0%, #c93535 100%)', color: '#fff', boxShadow: '0 2px 0 #7a1f1f, 0 4px 8px rgba(0,0,0,0.3)' }}>
+                  <Flag className="w-3.5 h-3.5" /> Resign
                 </button>
               )}
             </div>

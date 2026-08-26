@@ -312,11 +312,17 @@ export function LocalPlay() {
               <button
                 onClick={() => resign('b')}
                 className={cn(
-                  'flex items-center gap-1.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 font-medium hover:bg-red-500/20 transition-colors shrink-0',
-                  fullscreen ? 'px-4 py-3 text-sm' : 'px-3 py-2 text-xs',
+                  'flex items-center gap-1.5 rounded-2xl font-black transition-transform active:scale-[0.97] shrink-0',
+                  fullscreen ? 'px-5 py-5' : 'px-3 py-2.5 text-xs',
                 )}
+                style={{
+                  background: 'linear-gradient(180deg, #e05a5a 0%, #c93535 55%, #a02828 100%)',
+                  color: '#fff',
+                  boxShadow: '0 4px 0 #7a1f1f, 0 8px 16px rgba(0,0,0,0.4), inset 0 1px 1px rgba(255,255,255,0.25)',
+                  border: '1px solid rgba(0,0,0,0.25)',
+                }}
               >
-                <Flag className={fullscreen ? 'w-4 h-4' : 'w-3.5 h-3.5'} /> Resign
+                <Flag className={fullscreen ? 'w-5 h-5' : 'w-3.5 h-3.5'} /> Resign
               </button>
             )}
             {!hasTimer && result === 'playing' && chess.turn() === 'b' && (
@@ -365,11 +371,17 @@ export function LocalPlay() {
               <button
                 onClick={() => resign('w')}
                 className={cn(
-                  'flex items-center gap-1.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 font-medium hover:bg-red-500/20 transition-colors shrink-0',
-                  fullscreen ? 'px-4 py-3 text-sm' : 'px-3 py-2 text-xs',
+                  'flex items-center gap-1.5 rounded-2xl font-black transition-transform active:scale-[0.97] shrink-0',
+                  fullscreen ? 'px-5 py-5' : 'px-3 py-2.5 text-xs',
                 )}
+                style={{
+                  background: 'linear-gradient(180deg, #e05a5a 0%, #c93535 55%, #a02828 100%)',
+                  color: '#fff',
+                  boxShadow: '0 4px 0 #7a1f1f, 0 8px 16px rgba(0,0,0,0.4), inset 0 1px 1px rgba(255,255,255,0.25)',
+                  border: '1px solid rgba(0,0,0,0.25)',
+                }}
               >
-                <Flag className={fullscreen ? 'w-4 h-4' : 'w-3.5 h-3.5'} /> Resign
+                <Flag className={fullscreen ? 'w-5 h-5' : 'w-3.5 h-3.5'} /> Resign
               </button>
             )}
             {!hasTimer && result === 'playing' && chess.turn() === 'w' && (
