@@ -229,7 +229,7 @@ export function Import() {
           <motion.div
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            className="p-6 bg-emerald-500/10 border border-emerald-500/20 rounded-xl mb-8"
+            className="p-6 bg-emerald-500/20 border border-emerald-500/40 rounded-xl mb-8"
           >
             <CheckCircle2 className="w-12 h-12 text-emerald-500 mx-auto mb-3" />
             <h2 className="text-xl font-bold text-emerald-50 mb-2">Import Complete!</h2>
@@ -424,7 +424,7 @@ export function Import() {
             )}
 
             {apiError && !isLimitReached && (
-              <div className="p-4 bg-destructive/10 border border-destructive/20 text-destructive rounded-xl text-sm flex gap-3 items-start">
+              <div className="p-4 bg-destructive/20 border border-destructive/40 text-destructive rounded-xl text-sm flex gap-3 items-start">
                 <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
                 <div>
                   <p className="font-bold mb-1">Import failed</p>

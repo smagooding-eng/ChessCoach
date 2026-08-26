@@ -363,7 +363,7 @@ export function OpeningDetail() {
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0 }}
                         className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold text-sm
-                          ${feedback === 'correct' ? 'bg-emerald-500/15 border border-emerald-500/30 text-emerald-400' : 'bg-amber-500/10 border border-amber-500/25 text-amber-400'}`}
+                          ${feedback === 'correct' ? 'bg-emerald-500/20 border border-emerald-500/40 text-emerald-300' : 'bg-amber-500/20 border border-amber-500/45 text-amber-300'}`}
                       >
                         {feedback === 'correct'
                           ? <><CheckCircle2 className="w-4 h-4 shrink-0" /> Correct! Move {practiceStep} of {mainLine.length}</>

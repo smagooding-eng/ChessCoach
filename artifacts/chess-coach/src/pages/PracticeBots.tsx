@@ -41,16 +41,16 @@ const TIER_COLORS: Record<string, string> = {
 };
 
 const QUALITY_CFG: Record<string, { label: string; icon: string; bg: string; text: string; border: string; dot: string }> = {
-  checkmate:  { label: 'Checkmate!', icon: '♚', bg: 'bg-amber-500/10', text: 'text-amber-400', border: 'border-amber-500/30', dot: 'bg-amber-400' },
-  brilliant:  { label: 'Brilliant!!', icon: '✦', bg: 'bg-cyan-500/10', text: 'text-cyan-400', border: 'border-cyan-500/30', dot: 'bg-cyan-400' },
-  great:      { label: 'Great!', icon: '!', bg: 'bg-sky-500/10', text: 'text-sky-400', border: 'border-sky-500/30', dot: 'bg-sky-400' },
-  best:       { label: 'Best Move', icon: '!', bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/30', dot: 'bg-emerald-400' },
-  excellent:  { label: 'Excellent!', icon: '!', bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/30', dot: 'bg-emerald-400' },
-  good:       { label: 'Good', icon: '✓', bg: 'bg-green-500/10', text: 'text-green-400', border: 'border-green-500/30', dot: 'bg-green-400' },
-  book:       { label: 'Book Move', icon: '📖', bg: 'bg-blue-500/10', text: 'text-blue-400', border: 'border-blue-500/30', dot: 'bg-blue-400' },
-  inaccuracy: { label: 'Inaccuracy', icon: '?!', bg: 'bg-yellow-500/10', text: 'text-yellow-400', border: 'border-yellow-500/30', dot: 'bg-yellow-400' },
-  mistake:    { label: 'Mistake', icon: '?', bg: 'bg-orange-500/10', text: 'text-orange-400', border: 'border-orange-500/30', dot: 'bg-orange-400' },
-  blunder:    { label: 'Blunder', icon: '??', bg: 'bg-red-500/10', text: 'text-red-400', border: 'border-red-500/30', dot: 'bg-red-400' },
+  checkmate:  { label: 'Checkmate!', icon: '♚', bg: 'bg-amber-500/20', text: 'text-amber-300', border: 'border-amber-500/50', dot: 'bg-amber-400' },
+  brilliant:  { label: 'Brilliant!!', icon: '✦', bg: 'bg-cyan-500/20', text: 'text-cyan-300', border: 'border-cyan-500/50', dot: 'bg-cyan-400' },
+  great:      { label: 'Great!', icon: '!', bg: 'bg-sky-500/20', text: 'text-sky-300', border: 'border-sky-500/50', dot: 'bg-sky-400' },
+  best:       { label: 'Best Move', icon: '!', bg: 'bg-emerald-500/20', text: 'text-emerald-300', border: 'border-emerald-500/50', dot: 'bg-emerald-400' },
+  excellent:  { label: 'Excellent!', icon: '!', bg: 'bg-emerald-500/20', text: 'text-emerald-300', border: 'border-emerald-500/50', dot: 'bg-emerald-400' },
+  good:       { label: 'Good', icon: '✓', bg: 'bg-green-500/20', text: 'text-green-300', border: 'border-green-500/50', dot: 'bg-green-400' },
+  book:       { label: 'Book Move', icon: '📖', bg: 'bg-blue-500/20', text: 'text-blue-300', border: 'border-blue-500/50', dot: 'bg-blue-400' },
+  inaccuracy: { label: 'Inaccuracy', icon: '?!', bg: 'bg-yellow-500/20', text: 'text-yellow-300', border: 'border-yellow-500/50', dot: 'bg-yellow-400' },
+  mistake:    { label: 'Mistake', icon: '?', bg: 'bg-orange-500/20', text: 'text-orange-300', border: 'border-orange-500/50', dot: 'bg-orange-400' },
+  blunder:    { label: 'Blunder', icon: '??', bg: 'bg-red-500/20', text: 'text-red-300', border: 'border-red-500/50', dot: 'bg-red-400' },
 };
 
 function EvalBar({ evalScore }: { evalScore: number }) {
@@ -775,7 +775,7 @@ function OpeningTrainerView({ opening, onBack }: { opening: OpeningLine; onBack:
             <div className="flex items-center gap-2">
               <button onClick={handleShowHint}
                 disabled={!playerExpected}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-bold hover:bg-amber-500/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/20 border border-amber-500/50 text-amber-300 text-xs font-bold hover:bg-amber-500/30 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
                 <Lightbulb className="w-3 h-3" /> {hintOpen && playerExpected ? playerExpected : 'Hint'}
               </button>
               <button onClick={handleReset}

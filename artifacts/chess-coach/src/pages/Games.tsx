@@ -130,7 +130,7 @@ export function Games() {
   if (tab === 'games' && isError) {
     return (
       <div className="flex flex-col items-center justify-center py-20 gap-4">
-        <div className="w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center">
+        <div className="w-16 h-16 rounded-full bg-destructive/20 border border-destructive/30 flex items-center justify-center">
           <Filter className="w-8 h-8 text-destructive" />
         </div>
         <h2 className="text-xl font-bold">Failed to load games</h2>
@@ -373,7 +373,7 @@ export function Games() {
                             const cls =
                               plat === 'lichess' ? 'bg-white/10 text-white/70'
                               : plat === 'chessscout' ? 'bg-primary/15 text-primary'
-                              : 'bg-emerald-500/10 text-emerald-400/70';
+                              : 'bg-emerald-500/20 text-emerald-300';
                             const label = plat === 'lichess' ? 'LC' : plat === 'chessscout' ? 'CS' : 'CC';
                             return (
                               <span className={cn(

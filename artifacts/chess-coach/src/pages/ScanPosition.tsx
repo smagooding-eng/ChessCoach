@@ -333,7 +333,7 @@ export function ScanPosition() {
   }, [fen]);
 
   const confidenceColor = confidence === 'high' ? 'text-emerald-400' : confidence === 'medium' ? 'text-amber-400' : 'text-rose-400';
-  const confidenceBg = confidence === 'high' ? 'bg-emerald-500/10 border-emerald-500/30' : confidence === 'medium' ? 'bg-amber-500/10 border-amber-500/30' : 'bg-rose-500/10 border-rose-500/30';
+  const confidenceBg = confidence === 'high' ? 'bg-emerald-500/20 border-emerald-500/50' : confidence === 'medium' ? 'bg-amber-500/20 border-amber-500/50' : 'bg-rose-500/20 border-rose-500/50';
 
   return (
     <div className="max-w-lg mx-auto px-4 py-6 space-y-4">

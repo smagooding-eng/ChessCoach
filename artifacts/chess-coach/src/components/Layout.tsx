@@ -216,7 +216,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 <div className="pt-1 mt-1" style={{ borderTop: `1px solid ${BORDER_COLOR}` }}>
                   <button
                     onClick={() => { setProfileOpen(false); handleLogout(); }}
-                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl active:bg-red-500/10 transition-colors"
+                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl active:bg-red-500/20 transition-colors"
                     style={{ color: '#dc4343' }}
                   >
                     <LogOut className="w-4.5 h-4.5" />
@@ -320,7 +320,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   </Link>
                   <button
                     onClick={() => { setMoreOpen(false); handleLogout(); }}
-                    className="w-full flex items-center gap-3 px-3.5 py-3 rounded-xl active:bg-red-500/10 transition-colors"
+                    className="w-full flex items-center gap-3 px-3.5 py-3 rounded-xl active:bg-red-500/20 transition-colors"
                     style={{ color: '#dc4343' }}
                   >
                     <LogOut className="w-5 h-5" />

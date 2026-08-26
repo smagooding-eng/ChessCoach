@@ -839,7 +839,7 @@ ${sanitized}
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowTemplates(v => !v)}
-              className={`text-xs px-2.5 py-1.5 rounded transition-colors flex items-center gap-1 ${showTemplates ? 'bg-amber-500/20 text-amber-400' : 'bg-amber-500/10 text-amber-400/70 hover:bg-amber-500/15'}`}
+              className={`text-xs px-2.5 py-1.5 rounded transition-colors flex items-center gap-1 ${showTemplates ? 'bg-amber-500/30 text-amber-300' : 'bg-amber-500/20 text-amber-300 hover:bg-amber-500/30'}`}
             >
               <Sparkles className="w-3.5 h-3.5" /> Templates
             </button>
@@ -907,7 +907,7 @@ ${sanitized}
                     />
                     <button
                       onClick={() => setBroadcastAll(true)}
-                      className="text-[10px] px-2 py-1 rounded bg-amber-500/10 text-amber-400/70 hover:bg-amber-500/15 hover:text-amber-400 transition-colors whitespace-nowrap"
+                      className="text-[10px] px-2 py-1 rounded bg-amber-500/25 text-amber-300 hover:bg-amber-500/35 hover:text-amber-200 transition-colors whitespace-nowrap"
                     >
                       All Users
                     </button>
@@ -1119,7 +1119,7 @@ ${sanitized}
 
         <div className="px-5 py-4 border-t border-amber-500/15 bg-amber-500/5 shrink-0 space-y-3">
           {result && (
-            <div className={`flex items-center gap-2 text-xs px-3 py-2 rounded-xl ${result.type === 'success' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>
+            <div className={`flex items-center gap-2 text-xs font-bold px-3 py-2 rounded-xl ${result.type === 'success' ? 'bg-emerald-500/20 border border-emerald-500/40 text-emerald-300' : 'bg-red-500/20 border border-red-500/40 text-red-300'}`}>
               {result.type === 'success' ? <CheckCircle2 className="w-3.5 h-3.5 shrink-0" /> : <AlertCircle className="w-3.5 h-3.5 shrink-0" />}
               {result.message}
             </div>
@@ -1206,7 +1206,7 @@ function AdminTicker() {
               <button
                 onClick={handleClearCache}
                 disabled={clearing}
-                className="text-[10px] font-bold px-2 py-1 rounded transition-colors flex items-center gap-1 bg-red-500/10 text-red-400/70 hover:bg-red-500/15 hover:text-red-400 disabled:opacity-50"
+                className="text-[10px] font-black px-2.5 py-1.5 rounded-lg transition-colors flex items-center gap-1 bg-red-500/25 border border-red-500/50 text-red-300 hover:bg-red-500/35 disabled:opacity-50"
               >
                 {clearing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
                 {clearing ? 'Clearing...' : 'Clear Cache'}
@@ -1216,7 +1216,7 @@ function AdminTicker() {
               )}
               <button
                 onClick={openComposer}
-                className="text-[10px] font-bold px-2 py-1 rounded transition-colors flex items-center gap-1 bg-amber-500/10 text-amber-400/70 hover:bg-amber-500/15 hover:text-amber-400"
+                className="text-[10px] font-bold px-2 py-1 rounded transition-colors flex items-center gap-1 bg-amber-500/25 text-amber-300 hover:bg-amber-500/35 hover:text-amber-200"
               >
                 <Mail className="w-3 h-3" /> Compose
               </button>
@@ -1282,7 +1282,7 @@ function AdminTicker() {
                 else alert(`Error: ${data.error || 'Unknown error'}`);
               } catch { alert('Failed to run fix'); }
             }}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all hover:bg-orange-500/10 text-left border border-orange-500/20"
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all hover:bg-orange-500/25 text-left border border-orange-500/45"
           >
             <span className="text-lg">♜</span>
             <div>
@@ -1391,7 +1391,7 @@ function MarketingPanel() {
         />
 
         {error && (
-          <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs">
+          <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-red-500/20 border border-red-500/40 text-red-300 text-xs font-bold">
             <AlertCircle className="w-3.5 h-3.5 shrink-0" />
             {error}
           </div>

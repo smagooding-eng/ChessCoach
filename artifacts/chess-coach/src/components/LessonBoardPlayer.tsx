@@ -1651,7 +1651,7 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
               <div className="mt-2">
                 {showHint ? (
                   <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-                    className="flex items-start gap-2 p-3 rounded-xl bg-blue-500/10 border border-blue-500/20">
+                    className="flex items-start gap-2 p-3 rounded-xl bg-blue-500/20 border border-blue-500/40">
                     <Lightbulb className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
                     <p className="text-xs text-blue-300">{activeChallenge.hint}</p>
                   </motion.div>
@@ -1678,7 +1678,7 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
             {drillState === 'idle' && drillAttempts >= 2 && (
               <button
                 onClick={revealAnswer}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-amber-400 hover:bg-amber-500/10 border border-amber-500/30 transition-all"
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-amber-300 hover:bg-amber-500/20 border border-amber-500/50 transition-all"
               >
                 <Eye className="w-3.5 h-3.5" /> Reveal answer
               </button>

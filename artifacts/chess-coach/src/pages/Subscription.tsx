@@ -145,7 +145,7 @@ export function Subscription() {
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mb-6 p-4 rounded-xl bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 text-center"
+          className="mb-6 p-4 rounded-xl bg-yellow-500/20 border border-yellow-500/50 text-yellow-300 text-center font-medium"
         >
           Checkout was canceled. You can try again anytime.
         </motion.div>
