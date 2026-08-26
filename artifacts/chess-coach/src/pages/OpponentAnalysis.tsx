@@ -150,6 +150,7 @@ export function OpponentAnalysis() {
   const [loading, setLoading] = useState(false);
   const [statusMsg, setStatusMsg] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
+  const [isLimitReached, setIsLimitReached] = useState(false);
   const [result, setResult] = useState<OpponentResult | null>(null);
   const [challengeCopied, setChallengeCopied] = useState(false);
   const [expandedWeakness, setExpandedWeakness] = useState<number | null>(null);
@@ -203,6 +204,7 @@ export function OpponentAnalysis() {
   const resumeScoutPolling = async (jobId: string, targetName?: string) => {
     setLoading(true);
     setError(null);
+    setIsLimitReached(false);
     if (targetName) setInputUsername(targetName);
     setStatusMsg('Scout in progress… this may take 30–60 seconds');
     try {
@@ -281,6 +283,7 @@ export function OpponentAnalysis() {
 
     setLoading(true);
     setError(null);
+    setIsLimitReached(false);
     setResult(null);
     setStatusMsg('Starting analysis…');
     setCourseGenState('idle');
@@ -295,7 +298,8 @@ export function OpponentAnalysis() {
       });
       if (!startRes.ok) {
         const j = await startRes.json().catch(() => ({})) as Record<string, unknown>;
-        throw new Error((j.error as string) || `Server error (${startRes.status})`);
+        setIsLimitReached(j.error === 'usage_limit');
+        throw new Error((j.error === 'usage_limit' ? (j.message as string) : (j.error as string)) || `Server error (${startRes.status})`);
       }
       const { jobId } = await startRes.json() as { jobId: string };
 
@@ -471,7 +475,14 @@ export function OpponentAnalysis() {
       )}
 
       {/* Error */}
-      {error && (
+      {error && isLimitReached && (
+        <UpgradeNudge
+          headline="You've used your free basic scout"
+          subtext="Free plan includes 1 basic opponent scout. Upgrade to Pro for unlimited scouts with full AI weakness analysis."
+        />
+      )}
+
+      {error && !isLimitReached && (
         <motion.div
           initial={{ opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}
