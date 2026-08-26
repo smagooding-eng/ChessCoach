@@ -1,19 +1,26 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useParams, Link } from 'wouter';
 import { PageHero, CHESSCOM_GREEN, TEXT_LIGHT, TEXT_MUTED, BRASS } from '@/components/DesignSystem';
+import { ChessBoard } from '@/components/ChessBoard';
 import { Download, UserPlus, Loader2, Trophy, Flame, TrendingUp, Puzzle } from 'lucide-react';
 
 export type ShareableCard =
   | { type: 'course'; username: string; courseName: string; weaknessFixed: string; lessonsCompleted: number }
   | { type: 'milestone'; username: string; oldRating?: number; newRating: number }
   | { type: 'streak'; username: string; streakDays: number; accuracy?: number }
-  | { type: 'puzzle'; username: string; rating: number; themes: string[] };
+  | { type: 'puzzle'; username: string; rating: number; themes: string[] }
+  | { type: 'puzzle_position'; fen: string; rating: number; themes: string[] };
 
 function decodeCard(encoded: string): ShareableCard | null {
   try {
     const json = decodeURIComponent(escape(atob(decodeURIComponent(encoded))));
     const parsed = JSON.parse(json);
-    if (!parsed?.type || !parsed?.username) return null;
+    if (!parsed?.type) return null;
+    if (parsed.type === 'puzzle_position') {
+      if (!parsed.fen) return null;
+      return parsed as ShareableCard;
+    }
+    if (!parsed?.username) return null;
     return parsed as ShareableCard;
   } catch {
     return null;
@@ -54,6 +61,28 @@ function CardContent({ card }: { card: ShareableCard }) {
           <p className="text-sm mt-2" style={{ color: CHESSCOM_GREEN }}>
             {gain >= 0 ? `+${gain}` : gain} from {card.oldRating}
           </p>
+        )}
+      </div>
+    );
+  }
+  if (card.type === 'puzzle_position') {
+    return (
+      <div className="text-center py-5 px-4">
+        <p className="text-xs font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: CHESSCOM_GREEN }}>
+          Can you find the winning move?
+        </p>
+        <div className="max-w-[280px] mx-auto rounded-xl overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.1)' }}>
+          <ChessBoard fen={card.fen} practiceMode={false} />
+        </div>
+        <p className="text-sm font-semibold mt-4" style={{ color: TEXT_LIGHT }}>{card.rating}-rated puzzle</p>
+        {card.themes.length > 0 && (
+          <div className="flex items-center justify-center gap-1.5 flex-wrap mt-2 px-4">
+            {card.themes.slice(0, 3).map((theme) => (
+              <span key={theme} className="px-2 py-0.5 rounded-md text-[10px] font-semibold" style={{ background: 'rgba(129,182,76,0.15)', color: CHESSCOM_GREEN }}>
+                {theme}
+              </span>
+            ))}
+          </div>
         )}
       </div>
     );

@@ -702,59 +702,18 @@ export function Puzzles() {
 
                   {state === 'correct' && puzzle && (
                     <button
-                      onClick={async () => {
-                        const today = new Date();
-                        const dateStr = `${today.getFullYear()}.${String(today.getMonth() + 1).padStart(2, '0')}.${String(today.getDate()).padStart(2, '0')}`;
-                        const themesLine = (puzzle.themes ?? []).join(' ') || 'tactics';
-                        // Standard PGN tags for a non-starting position:
-                        // SetUp + FEN. Result "*" since it's unsolved/
-                        // ongoing. The comment carries the watermark and
-                        // doubles as the "can you solve it" prompt for
-                        // whoever opens this file.
-                        const pgn = [
-                          '[Event "ChessScout.net Puzzle"]',
-                          '[Site "https://chessscout.net"]',
-                          `[Date "${dateStr}"]`,
-                          '[White "?"]',
-                          '[Black "?"]',
-                          '[Result "*"]',
-                          '[SetUp "1"]',
-                          `[FEN "${puzzle.fen}"]`,
-                          `[Rating "${puzzle.rating}"]`,
-                          `[Themes "${themesLine}"]`,
-                          '[Annotator "ChessScout.net"]',
-                          '',
-                          `{Can you find the winning move? This ${puzzle.rating}-rated puzzle is unsolved -- solve it and thousands more free at https://chessscout.net}`,
-                          '*',
-                        ].join('\n');
-
-                        const filename = `chessscout-puzzle-${puzzle.id}.pgn`;
-                        const file = new File([pgn], filename, { type: 'application/x-chess-pgn' });
-
-                        if (navigator.canShare && navigator.canShare({ files: [file] })) {
-                          try {
-                            await navigator.share({
-                              files: [file],
-                              title: `ChessScout.net Puzzle (${puzzle.rating})`,
-                              text: `Can you solve this ${puzzle.rating}-rated puzzle?`,
-                            });
-                            return;
-                          } catch { /* fall through to download */ }
-                        }
-
-                        const blob = new Blob([pgn], { type: 'application/x-chess-pgn' });
-                        const url = URL.createObjectURL(blob);
-                        const a = document.createElement('a');
-                        a.href = url;
-                        a.download = filename;
-                        document.body.appendChild(a);
-                        a.click();
-                        document.body.removeChild(a);
-                        URL.revokeObjectURL(url);
+                      onClick={() => {
+                        const encoded = encodeCard({
+                          type: 'puzzle_position',
+                          fen: puzzle.fen,
+                          rating: puzzle.rating,
+                          themes: puzzle.themes ?? [],
+                        });
+                        navigate(`/share/${encoded}`);
                       }}
                       className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-bold transition-all"
                       style={{ background: 'rgba(255,255,255,0.08)', color: TEXT_MUTED }}>
-                      <Share2 size={16} />Share PGN
+                      <Share2 size={16} />Share as Image
                     </button>
                   )}
 
