@@ -416,7 +416,7 @@ export function LocalPlay() {
                 )}
               </div>
               <p className="text-sm text-muted-foreground">
-                {chess.isCheckmate() ? 'Checkmate' : chess.isStalemate() ? 'Stalemate' : chess.isThreefoldRepetition() ? 'Threefold Repetition' : chess.isInsufficientMaterial() ? 'Insufficient Material' : whiteTime === 0 ? 'White ran out of time' : blackTime === 0 ? 'Black ran out of time' : 'Resignation'}
+                {chess.isCheckmate() ? 'Checkmate' : chess.isStalemate() ? 'Stalemate' : chess.isThreefoldRepetition() ? 'Threefold Repetition' : chess.isInsufficientMaterial() ? 'Insufficient Material' : hasTimer && whiteTime === 0 ? 'White ran out of time' : hasTimer && blackTime === 0 ? 'Black ran out of time' : 'Resignation'}
               </p>
               <button
                 onClick={resetGame}
