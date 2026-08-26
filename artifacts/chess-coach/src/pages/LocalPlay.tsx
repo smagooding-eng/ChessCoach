@@ -146,7 +146,7 @@ export function LocalPlay() {
     }
   }, [moves]);
 
-  const hasTimer = timeControl && timeControl.seconds !== null;
+  const hasTimer = !!timeControl && timeControl.seconds !== null;
 
   const handleMove = useCallback((san: string) => {
     const moverColor = chess.turn();
