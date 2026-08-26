@@ -953,7 +953,7 @@ export function LandingPage() {
           <div className="space-y-4">
             {[
               { q: 'How is this different from Chess.com game review?', a: 'Chess.com reviews one game at a time. ChessScout.net looks across all your games to find the mistake you keep making — not just what happened in this one.' },
-              { q: 'What does the free tier include?', a: 'Unlimited daily puzzles, 3 opponent scouts, 5 courses, unlimited practice bots, and your first 20 imported games — no card required.' },
+              { q: 'What does the free tier include?', a: '5 puzzles/day, 1 basic opponent scout, 2 Scan Position uses/day, unlimited practice bots, Opening Trainer, and Local Play, basic analysis from your reviewed games, and your 20 most recent games — no card required.' },
               { q: 'Will I understand the analysis at my level?', a: 'Yes. Explanations are written in plain language, not engine notation — built for players working on real improvement, not just engine output.' },
               { q: 'Does it work with Lichess?', a: 'Yes, both Chess.com and Lichess are supported.' },
               { q: 'Can I cancel anytime?', a: 'Yes, cancel anytime from your account settings — no phone call, no retention flow.' },
@@ -1018,8 +1018,8 @@ export function LandingPage() {
                 <Flame className="w-3 h-3" /> FREE TIER AVAILABLE
               </div>
               <p className="text-[11px] mb-4" style={{ color: MUTED }}>
-                Free: unlimited daily puzzles, 3 opponent scouts, 5 courses, unlimited practice bots, first 20 games imported.
-                <br />Pro unlocks unlimited scouts, courses, imports, and full game analysis.
+                Free: 5 puzzles/day, 1 basic opponent scout, 2 scans/day, unlimited practice bots & Local Play, your 20 most recent games.
+                <br />Pro unlocks unlimited everything plus full AI weakness analysis and personalized courses.
               </p>
               <div className="flex items-baseline justify-center gap-2">
                 <span className="text-6xl font-black" style={{ color: TEXT }}>$5</span>

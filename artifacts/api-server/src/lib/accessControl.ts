@@ -8,6 +8,7 @@ export const FREE_TIER_LIMITS = {
   opponentScouts: 1,
   courses: 5,
   initialGameImport: 20,
+  scanPositionsPerDay: 2,
 } as const;
 
 /**

@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { PieceTile } from '@/components/DesignSystem';
+import { UpgradeNudge } from '@/components/UpgradeNudge';
 import { useUser } from '@/hooks/use-user';
 import { invalidateEloCache } from '@/hooks/use-elo-progress';
 import { motion } from 'framer-motion';
@@ -12,11 +13,12 @@ import { trackImportJob } from '@/components/ImportStatusWatcher';
 type Platform = 'chesscom' | 'lichess';
 
 export function Import() {
-  const { username, isLoaded, login, authUser, refreshAuth } = useUser();
+  const { username, isLoaded, login, authUser, refreshAuth, isPremium } = useUser();
   const [months, setMonths] = useState(3);
   const [isImporting, setIsImporting] = useState(false);
   const [result, setResult] = useState<{ imported: number; updated?: number; total: number; platform?: string } | null>(null);
   const [apiError, setApiError] = useState<string | null>(null);
+  const [isLimitReached, setIsLimitReached] = useState(false);
   const [, setLocation] = useLocation();
   const [isSyncing, setIsSyncing] = useState(false);
   const [platform, setPlatform] = useState<Platform>('chesscom');
@@ -52,6 +54,7 @@ export function Import() {
       return;
     }
     setApiError(null);
+    setIsLimitReached(false);
     setIsImporting(true);
     if (forceUpdate) setIsSyncing(true);
     try {
@@ -69,7 +72,8 @@ export function Import() {
       });
       if (!r.ok) {
         const errData = await r.json().catch(() => ({}));
-        throw new Error(errData.error || `Import failed (${r.status})`);
+        setIsLimitReached(errData.error === 'usage_limit');
+        throw new Error((errData.error === 'usage_limit' ? errData.message : errData.error) || `Import failed (${r.status})`);
       }
       const { jobId } = await r.json() as { jobId: string };
       trackImportJob(jobId, platform, importUsername);
@@ -114,6 +118,7 @@ export function Import() {
   const handleReset = () => {
     setResult(null);
     setApiError(null);
+    setIsLimitReached(false);
   };
 
   const handleStartEdit = () => {
@@ -186,6 +191,12 @@ export function Import() {
         <p className="text-muted-foreground mb-6 max-w-md mx-auto">
           Fetch your recent games to power deep analysis. Import from Chess.com, Lichess, or both.
         </p>
+
+        {!isPremium && (
+          <div className="max-w-md mx-auto mb-6">
+            <UpgradeNudge headline="Load your last 20 games? Free plan imports your most recent 20 — upgrade for unlimited" compact />
+          </div>
+        )}
 
         <div className="flex justify-center gap-2 mb-8">
           <button
@@ -405,7 +416,14 @@ export function Import() {
               </div>
             </div>
 
-            {apiError && (
+            {apiError && isLimitReached && (
+              <UpgradeNudge
+                headline="Want to load the rest of your games?"
+                subtext="Free plan imports your most recent 20 games. Upgrade to Pro now for unlimited game import."
+              />
+            )}
+
+            {apiError && !isLimitReached && (
               <div className="p-4 bg-destructive/10 border border-destructive/20 text-destructive rounded-xl text-sm flex gap-3 items-start">
                 <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
                 <div>

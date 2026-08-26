@@ -11,6 +11,7 @@ import { Search, Play, Filter, BookOpen, Sparkles, Users, RefreshCw } from 'luci
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { GameThumb } from '@/components/GameThumb';
+import { UpgradeNudge } from '@/components/UpgradeNudge';
 import { Import } from '@/pages/Import';
 import { Analysis } from '@/pages/Analysis';
 
@@ -50,6 +51,10 @@ export function Games() {
   const hasMore = games.length < total;
   const reviewedCount = summary?.reviewedCount ?? 0;
   const unreviewedCount = Math.max(0, total - reviewedCount);
+  // Not yet in the generated API client's types (backend added recently) --
+  // safe cast rather than waiting on a codegen regen.
+  const isViewLimited = (data as any)?.isViewLimited ?? false;
+  const viewLimit = (data as any)?.viewLimit ?? null;
 
   // Bulk review: trigger + poll. The background auto-review tick works
   // through unreviewed games slowly on its own even without this — this
@@ -228,6 +233,14 @@ export function Games() {
             {bulkJobId ? 'Reviewing…' : 'Review All'}
           </button>
         </div>
+      )}
+
+      {isViewLimited && (
+        <UpgradeNudge
+          headline={`Want to load all ${total.toLocaleString()} of your games?`}
+          subtext={`Free plan shows your ${viewLimit} most recent games. Upgrade to Pro now to see your full history.`}
+          compact
+        />
       )}
 
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">

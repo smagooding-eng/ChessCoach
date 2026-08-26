@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { PageHero, PRIMARY_BTN_STYLE, StatReadout, t } from '@/components/DesignSystem';
+import { UpgradeNudge } from '@/components/UpgradeNudge';
 import { trackBackgroundJob } from '@/components/BackgroundJobsWatcher';
 import { useLocation } from 'wouter';
 import { useMyAnalysisSummary, useMyWeaknesses } from '@/hooks/use-analysis';
@@ -25,7 +26,7 @@ const PIE_COLORS = [CHESSCOM_GREEN, '#dc4343', '#6b6966'];
 
 export function Analysis({ hideHeader = false }: { hideHeader?: boolean } = {}) {
   const [, navigate] = useLocation();
-  const { username, authUser } = useUser();
+  const { username, authUser, isPremium } = useUser();
   const queryClient = useQueryClient();
   const { data: summary, isLoading: loadingSummary } = useMyAnalysisSummary();
   const { data: weaknessesData, isLoading: loadingWeaknesses } = useMyWeaknesses();
@@ -194,6 +195,10 @@ export function Analysis({ hideHeader = false }: { hideHeader?: boolean } = {}) 
         </div>
       </div>
 
+      {!isPremium && (
+        <UpgradeNudge headline="Upgrade to Pro to run deep analysis" compact />
+      )}
+
       {isAnalyzing && statusMsg && (
         <motion.div
           initial={{ opacity: 0, y: -8 }}
@@ -206,7 +211,14 @@ export function Analysis({ hideHeader = false }: { hideHeader?: boolean } = {}) 
         </motion.div>
       )}
 
-      {analyzeError && (
+      {analyzeError && analyzeError.includes('Not enough reviewed games') && (
+        <UpgradeNudge
+          headline="Review a few more games to unlock your weakness report"
+          subtext="Free plan shows patterns from games you've already reviewed. Upgrade to Pro for full AI analysis anytime, no review requirement."
+        />
+      )}
+
+      {analyzeError && !analyzeError.includes('Not enough reviewed games') && (
         <motion.div
           initial={{ opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}

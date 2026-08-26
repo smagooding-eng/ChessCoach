@@ -7,6 +7,7 @@ import { useUser } from '@/hooks/use-user';
 import { Crown, RotateCcw, ChevronRight, Trophy, Target, Flame, Zap, Lightbulb, Loader2, Lock, Share2 } from 'lucide-react';
 import { useLocation, useSearch, Link } from 'wouter';
 import { encodeCard } from '@/pages/ShareCard';
+import { UpgradeNudge } from '@/components/UpgradeNudge';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useSettings, playMoveSound } from '@/context/SettingsContext';
 import { EvalBar, MaterialStrip } from '@/components/GameStatusStrip';
@@ -546,15 +547,8 @@ export function Puzzles() {
         {(
           <>
             {daily && !daily.premium && daily.limit && state !== 'limit_reached' && (
-              <div className="flex items-center justify-between px-3 py-2 rounded-xl mb-3"
-                style={{ background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.2)' }}>
-                <span className="text-xs font-medium" style={{ color: '#fbbf24' }}>
-                  {daily.used}/{daily.limit} free puzzles today
-                </span>
-                <button onClick={() => navigate('/subscription')} className="text-xs font-bold px-2 py-1 rounded"
-                  style={{ background: CHESSCOM_GREEN, color: '#000' }}>
-                  Go Pro
-                </button>
+              <div className="mb-3">
+                <UpgradeNudge headline={`${daily.used}/${daily.limit} free puzzles today — upgrade for unlimited`} compact />
               </div>
             )}
 
@@ -566,21 +560,10 @@ export function Puzzles() {
             )}
 
             {state === 'limit_reached' && (
-              <div className="flex flex-col items-center justify-center py-16 text-center">
-                <div className="w-16 h-16 rounded-xl flex items-center justify-center mb-4"
-                  style={{ background: 'rgba(245,158,11,0.15)' }}>
-                  <Lock size={28} style={{ color: '#f59e0b' }} />
-                </div>
-                <h2 className="text-lg font-bold mb-2" style={{ color: TEXT_LIGHT }}>Daily Limit Reached</h2>
-                <p className="text-sm mb-6 max-w-xs" style={{ color: TEXT_MUTED }}>
-                  Free users get {daily?.limit ?? 5} puzzles per day. Upgrade to ChessScout.net Pro for unlimited puzzles!
-                </p>
-                <button onClick={() => navigate('/subscription')}
-                  className="flex items-center gap-2 px-6 py-3 rounded-xl font-bold transition-all hover:scale-105"
-                  style={{ background: CHESSCOM_GREEN, color: '#000' }}>
-                  <Crown size={18} />Upgrade to Pro
-                </button>
-              </div>
+              <UpgradeNudge
+                headline="You've used today's free puzzles"
+                subtext={`Free plan includes ${daily?.limit ?? 5} puzzles per day. Upgrade to Pro for unlimited puzzles!`}
+              />
             )}
 
             {state === 'no_puzzles' && (

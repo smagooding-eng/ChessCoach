@@ -10,3 +10,4 @@ export * from "./outreach";
 export * from "./seoContent";
 export * from "./scannedPositions";
 export * from "./landingFunnel";
+export * from "./scanAttempts";

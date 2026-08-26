@@ -442,12 +442,12 @@ ${divider}
 <table style="width:100%;border-collapse:collapse;">
 <tr><td style="padding:8px 0;vertical-align:top;width:30px;color:#81b64c;font-size:18px;">🔍</td><td style="padding:8px 0;"><strong style="color:#e8e6e3;">Opponent Scout</strong><br/><span style="color:#9e9b98;font-size:13px;">Deep analysis of any player's openings, weaknesses &amp; tendencies</span></td></tr>
 <tr><td style="padding:8px 0;vertical-align:top;width:30px;color:#81b64c;font-size:18px;">♟️</td><td style="padding:8px 0;"><strong style="color:#e8e6e3;">Game Lookup</strong><br/><span style="color:#9e9b98;font-size:13px;">Review any Chess.com game with move-by-move replay</span></td></tr>
-<tr><td style="padding:8px 0;vertical-align:top;width:30px;color:#81b64c;font-size:18px;">🧩</td><td style="padding:8px 0;"><strong style="color:#e8e6e3;">Puzzles</strong><br/><span style="color:#9e9b98;font-size:13px;">Unlimited daily puzzles, filterable by type — mate in 2, forks, pins &amp; more</span></td></tr>
+<tr><td style="padding:8px 0;vertical-align:top;width:30px;color:#81b64c;font-size:18px;">🧩</td><td style="padding:8px 0;"><strong style="color:#e8e6e3;">Puzzles</strong><br/><span style="color:#9e9b98;font-size:13px;">5 free puzzles a day, filterable by type — mate in 2, forks, pins &amp; more</span></td></tr>
 <tr><td style="padding:8px 0;vertical-align:top;width:30px;color:#81b64c;font-size:18px;">🤖</td><td style="padding:8px 0;"><strong style="color:#e8e6e3;">Practice Bots</strong><br/><span style="color:#9e9b98;font-size:13px;">Train against bots calibrated to different rating levels — unlimited, always free</span></td></tr>
 </table>
 ${divider}
 <p style="text-align:center;"><a href="https://chessscout.net" style="${btnStyle}">Start Scouting Your Opponents →</a></p>
-<p style="text-align:center;margin-top:12px;"><span style="color:#9e9b98;font-size:12px;">Free plan includes unlimited daily puzzles, 3 opponent scouting reports, 5 courses, and unlimited bots — no card required</span></p>`,
+<p style="text-align:center;margin-top:12px;"><span style="color:#9e9b98;font-size:12px;">Free plan includes 5 puzzles/day, 1 basic opponent scout, and unlimited practice bots — no card required</span></p>`,
   },
   {
     name: '⭐ Upgrade to Pro',

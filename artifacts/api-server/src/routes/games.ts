@@ -177,7 +177,8 @@ router.post("/games/import", requireAuth, async (req, res): Promise<void> => {
   const { wouldExceedImportLimit } = await import("../lib/accessControl");
   if (await wouldExceedImportLimit(userId, storedUsername)) {
     res.status(402).json({
-      error: "You've reached the free plan's game import limit. Upgrade to import more games.",
+      error: "usage_limit",
+      message: "Want to load the rest of your games? Upgrade to Pro now for unlimited game import.",
       upgradeRequired: true,
     });
     return;
@@ -401,10 +402,25 @@ router.get("/games/elo-progress", async (req, res): Promise<void> => {
 
 router.get("/games", requireAuth, async (req, res): Promise<void> => {
   const query = ListGamesQueryParams.safeParse(req.query);
-  const limit = query.success ? (query.data.limit ?? 50) : 50;
-  const offset = query.success ? (query.data.offset ?? 0) : 0;
+  let limit = query.success ? (query.data.limit ?? 50) : 50;
+  let offset = query.success ? (query.data.offset ?? 0) : 0;
   const platform = query.success ? query.data.platform : undefined;
   const opponent = query.success ? query.data.opponent?.trim() : undefined;
+
+  // Free users can only ever VIEW their most recent 20 games, even if
+  // more exist in their library (e.g. imported while previously on Pro).
+  // The import-side 20-game cap only ever restricted pulling NEW games
+  // in -- this route had no awareness of premium status at all, so
+  // anyone with older/pre-existing games could see everything regardless
+  // of plan. The true total is still returned unrestricted so the
+  // frontend can show "you have X games -- upgrade to see them all".
+  const { hasFullAccess } = await import("../lib/accessControl");
+  const { full: isFullAccess } = await hasFullAccess(req.user!.id);
+  const FREE_VIEW_LIMIT = 20;
+  const pastFreeLimit = !isFullAccess && offset >= FREE_VIEW_LIMIT;
+  if (!isFullAccess && !pastFreeLimit) {
+    limit = Math.min(limit, FREE_VIEW_LIMIT - offset);
+  }
 
   const conditions = [eq(gamesTable.userId, req.user!.id)];
   if (platform && (platform === "chesscom" || platform === "lichess" || platform === "chessscout")) {
@@ -419,6 +435,25 @@ router.get("/games", requireAuth, async (req, res): Promise<void> => {
     );
   }
 
+  let countQuery = db.select({ value: count() }).from(gamesTable);
+  if (conditions.length > 0) {
+    // @ts-ignore
+    countQuery = countQuery.where(and(...conditions));
+  }
+
+  // Explicit short-circuit rather than relying on .limit(0) behavior,
+  // which isn't guaranteed across ORMs/drivers to mean "zero rows".
+  if (pastFreeLimit) {
+    const [[{ value: total }]] = await Promise.all([countQuery]);
+    res.json({
+      games: [],
+      total: Number(total),
+      isViewLimited: true,
+      viewLimit: FREE_VIEW_LIMIT,
+    });
+    return;
+  }
+
   let dbQuery = db
     .select()
     .from(gamesTable)
@@ -426,29 +461,25 @@ router.get("/games", requireAuth, async (req, res): Promise<void> => {
     .limit(limit)
     .offset(offset);
 
-  let countQuery = db.select({ value: count() }).from(gamesTable);
-
   if (conditions.length > 0) {
     // @ts-ignore
     dbQuery = dbQuery.where(and(...conditions));
-    // @ts-ignore
-    countQuery = countQuery.where(and(...conditions));
   }
 
   const [games, [{ value: total }]] = await Promise.all([dbQuery, countQuery]);
 
-  res.json(
-    ListGamesResponse.parse({
-      games: games.map((g) => ({
-        ...g,
-        reviewed: !!(g.reviewData && typeof g.reviewData === 'object'),
-        playedAt: g.playedAt.toISOString(),
-        createdAt: g.createdAt.toISOString(),
-        platform: g.platform || "chesscom",
-      })),
-      total: Number(total),
-    })
-  );
+  res.json({
+    games: games.map((g) => ({
+      ...g,
+      reviewed: !!(g.reviewData && typeof g.reviewData === 'object'),
+      playedAt: g.playedAt.toISOString(),
+      createdAt: g.createdAt.toISOString(),
+      platform: g.platform || "chesscom",
+    })),
+    total: Number(total),
+    isViewLimited: !isFullAccess && Number(total) > FREE_VIEW_LIMIT,
+    viewLimit: !isFullAccess ? FREE_VIEW_LIMIT : null,
+  });
 
   triggerBackgroundReReviewForStaleReviews(req.user!.id, req.log).catch(() => {});
 });

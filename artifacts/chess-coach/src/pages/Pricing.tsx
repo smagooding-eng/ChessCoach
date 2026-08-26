@@ -9,15 +9,18 @@ const TEXT = '#e8e6e3';
 const MUTED = '#9e9b98';
 const CARD = '#1c1b19';
 
-const ROWS: { feature: string; free: boolean; pro: boolean; chesscomFree: boolean }[] = [
+const ROWS: { feature: string; free: boolean | string; pro: boolean; chesscomFree: boolean }[] = [
   { feature: 'Cross-game pattern detection', free: false, pro: true, chesscomFree: false },
   { feature: 'Single-game review', free: true, pro: true, chesscomFree: true },
-  { feature: 'Personalized courses', free: true, pro: true, chesscomFree: false },
-  { feature: 'Opponent scouting', free: true, pro: true, chesscomFree: false },
-  { feature: 'Practice bots', free: true, pro: true, chesscomFree: false },
-  { feature: 'Scan Position (photo → board)', free: true, pro: true, chesscomFree: false },
-  { feature: 'Daily puzzles', free: true, pro: true, chesscomFree: true },
-  { feature: 'Games imported', free: '20 total', pro: 'Unlimited', chesscomFree: '—' } as any,
+  { feature: 'Basic analysis (from reviewed games)', free: true, pro: true, chesscomFree: false },
+  { feature: 'Deep AI weakness analysis', free: false, pro: true, chesscomFree: false },
+  { feature: 'Personalized courses', free: false, pro: true, chesscomFree: false },
+  { feature: 'Opponent scouting', free: '1 basic scout', pro: true, chesscomFree: false } as any,
+  { feature: 'Practice bots & Opening Trainer', free: true, pro: true, chesscomFree: false },
+  { feature: 'Local Play', free: true, pro: true, chesscomFree: false },
+  { feature: 'Scan Position (photo → board)', free: '2/day', pro: true, chesscomFree: false } as any,
+  { feature: 'Daily puzzles', free: '5/day', pro: true, chesscomFree: true } as any,
+  { feature: 'Games viewable', free: '20 most recent', pro: 'Unlimited', chesscomFree: '—' } as any,
   { feature: 'Price', free: '$0', pro: '$5/mo or $55/yr', chesscomFree: '$0' } as any,
 ];
 
@@ -56,11 +59,13 @@ export default function PricingPage() {
             <h2 className="text-lg font-black mb-1" style={{ color: TEXT }}>Free</h2>
             <p className="text-3xl font-black mb-4" style={{ color: TEXT }}>$0</p>
             <ul className="space-y-2 text-sm mb-6" style={{ color: MUTED }}>
-              <li>Unlimited daily puzzles</li>
-              <li>3 opponent scouts</li>
-              <li>5 personalized courses</li>
-              <li>Unlimited practice bots</li>
-              <li>First 20 games imported</li>
+              <li>5 puzzles/day</li>
+              <li>1 basic opponent scout</li>
+              <li>2 Scan Position uses/day</li>
+              <li>Basic analysis from reviewed games</li>
+              <li>Unlimited practice bots & Opening Trainer</li>
+              <li>Unlimited Local Play</li>
+              <li>Your 20 most recent games</li>
             </ul>
             <Link href="/#pricing" className="block text-center py-2.5 rounded-xl text-sm font-bold"
               style={{ background: 'rgba(255,255,255,0.06)', color: TEXT }}>
@@ -79,9 +84,10 @@ export default function PricingPage() {
             <p className="text-3xl font-black mb-1" style={{ color: TEXT }}>$5<span className="text-sm font-normal" style={{ color: MUTED }}>/mo</span></p>
             <p className="text-xs mb-4" style={{ color: MUTED }}>or $55/year</p>
             <ul className="space-y-2 text-sm mb-6" style={{ color: TEXT }}>
-              <li>Everything in Free, unlimited</li>
-              <li>Full cross-game pattern analysis</li>
-              <li>Unlimited scouts, courses, imports</li>
+              <li>Unlimited puzzles, scouts & scans</li>
+              <li>Full AI weakness analysis</li>
+              <li>Personalized courses</li>
+              <li>Unlimited game history</li>
             </ul>
             <Link href="/#pricing" className="block text-center py-2.5 rounded-xl text-sm font-black"
               style={{ background: G, color: '#fff' }}>

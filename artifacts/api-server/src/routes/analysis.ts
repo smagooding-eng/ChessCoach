@@ -746,8 +746,43 @@ router.get("/analysis/weaknesses/:id", async (req, res): Promise<void> => {
   });
 });
 
-router.post("/analysis/scan-position", requirePremium, async (req: Request, res: Response): Promise<void> => {
+router.post("/analysis/scan-position", async (req: Request, res: Response): Promise<void> => {
   try {
+    const userId = req.user?.id;
+    if (!userId) {
+      res.status(401).json({ error: "Authentication required" });
+      return;
+    }
+
+    const { hasFullAccess } = await import("../lib/accessControl");
+    const { full: isFullAccess } = await hasFullAccess(userId);
+
+    if (!isFullAccess) {
+      const { db: dbClient, scanAttemptsTable: scanAttempts } = await import("@workspace/db");
+      const { and: andOp, eq: eqOp, gte: gteOp, count: countOp } = await import("drizzle-orm");
+      const { FREE_TIER_LIMITS } = await import("../lib/accessControl");
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      const [todayResult] = await dbClient
+        .select({ c: countOp() })
+        .from(scanAttempts)
+        .where(andOp(
+          eqOp(scanAttempts.userId, userId),
+          eqOp(scanAttempts.success, true),
+          gteOp(scanAttempts.createdAt, todayStart),
+        ));
+      const usedToday = todayResult?.c ?? 0;
+      if (usedToday >= FREE_TIER_LIMITS.scanPositionsPerDay) {
+        res.status(403).json({
+          error: "usage_limit",
+          message: `Free plan includes ${FREE_TIER_LIMITS.scanPositionsPerDay} successful scans per day. Upgrade to Pro for unlimited scans!`,
+          used: usedToday,
+          limit: FREE_TIER_LIMITS.scanPositionsPerDay,
+        });
+        return;
+      }
+    }
+
     const { image } = req.body as { image: string };
     if (!image) {
       res.status(400).json({ error: "Image data is required" });
@@ -1290,6 +1325,13 @@ Return ONLY a JSON object mapping each square to its color, nothing else. Exampl
     if (agreementRatio >= 0.97) confidence = "high";
     else if (agreementRatio >= 0.9) confidence = "medium";
     else confidence = "low";
+
+    if (!isFullAccess) {
+      try {
+        const { db: dbClient2, scanAttemptsTable: scanAttempts2 } = await import("@workspace/db");
+        await dbClient2.insert(scanAttempts2).values({ userId, success: true });
+      } catch { /* logging failure shouldn't block the actual response */ }
+    }
 
     res.json({
       fen: validatedFen,

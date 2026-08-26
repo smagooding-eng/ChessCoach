@@ -1,6 +1,7 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { Link } from 'wouter';
 import { PieceTile } from '@/components/DesignSystem';
+import { UpgradeNudge } from '@/components/UpgradeNudge';
 import { Chess } from 'chess.js';
 import { ChessBoard } from '@/components/ChessBoard';
 import { apiFetch } from '@/lib/api';
@@ -176,6 +177,7 @@ export function ScanPosition() {
   const [builderTurn, setBuilderTurn] = useState<'w' | 'b'>('w');
   const [builderError, setBuilderError] = useState('');
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [isLimitReached, setIsLimitReached] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
@@ -206,13 +208,15 @@ export function ScanPosition() {
           body: JSON.stringify({ image: dataUrl }),
         });
 
-        const data = await res.json() as { fen?: string; confidence?: string; notes?: string; croppedImage?: string; annotatedImage?: string; error?: string };
+        const data = await res.json() as { fen?: string; confidence?: string; notes?: string; croppedImage?: string; annotatedImage?: string; error?: string; message?: string };
 
         if (!res.ok || !data.fen) {
-          setError(data.error || 'Could not recognize a chess position.');
+          setIsLimitReached(data.error === 'usage_limit');
+          setError((data.error === 'usage_limit' ? data.message : data.error) || 'Could not recognize a chess position.');
           setState('error');
           return;
         }
+        setIsLimitReached(false);
 
         setFen(data.fen);
         setConfidence(data.confidence || 'medium');
@@ -317,6 +321,7 @@ export function ScanPosition() {
     setFlipped(false);
     setGameStatus(null);
     setSaveState('idle');
+    setIsLimitReached(false);
   }, []);
 
   const goToPlayAI = useCallback((fromFen?: string) => {
@@ -439,7 +444,14 @@ export function ScanPosition() {
         </div>
       )}
 
-      {state === 'error' && (
+      {state === 'error' && isLimitReached && (
+        <UpgradeNudge
+          headline="You've used today's 2 free scans"
+          subtext="Upgrade to Pro for unlimited Scan Position uses — or use the position editor below, which is always free."
+        />
+      )}
+
+      {state === 'error' && !isLimitReached && (
         <div className="space-y-3">
           {previewUrl && (
             <div className="glass-card rounded-xl overflow-hidden border border-white/10">

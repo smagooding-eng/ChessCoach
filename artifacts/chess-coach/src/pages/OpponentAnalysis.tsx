@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { PageHero } from '@/components/DesignSystem';
+import { UpgradeNudge } from '@/components/UpgradeNudge';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Swords, Search, Target, AlertTriangle, TrendingUp, ChevronDown, ChevronUp, ChevronRight, Loader2, User, Users, Zap, Clock, Star, BookOpen, CheckCircle2, GraduationCap, History, RefreshCw, Send } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
@@ -650,7 +651,13 @@ export function OpponentAnalysis() {
                   Identified Weaknesses
                   <span className="text-xs text-muted-foreground font-normal ml-1">— exploit these</span>
                 </h3>
-                {result.weaknesses.map((w, i) => (
+                {result.weaknesses.length === 0 ? (
+                  <UpgradeNudge
+                    headline="Upgrade to Pro to see weaknesses"
+                    subtext={`This basic scout shows ${result.username}'s record and openings. Pro unlocks a full AI-written weakness breakdown, ready to exploit.`}
+                  />
+                ) : (
+                  result.weaknesses.map((w, i) => (
                   <motion.div
                     key={i}
                     initial={{ opacity: 0, x: -10 }}
@@ -711,7 +718,8 @@ export function OpponentAnalysis() {
                       )}
                     </AnimatePresence>
                   </motion.div>
-                ))}
+                ))
+                )}
               </div>
 
               {/* Right column: Top Openings + Scout Tip */}
@@ -816,7 +824,13 @@ export function OpponentAnalysis() {
                   </Link>
                 )}
 
-                {courseGenState === 'error' && (
+                {courseGenState === 'error' && courseGenError === 'Premium subscription required' && (
+                  <div className="shrink-0 w-full sm:w-auto">
+                    <UpgradeNudge headline="Upgrade to Pro to generate exploit courses" compact />
+                  </div>
+                )}
+
+                {courseGenState === 'error' && courseGenError !== 'Premium subscription required' && (
                   <div className="shrink-0 flex flex-col items-end gap-2">
                     <p className="text-xs text-red-400">{courseGenError}</p>
                     <button
