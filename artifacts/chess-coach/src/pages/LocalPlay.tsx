@@ -329,6 +329,11 @@ export function LocalPlay() {
               <span className="text-xs text-primary font-medium ml-auto">Your turn</span>
             )}
           </div>
+          {!hasTimer && fullscreen && (
+            <div className="mt-1">
+              <MaterialStrip fen={fen} color="b" />
+            </div>
+          )}
         </div>
 
         {hasTimer && !clockStarted && result === 'playing' && (
@@ -388,6 +393,11 @@ export function LocalPlay() {
               <span className="text-xs text-primary font-medium ml-auto">Your turn</span>
             )}
           </div>
+          {!hasTimer && fullscreen && (
+            <div className="mt-1">
+              <MaterialStrip fen={fen} color="w" />
+            </div>
+          )}
         </div>
 
         {/* Game over banner */}
