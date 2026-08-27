@@ -632,7 +632,7 @@ export function Analysis({ hideHeader = false }: { hideHeader?: boolean } = {}) 
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase"
-                        style={{ background: sevBg, color: sevColor }}>
+                        style={{ background: sevColor, color: '#ffffff' }}>
                         <SevIcon className="w-3 h-3" />
                         {weakness.severity}
                       </span>
@@ -675,7 +675,7 @@ export function Analysis({ hideHeader = false }: { hideHeader?: boolean } = {}) 
                   <button
                     onClick={(e) => { e.stopPropagation(); navigate(`/puzzles?weakness=${encodeURIComponent(weakness.category)}`); }}
                     className="mt-3 w-full flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold transition-colors relative"
-                    style={{ background: 'rgba(129,182,76,0.1)', color: CHESSCOM_GREEN, border: '1px solid rgba(129,182,76,0.2)' }}
+                    style={{ background: CHESSCOM_GREEN, color: '#000', border: 'none' }}
                   >
                     <Target className="w-3.5 h-3.5" />
                     Practice puzzles for this

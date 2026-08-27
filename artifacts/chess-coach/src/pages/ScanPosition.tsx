@@ -434,7 +434,7 @@ export function ScanPosition() {
               <img src={previewUrl} alt="Chess position" className="w-full max-h-80 object-contain bg-black/30" />
             </div>
           )}
-          <div className="glass-card rounded-xl px-4 py-5 border border-primary/30 bg-primary/5 flex items-center gap-3">
+          <div className="glass-card rounded-xl px-4 py-5 border border-primary/30 bg-primary flex items-center gap-3">
             <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin shrink-0" />
             <div>
               <p className="text-sm font-bold" style={{ color: '#81b64c' }}>Analyzing position...</p>
@@ -516,7 +516,7 @@ export function ScanPosition() {
             <button
               onClick={startExplore}
               className="py-3 rounded-xl font-bold text-sm transition-all active:scale-[0.97] flex items-center justify-center gap-2"
-              style={{ background: 'rgba(129,182,76,0.15)', color: '#81b64c', border: '1px solid rgba(129,182,76,0.3)' }}
+              style={{ background: 'rgba(129,182,76,0.35)', color: '#ffffff', border: '1px solid rgba(129,182,76,0.3)' }}
             >
               <Compass className="w-4 h-4" />
               Explore
@@ -524,7 +524,7 @@ export function ScanPosition() {
             <button
               onClick={() => goToPlayAI()}
               className="py-3 rounded-xl font-bold text-sm transition-all active:scale-[0.97] flex items-center justify-center gap-2"
-              style={{ background: 'rgba(129,182,76,0.15)', color: '#81b64c', border: '1px solid rgba(129,182,76,0.3)' }}
+              style={{ background: 'rgba(129,182,76,0.35)', color: '#ffffff', border: '1px solid rgba(129,182,76,0.3)' }}
             >
               <Swords className="w-4 h-4" />
               Play Bot
@@ -614,7 +614,7 @@ export function ScanPosition() {
             <button
               onClick={() => goToPlayAI(sandboxFen)}
               className="flex-1 py-2.5 rounded-xl text-xs font-bold transition-all active:scale-[0.97] flex items-center justify-center gap-1.5"
-              style={{ background: 'rgba(129,182,76,0.15)', color: '#81b64c', border: '1px solid rgba(129,182,76,0.3)' }}
+              style={{ background: 'rgba(129,182,76,0.35)', color: '#ffffff', border: '1px solid rgba(129,182,76,0.3)' }}
             >
               <Swords className="w-3.5 h-3.5" />
               Play Bot
@@ -809,7 +809,7 @@ export function ScanPosition() {
                 }
               }}
               className="py-3 rounded-xl font-bold text-sm transition-all active:scale-[0.97] flex items-center justify-center gap-2"
-              style={{ background: 'rgba(129,182,76,0.15)', color: '#81b64c', border: '1px solid rgba(129,182,76,0.3)' }}
+              style={{ background: 'rgba(129,182,76,0.35)', color: '#ffffff', border: '1px solid rgba(129,182,76,0.3)' }}
             >
               <Compass className="w-4 h-4" />
               Explore
@@ -824,7 +824,7 @@ export function ScanPosition() {
                 }
               }}
               className="py-3 rounded-xl font-bold text-sm transition-all active:scale-[0.97] flex items-center justify-center gap-2"
-              style={{ background: 'rgba(129,182,76,0.15)', color: '#81b64c', border: '1px solid rgba(129,182,76,0.3)' }}
+              style={{ background: 'rgba(129,182,76,0.35)', color: '#ffffff', border: '1px solid rgba(129,182,76,0.3)' }}
             >
               <Swords className="w-4 h-4" />
               Play Bot

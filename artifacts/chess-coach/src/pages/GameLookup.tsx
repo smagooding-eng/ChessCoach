@@ -833,7 +833,7 @@ export function GameLookup() {
                     doSearch(h.player1, h.player2);
                   }}
                   className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm transition-all hover:opacity-80"
-                  style={{ background: 'rgba(129,182,76,0.08)', border: '1px solid rgba(129,182,76,0.15)', color: TEXT_LIGHT }}
+                  style={{ background: 'rgba(129,182,76,0.25)', border: '1px solid rgba(129,182,76,0.5)', color: TEXT_LIGHT }}
                 >
                   <Swords size={12} style={{ color: CHESSCOM_GREEN }} />
                   <span className="font-medium">{h.player1}</span>

@@ -717,7 +717,7 @@ function OpeningTrainerView({ opening, onBack }: { opening: OpeningLine; onBack:
         <div className="space-y-2.5">
           <div className="glass-card rounded-xl p-3 flex items-center justify-between gap-3">
             <div className="flex items-center gap-2 min-w-0">
-              <div className="w-9 h-9 rounded-xl bg-primary/15 border border-primary/30 flex items-center justify-center shrink-0">
+              <div className="w-9 h-9 rounded-xl bg-primary border border-primary/30 flex items-center justify-center shrink-0">
                 <BookOpen className="w-4 h-4 text-primary" />
               </div>
               <div className="min-w-0">
@@ -733,7 +733,7 @@ function OpeningTrainerView({ opening, onBack }: { opening: OpeningLine; onBack:
                 <p className="text-sm font-mono font-bold text-primary">{accuracy}%</p>
               </div>
               {streak >= 2 && (
-                <div className="px-2 py-1 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-400 text-[10px] font-bold">
+                <div className="px-2 py-1 rounded-xl bg-amber-500/15 border bg-amber-500 text-white text-[10px] font-bold">
                   🔥 {streak}
                 </div>
               )}
@@ -775,7 +775,7 @@ function OpeningTrainerView({ opening, onBack }: { opening: OpeningLine; onBack:
             <div className="flex items-center gap-2">
               <button onClick={handleShowHint}
                 disabled={!playerExpected}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/20 border border-amber-500/50 text-amber-300 text-xs font-bold hover:bg-amber-500/30 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/20 border bg-amber-500 text-white text-xs font-bold hover:bg-amber-500/30 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
                 <Lightbulb className="w-3 h-3" /> {hintOpen && playerExpected ? playerExpected : 'Hint'}
               </button>
               <button onClick={handleReset}
@@ -895,7 +895,7 @@ function OpeningCard({ opening, onSelect }: { opening: OpeningLine; onSelect: (o
       className="relative flex flex-col gap-3 p-5 rounded-xl border border-white/10 bg-gradient-to-br from-[#2d2c29] to-[#1f1e1c] text-left transition-shadow hover:shadow-xl hover:shadow-black/30 group"
     >
       <div className="flex items-center justify-between">
-        <div className="w-10 h-10 rounded-xl bg-primary/15 border border-primary/30 flex items-center justify-center">
+        <div className="w-10 h-10 rounded-xl bg-primary border border-primary/30 flex items-center justify-center">
           <BookOpen className="w-5 h-5 text-primary" />
         </div>
         <span className="text-xs font-bold px-2.5 py-1 rounded-xl bg-black/30 border border-white/10 text-white/80">
@@ -987,7 +987,7 @@ export function PracticeBots() {
   return (
     <div className="space-y-6 pb-20 px-4 pt-4 md:px-0 md:pt-0">
       <div className="glass-card p-5 sm:p-6 rounded-xl sm:rounded-xl border-primary/20 relative overflow-hidden">
-        <div className="absolute right-0 top-0 w-64 h-64 bg-primary/5 blur-3xl rounded-full pointer-events-none" />
+        <div className="absolute right-0 top-0 w-64 h-64 bg-primary blur-3xl rounded-full pointer-events-none" />
         <div className="relative z-10 flex items-center gap-3">
           <PieceTile piece="♞" size={56} />
           <div>

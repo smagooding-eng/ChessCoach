@@ -162,7 +162,7 @@ export function Setup() {
         )}
 
         {error && (
-          <div className="mb-4 p-3 rounded-xl bg-red-500/20 border border-red-500/50 text-red-300 text-sm font-medium">
+          <div className="mb-4 p-3 rounded-xl bg-red-500/20 border bg-red-500 text-white text-sm font-medium">
             {error}
           </div>
         )}

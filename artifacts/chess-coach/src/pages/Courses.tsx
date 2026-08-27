@@ -266,10 +266,10 @@ export function Courses() {
                 <span className="px-3 py-1 rounded-full text-xs font-bold bg-secondary text-secondary-foreground">
                   {course.category}
                 </span>
-                <span className={`px-3 py-1 rounded-full text-xs font-bold border
-                  ${course.difficulty === 'Beginner' ? 'border-emerald-500/30 text-emerald-400' :
-                    course.difficulty === 'Intermediate' ? 'border-amber-500/30 text-amber-400' :
-                    'border-red-500/30 text-red-400'}`}>
+                <span className={`px-3 py-1 rounded-full text-xs font-bold text-white
+                  ${course.difficulty === 'Beginner' ? 'bg-emerald-500' :
+                    course.difficulty === 'Intermediate' ? 'bg-amber-500' :
+                    'bg-red-500'}`}>
                   {course.difficulty}
                 </span>
               </div>
@@ -296,7 +296,7 @@ export function Courses() {
 
                 <div className="flex gap-2">
                   <Link href={`/courses/${course.id}`} className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold transition-all
-                    ${isComplete ? 'bg-secondary text-foreground hover:bg-secondary/80' : 'bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground'}`}>
+                    ${isComplete ? 'bg-secondary text-foreground hover:bg-secondary/80' : 'bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground'}`}>
                     {isComplete ? 'Review Course' : <><PlayCircle className="w-5 h-5" /> Continue Learning</>}
                   </Link>
                   <button
@@ -319,7 +319,7 @@ export function Courses() {
             <p className="text-muted-foreground mb-4">Try adjusting your filters to find courses.</p>
             <button
               onClick={clearFilters}
-              className="px-5 py-2.5 rounded-xl bg-primary/10 text-primary font-bold hover:bg-primary/20 transition-all"
+              className="px-5 py-2.5 rounded-xl bg-primary text-primary-foreground font-bold hover:bg-primary/20 transition-all"
             >
               Clear Filters
             </button>

@@ -553,7 +553,7 @@ function UserDetailPanel({ userId, onBack }: { userId: string; onBack: () => voi
     { label: 'Games Imported', value: usage.gamesImported, color: 'text-blue-400', bg: 'bg-blue-400/10', icon: Swords },
     { label: 'Games Reviewed', value: usage.gamesReviewed, color: 'text-emerald-400', bg: 'bg-emerald-400/10', icon: Eye },
     { label: 'Opponents Scouted', value: usage.opponentsScouted, color: 'text-purple-400', bg: 'bg-purple-400/10', icon: Target },
-    { label: 'Puzzles Solved', value: usage.puzzlesSolved, color: 'text-primary', bg: 'bg-primary/10', icon: Trophy },
+    { label: 'Puzzles Solved', value: usage.puzzlesSolved, color: 'text-primary', bg: 'bg-primary', icon: Trophy },
     { label: 'Puzzles Failed', value: usage.puzzlesFailed, color: 'text-red-400', bg: 'bg-red-400/10', icon: X },
     { label: 'Courses Generated', value: usage.coursesGenerated, color: 'text-amber-400', bg: 'bg-amber-400/10', icon: GraduationCap },
     { label: 'Lessons Done', value: usage.lessonsCompleted, color: 'text-cyan-400', bg: 'bg-cyan-400/10', icon: Check },
@@ -587,7 +587,7 @@ function UserDetailPanel({ userId, onBack }: { userId: string; onBack: () => voi
           disabled={togglingPremium}
           className={cn(
             'mt-2 px-3 py-1.5 rounded-lg text-[11px] font-bold flex items-center gap-1.5 disabled:opacity-50',
-            premiumOverride ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30' : 'bg-primary/10 text-primary border border-primary/20'
+            premiumOverride ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30' : 'bg-primary text-primary-foreground border border-primary/20'
           )}
         >
           {togglingPremium ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
@@ -903,7 +903,7 @@ function SubscribersPanel({ onClose }: { onClose: () => void }) {
       exit={{ opacity: 0, height: 0 }}
       className="overflow-hidden border-t border-border/20"
     >
-      <div className="px-4 py-3 bg-primary/5 border-b border-primary/15 flex items-center justify-between sticky top-0 z-10">
+      <div className="px-4 py-3 bg-primary border-b border-primary/15 flex items-center justify-between sticky top-0 z-10">
         <div>
           <p className="text-xs font-bold text-primary">Subscribers (from Stripe)</p>
           <p className="text-[10px] text-muted-foreground">
@@ -2039,7 +2039,7 @@ ${sanitized}
 
         <div className="px-5 py-4 border-t border-amber-500/15 bg-amber-500/5 shrink-0 space-y-3">
           {result && (
-            <div className={`flex items-center gap-2 text-xs font-bold px-3 py-2 rounded-xl ${result.type === 'success' ? 'bg-emerald-500/20 border border-emerald-500/40 text-emerald-300' : 'bg-red-500/20 border border-red-500/40 text-red-300'}`}>
+            <div className={`flex items-center gap-2 text-xs font-bold px-3 py-2 rounded-xl ${result.type === 'success' ? 'bg-emerald-500/20 border bg-emerald-500 text-white' : 'bg-red-500/20 border bg-red-500 text-white'}`}>
               {result.type === 'success' ? <CheckCircle2 className="w-3.5 h-3.5 shrink-0" /> : <AlertCircle className="w-3.5 h-3.5 shrink-0" />}
               {result.message}
             </div>
@@ -2127,7 +2127,7 @@ function AdminTicker() {
               <button
                 onClick={handleClearCache}
                 disabled={clearing}
-                className="text-[10px] font-black px-2.5 py-1.5 rounded-lg transition-colors flex items-center gap-1 bg-red-500/25 border border-red-500/50 text-red-300 hover:bg-red-500/35 disabled:opacity-50"
+                className="text-[10px] font-black px-2.5 py-1.5 rounded-lg transition-colors flex items-center gap-1 bg-red-500/25 border bg-red-500 text-white hover:bg-red-500/35 disabled:opacity-50"
               >
                 {clearing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
                 {clearing ? 'Clearing...' : 'Clear Cache'}
@@ -2167,9 +2167,9 @@ function AdminTicker() {
           </button>
           <button
             onClick={() => setShowSubscribers(v => !v)}
-            className="p-4 text-center hover:bg-primary/5 transition-colors cursor-pointer"
+            className="p-4 text-center hover:bg-primary transition-colors cursor-pointer"
           >
-            <div className="w-8 h-8 bg-primary/10 rounded-xl flex items-center justify-center mx-auto mb-2">
+            <div className="w-8 h-8 bg-primary rounded-xl flex items-center justify-center mx-auto mb-2">
               <CreditCard className="w-4 h-4 text-primary" />
             </div>
             <p className="text-xl font-black text-foreground">{stats.subscriptions.total.toLocaleString()}</p>
@@ -2310,7 +2310,7 @@ function MarketingPanel() {
           <button
             onClick={generate}
             disabled={loading}
-            className="flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-purple-500/15 border border-purple-500/25 text-purple-400 text-xs font-bold hover:bg-purple-500/25 transition-colors disabled:opacity-50 shrink-0"
+            className="flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-purple-500/15 border bg-purple-500 text-white text-xs font-bold hover:bg-purple-500/25 transition-colors disabled:opacity-50 shrink-0"
           >
             {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
             {loading ? 'Generating...' : 'Generate Ads'}
@@ -2325,7 +2325,7 @@ function MarketingPanel() {
         />
 
         {error && (
-          <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-red-500/20 border border-red-500/40 text-red-300 text-xs font-bold">
+          <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-red-500/20 border bg-red-500 text-white text-xs font-bold">
             <AlertCircle className="w-3.5 h-3.5 shrink-0" />
             {error}
           </div>

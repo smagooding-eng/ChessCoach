@@ -16,7 +16,7 @@ const TONE_STYLES: Record<AICoachTone, {
   neutral: {
     ring: 'border-white/10',
     glow: 'from-primary/15 via-transparent to-transparent',
-    badgeBg: 'bg-primary/15',
+    badgeBg: 'bg-primary',
     badgeText: 'text-primary',
     avatarRing: 'ring-primary/40',
     avatarGrad: 'from-primary/30 to-primary/5',

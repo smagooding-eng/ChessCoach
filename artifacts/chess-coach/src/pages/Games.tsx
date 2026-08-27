@@ -258,7 +258,7 @@ export function Games() {
           onClick={() => { setH2hMode(!h2hMode); setH2hOpponent(''); }}
           className={cn(
             'flex items-center gap-1.5 px-3 py-2.5 rounded-xl border text-sm font-medium transition-colors shrink-0',
-            h2hMode ? 'bg-primary/15 border-primary/40 text-primary' : 'bg-secondary/50 border-border text-muted-foreground hover:text-foreground'
+            h2hMode ? 'bg-primary border-primary/40 text-primary-foreground' : 'bg-secondary/50 border-border text-muted-foreground hover:text-foreground'
           )}
         >
           <Users className="w-4 h-4" />
@@ -355,14 +355,14 @@ export function Games() {
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-bold text-sm truncate">vs {opponent}</span>
                           <span className="text-xs text-muted-foreground">({opponentRating})</span>
-                          <span className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide
-                            ${game.result === 'win' ? 'bg-emerald-500/20 text-emerald-400' :
-                              game.result === 'loss' ? 'bg-red-500/20 text-red-400' :
-                              'bg-slate-500/20 text-slate-400'}`}>
+                          <span className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide text-white
+                            ${game.result === 'win' ? 'bg-emerald-500' :
+                              game.result === 'loss' ? 'bg-red-500' :
+                              'bg-slate-500'}`}>
                             {game.result}
                           </span>
                           {reviewed && (
-                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-primary/15 text-primary text-[10px] font-bold">
+                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-primary text-primary-foreground text-[10px] font-bold">
                               <Sparkles className="w-2.5 h-2.5" /> Reviewed
                             </span>
                           )}
@@ -371,9 +371,9 @@ export function Games() {
                           {(() => {
                             const plat = (game.platform || 'chesscom') as 'lichess' | 'chesscom' | 'chessscout';
                             const cls =
-                              plat === 'lichess' ? 'bg-white/10 text-white/70'
-                              : plat === 'chessscout' ? 'bg-primary/15 text-primary'
-                              : 'bg-emerald-500/20 text-emerald-300';
+                              plat === 'lichess' ? 'bg-white/20 text-white'
+                              : plat === 'chessscout' ? 'bg-primary text-primary-foreground'
+                              : 'bg-emerald-500 text-white';
                             const label = plat === 'lichess' ? 'LC' : plat === 'chessscout' ? 'CS' : 'CC';
                             return (
                               <span className={cn(

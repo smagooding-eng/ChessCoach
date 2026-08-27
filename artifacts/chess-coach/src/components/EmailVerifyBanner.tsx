@@ -32,7 +32,7 @@ export function EmailVerifyBanner() {
     if (verifyMessage && verifyMessage.includes('verified')) {
       return (
         <div className="rounded-xl px-4 py-2.5 text-sm flex items-center gap-2"
-          style={{ background: 'rgba(129,182,76,0.12)', color: '#81b64c', border: '1px solid rgba(129,182,76,0.3)' }}>
+          style={{ background: 'rgba(129,182,76,0.35)', color: '#ffffff', border: '1px solid rgba(129,182,76,0.3)' }}>
           <Check className="w-4 h-4" /> {verifyMessage}
         </div>
       );

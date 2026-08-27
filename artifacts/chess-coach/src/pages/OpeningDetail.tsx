@@ -232,7 +232,7 @@ export function OpeningDetail() {
       <div className="glass-card rounded-xl p-5 flex flex-wrap items-start justify-between gap-4">
         <div>
           {data.eco && (
-            <span className="inline-block px-2 py-0.5 rounded text-[11px] font-bold bg-primary/15 text-primary border border-primary/20 mb-2">
+            <span className="inline-block px-2 py-0.5 rounded text-[11px] font-bold bg-primary text-primary-foreground border border-primary/20 mb-2">
               {data.eco}
             </span>
           )}
@@ -241,7 +241,7 @@ export function OpeningDetail() {
           {data.eco && (
             <Link
               href={`/practice?tab=openings&eco=${encodeURIComponent(data.eco)}`}
-              className="inline-flex items-center gap-1.5 mt-2.5 px-3 py-1.5 rounded-lg text-xs font-bold text-primary bg-primary/10 border border-primary/20 hover:bg-primary/15 transition-colors"
+              className="inline-flex items-center gap-1.5 mt-2.5 px-3 py-1.5 rounded-lg text-xs font-bold text-primary bg-primary border border-primary/20 hover:bg-primary transition-colors"
             >
               <Swords className="w-3.5 h-3.5" /> Practice This Opening
             </Link>
@@ -363,7 +363,7 @@ export function OpeningDetail() {
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0 }}
                         className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold text-sm
-                          ${feedback === 'correct' ? 'bg-emerald-500/20 border border-emerald-500/40 text-emerald-300' : 'bg-amber-500/20 border border-amber-500/45 text-amber-300'}`}
+                          ${feedback === 'correct' ? 'bg-emerald-500/20 border bg-emerald-500 text-white' : 'bg-amber-500/20 border bg-amber-500 text-white'}`}
                       >
                         {feedback === 'correct'
                           ? <><CheckCircle2 className="w-4 h-4 shrink-0" /> Correct! Move {practiceStep} of {mainLine.length}</>
@@ -404,7 +404,7 @@ export function OpeningDetail() {
                       <span key={i}
                         className={`px-2 py-0.5 rounded-xl font-mono text-xs
                           ${i < practiceStep ? 'bg-emerald-500/20 text-emerald-400' :
-                            i === practiceStep ? 'bg-primary/20 text-primary ring-1 ring-primary/40 font-bold' :
+                            i === practiceStep ? 'bg-primary/20 text-primary-foreground ring-1 ring-primary/40 font-bold' :
                             'bg-secondary/50 text-muted-foreground/40'}`}
                       >
                         {m.color === 'white' ? `${m.moveNumber}.` : ''}{i < practiceStep ? m.san : '?'}
@@ -567,7 +567,7 @@ export function OpeningDetail() {
                     className="flex items-center gap-3 px-4 py-3 hover:bg-white/[0.025] transition-colors group"
                   >
                     {o.eco && (
-                      <span className="shrink-0 px-1.5 py-0.5 rounded text-[9px] font-bold bg-primary/10 text-primary border border-primary/15">
+                      <span className="shrink-0 px-1.5 py-0.5 rounded text-[9px] font-bold bg-primary text-primary-foreground border border-primary/15">
                         {o.eco}
                       </span>
                     )}

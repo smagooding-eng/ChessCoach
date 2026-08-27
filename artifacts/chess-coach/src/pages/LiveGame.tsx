@@ -205,7 +205,7 @@ export function LiveGame({ live, onLeave }: { live: ReturnType<typeof useLivePla
 
       {premove && !isPlayerTurn && (
         <div className="flex items-center justify-between rounded-lg px-3 py-2 text-xs"
-          style={{ background: 'rgba(255,140,90,0.12)', color: '#ff8c5a', border: '1px solid rgba(255,140,90,0.35)' }}>
+          style={{ background: 'rgba(255,140,90,0.35)', color: '#ffffff', border: '1px solid rgba(255,140,90,0.35)' }}>
           <span>Premove: {premove.from} → {premove.to}</span>
           <button onClick={() => setPremove(null)} className="font-bold inline-flex items-center gap-1"><X className="w-3 h-3" /> Cancel</button>
         </div>

@@ -195,7 +195,7 @@ function FrequentOpponents({ games }: { games: LiveHistoryGame[] }) {
     <div className="glass-card rounded-xl p-3.5 border border-white/5">
       <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg bg-primary/15 text-primary flex items-center justify-center">
+          <div className="w-7 h-7 rounded-lg bg-primary text-primary-foreground flex items-center justify-center">
             <Users className="w-4 h-4" />
           </div>
           <div>
@@ -214,7 +214,7 @@ function FrequentOpponents({ games }: { games: LiveHistoryGame[] }) {
               className={cn(
                 'px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wide transition-colors border',
                 tcFilter === opt.id
-                  ? 'bg-primary/20 text-primary border-primary/40'
+                  ? 'bg-primary/20 text-primary-foreground border-primary/40'
                   : 'bg-secondary/40 text-muted-foreground border-border hover:text-foreground'
               )}
             >
@@ -381,7 +381,7 @@ export function LiveHistory() {
       <PageHero piece="♞" title="ChessScout.net Live" subtitle="Your live match history and rating progression by time control." />
 
       <div className="flex flex-wrap items-center gap-2">
-        <Link href="/live" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-primary/15 text-primary hover:bg-primary/25 border border-primary/30 transition-colors">
+        <Link href="/live" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-primary text-primary-foreground hover:bg-primary/25 border border-primary/30 transition-colors">
           <Swords className="w-3.5 h-3.5" /> Play Live
         </Link>
         <Link href="/games" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-secondary/60 text-muted-foreground hover:text-foreground border border-border transition-colors">
@@ -406,7 +406,7 @@ export function LiveHistory() {
             <div key={tcId} className="glass-card rounded-xl p-3.5 border border-white/5">
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-lg bg-primary/15 text-primary flex items-center justify-center">
+                  <div className="w-7 h-7 rounded-lg bg-primary text-primary-foreground flex items-center justify-center">
                     <Icon className="w-4 h-4" />
                   </div>
                   <div>
@@ -483,7 +483,7 @@ export function LiveHistory() {
                     className={cn(
                       'px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wide transition-colors border',
                       listTcFilter === opt.id
-                        ? 'bg-primary/20 text-primary border-primary/40'
+                        ? 'bg-primary/20 text-primary-foreground border-primary/40'
                         : 'bg-secondary/40 text-muted-foreground border-border hover:text-foreground'
                     )}
                   >
@@ -503,7 +503,7 @@ export function LiveHistory() {
                     className={cn(
                       'px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wide transition-colors border',
                       listModeFilter === opt.id
-                        ? 'bg-primary/20 text-primary border-primary/40'
+                        ? 'bg-primary/20 text-primary-foreground border-primary/40'
                         : 'bg-secondary/40 text-muted-foreground border-border hover:text-foreground'
                     )}
                   >
@@ -541,7 +541,7 @@ export function LiveHistory() {
                       {g.opponentRating != null && (
                         <span className="text-xs text-muted-foreground">({g.opponentRating})</span>
                       )}
-                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide bg-primary/15 text-primary">
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide bg-primary text-primary-foreground">
                         {meta.label}
                       </span>
                       <span className={cn(

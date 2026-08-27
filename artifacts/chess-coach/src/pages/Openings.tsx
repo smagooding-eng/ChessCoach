@@ -99,7 +99,7 @@ export function Openings() {
 
       <button
         onClick={() => navigate('/practice?tab=openings')}
-        className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground font-bold text-sm transition-all"
+        className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground font-bold text-sm transition-all"
       >
         <BookOpen className="w-4 h-4" /> Practice Your Openings Against the Trainer Bot
       </button>
@@ -232,7 +232,7 @@ export function Openings() {
                         <td className="px-4 py-3.5">
                           <div className="flex items-center gap-2.5">
                             {o.eco && (
-                              <span className="shrink-0 px-2 py-0.5 rounded-xl text-[10px] font-black bg-primary/15 text-primary border border-primary/25">
+                              <span className="shrink-0 px-2 py-0.5 rounded-xl text-[10px] font-black bg-primary text-primary-foreground border border-primary/25">
                                 {o.eco}
                               </span>
                             )}
@@ -259,7 +259,7 @@ export function Openings() {
 
                         <td className="px-4 py-3.5 text-center" onClick={e => e.stopPropagation()}>
                           <Link href={`/openings/${linkParam}`}
-                            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-primary/10 hover:bg-primary border border-primary/25 hover:border-primary text-primary hover:text-primary-foreground text-xs font-black transition-all">
+                            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-primary hover:bg-primary border border-primary/25 hover:border-primary text-primary hover:text-primary-foreground text-xs font-black transition-all">
                             <GraduationCap className="w-3.5 h-3.5" />
                             Practice
                           </Link>
@@ -295,7 +295,7 @@ export function Openings() {
                   <div className="flex items-start justify-between gap-3 mb-3">
                     <div className="flex-1 min-w-0">
                       {o.eco && (
-                        <span className="inline-block px-2 py-0.5 rounded-xl text-[10px] font-black bg-primary/15 text-primary border border-primary/25 mb-1.5">
+                        <span className="inline-block px-2 py-0.5 rounded-xl text-[10px] font-black bg-primary text-primary-foreground border border-primary/25 mb-1.5">
                           {o.eco}
                         </span>
                       )}

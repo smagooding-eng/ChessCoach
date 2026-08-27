@@ -54,20 +54,20 @@ interface OpponentResult {
 }
 
 const SEV_STYLES: Record<string, string> = {
-  Critical: 'bg-red-500/15 text-red-400 border-red-500/30',
-  High:     'bg-orange-500/15 text-orange-400 border-orange-500/30',
-  Medium:   'bg-amber-500/15 text-amber-400 border-amber-500/30',
-  Low:      'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
+  Critical: 'bg-red-500 text-white',
+  High:     'bg-orange-500 text-white',
+  Medium:   'bg-amber-500 text-white',
+  Low:      'bg-emerald-500 text-white',
 };
 
 const TITLE_COLORS: Record<string, string> = {
-  GM: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/40',
-  IM: 'bg-orange-500/20 text-orange-400 border-orange-500/40',
-  FM: 'bg-blue-500/20 text-blue-400 border-blue-500/40',
-  CM: 'bg-green-500/20 text-green-400 border-green-500/40',
-  NM: 'bg-purple-500/20 text-purple-400 border-purple-500/40',
-  WGM: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/40',
-  WIM: 'bg-orange-500/20 text-orange-400 border-orange-500/40',
+  GM: 'bg-yellow-500 text-black',
+  IM: 'bg-orange-500 text-white',
+  FM: 'bg-blue-500 text-white',
+  CM: 'bg-green-500 text-white',
+  NM: 'bg-purple-500 text-white',
+  WGM: 'bg-yellow-500 text-black',
+  WIM: 'bg-orange-500 text-white',
 };
 
 type CourseGenState = 'idle' | 'generating' | 'done' | 'error';
@@ -467,7 +467,7 @@ export function OpponentAnalysis() {
         <motion.div
           initial={{ opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}
-          className="p-4 rounded-xl bg-primary/8 border border-primary/20 text-primary flex items-center gap-3"
+          className="p-4 rounded-xl bg-primary border border-primary/20 text-primary-foreground flex items-center gap-3"
         >
           <Loader2 className="w-4 h-4 animate-spin shrink-0" />
           <span className="text-sm">{statusMsg}</span>
@@ -618,7 +618,8 @@ export function OpponentAnalysis() {
                       setTimeout(() => setChallengeCopied(false), 2500);
                     } catch { /* nothing more we can do */ }
                   }}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl transition-colors text-sm font-bold border border-border/60 hover:border-border"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl transition-transform active:scale-95 text-sm font-black"
+                  style={{ background: 'linear-gradient(180deg, #a8d876 0%, #81b64c 55%, #5f8f36 100%)', color: '#fff', boxShadow: '0 3px 0 #4a7028, 0 6px 12px rgba(0,0,0,0.3)' }}
                 >
                   <Send className="w-4 h-4" />
                   {challengeCopied ? 'Link copied!' : `Send ${result.username} their own report`}
@@ -774,7 +775,7 @@ export function OpponentAnalysis() {
                 </div>
 
                 {/* Scout tip box */}
-                <div className="p-4 rounded-xl bg-primary/10 border border-primary/20">
+                <div className="p-4 rounded-xl bg-primary border border-primary/20">
                   <div className="flex gap-2">
                     <Target className="w-4 h-4 text-primary mt-0.5 shrink-0" />
                     <div>
@@ -797,7 +798,7 @@ export function OpponentAnalysis() {
             >
               <div className="p-5 flex flex-col sm:flex-row items-start sm:items-center gap-4">
                 <div className="flex items-center gap-3 flex-1 min-w-0">
-                  <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center shrink-0">
+                  <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center shrink-0">
                     <GraduationCap className="w-5 h-5 text-primary" />
                   </div>
                   <div className="min-w-0">
@@ -869,7 +870,7 @@ export function OpponentAnalysis() {
                 <div className="px-5 pb-4 pt-0">
                   <div className="flex flex-wrap gap-2">
                     {result.weaknesses.slice(0, 3).map((w, i) => (
-                      <span key={i} className="px-2.5 py-1 rounded-xl bg-primary/10 text-primary text-xs font-bold">
+                      <span key={i} className="px-2.5 py-1 rounded-xl bg-primary text-primary-foreground text-xs font-bold">
                         vs {result.username}: Exploit {w.category}
                       </span>
                     ))}

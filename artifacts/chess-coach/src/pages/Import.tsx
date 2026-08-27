@@ -181,7 +181,7 @@ export function Import() {
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="max-w-2xl mx-auto mt-4 md:mt-10 px-4 md:px-0">
       <div className="glass-card rounded-xl p-8 md:p-10 text-center relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-primary/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
+        <div className="absolute top-0 right-0 w-64 h-64 bg-primary rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
 
         <div className="flex justify-center mb-4">
           <PieceTile piece="♟" size={56} />
@@ -204,7 +204,7 @@ export function Import() {
             className={cn(
               'flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm transition-all border',
               platform === 'chesscom'
-                ? 'bg-primary/15 border-primary/40 text-primary shadow-sm'
+                ? 'bg-primary border-primary/40 text-primary-foreground shadow-sm'
                 : 'bg-secondary/50 border-border text-muted-foreground hover:text-foreground hover:bg-secondary/70'
             )}
           >
@@ -216,7 +216,7 @@ export function Import() {
             className={cn(
               'flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm transition-all border',
               platform === 'lichess'
-                ? 'bg-primary/15 border-primary/40 text-primary shadow-sm'
+                ? 'bg-primary border-primary/40 text-primary-foreground shadow-sm'
                 : 'bg-secondary/50 border-border text-muted-foreground hover:text-foreground hover:bg-secondary/70'
             )}
           >

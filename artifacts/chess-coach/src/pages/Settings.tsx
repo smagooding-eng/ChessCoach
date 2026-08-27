@@ -17,8 +17,8 @@ function SwatchButton({ active, onClick, children, label }: { active: boolean; o
       onClick={onClick}
       className="flex flex-col items-center gap-2 p-3 rounded-xl transition-all"
       style={{
-        background: active ? 'rgba(129,182,76,0.12)' : 'rgba(255,255,255,0.03)',
-        border: active ? `1.5px solid ${CHESSCOM_GREEN}` : '1px solid rgba(255,255,255,0.08)',
+        background: active ? 'rgba(129,182,76,0.35)' : 'rgba(255,255,255,0.05)',
+        border: active ? `1.5px solid ${CHESSCOM_GREEN}` : '1px solid rgba(255,255,255,0.1)',
       }}
     >
       {children}

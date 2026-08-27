@@ -907,7 +907,7 @@ export function GameReplay() {
       </Link>
 
       {game.opening && (
-        <div className="flex glass-card rounded-xl px-4 py-2 md:px-5 md:py-2.5 items-center gap-2 md:gap-3 border border-primary/20 bg-primary/5 shrink-0 order-2 xl:order-none">
+        <div className="flex glass-card rounded-xl px-4 py-2 md:px-5 md:py-2.5 items-center gap-2 md:gap-3 border border-primary/20 bg-primary shrink-0 order-2 xl:order-none">
           <BookOpen className="w-4 h-4 text-primary shrink-0" />
           <span className="text-xs font-bold text-primary/70">{game.eco}</span>
           <span className="font-bold text-xs md:text-sm truncate">{game.opening}</span>
@@ -1049,7 +1049,7 @@ export function GameReplay() {
                 disabled={reviewing || reviewMoves.length > 0}
                 className={`p-2.5 md:px-3 md:py-2 rounded-xl text-xs font-bold transition-colors border flex items-center gap-1 md:gap-1.5 active:scale-90
                   ${reviewMoves.length > 0
-                    ? 'bg-primary/30 text-primary border-primary/60'
+                    ? 'bg-primary/30 text-primary-foreground border-primary/60'
                     : 'bg-secondary border-border hover:border-primary/40 hover:text-primary disabled:opacity-50'}`}>
                 {reviewing
                   ? <div className="w-5 h-5 md:w-3.5 md:h-3.5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
@@ -1198,7 +1198,7 @@ export function GameReplay() {
 
             return (
               <div className="space-y-3">
-                <div className="glass-card rounded-xl px-4 py-4 border border-primary/30 bg-primary/5 flex flex-col gap-3">
+                <div className="glass-card rounded-xl px-4 py-4 border border-primary/30 bg-primary flex flex-col gap-3">
                   <div className="flex items-center gap-3">
                     <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin shrink-0" />
                     <div className="flex-1 min-w-0">
@@ -1360,7 +1360,7 @@ export function GameReplay() {
 
           {/* Start position prompt / Review Game CTA */}
           {currentMove === 0 && reviewMoves.length === 0 && !reviewing && (
-            <div className="glass-card rounded-xl px-4 py-4 border border-primary/20 bg-primary/5 flex flex-col sm:flex-row items-start sm:items-center gap-3 justify-between">
+            <div className="glass-card rounded-xl px-4 py-4 border border-primary/20 bg-primary flex flex-col sm:flex-row items-start sm:items-center gap-3 justify-between">
               <div className="flex items-start gap-3">
                 <BrainCircuit className="w-5 h-5 text-primary shrink-0 mt-0.5" />
                 <div>
@@ -1489,7 +1489,7 @@ export function GameReplay() {
             <div
               onClick={() => { setCurrentMove(0); setPracticeMode(false); }}
               className={`px-3 py-1.5 rounded-xl text-xs cursor-pointer transition-colors mb-1
-                ${currentMove === 0 ? 'bg-primary/20 text-primary font-bold' : 'hover:bg-white/5 text-muted-foreground'}`}
+                ${currentMove === 0 ? 'bg-primary/20 text-primary-foreground font-bold' : 'hover:bg-white/5 text-muted-foreground'}`}
             >
               Start
             </div>

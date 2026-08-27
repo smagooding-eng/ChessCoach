@@ -230,7 +230,7 @@ export function WeaknessDetail() {
                   <span className="text-xs text-muted-foreground leading-tight">example<br/>games</span>
                 </div>
                 {relatedCourses.length > 0 && (
-                  <div className="px-4 py-2 rounded-xl border border-primary/20 bg-primary/8 flex items-center gap-2">
+                  <div className="px-4 py-2 rounded-xl border border-primary/20 bg-primary flex items-center gap-2">
                     <span className="text-2xl font-black text-primary">{relatedCourses.length}</span>
                     <span className="text-xs text-muted-foreground leading-tight">courses<br/>available</span>
                   </div>
@@ -351,7 +351,7 @@ export function WeaknessDetail() {
             {(examplesWithLinks ?? weakness.examples.map(text => ({ text, gameIds: [] }))).map((ex, i) => (
               <div key={i} className="rounded-xl bg-secondary/40 border border-white/6 overflow-hidden">
                 <div className="flex items-start gap-3 p-4">
-                  <span className="w-7 h-7 rounded-xl bg-amber-500/20 border border-amber-500/30 text-amber-400 text-sm font-black flex items-center justify-center shrink-0">
+                  <span className="w-7 h-7 rounded-xl bg-amber-500/20 border bg-amber-500 text-white text-sm font-black flex items-center justify-center shrink-0">
                     {i + 1}
                   </span>
                   <p className="text-sm text-foreground/85 leading-relaxed">{ex.text}</p>
@@ -360,7 +360,7 @@ export function WeaknessDetail() {
                   <div className="flex flex-wrap gap-2 px-4 pb-3 ml-10">
                     {ex.gameIds.map((gameId, gi) => (
                       <Link key={gameId} href={`/games/${gameId}`}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary/10 hover:bg-primary border border-primary/25 hover:border-primary text-primary hover:text-primary-foreground text-xs font-bold transition-all">
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary hover:bg-primary border border-primary/25 hover:border-primary text-primary hover:text-primary-foreground text-xs font-bold transition-all">
                         <Play className="w-3 h-3" />
                         View Game {gi + 1}
                       </Link>
@@ -381,7 +381,7 @@ export function WeaknessDetail() {
         className="glass-card rounded-xl p-6"
       >
         <h2 className="text-xl font-black mb-5 flex items-center gap-2.5">
-          <div className="p-2 rounded-xl bg-primary/15 border border-primary/30">
+          <div className="p-2 rounded-xl bg-primary border border-primary/30">
             <GraduationCap className="w-5 h-5 text-primary" />
           </div>
           Courses for This Weakness
@@ -393,7 +393,7 @@ export function WeaknessDetail() {
               const pct2 = Math.round((course.completedLessons / course.totalLessons) * 100) || 0;
               return (
                 <Link key={course.id} href={`/courses/${course.id}`}>
-                  <div className="flex items-center gap-4 rounded-xl border border-white/6 bg-secondary/30 px-4 py-4 hover:border-primary/40 hover:bg-primary/5 transition-all group cursor-pointer">
+                  <div className="flex items-center gap-4 rounded-xl border border-white/6 bg-secondary/30 px-4 py-4 hover:border-primary/40 hover:bg-primary transition-all group cursor-pointer">
                     <div className="flex-1 min-w-0">
                       <div className="font-bold text-base truncate group-hover:text-primary transition-colors">{course.title}</div>
                       <div className="flex items-center gap-2.5 mt-1.5">
@@ -462,7 +462,7 @@ export function WeaknessDetail() {
                   transition={{ delay: 0.2 + i * 0.06 }}
                 >
                   <Link href={`/games/${game.id}`}>
-                    <div className="flex gap-3 rounded-xl bg-secondary/40 border border-white/6 p-3 hover:border-primary/40 hover:bg-primary/5 transition-all group cursor-pointer">
+                    <div className="flex gap-3 rounded-xl bg-secondary/40 border border-white/6 p-3 hover:border-primary/40 hover:bg-primary transition-all group cursor-pointer">
                       {/* Mini board */}
                       <div className="shrink-0 w-[100px] h-[100px] rounded-xl overflow-hidden border-2 border-white/8 group-hover:border-primary/40 transition-colors pointer-events-none">
                         <Chessboard
