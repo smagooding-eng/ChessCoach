@@ -305,6 +305,15 @@ export function MistakeFixView({
         <p className="hidden md:block text-[10px] text-white/40 text-center px-2 leading-snug mt-1.5">
           {current.caption}
         </p>
+
+        {/* Invisible spacer reserving the combined height of what the
+            good-move view has here that this view has zero equivalent
+            of: two MaterialStrip rows (18px each, minHeight from
+            GameStatusStrip.tsx) plus the EvalBar (h-5 = 20px). Without
+            this, MistakeFixView's total rendered height falls short of
+            the good-move view's, and the board shifts position when
+            switching between good and bad moves. */}
+        <div aria-hidden className="h-[56px] mt-1.5 md:mt-2 invisible" />
       </div>
     </div>
   );
