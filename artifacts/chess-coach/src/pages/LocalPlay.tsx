@@ -2,7 +2,6 @@ import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { PageHero } from '@/components/DesignSystem';
 import { Chess } from 'chess.js';
 import { ChessBoard } from '@/components/ChessBoard';
-import { useSettings } from '@/context/SettingsContext';
 import { MaterialStrip } from '@/components/GameStatusStrip';
 import { motion, AnimatePresence } from 'framer-motion';
 import { RotateCcw, Flag, Clock, Play, ArrowLeft, Trophy, Handshake, Hand } from 'lucide-react';
@@ -35,7 +34,6 @@ interface MoveRecord {
 }
 
 export function LocalPlay() {
-  const { confirmMoves } = useSettings();
   const [timeControl, setTimeControl] = useState<TimeControl | null>(null);
   const [gameStarted, setGameStarted] = useState(false);
   const [chess] = useState(() => new Chess());
@@ -166,22 +164,16 @@ export function LocalPlay() {
       return;
     }
 
-    // Timed games: when Confirm Moves is on, the clock doubles as the
-    // confirmation step -- the mover's own clock keeps running until
-    // they tap it to submit, same as a real physical chess clock. When
-    // the setting is off, the clock just auto-advances immediately on
-    // move, no extra tap needed. Untimed games have no clock at all, so
-    // they use ChessBoard's own generic confirm-move overlay instead
-    // (see suppressConfirmMoves={hasTimer} below).
-    if (hasTimer) {
-      if (confirmMoves) {
-        setClockActive(moverColor);
-        setAwaitingSubmit(true);
-      } else {
-        setClockActive(moverColor === 'w' ? 'b' : 'w');
-      }
-    }
-  }, [chess, hasTimer, confirmMoves]);
+    // Local Play always requires an explicit tap to pass the turn --
+    // timed or not -- since this is a shared-device pass-and-play mode
+    // where the app has no other way to know when someone's done moving
+    // and handing the device to the other player. This replaces the
+    // generic Confirm Moves setting entirely for this mode (that
+    // setting's own overlay is always suppressed here -- see
+    // suppressConfirmMoves below).
+    setClockActive(moverColor);
+    setAwaitingSubmit(true);
+  }, [chess]);
 
   const submitClock = (side: 'w' | 'b') => {
     if (result !== 'playing' || !awaitingSubmit) return;
@@ -238,18 +230,22 @@ export function LocalPlay() {
     });
   }
 
-  // A clock renders as an actionable button once it's the side that
-  // needs to submit -- tapping it stops your time and starts theirs.
-  // Styled like the chess-clock paddle buttons used for Confirm Move
-  // elsewhere in the app: chunky, physical-feeling, strong drop shadow.
-  // Captured material for that side renders as a horizontal strip under
-  // the time, inside the same button.
+  // A clock/turn paddle renders as an actionable button once it's the
+  // side that needs to submit -- tapping it passes the turn. For timed
+  // games this also stops/starts the actual countdown; for untimed
+  // games it's the same button and the same tap-to-confirm mechanism,
+  // just with no time number to show. Styled like the chess-clock
+  // paddle buttons used for Confirm Move elsewhere in the app: chunky,
+  // physical-feeling, strong drop shadow. Captured material for that
+  // side renders as a horizontal strip under the label, inside the same
+  // button.
   function ClockButton({ side }: { side: 'w' | 'b' }) {
     const isActive = clockActive === side && result === 'playing';
-    const canSubmit = isActive && awaitingSubmit && clockStarted;
-    // White's clock before the game has started ticking -- tapping it
-    // here starts the game clock rather than submitting a move.
-    const needsStart = side === 'w' && !clockStarted && result === 'playing';
+    const canSubmit = isActive && awaitingSubmit && (!hasTimer || clockStarted);
+    // White's clock before a timed game has started ticking -- tapping
+    // it here starts the game clock rather than submitting a move.
+    // Untimed games have no clock to start, so this never applies there.
+    const needsStart = hasTimer && side === 'w' && !clockStarted && result === 'playing';
     const isTappable = canSubmit || needsStart;
     const time = side === 'w' ? whiteTime : blackTime;
     return (
@@ -275,7 +271,13 @@ export function LocalPlay() {
         <span className={cn('font-normal block opacity-80', fullscreen ? 'text-sm mb-0.5' : 'text-[10px]')}>
           {needsStart ? 'Tap to start' : (side === 'w' ? 'White' : 'Black')}
         </span>
-        <span className={fullscreen ? 'text-4xl' : 'text-lg'}>{formatClock(time)}</span>
+        {hasTimer ? (
+          <span className={fullscreen ? 'text-4xl' : 'text-lg'}>{formatClock(time)}</span>
+        ) : (
+          <span className={fullscreen ? 'text-2xl' : 'text-base'}>
+            {canSubmit ? 'Tap to pass turn' : 'Waiting…'}
+          </span>
+        )}
         {isTappable && <Hand className={cn('inline ml-2', fullscreen ? 'w-6 h-6 -mt-3' : 'w-3.5 h-3.5 -mt-1')} />}
         {fullscreen && (
           <div className="mt-1">
@@ -316,7 +318,7 @@ export function LocalPlay() {
         {/* Black's side — rotated 180° so the player across can read it */}
         <div className="w-full rotate-180">
           <div className="flex items-center gap-2 w-full">
-            {hasTimer && <ClockButton side="b" />}
+            <ClockButton side="b" />
             {result === 'playing' && (
               <button
                 onClick={() => resign('b')}
@@ -334,15 +336,7 @@ export function LocalPlay() {
                 <Flag className={fullscreen ? 'w-5 h-5' : 'w-3.5 h-3.5'} /> Resign
               </button>
             )}
-            {!hasTimer && result === 'playing' && chess.turn() === 'b' && (
-              <span className="text-xs text-primary font-medium ml-auto">Your turn</span>
-            )}
           </div>
-          {!hasTimer && fullscreen && (
-            <div className="mt-1">
-              <MaterialStrip fen={fen} color="b" />
-            </div>
-          )}
         </div>
 
         {hasTimer && !clockStarted && result === 'playing' && (
@@ -351,9 +345,9 @@ export function LocalPlay() {
           </p>
         )}
 
-        {hasTimer && clockStarted && awaitingSubmit && result === 'playing' && (
+        {(!hasTimer || clockStarted) && awaitingSubmit && result === 'playing' && (
           <p className="text-[11px] text-primary font-medium -mt-1" style={{ transform: clockActive === 'b' ? 'scaleY(-1)' : undefined }}>
-            {clockActive === 'w' ? 'White' : 'Black'}: tap your clock to pass the turn
+            {clockActive === 'w' ? 'White' : 'Black'}: tap your {hasTimer ? 'clock' : 'button'} to pass the turn
           </p>
         )}
 
@@ -373,14 +367,14 @@ export function LocalPlay() {
             practiceMode={result === 'playing' && (!hasTimer || clockStarted)}
             onMovePlayed={handleMove}
             maxWidthOverride={fullscreen ? 'min(100vw, 62vh)' : undefined}
-            suppressConfirmMoves={hasTimer}
+            suppressConfirmMoves
           />
         </div>
 
         {/* White's side — normal orientation */}
         <div className="w-full">
           <div className="flex items-center gap-2 w-full">
-            {hasTimer && <ClockButton side="w" />}
+            <ClockButton side="w" />
             {result === 'playing' && (
               <button
                 onClick={() => resign('w')}
@@ -398,15 +392,7 @@ export function LocalPlay() {
                 <Flag className={fullscreen ? 'w-5 h-5' : 'w-3.5 h-3.5'} /> Resign
               </button>
             )}
-            {!hasTimer && result === 'playing' && chess.turn() === 'w' && (
-              <span className="text-xs text-primary font-medium ml-auto">Your turn</span>
-            )}
           </div>
-          {!hasTimer && fullscreen && (
-            <div className="mt-1">
-              <MaterialStrip fen={fen} color="w" />
-            </div>
-          )}
         </div>
 
         {/* Game over banner */}
