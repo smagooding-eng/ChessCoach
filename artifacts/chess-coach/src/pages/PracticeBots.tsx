@@ -254,7 +254,24 @@ function GameView({ bot, onBack, startFen, startColor, isOnboarding }: { bot: Bo
     botTimeoutRef.current = setTimeout(async () => {
       if (gameIdRef.current !== currentGameId) return;
       const fenBefore = chess.fen();
-      const move = await getBotMove(fenBefore, bot);
+      let move: string | null = null;
+      try {
+        move = await getBotMove(fenBefore, bot);
+      } catch (err) {
+        // A thrown error here previously propagated up through the
+        // pending state update and crashed the whole page (visible as
+        // "Something went wrong" / React error #310, since the
+        // component would then re-render with a different hook count
+        // during error recovery). Falling back to a random legal move
+        // keeps the game playable instead of crashing.
+        console.error('Bot move calculation failed, falling back to a random legal move', err);
+        try {
+          const legalMoves = chess.moves();
+          move = legalMoves.length > 0 ? legalMoves[Math.floor(Math.random() * legalMoves.length)] : null;
+        } catch {
+          move = null;
+        }
+      }
       // The search yields internally, so re-check nothing changed underneath
       // it (e.g. the user reset the game or navigated away) before applying
       // the move.
@@ -725,7 +742,7 @@ function OpeningTrainerView({ opening, onBack }: { opening: OpeningLine; onBack:
           <div className="glass-card rounded-xl p-3 flex items-center justify-between gap-3">
             <div className="flex items-center gap-2 min-w-0">
               <div className="w-9 h-9 rounded-xl bg-primary border border-primary/30 flex items-center justify-center shrink-0">
-                <BookOpen className="w-4 h-4 text-primary" />
+                <BookOpen className="w-4 h-4 text-primary-foreground" />
               </div>
               <div className="min-w-0">
                 <p className="font-bold text-sm truncate">{opening.name}</p>
@@ -903,7 +920,7 @@ function OpeningCard({ opening, onSelect }: { opening: OpeningLine; onSelect: (o
     >
       <div className="flex items-center justify-between">
         <div className="w-10 h-10 rounded-xl bg-primary border border-primary/30 flex items-center justify-center">
-          <BookOpen className="w-5 h-5 text-primary" />
+          <BookOpen className="w-5 h-5 text-primary-foreground" />
         </div>
         <span className="text-xs font-bold px-2.5 py-1 rounded-xl bg-black/30 border border-white/10 text-white/80">
           {opening.eco}

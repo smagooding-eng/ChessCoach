@@ -621,6 +621,17 @@ export function GameReplay() {
   // bespoke stepper widget living inside MistakeFixView itself.
   const [mistakeSlide, setMistakeSlide] = useState<0 | 1>(0);
   const [engineStep, setEngineStep] = useState(0);
+  // Reset the mistake-view slide and engine-line step whenever the
+  // selected move changes -- always start back on "what you played".
+  // This must run unconditionally on every render, before any early
+  // return below (loading/error states) -- putting it after those
+  // returns caused a different number of hooks to run depending on
+  // whether the game had loaded yet, which is a hard React error
+  // (#310), not just a logic bug.
+  useEffect(() => {
+    setMistakeSlide(0);
+    setEngineStep(0);
+  }, [currentMove]);
   const [isPlaying, setIsPlaying]     = useState(false);
   const [flipped, setFlipped]         = useState(false);
   const [practiceMode, setPracticeMode] = useState(false);
@@ -906,13 +917,6 @@ export function GameReplay() {
   const cfg = currentReview ? CLASS_CFG[currentReview.classification] : null;
   const isBad = currentReview && ['inaccuracy', 'mistake', 'blunder', 'missed_win'].includes(currentReview.classification);
 
-  // Reset the mistake-view slide and engine-line step whenever the
-  // selected move changes -- always start back on "what you played".
-  useEffect(() => {
-    setMistakeSlide(0);
-    setEngineStep(0);
-  }, [currentMove]);
-
   return (
     <div className="gap-2 md:gap-3 px-3 pt-3 md:px-0 md:pt-0 pb-2 md:pb-0 h-[calc(100dvh-8rem)] md:h-[calc(100vh-3.5rem)] xl:h-[calc(100vh-3rem)] flex flex-col overflow-hidden">
       <Link href="/games" className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors text-sm shrink-0 order-3 xl:order-none">
@@ -921,9 +925,9 @@ export function GameReplay() {
 
       {game.opening && (
         <div className="flex glass-card rounded-xl px-4 py-2 md:px-5 md:py-2.5 items-center gap-2 md:gap-3 border border-primary/20 bg-primary shrink-0 order-2 xl:order-none">
-          <BookOpen className="w-4 h-4 text-primary shrink-0" />
-          <span className="text-xs font-bold text-primary/70">{game.eco}</span>
-          <span className="font-bold text-xs md:text-sm truncate">{game.opening}</span>
+          <BookOpen className="w-4 h-4 text-primary-foreground shrink-0" />
+          <span className="text-xs font-bold text-primary-foreground/70">{game.eco}</span>
+          <span className="font-bold text-xs md:text-sm truncate text-primary-foreground">{game.opening}</span>
         </div>
       )}
 
@@ -1398,15 +1402,15 @@ export function GameReplay() {
           {currentMove === 0 && reviewMoves.length === 0 && !reviewing && (
             <div className="glass-card rounded-xl px-4 py-4 border border-primary/20 bg-primary flex flex-col sm:flex-row items-start sm:items-center gap-3 justify-between">
               <div className="flex items-start gap-3">
-                <BrainCircuit className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+                <BrainCircuit className="w-5 h-5 text-primary-foreground shrink-0 mt-0.5" />
                 <div>
-                  <p className="text-sm font-bold text-foreground">Review this game with the coach</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">Get instant analysis for every move — classifications, explanations, and better alternatives.</p>
+                  <p className="text-sm font-bold text-primary-foreground">Review this game with the coach</p>
+                  <p className="text-xs text-primary-foreground/70 mt-0.5">Get instant analysis for every move — classifications, explanations, and better alternatives.</p>
                 </div>
               </div>
               <button
                 onClick={() => handleReview(false)}
-                className="shrink-0 flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-bold hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20">
+                className="shrink-0 flex items-center gap-2 px-4 py-2 rounded-xl bg-secondary text-foreground text-sm font-bold hover:bg-secondary/80 transition-colors shadow-lg">
                 <Sparkles className="w-4 h-4" />
                 Review Game
               </button>

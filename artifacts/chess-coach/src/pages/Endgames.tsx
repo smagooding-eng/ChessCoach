@@ -219,7 +219,7 @@ export function Endgames() {
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
               <div className="flex items-start gap-3">
                 <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center shrink-0">
-                  <currentTab.icon className="w-5 h-5 text-primary" />
+                  <currentTab.icon className="w-5 h-5 text-primary-foreground" />
                 </div>
                 <div>
                   <h2 className="font-bold text-lg">{currentTab.label}</h2>

@@ -231,8 +231,8 @@ export function WeaknessDetail() {
                 </div>
                 {relatedCourses.length > 0 && (
                   <div className="px-4 py-2 rounded-xl border border-primary/20 bg-primary flex items-center gap-2">
-                    <span className="text-2xl font-black text-primary">{relatedCourses.length}</span>
-                    <span className="text-xs text-muted-foreground leading-tight">courses<br/>available</span>
+                    <span className="text-2xl font-black text-primary-foreground">{relatedCourses.length}</span>
+                    <span className="text-xs text-primary-foreground/70 leading-tight">courses<br/>available</span>
                   </div>
                 )}
               </div>
@@ -382,7 +382,7 @@ export function WeaknessDetail() {
       >
         <h2 className="text-xl font-black mb-5 flex items-center gap-2.5">
           <div className="p-2 rounded-xl bg-primary border border-primary/30">
-            <GraduationCap className="w-5 h-5 text-primary" />
+            <GraduationCap className="w-5 h-5 text-primary-foreground" />
           </div>
           Courses for This Weakness
         </h2>
@@ -395,13 +395,13 @@ export function WeaknessDetail() {
                 <Link key={course.id} href={`/courses/${course.id}`}>
                   <div className="flex items-center gap-4 rounded-xl border border-white/6 bg-secondary/30 px-4 py-4 hover:border-primary/40 hover:bg-primary transition-all group cursor-pointer">
                     <div className="flex-1 min-w-0">
-                      <div className="font-bold text-base truncate group-hover:text-primary transition-colors">{course.title}</div>
+                      <div className="font-bold text-base truncate group-hover:text-primary-foreground transition-colors">{course.title}</div>
                       <div className="flex items-center gap-2.5 mt-1.5">
                         <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${diffColor(course.difficulty)}`}>
                           {course.difficulty.toUpperCase()}
                         </span>
-                        <span className="text-xs text-muted-foreground">{course.totalLessons} lessons</span>
-                        {pct2 > 0 && <span className="text-xs text-primary font-bold">{pct2}% complete</span>}
+                        <span className="text-xs text-muted-foreground group-hover:text-primary-foreground/80 transition-colors">{course.totalLessons} lessons</span>
+                        {pct2 > 0 && <span className="text-xs text-primary font-bold group-hover:text-primary-foreground transition-colors">{pct2}% complete</span>}
                       </div>
                       <div className="mt-2.5 h-1.5 rounded-full bg-white/6 overflow-hidden">
                         <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${pct2}%` }} />

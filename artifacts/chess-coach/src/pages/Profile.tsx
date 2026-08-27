@@ -1246,7 +1246,7 @@ function AdminTicker() {
           </button>
           <div className="p-4 text-center">
             <div className="w-8 h-8 bg-primary rounded-xl flex items-center justify-center mx-auto mb-2">
-              <CreditCard className="w-4 h-4 text-primary" />
+              <CreditCard className="w-4 h-4 text-primary-foreground" />
             </div>
             <p className="text-xl font-black text-foreground">{stats.subscriptions.total.toLocaleString()}</p>
             <p className="text-xs text-muted-foreground font-medium">Subscriptions</p>
@@ -1522,7 +1522,7 @@ export function ReferralCard({ isPremium, compact = false }: { isPremium: boolea
         {!isPremium || !data?.isPaid ? (
           <div className="text-center py-4">
             <div className="w-12 h-12 bg-primary rounded-xl flex items-center justify-center mx-auto mb-3">
-              <Crown className="w-6 h-6 text-primary" />
+              <Crown className="w-6 h-6 text-primary-foreground" />
             </div>
             <p className="text-sm font-bold text-foreground mb-1">Unlock Referrals</p>
             <p className="text-xs text-muted-foreground mb-3">

@@ -165,8 +165,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
-      <header className="md:hidden sticky top-0 z-50">
-        <div className="flex items-center justify-between px-4 h-12" style={{ background: `${BG_SIDEBAR}f5`, borderBottom: `1px solid ${BORDER_COLOR}`, backdropFilter: 'blur(16px)' }}>
+      <header className="md:hidden sticky top-0 z-50 top-nav-safe" style={{ background: `${BG_SIDEBAR}f5` }}>
+        <div className="flex items-center justify-between px-4 h-12" style={{ borderBottom: `1px solid ${BORDER_COLOR}`, backdropFilter: 'blur(16px)' }}>
           <Link href="/" className="flex items-center gap-2 active:opacity-70 transition-opacity">
             <img src={`${import.meta.env.BASE_URL}images/logo.svg`} alt="ChessScout.net" className="w-6 h-6 object-contain" />
             <span className="font-black text-gradient text-sm">ChessScout.net</span>

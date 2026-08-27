@@ -289,7 +289,7 @@ export async function getBotMove(fen: string, bot: BotConfig): Promise<string | 
     // fully block rendering/input for its whole duration — previously this
     // ran as one uninterrupted synchronous block.
     i++;
-    if (i % 4 === 0) {
+    if (i % 2 === 0) {
       await new Promise(resolve => setTimeout(resolve, 0));
     }
   }

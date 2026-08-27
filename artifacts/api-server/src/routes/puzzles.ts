@@ -207,11 +207,25 @@ router.get("/puzzles/next", requireAuth, async (req: Request, res: Response) => 
             const to = uci.slice(2, 4);
             const promotion = uci.length > 4 ? uci[4] : undefined;
             if (i > 0) {
-              // Check this solving move's piece BEFORE applying it.
+              // Check this solving move's piece BEFORE applying it, and
+              // confirm it's an actual sacrifice -- not just a move of
+              // the right piece type, but that piece landing on a square
+              // where the opponent's immediate next move recaptures it.
+              // Checking only "does this piece type move somewhere in
+              // the solution" (the earlier version) matched puzzles
+              // where e.g. a queen simply relocates or delivers the
+              // final mate, even when the piece actually given up
+              // earlier in the line was a rook.
               const piece = replay.get(from as any);
               if (piece?.type === targetPiece) {
-                found = true;
-                break;
+                const nextUci = rawMoves[i + 1];
+                if (nextUci) {
+                  const nextTo = nextUci.slice(2, 4);
+                  if (nextTo === to) {
+                    found = true;
+                    break;
+                  }
+                }
               }
             }
             try {

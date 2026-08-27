@@ -454,7 +454,15 @@ export function LocalPlay() {
 
   if (fullscreen) {
     return (
-      <div className="fixed inset-0 z-[70] flex flex-col overflow-y-auto bg-background px-4 pt-4 pb-4">
+      <div
+        className="fixed inset-0 z-[70] flex flex-col overflow-y-auto bg-background px-4"
+        style={{
+          paddingTop: 'max(1rem, env(safe-area-inset-top))',
+          paddingBottom: 'max(1rem, env(safe-area-inset-bottom))',
+          paddingLeft: 'max(1rem, env(safe-area-inset-left))',
+          paddingRight: 'max(1rem, env(safe-area-inset-right))',
+        }}
+      >
         {gameContent}
       </div>
     );

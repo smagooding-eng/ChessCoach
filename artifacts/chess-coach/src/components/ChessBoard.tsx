@@ -287,6 +287,14 @@ export function ChessBoard({
         setPendingMove({ from, to, san, isCorrect, tempFen: chess.fen() });
         return true;
       }
+      if (import.meta.env.DEV || (typeof window !== 'undefined' && window.location.search.includes('debugConfirm'))) {
+        console.log('[ChessBoard] confirm-move check', {
+          confirmMoves: confirmMovesRef.current,
+          suppressConfirmMoves: suppressConfirmMovesRef.current,
+          expected,
+          wouldConfirm: confirmMovesRef.current && !suppressConfirmMovesRef.current && !expected,
+        });
+      }
       onMovePlayedRef.current?.(san, isCorrect);
       return true;
     } catch {
@@ -557,7 +565,7 @@ export function ChessBoard({
           <button
             onClick={cancelPendingMove}
             className="w-12 shrink-0 rounded-xl flex items-center justify-center transition-transform active:scale-95"
-            style={{ background: 'rgba(255,255,255,0.08)', color: '#e8e6e3', border: '1px solid rgba(255,255,255,0.15)' }}
+            style={{ background: 'rgba(255,255,255,0.35)', color: '#ffffff', border: '1px solid rgba(255,255,255,0.15)' }}
             title="Cancel"
           >
             <span className="text-base font-black">✕</span>

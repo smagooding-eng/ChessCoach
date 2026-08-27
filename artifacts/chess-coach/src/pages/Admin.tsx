@@ -905,8 +905,8 @@ function SubscribersPanel({ onClose }: { onClose: () => void }) {
     >
       <div className="px-4 py-3 bg-primary border-b border-primary/15 flex items-center justify-between sticky top-0 z-10">
         <div>
-          <p className="text-xs font-bold text-primary">Subscribers (from Stripe)</p>
-          <p className="text-[10px] text-muted-foreground">
+          <p className="text-xs font-bold text-primary-foreground">Subscribers (from Stripe)</p>
+          <p className="text-[10px] text-primary-foreground/70">
             {subscribers.length} customer{subscribers.length === 1 ? '' : 's'} · {formatSubCents(totalRevenueCents, subscribers[0]?.paidCurrency ?? 'usd')} total lifetime revenue
           </p>
         </div>
@@ -2170,7 +2170,7 @@ function AdminTicker() {
             className="p-4 text-center hover:bg-primary transition-colors cursor-pointer"
           >
             <div className="w-8 h-8 bg-primary rounded-xl flex items-center justify-center mx-auto mb-2">
-              <CreditCard className="w-4 h-4 text-primary" />
+              <CreditCard className="w-4 h-4 text-primary-foreground" />
             </div>
             <p className="text-xl font-black text-foreground">{stats.subscriptions.total.toLocaleString()}</p>
             <p className="text-xs text-muted-foreground font-medium underline decoration-dotted underline-offset-2">Subscriptions</p>

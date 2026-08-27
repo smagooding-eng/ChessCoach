@@ -777,10 +777,10 @@ export function OpponentAnalysis() {
                 {/* Scout tip box */}
                 <div className="p-4 rounded-xl bg-primary border border-primary/20">
                   <div className="flex gap-2">
-                    <Target className="w-4 h-4 text-primary mt-0.5 shrink-0" />
+                    <Target className="w-4 h-4 text-primary-foreground mt-0.5 shrink-0" />
                     <div>
-                      <p className="text-xs font-bold text-primary mb-1">Preparation Tip</p>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-xs font-bold text-primary-foreground mb-1">Preparation Tip</p>
+                      <p className="text-xs text-primary-foreground/75">
                         Target their highest-severity weaknesses early. Steer towards openings where they score poorly — that's your edge.
                       </p>
                     </div>
@@ -799,7 +799,7 @@ export function OpponentAnalysis() {
               <div className="p-5 flex flex-col sm:flex-row items-start sm:items-center gap-4">
                 <div className="flex items-center gap-3 flex-1 min-w-0">
                   <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center shrink-0">
-                    <GraduationCap className="w-5 h-5 text-primary" />
+                    <GraduationCap className="w-5 h-5 text-primary-foreground" />
                   </div>
                   <div className="min-w-0">
                     <p className="font-black text-sm">Generate Exploit Courses</p>
