@@ -2,6 +2,7 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { Chess } from 'chess.js';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChessBoard } from './ChessBoard';
+import { MaterialStrip, EvalBar } from './GameStatusStrip';
 import { normalizeFen, cn } from '@/lib/utils';
 import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight } from 'lucide-react';
 
@@ -126,10 +127,49 @@ export function MistakeFixView({
   // Slide state: 0 = "what you played", 1 = "engine recommends".
   // Default to the played side so the user sees their mistake first.
   const [slide, setSlide] = useState<0 | 1>(0);
+  // How many moves into bestLineSan the engine slide is currently
+  // showing (0 = just the first/recommended move, matching the
+  // original static behavior). Lets the user step through the engine's
+  // full suggested continuation move by move instead of only ever
+  // seeing the position after move one.
+  const [engineStep, setEngineStep] = useState(0);
+
+  // Computes the FEN after replaying prevFen + bestLineSan[0..step]
+  // (inclusive). Falls back gracefully to whatever's already valid if a
+  // move in the line can't be replayed for any reason.
+  const stepFen = useMemo(() => {
+    if (!better || bestLineSan.length === 0) return better?.resultFen ?? prevFen;
+    try {
+      const chess = new Chess(normalizeFen(prevFen));
+      for (let i = 0; i <= Math.min(engineStep, bestLineSan.length - 1); i++) {
+        chess.move(bestLineSan[i], { strict: false } as never);
+      }
+      return chess.fen();
+    } catch {
+      return better.resultFen;
+    }
+  }, [prevFen, bestLineSan, engineStep, better]);
+
+  const stepLastMove = useMemo(() => {
+    if (!better || bestLineSan.length === 0) return better ? { from: better.from, to: better.to } : null;
+    try {
+      const chess = new Chess(normalizeFen(prevFen));
+      let last: { from: string; to: string } | null = null;
+      const clampedStep = Math.min(engineStep, bestLineSan.length - 1);
+      for (let i = 0; i <= clampedStep; i++) {
+        const result = chess.move(bestLineSan[i], { strict: false } as never);
+        if (result) last = { from: result.from, to: result.to };
+      }
+      return last;
+    } catch {
+      return better ? { from: better.from, to: better.to } : null;
+    }
+  }, [prevFen, bestLineSan, engineStep, better]);
 
   // Reset to "what you played" whenever the underlying move changes
   useEffect(() => {
     setSlide(0);
+    setEngineStep(0);
   }, [prevFen, playedMove?.san, betterMoveText]);
 
   const slides = [
@@ -158,11 +198,13 @@ export function MistakeFixView({
       chipBg: 'bg-emerald-400/15',
       chipText: 'text-emerald-300',
       chipBorder: 'border-emerald-400/40',
-      moveSan: better?.san ?? null,
-      fen: better?.resultFen ?? prevFen,
-      lastMove: better ? { from: better.from, to: better.to } : null,
+      moveSan: bestLineSan.length > 0 ? bestLineSan[Math.min(engineStep, bestLineSan.length - 1)] : (better?.san ?? null),
+      fen: stepFen,
+      lastMove: stepLastMove,
       quality: 'best' as const,
-      caption: better ? "Position after engine's move" : 'No alternative available',
+      caption: better
+        ? (bestLineSan.length > 1 ? `Move ${Math.min(engineStep, bestLineSan.length - 1) + 1} of ${bestLineSan.length} in the engine's line` : "Position after engine's move")
+        : 'No alternative available',
       empty: !better,
     },
   ];
@@ -240,6 +282,10 @@ export function MistakeFixView({
           )}
         </div>
 
+        {!current.empty && (
+          <MaterialStrip fen={current.fen} color={flipped ? 'w' : 'b'} className="px-1" />
+        )}
+
         <div className="relative overflow-hidden rounded-xl">
           <AnimatePresence mode="wait" initial={false}>
             <motion.div
@@ -265,10 +311,10 @@ export function MistakeFixView({
                     flipped={flipped}
                     lastMove={current.lastMove}
                     moveQuality={current.quality}
-                    arrows={current.lastMove ? [{
+                    arrows={(current.key === 'engine' && current.lastMove) ? [{
                       from: current.lastMove.from,
                       to: current.lastMove.to,
-                      color: current.key === 'engine' ? 'rgba(52,211,153,0.9)' : 'rgba(248,113,113,0.9)',
+                      color: 'rgba(52,211,153,0.9)',
                     }] : undefined}
                   />
                 </div>
@@ -277,28 +323,49 @@ export function MistakeFixView({
           </AnimatePresence>
         </div>
 
-        {/* Engine continuation — shows the next few best moves AFTER the
-            recommended fix so the user can see how the line plays out.
-            Only on the engine slide. Height is always reserved (toggled
-            via visibility, not presence) since this block's content
-            length varies between mistakes -- some have a long suggested
+        {/* Engine continuation stepper — lets the user step through the
+            engine's suggested line move by move (the board above
+            updates to match via engineStep/stepFen). Only on the engine
+            slide. Height is always reserved (toggled via visibility,
+            not presence) since whether this shows and how much content
+            it has varies per mistake -- some have a long suggested
             continuation, some have none at all -- and letting it appear
             and disappear was causing everything below it to shift. */}
         <div
           className={cn(
-            'mt-2 rounded-lg border border-emerald-400/20 bg-emerald-400/[0.06] px-2.5 py-1.5 h-[52px]',
+            'mt-2 rounded-lg border border-emerald-400/20 bg-emerald-400/[0.06] px-2.5 py-1.5 h-[52px] flex items-center justify-between gap-2',
             (slide === 1 && bestLineSan.length > 1) ? '' : 'invisible',
           )}
         >
-          <div className="flex items-center gap-1.5 mb-1">
-            <CheckCircle2 className="w-3 h-3 text-emerald-400/80 shrink-0" />
-            <span className="text-[9px] font-black uppercase tracking-[0.14em] text-emerald-300/80">
-              Engine continuation
-            </span>
+          <button
+            type="button"
+            onClick={() => setEngineStep(s => Math.max(0, s - 1))}
+            disabled={engineStep === 0}
+            aria-label="Previous move in engine line"
+            className="shrink-0 w-6 h-6 rounded-md flex items-center justify-center text-emerald-300/80 hover:bg-emerald-400/15 disabled:opacity-25 disabled:hover:bg-transparent transition-colors"
+          >
+            <ChevronLeft className="w-3.5 h-3.5" />
+          </button>
+          <div className="flex-1 min-w-0 text-center">
+            <div className="flex items-center justify-center gap-1.5 mb-0.5">
+              <CheckCircle2 className="w-3 h-3 text-emerald-400/80 shrink-0" />
+              <span className="text-[9px] font-black uppercase tracking-[0.14em] text-emerald-300/80">
+                Engine continuation
+              </span>
+            </div>
+            <p className="font-mono text-[11px] text-emerald-100/85 leading-snug truncate">
+              {formatSanLine(prevFen, bestLineSan.slice(0, Math.min(engineStep, bestLineSan.length - 1) + 1))}
+            </p>
           </div>
-          <p className="font-mono text-[11px] text-emerald-100/85 leading-snug break-words line-clamp-1">
-            {formatSanLine(prevFen, bestLineSan)}
-          </p>
+          <button
+            type="button"
+            onClick={() => setEngineStep(s => Math.min(bestLineSan.length - 1, s + 1))}
+            disabled={engineStep >= bestLineSan.length - 1}
+            aria-label="Next move in engine line"
+            className="shrink-0 w-6 h-6 rounded-md flex items-center justify-center text-emerald-300/80 hover:bg-emerald-400/15 disabled:opacity-25 disabled:hover:bg-transparent transition-colors"
+          >
+            <ChevronRight className="w-3.5 h-3.5" />
+          </button>
         </div>
 
         {/* Caption — hidden on mobile to save vertical space; the tab toggle already labels the view */}
@@ -306,14 +373,12 @@ export function MistakeFixView({
           {current.caption}
         </p>
 
-        {/* Invisible spacer reserving the combined height of what the
-            good-move view has here that this view has zero equivalent
-            of: two MaterialStrip rows (18px each, minHeight from
-            GameStatusStrip.tsx) plus the EvalBar (h-5 = 20px). Without
-            this, MistakeFixView's total rendered height falls short of
-            the good-move view's, and the board shifts position when
-            switching between good and bad moves. */}
-        <div aria-hidden className="h-[56px] mt-1.5 md:mt-2 invisible" />
+        {!current.empty && (
+          <>
+            <MaterialStrip fen={current.fen} color={flipped ? 'b' : 'w'} className="px-1" />
+            <EvalBar fen={current.fen} />
+          </>
+        )}
       </div>
     </div>
   );
