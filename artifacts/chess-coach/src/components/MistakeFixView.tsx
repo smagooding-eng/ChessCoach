@@ -2,7 +2,7 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { Chess } from 'chess.js';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChessBoard } from './ChessBoard';
-import { normalizeFen } from '@/lib/utils';
+import { normalizeFen, cn } from '@/lib/utils';
 import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight } from 'lucide-react';
 
 type Classification =
@@ -277,21 +277,29 @@ export function MistakeFixView({
           </AnimatePresence>
         </div>
 
-        {/* Engine continuation — shows the next few best moves AFTER the recommended fix
-            so the user can see how the line plays out. Only on the engine slide. */}
-        {slide === 1 && bestLineSan.length > 1 && (
-          <div className="mt-2 rounded-lg border border-emerald-400/20 bg-emerald-400/[0.06] px-2.5 py-1.5">
-            <div className="flex items-center gap-1.5 mb-1">
-              <CheckCircle2 className="w-3 h-3 text-emerald-400/80 shrink-0" />
-              <span className="text-[9px] font-black uppercase tracking-[0.14em] text-emerald-300/80">
-                Engine continuation
-              </span>
-            </div>
-            <p className="font-mono text-[11px] text-emerald-100/85 leading-snug break-words">
-              {formatSanLine(prevFen, bestLineSan)}
-            </p>
+        {/* Engine continuation — shows the next few best moves AFTER the
+            recommended fix so the user can see how the line plays out.
+            Only on the engine slide. Height is always reserved (toggled
+            via visibility, not presence) since this block's content
+            length varies between mistakes -- some have a long suggested
+            continuation, some have none at all -- and letting it appear
+            and disappear was causing everything below it to shift. */}
+        <div
+          className={cn(
+            'mt-2 rounded-lg border border-emerald-400/20 bg-emerald-400/[0.06] px-2.5 py-1.5 h-[52px]',
+            (slide === 1 && bestLineSan.length > 1) ? '' : 'invisible',
+          )}
+        >
+          <div className="flex items-center gap-1.5 mb-1">
+            <CheckCircle2 className="w-3 h-3 text-emerald-400/80 shrink-0" />
+            <span className="text-[9px] font-black uppercase tracking-[0.14em] text-emerald-300/80">
+              Engine continuation
+            </span>
           </div>
-        )}
+          <p className="font-mono text-[11px] text-emerald-100/85 leading-snug break-words line-clamp-1">
+            {formatSanLine(prevFen, bestLineSan)}
+          </p>
+        </div>
 
         {/* Caption — hidden on mobile to save vertical space; the tab toggle already labels the view */}
         <p className="hidden md:block text-[10px] text-white/40 text-center px-2 leading-snug mt-1.5">

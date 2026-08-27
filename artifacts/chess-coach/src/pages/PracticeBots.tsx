@@ -400,24 +400,31 @@ function GameView({ bot, onBack, startFen, startColor, isOnboarding }: { bot: Bo
 
       <div className="grid grid-cols-1 xl:grid-cols-[1fr_340px] gap-4">
         <div className="space-y-2.5">
-          <div className="glass-card rounded-xl p-2.5 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <img src={bot.avatar} alt={bot.name} className="w-8 h-8 rounded-full border border-white/20 shadow" />
-              <div>
-                <p className="font-bold text-sm">{bot.name}</p>
-                <p className="text-[10px] text-muted-foreground">{bot.personality} · {bot.rating} ELO</p>
+          <div className="glass-card rounded-xl p-2.5">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <img src={bot.avatar} alt={bot.name} className="w-8 h-8 rounded-full border border-white/20 shadow shrink-0" />
+                <div className="min-w-0">
+                  <p className="font-bold text-sm truncate">{bot.name}</p>
+                  <p className="text-[10px] text-muted-foreground truncate">{bot.personality} · {bot.rating} ELO</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground shrink-0">
+                <Clock className="w-3.5 h-3.5" />
+                {formatTime(elapsedSec)}
               </div>
             </div>
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground shrink-0">
-              <Clock className="w-3.5 h-3.5" />
-              {formatTime(elapsedSec)}
+            {/* Always-reserved height slot for the Thinking indicator --
+                previously a third item crammed into the row above, which
+                could wrap the row onto two lines when it appeared and
+                push the board below it up/down as the bot calculated
+                each move. Now it's a fixed-height line that's just
+                visually hidden when not thinking, so the banner's height
+                (and everything below it) never changes. */}
+            <div className={cn('flex items-center gap-2 text-xs text-muted-foreground mt-1.5 h-4', !thinking && 'invisible')}>
+              <div className="w-3 h-3 border-2 border-primary border-t-transparent rounded-full animate-spin shrink-0" />
+              Thinking…
             </div>
-            {thinking && (
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <div className="w-3 h-3 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                Thinking…
-              </div>
-            )}
           </div>
 
           <ChessBoard
