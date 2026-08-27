@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo } from 'react';
 import { Chess } from 'chess.js';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChessBoard } from './ChessBoard';
@@ -19,6 +19,15 @@ interface MistakeFixViewProps {
   classification: Classification;
   flipped: boolean;
   onJumpIn?: () => void;
+  /** Controlled slide state (0 = played, 1 = engine) -- lifted to the
+      parent so the app's existing move-navigation buttons can drive
+      stepping through the engine's continuation while this tab is
+      active, instead of a separate bespoke stepper widget living here. */
+  slide: 0 | 1;
+  onSlideChange: (slide: 0 | 1) => void;
+  /** Controlled step index into bestLineSan, also lifted to the parent
+      for the same reason. */
+  engineStep: number;
 }
 
 /** Render a SAN sequence with proper move numbers, e.g. "12. Nxe5 Nxe5 13. d4 Bb4+".
@@ -61,17 +70,17 @@ const CLASS_LABEL: Record<Classification, string> = {
 };
 
 const CLASS_TONE: Record<Classification, { label: string; ring: string; chipBg: string; chipText: string; chipBorder: string }> = {
-  checkmate:   { label: 'CHECKMATE',  ring: 'ring-yellow-400/40',  chipBg: 'bg-yellow-400/15', chipText: 'text-yellow-300',  chipBorder: 'border-yellow-400/40' },
-  brilliant:   { label: 'BRILLIANT',  ring: 'ring-cyan-400/40',    chipBg: 'bg-cyan-400/15',   chipText: 'text-cyan-300',    chipBorder: 'border-cyan-400/40' },
-  great:       { label: 'GREAT',      ring: 'ring-sky-400/40',     chipBg: 'bg-sky-400/15',    chipText: 'text-sky-300',     chipBorder: 'border-sky-400/40' },
-  best:        { label: 'BEST',       ring: 'ring-emerald-400/40', chipBg: 'bg-emerald-400/15',chipText: 'text-emerald-300', chipBorder: 'border-emerald-400/40' },
-  excellent:   { label: 'EXCELLENT',  ring: 'ring-teal-400/40',    chipBg: 'bg-teal-400/15',   chipText: 'text-teal-300',    chipBorder: 'border-teal-400/40' },
-  good:        { label: 'GOOD',       ring: 'ring-green-400/30',   chipBg: 'bg-green-400/15',  chipText: 'text-green-300',   chipBorder: 'border-green-400/30' },
-  book:        { label: 'BOOK',       ring: 'ring-blue-400/30',    chipBg: 'bg-blue-400/15',   chipText: 'text-blue-300',    chipBorder: 'border-blue-400/30' },
-  inaccuracy:  { label: 'INACCURACY', ring: 'ring-yellow-400/50',  chipBg: 'bg-yellow-400/15', chipText: 'text-yellow-300',  chipBorder: 'border-yellow-400/40' },
-  mistake:     { label: 'MISTAKE',    ring: 'ring-orange-400/50',  chipBg: 'bg-orange-400/15', chipText: 'text-orange-300',  chipBorder: 'border-orange-400/40' },
-  blunder:     { label: 'BLUNDER',    ring: 'ring-rose-500/60',    chipBg: 'bg-rose-500/15',   chipText: 'text-rose-300',    chipBorder: 'border-rose-500/40' },
-  missed_win:  { label: 'MISSED WIN', ring: 'ring-red-500/50',     chipBg: 'bg-red-500/15',    chipText: 'text-red-300',     chipBorder: 'border-red-500/40' },
+  checkmate:   { label: 'CHECKMATE',  ring: 'ring-yellow-400/40',  chipBg: 'bg-yellow-400/30',  chipText: 'text-yellow-200',  chipBorder: 'border-yellow-400/60' },
+  brilliant:   { label: 'BRILLIANT',  ring: 'ring-cyan-400/40',    chipBg: 'bg-cyan-400/30',    chipText: 'text-cyan-100',    chipBorder: 'border-cyan-400/60' },
+  great:       { label: 'GREAT',      ring: 'ring-sky-400/40',     chipBg: 'bg-sky-400/30',     chipText: 'text-sky-100',     chipBorder: 'border-sky-400/60' },
+  best:        { label: 'BEST',       ring: 'ring-emerald-400/40', chipBg: 'bg-emerald-400/30', chipText: 'text-emerald-100', chipBorder: 'border-emerald-400/60' },
+  excellent:   { label: 'EXCELLENT',  ring: 'ring-teal-400/40',    chipBg: 'bg-teal-400/30',    chipText: 'text-teal-100',    chipBorder: 'border-teal-400/60' },
+  good:        { label: 'GOOD',       ring: 'ring-green-400/30',   chipBg: 'bg-green-400/30',   chipText: 'text-green-100',   chipBorder: 'border-green-400/60' },
+  book:        { label: 'BOOK',       ring: 'ring-blue-400/30',    chipBg: 'bg-blue-400/30',    chipText: 'text-blue-100',    chipBorder: 'border-blue-400/60' },
+  inaccuracy:  { label: 'INACCURACY', ring: 'ring-yellow-400/50',  chipBg: 'bg-yellow-400/30',  chipText: 'text-yellow-200',  chipBorder: 'border-yellow-400/60' },
+  mistake:     { label: 'MISTAKE',    ring: 'ring-orange-400/50',  chipBg: 'bg-orange-400/30',  chipText: 'text-orange-100',  chipBorder: 'border-orange-400/60' },
+  blunder:     { label: 'BLUNDER',    ring: 'ring-rose-500/60',    chipBg: 'bg-rose-500/30',    chipText: 'text-rose-100',    chipBorder: 'border-rose-500/60' },
+  missed_win:  { label: 'MISSED WIN', ring: 'ring-red-500/50',     chipBg: 'bg-red-500/30',     chipText: 'text-red-100',     chipBorder: 'border-red-500/60' },
 };
 
 export function MistakeFixView({
@@ -81,6 +90,9 @@ export function MistakeFixView({
   bestLineSan = [],
   classification,
   flipped,
+  slide,
+  onSlideChange,
+  engineStep,
 }: MistakeFixViewProps) {
   const better = useMemo(
     () => betterMoveText ? parseBetterMove(betterMoveText, prevFen) : null,
@@ -100,16 +112,6 @@ export function MistakeFixView({
 
   const classLabel = CLASS_LABEL[classification];
   const tone = CLASS_TONE[classification];
-
-  // Slide state: 0 = "what you played", 1 = "engine recommends".
-  // Default to the played side so the user sees their mistake first.
-  const [slide, setSlide] = useState<0 | 1>(0);
-  // How many moves into bestLineSan the engine slide is currently
-  // showing (0 = just the first/recommended move, matching the
-  // original static behavior). Lets the user step through the engine's
-  // full suggested continuation move by move instead of only ever
-  // seeing the position after move one.
-  const [engineStep, setEngineStep] = useState(0);
 
   // Computes the FEN after replaying prevFen + bestLineSan[0..step]
   // (inclusive). Falls back gracefully to whatever's already valid if a
@@ -142,12 +144,6 @@ export function MistakeFixView({
       return better ? { from: better.from, to: better.to } : null;
     }
   }, [prevFen, bestLineSan, engineStep, better]);
-
-  // Reset to "what you played" whenever the underlying move changes
-  useEffect(() => {
-    setSlide(0);
-    setEngineStep(0);
-  }, [prevFen, playedMove?.san, betterMoveText]);
 
   const slides = [
     {
@@ -187,8 +183,8 @@ export function MistakeFixView({
   ];
   const current = slides[slide];
   const Icon = current.icon;
-  const goPrev = () => setSlide(0);
-  const goNext = () => setSlide(1);
+  const goPrev = () => onSlideChange(0);
+  const goNext = () => onSlideChange(1);
 
   return (
     <div className="space-y-1.5 md:space-y-2 max-w-[520px] mx-auto">
@@ -202,7 +198,7 @@ export function MistakeFixView({
               key={s.key}
               role="tab"
               aria-selected={active}
-              onClick={() => setSlide(idx as 0 | 1)}
+              onClick={() => onSlideChange(idx as 0 | 1)}
               className={`flex-1 flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md text-[10px] font-black uppercase tracking-[0.12em] transition-colors ${
                 active
                   ? `${s.chipBg} ${s.chipText} border ${s.chipBorder}`
@@ -299,71 +295,6 @@ export function MistakeFixView({
             </motion.div>
           </AnimatePresence>
         </div>
-
-        {/* Engine continuation stepper — lets the user step through the
-            engine's suggested line move by move (the board above
-            updates to match via engineStep/stepFen). Only on the engine
-            slide. Height is always reserved (toggled via visibility,
-            not presence) since whether this shows and how much content
-            it has varies per mistake -- some have a long suggested
-            continuation, some have none at all -- and letting it appear
-            and disappear was causing everything below it to shift.
-            Shows only the CURRENT step's move (not the full cumulative
-            line) -- the previous version rendered the whole growing
-            line with a single-line truncate, which meant the newest
-            move (exactly what you'd just stepped to) was the one most
-            likely to get cut off the edge, making it look like nothing
-            happened when it actually had. */}
-        {(bestLineSan.length > 1 && better) ? (
-          slide === 1 ? (
-            <div className="mt-2 rounded-lg border border-emerald-400/25 bg-emerald-400/[0.08] px-1.5 py-1.5 h-[52px] flex items-center gap-1">
-              <button
-                type="button"
-                onClick={() => setEngineStep(s => Math.max(0, s - 1))}
-                disabled={engineStep === 0}
-                aria-label="Previous move in engine line"
-                className="shrink-0 w-9 h-9 rounded-lg flex items-center justify-center text-emerald-200 bg-emerald-400/15 hover:bg-emerald-400/25 active:scale-90 disabled:opacity-20 disabled:hover:bg-emerald-400/15 disabled:active:scale-100 transition-all"
-              >
-                <ChevronLeft className="w-5 h-5" />
-              </button>
-              <div className="flex-1 min-w-0 text-center px-1">
-                <div className="flex items-center justify-center gap-1.5 mb-0.5">
-                  <CheckCircle2 className="w-3 h-3 text-emerald-400/80 shrink-0" />
-                  <span className="text-[9px] font-black uppercase tracking-[0.14em] text-emerald-300/80">
-                    Step {Math.min(engineStep, Math.max(bestLineSan.length - 1, 0)) + 1} of {bestLineSan.length}
-                  </span>
-                </div>
-                <p className="font-mono text-sm font-bold text-emerald-100">
-                  {bestLineSan[Math.min(engineStep, bestLineSan.length - 1)]}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setEngineStep(s => Math.min(bestLineSan.length - 1, s + 1))}
-                disabled={engineStep >= bestLineSan.length - 1}
-                aria-label="Next move in engine line"
-                className="shrink-0 w-9 h-9 rounded-lg flex items-center justify-center text-emerald-200 bg-emerald-400/15 hover:bg-emerald-400/25 active:scale-90 disabled:opacity-20 disabled:hover:bg-emerald-400/15 disabled:active:scale-100 transition-all"
-              >
-                <ChevronRight className="w-5 h-5" />
-              </button>
-            </div>
-          ) : (
-            // On the "played" tab, this space isn't blank/wasted -- it's
-            // a real button that takes you to the engine's continuation,
-            // same height and position so nothing shifts when switching.
-            <button
-              type="button"
-              onClick={() => setSlide(1)}
-              className="mt-2 w-full rounded-lg border border-emerald-400/25 bg-emerald-400/[0.08] hover:bg-emerald-400/[0.14] px-3 h-[52px] flex items-center justify-center gap-2 transition-colors"
-            >
-              <CheckCircle2 className="w-4 h-4 text-emerald-400/80 shrink-0" />
-              <span className="text-xs font-bold text-emerald-200">See the engine's {bestLineSan.length}-move continuation</span>
-              <ChevronRight className="w-4 h-4 text-emerald-400/60 shrink-0" />
-            </button>
-          )
-        ) : (
-          <div aria-hidden className="h-[52px] mt-2 invisible" />
-        )}
 
         {/* Caption — hidden on mobile to save vertical space; the tab toggle already labels the view */}
         <p className="hidden md:block text-[10px] text-white/40 text-center px-2 leading-snug mt-1.5">

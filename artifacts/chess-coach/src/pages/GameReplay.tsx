@@ -615,6 +615,12 @@ export function GameReplay() {
   const { player: blackPlayer } = useChessPlayer(game?.blackUsername);
 
   const [currentMove, setCurrentMove] = useState(0);
+  // Lifted from MistakeFixView so the existing move-navigation buttons
+  // below can drive stepping through the engine's suggested
+  // continuation while that tab is active, instead of a separate
+  // bespoke stepper widget living inside MistakeFixView itself.
+  const [mistakeSlide, setMistakeSlide] = useState<0 | 1>(0);
+  const [engineStep, setEngineStep] = useState(0);
   const [isPlaying, setIsPlaying]     = useState(false);
   const [flipped, setFlipped]         = useState(false);
   const [practiceMode, setPracticeMode] = useState(false);
@@ -900,6 +906,13 @@ export function GameReplay() {
   const cfg = currentReview ? CLASS_CFG[currentReview.classification] : null;
   const isBad = currentReview && ['inaccuracy', 'mistake', 'blunder', 'missed_win'].includes(currentReview.classification);
 
+  // Reset the mistake-view slide and engine-line step whenever the
+  // selected move changes -- always start back on "what you played".
+  useEffect(() => {
+    setMistakeSlide(0);
+    setEngineStep(0);
+  }, [currentMove]);
+
   return (
     <div className="gap-2 md:gap-3 px-3 pt-3 md:px-0 md:pt-0 pb-2 md:pb-0 h-[calc(100dvh-8rem)] md:h-[calc(100vh-3.5rem)] xl:h-[calc(100vh-3rem)] flex flex-col overflow-hidden">
       <Link href="/games" className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors text-sm shrink-0 order-3 xl:order-none">
@@ -974,6 +987,9 @@ export function GameReplay() {
                     bestLineSan={currentReview.bestLineSan ?? []}
                     classification={currentReview.classification}
                     flipped={flipped}
+                    slide={mistakeSlide}
+                    onSlideChange={setMistakeSlide}
+                    engineStep={engineStep}
                   />
                 );
               })()
@@ -1006,7 +1022,15 @@ export function GameReplay() {
                 className="p-2.5 md:p-2.5 rounded-xl bg-secondary hover:bg-primary/20 hover:text-primary transition-colors disabled:opacity-40 active:scale-90">
                 <ChevronsLeft className="w-5 h-5 md:w-4 md:h-4" />
               </button>
-              <button onClick={() => setCurrentMove(p => Math.max(0, p - 1))} disabled={currentMove === 0}
+              <button
+                onClick={() => {
+                  if (isBad && mistakeSlide === 1 && (currentReview?.bestLineSan?.length ?? 0) > 1 && engineStep > 0) {
+                    setEngineStep(s => Math.max(0, s - 1));
+                  } else {
+                    setCurrentMove(p => Math.max(0, p - 1));
+                  }
+                }}
+                disabled={isBad && mistakeSlide === 1 && (currentReview?.bestLineSan?.length ?? 0) > 1 ? engineStep === 0 : currentMove === 0}
                 className="p-2.5 md:p-2.5 rounded-xl bg-secondary hover:bg-primary/20 hover:text-primary transition-colors disabled:opacity-40 active:scale-90">
                 <ChevronLeft className="w-5 h-5 md:w-4 md:h-4" />
               </button>
@@ -1014,7 +1038,19 @@ export function GameReplay() {
                 className="px-3.5 py-2.5 md:px-4 md:py-2.5 rounded-xl bg-primary text-primary-foreground hover:opacity-90 transition-opacity active:scale-90 font-bold">
                 {isPlaying ? <Pause className="w-5 h-5 md:w-4 md:h-4" /> : <Play className="w-5 h-5 md:w-4 md:h-4" />}
               </button>
-              <button onClick={() => setCurrentMove(p => Math.min(maxMoves, p + 1))} disabled={currentMove >= maxMoves}
+              <button
+                onClick={() => {
+                  const lineLen = currentReview?.bestLineSan?.length ?? 0;
+                  if (isBad && mistakeSlide === 1 && lineLen > 1 && engineStep < lineLen - 1) {
+                    setEngineStep(s => Math.min(lineLen - 1, s + 1));
+                  } else {
+                    setCurrentMove(p => Math.min(maxMoves, p + 1));
+                  }
+                }}
+                disabled={(() => {
+                  const lineLen = currentReview?.bestLineSan?.length ?? 0;
+                  return (isBad && mistakeSlide === 1 && lineLen > 1) ? engineStep >= lineLen - 1 : currentMove >= maxMoves;
+                })()}
                 className="p-2.5 md:p-2.5 rounded-xl bg-secondary hover:bg-primary/20 hover:text-primary transition-colors disabled:opacity-40 active:scale-90">
                 <ChevronRight className="w-5 h-5 md:w-4 md:h-4" />
               </button>
