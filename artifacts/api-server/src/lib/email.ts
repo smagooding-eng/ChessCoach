@@ -139,3 +139,117 @@ export function welcomeEmailHtml(firstName: string | null): string {
 </body>
 </html>`;
 }
+
+const RAFFLE_DRAWING_DATE = 'November 17, 2026';
+const RAFFLE_MIN_SUBS = 500;
+
+// Sent when someone subscribes to Pro during the raffle entry period
+// WITHOUT a referral code applied -- one entry.
+export function raffleEntryEmailHtml(firstName: string | null): string {
+  const name = firstName || 'there';
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin:0;padding:0;background-color:#262421;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+  <div style="max-width:600px;margin:0 auto;padding:40px 20px;">
+    <div style="text-align:center;margin-bottom:32px;">
+      <h1 style="color:#81b64c;font-size:28px;margin:0;">♜ ChessScout.net</h1>
+    </div>
+    <div style="background-color:#302e2b;border-radius:12px;padding:32px;margin-bottom:24px;">
+      <div style="text-align:center;margin-bottom:20px;">
+        <span style="display:inline-block;background:#81b64c;color:#fff;padding:4px 14px;border-radius:14px;font-size:11px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;">You're entered</span>
+      </div>
+      <h2 style="color:#e8e6e3;font-size:22px;margin:0 0 4px;text-align:center;">You're in the running, ${name}! 🏆</h2>
+      <p style="color:#9e9b98;font-size:13px;margin:0 0 24px;text-align:center;">Your Pro subscription just earned you an entry to win</p>
+
+      <div style="background-color:#262421;border-radius:8px;padding:20px;margin:0 0 20px;text-align:center;">
+        <p style="color:#e8e6e3;font-size:16px;font-weight:700;margin:0 0 4px;">1 raffle entry — ChessNut Air electronic chessboard</p>
+        <p style="color:#9e9b98;font-size:13px;margin:0;">Drawing on ${RAFFLE_DRAWING_DATE}</p>
+      </div>
+
+      <div style="border-top:1px solid rgba(129,182,76,0.15);margin:20px 0;"></div>
+
+      <p style="color:#9e9b98;font-size:14px;line-height:1.6;margin:0 0 16px;">
+        Thanks for subscribing to ChessScout.net Pro. You've been automatically entered into our raffle for a chance to win a ChessNut Air.
+      </p>
+
+      <p style="color:#e8e6e3;font-size:14px;font-weight:700;margin:0 0 8px;">Want a second entry?</p>
+      <p style="color:#9e9b98;font-size:14px;line-height:1.6;margin:0 0 20px;">
+        Refer a friend and use referral code <strong style="color:#81b64c;">ADCCB497</strong> the next time you resubscribe, or share it with someone who hasn't joined yet — anyone who subscribes using that code gets 2 entries instead of 1.
+      </p>
+
+      <div style="border-top:1px solid rgba(129,182,76,0.15);margin:20px 0;"></div>
+
+      <p style="color:#9e9b98;font-size:12px;line-height:1.6;margin:0;">
+        The prize is only awarded if we reach ${RAFFLE_MIN_SUBS} qualifying subscriptions by the drawing date. Your subscription needs to still be active at the time of the drawing to win. No purchase necessary — a free entry method is available.
+        <a href="https://chessscout.net/raffle-rules" style="color:#81b64c;">Read the full official rules →</a>
+      </p>
+
+      <div style="text-align:center;margin-top:24px;">
+        <a href="https://chessscout.net/raffle" style="display:inline-block;background-color:#81b64c;color:#fff;text-decoration:none;padding:14px 32px;border-radius:8px;font-size:15px;font-weight:600;">View Raffle Details →</a>
+      </div>
+    </div>
+    <p style="color:#666;font-size:12px;text-align:center;margin:0;">
+      ChessScout.net — Know your opponent's weaknesses.
+    </p>
+  </div>
+</body>
+</html>`;
+}
+
+// Sent when someone subscribes to Pro during the raffle entry period
+// WITH referral code ADCCB497 applied at checkout -- two entries.
+export function raffleReferralEntryEmailHtml(firstName: string | null): string {
+  const name = firstName || 'there';
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin:0;padding:0;background-color:#262421;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+  <div style="max-width:600px;margin:0 auto;padding:40px 20px;">
+    <div style="text-align:center;margin-bottom:32px;">
+      <h1 style="color:#81b64c;font-size:28px;margin:0;">♜ ChessScout.net</h1>
+    </div>
+    <div style="background-color:#302e2b;border-radius:12px;padding:32px;margin-bottom:24px;">
+      <div style="text-align:center;margin-bottom:20px;">
+        <span style="display:inline-block;background:#81b64c;color:#fff;padding:4px 14px;border-radius:14px;font-size:11px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;">Double entry unlocked</span>
+      </div>
+      <h2 style="color:#e8e6e3;font-size:22px;margin:0 0 4px;text-align:center;">Nice move, ${name} — 2 entries! 🏆</h2>
+      <p style="color:#9e9b98;font-size:13px;margin:0 0 24px;text-align:center;">Your referral code doubled your odds</p>
+
+      <div style="background-color:#262421;border-radius:8px;padding:20px;margin:0 0 20px;text-align:center;">
+        <p style="color:#e8e6e3;font-size:16px;font-weight:700;margin:0 0 4px;">2 raffle entries — ChessNut Air electronic chessboard</p>
+        <p style="color:#9e9b98;font-size:13px;margin:0;">Drawing on ${RAFFLE_DRAWING_DATE}</p>
+      </div>
+
+      <div style="border-top:1px solid rgba(129,182,76,0.15);margin:20px 0;"></div>
+
+      <p style="color:#9e9b98;font-size:14px;line-height:1.6;margin:0 0 20px;">
+        You subscribed to ChessScout.net Pro using referral code <strong style="color:#81b64c;">ADCCB497</strong>, so instead of the usual single entry, you've been entered <strong style="color:#e8e6e3;">twice</strong> into our raffle for a chance to win a ChessNut Air.
+      </p>
+
+      <div style="border-top:1px solid rgba(129,182,76,0.15);margin:20px 0;"></div>
+
+      <p style="color:#9e9b98;font-size:12px;line-height:1.6;margin:0;">
+        The prize is only awarded if we reach ${RAFFLE_MIN_SUBS} qualifying subscriptions by the drawing date. Your subscription needs to still be active at the time of the drawing to win. No purchase necessary — a free entry method is available.
+        <a href="https://chessscout.net/raffle-rules" style="color:#81b64c;">Read the full official rules →</a>
+      </p>
+
+      <div style="text-align:center;margin-top:24px;">
+        <a href="https://chessscout.net/raffle" style="display:inline-block;background-color:#81b64c;color:#fff;text-decoration:none;padding:14px 32px;border-radius:8px;font-size:15px;font-weight:600;">View Raffle Details →</a>
+      </div>
+    </div>
+    <p style="color:#666;font-size:12px;text-align:center;margin:0;">
+      ChessScout.net — Know your opponent's weaknesses.
+    </p>
+  </div>
+</body>
+</html>`;
+}
