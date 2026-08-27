@@ -23,29 +23,6 @@ interface MistakeFixViewProps {
 
 /** Render a SAN sequence with proper move numbers, e.g. "12. Nxe5 Nxe5 13. d4 Bb4+".
  *  prevFen tells us whose turn it is and what the move number is at the start of the line. */
-function formatSanLine(prevFen: string, sanMoves: string[]): string {
-  if (!sanMoves.length) return '';
-  const parts = prevFen.split(/\s+/);
-  const sideToMove = parts[1] === 'b' ? 'b' : 'w';
-  let moveNumber = parseInt(parts[5] ?? '1', 10);
-  if (!Number.isFinite(moveNumber) || moveNumber < 1) moveNumber = 1;
-
-  const out: string[] = [];
-  let isWhiteToMove = sideToMove === 'w';
-  for (let i = 0; i < sanMoves.length; i++) {
-    if (isWhiteToMove) {
-      out.push(`${moveNumber}.`);
-      out.push(sanMoves[i]);
-    } else {
-      if (i === 0) out.push(`${moveNumber}...`);
-      out.push(sanMoves[i]);
-      moveNumber += 1;
-    }
-    isWhiteToMove = !isWhiteToMove;
-  }
-  return out.join(' ');
-}
-
 function tryMove(fen: string, san: string): { from: string; to: string; resultFen: string; san: string } | null {
   try {
     const chess = new Chess(normalizeFen(fen));
@@ -330,43 +307,63 @@ export function MistakeFixView({
             not presence) since whether this shows and how much content
             it has varies per mistake -- some have a long suggested
             continuation, some have none at all -- and letting it appear
-            and disappear was causing everything below it to shift. */}
-        <div
-          className={cn(
-            'mt-2 rounded-lg border border-emerald-400/20 bg-emerald-400/[0.06] px-2.5 py-1.5 h-[52px] flex items-center justify-between gap-2',
-            (slide === 1 && bestLineSan.length > 1) ? '' : 'invisible',
-          )}
-        >
-          <button
-            type="button"
-            onClick={() => setEngineStep(s => Math.max(0, s - 1))}
-            disabled={engineStep === 0}
-            aria-label="Previous move in engine line"
-            className="shrink-0 w-6 h-6 rounded-md flex items-center justify-center text-emerald-300/80 hover:bg-emerald-400/15 disabled:opacity-25 disabled:hover:bg-transparent transition-colors"
-          >
-            <ChevronLeft className="w-3.5 h-3.5" />
-          </button>
-          <div className="flex-1 min-w-0 text-center">
-            <div className="flex items-center justify-center gap-1.5 mb-0.5">
-              <CheckCircle2 className="w-3 h-3 text-emerald-400/80 shrink-0" />
-              <span className="text-[9px] font-black uppercase tracking-[0.14em] text-emerald-300/80">
-                Engine continuation
-              </span>
+            and disappear was causing everything below it to shift.
+            Shows only the CURRENT step's move (not the full cumulative
+            line) -- the previous version rendered the whole growing
+            line with a single-line truncate, which meant the newest
+            move (exactly what you'd just stepped to) was the one most
+            likely to get cut off the edge, making it look like nothing
+            happened when it actually had. */}
+        {(bestLineSan.length > 1 && better) ? (
+          slide === 1 ? (
+            <div className="mt-2 rounded-lg border border-emerald-400/25 bg-emerald-400/[0.08] px-1.5 py-1.5 h-[52px] flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setEngineStep(s => Math.max(0, s - 1))}
+                disabled={engineStep === 0}
+                aria-label="Previous move in engine line"
+                className="shrink-0 w-9 h-9 rounded-lg flex items-center justify-center text-emerald-200 bg-emerald-400/15 hover:bg-emerald-400/25 active:scale-90 disabled:opacity-20 disabled:hover:bg-emerald-400/15 disabled:active:scale-100 transition-all"
+              >
+                <ChevronLeft className="w-5 h-5" />
+              </button>
+              <div className="flex-1 min-w-0 text-center px-1">
+                <div className="flex items-center justify-center gap-1.5 mb-0.5">
+                  <CheckCircle2 className="w-3 h-3 text-emerald-400/80 shrink-0" />
+                  <span className="text-[9px] font-black uppercase tracking-[0.14em] text-emerald-300/80">
+                    Step {Math.min(engineStep, Math.max(bestLineSan.length - 1, 0)) + 1} of {bestLineSan.length}
+                  </span>
+                </div>
+                <p className="font-mono text-sm font-bold text-emerald-100">
+                  {bestLineSan[Math.min(engineStep, bestLineSan.length - 1)]}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEngineStep(s => Math.min(bestLineSan.length - 1, s + 1))}
+                disabled={engineStep >= bestLineSan.length - 1}
+                aria-label="Next move in engine line"
+                className="shrink-0 w-9 h-9 rounded-lg flex items-center justify-center text-emerald-200 bg-emerald-400/15 hover:bg-emerald-400/25 active:scale-90 disabled:opacity-20 disabled:hover:bg-emerald-400/15 disabled:active:scale-100 transition-all"
+              >
+                <ChevronRight className="w-5 h-5" />
+              </button>
             </div>
-            <p className="font-mono text-[11px] text-emerald-100/85 leading-snug truncate">
-              {formatSanLine(prevFen, bestLineSan.slice(0, Math.min(engineStep, bestLineSan.length - 1) + 1))}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => setEngineStep(s => Math.min(bestLineSan.length - 1, s + 1))}
-            disabled={engineStep >= bestLineSan.length - 1}
-            aria-label="Next move in engine line"
-            className="shrink-0 w-6 h-6 rounded-md flex items-center justify-center text-emerald-300/80 hover:bg-emerald-400/15 disabled:opacity-25 disabled:hover:bg-transparent transition-colors"
-          >
-            <ChevronRight className="w-3.5 h-3.5" />
-          </button>
-        </div>
+          ) : (
+            // On the "played" tab, this space isn't blank/wasted -- it's
+            // a real button that takes you to the engine's continuation,
+            // same height and position so nothing shifts when switching.
+            <button
+              type="button"
+              onClick={() => setSlide(1)}
+              className="mt-2 w-full rounded-lg border border-emerald-400/25 bg-emerald-400/[0.08] hover:bg-emerald-400/[0.14] px-3 h-[52px] flex items-center justify-center gap-2 transition-colors"
+            >
+              <CheckCircle2 className="w-4 h-4 text-emerald-400/80 shrink-0" />
+              <span className="text-xs font-bold text-emerald-200">See the engine's {bestLineSan.length}-move continuation</span>
+              <ChevronRight className="w-4 h-4 text-emerald-400/60 shrink-0" />
+            </button>
+          )
+        ) : (
+          <div aria-hidden className="h-[52px] mt-2 invisible" />
+        )}
 
         {/* Caption — hidden on mobile to save vertical space; the tab toggle already labels the view */}
         <p className="hidden md:block text-[10px] text-white/40 text-center px-2 leading-snug mt-1.5">
