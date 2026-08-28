@@ -1117,7 +1117,7 @@ router.get("/admin/affiliates", requireAdmin, async (_req: Request, res: Respons
 // is, for now, a single affiliate.
 router.post("/admin/affiliates/:userId", requireAdmin, async (req: Request, res: Response) => {
   try {
-    const { userId } = req.params;
+    const userId = req.params.userId as string;
     const { email, isAffiliate, commissionTiers, programEndsAt } = req.body ?? {};
 
     let target;
@@ -1154,7 +1154,7 @@ router.post("/admin/affiliates/:userId", requireAdmin, async (req: Request, res:
 // succeeds, so a failed transfer never gets marked paid.
 router.post("/admin/affiliates/:userId/payout", requireAdmin, async (req: Request, res: Response) => {
   try {
-    const { userId } = req.params;
+    const userId = req.params.userId as string;
     const [affiliate] = await db.select().from(usersTable).where(eq(usersTable.id, userId));
     if (!affiliate?.isAffiliate) {
       res.status(404).json({ error: "Not an affiliate" });
@@ -1215,7 +1215,7 @@ router.post("/admin/affiliates/:userId/payout", requireAdmin, async (req: Reques
 // { cents: number, reason?: string }
 router.post("/admin/affiliates/:userId/adjustments", requireAdmin, async (req: Request, res: Response) => {
   try {
-    const { userId } = req.params;
+    const userId = req.params.userId as string;
     const { cents, reason } = req.body ?? {};
     if (!Number.isFinite(cents) || cents === 0) {
       res.status(400).json({ error: "cents must be a non-zero number" });
