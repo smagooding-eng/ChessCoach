@@ -9,7 +9,7 @@ const BG = '#141413';
 const TEXT = '#e8e6e3';
 const MUTED = '#9e9b98';
 const CARD = '#1c1b19';
-const REFERRAL_CODE = 'ADCCB497';
+const REFERRAL_CODE = 'CHESSEDITZ';
 const DRAWING_DATE = 'November 17, 2026';
 const MIN_SUBS = 500;
 

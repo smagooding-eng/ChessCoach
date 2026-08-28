@@ -179,7 +179,7 @@ export function raffleEntryEmailHtml(firstName: string | null): string {
 
       <p style="color:#e8e6e3;font-size:14px;font-weight:700;margin:0 0 8px;">Want a second entry?</p>
       <p style="color:#9e9b98;font-size:14px;line-height:1.6;margin:0 0 20px;">
-        Refer a friend and use referral code <strong style="color:#81b64c;">ADCCB497</strong> the next time you resubscribe, or share it with someone who hasn't joined yet — anyone who subscribes using that code gets 2 entries instead of 1.
+        Refer a friend and use referral code <strong style="color:#81b64c;">CHESSEDITZ</strong> the next time you resubscribe, or share it with someone who hasn't joined yet — anyone who subscribes using that code gets 2 entries instead of 1.
       </p>
 
       <div style="border-top:1px solid rgba(129,182,76,0.15);margin:20px 0;"></div>
@@ -202,7 +202,7 @@ export function raffleEntryEmailHtml(firstName: string | null): string {
 }
 
 // Sent when someone subscribes to Pro during the raffle entry period
-// WITH referral code ADCCB497 applied at checkout -- two entries.
+// WITH referral code CHESSEDITZ applied at checkout -- two entries.
 export function raffleReferralEntryEmailHtml(firstName: string | null): string {
   const name = firstName || 'there';
   return `
@@ -232,7 +232,7 @@ export function raffleReferralEntryEmailHtml(firstName: string | null): string {
       <div style="border-top:1px solid rgba(129,182,76,0.15);margin:20px 0;"></div>
 
       <p style="color:#9e9b98;font-size:14px;line-height:1.6;margin:0 0 20px;">
-        You subscribed to ChessScout.net Pro using referral code <strong style="color:#81b64c;">ADCCB497</strong>, so instead of the usual single entry, you've been entered <strong style="color:#e8e6e3;">twice</strong> into our raffle for a chance to win a ChessNut Air.
+        You subscribed to ChessScout.net Pro using referral code <strong style="color:#81b64c;">CHESSEDITZ</strong>, so instead of the usual single entry, you've been entered <strong style="color:#e8e6e3;">twice</strong> into our raffle for a chance to win a ChessNut Air.
       </p>
 
       <div style="border-top:1px solid rgba(129,182,76,0.15);margin:20px 0;"></div>

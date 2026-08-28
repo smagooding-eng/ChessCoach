@@ -11,7 +11,7 @@ const MUTED = '#9e9b98';
 
 const LAST_UPDATED = 'August 27, 2026';
 const CONTACT_EMAIL = 'chessscout.net@gmail.com';
-const REFERRAL_CODE = 'ADCCB497';
+const REFERRAL_CODE = 'CHESSEDITZ';
 const DRAWING_DATE = 'November 17, 2026';
 const MIN_SUBS = 500;
 

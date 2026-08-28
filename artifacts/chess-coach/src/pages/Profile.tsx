@@ -568,7 +568,7 @@ ${badge("You're entered")}
 <p>Thanks for subscribing to ChessScout.net Pro. You've been automatically entered into our raffle for a chance to win a ChessNut Air.</p>
 ${divider}
 <p style="color:#e8e6e3;font-weight:700;margin:0 0 8px;">Want a second entry?</p>
-<p>Refer a friend and use referral code <strong style="color:#81b64c;">ADCCB497</strong> the next time you resubscribe, or share it with someone who hasn't joined yet — anyone who subscribes using that code gets 2 entries instead of 1.</p>
+<p>Refer a friend and use referral code <strong style="color:#81b64c;">CHESSEDITZ</strong> the next time you resubscribe, or share it with someone who hasn't joined yet — anyone who subscribes using that code gets 2 entries instead of 1.</p>
 ${divider}
 <p style="color:#9e9b98;font-size:12px;">The prize is only awarded if we reach 500 qualifying subscriptions by the drawing date. Your subscription needs to still be active at the time of the drawing to win. No purchase necessary — a free entry method is available. <a href="https://chessscout.net/raffle-rules" style="color:#81b64c;">Read the full official rules →</a></p>
 <p style="text-align:center;"><a href="https://chessscout.net/raffle" style="${btnStyle}">View Raffle Details →</a></p>`,
@@ -584,7 +584,7 @@ ${badge('Double entry unlocked')}
 <p style="color:#e8e6e3;font-size:16px;font-weight:700;margin:0 0 4px;">2 raffle entries — ChessNut Air electronic chessboard</p>
 <p style="color:#9e9b98;font-size:13px;margin:0;">Drawing on November 17, 2026</p>
 </div>
-<p>You subscribed to ChessScout.net Pro using referral code <strong style="color:#81b64c;">ADCCB497</strong>, so instead of the usual single entry, you've been entered <strong style="color:#e8e6e3;">twice</strong> into our raffle for a chance to win a ChessNut Air.</p>
+<p>You subscribed to ChessScout.net Pro using referral code <strong style="color:#81b64c;">CHESSEDITZ</strong>, so instead of the usual single entry, you've been entered <strong style="color:#e8e6e3;">twice</strong> into our raffle for a chance to win a ChessNut Air.</p>
 ${divider}
 <p style="color:#9e9b98;font-size:12px;">The prize is only awarded if we reach 500 qualifying subscriptions by the drawing date. Your subscription needs to still be active at the time of the drawing to win. No purchase necessary — a free entry method is available. <a href="https://chessscout.net/raffle-rules" style="color:#81b64c;">Read the full official rules →</a></p>
 <p style="text-align:center;"><a href="https://chessscout.net/raffle" style="${btnStyle}">View Raffle Details →</a></p>`,
