@@ -10,7 +10,7 @@ import { Link, useLocation } from 'wouter';
 import { apiFetch } from '@/lib/api';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  User, Mail, Crown, LogOut, ChevronRight, Trophy, Swords, Target,
+  User, Mail, Crown, LogOut, ChevronRight, Trophy, Swords, Target, DollarSign,
   GraduationCap, Settings, Shield, Edit3, Check, X, Eye, Users, CreditCard,
   Activity, Send, AlertCircle, CheckCircle2, Bold, Italic, Heading1, Heading2,
   Link as LinkIcon, Image, Type, Palette, List, ListOrdered, Minus, Undo2, Redo2, FileText, Sparkles,
@@ -1632,6 +1632,10 @@ export function ReferralCard({ isPremium, compact = false }: { isPremium: boolea
                 <p className="text-[11px] text-muted-foreground">Went Pro</p>
               </div>
             </div>
+
+            <Link href="/affiliate" className="flex items-center justify-center gap-1.5 text-xs font-bold text-primary hover:text-primary/80 transition-colors py-1">
+              <DollarSign className="w-3.5 h-3.5" /> Affiliate Dashboard <ChevronRight className="w-3 h-3" />
+            </Link>
 
             {data && data.referrals.length > 0 && (
               <div>
