@@ -1,5 +1,5 @@
 import { Router, type IRouter, type Request, type Response } from "express";
-import { db, usersTable, pageViewsTable, gamesTable, weaknessesTable, coursesTable, lessonsTable, backgroundJobsTable, referralConversionsTable, seoArticlesTable } from "@workspace/db";
+import { db, usersTable, pageViewsTable, gamesTable, weaknessesTable, coursesTable, lessonsTable, backgroundJobsTable, referralConversionsTable, affiliateAdjustmentsTable, seoArticlesTable } from "@workspace/db";
 import { sql, count, gte, countDistinct, inArray, eq, and, isNotNull, desc } from "drizzle-orm";
 import { puzzleAttemptsTable } from "@workspace/db";
 import { sessionsTable } from "@workspace/db";
@@ -387,6 +387,60 @@ router.get("/admin/referral-codes", requireAdmin, async (_req: Request, res: Res
     res.json({ codes });
   } catch (err: any) {
     res.status(500).json({ error: "Failed to fetch referral codes", details: err.message });
+  }
+});
+
+// Individual referred users -- not just aggregate counts. Each row is
+// one signup, with who referred them, when they signed up, and whether
+// they've converted to a paid subscription. This is the drill-down view
+// behind the referral codes summary, and what powers selecting specific
+// referred users to email directly.
+router.get("/admin/referral-signups", requireAdmin, async (_req: Request, res: Response) => {
+  try {
+    const conversions = await db.select().from(referralConversionsTable).orderBy(desc(referralConversionsTable.createdAt));
+    if (conversions.length === 0) {
+      res.json({ signups: [] });
+      return;
+    }
+
+    const referrerIds = [...new Set(conversions.map(c => c.referrerUserId))];
+    const referredIds = [...new Set(conversions.map(c => c.referredUserId))];
+    const allIds = [...new Set([...referrerIds, ...referredIds])];
+
+    const users = await db
+      .select({
+        id: usersTable.id,
+        email: usersTable.email,
+        firstName: usersTable.firstName,
+        chesscomUsername: usersTable.chesscomUsername,
+        inviteCode: usersTable.inviteCode,
+        createdAt: usersTable.createdAt,
+      })
+      .from(usersTable)
+      .where(inArray(usersTable.id, allIds));
+    const usersById = new Map<string, typeof users[number]>(users.map(u => [u.id, u]));
+
+    const signups = conversions.map(c => {
+      const referrer = usersById.get(c.referrerUserId);
+      const referred = usersById.get(c.referredUserId);
+      return {
+        conversionId: c.id,
+        referrerName: referrer?.firstName || referrer?.chesscomUsername || referrer?.email || "Unknown",
+        referrerInviteCode: referrer?.inviteCode ?? null,
+        referredUserId: c.referredUserId,
+        referredEmail: referred?.email ?? null,
+        referredName: referred?.firstName || referred?.chesscomUsername || referred?.email || "Unknown",
+        signedUpAt: referred?.createdAt ?? c.createdAt,
+        status: c.status,
+        convertedAt: c.convertedAt,
+        commissionOwedCents: c.commissionOwedCents,
+        commissionPaidAt: c.commissionPaidAt,
+      };
+    });
+
+    res.json({ signups });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to fetch referral signups", details: err.message });
   }
 });
 
@@ -1002,6 +1056,185 @@ router.get("/public/stats", async (_req: Request, res: Response) => {
     });
   } catch {
     res.json({ users: 0, gamesImported: 0, gamesAnalyzed: 0, opponentsScouted: 0 });
+  }
+});
+
+// List every affiliate (isAffiliate = true) with their commission
+// totals -- owed-and-unpaid, and lifetime-paid. Totals are summed from
+// the commissionOwedCents snapshots already stored on each conversion
+// at the time it converted, not recomputed live.
+router.get("/admin/affiliates", requireAdmin, async (_req: Request, res: Response) => {
+  try {
+    const affiliates = await db.select().from(usersTable).where(eq(usersTable.isAffiliate, true));
+
+    const results = await Promise.all(affiliates.map(async (a) => {
+      const conversions = await db.select().from(referralConversionsTable)
+        .where(and(
+          eq(referralConversionsTable.referrerUserId, a.id),
+          isNotNull(referralConversionsTable.commissionOwedCents),
+        ));
+      const adjustments = await db.select().from(affiliateAdjustmentsTable)
+        .where(eq(affiliateAdjustmentsTable.affiliateUserId, a.id))
+        .orderBy(desc(affiliateAdjustmentsTable.createdAt));
+      let owedUnpaidCents = 0;
+      let paidCents = 0;
+      for (const c of conversions) {
+        const cents = c.commissionOwedCents ?? 0;
+        if (c.commissionPaidAt) paidCents += cents;
+        else owedUnpaidCents += cents;
+      }
+      for (const adj of adjustments) {
+        if (adj.paidAt) paidCents += adj.cents;
+        else owedUnpaidCents += adj.cents;
+      }
+      return {
+        id: a.id,
+        email: a.email,
+        firstName: a.firstName,
+        lastName: a.lastName,
+        inviteCode: a.inviteCode,
+        affiliateCommissionTiers: a.affiliateCommissionTiers,
+        affiliateProgramEndsAt: a.affiliateProgramEndsAt,
+        stripeConnectAccountId: a.stripeConnectAccountId,
+        conversionCount: conversions.length,
+        adjustments,
+        owedUnpaidCents,
+        paidCents,
+      };
+    }));
+
+    res.json({ affiliates: results });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to load affiliates" });
+  }
+});
+
+// Mark a user as an affiliate (or update their existing terms). Body:
+// { email?: string, isAffiliate: boolean, commissionTiers?: [{maxDaysSinceSignup, cents}], programEndsAt?: string | null }
+// :userId in the URL can be a real user ID, or the literal string
+// "by-email" with an email in the body -- lets the admin panel take a
+// plain email input instead of needing a full user-search UI for what
+// is, for now, a single affiliate.
+router.post("/admin/affiliates/:userId", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.params;
+    const { email, isAffiliate, commissionTiers, programEndsAt } = req.body ?? {};
+
+    let target;
+    if (userId === "by-email") {
+      if (!email) {
+        res.status(400).json({ error: "Email is required" });
+        return;
+      }
+      [target] = await db.select().from(usersTable).where(eq(usersTable.email, email.toLowerCase().trim()));
+    } else {
+      [target] = await db.select().from(usersTable).where(eq(usersTable.id, userId));
+    }
+    if (!target) {
+      res.status(404).json({ error: "User not found" });
+      return;
+    }
+
+    await db.update(usersTable).set({
+      isAffiliate: !!isAffiliate,
+      affiliateCommissionTiers: Array.isArray(commissionTiers) ? commissionTiers : null,
+      affiliateProgramEndsAt: programEndsAt ? new Date(programEndsAt) : null,
+    }).where(eq(usersTable.id, target.id));
+
+    res.json({ success: true, userId: target.id });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to update affiliate" });
+  }
+});
+
+// Trigger an actual Stripe transfer for an affiliate's outstanding
+// unpaid commission. Requires the affiliate to have completed Stripe
+// Connect onboarding (stripeConnectAccountId set and payouts enabled).
+// Marks every unpaid conversion as paid only after the transfer
+// succeeds, so a failed transfer never gets marked paid.
+router.post("/admin/affiliates/:userId/payout", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.params;
+    const [affiliate] = await db.select().from(usersTable).where(eq(usersTable.id, userId));
+    if (!affiliate?.isAffiliate) {
+      res.status(404).json({ error: "Not an affiliate" });
+      return;
+    }
+    if (!affiliate.stripeConnectAccountId) {
+      res.status(400).json({ error: "Affiliate hasn't connected a payout account yet" });
+      return;
+    }
+
+    const unpaid = await db.select().from(referralConversionsTable)
+      .where(and(
+        eq(referralConversionsTable.referrerUserId, userId),
+        isNotNull(referralConversionsTable.commissionOwedCents),
+      ));
+    const unpaidConversions = unpaid.filter(c => !c.commissionPaidAt && (c.commissionOwedCents ?? 0) > 0);
+
+    const unpaidAdjustments = (await db.select().from(affiliateAdjustmentsTable)
+      .where(eq(affiliateAdjustmentsTable.affiliateUserId, userId)))
+      .filter(a => !a.paidAt);
+
+    const totalCents =
+      unpaidConversions.reduce((sum, c) => sum + (c.commissionOwedCents ?? 0), 0) +
+      unpaidAdjustments.reduce((sum, a) => sum + a.cents, 0);
+
+    if (totalCents <= 0) {
+      res.status(400).json({ error: "Nothing owed" });
+      return;
+    }
+
+    const stripe = await getUncachableStripeClient();
+    const transfer = await stripe.transfers.create({
+      amount: totalCents,
+      currency: "usd",
+      destination: affiliate.stripeConnectAccountId,
+      description: `Affiliate commission payout — ${unpaidConversions.length} conversion(s), ${unpaidAdjustments.length} adjustment(s)`,
+    });
+
+    const now = new Date();
+    await Promise.all([
+      ...unpaidConversions.map(c =>
+        db.update(referralConversionsTable).set({ commissionPaidAt: now }).where(eq(referralConversionsTable.id, c.id))
+      ),
+      ...unpaidAdjustments.map(a =>
+        db.update(affiliateAdjustmentsTable).set({ paidAt: now }).where(eq(affiliateAdjustmentsTable.id, a.id))
+      ),
+    ]);
+
+    res.json({ success: true, transferId: transfer.id, amountCents: totalCents, conversionsPaid: unpaidConversions.length, adjustmentsPaid: unpaidAdjustments.length });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || "Payout failed" });
+  }
+});
+
+// Add a manual commission adjustment for an affiliate -- a correction
+// or bonus that isn't tied to a specific auto-calculated conversion.
+// Positive cents adds to what's owed, negative subtracts. Body:
+// { cents: number, reason?: string }
+router.post("/admin/affiliates/:userId/adjustments", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.params;
+    const { cents, reason } = req.body ?? {};
+    if (!Number.isFinite(cents) || cents === 0) {
+      res.status(400).json({ error: "cents must be a non-zero number" });
+      return;
+    }
+    const [affiliate] = await db.select().from(usersTable).where(eq(usersTable.id, userId));
+    if (!affiliate?.isAffiliate) {
+      res.status(404).json({ error: "Not an affiliate" });
+      return;
+    }
+    await db.insert(affiliateAdjustmentsTable).values({
+      affiliateUserId: userId,
+      cents: Math.round(cents),
+      reason: reason || null,
+      createdByUserId: req.user?.id ?? null,
+    });
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || "Failed to add adjustment" });
   }
 });
 

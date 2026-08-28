@@ -8,7 +8,7 @@ import { Link } from 'wouter';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Activity, AlertCircle, Bold, Brain, Camera, Check, CheckCircle2, ChevronDown, ChevronRight,
-  Copy, CreditCard, Crown, Edit3, Eye, FileText, Gamepad2, Gift, GraduationCap, Heading1, Heading2,
+  Copy, CreditCard, Crown, DollarSign, Edit3, Eye, FileText, Gamepad2, Gift, GraduationCap, Heading1, Heading2,
   History, Image, Italic, Link as LinkIcon, List, ListOrdered, Loader2, LogOut, Mail, Megaphone,
   Minus, Palette, Play, Redo2, RefreshCw, Search, Send, Settings, Shield, Sparkles, Swords, Target, Trash2,
   Trophy, Type, Undo2, User, UserCheck, UserPlus, Users, X, Zap, TrendingUp,
@@ -806,6 +806,432 @@ function ReferralCodesPanel() {
           </>
         )}
       </div>
+    </motion.div>
+  );
+}
+
+interface AffiliateRow {
+  id: string;
+  email: string | null;
+  firstName: string | null;
+  lastName: string | null;
+  inviteCode: string | null;
+  affiliateCommissionTiers: { maxDaysSinceSignup: number; cents: number }[] | null;
+  affiliateProgramEndsAt: string | null;
+  stripeConnectAccountId: string | null;
+  conversionCount: number;
+  owedUnpaidCents: number;
+  paidCents: number;
+}
+
+function AffiliatesPanel() {
+  const [affiliates, setAffiliates] = useState<AffiliateRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [formEmail, setFormEmail] = useState('');
+  const [tiers, setTiers] = useState<{ maxDaysSinceSignup: string; dollars: string }[]>([
+    { maxDaysSinceSignup: '30', dollars: '1.00' },
+    { maxDaysSinceSignup: '60', dollars: '0.50' },
+  ]);
+  const [programEndsAt, setProgramEndsAt] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [payoutState, setPayoutState] = useState<Record<string, 'sending' | 'done' | 'error'>>({});
+  const [adjustingId, setAdjustingId] = useState<string | null>(null);
+  const [adjustAmount, setAdjustAmount] = useState('');
+  const [adjustReason, setAdjustReason] = useState('');
+  const [adjustSaving, setAdjustSaving] = useState(false);
+  const [adjustError, setAdjustError] = useState<string | null>(null);
+
+  const handleAddAdjustment = async (id: string) => {
+    setAdjustError(null);
+    const dollars = parseFloat(adjustAmount);
+    if (!Number.isFinite(dollars) || dollars === 0) {
+      setAdjustError('Enter a non-zero amount (use a minus sign to subtract).');
+      return;
+    }
+    setAdjustSaving(true);
+    try {
+      const res = await apiFetch(`/api/admin/affiliates/${id}/adjustments`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cents: Math.round(dollars * 100), reason: adjustReason.trim() || undefined }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setAdjustError(data.error || 'Failed to save adjustment.');
+        setAdjustSaving(false);
+        return;
+      }
+      setAdjustingId(null);
+      setAdjustAmount('');
+      setAdjustReason('');
+      load();
+    } catch {
+      setAdjustError('Something went wrong.');
+    }
+    setAdjustSaving(false);
+  };
+
+  const load = () => {
+    setLoading(true);
+    apiFetch('/api/admin/affiliates', { credentials: 'include' })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => setAffiliates(d?.affiliates ?? []))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const addTierRow = () => setTiers(t => [...t, { maxDaysSinceSignup: '', dollars: '' }]);
+  const removeTierRow = (i: number) => setTiers(t => t.filter((_, idx) => idx !== i));
+  const updateTier = (i: number, field: 'maxDaysSinceSignup' | 'dollars', value: string) =>
+    setTiers(t => t.map((row, idx) => idx === i ? { ...row, [field]: value } : row));
+
+  const handleSubmit = async () => {
+    setFormError(null);
+    if (!formEmail.trim()) {
+      setFormError('Enter an email address.');
+      return;
+    }
+    const parsedTiers = tiers
+      .filter(t => t.maxDaysSinceSignup.trim() && t.dollars.trim())
+      .map(t => ({
+        maxDaysSinceSignup: parseInt(t.maxDaysSinceSignup, 10),
+        cents: Math.round(parseFloat(t.dollars) * 100),
+      }));
+    if (parsedTiers.some(t => !Number.isFinite(t.maxDaysSinceSignup) || !Number.isFinite(t.cents))) {
+      setFormError('Check that all tier rows have valid numbers.');
+      return;
+    }
+    setSaving(true);
+    try {
+      const res = await apiFetch('/api/admin/affiliates/by-email', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: formEmail.trim(),
+          isAffiliate: true,
+          commissionTiers: parsedTiers,
+          programEndsAt: programEndsAt || null,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setFormError(data.error || 'Failed to save.');
+        setSaving(false);
+        return;
+      }
+      setShowForm(false);
+      setFormEmail('');
+      load();
+    } catch {
+      setFormError('Something went wrong.');
+    }
+    setSaving(false);
+  };
+
+  const handlePayout = async (id: string) => {
+    setPayoutState(s => ({ ...s, [id]: 'sending' }));
+    try {
+      const res = await apiFetch(`/api/admin/affiliates/${id}/payout`, { method: 'POST', credentials: 'include' });
+      const data = await res.json();
+      if (!res.ok) {
+        setPayoutState(s => ({ ...s, [id]: 'error' }));
+        alert(data.error || 'Payout failed');
+        return;
+      }
+      setPayoutState(s => ({ ...s, [id]: 'done' }));
+      load();
+    } catch {
+      setPayoutState(s => ({ ...s, [id]: 'error' }));
+    }
+  };
+
+  const usd = (cents: number) => `$${(cents / 100).toFixed(2)}`;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="rounded-xl border border-border/40 bg-card overflow-hidden"
+    >
+      <div className="px-5 py-3 border-b border-border/30 bg-primary/10 flex items-center justify-between">
+        <h3 className="text-sm font-bold text-primary flex items-center gap-2">
+          <DollarSign className="w-4 h-4" /> Affiliates
+        </h3>
+        <button
+          onClick={() => setShowForm(v => !v)}
+          className="text-[11px] font-bold px-2.5 py-1.5 rounded-lg bg-primary text-primary-foreground"
+        >
+          {showForm ? 'Cancel' : '+ Add Affiliate'}
+        </button>
+      </div>
+
+      {showForm && (
+        <div className="p-4 border-b border-border/30 space-y-3">
+          <div>
+            <label className="text-[11px] font-bold text-muted-foreground block mb-1">User email</label>
+            <input
+              type="email"
+              value={formEmail}
+              onChange={(e) => setFormEmail(e.target.value)}
+              placeholder="affiliate@example.com"
+              className="w-full px-3 py-2 rounded-lg bg-secondary text-sm border border-border/40"
+            />
+          </div>
+
+          <div>
+            <label className="text-[11px] font-bold text-muted-foreground block mb-1">Commission tiers (days since their referred user signed up → commission)</label>
+            <div className="space-y-2">
+              {tiers.map((t, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground shrink-0">Within</span>
+                  <input
+                    type="number"
+                    value={t.maxDaysSinceSignup}
+                    onChange={(e) => updateTier(i, 'maxDaysSinceSignup', e.target.value)}
+                    placeholder="30"
+                    className="w-16 px-2 py-1.5 rounded-lg bg-secondary text-sm border border-border/40"
+                  />
+                  <span className="text-xs text-muted-foreground shrink-0">days →</span>
+                  <span className="text-xs text-muted-foreground shrink-0">$</span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={t.dollars}
+                    onChange={(e) => updateTier(i, 'dollars', e.target.value)}
+                    placeholder="1.00"
+                    className="w-20 px-2 py-1.5 rounded-lg bg-secondary text-sm border border-border/40"
+                  />
+                  <button onClick={() => removeTierRow(i)} className="text-xs text-destructive px-1">✕</button>
+                </div>
+              ))}
+              <button onClick={addTierRow} className="text-[11px] font-bold text-primary">+ Add tier</button>
+            </div>
+          </div>
+
+          <div>
+            <label className="text-[11px] font-bold text-muted-foreground block mb-1">Program ends (optional)</label>
+            <input
+              type="date"
+              value={programEndsAt}
+              onChange={(e) => setProgramEndsAt(e.target.value)}
+              className="w-full px-3 py-2 rounded-lg bg-secondary text-sm border border-border/40"
+            />
+          </div>
+
+          {formError && <p className="text-xs text-destructive">{formError}</p>}
+
+          <button
+            onClick={handleSubmit}
+            disabled={saving}
+            className="w-full py-2.5 rounded-lg font-bold text-sm bg-primary text-primary-foreground disabled:opacity-50"
+          >
+            {saving ? 'Saving...' : 'Save Affiliate'}
+          </button>
+        </div>
+      )}
+
+      <div className="p-2">
+        {loading ? (
+          <div className="flex justify-center py-6"><Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /></div>
+        ) : affiliates.length === 0 ? (
+          <p className="text-xs text-muted-foreground text-center py-4">No affiliates yet.</p>
+        ) : (
+          <div className="divide-y divide-border/20">
+            {affiliates.map((a) => (
+              <div key={a.id} className="px-3 py-3">
+                <div className="flex items-center justify-between gap-3 mb-2">
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold text-foreground truncate">{a.firstName || a.email}</p>
+                    <p className="text-[11px] font-mono text-muted-foreground">{a.inviteCode}</p>
+                  </div>
+                  <div className="flex items-center gap-4 shrink-0 text-right">
+                    <div>
+                      <p className="text-sm font-black text-primary">{usd(a.owedUnpaidCents)}</p>
+                      <p className="text-[9px] text-muted-foreground uppercase tracking-wide">Owed</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-black text-foreground">{usd(a.paidCents)}</p>
+                      <p className="text-[9px] text-muted-foreground uppercase tracking-wide">Paid</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-[10px] text-muted-foreground">
+                    {a.stripeConnectAccountId ? 'Payout account connected' : 'Not connected yet'} &middot; {a.conversionCount} conversion{a.conversionCount === 1 ? '' : 's'}
+                  </p>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      onClick={() => setAdjustingId(v => v === a.id ? null : a.id)}
+                      className="text-[11px] font-bold px-2.5 py-1.5 rounded-lg bg-secondary text-foreground"
+                    >
+                      Adjust
+                    </button>
+                    {a.owedUnpaidCents > 0 && (
+                      <button
+                        onClick={() => handlePayout(a.id)}
+                        disabled={!a.stripeConnectAccountId || payoutState[a.id] === 'sending'}
+                        className="text-[11px] font-bold px-3 py-1.5 rounded-lg bg-primary text-primary-foreground disabled:opacity-40"
+                      >
+                        {payoutState[a.id] === 'sending' ? 'Sending...' : payoutState[a.id] === 'done' ? 'Paid ✓' : `Pay ${usd(a.owedUnpaidCents)}`}
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {adjustingId === a.id && (
+                  <div className="mt-3 p-3 rounded-lg bg-secondary/40 space-y-2">
+                    <p className="text-[10px] text-muted-foreground">Add or subtract from what's owed — use a minus sign to subtract (e.g. -0.50). Doesn't touch auto-calculated commission, this stacks on top as its own line item.</p>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground shrink-0">$</span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={adjustAmount}
+                        onChange={(e) => setAdjustAmount(e.target.value)}
+                        placeholder="1.00 or -0.50"
+                        className="w-24 px-2 py-1.5 rounded-lg bg-secondary text-sm border border-border/40"
+                      />
+                      <input
+                        type="text"
+                        value={adjustReason}
+                        onChange={(e) => setAdjustReason(e.target.value)}
+                        placeholder="Reason (optional)"
+                        className="flex-1 px-2 py-1.5 rounded-lg bg-secondary text-sm border border-border/40 min-w-0"
+                      />
+                    </div>
+                    {adjustError && <p className="text-xs text-destructive">{adjustError}</p>}
+                    <button
+                      onClick={() => handleAddAdjustment(a.id)}
+                      disabled={adjustSaving}
+                      className="w-full py-2 rounded-lg font-bold text-xs bg-primary text-primary-foreground disabled:opacity-50"
+                    >
+                      {adjustSaving ? 'Saving...' : 'Add Adjustment'}
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </motion.div>
+  );
+}
+
+interface ReferralSignupRow {
+  conversionId: string;
+  referrerName: string;
+  referrerInviteCode: string | null;
+  referredUserId: string;
+  referredEmail: string | null;
+  referredName: string;
+  signedUpAt: string;
+  status: string;
+  convertedAt: string | null;
+  commissionOwedCents: number | null;
+  commissionPaidAt: string | null;
+}
+
+function ReferralSignupsPanel() {
+  const [signups, setSignups] = useState<ReferralSignupRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [expanded, setExpanded] = useState(false);
+  const [showEmailModal, setShowEmailModal] = useState(false);
+
+  useEffect(() => {
+    apiFetch('/api/admin/referral-signups', { credentials: 'include' })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => setSignups(d?.signups ?? []))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const toggle = (id: string) => {
+    setSelected(s => {
+      const next = new Set(s);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const visibleSignups = expanded ? signups : signups.slice(0, 10);
+  const selectedEmails = signups
+    .filter(s => selected.has(s.referredUserId) && s.referredEmail)
+    .map(s => s.referredEmail as string);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="rounded-xl border border-border/40 bg-card overflow-hidden"
+    >
+      <div className="px-5 py-3 border-b border-border/30 bg-blue-500/10 flex items-center justify-between gap-2">
+        <h3 className="text-sm font-bold text-blue-400 flex items-center gap-2">
+          <UserPlus className="w-4 h-4" /> Referred Signups
+        </h3>
+        {selected.size > 0 && (
+          <button
+            onClick={() => setShowEmailModal(true)}
+            className="text-[11px] font-bold px-2.5 py-1.5 rounded-lg bg-primary text-primary-foreground flex items-center gap-1 shrink-0"
+          >
+            <Mail className="w-3 h-3" /> Email {selected.size} selected
+          </button>
+        )}
+      </div>
+      <div className="p-2">
+        {loading ? (
+          <div className="flex justify-center py-6"><Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /></div>
+        ) : signups.length === 0 ? (
+          <p className="text-xs text-muted-foreground text-center py-4">No referral signups yet.</p>
+        ) : (
+          <>
+            <div className="divide-y divide-border/20">
+              {visibleSignups.map((s) => (
+                <label key={s.conversionId} className="flex items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-secondary/40">
+                  <input
+                    type="checkbox"
+                    checked={selected.has(s.referredUserId)}
+                    onChange={() => toggle(s.referredUserId)}
+                    disabled={!s.referredEmail}
+                    className="shrink-0"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-bold text-foreground truncate">{s.referredName}</p>
+                    <p className="text-[11px] text-muted-foreground truncate">
+                      referred by {s.referrerName} ({s.referrerInviteCode}) &middot; signed up {new Date(s.signedUpAt).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${s.status === 'converted' ? 'bg-emerald-500 text-white' : 'bg-secondary text-muted-foreground'}`}>
+                    {s.status === 'converted' ? 'Converted' : 'Signed up'}
+                  </span>
+                </label>
+              ))}
+            </div>
+            {signups.length > 10 && (
+              <button
+                onClick={() => setExpanded(v => !v)}
+                className="w-full text-center text-xs font-bold text-primary py-2"
+              >
+                {expanded ? 'Show less' : `Show all ${signups.length}`}
+              </button>
+            )}
+          </>
+        )}
+      </div>
+
+      <AnimatePresence>
+        {showEmailModal && (
+          <EmailComposerModal
+            onClose={() => setShowEmailModal(false)}
+            initialRecipients={selectedEmails}
+          />
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }
@@ -2224,6 +2650,8 @@ function AdminTicker() {
 
       <LandingFunnelPanel />
       <ReferralCodesPanel />
+      <ReferralSignupsPanel />
+      <AffiliatesPanel />
 
       <motion.div
         initial={{ opacity: 0, y: 10 }}

@@ -40,6 +40,36 @@ function getTrialInfo(createdAt: Date | string) {
   return { isActive: remaining > 0, daysLeft, endsAt: new Date(created.getTime() + totalMs).toISOString() };
 }
 
+// Returns the commission (in cents) the referrer earns for this specific
+// conversion, or null if they earn nothing -- not an affiliate, the
+// affiliate program has ended, or this conversion fell outside every
+// configured tier. Computed once at conversion time and stored as a
+// snapshot (see referralConversionsTable.commissionOwedCents), not
+// recomputed live, so later edits to an affiliate's tiers don't
+// retroactively change amounts already earned.
+async function computeAffiliateCommissionCents(referrerUserId: string, referredUserId: string): Promise<number | null> {
+  const [referrer] = await db.select().from(usersTable).where(eq(usersTable.id, referrerUserId));
+  if (!referrer?.isAffiliate) return null;
+  if (referrer.affiliateProgramEndsAt && new Date() > new Date(referrer.affiliateProgramEndsAt)) return null;
+
+  const tiers = referrer.affiliateCommissionTiers;
+  if (!tiers || tiers.length === 0) return null;
+
+  const [referred] = await db.select().from(usersTable).where(eq(usersTable.id, referredUserId));
+  if (!referred?.createdAt) return null;
+
+  const daysSinceSignup = (Date.now() - new Date(referred.createdAt).getTime()) / (24 * 60 * 60 * 1000);
+
+  // Tiers are matched in ascending maxDaysSinceSignup order -- the first
+  // tier whose window the conversion falls within wins. A conversion
+  // past every tier's window earns nothing.
+  const sorted = [...tiers].sort((a, b) => a.maxDaysSinceSignup - b.maxDaysSinceSignup);
+  for (const tier of sorted) {
+    if (daysSinceSignup <= tier.maxDaysSinceSignup) return tier.cents;
+  }
+  return null;
+}
+
 router.get('/stripe/subscription', async (req: Request, res: Response) => {
   if (!req.isAuthenticated()) {
     res.status(401).json({ error: 'Not authenticated' });
@@ -80,8 +110,9 @@ router.get('/stripe/subscription', async (req: Request, res: Response) => {
                 eq(referralConversionsTable.status, 'signed_up')
               ));
             if (pending) {
+              const commissionOwedCents = await computeAffiliateCommissionCents(pending.referrerUserId, req.user.id);
               await db.update(referralConversionsTable)
-                .set({ status: 'converted', convertedAt: new Date() })
+                .set({ status: 'converted', convertedAt: new Date(), commissionOwedCents })
                 .where(eq(referralConversionsTable.id, pending.id));
             }
           } catch {}
@@ -246,6 +277,99 @@ router.get('/stripe/products', async (_req: Request, res: Response) => {
   } catch (err: any) {
     console.error('Products list error:', err.message);
     res.status(500).json({ error: 'Failed to list products' });
+  }
+});
+
+// Creates a Stripe Connect Express account for the current user if they
+// don't have one yet, then returns a one-time onboarding link URL.
+// Express accounts are the lightest-weight Connect option -- Stripe's
+// own hosted UI handles bank details and identity verification, so
+// there's no custom onboarding form to build or maintain here.
+router.post('/affiliate/connect/onboard', async (req: Request, res: Response) => {
+  if (!req.isAuthenticated()) {
+    res.status(401).json({ error: 'Not authenticated' });
+    return;
+  }
+  try {
+    const [user] = await db.select().from(usersTable).where(eq(usersTable.id, req.user.id));
+    if (!user?.isAffiliate) {
+      res.status(403).json({ error: 'Not an affiliate' });
+      return;
+    }
+
+    const stripe = await getUncachableStripeClient();
+    let accountId = user.stripeConnectAccountId;
+
+    if (!accountId) {
+      const account = await stripe.accounts.create({
+        type: 'express',
+        email: user.email ?? undefined,
+        capabilities: { transfers: { requested: true } },
+      });
+      accountId = account.id;
+      await db.update(usersTable).set({ stripeConnectAccountId: accountId }).where(eq(usersTable.id, user.id));
+    }
+
+    const origin = getOrigin(req);
+    const accountLink = await stripe.accountLinks.create({
+      account: accountId,
+      refresh_url: `${origin}/affiliate?connect=refresh`,
+      return_url: `${origin}/affiliate?connect=complete`,
+      type: 'account_onboarding',
+    });
+
+    res.json({ url: accountLink.url });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to start onboarding' });
+  }
+});
+
+// The current user's own affiliate status: whether they're an
+// affiliate at all, their Connect payout-readiness, and their personal
+// commission totals (owed-unpaid and lifetime-paid).
+router.get('/affiliate/status', async (req: Request, res: Response) => {
+  if (!req.isAuthenticated()) {
+    res.status(401).json({ error: 'Not authenticated' });
+    return;
+  }
+  try {
+    const [user] = await db.select().from(usersTable).where(eq(usersTable.id, req.user.id));
+    if (!user?.isAffiliate) {
+      res.json({ isAffiliate: false });
+      return;
+    }
+
+    let payoutsEnabled = false;
+    if (user.stripeConnectAccountId) {
+      try {
+        const stripe = await getUncachableStripeClient();
+        const account = await stripe.accounts.retrieve(user.stripeConnectAccountId);
+        payoutsEnabled = !!account.payouts_enabled;
+      } catch { /* account may still be mid-onboarding */ }
+    }
+
+    const conversions = await db.select().from(referralConversionsTable)
+      .where(eq(referralConversionsTable.referrerUserId, user.id));
+    let owedUnpaidCents = 0;
+    let paidCents = 0;
+    for (const c of conversions) {
+      const cents = c.commissionOwedCents ?? 0;
+      if (!cents) continue;
+      if (c.commissionPaidAt) paidCents += cents;
+      else owedUnpaidCents += cents;
+    }
+
+    res.json({
+      isAffiliate: true,
+      connected: !!user.stripeConnectAccountId,
+      payoutsEnabled,
+      inviteCode: user.inviteCode,
+      affiliateProgramEndsAt: user.affiliateProgramEndsAt,
+      owedUnpaidCents,
+      paidCents,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to load affiliate status' });
   }
 });
 

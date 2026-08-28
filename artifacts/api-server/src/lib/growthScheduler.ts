@@ -126,7 +126,7 @@ async function sendTrialExpiryReminders() {
       try {
         await sendEmail({
           to: user.email,
-          subject: "⏰ Your ChessScout trial ends soon — don't lose your edge!",
+          subject: "See what you're missing on the free plan ♟️",
           html: trialExpiryHtml(user.firstName),
         });
         await db.insert(emailDripLogTable).values({ userId: user.id, dripType: 'trial_expiry' });
@@ -243,78 +243,84 @@ async function sendUnreviewedGamesReminder() {
 }
 
 function unreviewedGamesHtml(name: string | null, gameCount: number): string {
-  const n = name || 'there';
+  const greeting = name ? `Hey ${name}` : 'Hey there';
   return `<!DOCTYPE html><html><head><meta charset="utf-8"></head>
 <body style="margin:0;padding:0;background:#262421;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
 <div style="max-width:600px;margin:0 auto;padding:40px 20px;">
   <div style="text-align:center;margin-bottom:24px;"><h1 style="color:#81b64c;font-size:24px;margin:0;">♜ ChessScout.net</h1></div>
   <div style="background:#302e2b;border-radius:12px;padding:32px;margin-bottom:24px;">
-    <h2 style="color:#e8e6e3;font-size:20px;margin:0 0 16px;">Hey ${n}, ${gameCount} of your games haven't been reviewed yet</h2>
-    <p style="color:#9e9b98;font-size:15px;line-height:1.6;margin:0 0 20px;">
-      That's ${gameCount} real games sitting there with mistakes we haven't broken down for you yet — patterns you might be repeating without knowing it.
-    </p>
-    <div style="text-align:center;margin:28px 0;">
-      <a href="https://chessscout.net/games" style="display:inline-block;background:#81b64c;color:#000;font-weight:700;font-size:15px;padding:14px 32px;border-radius:10px;text-decoration:none;">Review my games</a>
+    <div style="text-align:center;margin-bottom:16px;"><span style="display:inline-block;background:#81b64c;color:#fff;padding:4px 14px;border-radius:14px;font-size:11px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;">Waiting for review</span></div>
+    <h2 style="color:#e8e6e3;font-size:20px;margin:0 0 16px;text-align:center;">${greeting}, ${gameCount} of your games haven't been reviewed yet</h2>
+    <div style="background:#262421;border-radius:8px;padding:20px;margin:0 0 20px;text-align:center;">
+      <p style="color:#e8e6e3;font-size:32px;font-weight:800;margin:0 0 4px;">${gameCount}</p>
+      <p style="color:#9e9b98;font-size:13px;margin:0;">unreviewed game${gameCount === 1 ? '' : 's'} sitting there with mistakes we haven't broken down yet</p>
     </div>
-    <p style="color:#6b6864;font-size:12px;line-height:1.6;margin:0;">
-      You're getting this because it's been a few days since your last visit. We only send this once.
+    <p style="color:#9e9b98;font-size:15px;line-height:1.6;margin:0 0 24px;text-align:center;">
+      That's real patterns you might be repeating without knowing it — get the breakdown before your next game.
     </p>
+    <div style="text-align:center;">
+      <a href="https://chessscout.net/games" style="display:inline-block;background:linear-gradient(180deg,#a8d876 0%,#81b64c 55%,#5f8f36 100%);color:#fff;font-weight:700;font-size:15px;padding:14px 32px;border-radius:10px;text-decoration:none;box-shadow:0 3px 0 #4a7028;">Review My Games →</a>
+    </div>
   </div>
+  <p style="color:#666;font-size:12px;text-align:center;margin:0;">
+    You're getting this because it's been a few days since your last visit. We only send this once.<br/>ChessScout.net — Know your opponent's weaknesses.
+  </p>
 </div>
 </body></html>`;
 }
 
 function trialExpiryHtml(name: string | null): string {
-  const n = name || 'there';
+  const greeting = name ? `Hey ${name}` : 'Hey there';
   return `<!DOCTYPE html><html><head><meta charset="utf-8"></head>
 <body style="margin:0;padding:0;background:#262421;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
 <div style="max-width:600px;margin:0 auto;padding:40px 20px;">
   <div style="text-align:center;margin-bottom:24px;"><h1 style="color:#81b64c;font-size:24px;margin:0;">♜ ChessScout.net</h1></div>
   <div style="background:#302e2b;border-radius:12px;padding:32px;margin-bottom:24px;">
-    <h2 style="color:#e8e6e3;font-size:20px;margin:0 0 16px;">Hey ${n}, your free trial is ending soon!</h2>
+    <div style="text-align:center;margin-bottom:16px;"><span style="display:inline-block;background:#81b64c;color:#fff;padding:4px 14px;border-radius:14px;font-size:11px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;">Upgrade available</span></div>
+    <h2 style="color:#e8e6e3;font-size:20px;margin:0 0 16px;text-align:center;">${greeting}, here's what you're missing on the free plan</h2>
     <p style="color:#9e9b98;font-size:15px;line-height:1.6;margin:0 0 20px;">
-      Your 3-day ChessScout trial expires in less than 12 hours. After that, you'll lose access to:
+      You joined ChessScout.net a few days ago — here's the full picture of what Pro unlocks beyond the free tier:
     </p>
-    <ul style="color:#e8e6e3;font-size:14px;line-height:2;padding-left:20px;margin:0 0 20px;">
-      <li>Deep opponent scouting reports</li>
-      <li>Unlimited game analysis with Stockfish 17</li>
-      <li>Personalized training courses</li>
-      <li>Practice bots from 400 to 2000 ELO</li>
-    </ul>
-    <p style="color:#9e9b98;font-size:15px;line-height:1.6;margin:0 0 24px;">
-      Lock in your edge for just <strong style="color:#81b64c;">$4/month</strong> or <strong style="color:#81b64c;">$1/week</strong>. Cancel anytime.
+    <table style="width:100%;border-collapse:collapse;margin:0 0 20px;">
+      <tr><td style="padding:8px 0;vertical-align:top;width:28px;color:#81b64c;font-size:16px;">🔍</td><td style="padding:8px 0;"><strong style="color:#e8e6e3;font-size:14px;">Deep opponent scouting reports</strong><br/><span style="color:#9e9b98;font-size:12px;">Free plan includes 1 basic scout — Pro is unlimited with full weakness analysis</span></td></tr>
+      <tr><td style="padding:8px 0;vertical-align:top;width:28px;color:#81b64c;font-size:16px;">♟️</td><td style="padding:8px 0;"><strong style="color:#e8e6e3;font-size:14px;">Unlimited game analysis</strong><br/><span style="color:#9e9b98;font-size:12px;">Deep AI analysis of every move, not just what your reviewed games already show</span></td></tr>
+      <tr><td style="padding:8px 0;vertical-align:top;width:28px;color:#81b64c;font-size:16px;">🎓</td><td style="padding:8px 0;"><strong style="color:#e8e6e3;font-size:14px;">Personalized training courses</strong><br/><span style="color:#9e9b98;font-size:12px;">Built around your actual weaknesses, not generic lessons</span></td></tr>
+      <tr><td style="padding:8px 0;vertical-align:top;width:28px;color:#81b64c;font-size:16px;">🧩</td><td style="padding:8px 0;"><strong style="color:#e8e6e3;font-size:14px;">Unlimited puzzles</strong><br/><span style="color:#9e9b98;font-size:12px;">Free plan is 5/day — Pro removes the cap</span></td></tr>
+    </table>
+    <p style="color:#9e9b98;font-size:15px;line-height:1.6;margin:0 0 24px;text-align:center;">
+      Lock in your edge for just <strong style="color:#81b64c;">$5/month</strong> or <strong style="color:#81b64c;">$55/year</strong>. Cancel anytime.
     </p>
     <div style="text-align:center;">
-      <a href="https://chessscout.net" style="display:inline-block;background:#81b64c;color:#fff;text-decoration:none;padding:14px 32px;border-radius:8px;font-size:16px;font-weight:600;">Keep My Edge →</a>
+      <a href="https://chessscout.net/subscription" style="display:inline-block;background:linear-gradient(180deg,#a8d876 0%,#81b64c 55%,#5f8f36 100%);color:#fff;text-decoration:none;padding:14px 32px;border-radius:10px;font-size:16px;font-weight:700;box-shadow:0 3px 0 #4a7028;">Upgrade to Pro →</a>
     </div>
   </div>
-  <p style="color:#666;font-size:12px;text-align:center;">ChessScout.net — Know your opponent's weaknesses.</p>
+  <p style="color:#666;font-size:12px;text-align:center;margin:0;">ChessScout.net — Know your opponent's weaknesses.</p>
 </div></body></html>`;
 }
 
 function winBackHtml(name: string | null): string {
-  const n = name || 'there';
+  const greeting = name ? `We miss you, ${name}!` : 'We miss you!';
   return `<!DOCTYPE html><html><head><meta charset="utf-8"></head>
 <body style="margin:0;padding:0;background:#262421;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
 <div style="max-width:600px;margin:0 auto;padding:40px 20px;">
   <div style="text-align:center;margin-bottom:24px;"><h1 style="color:#81b64c;font-size:24px;margin:0;">♜ ChessScout.net</h1></div>
   <div style="background:#302e2b;border-radius:12px;padding:32px;margin-bottom:24px;">
-    <h2 style="color:#e8e6e3;font-size:20px;margin:0 0 16px;">We miss you, ${n}!</h2>
+    <div style="text-align:center;margin-bottom:16px;"><span style="display:inline-block;background:#81b64c;color:#fff;padding:4px 14px;border-radius:14px;font-size:11px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;">It's been a week</span></div>
+    <h2 style="color:#e8e6e3;font-size:20px;margin:0 0 16px;text-align:center;">${greeting}</h2>
     <p style="color:#9e9b98;font-size:15px;line-height:1.6;margin:0 0 20px;">
-      It's been a week since your last visit to ChessScout. While you've been away, other players have been scouting their opponents and climbing the ranks.
+      It's been a week since your last visit to ChessScout.net. While you've been away, other players have been scouting their opponents and climbing the ranks.
     </p>
-    <p style="color:#9e9b98;font-size:15px;line-height:1.6;margin:0 0 20px;">
-      Here's what you're missing:
-    </p>
-    <ul style="color:#e8e6e3;font-size:14px;line-height:2;padding-left:20px;margin:0 0 20px;">
-      <li>New analysis features for deeper insights</li>
-      <li>Fresh daily puzzles to sharpen your tactics</li>
-      <li>Updated scouting reports for your opponents</li>
-    </ul>
+    <div style="border-top:1px solid rgba(129,182,76,0.15);margin:0 0 20px;"></div>
+    <p style="color:#e8e6e3;font-size:14px;font-weight:700;margin:0 0 12px;">Here's what you're missing:</p>
+    <table style="width:100%;border-collapse:collapse;margin:0 0 24px;">
+      <tr><td style="padding:6px 0;vertical-align:top;width:26px;color:#81b64c;">🔍</td><td style="padding:6px 0;color:#e8e6e3;font-size:14px;">New analysis features for deeper insights</td></tr>
+      <tr><td style="padding:6px 0;vertical-align:top;width:26px;color:#81b64c;">🧩</td><td style="padding:6px 0;color:#e8e6e3;font-size:14px;">Fresh daily puzzles to sharpen your tactics</td></tr>
+      <tr><td style="padding:6px 0;vertical-align:top;width:26px;color:#81b64c;">📋</td><td style="padding:6px 0;color:#e8e6e3;font-size:14px;">Updated scouting reports for your opponents</td></tr>
+    </table>
     <div style="text-align:center;">
-      <a href="https://chessscout.net" style="display:inline-block;background:#81b64c;color:#fff;text-decoration:none;padding:14px 32px;border-radius:8px;font-size:16px;font-weight:600;">Get Back in the Game →</a>
+      <a href="https://chessscout.net" style="display:inline-block;background:linear-gradient(180deg,#a8d876 0%,#81b64c 55%,#5f8f36 100%);color:#fff;text-decoration:none;padding:14px 32px;border-radius:10px;font-size:16px;font-weight:700;box-shadow:0 3px 0 #4a7028;">Get Back in the Game →</a>
     </div>
   </div>
-  <p style="color:#666;font-size:12px;text-align:center;">ChessScout.net — Know your opponent's weaknesses.</p>
+  <p style="color:#666;font-size:12px;text-align:center;margin:0;">ChessScout.net — Know your opponent's weaknesses.</p>
 </div></body></html>`;
 }

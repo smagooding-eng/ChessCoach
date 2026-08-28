@@ -71,6 +71,7 @@ const ScanArchivePage = lazy(() => import("@/pages/ScanArchive"));
 const PrivacyPage = lazy(() => import("@/pages/Privacy"));
 const RafflePage = lazy(() => import("@/pages/Raffle"));
 const RaffleRulesPage = lazy(() => import("@/pages/RaffleRules"));
+const AffiliatePage = lazy(() => import("@/pages/Affiliate"));
 const TermsPage = lazy(() => import("@/pages/Terms"));
 const VsAimchessPage = lazy(() => import("@/pages/VsAimchess"));
 const PricingPage = lazy(() => import("@/pages/Pricing"));
@@ -245,6 +246,7 @@ function Router() {
       <Route path="/privacy" component={PrivacyPage} />
       <Route path="/raffle" component={RafflePage} />
       <Route path="/raffle-rules" component={RaffleRulesPage} />
+      <Route path="/affiliate" component={AffiliatePage} />
       <Route path="/terms" component={TermsPage} />
       <Route path="/vs/aimchess" component={VsAimchessPage} />
       <Route path="/pricing" component={PricingPage} />
