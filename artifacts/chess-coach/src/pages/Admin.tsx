@@ -829,6 +829,11 @@ function AffiliatesPanel() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [formEmail, setFormEmail] = useState('');
+  const [selectedUser, setSelectedUser] = useState<{ id: string; email: string | null; firstName: string | null; tier: string } | null>(null);
+  const [userSearch, setUserSearch] = useState('');
+  const [allUsers, setAllUsers] = useState<{ id: string; email: string | null; firstName: string | null; tier: string }[]>([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [usersLoaded, setUsersLoaded] = useState(false);
   const [tiers, setTiers] = useState<{ maxDaysSinceSignup: string; dollars: string }[]>([
     { maxDaysSinceSignup: '30', dollars: '1.00' },
     { maxDaysSinceSignup: '60', dollars: '0.50' },
@@ -884,6 +889,31 @@ function AffiliatesPanel() {
 
   useEffect(() => { load(); }, []);
 
+  const openForm = () => {
+    setShowForm(v => !v);
+    if (!usersLoaded && !usersLoading) {
+      setUsersLoading(true);
+      apiFetch('/api/admin/users', { credentials: 'include' })
+        .then(r => r.ok ? r.json() : null)
+        .then(d => {
+          setAllUsers((d?.users ?? []).map((u: any) => ({ id: u.id, email: u.email, firstName: u.firstName, tier: u.tier })));
+          setUsersLoaded(true);
+        })
+        .finally(() => setUsersLoading(false));
+    }
+  };
+
+  const selectUser = (u: { id: string; email: string | null; firstName: string | null; tier: string }) => {
+    setSelectedUser(u);
+    setFormEmail(u.email ?? '');
+    setUserSearch('');
+  };
+
+  const filteredUsers = userSearch.trim().length === 0 ? [] : allUsers.filter(u => {
+    const q = userSearch.toLowerCase();
+    return (u.email?.toLowerCase().includes(q)) || (u.firstName?.toLowerCase().includes(q));
+  }).slice(0, 8);
+
   const addTierRow = () => setTiers(t => [...t, { maxDaysSinceSignup: '', dollars: '' }]);
   const removeTierRow = (i: number) => setTiers(t => t.filter((_, idx) => idx !== i));
   const updateTier = (i: number, field: 'maxDaysSinceSignup' | 'dollars', value: string) =>
@@ -926,6 +956,8 @@ function AffiliatesPanel() {
       }
       setShowForm(false);
       setFormEmail('');
+      setSelectedUser(null);
+      setUserSearch('');
       load();
     } catch {
       setFormError('Something went wrong.');
@@ -963,7 +995,7 @@ function AffiliatesPanel() {
           <DollarSign className="w-4 h-4" /> Affiliates
         </h3>
         <button
-          onClick={() => setShowForm(v => !v)}
+          onClick={openForm}
           className="text-[11px] font-bold px-2.5 py-1.5 rounded-lg bg-primary text-primary-foreground"
         >
           {showForm ? 'Cancel' : '+ Add Affiliate'}
@@ -973,14 +1005,51 @@ function AffiliatesPanel() {
       {showForm && (
         <div className="p-4 border-b border-border/30 space-y-3">
           <div>
-            <label className="text-[11px] font-bold text-muted-foreground block mb-1">User email</label>
-            <input
-              type="email"
-              value={formEmail}
-              onChange={(e) => setFormEmail(e.target.value)}
-              placeholder="affiliate@example.com"
-              className="w-full px-3 py-2 rounded-lg bg-secondary text-sm border border-border/40"
-            />
+            <label className="text-[11px] font-bold text-muted-foreground block mb-1">User</label>
+            {selectedUser ? (
+              <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-secondary border border-border/40">
+                <div className="min-w-0">
+                  <p className="text-sm font-bold truncate">{selectedUser.firstName || selectedUser.email}</p>
+                  <p className="text-[11px] text-muted-foreground truncate">{selectedUser.email}</p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full ${selectedUser.tier === 'pro' ? 'bg-primary text-primary-foreground' : selectedUser.tier === 'admin' ? 'bg-amber-500 text-white' : 'bg-muted text-muted-foreground'}`}>
+                    {selectedUser.tier}
+                  </span>
+                  <button onClick={() => { setSelectedUser(null); setFormEmail(''); }} className="text-xs text-destructive">✕</button>
+                </div>
+              </div>
+            ) : (
+              <div className="relative">
+                <input
+                  type="text"
+                  value={userSearch}
+                  onChange={(e) => setUserSearch(e.target.value)}
+                  placeholder={usersLoading ? 'Loading users...' : 'Search by name or email...'}
+                  disabled={usersLoading}
+                  className="w-full px-3 py-2 rounded-lg bg-secondary text-sm border border-border/40 disabled:opacity-60"
+                />
+                {filteredUsers.length > 0 && (
+                  <div className="absolute z-10 top-full left-0 right-0 mt-1 rounded-lg bg-card border border-border/40 shadow-lg max-h-56 overflow-y-auto">
+                    {filteredUsers.map(u => (
+                      <button
+                        key={u.id}
+                        onClick={() => selectUser(u)}
+                        className="w-full flex items-center justify-between gap-2 px-3 py-2 text-left hover:bg-secondary/60 border-b border-border/20 last:border-0"
+                      >
+                        <div className="min-w-0">
+                          <p className="text-sm font-bold truncate">{u.firstName || u.email}</p>
+                          <p className="text-[11px] text-muted-foreground truncate">{u.email}</p>
+                        </div>
+                        <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full shrink-0 ${u.tier === 'pro' ? 'bg-primary text-primary-foreground' : u.tier === 'admin' ? 'bg-amber-500 text-white' : 'bg-muted text-muted-foreground'}`}>
+                          {u.tier}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <div>
