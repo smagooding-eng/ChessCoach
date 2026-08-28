@@ -740,13 +740,53 @@ function ReferralCodesPanel() {
   const [codes, setCodes] = useState<{ userId: string; email: string | null; displayName: string; inviteCode: string; referred: number; converted: number }[]>([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState('');
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const load = () => {
     apiFetch('/api/admin/referral-codes', { credentials: 'include' })
       .then(r => r.ok ? r.json() : null)
       .then(d => setCodes(d?.codes ?? []))
       .finally(() => setLoading(false));
-  }, []);
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const startEdit = (userId: string, currentCode: string) => {
+    setEditingId(userId);
+    setEditValue(currentCode);
+    setEditError(null);
+  };
+
+  const saveEdit = async (userId: string) => {
+    setEditError(null);
+    if (!editValue.trim()) {
+      setEditError('Code cannot be empty.');
+      return;
+    }
+    setEditSaving(true);
+    try {
+      const res = await apiFetch(`/api/admin/users/${userId}/invite-code`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: editValue.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setEditError(data.error || 'Failed to save.');
+        setEditSaving(false);
+        return;
+      }
+      setEditingId(null);
+      load();
+    } catch {
+      setEditError('Something went wrong.');
+    }
+    setEditSaving(false);
+  };
 
   const totalReferred = codes.reduce((sum, c) => sum + c.referred, 0);
   const totalConverted = codes.reduce((sum, c) => sum + c.converted, 0);
@@ -777,21 +817,57 @@ function ReferralCodesPanel() {
           <>
             <div className="divide-y divide-border/20">
               {visibleCodes.map((c) => (
-                <div key={c.userId} className="flex items-center justify-between gap-3 px-3 py-2.5">
-                  <div className="min-w-0">
-                    <p className="text-sm font-bold text-foreground truncate">{c.displayName}</p>
-                    <p className="text-[11px] font-mono text-muted-foreground">{c.inviteCode}</p>
-                  </div>
-                  <div className="flex items-center gap-4 shrink-0 text-right">
-                    <div>
-                      <p className="text-sm font-black text-foreground">{c.referred}</p>
-                      <p className="text-[9px] text-muted-foreground uppercase tracking-wide">Referred</p>
+                <div key={c.userId} className="px-3 py-2.5">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-bold text-foreground truncate">{c.displayName}</p>
+                      {editingId === c.userId ? (
+                        <div className="flex items-center gap-1.5 mt-1">
+                          <input
+                            type="text"
+                            value={editValue}
+                            onChange={(e) => setEditValue(e.target.value)}
+                            className="w-32 px-2 py-1 rounded-lg bg-secondary text-xs font-mono border border-border/40"
+                            autoFocus
+                          />
+                          <button
+                            onClick={() => saveEdit(c.userId)}
+                            disabled={editSaving}
+                            className="text-[10px] font-bold px-2 py-1 rounded-lg bg-primary text-primary-foreground disabled:opacity-50"
+                          >
+                            {editSaving ? '...' : 'Save'}
+                          </button>
+                          <button onClick={() => setEditingId(null)} className="text-[10px] font-bold px-2 py-1 rounded-lg bg-secondary text-muted-foreground">
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1.5">
+                          <p className="text-[11px] font-mono text-muted-foreground">{c.inviteCode}</p>
+                          <button
+                            onClick={() => startEdit(c.userId, c.inviteCode)}
+                            className="text-muted-foreground hover:text-primary transition-colors"
+                            aria-label="Edit referral code"
+                          >
+                            <Edit3 className="w-3 h-3" />
+                          </button>
+                        </div>
+                      )}
                     </div>
-                    <div>
-                      <p className="text-sm font-black text-primary">{c.converted}</p>
-                      <p className="text-[9px] text-muted-foreground uppercase tracking-wide">Converted</p>
+                    <div className="flex items-center gap-4 shrink-0 text-right">
+                      <div>
+                        <p className="text-sm font-black text-foreground">{c.referred}</p>
+                        <p className="text-[9px] text-muted-foreground uppercase tracking-wide">Referred</p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-black text-primary">{c.converted}</p>
+                        <p className="text-[9px] text-muted-foreground uppercase tracking-wide">Converted</p>
+                      </div>
                     </div>
                   </div>
+                  {editingId === c.userId && editError && (
+                    <p className="text-[10px] text-destructive mt-1">{editError}</p>
+                  )}
                 </div>
               ))}
             </div>

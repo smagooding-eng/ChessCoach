@@ -444,6 +444,39 @@ router.get("/admin/referral-signups", requireAdmin, async (_req: Request, res: R
   }
 });
 
+// Set (or change) a specific user's referral/invite code. Validates the
+// new code isn't already taken by someone else, since inviteCode has a
+// unique constraint at the DB level -- checking here first gives a
+// clear error message instead of a raw constraint-violation exception.
+router.post("/admin/users/:userId/invite-code", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const userId = req.params.userId as string;
+    const { code } = req.body ?? {};
+    if (!code || typeof code !== "string" || !code.trim()) {
+      res.status(400).json({ error: "Code is required" });
+      return;
+    }
+    const normalized = code.trim().toUpperCase();
+
+    const [target] = await db.select().from(usersTable).where(eq(usersTable.id, userId));
+    if (!target) {
+      res.status(404).json({ error: "User not found" });
+      return;
+    }
+
+    const [existing] = await db.select().from(usersTable).where(eq(usersTable.inviteCode, normalized));
+    if (existing && existing.id !== userId) {
+      res.status(409).json({ error: `Code "${normalized}" is already in use by another user` });
+      return;
+    }
+
+    await db.update(usersTable).set({ inviteCode: normalized }).where(eq(usersTable.id, userId));
+    res.json({ success: true, inviteCode: normalized });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || "Failed to update referral code" });
+  }
+});
+
 router.get("/admin/seo-articles", requireAdmin, async (_req: Request, res: Response) => {
   try {
     const articles = await db
