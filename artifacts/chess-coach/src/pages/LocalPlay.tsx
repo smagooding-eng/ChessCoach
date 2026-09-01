@@ -147,6 +147,7 @@ export function LocalPlay() {
   const hasTimer = !!timeControl && timeControl.seconds !== null;
 
   const handleMove = useCallback((san: string) => {
+    if (awaitingSubmit) return;
     const moverColor = chess.turn();
     const moveResult = chess.move(san);
     if (!moveResult) return;
@@ -173,7 +174,21 @@ export function LocalPlay() {
     // suppressConfirmMoves below).
     setClockActive(moverColor);
     setAwaitingSubmit(true);
-  }, [chess]);
+  }, [chess, awaitingSubmit]);
+
+  // Reverts the move currently awaiting clock confirmation. Only
+  // meaningful while awaitingSubmit is true -- the turn hasn't actually
+  // passed yet at that point (that only happens on submitClock), so
+  // undoing here just gives the same player another attempt, with no
+  // clock/turn implications.
+  const undoLastMove = useCallback(() => {
+    if (!awaitingSubmit) return;
+    const undone = chess.undo();
+    if (!undone) return;
+    setMoves(prev => prev.slice(0, -1));
+    setFen(chess.fen());
+    setAwaitingSubmit(false);
+  }, [chess, awaitingSubmit]);
 
   const submitClock = (side: 'w' | 'b') => {
     if (result !== 'playing' || !awaitingSubmit) return;
@@ -346,9 +361,18 @@ export function LocalPlay() {
         )}
 
         {(!hasTimer || clockStarted) && awaitingSubmit && result === 'playing' && (
-          <p className="text-[11px] text-primary font-medium -mt-1" style={{ transform: clockActive === 'b' ? 'scaleY(-1)' : undefined }}>
-            {clockActive === 'w' ? 'White' : 'Black'}: tap your {hasTimer ? 'clock' : 'button'} to pass the turn
-          </p>
+          <div className="flex items-center justify-center gap-2 -mt-1" style={{ transform: clockActive === 'b' ? 'scaleY(-1)' : undefined }}>
+            <p className="text-[11px] text-primary font-medium">
+              {clockActive === 'w' ? 'White' : 'Black'}: tap your {hasTimer ? 'clock' : 'button'} to pass the turn
+            </p>
+            <button
+              onClick={undoLastMove}
+              className="text-[11px] font-bold px-2 py-0.5 rounded-lg underline"
+              style={{ color: 'rgba(255,255,255,0.5)' }}
+            >
+              Undo move
+            </button>
+          </div>
         )}
 
         {/* Board, centered and genuinely edge-to-edge in fullscreen --
@@ -364,7 +388,7 @@ export function LocalPlay() {
         <div className={cn('w-full local-play-board', fullscreen && '-mx-4 w-screen')}>
           <ChessBoard
             fen={fen}
-            practiceMode={result === 'playing' && (!hasTimer || clockStarted)}
+            practiceMode={result === 'playing' && (!hasTimer || clockStarted) && !awaitingSubmit}
             onMovePlayed={handleMove}
             maxWidthOverride={fullscreen ? 'min(100vw, 62vh)' : undefined}
             suppressConfirmMoves

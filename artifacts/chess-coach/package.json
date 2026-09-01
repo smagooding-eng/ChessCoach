@@ -73,7 +73,8 @@
     "zod": "catalog:"
   },
   "dependencies": {
-    "@heycatch/sdk": "^0.7.0",
+    "@stripe/react-stripe-js": "^2.8.1",
+    "@stripe/stripe-js": "^4.8.0",
     "chess.js": "^1.4.0",
     "html2canvas": "^1.4.1",
     "react-chessboard": "^5.10.0",

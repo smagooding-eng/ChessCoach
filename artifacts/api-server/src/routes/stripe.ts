@@ -182,6 +182,67 @@ router.post('/stripe/checkout', async (req: Request, res: Response) => {
   }
 });
 
+// Embedded checkout -- creates a subscription in "incomplete" status and
+// returns the client secret of its first invoice's payment intent, so
+// the frontend can collect card details and confirm payment entirely
+// in-page via Stripe Elements (PaymentElement), with no redirect to a
+// Stripe-hosted page. This is Stripe's own recommended pattern for
+// embedded subscription checkout -- see docs.stripe.com/billing/subscriptions/build-subscriptions.
+router.post('/stripe/checkout-embedded', async (req: Request, res: Response) => {
+  if (!req.isAuthenticated()) {
+    res.status(401).json({ error: 'Not authenticated' });
+    return;
+  }
+
+  const { priceId } = req.body;
+  if (!priceId || typeof priceId !== 'string' || !priceId.startsWith('price_')) {
+    res.status(400).json({ error: 'Valid priceId is required' });
+    return;
+  }
+
+  try {
+    const user = await storage.getUser(req.user.id);
+    let customerId = user?.stripeCustomerId;
+
+    if (!customerId) {
+      const customer = await stripeService.createCustomer(
+        user?.email || `${req.user.id}@chess-coach.app`,
+        req.user.id,
+      );
+      await storage.updateUserStripeInfo(req.user.id, { stripeCustomerId: customer.id });
+      customerId = customer.id;
+    }
+
+    const stripe = await getUncachableStripeClient();
+    const subscription = await stripe.subscriptions.create({
+      customer: customerId,
+      items: [{ price: priceId }],
+      payment_behavior: 'default_incomplete',
+      payment_settings: {
+        save_default_payment_method: 'on_subscription',
+        payment_method_types: ['card'],
+      },
+      expand: ['latest_invoice.payment_intent'],
+    });
+
+    const invoice: any = subscription.latest_invoice;
+    const paymentIntent = invoice?.payment_intent;
+
+    if (!paymentIntent?.client_secret) {
+      res.status(500).json({ error: 'Could not initialize payment. Please try again.' });
+      return;
+    }
+
+    res.json({
+      subscriptionId: subscription.id,
+      clientSecret: paymentIntent.client_secret,
+    });
+  } catch (err: any) {
+    console.error('Embedded checkout error:', err.message);
+    res.status(500).json({ error: err?.message || 'Failed to start checkout' });
+  }
+});
+
 router.post('/stripe/portal', async (req: Request, res: Response) => {
   if (!req.isAuthenticated()) {
     res.status(401).json({ error: 'Not authenticated' });

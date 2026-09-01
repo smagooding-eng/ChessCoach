@@ -3,6 +3,7 @@ import { useUser } from '@/hooks/use-user';
 import { useLocation, Link } from 'wouter';
 import { HeroDemo } from '@/components/HeroDemo';
 import { trackFunnelEvent } from '@/lib/funnelTracking';
+import { useLandingFunnelTracking } from '@/hooks/use-landing-funnel-tracking';
 import { ArrowRight, Mail, Eye, EyeOff, UserPlus, LogIn, Search, BarChart3, Brain, TrendingUp, Check, X, Zap, Target, Crosshair, BookOpen, Gamepad2, Users, Star, Flame, Trophy, Sparkles, Download as DownloadIcon, Smartphone } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { apiFetch, apiUrl, setAuthToken } from '@/lib/api';
@@ -641,6 +642,8 @@ export function LandingPage() {
     trackFunnelEvent('landing_view');
   }, []);
 
+  useLandingFunnelTracking();
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const ref = params.get('ref');
@@ -703,7 +706,7 @@ export function LandingPage() {
         </div>
       </nav>
 
-      <section className="relative pt-12 pb-16 sm:pt-20 sm:pb-24">
+      <section data-track-section="hero" className="relative pt-12 pb-16 sm:pt-20 sm:pb-24">
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div className="absolute top-[-200px] left-1/2 -translate-x-1/2 w-[1000px] h-[800px] rounded-full blur-[160px]" style={{ background: `${G}08` }} />
         </div>
@@ -829,7 +832,7 @@ export function LandingPage() {
 
       <SocialProofBar />
 
-      <section className="py-16 sm:py-20" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+      <section data-track-section="how_it_works" className="py-16 sm:py-20" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
         <div className="max-w-5xl mx-auto px-4 sm:px-8">
           <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} className="text-center mb-12">
             <h2 className="text-2xl sm:text-3xl font-black" style={{ color: TEXT }}>
@@ -865,7 +868,7 @@ export function LandingPage() {
         </div>
       </section>
 
-      <section className="py-16 sm:py-20" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+      <section data-track-section="differentiators" className="py-16 sm:py-20" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
         <div className="max-w-5xl mx-auto px-4 sm:px-8">
           <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} className="text-center mb-12">
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full mb-4 text-[11px] font-black tracking-wider"
@@ -902,7 +905,7 @@ export function LandingPage() {
         </div>
       </section>
 
-      <section className="py-16 sm:py-20" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+      <section data-track-section="features" className="py-16 sm:py-20" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
         <div className="max-w-5xl mx-auto px-4 sm:px-8">
           <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} className="text-center mb-12">
             <h2 className="text-2xl sm:text-3xl font-black" style={{ color: TEXT }}>
@@ -945,7 +948,7 @@ export function LandingPage() {
         </div>
       </section>
 
-      <section className="py-16 sm:py-20" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+      <section data-track-section="faq" className="py-16 sm:py-20" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
         <div className="max-w-2xl mx-auto px-4 sm:px-8">
           <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} className="text-center mb-10">
             <h2 className="text-2xl sm:text-3xl font-black" style={{ color: TEXT }}>Questions</h2>
@@ -968,7 +971,7 @@ export function LandingPage() {
         </div>
       </section>
 
-      <section id="pricing" className="py-16 sm:py-20" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+      <section data-track-section="pricing" id="pricing" className="py-16 sm:py-20" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
         <div className="max-w-lg mx-auto px-4 sm:px-8">
           <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} className="text-center mb-10">
             <p className="text-xs font-black uppercase tracking-widest mb-3" style={{ color: G }}>
@@ -1060,7 +1063,7 @@ export function LandingPage() {
         </div>
       </section>
 
-      <section className="py-20 sm:py-28" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+      <section data-track-section="final_cta" className="py-20 sm:py-28" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
         <div className="max-w-3xl mx-auto px-4 sm:px-8 text-center">
           <motion.div initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}>
             <h2 className="text-2xl sm:text-3xl font-black leading-snug" style={{ color: TEXT }}>

@@ -12,7 +12,7 @@ import {
   GetAnalysisSummaryResponse,
 } from "@workspace/api-zod";
 import { analyzePlayerGames, computeGroundedWeaknesses } from "../lib/openaiAnalysis";
-import { accuracyFromAvgLoss } from "../lib/engineAnalysis";
+import { accuracyFromAvgLoss, evaluateAllPositions, classifyFromWinPctLoss, winPct, isSacrificialMove } from "../lib/engineAnalysis";
 import { randomUUID } from "crypto";
 import type { Logger } from "pino";
 import OpenAI from "openai";
@@ -1343,6 +1343,92 @@ Return ONLY a JSON object mapping each square to its color, nothing else. Exampl
   } catch (err: unknown) {
     req.log?.error?.({ err }, "Scan position error");
     res.status(500).json({ error: "Failed to analyze the image. Please try again." });
+  }
+});
+
+// Analyzes an arbitrary sequence of moves with the real engine-based
+// classification pipeline -- unlike every other analysis route, this
+// doesn't require a stored game. Built specifically so bot games (which
+// are ephemeral, client-side, and never saved to gamesTable) can get an
+// accurate re-classification after the game ends, replacing the
+// necessarily much cruder depth-2 client-side estimate used live during
+// play for instant feedback.
+router.post("/analysis/analyze-moves", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { moves, startFen } = req.body as {
+      moves?: { san: string; color: "white" | "black" }[];
+      startFen?: string;
+    };
+    if (!Array.isArray(moves) || moves.length === 0) {
+      res.status(400).json({ error: "moves array is required" });
+      return;
+    }
+    if (moves.length > 200) {
+      res.status(400).json({ error: "Too many moves for a single request" });
+      return;
+    }
+
+    const chess = startFen ? new Chess(startFen) : new Chess();
+    const fens: string[] = [chess.fen()];
+    const uciMoves: { from: string; to: string }[] = [];
+    for (const m of moves) {
+      const result = chess.move(m.san);
+      if (!result) {
+        res.status(400).json({ error: `Illegal move in sequence: ${m.san}` });
+        return;
+      }
+      fens.push(chess.fen());
+      uciMoves.push({ from: result.from, to: result.to });
+    }
+
+    const evals = await evaluateAllPositions(fens);
+
+    const results: { moveIndex: number; san: string; classification: string }[] = [];
+    for (let i = 0; i < moves.length; i++) {
+      const evalBefore = evals[i];
+      const evalAfter = evals[i + 1];
+      if (!evalBefore || !evalAfter) continue;
+
+      const playerColor = moves[i].color;
+      const cpBefore = evalBefore.cpWhite;
+      const cpAfter = evalAfter.cpWhite;
+      const playedUci = `${uciMoves[i].from}${uciMoves[i].to}`;
+      const isTopEngineMove = evalBefore.bestMoveUci.startsWith(playedUci);
+      const isSecondEngineMove = evalBefore.secondBestUci.startsWith(playedUci);
+      const isOpeningRange = i < 30;
+      const wasBalanced = Math.abs(cpBefore) < 150;
+
+      let winPctLossRaw: number;
+      if (playerColor === "white") {
+        winPctLossRaw = winPct(cpBefore) - winPct(cpAfter);
+      } else {
+        winPctLossRaw = (100 - winPct(cpBefore)) - (100 - winPct(cpAfter));
+      }
+      const playerWinBefore = playerColor === "white" ? winPct(cpBefore) : 100 - winPct(cpBefore);
+      const playerWinAfter = playerColor === "white" ? winPct(cpAfter) : 100 - winPct(cpAfter);
+
+      let legalMoveCount = 20;
+      try {
+        const pos = new Chess(fens[i]);
+        legalMoveCount = pos.moves().length;
+      } catch {}
+
+      let classification = classifyFromWinPctLoss(
+        winPctLossRaw, isTopEngineMove, isSecondEngineMove, isOpeningRange, wasBalanced,
+        playerWinBefore, false, playerWinAfter, legalMoveCount, cpBefore, cpAfter, playerColor,
+      );
+
+      if (classification === "brilliant") {
+        if (!isSacrificialMove(fens[i], moves[i].san)) classification = "best";
+      }
+
+      results.push({ moveIndex: i, san: moves[i].san, classification });
+    }
+
+    res.json({ results });
+  } catch (err: any) {
+    req.log?.error?.({ err }, "analyze-moves error");
+    res.status(500).json({ error: "Failed to analyze moves" });
   }
 });
 

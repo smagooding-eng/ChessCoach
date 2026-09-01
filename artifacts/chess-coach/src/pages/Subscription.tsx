@@ -5,6 +5,7 @@ import { useLocation } from 'wouter';
 import { Crown, Check, Zap, BrainCircuit, GraduationCap, Swords, Volume2, Loader2, ExternalLink, Clock } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { apiFetch, apiFetchLocal } from '@/lib/api';
+import { EmbeddedCheckoutForm } from '@/components/EmbeddedCheckoutForm';
 
 const PREMIUM_FEATURES = [
   { icon: BrainCircuit, label: 'Deep Game Analysis', desc: 'In-depth analysis of every game you play' },
@@ -41,7 +42,7 @@ export function Subscription() {
   const [, setLocation] = useLocation();
   const [products, setProducts] = useState<ProductInfo[]>([]);
   const [loading, setLoading] = useState(true);
-  const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
+  const [selectedPriceId, setSelectedPriceId] = useState<string | null>(null);
   const [portalLoading, setPortalLoading] = useState(false);
 
   const searchParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
@@ -67,37 +68,6 @@ export function Subscription() {
       })
       .catch(() => setLoading(false));
   }, []);
-
-  const [checkoutError, setCheckoutError] = useState('');
-
-  const handleCheckout = async (priceId: string) => {
-    if (!isAuthenticated) {
-      setLocation('/setup');
-      return;
-    }
-
-    setCheckoutLoading(priceId);
-    setCheckoutError('');
-    try {
-      const res = await apiFetch('/api/stripe/checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ priceId }),
-      });
-      const data = await res.json();
-      if (data.url) {
-        window.location.href = data.url;
-      } else {
-        setCheckoutError(data.error || 'Could not start checkout. Please try again.');
-      }
-    } catch (err) {
-      console.error('Checkout error:', err);
-      setCheckoutError('Connection error. Please try again.');
-    } finally {
-      setCheckoutLoading(null);
-    }
-  };
 
   const [portalError, setPortalError] = useState('');
 
@@ -247,44 +217,36 @@ export function Subscription() {
                 <div className="flex justify-center py-4">
                   <Loader2 className="w-6 h-6 animate-spin text-primary" />
                 </div>
+              ) : selectedPriceId ? (
+                <EmbeddedCheckoutForm
+                  priceId={selectedPriceId}
+                  onSuccess={() => {
+                    setSelectedPriceId(null);
+                    refreshSubscription();
+                  }}
+                  onCancel={() => setSelectedPriceId(null)}
+                />
               ) : (
                 <div className="space-y-2">
                   {monthlyPrice && (
                     <button
-                      onClick={() => handleCheckout(monthlyPrice.id)}
-                      disabled={!!checkoutLoading}
+                      onClick={() => isAuthenticated ? setSelectedPriceId(monthlyPrice.id) : setLocation('/setup')}
                       className="w-full flex items-center justify-center gap-2 btn-primary text-sm py-3"
                     >
-                      {checkoutLoading === monthlyPrice.id ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <>
-                          <Zap className="w-4 h-4" />
-                          ${(monthlyPrice.unit_amount / 100).toFixed(0)}/month
-                        </>
-                      )}
+                      <Zap className="w-4 h-4" />
+                      ${(monthlyPrice.unit_amount / 100).toFixed(0)}/month
                     </button>
                   )}
                   {yearlyPrice && (
                     <button
-                      onClick={() => handleCheckout(yearlyPrice.id)}
-                      disabled={!!checkoutLoading}
+                      onClick={() => isAuthenticated ? setSelectedPriceId(yearlyPrice.id) : setLocation('/setup')}
                       className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-secondary hover:bg-secondary/80 transition-colors font-bold text-sm"
                     >
-                      {checkoutLoading === yearlyPrice.id ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <>
-                          ${(yearlyPrice.unit_amount / 100).toFixed(0)}/year
-                        </>
-                      )}
+                      ${(yearlyPrice.unit_amount / 100).toFixed(0)}/year
                     </button>
                   )}
                   {!yearlyPrice && !monthlyPrice && (
                     <p className="text-sm text-muted-foreground text-center">Pricing plans coming soon.</p>
-                  )}
-                  {checkoutError && (
-                    <p className="text-xs text-red-400 text-center mt-2">{checkoutError}</p>
                   )}
                 </div>
               )}

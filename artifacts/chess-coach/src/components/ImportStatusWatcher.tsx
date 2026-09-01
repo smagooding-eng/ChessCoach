@@ -71,8 +71,10 @@ export function ImportStatusWatcher() {
   const [, navigate] = useLocation();
   const queryClient = useQueryClient();
   const [completed, setCompleted] = useState<Job[]>([]);
+  const [pendingCount, setPendingCount] = useState(0);
   const [showPickModal, setShowPickModal] = useState(false);
   const [bannerVisible, setBannerVisible] = useState(false);
+  const [pendingBannerDismissed, setPendingBannerDismissed] = useState(false);
   const pollRef = useRef<number | null>(null);
 
   // Polling loop
@@ -102,7 +104,7 @@ export function ImportStatusWatcher() {
       try {
         migrateSessionJobs();
         const jobs = readJobs(userId);
-        if (jobs.length === 0) return;
+        if (jobs.length === 0) { setPendingCount(0); return; }
 
         const stillPending: Job[] = [];
         const newlyDone: Job[] = [];
@@ -129,6 +131,7 @@ export function ImportStatusWatcher() {
         }
 
         writeJobs(userId, stillPending, jobs);
+        setPendingCount(stillPending.length);
 
         if (newlyDone.length > 0) {
           invalidateEloCache();
@@ -159,10 +162,19 @@ export function ImportStatusWatcher() {
     setCompleted([]);
   };
 
+  const dismissPendingBanner = () => {
+    setPendingBannerDismissed(true);
+  };
+
   const goToGames = () => {
     setBannerVisible(false);
     navigate('/games');
     setShowPickModal(true);
+  };
+
+  const goToAnalysis = () => {
+    setBannerVisible(false);
+    navigate('/analysis');
   };
 
   if (!authUser) return null;
@@ -172,6 +184,27 @@ export function ImportStatusWatcher() {
 
   return (
     <>
+      {pendingCount > 0 && !bannerVisible && !pendingBannerDismissed && (
+        <div className="fixed bottom-5 right-5 z-50 max-w-sm rounded-2xl p-4 shadow-2xl"
+          style={{ background: BG_CARD, border: `1px solid ${BORDER}`, boxShadow: '0 18px 50px rgba(0,0,0,0.55)' }}>
+          <div className="flex items-start gap-3">
+            <div className="rounded-xl p-2 shrink-0" style={{ background: 'rgba(129,182,76,0.15)', color: CHESSCOM_GREEN }}>
+              <div className="w-5 h-5 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: `${CHESSCOM_GREEN} transparent ${CHESSCOM_GREEN} ${CHESSCOM_GREEN}` }} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h3 className="text-sm font-black" style={{ color: TEXT_LIGHT }}>
+                We're importing your games...
+              </h3>
+              <p className="text-xs mt-0.5" style={{ color: TEXT_MUTED }}>
+                This usually takes a minute or two. We'll let you know the moment they're ready to review.
+              </p>
+            </div>
+            <button onClick={dismissPendingBanner} className="rounded-md p-1 hover:bg-white/5 shrink-0" style={{ color: TEXT_MUTED }}>
+              <X size={14} />
+            </button>
+          </div>
+        </div>
+      )}
       {bannerVisible && completed.length > 0 && (
         <div className="fixed bottom-5 right-5 z-50 max-w-sm rounded-2xl p-4 shadow-2xl"
           style={{ background: BG_CARD, border: `1px solid ${BORDER}`, boxShadow: '0 18px 50px rgba(0,0,0,0.55)' }}>
@@ -184,20 +217,25 @@ export function ImportStatusWatcher() {
                 Your {labels} games are ready!
               </h3>
               <p className="text-xs mt-0.5" style={{ color: TEXT_MUTED }}>
-                Pick a game to review first.
+                See what the engine found, or jump into a single game first.
               </p>
               <div className="mt-3 flex gap-2">
-                <button onClick={goToGames}
+                <button onClick={goToAnalysis}
                   className="flex-1 px-3 py-1.5 rounded-lg text-xs font-black"
                   style={{ background: CHESSCOM_GREEN, color: 'white' }}>
-                  Open my games
+                  Run Analysis
                 </button>
-                <button onClick={dismissBanner}
-                  className="px-3 py-1.5 rounded-lg text-xs font-bold"
-                  style={{ color: TEXT_MUTED, border: `1px solid ${BORDER}` }}>
-                  Later
+                <button onClick={goToGames}
+                  className="flex-1 px-3 py-1.5 rounded-lg text-xs font-bold"
+                  style={{ background: 'rgba(255,255,255,0.08)', color: TEXT_LIGHT }}>
+                  Browse Games
                 </button>
               </div>
+              <button onClick={dismissBanner}
+                className="w-full mt-2 px-3 py-1 rounded-lg text-[11px] font-bold"
+                style={{ color: TEXT_MUTED }}>
+                Later
+              </button>
             </div>
             <button onClick={dismissBanner} className="rounded-md p-1 hover:bg-white/5" style={{ color: TEXT_MUTED }}>
               <X size={14} />

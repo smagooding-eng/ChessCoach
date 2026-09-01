@@ -93,6 +93,34 @@ export function Setup() {
 
       if (data.user?.chesscomUsername) {
         login(data.user.chesscomUsername);
+
+        // Fire-and-forget: start the import + review immediately on
+        // signup, not dependent on the user ever reaching or completing
+        // /welcome. Real-user analytics showed most visitors skipping or
+        // bouncing off /welcome, which meant the import (previously only
+        // triggered from there) never ran -- so even users who did make
+        // it to /analysis had nothing to analyze. This is a second
+        // trigger point, not a replacement; /welcome's own trigger stays
+        // in place as a safety net for edge cases (e.g. a user who
+        // registers without a username here, then adds one on /welcome).
+        if (mode === 'register') {
+          (async () => {
+            try {
+              await apiFetch('/api/games/import', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ username: data.user.chesscomUsername, platform: 'chesscom', months: 3 }),
+              });
+              await apiFetch('/api/games/review-all', { method: 'POST', credentials: 'include' });
+            } catch {
+              // Silent -- this is a background convenience trigger, not
+              // a blocking step in the signup flow. /welcome's own
+              // trigger and the manual Import page remain available if
+              // this happens to fail.
+            }
+          })();
+        }
       }
 
       await refreshAuth();
@@ -209,10 +237,10 @@ export function Setup() {
                 type={showPassword ? 'text' : 'password'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder={mode === 'register' ? 'Min 6 characters' : 'Your password'}
+                placeholder={mode === 'register' ? 'At least 8 characters' : 'Your password'}
                 className="w-full px-4 py-3 pr-10 rounded-xl bg-secondary/80 border-2 border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/20 transition-all text-sm"
                 required
-                minLength={mode === 'register' ? 6 : undefined}
+                minLength={mode === 'register' ? 8 : undefined}
               />
               <button
                 type="button"
@@ -222,6 +250,11 @@ export function Setup() {
                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
+            {mode === 'register' && (
+              <p className="text-[11px] text-muted-foreground mt-1 ml-1">
+                At least 8 characters, with at least one letter and one number.
+              </p>
+            )}
           </div>
 
           {mode === 'register' && (

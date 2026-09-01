@@ -176,6 +176,19 @@ export function Puzzles() {
     }
   }, [puzzleTheme, ratingBand, sacrificePiece]);
 
+  // Clears the filters most likely to have narrowed the pool to nothing
+  // (rating band, theme, sacrifice piece), then retries. Previously
+  // "Try Again" on the no-puzzles state just re-ran the exact same
+  // query that had just returned nothing, which would fail again for
+  // the same reason -- real-user analytics showed this button getting
+  // clicked 7+ times in a row in a single session, almost certainly
+  // because it kept failing identically each time.
+  const clearFiltersAndRetry = useCallback(() => {
+    setPuzzleTheme('');
+    setSacrificePiece('');
+    setRatingBand('');
+  }, []);
+
   useEffect(() => {
     fetchNextPuzzle();
     fetchStats();
@@ -568,10 +581,11 @@ export function Puzzles() {
 
             {state === 'no_puzzles' && (
               <div className="flex flex-col items-center justify-center py-16 text-center">
-                <p className="text-sm mb-4" style={{ color: TEXT_MUTED }}>No puzzles available right now.</p>
-                <button onClick={fetchNextPuzzle}
+                <p className="text-sm mb-1" style={{ color: TEXT_MUTED }}>No puzzles match your current filters.</p>
+                <p className="text-xs mb-4" style={{ color: TEXT_MUTED }}>Try a broader difficulty range or theme.</p>
+                <button onClick={clearFiltersAndRetry}
                   className="px-4 py-2 rounded-xl text-sm font-bold" style={{ background: CHESSCOM_GREEN, color: '#000' }}>
-                  Try Again
+                  Clear Filters &amp; Try Again
                 </button>
               </div>
             )}

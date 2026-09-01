@@ -149,8 +149,8 @@ router.get("/puzzles/next", requireAuth, async (req: Request, res: Response) => 
     const minRatingParam = typeof req.query.minRating === "string" ? parseInt(req.query.minRating, 10) : null;
     const maxRatingParam = typeof req.query.maxRating === "string" ? parseInt(req.query.maxRating, 10) : null;
     const ratingConditions = [
-      ...(minRatingParam && !isNaN(minRatingParam) ? [sql`${puzzlesTable.rating} >= ${minRatingParam}`] : []),
-      ...(maxRatingParam && !isNaN(maxRatingParam) ? [sql`${puzzlesTable.rating} <= ${maxRatingParam}`] : []),
+      ...(minRatingParam !== null && !isNaN(minRatingParam) ? [sql`${puzzlesTable.rating} >= ${minRatingParam}`] : []),
+      ...(maxRatingParam !== null && !isNaN(maxRatingParam) ? [sql`${puzzlesTable.rating} <= ${maxRatingParam}`] : []),
     ];
 
     // Optional piece-type filter for sacrifice puzzles -- Lichess's

@@ -14,7 +14,15 @@ function requireAdmin(req: Request, res: Response, next: Function) {
   next();
 }
 
-const VALID_EVENTS = new Set(["landing_view", "mia_started", "mia_skipped", "signup_clicked", "signup_completed"]);
+const SECTION_IDS = ["hero", "how_it_works", "differentiators", "features", "faq", "pricing", "final_cta"] as const;
+
+const VALID_EVENTS = new Set([
+  "landing_view", "mia_started", "mia_skipped", "signup_clicked", "signup_completed",
+  "scroll_25", "scroll_50", "scroll_75", "scroll_100",
+  "engaged_10s",
+  ...SECTION_IDS.map((s) => `viewed_${s}`),
+  ...SECTION_IDS.map((s) => `exit_${s}`),
+]);
 
 // Public -- fired directly from the landing page, no auth (most visitors
 // firing these events haven't signed up yet, that's the whole point).
@@ -54,6 +62,21 @@ router.get("/admin/landing-funnel", requireAdmin, async (req: Request, res: Resp
     const signupClicked = countMap["signup_clicked"] ?? 0;
     const signupCompleted = countMap["signup_completed"] ?? 0;
 
+    const scrollDepth = {
+      scroll25: countMap["scroll_25"] ?? 0,
+      scroll50: countMap["scroll_50"] ?? 0,
+      scroll75: countMap["scroll_75"] ?? 0,
+      scroll100: countMap["scroll_100"] ?? 0,
+    };
+    const engaged10s = countMap["engaged_10s"] ?? 0;
+
+    const sectionViews: Record<string, number> = {};
+    const sectionExits: Record<string, number> = {};
+    for (const s of SECTION_IDS) {
+      sectionViews[s] = countMap[`viewed_${s}`] ?? 0;
+      sectionExits[s] = countMap[`exit_${s}`] ?? 0;
+    }
+
     // "Left without doing anything" = viewed the landing page but never
     // triggered any other funnel event at all (not even Mia or signup click).
     const distinctActiveVisitors = await db
@@ -74,6 +97,10 @@ router.get("/admin/landing-funnel", requireAdmin, async (req: Request, res: Resp
       signupClicked,
       signupCompleted,
       leftWithoutAction,
+      scrollDepth,
+      engaged10s,
+      sectionViews,
+      sectionExits,
     });
   } catch (err: any) {
     res.status(500).json({ error: "Failed to fetch landing funnel stats", details: err.message });

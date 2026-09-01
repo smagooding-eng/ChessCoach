@@ -244,11 +244,22 @@ export function ChessBoard({
     setPromotionPending(null);
   }
 
+  // Tracks whether a confirm is currently being processed, purely for
+  // immediate visual feedback -- separate from pendingMove itself so the
+  // button can visibly react the instant it's tapped, before the
+  // pendingMove state clears and the whole overlay unmounts. Real user
+  // analytics showed this exact button getting rage-clicked up to 37
+  // times in a single session; the most likely explanation is the first
+  // tap was actually working, but with no visible confirmation it had
+  // registered, users kept tapping out of uncertainty.
+  const [confirming, setConfirming] = useState(false);
+
   const confirmPendingMove = useCallback(() => {
-    if (!pendingMove) return;
+    if (!pendingMove || confirming) return;
+    setConfirming(true);
     onMovePlayedRef.current?.(pendingMove.san, pendingMove.isCorrect);
     setPendingMove(null);
-  }, [pendingMove]);
+  }, [pendingMove, confirming]);
 
   const cancelPendingMove = useCallback(() => {
     setPendingMove(null);
@@ -284,6 +295,7 @@ export function ChessBoard({
         feedbackTimerRef.current = setTimeout(() => setFeedback(null), 900);
       }
       if (confirmMovesRef.current && !suppressConfirmMovesRef.current && !expected) {
+        setConfirming(false);
         setPendingMove({ from, to, san, isCorrect, tempFen: chess.fen() });
         return true;
       }
@@ -572,10 +584,12 @@ export function ChessBoard({
           </button>
           <button
             onClick={confirmPendingMove}
-            className="relative flex-1 h-14 rounded-xl overflow-hidden flex transition-transform active:scale-[0.98]"
+            disabled={confirming}
+            className="relative flex-1 h-14 rounded-xl overflow-hidden flex transition-all active:scale-[0.98]"
             style={{
               boxShadow: '0 4px 0 #2a2a2a, 0 8px 16px rgba(0,0,0,0.4)',
               border: '1px solid rgba(0,0,0,0.25)',
+              opacity: confirming ? 0.6 : 1,
             }}
           >
             <span
@@ -588,7 +602,7 @@ export function ChessBoard({
               className="flex-1 flex items-center justify-center font-black text-xs tracking-wider"
               style={{ background: 'linear-gradient(180deg, #a8d876 0%, #81b64c 55%, #5f8f36 100%)', color: '#fff' }}
             >
-              CONFIRM
+              {confirming ? '✓' : 'CONFIRM'}
             </span>
             {/* center seam */}
             <div className="absolute left-1/2 top-0 bottom-0 w-[2px] -translate-x-1/2" style={{ background: 'rgba(0,0,0,0.35)' }} />

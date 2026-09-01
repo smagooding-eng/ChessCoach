@@ -188,6 +188,41 @@ function GameView({ bot, onBack, startFen, startColor, isOnboarding }: { bot: Bo
   const [, navigate] = useLocation();
   const [seededRating, setSeededRating] = useState<number | null>(null);
   const seedRequestedRef = useRef(false);
+  const reanalyzedRef = useRef(false);
+
+  // The live quality labels shown during play come from a fast but
+  // necessarily shallow (depth-2) client-side search, needed for
+  // instant per-move feedback with no network round-trip. Once the
+  // game ends, re-run the whole move list through the real
+  // Stockfish-based backend pipeline and replace the labels with
+  // accurate ones -- the live estimate can call moves "brilliant" or
+  // "book" that don't hold up under real analysis.
+  useEffect(() => {
+    if (result === 'playing' || reanalyzedRef.current || moves.length === 0) return;
+    reanalyzedRef.current = true;
+
+    const payload = {
+      startFen: moves[0]?.fenBefore,
+      moves: moves.map(m => ({ san: m.san, color: m.color === 'w' ? 'white' : 'black' })),
+    };
+
+    apiFetch('/api/analysis/analyze-moves', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+      .then(r => r.ok ? r.json() : null)
+      .then((data: { results?: { moveIndex: number; classification: string }[] } | null) => {
+        if (!data?.results) return;
+        setMoves(prev => prev.map((m, i) => {
+          const updated = data.results!.find(r => r.moveIndex === i);
+          if (!updated || !m.analysis) return m;
+          return { ...m, analysis: { ...m.analysis, quality: updated.classification as MoveAnalysisResult['quality'] } };
+        }));
+      })
+      .catch(() => { /* live labels remain as the fallback if this fails */ });
+  }, [result, moves]);
 
   useEffect(() => {
     if (!isOnboarding || result === 'playing' || seedRequestedRef.current) return;

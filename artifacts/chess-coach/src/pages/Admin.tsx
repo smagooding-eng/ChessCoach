@@ -1381,10 +1381,24 @@ function ReferralSignupsPanel() {
   );
 }
 
+const SECTION_LABELS: Record<string, string> = {
+  hero: 'Hero',
+  how_it_works: 'How It Works',
+  differentiators: 'Only on ChessScout',
+  features: 'Features',
+  faq: 'FAQ',
+  pricing: 'Pricing',
+  final_cta: 'Final CTA',
+};
+
 function LandingFunnelPanel() {
   const [data, setData] = useState<{
     landingViews: number; miaStarted: number; miaSkipped: number;
     signupClicked: number; signupCompleted: number; leftWithoutAction: number;
+    scrollDepth: { scroll25: number; scroll50: number; scroll75: number; scroll100: number };
+    engaged10s: number;
+    sectionViews: Record<string, number>;
+    sectionExits: Record<string, number>;
   } | null>(null);
   const [loading, setLoading] = useState(true);
   const [days, setDays] = useState(30);
@@ -1405,6 +1419,15 @@ function LandingFunnelPanel() {
     { label: 'Completed Sign Up', value: data.signupCompleted, color: 'text-primary' },
     { label: 'Left without any action', value: data.leftWithoutAction, color: 'text-red-400' },
   ] : [];
+
+  const scrollRows = data ? [
+    { label: '25% scrolled', value: data.scrollDepth.scroll25 },
+    { label: '50% scrolled', value: data.scrollDepth.scroll50 },
+    { label: '75% scrolled', value: data.scrollDepth.scroll75 },
+    { label: '100% scrolled', value: data.scrollDepth.scroll100 },
+  ] : [];
+
+  const sectionOrder = ['hero', 'how_it_works', 'differentiators', 'features', 'faq', 'pricing', 'final_cta'];
 
   return (
     <motion.div
@@ -1432,14 +1455,63 @@ function LandingFunnelPanel() {
         ) : !data ? (
           <p className="text-xs text-muted-foreground text-center py-4">Failed to load funnel data.</p>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            {rows.map((r) => (
-              <div key={r.label} className="p-3 rounded-xl bg-white/5 border border-white/5">
-                <p className={cn('text-2xl font-black', r.color)}>{r.value.toLocaleString()}</p>
-                <p className="text-[11px] text-muted-foreground mt-0.5">{r.label}</p>
+          <>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {rows.map((r) => (
+                <div key={r.label} className="p-3 rounded-xl bg-white/5 border border-white/5">
+                  <p className={cn('text-2xl font-black', r.color)}>{r.value.toLocaleString()}</p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">{r.label}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-5 pt-4 border-t border-border/20">
+              <p className="text-xs font-bold text-muted-foreground mb-2">Scroll depth &amp; engagement</p>
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                {scrollRows.map((r) => (
+                  <div key={r.label} className="p-2.5 rounded-lg bg-white/5 border border-white/5 text-center">
+                    <p className="text-lg font-black text-foreground">{r.value.toLocaleString()}</p>
+                    <p className="text-[10px] text-muted-foreground">{r.label}</p>
+                  </div>
+                ))}
+                <div className="p-2.5 rounded-lg bg-white/5 border border-white/5 text-center">
+                  <p className="text-lg font-black text-emerald-400">{data.engaged10s.toLocaleString()}</p>
+                  <p className="text-[10px] text-muted-foreground">Stayed 10s+</p>
+                </div>
               </div>
-            ))}
-          </div>
+              <p className="text-[10px] text-muted-foreground mt-2">
+                Compare against landing page views ({data.landingViews.toLocaleString()}) to see how far people actually get before leaving.
+              </p>
+            </div>
+
+            <div className="mt-5 pt-4 border-t border-border/20">
+              <p className="text-xs font-bold text-muted-foreground mb-2">Section views &amp; exits</p>
+              <div className="space-y-1.5">
+                {sectionOrder.map((s) => {
+                  const views = data.sectionViews[s] ?? 0;
+                  const exits = data.sectionExits[s] ?? 0;
+                  return (
+                    <div key={s} className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg bg-white/5">
+                      <p className="text-xs font-bold text-foreground">{SECTION_LABELS[s] ?? s}</p>
+                      <div className="flex items-center gap-4 text-right shrink-0">
+                        <div>
+                          <p className="text-sm font-black text-foreground">{views.toLocaleString()}</p>
+                          <p className="text-[9px] text-muted-foreground uppercase tracking-wide">Viewed</p>
+                        </div>
+                        <div>
+                          <p className="text-sm font-black text-red-400">{exits.toLocaleString()}</p>
+                          <p className="text-[9px] text-muted-foreground uppercase tracking-wide">Left here</p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <p className="text-[10px] text-muted-foreground mt-2">
+                "Left here" is where the visitor's tab was last visible before they closed it or navigated away -- the section with the highest count is where you're losing the most people.
+              </p>
+            </div>
+          </>
         )}
       </div>
     </motion.div>
