@@ -1383,7 +1383,7 @@ router.post("/analysis/analyze-moves", async (req: Request, res: Response): Prom
 
     const evals = await evaluateAllPositions(fens);
 
-    const results: { moveIndex: number; san: string; classification: string }[] = [];
+    const results: { moveIndex: number; san: string; classification: string; cpLoss: number }[] = [];
     for (let i = 0; i < moves.length; i++) {
       const evalBefore = evals[i];
       const evalAfter = evals[i + 1];
