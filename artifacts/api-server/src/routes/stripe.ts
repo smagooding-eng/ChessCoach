@@ -222,20 +222,25 @@ router.post('/stripe/checkout-embedded', async (req: Request, res: Response) => 
         save_default_payment_method: 'on_subscription',
         payment_method_types: ['card'],
       },
-      expand: ['latest_invoice.payment_intent'],
+      expand: ['latest_invoice.payment_intent', 'latest_invoice.confirmation_secret'],
     });
 
     const invoice: any = subscription.latest_invoice;
-    const paymentIntent = invoice?.payment_intent;
+    // Stripe's newer "flexible" billing mode no longer reliably populates
+    // invoice.payment_intent the way it used to -- the client secret is
+    // now more consistently found on invoice.confirmation_secret instead.
+    // Check both so this works regardless of which billing mode this
+    // Stripe account is on.
+    const clientSecret = invoice?.confirmation_secret?.client_secret ?? invoice?.payment_intent?.client_secret;
 
-    if (!paymentIntent?.client_secret) {
+    if (!clientSecret) {
       res.status(500).json({ error: 'Could not initialize payment. Please try again.' });
       return;
     }
 
     res.json({
       subscriptionId: subscription.id,
-      clientSecret: paymentIntent.client_secret,
+      clientSecret,
     });
   } catch (err: any) {
     console.error('Embedded checkout error:', err.message);

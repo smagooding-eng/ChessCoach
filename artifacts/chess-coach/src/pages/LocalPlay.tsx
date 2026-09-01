@@ -94,11 +94,14 @@ export function LocalPlay() {
     setFullscreen(true);
   };
 
-  // Timer only runs for clockActive's side, only once White has started
-  // it, and only when not paused waiting for the mover to tap their clock.
+  // Timer runs for clockActive's side once White has started it, and
+  // keeps running even after a move is made and awaiting clock
+  // confirmation -- matching a real chess clock, where your time keeps
+  // counting down until you actually press the clock, not just until
+  // you've moved a piece.
   useEffect(() => {
     if (!gameStarted || result !== 'playing' || !timeControl || timeControl.seconds === null) return;
-    if (!clockStarted || awaitingSubmit) return;
+    if (!clockStarted) return;
 
     timerRef.current = setInterval(() => {
       if (clockActive === 'w') {
@@ -123,7 +126,7 @@ export function LocalPlay() {
     }, 1000);
 
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
-  }, [gameStarted, result, timeControl, clockActive, awaitingSubmit, clockStarted]);
+  }, [gameStarted, result, timeControl, clockActive, clockStarted]);
 
   // Mobile browsers tint the system status bar/URL bar to match
   // <meta name="theme-color">, which is normally the app's brand green
