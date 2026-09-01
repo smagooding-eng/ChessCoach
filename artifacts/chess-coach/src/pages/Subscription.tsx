@@ -70,6 +70,36 @@ export function Subscription() {
   }, []);
 
   const [portalError, setPortalError] = useState('');
+  const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
+  const [checkoutError, setCheckoutError] = useState('');
+
+  const handleCheckout = async (priceId: string) => {
+    if (!isAuthenticated) {
+      setLocation('/setup');
+      return;
+    }
+    setCheckoutLoading(priceId);
+    setCheckoutError('');
+    try {
+      const res = await apiFetch('/api/stripe/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ priceId }),
+      });
+      const data = await res.json();
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        setCheckoutError(data.error || 'Could not start checkout. Please try again.');
+      }
+    } catch (err) {
+      console.error('Checkout error:', err);
+      setCheckoutError('Connection error. Please try again.');
+    } finally {
+      setCheckoutLoading(null);
+    }
+  };
 
   const handlePortal = async () => {
     setPortalLoading(true);
@@ -218,14 +248,38 @@ export function Subscription() {
                   <Loader2 className="w-6 h-6 animate-spin text-primary" />
                 </div>
               ) : selectedPriceId ? (
-                <EmbeddedCheckoutForm
-                  priceId={selectedPriceId}
-                  onSuccess={() => {
-                    setSelectedPriceId(null);
-                    refreshSubscription();
-                  }}
-                  onCancel={() => setSelectedPriceId(null)}
-                />
+                <div className="space-y-3">
+                  <EmbeddedCheckoutForm
+                    priceId={selectedPriceId}
+                    onSuccess={() => {
+                      setSelectedPriceId(null);
+                      refreshSubscription();
+                    }}
+                    onCancel={() => setSelectedPriceId(null)}
+                  />
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 h-px bg-border/40" />
+                    <span className="text-[11px] text-muted-foreground">or</span>
+                    <div className="flex-1 h-px bg-border/40" />
+                  </div>
+                  <button
+                    onClick={() => handleCheckout(selectedPriceId)}
+                    disabled={!!checkoutLoading}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-secondary hover:bg-secondary/80 transition-colors font-bold text-sm"
+                  >
+                    {checkoutLoading === selectedPriceId ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <>
+                        <ExternalLink className="w-4 h-4" />
+                        Continue with Stripe
+                      </>
+                    )}
+                  </button>
+                  {checkoutError && (
+                    <p className="text-xs text-red-400 text-center">{checkoutError}</p>
+                  )}
+                </div>
               ) : (
                 <div className="space-y-2">
                   {monthlyPrice && (
