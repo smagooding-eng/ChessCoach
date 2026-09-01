@@ -355,6 +355,15 @@ export function LocalPlay() {
               </button>
             )}
           </div>
+          {result === 'playing' && awaitingSubmit && clockActive === 'b' && (
+            <button
+              onClick={undoLastMove}
+              className="w-full text-center text-[11px] font-bold underline mt-1"
+              style={{ color: 'rgba(255,255,255,0.5)' }}
+            >
+              Undo move
+            </button>
+          )}
         </div>
 
         {hasTimer && !clockStarted && result === 'playing' && (
@@ -364,18 +373,9 @@ export function LocalPlay() {
         )}
 
         {(!hasTimer || clockStarted) && awaitingSubmit && result === 'playing' && (
-          <div className="flex items-center justify-center gap-2 -mt-1" style={{ transform: clockActive === 'b' ? 'scaleY(-1)' : undefined }}>
-            <p className="text-[11px] text-primary font-medium">
-              {clockActive === 'w' ? 'White' : 'Black'}: tap your {hasTimer ? 'clock' : 'button'} to pass the turn
-            </p>
-            <button
-              onClick={undoLastMove}
-              className="text-[11px] font-bold px-2 py-0.5 rounded-lg underline"
-              style={{ color: 'rgba(255,255,255,0.5)' }}
-            >
-              Undo move
-            </button>
-          </div>
+          <p className="text-[11px] text-primary font-medium -mt-1" style={{ transform: clockActive === 'b' ? 'scaleY(-1)' : undefined }}>
+            {clockActive === 'w' ? 'White' : 'Black'}: tap your {hasTimer ? 'clock' : 'button'} to pass the turn
+          </p>
         )}
 
         {/* Board, centered and genuinely edge-to-edge in fullscreen --
@@ -420,6 +420,15 @@ export function LocalPlay() {
               </button>
             )}
           </div>
+          {result === 'playing' && awaitingSubmit && clockActive === 'w' && (
+            <button
+              onClick={undoLastMove}
+              className="w-full text-center text-[11px] font-bold underline mt-1"
+              style={{ color: 'rgba(255,255,255,0.5)' }}
+            >
+              Undo move
+            </button>
+          )}
         </div>
 
         {/* Game over banner */}
