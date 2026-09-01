@@ -213,12 +213,19 @@ function GameView({ bot, onBack, startFen, startColor, isOnboarding }: { bot: Bo
       body: JSON.stringify(payload),
     })
       .then(r => r.ok ? r.json() : null)
-      .then((data: { results?: { moveIndex: number; classification: string }[] } | null) => {
+      .then((data: { results?: { moveIndex: number; classification: string; cpLoss?: number }[] } | null) => {
         if (!data?.results) return;
         setMoves(prev => prev.map((m, i) => {
           const updated = data.results!.find(r => r.moveIndex === i);
           if (!updated || !m.analysis) return m;
-          return { ...m, analysis: { ...m.analysis, quality: updated.classification as MoveAnalysisResult['quality'] } };
+          return {
+            ...m,
+            analysis: {
+              ...m.analysis,
+              quality: updated.classification as MoveAnalysisResult['quality'],
+              cpLoss: updated.cpLoss ?? m.analysis.cpLoss,
+            },
+          };
         }));
       })
       .catch(() => { /* live labels remain as the fallback if this fails */ });

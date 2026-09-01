@@ -1422,7 +1422,7 @@ router.post("/analysis/analyze-moves", async (req: Request, res: Response): Prom
         if (!isSacrificialMove(fens[i], moves[i].san)) classification = "best";
       }
 
-      results.push({ moveIndex: i, san: moves[i].san, classification });
+      results.push({ moveIndex: i, san: moves[i].san, classification, cpLoss: Math.max(0, winPctLossRaw) });
     }
 
     res.json({ results });
