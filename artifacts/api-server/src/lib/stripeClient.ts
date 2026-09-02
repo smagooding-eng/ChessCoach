@@ -34,11 +34,23 @@ export async function getStripeSecretKey() {
 }
 
 let stripeSync: any = null;
+let migrationsRun = false;
 
 export async function getStripeSync() {
   if (!stripeSync) {
-    const { StripeSync } = await import('stripe-replit-sync');
+    const { StripeSync, runMigrations } = await import('stripe-replit-sync');
     const secretKey = await getStripeSecretKey();
+
+    // The library requires this to be called separately before first use --
+    // it creates the `stripe` schema and its tables (including
+    // _managed_webhooks) in Postgres. Without this, every webhook and
+    // every sync operation fails with "relation ... does not exist",
+    // since the schema was never created.
+    if (!migrationsRun) {
+      await runMigrations({ databaseUrl: process.env.DATABASE_URL! });
+      migrationsRun = true;
+    }
+
     stripeSync = new StripeSync({
       poolConfig: {
         connectionString: process.env.DATABASE_URL!,
