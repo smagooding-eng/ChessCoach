@@ -11,7 +11,7 @@ import {
   Copy, CreditCard, Crown, DollarSign, Edit3, Eye, FileText, Gamepad2, Gift, GraduationCap, Heading1, Heading2,
   History, Image, Italic, Link as LinkIcon, List, ListOrdered, Loader2, LogOut, Mail, Megaphone,
   Minus, Palette, Play, Redo2, RefreshCw, Search, Send, Settings, Shield, Sparkles, Swords, Target, Trash2,
-  Trophy, Type, Undo2, User, UserCheck, UserPlus, Users, X, Zap, TrendingUp,
+  Trophy, Type, Undo2, User, UserCheck, UserPlus, Users, Wrench, X, Zap, TrendingUp,
 } from 'lucide-react';
 
 interface AdminStats {
@@ -2902,7 +2902,42 @@ function AdminTicker() {
         </div>
       </motion.div>
 
-      <MarketingPanel />
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="rounded-xl border border-border/40 bg-card overflow-hidden"
+      >
+        <div className="px-5 py-3 border-b border-border/30" style={{ background: 'rgba(224,160,58,0.08)' }}>
+          <h3 className="text-sm font-bold flex items-center gap-2" style={{ color: '#e0a03a' }}>
+            <Wrench className="w-4 h-4" /> Features in Development
+          </h3>
+          <p className="text-[11px] text-muted-foreground mt-0.5">Admin-only for now &mdash; not linked anywhere in the regular app.</p>
+        </div>
+        <div className="p-4 space-y-2">
+          <Link href="/admin/traps" className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all hover:bg-white/5 text-left border border-white/10">
+            <span className="text-lg">🗡️</span>
+            <div className="flex-1">
+              <p className="text-foreground font-bold">Chess Traps Training</p>
+              <p className="text-xs text-muted-foreground">Set them and spot them &mdash; in progress</p>
+            </div>
+            <ChevronRight className="w-4 h-4 text-muted-foreground" />
+          </Link>
+          <div className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-left border border-white/5 opacity-50">
+            <span className="text-lg">📖</span>
+            <div className="flex-1">
+              <p className="text-foreground font-bold">Beginner Courses</p>
+              <p className="text-xs text-muted-foreground">Not started yet</p>
+            </div>
+          </div>
+          <div className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-left border border-white/5 opacity-50">
+            <span className="text-lg">🧸</span>
+            <div className="flex-1">
+              <p className="text-foreground font-bold">Chess for Kids</p>
+              <p className="text-xs text-muted-foreground">Not started yet</p>
+            </div>
+          </div>
+        </div>
+      </motion.div>
 
       <OutreachStudio />
 

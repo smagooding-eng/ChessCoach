@@ -72,6 +72,8 @@ const PrivacyPage = lazy(() => import("@/pages/Privacy"));
 const RafflePage = lazy(() => import("@/pages/Raffle"));
 const RaffleRulesPage = lazy(() => import("@/pages/RaffleRules"));
 const AffiliatePage = lazy(() => import("@/pages/Affiliate"));
+const TrapsPage = lazy(() => import("@/pages/Traps"));
+const TrapTrainingPage = lazy(() => import("@/pages/TrapTraining"));
 const TermsPage = lazy(() => import("@/pages/Terms"));
 const VsAimchessPage = lazy(() => import("@/pages/VsAimchess"));
 const PricingPage = lazy(() => import("@/pages/Pricing"));
@@ -181,6 +183,8 @@ const POpponents     = () => <ProtectedRoute component={OpponentAnalysis} />;
 const PPracticeBots  = () => <ProtectedRoute component={PracticeBots} />;
 const PLocalPlay     = () => <ProtectedRoute component={LocalPlay} />;
 const PLivePlay      = () => <ProtectedRoute component={LivePlay} requireAdmin />;
+const PTraps         = () => <ProtectedRoute component={TrapsPage} requireAdmin />;
+const PTrapTraining  = () => <ProtectedRoute component={TrapTrainingPage} requireAdmin />;
 const PLiveHistory   = () => <ProtectedRoute component={LiveHistory} fallbackNav="/live" requireAdmin />;
 const PGameLookup    = () => <ProtectedRoute component={GameLookup} />;
 const PSubscription  = () => <ProtectedRoute component={Subscription} />;
@@ -270,6 +274,8 @@ function Router() {
       <Route path="/practice"        component={PPracticeBots} />
       <Route path="/play"            component={PLocalPlay} />
       <Route path="/live"            component={PLivePlay} />
+      <Route path="/admin/traps/:id" component={PTrapTraining} />
+      <Route path="/admin/traps"     component={PTraps} />
       <Route path="/live/history"    component={PLiveHistory} />
       <Route path="/lookup"          component={PGameLookup} />
       <Route path="/puzzles"          component={PPuzzles} />

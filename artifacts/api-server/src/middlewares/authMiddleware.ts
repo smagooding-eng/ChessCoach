@@ -60,6 +60,28 @@ export function requireAuth(
   next();
 }
 
+export async function requireAdmin(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  if (!req.isAuthenticated()) {
+    res.status(401).json({ error: "Authentication required" });
+    return;
+  }
+  try {
+    const { storage } = await import("../lib/storage");
+    const user = await storage.getUser(req.user!.id);
+    if (user?.isAdmin || ADMIN_EMAILS.includes(user?.email?.toLowerCase?.() ?? "")) {
+      next();
+      return;
+    }
+    res.status(403).json({ error: "Admin access required" });
+  } catch {
+    res.status(500).json({ error: "Failed to verify admin access" });
+  }
+}
+
 export async function requirePremium(
   req: Request,
   res: Response,
