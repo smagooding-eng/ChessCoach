@@ -22,7 +22,8 @@ router.get("/traps", async (_req: Request, res: Response) => {
 
 router.get("/traps/:id", async (req: Request, res: Response) => {
   try {
-    const id = parseInt(req.params.id, 10);
+    const idParam = req.params.id as string;
+    const id = parseInt(idParam, 10);
     if (isNaN(id)) {
       res.status(400).json({ error: "Invalid trap id" });
       return;
@@ -57,7 +58,8 @@ router.post("/traps/:id/attempt", async (req: Request, res: Response) => {
       res.status(401).json({ error: "Not authenticated" });
       return;
     }
-    const id = parseInt(req.params.id, 10);
+    const idParam = req.params.id as string;
+    const id = parseInt(idParam, 10);
     const { mode, success } = req.body ?? {};
     if (isNaN(id) || (mode !== "commit" && mode !== "avoid")) {
       res.status(400).json({ error: "Invalid request" });
@@ -115,7 +117,8 @@ router.post("/traps", async (req: Request, res: Response) => {
 
 router.put("/traps/:id", async (req: Request, res: Response) => {
   try {
-    const id = parseInt(req.params.id, 10);
+    const idParam = req.params.id as string;
+    const id = parseInt(idParam, 10);
     if (isNaN(id)) {
       res.status(400).json({ error: "Invalid trap id" });
       return;
@@ -132,7 +135,8 @@ router.put("/traps/:id", async (req: Request, res: Response) => {
 
 router.delete("/traps/:id", async (req: Request, res: Response) => {
   try {
-    const id = parseInt(req.params.id, 10);
+    const idParam = req.params.id as string;
+    const id = parseInt(idParam, 10);
     if (isNaN(id)) {
       res.status(400).json({ error: "Invalid trap id" });
       return;
