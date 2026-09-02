@@ -1,15 +1,14 @@
 import { Router, type IRouter, type Request, type Response } from "express";
-import { requireAdmin } from "../middlewares/authMiddleware";
+import { requireAdmin, requireAuth, isUserPremium } from "../middlewares/authMiddleware";
 import { db, chessTrapsTable, trapProgressTable } from "@workspace/db";
 import { eq, and, asc } from "drizzle-orm";
 
 const router: IRouter = Router();
 
-// Every route here is admin-gated -- the whole feature is hidden until
-// ready for a real launch, not just hidden from navigation.
-router.use("/traps", requireAdmin);
-
-router.get("/traps", async (_req: Request, res: Response) => {
+// Viewing and training routes just need a logged-in user -- this is a
+// real, launched feature now. Content-management routes (create/edit/
+// archive) stay admin-only, gated per-route further down.
+router.get("/traps", requireAuth, async (_req: Request, res: Response) => {
   try {
     const traps = await db.select().from(chessTrapsTable)
       .where(eq(chessTrapsTable.archived, false))
@@ -20,7 +19,7 @@ router.get("/traps", async (_req: Request, res: Response) => {
   }
 });
 
-router.get("/traps/:id", async (req: Request, res: Response) => {
+router.get("/traps/:id", requireAuth, async (req: Request, res: Response) => {
   try {
     const idParam = req.params.id as string;
     const id = parseInt(idParam, 10);
@@ -34,17 +33,39 @@ router.get("/traps/:id", async (req: Request, res: Response) => {
       return;
     }
 
-    let progress: { commit: boolean; avoid: boolean } = { commit: false, avoid: false };
-    if (req.isAuthenticated()) {
-      const rows = await db.select().from(trapProgressTable)
-        .where(and(eq(trapProgressTable.trapId, id), eq(trapProgressTable.userId, req.user!.id)));
-      for (const r of rows) {
-        if (r.mode === "commit") progress.commit = r.completed;
-        if (r.mode === "avoid") progress.avoid = r.completed;
+    // Paywall: beginner traps are free for every logged-in user.
+    // Intermediate/advanced require Pro -- checked server-side so this
+    // can't be bypassed by calling the API directly. Non-premium users
+    // get the summary (for the upgrade prompt) but not the actual
+    // training content.
+    if (trap.difficulty !== "beginner") {
+      const premium = await isUserPremium(req.user!.id);
+      if (!premium) {
+        res.json({
+          trap: {
+            id: trap.id,
+            name: trap.name,
+            category: trap.category,
+            difficulty: trap.difficulty,
+            trapSide: trap.trapSide,
+            summary: trap.summary,
+          },
+          locked: true,
+          progress: { commit: false, avoid: false },
+        });
+        return;
       }
     }
 
-    res.json({ trap, progress });
+    let progress: { commit: boolean; avoid: boolean } = { commit: false, avoid: false };
+    const rows = await db.select().from(trapProgressTable)
+      .where(and(eq(trapProgressTable.trapId, id), eq(trapProgressTable.userId, req.user!.id)));
+    for (const r of rows) {
+      if (r.mode === "commit") progress.commit = r.completed;
+      if (r.mode === "avoid") progress.avoid = r.completed;
+    }
+
+    res.json({ trap, locked: false, progress });
   } catch (err: any) {
     res.status(500).json({ error: "Failed to load trap" });
   }
@@ -52,18 +73,29 @@ router.get("/traps/:id", async (req: Request, res: Response) => {
 
 // Records an attempt at a mode, marking it completed on success.
 // Body: { mode: 'commit' | 'avoid', success: boolean }
-router.post("/traps/:id/attempt", async (req: Request, res: Response) => {
+router.post("/traps/:id/attempt", requireAuth, async (req: Request, res: Response) => {
   try {
-    if (!req.isAuthenticated()) {
-      res.status(401).json({ error: "Not authenticated" });
-      return;
-    }
     const idParam = req.params.id as string;
     const id = parseInt(idParam, 10);
     const { mode, success } = req.body ?? {};
     if (isNaN(id) || (mode !== "commit" && mode !== "avoid")) {
       res.status(400).json({ error: "Invalid request" });
       return;
+    }
+
+    // Re-check the paywall here too -- prevents recording progress on
+    // locked content via a direct API call.
+    const [trap] = await db.select().from(chessTrapsTable).where(eq(chessTrapsTable.id, id));
+    if (!trap) {
+      res.status(404).json({ error: "Trap not found" });
+      return;
+    }
+    if (trap.difficulty !== "beginner") {
+      const premium = await isUserPremium(req.user!.id);
+      if (!premium) {
+        res.status(403).json({ error: "Premium subscription required" });
+        return;
+      }
     }
 
     const [existing] = await db.select().from(trapProgressTable)
@@ -97,7 +129,7 @@ router.post("/traps/:id/attempt", async (req: Request, res: Response) => {
 });
 
 // Admin content-management routes -- create/edit/archive traps.
-router.post("/traps", async (req: Request, res: Response) => {
+router.post("/traps", requireAdmin, async (req: Request, res: Response) => {
   try {
     const { name, category, difficulty, trapSide, summary, explanation, startingFen, trapLineSan, moveNotes, criticalMoveIndex, safeMovesSan, orderIndex } = req.body ?? {};
     if (!name || !category || !difficulty || !trapSide || !summary || !explanation || !startingFen || !Array.isArray(trapLineSan) || !Array.isArray(safeMovesSan)) {
@@ -116,7 +148,7 @@ router.post("/traps", async (req: Request, res: Response) => {
   }
 });
 
-router.put("/traps/:id", async (req: Request, res: Response) => {
+router.put("/traps/:id", requireAdmin, async (req: Request, res: Response) => {
   try {
     const idParam = req.params.id as string;
     const id = parseInt(idParam, 10);
@@ -134,7 +166,7 @@ router.put("/traps/:id", async (req: Request, res: Response) => {
   }
 });
 
-router.delete("/traps/:id", async (req: Request, res: Response) => {
+router.delete("/traps/:id", requireAdmin, async (req: Request, res: Response) => {
   try {
     const idParam = req.params.id as string;
     const id = parseInt(idParam, 10);

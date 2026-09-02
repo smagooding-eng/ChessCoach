@@ -4,6 +4,7 @@ import { Chess } from 'chess.js';
 import { ArrowLeft, Swords, Shield, Loader2, CheckCircle2, XCircle, RotateCcw, Lightbulb, MoveRight } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { ChessBoard } from '@/components/ChessBoard';
+import { UpgradeNudge } from '@/components/UpgradeNudge';
 
 const BG = '#141413';
 const CARD = '#1c1b19';
@@ -20,21 +21,33 @@ interface Trap {
   difficulty: string;
   trapSide: 'white' | 'black';
   summary: string;
-  explanation: string;
-  startingFen: string;
-  trapLineSan: string[];
+  explanation?: string;
+  startingFen?: string;
+  trapLineSan?: string[];
   moveNotes?: string[];
-  criticalMoveIndex: number;
-  safeMovesSan: string[];
+  criticalMoveIndex?: number;
+  safeMovesSan?: string[];
 }
 
 type Mode = 'commit' | 'avoid';
+// TrainingBoard only ever renders when the trap is confirmed unlocked
+// (gated by the locked check in the parent), so these fields are
+// genuinely guaranteed present at that point -- this type reflects
+// that instead of forcing optional-chaining throughout the component.
+type UnlockedTrap = Trap & {
+  explanation: string;
+  startingFen: string;
+  trapLineSan: string[];
+  criticalMoveIndex: number;
+  safeMovesSan: string[];
+};
 type StepState = 'playing' | 'success' | 'failure';
 
 export default function TrapTrainingPage() {
   const { id } = useParams<{ id: string }>();
   const [trap, setTrap] = useState<Trap | null>(null);
   const [loading, setLoading] = useState(true);
+  const [locked, setLocked] = useState(false);
   const [progress, setProgress] = useState<{ commit: boolean; avoid: boolean }>({ commit: false, avoid: false });
   const [mode, setMode] = useState<Mode | null>(null);
   const [liveNote, setLiveNote] = useState<string | null>(null);
@@ -42,7 +55,7 @@ export default function TrapTrainingPage() {
   useEffect(() => {
     apiFetch(`/api/traps/${id}`, { credentials: 'include' })
       .then(r => r.ok ? r.json() : null)
-      .then(d => { if (d?.trap) { setTrap(d.trap); setProgress(d.progress ?? { commit: false, avoid: false }); } })
+      .then(d => { if (d?.trap) { setTrap(d.trap); setLocked(!!d.locked); setProgress(d.progress ?? { commit: false, avoid: false }); } })
       .finally(() => setLoading(false));
   }, [id]);
 
@@ -76,7 +89,11 @@ export default function TrapTrainingPage() {
         <p className="text-sm mb-1" style={{ color: MUTED }}>{trap.category} &middot; {trap.difficulty}</p>
         <p className="text-sm mb-6" style={{ color: TEXT }}>{trap.summary}</p>
 
-        {!mode ? (
+        {locked ? (
+          <div className="mb-6">
+            <UpgradeNudge headline={`Unlock ${trap.difficulty} traps with Pro`} />
+          </div>
+        ) : !mode ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
             <button
               onClick={() => { setMode('commit'); setLiveNote(null); }}
@@ -105,7 +122,7 @@ export default function TrapTrainingPage() {
           </div>
         ) : (
           <TrainingBoard
-            trap={trap}
+            trap={trap as UnlockedTrap}
             mode={mode}
             onExit={() => { setMode(null); setLiveNote(null); }}
             onComplete={(m) => setProgress(p => ({ ...p, [m]: true }))}
@@ -113,21 +130,23 @@ export default function TrapTrainingPage() {
           />
         )}
 
-        <div className="rounded-2xl p-5 mt-2" style={{ background: CARD, border: '1px solid rgba(255,255,255,0.06)' }}>
-          <p className="text-xs font-black uppercase tracking-wide mb-2" style={{ color: MUTED }}>
-            {liveNote ? "Right now" : "Why it works"}
-          </p>
-          <p className="text-sm leading-relaxed" style={{ color: liveNote ? ACCENT : TEXT }}>
-            {liveNote ?? trap.explanation}
-          </p>
-        </div>
+        {!locked && (
+          <div className="rounded-2xl p-5 mt-2" style={{ background: CARD, border: '1px solid rgba(255,255,255,0.06)' }}>
+            <p className="text-xs font-black uppercase tracking-wide mb-2" style={{ color: MUTED }}>
+              {liveNote ? "Right now" : "Why it works"}
+            </p>
+            <p className="text-sm leading-relaxed" style={{ color: liveNote ? ACCENT : TEXT }}>
+              {liveNote ?? trap.explanation}
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
 function TrainingBoard({ trap, mode, onExit, onComplete, onNoteChange }: {
-  trap: Trap;
+  trap: UnlockedTrap;
   mode: Mode;
   onExit: () => void;
   onComplete: (mode: Mode) => void;
