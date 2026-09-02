@@ -20,13 +20,17 @@ export const chessTrapsTable = pgTable("chess_traps", {
   // mode has the user play, and whose moves "avoid" mode has the bot play.
   trapSide: text("trap_side").notNull(), // 'white' | 'black'
   summary: text("summary").notNull(), // one-line hook, shown on the card
-  explanation: text("explanation").notNull(), // why the trap works, shown in the detail view
+  explanation: text("explanation").notNull(), // why the trap works, shown as the static fallback
   startingFen: text("starting_fen").notNull(),
   // The full move sequence in SAN, from startingFen, showing the trap
   // executed against the natural (losing) defense. Used directly for
   // "commit" mode -- the user plays the trapSide's moves, a fixed bot
   // plays the other side's scripted natural replies.
   trapLineSan: jsonb("trap_line_san").notNull().$type<string[]>(),
+  // One short note per move, parallel array to trapLineSan -- explains
+  // what that specific move does and why, shown live as training
+  // progresses so the user isn't guessing blindly which piece to move.
+  moveNotes: jsonb("move_notes").notNull().default([]).$type<string[]>(),
   // Index into trapLineSan of the critical mistake -- the move the
   // defender should NOT play. "Avoid" mode plays the bot's moves up to
   // (not including) this index, then asks the user to find a safe

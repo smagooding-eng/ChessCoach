@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useParams, Link } from 'wouter';
 import { Chess } from 'chess.js';
-import { ArrowLeft, Swords, Shield, Loader2, CheckCircle2, XCircle, RotateCcw, Lightbulb } from 'lucide-react';
+import { ArrowLeft, Swords, Shield, Loader2, CheckCircle2, XCircle, RotateCcw, Lightbulb, MoveRight } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { ChessBoard } from '@/components/ChessBoard';
 
@@ -23,6 +23,7 @@ interface Trap {
   explanation: string;
   startingFen: string;
   trapLineSan: string[];
+  moveNotes: string[];
   criticalMoveIndex: number;
   safeMovesSan: string[];
 }
@@ -36,6 +37,7 @@ export default function TrapTrainingPage() {
   const [loading, setLoading] = useState(true);
   const [progress, setProgress] = useState<{ commit: boolean; avoid: boolean }>({ commit: false, avoid: false });
   const [mode, setMode] = useState<Mode | null>(null);
+  const [liveNote, setLiveNote] = useState<string | null>(null);
 
   useEffect(() => {
     apiFetch(`/api/traps/${id}`, { credentials: 'include' })
@@ -77,7 +79,7 @@ export default function TrapTrainingPage() {
         {!mode ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
             <button
-              onClick={() => setMode('commit')}
+              onClick={() => { setMode('commit'); setLiveNote(null); }}
               className="rounded-2xl p-5 text-left transition-transform hover:scale-[1.02]"
               style={{ background: CARD, border: `1px solid ${progress.commit ? GREEN : 'rgba(255,255,255,0.06)'}` }}
             >
@@ -89,7 +91,7 @@ export default function TrapTrainingPage() {
               <p className="text-xs" style={{ color: MUTED }}>Play the trapping side and execute the sequence.</p>
             </button>
             <button
-              onClick={() => setMode('avoid')}
+              onClick={() => { setMode('avoid'); setLiveNote(null); }}
               className="rounded-2xl p-5 text-left transition-transform hover:scale-[1.02]"
               style={{ background: CARD, border: `1px solid ${progress.avoid ? GREEN : 'rgba(255,255,255,0.06)'}` }}
             >
@@ -105,21 +107,32 @@ export default function TrapTrainingPage() {
           <TrainingBoard
             trap={trap}
             mode={mode}
-            onExit={() => setMode(null)}
+            onExit={() => { setMode(null); setLiveNote(null); }}
             onComplete={(m) => setProgress(p => ({ ...p, [m]: true }))}
+            onNoteChange={setLiveNote}
           />
         )}
 
         <div className="rounded-2xl p-5 mt-2" style={{ background: CARD, border: '1px solid rgba(255,255,255,0.06)' }}>
-          <p className="text-xs font-black uppercase tracking-wide mb-2" style={{ color: MUTED }}>Why it works</p>
-          <p className="text-sm leading-relaxed" style={{ color: TEXT }}>{trap.explanation}</p>
+          <p className="text-xs font-black uppercase tracking-wide mb-2" style={{ color: MUTED }}>
+            {liveNote ? "Right now" : "Why it works"}
+          </p>
+          <p className="text-sm leading-relaxed" style={{ color: liveNote ? ACCENT : TEXT }}>
+            {liveNote ?? trap.explanation}
+          </p>
         </div>
       </div>
     </div>
   );
 }
 
-function TrainingBoard({ trap, mode, onExit, onComplete }: { trap: Trap; mode: Mode; onExit: () => void; onComplete: (mode: Mode) => void }) {
+function TrainingBoard({ trap, mode, onExit, onComplete, onNoteChange }: {
+  trap: Trap;
+  mode: Mode;
+  onExit: () => void;
+  onComplete: (mode: Mode) => void;
+  onNoteChange: (note: string | null) => void;
+}) {
   const chessRef = useRef(new Chess(trap.startingFen));
   const [fen, setFen] = useState(chessRef.current.fen());
   const [stepIdx, setStepIdx] = useState(0);
@@ -150,22 +163,43 @@ function TrainingBoard({ trap, mode, onExit, onComplete }: { trap: Trap; mode: M
     if (success) onComplete(mode);
   }, [trap.id, mode, onComplete]);
 
-  // In "commit" mode the user plays trap.trapSide's moves; every other
-  // move in the sequence auto-plays as the scripted opponent reply.
-  // In "avoid" mode the user plays the opposite side -- moves are
-  // auto-played up to the critical index, then the user must find a
-  // safe alternative instead of the scripted (losing) move.
   const userColor = mode === 'commit' ? trap.trapSide : (trap.trapSide === 'white' ? 'black' : 'white');
   const isUsersTurn = (chessRef.current.turn() === 'w' ? 'white' : 'black') === userColor;
   const isCriticalStep = mode === 'avoid' && stepIdx === trap.criticalMoveIndex;
+
+  // Drive the live "Right now" note as training progresses.
+  useEffect(() => {
+    if (state !== 'playing') { onNoteChange(null); return; }
+
+    if (mode === 'commit') {
+      if (stepIdx >= trap.trapLineSan.length) { onNoteChange(null); return; }
+      const note = trap.moveNotes[stepIdx];
+      if (isUsersTurn) {
+        onNoteChange(`Play ${trap.trapLineSan[stepIdx]}${note ? ' — ' + note : ''}`);
+      } else {
+        onNoteChange(note ? `Opponent plays ${trap.trapLineSan[stepIdx]}: ${note}` : null);
+      }
+      return;
+    }
+
+    // avoid mode
+    if (isCriticalStep) {
+      onNoteChange(null); // handled by the hint button instead, not spoiled here
+    } else if (stepIdx < trap.trapLineSan.length) {
+      const note = trap.moveNotes[stepIdx];
+      onNoteChange(note ? `${trap.trapLineSan[stepIdx]}: ${note}` : null);
+    } else {
+      onNoteChange(null);
+    }
+  }, [stepIdx, state, mode, isUsersTurn, isCriticalStep, trap.trapLineSan, trap.moveNotes, onNoteChange]);
 
   // Auto-play scripted moves that aren't the user's turn (both modes),
   // and in avoid mode, auto-play straight through to the critical step.
   useEffect(() => {
     if (state !== 'playing') return;
     if (stepIdx >= trap.trapLineSan.length) return;
-    if (mode === 'avoid' && stepIdx === trap.criticalMoveIndex) return; // wait for the user here
-    if (mode === 'commit' && isUsersTurn) return; // wait for the user here
+    if (mode === 'avoid' && stepIdx === trap.criticalMoveIndex) return;
+    if (mode === 'commit' && isUsersTurn) return;
 
     const timer = setTimeout(() => {
       try {
@@ -175,7 +209,7 @@ function TrainingBoard({ trap, mode, onExit, onComplete }: { trap: Trap; mode: M
       } catch {
         // scripted move didn't apply -- stop advancing rather than corrupt state
       }
-    }, 500);
+    }, 700);
     return () => clearTimeout(timer);
   }, [stepIdx, state, mode, trap.trapLineSan, trap.criticalMoveIndex, isUsersTurn]);
 
@@ -196,9 +230,8 @@ function TrainingBoard({ trap, mode, onExit, onComplete }: { trap: Trap; mode: M
       return;
     }
 
-    // Commit mode: the move must match the scripted line exactly.
     const expected = trap.trapLineSan[stepIdx];
-    if (san !== expected) return; // ChessBoard's own expectedMoveSan check normally prevents this
+    if (san !== expected) return;
     const move = chessRef.current.move(san);
     if (!move) return;
     setFen(chessRef.current.fen());
@@ -226,6 +259,13 @@ function TrainingBoard({ trap, mode, onExit, onComplete }: { trap: Trap; mode: M
         <button onClick={onExit} className="text-xs font-bold" style={{ color: MUTED }}>Exit</button>
       </div>
 
+      {mode === 'commit' && expectedMoveSan && state === 'playing' && (
+        <div className="mb-3 flex items-center gap-2 px-3 py-2 rounded-xl" style={{ background: `${ACCENT}15`, border: `1px solid ${ACCENT}40` }}>
+          <MoveRight className="w-4 h-4 shrink-0" style={{ color: ACCENT }} />
+          <p className="text-sm font-bold" style={{ color: ACCENT }}>Play {expectedMoveSan}</p>
+        </div>
+      )}
+
       <ChessBoard
         fen={fen}
         practiceMode={boardInteractive}
@@ -241,7 +281,9 @@ function TrainingBoard({ trap, mode, onExit, onComplete }: { trap: Trap; mode: M
         <div className="mt-3 text-center">
           <p className="text-sm font-bold mb-2">This is the critical moment. Find the safe move.</p>
           {showHint ? (
-            <p className="text-xs" style={{ color: ACCENT }}>Avoid the move that looks natural here — look for what it actually hangs.</p>
+            <p className="text-xs" style={{ color: ACCENT }}>
+              {trap.moveNotes[trap.criticalMoveIndex] || 'Avoid the move that looks natural here — look for what it actually hangs.'}
+            </p>
           ) : (
             <button onClick={() => setShowHint(true)} className="text-xs font-bold flex items-center gap-1 mx-auto" style={{ color: MUTED }}>
               <Lightbulb className="w-3.5 h-3.5" /> Hint

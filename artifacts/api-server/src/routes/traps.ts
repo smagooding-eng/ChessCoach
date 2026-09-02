@@ -99,14 +99,15 @@ router.post("/traps/:id/attempt", async (req: Request, res: Response) => {
 // Admin content-management routes -- create/edit/archive traps.
 router.post("/traps", async (req: Request, res: Response) => {
   try {
-    const { name, category, difficulty, trapSide, summary, explanation, startingFen, trapLineSan, criticalMoveIndex, safeMovesSan, orderIndex } = req.body ?? {};
+    const { name, category, difficulty, trapSide, summary, explanation, startingFen, trapLineSan, moveNotes, criticalMoveIndex, safeMovesSan, orderIndex } = req.body ?? {};
     if (!name || !category || !difficulty || !trapSide || !summary || !explanation || !startingFen || !Array.isArray(trapLineSan) || !Array.isArray(safeMovesSan)) {
       res.status(400).json({ error: "Missing required fields" });
       return;
     }
     const [created] = await db.insert(chessTrapsTable).values({
       name, category, difficulty, trapSide, summary, explanation, startingFen,
-      trapLineSan, criticalMoveIndex: criticalMoveIndex ?? 0, safeMovesSan,
+      trapLineSan, moveNotes: Array.isArray(moveNotes) ? moveNotes : [],
+      criticalMoveIndex: criticalMoveIndex ?? 0, safeMovesSan,
       orderIndex: orderIndex ?? 0,
     }).returning();
     res.json({ trap: created });
