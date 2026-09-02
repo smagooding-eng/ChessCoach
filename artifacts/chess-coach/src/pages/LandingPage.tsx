@@ -758,18 +758,14 @@ export function LandingPage() {
               <style>{`@keyframes shimmer { to { background-position: 200% center; } }`}</style>
 
               <p className="mt-5 text-base sm:text-lg leading-relaxed max-w-lg" style={{ color: MUTED }}>
-                Upload your Chess.com or Lichess games. We'll show your biggest mistakes, patterns, and exactly how to fix them.
-              </p>
-
-              <p className="mt-4 text-sm font-bold max-w-lg" style={{ color: TEXT }}>
-                Stuck at the same rating? Most players plateau for the same 2-3 reasons. We'll show you yours.
+                Upload your Chess.com or Lichess games and see why you plateau at the same rating — the 2-3 mistakes keeping you stuck, with exactly how to fix them.
               </p>
 
               <p className="mt-2 text-xs max-w-lg" style={{ color: MUTED }}>
                 For club players 400–2000 ELO. Not for titled players or grandmasters.
               </p>
 
-              <div className="mt-8 flex flex-col sm:flex-row gap-3">
+              <div className="mt-7 flex flex-col sm:flex-row gap-3 items-start sm:items-center">
                 <button onClick={openSignup}
                   className="group flex items-center justify-center gap-2.5 px-7 py-3.5 rounded-xl font-bold text-sm transition-all"
                   style={{ background: G, color: '#fff', boxShadow: `0 4px 20px ${G}40` }}
@@ -779,25 +775,27 @@ export function LandingPage() {
                   Analyze My Games Free
                   <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                 </button>
-                <button onClick={openSignup}
-                  className="flex items-center justify-center gap-2 px-5 py-3 rounded-xl font-medium text-xs transition-all"
-                  style={{ background: 'transparent', color: MUTED, border: '1px solid rgba(255,255,255,0.08)' }}
-                  onMouseEnter={e => { e.currentTarget.style.color = TEXT; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.16)'; }}
-                  onMouseLeave={e => { e.currentTarget.style.color = MUTED; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'; }}>
-                  <Crosshair className="w-3.5 h-3.5" />
-                  Scout Opponent
-                </button>
-                <a href={`${import.meta.env.BASE_URL}download`}
-                  className="flex items-center justify-center gap-2 px-5 py-3 rounded-xl font-medium text-xs transition-all"
-                  style={{ background: 'transparent', color: MUTED, border: '1px solid rgba(255,255,255,0.08)' }}
-                  onMouseEnter={e => { e.currentTarget.style.color = TEXT; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.16)'; }}
-                  onMouseLeave={e => { e.currentTarget.style.color = MUTED; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'; }}>
-                  <DownloadIcon className="w-3.5 h-3.5" />
-                  Download App
-                </a>
+                <div className="flex items-center gap-4 text-xs font-medium">
+                  <button onClick={openSignup}
+                    className="flex items-center gap-1.5 transition-colors"
+                    style={{ color: MUTED }}
+                    onMouseEnter={e => { e.currentTarget.style.color = TEXT; }}
+                    onMouseLeave={e => { e.currentTarget.style.color = MUTED; }}>
+                    <Crosshair className="w-3.5 h-3.5" />
+                    Scout an opponent
+                  </button>
+                  <a href={`${import.meta.env.BASE_URL}download`}
+                    className="flex items-center gap-1.5 transition-colors"
+                    style={{ color: MUTED }}
+                    onMouseEnter={e => { e.currentTarget.style.color = TEXT; }}
+                    onMouseLeave={e => { e.currentTarget.style.color = MUTED; }}>
+                    <DownloadIcon className="w-3.5 h-3.5" />
+                    Get the app
+                  </a>
+                </div>
               </div>
 
-              <div className="mt-6 max-w-lg">
+              <div className="mt-5 max-w-lg">
                 <HeroDemo onUpgradeClick={openSignup} />
               </div>
 
