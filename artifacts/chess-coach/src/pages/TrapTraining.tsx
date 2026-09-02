@@ -268,6 +268,7 @@ function TrainingBoard({ trap, mode, onExit, onComplete, onNoteChange }: {
 
       <ChessBoard
         fen={fen}
+        flipped={userColor === 'black'}
         practiceMode={boardInteractive}
         expectedMoveSan={expectedMoveSan}
         onMovePlayed={(san) => handleMove(san)}
