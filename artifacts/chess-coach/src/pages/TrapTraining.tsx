@@ -23,7 +23,7 @@ interface Trap {
   explanation: string;
   startingFen: string;
   trapLineSan: string[];
-  moveNotes: string[];
+  moveNotes?: string[];
   criticalMoveIndex: number;
   safeMovesSan: string[];
 }
@@ -173,7 +173,7 @@ function TrainingBoard({ trap, mode, onExit, onComplete, onNoteChange }: {
 
     if (mode === 'commit') {
       if (stepIdx >= trap.trapLineSan.length) { onNoteChange(null); return; }
-      const note = trap.moveNotes[stepIdx];
+      const note = trap.moveNotes?.[stepIdx];
       if (isUsersTurn) {
         onNoteChange(`Play ${trap.trapLineSan[stepIdx]}${note ? ' — ' + note : ''}`);
       } else {
@@ -186,7 +186,7 @@ function TrainingBoard({ trap, mode, onExit, onComplete, onNoteChange }: {
     if (isCriticalStep) {
       onNoteChange(null); // handled by the hint button instead, not spoiled here
     } else if (stepIdx < trap.trapLineSan.length) {
-      const note = trap.moveNotes[stepIdx];
+      const note = trap.moveNotes?.[stepIdx];
       onNoteChange(note ? `${trap.trapLineSan[stepIdx]}: ${note}` : null);
     } else {
       onNoteChange(null);
@@ -283,7 +283,7 @@ function TrainingBoard({ trap, mode, onExit, onComplete, onNoteChange }: {
           <p className="text-sm font-bold mb-2">This is the critical moment. Find the safe move.</p>
           {showHint ? (
             <p className="text-xs" style={{ color: ACCENT }}>
-              {trap.moveNotes[trap.criticalMoveIndex] || 'Avoid the move that looks natural here — look for what it actually hangs.'}
+              {trap.moveNotes?.[trap.criticalMoveIndex] || 'Avoid the move that looks natural here — look for what it actually hangs.'}
             </p>
           ) : (
             <button onClick={() => setShowHint(true)} className="text-xs font-bold flex items-center gap-1 mx-auto" style={{ color: MUTED }}>
