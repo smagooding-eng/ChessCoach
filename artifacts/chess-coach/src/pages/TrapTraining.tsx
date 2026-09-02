@@ -209,7 +209,7 @@ function TrainingBoard({ trap, mode, onExit, onComplete, onNoteChange }: {
       } catch {
         // scripted move didn't apply -- stop advancing rather than corrupt state
       }
-    }, 700);
+    }, 1800);
     return () => clearTimeout(timer);
   }, [stepIdx, state, mode, trap.trapLineSan, trap.criticalMoveIndex, isUsersTurn]);
 
@@ -259,10 +259,18 @@ function TrainingBoard({ trap, mode, onExit, onComplete, onNoteChange }: {
         <button onClick={onExit} className="text-xs font-bold" style={{ color: MUTED }}>Exit</button>
       </div>
 
-      {mode === 'commit' && expectedMoveSan && state === 'playing' && (
-        <div className="mb-3 flex items-center gap-2 px-3 py-2 rounded-xl" style={{ background: `${ACCENT}15`, border: `1px solid ${ACCENT}40` }}>
+      {mode === 'commit' && (
+        <div
+          className="mb-3 flex items-center gap-2 px-3 py-2 rounded-xl transition-opacity"
+          style={{
+            background: `${ACCENT}15`,
+            border: `1px solid ${ACCENT}40`,
+            opacity: expectedMoveSan && state === 'playing' ? 1 : 0,
+            visibility: expectedMoveSan && state === 'playing' ? 'visible' : 'hidden',
+          }}
+        >
           <MoveRight className="w-4 h-4 shrink-0" style={{ color: ACCENT }} />
-          <p className="text-sm font-bold" style={{ color: ACCENT }}>Play {expectedMoveSan}</p>
+          <p className="text-sm font-bold" style={{ color: ACCENT }}>Play {expectedMoveSan || '...'}</p>
         </div>
       )}
 
