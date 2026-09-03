@@ -5,7 +5,7 @@ import { useMyCourses } from '@/hooks/use-courses';
 import { useMyGames } from '@/hooks/use-games';
 import { GameThumb } from '@/components/GameThumb';
 import { Link } from 'wouter';
-import { Swords, Trophy, Target, AlertTriangle, BookOpen, Clock, GraduationCap, TrendingUp, ChevronRight, Search, Play, Bot, Camera, Lock, Crown, Flame, Zap, Award, Activity, Sparkles, ArrowUpRight, Share2, Puzzle } from 'lucide-react';
+import { Swords, Trophy, Target, AlertTriangle, BookOpen, Clock, GraduationCap, TrendingUp, ChevronRight, Search, Play, Bot, Camera, Lock, Crown, Flame, Zap, Award, Activity, Sparkles, ArrowUpRight, Share2, Puzzle, Crosshair } from 'lucide-react';
 import { encodeCard } from '@/pages/ShareCard';
 import { useUser } from '@/hooks/use-user';
 import { useChessPlayer } from '@/hooks/use-chess-player';
@@ -302,6 +302,25 @@ export function Dashboard() {
         </Link>
       </div>
 
+      <div className="grid grid-cols-1 gap-3 px-3 md:px-0">
+        <Link href="/traps" className="block">
+          <div className="relative overflow-hidden rounded-2xl p-4 flex items-center gap-3 transition-colors group cursor-pointer"
+            style={{
+              background: 'linear-gradient(180deg, #383532 0%, #2a2825 100%)',
+              border: '1px solid rgba(224,160,58,0.35)',
+              boxShadow: '0 18px 50px -16px rgba(0,0,0,0.6), 0 4px 16px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04)',
+            }}>
+            <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ background: 'rgba(224,160,58,0.15)' }}>
+              <Crosshair className="w-4.5 h-4.5" style={{ color: '#e0a03a' }} />
+            </div>
+            <div className="flex-1">
+              <h3 className="font-semibold text-sm" style={{ color: TEXT_LIGHT }}>Chess Traps</h3>
+              <p className="text-xs mt-0.5" style={{ color: TEXT_MUTED }}>Learn the classics from both sides</p>
+            </div>
+          </div>
+        </Link>
+      </div>
+
       <Link href="/analysis" className="block px-3 md:px-0">
         <div className="relative overflow-hidden rounded-2xl transition-all hover:scale-[1.01] active:scale-[0.99]"
           style={{
@@ -420,7 +439,7 @@ export function Dashboard() {
                 border: '1px solid rgba(255,255,255,0.06)',
                 boxShadow: '0 18px 50px -16px rgba(0,0,0,0.6), 0 4px 16px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04)',
               }}>
-              
+
               <div className="relative flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
                   <PieceTile piece="♝" />
