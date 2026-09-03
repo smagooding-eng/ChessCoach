@@ -12,3 +12,4 @@ export * from "./scannedPositions";
 export * from "./landingFunnel";
 export * from "./scanAttempts";
 export * from "./chessTraps";
+export * from "./beginnerCourses";
