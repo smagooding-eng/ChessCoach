@@ -19,6 +19,7 @@ import scannedPositionsRouter from "./scannedPositions";
 import demoRouter from "./demo";
 import landingFunnelRouter from "./landingFunnel";
 import trapsRouter from "./traps";
+import beginnerCoursesRouter from "./beginnerCourses";
 import { requirePremium } from "../middlewares/authMiddleware";
 import { db, pageViewsTable } from "@workspace/db";
 
@@ -40,6 +41,7 @@ router.use(scannedPositionsRouter);
 router.use(demoRouter);
 router.use(landingFunnelRouter);
 router.use(trapsRouter);
+router.use(beginnerCoursesRouter);
 
 router.post("/track", async (req: Request, res: Response) => {
   try {

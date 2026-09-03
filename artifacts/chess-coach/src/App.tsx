@@ -73,6 +73,9 @@ const RafflePage = lazy(() => import("@/pages/Raffle"));
 const RaffleRulesPage = lazy(() => import("@/pages/RaffleRules"));
 const AffiliatePage = lazy(() => import("@/pages/Affiliate"));
 const TrapsPage = lazy(() => import("@/pages/Traps"));
+const BeginnerCoursesPage = lazy(() => import("@/pages/BeginnerCourses"));
+const BeginnerCourseDetailPage = lazy(() => import("@/pages/BeginnerCourseDetail"));
+const BeginnerLessonPage = lazy(() => import("@/pages/BeginnerLesson"));
 const TrapTrainingPage = lazy(() => import("@/pages/TrapTraining"));
 const TermsPage = lazy(() => import("@/pages/Terms"));
 const VsAimchessPage = lazy(() => import("@/pages/VsAimchess"));
@@ -185,6 +188,9 @@ const PLocalPlay     = () => <ProtectedRoute component={LocalPlay} />;
 const PLivePlay      = () => <ProtectedRoute component={LivePlay} requireAdmin />;
 const PTraps         = () => <ProtectedRoute component={TrapsPage} />;
 const PTrapTraining  = () => <ProtectedRoute component={TrapTrainingPage} />;
+const PBeginnerCourses = () => <ProtectedRoute component={BeginnerCoursesPage} requireAdmin />;
+const PBeginnerCourseDetail = () => <ProtectedRoute component={BeginnerCourseDetailPage} requireAdmin />;
+const PBeginnerLesson = () => <ProtectedRoute component={BeginnerLessonPage} requireAdmin />;
 const PLiveHistory   = () => <ProtectedRoute component={LiveHistory} fallbackNav="/live" requireAdmin />;
 const PGameLookup    = () => <ProtectedRoute component={GameLookup} />;
 const PSubscription  = () => <ProtectedRoute component={Subscription} />;
@@ -275,6 +281,9 @@ function Router() {
       <Route path="/play"            component={PLocalPlay} />
       <Route path="/live"            component={PLivePlay} />
       <Route path="/traps/:id" component={PTrapTraining} />
+<Route path="/admin/beginner-courses/:id" component={PBeginnerCourseDetail} />
+<Route path="/admin/beginner-courses" component={PBeginnerCourses} />
+<Route path="/admin/beginner-lessons/:id" component={PBeginnerLesson} />
       <Route path="/traps"     component={PTraps} />
       <Route path="/live/history"    component={PLiveHistory} />
       <Route path="/lookup"          component={PGameLookup} />
