@@ -63,6 +63,53 @@ router.get("/admin/stats", requireAdmin, async (_req: Request, res: Response) =>
       .from(pageViewsTable)
       .where(gte(pageViewsTable.createdAt, todayStart));
 
+    // By-IP counterparts to the visitorId-based unique counts above --
+    // visitorId is a per-browser localStorage value, so it double-counts
+    // anyone using multiple browsers/devices or the installed app (which
+    // doesn't share localStorage with the web build). IP is a rougher
+    // but harder-to-inflate proxy. The frontend has expected these two
+    // fields (totalByIp/todayByIp) since the funnel-tracking work, but
+    // this endpoint never actually computed them -- fixing that here.
+    const [totalUniqueByIpResult] = await db
+      .select({ count: countDistinct(pageViewsTable.ipAddress) })
+      .from(pageViewsTable);
+
+    const [todayUniqueByIpResult] = await db
+      .select({ count: countDistinct(pageViewsTable.ipAddress) })
+      .from(pageViewsTable)
+      .where(gte(pageViewsTable.createdAt, todayStart));
+
+    // New vs. returning vs. bounced, site-wide, all time. A visitor is
+    // "returning" once we've seen them active on more than one distinct
+    // calendar day (not just multiple page views in one sitting).
+    // "Bounced" = never signed up, regardless of how many times they've
+    // been back -- independent of the new/returning split, since a
+    // visitor can come back several times and still never convert.
+    const visitorBreakdownResult = await db.execute(sql`
+      WITH visitor_agg AS (
+        SELECT
+          visitor_id,
+          COUNT(DISTINCT date_trunc('day', created_at)) AS days_active,
+          BOOL_OR(user_id IS NOT NULL) AS signed_up
+        FROM page_views
+        WHERE visitor_id IS NOT NULL
+        GROUP BY visitor_id
+      )
+      SELECT
+        COUNT(*) FILTER (WHERE days_active <= 1) AS new_visitors,
+        COUNT(*) FILTER (WHERE days_active > 1) AS returning_visitors,
+        COUNT(*) FILTER (WHERE NOT signed_up) AS bounced_visitors
+      FROM visitor_agg
+    `);
+    const visitorBreakdownRow = (visitorBreakdownResult.rows[0] ?? {}) as {
+      new_visitors?: string | number; returning_visitors?: string | number; bounced_visitors?: string | number;
+    };
+    const visitorBreakdown = {
+      new: Number(visitorBreakdownRow.new_visitors ?? 0),
+      returning: Number(visitorBreakdownRow.returning_visitors ?? 0),
+      bounced: Number(visitorBreakdownRow.bounced_visitors ?? 0),
+    };
+
     let subBreakdown = { active: 0, trialing: 0, canceled: 0, pastDue: 0, total: 0 };
     try {
       const stripe = await getUncachableStripeClient();
@@ -100,6 +147,7 @@ router.get("/admin/stats", requireAdmin, async (_req: Request, res: Response) =>
         path: pageViewsTable.path,
         views: count(),
         uniqueVisitors: countDistinct(pageViewsTable.visitorId),
+        uniqueByIp: countDistinct(pageViewsTable.ipAddress),
       })
       .from(pageViewsTable)
       .groupBy(pageViewsTable.path)
@@ -108,7 +156,13 @@ router.get("/admin/stats", requireAdmin, async (_req: Request, res: Response) =>
 
     res.json({
       pageViews: { total: totalViewsResult.count, today: todayViewsResult.count },
-      uniqueVisitors: { total: totalUniqueResult.count, today: todayUniqueResult.count },
+      uniqueVisitors: {
+        total: totalUniqueResult.count,
+        today: todayUniqueResult.count,
+        totalByIp: totalUniqueByIpResult.count,
+        todayByIp: todayUniqueByIpResult.count,
+      },
+      visitorBreakdown,
       users: { total: totalUsersResult.count, today: todayUsersResult.count },
       subscriptions: subBreakdown,
       games: {
@@ -125,6 +179,7 @@ router.get("/admin/stats", requireAdmin, async (_req: Request, res: Response) =>
         path: r.path,
         views: r.views,
         uniqueVisitors: r.uniqueVisitors,
+        uniqueByIp: r.uniqueByIp,
       })),
     });
   } catch (err: any) {

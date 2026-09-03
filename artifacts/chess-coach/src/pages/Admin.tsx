@@ -14,9 +14,12 @@ import {
   Trophy, Type, Undo2, User, UserCheck, UserPlus, Users, Wrench, X, Zap, TrendingUp,
 } from 'lucide-react';
 
+interface VisitorBreakdown { new: number; returning: number; bounced: number }
+
 interface AdminStats {
   pageViews: { total: number; today: number };
   uniqueVisitors: { total: number; today: number; totalByIp: number; todayByIp: number };
+  visitorBreakdown: VisitorBreakdown;
   funnel: { landingPageUniqueIps: number; signups: number; paying: number };
   users: { total: number; today: number };
   subscriptions: { active: number; trialing: number; canceled: number; pastDue: number; total: number };
@@ -125,6 +128,46 @@ function StatCard({
           {footnote}
         </p>
       )}
+    </div>
+  );
+}
+
+// New = only ever seen on a single calendar day so far (they may still
+// come back later). Returning = seen active on 2+ distinct days.
+// Bounced = never signed up, regardless of how many times they've been
+// back -- this can overlap with either of the above, since a visitor
+// can return several times and still never convert. Shared between the
+// site-wide stats panel and the landing-page funnel panel, which both
+// return the same { new, returning, bounced } shape.
+function VisitorBreakdownPanel({ title, subtitle, data }: { title: string; subtitle?: string; data: VisitorBreakdown }) {
+  const items = [
+    { label: 'New', sub: 'first time seen', value: data.new, color: CHESSCOM_GREEN },
+    { label: 'Returning', sub: 'seen 2+ days', value: data.returning, color: '#5b9bd5' },
+    { label: 'Bounced', sub: 'never signed up', value: data.bounced, color: '#dc4343' },
+  ];
+  return (
+    <div
+      className="rounded-xl p-4"
+      style={{ background: BG_CARD, border: `1px solid rgba(255,255,255,0.05)` }}
+    >
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-base font-black" style={{ color: TEXT_LIGHT }}>{title}</h2>
+        {subtitle && (
+          <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: TEXT_MUTED }}>{subtitle}</p>
+        )}
+      </div>
+      <div className="grid grid-cols-3 gap-2">
+        {items.map((item) => (
+          <div key={item.label} className="rounded-lg p-3 text-center" style={{ background: 'rgba(255,255,255,0.03)' }}>
+            <p className="text-2xl font-black" style={{ color: item.color }}>{fmt(item.value)}</p>
+            <p className="text-[10px] font-bold uppercase tracking-wider mt-1" style={{ color: TEXT_MUTED }}>{item.label}</p>
+            <p className="text-[10px]" style={{ color: TEXT_MUTED }}>{item.sub}</p>
+          </div>
+        ))}
+      </div>
+      <p className="text-[10px] mt-2" style={{ color: TEXT_MUTED }}>
+        "Bounced" can overlap with "Returning" — someone can come back several times and still never sign up.
+      </p>
     </div>
   );
 }
@@ -299,6 +342,14 @@ export function Admin() {
             primaryLabel="Visits"
           />
         </div>
+      )}
+
+      {stats && stats.visitorBreakdown && (
+        <VisitorBreakdownPanel
+          title="Visitors, Site-Wide"
+          subtitle="All time"
+          data={stats.visitorBreakdown}
+        />
       )}
 
       {stats && stats.funnel && (
@@ -1399,6 +1450,7 @@ function LandingFunnelPanel() {
     engaged10s: number;
     sectionViews: Record<string, number>;
     sectionExits: Record<string, number>;
+    visitorBreakdown: VisitorBreakdown;
   } | null>(null);
   const [loading, setLoading] = useState(true);
   const [days, setDays] = useState(30);
@@ -1464,6 +1516,25 @@ function LandingFunnelPanel() {
                 </div>
               ))}
             </div>
+
+            {data.visitorBreakdown && (
+              <div className="mt-5 pt-4 border-t border-border/20">
+                <p className="text-xs font-bold text-muted-foreground mb-2">New vs. returning vs. bounced (landing page visitors only)</p>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { label: 'New', sub: 'first time seen', value: data.visitorBreakdown.new, color: 'text-primary' },
+                    { label: 'Returning', sub: 'seen 2+ days', value: data.visitorBreakdown.returning, color: 'text-blue-400' },
+                    { label: 'Bounced', sub: 'never signed up', value: data.visitorBreakdown.bounced, color: 'text-red-400' },
+                  ].map((r) => (
+                    <div key={r.label} className="p-2.5 rounded-lg bg-white/5 border border-white/5 text-center">
+                      <p className={cn('text-lg font-black', r.color)}>{r.value.toLocaleString()}</p>
+                      <p className="text-[10px] text-muted-foreground">{r.label}</p>
+                      <p className="text-[9px] text-muted-foreground/70">{r.sub}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div className="mt-5 pt-4 border-t border-border/20">
               <p className="text-xs font-bold text-muted-foreground mb-2">Scroll depth &amp; engagement</p>
