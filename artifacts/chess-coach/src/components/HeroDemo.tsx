@@ -119,11 +119,14 @@ export function HeroDemo({ onUpgradeClick }: { onUpgradeClick: () => void }) {
   };
 
   return (
-    <div className="rounded-2xl p-5 sm:p-6" style={{ background: CARD, border: '1px solid rgba(255,255,255,0.08)' }}>
+    <div id="hero-demo" className="rounded-2xl p-6 sm:p-8" style={{ background: CARD, border: `1.5px solid ${G}40`, boxShadow: `0 30px 80px -20px rgba(0,0,0,0.6), 0 0 60px ${G}12` }}>
       {state !== 'result' && (
         <>
-          <p className="text-xs font-black uppercase tracking-wide mb-3" style={{ color: G }}>
+          <p className="text-sm font-black uppercase tracking-wide mb-1" style={{ color: G }}>
             Try it free — no signup
+          </p>
+          <p className="text-xs mb-4" style={{ color: MUTED }}>
+            Real analysis of your real games, right here. Takes about 10 seconds.
           </p>
           <div className="flex flex-col sm:flex-row gap-2">
             <div className="flex rounded-xl overflow-hidden shrink-0" style={{ border: '1px solid rgba(255,255,255,0.1)' }}>
@@ -132,7 +135,7 @@ export function HeroDemo({ onUpgradeClick }: { onUpgradeClick: () => void }) {
                   key={p}
                   onClick={() => setPlatform(p)}
                   disabled={state === 'loading' || state === 'analyzing'}
-                  className="flex-1 flex items-center justify-center px-4 py-2.5 text-xs font-bold text-center transition-colors"
+                  className="flex-1 flex items-center justify-center px-4 py-3 text-xs font-bold text-center transition-colors"
                   style={{ background: platform === p ? G : 'transparent', color: platform === p ? '#000' : MUTED, minWidth: '92px' }}
                 >
                   {p === 'chesscom' ? 'Chess.com' : 'Lichess'}
@@ -140,19 +143,20 @@ export function HeroDemo({ onUpgradeClick }: { onUpgradeClick: () => void }) {
               ))}
             </div>
             <input
+              id="demo-username-input"
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && runDemo()}
               disabled={state === 'loading' || state === 'analyzing'}
               placeholder="Your username"
-              className="flex-1 px-4 py-2.5 rounded-xl text-sm disabled:opacity-60"
+              className="flex-1 px-4 py-3 rounded-xl text-sm disabled:opacity-60"
               style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', color: TEXT }}
             />
             <button
               onClick={runDemo}
               disabled={state === 'loading' || state === 'analyzing' || !username.trim()}
-              className="px-5 py-2.5 rounded-xl text-sm font-black shrink-0 disabled:opacity-50 flex items-center justify-center gap-2 min-w-[110px]"
+              className="px-5 py-3 rounded-xl text-sm font-black shrink-0 disabled:opacity-50 flex items-center justify-center gap-2 min-w-[110px]"
               style={{ background: G, color: '#000' }}
             >
               {state === 'loading' && <Loader2 className="w-4 h-4 animate-spin" />}

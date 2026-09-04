@@ -4,7 +4,7 @@ import { useLocation, Link } from 'wouter';
 import { HeroDemo } from '@/components/HeroDemo';
 import { trackFunnelEvent } from '@/lib/funnelTracking';
 import { useLandingFunnelTracking } from '@/hooks/use-landing-funnel-tracking';
-import { ArrowRight, Mail, Eye, EyeOff, UserPlus, LogIn, Search, BarChart3, Brain, TrendingUp, Check, X, Zap, Target, Crosshair, BookOpen, Gamepad2, Users, Star, Flame, Trophy, Sparkles, Download as DownloadIcon, Smartphone } from 'lucide-react';
+import { ArrowRight, Mail, Eye, EyeOff, UserPlus, LogIn, Search, BarChart3, Brain, Check, X, Target, Crosshair, BookOpen, Gamepad2, Flame, Puzzle, Users, Skull, History, GraduationCap, Download as DownloadIcon, Smartphone } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { apiFetch, apiUrl, setAuthToken } from '@/lib/api';
 
@@ -13,173 +13,6 @@ const BG = '#262421';
 const CARD = '#302e2b';
 const TEXT = '#e8e6e3';
 const MUTED = '#9e9b98';
-
-type LBPiece = { p: string; w: boolean };
-const LB_FILES = ['a','b','c','d','e','f','g','h'];
-const LB_RANKS = [8,7,6,5,4,3,2,1];
-
-function HeroBoard() {
-  // Scholar's mate-ready position. Best move: Qh5 -> f7 (mate).
-  const pieces: Record<string, LBPiece> = {
-    a8:{p:'♜',w:false},b8:{p:'♞',w:false},c8:{p:'♝',w:false},d8:{p:'♛',w:false},e8:{p:'♚',w:false},f8:{p:'♝',w:false},h8:{p:'♜',w:false},
-    a7:{p:'♟',w:false},b7:{p:'♟',w:false},c7:{p:'♟',w:false},d7:{p:'♟',w:false},f7:{p:'♟',w:false},g7:{p:'♟',w:false},h7:{p:'♟',w:false},
-    c6:{p:'♞',w:false},f6:{p:'♞',w:false},e5:{p:'♟',w:false},
-    c4:{p:'♗',w:true},e4:{p:'♙',w:true},h5:{p:'♕',w:true},f3:{p:'♘',w:true},
-    a2:{p:'♙',w:true},b2:{p:'♙',w:true},c2:{p:'♙',w:true},d2:{p:'♙',w:true},f2:{p:'♙',w:true},g2:{p:'♙',w:true},h2:{p:'♙',w:true},
-    a1:{p:'♖',w:true},c1:{p:'♗',w:true},e1:{p:'♔',w:true},h1:{p:'♖',w:true},
-  };
-  const SOURCE = 'h5';
-  const TARGET = 'f7';
-  const SIZE = 360;
-  const SQ = SIZE / 8;
-  const sqXY = (sq: string) => {
-    const f = LB_FILES.indexOf(sq[0]!);
-    const r = LB_RANKS.indexOf(parseInt(sq[1]!, 10));
-    return { x: f * SQ + SQ / 2, y: r * SQ + SQ / 2 };
-  };
-  const a = sqXY(SOURCE);
-  const b = sqXY(TARGET);
-  const fontSize = Math.round(SQ * 0.78);
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 20, rotate: -2 }}
-      animate={{ opacity: 1, y: 0, rotate: 0 }}
-      transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
-      className="relative mx-auto"
-      style={{ width: SIZE, maxWidth: '100%' }}
-    >
-      {/* glow halo */}
-      <motion.div
-        aria-hidden
-        className="absolute -inset-8 rounded-[40px] pointer-events-none"
-        style={{ background: `radial-gradient(circle, ${G}33 0%, transparent 70%)`, filter: 'blur(24px)' }}
-        animate={{ opacity: [0.55, 0.85, 0.55] }}
-        transition={{ duration: 3.5, repeat: Infinity, ease: 'easeInOut' }}
-      />
-
-      <div
-        className="relative rounded-xl overflow-hidden"
-        style={{
-          width: SIZE,
-          maxWidth: '100%',
-          boxShadow: '0 30px 60px -10px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.05)',
-        }}
-      >
-        <div className="aspect-square grid" style={{ gridTemplateColumns: 'repeat(8, 1fr)', gridTemplateRows: 'repeat(8, 1fr)' }}>
-          {LB_RANKS.map((r, ri) =>
-            LB_FILES.map((f, fi) => {
-              const sq = `${f}${r}`;
-              const isLight = (ri + fi) % 2 === 0;
-              const piece = pieces[sq];
-              const isHL = sq === SOURCE || sq === TARGET;
-              return (
-                <div key={sq} className="relative flex items-center justify-center" style={{ background: isLight ? '#eeeed2' : '#769656' }}>
-                  {isHL && (
-                    <div className="absolute inset-0" style={{ background: 'rgba(129,182,76,0.55)', boxShadow: 'inset 0 0 0 2px #81b64c' }} />
-                  )}
-                  {piece && (
-                    <span
-                      className="relative select-none"
-                      style={{
-                        fontSize,
-                        lineHeight: 1,
-                        color: piece.w ? '#fff' : '#1a1a1a',
-                        textShadow: piece.w
-                          ? '0 1px 2px rgba(0,0,0,0.7), 0 0 1px rgba(0,0,0,0.9)'
-                          : '0 1px 1px rgba(255,255,255,0.2)',
-                      }}
-                    >
-                      {piece.p}
-                    </span>
-                  )}
-                </div>
-              );
-            })
-          )}
-        </div>
-
-        {/* arrow */}
-        <svg className="absolute inset-0 pointer-events-none w-full h-full" viewBox={`0 0 ${SIZE} ${SIZE}`}>
-          <defs>
-            <marker id="hbarrow" markerWidth="3.5" markerHeight="3.5" refX="1.7" refY="1.7" orient="auto">
-              <polygon points="0 0, 3.5 1.7, 0 3.5" fill="#81b64c" />
-            </marker>
-          </defs>
-          <motion.line
-            x1={a.x} y1={a.y} x2={b.x} y2={b.y}
-            stroke="#81b64c" strokeWidth={6} strokeLinecap="round"
-            markerEnd="url(#hbarrow)"
-            initial={{ pathLength: 0, opacity: 0 }}
-            animate={{ pathLength: 1, opacity: 1 }}
-            transition={{ delay: 0.7, duration: 0.7, ease: 'easeOut' }}
-            style={{ filter: 'drop-shadow(0 2px 6px rgba(129,182,76,0.6))' }}
-          />
-        </svg>
-
-        {/* scan line */}
-        <motion.div
-          aria-hidden
-          className="absolute left-0 right-0 pointer-events-none"
-          style={{
-            height: 14,
-            background: 'linear-gradient(90deg, transparent 0%, rgba(129,182,76,0.55) 50%, transparent 100%)',
-            filter: 'blur(3px)',
-            boxShadow: '0 0 12px rgba(129,182,76,0.7)',
-          }}
-          initial={{ top: 0 }}
-          animate={{ top: ['-14px', `${SIZE}px`, '-14px'] }}
-          transition={{ duration: 3.2, repeat: Infinity, ease: 'easeInOut' }}
-        />
-
-        {/* SCANNING badge */}
-        <div className="absolute top-3 right-3 flex items-center gap-1.5 px-2.5 py-1 rounded-full" style={{ background: 'rgba(0,0,0,0.78)', backdropFilter: 'blur(6px)' }}>
-          <motion.div className="w-2 h-2 rounded-full" style={{ background: G }} animate={{ opacity: [0.3, 1, 0.3] }} transition={{ duration: 1.2, repeat: Infinity }} />
-          <span className="text-[10px] font-black tracking-widest" style={{ color: '#fff' }}>ANALYZING</span>
-        </div>
-      </div>
-
-      {/* verdict pill that floats below */}
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 1.3, duration: 0.4 }}
-        className="absolute left-1/2 -bottom-7 -translate-x-1/2 flex items-center gap-2 px-4 py-2 rounded-full"
-        style={{
-          background: 'linear-gradient(90deg, #1f1d1b 0%, #2a2826 100%)',
-          border: `1.5px solid ${G}`,
-          boxShadow: `0 12px 30px -8px ${G}66, 0 0 0 1px rgba(255,255,255,0.05)`,
-          whiteSpace: 'nowrap',
-        }}
-      >
-        <Sparkles className="w-3.5 h-3.5" style={{ color: G }} />
-        <span className="text-[11px] font-black tracking-wider" style={{ color: G }}>BEST MOVE</span>
-        <span className="text-sm font-black font-mono" style={{ color: TEXT }}>Qxf7<span style={{ color: G }}>#</span></span>
-        <span className="text-[10px] font-bold" style={{ color: MUTED }}>· mate</span>
-      </motion.div>
-
-      {/* corner floating chips */}
-      <motion.div
-        initial={{ opacity: 0, x: -10 }}
-        animate={{ opacity: 1, x: 0 }}
-        transition={{ delay: 1.0 }}
-        className="absolute -top-3 -left-3 px-2.5 py-1 rounded-xl text-[10px] font-black tracking-wider"
-        style={{ background: '#dc4343', color: '#fff', boxShadow: '0 6px 18px rgba(220,67,67,0.5)' }}
-      >
-        ⚠ BLUNDER DETECTED
-      </motion.div>
-      <motion.div
-        initial={{ opacity: 0, x: 10 }}
-        animate={{ opacity: 1, x: 0 }}
-        transition={{ delay: 1.15 }}
-        className="absolute -bottom-3 -right-3 px-2.5 py-1 rounded-xl text-[10px] font-black tracking-wider"
-        style={{ background: G, color: '#fff', boxShadow: `0 6px 18px ${G}66` }}
-      >
-        +∞ EVAL
-      </motion.div>
-    </motion.div>
-  );
-}
 
 const EMAIL_RE = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 function clientValidEmail(email: string): boolean {
@@ -206,10 +39,13 @@ function AuthModal({ open, onClose, initialMode, externalError }: { open: boolea
   const [mode, setMode] = useState<'login' | 'register'>(initialMode);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [firstName, setFirstName] = useState('');
-  const [chesscomUsername, setChesscomUsername] = useState('');
-  const [lichessUsername, setLichessUsername] = useState('');
+  // Chess.com/Lichess username used to live in this form too, but that's
+  // a second decision on top of "create an account" -- and ProtectedRoute
+  // already force-routes any authenticated user with neither username set
+  // to /welcome, so it's never actually lost, just asked for one step
+  // later once they've already got an account. Referral code stays
+  // (captured silently below from the ?ref= param / localStorage, no
+  // visible field needed) since it has to be attached at signup time.
   const [referralCodeInput, setReferralCodeInput] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState(externalError || '');
@@ -251,19 +87,12 @@ function AuthModal({ open, onClose, initialMode, externalError }: { open: boolea
         setError(failed[0].label);
         return;
       }
-      if (password !== confirmPassword) {
-        setError('Passwords do not match');
-        return;
-      }
     }
     setLoading(true);
     try {
       const endpoint = mode === 'register' ? '/api/auth/register' : '/api/auth/login';
       const body: Record<string, string> = { email: email.trim().toLowerCase(), password };
       if (mode === 'register') {
-        if (firstName.trim()) body.firstName = firstName.trim();
-        if (chesscomUsername.trim()) body.chesscomUsername = chesscomUsername.trim();
-        if (lichessUsername.trim()) body.lichessUsername = lichessUsername.trim();
         const ref = referralCodeInput.trim().toUpperCase();
         if (ref) body.referralCode = ref;
       }
@@ -371,18 +200,6 @@ function AuthModal({ open, onClose, initialMode, externalError }: { open: boolea
           )}
 
           <form onSubmit={handleSubmit} className="space-y-3">
-            {mode === 'register' && (
-              <div>
-                <label className="block text-xs font-medium mb-1 ml-1" style={{ color: TEXT }}>
-                  Name <span style={{ color: MUTED }}>(optional)</span>
-                </label>
-                <input type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="Your name"
-                  className="w-full px-4 py-3 rounded-xl text-sm outline-none transition-all"
-                  style={{ background: 'rgba(255,255,255,0.05)', border: '2px solid rgba(255,255,255,0.08)', color: TEXT }}
-                  onFocus={e => (e.target.style.borderColor = G)}
-                  onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.08)')} />
-              </div>
-            )}
             <div>
               <label className="block text-xs font-medium mb-1 ml-1" style={{ color: TEXT }}>Email</label>
               <div className="relative">
@@ -420,61 +237,6 @@ function AuthModal({ open, onClose, initialMode, externalError }: { open: boolea
                 </ul>
               )}
             </div>
-            {mode === 'register' && (
-              <div>
-                <label className="block text-xs font-medium mb-1 ml-1" style={{ color: TEXT }}>Confirm Password</label>
-                <div className="relative">
-                  <input type={showPassword ? 'text' : 'password'} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder="Re-enter your password" required minLength={8}
-                    className="w-full px-4 py-3 rounded-xl text-sm outline-none transition-all"
-                    style={{ background: 'rgba(255,255,255,0.05)', border: '2px solid rgba(255,255,255,0.08)', color: TEXT }}
-                    onFocus={e => (e.target.style.borderColor = G)}
-                    onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.08)')} />
-                </div>
-                {confirmPassword && password !== confirmPassword && (
-                  <p className="text-[11px] mt-1 ml-1" style={{ color: '#ef6b6b' }}>Passwords don't match yet.</p>
-                )}
-              </div>
-            )}
-            {mode === 'register' && (
-              <div>
-                <label className="block text-xs font-medium mb-1 ml-1" style={{ color: TEXT }}>
-                  Chess.com Username <span style={{ color: MUTED }}>(optional)</span>
-                </label>
-                <input type="text" value={chesscomUsername} onChange={(e) => setChesscomUsername(e.target.value)} placeholder="e.g. Hikaru"
-                  className="w-full px-4 py-3 rounded-xl text-sm outline-none transition-all"
-                  style={{ background: 'rgba(255,255,255,0.05)', border: '2px solid rgba(255,255,255,0.08)', color: TEXT }}
-                  onFocus={e => (e.target.style.borderColor = G)}
-                  onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.08)')} />
-              </div>
-            )}
-            {mode === 'register' && (
-              <div>
-                <label className="block text-xs font-medium mb-1 ml-1" style={{ color: TEXT }}>
-                  Lichess Username <span style={{ color: MUTED }}>(optional)</span>
-                </label>
-                <input type="text" value={lichessUsername} onChange={(e) => setLichessUsername(e.target.value)} placeholder="e.g. DrNykterstein"
-                  className="w-full px-4 py-3 rounded-xl text-sm outline-none transition-all"
-                  style={{ background: 'rgba(255,255,255,0.05)', border: '2px solid rgba(255,255,255,0.08)', color: TEXT }}
-                  onFocus={e => (e.target.style.borderColor = G)}
-                  onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.08)')} />
-              </div>
-            )}
-            {mode === 'register' && (
-              <div>
-                <label className="block text-xs font-medium mb-1 ml-1" style={{ color: TEXT }}>
-                  Referral Code <span style={{ color: MUTED }}>(optional)</span>
-                </label>
-                <input type="text" value={referralCodeInput} onChange={(e) => setReferralCodeInput(e.target.value.toUpperCase())} placeholder="e.g. A1B2C3D4"
-                  className="w-full px-4 py-3 rounded-xl text-sm outline-none transition-all font-mono tracking-wider"
-                  style={{ background: 'rgba(255,255,255,0.05)', border: '2px solid rgba(255,255,255,0.08)', color: TEXT }}
-                  onFocus={e => (e.target.style.borderColor = G)}
-                  onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.08)')} />
-                {referralCodeInput && (
-                  <p className="text-[11px] mt-1 ml-1" style={{ color: G }}>Got it — a friend's referral will be credited.</p>
-                )}
-              </div>
-            )}
             <button type="submit" disabled={loading}
               className="w-full group flex items-center justify-center gap-2 py-3.5 rounded-xl font-bold text-sm transition-all mt-2"
               style={{ background: G, color: '#fff' }}
@@ -546,7 +308,28 @@ function SocialProofBar() {
       .catch(() => {});
   }, []);
 
-  if (!stats || stats.gamesAnalyzed < 5) return null;
+  // Below the volume threshold for real numbers to mean anything --
+  // rather than leaving this blank (silence reads as "nobody's here
+  // yet"), show something true and non-numeric instead of inventing a
+  // stat. This still returns null on the very first load before the
+  // stats fetch resolves, since a flash of the fallback text would look
+  // worse than nothing for the ~100ms most visitors won't even notice.
+  if (!stats) return null;
+  if (stats.gamesAnalyzed < 5) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true }}
+        className="py-8"
+        style={{ borderTop: '1px solid rgba(255,255,255,0.04)', borderBottom: '1px solid rgba(255,255,255,0.04)' }}
+      >
+        <p className="text-center text-xs font-bold uppercase tracking-widest" style={{ color: MUTED }}>
+          Every scan runs on a real Stockfish engine — not generic tips
+        </p>
+      </motion.div>
+    );
+  }
 
   const items = [
     { label: 'Games Imported', value: stats.gamesImported, icon: DownloadIcon },
@@ -577,55 +360,6 @@ function SocialProofBar() {
             </div>
           ))}
         </div>
-      </div>
-    </motion.div>
-  );
-}
-
-function InsightsResultCard({ delay = 0 }: { delay?: number }) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 16 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, delay }}
-      className="rounded-xl p-5 sm:p-6"
-      style={{ background: CARD, border: '1px solid rgba(255,255,255,0.05)', boxShadow: `0 25px 80px rgba(0,0,0,0.5), 0 0 60px ${G}10` }}
-    >
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <BarChart3 className="w-4 h-4" style={{ color: G }} />
-          <span className="text-[11px] font-black uppercase tracking-widest" style={{ color: G }}>Your Mistakes</span>
-        </div>
-        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: 'rgba(255,255,255,0.05)', color: MUTED }}>
-          124 GAMES ANALYZED
-        </span>
-      </div>
-      <div className="space-y-2.5">
-        {[
-          { label: 'Weak Endgames', severity: 'Critical', color: '#dc4343', detail: 'You lose 62% of games past move 30' },
-          { label: 'Blunders in Time Trouble', severity: 'High', color: '#e88930', detail: '41% of losses come under 30 seconds left' },
-          { label: 'Struggles vs 1.d4', severity: 'Medium', color: '#e8c830', detail: 'Win rate drops to 28% as Black' },
-        ].map(w => (
-          <div key={w.label} className="py-2.5 px-3 rounded-xl" style={{ background: `${w.color}08`, border: `1px solid ${w.color}25` }}>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="w-1.5 h-1.5 rounded-full" style={{ background: w.color }} />
-                <span className="text-xs font-bold" style={{ color: TEXT }}>{w.label}</span>
-              </div>
-              <span className="text-[10px] font-black px-2 py-0.5 rounded-full" style={{ background: `${w.color}18`, color: w.color }}>{w.severity}</span>
-            </div>
-            <p className="text-[11px] mt-1 ml-3.5" style={{ color: MUTED }}>{w.detail}</p>
-          </div>
-        ))}
-      </div>
-      <div className="mt-4 py-3 px-3.5 rounded-xl" style={{ background: `${G}10`, border: `1px solid ${G}25` }}>
-        <div className="flex items-center gap-1.5 mb-1.5">
-          <Zap className="w-3.5 h-3.5" style={{ color: G }} />
-          <span className="text-[10px] font-black tracking-wider" style={{ color: G }}>YOUR GAME PLAN</span>
-        </div>
-        <p className="text-[12px] leading-relaxed" style={{ color: TEXT }}>
-          Train rook endgames first. Practice 5+0 to build time-pressure habits. Add a sharp answer to 1.d4.
-        </p>
       </div>
     </motion.div>
   );
@@ -670,6 +404,23 @@ export function LandingPage() {
   const openSignup = () => { trackFunnelEvent('signup_clicked'); setAuthMode('register'); setAuthOpen(true); };
   const openLogin = () => { setAuthMode('login'); setAuthOpen(true); };
 
+  // Sends first-touch clicks ("Try Free" in the nav, the hero CTA, the
+  // mobile sticky bar) into the free no-signup demo instead of straight
+  // into the signup wall -- a visitor who's never seen the product
+  // shouldn't hit a form before they've seen any value. Pricing and the
+  // final CTA further down the page skip this and go straight to
+  // openSignup: by that point they've already scrolled past the demo
+  // (or deliberately ignored it), so re-routing them back up to it would
+  // be the wrong call.
+  const scrollToDemo = () => {
+    const el = document.getElementById('hero-demo');
+    if (!el) { openSignup(); return; }
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    window.setTimeout(() => {
+      document.getElementById('demo-username-input')?.focus();
+    }, 450);
+  };
+
   return (
     <div className="min-h-screen overflow-x-hidden" style={{ background: `radial-gradient(ellipse at top, #2c2925 0%, ${BG} 50%, #1c1a18 100%)` }}>
       <nav className="sticky top-0 z-40 backdrop-blur-xl" style={{ background: `${BG}dd`, borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
@@ -696,7 +447,7 @@ export function LandingPage() {
               onMouseEnter={e => (e.currentTarget.style.color = TEXT)} onMouseLeave={e => (e.currentTarget.style.color = MUTED)}>
               Sign In
             </button>
-            <button onClick={openSignup} className="text-sm font-bold px-5 py-2 rounded-xl transition-all"
+            <button onClick={scrollToDemo} className="text-sm font-bold px-5 py-2 rounded-xl transition-all"
               style={{ background: G, color: '#fff' }}
               onMouseEnter={e => (e.currentTarget.style.background = '#6fa23e')}
               onMouseLeave={e => (e.currentTarget.style.background = G)}>
@@ -766,7 +517,7 @@ export function LandingPage() {
               </p>
 
               <div className="mt-7 flex flex-col sm:flex-row gap-3 items-start sm:items-center">
-                <button onClick={openSignup}
+                <button onClick={scrollToDemo}
                   className="group flex items-center justify-center gap-2.5 px-7 py-3.5 rounded-xl font-bold text-sm transition-all"
                   style={{ background: G, color: '#fff', boxShadow: `0 4px 20px ${G}40` }}
                   onMouseEnter={e => { e.currentTarget.style.background = '#6fa23e'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
@@ -795,10 +546,6 @@ export function LandingPage() {
                 </div>
               </div>
 
-              <div className="mt-5 max-w-lg">
-                <HeroDemo onUpgradeClick={openSignup} />
-              </div>
-
               <div className="mt-6 flex flex-wrap items-center gap-4 text-xs font-bold" style={{ color: MUTED }}>
                 <span className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5" style={{ color: G }} /> Free tier included</span>
                 <span className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5" style={{ color: G }} /> No credit card</span>
@@ -806,24 +553,19 @@ export function LandingPage() {
               </div>
             </motion.div>
 
+            {/* This is now the single hero visual on every breakpoint --
+                a live, no-signup demo instead of a decorative mockup.
+                lg:grid-cols-2 stacks it below the text column on mobile
+                automatically, so there's no separate mobile duplicate to
+                maintain. */}
             <motion.div
               initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.7, delay: 0.15 }}
-              className="hidden lg:flex flex-col items-center gap-10"
+              className="lg:pt-12"
             >
-              <HeroBoard />
-              <div className="w-full">
-                <InsightsResultCard delay={0.3} />
-              </div>
+              <HeroDemo onUpgradeClick={openSignup} />
             </motion.div>
-          </div>
-
-          <div className="lg:hidden mt-10 max-w-md mx-auto flex flex-col items-center gap-10">
-            <HeroBoard />
-            <div className="w-full">
-              <InsightsResultCard delay={0.2} />
-            </div>
           </div>
         </div>
       </section>
@@ -868,17 +610,20 @@ export function LandingPage() {
 
       <section data-track-section="differentiators" className="py-16 sm:py-20" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
         <div className="max-w-5xl mx-auto px-4 sm:px-8">
-          <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} className="text-center mb-12">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full mb-4 text-[11px] font-black tracking-wider"
+          <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} className="text-center mb-10">
+            <h2 className="text-2xl sm:text-3xl font-black" style={{ color: TEXT }}>
+              Everything You Get
+            </h2>
+            <p className="mt-2 text-sm" style={{ color: MUTED }}>One subscription, a full toolkit — not just a report card</p>
+          </motion.div>
+
+          <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} className="text-center mb-4">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-black tracking-wider"
               style={{ background: `${G}15`, color: G, border: `1px solid ${G}30` }}>
               NOBODY ELSE HAS THIS
             </div>
-            <h2 className="text-2xl sm:text-3xl font-black" style={{ color: TEXT }}>
-              Only on ChessScout.net
-            </h2>
           </motion.div>
-
-          <div className="grid sm:grid-cols-2 gap-5">
+          <div className="grid sm:grid-cols-2 gap-5 mb-12">
             {[
               { icon: Search, title: 'Scan Position', desc: 'See a position anywhere — your game, a book, a stream — snap a photo and practice it out from any position. Play it against a bot or explore every line. No one else lets you do this.' },
               { icon: Gamepad2, title: 'Practice Bots', desc: '8 bot opponents from 400 to 2000 ELO with live move analysis as you play — build new habits in real games, not just puzzles.' },
@@ -900,24 +645,14 @@ export function LandingPage() {
               </motion.div>
             ))}
           </div>
-        </div>
-      </section>
 
-      <section data-track-section="features" className="py-16 sm:py-20" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
-        <div className="max-w-5xl mx-auto px-4 sm:px-8">
-          <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} className="text-center mb-12">
-            <h2 className="text-2xl sm:text-3xl font-black" style={{ color: TEXT }}>
-              Built To Make You Better
-            </h2>
-            <p className="mt-2 text-sm" style={{ color: MUTED }}>Every tool starts with your games and your mistakes</p>
-          </motion.div>
-
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <p className="text-xs font-black uppercase tracking-widest mb-4" style={{ color: MUTED }}>You'll use these every day</p>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
             {[
-              { icon: BarChart3, title: 'See Exactly Where You Went Wrong', desc: 'Move-by-move breakdown of your games with accuracy scores and the exact moments you went wrong', accent: true, unique: false },
-              { icon: BookOpen, title: 'Practice the Mistakes You Actually Make', desc: 'Custom lessons built from your actual mistakes — not generic theory', accent: false, unique: false },
-              { icon: TrendingUp, title: 'Watch Your Rating Climb Over Time', desc: 'See your improvement over time across openings, tactics, and endgames', accent: false, unique: false },
-              { icon: Crosshair, title: 'Prepare for Your Next Tournament', desc: 'Prepare for specific opponents — useful for tournaments and rivals', accent: false, unique: false },
+              { icon: Puzzle, title: 'Puzzles', desc: 'Fresh sets daily' },
+              { icon: Users, title: 'Local Play', desc: 'Play offline anytime' },
+              { icon: BookOpen, title: 'Opening Trainer', desc: 'Drill your repertoire' },
+              { icon: Skull, title: 'Chess Traps', desc: 'Learn the classics, both sides' },
             ].map((item, i) => (
               <motion.div
                 key={item.title}
@@ -925,19 +660,34 @@ export function LandingPage() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: i * 0.06 }}
-                className="relative rounded-xl p-5 transition-colors"
-                style={{
-                  background: item.accent ? `${G}08` : CARD,
-                  border: item.accent ? `1px solid ${G}30` : '1px solid rgba(255,255,255,0.04)',
-                }}
+                className="rounded-xl p-5"
+                style={{ background: CARD, border: '1px solid rgba(255,255,255,0.04)' }}
               >
-                {item.unique && (
-                  <span className="absolute top-3 right-3 px-2 py-0.5 rounded-md text-[9px] font-black tracking-wide"
-                    style={{ background: `${G}20`, color: G }}>
-                    NOBODY ELSE HAS THIS
-                  </span>
-                )}
-                <item.icon className="w-5 h-5 mb-3" style={{ color: item.accent ? G : MUTED }} />
+                <item.icon className="w-5 h-5 mb-3" style={{ color: TEXT }} />
+                <h3 className="text-sm font-bold mb-1" style={{ color: TEXT }}>{item.title}</h3>
+                <p className="text-xs leading-relaxed" style={{ color: MUTED }}>{item.desc}</p>
+              </motion.div>
+            ))}
+          </div>
+
+          <p className="text-xs font-black uppercase tracking-widest mb-4" style={{ color: MUTED }}>Plus, whenever you need them</p>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            {[
+              { icon: BarChart3, title: 'Deep Analysis', desc: 'Move-by-move breakdown of every game' },
+              { icon: Crosshair, title: 'Opponent Scout', desc: 'Prep for a specific rival or tournament' },
+              { icon: History, title: 'Game Lookup', desc: 'Every past game, one search away' },
+              { icon: GraduationCap, title: 'Courses', desc: 'Personalized lessons from your mistakes' },
+            ].map((item, i) => (
+              <motion.div
+                key={item.title}
+                initial={{ opacity: 0, y: 16 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: i * 0.06 }}
+                className="rounded-xl p-5"
+                style={{ background: CARD, border: '1px solid rgba(255,255,255,0.04)' }}
+              >
+                <item.icon className="w-5 h-5 mb-3" style={{ color: MUTED }} />
                 <h3 className="text-sm font-bold mb-1" style={{ color: TEXT }}>{item.title}</h3>
                 <p className="text-xs leading-relaxed" style={{ color: MUTED }}>{item.desc}</p>
               </motion.div>
