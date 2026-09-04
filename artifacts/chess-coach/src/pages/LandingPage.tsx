@@ -851,8 +851,7 @@ export function LandingPage() {
 
       <div className="fixed bottom-0 left-0 right-0 z-30 sm:hidden p-3 bottom-nav-safe" style={{ background: `${BG}f0`, backdropFilter: 'blur(12px)', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
         <button onClick={openSignup}
-          className="w-full group flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm"
-          style={{ background: G, color: '#fff' }}>
+          className="w-full group flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm">
           Analyze My Games Free
           <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
         </button>
