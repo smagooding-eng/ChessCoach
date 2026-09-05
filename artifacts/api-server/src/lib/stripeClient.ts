@@ -51,12 +51,29 @@ export async function getStripeSync() {
       migrationsRun = true;
     }
 
+    // stripeWebhookSecret MUST be passed here. Without it, the library's
+    // processWebhook() falls back to looking up a secret from its own
+    // stripe._managed_webhooks table -- a feature for webhook endpoints
+    // the library auto-provisions via the Stripe API, which this app
+    // doesn't use (the endpoint is configured by hand in the Stripe
+    // Dashboard). That table was never created for this account, so
+    // every single webhook failed with "relation ... does not exist"
+    // regardless of event type -- this one field was the entire bug.
+    if (!process.env.STRIPE_WEBHOOK_SECRET) {
+      throw new Error(
+        'STRIPE_WEBHOOK_SECRET environment variable is required for webhook processing. ' +
+        'Set it to the signing secret shown for this endpoint in the Stripe Dashboard ' +
+        '(Developers -> Webhooks -> this endpoint -> Signing secret).'
+      );
+    }
+
     stripeSync = new StripeSync({
       poolConfig: {
         connectionString: process.env.DATABASE_URL!,
         max: 2,
       },
       stripeSecretKey: secretKey,
+      stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
     });
   }
   return stripeSync;
