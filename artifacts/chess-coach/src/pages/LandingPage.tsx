@@ -421,6 +421,16 @@ export function LandingPage() {
     }, 450);
   };
 
+  // Pricing now lives as a full section on this same page (right after
+  // "Everything You Get"), so the nav link should jump to it instead of
+  // navigating to the separate /pricing page -- that page still exists
+  // and stays linked from the footer, for SEO/ad-landing traffic that
+  // arrives directly on it, but a visitor already scrolling this page
+  // shouldn't get pulled off it just to see the price.
+  const scrollToPricing = () => {
+    document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
   return (
     <div className="min-h-screen overflow-x-hidden" style={{ background: `radial-gradient(ellipse at top, #2c2925 0%, ${BG} 50%, #1c1a18 100%)` }}>
       <nav className="sticky top-0 z-40 backdrop-blur-xl" style={{ background: `${BG}dd`, borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
@@ -437,12 +447,12 @@ export function LandingPage() {
               onMouseEnter={e => (e.currentTarget.style.color = TEXT)} onMouseLeave={e => (e.currentTarget.style.color = MUTED)}>
               <Smartphone className="w-3.5 h-3.5" /> Download
             </a>
-            <Link href="/pricing"
+            <button onClick={scrollToPricing}
               className="hidden sm:inline-flex text-sm font-medium transition-colors"
               style={{ color: MUTED }}
               onMouseEnter={e => (e.currentTarget.style.color = TEXT)} onMouseLeave={e => (e.currentTarget.style.color = MUTED)}>
               Pricing
-            </Link>
+            </button>
             <button onClick={openLogin} className="text-sm font-medium transition-colors" style={{ color: MUTED }}
               onMouseEnter={e => (e.currentTarget.style.color = TEXT)} onMouseLeave={e => (e.currentTarget.style.color = MUTED)}>
               Sign In
