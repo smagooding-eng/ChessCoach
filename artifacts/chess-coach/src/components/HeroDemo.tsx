@@ -1,12 +1,18 @@
 import { useState } from 'react';
-import { Loader2, TrendingDown, ArrowRight, Lock, Sparkles, BookOpen, Swords, Check, ChevronDown, ChevronUp, X, Crown } from 'lucide-react';
+import { Loader2, TrendingDown, ArrowRight, Lock, Sparkles, BookOpen, Swords, ChevronDown, ChevronUp, Crown, ArrowRightLeft } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
-import { analyzeMoveQuality } from '@/lib/chess-bot';
+import { analyzeMoveQuality, type MoveAnalysisResult } from '@/lib/chess-bot';
 
 const G = '#81b64c';
 const TEXT = '#e8e6e3';
 const MUTED = '#9e9b98';
 const CARD = '#1c1b19';
+
+interface BlunderDetail extends MoveAnalysisResult {
+  fenBefore: string;
+  san: string;
+  moveNumber: number;
+}
 
 interface DemoResult {
   gamesAnalyzed: number;
@@ -16,6 +22,47 @@ interface DemoResult {
   topOpening: string | null;
   blunderRate: number;
   totals: { total: number; wins: number; losses: number } | null;
+  // The single worst real blunder found across the analyzed games (by
+  // centipawn loss) -- not a mockup. Null when the sampled games happened
+  // to have zero blunders.
+  worstBlunder: BlunderDetail | null;
+}
+
+// Renders a FEN position as a small static 8x8 grid using unicode chess
+// glyphs. Deliberately not react-chessboard/chess.js's full interactive
+// ChessBoard component -- that component (with its drag-and-drop, sound
+// effects, and error-boundary retry machinery) is built for gameplay
+// pages, not a read-only landing-page diagram, and pulling it into the
+// landing bundle would add real weight to the page we're trying to make
+// faster. This is read-only and has no other dependencies.
+function MiniBoard({ fen }: { fen: string }) {
+  const PIECES: Record<string, string> = {
+    K: '♔', Q: '♕', R: '♖', B: '♗', N: '♘', P: '♙',
+    k: '♚', q: '♛', r: '♜', b: '♝', n: '♞', p: '♟',
+  };
+  const rows = fen.split(' ')[0].split('/');
+  const squares: { dark: boolean; piece: string | null }[] = [];
+  rows.forEach((row, r) => {
+    let file = 0;
+    for (const ch of row) {
+      if (/\d/.test(ch)) {
+        const n = parseInt(ch, 10);
+        for (let i = 0; i < n; i++) { squares.push({ dark: (r + file) % 2 === 1, piece: null }); file++; }
+      } else {
+        squares.push({ dark: (r + file) % 2 === 1, piece: ch });
+        file++;
+      }
+    }
+  });
+  return (
+    <div className="grid grid-cols-8 w-full rounded-md overflow-hidden shrink-0" style={{ maxWidth: '132px', border: '1px solid rgba(255,255,255,0.15)', aspectRatio: '1' }}>
+      {squares.map((sq, i) => (
+        <div key={i} className="flex items-center justify-center" style={{ aspectRatio: '1', background: sq.dark ? '#5c7a3a' : '#e8e6d8', fontSize: '0.85rem', lineHeight: 1 }}>
+          {sq.piece ? PIECES[sq.piece] : ''}
+        </div>
+      ))}
+    </div>
+  );
 }
 
 // Runs analyzeMoveQuality() in small batches with a yield back to the
@@ -25,17 +72,17 @@ interface DemoResult {
 // freeze the tab -- this keeps the UI responsive and lets the progress
 // bar actually update while it works.
 async function analyzeMovesInChunks(
-  allMoves: { fenBefore: string; san: string }[],
+  allMoves: { fenBefore: string; san: string; moveNumber: number }[],
   onProgress: (done: number, total: number) => void,
-): Promise<{ quality: string }[]> {
+): Promise<BlunderDetail[]> {
   const BATCH_SIZE = 6;
-  const results: { quality: string }[] = [];
+  const results: BlunderDetail[] = [];
   for (let i = 0; i < allMoves.length; i += BATCH_SIZE) {
     const batch = allMoves.slice(i, i + BATCH_SIZE);
     for (const move of batch) {
       try {
         const analysis = analyzeMoveQuality(move.fenBefore, move.san);
-        results.push({ quality: analysis.quality });
+        results.push({ ...analysis, fenBefore: move.fenBefore, san: move.san, moveNumber: move.moveNumber });
       } catch {
         // Skip any move that fails to analyze rather than aborting the
         // whole demo over one malformed FEN/SAN edge case.
@@ -53,9 +100,13 @@ async function analyzeMovesInChunks(
 // server-side (existing Chess.com/Lichess integration, rate-limited per
 // IP), then analyzed entirely in the browser using analyzeMoveQuality(),
 // the same lightweight chess-engine-based classifier that already powers
-// Practice Bots move feedback. Full AI-written explanations of *why* a
-// move was a mistake remain a signed-in/paid feature -- this demo shows
-// the pattern-finding value, not the full product.
+// Practice Bots move feedback. analyzeMoveQuality already computes a full
+// breakdown per move (eval swing, the engine's suggested best move,
+// pros/cons, a plain-language summary) -- the result view below shows all
+// of that for the visitor's single worst real blunder, rather than
+// discarding everything but the quality label. Full AI-written
+// explanations across *every* game remain a signed-in/paid feature; this
+// demo shows one real example of that depth, not a mockup of it.
 export function HeroDemo({ onUpgradeClick }: { onUpgradeClick: () => void }) {
   const [username, setUsername] = useState('');
   const [platform, setPlatform] = useState<'chesscom' | 'lichess'>('chesscom');
@@ -63,7 +114,7 @@ export function HeroDemo({ onUpgradeClick }: { onUpgradeClick: () => void }) {
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState('');
   const [result, setResult] = useState<DemoResult | null>(null);
-  const [showSample, setShowSample] = useState(false);
+  const [showBreakdown, setShowBreakdown] = useState(true);
 
   const runDemo = async () => {
     if (!username.trim()) return;
@@ -86,30 +137,36 @@ export function HeroDemo({ onUpgradeClick }: { onUpgradeClick: () => void }) {
       setState('analyzing');
 
       const openingCounts: Record<string, number> = {};
-      const allMoves: { fenBefore: string; san: string }[] = [];
+      const allMoves: { fenBefore: string; san: string; moveNumber: number }[] = [];
       for (const game of data.games as { openingName: string | null; moves: { fenBefore: string; san: string }[] }[]) {
         if (game.openingName) {
           openingCounts[game.openingName] = (openingCounts[game.openingName] ?? 0) + 1;
         }
-        allMoves.push(...game.moves);
+        game.moves.forEach((move, idx) => {
+          allMoves.push({ ...move, moveNumber: Math.floor(idx / 2) + 1 });
+        });
       }
 
       const analyzed = await analyzeMovesInChunks(allMoves, (done, total) => {
         setProgress(Math.round((done / total) * 100));
       });
 
-      const blunders = analyzed.filter((a) => a.quality === 'blunder').length;
+      const blunderList = analyzed.filter((a) => a.quality === 'blunder');
       const mistakes = analyzed.filter((a) => a.quality === 'mistake').length;
       const topOpening = Object.entries(openingCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+      const worstBlunder = blunderList.length > 0
+        ? blunderList.reduce((worst, b) => (b.cpLoss > worst.cpLoss ? b : worst))
+        : null;
 
       setResult({
         gamesAnalyzed: data.gamesAnalyzed,
         totalMoves: analyzed.length,
-        blunders,
+        blunders: blunderList.length,
         mistakes,
         topOpening,
-        blunderRate: analyzed.length > 0 ? Math.round((blunders / analyzed.length) * 1000) / 10 : 0,
+        blunderRate: analyzed.length > 0 ? Math.round((blunderList.length / analyzed.length) * 1000) / 10 : 0,
         totals: data.totals ?? null,
+        worstBlunder,
       });
       setState('result');
     } catch {
@@ -191,14 +248,48 @@ export function HeroDemo({ onUpgradeClick }: { onUpgradeClick: () => void }) {
             </p>
           </div>
 
+          {result.worstBlunder ? (
+            <div className="rounded-xl p-4 mb-4" style={{ background: '#141413', border: '1px solid rgba(255,255,255,0.08)' }}>
+              <button onClick={() => setShowBreakdown((v) => !v)} className="w-full flex items-center justify-between gap-2 mb-1">
+                <p className="text-[10px] font-black uppercase tracking-wide" style={{ color: MUTED }}>Your biggest blunder — real, from your games</p>
+                {showBreakdown ? <ChevronUp className="w-3.5 h-3.5 shrink-0" style={{ color: MUTED }} /> : <ChevronDown className="w-3.5 h-3.5 shrink-0" style={{ color: MUTED }} />}
+              </button>
+              {showBreakdown && (
+                <div className="flex gap-3 mt-2">
+                  <MiniBoard fen={result.worstBlunder.fenBefore} />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5 flex-wrap text-xs font-mono mb-1.5">
+                      <span style={{ color: TEXT }}>{result.worstBlunder.moveNumber}.</span>
+                      <span style={{ color: '#e57373', textDecoration: 'line-through' }}>{result.worstBlunder.san}</span>
+                      {result.worstBlunder.bestMoveSan && (
+                        <span className="flex items-center gap-1.5" style={{ color: G }}>
+                          <ArrowRightLeft className="w-3 h-3" /> {result.worstBlunder.bestMoveSan}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] leading-relaxed" style={{ color: MUTED }}>{result.worstBlunder.summary}</p>
+                    <p className="text-[10px] font-bold mt-1.5" style={{ color: '#e57373' }}>
+                      Eval swing: {(result.worstBlunder.cpLoss / 100).toFixed(1)} pawns
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="rounded-xl p-4 mb-4 flex items-center gap-2" style={{ background: '#141413', border: '1px solid rgba(255,255,255,0.08)' }}>
+              <Sparkles className="w-4 h-4 shrink-0" style={{ color: G }} />
+              <p className="text-xs" style={{ color: MUTED }}>No outright blunders in these games — solid control. Go Pro to see the smaller mistakes still costing you points.</p>
+            </div>
+          )}
+
           <div className="rounded-xl p-4 mb-4" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
             <p className="text-[11px] font-black uppercase tracking-wide mb-2.5 flex items-center gap-1.5" style={{ color: G }}>
-              <Sparkles className="w-3.5 h-3.5" /> Pro unlocks for these exact games
+              <Crown className="w-3.5 h-3.5" /> Pro does this for every mistake, in every game
             </p>
             <div className="space-y-2">
               <div className="flex items-start gap-2">
                 <Lock className="w-3.5 h-3.5 shrink-0 mt-0.5" style={{ color: MUTED }} />
-                <p className="text-xs" style={{ color: MUTED }}>Plain-English explanation of <strong style={{ color: TEXT }}>why</strong> each blunder happened, not just that it did</p>
+                <p className="text-xs" style={{ color: MUTED }}>Deeper AI coaching on <strong style={{ color: TEXT }}>why</strong> it happened — this scan gives the engine's line, Pro adds the plain-English lesson</p>
               </div>
               <div className="flex items-start gap-2">
                 <BookOpen className="w-3.5 h-3.5 shrink-0 mt-0.5" style={{ color: MUTED }} />
@@ -223,17 +314,6 @@ export function HeroDemo({ onUpgradeClick }: { onUpgradeClick: () => void }) {
           </div>
 
           <button
-            onClick={() => setShowSample((v) => !v)}
-            className="w-full flex items-center justify-between gap-2 px-4 py-3 rounded-xl mb-4 text-xs font-bold"
-            style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', color: TEXT }}
-          >
-            <span>See what a full Pro review looks like</span>
-            {showSample ? <ChevronUp className="w-4 h-4" style={{ color: MUTED }} /> : <ChevronDown className="w-4 h-4" style={{ color: MUTED }} />}
-          </button>
-
-          {showSample && <SampleReviewCard />}
-
-          <button
             onClick={onUpgradeClick}
             className="w-full py-3 rounded-xl text-sm font-black flex items-center justify-center gap-2"
             style={{ background: G, color: '#000' }}
@@ -242,41 +322,6 @@ export function HeroDemo({ onUpgradeClick }: { onUpgradeClick: () => void }) {
           </button>
         </div>
       )}
-    </div>
-  );
-}
-
-// A clearly-labeled EXAMPLE, not the visitor's real data -- this demo
-// never calls OpenAI, so there's no real AI-written review to show for
-// their own games. This mirrors the actual GameReplay move-list UI
-// closely enough to set accurate expectations without misrepresenting
-// what was just computed above (which is real, but move-quality only,
-// not the AI explanation).
-function SampleReviewCard() {
-  const sampleMoves = [
-    { num: 14, san: 'Nxe5??', quality: 'blunder', color: '#e57373', label: 'Blunder', note: 'This hangs the knight to Qxe5 — the queen was already eyeing e5 after your last move opened the diagonal.' },
-    { num: 21, san: 'Rd1', quality: 'best', color: '#81b64c', label: 'Best', note: 'Centralizing the rook before trading queens — this was the top engine choice.' },
-    { num: 27, san: 'f6?', quality: 'mistake', color: '#eaa631', label: 'Mistake', note: 'Weakens the king\'s shelter right when the opponent has a rook on the open g-file.' },
-  ];
-  return (
-    <div className="rounded-xl p-4 mb-4" style={{ background: '#141413', border: '1px solid rgba(255,255,255,0.08)' }}>
-      <div className="flex items-center justify-between mb-3">
-        <p className="text-[10px] font-black uppercase tracking-wide" style={{ color: MUTED }}>Example — not your data</p>
-        <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md" style={{ background: 'rgba(129,182,76,0.15)', color: G }}>
-          <Crown className="w-2.5 h-2.5" /> Pro
-        </span>
-      </div>
-      <div className="space-y-2.5">
-        {sampleMoves.map((m) => (
-          <div key={m.num} className="flex items-start gap-2.5">
-            <span className="text-xs font-mono shrink-0 w-14" style={{ color: TEXT }}>{m.num}. {m.san}</span>
-            <div className="flex-1 min-w-0">
-              <span className="text-[10px] font-black px-1.5 py-0.5 rounded" style={{ background: `${m.color}20`, color: m.color }}>{m.label}</span>
-              <p className="text-[11px] mt-1 leading-relaxed" style={{ color: MUTED }}>{m.note}</p>
-            </div>
-          </div>
-        ))}
-      </div>
     </div>
   );
 }

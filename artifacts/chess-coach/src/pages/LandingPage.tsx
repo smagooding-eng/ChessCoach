@@ -572,42 +572,6 @@ export function LandingPage() {
 
       <SocialProofBar />
 
-      <section data-track-section="how_it_works" className="py-16 sm:py-20" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
-        <div className="max-w-5xl mx-auto px-4 sm:px-8">
-          <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} className="text-center mb-12">
-            <h2 className="text-2xl sm:text-3xl font-black" style={{ color: TEXT }}>
-              How It Works
-            </h2>
-            <p className="mt-2 text-sm" style={{ color: MUTED }}>Three steps to your next win</p>
-          </motion.div>
-
-          <div className="grid sm:grid-cols-3 gap-6">
-            {[
-              { num: '01', icon: BarChart3, title: 'Import Your Games', desc: 'Connect your Chess.com or Lichess account. We pull your recent games in seconds.' },
-              { num: '02', icon: Brain, title: 'We Find Your Mistakes', desc: 'Our engine spots the patterns costing you points — across openings, endgames, and time trouble.' },
-              { num: '03', icon: Target, title: 'Get a Clear Game Plan', desc: 'A short, focused list of what to fix first — with drills built around your actual weaknesses.' },
-            ].map((item, i) => (
-              <motion.div
-                key={item.num}
-                initial={{ opacity: 0, y: 16 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: i * 0.1 }}
-                className="rounded-xl p-6 relative overflow-hidden group"
-                style={{ background: `linear-gradient(180deg, ${CARD} 0%, #2a2825 100%)`, border: '1px solid rgba(255,255,255,0.06)', boxShadow: '0 24px 60px -14px rgba(0,0,0,0.6), 0 1px 0 rgba(255,255,255,0.05) inset' }}
-              >
-                <span className="absolute top-4 right-4 text-4xl font-black" style={{ color: 'rgba(255,255,255,0.03)' }}>{item.num}</span>
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-4" style={{ background: `${G}15` }}>
-                  <item.icon className="w-5 h-5" style={{ color: G }} />
-                </div>
-                <h3 className="text-base font-bold mb-1.5" style={{ color: TEXT }}>{item.title}</h3>
-                <p className="text-sm leading-relaxed" style={{ color: MUTED }}>{item.desc}</p>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
-
       <section data-track-section="differentiators" className="py-16 sm:py-20" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
         <div className="max-w-5xl mx-auto px-4 sm:px-8">
           <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} className="text-center mb-10">
@@ -690,29 +654,6 @@ export function LandingPage() {
                 <item.icon className="w-5 h-5 mb-3" style={{ color: MUTED }} />
                 <h3 className="text-sm font-bold mb-1" style={{ color: TEXT }}>{item.title}</h3>
                 <p className="text-xs leading-relaxed" style={{ color: MUTED }}>{item.desc}</p>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section data-track-section="faq" className="py-16 sm:py-20" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
-        <div className="max-w-2xl mx-auto px-4 sm:px-8">
-          <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} className="text-center mb-10">
-            <h2 className="text-2xl sm:text-3xl font-black" style={{ color: TEXT }}>Questions</h2>
-          </motion.div>
-          <div className="space-y-4">
-            {[
-              { q: 'How is this different from Chess.com game review?', a: 'Chess.com reviews one game at a time. ChessScout.net looks across all your games to find the mistake you keep making — not just what happened in this one.' },
-              { q: 'What does the free tier include?', a: '5 puzzles/day, 1 basic opponent scout, 2 Scan Position uses/day, unlimited practice bots, Opening Trainer, and Local Play, basic analysis from your reviewed games, and your 20 most recent games — no card required.' },
-              { q: 'Will I understand the analysis at my level?', a: 'Yes. Explanations are written in plain language, not engine notation — built for players working on real improvement, not just engine output.' },
-              { q: 'Does it work with Lichess?', a: 'Yes, both Chess.com and Lichess are supported.' },
-              { q: 'Can I cancel anytime?', a: 'Yes, cancel anytime from your account settings — no phone call, no retention flow.' },
-            ].map((item) => (
-              <motion.div key={item.q} initial={{ opacity: 0, y: 12 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
-                className="rounded-xl p-5" style={{ background: CARD, border: '1px solid rgba(255,255,255,0.04)' }}>
-                <h3 className="text-sm font-bold mb-1.5" style={{ color: TEXT }}>{item.q}</h3>
-                <p className="text-sm leading-relaxed" style={{ color: MUTED }}>{item.a}</p>
               </motion.div>
             ))}
           </div>
@@ -811,6 +752,65 @@ export function LandingPage() {
         </div>
       </section>
 
+      <section data-track-section="how_it_works" className="py-16 sm:py-20" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+        <div className="max-w-5xl mx-auto px-4 sm:px-8">
+          <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} className="text-center mb-12">
+            <h2 className="text-2xl sm:text-3xl font-black" style={{ color: TEXT }}>
+              How It Works
+            </h2>
+            <p className="mt-2 text-sm" style={{ color: MUTED }}>Three steps to your next win</p>
+          </motion.div>
+
+          <div className="grid sm:grid-cols-3 gap-6">
+            {[
+              { num: '01', icon: BarChart3, title: 'Import Your Games', desc: 'Connect your Chess.com or Lichess account. We pull your recent games in seconds.' },
+              { num: '02', icon: Brain, title: 'We Find Your Mistakes', desc: 'Our engine spots the patterns costing you points — across openings, endgames, and time trouble.' },
+              { num: '03', icon: Target, title: 'Get a Clear Game Plan', desc: 'A short, focused list of what to fix first — with drills built around your actual weaknesses.' },
+            ].map((item, i) => (
+              <motion.div
+                key={item.num}
+                initial={{ opacity: 0, y: 16 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: i * 0.1 }}
+                className="rounded-xl p-6 relative overflow-hidden group"
+                style={{ background: `linear-gradient(180deg, ${CARD} 0%, #2a2825 100%)`, border: '1px solid rgba(255,255,255,0.06)', boxShadow: '0 24px 60px -14px rgba(0,0,0,0.6), 0 1px 0 rgba(255,255,255,0.05) inset' }}
+              >
+                <span className="absolute top-4 right-4 text-4xl font-black" style={{ color: 'rgba(255,255,255,0.03)' }}>{item.num}</span>
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-4" style={{ background: `${G}15` }}>
+                  <item.icon className="w-5 h-5" style={{ color: G }} />
+                </div>
+                <h3 className="text-base font-bold mb-1.5" style={{ color: TEXT }}>{item.title}</h3>
+                <p className="text-sm leading-relaxed" style={{ color: MUTED }}>{item.desc}</p>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section data-track-section="faq" className="py-16 sm:py-20" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+        <div className="max-w-2xl mx-auto px-4 sm:px-8">
+          <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} className="text-center mb-10">
+            <h2 className="text-2xl sm:text-3xl font-black" style={{ color: TEXT }}>Questions</h2>
+          </motion.div>
+          <div className="space-y-4">
+            {[
+              { q: 'How is this different from Chess.com game review?', a: 'Chess.com reviews one game at a time. ChessScout.net looks across all your games to find the mistake you keep making — not just what happened in this one.' },
+              { q: 'What does the free tier include?', a: '5 puzzles/day, 1 basic opponent scout, 2 Scan Position uses/day, unlimited practice bots, Opening Trainer, and Local Play, basic analysis from your reviewed games, and your 20 most recent games — no card required.' },
+              { q: 'Will I understand the analysis at my level?', a: 'Yes. Explanations are written in plain language, not engine notation — built for players working on real improvement, not just engine output.' },
+              { q: 'Does it work with Lichess?', a: 'Yes, both Chess.com and Lichess are supported.' },
+              { q: 'Can I cancel anytime?', a: 'Yes, cancel anytime from your account settings — no phone call, no retention flow.' },
+            ].map((item) => (
+              <motion.div key={item.q} initial={{ opacity: 0, y: 12 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
+                className="rounded-xl p-5" style={{ background: CARD, border: '1px solid rgba(255,255,255,0.04)' }}>
+                <h3 className="text-sm font-bold mb-1.5" style={{ color: TEXT }}>{item.q}</h3>
+                <p className="text-sm leading-relaxed" style={{ color: MUTED }}>{item.a}</p>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       <section data-track-section="final_cta" className="py-20 sm:py-28" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
         <div className="max-w-3xl mx-auto px-4 sm:px-8 text-center">
           <motion.div initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}>
@@ -851,7 +851,8 @@ export function LandingPage() {
 
       <div className="fixed bottom-0 left-0 right-0 z-30 sm:hidden p-3 bottom-nav-safe" style={{ background: `${BG}f0`, backdropFilter: 'blur(12px)', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
         <button onClick={openSignup}
-          className="w-full group flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm">
+          className="w-full group flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm"
+          style={{ background: G, color: '#fff' }}>
           Analyze My Games Free
           <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
         </button>
