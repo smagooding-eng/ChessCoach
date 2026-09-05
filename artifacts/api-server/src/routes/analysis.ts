@@ -12,6 +12,7 @@ import {
   GetAnalysisSummaryResponse,
 } from "@workspace/api-zod";
 import { analyzePlayerGames, computeGroundedWeaknesses } from "../lib/openaiAnalysis";
+import { trackAiUsage, AI_FEATURES } from "../lib/aiUsageTracker";
 import { accuracyFromAvgLoss, evaluateAllPositions, classifyFromWinPctLoss, winPct, isSacrificialMove } from "../lib/engineAnalysis";
 import { randomUUID } from "crypto";
 import type { Logger } from "pino";
@@ -82,7 +83,7 @@ async function runAnalysisJob(username: string, jobId: string, log: Logger, user
     // analysis otherwise.
     const { hasFullAccess } = await import("../lib/accessControl");
     const { full: isFullAccess } = await hasFullAccess(userId);
-    const analysis = grounded ?? (isFullAccess ? await analyzePlayerGames(username, gameSummaries) : null);
+    const analysis = grounded ?? (isFullAccess ? await analyzePlayerGames(username, gameSummaries, { userId }) : null);
 
     if (!analysis) {
       await db.update(backgroundJobsTable).set({
@@ -281,7 +282,7 @@ router.post("/analysis/analyze", requirePremium, async (req, res): Promise<void>
     .limit(500);
 
   const grounded = computeGroundedWeaknesses(username, allReviewed);
-  const analysis = grounded ?? await analyzePlayerGames(username, gameSummaries);
+  const analysis = grounded ?? await analyzePlayerGames(username, gameSummaries, { userId: req.user?.id });
   const indexSourceGames = grounded ? allReviewed : games;
 
   await db.delete(weaknessesTable).where(eq(weaknessesTable.username, username.toLowerCase()));
@@ -883,6 +884,7 @@ Return ONLY this JSON, no markdown:
         }],
         response_format: { type: "json_object" },
       });
+      void trackAiUsage({ userId, feature: AI_FEATURES.SCAN_POSITION, model: "gpt-5.6-terra", usage: r.usage });
       const c = r.choices[0]?.message?.content ?? "{}";
       try { return JSON.parse(c) as ScanResp; } catch { return {}; }
     }
@@ -1130,6 +1132,7 @@ Format: {"x1": <left%>, "y1": <top%>, "x2": <right%>, "y2": <bottom%>}` },
           }],
           response_format: { type: "json_object" },
         });
+        void trackAiUsage({ userId, feature: AI_FEATURES.SCAN_POSITION, model: "gpt-5.6-terra", usage: bboxResp.usage });
         const bboxRaw = bboxResp.choices[0]?.message?.content ?? "{}";
         const parsed = JSON.parse(bboxRaw);
         const x1 = Number(parsed.x1), y1 = Number(parsed.y1), x2 = Number(parsed.x2), y2 = Number(parsed.y2);
@@ -1212,6 +1215,7 @@ Return ONLY a JSON object mapping each square to its color, nothing else. Exampl
             }],
             response_format: { type: "json_object" },
           });
+          void trackAiUsage({ userId, feature: AI_FEATURES.SCAN_POSITION, model: "gpt-5.6-terra", usage: r.usage });
           const obj = JSON.parse(r.choices[0]?.message?.content ?? "{}") as Record<string, unknown>;
           const out: Record<string, string> = {};
           for (const [k, v] of Object.entries(obj)) {

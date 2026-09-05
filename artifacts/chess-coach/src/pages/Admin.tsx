@@ -1589,6 +1589,110 @@ function LandingFunnelPanel() {
   );
 }
 
+function AiUsagePanel() {
+  const [data, setData] = useState<{
+    days: number;
+    totals: { calls: number; tokens: number; costUsd: number; unknownRateTokens: number };
+    byFeature: { feature: string; calls: number; tokens: number; costUsd: number }[];
+    topUsers: { userId: string; label: string; calls: number; tokens: number; costUsd: number }[];
+  } | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [days, setDays] = useState(30);
+
+  useEffect(() => {
+    setLoading(true);
+    apiFetch(`/api/admin/ai-usage?days=${days}`, { credentials: 'include' })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => setData(d))
+      .finally(() => setLoading(false));
+  }, [days]);
+
+  const FEATURE_LABELS: Record<string, string> = {
+    game_analysis: 'Game Analysis (weaknesses)',
+    single_move_analysis: 'Single Move Explanation',
+    full_game_review: 'Full Game Review',
+    scan_position: 'Scan Position',
+    lesson_content: 'Lesson Content',
+    opponent_exploit_course: 'Opponent Exploit Course',
+    weakness_course: 'Weakness Course',
+    endgame_course: 'Endgame Course',
+    puzzle_explanation: 'Puzzle Explanation',
+    seo_article: 'SEO Article',
+    admin_marketing: 'Admin Marketing Copy',
+    outreach_draft: 'Outreach Draft',
+  };
+  const fmtUsd = (n: number) => n < 0.01 && n > 0 ? '<$0.01' : `$${n.toFixed(2)}`;
+
+  return (
+    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="rounded-2xl border border-border/40 bg-card/60 p-5">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-sm font-bold flex items-center gap-2"><Sparkles className="w-4 h-4 text-purple-400" /> AI Usage &amp; Cost</h2>
+        <select value={days} onChange={(e) => setDays(Number(e.target.value))}
+          className="text-xs bg-background border border-border/40 rounded-lg px-2 py-1">
+          <option value={7}>Last 7 days</option>
+          <option value={30}>Last 30 days</option>
+          <option value={90}>Last 90 days</option>
+        </select>
+      </div>
+
+      {loading && <p className="text-xs text-muted-foreground">Loading...</p>}
+
+      {!loading && data && (
+        <>
+          <div className="grid grid-cols-3 gap-2 mb-5">
+            <div className="p-2.5 rounded-lg bg-white/5 border border-white/5 text-center">
+              <p className="text-lg font-black text-primary">{fmtUsd(data.totals.costUsd)}</p>
+              <p className="text-[10px] text-muted-foreground">Est. cost</p>
+            </div>
+            <div className="p-2.5 rounded-lg bg-white/5 border border-white/5 text-center">
+              <p className="text-lg font-black">{data.totals.calls.toLocaleString()}</p>
+              <p className="text-[10px] text-muted-foreground">AI calls</p>
+            </div>
+            <div className="p-2.5 rounded-lg bg-white/5 border border-white/5 text-center">
+              <p className="text-lg font-black">{(data.totals.tokens / 1000).toFixed(0)}k</p>
+              <p className="text-[10px] text-muted-foreground">Tokens</p>
+            </div>
+          </div>
+
+          {data.totals.unknownRateTokens > 0 && (
+            <p className="text-[10px] text-muted-foreground mb-4">
+              {(data.totals.unknownRateTokens / 1000).toFixed(0)}k tokens are on a model with no cost rate set yet, so the total above is a floor, not the full picture.
+            </p>
+          )}
+
+          <p className="text-xs font-bold text-muted-foreground mb-2">By feature</p>
+          <div className="space-y-1.5 mb-5">
+            {data.byFeature.length === 0 && <p className="text-xs text-muted-foreground">No AI usage tracked yet in this window.</p>}
+            {data.byFeature.map((f) => (
+              <div key={f.feature} className="flex items-center justify-between text-xs p-2 rounded-lg bg-white/5">
+                <span>{FEATURE_LABELS[f.feature] ?? f.feature}</span>
+                <span className="flex items-center gap-3 text-muted-foreground">
+                  <span>{f.calls.toLocaleString()} calls</span>
+                  <span className="font-bold text-foreground">{fmtUsd(f.costUsd)}</span>
+                </span>
+              </div>
+            ))}
+          </div>
+
+          <p className="text-xs font-bold text-muted-foreground mb-2">Top users by cost</p>
+          <div className="space-y-1.5">
+            {data.topUsers.length === 0 && <p className="text-xs text-muted-foreground">No per-user AI usage tracked yet in this window.</p>}
+            {data.topUsers.map((u) => (
+              <div key={u.userId} className="flex items-center justify-between text-xs p-2 rounded-lg bg-white/5">
+                <span className="truncate">{u.label}</span>
+                <span className="flex items-center gap-3 text-muted-foreground shrink-0">
+                  <span>{u.calls.toLocaleString()} calls</span>
+                  <span className="font-bold text-foreground">{fmtUsd(u.costUsd)}</span>
+                </span>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </motion.div>
+  );
+}
+
 function SubscribersPanel({ onClose }: { onClose: () => void }) {
   const [subscribers, setSubscribers] = useState<StripeSubscriber[]>([]);
   const [loading, setLoading] = useState(true);
@@ -2937,6 +3041,8 @@ function AdminTicker() {
       </motion.div>
 
       <LandingFunnelPanel />
+
+      <AiUsagePanel />
       <ReferralCodesPanel />
       <ReferralSignupsPanel />
       <AffiliatesPanel />
@@ -2993,14 +3099,13 @@ function AdminTicker() {
             </div>
             <ChevronRight className="w-4 h-4 text-muted-foreground" />
           </Link>
-          <Link href="/admin/beginner-courses" className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all hover:bg-white/5 text-left border border-white/10">
-  <span className="text-lg">📖</span>
-  <div className="flex-1">
-    <p className="text-foreground font-bold">Beginner Courses</p>
-    <p className="text-xs text-muted-foreground">7 lessons — pawn through king, plus checkmate</p>
-  </div>
-  <ChevronRight className="w-4 h-4 text-muted-foreground" />
-</Link>
+          <div className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-left border border-white/5 opacity-50">
+            <span className="text-lg">📖</span>
+            <div className="flex-1">
+              <p className="text-foreground font-bold">Beginner Courses</p>
+              <p className="text-xs text-muted-foreground">Not started yet</p>
+            </div>
+          </div>
           <div className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-left border border-white/5 opacity-50">
             <span className="text-lg">🧸</span>
             <div className="flex-1">

@@ -17,6 +17,7 @@ import { fetchLichessGames, extractLichessGameMetadata } from "../lib/lichess";
 import { analyzeMoves, analyzeSingleMove, reviewFullGame, analyzeGamePgn } from "../lib/openaiAnalysis";
 import { randomUUID } from "crypto";
 import type { Logger } from "pino";
+import { trackAiUsage, AI_FEATURES } from "../lib/aiUsageTracker";
 
 const router: IRouter = Router();
 
@@ -1000,6 +1001,7 @@ router.post("/games/:id/analyze-move", async (req, res): Promise<void> => {
       result: game.result,
       whiteUsername: game.whiteUsername,
       blackUsername: game.blackUsername,
+      userId: req.user?.id,
     });
     res.json(analysis);
   } catch (err) {
@@ -1046,6 +1048,7 @@ async function runAnalyzePgnJob(pgn: string, jobId: string, log: Logger): Promis
 async function reviewOneGame(
   game: typeof gamesTable.$inferSelect,
   onProgress?: (done: number, total: number) => void,
+  userId?: string,
 ): Promise<void> {
   const moves = parsePgnMoves(game.pgn);
   const startFen = extractStartFen(game.pgn);
@@ -1058,6 +1061,7 @@ async function reviewOneGame(
     blackUsername: game.blackUsername,
     startFen: startFen !== "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1" ? startFen : undefined,
     onProgress,
+    userId,
   });
 
   await db.update(gamesTable)
@@ -1101,7 +1105,7 @@ export async function runBulkReviewJob(
 
     for (const game of unreviewed) {
       try {
-        await reviewOneGame(game);
+        await reviewOneGame(game, undefined, userId);
         reviewedSoFar++;
       } catch (err) {
         log.warn({ err, gameId: game.id }, "Bulk review: one game failed, continuing with the rest");
@@ -1202,6 +1206,7 @@ async function runReviewJob(gameId: number, jobId: string, log: Logger): Promise
           result: { progress: done, total } as unknown as Record<string, unknown>,
         }).where(eq(backgroundJobsTable.id, jobId)).catch(() => {});
       },
+      userId: game.userId ?? undefined,
     });
 
     await db.update(gamesTable)

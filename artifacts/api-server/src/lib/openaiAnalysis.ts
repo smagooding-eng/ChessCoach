@@ -12,6 +12,7 @@ import {
   type CoachStatus,
   type EngineFacts,
 } from "./engineFacts";
+import { trackAiUsage, AI_FEATURES } from "./aiUsageTracker";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -65,7 +66,7 @@ function pgnMoveLine(pgn: string, maxHalfMoves = 30): string {
 export async function analyzePlayerGames(
   username: string,
   games: GameSummary[],
-  options?: { isOpponentScout?: boolean }
+  options?: { isOpponentScout?: boolean; userId?: string }
 ): Promise<AnalysisOutput> {
   const subset = games.slice(0, 30);
 
@@ -132,6 +133,7 @@ Respond with VALID JSON only:
       messages: [{ role: "user", content: prompt }],
       response_format: { type: "json_object" },
     });
+    void trackAiUsage({ userId: options?.userId, feature: AI_FEATURES.GAME_ANALYSIS, model: "gpt-5.6-luna", usage: response.usage });
 
     const content = response.choices[0]?.message?.content ?? "{}";
     const parsed = JSON.parse(content) as AnalysisOutput;
@@ -449,6 +451,7 @@ interface AnalyzeSingleMoveInput {
   result: string;
   whiteUsername: string;
   blackUsername: string;
+  userId?: string;
 }
 
 export async function analyzeSingleMove(input: AnalyzeSingleMoveInput): Promise<SingleMoveAnalysis> {
@@ -564,6 +567,7 @@ Respond with valid JSON:
       messages: [{ role: "user", content: prompt }],
       response_format: { type: "json_object" },
     });
+    void trackAiUsage({ userId: input.userId, feature: AI_FEATURES.SINGLE_MOVE_ANALYSIS, model: "gpt-5.6-luna", usage: response.usage });
     const content = response.choices[0]?.message?.content ?? "{}";
     const parsed = JSON.parse(content) as {
       pros?: string[];
@@ -882,8 +886,9 @@ export async function reviewFullGame(input: {
   blackUsername: string;
   startFen?: string;
   onProgress?: (done: number, total: number) => void;
+  userId?: string;
 }): Promise<GameReviewResult> {
-  const { moves, opening, eco, result, whiteUsername, blackUsername, startFen, onProgress } = input;
+  const { moves, opening, eco, result, whiteUsername, blackUsername, startFen, onProgress, userId } = input;
   const ecoBookFens = getBookFensForEco(eco);
   const startTime = Date.now();
 
@@ -1021,6 +1026,20 @@ JSON format:
     const gptTime = Date.now() - startTime;
     const totalTokens = gptResponses.reduce((s, r) => s + (r?.usage?.completion_tokens ?? 0), 0);
     logger.info({ gptTimeMs: gptTime, evaluated: evals.length, chunks: chunks.length, totalTokensUsed: totalTokens, chunkFailures }, "Parallel GPT + Stockfish complete");
+
+    // One aggregate row for the whole review rather than one per chunk --
+    // a full game review fans out into several parallel chunk calls, and
+    // for cost-attribution purposes what matters is total tokens per
+    // review, not a row per internal chunk.
+    void trackAiUsage({
+      userId,
+      feature: AI_FEATURES.FULL_GAME_REVIEW,
+      model: "gpt-5.6-luna",
+      usage: {
+        prompt_tokens: gptResponses.reduce((s, r) => s + (r?.usage?.prompt_tokens ?? 0), 0),
+        completion_tokens: totalTokens,
+      },
+    });
 
     let allParsedMoves: Array<Partial<MoveReview>> = [];
     let gameSummaryRaw: Partial<GameReviewSummary> | undefined;

@@ -105,7 +105,7 @@ router.post("/opponents/start", async (req, res): Promise<void> => {
 
   req.log.info({ target, jobId, isFullAccess }, "Analyzing opponent (background)");
 
-  runAnalysis(target, requestingUser, jobId, req.log, isFullAccess).catch((err) => {
+  runAnalysis(target, requestingUser, jobId, req.log, isFullAccess, userId).catch((err) => {
     req.log.error({ err, jobId }, "Background analysis failed");
   });
 });
@@ -225,6 +225,7 @@ async function runAnalysis(
   jobId: string,
   log: import("pino").Logger,
   isFullAccess: boolean,
+  userId: string,
 ): Promise<void> {
   try {
     const [profileResult, gamesResult] = await Promise.allSettled([
@@ -268,7 +269,7 @@ async function runAnalysis(
     // which were always computed independently of the AI call anyway.
     let weaknesses: OpponentWeakness[] = [];
     if (isFullAccess) {
-      const analysis = await analyzePlayerGames(target, gameSummaries, { isOpponentScout: true });
+      const analysis = await analyzePlayerGames(target, gameSummaries, { isOpponentScout: true, userId });
       if (!analysis || !Array.isArray(analysis.weaknesses)) {
         await db.update(backgroundJobsTable).set({
           status: "error",

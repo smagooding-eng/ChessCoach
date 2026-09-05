@@ -6,6 +6,8 @@ import { sessionsTable } from "@workspace/db";
 import { getUncachableStripeClient } from "../lib/stripeClient";
 import { ADMIN_EMAILS } from "../lib/auth";
 import { generateNextSeoArticle } from "../lib/seoContentEngine";
+import { estimateCostUsd } from "../lib/aiUsageTracker";
+import { aiUsageEventsTable } from "@workspace/db";
 import OpenAI from "openai";
 
 const router: IRouter = Router();
@@ -1323,6 +1325,75 @@ router.post("/admin/affiliates/:userId/adjustments", requireAdmin, async (req: R
     res.json({ success: true });
   } catch (err: any) {
     res.status(500).json({ error: err?.message || "Failed to add adjustment" });
+  }
+});
+
+// AI usage & cost breakdown, by feature and by user. Cost is computed
+// from raw token counts at read time (rather than stored per-row) so
+// that correcting a rate in aiUsageTracker.ts retroactively recalculates
+// history instead of requiring a backfill. Rows for a model with no
+// known rate still contribute their tokens to the totals; their cost
+// contribution is simply 0 until a rate is added.
+router.get("/admin/ai-usage", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const days = Math.min(90, Math.max(1, parseInt(req.query.days as string) || 30));
+    const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+
+    const rows = await db
+      .select({
+        userId: aiUsageEventsTable.userId,
+        feature: aiUsageEventsTable.feature,
+        model: aiUsageEventsTable.model,
+        promptTokens: aiUsageEventsTable.promptTokens,
+        completionTokens: aiUsageEventsTable.completionTokens,
+      })
+      .from(aiUsageEventsTable)
+      .where(gte(aiUsageEventsTable.createdAt, since));
+
+    const byFeature: Record<string, { calls: number; tokens: number; costUsd: number }> = {};
+    const byUser: Record<string, { calls: number; tokens: number; costUsd: number }> = {};
+    let totalCalls = 0, totalTokens = 0, totalCostUsd = 0, unknownRateTokens = 0;
+
+    for (const r of rows) {
+      const tokens = r.promptTokens + r.completionTokens;
+      const cost = estimateCostUsd(r.model, r.promptTokens, r.completionTokens);
+      totalCalls++;
+      totalTokens += tokens;
+      if (cost === null) unknownRateTokens += tokens;
+      else totalCostUsd += cost;
+
+      const f = (byFeature[r.feature] ??= { calls: 0, tokens: 0, costUsd: 0 });
+      f.calls++; f.tokens += tokens; f.costUsd += cost ?? 0;
+
+      const key = r.userId ?? "(none — background job)";
+      const u = (byUser[key] ??= { calls: 0, tokens: 0, costUsd: 0 });
+      u.calls++; u.tokens += tokens; u.costUsd += cost ?? 0;
+    }
+
+    // Attach email/username to the per-user breakdown for the top
+    // spenders, rather than every user with any usage -- this is meant
+    // to answer "who is costing me money", not to be a full user list.
+    const topUserIds = Object.entries(byUser)
+      .filter(([id]) => id !== "(none — background job)")
+      .sort((a, b) => b[1].costUsd - a[1].costUsd)
+      .slice(0, 25)
+      .map(([id]) => id);
+    const userRows = topUserIds.length > 0
+      ? await db.select({ id: usersTable.id, email: usersTable.email, chesscomUsername: usersTable.chesscomUsername })
+          .from(usersTable).where(inArray(usersTable.id, topUserIds))
+      : [];
+    const userLabel = new Map(userRows.map((u) => [u.id, u.chesscomUsername || u.email || u.id]));
+
+    res.json({
+      days,
+      totals: { calls: totalCalls, tokens: totalTokens, costUsd: totalCostUsd, unknownRateTokens },
+      byFeature: Object.entries(byFeature)
+        .map(([feature, v]) => ({ feature, ...v }))
+        .sort((a, b) => b.costUsd - a.costUsd || b.tokens - a.tokens),
+      topUsers: topUserIds.map((id) => ({ userId: id, label: userLabel.get(id) ?? id, ...byUser[id] })),
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || "Failed to load AI usage" });
   }
 });
 
