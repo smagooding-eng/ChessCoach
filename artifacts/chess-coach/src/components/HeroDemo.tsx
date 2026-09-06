@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Loader2, TrendingDown, ArrowRight, Lock, Sparkles, BookOpen, Swords, ChevronDown, ChevronUp, Crown, ArrowRightLeft } from 'lucide-react';
+import { Loader2, TrendingDown, ArrowRight, Lock, Sparkles, BookOpen, Swords, ChevronDown, ChevronUp, Crown, ArrowRightLeft, Crosshair } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { analyzeMoveQuality, type MoveAnalysisResult } from '@/lib/chess-bot';
 
@@ -7,11 +7,31 @@ const G = '#81b64c';
 const TEXT = '#e8e6e3';
 const MUTED = '#9e9b98';
 const CARD = '#1c1b19';
+const SEV_COLORS: Record<string, string> = { Critical: '#ef4444', High: '#f97316', Medium: '#f59e0b', Low: '#10b981' };
 
 interface BlunderDetail extends MoveAnalysisResult {
   fenBefore: string;
   san: string;
   moveNumber: number;
+}
+
+interface SampleWeakness {
+  category: string;
+  severity: string;
+  description: string;
+  frequency: number;
+  examples: string[];
+  previewFen: string | null;
+}
+
+interface SampleReport {
+  username: string;
+  totalGames: number;
+  wins: number;
+  losses: number;
+  draws: number;
+  avgRating: number | null;
+  weaknesses: SampleWeakness[];
 }
 
 interface DemoResult {
@@ -65,7 +85,63 @@ function MiniBoard({ fen }: { fen: string }) {
   );
 }
 
-// Runs analyzeMoveQuality() in small batches with a yield back to the
+// Shared between both landing-page dropdowns -- Pro's personal weakness
+// report and Opponent Scout's "their weaknesses" report are the exact
+// same underlying data and page structure in the real app, just framed
+// as "fix this" vs "exploit this". frame picks the copy; the data and
+// layout are identical, matching what Analysis.tsx and
+// OpponentAnalysis.tsx actually render.
+function SampleWeaknessList({ report, frame }: { report: SampleReport; frame: 'fix' | 'exploit' }) {
+  const totalDecided = report.wins + report.losses + report.draws;
+  return (
+    <div>
+      <div className="grid grid-cols-4 gap-1.5 mb-3">
+        {[
+          { label: 'Games', value: report.totalGames },
+          { label: 'Wins', value: report.wins },
+          { label: 'Losses', value: report.losses },
+          { label: 'Avg Rating', value: report.avgRating ?? '—' },
+        ].map((s) => (
+          <div key={s.label} className="rounded-lg p-2 text-center" style={{ background: 'rgba(255,255,255,0.03)' }}>
+            <p className="text-sm font-black" style={{ color: TEXT }}>{s.value}</p>
+            <p className="text-[9px]" style={{ color: MUTED }}>{s.label}</p>
+          </div>
+        ))}
+      </div>
+      {totalDecided > 0 && (
+        <div className="flex h-1.5 rounded-full overflow-hidden mb-4">
+          <div style={{ width: `${(report.wins / totalDecided) * 100}%`, background: G }} />
+          <div style={{ width: `${(report.draws / totalDecided) * 100}%`, background: 'rgba(255,255,255,0.15)' }} />
+          <div style={{ width: `${(report.losses / totalDecided) * 100}%`, background: '#c1493d' }} />
+        </div>
+      )}
+      <div className="space-y-2.5">
+        {report.weaknesses.map((w, i) => (
+          <div key={i} className="rounded-lg p-3" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+            <div className="flex items-start gap-2.5">
+              {w.previewFen && <MiniBoard fen={w.previewFen} />}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5 flex-wrap mb-1">
+                  <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full" style={{ background: SEV_COLORS[w.severity] ?? SEV_COLORS.Low, color: '#fff' }}>{w.severity}</span>
+                  <span className="text-xs font-bold" style={{ color: TEXT }}>{w.category}</span>
+                  <span className="text-[10px]" style={{ color: MUTED }}>· shows up in {w.frequency} games</span>
+                </div>
+                <p className="text-[11px] leading-relaxed" style={{ color: MUTED }}>{w.description}</p>
+                {w.examples?.[0] && (
+                  <p className="text-[10px] mt-1 italic" style={{ color: MUTED }}>
+                    {frame === 'exploit' ? 'How to punish it: ' : 'Example: '}{w.examples[0]}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+
 // browser between each one (via setTimeout 0), instead of one long
 // synchronous loop. A depth-2 minimax per move is fast individually, but
 // running 30-40 of them back-to-back on the main thread can visibly
@@ -115,6 +191,32 @@ export function HeroDemo({ onUpgradeClick }: { onUpgradeClick: () => void }) {
   const [error, setError] = useState('');
   const [result, setResult] = useState<DemoResult | null>(null);
   const [showBreakdown, setShowBreakdown] = useState(true);
+  const [sample, setSample] = useState<SampleReport | null>(null);
+  const [sampleLoading, setSampleLoading] = useState(false);
+  const [sampleError, setSampleError] = useState(false);
+  const [showProSample, setShowProSample] = useState(false);
+  const [showScoutSample, setShowScoutSample] = useState(false);
+
+  // Both dropdowns share one fetch -- Opponent Scout shows the exact same
+  // weakness-detection output as the personal Pro analysis, just aimed at
+  // someone else's account instead of your own, so there's no need for a
+  // second sample or a second request.
+  const loadSample = async () => {
+    if (sample || sampleLoading) return;
+    setSampleLoading(true);
+    setSampleError(false);
+    try {
+      const res = await apiFetch('/api/demo/sample-report');
+      if (!res.ok) throw new Error();
+      setSample(await res.json());
+    } catch {
+      setSampleError(true);
+    } finally {
+      setSampleLoading(false);
+    }
+  };
+  const toggleProSample = () => { if (!showProSample) loadSample(); setShowProSample((v) => !v); };
+  const toggleScoutSample = () => { if (!showScoutSample) loadSample(); setShowScoutSample((v) => !v); };
 
   const runDemo = async () => {
     if (!username.trim()) return;
@@ -312,6 +414,40 @@ export function HeroDemo({ onUpgradeClick }: { onUpgradeClick: () => void }) {
               )}
             </div>
           </div>
+
+          <button
+            onClick={toggleProSample}
+            className="w-full flex items-center justify-between gap-2 px-4 py-3 rounded-xl mb-2 text-xs font-bold"
+            style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', color: TEXT }}
+          >
+            <span className="flex items-center gap-1.5"><Crown className="w-3.5 h-3.5" style={{ color: G }} /> What your analysis looks like with Pro</span>
+            {showProSample ? <ChevronUp className="w-4 h-4 shrink-0" style={{ color: MUTED }} /> : <ChevronDown className="w-4 h-4 shrink-0" style={{ color: MUTED }} />}
+          </button>
+          {showProSample && (
+            <div className="rounded-xl p-3 mb-2" style={{ background: '#141413', border: '1px solid rgba(255,255,255,0.08)' }}>
+              <p className="text-[10px] font-black uppercase tracking-wide mb-2.5" style={{ color: MUTED }}>Real sample account — not your data</p>
+              {sampleLoading && <div className="flex justify-center py-4"><Loader2 className="w-4 h-4 animate-spin" style={{ color: MUTED }} /></div>}
+              {sampleError && <p className="text-xs" style={{ color: '#e57373' }}>Couldn't load the sample right now.</p>}
+              {sample && <SampleWeaknessList report={sample} frame="fix" />}
+            </div>
+          )}
+
+          <button
+            onClick={toggleScoutSample}
+            className="w-full flex items-center justify-between gap-2 px-4 py-3 rounded-xl mb-4 text-xs font-bold"
+            style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', color: TEXT }}
+          >
+            <span className="flex items-center gap-1.5"><Crosshair className="w-3.5 h-3.5" style={{ color: G }} /> What Opponent Scout shows about someone else</span>
+            {showScoutSample ? <ChevronUp className="w-4 h-4 shrink-0" style={{ color: MUTED }} /> : <ChevronDown className="w-4 h-4 shrink-0" style={{ color: MUTED }} />}
+          </button>
+          {showScoutSample && (
+            <div className="rounded-xl p-3 mb-4" style={{ background: '#141413', border: '1px solid rgba(255,255,255,0.08)' }}>
+              <p className="text-[10px] font-black uppercase tracking-wide mb-2.5" style={{ color: MUTED }}>Scouting "{sample?.username ?? 'a real account'}" — same real report, before playing them</p>
+              {sampleLoading && <div className="flex justify-center py-4"><Loader2 className="w-4 h-4 animate-spin" style={{ color: MUTED }} /></div>}
+              {sampleError && <p className="text-xs" style={{ color: '#e57373' }}>Couldn't load the sample right now.</p>}
+              {sample && <SampleWeaknessList report={sample} frame="exploit" />}
+            </div>
+          )}
 
           <button
             onClick={onUpgradeClick}

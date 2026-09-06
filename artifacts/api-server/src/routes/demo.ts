@@ -1,6 +1,8 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { fetchChessComGames, parsePgnMoves as parseChessComPgnMoves, extractOpeningFromPgn } from "../lib/chesscom";
 import { fetchLichessGames } from "../lib/lichess";
+import { db, gamesTable, weaknessesTable } from "@workspace/db";
+import { eq, desc, inArray } from "drizzle-orm";
 
 const router: IRouter = Router();
 
@@ -137,6 +139,98 @@ router.post("/demo/analyze", async (req: Request, res: Response) => {
   } catch (err: any) {
     console.error("Demo analyze error:", err.message);
     res.status(500).json({ error: "Couldn't fetch games right now. Try again shortly." });
+  }
+});
+
+// Deliberately hardcoded, not a query param -- this route exists to show
+// the landing page's "what Pro/Opponent Scout actually looks like"
+// dropdowns a real, complete sample report, without letting a visitor
+// pull up any arbitrary account's data through it. Only the username is
+// shown to the visitor (already public knowledge by design here); no
+// user ID, email, or other account info is ever included in the
+// response.
+const SAMPLE_USERNAME = "chessscoutnet";
+
+router.get("/demo/sample-report", async (_req: Request, res: Response) => {
+  try {
+    const games = await db
+      .select({
+        whiteUsername: gamesTable.whiteUsername,
+        blackUsername: gamesTable.blackUsername,
+        whiteRating: gamesTable.whiteRating,
+        blackRating: gamesTable.blackRating,
+        result: gamesTable.result,
+      })
+      .from(gamesTable)
+      .where(eq(gamesTable.username, SAMPLE_USERNAME));
+
+    let wins = 0, losses = 0, draws = 0, totalRating = 0, ratedGames = 0;
+    for (const g of games) {
+      if (g.result === "win") wins++;
+      else if (g.result === "loss") losses++;
+      else draws++;
+      const isWhite = g.whiteUsername.toLowerCase() === SAMPLE_USERNAME;
+      const rating = isWhite ? g.whiteRating : g.blackRating;
+      if (rating > 0) { totalRating += rating; ratedGames++; }
+    }
+
+    const weaknessRows = await db
+      .select()
+      .from(weaknessesTable)
+      .where(eq(weaknessesTable.username, SAMPLE_USERNAME))
+      .orderBy(desc(weaknessesTable.createdAt))
+      .limit(6);
+
+    // Same preview-FEN approach as the real /analysis/weaknesses route --
+    // a real board position from partway through one of the actual
+    // related games, not a placeholder.
+    const firstGameIds = Array.from(new Set(
+      weaknessRows.flatMap((w) => (w.relatedGameIds ?? []).slice(0, 1))
+    ));
+    const pgnById = new Map<number, string | null>();
+    if (firstGameIds.length > 0) {
+      const rows = await db.select({ id: gamesTable.id, pgn: gamesTable.pgn }).from(gamesTable).where(inArray(gamesTable.id, firstGameIds));
+      for (const r of rows) pgnById.set(r.id, r.pgn);
+    }
+    function fenFromPgn(pgn: string | null): string | null {
+      if (!pgn) return null;
+      try {
+        const Chess = require("chess.js").Chess;
+        const c = new Chess();
+        c.loadPgn(pgn);
+        const history = c.history({ verbose: true });
+        const mid = Math.min(Math.floor(history.length * 0.55), history.length);
+        if (mid === 0) return null;
+        const player = new Chess();
+        for (let i = 0; i < mid; i++) player.move(history[i].san);
+        return player.fen();
+      } catch {
+        return null;
+      }
+    }
+
+    const weaknesses = weaknessRows.map((w) => {
+      const firstId = (w.relatedGameIds ?? [])[0];
+      return {
+        category: w.category,
+        severity: w.severity,
+        description: w.description,
+        frequency: w.frequency,
+        examples: w.examples,
+        previewFen: firstId != null ? fenFromPgn(pgnById.get(firstId) ?? null) : null,
+      };
+    });
+
+    res.json({
+      username: SAMPLE_USERNAME,
+      totalGames: games.length,
+      wins, losses, draws,
+      avgRating: ratedGames > 0 ? Math.round(totalRating / ratedGames) : null,
+      weaknesses,
+    });
+  } catch (err: any) {
+    console.error("Demo sample report error:", err.message);
+    res.status(500).json({ error: "Couldn't load the sample report right now." });
   }
 });
 
