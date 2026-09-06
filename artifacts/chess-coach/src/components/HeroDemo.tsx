@@ -35,6 +35,12 @@ interface SampleReport {
   severityCounts: Record<string, number>;
   topWeaknessAreas: { category: string; count: number }[];
   favoriteOpenings: { opening: string; games: number; winRate: number }[];
+  phaseAccuracy: {
+    opening: { accuracy: number; moves: number };
+    middlegame: { accuracy: number; moves: number };
+    endgame: { accuracy: number; moves: number };
+    gamesAnalyzed: number;
+  };
   weaknesses: SampleWeakness[];
 }
 
@@ -145,6 +151,27 @@ function SampleWeaknessList({ report, frame }: { report: SampleReport; frame: 'f
         ))}
       </div>
 
+      {report.phaseAccuracy.gamesAnalyzed > 0 && (
+        <>
+          <p className="text-[10px] font-black uppercase tracking-wide mb-1.5" style={{ color: MUTED }}>
+            Accuracy by game phase — from {report.phaseAccuracy.gamesAnalyzed} reviewed games
+          </p>
+          <div className="grid grid-cols-3 gap-1.5 mb-4">
+            {(['opening', 'middlegame', 'endgame'] as const).map((phase) => {
+              const p = report.phaseAccuracy[phase];
+              const color = p.accuracy >= 70 ? G : p.accuracy >= 50 ? '#f59e0b' : '#ef4444';
+              return (
+                <div key={phase} className="rounded-lg p-2 text-center" style={{ background: 'rgba(255,255,255,0.03)' }}>
+                  <p className="text-[9px] uppercase tracking-wide mb-0.5" style={{ color: MUTED }}>{phase}</p>
+                  <p className="text-base font-black" style={{ color }}>{p.moves > 0 ? `${p.accuracy}%` : '—'}</p>
+                  <p className="text-[9px]" style={{ color: MUTED }}>{p.moves} moves</p>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
+
       {report.topWeaknessAreas.length > 0 && (
         <>
           <p className="text-[10px] font-black uppercase tracking-wide mb-1.5" style={{ color: MUTED }}>Top weakness areas — by count</p>
@@ -174,10 +201,20 @@ function SampleWeaknessList({ report, frame }: { report: SampleReport; frame: 'f
                   <span className="text-[10px]" style={{ color: MUTED }}>· shows up in {w.frequency} games</span>
                 </div>
                 <p className="text-[11px] leading-relaxed" style={{ color: MUTED }}>{w.description}</p>
-                {w.examples?.[0] && (
-                  <p className="text-[10px] mt-1 italic" style={{ color: MUTED }}>
-                    {frame === 'exploit' ? 'How to punish it: ' : 'Example: '}{w.examples[0]}
-                  </p>
+                {w.examples && w.examples.length > 0 && (
+                  <div className="mt-2 pt-2" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                    <p className="text-[9px] font-black uppercase tracking-wide mb-1" style={{ color: MUTED }}>
+                      {frame === 'exploit' ? 'How to punish it' : 'Examples from your games'}
+                    </p>
+                    <ul className="space-y-1">
+                      {w.examples.map((ex, exIdx) => (
+                        <li key={exIdx} className="text-[10px] leading-relaxed flex gap-1.5" style={{ color: MUTED }}>
+                          <span style={{ color: G }}>•</span>
+                          <span>{ex}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 )}
               </div>
             </div>

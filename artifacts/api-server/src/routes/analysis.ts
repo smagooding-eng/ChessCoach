@@ -14,6 +14,7 @@ import {
 import { analyzePlayerGames, computeGroundedWeaknesses } from "../lib/openaiAnalysis";
 import { trackAiUsage, AI_FEATURES } from "../lib/aiUsageTracker";
 import { accuracyFromAvgLoss, evaluateAllPositions, classifyFromWinPctLoss, winPct, isSacrificialMove } from "../lib/engineAnalysis";
+import { computePhaseAccuracy } from "../lib/phaseAccuracy";
 import { randomUUID } from "crypto";
 import type { Logger } from "pino";
 import OpenAI from "openai";
@@ -505,22 +506,20 @@ router.get("/analysis/summary", async (req, res): Promise<void> => {
     winRate: b.games > 0 ? Math.round((b.wins / b.games) * 100) / 100 : 0,
   }));
 
-  // Phase accuracy across all reviewed games. Phases are bucketed by full-move number
-  // (moveIndex/2 + 1): opening = 1-15, middlegame = 16-32, endgame = 33+.
-  type PhaseKey = "opening" | "middlegame" | "endgame";
+  const phaseAccuracy = computePhaseAccuracy(games, username);
+
+  // Real progression over time: accuracy and blunder rate by month, computed
+  // from actual engine-verified move classifications — not just win/loss
+  // counts (monthlyTrend, above), so this can genuinely show "you're
+  // blundering less than you were 3 months ago" or the reverse. Kept as its
+  // own pass over the review data (separate from computePhaseAccuracy above)
+  // since it buckets by month rather than by game phase -- a different cut
+  // of the same underlying per-move data, not worth forcing into one
+  // combined function just to share a single loop.
   const WIN_PCT_MAP: Record<string, number> = {
     checkmate: 0, brilliant: 0, great: 0, best: 0, excellent: 0.5, book: 0.7, good: 2,
     inaccuracy: 8, mistake: 16, blunder: 33, missed_win: 25,
   };
-  const phaseBuckets: Record<PhaseKey, {
-    moves: number; winPctLossSum: number;
-    blunders: number; mistakes: number; inaccuracies: number; bestOrBetter: number;
-  }> = {
-    opening:    { moves: 0, winPctLossSum: 0, blunders: 0, mistakes: 0, inaccuracies: 0, bestOrBetter: 0 },
-    middlegame: { moves: 0, winPctLossSum: 0, blunders: 0, mistakes: 0, inaccuracies: 0, bestOrBetter: 0 },
-    endgame:    { moves: 0, winPctLossSum: 0, blunders: 0, mistakes: 0, inaccuracies: 0, bestOrBetter: 0 },
-  };
-  let gamesAnalyzed = 0;
   const monthlyAccuracyMap = new Map<string, { moves: number; winPctLossSum: number; blunders: number }>();
   for (const g of games) {
     if (!g.reviewData || typeof g.reviewData !== "object") continue;
@@ -529,76 +528,33 @@ router.get("/analysis/summary", async (req, res): Promise<void> => {
     if (!movesArr || movesArr.length === 0) continue;
 
     const userColor: "white" | "black" = g.whiteUsername.toLowerCase() === username.toLowerCase() ? "white" : "black";
-    let contributedThisGame = false;
     const gameMonthKey = g.playedAt
       ? `${new Date(g.playedAt).getUTCFullYear()}-${String(new Date(g.playedAt).getUTCMonth() + 1).padStart(2, "0")}`
       : null;
+    if (!gameMonthKey) continue;
 
     for (const raw of movesArr) {
       if (!raw || typeof raw !== "object") continue;
-      const m = raw as {
-        moveIndex?: number; color?: string; classification?: string;
-        cpLoss?: number | null; engineAvailable?: boolean;
-      };
+      const m = raw as { color?: string; classification?: string; cpLoss?: number | null; engineAvailable?: boolean };
       if (m.color !== userColor) continue;
       if (typeof m.classification !== "string") continue;
 
-      const moveNumber = Math.floor((m.moveIndex ?? 0) / 2) + 1;
-      const phase: PhaseKey =
-        moveNumber <= 15 ? "opening" :
-        moveNumber <= 32 ? "middlegame" : "endgame";
-
-      const bucket = phaseBuckets[phase];
-      bucket.moves++;
-      contributedThisGame = true;
-
       const cls = m.classification;
-      if (cls === "blunder") bucket.blunders++;
-      else if (cls === "mistake" || cls === "missed_win") bucket.mistakes++;
-      else if (cls === "inaccuracy") bucket.inaccuracies++;
-      else if (["best", "great", "brilliant", "excellent"].includes(cls)) bucket.bestOrBetter++;
-
       const base = WIN_PCT_MAP[cls] ?? 2;
       const useEngine = m.cpLoss != null && m.engineAvailable === true;
       const sample = useEngine
         ? (m.cpLoss as number)
         : Math.max(base, ["good", "book", "excellent", "best", "great"].includes(cls) && !m.engineAvailable ? 3 : base);
-      bucket.winPctLossSum += sample;
 
-      // Progression tracking: same per-move data, bucketed by the game's
-      // month instead of by game phase, so accuracy/blunder-rate over time
-      // is a real computed trend rather than just win/loss counts.
-      if (gameMonthKey) {
-        if (!monthlyAccuracyMap.has(gameMonthKey)) {
-          monthlyAccuracyMap.set(gameMonthKey, { moves: 0, winPctLossSum: 0, blunders: 0 });
-        }
-        const mBucket = monthlyAccuracyMap.get(gameMonthKey)!;
-        mBucket.moves++;
-        mBucket.winPctLossSum += sample;
-        if (cls === "blunder") mBucket.blunders++;
+      if (!monthlyAccuracyMap.has(gameMonthKey)) {
+        monthlyAccuracyMap.set(gameMonthKey, { moves: 0, winPctLossSum: 0, blunders: 0 });
       }
+      const mBucket = monthlyAccuracyMap.get(gameMonthKey)!;
+      mBucket.moves++;
+      mBucket.winPctLossSum += sample;
+      if (cls === "blunder") mBucket.blunders++;
     }
-    if (contributedThisGame) gamesAnalyzed++;
   }
-  const phaseStat = (b: typeof phaseBuckets["opening"]) => ({
-    accuracy: b.moves > 0 ? Math.round(accuracyFromAvgLoss(b.winPctLossSum / b.moves)) : 0,
-    moves: b.moves,
-    blunders: b.blunders,
-    mistakes: b.mistakes,
-    inaccuracies: b.inaccuracies,
-    bestOrBetter: b.bestOrBetter,
-  });
-  const phaseAccuracy = {
-    opening: phaseStat(phaseBuckets.opening),
-    middlegame: phaseStat(phaseBuckets.middlegame),
-    endgame: phaseStat(phaseBuckets.endgame),
-    gamesAnalyzed,
-  };
-
-  // Real progression over time: accuracy and blunder rate by month, computed
-  // from actual engine-verified move classifications — not just win/loss
-  // counts (monthlyTrend, above), so this can genuinely show "you're
-  // blundering less than you were 3 months ago" or the reverse.
   const accuracyTrend = Array.from(monthlyAccuracyMap.entries())
     .sort(([a], [b]) => (a < b ? -1 : 1))
     .map(([month, b]) => ({

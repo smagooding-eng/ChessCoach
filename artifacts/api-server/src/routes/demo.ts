@@ -3,6 +3,7 @@ import { fetchChessComGames, parsePgnMoves as parseChessComPgnMoves, extractOpen
 import { fetchLichessGames } from "../lib/lichess";
 import { db, gamesTable, weaknessesTable } from "@workspace/db";
 import { eq, desc, inArray } from "drizzle-orm";
+import { computePhaseAccuracy } from "../lib/phaseAccuracy";
 
 const router: IRouter = Router();
 
@@ -149,7 +150,7 @@ router.post("/demo/analyze", async (req: Request, res: Response) => {
 // shown to the visitor (already public knowledge by design here); no
 // user ID, email, or other account info is ever included in the
 // response.
-const SAMPLE_USERNAME = "chessscoutnet";
+const SAMPLE_USERNAME = "damnshazam";
 
 router.get("/demo/sample-report", async (_req: Request, res: Response) => {
   try {
@@ -161,6 +162,8 @@ router.get("/demo/sample-report", async (_req: Request, res: Response) => {
         blackRating: gamesTable.blackRating,
         result: gamesTable.result,
         opening: gamesTable.opening,
+        reviewData: gamesTable.reviewData,
+        playedAt: gamesTable.playedAt,
       })
       .from(gamesTable)
       .where(eq(gamesTable.username, SAMPLE_USERNAME));
@@ -185,6 +188,8 @@ router.get("/demo/sample-report", async (_req: Request, res: Response) => {
       .map(([opening, s]) => ({ opening, games: s.games, winRate: Math.round((s.wins / s.games) * 100) }))
       .sort((a, b) => b.games - a.games)
       .slice(0, 3);
+
+    const phaseAccuracy = computePhaseAccuracy(games, SAMPLE_USERNAME);
 
     // All weaknesses for the count breakdown (cheap -- this account's
     // weakness table is small), separate from how many full detail
@@ -215,7 +220,7 @@ router.get("/demo/sample-report", async (_req: Request, res: Response) => {
       .from(weaknessesTable)
       .where(eq(weaknessesTable.username, SAMPLE_USERNAME))
       .orderBy(desc(weaknessesTable.createdAt))
-      .limit(6);
+      .limit(8);
 
     // Same preview-FEN approach as the real /analysis/weaknesses route --
     // a real board position from partway through one of the actual
@@ -266,6 +271,7 @@ router.get("/demo/sample-report", async (_req: Request, res: Response) => {
       severityCounts,
       topWeaknessAreas,
       favoriteOpenings,
+      phaseAccuracy,
       weaknesses,
     });
   } catch (err: any) {
