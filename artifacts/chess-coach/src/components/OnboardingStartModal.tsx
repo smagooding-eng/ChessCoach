@@ -182,11 +182,15 @@ export function OnboardingStartModal({ username: initialUsername, platform: init
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4" style={{ background: 'rgba(0,0,0,0.7)' }}>
       <div className="w-full max-w-md rounded-2xl p-6 md:p-8 space-y-5 text-center"
         style={{ background: BG_CARD, border: `1px solid ${BORDER}`, boxShadow: '0 18px 50px rgba(0,0,0,0.45)' }}>
-        <div className="text-4xl">♟</div>
+        <div className="text-4xl">{status === 'ready' ? '✅' : '♟'}</div>
         <div>
-          <h2 className="text-xl font-black mb-2" style={{ color: TEXT_LIGHT }}>Setting up your account</h2>
+          <h2 className="text-xl font-black mb-2" style={{ color: TEXT_LIGHT }}>
+            {status === 'ready' ? "You're all set!" : 'Setting up your account'}
+          </h2>
           <p className="text-sm leading-relaxed" style={{ color: TEXT_MUTED }}>
-            We're pulling your last 20 games and running a full analysis in the background — usually takes a minute or two.
+            {status === 'ready'
+              ? "Your games are imported and we're reviewing them now — check your dashboard in a couple minutes for your first weaknesses."
+              : "We're pulling your last 20 games and running a full analysis in the background — usually takes a minute or two."}
           </p>
         </div>
 
