@@ -198,7 +198,12 @@ function SampleWeaknessList({ report, frame }: { report: SampleReport; frame: 'f
                 <div className="flex items-center gap-1.5 flex-wrap mb-1">
                   <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full" style={{ background: SEV_COLORS[w.severity] ?? SEV_COLORS.Low, color: '#fff' }}>{w.severity}</span>
                   <span className="text-xs font-bold" style={{ color: TEXT }}>{w.category}</span>
-                  <span className="text-[10px]" style={{ color: MUTED }}>· shows up in {w.frequency} games</span>
+                </div>
+                <div className="flex items-center gap-2 mb-1.5">
+                  <div className="flex-1 h-1 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
+                    <div className="h-full rounded-full" style={{ width: `${Math.round(w.frequency * 100)}%`, background: SEV_COLORS[w.severity] ?? SEV_COLORS.Low }} />
+                  </div>
+                  <span className="text-[10px] font-bold shrink-0" style={{ color: SEV_COLORS[w.severity] ?? SEV_COLORS.Low }}>{Math.round(w.frequency * 100)}%</span>
                 </div>
                 <p className="text-[11px] leading-relaxed" style={{ color: MUTED }}>{w.description}</p>
                 {w.examples && w.examples.length > 0 && (
