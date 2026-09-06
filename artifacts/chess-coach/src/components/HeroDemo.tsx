@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Loader2, TrendingDown, ArrowRight, Lock, Sparkles, BookOpen, Swords, ChevronDown, ChevronUp, Crown, ArrowRightLeft, Crosshair } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { analyzeMoveQuality, type MoveAnalysisResult } from '@/lib/chess-bot';
+import { SAMPLE_REPORT, type SampleReport } from '@/lib/sampleReport';
 
 const G = '#81b64c';
 const TEXT = '#e8e6e3';
@@ -13,34 +14,6 @@ interface BlunderDetail extends MoveAnalysisResult {
   fenBefore: string;
   san: string;
   moveNumber: number;
-}
-
-interface SampleWeakness {
-  category: string;
-  severity: string;
-  description: string;
-  frequency: number;
-  examples: string[];
-  previewFen: string | null;
-}
-
-interface SampleReport {
-  totalGames: number;
-  wins: number;
-  losses: number;
-  draws: number;
-  avgRating: number | null;
-  biggestOpportunity: string | null;
-  severityCounts: Record<string, number>;
-  topWeaknessAreas: { category: string; count: number }[];
-  favoriteOpenings: { opening: string; games: number; winRate: number }[];
-  phaseAccuracy: {
-    opening: { accuracy: number; moves: number };
-    middlegame: { accuracy: number; moves: number };
-    endgame: { accuracy: number; moves: number };
-    gamesAnalyzed: number;
-  };
-  weaknesses: SampleWeakness[];
 }
 
 interface DemoResult {
@@ -298,32 +271,14 @@ export function HeroDemo({ onUpgradeClick }: { onUpgradeClick: () => void }) {
   const [error, setError] = useState('');
   const [result, setResult] = useState<DemoResult | null>(null);
   const [showBreakdown, setShowBreakdown] = useState(true);
-  const [sample, setSample] = useState<SampleReport | null>(null);
-  const [sampleLoading, setSampleLoading] = useState(false);
-  const [sampleError, setSampleError] = useState(false);
   const [showProSample, setShowProSample] = useState(false);
   const [showScoutSample, setShowScoutSample] = useState(false);
-
-  // Both dropdowns share one fetch -- Opponent Scout shows the exact same
-  // weakness-detection output as the personal Pro analysis, just aimed at
-  // someone else's account instead of your own, so there's no need for a
-  // second sample or a second request.
-  const loadSample = async () => {
-    if (sample || sampleLoading) return;
-    setSampleLoading(true);
-    setSampleError(false);
-    try {
-      const res = await apiFetch('/api/demo/sample-report');
-      if (!res.ok) throw new Error();
-      setSample(await res.json());
-    } catch {
-      setSampleError(true);
-    } finally {
-      setSampleLoading(false);
-    }
-  };
-  const toggleProSample = () => { if (!showProSample) loadSample(); setShowProSample((v) => !v); };
-  const toggleScoutSample = () => { if (!showScoutSample) loadSample(); setShowScoutSample((v) => !v); };
+  // Static, bundled sample data (see lib/sampleReport.ts) -- this is a
+  // fixed demo sample, not something that varies per visitor, so it's
+  // available instantly with no fetch and no loading state.
+  const sample = SAMPLE_REPORT;
+  const toggleProSample = () => setShowProSample((v) => !v);
+  const toggleScoutSample = () => setShowScoutSample((v) => !v);
 
   const runDemo = async () => {
     if (!username.trim()) return;
@@ -533,9 +488,7 @@ export function HeroDemo({ onUpgradeClick }: { onUpgradeClick: () => void }) {
           {showProSample && (
             <div className="rounded-xl p-3 mb-2" style={{ background: '#141413', border: '1px solid rgba(255,255,255,0.08)' }}>
               <p className="text-[10px] font-black uppercase tracking-wide mb-2.5" style={{ color: MUTED }}>Real sample account — not your data</p>
-              {sampleLoading && <div className="flex justify-center py-4"><Loader2 className="w-4 h-4 animate-spin" style={{ color: MUTED }} /></div>}
-              {sampleError && <p className="text-xs" style={{ color: '#e57373' }}>Couldn't load the sample right now.</p>}
-              {sample && <SampleWeaknessList report={sample} frame="fix" />}
+              <SampleWeaknessList report={sample} frame="fix" />
             </div>
           )}
 
@@ -550,9 +503,7 @@ export function HeroDemo({ onUpgradeClick }: { onUpgradeClick: () => void }) {
           {showScoutSample && (
             <div className="rounded-xl p-3 mb-4" style={{ background: '#141413', border: '1px solid rgba(255,255,255,0.08)' }}>
               <p className="text-[10px] font-black uppercase tracking-wide mb-2.5" style={{ color: MUTED }}>Scouting a real account — same real report, before playing them</p>
-              {sampleLoading && <div className="flex justify-center py-4"><Loader2 className="w-4 h-4 animate-spin" style={{ color: MUTED }} /></div>}
-              {sampleError && <p className="text-xs" style={{ color: '#e57373' }}>Couldn't load the sample right now.</p>}
-              {sample && <SampleWeaknessList report={sample} frame="exploit" />}
+              <SampleWeaknessList report={sample} frame="exploit" />
             </div>
           )}
 
