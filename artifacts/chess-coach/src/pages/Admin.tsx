@@ -1445,7 +1445,8 @@ const SECTION_LABELS: Record<string, string> = {
 function LandingFunnelPanel() {
   const [data, setData] = useState<{
     landingViews: number; miaStarted: number; miaSkipped: number;
-    signupClicked: number; signupCompleted: number; leftWithoutAction: number;
+    signupClicked: number; signupFormSubmitted: number; signupError: number; signupCompleted: number;
+    opponentScoutClicked: number; leftWithoutAction: number;
     scrollDepth: { scroll25: number; scroll50: number; scroll75: number; scroll100: number };
     engaged10s: number;
     sectionViews: Record<string, number>;
@@ -1467,9 +1468,15 @@ function LandingFunnelPanel() {
     { label: 'Landing page views', value: data.landingViews, color: 'text-foreground' },
     { label: 'Played Mia', value: data.miaStarted, color: 'text-emerald-400' },
     { label: 'Skipped Mia', value: data.miaSkipped, color: 'text-orange-400' },
-    { label: 'Clicked Sign Up', value: data.signupClicked, color: 'text-blue-400' },
-    { label: 'Completed Sign Up', value: data.signupCompleted, color: 'text-primary' },
+    { label: 'Scout an opponent clicked', value: data.opponentScoutClicked, color: 'text-cyan-400' },
     { label: 'Left without any action', value: data.leftWithoutAction, color: 'text-red-400' },
+  ] : [];
+
+  const signupFunnelRows = data ? [
+    { label: 'Opened sign up', value: data.signupClicked, color: 'text-blue-400' },
+    { label: 'Submitted the form', value: data.signupFormSubmitted, color: 'text-indigo-400' },
+    { label: 'Hit an error', value: data.signupError, color: 'text-red-400' },
+    { label: 'Completed sign up', value: data.signupCompleted, color: 'text-primary' },
   ] : [];
 
   const scrollRows = data ? [
@@ -1515,6 +1522,23 @@ function LandingFunnelPanel() {
                   <p className="text-[11px] text-muted-foreground mt-0.5">{r.label}</p>
                 </div>
               ))}
+            </div>
+
+            <div className="mt-5 pt-4 border-t border-border/20">
+              <p className="text-xs font-bold text-muted-foreground mb-2">
+                Sign up funnel — where the {data.signupClicked.toLocaleString()} who opened the form actually go
+              </p>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {signupFunnelRows.map((r) => (
+                  <div key={r.label} className="p-3 rounded-xl bg-white/5 border border-white/5">
+                    <p className={cn('text-xl font-black', r.color)}>{r.value.toLocaleString()}</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">{r.label}</p>
+                  </div>
+                ))}
+              </div>
+              <p className="text-[10px] text-muted-foreground mt-2">
+                "Opened" minus "Submitted" is people who saw the form and closed it without trying. "Submitted" minus ("Errored" + "Completed") is a request that never got a clear result client-side — worth a look if it's non-zero.
+              </p>
             </div>
 
             {data.visitorBreakdown && (

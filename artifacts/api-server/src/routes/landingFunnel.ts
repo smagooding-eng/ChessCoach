@@ -62,6 +62,7 @@ const SECTION_IDS = ["hero", "how_it_works", "differentiators", "features", "faq
 
 const VALID_EVENTS = new Set([
   "landing_view", "mia_started", "mia_skipped", "signup_clicked", "signup_completed",
+  "signup_form_submitted", "signup_error", "opponent_scout_clicked",
   "scroll_25", "scroll_50", "scroll_75", "scroll_100",
   "engaged_10s",
   ...SECTION_IDS.map((s) => `viewed_${s}`),
@@ -104,7 +105,10 @@ router.get("/admin/landing-funnel", requireAdmin, async (req: Request, res: Resp
     const miaStarted = countMap["mia_started"] ?? 0;
     const miaSkipped = countMap["mia_skipped"] ?? 0;
     const signupClicked = countMap["signup_clicked"] ?? 0;
+    const signupFormSubmitted = countMap["signup_form_submitted"] ?? 0;
+    const signupError = countMap["signup_error"] ?? 0;
     const signupCompleted = countMap["signup_completed"] ?? 0;
+    const opponentScoutClicked = countMap["opponent_scout_clicked"] ?? 0;
 
     const scrollDepth = {
       scroll25: countMap["scroll_25"] ?? 0,
@@ -141,7 +145,10 @@ router.get("/admin/landing-funnel", requireAdmin, async (req: Request, res: Resp
       miaStarted,
       miaSkipped,
       signupClicked,
+      signupFormSubmitted,
+      signupError,
       signupCompleted,
+      opponentScoutClicked,
       leftWithoutAction,
       scrollDepth,
       engaged10s,

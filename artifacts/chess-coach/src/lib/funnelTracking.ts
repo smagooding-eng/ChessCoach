@@ -14,6 +14,7 @@ export type LandingSectionId = 'hero' | 'how_it_works' | 'differentiators' | 'fe
 
 export type LandingFunnelEvent =
   | 'landing_view' | 'mia_started' | 'mia_skipped' | 'signup_clicked' | 'signup_completed'
+  | 'signup_form_submitted' | 'signup_error' | 'opponent_scout_clicked'
   | 'scroll_25' | 'scroll_50' | 'scroll_75' | 'scroll_100'
   | 'engaged_10s'
   | `viewed_${LandingSectionId}`

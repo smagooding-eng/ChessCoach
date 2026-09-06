@@ -35,7 +35,7 @@ function passwordChecks(pwd: string): PwdCheck[] {
   ];
 }
 
-function AuthModal({ open, onClose, initialMode, externalError }: { open: boolean; onClose: () => void; initialMode: 'login' | 'register'; externalError?: string }) {
+function AuthModal({ open, onClose, initialMode, externalError, context = 'default' }: { open: boolean; onClose: () => void; initialMode: 'login' | 'register'; externalError?: string; context?: 'default' | 'opponent_scout' }) {
   const [mode, setMode] = useState<'login' | 'register'>(initialMode);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -78,13 +78,16 @@ function AuthModal({ open, onClose, initialMode, externalError }: { open: boolea
     e.preventDefault();
     setError('');
     if (mode === 'register') {
+      trackFunnelEvent('signup_form_submitted');
       if (!clientValidEmail(email)) {
         setError('Please enter a valid email address');
+        trackFunnelEvent('signup_error');
         return;
       }
       const failed = passwordChecks(password).filter(c => !c.ok);
       if (failed.length > 0) {
         setError(failed[0].label);
+        trackFunnelEvent('signup_error');
         return;
       }
     }
@@ -103,7 +106,11 @@ function AuthModal({ open, onClose, initialMode, externalError }: { open: boolea
         body: JSON.stringify(body),
       });
       const data = await res.json();
-      if (!res.ok) { setError(data.error || 'Something went wrong'); return; }
+      if (!res.ok) {
+        setError(data.error || 'Something went wrong');
+        if (mode === 'register') trackFunnelEvent('signup_error');
+        return;
+      }
       if (mode === 'register') trackFunnelEvent('signup_completed');
       if (data.token) setAuthToken(data.token);
       localStorage.removeItem('chessscout_ref');
@@ -112,6 +119,7 @@ function AuthModal({ open, onClose, initialMode, externalError }: { open: boolea
       setLocation('/');
     } catch {
       setError('Connection error. Please try again.');
+      if (mode === 'register') trackFunnelEvent('signup_error');
     } finally {
       setLoading(false);
     }
@@ -158,7 +166,7 @@ function AuthModal({ open, onClose, initialMode, externalError }: { open: boolea
 
           <div className="text-center mb-6">
             <h2 className="text-2xl font-black" style={{ color: TEXT }}>
-              {mode === 'login' ? 'Welcome Back' : 'Analyze My Games Free'}
+              {mode === 'login' ? 'Welcome Back' : context === 'opponent_scout' ? 'Scout Any Opponent Free' : 'Analyze My Games Free'}
             </h2>
             <p className="text-sm mt-1" style={{ color: MUTED }}>
               {mode === 'login' ? 'Sign in to your account' : 'Free to start — upgrade to Pro anytime'}
@@ -245,7 +253,7 @@ function AuthModal({ open, onClose, initialMode, externalError }: { open: boolea
               {loading ? (
                 <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
               ) : mode === 'register' ? (
-                <><UserPlus className="w-4 h-4" />Analyze My Games Free</>
+                <><UserPlus className="w-4 h-4" />{context === 'opponent_scout' ? 'Scout Any Opponent Free' : 'Analyze My Games Free'}</>
               ) : (
                 <><LogIn className="w-4 h-4" />Sign In</>
               )}
@@ -368,6 +376,7 @@ function SocialProofBar() {
 export function LandingPage() {
   const [authOpen, setAuthOpen] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'register'>('register');
+  const [authContext, setAuthContext] = useState<'default' | 'opponent_scout'>('default');
   const [oauthError, setOauthError] = useState('');
   const { isAuthenticated, isAuthLoading } = useUser();
   const [, setLocation] = useLocation();
@@ -401,7 +410,15 @@ export function LandingPage() {
     }
   }, [isAuthLoading, isAuthenticated, setLocation]);
 
-  const openSignup = () => { trackFunnelEvent('signup_clicked'); setAuthMode('register'); setAuthOpen(true); };
+  const openSignup = () => { trackFunnelEvent('signup_clicked'); setAuthMode('register'); setAuthContext('default'); setAuthOpen(true); };
+
+  // Separate from openSignup deliberately: someone clicking "Scout an
+  // opponent" wants to scout an opponent, not necessarily to sign up --
+  // counting this click as signup_clicked was inflating that funnel
+  // metric with non-signup intent and, worse, popping up a modal headed
+  // "Analyze My Games Free" for someone who never asked to analyze their
+  // own games. Tracked and labeled separately instead.
+  const openOpponentScout = () => { trackFunnelEvent('opponent_scout_clicked'); setAuthMode('register'); setAuthContext('opponent_scout'); setAuthOpen(true); };
   const openLogin = () => { setAuthMode('login'); setAuthOpen(true); };
 
   // Sends first-touch clicks ("Try Free" in the nav, the hero CTA, the
@@ -537,7 +554,7 @@ export function LandingPage() {
                   <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                 </button>
                 <div className="flex items-center gap-4 text-xs font-medium">
-                  <button onClick={openSignup}
+                  <button onClick={openOpponentScout}
                     className="flex items-center gap-1.5 transition-colors"
                     style={{ color: MUTED }}
                     onMouseEnter={e => { e.currentTarget.style.color = TEXT; }}
@@ -868,7 +885,7 @@ export function LandingPage() {
         </button>
       </div>
 
-      <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} initialMode={authMode} externalError={oauthError} />
+      <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} initialMode={authMode} externalError={oauthError} context={authContext} />
     </div>
   );
 }
