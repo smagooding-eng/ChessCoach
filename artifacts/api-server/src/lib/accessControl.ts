@@ -88,10 +88,16 @@ export async function wouldExceedImportLimit(userId: string, username: string): 
   const { full } = await hasFullAccess(userId);
   if (full) return false;
 
+  // Must be scoped to this user's own games -- username alone matches
+  // every row anyone has ever imported or opponent-scouted under that
+  // chess.com/lichess handle, so a common or previously-scouted username
+  // (e.g. a well-known GM) could already show a high count from other
+  // accounts' activity, incorrectly blocking a brand-new user's very
+  // first import.
   const [row] = await db
     .select({ c: count() })
     .from(gamesTable)
-    .where(eq(gamesTable.username, username.toLowerCase()));
+    .where(and(eq(gamesTable.username, username.toLowerCase()), eq(gamesTable.userId, userId)));
 
   return (row?.c ?? 0) >= FREE_TIER_LIMITS.initialGameImport;
 }
