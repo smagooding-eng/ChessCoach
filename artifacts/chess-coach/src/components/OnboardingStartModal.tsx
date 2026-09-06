@@ -28,7 +28,7 @@ interface OnboardingStartModalProps {
  */
 export function OnboardingStartModal({ username: initialUsername, platform: initialPlatform, onDone }: OnboardingStartModalProps) {
   const [, navigate] = useLocation();
-  const [status, setStatus] = useState<'need-username' | 'starting' | 'ready' | 'error'>(
+  const [status, setStatus] = useState<'need-username' | 'starting' | 'ready'>(
     initialUsername ? 'starting' : 'need-username'
   );
   const [usernameInput, setUsernameInput] = useState('');
@@ -36,6 +36,7 @@ export function OnboardingStartModal({ username: initialUsername, platform: init
   const [username, setUsername] = useState<string | null>(initialUsername);
   const [linkError, setLinkError] = useState<string | null>(null);
   const [linking, setLinking] = useState(false);
+  const [importErrorMessage, setImportErrorMessage] = useState<string | null>(null);
 
   const submitUsername = async () => {
     const trimmed = usernameInput.trim();
@@ -55,6 +56,7 @@ export function OnboardingStartModal({ username: initialUsername, platform: init
       });
       if (!res.ok) throw new Error();
       setUsername(trimmed);
+      setImportErrorMessage(null);
       setStatus('starting');
     } catch {
       setLinkError('Failed to save — please try again.');
@@ -68,18 +70,31 @@ export function OnboardingStartModal({ username: initialUsername, platform: init
     let cancelled = false;
     (async () => {
       try {
-        await apiFetch('/api/games/import', {
+        const importRes = await apiFetch('/api/games/import', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
           body: JSON.stringify({ username, platform, months: 3 }),
         });
+        if (!importRes.ok) {
+          const errBody = await importRes.json().catch(() => null) as { error?: string; message?: string } | null;
+          throw new Error(errBody?.message || errBody?.error || `Import failed (${importRes.status})`);
+        }
+
         const reviewRes = await apiFetch('/api/games/review-all', { method: 'POST', credentials: 'include' });
+        if (!reviewRes.ok) {
+          const errBody = await reviewRes.json().catch(() => null) as { error?: string } | null;
+          throw new Error(errBody?.error || `Review failed (${reviewRes.status})`);
+        }
         const reviewData = await reviewRes.json().catch(() => null) as { jobId?: string } | null;
         if (reviewData?.jobId) trackBackgroundJob('gamesReview', reviewData.jobId);
         if (!cancelled) setStatus('ready');
-      } catch {
-        if (!cancelled) setStatus('error');
+      } catch (err) {
+        if (!cancelled) {
+          setImportErrorMessage(err instanceof Error ? err.message : 'Something went wrong importing your games.');
+          setUsernameInput(username);
+          setStatus('need-username');
+        }
       }
     })();
     return () => { cancelled = true; };
@@ -104,9 +119,13 @@ export function OnboardingStartModal({ username: initialUsername, platform: init
           style={{ background: BG_CARD, border: `1px solid ${BORDER}`, boxShadow: '0 18px 50px rgba(0,0,0,0.45)' }}>
           <div className="text-4xl">♟</div>
           <div>
-            <h2 className="text-xl font-black mb-2" style={{ color: TEXT_LIGHT }}>One quick thing</h2>
+            <h2 className="text-xl font-black mb-2" style={{ color: TEXT_LIGHT }}>
+              {importErrorMessage ? "Let's try that again" : 'One quick thing'}
+            </h2>
             <p className="text-sm leading-relaxed" style={{ color: TEXT_MUTED }}>
-              Tell us where you play so we can pull your games and start analyzing them.
+              {importErrorMessage
+                ? `${importErrorMessage} Double check the username below, or try the other platform.`
+                : 'Tell us where you play so we can pull your games and start analyzing them.'}
             </p>
           </div>
 
@@ -167,9 +186,7 @@ export function OnboardingStartModal({ username: initialUsername, platform: init
         <div>
           <h2 className="text-xl font-black mb-2" style={{ color: TEXT_LIGHT }}>Setting up your account</h2>
           <p className="text-sm leading-relaxed" style={{ color: TEXT_MUTED }}>
-            {status === 'error'
-              ? "We're pulling your recent games and analyzing them now — this can take a minute. You can head to your dashboard and check back shortly."
-              : "We're pulling your last 20 games and running a full analysis in the background — usually takes a minute or two."}
+            We're pulling your last 20 games and running a full analysis in the background — usually takes a minute or two.
           </p>
         </div>
 
