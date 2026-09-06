@@ -487,7 +487,7 @@ function buildFrontendFixPgn(mistakePgn: string, drillExpectedMove: string | nul
 
 export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, drillExpectedMove, drillHint, content, extraChallenges, conceptTitle }: LessonBoardPlayerProps) {
   const [, navigate] = useLocation();
-  const { boardColors, boardTextureCss, pieceColors, pieceShape, showCoordinates } = useSettings();
+  const { boardColors, boardTextureCss, pieceColors, pieceShape, showCoordinates, showLegalMoves } = useSettings();
   const BOARD_LIGHT = boardColors.light;
   const BOARD_DARK = boardColors.dark;
   const BOARD_TEXTURE_IMAGE = boardTextureCss.backgroundImage;
@@ -667,16 +667,20 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
   const drillSquareStyles = useMemo(() => {
     const styles: Record<string, React.CSSProperties> = {};
     if (drillSelectedSq) styles[drillSelectedSq] = { background: 'rgba(100, 180, 255, 0.55)', borderRadius: '4px' };
-    for (const sq of drillLegalTargets) styles[sq] = { background: 'radial-gradient(circle, rgba(100,180,255,0.55) 28%, transparent 30%)' };
+    if (showLegalMoves) {
+      for (const sq of drillLegalTargets) styles[sq] = { background: 'radial-gradient(circle, rgba(100,180,255,0.55) 28%, transparent 30%)' };
+    }
     return styles;
-  }, [drillSelectedSq, drillLegalTargets]);
+  }, [drillSelectedSq, drillLegalTargets, showLegalMoves]);
 
   const repeatSquareStyles = useMemo(() => {
     const styles: Record<string, React.CSSProperties> = {};
     if (repeatSelectedSq) styles[repeatSelectedSq] = { background: 'rgba(100, 180, 255, 0.55)', borderRadius: '4px' };
-    for (const sq of repeatLegalTargets) styles[sq] = { background: 'radial-gradient(circle, rgba(100,180,255,0.55) 28%, transparent 30%)' };
+    if (showLegalMoves) {
+      for (const sq of repeatLegalTargets) styles[sq] = { background: 'radial-gradient(circle, rgba(100,180,255,0.55) 28%, transparent 30%)' };
+    }
     return styles;
-  }, [repeatSelectedSq, repeatLegalTargets]);
+  }, [repeatSelectedSq, repeatLegalTargets, showLegalMoves]);
 
   // ── Drill handlers ───────────────────────────────────────────────────────────
   const handleDrillDrop = useCallback((args: { sourceSquare: string; targetSquare: string | null; piece: unknown }) => {

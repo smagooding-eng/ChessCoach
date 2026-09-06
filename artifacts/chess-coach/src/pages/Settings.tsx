@@ -72,6 +72,7 @@ export default function SettingsPage() {
     pieceCustomColors, setPieceCustomColor,
     confirmMoves, setConfirmMoves,
     showCoordinates, setShowCoordinates,
+    showLegalMoves, setShowLegalMoves,
     soundEnabled, setSoundEnabled,
     promotionChoice, setPromotionChoice,
     boardSize, setBoardSize,
@@ -283,6 +284,7 @@ export default function SettingsPage() {
         <h2 className="text-sm font-black uppercase tracking-wide mb-1" style={{ color: TEXT_MUTED }}>Gameplay</h2>
         <ToggleRow label="Confirm Moves" description="Tap a big confirm button before your move is played — like pressing a chess clock" checked={confirmMoves} onChange={setConfirmMoves} />
         <ToggleRow label="Board Coordinates" description="Show file/rank labels (a-h, 1-8) around the board edge" checked={showCoordinates} onChange={setShowCoordinates} />
+        <ToggleRow label="Legal Move Dots" description="Highlight where a selected piece can move — turn off if you'd rather not see them" checked={showLegalMoves} onChange={setShowLegalMoves} />
         <ToggleRow label="Ask on Promotion" description="Choose which piece to promote to, instead of always auto-queening" checked={promotionChoice === 'ask'} onChange={(v) => setPromotionChoice(v ? 'ask' : 'queen')} />
         <ToggleRow label="Move Sounds" description="Play a short sound when a move or capture is made" checked={soundEnabled} onChange={setSoundEnabled} />
       </section>

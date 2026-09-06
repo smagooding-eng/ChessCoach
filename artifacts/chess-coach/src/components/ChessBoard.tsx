@@ -130,7 +130,7 @@ export function ChessBoard({
   maxWidthOverride,
   suppressConfirmMoves = false,
 }: ChessBoardProps) {
-  const { confirmMoves, boardColors, boardTextureCss, showCoordinates, pieceColors, pieceShape, soundEnabled, promotionChoice, boardMaxWidth: settingsMaxWidth } = useSettings();
+  const { confirmMoves, boardColors, boardTextureCss, showCoordinates, showLegalMoves, pieceColors, pieceShape, soundEnabled, promotionChoice, boardMaxWidth: settingsMaxWidth } = useSettings();
   const boardMaxWidth = maxWidthOverride ?? settingsMaxWidth;
   const confirmMovesRef = useRef(confirmMoves);
   confirmMovesRef.current = confirmMoves;
@@ -456,18 +456,20 @@ export function ChessBoard({
       styles[premove.to] = { ...(styles[premove.to] || {}), background: 'rgba(255, 140, 90, 0.55)', boxShadow: 'inset 0 0 0 2px rgba(255,140,90,0.9)' };
     }
 
-    for (const sq of legalTargets) {
-      if (legalMoveInfo.captures.has(sq)) {
-        styles[sq] = {
-          background: 'radial-gradient(circle, transparent 55%, rgba(100,180,255,0.55) 56%)',
-          borderRadius: '50%',
-          ...(styles[sq] || {}),
-        };
-      } else {
-        styles[sq] = {
-          background: 'radial-gradient(circle, rgba(100,180,255,0.55) 28%, transparent 30%)',
-          ...(styles[sq] || {}),
-        };
+    if (showLegalMoves) {
+      for (const sq of legalTargets) {
+        if (legalMoveInfo.captures.has(sq)) {
+          styles[sq] = {
+            background: 'radial-gradient(circle, transparent 55%, rgba(100,180,255,0.55) 56%)',
+            borderRadius: '50%',
+            ...(styles[sq] || {}),
+          };
+        } else {
+          styles[sq] = {
+            background: 'radial-gradient(circle, rgba(100,180,255,0.55) 28%, transparent 30%)',
+            ...(styles[sq] || {}),
+          };
+        }
       }
     }
 
@@ -479,7 +481,7 @@ export function ChessBoard({
     }
 
     return styles;
-  }, [lastMove, selectedSquare, legalTargets, legalMoveInfo, feedback, moveQuality]);
+  }, [lastMove, selectedSquare, legalTargets, legalMoveInfo, feedback, moveQuality, showLegalMoves]);
 
   const boardKeyRef = useRef(0);
 

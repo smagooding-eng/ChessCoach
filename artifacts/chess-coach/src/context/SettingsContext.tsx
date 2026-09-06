@@ -98,6 +98,7 @@ interface Settings {
   pieceCustomColors: ColorPair;
   confirmMoves: boolean;
   showCoordinates: boolean;
+  showLegalMoves: boolean;
   soundEnabled: boolean;
   promotionChoice: PromotionChoice;
   boardSize: BoardSize;
@@ -113,6 +114,7 @@ const APP_DEFAULT_SETTINGS: Settings = {
   pieceCustomColors: { light: '#ffffff', dark: '#2b2b2b' },
   confirmMoves: false,
   showCoordinates: true,
+  showLegalMoves: true,
   soundEnabled: true,
   promotionChoice: 'queen',
   boardSize: 'standard',
@@ -142,6 +144,7 @@ interface SettingsContextValue extends Settings {
   setPieceCustomColor: (which: 'light' | 'dark', color: string) => void;
   setConfirmMoves: (v: boolean) => void;
   setShowCoordinates: (v: boolean) => void;
+  setShowLegalMoves: (v: boolean) => void;
   setSoundEnabled: (v: boolean) => void;
   setPromotionChoice: (v: PromotionChoice) => void;
   setBoardSize: (v: BoardSize) => void;
@@ -232,6 +235,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       setSettings((s) => ({ ...s, pieceStyle: 'custom', pieceCustomColors: { ...s.pieceCustomColors, [which]: color } })),
     setConfirmMoves: (v) => setSettings((s) => ({ ...s, confirmMoves: v })),
     setShowCoordinates: (v) => setSettings((s) => ({ ...s, showCoordinates: v })),
+    setShowLegalMoves: (v) => setSettings((s) => ({ ...s, showLegalMoves: v })),
     setSoundEnabled: (v) => setSettings((s) => ({ ...s, soundEnabled: v })),
     setPromotionChoice: (v) => setSettings((s) => ({ ...s, promotionChoice: v })),
     setBoardSize: (v) => setSettings((s) => ({ ...s, boardSize: v })),
