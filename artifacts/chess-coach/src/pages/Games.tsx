@@ -65,6 +65,19 @@ export function Games() {
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
+    apiFetch('/api/games/review-all-active', { credentials: 'include' })
+      .then(r => r.ok ? r.json() : null)
+      .then((data: { jobId: string | null } | null) => {
+        if (data?.jobId) setBulkJobId(data.jobId);
+      })
+      .catch(() => {});
+    // Runs once on mount only -- this is purely to pick up a review job
+    // that might already be running (e.g. started during onboarding),
+    // not something that should re-fire on every re-render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
     if (!bulkJobId) return;
     const poll = async () => {
       try {

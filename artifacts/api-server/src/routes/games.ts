@@ -1135,6 +1135,27 @@ export async function runBulkReviewJob(
 const MANUAL_BULK_REVIEW_MAX = 100;
 const BULK_REVIEW_STALE_MS = 60 * 60 * 1000; // generous — 100 sequential game reviews can legitimately take a long time
 
+// Read-only check for an already-running bulk review, so any page that
+// shows a "review your games" prompt can find out first whether one's
+// already in flight (e.g. kicked off during onboarding) instead of
+// offering to start a second one or showing a stale "not reviewed yet"
+// count while one's already working through the list.
+router.get("/games/review-all-active", requireAuth, async (req, res): Promise<void> => {
+  const userId = req.user!.id;
+  const [pending] = await db.select().from(backgroundJobsTable).where(
+    and(
+      eq(backgroundJobsTable.userId, userId),
+      eq(backgroundJobsTable.type, "bulk_review"),
+      eq(backgroundJobsTable.status, "pending"),
+    )
+  );
+  if (pending && Date.now() - new Date(pending.createdAt!).getTime() <= BULK_REVIEW_STALE_MS) {
+    res.json({ jobId: pending.id });
+  } else {
+    res.json({ jobId: null });
+  }
+});
+
 router.post("/games/review-all", requireAuth, async (req, res): Promise<void> => {
   const userId = req.user!.id;
 
