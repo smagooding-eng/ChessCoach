@@ -125,7 +125,7 @@ export function estimatedLossForMove(m: {
   return Math.max(base, isGoodTierUnverified ? 3 : base);
 }
 
-class StockfishProcess {
+export class StockfishProcess {
   private proc: ChildProcessWithoutNullStreams | null = null;
   private buffer = "";
   private resolveFunc: ((lines: string[]) => void) | null = null;
@@ -134,6 +134,19 @@ class StockfishProcess {
   private waitForToken = "";
   private pendingTimers: ReturnType<typeof setTimeout>[] = [];
   private dead = false;
+  // Fires when the process dies unexpectedly. Previously the exit/error
+  // handlers reset the module-level globalEngine/engineInitPromise
+  // directly -- fine when there's only ever one instance, but a second,
+  // independent StockfishProcess (e.g. for a bulk background job) would
+  // then incorrectly reset the *live* engine's singleton state on its own
+  // exit, potentially dropping an in-flight real user request. Each
+  // instance now only touches its own state; callers that need to react
+  // to a dead engine (like getEngine() below) wire that up via this hook.
+  private onDead?: () => void;
+
+  constructor(onDead?: () => void) {
+    this.onDead = onDead;
+  }
 
   private clearTimers(): void {
     for (const t of this.pendingTimers) clearTimeout(t);
@@ -170,8 +183,7 @@ class StockfishProcess {
       logger.warn({ code, signal }, "Stockfish process exited");
       this.dead = true;
       this.proc = null;
-      globalEngine = null;
-      engineInitPromise = null;
+      this.onDead?.();
       this.doReject(new Error(`Stockfish exited: code=${code} signal=${signal}`));
     });
 
@@ -179,8 +191,7 @@ class StockfishProcess {
       logger.error({ err }, "Stockfish process error");
       this.dead = true;
       this.proc = null;
-      globalEngine = null;
-      engineInitPromise = null;
+      this.onDead?.();
       this.doReject(err);
     });
 
@@ -342,7 +353,10 @@ async function getEngine(): Promise<StockfishProcess> {
   }
   if (engineInitPromise) { await engineInitPromise; return globalEngine!; }
 
-  globalEngine = new StockfishProcess();
+  globalEngine = new StockfishProcess(() => {
+    globalEngine = null;
+    engineInitPromise = null;
+  });
   engineInitPromise = globalEngine.init().catch((err) => {
     logger.error({ err }, "Failed to initialize Stockfish");
     globalEngine = null;

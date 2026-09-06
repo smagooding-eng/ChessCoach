@@ -1821,6 +1821,123 @@ function UserActivityPanel() {
   );
 }
 
+function BulkReviewPanel() {
+  const [status, setStatus] = useState<{
+    job: { id: string; status: string; error?: string | null; targetGames?: number; depth?: number; engineDelayMs?: number; gamesImported?: number; gamesReviewed?: number; usernamesProcessed?: number } | null;
+    queuePending: number;
+    queueDone: number;
+  } | null>(null);
+  const [targetGames, setTargetGames] = useState(1_000_000);
+  const [depth, setDepth] = useState(10);
+  const [engineDelayMs, setEngineDelayMs] = useState(250);
+  const [busy, setBusy] = useState(false);
+
+  const load = () => {
+    apiFetch('/api/admin/bulk-review/status', { credentials: 'include' })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d) setStatus(d); });
+  };
+
+  useEffect(() => {
+    load();
+    const id = setInterval(load, 15000);
+    return () => clearInterval(id);
+  }, []);
+
+  const isRunning = status?.job?.status === 'pending' || status?.job?.status === 'stopping';
+
+  const start = async () => {
+    setBusy(true);
+    try {
+      await apiFetch('/api/admin/bulk-review/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ targetGames, depth, engineDelayMs }),
+      });
+      load();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const stop = async () => {
+    setBusy(true);
+    try {
+      await apiFetch('/api/admin/bulk-review/stop', { method: 'POST', credentials: 'include' });
+      load();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="rounded-2xl border border-border/40 bg-card/60 p-5">
+      <h2 className="text-sm font-bold flex items-center gap-2 mb-1"><RefreshCw className="w-4 h-4 text-emerald-400" /> Bulk Game Review (Admin Only)</h2>
+      <p className="text-[11px] text-muted-foreground mb-4">
+        Pulls games from Chess.com's public API and reviews them with a second, isolated Stockfish process — no OpenAI calls, so it's free to run. Meant to run slowly in the background for as long as it takes; feeds the landing page's real games-imported/analyzed counters over time.
+      </p>
+
+      {status?.job?.status === 'error' && (
+        <p className="text-xs text-red-400 mb-3">Last run ended with an error: {status.job.error}</p>
+      )}
+
+      {isRunning && status?.job ? (
+        <>
+          <div className="grid grid-cols-3 gap-2 mb-3">
+            <div className="p-2.5 rounded-lg bg-white/5 border border-white/5 text-center">
+              <p className="text-lg font-black text-primary">{(status.job.gamesImported ?? 0).toLocaleString()}</p>
+              <p className="text-[10px] text-muted-foreground">Games imported</p>
+            </div>
+            <div className="p-2.5 rounded-lg bg-white/5 border border-white/5 text-center">
+              <p className="text-lg font-black">{(status.job.gamesReviewed ?? 0).toLocaleString()}</p>
+              <p className="text-[10px] text-muted-foreground">Games reviewed</p>
+            </div>
+            <div className="p-2.5 rounded-lg bg-white/5 border border-white/5 text-center">
+              <p className="text-lg font-black">{status.queuePending.toLocaleString()}</p>
+              <p className="text-[10px] text-muted-foreground">Usernames queued</p>
+            </div>
+          </div>
+          <p className="text-[10px] text-muted-foreground mb-3">
+            {status.job.status === 'stopping' ? 'Stopping — will finish the current game, then stop.' : `Running toward a target of ${(status.job.targetGames ?? 0).toLocaleString()} games, depth ${status.job.depth}.`}
+          </p>
+          <button onClick={stop} disabled={busy || status.job.status === 'stopping'}
+            className="w-full py-2.5 rounded-xl text-xs font-black bg-red-500/20 text-red-400 disabled:opacity-50">
+            {status.job.status === 'stopping' ? 'Stopping…' : 'Stop'}
+          </button>
+        </>
+      ) : (
+        <>
+          <div className="grid grid-cols-3 gap-2 mb-3">
+            <label className="text-[10px] text-muted-foreground">
+              Target games
+              <input type="number" value={targetGames} onChange={(e) => setTargetGames(Number(e.target.value))}
+                className="w-full mt-1 text-xs bg-background border border-border/40 rounded-lg px-2 py-1.5" />
+            </label>
+            <label className="text-[10px] text-muted-foreground">
+              Engine depth
+              <input type="number" value={depth} onChange={(e) => setDepth(Number(e.target.value))}
+                className="w-full mt-1 text-xs bg-background border border-border/40 rounded-lg px-2 py-1.5" />
+            </label>
+            <label className="text-[10px] text-muted-foreground">
+              Delay/move (ms)
+              <input type="number" value={engineDelayMs} onChange={(e) => setEngineDelayMs(Number(e.target.value))}
+                className="w-full mt-1 text-xs bg-background border border-border/40 rounded-lg px-2 py-1.5" />
+            </label>
+          </div>
+          <p className="text-[10px] text-muted-foreground mb-3">
+            Lower depth and higher delay = slower per game, but gentler on the shared CPU. Depth 18 is what paid per-user reviews use — this doesn't need to match that.
+          </p>
+          <button onClick={start} disabled={busy}
+            className="w-full py-2.5 rounded-xl text-xs font-black bg-primary text-primary-foreground disabled:opacity-50">
+            Start
+          </button>
+        </>
+      )}
+    </motion.div>
+  );
+}
+
 function SubscribersPanel({ onClose }: { onClose: () => void }) {
   const [subscribers, setSubscribers] = useState<StripeSubscriber[]>([]);
   const [loading, setLoading] = useState(true);
@@ -3173,6 +3290,8 @@ function AdminTicker() {
       <AiUsagePanel />
 
       <UserActivityPanel />
+
+      <BulkReviewPanel />
       <ReferralCodesPanel />
       <ReferralSignupsPanel />
       <AffiliatesPanel />

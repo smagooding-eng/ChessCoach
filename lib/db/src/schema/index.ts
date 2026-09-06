@@ -14,3 +14,4 @@ export * from "./scanAttempts";
 export * from "./chessTraps";
 export * from "./aiUsage";
 export * from "./beginnerCourses";
+export * from "./bulkCrawl";

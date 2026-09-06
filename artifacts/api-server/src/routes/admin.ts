@@ -7,7 +7,9 @@ import { getUncachableStripeClient } from "../lib/stripeClient";
 import { ADMIN_EMAILS } from "../lib/auth";
 import { generateNextSeoArticle } from "../lib/seoContentEngine";
 import { estimateCostUsd } from "../lib/aiUsageTracker";
-import { aiUsageEventsTable } from "@workspace/db";
+import { aiUsageEventsTable, bulkCrawlQueueTable } from "@workspace/db";
+import { runBulkCrawlJob } from "../lib/bulkGameCrawler";
+import { randomUUID } from "crypto";
 import OpenAI from "openai";
 
 const router: IRouter = Router();
@@ -1502,6 +1504,71 @@ router.get("/admin/user-activity", requireAdmin, async (req: Request, res: Respo
     });
   } catch (err: any) {
     res.status(500).json({ error: err?.message || "Failed to load user activity" });
+  }
+});
+
+// Admin-only, deliberately: this pulls a very large volume of games from
+// Chess.com and runs them through a second, isolated Stockfish process
+// (see bulkStockfish.ts) purely to grow the landing page's real
+// "games imported/analyzed" counters over time -- no OpenAI call
+// anywhere in this path, by design, to keep it free to run. It's meant
+// to run slowly and quietly in the background for as long as it takes;
+// there's no expectation of it finishing quickly.
+router.post("/admin/bulk-review/start", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const targetGames = Math.max(1, Math.min(2_000_000, parseInt(req.body?.targetGames) || 1_000_000));
+    const depth = Math.max(4, Math.min(18, parseInt(req.body?.depth) || 10));
+    const engineDelayMs = Math.max(0, Math.min(5000, parseInt(req.body?.engineDelayMs) || 250));
+
+    const [existing] = await db.select().from(backgroundJobsTable)
+      .where(and(eq(backgroundJobsTable.type, "bulk_game_crawl"), eq(backgroundJobsTable.status, "pending")));
+    if (existing) {
+      res.json({ jobId: existing.id, alreadyRunning: true });
+      return;
+    }
+
+    const jobId = randomUUID();
+    await db.insert(backgroundJobsTable).values({
+      id: jobId,
+      userId: req.user!.id,
+      type: "bulk_game_crawl",
+      status: "pending",
+      result: { targetGames, depth, engineDelayMs, gamesImported: 0, gamesReviewed: 0, usernamesProcessed: 0 },
+    });
+
+    res.json({ jobId, alreadyRunning: false });
+    runBulkCrawlJob(jobId, targetGames, depth, engineDelayMs).catch(() => {});
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || "Failed to start bulk review job" });
+  }
+});
+
+router.get("/admin/bulk-review/status", requireAdmin, async (_req: Request, res: Response) => {
+  try {
+    const [job] = await db.select().from(backgroundJobsTable)
+      .where(eq(backgroundJobsTable.type, "bulk_game_crawl"))
+      .orderBy(desc(backgroundJobsTable.createdAt))
+      .limit(1);
+    const [queuePending] = await db.select({ c: count() }).from(bulkCrawlQueueTable).where(eq(bulkCrawlQueueTable.status, "pending"));
+    const [queueDone] = await db.select({ c: count() }).from(bulkCrawlQueueTable).where(eq(bulkCrawlQueueTable.status, "done"));
+
+    res.json({
+      job: job ? { id: job.id, status: job.status, error: job.error, ...(job.result as object ?? {}) } : null,
+      queuePending: queuePending?.c ?? 0,
+      queueDone: queueDone?.c ?? 0,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || "Failed to load bulk review status" });
+  }
+});
+
+router.post("/admin/bulk-review/stop", requireAdmin, async (_req: Request, res: Response) => {
+  try {
+    await db.update(backgroundJobsTable).set({ status: "stopping" })
+      .where(and(eq(backgroundJobsTable.type, "bulk_game_crawl"), eq(backgroundJobsTable.status, "pending")));
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || "Failed to stop bulk review job" });
   }
 });
 
