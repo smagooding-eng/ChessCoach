@@ -31,6 +31,10 @@ interface SampleReport {
   losses: number;
   draws: number;
   avgRating: number | null;
+  biggestOpportunity: string | null;
+  severityCounts: Record<string, number>;
+  topWeaknessAreas: { category: string; count: number }[];
+  favoriteOpenings: { opening: string; games: number; winRate: number }[];
   weaknesses: SampleWeakness[];
 }
 
@@ -93,8 +97,20 @@ function MiniBoard({ fen }: { fen: string }) {
 // OpponentAnalysis.tsx actually render.
 function SampleWeaknessList({ report, frame }: { report: SampleReport; frame: 'fix' | 'exploit' }) {
   const totalDecided = report.wins + report.losses + report.draws;
+  const severityLabels: { key: string; icon: string }[] = [
+    { key: 'Critical', icon: '⚡' }, { key: 'High', icon: '⚠' }, { key: 'Medium', icon: '🛡' }, { key: 'Low', icon: '👁' },
+  ];
+  const maxSeverity = Math.max(1, ...Object.values(report.severityCounts));
+  const maxCategory = Math.max(1, ...report.topWeaknessAreas.map((a) => a.count));
   return (
     <div>
+      {report.biggestOpportunity && (
+        <p className="text-xs mb-3" style={{ color: MUTED }}>
+          {frame === 'exploit' ? 'Their biggest opening to attack right now: ' : 'Your biggest opportunity right now: '}
+          <span className="font-black" style={{ color: TEXT }}>{report.biggestOpportunity}</span>
+        </p>
+      )}
+
       <div className="grid grid-cols-4 gap-1.5 mb-3">
         {[
           { label: 'Games', value: report.totalGames },
@@ -115,7 +131,38 @@ function SampleWeaknessList({ report, frame }: { report: SampleReport; frame: 'f
           <div style={{ width: `${(report.losses / totalDecided) * 100}%`, background: '#c1493d' }} />
         </div>
       )}
-      <div className="space-y-2.5">
+
+      <p className="text-[10px] font-black uppercase tracking-wide mb-1.5" style={{ color: MUTED }}>Severity breakdown</p>
+      <div className="space-y-1 mb-4">
+        {severityLabels.map((s) => (
+          <div key={s.key} className="flex items-center gap-2">
+            <span className="text-[10px] w-14 shrink-0" style={{ color: SEV_COLORS[s.key] }}>{s.icon} {s.key}</span>
+            <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
+              <div className="h-full rounded-full" style={{ width: `${((report.severityCounts[s.key] ?? 0) / maxSeverity) * 100}%`, background: SEV_COLORS[s.key] }} />
+            </div>
+            <span className="text-[10px] font-bold w-4 text-right" style={{ color: TEXT }}>{report.severityCounts[s.key] ?? 0}</span>
+          </div>
+        ))}
+      </div>
+
+      {report.topWeaknessAreas.length > 0 && (
+        <>
+          <p className="text-[10px] font-black uppercase tracking-wide mb-1.5" style={{ color: MUTED }}>Top weakness areas — by count</p>
+          <div className="space-y-1 mb-4">
+            {report.topWeaknessAreas.map((a) => (
+              <div key={a.category} className="flex items-center gap-2">
+                <span className="text-[10px] w-28 shrink-0 truncate" style={{ color: TEXT }}>{a.category}</span>
+                <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
+                  <div className="h-full rounded-full" style={{ width: `${(a.count / maxCategory) * 100}%`, background: G }} />
+                </div>
+                <span className="text-[10px] font-bold w-4 text-right" style={{ color: TEXT }}>{a.count}</span>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      <div className="space-y-2.5 mb-4">
         {report.weaknesses.map((w, i) => (
           <div key={i} className="rounded-lg p-3" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
             <div className="flex items-start gap-2.5">
@@ -137,6 +184,25 @@ function SampleWeaknessList({ report, frame }: { report: SampleReport; frame: 'f
           </div>
         ))}
       </div>
+
+      {report.favoriteOpenings.length > 0 && (
+        <>
+          <p className="text-[10px] font-black uppercase tracking-wide mb-1.5" style={{ color: MUTED }}>{frame === 'exploit' ? 'Their favourite openings' : 'Favourite openings'}</p>
+          <div className="space-y-1.5">
+            {report.favoriteOpenings.map((o) => (
+              <div key={o.opening} className="p-2 rounded-lg" style={{ background: 'rgba(255,255,255,0.03)' }}>
+                <div className="flex items-center justify-between text-[10px] mb-1">
+                  <span className="truncate pr-2" style={{ color: TEXT }}>{o.opening}</span>
+                  <span className="shrink-0" style={{ color: MUTED }}>{o.games}g · {o.winRate}%</span>
+                </div>
+                <div className="h-1 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
+                  <div className="h-full rounded-full" style={{ width: `${o.winRate}%`, background: G }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
     </div>
   );
 }

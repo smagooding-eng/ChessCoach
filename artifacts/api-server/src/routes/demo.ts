@@ -160,11 +160,13 @@ router.get("/demo/sample-report", async (_req: Request, res: Response) => {
         whiteRating: gamesTable.whiteRating,
         blackRating: gamesTable.blackRating,
         result: gamesTable.result,
+        opening: gamesTable.opening,
       })
       .from(gamesTable)
       .where(eq(gamesTable.username, SAMPLE_USERNAME));
 
     let wins = 0, losses = 0, draws = 0, totalRating = 0, ratedGames = 0;
+    const openingMap = new Map<string, { games: number; wins: number }>();
     for (const g of games) {
       if (g.result === "win") wins++;
       else if (g.result === "loss") losses++;
@@ -172,7 +174,41 @@ router.get("/demo/sample-report", async (_req: Request, res: Response) => {
       const isWhite = g.whiteUsername.toLowerCase() === SAMPLE_USERNAME;
       const rating = isWhite ? g.whiteRating : g.blackRating;
       if (rating > 0) { totalRating += rating; ratedGames++; }
+
+      const opening = g.opening || "Unknown Opening";
+      const stat = openingMap.get(opening) ?? { games: 0, wins: 0 };
+      stat.games++;
+      if (g.result === "win") stat.wins++;
+      openingMap.set(opening, stat);
     }
+    const favoriteOpenings = Array.from(openingMap.entries())
+      .map(([opening, s]) => ({ opening, games: s.games, winRate: Math.round((s.wins / s.games) * 100) }))
+      .sort((a, b) => b.games - a.games)
+      .slice(0, 3);
+
+    // All weaknesses for the count breakdown (cheap -- this account's
+    // weakness table is small), separate from how many full detail
+    // cards get shown below.
+    const allWeaknesses = await db
+      .select({ category: weaknessesTable.category, severity: weaknessesTable.severity, frequency: weaknessesTable.frequency })
+      .from(weaknessesTable)
+      .where(eq(weaknessesTable.username, SAMPLE_USERNAME));
+
+    const severityCounts = { Critical: 0, High: 0, Medium: 0, Low: 0 } as Record<string, number>;
+    const categoryCounts = new Map<string, number>();
+    for (const w of allWeaknesses) {
+      severityCounts[w.severity] = (severityCounts[w.severity] ?? 0) + 1;
+      categoryCounts.set(w.category, (categoryCounts.get(w.category) ?? 0) + 1);
+    }
+    const topWeaknessAreas = Array.from(categoryCounts.entries())
+      .map(([category, count]) => ({ category, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+
+    const severityOrder: Record<string, number> = { Critical: 0, High: 1, Medium: 2, Low: 3 };
+    const biggestOpportunity = [...allWeaknesses].sort((a, b) =>
+      (severityOrder[a.severity] ?? 4) - (severityOrder[b.severity] ?? 4) || b.frequency - a.frequency
+    )[0]?.category ?? null;
 
     const weaknessRows = await db
       .select()
@@ -226,6 +262,10 @@ router.get("/demo/sample-report", async (_req: Request, res: Response) => {
       totalGames: games.length,
       wins, losses, draws,
       avgRating: ratedGames > 0 ? Math.round(totalRating / ratedGames) : null,
+      biggestOpportunity,
+      severityCounts,
+      topWeaknessAreas,
+      favoriteOpenings,
       weaknesses,
     });
   } catch (err: any) {
