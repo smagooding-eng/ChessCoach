@@ -274,13 +274,20 @@ function AuthModal({ open, onClose, initialMode, externalError, context = 'defau
   );
 }
 
+// Previously used its own IntersectionObserver to only start counting up
+// once scrolled into view -- but the parent section already fades in via
+// whileInView, and opacity:0 doesn't stop an element from being
+// geometrically "in the viewport." That meant the count-up could run
+// (and finish) while still invisible, so it snapped straight to the
+// final number the instant the fade-in revealed it. Simpler and
+// correct: this only ever mounts after stats have already loaded and
+// the section is about to render, so just animate on mount.
 function AnimatedCount({ target, duration = 1500 }: { target: number; duration?: number }) {
   const [count, setCount] = useState(0);
-  const ref = useRef<HTMLSpanElement>(null);
   const started = useRef(false);
 
-  const runAnimation = () => {
-    if (started.current) return;
+  useEffect(() => {
+    if (target <= 0 || started.current) return;
     started.current = true;
     const start = performance.now();
     const animate = (now: number) => {
@@ -291,23 +298,13 @@ function AnimatedCount({ target, duration = 1500 }: { target: number; duration?:
       else setCount(target);
     };
     requestAnimationFrame(animate);
-  };
-
-  useEffect(() => {
-    if (target <= 0 || started.current) return;
-    if (!('IntersectionObserver' in window)) { runAnimation(); return; }
-    const observer = new IntersectionObserver(([entry]) => {
-      if (entry.isIntersecting) { runAnimation(); observer.disconnect(); }
-    }, { threshold: 0.1 });
-    if (ref.current) observer.observe(ref.current);
-    return () => observer.disconnect();
   }, [target, duration]);
 
-  return <span ref={ref}>{count.toLocaleString()}</span>;
+  return <span>{count.toLocaleString()}</span>;
 }
 
 function SocialProofBar() {
-  const [stats, setStats] = useState<{ users: number; gamesImported: number; gamesAnalyzed: number; opponentsScouted: number } | null>(null);
+  const [stats, setStats] = useState<{ users: number; gamesImported: number; gamesAnalyzed: number } | null>(null);
 
   useEffect(() => {
     apiFetch('/api/public/stats')
@@ -342,7 +339,6 @@ function SocialProofBar() {
   const items = [
     { label: 'Games Imported', value: stats.gamesImported, icon: DownloadIcon },
     { label: 'Games Analyzed', value: stats.gamesAnalyzed, icon: BarChart3 },
-    { label: 'Opponents Scouted', value: stats.opponentsScouted, icon: Crosshair },
   ].filter(i => i.value > 0);
 
   return (
