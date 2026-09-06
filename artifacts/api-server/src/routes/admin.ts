@@ -1397,4 +1397,112 @@ router.get("/admin/ai-usage", requireAdmin, async (req: Request, res: Response) 
   }
 });
 
+// Full per-user activity: who's using what, and who's new vs returning,
+// for real registered accounts (not the anonymous visitor breakdown --
+// that one covers pre-signup traffic, this one covers what happens
+// after). "New" vs "returning" here is just the account's own signup
+// date vs today, which is a much simpler and more reliable signal than
+// the visitorId-based heuristic used for anonymous visitors, since a
+// registered account already has an unambiguous creation timestamp.
+router.get("/admin/user-activity", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const days = Math.min(90, Math.max(1, parseInt(req.query.days as string) || 30));
+    const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+    const todayStart = new Date();
+    todayStart.setUTCHours(0, 0, 0, 0);
+
+    const [allUsers, windowPageViews, activeTodayRows, windowAiUsage] = await Promise.all([
+      db.select({ id: usersTable.id, email: usersTable.email, chesscomUsername: usersTable.chesscomUsername, createdAt: usersTable.createdAt })
+        .from(usersTable),
+      db.select({ userId: pageViewsTable.userId, path: pageViewsTable.path, createdAt: pageViewsTable.createdAt })
+        .from(pageViewsTable)
+        .where(and(isNotNull(pageViewsTable.userId), gte(pageViewsTable.createdAt, since))),
+      db.select({ userId: pageViewsTable.userId })
+        .from(pageViewsTable)
+        .where(and(isNotNull(pageViewsTable.userId), gte(pageViewsTable.createdAt, todayStart)))
+        .groupBy(pageViewsTable.userId),
+      db.select({ userId: aiUsageEventsTable.userId, model: aiUsageEventsTable.model, promptTokens: aiUsageEventsTable.promptTokens, completionTokens: aiUsageEventsTable.completionTokens })
+        .from(aiUsageEventsTable)
+        .where(and(isNotNull(aiUsageEventsTable.userId), gte(aiUsageEventsTable.createdAt, since))),
+    ]);
+
+    // All aggregation happens here in JS rather than in SQL -- at this
+    // app's scale (tens of thousands of page views, not millions) that's
+    // simpler to read and change than an equivalent set of window
+    // functions, and it avoids yet another raw-SQL query shape to
+    // maintain.
+    type UserAgg = {
+      pageViewsByPath: Record<string, number>;
+      totalPageViews: number;
+      daysActiveSet: Set<string>;
+      lastActiveAt: Date | null;
+      aiCostUsd: number;
+      aiCalls: number;
+    };
+    const byUser = new Map<string, UserAgg>();
+    const getAgg = (userId: string): UserAgg => {
+      let agg = byUser.get(userId);
+      if (!agg) {
+        agg = { pageViewsByPath: {}, totalPageViews: 0, daysActiveSet: new Set(), lastActiveAt: null, aiCostUsd: 0, aiCalls: 0 };
+        byUser.set(userId, agg);
+      }
+      return agg;
+    };
+
+    for (const pv of windowPageViews) {
+      if (!pv.userId) continue;
+      const agg = getAgg(pv.userId);
+      agg.pageViewsByPath[pv.path] = (agg.pageViewsByPath[pv.path] ?? 0) + 1;
+      agg.totalPageViews++;
+      agg.daysActiveSet.add(pv.createdAt.toISOString().slice(0, 10));
+      if (!agg.lastActiveAt || pv.createdAt > agg.lastActiveAt) agg.lastActiveAt = pv.createdAt;
+    }
+    for (const e of windowAiUsage) {
+      if (!e.userId) continue;
+      const agg = getAgg(e.userId);
+      agg.aiCalls++;
+      agg.aiCostUsd += estimateCostUsd(e.model, e.promptTokens, e.completionTokens) ?? 0;
+    }
+
+    const activeTodayIds = new Set(activeTodayRows.map((r) => r.userId).filter((id): id is string => !!id));
+    let newUsersToday = 0, returningUsersToday = 0;
+    for (const u of allUsers) {
+      const signedUpToday = u.createdAt >= todayStart;
+      if (signedUpToday) newUsersToday++;
+      else if (activeTodayIds.has(u.id)) returningUsersToday++;
+    }
+
+    const users = allUsers
+      .map((u) => {
+        const agg = byUser.get(u.id);
+        const topFeatures = agg
+          ? Object.entries(agg.pageViewsByPath).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([path, count]) => ({ path, count }))
+          : [];
+        return {
+          id: u.id,
+          label: u.chesscomUsername || u.email || u.id,
+          email: u.email,
+          signedUpAt: u.createdAt.toISOString(),
+          isNew: u.createdAt >= todayStart,
+          activeToday: activeTodayIds.has(u.id),
+          lastActiveAt: agg?.lastActiveAt?.toISOString() ?? null,
+          totalPageViews: agg?.totalPageViews ?? 0,
+          daysActive: agg?.daysActiveSet.size ?? 0,
+          topFeatures,
+          aiCostUsd: agg?.aiCostUsd ?? 0,
+          aiCalls: agg?.aiCalls ?? 0,
+        };
+      })
+      .sort((a, b) => (b.lastActiveAt ?? '').localeCompare(a.lastActiveAt ?? ''));
+
+    res.json({
+      days,
+      today: { newUsers: newUsersToday, returningUsers: returningUsersToday, activeUsers: activeTodayIds.size },
+      users,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || "Failed to load user activity" });
+  }
+});
+
 export default router;

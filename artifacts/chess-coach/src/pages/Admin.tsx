@@ -1693,6 +1693,110 @@ function AiUsagePanel() {
   );
 }
 
+function UserActivityPanel() {
+  const [data, setData] = useState<{
+    days: number;
+    today: { newUsers: number; returningUsers: number; activeUsers: number };
+    users: {
+      id: string; label: string; email: string | null; signedUpAt: string; isNew: boolean; activeToday: boolean;
+      lastActiveAt: string | null; totalPageViews: number; daysActive: number;
+      topFeatures: { path: string; count: number }[]; aiCostUsd: number; aiCalls: number;
+    }[];
+  } | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [days, setDays] = useState(30);
+  const [expanded, setExpanded] = useState(false);
+
+  useEffect(() => {
+    setLoading(true);
+    apiFetch(`/api/admin/user-activity?days=${days}`, { credentials: 'include' })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => setData(d))
+      .finally(() => setLoading(false));
+  }, [days]);
+
+  const fmtDate = (iso: string | null) => {
+    if (!iso) return 'never';
+    const d = new Date(iso);
+    const today = new Date();
+    if (d.toDateString() === today.toDateString()) return 'today';
+    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  };
+  const visibleUsers = expanded ? data?.users ?? [] : (data?.users ?? []).slice(0, 15);
+
+  return (
+    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="rounded-2xl border border-border/40 bg-card/60 p-5">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-sm font-bold flex items-center gap-2"><Users className="w-4 h-4 text-blue-400" /> User Activity</h2>
+        <select value={days} onChange={(e) => setDays(Number(e.target.value))}
+          className="text-xs bg-background border border-border/40 rounded-lg px-2 py-1">
+          <option value={7}>Last 7 days</option>
+          <option value={30}>Last 30 days</option>
+          <option value={90}>Last 90 days</option>
+        </select>
+      </div>
+
+      {loading && <p className="text-xs text-muted-foreground">Loading...</p>}
+
+      {!loading && data && (
+        <>
+          <div className="grid grid-cols-3 gap-2 mb-5">
+            <div className="p-2.5 rounded-lg bg-white/5 border border-white/5 text-center">
+              <p className="text-lg font-black text-primary">{data.today.newUsers}</p>
+              <p className="text-[10px] text-muted-foreground">New today</p>
+            </div>
+            <div className="p-2.5 rounded-lg bg-white/5 border border-white/5 text-center">
+              <p className="text-lg font-black text-blue-400">{data.today.returningUsers}</p>
+              <p className="text-[10px] text-muted-foreground">Returning today</p>
+            </div>
+            <div className="p-2.5 rounded-lg bg-white/5 border border-white/5 text-center">
+              <p className="text-lg font-black">{data.today.activeUsers}</p>
+              <p className="text-[10px] text-muted-foreground">Active today</p>
+            </div>
+          </div>
+
+          <p className="text-xs font-bold text-muted-foreground mb-2">Per user, sorted by last active — {data.users.length} total accounts</p>
+          <div className="space-y-2">
+            {visibleUsers.map((u) => (
+              <div key={u.id} className="p-3 rounded-lg bg-white/5 border border-white/5">
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-xs font-bold truncate">{u.label}</span>
+                  <span className={cn('text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide shrink-0',
+                    u.isNew ? 'bg-primary/20 text-primary' : u.activeToday ? 'bg-blue-500/20 text-blue-400' : 'bg-white/10 text-muted-foreground')}>
+                    {u.isNew ? 'New today' : u.activeToday ? 'Active today' : 'Not active today'}
+                  </span>
+                </div>
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[10px] text-muted-foreground mb-1.5">
+                  <span>Signed up {fmtDate(u.signedUpAt)}</span>
+                  <span>Last active {fmtDate(u.lastActiveAt)}</span>
+                  <span>{u.daysActive} day{u.daysActive === 1 ? '' : 's'} active</span>
+                  <span>{u.totalPageViews} page views</span>
+                  {u.aiCalls > 0 && <span className="text-foreground font-bold">{u.aiCalls} AI calls (${u.aiCostUsd.toFixed(2)})</span>}
+                </div>
+                {u.topFeatures.length > 0 && (
+                  <div className="flex flex-wrap gap-1">
+                    {u.topFeatures.map((f) => (
+                      <span key={f.path} className="text-[9px] px-1.5 py-0.5 rounded bg-white/5 text-muted-foreground">
+                        {labelForPath(f.path)} · {f.count}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {data.users.length > 15 && (
+            <button onClick={() => setExpanded((v) => !v)} className="w-full mt-3 text-xs font-bold text-primary py-2">
+              {expanded ? 'Show fewer' : `Show all ${data.users.length} users`}
+            </button>
+          )}
+        </>
+      )}
+    </motion.div>
+  );
+}
+
 function SubscribersPanel({ onClose }: { onClose: () => void }) {
   const [subscribers, setSubscribers] = useState<StripeSubscriber[]>([]);
   const [loading, setLoading] = useState(true);
@@ -3043,6 +3147,8 @@ function AdminTicker() {
       <LandingFunnelPanel />
 
       <AiUsagePanel />
+
+      <UserActivityPanel />
       <ReferralCodesPanel />
       <ReferralSignupsPanel />
       <AffiliatesPanel />
