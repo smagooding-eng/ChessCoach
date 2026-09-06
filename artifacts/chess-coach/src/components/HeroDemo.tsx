@@ -25,7 +25,6 @@ interface SampleWeakness {
 }
 
 interface SampleReport {
-  username: string;
   totalGames: number;
   wins: number;
   losses: number;
@@ -550,7 +549,7 @@ export function HeroDemo({ onUpgradeClick }: { onUpgradeClick: () => void }) {
           </button>
           {showScoutSample && (
             <div className="rounded-xl p-3 mb-4" style={{ background: '#141413', border: '1px solid rgba(255,255,255,0.08)' }}>
-              <p className="text-[10px] font-black uppercase tracking-wide mb-2.5" style={{ color: MUTED }}>Scouting "{sample?.username ?? 'a real account'}" — same real report, before playing them</p>
+              <p className="text-[10px] font-black uppercase tracking-wide mb-2.5" style={{ color: MUTED }}>Scouting a real account — same real report, before playing them</p>
               {sampleLoading && <div className="flex justify-center py-4"><Loader2 className="w-4 h-4 animate-spin" style={{ color: MUTED }} /></div>}
               {sampleError && <p className="text-xs" style={{ color: '#e57373' }}>Couldn't load the sample right now.</p>}
               {sample && <SampleWeaknessList report={sample} frame="exploit" />}

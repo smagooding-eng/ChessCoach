@@ -263,7 +263,6 @@ router.get("/demo/sample-report", async (_req: Request, res: Response) => {
     });
 
     res.json({
-      username: SAMPLE_USERNAME,
       totalGames: games.length,
       wins, losses, draws,
       avgRating: ratedGames > 0 ? Math.round(totalRating / ratedGames) : null,
