@@ -54,7 +54,11 @@ export const SAMPLE_REPORT: SampleReport = {
     { category: 'Opening Preparation', count: 1 },
     { category: 'Positional Play', count: 1 },
   ],
-  favoriteOpenings: [],
+  favoriteOpenings: [
+    { opening: 'Italian Game', games: 8, winRate: 50 },
+    { opening: 'Sicilian Defense', games: 6, winRate: 33 },
+    { opening: 'English Opening: Agincourt Defense', games: 4, winRate: 25 },
+  ],
   phaseAccuracy: {
     opening: { accuracy: 62, moves: 3299 },
     middlegame: { accuracy: 0, moves: 0 },
