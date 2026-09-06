@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useLocation } from 'wouter';
 import { apiFetch } from '@/lib/api';
 import { trackBackgroundJob } from '@/components/BackgroundJobsWatcher';
+import { trackImportJob } from '@/components/ImportStatusWatcher';
 import { trackFunnelEvent } from '@/lib/funnelTracking';
 
 const CHESSCOM_GREEN = '#81b64c';
@@ -70,7 +71,7 @@ export function OnboardingStartModal({ username: initialUsername, platform: init
     let cancelled = false;
     (async () => {
       try {
-        const importRes = await apiFetch('/api/games/import', {
+        const importRes = await apiFetch('/api/games/import-bg', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
@@ -80,6 +81,30 @@ export function OnboardingStartModal({ username: initialUsername, platform: init
           const errBody = await importRes.json().catch(() => null) as { error?: string; message?: string } | null;
           throw new Error(errBody?.message || errBody?.error || `Import failed (${importRes.status})`);
         }
+        const { jobId: importJobId } = await importRes.json() as { jobId: string };
+
+        // This registers with the same global watcher/popup used by manual
+        // imports elsewhere in the app -- the "your games are ready, click
+        // here to browse them" notification. It'll keep showing and
+        // updating regardless of what page this modal itself is on, or
+        // even after this modal closes.
+        trackImportJob(importJobId, platform, username);
+
+        // Poll locally too, purely so this modal knows when to move on
+        // to kicking off the review and advancing its own "ready" step --
+        // a separate concern from the global popup above, which polls
+        // independently.
+        let importStatus = 'pending';
+        while (!cancelled && importStatus === 'pending') {
+          await new Promise((r) => setTimeout(r, 3000));
+          if (cancelled) return;
+          const statusRes = await apiFetch(`/api/games/import-status/${importJobId}`, { credentials: 'include' });
+          if (!statusRes.ok) continue; // transient — keep polling
+          const statusData = await statusRes.json() as { status: string; error?: string | null };
+          importStatus = statusData.status;
+          if (importStatus === 'error') throw new Error(statusData.error || 'Import failed');
+        }
+        if (cancelled) return;
 
         const reviewRes = await apiFetch('/api/games/review-all', { method: 'POST', credentials: 'include' });
         if (!reviewRes.ok) {

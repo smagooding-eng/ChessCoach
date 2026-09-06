@@ -217,7 +217,7 @@ export function ImportStatusWatcher() {
                 Your {labels} games are ready!
               </h3>
               <p className="text-xs mt-0.5" style={{ color: TEXT_MUTED }}>
-                See what the engine found, or jump into a single game first.
+                We're reviewing them now for weaknesses and patterns — see what the engine's already found, or jump into a single game first.
               </p>
               <div className="mt-3 flex gap-2">
                 <button onClick={goToAnalysis}

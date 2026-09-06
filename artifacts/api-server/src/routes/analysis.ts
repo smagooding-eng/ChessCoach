@@ -400,9 +400,18 @@ router.get("/analysis/summary", async (req, res): Promise<void> => {
     res.status(400).json({ error: query.error.message });
     return;
   }
+  if (!req.user?.id) {
+    res.status(401).json({ error: "Authentication required" });
+    return;
+  }
 
   const { username } = query.data;
 
+  // Must be scoped to this account's own games -- username alone matches
+  // every row anyone has ever imported or opponent-scouted under that
+  // chess.com/lichess handle, which was inflating (or deflating) the
+  // reviewed-count shown here with other accounts' activity for anyone
+  // whose handle had been scouted or imported before.
   const games = await db
     .select({
       whiteUsername: gamesTable.whiteUsername,
@@ -416,7 +425,7 @@ router.get("/analysis/summary", async (req, res): Promise<void> => {
       reviewData: gamesTable.reviewData,
     })
     .from(gamesTable)
-    .where(eq(gamesTable.username, username.toLowerCase()));
+    .where(and(eq(gamesTable.username, username.toLowerCase()), eq(gamesTable.userId, req.user.id)));
 
   const reviewedCount = games.filter(
     (g) => g.reviewData && typeof g.reviewData === "object"
