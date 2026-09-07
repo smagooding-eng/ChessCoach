@@ -237,6 +237,15 @@ export interface Lesson {
   extraChallenges?: LessonChallenge[] | null;
   /** @nullable */
   conceptTitle?: string | null;
+  /**
+   * Unified lesson-beat sequence from the courses redesign. Each beat is
+   * one of concept/example/drill/summary -- see lib/db/src/schema/courses.ts
+   * (LessonBeat type) for the authoritative shape; kept loosely typed
+   * here since the OpenAPI schema for this field is intentionally generic
+   * (see openapi.yaml) rather than a full discriminated union.
+   * @nullable
+   */
+  beats?: object[] | null;
 }
 
 export interface LessonChallenge {

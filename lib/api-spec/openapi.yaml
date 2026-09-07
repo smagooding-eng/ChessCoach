@@ -898,6 +898,38 @@ components:
           type: ["string", "null"]
         drillHint:
           type: ["string", "null"]
+        extraChallenges:
+          type: ["array", "null"]
+          items:
+            type: object
+            properties:
+              fen:
+                type: string
+              expectedMove:
+                type: string
+              hint:
+                type: string
+              contextPgn:
+                type: ["string", "null"]
+            required:
+              - fen
+              - expectedMove
+              - hint
+        conceptTitle:
+          type: ["string", "null"]
+        beats:
+          type: ["array", "null"]
+          description: >-
+            Unified lesson-beat sequence from the courses redesign. Each
+            beat is one of concept/example/drill/summary -- see
+            lib/db/src/schema/courses.ts (LessonBeat type) for the
+            authoritative shape. Left loosely typed here (generic object)
+            rather than a full discriminated-union schema, since the
+            frontend narrows on `kind` itself and a strict oneOf here
+            would need updating in lockstep with every future beat-shape
+            change for no real safety benefit.
+          items:
+            type: object
       required:
         - id
         - courseId

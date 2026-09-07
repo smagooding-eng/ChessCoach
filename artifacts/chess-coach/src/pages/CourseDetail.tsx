@@ -2,11 +2,25 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useParams, Link } from 'wouter';
 import { useCourseDetail, useMarkLessonComplete } from '@/hooks/use-courses';
 import { LessonBoardPlayer } from '@/components/LessonBoardPlayer';
+import { ChessBoard } from '@/components/ChessBoard';
+import { Chess } from 'chess.js';
 import {
   ArrowLeft, CheckCircle2, Target, X, Check,
   ChevronLeft, ChevronRight, Award, List,
   Volume2, VolumeX, BookOpen, Loader,
 } from 'lucide-react';
+
+// Mirrors lib/db/src/schema/courses.ts's LessonBeat type -- kept as a
+// local copy rather than a new cross-package dependency on
+// @workspace/db from the frontend, same reasoning as lib/openingBook.ts
+// (it's a small, stable shape; the frontend doesn't otherwise depend on
+// the backend's DB package, which also pulls in Node-only runtime code
+// it doesn't need just for this one type).
+type LessonBeat =
+  | { kind: 'concept'; title: string; text: string }
+  | { kind: 'example'; text: string; pgn: string; annotation?: string; replayable?: boolean }
+  | { kind: 'drill'; text: string; fen: string; expectedMove: string; hint?: string | null; followUpSan?: string[] }
+  | { kind: 'summary'; text: string };
 
 const CHESSCOM_GREEN = '#81b64c';
 const BG_DARK = '#262421';
@@ -436,6 +450,277 @@ function LessonContentStepper({ content, lessonId, courseCategory, conceptTitle,
   );
 }
 
+// ── Unified beat player (courses redesign) ─────────────────────────────────
+// Replaces the old LessonContentStepper + LessonBoardPlayer pairing for any
+// lesson that has `beats` populated (post-migration). One currentBeat index
+// drives both the text panel and the board, instead of four independent
+// navigation states -- see courses-redesign-spec.md for the full
+// rationale. Falls back to the old system automatically for any
+// not-yet-migrated lesson (see the render call site below).
+function beatText(beat: LessonBeat | undefined): string {
+  if (!beat) return '';
+  return beat.text;
+}
+
+function LessonBeatPlayer({
+  beats, lessonId, onLessonComplete, isLastLesson,
+}: {
+  beats: LessonBeat[];
+  lessonId: number;
+  onLessonComplete: () => void;
+  isLastLesson: boolean;
+}) {
+  const [currentBeat, setCurrentBeat] = useState(0);
+  const [speaking, setSpeaking] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [autoRead, setAutoRead] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
+
+  const [drillResult, setDrillResult] = useState<'correct' | 'wrong' | null>(null);
+  const [showFix, setShowFix] = useState(false);
+  const [fixFens, setFixFens] = useState<string[]>([]);
+  const [fixPly, setFixPly] = useState(0);
+
+  const [exampleFens, setExampleFens] = useState<string[]>([]);
+  const [examplePly, setExamplePly] = useState(0);
+
+  const beat = beats[currentBeat];
+  const isFirst = currentBeat === 0;
+  const isLastBeat = currentBeat === beats.length - 1;
+
+  function stopReading() {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    if (audioRef.current) { audioRef.current.pause(); audioRef.current.src = ''; audioRef.current = null; }
+    setSpeaking(false);
+    setLoading(false);
+  }
+
+  const readAloud = useCallback(async (text: string) => {
+    stopReading();
+    const plain = toPlainText(text);
+    if (!plain) return;
+    const controller = new AbortController();
+    abortRef.current = controller;
+    setLoading(true);
+    try {
+      const res = await apiFetch('/api/tts/speak', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: plain, voice: 'nova' }),
+        signal: controller.signal,
+      });
+      if (!res.ok) throw new Error('TTS failed');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      audioRef.current = audio;
+      audio.onplay = () => { setLoading(false); setSpeaking(true); };
+      audio.onended = () => { setSpeaking(false); URL.revokeObjectURL(url); };
+      audio.onerror = () => { setSpeaking(false); setLoading(false); URL.revokeObjectURL(url); };
+      await audio.play();
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === 'AbortError') return;
+      setLoading(false);
+      setSpeaking(false);
+    }
+  }, []);
+
+  // Reset to beat 0 whenever the lesson itself changes.
+  useEffect(() => {
+    setCurrentBeat(0);
+    stopReading();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lessonId]);
+
+  // Reset per-beat interactive state whenever the current beat changes.
+  useEffect(() => {
+    setDrillResult(null);
+    setShowFix(false);
+    setFixPly(0);
+    setExamplePly(0);
+    stopReading();
+    if (autoRead) setTimeout(() => readAloud(beatText(beat)), 80);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentBeat, lessonId]);
+
+  useEffect(() => () => { stopReading(); }, []);
+
+  // Build the FEN sequence for an example beat's pgn, once per beat.
+  useEffect(() => {
+    if (beat?.kind !== 'example' || !beat.pgn) { setExampleFens([]); return; }
+    try {
+      const chess = new Chess();
+      chess.loadPgn(beat.pgn);
+      const moves = chess.history();
+      const replay = new Chess();
+      const fens = [replay.fen()];
+      for (const m of moves) { replay.move(m); fens.push(replay.fen()); }
+      setExampleFens(fens);
+    } catch {
+      setExampleFens([]);
+    }
+  }, [beat]);
+
+  // Auto-play example beats, one move at a time.
+  useEffect(() => {
+    if (beat?.kind !== 'example' || exampleFens.length === 0) return;
+    if (examplePly >= exampleFens.length - 1) return;
+    const t = setTimeout(() => setExamplePly((p) => p + 1), 900);
+    return () => clearTimeout(t);
+  }, [beat, exampleFens, examplePly]);
+
+  // Build + auto-play the "show the fix" continuation for a drill.
+  useEffect(() => {
+    if (!showFix || beat?.kind !== 'drill') return;
+    try {
+      const chess = new Chess(beat.fen);
+      const fens = [chess.fen()];
+      for (const san of beat.followUpSan ?? []) {
+        const m = chess.move(san);
+        if (!m) break;
+        fens.push(chess.fen());
+      }
+      setFixFens(fens);
+      setFixPly(0);
+    } catch {
+      setFixFens([beat.fen]);
+    }
+  }, [showFix, beat]);
+
+  useEffect(() => {
+    if (!showFix || fixFens.length === 0) return;
+    if (fixPly >= fixFens.length - 1) return;
+    const t = setTimeout(() => setFixPly((p) => p + 1), 900);
+    return () => clearTimeout(t);
+  }, [showFix, fixFens, fixPly]);
+
+  const goTo = useCallback((idx: number) => {
+    setCurrentBeat(Math.max(0, Math.min(idx, beats.length - 1)));
+  }, [beats.length]);
+
+  const handleNext = () => {
+    if (isLastBeat) onLessonComplete();
+    else goTo(currentBeat + 1);
+  };
+
+  if (beats.length === 0) return null;
+
+  const boardFen = beat.kind === 'drill'
+    ? (showFix ? fixFens[fixPly] ?? beat.fen : beat.fen)
+    : beat.kind === 'example'
+      ? exampleFens[examplePly] ?? undefined
+      : undefined;
+
+  return (
+    <div className="xl:grid xl:grid-cols-[1fr_520px] xl:gap-5 xl:items-start">
+      {/* Text panel */}
+      <div className="rounded-xl p-3 md:p-4 mt-2 md:mt-3 xl:mt-0 order-2 xl:order-1 xl:max-h-[85vh] xl:overflow-y-auto space-y-3" style={{ backgroundColor: BG_DARK }}>
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-2">
+            <BookOpen className="w-3.5 h-3.5 shrink-0" style={{ color: CHESSCOM_GREEN }} />
+            <span className="text-xs text-white/50">
+              Step <span className="font-bold text-white/80">{currentBeat + 1}</span> of {beats.length}
+            </span>
+            {beats.length > 1 && (
+              <button
+                onClick={() => setAutoRead((a) => !a)}
+                title={autoRead ? 'Auto-read on (click to disable)' : 'Enable auto-read on step change'}
+                className={cn('ml-1 text-[10px] font-bold px-2 py-0.5 rounded-full transition-colors', autoRead ? 'text-white' : 'text-white/40 hover:text-white/70')}
+                style={autoRead ? { backgroundColor: CHESSCOM_GREEN } : { backgroundColor: 'rgba(255,255,255,0.08)' }}
+              >
+                AUTO
+              </button>
+            )}
+          </div>
+          <button
+            onClick={() => (speaking || loading) ? stopReading() : readAloud(beatText(beat))}
+            className={cn('flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all', (speaking || loading) ? 'text-white' : 'text-white/50 hover:text-white hover:bg-white/10')}
+            style={(speaking || loading) ? { backgroundColor: CHESSCOM_GREEN } : undefined}
+          >
+            {loading ? <><Loader className="w-3.5 h-3.5 animate-spin" /> Loading…</> : speaking ? <><VolumeX className="w-3.5 h-3.5" /> Stop</> : <><Volume2 className="w-3.5 h-3.5" /> Read aloud</>}
+          </button>
+        </div>
+
+        <AnimatePresence mode="wait">
+          <motion.div key={currentBeat} initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }} transition={{ duration: 0.18 }} className="min-h-[60px]">
+            {beat.kind === 'concept' && (
+              <div>
+                <h4 className="text-sm font-bold mb-2" style={{ color: CHESSCOM_GREEN }}>{beat.title}</h4>
+                {renderStep(beat.text)}
+              </div>
+            )}
+            {beat.kind !== 'concept' && renderStep(beat.text)}
+
+            {beat.kind === 'drill' && (
+              <div className="mt-3">
+                {drillResult === 'correct' && (
+                  <p className="text-sm font-bold flex items-center gap-1.5" style={{ color: CHESSCOM_GREEN }}><Check className="w-4 h-4" /> Correct!</p>
+                )}
+                {drillResult === 'wrong' && beat.hint && (
+                  <p className="text-sm" style={{ color: MISTAKE_RED }}>Not quite. {beat.hint}</p>
+                )}
+                {drillResult && (beat.followUpSan?.length ?? 0) > 0 && (
+                  <button
+                    onClick={() => setShowFix((v) => !v)}
+                    className="mt-2 text-xs font-bold px-3 py-1.5 rounded-lg"
+                    style={{ backgroundColor: 'rgba(255,255,255,0.08)', color: CHESSCOM_GREEN }}
+                  >
+                    {showFix ? 'Hide the line' : 'Show the correct line'}
+                  </button>
+                )}
+              </div>
+            )}
+          </motion.div>
+        </AnimatePresence>
+
+        {beats.length > 1 && (
+          <div className="flex items-center justify-between gap-3 pt-3 mt-1" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+            <button onClick={() => goTo(currentBeat - 1)} disabled={isFirst} className="flex items-center gap-1 pl-1.5 pr-3 py-1.5 text-xs font-semibold rounded-full transition-all disabled:opacity-0 text-white/60 hover:text-white hover:bg-white/10">
+              <ChevronLeft className="w-4 h-4" /> Prev
+            </button>
+            <div className="flex items-center gap-1.5">
+              {beats.map((_, i) => (
+                <button key={i} onClick={() => goTo(i)} className={cn('rounded-full transition-all', i === currentBeat ? 'w-6 h-2' : 'w-2 h-2 bg-white/15 hover:bg-white/30')} style={i === currentBeat ? { backgroundColor: CHESSCOM_GREEN } : undefined} title={`Step ${i + 1}`} />
+              ))}
+            </div>
+            <button
+              onClick={handleNext}
+              disabled={beat.kind === 'drill' && !drillResult}
+              className="flex items-center gap-1 pr-1.5 pl-3 py-1.5 text-xs font-semibold rounded-full transition-all disabled:opacity-30"
+              style={{ color: CHESSCOM_GREEN }}
+            >
+              {isLastBeat ? (isLastLesson ? 'Complete Course' : 'Complete & Next') : 'Next'} <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Board panel */}
+      <div className="order-1 xl:order-2">
+        {beat.kind === 'drill' && (
+          <ChessBoard
+            key={`${lessonId}-${currentBeat}-${showFix}`}
+            fen={boardFen ?? beat.fen}
+            practiceMode={!drillResult && !showFix}
+            expectedMoveSan={!showFix ? beat.expectedMove : undefined}
+            onMovePlayed={(_san, isCorrect) => setDrillResult(isCorrect ? 'correct' : 'wrong')}
+          />
+        )}
+        {beat.kind === 'example' && (
+          <ChessBoard key={`${lessonId}-${currentBeat}`} fen={boardFen ?? exampleFens[0] ?? 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'} practiceMode={false} />
+        )}
+        {(beat.kind === 'concept' || beat.kind === 'summary') && (
+          <div className="flex items-center justify-center rounded-xl p-8 text-center text-sm text-white/40" style={{ backgroundColor: BG_DARK, minHeight: 240 }}>
+            {beat.kind === 'summary' ? '🎉 Lesson complete' : 'Read the idea, then continue to see it in action.'}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Main CourseDetail page ─────────────────────────────────────────────────────
 export function CourseDetail() {
   const { id } = useParams();
@@ -452,6 +737,12 @@ export function CourseDetail() {
 
   const sortedLessons = [...(course?.lessons ?? [])].sort((a, b) => a.orderIndex - b.orderIndex);
   const lesson = sortedLessons[currentIdx];
+  // Whether this lesson has been migrated to the courses-redesign beats[]
+  // shape -- drives both which player renders and whether the old
+  // redundant footer lesson-switcher shows (the new player has its own
+  // Prev/Next + Complete&Next, so showing both would just reintroduce the
+  // duplicate-navigation problem the redesign exists to fix).
+  const usingBeatPlayer = !!(lesson && Array.isArray((lesson as any).beats) && (lesson as any).beats.length > 0);
   const isFirst = currentIdx === 0;
   const isLast = currentIdx === sortedLessons.length - 1;
 
@@ -680,79 +971,103 @@ export function CourseDetail() {
                 </div>
 
                 {/* Board (sticky on wide screens) + lesson content side by side */}
-                <div className="xl:grid xl:grid-cols-[1fr_520px] xl:gap-5 xl:items-start">
-                  {/* Step-by-step lesson text with TTS — left column, scrolls independently at wide screens so the board never has to move */}
-                  {lesson && lesson.content && (
-                    <div
-                      className="rounded-xl p-3 md:p-4 mt-2 md:mt-3 xl:mt-0 order-2 xl:order-1 xl:max-h-[85vh] xl:overflow-y-auto"
-                      style={{ backgroundColor: BG_DARK }}
-                    >
-                      <LessonContentStepper
-                        key={lesson.id}
-                        content={lesson.content}
-                        lessonId={lesson.id}
-                        courseCategory={course?.category ?? ''}
-                        conceptTitle={lesson.conceptTitle}
-                        onStepChange={(stepText) => setShowFixLine(/##\s*The Fix/i.test(stepText))}
-                      />
-                    </div>
-                  )}
-
-                  {/* Interactive board — right column at wide screens, kept at full natural size */}
-                  {lesson && (
-                    <div className="order-1 xl:order-2">
-                      <LessonBoardPlayer
-                        pgn={lesson.examplePgn || lesson.drillFen || 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'}
-                        fixPgn={lesson.fixExamplePgn ?? null}
-                        showFixLine={showFixLine}
-                        title={lesson.title}
-                        drillFen={lesson.drillFen ?? null}
-                        drillExpectedMove={lesson.drillExpectedMove ?? null}
-                        drillHint={lesson.drillHint ?? null}
-                        content={lesson.content ?? null}
-                        extraChallenges={lesson.extraChallenges ?? null}
-                        conceptTitle={lesson.conceptTitle ?? null}
-                      />
-                    </div>
-                  )}
-                </div>
-
-                {/* Navigation footer */}
-                <div className="mt-5 pt-4 flex flex-col gap-3" style={{ borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-                  <button
-                    onClick={() => handleMarkComplete(!lesson?.completed)}
-                    disabled={isUpdating}
-                    className={cn(
-                      'w-full flex items-center justify-center gap-2 py-3.5 rounded-xl text-sm font-black transition-all',
-                      lesson?.completed
-                        ? 'bg-white/10 text-white/60 hover:text-white hover:bg-white/15'
-                        : 'text-white hover:brightness-110 shadow-lg'
-                    )}
-                    style={!lesson?.completed ? { background: `linear-gradient(180deg, #95c45a 0%, ${CHESSCOM_GREEN} 100%)` } : undefined}
-                  >
-                    <CheckCircle2 className="w-4 h-4" />
-                    {lesson?.completed ? 'Mark Incomplete' : (isLast ? 'Complete Course' : 'Complete & Next')}
-                  </button>
-
-                  <div className="flex items-center justify-between">
-                    <button
-                      disabled={isFirst}
-                      onClick={() => setCurrentIdx(i => i - 1)}
-                      className="flex items-center gap-1.5 px-2 py-1.5 text-sm font-semibold rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition-all disabled:opacity-0"
-                    >
-                      <ChevronLeft className="w-4 h-4" /> Previous lesson
-                    </button>
-
-                    {!isLast && (
-                      <button
-                        onClick={() => setCurrentIdx(i => i + 1)}
-                        className="px-2 py-1.5 text-xs font-medium text-white/35 hover:text-white/60 transition-all"
+                {lesson && usingBeatPlayer ? (
+                  // New unified beat player -- lesson has been migrated to
+                  // the courses-redesign beats[] shape. Handles its own
+                  // two-column layout internally.
+                  <LessonBeatPlayer
+                    key={lesson.id}
+                    beats={(lesson as any).beats as LessonBeat[]}
+                    lessonId={lesson.id}
+                    isLastLesson={isLast}
+                    onLessonComplete={() => handleMarkComplete(true)}
+                  />
+                ) : (
+                  // Old system -- kept as a fallback for any lesson that
+                  // hasn't gone through the beats migration yet (see
+                  // scripts/migrate-lesson-beats.ts). Once every lesson is
+                  // migrated, this branch (and LessonContentStepper /
+                  // LessonBoardPlayer's old tab system) can be removed.
+                  <div className="xl:grid xl:grid-cols-[1fr_520px] xl:gap-5 xl:items-start">
+                    {/* Step-by-step lesson text with TTS — left column, scrolls independently at wide screens so the board never has to move */}
+                    {lesson && lesson.content && (
+                      <div
+                        className="rounded-xl p-3 md:p-4 mt-2 md:mt-3 xl:mt-0 order-2 xl:order-1 xl:max-h-[85vh] xl:overflow-y-auto"
+                        style={{ backgroundColor: BG_DARK }}
                       >
-                        Skip without completing →
-                      </button>
+                        <LessonContentStepper
+                          key={lesson.id}
+                          content={lesson.content}
+                          lessonId={lesson.id}
+                          courseCategory={course?.category ?? ''}
+                          conceptTitle={lesson.conceptTitle}
+                          onStepChange={(stepText) => setShowFixLine(/##\s*The Fix/i.test(stepText))}
+                        />
+                      </div>
+                    )}
+
+                    {/* Interactive board — right column at wide screens, kept at full natural size */}
+                    {lesson && (
+                      <div className="order-1 xl:order-2">
+                        <LessonBoardPlayer
+                          pgn={lesson.examplePgn || lesson.drillFen || 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'}
+                          fixPgn={lesson.fixExamplePgn ?? null}
+                          showFixLine={showFixLine}
+                          title={lesson.title}
+                          drillFen={lesson.drillFen ?? null}
+                          drillExpectedMove={lesson.drillExpectedMove ?? null}
+                          drillHint={lesson.drillHint ?? null}
+                          content={lesson.content ?? null}
+                          extraChallenges={lesson.extraChallenges ?? null}
+                          conceptTitle={lesson.conceptTitle ?? null}
+                        />
+                      </div>
                     )}
                   </div>
-                </div>
+                )}
+
+                {/* Navigation footer -- only for lessons still on the old
+                    system; the new beat player has its own equivalent
+                    controls built in, and duplicating both here would be
+                    exactly the kind of redundant navigation this redesign
+                    removes. */}
+                {!usingBeatPlayer && (
+                  <div className="mt-5 pt-4 flex flex-col gap-3" style={{ borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                    <button
+                      onClick={() => handleMarkComplete(!lesson?.completed)}
+                      disabled={isUpdating}
+                      className={cn(
+                        'w-full flex items-center justify-center gap-2 py-3.5 rounded-xl text-sm font-black transition-all',
+                        lesson?.completed
+                          ? 'bg-white/10 text-white/60 hover:text-white hover:bg-white/15'
+                          : 'text-white hover:brightness-110 shadow-lg'
+                      )}
+                      style={!lesson?.completed ? { background: `linear-gradient(180deg, #95c45a 0%, ${CHESSCOM_GREEN} 100%)` } : undefined}
+                    >
+                      <CheckCircle2 className="w-4 h-4" />
+                      {lesson?.completed ? 'Mark Incomplete' : (isLast ? 'Complete Course' : 'Complete & Next')}
+                    </button>
+
+                    <div className="flex items-center justify-between">
+                      <button
+                        disabled={isFirst}
+                        onClick={() => setCurrentIdx(i => i - 1)}
+                        className="flex items-center gap-1.5 px-2 py-1.5 text-sm font-semibold rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition-all disabled:opacity-0"
+                      >
+                        <ChevronLeft className="w-4 h-4" /> Previous lesson
+                      </button>
+
+                      {!isLast && (
+                        <button
+                          onClick={() => setCurrentIdx(i => i + 1)}
+                          className="px-2 py-1.5 text-xs font-medium text-white/35 hover:text-white/60 transition-all"
+                        >
+                          Skip without completing →
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
               </motion.div>
             </AnimatePresence>
 
