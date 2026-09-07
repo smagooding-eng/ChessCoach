@@ -39,9 +39,25 @@ export const BOARD_THEMES: Record<Exclude<BoardTheme, 'custom'>, { light: string
 // color stay independent choices.
 export const BOARD_TEXTURES: Record<BoardTexture, { label: string; backgroundImage: string; backgroundSize?: string }> = {
   flat:   { label: 'Flat', backgroundImage: 'none' },
+  // Plain CSS gradients are inherently regular/mathematical -- a
+  // repeating-linear-gradient can only ever look like a hatch pattern or
+  // a grid of dots, never organic grain or fabric fiber. An inline SVG
+  // feTurbulence filter, rendered as a data-URI background image, can
+  // actually generate fractal noise -- which is what wood grain and felt
+  // fiber both fundamentally are. No new image assets, no runtime cost
+  // (it's declarative, rendered once by the browser like any other
+  // background-image), just a more honest tool for this specific job.
   wood:   {
     label: 'Wood Grain',
-    backgroundImage: 'repeating-linear-gradient(90deg, rgba(0,0,0,0.06) 0px, rgba(0,0,0,0.06) 1px, transparent 1px, transparent 3px), repeating-linear-gradient(0deg, rgba(255,255,255,0.03) 0px, transparent 2px, rgba(0,0,0,0.03) 4px, transparent 6px)',
+    // Anisotropic base frequency (very low along X, higher along Y) is
+    // what makes turbulence noise read as long grain streaks rather than
+    // an even blob -- low X frequency means the pattern barely changes
+    // along the grain's length, higher Y frequency creates many distinct
+    // bands running across it, the way real growth rings do. Tinted warm
+    // brown via feColorMatrix and kept low-alpha so it reads as texture
+    // on top of the existing square color, not a color change.
+    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='w'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.012 0.18' numOctaves='4' seed='7' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 0.32  0 0 0 0 0.19  0 0 0 0 0.07  0 0 0 0.35 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23w)'/%3E%3C/svg%3E")`,
+    backgroundSize: '140px 140px',
   },
   marble: {
     label: 'Marble',
@@ -49,8 +65,12 @@ export const BOARD_TEXTURES: Record<BoardTexture, { label: string; backgroundIma
   },
   felt:   {
     label: 'Felt',
-    backgroundImage: 'radial-gradient(rgba(0,0,0,0.05) 1px, transparent 1px)',
-    backgroundSize: '3px 3px',
+    // High, near-isotropic base frequency for fine, dense fiber-like
+    // noise rather than wood's long streaks; stitchTiles keeps a small
+    // tile seamless so it reads as uniform fabric instead of a visibly
+    // repeating square.
+    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28'%3E%3Cfilter id='f'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' seed='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.16 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23f)'/%3E%3C/svg%3E")`,
+    backgroundSize: '28px 28px',
   },
 };
 
