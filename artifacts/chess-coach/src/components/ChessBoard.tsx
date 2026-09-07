@@ -562,7 +562,7 @@ export function ChessBoard({
               cursor: (practiceMode || premoveMode) && !pendingMove ? 'pointer' : 'default',
             },
             lightSquareStyle: { backgroundColor: boardColors.light, backgroundImage: boardTextureCss.backgroundImage, backgroundSize: boardTextureCss.backgroundSize },
-            darkSquareStyle: { backgroundColor: boardColors.dark, backgroundImage: boardTextureCss.backgroundImage, backgroundSize: boardTextureCss.backgroundSize },
+            darkSquareStyle: { backgroundColor: boardColors.dark, backgroundImage: boardTextureCss.backgroundImageDark ?? boardTextureCss.backgroundImage, backgroundSize: boardTextureCss.backgroundSize },
             pieces: tintedPieces,
             animationDurationInMs: 150,
           }}

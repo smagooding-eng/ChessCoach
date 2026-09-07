@@ -37,7 +37,7 @@ export const BOARD_THEMES: Record<Exclude<BoardTheme, 'custom'>, { light: string
 // gradient/pattern-based rather than photographic). Applied as an overlay
 // backgroundImage on top of the existing solid boardColors, so texture and
 // color stay independent choices.
-export const BOARD_TEXTURES: Record<BoardTexture, { label: string; backgroundImage: string; backgroundSize?: string }> = {
+export const BOARD_TEXTURES: Record<BoardTexture, { label: string; backgroundImage: string; backgroundImageDark?: string; backgroundSize?: string }> = {
   flat:   { label: 'Flat', backgroundImage: 'none' },
   // Plain CSS gradients are inherently regular/mathematical -- a
   // repeating-linear-gradient can only ever look like a hatch pattern or
@@ -56,7 +56,15 @@ export const BOARD_TEXTURES: Record<BoardTexture, { label: string; backgroundIma
     // bands running across it, the way real growth rings do. Tinted warm
     // brown via feColorMatrix and kept low-alpha so it reads as texture
     // on top of the existing square color, not a color change.
+    //
+    // backgroundImage (light squares) has the frequencies as X,Y --
+    // grain runs horizontally. backgroundImageDark (dark squares) is the
+    // same filter with X and Y swapped, so its grain runs vertically
+    // instead -- real wooden chessboards are often built this way on
+    // purpose, alternating grain direction between the two square colors
+    // for contrast, rather than every square looking identically milled.
     backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='w'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.012 0.18' numOctaves='4' seed='7' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 0.32  0 0 0 0 0.19  0 0 0 0 0.07  0 0 0 0.35 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23w)'/%3E%3C/svg%3E")`,
+    backgroundImageDark: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='wd'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.18 0.012' numOctaves='4' seed='7' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 0.32  0 0 0 0 0.19  0 0 0 0 0.07  0 0 0 0.35 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23wd)'/%3E%3C/svg%3E")`,
     backgroundSize: '140px 140px',
   },
   marble: {
@@ -190,7 +198,7 @@ interface SettingsContextValue extends Settings {
   setPromotionChoice: (v: PromotionChoice) => void;
   setBoardSize: (v: BoardSize) => void;
   boardColors: ColorPair;
-  boardTextureCss: { backgroundImage: string; backgroundSize?: string };
+  boardTextureCss: { backgroundImage: string; backgroundImageDark?: string; backgroundSize?: string };
   appBackgroundCss: React.CSSProperties;
   pieceColors: ColorPair & { finish: React.CSSProperties };
   boardMaxWidth: number;
