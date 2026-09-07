@@ -69,11 +69,29 @@ export interface LessonBeatsConversionResult {
   warnings: string[];
 }
 
+// Only the fields the conversion actually reads -- deliberately narrower
+// than the full Lesson row type, since this also gets called on
+// newly-generated lessons at insert time (courses.ts, opponents.ts),
+// before they have a real id/courseId/completed/etc. Requiring the full
+// row shape there would force call sites to fabricate placeholder values
+// for columns this function never looks at.
+export interface LessonBeatsSourceData {
+  id?: number;
+  content: string | null;
+  examplePgn?: string | null;
+  fixExamplePgn?: string | null;
+  drillFen?: string | null;
+  drillExpectedMove?: string | null;
+  drillHint?: string | null;
+  extraChallenges?: LessonChallenge[] | null;
+  conceptTitle?: string | null;
+}
+
 // Converts one existing lesson's free-text `content` (plus its separate
 // examplePgn/drillFen/etc. columns) into the unified beats[] sequence. Does
 // not mutate the lesson or touch the database -- pure function, safe to
 // run against the same lesson repeatedly while reviewing output.
-export function convertLessonToBeats(lesson: Lesson): LessonBeatsConversionResult {
+export function convertLessonToBeats(lesson: LessonBeatsSourceData): LessonBeatsConversionResult {
   const warnings: string[] = [];
   const beats: LessonBeat[] = [];
   const content = lesson.content ?? "";
@@ -82,7 +100,7 @@ export function convertLessonToBeats(lesson: Lesson): LessonBeatsConversionResul
   if (conceptText) {
     beats.push({ kind: "concept", title: lesson.conceptTitle ?? "The Idea", text: conceptText });
   } else if (lesson.conceptTitle) {
-    warnings.push(`Lesson ${lesson.id}: has a conceptTitle but no "## The Concept" section was found in content.`);
+    warnings.push(`Lesson ${lesson.id ?? "(new)"}: has a conceptTitle but no "## The Concept" section was found in content.`);
   }
 
   const steps = splitIntoSteps(content);
@@ -119,7 +137,7 @@ export function convertLessonToBeats(lesson: Lesson): LessonBeatsConversionResul
   // losing a real drill because the heading didn't say "fix".
   const hasDrillBeat = beats.some((b) => b.kind === "drill");
   if (!hasDrillBeat && lesson.drillFen && lesson.drillExpectedMove) {
-    warnings.push(`Lesson ${lesson.id}: drill data existed but no step matched a "fix" heading -- appended as a final beat instead of dropping it.`);
+    warnings.push(`Lesson ${lesson.id ?? "(new)"}: drill data existed but no step matched a "fix" heading -- appended as a final beat instead of dropping it.`);
     beats.push({
       kind: "drill",
       text: lesson.drillHint ? `**Your move.** ${lesson.drillHint}` : "**Your move.**",
@@ -145,7 +163,7 @@ export function convertLessonToBeats(lesson: Lesson): LessonBeatsConversionResul
   });
 
   if (beats.length === 0) {
-    warnings.push(`Lesson ${lesson.id}: produced zero beats -- content may be empty or in an unexpected format. Needs manual review.`);
+    warnings.push(`Lesson ${lesson.id ?? "(new)"}: produced zero beats -- content may be empty or in an unexpected format. Needs manual review.`);
   }
 
   return { beats, warnings };

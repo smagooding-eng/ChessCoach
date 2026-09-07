@@ -13,6 +13,7 @@ import {
   UpdateCourseProgressResponse,
 } from "@workspace/api-zod";
 import { generateCourseForWeakness, generateEndgameCourse, type EndgameType } from "../lib/openaiAnalysis";
+import { convertLessonToBeats } from "../lib/lessonContentParser";
 import { verifyLesson, verifyLessonDrillEngine } from "../lib/puzzleVerifier";
 import { analyzePuzzle } from "../lib/chessMotifs";
 import { Chess } from "chess.js";
@@ -260,6 +261,7 @@ async function runCourseGenerationJob(username: string, jobId: string, log: Logg
             drillHint: lesson.drillHint ?? null,
             extraChallenges: lesson.extraChallenges ?? null,
             conceptTitle: lesson.conceptTitle ?? null,
+            beats: convertLessonToBeats(lesson).beats,
           });
         }
       } catch (err) {
@@ -490,6 +492,7 @@ router.post("/courses/generate", async (req, res): Promise<void> => {
           drillHint: lesson.drillHint ?? null,
           extraChallenges: lesson.extraChallenges ?? null,
           conceptTitle: lesson.conceptTitle ?? null,
+          beats: convertLessonToBeats(lesson).beats,
         });
       }
 
@@ -572,6 +575,7 @@ async function runEndgameJob(
         drillHint: lesson.drillHint ?? null,
         extraChallenges: lesson.extraChallenges ?? null,
         conceptTitle: lesson.conceptTitle ?? null,
+        beats: convertLessonToBeats(lesson).beats,
       });
     }
 

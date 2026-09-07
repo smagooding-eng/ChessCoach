@@ -3,6 +3,7 @@ import { db, gamesTable, coursesTable, lessonsTable, backgroundJobsTable } from 
 import { sql, eq, and, desc } from "drizzle-orm";
 import { fetchChessComGames, extractGameMetadata, fetchChessComProfile, fetchChessComTopPlayers } from "../lib/chesscom";
 import { analyzePlayerGames, generateExploitCourseForOpponent } from "../lib/openaiAnalysis";
+import { convertLessonToBeats } from "../lib/lessonContentParser";
 import { randomUUID } from "crypto";
 import { requireAuth, requirePremium } from "../middlewares/authMiddleware";
 import { sanitizeLessons, type RawLesson } from "./courses";
@@ -504,6 +505,7 @@ async function runCourseGeneration(
           drillHint: lesson.drillHint ?? null,
           extraChallenges: lesson.extraChallenges ?? null,
           conceptTitle: lesson.conceptTitle ?? null,
+          beats: convertLessonToBeats(lesson).beats,
         });
       }
 
