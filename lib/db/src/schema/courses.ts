@@ -22,6 +22,29 @@ export interface LessonChallenge {
   contextPgn?: string | null;
 }
 
+// The unified lesson-beat sequence from the courses redesign -- see
+// scripts/migrate-lesson-beats.ts for how existing lessons' free-text
+// `content` gets converted into this shape, and courses-redesign-spec.md
+// for the full design rationale. One ordered list of beats replaces the
+// previous four independent navigation states (lesson text steps, board
+// tabs, drill concept-intro, and the fragile regex-driven fix-line
+// toggle).
+export type LessonBeat =
+  | { kind: "concept"; title: string; text: string }
+  | { kind: "example"; text: string; pgn: string; annotation?: string; replayable?: boolean }
+  | {
+      kind: "drill";
+      text: string;
+      fen: string;
+      expectedMove: string;
+      hint?: string | null;
+      // Correct move first, then a short plausible continuation --
+      // explicit data instead of the fragile regex/PGN-surgery
+      // (buildFrontendFixPgn) the old "show the fix" toggle relied on.
+      followUpSan?: string[];
+    }
+  | { kind: "summary"; text: string };
+
 export const lessonsTable = pgTable("lessons", {
   id: serial("id").primaryKey(),
   courseId: integer("course_id").notNull().references(() => coursesTable.id),
@@ -42,6 +65,14 @@ export const lessonsTable = pgTable("lessons", {
   extraChallenges: jsonb("extra_challenges").$type<LessonChallenge[]>(),
   conceptTitle: text("concept_title"),
   archived: boolean("archived").notNull().default(false),
+  // Nullable and additive on purpose -- this is the new unified
+  // beat-sequence shape from the courses redesign, populated by a
+  // one-time migration script (scripts/migrate-lesson-beats.ts) that
+  // reads the fields above and writes this without touching any of
+  // them. Existing UI keeps working off the old fields until the new
+  // stepper ships and switches over; nothing here is destructive or
+  // one-way.
+  beats: jsonb("beats").$type<LessonBeat[]>(),
 });
 
 export const insertCourseSchema = createInsertSchema(coursesTable).omit({ id: true, createdAt: true });
