@@ -943,6 +943,39 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
 
   return (
     <div className="rounded-xl overflow-hidden shadow-xl" style={{ backgroundColor: BG_DARK }}>
+      {/* Same gradient defs as ChessBoard.tsx, duplicated here rather than
+          shared, since a lesson page can render this component without a
+          ChessBoard instance also mounted -- and SVG url(#id) fills need
+          the def to actually exist in the document to resolve. Duplicate
+          identical IDs elsewhere on the same page are harmless. */}
+      <svg width="0" height="0" style={{ position: 'absolute' }} aria-hidden="true">
+        <defs>
+          <linearGradient id="cc-grad-shaded-light" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#fdfdfd" /><stop offset="55%" stopColor="#e2e2e2" /><stop offset="100%" stopColor="#bdbdbd" />
+          </linearGradient>
+          <linearGradient id="cc-grad-shaded-dark" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#5a5a5a" /><stop offset="55%" stopColor="#333333" /><stop offset="100%" stopColor="#151515" />
+          </linearGradient>
+          <linearGradient id="cc-grad-wood-light" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#fbe9c6" /><stop offset="50%" stopColor="#e8c583" /><stop offset="100%" stopColor="#c08f43" />
+          </linearGradient>
+          <linearGradient id="cc-grad-wood-dark" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#8a5a2e" /><stop offset="50%" stopColor="#5c3a1a" /><stop offset="100%" stopColor="#2e1a0a" />
+          </linearGradient>
+          <linearGradient id="cc-grad-marble-light" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#ffffff" /><stop offset="60%" stopColor="#e6e6ee" /><stop offset="100%" stopColor="#c4c4d2" />
+          </linearGradient>
+          <linearGradient id="cc-grad-marble-dark" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#4a4a54" /><stop offset="60%" stopColor="#26262e" /><stop offset="100%" stopColor="#0e0e12" />
+          </linearGradient>
+          <linearGradient id="cc-grad-chrome-light" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#ffffff" /><stop offset="35%" stopColor="#c9d3d9" /><stop offset="60%" stopColor="#eef3f5" /><stop offset="100%" stopColor="#8a97a0" />
+          </linearGradient>
+          <linearGradient id="cc-grad-chrome-dark" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#7a828a" /><stop offset="35%" stopColor="#2a2d31" /><stop offset="60%" stopColor="#4a4f55" /><stop offset="100%" stopColor="#0a0b0c" />
+          </linearGradient>
+        </defs>
+      </svg>
       {/* ── Tab pills ─────────────────────────────────────────────────────── */}
       <div className="flex items-center gap-1.5 px-3 py-2 md:py-2.5 overflow-x-auto" style={{ backgroundColor: BG_CARD }}>
         <button

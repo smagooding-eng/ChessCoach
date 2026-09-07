@@ -188,8 +188,12 @@ export default function SettingsPage() {
             return (
               <SwatchButton key={key} active={pieceStyle === key} onClick={() => setPieceStyle(key)} label={t.label}>
                 <div className="flex items-center gap-0.5">
-                  <span className="text-2xl leading-none" style={{ color: t.light, WebkitTextStroke: '1px #555', ...t.finish }}>♞</span>
-                  <span className="text-2xl leading-none" style={{ color: t.dark, WebkitTextStroke: '1px #999', ...t.finish }}>♞</span>
+                  <span className="text-2xl leading-none" style={t.previewLight
+                    ? { background: t.previewLight, WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent', WebkitTextStroke: '1px #555' }
+                    : { color: t.light, WebkitTextStroke: '1px #555', ...t.finish }}>♞</span>
+                  <span className="text-2xl leading-none" style={t.previewDark
+                    ? { background: t.previewDark, WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent', WebkitTextStroke: '1px #999' }
+                    : { color: t.dark, WebkitTextStroke: '1px #999', ...t.finish }}>♞</span>
                 </div>
               </SwatchButton>
             );
