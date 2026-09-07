@@ -709,7 +709,19 @@ function LessonBeatPlayer({
           />
         )}
         {beat.kind === 'example' && (
-          <ChessBoard key={`${lessonId}-${currentBeat}`} fen={boardFen ?? exampleFens[0] ?? 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'} practiceMode={false} />
+          beat.pgn
+            ? <ChessBoard key={`${lessonId}-${currentBeat}`} fen={boardFen ?? exampleFens[0]} practiceMode={false} />
+            // An empty pgn means this lesson's source content never had a
+            // real example position -- showing the default starting
+            // position here would look like a real diagram and actively
+            // mislead the learner into thinking it relates to the text.
+            // Showing nothing is the honest option until this lesson's
+            // content gets a real example position.
+            : (
+              <div className="flex items-center justify-center rounded-xl p-8 text-center text-sm text-white/40" style={{ backgroundColor: BG_DARK, minHeight: 240 }}>
+                No diagram available for this step yet.
+              </div>
+            )
         )}
         {(beat.kind === 'concept' || beat.kind === 'summary') && (
           <div className="flex items-center justify-center rounded-xl p-8 text-center text-sm text-white/40" style={{ backgroundColor: BG_DARK, minHeight: 240 }}>
