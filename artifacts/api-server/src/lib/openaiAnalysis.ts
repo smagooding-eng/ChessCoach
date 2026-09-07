@@ -1949,6 +1949,7 @@ Rules: The Concept section must be general chess teaching, not specific to this 
       messages: [{ role: "user", content: prompt }],
       response_format: { type: "json_object" },
     });
+    void trackAiUsage({ userId: undefined, feature: AI_FEATURES.LESSON_CONTENT, model: "gpt-5.6-luna", usage: response.usage });
     const parsed = JSON.parse(response.choices[0]?.message?.content ?? "{}") as { title?: string; content?: string };
     // Only fact-check the position-specific sections — the Concept section
     // is deliberately general chess teaching and may reference pieces or
@@ -2132,6 +2133,7 @@ Respond with valid JSON:
       messages: [{ role: "user", content: prompt }],
       response_format: { type: "json_object" },
     });
+    void trackAiUsage({ userId: undefined, feature: AI_FEATURES.OPPONENT_EXPLOIT_COURSE, model: "gpt-5.6-luna", usage: response.usage });
 
     const content = response.choices[0]?.message?.content ?? "{}";
     const parsed = JSON.parse(content) as CourseOutput;
@@ -2246,6 +2248,7 @@ Respond with valid JSON:
       messages: [{ role: "user", content: prompt }],
       response_format: { type: "json_object" },
     });
+    void trackAiUsage({ userId: undefined, feature: AI_FEATURES.WEAKNESS_COURSE, model: "gpt-5.6-luna", usage: response.usage });
 
     const content = response.choices[0]?.message?.content ?? "{}";
     const parsed = JSON.parse(content) as CourseOutput;
@@ -2476,6 +2479,7 @@ Respond with valid JSON:
       messages: [{ role: "user", content: prompt }],
       response_format: { type: "json_object" },
     });
+    void trackAiUsage({ userId: undefined, feature: AI_FEATURES.ENDGAME_COURSE, model: "gpt-5.6-luna", usage: response.usage });
 
     const content = response.choices[0]?.message?.content ?? "{}";
     const parsed = JSON.parse(content) as CourseOutput;

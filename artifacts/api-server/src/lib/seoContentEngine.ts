@@ -2,6 +2,7 @@ import OpenAI from "openai";
 import { db, seoArticlesTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { logger } from "./logger";
+import { trackAiUsage, AI_FEATURES } from "./aiUsageTracker";
 
 // Long-tail keywords targeting real, specific frustration a chess player
 // would type into Google — not generic terms like "chess coach" (which a
@@ -73,6 +74,7 @@ Return valid JSON only:
       messages: [{ role: "user", content: prompt }],
       response_format: { type: "json_object" },
     });
+    void trackAiUsage({ userId: undefined, feature: AI_FEATURES.SEO_ARTICLE, model: "gpt-5.6-luna", usage: response.usage });
     const parsed = JSON.parse(response.choices[0]?.message?.content ?? "{}") as Partial<GeneratedArticle>;
     if (!parsed.title || !parsed.content || !parsed.metaDescription) return null;
     return parsed as GeneratedArticle;

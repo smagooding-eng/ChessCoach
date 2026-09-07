@@ -1,6 +1,7 @@
 import { db, puzzlesTable } from "@workspace/db";
 import { count, eq, sql } from "drizzle-orm";
 import { Chess } from "chess.js";
+import { trackAiUsage, AI_FEATURES } from "./aiUsageTracker";
 
 interface VerifiedPuzzle {
   lichessId: string;
@@ -334,6 +335,7 @@ export async function generatePuzzleExplanation(puzzle: { fen: string; moves: st
         },
       ],
     });
+    void trackAiUsage({ userId: undefined, feature: AI_FEATURES.PUZZLE_EXPLANATION, model: "gpt-5.6-luna", usage: completion.usage });
 
     return completion.choices[0]?.message?.content?.trim() ?? null;
   } catch (err: any) {

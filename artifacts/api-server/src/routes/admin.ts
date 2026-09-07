@@ -6,7 +6,7 @@ import { sessionsTable } from "@workspace/db";
 import { getUncachableStripeClient } from "../lib/stripeClient";
 import { ADMIN_EMAILS } from "../lib/auth";
 import { generateNextSeoArticle } from "../lib/seoContentEngine";
-import { estimateCostUsd } from "../lib/aiUsageTracker";
+import { estimateCostUsd, trackAiUsage, AI_FEATURES } from "../lib/aiUsageTracker";
 import { aiUsageEventsTable, bulkCrawlQueueTable } from "@workspace/db";
 import { runBulkCrawlJob } from "../lib/bulkGameCrawler";
 import { randomUUID } from "crypto";
@@ -965,6 +965,7 @@ Return VALID JSON only:
       messages: [{ role: "user", content: prompt }],
       response_format: { type: "json_object" },
     });
+    void trackAiUsage({ userId: req.user?.id, feature: AI_FEATURES.ADMIN_MARKETING, model: "gpt-5.6-luna", usage: response.usage });
 
     const content = response.choices[0]?.message?.content ?? "{}";
     const parsed = JSON.parse(content);

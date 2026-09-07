@@ -3,6 +3,7 @@ import { db, outreachLeadsTable } from "@workspace/db";
 import { eq, desc } from "drizzle-orm";
 import OpenAI from "openai";
 import { logger } from "../lib/logger";
+import { trackAiUsage, AI_FEATURES } from "../lib/aiUsageTracker";
 
 const router: IRouter = Router();
 
@@ -177,6 +178,7 @@ Return plain text only — just the reply itself, no preamble, no markdown forma
       max_completion_tokens: 500,
       messages: [{ role: "user", content: prompt }],
     });
+    void trackAiUsage({ userId: req.user?.id, feature: AI_FEATURES.OUTREACH_DRAFT, model: "gpt-5.6-luna", usage: response.usage });
 
     const draft = response.choices[0]?.message?.content?.trim() ?? "";
     if (!draft) {
