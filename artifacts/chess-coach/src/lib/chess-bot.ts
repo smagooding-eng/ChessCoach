@@ -1,4 +1,5 @@
 import { Chess } from 'chess.js';
+import { isBookPosition } from './openingBook';
 
 const PIECE_VALUES: Record<string, number> = {
   p: 100, n: 320, b: 330, r: 500, q: 900, k: 20000,
@@ -312,19 +313,23 @@ export interface MoveAnalysisResult {
   summary: string;
 }
 
-function isStandardOpeningMove(moveResult: ReturnType<Chess['move']>, turn: string): boolean {
-  if (!moveResult) return false;
-  if (moveResult.san === 'O-O' || moveResult.san === 'O-O-O') return true;
-  if (moveResult.piece === 'p' && ['c4','c5','d4','d5','e4','e5','f4','b3','g3','b6','g6','a3','h3','a6','h6','c3','c6','e3','e6','d3','d6'].includes(moveResult.to)) return true;
-  if (['n', 'b'].includes(moveResult.piece)) {
-    const r = parseInt(moveResult.from[1]);
-    if ((turn === 'w' && r <= 2) || (turn === 'b' && r >= 7)) return true;
+// A real sacrifice check, not just "did this move capture something of
+// lower value" -- that older check only caught sacrifices that happen to
+// also be captures, and completely missed the classic pattern of placing
+// a piece en prise with no capture involved (e.g. a knight dropped onto
+// an outpost the opponent can take, setting up a mating attack). This
+// checks whether the piece that just moved is now actually capturable by
+// the opponent, for pieces worth at least a minor piece -- pawns being
+// "sacrificed" for a tempo is normal and not what "Brilliant" is about.
+function isRealSacrifice(fenAfterMove: string, movedPiece: string, toSquare: string): boolean {
+  if (PIECE_VALUES[movedPiece] < PIECE_VALUES['n']) return false;
+  try {
+    const chess = new Chess(fenAfterMove);
+    const opponentMoves = chess.moves({ verbose: true }) as Array<{ to: string }>;
+    return opponentMoves.some((m) => m.to === toSquare);
+  } catch {
+    return false;
   }
-  if (moveResult.piece === 'q') {
-    const r = parseInt(moveResult.from[1]);
-    if ((turn === 'w' && r === 1) || (turn === 'b' && r === 8)) return true;
-  }
-  return false;
 }
 
 export function analyzeMoveQuality(fenBefore: string, san: string): MoveAnalysisResult {
@@ -347,6 +352,7 @@ export function analyzeMoveQuality(fenBefore: string, san: string): MoveAnalysis
   const evalAfter = evaluate(chess);
   const inCheck = chess.inCheck();
   const isMate = chess.isCheckmate();
+  const fenAfterMove = chess.fen();
   chess.undo();
 
   if (isMate) {
@@ -394,15 +400,31 @@ export function analyzeMoveQuality(fenBefore: string, san: string): MoveAnalysis
   const isComplexPosition = movesWithin10 <= 2 && moves.length > 5;
 
   const isOpening = halfMoveCount <= 16;
-  const isBookMove = isOpening && cpLoss <= 30 && isStandardOpeningMove(moveResult, turn);
+  // No move-count cutoff here, unlike the "great" classification below --
+  // isBookPosition() only ever returns true for a position that's
+  // actually in the opening-theory database, so it doesn't need an
+  // artificial ply limit on top of it. Adding one caused real book lines
+  // that run past move 8 (several genuinely do -- e.g. some King's
+  // Indian main lines continue to move 10) to get wrongly rejected right
+  // as they left an arbitrary cutoff, despite the position still being
+  // 100% known theory.
+  const isBookMove = isBookPosition(fenAfterMove);
 
   const evalSwing = maximizing ? (evalAfter - evalBefore) : (evalBefore - evalAfter);
-  const isSacrifice = moveResult.captured && PIECE_VALUES[moveResult.piece] > (PIECE_VALUES[moveResult.captured] || 0) + 100;
+  // A real sacrifice check (see isRealSacrifice above) instead of "did
+  // this move capture something of lower value" -- that only caught
+  // sacrifices that also happened to be captures. Also requires the
+  // position to have been roughly balanced beforehand and a genuinely
+  // large swing in the player's favor -- "Brilliant" on chess.com/Lichess
+  // is rare by design (a strong sacrifice found in a roughly even fight),
+  // not "the engine's top move happened to also give check".
+  const isSacrifice = isRealSacrifice(fenAfterMove, moveResult.piece, moveResult.to);
+  const wasRoughlyBalanced = Math.abs(evalBefore) < 300;
 
   let quality: MoveAnalysisResult['quality'];
   if (isBookMove) {
     quality = 'book';
-  } else if (isBest && cpLoss === 0 && isComplexPosition && (isSacrifice || inCheck || evalSwing > 80)) {
+  } else if (isBest && cpLoss === 0 && isComplexPosition && wasRoughlyBalanced && isSacrifice && evalSwing >= 250) {
     quality = 'brilliant';
   } else if (isBest && cpLoss === 0 && movesWithin30 <= 1 && !isOpening && moves.length > 2) {
     // "Great": the only move that holds the position -- everything else
