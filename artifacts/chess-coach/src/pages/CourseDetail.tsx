@@ -553,8 +553,20 @@ function LessonBeatPlayer({
     try {
       const chess = new Chess();
       chess.loadPgn(beat.pgn);
+      // Bug fix: the PGN's own [FEN "..."] header (when the position
+      // doesn't start from the standard setup, which is the normal case
+      // here -- these are almost always a specific mid-game position, not
+      // a full game from move 1) was being read correctly by loadPgn()
+      // above, but then completely discarded -- replaying the extracted
+      // moves on a fresh default-position Chess() instead of the PGN's
+      // actual starting position. Since the first move usually isn't
+      // legal from the standard starting position, that replay call
+      // threw, got swallowed by the catch below, and left exampleFens
+      // permanently empty -- which is exactly why the board only ever
+      // showed the plain starting position and never advanced.
+      const startFen = chess.getHeaders().FEN || undefined;
       const moves = chess.history();
-      const replay = new Chess();
+      const replay = new Chess(startFen);
       const fens = [replay.fen()];
       for (const m of moves) { replay.move(m); fens.push(replay.fen()); }
       setExampleFens(fens);
