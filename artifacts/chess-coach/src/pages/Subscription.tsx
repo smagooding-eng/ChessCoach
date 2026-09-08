@@ -250,8 +250,30 @@ export function Subscription() {
                 </div>
               ) : selectedPriceId ? (
                 <div className="space-y-3">
+                  {/* Express Checkout (Apple Pay / Google Pay) renders here
+                      unconditionally, sharing the same subscription/clientSecret
+                      as manual card entry below rather than creating a second
+                      one -- it's the prominent, fastest option, and hides
+                      itself automatically if no wallet is available for this
+                      browser/device. */}
+                  <EmbeddedCheckoutForm
+                    priceId={selectedPriceId}
+                    showManualCard={showManualCard}
+                    onSuccess={() => {
+                      setSelectedPriceId(null);
+                      setShowManualCard(false);
+                      refreshSubscription();
+                    }}
+                    onCancel={() => setShowManualCard(false)}
+                  />
+
                   {!showManualCard && (
                     <>
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 h-px bg-border/40" />
+                        <span className="text-[11px] text-muted-foreground">or</span>
+                        <div className="flex-1 h-px bg-border/40" />
+                      </div>
                       <button
                         onClick={() => handleCheckout(selectedPriceId)}
                         disabled={!!checkoutLoading}
@@ -284,18 +306,6 @@ export function Subscription() {
                         Enter card details manually
                       </button>
                     </>
-                  )}
-
-                  {showManualCard && (
-                    <EmbeddedCheckoutForm
-                      priceId={selectedPriceId}
-                      onSuccess={() => {
-                        setSelectedPriceId(null);
-                        setShowManualCard(false);
-                        refreshSubscription();
-                      }}
-                      onCancel={() => setShowManualCard(false)}
-                    />
                   )}
                 </div>
               ) : (

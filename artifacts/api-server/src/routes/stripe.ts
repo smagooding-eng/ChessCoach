@@ -1,7 +1,7 @@
 import { Router, type IRouter, type Request, type Response } from 'express';
 import { storage } from '../lib/storage';
 import { stripeService } from '../lib/stripeService';
-import { getUncachableStripeClient } from '../lib/stripeClient';
+import { getUncachableStripeClient, getStripeSync } from '../lib/stripeClient';
 import { db, referralConversionsTable, usersTable } from '@workspace/db';
 import { eq, and, sql } from 'drizzle-orm';
 import crypto from 'crypto';
@@ -220,7 +220,12 @@ router.post('/stripe/checkout-embedded', async (req: Request, res: Response) => 
       payment_behavior: 'default_incomplete',
       payment_settings: {
         save_default_payment_method: 'on_subscription',
-        payment_method_types: ['card'],
+        // No explicit payment_method_types -- Stripe automatically offers
+        // whichever methods are enabled in the Dashboard (Settings ->
+        // Payment methods), which is what lets Apple Pay/Google Pay show
+        // up in ExpressCheckoutElement. Hardcoding ['card'] here worked
+        // for the manual card form, but would have quietly excluded any
+        // wallet method even after enabling it in the Dashboard.
       },
       expand: ['latest_invoice.payment_intent', 'latest_invoice.confirmation_secret'],
     });
@@ -245,6 +250,106 @@ router.post('/stripe/checkout-embedded', async (req: Request, res: Response) => 
   } catch (err: any) {
     console.error('Embedded checkout error:', err.message);
     res.status(500).json({ error: err?.message || 'Failed to start checkout' });
+  }
+});
+
+// Confirms Pro access immediately after a payment succeeds on the
+// frontend, independent of the Stripe webhook. hasFullAccess() reads
+// straight from the stripe.subscriptions table (kept in sync by the
+// webhook in normal operation) -- if the webhook is down, delayed, or
+// simply hasn't fired yet by the time the page redirects, a customer who
+// was just charged sees no Pro access at all. This checks the
+// subscription's real status directly against Stripe's API (not the
+// local synced copy) and writes the same row the webhook would have
+// written, so it's a same-source-of-truth fallback, not a separate
+// "override" flag: a later webhook event (e.g. a cancellation) still
+// overwrites it normally, nothing gets stuck.
+router.post('/stripe/confirm-subscription', async (req: Request, res: Response) => {
+  if (!req.isAuthenticated()) {
+    res.status(401).json({ error: 'Not authenticated' });
+    return;
+  }
+
+  const { subscriptionId } = req.body;
+  if (!subscriptionId || typeof subscriptionId !== 'string' || !subscriptionId.startsWith('sub_')) {
+    res.status(400).json({ error: 'Valid subscriptionId is required' });
+    return;
+  }
+
+  try {
+    const user = await storage.getUser(req.user.id);
+    if (!user?.stripeCustomerId) {
+      res.status(400).json({ error: 'No Stripe customer on file for this account' });
+      return;
+    }
+
+    const stripe = await getUncachableStripeClient();
+    const subscription = await stripe.subscriptions.retrieve(subscriptionId, {
+      expand: ['customer'],
+    });
+
+    // Make sure the subscription being confirmed actually belongs to the
+    // signed-in user -- without this check, anyone could pass any
+    // subscriptionId and get themselves marked Pro off someone else's
+    // payment.
+    const customerId = typeof subscription.customer === 'string' ? subscription.customer : subscription.customer?.id;
+    if (customerId !== user.stripeCustomerId) {
+      res.status(403).json({ error: 'This subscription does not belong to your account' });
+      return;
+    }
+
+    if (!['active', 'trialing'].includes(subscription.status)) {
+      // Not an error -- e.g. still `incomplete` because 3D Secure hasn't
+      // finished. The webhook will pick it up once it does.
+      res.json({ confirmed: false, status: subscription.status });
+      return;
+    }
+
+    // Ensure the stripe.* schema/tables exist before writing to them --
+    // they're created lazily on first use by the sync library, and this
+    // endpoint can in principle be the very first thing that touches
+    // Stripe data after a fresh deploy.
+    await getStripeSync();
+
+    const item: any = subscription.items.data[0];
+    // Newer Stripe API versions moved current_period_start/end from the
+    // subscription object down to each subscription item; falling back
+    // to the subscription-level field keeps this working either way.
+    const periodStart = item?.current_period_start ?? (subscription as any).current_period_start ?? null;
+    const periodEnd = item?.current_period_end ?? (subscription as any).current_period_end ?? null;
+
+    await db.execute(sql`
+      INSERT INTO stripe.customers (id, object)
+      VALUES (${customerId}, 'customer')
+      ON CONFLICT (id) DO NOTHING
+    `);
+    await db.execute(sql`
+      INSERT INTO stripe.subscriptions (
+        id, object, customer, status, items,
+        current_period_start, current_period_end, cancel_at_period_end, created, livemode
+      )
+      VALUES (
+        ${subscription.id}, 'subscription', ${customerId}, ${subscription.status}::stripe.subscription_status, ${JSON.stringify(subscription.items)}::jsonb,
+        ${periodStart}, ${periodEnd}, ${subscription.cancel_at_period_end}, ${subscription.created}, ${subscription.livemode}
+      )
+      ON CONFLICT (id) DO UPDATE SET
+        status = excluded.status,
+        items = excluded.items,
+        current_period_start = excluded.current_period_start,
+        current_period_end = excluded.current_period_end,
+        cancel_at_period_end = excluded.cancel_at_period_end
+    `);
+
+    res.json({ confirmed: true, status: subscription.status });
+  } catch (err: any) {
+    console.error('Confirm subscription error:', err.message);
+    // Deliberately still 200 with confirmed:false rather than 500 --
+    // the payment already succeeded on Stripe's side regardless of
+    // whether this fallback write works, and the real webhook (once
+    // healthy) will reconcile this subscription on its own. The
+    // frontend shouldn't show the customer an error for a charge that
+    // actually went through.
+    res.json({ confirmed: false, error: 'Could not confirm access yet — this will sync automatically shortly.' });
   }
 });
 
