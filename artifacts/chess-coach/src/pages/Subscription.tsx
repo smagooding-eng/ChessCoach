@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { PieceTile } from '@/components/DesignSystem';
 import { useUser } from '@/hooks/use-user';
 import { useLocation } from 'wouter';
-import { Crown, Check, Zap, BrainCircuit, GraduationCap, Swords, Volume2, Loader2, ExternalLink, Clock } from 'lucide-react';
+import { Crown, Check, Zap, BrainCircuit, GraduationCap, Swords, Volume2, Loader2, ExternalLink, Clock, CreditCard } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { apiFetch, apiFetchLocal } from '@/lib/api';
 import { EmbeddedCheckoutForm } from '@/components/EmbeddedCheckoutForm';
@@ -43,6 +43,7 @@ export function Subscription() {
   const [products, setProducts] = useState<ProductInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedPriceId, setSelectedPriceId] = useState<string | null>(null);
+  const [showManualCard, setShowManualCard] = useState(false);
   const [portalLoading, setPortalLoading] = useState(false);
 
   const searchParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
@@ -249,42 +250,59 @@ export function Subscription() {
                 </div>
               ) : selectedPriceId ? (
                 <div className="space-y-3">
-                  <EmbeddedCheckoutForm
-                    priceId={selectedPriceId}
-                    onSuccess={() => {
-                      setSelectedPriceId(null);
-                      refreshSubscription();
-                    }}
-                    onCancel={() => setSelectedPriceId(null)}
-                  />
-                  <div className="flex items-center gap-2">
-                    <div className="flex-1 h-px bg-border/40" />
-                    <span className="text-[11px] text-muted-foreground">or</span>
-                    <div className="flex-1 h-px bg-border/40" />
-                  </div>
-                  <button
-                    onClick={() => handleCheckout(selectedPriceId)}
-                    disabled={!!checkoutLoading}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-secondary hover:bg-secondary/80 transition-colors font-bold text-sm"
-                  >
-                    {checkoutLoading === selectedPriceId ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <>
-                        <ExternalLink className="w-4 h-4" />
-                        Continue with Stripe
-                      </>
-                    )}
-                  </button>
-                  {checkoutError && (
-                    <p className="text-xs text-red-400 text-center">{checkoutError}</p>
+                  {!showManualCard && (
+                    <>
+                      <button
+                        onClick={() => handleCheckout(selectedPriceId)}
+                        disabled={!!checkoutLoading}
+                        className="w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl font-black text-sm transition-transform hover:scale-[1.02] active:scale-[0.98] disabled:opacity-60 disabled:hover:scale-100"
+                        style={{ background: 'linear-gradient(180deg, #a8d876 0%, #81b64c 55%, #5f8f36 100%)', color: '#fff', boxShadow: '0 4px 0 #4a7028' }}
+                      >
+                        {checkoutLoading === selectedPriceId ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <>
+                            <ExternalLink className="w-4 h-4" />
+                            Continue with Stripe
+                          </>
+                        )}
+                      </button>
+                      {checkoutError && (
+                        <p className="text-xs text-red-400 text-center">{checkoutError}</p>
+                      )}
+
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 h-px bg-border/40" />
+                        <span className="text-[11px] text-muted-foreground">or</span>
+                        <div className="flex-1 h-px bg-border/40" />
+                      </div>
+                      <button
+                        onClick={() => setShowManualCard(true)}
+                        className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-secondary hover:bg-secondary/80 transition-colors font-bold text-sm"
+                      >
+                        <CreditCard className="w-4 h-4" />
+                        Enter card details manually
+                      </button>
+                    </>
+                  )}
+
+                  {showManualCard && (
+                    <EmbeddedCheckoutForm
+                      priceId={selectedPriceId}
+                      onSuccess={() => {
+                        setSelectedPriceId(null);
+                        setShowManualCard(false);
+                        refreshSubscription();
+                      }}
+                      onCancel={() => setShowManualCard(false)}
+                    />
                   )}
                 </div>
               ) : (
                 <div className="space-y-2">
                   {monthlyPrice && (
                     <button
-                      onClick={() => isAuthenticated ? setSelectedPriceId(monthlyPrice.id) : setLocation('/setup')}
+                      onClick={() => { if (isAuthenticated) { setSelectedPriceId(monthlyPrice.id); setShowManualCard(false); } else setLocation('/setup'); }}
                       className="w-full flex items-center justify-center gap-2 btn-primary text-sm py-3"
                     >
                       <Zap className="w-4 h-4" />
@@ -293,7 +311,7 @@ export function Subscription() {
                   )}
                   {yearlyPrice && (
                     <button
-                      onClick={() => isAuthenticated ? setSelectedPriceId(yearlyPrice.id) : setLocation('/setup')}
+                      onClick={() => { if (isAuthenticated) { setSelectedPriceId(yearlyPrice.id); setShowManualCard(false); } else setLocation('/setup'); }}
                       className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-secondary hover:bg-secondary/80 transition-colors font-bold text-sm"
                     >
                       ${(yearlyPrice.unit_amount / 100).toFixed(0)}/year
