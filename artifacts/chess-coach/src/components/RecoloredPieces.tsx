@@ -111,7 +111,26 @@ export function buildTintedPieceSet(opts: {
   // instead, same as any other flat-color style.
   useGradientForCustom?: boolean;
 }): Record<string, (props?: { fill?: string; square?: string; svgStyle?: React.CSSProperties }) => React.ReactElement> {
-  const { pieceColors, pieceShape, pieceStyle, useGradientForCustom } = opts;
+  const { pieceColors: rawPieceColors, pieceShape, pieceStyle, useGradientForCustom } = opts;
+
+  // Defensive fallback: if pieceColors is ever missing, empty, or
+  // malformed for any reason (an upstream loading race, a corrupted
+  // stored value, anything not yet root-caused), fall back to the same
+  // colors Classic uses rather than let an invalid value silently
+  // produce a piece with no fill. A wrong-but-visible color is a much
+  // smaller problem than an invisible piece.
+  const isValidHex = (v: unknown): v is string => typeof v === 'string' && /^#[0-9a-fA-F]{3,8}$/.test(v);
+  const rawIsValid = isValidHex(rawPieceColors?.light) && isValidHex(rawPieceColors?.dark);
+  if (!rawIsValid && typeof console !== 'undefined') {
+    console.warn('[buildTintedPieceSet] pieceColors was missing/invalid, falling back to Classic colors. Received:', rawPieceColors);
+  }
+  const pieceColors = {
+    light: isValidHex(rawPieceColors?.light) ? rawPieceColors.light : '#ffffff',
+    dark: isValidHex(rawPieceColors?.dark) ? rawPieceColors.dark : '#2b2b2b',
+    baseLight: isValidHex(rawPieceColors?.baseLight) ? rawPieceColors.baseLight : (isValidHex(rawPieceColors?.light) ? rawPieceColors.light : '#ffffff'),
+    baseDark: isValidHex(rawPieceColors?.baseDark) ? rawPieceColors.baseDark : (isValidHex(rawPieceColors?.dark) ? rawPieceColors.dark : '#2b2b2b'),
+    finish: rawPieceColors?.finish ?? {},
+  };
 
   if (pieceShape === 'cburnett') {
     const wrapped: Record<string, (props?: any) => React.ReactElement> = {};
