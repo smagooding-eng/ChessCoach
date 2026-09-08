@@ -318,29 +318,17 @@ export function Puzzles() {
       }
       return wrapped;
     }
-    if (pieceColors.light === '#ffffff' && pieceColors.dark === '#2b2b2b' && Object.keys(pieceColors.finish).length === 0) return undefined;
-    // Same fix as ChessBoard.tsx -- see CustomPieces.tsx.
-    const isCustomHex = pieceColors.light.startsWith('#') && pieceColors.dark.startsWith('#');
-    if (isCustomHex) {
-      const lightScheme = getPieceColorScheme(pieceColors.light);
-      const darkScheme = getPieceColorScheme(pieceColors.dark);
-      return buildCustomPieceSet(
-        (isWhite) => {
-          const scheme = isWhite ? lightScheme : darkScheme;
-          return { fill: isWhite ? pieceColors.light : pieceColors.dark, outline: scheme.outline, detail: scheme.detail };
-        },
-        pieceColors.finish,
-      ) as unknown as typeof defaultPieces;
-    }
-    const wrapped: typeof defaultPieces = {};
-    for (const [key, PieceComponent] of Object.entries(defaultPieces)) {
-      const isWhitePiece = key.startsWith('w');
-      const fill = isWhitePiece ? pieceColors.light : pieceColors.dark;
-      wrapped[key] = (props) => (
-        <PieceComponent {...props} fill={fill} svgStyle={{ ...props?.svgStyle, ...pieceColors.finish }} />
-      );
-    }
-    return wrapped;
+    // Same fix as ChessBoard.tsx, applied to every piece style -- see
+    // CustomPieces.tsx.
+    const lightScheme = getPieceColorScheme(pieceColors.baseLight);
+    const darkScheme = getPieceColorScheme(pieceColors.baseDark);
+    return buildCustomPieceSet(
+      (isWhite) => {
+        const scheme = isWhite ? lightScheme : darkScheme;
+        return { fill: isWhite ? pieceColors.light : pieceColors.dark, outline: scheme.outline, detail: scheme.detail };
+      },
+      pieceColors.finish,
+    ) as unknown as typeof defaultPieces;
   }, [pieceColors, pieceShape]);
 
   const handleSquareClick = useCallback(({ square, piece }: { square: string; piece: { pieceType: string } | null }) => {

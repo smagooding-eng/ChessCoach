@@ -504,34 +504,21 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
       }
       return wrapped;
     }
-    if (pieceColors.light === '#ffffff' && pieceColors.dark === '#2b2b2b' && Object.keys(pieceColors.finish).length === 0) return undefined;
-    // Same fix as ChessBoard.tsx: custom colors (raw hex) get the
-    // parameterized piece set with a computed outline/detail instead of
-    // the stock pieces' hardcoded black outline and black/white detail --
-    // see CustomPieces.tsx. Flat fill here rather than the gradient
-    // version ChessBoard.tsx uses, since this component doesn't have its
-    // own <defs> block for the gradient url() to resolve against.
-    const isCustomHex = pieceColors.light.startsWith('#') && pieceColors.dark.startsWith('#');
-    if (isCustomHex) {
-      const lightScheme = getPieceColorScheme(pieceColors.light);
-      const darkScheme = getPieceColorScheme(pieceColors.dark);
-      return buildCustomPieceSet(
-        (isWhite) => {
-          const scheme = isWhite ? lightScheme : darkScheme;
-          return { fill: isWhite ? pieceColors.light : pieceColors.dark, outline: scheme.outline, detail: scheme.detail };
-        },
-        pieceColors.finish,
-      ) as unknown as typeof defaultPieces;
-    }
-    const wrapped: typeof defaultPieces = {};
-    for (const [key, PieceComponent] of Object.entries(defaultPieces)) {
-      const isWhitePiece = key.startsWith('w');
-      const fill = isWhitePiece ? pieceColors.light : pieceColors.dark;
-      wrapped[key] = (props) => (
-        <PieceComponent {...props} fill={fill} svgStyle={{ ...props?.svgStyle, ...pieceColors.finish }} />
-      );
-    }
-    return wrapped;
+    // Same fix as ChessBoard.tsx, applied to every piece style now (not
+    // just custom colors) -- computed outline/detail instead of the stock
+    // pieces' hardcoded black outline and black/white detail. See
+    // CustomPieces.tsx. Flat fill here rather than the gradient version
+    // ChessBoard.tsx uses for custom colors, since this component doesn't
+    // have its own <defs> block for a gradient url() to resolve against.
+    const lightScheme = getPieceColorScheme(pieceColors.baseLight);
+    const darkScheme = getPieceColorScheme(pieceColors.baseDark);
+    return buildCustomPieceSet(
+      (isWhite) => {
+        const scheme = isWhite ? lightScheme : darkScheme;
+        return { fill: isWhite ? pieceColors.light : pieceColors.dark, outline: scheme.outline, detail: scheme.detail };
+      },
+      pieceColors.finish,
+    ) as unknown as typeof defaultPieces;
   }, [pieceColors, pieceShape]);
   const activePgn = useMemo(() => {
     if (showFixLine) {

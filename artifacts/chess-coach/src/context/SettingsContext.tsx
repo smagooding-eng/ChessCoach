@@ -89,16 +89,16 @@ export const APP_BACKGROUNDS: Record<AppBackground, { label: string; css: React.
   noise:         { label: 'Textured', css: { backgroundImage: 'radial-gradient(rgba(255,255,255,0.015) 1px, transparent 1px)', backgroundSize: '3px 3px' } },
 };
 
-export const PIECE_STYLES: Record<Exclude<PieceStyle, 'custom'>, { light: string; dark: string; label: string; finish: React.CSSProperties; previewLight?: string; previewDark?: string }> = {
-  classic:  { light: '#ffffff', dark: '#2b2b2b', label: 'Classic',  finish: {} },
-  glossy:   { light: '#ffffff', dark: '#2b2b2b', label: 'Glossy',   finish: { filter: 'drop-shadow(0 2px 1px rgba(0,0,0,0.35)) brightness(1.08) contrast(1.1)' } },
-  outlined: { light: '#ffffff', dark: '#1a1a1a', label: 'Outlined', finish: { filter: 'drop-shadow(0 0 0.5px #000) drop-shadow(0 0 0.5px #000) drop-shadow(0 0 0.5px #000)' } },
-  ocean:    { light: '#dff1ff', dark: '#1c4b7a', label: 'Ocean',    finish: { filter: 'drop-shadow(0 1px 1px rgba(0,0,0,0.3))' } },
-  crimson:  { light: '#ffe9e9', dark: '#7a1c2b', label: 'Crimson',  finish: { filter: 'drop-shadow(0 1px 1px rgba(0,0,0,0.3))' } },
-  emerald:  { light: '#e8fff2', dark: '#166b45', label: 'Emerald',  finish: { filter: 'drop-shadow(0 1px 1px rgba(0,0,0,0.3))' } },
-  royal:    { light: '#f3e9ff', dark: '#4a1c7a', label: 'Royal',    finish: { filter: 'drop-shadow(0 1px 1px rgba(0,0,0,0.3))' } },
-  flat:     { light: '#f2f2f2', dark: '#232323', label: 'Flat',     finish: { filter: 'contrast(0.92) saturate(0.85)' } },
-  depth:    { light: '#ffffff', dark: '#2b2b2b', label: 'Depth',    finish: { filter: 'drop-shadow(0 3px 2px rgba(0,0,0,0.5)) drop-shadow(0 1px 0 rgba(255,255,255,0.15)) brightness(1.05)' } },
+export const PIECE_STYLES: Record<Exclude<PieceStyle, 'custom'>, { light: string; dark: string; label: string; finish: React.CSSProperties; previewLight?: string; previewDark?: string; baseLight: string; baseDark: string }> = {
+  classic:  { light: '#ffffff', dark: '#2b2b2b', label: 'Classic',  finish: {}, baseLight: '#ffffff', baseDark: '#2b2b2b' },
+  glossy:   { light: '#ffffff', dark: '#2b2b2b', label: 'Glossy',   finish: { filter: 'drop-shadow(0 2px 1px rgba(0,0,0,0.35)) brightness(1.08) contrast(1.1)' }, baseLight: '#ffffff', baseDark: '#2b2b2b' },
+  outlined: { light: '#ffffff', dark: '#1a1a1a', label: 'Outlined', finish: { filter: 'drop-shadow(0 0 0.5px #000) drop-shadow(0 0 0.5px #000) drop-shadow(0 0 0.5px #000)' }, baseLight: '#ffffff', baseDark: '#1a1a1a' },
+  ocean:    { light: '#dff1ff', dark: '#1c4b7a', label: 'Ocean',    finish: { filter: 'drop-shadow(0 1px 1px rgba(0,0,0,0.3))' }, baseLight: '#dff1ff', baseDark: '#1c4b7a' },
+  crimson:  { light: '#ffe9e9', dark: '#7a1c2b', label: 'Crimson',  finish: { filter: 'drop-shadow(0 1px 1px rgba(0,0,0,0.3))' }, baseLight: '#ffe9e9', baseDark: '#7a1c2b' },
+  emerald:  { light: '#e8fff2', dark: '#166b45', label: 'Emerald',  finish: { filter: 'drop-shadow(0 1px 1px rgba(0,0,0,0.3))' }, baseLight: '#e8fff2', baseDark: '#166b45' },
+  royal:    { light: '#f3e9ff', dark: '#4a1c7a', label: 'Royal',    finish: { filter: 'drop-shadow(0 1px 1px rgba(0,0,0,0.3))' }, baseLight: '#f3e9ff', baseDark: '#4a1c7a' },
+  flat:     { light: '#f2f2f2', dark: '#232323', label: 'Flat',     finish: { filter: 'contrast(0.92) saturate(0.85)' }, baseLight: '#f2f2f2', baseDark: '#232323' },
+  depth:    { light: '#ffffff', dark: '#2b2b2b', label: 'Depth',    finish: { filter: 'drop-shadow(0 3px 2px rgba(0,0,0,0.5)) drop-shadow(0 1px 0 rgba(255,255,255,0.15)) brightness(1.05)' }, baseLight: '#ffffff', baseDark: '#2b2b2b' },
   // These four use a gradient fill (defined once in ChessBoard.tsx's
   // <defs>, referenced here by url(#id)) instead of a flat color -- a
   // flat-filled silhouette plus a drop-shadow filter can only ever fake
@@ -112,14 +112,17 @@ export const PIECE_STYLES: Record<Exclude<PieceStyle, 'custom'>, { light: string
   // SVG url(#id) fill reference the way the real board pieces can. These
   // give that preview an accurate gradient via background-clip:text
   // instead (see Settings.tsx).
+  // baseLight/baseDark: a representative flat hex (the gradient's middle
+  // stop) for computing outline/detail colors from -- getPieceColorScheme
+  // needs one concrete color to work from, not a gradient reference.
   shaded:   { light: 'url(#cc-grad-shaded-light)', dark: 'url(#cc-grad-shaded-dark)', label: 'Shaded', finish: { filter: 'drop-shadow(0 2px 2px rgba(0,0,0,0.45))' },
-    previewLight: 'linear-gradient(135deg, #fdfdfd 0%, #e2e2e2 55%, #bdbdbd 100%)', previewDark: 'linear-gradient(135deg, #5a5a5a 0%, #333333 55%, #151515 100%)' },
+    previewLight: 'linear-gradient(135deg, #fdfdfd 0%, #e2e2e2 55%, #bdbdbd 100%)', previewDark: 'linear-gradient(135deg, #5a5a5a 0%, #333333 55%, #151515 100%)', baseLight: '#e2e2e2', baseDark: '#333333' },
   wood3d:   { light: 'url(#cc-grad-wood-light)', dark: 'url(#cc-grad-wood-dark)', label: '3D Wood', finish: { filter: 'drop-shadow(0 3px 2px rgba(40,20,0,0.5)) drop-shadow(0 1px 0 rgba(255,235,200,0.25))' },
-    previewLight: 'linear-gradient(135deg, #fbe9c6 0%, #e8c583 50%, #c08f43 100%)', previewDark: 'linear-gradient(135deg, #8a5a2e 0%, #5c3a1a 50%, #2e1a0a 100%)' },
+    previewLight: 'linear-gradient(135deg, #fbe9c6 0%, #e8c583 50%, #c08f43 100%)', previewDark: 'linear-gradient(135deg, #8a5a2e 0%, #5c3a1a 50%, #2e1a0a 100%)', baseLight: '#e8c583', baseDark: '#5c3a1a' },
   marble3d: { light: 'url(#cc-grad-marble-light)', dark: 'url(#cc-grad-marble-dark)', label: '3D Marble', finish: { filter: 'drop-shadow(0 3px 3px rgba(0,0,0,0.4)) drop-shadow(0 1px 0 rgba(255,255,255,0.3))' },
-    previewLight: 'linear-gradient(135deg, #ffffff 0%, #e6e6ee 60%, #c4c4d2 100%)', previewDark: 'linear-gradient(135deg, #4a4a54 0%, #26262e 60%, #0e0e12 100%)' },
+    previewLight: 'linear-gradient(135deg, #ffffff 0%, #e6e6ee 60%, #c4c4d2 100%)', previewDark: 'linear-gradient(135deg, #4a4a54 0%, #26262e 60%, #0e0e12 100%)', baseLight: '#e6e6ee', baseDark: '#26262e' },
   chrome:   { light: 'url(#cc-grad-chrome-light)', dark: 'url(#cc-grad-chrome-dark)', label: 'Chrome', finish: { filter: 'drop-shadow(0 2px 3px rgba(0,0,0,0.5)) contrast(1.15)' },
-    previewLight: 'linear-gradient(135deg, #ffffff 0%, #c9d3d9 35%, #eef3f5 60%, #8a97a0 100%)', previewDark: 'linear-gradient(135deg, #7a828a 0%, #2a2d31 35%, #4a4f55 60%, #0a0b0c 100%)' },
+    previewLight: 'linear-gradient(135deg, #ffffff 0%, #c9d3d9 35%, #eef3f5 60%, #8a97a0 100%)', previewDark: 'linear-gradient(135deg, #7a828a 0%, #2a2d31 35%, #4a4f55 60%, #0a0b0c 100%)', baseLight: '#c9d3d9', baseDark: '#2a2d31' },
 };
 
 export const BOARD_SIZES: Record<BoardSize, { maxWidth: number; label: string }> = {
@@ -200,7 +203,7 @@ interface SettingsContextValue extends Settings {
   boardColors: ColorPair;
   boardTextureCss: { backgroundImage: string; backgroundImageDark?: string; backgroundSize?: string };
   appBackgroundCss: React.CSSProperties;
-  pieceColors: ColorPair & { finish: React.CSSProperties };
+  pieceColors: ColorPair & { finish: React.CSSProperties; baseLight: string; baseDark: string };
   boardMaxWidth: number;
   savedThemes: SavedTheme[];
   saveCurrentAsTheme: (name: string) => void;
@@ -268,7 +271,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     settings.boardTheme === 'custom' ? settings.boardCustomColors : BOARD_THEMES[settings.boardTheme];
   const resolvedPieceStyle =
     settings.pieceStyle === 'custom'
-      ? { ...settings.pieceCustomColors, finish: {} as React.CSSProperties }
+      ? { ...settings.pieceCustomColors, finish: {} as React.CSSProperties, baseLight: settings.pieceCustomColors.light, baseDark: settings.pieceCustomColors.dark }
       : { ...PIECE_STYLES[settings.pieceStyle] };
 
   const value: SettingsContextValue = {
