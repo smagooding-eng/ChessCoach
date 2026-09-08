@@ -57,14 +57,19 @@ export interface PieceColorScheme {
 export function getPieceColorScheme(hex: string): PieceColorScheme {
   const isDark = perceivedBrightness(hex) < 128;
   return {
-    // Strongly lightened/darkened so the outline reads clearly against
-    // both the piece's own fill and a same-toned board square -- this is
-    // the actual fix for a dark custom piece disappearing on a dark square.
-    outline: isDark ? blend(hex, 0.82) : blend(hex, -0.75),
+    // Lightened/darkened enough to read clearly against both the
+    // piece's own fill and a same-toned board square (the actual fix for
+    // a dark piece disappearing on a dark square) -- but not so far
+    // toward white/black that it reads as a glowing halo around the
+    // piece instead of a normal outline. 0.82 (the original amount) was
+    // too extreme for anything but a near-black piece; 0.5 stays clearly
+    // visible without the halo look on saturated colors like purple or
+    // green.
+    outline: isDark ? blend(hex, 0.5) : blend(hex, -0.75),
     // Dark pieces get a lighter tint of their own color for detail lines
     // and eyes; light pieces get a darker one -- a shade of the piece's
     // own color either way, not a fixed black or white.
-    detail: isDark ? blend(hex, 0.5) : blend(hex, -0.5),
+    detail: isDark ? blend(hex, 0.4) : blend(hex, -0.5),
     gradientLight: blend(hex, 0.22),
     gradientDark: blend(hex, -0.22),
   };
