@@ -76,6 +76,7 @@ function StatCard({
   secondaryLabel,
   accent,
   footnote,
+  onClick,
 }: {
   icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
   label: string;
@@ -85,11 +86,14 @@ function StatCard({
   secondaryLabel?: string;
   accent?: string;
   footnote?: string;
+  onClick?: () => void;
 }) {
   const color = accent ?? CHESSCOM_GREEN;
+  const Wrapper = onClick ? 'button' : 'div';
   return (
-    <div
-      className="rounded-xl p-4 flex flex-col gap-3"
+    <Wrapper
+      onClick={onClick}
+      className={cn('rounded-xl p-4 flex flex-col gap-3 text-left w-full', onClick && 'hover:brightness-110 transition-all cursor-pointer')}
       style={{ background: BG_CARD, border: `1px solid rgba(255,255,255,0.05)` }}
     >
       <div className="flex items-center gap-2">
@@ -99,7 +103,7 @@ function StatCard({
         >
           <Icon className="w-4 h-4" style={{ color }} />
         </div>
-        <p className="text-[10px] font-black uppercase tracking-[0.18em]" style={{ color: TEXT_MUTED }}>
+        <p className={cn('text-[10px] font-black uppercase tracking-[0.18em]', onClick && 'underline decoration-dotted underline-offset-2')} style={{ color: TEXT_MUTED }}>
           {label}
         </p>
       </div>
@@ -128,7 +132,7 @@ function StatCard({
           {footnote}
         </p>
       )}
-    </div>
+    </Wrapper>
   );
 }
 
@@ -178,6 +182,37 @@ export function Admin() {
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'overview' | 'traffic' | 'ai' | 'users' | 'growth' | 'tools'>('overview');
+  const [showUsers, setShowUsers] = useState(false);
+  const [showSubscribers, setShowSubscribers] = useState(false);
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [emailRecipients, setEmailRecipients] = useState<string[]>([]);
+  const [clearing, setClearing] = useState(false);
+  const [clearResult, setClearResult] = useState<string | null>(null);
+
+  const handleEmailUsers = (emails: string[]) => {
+    setEmailRecipients(emails);
+    setShowUsers(false);
+    setShowEmailModal(true);
+  };
+
+  const openComposer = () => {
+    setEmailRecipients([]);
+    setShowEmailModal(true);
+  };
+
+  const handleClearCache = async () => {
+    if (!confirm('Clear ALL courses, reviews, and weaknesses for every user? Scout reports will be preserved.')) return;
+    setClearing(true);
+    setClearResult(null);
+    try {
+      const res = await apiFetch('/api/admin/clear-ai-cache', { method: 'POST', credentials: 'include' });
+      const data = await res.json();
+      if (res.ok) setClearResult('Cache cleared successfully');
+      else setClearResult(data.error || 'Failed');
+    } catch { setClearResult('Request failed'); }
+    finally { setClearing(false); setTimeout(() => setClearResult(null), 4000); }
+  };
 
   useEffect(() => {
     if (!isAuthLoading && !authUser?.isAdmin) {
@@ -201,7 +236,12 @@ export function Admin() {
   }, []);
 
   useEffect(() => {
-    if (authUser?.isAdmin) load();
+    if (!authUser?.isAdmin) return;
+    load();
+    // Preserves the "auto-refreshes every 30s" behavior that used to live
+    // in the now-removed AdminTicker component's own separate stats poll.
+    const interval = setInterval(load, 30000);
+    return () => clearInterval(interval);
   }, [authUser, load]);
 
   if (isAuthLoading || !authUser?.isAdmin) {
@@ -214,19 +254,64 @@ export function Admin() {
         <div className="flex-1 min-w-[260px]">
           <PageHero piece="♚" title="Admin Dashboard" subtitle="Combined user and activity stats across the entire app." />
         </div>
-        <button
-          onClick={load}
-          disabled={loading}
-          className="flex items-center gap-2 px-3 py-2 rounded-xl font-bold text-sm transition-all disabled:opacity-50"
-          style={{
-            background: `${CHESSCOM_GREEN}1a`,
-            color: CHESSCOM_GREEN,
-            border: `1px solid ${CHESSCOM_GREEN}33`,
-          }}
-        >
-          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-          Refresh
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={handleClearCache}
+            disabled={clearing}
+            className="text-[11px] font-black px-2.5 py-2 rounded-xl transition-colors flex items-center gap-1 bg-red-500/25 border border-red-500/40 text-red-300 hover:bg-red-500/35 disabled:opacity-50"
+          >
+            {clearing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+            {clearing ? 'Clearing…' : 'Clear Cache'}
+          </button>
+          {clearResult && <span className="text-[11px] font-medium text-emerald-400">{clearResult}</span>}
+          <button
+            onClick={openComposer}
+            className="text-[11px] font-bold px-2.5 py-2 rounded-xl transition-colors flex items-center gap-1 bg-amber-500/20 border border-amber-500/30 text-amber-300 hover:bg-amber-500/30"
+          >
+            <Mail className="w-3.5 h-3.5" /> Compose
+          </button>
+          <button
+            onClick={load}
+            disabled={loading}
+            className="flex items-center gap-2 px-3 py-2 rounded-xl font-bold text-sm transition-all disabled:opacity-50"
+            style={{
+              background: `${CHESSCOM_GREEN}1a`,
+              color: CHESSCOM_GREEN,
+              border: `1px solid ${CHESSCOM_GREEN}33`,
+            }}
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
+        </div>
+      </div>
+
+      {/* One tab bar instead of one continuous scroll through 15 separate
+          panels -- each stat/panel now lives in exactly one place, grouped
+          by the question it answers, instead of wherever it happened to
+          get added over time. auto-refreshes every 30s via the interval
+          on the load() effect above (this used to be a second, separate
+          poll inside the now-removed AdminTicker component). */}
+      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 -mx-3 px-3 md:mx-0 md:px-0">
+        {([
+          ['overview', 'Overview'],
+          ['traffic', 'Traffic & Funnel'],
+          ['ai', 'AI Usage & Cost'],
+          ['users', 'Users'],
+          ['growth', 'Growth & Marketing'],
+          ['tools', 'Admin Tools'],
+        ] as const).map(([key, label]) => (
+          <button
+            key={key}
+            onClick={() => setActiveTab(key)}
+            className="shrink-0 px-3.5 py-2 rounded-full text-xs font-bold transition-all"
+            style={activeTab === key
+              ? { background: CHESSCOM_GREEN, color: '#000' }
+              : { background: 'rgba(255,255,255,0.05)', color: TEXT_MUTED }}
+          >
+            {label}
+          </button>
+        ))}
       </div>
 
       {error && (
@@ -238,32 +323,8 @@ export function Admin() {
         </div>
       )}
 
-      <div
-        className="rounded-xl p-4"
-        style={{ background: BG_CARD, border: `1px solid rgba(255,255,255,0.05)` }}
-      >
-        <div className="flex items-center justify-between gap-3 mb-3">
-          <div>
-            <h2 className="text-base font-black" style={{ color: TEXT_LIGHT }}>Live Play (admin only)</h2>
-            <p className="text-[11px] mt-0.5" style={{ color: TEXT_MUTED }}>Hidden from regular users for now. Use these links to test.</p>
-          </div>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Link href="/live">
-            <a className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl font-bold text-sm"
-              style={{ background: `${CHESSCOM_GREEN}1a`, color: CHESSCOM_GREEN, border: `1px solid ${CHESSCOM_GREEN}33` }}>
-              <Play className="w-4 h-4" /> Play Live
-            </a>
-          </Link>
-          <Link href="/live/history">
-            <a className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl font-bold text-sm"
-              style={{ background: 'rgba(255,255,255,0.04)', color: TEXT_LIGHT, border: '1px solid rgba(255,255,255,0.08)' }}>
-              <History className="w-4 h-4" /> Live History
-            </a>
-          </Link>
-        </div>
-      </div>
-
+      {activeTab === 'overview' && (
+      <>
       {loading && !stats && (
         <div className="flex items-center justify-center py-16" style={{ color: TEXT_MUTED }}>
           Loading…
@@ -279,6 +340,7 @@ export function Admin() {
             primaryLabel="Total"
             secondary={stats.users.today}
             secondaryLabel="Today"
+            onClick={() => setShowUsers(true)}
           />
           <StatCard
             icon={Eye}
@@ -305,6 +367,7 @@ export function Admin() {
             secondary={stats.subscriptions.active}
             secondaryLabel="Active"
             accent="#eaa631"
+            onClick={() => setShowSubscribers(true)}
           />
           <StatCard
             icon={CreditCard}
@@ -344,49 +407,10 @@ export function Admin() {
         </div>
       )}
 
-      {stats && stats.visitorBreakdown && (
-        <VisitorBreakdownPanel
-          title="Visitors, Site-Wide"
-          subtitle="All time"
-          data={stats.visitorBreakdown}
-        />
-      )}
-
-      {stats && stats.funnel && (
-        <div
-          className="rounded-xl p-4"
-          style={{ background: BG_CARD, border: `1px solid rgba(255,255,255,0.05)` }}
-        >
-          <h2 className="text-base font-black mb-3" style={{ color: TEXT_LIGHT }}>
-            Conversion Funnel
-          </h2>
-          <div className="flex items-stretch gap-2">
-            {[
-              { label: 'Landing Page Visitors', value: stats.funnel.landingPageUniqueIps, sub: 'unique IPs' },
-              { label: 'Signed Up', value: stats.funnel.signups, sub: 'accounts' },
-              { label: 'Paying', value: stats.funnel.paying, sub: 'subscriptions' },
-            ].map((step, i, arr) => {
-              const prevValue = i === 0 ? step.value : arr[i - 1].value;
-              const pct = prevValue > 0 ? Math.round((step.value / prevValue) * 100) : 0;
-              return (
-                <div key={step.label} className="flex-1 flex items-center gap-2">
-                  <div className="flex-1 rounded-lg p-3 text-center" style={{ background: 'rgba(255,255,255,0.03)' }}>
-                    <p className="text-2xl font-black" style={{ color: CHESSCOM_GREEN }}>{step.value}</p>
-                    <p className="text-[10px] font-bold uppercase tracking-wider mt-1" style={{ color: TEXT_MUTED }}>{step.label}</p>
-                    <p className="text-[10px]" style={{ color: TEXT_MUTED }}>{step.sub}</p>
-                    {i > 0 && (
-                      <p className="text-[10px] font-bold mt-1" style={{ color: CHESSCOM_GREEN }}>{pct}% of previous step</p>
-                    )}
-                  </div>
-                  {i < arr.length - 1 && (
-                    <ChevronRight className="w-4 h-4 shrink-0" style={{ color: TEXT_MUTED }} />
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
+      <AnimatePresence>
+        {showUsers && <UserListPanel onClose={() => setShowUsers(false)} onEmailUsers={handleEmailUsers} />}
+        {showSubscribers && <SubscribersPanel onClose={() => setShowSubscribers(false)} />}
+      </AnimatePresence>
 
       {stats && stats.topPages && stats.topPages.length > 0 && (
         <div
@@ -437,8 +461,186 @@ export function Admin() {
           </div>
         </div>
       )}
+      </>
+      )}
 
-      <AdminTicker />
+      {activeTab === 'traffic' && (
+        <>
+          {stats && stats.visitorBreakdown && (
+            <VisitorBreakdownPanel
+              title="Visitors, Site-Wide"
+              subtitle="All time"
+              data={stats.visitorBreakdown}
+            />
+          )}
+
+          {stats && stats.funnel && (
+            <div
+              className="rounded-xl p-4"
+              style={{ background: BG_CARD, border: `1px solid rgba(255,255,255,0.05)` }}
+            >
+              <h2 className="text-base font-black mb-1" style={{ color: TEXT_LIGHT }}>
+                Conversion Funnel
+              </h2>
+              <p className="text-[11px] mb-3" style={{ color: TEXT_MUTED }}>
+                Counted by unique IP through to a paying subscription — a different method than the more granular funnel below, which tracks individual visitor sessions through each step of the signup form specifically. The two won't match exactly; each answers a different question.
+              </p>
+              <div className="flex items-stretch gap-2">
+                {[
+                  { label: 'Landing Page Visitors', value: stats.funnel.landingPageUniqueIps, sub: 'unique IPs' },
+                  { label: 'Signed Up', value: stats.funnel.signups, sub: 'accounts' },
+                  { label: 'Paying', value: stats.funnel.paying, sub: 'subscriptions' },
+                ].map((step, i, arr) => {
+                  const prevValue = i === 0 ? step.value : arr[i - 1].value;
+                  const pct = prevValue > 0 ? Math.round((step.value / prevValue) * 100) : 0;
+                  return (
+                    <div key={step.label} className="flex-1 flex items-center gap-2">
+                      <div className="flex-1 rounded-lg p-3 text-center" style={{ background: 'rgba(255,255,255,0.03)' }}>
+                        <p className="text-2xl font-black" style={{ color: CHESSCOM_GREEN }}>{step.value}</p>
+                        <p className="text-[10px] font-bold uppercase tracking-wider mt-1" style={{ color: TEXT_MUTED }}>{step.label}</p>
+                        <p className="text-[10px]" style={{ color: TEXT_MUTED }}>{step.sub}</p>
+                        {i > 0 && (
+                          <p className="text-[10px] font-bold mt-1" style={{ color: CHESSCOM_GREEN }}>{pct}% of previous step</p>
+                        )}
+                      </div>
+                      {i < arr.length - 1 && (
+                        <ChevronRight className="w-4 h-4 shrink-0" style={{ color: TEXT_MUTED }} />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          <LandingFunnelPanel />
+        </>
+      )}
+
+      {activeTab === 'ai' && <AiUsagePanel />}
+
+      {activeTab === 'users' && <UserActivityPanel />}
+
+      {activeTab === 'growth' && (
+        <>
+          <ReferralCodesPanel />
+          <ReferralSignupsPanel />
+          <AffiliatesPanel />
+          <OutreachStudio />
+          <SeoArticlesPanel />
+          <FacebookAutoPostPanel />
+        </>
+      )}
+
+      {activeTab === 'tools' && (
+        <>
+          <div
+            className="rounded-xl p-4"
+            style={{ background: BG_CARD, border: `1px solid rgba(255,255,255,0.05)` }}
+          >
+            <div className="flex items-center justify-between gap-3 mb-3">
+              <div>
+                <h2 className="text-base font-black" style={{ color: TEXT_LIGHT }}>Live Play (admin only)</h2>
+                <p className="text-[11px] mt-0.5" style={{ color: TEXT_MUTED }}>Hidden from regular users for now. Use these links to test.</p>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Link href="/live">
+                <a className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl font-bold text-sm"
+                  style={{ background: `${CHESSCOM_GREEN}1a`, color: CHESSCOM_GREEN, border: `1px solid ${CHESSCOM_GREEN}33` }}>
+                  <Play className="w-4 h-4" /> Play Live
+                </a>
+              </Link>
+              <Link href="/live/history">
+                <a className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl font-bold text-sm"
+                  style={{ background: 'rgba(255,255,255,0.04)', color: TEXT_LIGHT, border: '1px solid rgba(255,255,255,0.08)' }}>
+                  <History className="w-4 h-4" /> Live History
+                </a>
+              </Link>
+            </div>
+          </div>
+
+          <BulkReviewPanel />
+
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="rounded-xl border border-border/40 bg-card overflow-hidden"
+          >
+            <div className="px-5 py-3 border-b border-border/30 bg-orange-500/5">
+              <h3 className="text-sm font-bold text-orange-400 flex items-center gap-2">
+                <Zap className="w-4 h-4" /> Admin Tools
+              </h3>
+            </div>
+            <div className="p-4 space-y-2">
+              <button
+                onClick={async () => {
+                  if (!confirm('This will normalize all Chess960 game FENs in the database and clear their cached reviews. Continue?')) return;
+                  try {
+                    const res = await apiFetch('/api/admin/fix-chess960', { method: 'POST' });
+                    const data = await res.json() as { fixedPgns?: number; totalGames?: number; error?: string };
+                    if (res.ok) alert(`Fixed ${data.fixedPgns} Chess960 games out of ${data.totalGames} total.`);
+                    else alert(`Error: ${data.error || 'Unknown error'}`);
+                  } catch { alert('Failed to run fix'); }
+                }}
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all hover:bg-orange-500/25 text-left border border-orange-500/45"
+              >
+                <span className="text-lg">♜</span>
+                <div>
+                  <p className="text-foreground font-bold">Fix Chess960 Games</p>
+                  <p className="text-xs text-muted-foreground">Normalize FENs for old imported Chess960 games &amp; clear stale reviews</p>
+                </div>
+              </button>
+            </div>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="rounded-xl border border-border/40 bg-card overflow-hidden"
+          >
+            <div className="px-5 py-3 border-b border-border/30" style={{ background: 'rgba(224,160,58,0.08)' }}>
+              <h3 className="text-sm font-bold flex items-center gap-2" style={{ color: '#e0a03a' }}>
+                <Wrench className="w-4 h-4" /> Features in Development
+              </h3>
+              <p className="text-[11px] text-muted-foreground mt-0.5">Admin-only for now &mdash; not linked anywhere in the regular app.</p>
+            </div>
+            <div className="p-4 space-y-2">
+              <Link href="/admin/traps" className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all hover:bg-white/5 text-left border border-white/10">
+                <span className="text-lg">🗡️</span>
+                <div className="flex-1">
+                  <p className="text-foreground font-bold">Chess Traps Training</p>
+                  <p className="text-xs text-muted-foreground">Set them and spot them &mdash; in progress</p>
+                </div>
+                <ChevronRight className="w-4 h-4 text-muted-foreground" />
+              </Link>
+              <div className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-left border border-white/5 opacity-50">
+                <span className="text-lg">📖</span>
+                <div className="flex-1">
+                  <p className="text-foreground font-bold">Beginner Courses</p>
+                  <p className="text-xs text-muted-foreground">Not started yet</p>
+                </div>
+              </div>
+              <div className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-left border border-white/5 opacity-50">
+                <span className="text-lg">🧸</span>
+                <div className="flex-1">
+                  <p className="text-foreground font-bold">Chess for Kids</p>
+                  <p className="text-xs text-muted-foreground">Not started yet</p>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        </>
+      )}
+
+      <AnimatePresence>
+        {showEmailModal && (
+          <EmailComposerModal
+            onClose={() => setShowEmailModal(false)}
+            initialRecipients={emailRecipients}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -3165,222 +3367,6 @@ ${sanitized}
   );
 }
 
-function AdminTicker() {
-  const [stats, setStats] = useState<AdminStats | null>(null);
-  const [showUsers, setShowUsers] = useState(false);
-  const [showSubscribers, setShowSubscribers] = useState(false);
-  const [showEmailModal, setShowEmailModal] = useState(false);
-  const [emailRecipients, setEmailRecipients] = useState<string[]>([]);
-  const [clearing, setClearing] = useState(false);
-  const [clearResult, setClearResult] = useState<string | null>(null);
-
-  useEffect(() => {
-    const fetchStats = () => {
-      apiFetch('/api/admin/stats', { credentials: 'include' })
-        .then(r => r.ok ? r.json() : null)
-        .then(d => { if (d) setStats(d); })
-        .catch(() => {});
-    };
-    fetchStats();
-    const interval = setInterval(fetchStats, 30000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const handleEmailUsers = (emails: string[]) => {
-    setEmailRecipients(emails);
-    setShowUsers(false);
-    setShowEmailModal(true);
-  };
-
-  const openComposer = () => {
-    setEmailRecipients([]);
-    setShowEmailModal(true);
-  };
-
-  const handleClearCache = async () => {
-    if (!confirm('Clear ALL courses, reviews, and weaknesses for every user? Scout reports will be preserved.')) return;
-    setClearing(true);
-    setClearResult(null);
-    try {
-      const res = await apiFetch('/api/admin/clear-ai-cache', { method: 'POST', credentials: 'include' });
-      const data = await res.json();
-      if (res.ok) setClearResult('Cache cleared successfully');
-      else setClearResult(data.error || 'Failed');
-    } catch { setClearResult('Request failed'); }
-    finally { setClearing(false); setTimeout(() => setClearResult(null), 4000); }
-  };
-
-  if (!stats) return null;
-
-  return (
-    <>
-      <motion.div
-        variants={{ hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0 } }}
-        className="bg-card border border-amber-500/20 rounded-xl overflow-hidden"
-      >
-        <div className="px-4 py-3 border-b border-amber-500/15 bg-amber-500/5">
-          <h2 className="text-sm font-bold text-amber-400 flex items-center gap-2">
-            <Activity className="w-4 h-4" /> Admin Dashboard
-            <span className="ml-auto flex items-center gap-2">
-              <button
-                onClick={handleClearCache}
-                disabled={clearing}
-                className="text-[10px] font-black px-2.5 py-1.5 rounded-lg transition-colors flex items-center gap-1 bg-red-500/25 border bg-red-500 text-white hover:bg-red-500/35 disabled:opacity-50"
-              >
-                {clearing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
-                {clearing ? 'Clearing...' : 'Clear Cache'}
-              </button>
-              {clearResult && (
-                <span className="text-[10px] font-medium text-emerald-400">{clearResult}</span>
-              )}
-              <button
-                onClick={openComposer}
-                className="text-[10px] font-bold px-2 py-1 rounded transition-colors flex items-center gap-1 bg-amber-500/25 text-amber-300 hover:bg-amber-500/35 hover:text-amber-200"
-              >
-                <Mail className="w-3 h-3" /> Compose
-              </button>
-              <span className="text-[10px] font-normal text-muted-foreground">auto-refreshes every 30s</span>
-            </span>
-          </h2>
-        </div>
-        <div className="grid grid-cols-3 divide-x divide-border/30">
-          <div className="p-4 text-center">
-            <div className="w-8 h-8 bg-blue-400/10 rounded-xl flex items-center justify-center mx-auto mb-2">
-              <Eye className="w-4 h-4 text-blue-400" />
-            </div>
-            <p className="text-xl font-black text-foreground">{(stats.uniqueVisitors?.total ?? stats.pageViews.total).toLocaleString()}</p>
-            <p className="text-xs text-muted-foreground font-medium">Unique Visitors</p>
-            <p className="text-[10px] text-muted-foreground/60 mt-0.5">{(stats.uniqueVisitors?.today ?? stats.pageViews.today)} today</p>
-          </div>
-          <button
-            onClick={() => setShowUsers(v => !v)}
-            className="p-4 text-center hover:bg-emerald-400/5 transition-colors cursor-pointer"
-          >
-            <div className="w-8 h-8 bg-emerald-400/10 rounded-xl flex items-center justify-center mx-auto mb-2">
-              <Users className="w-4 h-4 text-emerald-400" />
-            </div>
-            <p className="text-xl font-black text-foreground">{stats.users.total.toLocaleString()}</p>
-            <p className="text-xs text-emerald-400 font-medium underline decoration-dotted underline-offset-2">Users</p>
-            <p className="text-[10px] text-muted-foreground/60 mt-0.5">{stats.users.today} today</p>
-          </button>
-          <button
-            onClick={() => setShowSubscribers(v => !v)}
-            className="p-4 text-center hover:bg-primary transition-colors cursor-pointer"
-          >
-            <div className="w-8 h-8 bg-primary rounded-xl flex items-center justify-center mx-auto mb-2">
-              <CreditCard className="w-4 h-4 text-primary-foreground" />
-            </div>
-            <p className="text-xl font-black text-foreground">{stats.subscriptions.total.toLocaleString()}</p>
-            <p className="text-xs text-muted-foreground font-medium underline decoration-dotted underline-offset-2">Subscriptions</p>
-            <div className="text-[10px] text-muted-foreground/60 mt-0.5 space-y-0.5">
-              {stats.subscriptions.active > 0 && <p className="text-emerald-400">{stats.subscriptions.active} paid</p>}
-              {stats.subscriptions.trialing > 0 && <p className="text-blue-400">{stats.subscriptions.trialing} trial</p>}
-              {stats.subscriptions.pastDue > 0 && <p className="text-orange-400">{stats.subscriptions.pastDue} past due</p>}
-            </div>
-          </button>
-        </div>
-        <AnimatePresence>
-          {showUsers && <UserListPanel onClose={() => setShowUsers(false)} onEmailUsers={handleEmailUsers} />}
-          {showSubscribers && <SubscribersPanel onClose={() => setShowSubscribers(false)} />}
-        </AnimatePresence>
-      </motion.div>
-
-      <LandingFunnelPanel />
-
-      <AiUsagePanel />
-
-      <UserActivityPanel />
-
-      <BulkReviewPanel />
-      <ReferralCodesPanel />
-      <ReferralSignupsPanel />
-      <AffiliatesPanel />
-
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="rounded-xl border border-border/40 bg-card overflow-hidden"
-      >
-        <div className="px-5 py-3 border-b border-border/30 bg-orange-500/5">
-          <h3 className="text-sm font-bold text-orange-400 flex items-center gap-2">
-            <Zap className="w-4 h-4" /> Admin Tools
-          </h3>
-        </div>
-        <div className="p-4 space-y-2">
-          <button
-            onClick={async () => {
-              if (!confirm('This will normalize all Chess960 game FENs in the database and clear their cached reviews. Continue?')) return;
-              try {
-                const res = await apiFetch('/api/admin/fix-chess960', { method: 'POST' });
-                const data = await res.json() as { fixedPgns?: number; totalGames?: number; error?: string };
-                if (res.ok) alert(`Fixed ${data.fixedPgns} Chess960 games out of ${data.totalGames} total.`);
-                else alert(`Error: ${data.error || 'Unknown error'}`);
-              } catch { alert('Failed to run fix'); }
-            }}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all hover:bg-orange-500/25 text-left border border-orange-500/45"
-          >
-            <span className="text-lg">♜</span>
-            <div>
-              <p className="text-foreground font-bold">Fix Chess960 Games</p>
-              <p className="text-xs text-muted-foreground">Normalize FENs for old imported Chess960 games &amp; clear stale reviews</p>
-            </div>
-          </button>
-        </div>
-      </motion.div>
-
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="rounded-xl border border-border/40 bg-card overflow-hidden"
-      >
-        <div className="px-5 py-3 border-b border-border/30" style={{ background: 'rgba(224,160,58,0.08)' }}>
-          <h3 className="text-sm font-bold flex items-center gap-2" style={{ color: '#e0a03a' }}>
-            <Wrench className="w-4 h-4" /> Features in Development
-          </h3>
-          <p className="text-[11px] text-muted-foreground mt-0.5">Admin-only for now &mdash; not linked anywhere in the regular app.</p>
-        </div>
-        <div className="p-4 space-y-2">
-          <Link href="/admin/traps" className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all hover:bg-white/5 text-left border border-white/10">
-            <span className="text-lg">🗡️</span>
-            <div className="flex-1">
-              <p className="text-foreground font-bold">Chess Traps Training</p>
-              <p className="text-xs text-muted-foreground">Set them and spot them &mdash; in progress</p>
-            </div>
-            <ChevronRight className="w-4 h-4 text-muted-foreground" />
-          </Link>
-          <div className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-left border border-white/5 opacity-50">
-            <span className="text-lg">📖</span>
-            <div className="flex-1">
-              <p className="text-foreground font-bold">Beginner Courses</p>
-              <p className="text-xs text-muted-foreground">Not started yet</p>
-            </div>
-          </div>
-          <div className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-left border border-white/5 opacity-50">
-            <span className="text-lg">🧸</span>
-            <div className="flex-1">
-              <p className="text-foreground font-bold">Chess for Kids</p>
-              <p className="text-xs text-muted-foreground">Not started yet</p>
-            </div>
-          </div>
-        </div>
-      </motion.div>
-
-      <OutreachStudio />
-
-      <SeoArticlesPanel />
-      <FacebookAutoPostPanel />
-
-      <AnimatePresence>
-        {showEmailModal && (
-          <EmailComposerModal
-            onClose={() => setShowEmailModal(false)}
-            initialRecipients={emailRecipients}
-          />
-        )}
-      </AnimatePresence>
-    </>
-  );
-}
 
 const MARKETING_THEMES = ["Free Trial", "Opponent Scouting", "Game Analysis", "New Feature", "General Promo", "ELO Improvement"];
 
