@@ -2061,8 +2061,13 @@ function BulkReviewPanel() {
     queueDone: number;
   } | null>(null);
   const [targetGames, setTargetGames] = useState(1_000_000);
-  const [depth, setDepth] = useState(10);
-  const [engineDelayMs, setEngineDelayMs] = useState(250);
+  // Depth 10 / 250ms delay (the old defaults) worked out to roughly 200
+  // games in 16 hours in practice -- far too slow for something that
+  // only feeds public landing-page counters, not real per-user analysis
+  // quality. Depth 6 trades very little of that value for a large,
+  // roughly-exponential speedup in Stockfish's per-position search time.
+  const [depth, setDepth] = useState(6);
+  const [engineDelayMs, setEngineDelayMs] = useState(20);
   const [busy, setBusy] = useState(false);
 
   const load = () => {
