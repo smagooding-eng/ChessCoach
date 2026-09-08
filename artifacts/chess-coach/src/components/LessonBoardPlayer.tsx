@@ -9,7 +9,8 @@ import {
 } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { motion, AnimatePresence } from 'framer-motion';
-import { cn } from '@/lib/utils';
+import { cn, getPieceColorScheme } from '@/lib/utils';
+import { buildCustomPieceSet } from './CustomPieces';
 
 const CHESSCOM_GREEN = '#81b64c';
 const BG_DARK = '#262421';
@@ -504,6 +505,24 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
       return wrapped;
     }
     if (pieceColors.light === '#ffffff' && pieceColors.dark === '#2b2b2b' && Object.keys(pieceColors.finish).length === 0) return undefined;
+    // Same fix as ChessBoard.tsx: custom colors (raw hex) get the
+    // parameterized piece set with a computed outline/detail instead of
+    // the stock pieces' hardcoded black outline and black/white detail --
+    // see CustomPieces.tsx. Flat fill here rather than the gradient
+    // version ChessBoard.tsx uses, since this component doesn't have its
+    // own <defs> block for the gradient url() to resolve against.
+    const isCustomHex = pieceColors.light.startsWith('#') && pieceColors.dark.startsWith('#');
+    if (isCustomHex) {
+      const lightScheme = getPieceColorScheme(pieceColors.light);
+      const darkScheme = getPieceColorScheme(pieceColors.dark);
+      return buildCustomPieceSet(
+        (isWhite) => {
+          const scheme = isWhite ? lightScheme : darkScheme;
+          return { fill: isWhite ? pieceColors.light : pieceColors.dark, outline: scheme.outline, detail: scheme.detail };
+        },
+        pieceColors.finish,
+      ) as unknown as typeof defaultPieces;
+    }
     const wrapped: typeof defaultPieces = {};
     for (const [key, PieceComponent] of Object.entries(defaultPieces)) {
       const isWhitePiece = key.startsWith('w');

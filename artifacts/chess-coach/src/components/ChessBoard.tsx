@@ -1,7 +1,8 @@
 import React, { useState, useCallback, useMemo, useRef, useEffect, Component, type ReactNode } from 'react';
 import { Chessboard, defaultPieces } from 'react-chessboard';
 import { Chess } from 'chess.js';
-import { normalizeFen } from '@/lib/utils';
+import { normalizeFen, getPieceColorScheme } from '@/lib/utils';
+import { buildCustomPieceSet } from './CustomPieces';
 import { useSettings, playMoveSound } from '@/context/SettingsContext';
 import { Trophy, X } from 'lucide-react';
 
@@ -201,6 +202,13 @@ export function ChessBoard({
   const [pendingMove, setPendingMove] = useState<{ from: string; to: string; san: string; isCorrect: boolean; tempFen: string } | null>(null);
   const [promotionPending, setPromotionPending] = useState<{ from: string; to: string } | null>(null);
 
+  // Computed once, referenced both by the custom piece set below and by
+  // the gradient <defs> in the render output further down.
+  const customPieceSchemes = useMemo(() => {
+    if (!(pieceColors.light.startsWith('#') && pieceColors.dark.startsWith('#'))) return null;
+    return { light: getPieceColorScheme(pieceColors.light), dark: getPieceColorScheme(pieceColors.dark) };
+  }, [pieceColors.light, pieceColors.dark]);
+
   // Wraps the library's real default piece renderers with a direct `fill`
   // color override -- a real color change, not a CSS filter (filters like
   // hue-rotate barely affect near-grayscale source art, which is why an
@@ -220,6 +228,28 @@ export function ChessBoard({
       return wrapped;
     }
     if (pieceColors.light === '#ffffff' && pieceColors.dark === '#2b2b2b' && Object.keys(pieceColors.finish).length === 0) return undefined;
+    // Custom colors (raw hex, unlike the preset styles' url(#...) gradient
+    // references) get the parameterized piece set instead of the stock
+    // react-chessboard pieces -- see CustomPieces.tsx for why: the stock
+    // pieces hardcode their outline to black and (for the black knight)
+    // their eye/highlight detail to white, neither of which adapts to a
+    // custom color. This is what makes a dark custom color disappear on a
+    // dark square, and what makes a bright custom color end up with a
+    // mismatched white/black detail slapped on top of it.
+    const isCustomHex = customPieceSchemes !== null;
+    if (isCustomHex) {
+      return buildCustomPieceSet(
+        (isWhite) => {
+          const scheme = isWhite ? customPieceSchemes!.light : customPieceSchemes!.dark;
+          return {
+            fill: `url(#cc-grad-custom-${isWhite ? 'light' : 'dark'})`,
+            outline: scheme.outline,
+            detail: scheme.detail,
+          };
+        },
+        pieceColors.finish,
+      ) as unknown as typeof defaultPieces;
+    }
     const wrapped: typeof defaultPieces = {};
     for (const [key, PieceComponent] of Object.entries(defaultPieces)) {
       const isWhitePiece = key.startsWith('w');
@@ -229,7 +259,7 @@ export function ChessBoard({
       );
     }
     return wrapped;
-  }, [pieceColors, pieceShape]);
+  }, [pieceColors, pieceShape, customPieceSchemes]);
 
   useEffect(() => {
     return () => { if (feedbackTimerRef.current) clearTimeout(feedbackTimerRef.current); };
@@ -537,6 +567,26 @@ export function ChessBoard({
             <stop offset="60%" stopColor="#4a4f55" />
             <stop offset="100%" stopColor="#0a0b0c" />
           </linearGradient>
+          {/* Dynamic gradient for custom piece colors, computed from
+              whatever hex the user picked (see getPieceColorScheme in
+              lib/utils.ts) -- gives custom colors the same subtle 3D
+              shading the preset styles above already have, instead of a
+              flat, single-tone fill. Only rendered when custom colors are
+              actually active. */}
+          {customPieceSchemes && (
+            <>
+              <linearGradient id="cc-grad-custom-light" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor={customPieceSchemes.light.gradientLight} />
+                <stop offset="55%" stopColor={pieceColors.light} />
+                <stop offset="100%" stopColor={customPieceSchemes.light.gradientDark} />
+              </linearGradient>
+              <linearGradient id="cc-grad-custom-dark" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor={customPieceSchemes.dark.gradientLight} />
+                <stop offset="55%" stopColor={pieceColors.dark} />
+                <stop offset="100%" stopColor={customPieceSchemes.dark.gradientDark} />
+              </linearGradient>
+            </>
+          )}
         </defs>
       </svg>
       <BoardErrorBoundary position={position} renderKey={boardKeyRef.current}>

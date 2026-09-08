@@ -3,6 +3,8 @@ import { PieceTile } from '@/components/DesignSystem';
 import { Chess } from 'chess.js';
 import { Chessboard, defaultPieces } from 'react-chessboard';
 import { apiFetch } from '@/lib/api';
+import { getPieceColorScheme } from '@/lib/utils';
+import { buildCustomPieceSet } from '@/components/CustomPieces';
 import { useUser } from '@/hooks/use-user';
 import { Crown, RotateCcw, ChevronRight, Trophy, Target, Flame, Zap, Lightbulb, Loader2, Lock, Share2 } from 'lucide-react';
 import { useLocation, useSearch, Link } from 'wouter';
@@ -317,6 +319,19 @@ export function Puzzles() {
       return wrapped;
     }
     if (pieceColors.light === '#ffffff' && pieceColors.dark === '#2b2b2b' && Object.keys(pieceColors.finish).length === 0) return undefined;
+    // Same fix as ChessBoard.tsx -- see CustomPieces.tsx.
+    const isCustomHex = pieceColors.light.startsWith('#') && pieceColors.dark.startsWith('#');
+    if (isCustomHex) {
+      const lightScheme = getPieceColorScheme(pieceColors.light);
+      const darkScheme = getPieceColorScheme(pieceColors.dark);
+      return buildCustomPieceSet(
+        (isWhite) => {
+          const scheme = isWhite ? lightScheme : darkScheme;
+          return { fill: isWhite ? pieceColors.light : pieceColors.dark, outline: scheme.outline, detail: scheme.detail };
+        },
+        pieceColors.finish,
+      ) as unknown as typeof defaultPieces;
+    }
     const wrapped: typeof defaultPieces = {};
     for (const [key, PieceComponent] of Object.entries(defaultPieces)) {
       const isWhitePiece = key.startsWith('w');
