@@ -10,7 +10,7 @@ const TEXT = '#e8e6e3';
 const MUTED = '#9e9b98';
 
 const LAST_UPDATED = 'April 20, 2026';
-const CONTACT_EMAIL = 'smagooding@gmail.com';
+const CONTACT_EMAIL = 'ChessScout.net@gmail.com';
 
 export default function PrivacyPage() {
   useEffect(() => {
