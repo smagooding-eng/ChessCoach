@@ -10,7 +10,7 @@ import {
 import { useLocation } from 'wouter';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn, getPieceColorScheme } from '@/lib/utils';
-import { buildCustomPieceSet } from './CustomPieces';
+import { withRecoloredOutline } from './RecoloredPieces';
 
 const CHESSCOM_GREEN = '#81b64c';
 const BG_DARK = '#262421';
@@ -488,7 +488,7 @@ function buildFrontendFixPgn(mistakePgn: string, drillExpectedMove: string | nul
 
 export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, drillExpectedMove, drillHint, content, extraChallenges, conceptTitle }: LessonBoardPlayerProps) {
   const [, navigate] = useLocation();
-  const { boardColors, boardTextureCss, pieceColors, pieceShape, showCoordinates, showLegalMoves } = useSettings();
+  const { boardColors, boardTextureCss, pieceColors, pieceShape, pieceStyle, showCoordinates, showLegalMoves } = useSettings();
   const BOARD_LIGHT = boardColors.light;
   const BOARD_DARK = boardColors.dark;
   const BOARD_TEXTURE_IMAGE = boardTextureCss.backgroundImage;
@@ -504,21 +504,23 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
       }
       return wrapped;
     }
-    // Same fix as ChessBoard.tsx, applied to every piece style now (not
-    // just custom colors) -- computed outline/detail instead of the stock
-    // pieces' hardcoded black outline and black/white detail. See
-    // CustomPieces.tsx. Flat fill here rather than the gradient version
-    // ChessBoard.tsx uses for custom colors, since this component doesn't
-    // have its own <defs> block for a gradient url() to resolve against.
+    // Same recoloring approach as ChessBoard.tsx -- see RecoloredPieces.tsx.
+    // Fill here doesn't use the gradient version ChessBoard.tsx uses for
+    // custom colors, since this component doesn't have its own <defs>
+    // block for a gradient url() to resolve against.
     const lightScheme = getPieceColorScheme(pieceColors.baseLight);
     const darkScheme = getPieceColorScheme(pieceColors.baseDark);
-    return buildCustomPieceSet(
-      (isWhite) => {
-        const scheme = isWhite ? lightScheme : darkScheme;
-        return { fill: isWhite ? pieceColors.light : pieceColors.dark, outline: scheme.outline, detail: scheme.detail };
-      },
-      pieceColors.finish,
-    ) as unknown as typeof defaultPieces;
+    const wrapped: typeof defaultPieces = {};
+    for (const [key, PieceComponent] of Object.entries(defaultPieces)) {
+      const isWhitePiece = key.startsWith('w');
+      const scheme = isWhitePiece ? lightScheme : darkScheme;
+      const fill = isWhitePiece ? pieceColors.light : pieceColors.dark;
+      const Recolored = withRecoloredOutline(PieceComponent);
+      wrapped[key] = (props) => (
+        <Recolored fill={fill} outline={scheme.outline} detail={scheme.detail} svgStyle={{ ...props?.svgStyle, ...pieceColors.finish }} />
+      );
+    }
+    return wrapped;
   }, [pieceColors, pieceShape]);
   const activePgn = useMemo(() => {
     if (showFixLine) {

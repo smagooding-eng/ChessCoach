@@ -4,7 +4,7 @@ import { Chess } from 'chess.js';
 import { Chessboard, defaultPieces } from 'react-chessboard';
 import { apiFetch } from '@/lib/api';
 import { getPieceColorScheme } from '@/lib/utils';
-import { buildCustomPieceSet } from '@/components/CustomPieces';
+import { withRecoloredOutline } from '@/components/RecoloredPieces';
 import { useUser } from '@/hooks/use-user';
 import { Crown, RotateCcw, ChevronRight, Trophy, Target, Flame, Zap, Lightbulb, Loader2, Lock, Share2 } from 'lucide-react';
 import { useLocation, useSearch, Link } from 'wouter';
@@ -86,7 +86,7 @@ type PuzzleState = 'loading' | 'ready' | 'solving' | 'correct' | 'wrong' | 'show
 
 export function Puzzles() {
   const { authUser } = useUser();
-  const { boardColors, boardTextureCss, pieceColors, pieceShape, showCoordinates, soundEnabled, boardMaxWidth } = useSettings();
+  const { boardColors, boardTextureCss, pieceColors, pieceShape, pieceStyle, showCoordinates, soundEnabled, boardMaxWidth } = useSettings();
   const [, navigate] = useLocation();
   const search = useSearch();
   const targetTheme = new URLSearchParams(search).get('theme') ?? new URLSearchParams(search).get('weakness');
@@ -318,17 +318,20 @@ export function Puzzles() {
       }
       return wrapped;
     }
-    // Same fix as ChessBoard.tsx, applied to every piece style -- see
-    // CustomPieces.tsx.
+    // Same recoloring approach as ChessBoard.tsx -- see RecoloredPieces.tsx.
     const lightScheme = getPieceColorScheme(pieceColors.baseLight);
     const darkScheme = getPieceColorScheme(pieceColors.baseDark);
-    return buildCustomPieceSet(
-      (isWhite) => {
-        const scheme = isWhite ? lightScheme : darkScheme;
-        return { fill: isWhite ? pieceColors.light : pieceColors.dark, outline: scheme.outline, detail: scheme.detail };
-      },
-      pieceColors.finish,
-    ) as unknown as typeof defaultPieces;
+    const wrapped: typeof defaultPieces = {};
+    for (const [key, PieceComponent] of Object.entries(defaultPieces)) {
+      const isWhitePiece = key.startsWith('w');
+      const scheme = isWhitePiece ? lightScheme : darkScheme;
+      const fill = isWhitePiece ? pieceColors.light : pieceColors.dark;
+      const Recolored = withRecoloredOutline(PieceComponent);
+      wrapped[key] = (props) => (
+        <Recolored fill={fill} outline={scheme.outline} detail={scheme.detail} svgStyle={{ ...props?.svgStyle, ...pieceColors.finish }} />
+      );
+    }
+    return wrapped;
   }, [pieceColors, pieceShape]);
 
   const handleSquareClick = useCallback(({ square, piece }: { square: string; piece: { pieceType: string } | null }) => {

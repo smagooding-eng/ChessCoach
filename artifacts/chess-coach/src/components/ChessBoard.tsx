@@ -2,7 +2,7 @@ import React, { useState, useCallback, useMemo, useRef, useEffect, Component, ty
 import { Chessboard, defaultPieces } from 'react-chessboard';
 import { Chess } from 'chess.js';
 import { normalizeFen, getPieceColorScheme } from '@/lib/utils';
-import { buildCustomPieceSet } from './CustomPieces';
+import { withRecoloredOutline } from './RecoloredPieces';
 import { useSettings, playMoveSound } from '@/context/SettingsContext';
 import { Trophy, X } from 'lucide-react';
 
@@ -202,8 +202,8 @@ export function ChessBoard({
   const [pendingMove, setPendingMove] = useState<{ from: string; to: string; san: string; isCorrect: boolean; tempFen: string } | null>(null);
   const [promotionPending, setPromotionPending] = useState<{ from: string; to: string } | null>(null);
 
-  // Computed once, referenced both by the custom piece set below and by
-  // the gradient <defs> in the render output further down. baseLight/
+  // Computed once, referenced both by the recolored piece set below and
+  // by the gradient <defs> in the render output further down. baseLight/
   // baseDark are always a real hex (unlike pieceColors.light/dark, which
   // is a url(#...) gradient reference for the four 3D-look presets), so
   // this works the same way for every style, not just custom colors.
@@ -212,18 +212,17 @@ export function ChessBoard({
     [pieceColors.baseLight, pieceColors.baseDark],
   );
 
-  // Wraps the library's real default piece renderers with a computed
-  // outline/detail and a direct `fill` color override -- a real color
-  // change, not a CSS filter (filters like hue-rotate barely affect
-  // near-grayscale source art, which is why an earlier filter-based
-  // attempt at this wasn't visibly noticeable). Applied to every piece
-  // style, including Classic: the stock react-chessboard pieces hardcode
-  // their outline to black and (for the black knight) their eye/highlight
-  // detail to white regardless of fill color, which is what made a dark
-  // custom color disappear on a dark square and made a bright custom
-  // color end up with a mismatched black/white detail on top of it. Since
-  // every style now goes through the same computed-color pieces, they all
-  // get an outline and detail that's actually a shade of their own color.
+  // Wraps the library's real default piece renderers (unmodified -- same
+  // fill/svgStyle handling as always) and then remaps the *rendered
+  // element tree's* outline and detail colors (see RecoloredPieces.tsx).
+  // An earlier version of this recreated all 12 piece SVGs from scratch
+  // with parameterized colors, which caused pieces to render with no
+  // fill at all on some styles ("transparent pieces") for a cause never
+  // conclusively found. This rebuilds the same idea on the stock
+  // components instead, so fill is always exactly what the
+  // already-proven-correct library rendering produces -- only the
+  // outline (hardcoded to black in the stock pieces) and the detail
+  // accents (hardcoded white/black regardless of fill) get remapped.
   const tintedPieces = useMemo(() => {
     if (pieceShape === 'cburnett') {
       // Real, distinct artwork set (not the library's default shapes).
@@ -237,22 +236,19 @@ export function ChessBoard({
       }
       return wrapped;
     }
-    return buildCustomPieceSet(
-      (isWhite) => {
-        const scheme = isWhite ? pieceSchemes.light : pieceSchemes.dark;
-        return {
-          // Only custom colors get the dynamic gradient fill (defined in
-          // the <defs> below from whatever hex was picked) -- the 3D-look
-          // presets (Shaded/3D Wood/3D Marble/Chrome) already have their
-          // own fixed gradient in pieceColors.light/dark, and the rest
-          // just use their own flat hex, both unchanged from before.
-          fill: pieceStyle === 'custom' ? `url(#cc-grad-custom-${isWhite ? 'light' : 'dark'})` : (isWhite ? pieceColors.light : pieceColors.dark),
-          outline: scheme.outline,
-          detail: scheme.detail,
-        };
-      },
-      pieceColors.finish,
-    ) as unknown as typeof defaultPieces;
+    const wrapped: typeof defaultPieces = {};
+    for (const [key, PieceComponent] of Object.entries(defaultPieces)) {
+      const isWhitePiece = key.startsWith('w');
+      const scheme = isWhitePiece ? pieceSchemes.light : pieceSchemes.dark;
+      const fill = pieceStyle === 'custom'
+        ? `url(#cc-grad-custom-${isWhitePiece ? 'light' : 'dark'})`
+        : (isWhitePiece ? pieceColors.light : pieceColors.dark);
+      const Recolored = withRecoloredOutline(PieceComponent);
+      wrapped[key] = (props) => (
+        <Recolored fill={fill} outline={scheme.outline} detail={scheme.detail} svgStyle={{ ...props?.svgStyle, ...pieceColors.finish }} />
+      );
+    }
+    return wrapped;
   }, [pieceColors, pieceShape, pieceStyle, pieceSchemes]);
 
 
