@@ -56,14 +56,25 @@ export interface PieceColorScheme {
 
 export function getPieceColorScheme(hex: string): PieceColorScheme {
   const isDark = perceivedBrightness(hex) < 128;
+  // Darkening a color that's already at or near black has nowhere to go
+  // (blend(hex, -0.4) on pure black is still pure black) -- the detail
+  // would be completely invisible against the body. When that happens,
+  // fall back to a slight, still-subtle lightening instead of the
+  // stronger highlight this used to always use for dark pieces.
+  const darkerDetail = blend(hex, -0.4);
+  const detailDelta = hexToRgb(hex).reduce((sum, c, i) => sum + Math.abs(c - hexToRgb(darkerDetail)[i]), 0);
   return {
     // Strongly lightened/darkened so the outline reads clearly against
     // both the piece's own fill and a same-toned board square -- this is
     // the actual fix for a dark custom piece disappearing on a dark square.
     outline: isDark ? blend(hex, 0.82) : blend(hex, -0.75),
-    // Softer than the outline -- a highlight/engraving tone of the same
-    // color rather than a stark pure white or black sticker.
-    detail: isDark ? blend(hex, 0.62) : blend(hex, -0.5),
+    // Dark pieces get a darker shade of their own color for detail lines
+    // (a subtle carved/shadowed groove look) rather than a lighter one --
+    // a light detail line reads as an odd bright accent on a dark piece;
+    // a darker one reads as part of the same piece, just recessed. Light
+    // pieces keep the darker-detail direction they already had, which
+    // matches the classic look and was never the complaint.
+    detail: isDark ? (detailDelta < 20 ? blend(hex, 0.15) : darkerDetail) : blend(hex, -0.5),
     gradientLight: blend(hex, 0.22),
     gradientDark: blend(hex, -0.22),
   };
