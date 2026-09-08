@@ -1,14 +1,34 @@
 import { db, gamesTable, backgroundJobsTable, bulkCrawlQueueTable } from "@workspace/db";
 import { eq, and, isNull, sql } from "drizzle-orm";
 import { fetchChessComGames, extractGameMetadata, parsePgnMoves } from "./chesscom";
-import { reviewGameEngineOnly } from "./bulkStockfish";
+import { reviewGameEngineOnly, destroyBulkEngine } from "./bulkStockfish";
 import { logger } from "./logger";
 
 const CHESSCOM_REQUEST_DELAY_MS = 1500; // respectful pace against Chess.com's public API
 const CHESSCOM_USER_AGENT = "ChessCoach/1.0";
+const FETCH_TIMEOUT_MS = 20000;
 
 async function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
+}
+
+// Neither the Chess.com fetch nor the bulk Stockfish engine call had any
+// timeout at all -- if either one ever stalls (a hung network request, a
+// dead engine process that never rejects), the loop below would freeze
+// on that single await forever. Since the stop-check only happens
+// between loop iterations, a stuck await here is exactly what made the
+// job look "stopped working" and made clicking Stop hang indefinitely --
+// there was no way to ever get back around to checking the stop flag.
+async function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout>;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`Timed out after ${ms}ms: ${label}`)), ms);
+  });
+  try {
+    return await Promise.race([promise, timeout]);
+  } finally {
+    clearTimeout(timer!);
+  }
 }
 
 // Seeds the crawl queue from Chess.com's public leaderboards the first
@@ -84,11 +104,24 @@ export async function runBulkCrawlJob(jobId: string, targetGames: number, depth:
       }
 
       try {
-        const games = await fetchChessComGames(next.username, 1);
+        const games = await withTimeout(fetchChessComGames(next.username, 1), FETCH_TIMEOUT_MS, `fetchChessComGames(${next.username})`);
         await sleep(CHESSCOM_REQUEST_DELAY_MS);
 
         for (const game of games) {
           if (gamesImported >= targetGames) break;
+
+          // Checking the stop flag here too, not just once per username --
+          // a single username's games can take a while to get through
+          // (especially with several games each needing an engine pass),
+          // and only checking between usernames meant Stop could take a
+          // very long time to actually take effect.
+          const [jobNow] = await db.select({ status: backgroundJobsTable.status }).from(backgroundJobsTable).where(eq(backgroundJobsTable.id, jobId));
+          if (!jobNow || jobNow.status === "stopping") {
+            logger.info({ jobId }, "Bulk crawl: stop requested mid-username, exiting cleanly");
+            await updateJobProgress(jobId, { gamesImported, gamesReviewed, usernamesProcessed });
+            await db.update(backgroundJobsTable).set({ status: "done", completedAt: new Date() }).where(eq(backgroundJobsTable.id, jobId));
+            return;
+          }
 
           const meta = extractGameMetadata(game, next.username);
           if (meta.chesscomGameId) {
@@ -120,17 +153,28 @@ export async function runBulkCrawlJob(jobId: string, targetGames: number, depth:
           gamesImported++;
 
           // Real Stockfish review, no OpenAI call anywhere in this path.
+          // Timeout is proportional to move count (generous -- this is
+          // meant to catch a genuinely stuck/dead engine process, not
+          // penalize a long game that's legitimately still working) so a
+          // hung engine gets torn down and rebuilt instead of blocking
+          // the whole crawl loop indefinitely.
           try {
             const fens = [moves[0].fenBefore, ...moves.map((m) => m.fen).filter((f): f is string => !!f)];
             const colors = moves.map((m) => m.color as "white" | "black");
             const sans = moves.map((m) => m.san);
-            const review = await reviewGameEngineOnly(fens, colors, sans, depth, engineDelayMs);
+            const reviewTimeoutMs = Math.max(60000, moves.length * 5000);
+            const review = await withTimeout(
+              reviewGameEngineOnly(fens, colors, sans, depth, engineDelayMs),
+              reviewTimeoutMs,
+              `reviewGameEngineOnly(gameId=${inserted.id}, ${moves.length} moves)`,
+            );
             await db.update(gamesTable)
               .set({ reviewData: review, analyzed: true })
               .where(eq(gamesTable.id, inserted.id));
             gamesReviewed++;
           } catch (err) {
-            logger.warn({ err, gameId: inserted.id }, "Bulk crawl: engine review failed for one game, continuing");
+            logger.warn({ err, gameId: inserted.id }, "Bulk crawl: engine review failed or timed out for one game -- tearing down the bulk engine and continuing");
+            destroyBulkEngine();
           }
 
           // Crawl expansion: queue up whichever side wasn't the username
