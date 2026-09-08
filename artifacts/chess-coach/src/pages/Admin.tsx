@@ -1649,6 +1649,7 @@ function LandingFunnelPanel() {
     landingViews: number; miaStarted: number; miaSkipped: number;
     signupClicked: number; signupFormSubmitted: number; signupError: number; signupCompleted: number;
     opponentScoutClicked: number; leftWithoutAction: number;
+    googleOauthClicked: number; googleSignupCompleted: number; googleSignupError: number;
     scrollDepth: { scroll25: number; scroll50: number; scroll75: number; scroll100: number };
     engaged10s: number;
     sectionViews: Record<string, number>;
@@ -1679,6 +1680,17 @@ function LandingFunnelPanel() {
     { label: 'Submitted the form', value: data.signupFormSubmitted, color: 'text-indigo-400' },
     { label: 'Hit an error', value: data.signupError, color: 'text-red-400' },
     { label: 'Completed sign up', value: data.signupCompleted, color: 'text-primary' },
+  ] : [];
+
+  // Separate funnel for the "Continue with Google" path specifically --
+  // clicked vs completed vs errored is the only way to actually see
+  // whether Google's OAuth screen (which the branding fix affects) is
+  // costing real signups, rather than guessing from the email funnel
+  // above, which never touches this path at all.
+  const googleFunnelRows = data ? [
+    { label: 'Clicked "Continue with Google"', value: data.googleOauthClicked, color: 'text-blue-400' },
+    { label: 'Completed sign up', value: data.googleSignupCompleted, color: 'text-primary' },
+    { label: 'Hit an error', value: data.googleSignupError, color: 'text-red-400' },
   ] : [];
 
   const scrollRows = data ? [
@@ -1741,6 +1753,25 @@ function LandingFunnelPanel() {
               <p className="text-[10px] text-muted-foreground mt-2">
                 "Opened" minus "Submitted" is people who saw the form and closed it without trying. "Submitted" minus ("Errored" + "Completed") is a request that never got a clear result client-side — worth a look if it's non-zero.
               </p>
+            </div>
+
+            <div className="mt-5 pt-4 border-t border-border/20">
+              <p className="text-xs font-bold text-muted-foreground mb-2">
+                "Continue with Google" funnel — tracked separately from the email form above
+              </p>
+              <div className="grid grid-cols-3 gap-2">
+                {googleFunnelRows.map((r) => (
+                  <div key={r.label} className="p-3 rounded-xl bg-white/5 border border-white/5">
+                    <p className={cn('text-xl font-black', r.color)}>{r.value.toLocaleString()}</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">{r.label}</p>
+                  </div>
+                ))}
+              </div>
+              {data.googleOauthClicked > 0 && (
+                <p className="text-[10px] text-muted-foreground mt-2">
+                  Completion rate: {Math.round((data.googleSignupCompleted / data.googleOauthClicked) * 100)}% — compare against the email form's completion rate above (Completed ÷ Opened) to see whether one path is genuinely underperforming the other, rather than assuming it.
+                </p>
+              )}
             </div>
 
             {data.visitorBreakdown && (

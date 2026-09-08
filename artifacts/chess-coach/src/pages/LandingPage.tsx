@@ -126,6 +126,7 @@ function AuthModal({ open, onClose, initialMode, externalError, context = 'defau
   };
 
   const handleGoogleLogin = () => {
+    trackFunnelEvent('google_oauth_clicked');
     const ref = localStorage.getItem('chessscout_ref') || '';
     const url = ref ? apiUrl(`/api/auth/google?ref=${encodeURIComponent(ref)}`) : apiUrl('/api/auth/google');
     window.location.href = url;
@@ -389,9 +390,11 @@ export function LandingPage() {
     if (ref) localStorage.setItem('chessscout_ref', ref);
     const urlError = params.get('error');
     if (urlError === 'google_not_configured') {
+      trackFunnelEvent('google_signup_error');
       setOauthError('Google sign-in is not available yet. Please use email and password.');
       setAuthOpen(true);
     } else if (urlError === 'google_auth_failed') {
+      trackFunnelEvent('google_signup_error');
       setOauthError('Google sign-in failed. Please try again or use email and password.');
       setAuthOpen(true);
     }

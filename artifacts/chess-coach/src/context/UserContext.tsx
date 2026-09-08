@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { analytics } from '@heycatch/sdk';
 import { apiFetch, setAuthToken, getAuthToken } from '@/lib/api';
+import { trackFunnelEvent } from '@/lib/funnelTracking';
 
 interface AuthUser {
   id: string;
@@ -74,6 +75,13 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         const hashToken = hashParams.get('token');
         if (hashToken) {
           setAuthToken(hashToken);
+          // Only fired for a genuinely brand-new account (see the
+          // isNewSignup flag in the backend's /auth/google/callback) --
+          // an existing login or an existing local account linking
+          // Google both land here too, but neither is a signup.
+          if (hashParams.get('newSignup') === 'google') {
+            trackFunnelEvent('google_signup_completed');
+          }
           window.history.replaceState(null, '', window.location.pathname + window.location.search);
         }
       }

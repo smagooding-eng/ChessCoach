@@ -377,6 +377,8 @@ router.get("/auth/google/callback", async (req: Request, res: Response) => {
       .from(usersTable)
       .where(eq(usersTable.googleId, profile.id));
 
+    let isNewSignup = false;
+
     if (!user) {
       const [existingByEmail] = profile.email
         ? await db.select().from(usersTable).where(eq(usersTable.email, profile.email))
@@ -396,6 +398,7 @@ router.get("/auth/google/callback", async (req: Request, res: Response) => {
           .where(eq(usersTable.id, existingByEmail.id))
           .returning();
       } else {
+        isNewSignup = true;
         let googleReferrerUserId: string | null = null;
         if (googleRefCode) {
           const [referrer] = await db.select({ id: usersTable.id })
@@ -442,7 +445,14 @@ router.get("/auth/google/callback", async (req: Request, res: Response) => {
     const sid = await createSession(sessionData);
     setSessionCookie(res, sid);
 
-    res.redirect(frontendOrigin + "/#token=" + sid);
+    // isNewSignup distinguishes a genuinely new account from an existing
+    // login or an existing local account just linking Google -- only the
+    // former should count as a completed signup in funnel tracking. The
+    // frontend (UserContext.tsx) reads this off the hash and fires the
+    // corresponding funnel event once, since this redirect is the only
+    // place that knows which case just happened.
+    const newSignupParam = isNewSignup ? "&newSignup=google" : "";
+    res.redirect(frontendOrigin + "/#token=" + sid + newSignupParam);
   } catch (err: any) {
     req.log?.error?.({ err }, "Google callback error");
     res.redirect(frontendOrigin + "/?error=google_auth_failed");
