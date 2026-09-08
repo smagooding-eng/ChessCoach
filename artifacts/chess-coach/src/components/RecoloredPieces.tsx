@@ -48,9 +48,13 @@ function remapStyle(style: React.CSSProperties | undefined, outline: string, det
   }
   // Everything else's stroke is the outline -- this covers both the
   // outer body outline (which also has a real, untouched fill) and any
-  // plain black accent lines.
+  // plain black accent lines. Also thins the stroke slightly (the
+  // original 1.5 reads as thick once the color is lighter than pure
+  // black -- a thin dark line disappears into the fill at that width,
+  // but a thin *lighter* line at the same width reads as bold/wide).
   if (stroke === '#000000') {
     (next as any).stroke = outline;
+    (next as any).strokeWidth = '1';
   }
   return next;
 }

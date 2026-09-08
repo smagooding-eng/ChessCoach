@@ -57,15 +57,11 @@ export interface PieceColorScheme {
 export function getPieceColorScheme(hex: string): PieceColorScheme {
   const isDark = perceivedBrightness(hex) < 128;
   return {
-    // Lightened/darkened enough to read clearly against both the
-    // piece's own fill and a same-toned board square (the actual fix for
-    // a dark piece disappearing on a dark square) -- but not so far
-    // toward white/black that it reads as a glowing halo around the
-    // piece instead of a normal outline. 0.82 (the original amount) was
-    // too extreme for anything but a near-black piece; 0.5 stays clearly
-    // visible without the halo look on saturated colors like purple or
-    // green.
-    outline: isDark ? blend(hex, 0.5) : blend(hex, -0.75),
+    // Same reasoning as before, tuned slightly further: even at 50%,
+    // combined with the original 1.5 stroke width, this was still
+    // reading as too prominent against a busy/textured board. Thinner
+    // width (set in remapStyle) plus a little less lightening here.
+    outline: isDark ? blend(hex, 0.42) : blend(hex, -0.75),
     // Dark pieces get a lighter tint of their own color for detail lines
     // and eyes; light pieces get a darker one -- a shade of the piece's
     // own color either way, not a fixed black or white.
