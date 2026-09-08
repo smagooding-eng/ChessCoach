@@ -7,7 +7,7 @@ import { useMyAnalysisSummary, useMyWeaknesses } from '@/hooks/use-analysis';
 import { useUser } from '@/hooks/use-user';
 import { useQueryClient } from '@tanstack/react-query';
 import { Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area, XAxis, YAxis, CartesianGrid } from 'recharts';
-import { BrainCircuit, AlertTriangle, Activity, ChevronRight, ChevronDown, Loader2, TrendingUp, CheckCircle2, ArrowUpRight, BookOpen, Trophy, Target, Brain, Clock, Shield, Zap, Eye, LineChart } from 'lucide-react';
+import { BrainCircuit, AlertTriangle, Activity, ChevronRight, ChevronDown, Loader2, TrendingUp, CheckCircle2, ArrowUpRight, BookOpen, Trophy, Target, Brain, Clock, Shield, Zap, Eye, LineChart, Lock } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Chessboard } from 'react-chessboard';
 import { getTierForRating, ELO_TIERS } from '@/lib/elo-tips';
@@ -181,15 +181,17 @@ export function Analysis({ hideHeader = false }: { hideHeader?: boolean } = {}) 
         </div>
         <div className="flex items-center">
           <button
-            onClick={handleAnalyze}
+            onClick={isPremium ? handleAnalyze : () => navigate('/subscription')}
             disabled={isAnalyzing}
             className="shrink-0 px-5 py-2.5 rounded-xl font-semibold text-sm text-white flex items-center gap-2 transition-all hover:scale-[1.02] disabled:opacity-50"
             style={PRIMARY_BTN_STYLE}
           >
             {isAnalyzing ? (
               <><Loader2 className="w-4 h-4 animate-spin" /> Processing...</>
-            ) : (
+            ) : isPremium ? (
               <><Activity className="w-4 h-4" /> Run Deep Analysis</>
+            ) : (
+              <><Lock className="w-4 h-4" /> Upgrade to Pro</>
             )}
           </button>
         </div>
