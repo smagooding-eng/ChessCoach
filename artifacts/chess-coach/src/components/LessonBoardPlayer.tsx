@@ -9,8 +9,8 @@ import {
 } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { motion, AnimatePresence } from 'framer-motion';
-import { cn, getPieceColorScheme } from '@/lib/utils';
-import { withRecoloredOutline } from './RecoloredPieces';
+import { cn } from '@/lib/utils';
+import { buildTintedPieceSet } from './RecoloredPieces';
 
 const CHESSCOM_GREEN = '#81b64c';
 const BG_DARK = '#262421';
@@ -494,34 +494,12 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
   const BOARD_TEXTURE_IMAGE = boardTextureCss.backgroundImage;
   const BOARD_TEXTURE_IMAGE_DARK = boardTextureCss.backgroundImageDark ?? boardTextureCss.backgroundImage;
   const BOARD_TEXTURE_SIZE = boardTextureCss.backgroundSize;
-  const tintedPieces = useMemo(() => {
-    if (pieceShape === 'cburnett') {
-      const wrapped: typeof defaultPieces = {};
-      for (const key of Object.keys(defaultPieces)) {
-        wrapped[key] = ({ svgStyle } = {}) => (
-          <img src={`/pieces/cburnett/${key}.svg`} alt={key} style={{ width: '100%', height: '100%', ...svgStyle }} />
-        );
-      }
-      return wrapped;
-    }
-    // Same recoloring approach as ChessBoard.tsx -- see RecoloredPieces.tsx.
-    // Fill here doesn't use the gradient version ChessBoard.tsx uses for
-    // custom colors, since this component doesn't have its own <defs>
-    // block for a gradient url() to resolve against.
-    const lightScheme = getPieceColorScheme(pieceColors.baseLight);
-    const darkScheme = getPieceColorScheme(pieceColors.baseDark);
-    const wrapped: typeof defaultPieces = {};
-    for (const [key, PieceComponent] of Object.entries(defaultPieces)) {
-      const isWhitePiece = key.startsWith('w');
-      const scheme = isWhitePiece ? lightScheme : darkScheme;
-      const fill = isWhitePiece ? pieceColors.light : pieceColors.dark;
-      const Recolored = withRecoloredOutline(PieceComponent);
-      wrapped[key] = (props) => (
-        <Recolored fill={fill} outline={scheme.outline} detail={scheme.detail} svgStyle={{ ...props?.svgStyle, ...pieceColors.finish }} />
-      );
-    }
-    return wrapped;
-  }, [pieceColors, pieceShape]);
+  // Now built by the one shared function every board calls -- see
+  // buildTintedPieceSet in RecoloredPieces.tsx.
+  const tintedPieces = useMemo(
+    () => buildTintedPieceSet({ pieceColors, pieceShape, pieceStyle }) as unknown as typeof defaultPieces,
+    [pieceColors, pieceShape, pieceStyle],
+  );
   const activePgn = useMemo(() => {
     if (showFixLine) {
       if (fixPgn) return fixPgn;

@@ -2,7 +2,7 @@ import React, { useState, useCallback, useMemo, useRef, useEffect, Component, ty
 import { Chessboard, defaultPieces } from 'react-chessboard';
 import { Chess } from 'chess.js';
 import { normalizeFen, getPieceColorScheme } from '@/lib/utils';
-import { withRecoloredOutline } from './RecoloredPieces';
+import { buildTintedPieceSet } from './RecoloredPieces';
 import { useSettings, playMoveSound } from '@/context/SettingsContext';
 import { Trophy, X } from 'lucide-react';
 
@@ -212,44 +212,16 @@ export function ChessBoard({
     [pieceColors.baseLight, pieceColors.baseDark],
   );
 
-  // Wraps the library's real default piece renderers (unmodified -- same
-  // fill/svgStyle handling as always) and then remaps the *rendered
-  // element tree's* outline and detail colors (see RecoloredPieces.tsx).
-  // An earlier version of this recreated all 12 piece SVGs from scratch
-  // with parameterized colors, which caused pieces to render with no
-  // fill at all on some styles ("transparent pieces") for a cause never
-  // conclusively found. This rebuilds the same idea on the stock
-  // components instead, so fill is always exactly what the
-  // already-proven-correct library rendering produces -- only the
-  // outline (hardcoded to black in the stock pieces) and the detail
-  // accents (hardcoded white/black regardless of fill) get remapped.
-  const tintedPieces = useMemo(() => {
-    if (pieceShape === 'cburnett') {
-      // Real, distinct artwork set (not the library's default shapes).
-      // Static SVG files with color baked in, so the color picker
-      // doesn't apply on top of this -- shape and color are independent.
-      const wrapped: typeof defaultPieces = {};
-      for (const key of Object.keys(defaultPieces)) {
-        wrapped[key] = ({ svgStyle } = {}) => (
-          <img src={`/pieces/cburnett/${key}.svg`} alt={key} style={{ width: '100%', height: '100%', ...svgStyle }} />
-        );
-      }
-      return wrapped;
-    }
-    const wrapped: typeof defaultPieces = {};
-    for (const [key, PieceComponent] of Object.entries(defaultPieces)) {
-      const isWhitePiece = key.startsWith('w');
-      const scheme = isWhitePiece ? pieceSchemes.light : pieceSchemes.dark;
-      const fill = pieceStyle === 'custom'
-        ? `url(#cc-grad-custom-${isWhitePiece ? 'light' : 'dark'})`
-        : (isWhitePiece ? pieceColors.light : pieceColors.dark);
-      const Recolored = withRecoloredOutline(PieceComponent);
-      wrapped[key] = (props) => (
-        <Recolored fill={fill} outline={scheme.outline} detail={scheme.detail} svgStyle={{ ...props?.svgStyle, ...pieceColors.finish }} />
-      );
-    }
-    return wrapped;
-  }, [pieceColors, pieceShape, pieceStyle, pieceSchemes]);
+  // Now built by the one shared function every board calls -- see
+  // buildTintedPieceSet in RecoloredPieces.tsx for why (Puzzles.tsx used
+  // to have its own hand-copied version of this loop, and kept showing
+  // pieces with no fill in production for a cause never pinned down
+  // despite the two copies looking identical -- removing the duplication
+  // outright means there's no second copy left to diverge).
+  const tintedPieces = useMemo(
+    () => buildTintedPieceSet({ pieceColors, pieceShape, pieceStyle, useGradientForCustom: true }) as unknown as typeof defaultPieces,
+    [pieceColors, pieceShape, pieceStyle],
+  );
 
 
   useEffect(() => {

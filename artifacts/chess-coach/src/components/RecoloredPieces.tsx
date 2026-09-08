@@ -1,4 +1,6 @@
 import React from 'react';
+import { defaultPieces } from 'react-chessboard';
+import { getPieceColorScheme } from '@/lib/utils';
 
 // Recolors react-chessboard's own stock piece SVGs by walking the
 // rendered element tree and remapping specific style values, instead of
@@ -86,4 +88,54 @@ export function withRecoloredOutline(
     const rendered = StockPiece({ fill, svgStyle });
     return remapElement(rendered, outline, detail) as React.ReactElement;
   };
+}
+
+// The one place that actually builds a piece set for react-chessboard's
+// `pieces` prop -- ChessBoard.tsx, LessonBoardPlayer.tsx, and Puzzles.tsx
+// each used to have their own hand-copied version of this loop. Puzzles
+// specifically kept showing pieces with no fill in production despite
+// its copy looking byte-for-byte identical to the one that worked fine
+// everywhere else, and the cause was never pinned down even after
+// extensive isolated testing of the piece-rendering logic itself. Rather
+// than keep hunting for how two "identical" copies could diverge, this
+// removes the duplication outright: every board now calls this one
+// function, so there is no second copy left to diverge from the first.
+export function buildTintedPieceSet(opts: {
+  pieceColors: { light: string; dark: string; baseLight: string; baseDark: string; finish: React.CSSProperties };
+  pieceShape: string;
+  pieceStyle: string;
+  // Only ChessBoard.tsx has its own <defs> block with a dynamic gradient
+  // for custom colors (see ChessBoard.tsx's cc-grad-custom-light/dark).
+  // Other boards don't have that <defs> block, so a url(#...) reference
+  // there would resolve to nothing -- they get the flat custom color
+  // instead, same as any other flat-color style.
+  useGradientForCustom?: boolean;
+}): Record<string, (props?: { fill?: string; square?: string; svgStyle?: React.CSSProperties }) => React.ReactElement> {
+  const { pieceColors, pieceShape, pieceStyle, useGradientForCustom } = opts;
+
+  if (pieceShape === 'cburnett') {
+    const wrapped: Record<string, (props?: any) => React.ReactElement> = {};
+    for (const key of ['wP', 'wR', 'wN', 'wB', 'wQ', 'wK', 'bP', 'bR', 'bN', 'bB', 'bQ', 'bK']) {
+      wrapped[key] = ({ svgStyle }: any = {}) => (
+        <img src={`/pieces/cburnett/${key}.svg`} alt={key} style={{ width: '100%', height: '100%', ...svgStyle }} />
+      );
+    }
+    return wrapped;
+  }
+
+  const lightScheme = getPieceColorScheme(pieceColors.baseLight);
+  const darkScheme = getPieceColorScheme(pieceColors.baseDark);
+  const wrapped: Record<string, (props?: any) => React.ReactElement> = {};
+  for (const [key, PieceComponent] of Object.entries(defaultPieces)) {
+    const isWhitePiece = key.startsWith('w');
+    const scheme = isWhitePiece ? lightScheme : darkScheme;
+    const fill = pieceStyle === 'custom' && useGradientForCustom
+      ? `url(#cc-grad-custom-${isWhitePiece ? 'light' : 'dark'})`
+      : (isWhitePiece ? pieceColors.light : pieceColors.dark);
+    const Recolored = withRecoloredOutline(PieceComponent);
+    wrapped[key] = (props?: any) => (
+      <Recolored fill={fill} outline={scheme.outline} detail={scheme.detail} svgStyle={{ ...props?.svgStyle, ...pieceColors.finish }} />
+    );
+  }
+  return wrapped;
 }

@@ -3,8 +3,7 @@ import { PieceTile } from '@/components/DesignSystem';
 import { Chess } from 'chess.js';
 import { Chessboard, defaultPieces } from 'react-chessboard';
 import { apiFetch } from '@/lib/api';
-import { getPieceColorScheme } from '@/lib/utils';
-import { withRecoloredOutline } from '@/components/RecoloredPieces';
+import { buildTintedPieceSet } from '@/components/RecoloredPieces';
 import { useUser } from '@/hooks/use-user';
 import { Crown, RotateCcw, ChevronRight, Trophy, Target, Flame, Zap, Lightbulb, Loader2, Lock, Share2 } from 'lucide-react';
 import { useLocation, useSearch, Link } from 'wouter';
@@ -305,34 +304,15 @@ export function Puzzles() {
 
   const legalTargets = legalMoveInfo.targets;
 
-  // Same fill-based piece tinting used in the shared ChessBoard component --
-  // duplicated here since this page renders react-chessboard directly
-  // rather than through that shared wrapper.
-  const tintedPieces = useMemo(() => {
-    if (pieceShape === 'cburnett') {
-      const wrapped: typeof defaultPieces = {};
-      for (const key of Object.keys(defaultPieces)) {
-        wrapped[key] = ({ svgStyle } = {}) => (
-          <img src={`/pieces/cburnett/${key}.svg`} alt={key} style={{ width: '100%', height: '100%', ...svgStyle }} />
-        );
-      }
-      return wrapped;
-    }
-    // Same recoloring approach as ChessBoard.tsx -- see RecoloredPieces.tsx.
-    const lightScheme = getPieceColorScheme(pieceColors.baseLight);
-    const darkScheme = getPieceColorScheme(pieceColors.baseDark);
-    const wrapped: typeof defaultPieces = {};
-    for (const [key, PieceComponent] of Object.entries(defaultPieces)) {
-      const isWhitePiece = key.startsWith('w');
-      const scheme = isWhitePiece ? lightScheme : darkScheme;
-      const fill = isWhitePiece ? pieceColors.light : pieceColors.dark;
-      const Recolored = withRecoloredOutline(PieceComponent);
-      wrapped[key] = (props) => (
-        <Recolored fill={fill} outline={scheme.outline} detail={scheme.detail} svgStyle={{ ...props?.svgStyle, ...pieceColors.finish }} />
-      );
-    }
-    return wrapped;
-  }, [pieceColors, pieceShape]);
+  // Now built by the one shared function every board calls -- no longer
+  // a separate hand-copied version of this loop (see buildTintedPieceSet
+  // in RecoloredPieces.tsx for why that mattered: this page kept showing
+  // pieces with no fill in production despite its old copy looking
+  // identical to the one that worked fine elsewhere).
+  const tintedPieces = useMemo(
+    () => buildTintedPieceSet({ pieceColors, pieceShape, pieceStyle }) as unknown as typeof defaultPieces,
+    [pieceColors, pieceShape, pieceStyle],
+  );
 
   const handleSquareClick = useCallback(({ square, piece }: { square: string; piece: { pieceType: string } | null }) => {
     if (state !== 'ready' || !game) return;
