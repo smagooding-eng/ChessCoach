@@ -277,8 +277,8 @@ export function Subscription() {
                       <button
                         onClick={() => handleCheckout(selectedPriceId)}
                         disabled={!!checkoutLoading}
-                        className="w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl font-black text-sm transition-transform hover:scale-[1.02] active:scale-[0.98] disabled:opacity-60 disabled:hover:scale-100"
-                        style={{ background: 'linear-gradient(180deg, #a8d876 0%, #81b64c 55%, #5f8f36 100%)', color: '#fff', boxShadow: '0 4px 0 #4a7028' }}
+                        className="w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl font-bold text-sm transition-colors hover:brightness-110 disabled:opacity-60"
+                        style={{ background: '#635BFF', color: '#fff' }}
                       >
                         {checkoutLoading === selectedPriceId ? (
                           <Loader2 className="w-4 h-4 animate-spin" />
