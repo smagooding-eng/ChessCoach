@@ -120,13 +120,24 @@ export function buildTintedPieceSet(opts: {
   // produce a piece with no fill. A wrong-but-visible color is a much
   // smaller problem than an invisible piece.
   const isValidHex = (v: unknown): v is string => typeof v === 'string' && /^#[0-9a-fA-F]{3,8}$/.test(v);
-  const rawIsValid = isValidHex(rawPieceColors?.light) && isValidHex(rawPieceColors?.dark);
+  // The actual fill (light/dark) legitimately can be a url(#...) gradient
+  // reference instead of a hex color -- the Shaded/3D Wood/3D Marble/
+  // Chrome presets all store their fill this way. The original version of
+  // this check only accepted hex, which meant it was silently discarding
+  // every gradient-preset fill as "invalid" and replacing it with a flat
+  // fallback color -- a real regression this defensive check itself
+  // introduced, not the bug it was meant to guard against. baseLight/
+  // baseDark stay hex-only below since those specifically feed the
+  // outline/detail color math, which needs a real color to blend, not a
+  // paint-server reference.
+  const isValidFill = (v: unknown): v is string => isValidHex(v) || (typeof v === 'string' && /^url\(#[\w-]+\)$/.test(v));
+  const rawIsValid = isValidFill(rawPieceColors?.light) && isValidFill(rawPieceColors?.dark);
   if (!rawIsValid && typeof console !== 'undefined') {
     console.warn('[buildTintedPieceSet] pieceColors was missing/invalid, falling back to Classic colors. Received:', rawPieceColors);
   }
   const pieceColors = {
-    light: isValidHex(rawPieceColors?.light) ? rawPieceColors.light : '#ffffff',
-    dark: isValidHex(rawPieceColors?.dark) ? rawPieceColors.dark : '#2b2b2b',
+    light: isValidFill(rawPieceColors?.light) ? rawPieceColors.light : '#ffffff',
+    dark: isValidFill(rawPieceColors?.dark) ? rawPieceColors.dark : '#2b2b2b',
     baseLight: isValidHex(rawPieceColors?.baseLight) ? rawPieceColors.baseLight : (isValidHex(rawPieceColors?.light) ? rawPieceColors.light : '#ffffff'),
     baseDark: isValidHex(rawPieceColors?.baseDark) ? rawPieceColors.baseDark : (isValidHex(rawPieceColors?.dark) ? rawPieceColors.dark : '#2b2b2b'),
     finish: rawPieceColors?.finish ?? {},
