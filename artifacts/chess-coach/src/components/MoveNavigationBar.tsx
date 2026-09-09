@@ -39,8 +39,10 @@ export function MoveNavigationBar({
       onClick={onClick}
       disabled={disabled}
       aria-label={label}
-      className="w-10 h-10 flex items-center justify-center rounded-full transition-all duration-150 hover:bg-white/8 active:scale-90 disabled:opacity-30 disabled:pointer-events-none"
-      style={{ color: TEXT_LIGHT }}
+      className="w-10 h-10 flex items-center justify-center rounded-full transition-all duration-150 active:scale-90 disabled:opacity-30 disabled:pointer-events-none"
+      style={{ color: TEXT_LIGHT, background: 'rgba(255,255,255,0.06)' }}
+      onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.14)'; }}
+      onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; }}
     >
       {icon}
     </button>
@@ -49,7 +51,7 @@ export function MoveNavigationBar({
   return (
     <div className="flex flex-col items-center gap-2">
       <div
-        className="inline-flex items-center gap-1 px-2 py-1.5 rounded-full"
+        className="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-full"
         style={{ background: 'rgba(0,0,0,0.22)', border: '1px solid rgba(255,255,255,0.07)' }}
       >
         {navBtn(onFirst, !canGoBack, <ChevronsLeft className="w-[18px] h-[18px]" />, 'Go to start')}

@@ -1130,14 +1130,14 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
                 <button
                   onClick={() => { setIsPlaying(false); go(0); }}
                   disabled={isFirst}
-                  className="p-2 md:p-2.5 rounded-full text-white/50 hover:text-white hover:bg-white/10 transition-all disabled:opacity-20"
+                  className="p-2 md:p-2.5 rounded-full text-white/70 bg-white/[0.06] hover:bg-white/[0.14] hover:text-white transition-all disabled:opacity-20"
                 >
                   <SkipBack className="w-3.5 h-3.5 md:w-4 md:h-4" />
                 </button>
                 <button
                   onClick={() => go(currentStep - 1)}
                   disabled={isFirst}
-                  className="p-2 md:p-2.5 rounded-full text-white/50 hover:text-white hover:bg-white/10 transition-all disabled:opacity-20"
+                  className="p-2 md:p-2.5 rounded-full text-white/70 bg-white/[0.06] hover:bg-white/[0.14] hover:text-white transition-all disabled:opacity-20"
                 >
                   <ChevronLeft className="w-4 h-4 md:w-5 md:h-5" />
                 </button>
@@ -1165,14 +1165,14 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
                 <button
                   onClick={() => go(currentStep + 1)}
                   disabled={isLast}
-                  className="p-2 md:p-2.5 rounded-full text-white/50 hover:text-white hover:bg-white/10 transition-all disabled:opacity-20"
+                  className="p-2 md:p-2.5 rounded-full text-white/70 bg-white/[0.06] hover:bg-white/[0.14] hover:text-white transition-all disabled:opacity-20"
                 >
                   <ChevronRight className="w-4 h-4 md:w-5 md:h-5" />
                 </button>
                 <button
                   onClick={() => { setIsPlaying(false); go(totalSteps - 1); }}
                   disabled={isLast}
-                  className="p-2 md:p-2.5 rounded-full text-white/50 hover:text-white hover:bg-white/10 transition-all disabled:opacity-20"
+                  className="p-2 md:p-2.5 rounded-full text-white/70 bg-white/[0.06] hover:bg-white/[0.14] hover:text-white transition-all disabled:opacity-20"
                 >
                   <SkipForward className="w-3.5 h-3.5 md:w-4 md:h-4" />
                 </button>
