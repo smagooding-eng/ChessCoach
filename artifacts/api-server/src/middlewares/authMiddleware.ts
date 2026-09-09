@@ -82,6 +82,16 @@ export async function isUserPremium(userId: string): Promise<boolean> {
   if (user?.isAdmin || ADMIN_EMAILS.includes(user?.email?.toLowerCase?.() ?? "")) {
     return true;
   }
+  // Admin-granted complimentary Pro access -- independent of any real
+  // Stripe subscription. This was missing here even though the frontend's
+  // own premium check (via /stripe/subscription, which explicitly returns
+  // status: 'active' for an override) already accounted for it -- meaning
+  // an override user saw Pro UI correctly but got blocked with a 403 the
+  // moment they actually tried to use a premium feature, since every
+  // premium-gated endpoint runs through this exact function.
+  if (user?.isPremiumOverride) {
+    return true;
+  }
   if (user?.stripeCustomerId) {
     let sub: any = null;
     try {
