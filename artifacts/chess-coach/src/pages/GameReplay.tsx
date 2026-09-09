@@ -1061,8 +1061,8 @@ export function GameReplay() {
                 onClick={() => { setPracticeMode(p => !p); setIsPlaying(false); }}
                 className={`p-2.5 md:px-3 md:py-2 rounded-xl text-xs font-bold transition-colors border active:scale-90
                   ${practiceMode
-                    ? 'bg-emerald-500/30 text-emerald-300 border-emerald-500/60'
-                    : 'bg-secondary border-border hover:border-primary/40 hover:text-primary'}`}>
+                    ? 'bg-violet-500/30 text-violet-300 border-violet-500/60'
+                    : 'bg-secondary border-border hover:border-violet-400/40 hover:text-violet-300'}`}>
                 <span className="flex items-center gap-1">
                   <Zap className="w-5 h-5 md:w-3.5 md:h-3.5" />
                   <span className="hidden md:inline">{practiceMode ? 'Practice ON' : 'Practice'}</span>
