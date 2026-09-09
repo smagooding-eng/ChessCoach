@@ -23,26 +23,28 @@ export type AiFeature = (typeof AI_FEATURES)[keyof typeof AI_FEATURES];
 // $ per 1M tokens. "luna" and "terra" are this account's own model
 // aliases, not standard OpenAI model names.
 //
-// luna's rate below is calibrated from real OpenAI billing data, not a
-// guess: Sep 8, 2026 showed 9.012M tokens (4.075M input + 4.937M output)
-// for $10.00 actual spend on the OpenAI dashboard, almost entirely
-// "Puzzle Explanation" calls (the only feature using luna at meaningful
-// volume that day) -- $10.00 / 9.012M tokens = ~$1.11/1M. The previous
-// $0.02/1M figure was given directly by Shann earlier and was never
-// independently checked against real billing; it was off by roughly
-// 55x, which is what was making the admin dashboard's dollar estimates
-// look far lower than actual spend even after the real volume bug (an
-// unrelated issue, since fixed) was accounted for. Using one blended
-// rate (not separate prompt/completion rates) since that's the only
-// number available from a single day's total -- can be split later if
-// real separate input/output pricing is ever provided.
-// terra's rate is unchanged (still as originally given, not yet
-// independently verified the same way).
-// gpt-audio's rate is still unknown -- cost reports as null for it
-// until that's provided too.
+// These are the real, official documented rates from OpenAI's own
+// pricing page (developers.openai.com), not a guess or a reverse-
+// engineered estimate from one day's billing. Two earlier attempts at
+// this were both wrong: $0.02/1M (given directly by Shann, never
+// verified -- off by ~55x) and then a rough $1.11/1M blended estimate
+// reverse-engineered from a single day's total spend divided by total
+// tokens (reasonable given what was available at the time, but blending
+// input+output together always over/under-estimates depending on the
+// actual mix, since output is billed at a very different rate than
+// input for both these models).
+//
+// Cached-input tokens are billed at a separate, lower rate (luna: $0.02,
+// terra: $0.20) -- not applied here since the OpenAI usage object this
+// tracker receives doesn't currently break out cached vs. uncached
+// prompt tokens, only a single prompt_tokens total. Using the plain
+// (uncached) input rate for all prompt tokens means this may slightly
+// overestimate cost on requests that got a cache hit -- the safe
+// direction to be wrong in, given the whole point of this fix is to stop
+// underestimating.
 const MODEL_RATES_PER_1M_TOKENS: Record<string, { prompt: number; completion: number } | null> = {
-  "gpt-5.6-luna": { prompt: 1.11, completion: 1.11 },
-  "gpt-5.6-terra": { prompt: 2.00, completion: 2.00 },
+  "gpt-5.6-luna": { prompt: 0.20, completion: 1.20 },
+  "gpt-5.6-terra": { prompt: 2.00, completion: 12.00 },
   "gpt-audio": null,
 };
 
