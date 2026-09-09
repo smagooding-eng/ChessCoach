@@ -714,6 +714,45 @@ router.get("/games/openings", requireAuth, async (req, res): Promise<void> => {
   res.json({ openings, totalGames });
 });
 
+router.get("/games/recent-opponents", async (req, res): Promise<void> => {
+  const username = (req.query.username as string || "").trim().toLowerCase();
+
+  if (!username) {
+    res.status(400).json({ error: "username is required" });
+    return;
+  }
+
+  try {
+    req.log.info({ username }, "Recent opponents: fetching games from chess.com");
+    // 2 months is normally enough to find 20 distinct opponents for any
+    // reasonably active player; for a quiet account this may come back
+    // with fewer than 20, which is fine -- the frontend just shows
+    // whatever comes back rather than treating a short list as an error.
+    const games = await fetchChessComGames(username, 2);
+
+    const seen = new Set<string>();
+    const opponents: { username: string; lastPlayedAt: string }[] = [];
+
+    const sorted = [...games].sort((a, b) => b.end_time - a.end_time);
+    for (const g of sorted) {
+      const w = g.white.username;
+      const b = g.black.username;
+      const isUserWhite = w.toLowerCase() === username;
+      const opponent = isUserWhite ? b : w;
+      const opponentKey = opponent.toLowerCase();
+      if (opponentKey === username || seen.has(opponentKey)) continue;
+      seen.add(opponentKey);
+      opponents.push({ username: opponent, lastPlayedAt: new Date(g.end_time * 1000).toISOString() });
+      if (opponents.length >= 20) break;
+    }
+
+    res.json({ username, opponents });
+  } catch (err: any) {
+    req.log.error({ err, username }, "Recent opponents lookup failed");
+    res.status(500).json({ error: err.message || "Failed to fetch recent opponents" });
+  }
+});
+
 router.get("/games/h2h-lookup", async (req, res): Promise<void> => {
   const player1 = (req.query.player1 as string || "").trim().toLowerCase();
   const player2 = (req.query.player2 as string || "").trim().toLowerCase();

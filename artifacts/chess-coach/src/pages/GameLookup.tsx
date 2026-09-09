@@ -270,11 +270,49 @@ export function GameLookup() {
   const [hasSearched, setHasSearched] = useState(false);
   const [searchHistory, setSearchHistory] = useState<SearchHistoryItem[]>(() => getSearchHistory());
 
+  // Player 1's recent opponents, offered as suggestions for Player 2 --
+  // the user can still just type any name; this is a shortcut, not a
+  // restriction.
+  const [recentOpponents, setRecentOpponents] = useState<{ username: string; lastPlayedAt: string }[]>([]);
+  const [loadingOpponents, setLoadingOpponents] = useState(false);
+  const [showOpponentsDropdown, setShowOpponentsDropdown] = useState(false);
+  const opponentsFetchedForRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const name = player1.trim();
+    if (!name) {
+      setRecentOpponents([]);
+      opponentsFetchedForRef.current = null;
+      return;
+    }
+    const timer = setTimeout(async () => {
+      const key = name.toLowerCase();
+      if (opponentsFetchedForRef.current === key) return;
+      opponentsFetchedForRef.current = key;
+      setLoadingOpponents(true);
+      try {
+        const res = await apiFetch(`/api/games/recent-opponents?username=${encodeURIComponent(name)}`);
+        if (res.ok) {
+          const data = await res.json() as { opponents: { username: string; lastPlayedAt: string }[] };
+          setRecentOpponents(data.opponents || []);
+        } else {
+          setRecentOpponents([]);
+        }
+      } catch {
+        setRecentOpponents([]);
+      } finally {
+        setLoadingOpponents(false);
+      }
+    }, 600); // debounced -- don't hit chess.com on every keystroke
+    return () => clearTimeout(timer);
+  }, [player1]);
+
   const [selectedGame, setSelectedGame] = useState<H2HGame | null>(null);
   const [moveIndex, setMoveIndex] = useState(0);
   const [flipped, setFlipped] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const playRef = useRef(false);
+
 
   const [analysis, setAnalysis] = useState<MoveAnalysis[]>([]);
   const [turningPoints, setTurningPoints] = useState<TurningPoint[]>([]);
@@ -783,12 +821,14 @@ export function GameLookup() {
             <div className="flex items-center justify-center" style={{ color: TEXT_MUTED }}>
               <Swords size={20} />
             </div>
-            <div className="flex-1 w-full">
+            <div className="flex-1 w-full relative">
               <label className="text-xs font-medium mb-1 block" style={{ color: TEXT_MUTED }}>Player 2</label>
               <input
                 type="text"
                 value={player2}
                 onChange={e => setPlayer2(e.target.value)}
+                onFocus={() => setShowOpponentsDropdown(true)}
+                onBlur={() => setTimeout(() => setShowOpponentsDropdown(false), 150)}
                 placeholder="Chess.com username"
                 className="w-full px-3 py-2.5 rounded-xl text-sm border outline-none focus:ring-1 transition-all"
                 style={{
@@ -798,6 +838,33 @@ export function GameLookup() {
                 }}
                 onKeyDown={e => { if (e.key === 'Enter') handleSearch(); }}
               />
+              {showOpponentsDropdown && player1.trim() && (recentOpponents.length > 0 || loadingOpponents) && (
+                <div
+                  className="absolute z-20 top-full left-0 right-0 mt-1 rounded-xl border overflow-hidden max-h-64 overflow-y-auto"
+                  style={{ background: BG_CARD, borderColor: CARD_BORDER, boxShadow: CARD_SHADOW }}
+                >
+                  <p className="px-3 py-1.5 text-[11px] font-medium" style={{ color: TEXT_MUTED }}>
+                    {loadingOpponents ? 'Loading recent opponents…' : `${player1.trim()}'s recent opponents`}
+                  </p>
+                  {recentOpponents.map(o => (
+                    <button
+                      key={o.username}
+                      type="button"
+                      // onMouseDown, not onClick -- fires before the input's
+                      // onBlur, so the click registers before the dropdown
+                      // closes (onClick would lose the race to onBlur).
+                      onMouseDown={() => { setPlayer2(o.username); setShowOpponentsDropdown(false); }}
+                      className="w-full text-left px-3 py-2 text-sm transition-colors hover:bg-white/5 flex items-center justify-between gap-2"
+                      style={{ color: TEXT_LIGHT }}
+                    >
+                      <span className="truncate">{o.username}</span>
+                      <span className="text-[10px] shrink-0" style={{ color: TEXT_MUTED }}>
+                        {new Date(o.lastPlayedAt).toLocaleDateString()}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
             <button
               onClick={handleSearch}
