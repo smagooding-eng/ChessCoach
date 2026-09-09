@@ -19,18 +19,32 @@ import { getPieceColorScheme } from '@/lib/utils';
 // than keep guessing at a live-only discrepancy, this rebuilds the same
 // idea on top of code that is already proven correct, since it's the
 // exact same stock rendering that's always worked.
-function remapStyle(style: React.CSSProperties | undefined, outline: string, detail: string): React.CSSProperties | undefined {
+function remapStyle(style: React.CSSProperties | undefined, outline: string, detail: string, ownFill: string): React.CSSProperties | undefined {
   if (!style) return style;
   const next = { ...style };
   const fill = (style as any).fill;
   const stroke = (style as any).stroke;
 
+  // If this element's fill is exactly the color the piece itself was
+  // given, it's the body shape -- regardless of what hex value that
+  // happens to be. This matters because when a user picks pure black
+  // (#000000) as their custom color, the body shape ends up with
+  // fill:#000000 (their color) and stroke:#000000 (the stock outline),
+  // which is the exact same fill+stroke pairing the knight-eye rule
+  // below looks for. Without this guard, a pure-black custom color
+  // makes every piece's entire body match the "knight eye" pattern,
+  // remapping the whole body to the detail color and destroying the
+  // fill/outline distinction -- not just on the knight, on every piece.
+  const isOwnFill = fill === ownFill;
+
   // Knight eyes: fill and stroke set to the same color together (either
   // '#000000' on the white knight or '#ffffff' on the black knight) --
   // this exact fill+stroke pairing only occurs on the eye paths, never
   // on a body shape (body shapes have a real fill color and a stroke
-  // that's always '#000000', not matched together like this).
-  if ((fill === '#000000' && stroke === '#000000') || (fill === '#ffffff' && stroke === '#ffffff')) {
+  // that's always '#000000', not matched together like this) -- except
+  // when the piece's own fill happens to equal that value too, hence
+  // the isOwnFill guard above.
+  if (!isOwnFill && ((fill === '#000000' && stroke === '#000000') || (fill === '#ffffff' && stroke === '#ffffff'))) {
     (next as any).fill = detail;
     (next as any).stroke = detail;
     return next;
@@ -43,8 +57,10 @@ function remapStyle(style: React.CSSProperties | undefined, outline: string, det
   }
   // Standalone highlight fills with no stroke at all (e.g. the black
   // knight's mane highlight) -- same detail treatment as the eyes/lines
-  // above, just without a matching stroke to key off of.
-  if ((fill === '#ffffff' || fill === '#000000') && (stroke === undefined || stroke === 'none')) {
+  // above, just without a matching stroke to key off of. Same isOwnFill
+  // guard: a body shape with stroke:none would otherwise be misread as
+  // this pattern too when the user's fill is black or white.
+  if (!isOwnFill && (fill === '#ffffff' || fill === '#000000') && (stroke === undefined || stroke === 'none')) {
     (next as any).fill = detail;
     return next;
   }
@@ -61,12 +77,12 @@ function remapStyle(style: React.CSSProperties | undefined, outline: string, det
   return next;
 }
 
-function remapElement(node: React.ReactNode, outline: string, detail: string): React.ReactNode {
+function remapElement(node: React.ReactNode, outline: string, detail: string, ownFill: string): React.ReactNode {
   if (!React.isValidElement(node)) return node;
   const props = node.props as { style?: React.CSSProperties; children?: React.ReactNode };
-  const newStyle = remapStyle(props.style, outline, detail);
+  const newStyle = remapStyle(props.style, outline, detail, ownFill);
   const newChildren = props.children
-    ? React.Children.map(props.children, (child) => remapElement(child, outline, detail))
+    ? React.Children.map(props.children, (child) => remapElement(child, outline, detail, ownFill))
     : props.children;
   return React.cloneElement(node, { style: newStyle } as any, newChildren);
 }
@@ -86,7 +102,7 @@ export function withRecoloredOutline(
 ) {
   return function RecoloredPiece({ fill, outline, detail, svgStyle }: RecoloredPieceProps) {
     const rendered = StockPiece({ fill, svgStyle });
-    return remapElement(rendered, outline, detail) as React.ReactElement;
+    return remapElement(rendered, outline, detail, fill) as React.ReactElement;
   };
 }
 

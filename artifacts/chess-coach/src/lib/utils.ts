@@ -47,6 +47,24 @@ function perceivedBrightness(hex: string): number {
   return (r * 299 + g * 587 + b * 114) / 1000;
 }
 
+// blend() by percentage breaks down at the extremes: the same 20% blend
+// that gives a medium gray a visibly lighter tint gives pure black
+// (#000000) only #333333 -- 20% of "not much" is even less. Ensures the
+// result is at least minBrightness by blending further toward white if
+// the percentage blend alone doesn't reach it, so a pure black or
+// near-black custom color still gets a genuinely visible outline/detail
+// instead of one that's technically a different hex but reads as the
+// same color as the fill.
+function blendWithFloor(hex: string, amount: number, minBrightness: number): string {
+  const base = blend(hex, amount);
+  if (perceivedBrightness(base) >= minBrightness) return base;
+  const [r, g, b] = hexToRgb(hex);
+  const baseBrightness = perceivedBrightness(hex);
+  if (baseBrightness >= minBrightness) return hex;
+  const t = (minBrightness - baseBrightness) / (255 - baseBrightness);
+  return rgbToHex(r + (255 - r) * t, g + (255 - g) * t, b + (255 - b) * t);
+}
+
 export interface PieceColorScheme {
   outline: string;
   detail: string;
@@ -61,7 +79,9 @@ export function getPieceColorScheme(hex: string): PieceColorScheme {
     // combined with the original 1.5 stroke width, this was still
     // reading as too prominent against a busy/textured board. Thinner
     // width (set in remapStyle) plus a little less lightening here.
-    outline: isDark ? blend(hex, 0.42) : blend(hex, -0.75),
+    // Floors added so this still works for near-black colors specifically
+    // -- see blendWithFloor.
+    outline: isDark ? blendWithFloor(hex, 0.42, 110) : blend(hex, -0.75),
     // Dark pieces get a lighter tint of their own color for detail lines
     // and eyes; light pieces get a darker one -- a shade of the piece's
     // own color either way, not a fixed black or white.
@@ -73,7 +93,7 @@ export function getPieceColorScheme(hex: string): PieceColorScheme {
     // making the whole piece read as "one solid color, no details" even
     // though the detail lines were technically there. Lowered to give a
     // real gap again, similar in proportion to the light side's.
-    detail: isDark ? blend(hex, 0.2) : blend(hex, -0.5),
+    detail: isDark ? blendWithFloor(hex, 0.2, 70) : blend(hex, -0.5),
     gradientLight: blend(hex, 0.22),
     gradientDark: blend(hex, -0.22),
   };
