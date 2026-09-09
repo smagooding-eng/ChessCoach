@@ -741,6 +741,38 @@ router.post("/admin/users/:userId/premium-override", requireAdmin, async (req: R
   }
 });
 
+router.post("/admin/users/:userId/affiliate-override", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const userId = req.params.userId as string;
+    const { enabled } = req.body as { enabled: boolean };
+    if (typeof enabled !== "boolean") {
+      res.status(400).json({ error: "enabled (boolean) required" });
+      return;
+    }
+
+    // Same shape as premium-override just above, but for affiliate status
+    // -- lives here, toggled against a specific, already-confirmed user
+    // row, rather than only through the separate "add affiliate by email"
+    // form on the Growth tab, where a typo'd or mismatched email silently
+    // sets isAffiliate on the wrong account (or no account) instead of
+    // throwing an error.
+    const [updated] = await db
+      .update(usersTable)
+      .set({ isAffiliate: enabled })
+      .where(eq(usersTable.id, userId))
+      .returning({ id: usersTable.id, email: usersTable.email, isAffiliate: usersTable.isAffiliate });
+
+    if (!updated) {
+      res.status(404).json({ error: "User not found" });
+      return;
+    }
+
+    res.json({ success: true, user: updated });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to update affiliate status", details: err.message });
+  }
+});
+
 router.get("/admin/users/:userId/usage", requireAdmin, async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
@@ -847,6 +879,7 @@ router.get("/admin/users/:userId/usage", requireAdmin, async (req: Request, res:
         createdAt: user.createdAt,
         lastLoginAt: user.lastLoginAt,
         isPremiumOverride: user.isPremiumOverride,
+        isAffiliate: user.isAffiliate,
       },
       usage: {
         gamesImported: gamesImported.count,

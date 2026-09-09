@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { PageHero } from '@/components/DesignSystem';
 import { useLocation } from 'wouter';
 import { useUser } from '@/hooks/use-user';
@@ -631,7 +631,27 @@ export function Admin() {
 
       {activeTab === 'ai' && <AiUsagePanel />}
 
-      {activeTab === 'users' && <UserActivityPanel />}
+      {activeTab === 'users' && (
+        <>
+          {/* This is the same UserListPanel the Overview tab's Users stat
+              card opens (via the same showUsers state) -- grant Pro,
+              grant affiliate, view usage, delete, filter, and sort all
+              live here. Surfaced directly on this tab too, not just via
+              a click-through on Overview, since "Users" is where an
+              admin would naturally look for this first. */}
+          <div className="rounded-2xl border border-border/40 bg-card/60 overflow-hidden">
+            <button
+              onClick={() => setShowUsers(true)}
+              className="w-full px-5 py-4 flex items-center justify-between hover:bg-secondary/20 transition-colors"
+            >
+              <span className="text-sm font-bold flex items-center gap-2"><Users className="w-4 h-4 text-blue-400" /> Manage Users</span>
+              <span className="text-xs text-muted-foreground">Grant Pro / affiliate, view usage, delete, filter &amp; sort →</span>
+            </button>
+            {showUsers && <UserListPanel onClose={() => setShowUsers(false)} onEmailUsers={handleEmailUsers} />}
+          </div>
+          <UserActivityPanel />
+        </>
+      )}
 
       {activeTab === 'growth' && (
         <>
@@ -770,6 +790,7 @@ interface AdminUser {
 }
 
 type UserFilter = 'all' | 'admin' | 'pro' | 'trial' | 'free';
+type UserSort = 'newest' | 'oldest' | 'recent-login' | 'name';
 
 function TierBadge({ user }: { user: AdminUser }) {
   const interval = user.planInterval === 'week' ? '/wk' : user.planInterval === 'month' ? '/mo' : '';
@@ -814,7 +835,7 @@ const FILTER_TABS: { key: UserFilter; label: string; color: string }[] = [
 ];
 
 interface UserUsage {
-  user: { id: string; email: string | null; firstName: string | null; chesscomUsername: string | null; inviteCode: string | null; referredByUserId: string | null; createdAt: string; lastLoginAt: string | null; isPremiumOverride: boolean };
+  user: { id: string; email: string | null; firstName: string | null; chesscomUsername: string | null; inviteCode: string | null; referredByUserId: string | null; createdAt: string; lastLoginAt: string | null; isPremiumOverride: boolean; isAffiliate: boolean };
   usage: { gamesImported: number; gamesReviewed: number; opponentsScouted: number; puzzlesSolved: number; puzzlesFailed: number; coursesGenerated: number; lessonsCompleted: number; pageViews: number };
   payments: { totalPaidCents: number; currency: string; count: number; history: { id: string; amountCents: number; currency: string; status: string; description: string | null; createdAt: string }[] } | null;
   paymentsError: string | null;
@@ -833,6 +854,8 @@ function UserDetailPanel({ userId, onBack }: { userId: string; onBack: () => voi
   const [error, setError] = useState('');
   const [premiumOverride, setPremiumOverride] = useState(false);
   const [togglingPremium, setTogglingPremium] = useState(false);
+  const [affiliateOverride, setAffiliateOverride] = useState(false);
+  const [togglingAffiliate, setTogglingAffiliate] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
@@ -845,7 +868,7 @@ function UserDetailPanel({ userId, onBack }: { userId: string; onBack: () => voi
         if (!r.ok) throw new Error('Failed to load');
         return r.json();
       })
-      .then(d => { setData(d); setPremiumOverride(Boolean(d?.user?.isPremiumOverride)); })
+      .then(d => { setData(d); setPremiumOverride(Boolean(d?.user?.isPremiumOverride)); setAffiliateOverride(Boolean(d?.user?.isAffiliate)); })
       .catch(() => setError('Failed to load user stats'))
       .finally(() => setLoading(false));
   }, [userId]);
@@ -863,6 +886,21 @@ function UserDetailPanel({ userId, onBack }: { userId: string; onBack: () => voi
       if (res.ok) setPremiumOverride(next);
     } catch { /* leave state as-is on failure */ }
     setTogglingPremium(false);
+  };
+
+  const toggleAffiliateOverride = async () => {
+    setTogglingAffiliate(true);
+    const next = !affiliateOverride;
+    try {
+      const res = await apiFetch(`/api/admin/users/${userId}/affiliate-override`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ enabled: next }),
+      });
+      if (res.ok) setAffiliateOverride(next);
+    } catch { /* leave state as-is on failure */ }
+    setTogglingAffiliate(false);
   };
 
   const handleDeleteAccount = async () => {
@@ -957,6 +995,21 @@ function UserDetailPanel({ userId, onBack }: { userId: string; onBack: () => voi
         >
           {togglingPremium ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
           {premiumOverride ? 'Pro access granted — click to revoke' : 'Grant free Pro access'}
+        </button>
+
+        {/* Toggled directly against this confirmed user row, unlike the
+            separate "add affiliate by email" form -- no risk of a typo'd
+            or mismatched email silently missing the intended account. */}
+        <button
+          onClick={toggleAffiliateOverride}
+          disabled={togglingAffiliate}
+          className={cn(
+            'mt-2 ml-2 px-3 py-1.5 rounded-lg text-[11px] font-bold flex items-center gap-1.5 disabled:opacity-50',
+            affiliateOverride ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30' : 'bg-secondary/50 text-foreground border border-border/40'
+          )}
+        >
+          {togglingAffiliate ? <Loader2 className="w-3 h-3 animate-spin" /> : <Users className="w-3 h-3" />}
+          {affiliateOverride ? 'Affiliate — click to revoke' : 'Grant affiliate access'}
         </button>
 
         <div className="mt-2 flex items-center gap-2 flex-wrap">
@@ -2365,6 +2418,7 @@ function UserListPanel({ onClose, onEmailUsers }: { onClose: () => void; onEmail
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<UserFilter>('all');
+  const [sortBy, setSortBy] = useState<UserSort>('newest');
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [deleting, setDeleting] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
@@ -2378,7 +2432,29 @@ function UserListPanel({ onClose, onEmailUsers }: { onClose: () => void; onEmail
       .finally(() => setLoading(false));
   }, []);
 
-  const filtered = filter === 'all' ? users : users.filter(u => u.tier === filter);
+  const filtered = useMemo(() => {
+    const base = filter === 'all' ? users : users.filter(u => u.tier === filter);
+    const sorted = [...base];
+    switch (sortBy) {
+      case 'oldest':
+        sorted.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+        break;
+      case 'recent-login':
+        // Never-logged-in users (null) sort last regardless of direction --
+        // "most recently active" should surface real activity first.
+        sorted.sort((a, b) => (a.daysSinceLogin ?? Infinity) - (b.daysSinceLogin ?? Infinity));
+        break;
+      case 'name':
+        sorted.sort((a, b) => (a.email || a.chesscomUsername || a.firstName || '').localeCompare(b.email || b.chesscomUsername || b.firstName || ''));
+        break;
+      case 'newest':
+      default:
+        sorted.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+        break;
+    }
+    return sorted;
+  }, [users, filter, sortBy]);
+
   const counts = users.reduce((acc, u) => {
     acc[u.tier] = (acc[u.tier] || 0) + 1;
     return acc;
@@ -2506,6 +2582,17 @@ function UserListPanel({ onClose, onEmailUsers }: { onClose: () => void; onEmail
               </button>
             );
           })}
+          <div className="w-px h-4 bg-border/30 mx-1 shrink-0" />
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as UserSort)}
+            className="text-[11px] font-bold bg-secondary/30 text-muted-foreground hover:text-foreground rounded px-2 py-1 outline-none shrink-0 cursor-pointer"
+          >
+            <option value="newest">Newest first</option>
+            <option value="oldest">Oldest first</option>
+            <option value="recent-login">Recently active</option>
+            <option value="name">Name / email</option>
+          </select>
         </div>
       )}
       {viewingUserId ? (
