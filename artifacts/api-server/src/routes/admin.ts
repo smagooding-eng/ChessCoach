@@ -1,7 +1,7 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { db, usersTable, pageViewsTable, gamesTable, weaknessesTable, coursesTable, lessonsTable, backgroundJobsTable, referralConversionsTable, affiliateAdjustmentsTable, seoArticlesTable, puzzlesTable } from "@workspace/db";
 import { preGenerateExplanations } from "../lib/puzzleSeed";
-import { sql, count, gte, countDistinct, inArray, eq, and, isNotNull, desc } from "drizzle-orm";
+import { sql, count, gte, lte, countDistinct, inArray, eq, and, isNotNull, desc } from "drizzle-orm";
 import { puzzleAttemptsTable } from "@workspace/db";
 import { sessionsTable } from "@workspace/db";
 import { getUncachableStripeClient } from "../lib/stripeClient";
@@ -14,6 +14,28 @@ import { randomUUID } from "crypto";
 import OpenAI from "openai";
 
 const router: IRouter = Router();
+
+// Shared by every admin panel endpoint with a date-range filter (AI
+// usage, user activity, landing funnel). Prefers explicit startDate/
+// endDate (YYYY-MM-DD, inclusive both ends) if provided -- this is what
+// lets "Today" and "Yesterday" work as real single-day ranges rather
+// than "everything since N days ago", which a day-count param can't
+// express. Falls back to the old ?days=N behavior (a rolling window
+// ending now) when no explicit range is given, so nothing that already
+// calls these endpoints with ?days= breaks.
+export function parseDateRangeParams(req: Request, defaultDays = 30): { since: Date; until: Date } {
+  const startDateStr = req.query.startDate as string | undefined;
+  const endDateStr = req.query.endDate as string | undefined;
+  if (startDateStr && endDateStr) {
+    return {
+      since: new Date(`${startDateStr}T00:00:00.000Z`),
+      until: new Date(`${endDateStr}T23:59:59.999Z`),
+    };
+  }
+  const days = Math.min(90, Math.max(1, parseInt(req.query.days as string) || defaultDays));
+  return { since: new Date(Date.now() - days * 24 * 60 * 60 * 1000), until: new Date() };
+}
+
 function requireAdmin(req: Request, res: Response, next: Function) {
   if (!req.isAuthenticated() || !req.user?.isAdmin) {
     res.status(403).json({ error: "Admin access required" });
@@ -1367,8 +1389,7 @@ router.post("/admin/affiliates/:userId/adjustments", requireAdmin, async (req: R
 // contribution is simply 0 until a rate is added.
 router.get("/admin/ai-usage", requireAdmin, async (req: Request, res: Response) => {
   try {
-    const days = Math.min(90, Math.max(1, parseInt(req.query.days as string) || 30));
-    const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+    const { since, until } = parseDateRangeParams(req, 30);
 
     const rows = await db
       .select({
@@ -1379,7 +1400,7 @@ router.get("/admin/ai-usage", requireAdmin, async (req: Request, res: Response) 
         completionTokens: aiUsageEventsTable.completionTokens,
       })
       .from(aiUsageEventsTable)
-      .where(gte(aiUsageEventsTable.createdAt, since));
+      .where(and(gte(aiUsageEventsTable.createdAt, since), lte(aiUsageEventsTable.createdAt, until)));
 
     const byFeature: Record<string, { calls: number; tokens: number; costUsd: number }> = {};
     const byUser: Record<string, { calls: number; tokens: number; costUsd: number }> = {};
@@ -1416,7 +1437,8 @@ router.get("/admin/ai-usage", requireAdmin, async (req: Request, res: Response) 
     const userLabel = new Map(userRows.map((u) => [u.id, u.chesscomUsername || u.email || u.id]));
 
     res.json({
-      days,
+      since: since.toISOString(),
+      until: until.toISOString(),
       totals: { calls: totalCalls, tokens: totalTokens, costUsd: totalCostUsd, unknownRateTokens },
       byFeature: Object.entries(byFeature)
         .map(([feature, v]) => ({ feature, ...v }))
@@ -1437,8 +1459,7 @@ router.get("/admin/ai-usage", requireAdmin, async (req: Request, res: Response) 
 // registered account already has an unambiguous creation timestamp.
 router.get("/admin/user-activity", requireAdmin, async (req: Request, res: Response) => {
   try {
-    const days = Math.min(90, Math.max(1, parseInt(req.query.days as string) || 30));
-    const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+    const { since, until } = parseDateRangeParams(req, 30);
     const todayStart = new Date();
     todayStart.setUTCHours(0, 0, 0, 0);
 
@@ -1447,14 +1468,14 @@ router.get("/admin/user-activity", requireAdmin, async (req: Request, res: Respo
         .from(usersTable),
       db.select({ userId: pageViewsTable.userId, path: pageViewsTable.path, createdAt: pageViewsTable.createdAt })
         .from(pageViewsTable)
-        .where(and(isNotNull(pageViewsTable.userId), gte(pageViewsTable.createdAt, since))),
+        .where(and(isNotNull(pageViewsTable.userId), gte(pageViewsTable.createdAt, since), lte(pageViewsTable.createdAt, until))),
       db.select({ userId: pageViewsTable.userId })
         .from(pageViewsTable)
         .where(and(isNotNull(pageViewsTable.userId), gte(pageViewsTable.createdAt, todayStart)))
         .groupBy(pageViewsTable.userId),
       db.select({ userId: aiUsageEventsTable.userId, model: aiUsageEventsTable.model, promptTokens: aiUsageEventsTable.promptTokens, completionTokens: aiUsageEventsTable.completionTokens })
         .from(aiUsageEventsTable)
-        .where(and(isNotNull(aiUsageEventsTable.userId), gte(aiUsageEventsTable.createdAt, since))),
+        .where(and(isNotNull(aiUsageEventsTable.userId), gte(aiUsageEventsTable.createdAt, since), lte(aiUsageEventsTable.createdAt, until))),
     ]);
 
     // All aggregation happens here in JS rather than in SQL -- at this
@@ -1527,7 +1548,7 @@ router.get("/admin/user-activity", requireAdmin, async (req: Request, res: Respo
       .sort((a, b) => (b.lastActiveAt ?? '').localeCompare(a.lastActiveAt ?? ''));
 
     res.json({
-      days,
+      days: Math.max(1, Math.round((until.getTime() - since.getTime()) / (24 * 60 * 60 * 1000))),
       today: { newUsers: newUsersToday, returningUsers: returningUsersToday, activeUsers: activeTodayIds.size },
       users,
     });

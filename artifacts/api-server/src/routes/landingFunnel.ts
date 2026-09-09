@@ -1,6 +1,7 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { db, landingFunnelEventsTable } from "@workspace/db";
-import { sql, gte } from "drizzle-orm";
+import { sql, gte, lte, and } from "drizzle-orm";
+import { parseDateRangeParams } from "./admin";
 
 // Same shape returned by /api/admin/stats -- kept identical so the admin
 // UI can render both with one component.
@@ -14,12 +15,12 @@ interface VisitorBreakdown { new: number; returning: number; bounced: number }
 // generic page-view tracker, so it's a reliable join key. A visitor_id
 // with no matching page_views row at all (edge case) is treated as a
 // single-day, not-signed-up visit rather than dropped from the count.
-async function getLandingVisitorBreakdown(since: Date): Promise<VisitorBreakdown> {
+async function getLandingVisitorBreakdown(since: Date, until: Date): Promise<VisitorBreakdown> {
   const result = await db.execute(sql`
     WITH landing_visitors AS (
       SELECT DISTINCT visitor_id
       FROM landing_funnel_events
-      WHERE event_type = 'landing_view' AND created_at >= ${since}
+      WHERE event_type = 'landing_view' AND created_at >= ${since} AND created_at <= ${until}
     ),
     visitor_agg AS (
       SELECT
@@ -90,13 +91,12 @@ router.post("/landing-funnel/track", async (req: Request, res: Response) => {
 // dashboard's page-view stats, per explicit instruction not to mix them in.
 router.get("/admin/landing-funnel", requireAdmin, async (req: Request, res: Response) => {
   try {
-    const days = req.query.days ? parseInt(req.query.days as string, 10) : 30;
-    const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+    const { since, until } = parseDateRangeParams(req, 30);
 
     const counts = await db
       .select({ eventType: landingFunnelEventsTable.eventType, count: sql<number>`count(distinct ${landingFunnelEventsTable.visitorId})` })
       .from(landingFunnelEventsTable)
-      .where(gte(landingFunnelEventsTable.createdAt, since))
+      .where(and(gte(landingFunnelEventsTable.createdAt, since), lte(landingFunnelEventsTable.createdAt, until)))
       .groupBy(landingFunnelEventsTable.eventType);
 
     const countMap: Record<string, number> = {};
@@ -134,17 +134,17 @@ router.get("/admin/landing-funnel", requireAdmin, async (req: Request, res: Resp
     const distinctActiveVisitors = await db
       .select({ visitorId: landingFunnelEventsTable.visitorId })
       .from(landingFunnelEventsTable)
-      .where(gte(landingFunnelEventsTable.createdAt, since));
+      .where(and(gte(landingFunnelEventsTable.createdAt, since), lte(landingFunnelEventsTable.createdAt, until)));
     const visitorEventCounts: Record<string, number> = {};
     for (const row of distinctActiveVisitors) {
       visitorEventCounts[row.visitorId] = (visitorEventCounts[row.visitorId] ?? 0) + 1;
     }
     const leftWithoutAction = Object.values(visitorEventCounts).filter((c) => c === 1).length;
 
-    const visitorBreakdown = await getLandingVisitorBreakdown(since);
+    const visitorBreakdown = await getLandingVisitorBreakdown(since, until);
 
     res.json({
-      days,
+      days: Math.max(1, Math.round((until.getTime() - since.getTime()) / (24 * 60 * 60 * 1000))),
       landingViews,
       miaStarted,
       miaSkipped,
