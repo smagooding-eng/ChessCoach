@@ -1125,8 +1125,8 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
 
           {/* Controls */}
           <div className="flex flex-col items-center gap-2 px-2 py-3 md:px-4 max-w-[480px] mx-auto w-full">
-            <div className="flex items-center justify-center gap-1.5 md:gap-3 flex-wrap">
-              <div className="flex items-center rounded-full p-0.5" style={{ background: 'rgba(255,255,255,0.05)' }}>
+            <div className="flex items-center justify-center gap-2.5 md:gap-4 flex-wrap">
+              <div className="flex items-center gap-1 rounded-full p-1" style={{ background: 'rgba(0,0,0,0.22)', border: '1px solid rgba(255,255,255,0.07)' }}>
                 <button
                   onClick={() => { setIsPlaying(false); go(0); }}
                   disabled={isFirst}
@@ -1161,7 +1161,7 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
                 )}
               </button>
 
-              <div className="flex items-center rounded-full p-0.5" style={{ background: 'rgba(255,255,255,0.05)' }}>
+              <div className="flex items-center gap-1 rounded-full p-1" style={{ background: 'rgba(0,0,0,0.22)', border: '1px solid rgba(255,255,255,0.07)' }}>
                 <button
                   onClick={() => go(currentStep + 1)}
                   disabled={isLast}

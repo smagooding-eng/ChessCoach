@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { PageHero } from '@/components/DesignSystem';
 import { ChessBoard } from '@/components/ChessBoard';
+import { MoveNavigationBar } from '@/components/MoveNavigationBar';
 import { Chess } from 'chess.js';
 import { apiFetch } from '@/lib/api';
 import { normalizeFen } from '@/lib/utils';
@@ -722,14 +723,17 @@ export function GameLookup() {
               </div>
 
               <div className="flex flex-col border-l" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
-                <div className="flex items-center justify-center gap-1 md:gap-2 p-2 border-b" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
-                  <button onClick={goFirst} className="p-3 md:p-2 rounded-xl hover:bg-white/10 active:scale-90 transition-transform" style={{ color: TEXT_MUTED }}><ChevronsLeft className="w-5 h-5 md:w-[18px] md:h-[18px]" /></button>
-                  <button onClick={goPrev} className="p-3 md:p-2 rounded-xl hover:bg-white/10 active:scale-90 transition-transform" style={{ color: TEXT_MUTED }}><ChevronLeft className="w-5 h-5 md:w-[18px] md:h-[18px]" /></button>
-                  <button onClick={togglePlay} className="p-3 md:p-2 rounded-xl hover:bg-white/10 active:scale-90 transition-transform" style={{ color: CHESSCOM_GREEN }}>
-                    {isPlaying ? <Pause className="w-5 h-5 md:w-[18px] md:h-[18px]" /> : <Play className="w-5 h-5 md:w-[18px] md:h-[18px]" />}
-                  </button>
-                  <button onClick={goNext} className="p-3 md:p-2 rounded-xl hover:bg-white/10 active:scale-90 transition-transform" style={{ color: TEXT_MUTED }}><ChevronRight className="w-5 h-5 md:w-[18px] md:h-[18px]" /></button>
-                  <button onClick={goLast} className="p-3 md:p-2 rounded-xl hover:bg-white/10 active:scale-90 transition-transform" style={{ color: TEXT_MUTED }}><ChevronsRight className="w-5 h-5 md:w-[18px] md:h-[18px]" /></button>
+                <div className="flex items-center justify-center gap-2 p-2 border-b" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
+                  <MoveNavigationBar
+                    isPlaying={isPlaying}
+                    onFirst={goFirst}
+                    onPrev={goPrev}
+                    onPlayPause={togglePlay}
+                    onNext={goNext}
+                    onLast={goLast}
+                    canGoBack={moveIndex > 0}
+                    canGoForward={moveIndex < totalMoves}
+                  />
                   <span className="text-[10px] ml-2" style={{ color: TEXT_MUTED }}>
                     {moveIndex}/{totalMoves}
                   </span>

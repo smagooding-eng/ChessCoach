@@ -3,6 +3,7 @@ import { useParams, Link, useLocation } from 'wouter';
 import { useGameViewer } from '@/hooks/use-games';
 import { EvalBar, MaterialStrip } from '@/components/GameStatusStrip';
 import { ChessBoard } from '@/components/ChessBoard';
+import { MoveNavigationBar } from '@/components/MoveNavigationBar';
 import { Chess } from 'chess.js';
 import { normalizeFen } from '@/lib/utils';
 import {
@@ -1021,48 +1022,32 @@ export function GameReplay() {
 
           {/* Playback controls */}
           <div className="glass-card rounded-xl px-1.5 py-1.5 md:p-3 flex items-center justify-between order-[-2] xl:order-none">
-            <div className="flex items-center">
-              <button onClick={() => { setCurrentMove(0); setIsPlaying(false); }} disabled={currentMove === 0}
-                className="p-2.5 md:p-2.5 rounded-xl bg-secondary hover:bg-primary/20 hover:text-primary transition-colors disabled:opacity-40 active:scale-90">
-                <ChevronsLeft className="w-5 h-5 md:w-4 md:h-4" />
-              </button>
-              <button
-                onClick={() => {
-                  if (isBad && mistakeSlide === 1 && (currentReview?.bestLineSan?.length ?? 0) > 1 && engineStep > 0) {
-                    setEngineStep(s => Math.max(0, s - 1));
-                  } else {
-                    setCurrentMove(p => Math.max(0, p - 1));
-                  }
-                }}
-                disabled={isBad && mistakeSlide === 1 && (currentReview?.bestLineSan?.length ?? 0) > 1 ? engineStep === 0 : currentMove === 0}
-                className="p-2.5 md:p-2.5 rounded-xl bg-secondary hover:bg-primary/20 hover:text-primary transition-colors disabled:opacity-40 active:scale-90">
-                <ChevronLeft className="w-5 h-5 md:w-4 md:h-4" />
-              </button>
-              <button onClick={() => setIsPlaying(p => !p)}
-                className="px-3.5 py-2.5 md:px-4 md:py-2.5 rounded-xl bg-primary text-primary-foreground hover:opacity-90 transition-opacity active:scale-90 font-bold">
-                {isPlaying ? <Pause className="w-5 h-5 md:w-4 md:h-4" /> : <Play className="w-5 h-5 md:w-4 md:h-4" />}
-              </button>
-              <button
-                onClick={() => {
-                  const lineLen = currentReview?.bestLineSan?.length ?? 0;
-                  if (isBad && mistakeSlide === 1 && lineLen > 1 && engineStep < lineLen - 1) {
-                    setEngineStep(s => Math.min(lineLen - 1, s + 1));
-                  } else {
-                    setCurrentMove(p => Math.min(maxMoves, p + 1));
-                  }
-                }}
-                disabled={(() => {
-                  const lineLen = currentReview?.bestLineSan?.length ?? 0;
-                  return (isBad && mistakeSlide === 1 && lineLen > 1) ? engineStep >= lineLen - 1 : currentMove >= maxMoves;
-                })()}
-                className="p-2.5 md:p-2.5 rounded-xl bg-secondary hover:bg-primary/20 hover:text-primary transition-colors disabled:opacity-40 active:scale-90">
-                <ChevronRight className="w-5 h-5 md:w-4 md:h-4" />
-              </button>
-              <button onClick={() => { setCurrentMove(maxMoves); setIsPlaying(false); }} disabled={currentMove >= maxMoves}
-                className="p-2.5 md:p-2.5 rounded-xl bg-secondary hover:bg-primary/20 hover:text-primary transition-colors disabled:opacity-40 active:scale-90">
-                <ChevronsRight className="w-5 h-5 md:w-4 md:h-4" />
-              </button>
-            </div>
+            <MoveNavigationBar
+              isPlaying={isPlaying}
+              onFirst={() => { setCurrentMove(0); setIsPlaying(false); }}
+              onPrev={() => {
+                if (isBad && mistakeSlide === 1 && (currentReview?.bestLineSan?.length ?? 0) > 1 && engineStep > 0) {
+                  setEngineStep(s => Math.max(0, s - 1));
+                } else {
+                  setCurrentMove(p => Math.max(0, p - 1));
+                }
+              }}
+              onPlayPause={() => setIsPlaying(p => !p)}
+              onNext={() => {
+                const lineLen = currentReview?.bestLineSan?.length ?? 0;
+                if (isBad && mistakeSlide === 1 && lineLen > 1 && engineStep < lineLen - 1) {
+                  setEngineStep(s => Math.min(lineLen - 1, s + 1));
+                } else {
+                  setCurrentMove(p => Math.min(maxMoves, p + 1));
+                }
+              }}
+              onLast={() => { setCurrentMove(maxMoves); setIsPlaying(false); }}
+              canGoBack={(isBad && mistakeSlide === 1 && (currentReview?.bestLineSan?.length ?? 0) > 1) ? engineStep > 0 : currentMove > 0}
+              canGoForward={(() => {
+                const lineLen = currentReview?.bestLineSan?.length ?? 0;
+                return (isBad && mistakeSlide === 1 && lineLen > 1) ? engineStep < lineLen - 1 : currentMove < maxMoves;
+              })()}
+            />
 
             <div className="flex items-center gap-0.5 md:gap-2">
               <span className="text-[10px] md:text-xs text-muted-foreground font-mono">{currentMove}/{maxMoves}</span>
