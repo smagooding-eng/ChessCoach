@@ -18,10 +18,22 @@ export function startGrowthScheduler() {
     await runEmailDrips();
   });
 
-  cron.schedule('*/15 * * * *', async () => {
-    logger.info('[review] Auto bulk-review tick');
-    await runAutoReviewTick();
-  });
+  // DISABLED: this was silently burning real OpenAI cost with zero user
+  // involvement -- every 15 minutes, up to 5 random accounts with any
+  // unreviewed games would get a full OpenAI-powered review triggered
+  // automatically. Confirmed via runAutoReviewTick -> runBulkReviewJob ->
+  // reviewOneGame -> reviewFullGame, the same OpenAI-billed function used
+  // for real user-requested reviews. With no meaningful user base yet,
+  // this convenience feature's cost wasn't buying anything -- it just ran
+  // continuously regardless of whether anyone was using the site.
+  // Re-enable only with a real cost cap (e.g. a daily/monthly OpenAI
+  // spend ceiling checked before each tick) once there's an actual
+  // active user base where the convenience is worth paying for.
+  //
+  // cron.schedule('*/15 * * * *', async () => {
+  //   logger.info('[review] Auto bulk-review tick');
+  //   await runAutoReviewTick();
+  // });
 
   // Weekly, not more often — this is a slow, compounding content channel.
   // Publishing one genuinely substantive article a week beats a burst of
@@ -40,7 +52,7 @@ export function startGrowthScheduler() {
     }
   });
 
-  logger.info('[growth] Scheduler started (drips: every 6h, auto-review: every 15min, seo: weekly Mondays 9am)');
+  logger.info('[growth] Scheduler started (drips: every 6h, auto-review: DISABLED -- was an unbounded OpenAI cost source, seo: weekly Mondays 9am)');
 }
 
 // Gentle, throttled background review: each tick picks a small number of
@@ -55,10 +67,21 @@ const AUTO_REVIEW_GAMES_PER_USER_PER_TICK = 2;
 
 async function runAutoReviewTick() {
   try {
-    const candidates = await db
+    // Postgres rejects ORDER BY RANDOM() directly on a SELECT DISTINCT
+    // query -- "for SELECT DISTINCT, ORDER BY expressions must appear in
+    // select list" -- which is exactly what this was doing before,
+    // meaning this tick has been failing on every single run. Wrapping
+    // the distinct selection in a subquery and randomizing the outer
+    // query sidesteps that restriction.
+    const distinctUsers = db
       .selectDistinct({ userId: gamesTable.userId })
       .from(gamesTable)
       .where(and(isNull(gamesTable.reviewData), isNotNull(gamesTable.userId)))
+      .as('distinct_users');
+
+    const candidates = await db
+      .select({ userId: distinctUsers.userId })
+      .from(distinctUsers)
       .orderBy(sql`RANDOM()`)
       .limit(AUTO_REVIEW_USERS_PER_TICK);
 

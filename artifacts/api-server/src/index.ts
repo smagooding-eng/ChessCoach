@@ -190,12 +190,19 @@ initStripe().catch((err) => {
   logger.error({ err }, 'Stripe init failed after server start');
 });
 
-import("./lib/puzzleSeed").then(({ seedPuzzlesIfNeeded, preGenerateExplanations }) => {
-  seedPuzzlesIfNeeded().then(() => {
-    preGenerateExplanations().catch((err: any) => {
-      logger.error({ err }, "Puzzle explanation pre-generation failed");
-    });
-  }).catch((err: any) => {
+import("./lib/puzzleSeed").then(({ seedPuzzlesIfNeeded }) => {
+  // preGenerateExplanations() used to run automatically here on every
+  // server startup. That's a real bug, not a minor inefficiency: this
+  // app redeploys frequently, and every single restart re-triggered a
+  // full OpenAI-powered pass over every puzzle still missing an
+  // explanation. If a prior run got killed mid-pass by the next deploy
+  // (very likely, given how many puzzles there are and how often this
+  // service restarts), the next startup just started over from the same
+  // point, burning real OpenAI cost on the same puzzles repeatedly
+  // without making sustained progress. It's now a manual, admin-triggered
+  // action instead -- see POST /api/admin/generate-puzzle-explanations --
+  // so it runs deliberately, once, when actually wanted.
+  seedPuzzlesIfNeeded().catch((err: any) => {
     logger.error({ err }, "Puzzle seed failed");
   });
 }).catch(() => {});

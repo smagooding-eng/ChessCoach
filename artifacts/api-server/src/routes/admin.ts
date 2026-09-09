@@ -1,5 +1,6 @@
 import { Router, type IRouter, type Request, type Response } from "express";
-import { db, usersTable, pageViewsTable, gamesTable, weaknessesTable, coursesTable, lessonsTable, backgroundJobsTable, referralConversionsTable, affiliateAdjustmentsTable, seoArticlesTable } from "@workspace/db";
+import { db, usersTable, pageViewsTable, gamesTable, weaknessesTable, coursesTable, lessonsTable, backgroundJobsTable, referralConversionsTable, affiliateAdjustmentsTable, seoArticlesTable, puzzlesTable } from "@workspace/db";
+import { preGenerateExplanations } from "../lib/puzzleSeed";
 import { sql, count, gte, countDistinct, inArray, eq, and, isNotNull, desc } from "drizzle-orm";
 import { puzzleAttemptsTable } from "@workspace/db";
 import { sessionsTable } from "@workspace/db";
@@ -34,6 +35,33 @@ function computeUserStatus(email: string | null, createdAt: string | Date, strip
   const daysSinceCreated = Math.floor(elapsed / 86400000);
   return { tier: 'free' as const, detail: daysSinceCreated };
 }
+
+router.get("/admin/puzzle-explanations/status", requireAdmin, async (_req: Request, res: Response) => {
+  try {
+    const [{ count: remaining }] = await db.select({ count: count() })
+      .from(puzzlesTable)
+      .where(sql`${puzzlesTable.explanation} IS NULL`);
+    res.json({ remaining });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || "Failed to check status" });
+  }
+});
+
+// Manual replacement for what used to run automatically on every server
+// startup -- see the comment in index.ts for why that was a real bug,
+// not just an inefficiency. Capped at a modest default per call
+// (overridable, but deliberately not unbounded) so a single click can't
+// accidentally trigger a huge, uncontrolled OpenAI spend the same way
+// the automatic version did.
+router.post("/admin/puzzle-explanations/generate", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const limit = Math.min(Number(req.body?.limit) || 25, 200);
+    const result = await preGenerateExplanations(limit);
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || "Failed to generate explanations" });
+  }
+});
 
 router.get("/admin/stats", requireAdmin, async (_req: Request, res: Response) => {
   try {

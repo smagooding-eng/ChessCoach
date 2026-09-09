@@ -1,7 +1,7 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { db, puzzlesTable, puzzleAttemptsTable, gamesTable } from "@workspace/db";
 import { eq, count, desc, sql, and, gte, inArray } from "drizzle-orm";
-import { requireAuth } from "../middlewares/authMiddleware";
+import { requireAuth, requirePremium } from "../middlewares/authMiddleware";
 import { Chess } from "chess.js";
 
 const router: IRouter = Router();
@@ -640,7 +640,10 @@ router.post("/puzzles/:id/solve", requireAuth, async (req: Request, res: Respons
   }
 });
 
-router.post("/puzzles/:id/explain", requireAuth, async (req: Request, res: Response) => {
+// Premium-gated: this is exactly the kind of OpenAI-billed feature that
+// should be reserved for paying users, not something any logged-in free
+// account can trigger by clicking a button.
+router.post("/puzzles/:id/explain", requireAuth, requirePremium, async (req: Request, res: Response) => {
   try {
     const puzzleId = parseInt(req.params.id as string);
     const [puzzle] = await db

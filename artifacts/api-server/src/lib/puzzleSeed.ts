@@ -344,15 +344,16 @@ export async function generatePuzzleExplanation(puzzle: { fen: string; moves: st
   }
 }
 
-export async function preGenerateExplanations() {
-  const puzzles = await db
+export async function preGenerateExplanations(limit?: number) {
+  const query = db
     .select()
     .from(puzzlesTable)
     .where(sql`${puzzlesTable.explanation} IS NULL`);
+  const puzzles = limit ? await query.limit(limit) : await query;
 
   if (puzzles.length === 0) {
     console.log("[puzzles] All explanations already generated");
-    return;
+    return { generated: 0, attempted: 0 };
   }
 
   console.log(`[puzzles] Generating explanations for ${puzzles.length} puzzles...`);
@@ -368,4 +369,5 @@ export async function preGenerateExplanations() {
   }
 
   console.log(`[puzzles] Generated ${generated}/${puzzles.length} explanations`);
+  return { generated, attempted: puzzles.length };
 }
