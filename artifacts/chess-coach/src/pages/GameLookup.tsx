@@ -687,13 +687,36 @@ export function GameLookup() {
                   {analysis.length > 0 && (
                     <EvalBar evalCp={currentEval} flipped={flipped} />
                   )}
-                  <div style={{ width: 'min(calc(100vw - 80px), 440px)', aspectRatio: '1' }}>
-                    <ChessBoard
-                      fen={currentFen}
-                      flipped={flipped}
-                      lastMove={lastMovePair}
-                      moveQuality={moveQuality}
-                    />
+                  <div className="flex flex-col gap-1.5" style={{ width: 'min(calc(100vw - 80px), 560px)' }}>
+                    {/* Top label is whoever's on top given the current
+                        flip state -- black by default (index 1 in the
+                        pair below), swapped to white when flipped. */}
+                    {selectedGame && (() => {
+                      const white = { name: selectedGame.whiteUsername, rating: selectedGame.whiteRating, color: '#f5f5f5' };
+                      const black = { name: selectedGame.blackUsername, rating: selectedGame.blackRating, color: '#2b2b2b' };
+                      const [top, bottom] = flipped ? [white, black] : [black, white];
+                      const PlayerLabel = ({ p }: { p: typeof white }) => (
+                        <div className="flex items-center gap-1.5 px-1 text-xs font-medium" style={{ color: TEXT_LIGHT }}>
+                          <span className="w-2.5 h-2.5 rounded-full border border-white/30 shrink-0" style={{ background: p.color }} />
+                          <span className="truncate">{p.name}</span>
+                          <span style={{ color: TEXT_MUTED }}>({p.rating})</span>
+                        </div>
+                      );
+                      return (
+                        <>
+                          <PlayerLabel p={top} />
+                          <div style={{ aspectRatio: '1' }}>
+                            <ChessBoard
+                              fen={currentFen}
+                              flipped={flipped}
+                              lastMove={lastMovePair}
+                              moveQuality={moveQuality}
+                            />
+                          </div>
+                          <PlayerLabel p={bottom} />
+                        </>
+                      );
+                    })()}
                   </div>
                 </div>
               </div>
