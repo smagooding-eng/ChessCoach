@@ -505,7 +505,7 @@ router.get("/auth/referrals", async (req: Request, res: Response) => {
   }
   try {
     const userId = req.user.id;
-    const [user] = await db.select({ inviteCode: usersTable.inviteCode, stripeCustomerId: usersTable.stripeCustomerId, isPremiumOverride: usersTable.isPremiumOverride }).from(usersTable).where(eq(usersTable.id, userId));
+    const [user] = await db.select({ inviteCode: usersTable.inviteCode, stripeCustomerId: usersTable.stripeCustomerId, isPremiumOverride: usersTable.isPremiumOverride, isAffiliate: usersTable.isAffiliate }).from(usersTable).where(eq(usersTable.id, userId));
 
     let isPaid = !!user?.isPremiumOverride;
     if (!isPaid && user?.stripeCustomerId) {
@@ -529,7 +529,14 @@ router.get("/auth/referrals", async (req: Request, res: Response) => {
     // admin-granted free Pro account) -- those users were correctly shown
     // the unlocked referral UI via the broader isPaid check above, but
     // never actually got a code generated, so there was nothing to copy.
-    if (isPaid && user && !user.inviteCode) {
+    // Also generate a code for a formal (admin-designated) affiliate, even
+    // if they aren't a paying subscriber themselves -- being an affiliate
+    // partner and being a paying customer are independent things. Before
+    // this, an affiliate on the Free plan got no invite code and no
+    // referral link at all, and the Affiliate Dashboard link on this page
+    // was hidden entirely behind the same isPaid check below, effectively
+    // locking a designated affiliate out of their own dashboard.
+    if ((isPaid || user?.isAffiliate) && user && !user.inviteCode) {
       try {
         const newCode = crypto.randomBytes(4).toString("hex").toUpperCase();
         await db.update(usersTable).set({ inviteCode: newCode }).where(eq(usersTable.id, userId));
@@ -567,8 +574,9 @@ router.get("/auth/referrals", async (req: Request, res: Response) => {
     });
 
     res.json({
-      inviteCode: isPaid ? (user?.inviteCode ?? null) : null,
+      inviteCode: (isPaid || user?.isAffiliate) ? (user?.inviteCode ?? null) : null,
       isPaid,
+      isAffiliate: !!user?.isAffiliate,
       totalReferred: referrals.length,
       totalConverted: referrals.filter(r => r.status === "converted").length,
       referrals: referralDetails,

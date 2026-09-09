@@ -1470,6 +1470,7 @@ function MarketingPanel() {
 interface ReferralData {
   inviteCode: string | null;
   isPaid: boolean;
+  isAffiliate: boolean;
   totalReferred: number;
   totalConverted: number;
   referrals: { id: string; status: string; createdAt: string; convertedAt: string | null; referredName: string }[];
@@ -1516,7 +1517,7 @@ export function ReferralCard({ isPremium, compact = false }: { isPremium: boolea
         variants={{ hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0 } }}
         className="bg-card border border-border/50 rounded-xl overflow-hidden"
       >
-        {!isPremium || !data?.isPaid ? (
+        {(!isPremium || !data?.isPaid) && !data?.isAffiliate ? (
           <Link href="/subscription" className="flex items-center gap-3 px-4 py-3 group">
             <Gift className="w-4 h-4 text-primary shrink-0" />
             <p className="flex-1 text-xs font-bold text-foreground">Go Pro to unlock referrals</p>
@@ -1554,7 +1555,7 @@ export function ReferralCard({ isPremium, compact = false }: { isPremium: boolea
         </h2>
       </div>
       <div className="p-4">
-        {!isPremium || !data?.isPaid ? (
+        {(!isPremium || !data?.isPaid) && !data?.isAffiliate ? (
           <div className="text-center py-4">
             <div className="w-12 h-12 bg-primary rounded-xl flex items-center justify-center mx-auto mb-3">
               <Crown className="w-6 h-6 text-primary-foreground" />
