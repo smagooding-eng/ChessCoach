@@ -67,6 +67,118 @@ function fmt(n: number | undefined): string {
   return n.toLocaleString();
 }
 
+// Shared date-range picker used by every admin panel with a "last N
+// days"-style filter (AI Usage, Landing Funnel, User Activity) -- one
+// component instead of three separately hand-built dropdowns, so adding
+// Today/Yesterday/Custom happens once and stays consistent everywhere,
+// and any future panel gets the same options for free.
+type DateRangePreset = 'today' | 'yesterday' | '7d' | '30d' | '90d' | 'custom';
+
+interface DateRange {
+  startDate: string; // YYYY-MM-DD, inclusive
+  endDate: string;   // YYYY-MM-DD, inclusive
+}
+
+const DATE_RANGE_LABELS: Record<DateRangePreset, string> = {
+  today: 'Today',
+  yesterday: 'Yesterday',
+  '7d': 'Last 7 days',
+  '30d': 'Last 30 days',
+  '90d': 'Last 90 days',
+  custom: 'Custom range...',
+};
+
+function fmtDate(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
+
+function computeDateRange(preset: DateRangePreset, customStart: string, customEnd: string): DateRange {
+  const today = new Date();
+  const todayStr = fmtDate(today);
+  switch (preset) {
+    case 'today':
+      return { startDate: todayStr, endDate: todayStr };
+    case 'yesterday': {
+      const y = new Date(today);
+      y.setDate(y.getDate() - 1);
+      const yStr = fmtDate(y);
+      return { startDate: yStr, endDate: yStr };
+    }
+    case '7d': {
+      const s = new Date(today);
+      s.setDate(s.getDate() - 6); // 6 days back + today = 7 days inclusive
+      return { startDate: fmtDate(s), endDate: todayStr };
+    }
+    case '30d': {
+      const s = new Date(today);
+      s.setDate(s.getDate() - 29);
+      return { startDate: fmtDate(s), endDate: todayStr };
+    }
+    case '90d': {
+      const s = new Date(today);
+      s.setDate(s.getDate() - 89);
+      return { startDate: fmtDate(s), endDate: todayStr };
+    }
+    case 'custom':
+      return { startDate: customStart || todayStr, endDate: customEnd || todayStr };
+  }
+}
+
+function DateRangeFilter({
+  onChange,
+  presets = ['today', 'yesterday', '7d', '30d', '90d', 'custom'],
+  defaultPreset = '7d',
+}: {
+  onChange: (range: DateRange) => void;
+  presets?: DateRangePreset[];
+  defaultPreset?: DateRangePreset;
+}) {
+  const [preset, setPreset] = useState<DateRangePreset>(defaultPreset);
+  const [customStart, setCustomStart] = useState('');
+  const [customEnd, setCustomEnd] = useState('');
+
+  useEffect(() => {
+    // Wait for both custom dates before firing -- an incomplete range
+    // would just re-query with today's date as a placeholder, which is
+    // wasted work and a flash of wrong data.
+    if (preset === 'custom' && (!customStart || !customEnd)) return;
+    onChange(computeDateRange(preset, customStart, customEnd));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preset, customStart, customEnd]);
+
+  return (
+    <div className="flex items-center gap-2 flex-wrap justify-end">
+      <select
+        value={preset}
+        onChange={(e) => setPreset(e.target.value as DateRangePreset)}
+        className="text-xs bg-background border border-border/40 rounded-lg px-2 py-1"
+      >
+        {presets.map((p) => <option key={p} value={p}>{DATE_RANGE_LABELS[p]}</option>)}
+      </select>
+      {preset === 'custom' && (
+        <>
+          <input
+            type="date"
+            value={customStart}
+            max={customEnd || undefined}
+            onChange={(e) => setCustomStart(e.target.value)}
+            className="text-xs bg-background border border-border/40 rounded-lg px-2 py-1"
+          />
+          <span className="text-xs text-muted-foreground">to</span>
+          <input
+            type="date"
+            value={customEnd}
+            min={customStart || undefined}
+            max={fmtDate(new Date())}
+            onChange={(e) => setCustomEnd(e.target.value)}
+            className="text-xs bg-background border border-border/40 rounded-lg px-2 py-1"
+          />
+        </>
+      )}
+    </div>
+  );
+}
+
 function StatCard({
   icon: Icon,
   label,
@@ -1657,15 +1769,16 @@ function LandingFunnelPanel() {
     visitorBreakdown: VisitorBreakdown;
   } | null>(null);
   const [loading, setLoading] = useState(true);
-  const [days, setDays] = useState(30);
+  const [range, setRange] = useState<DateRange>({ startDate: '', endDate: '' });
 
   useEffect(() => {
+    if (!range.startDate || !range.endDate) return;
     setLoading(true);
-    apiFetch(`/api/admin/landing-funnel?days=${days}`, { credentials: 'include' })
+    apiFetch(`/api/admin/landing-funnel?startDate=${range.startDate}&endDate=${range.endDate}`, { credentials: 'include' })
       .then(r => r.ok ? r.json() : null)
       .then(d => setData(d))
       .finally(() => setLoading(false));
-  }, [days]);
+  }, [range]);
 
   const rows = data ? [
     { label: 'Landing page views', value: data.landingViews, color: 'text-foreground' },
@@ -1712,15 +1825,7 @@ function LandingFunnelPanel() {
         <h3 className="text-sm font-bold text-purple-400 flex items-center gap-2">
           <TrendingUp className="w-4 h-4" /> Landing Page Funnel
         </h3>
-        <select
-          value={days}
-          onChange={(e) => setDays(Number(e.target.value))}
-          className="text-xs bg-background border border-border/40 rounded-lg px-2 py-1"
-        >
-          <option value={7}>Last 7 days</option>
-          <option value={30}>Last 30 days</option>
-          <option value={90}>Last 90 days</option>
-        </select>
+        <DateRangeFilter onChange={setRange} defaultPreset="30d" />
       </div>
       <div className="p-4">
         {loading ? (
@@ -1854,15 +1959,16 @@ function AiUsagePanel() {
     topUsers: { userId: string; label: string; calls: number; tokens: number; costUsd: number }[];
   } | null>(null);
   const [loading, setLoading] = useState(true);
-  const [days, setDays] = useState(30);
+  const [range, setRange] = useState<DateRange>({ startDate: '', endDate: '' });
 
   useEffect(() => {
+    if (!range.startDate || !range.endDate) return;
     setLoading(true);
-    apiFetch(`/api/admin/ai-usage?days=${days}`, { credentials: 'include' })
+    apiFetch(`/api/admin/ai-usage?startDate=${range.startDate}&endDate=${range.endDate}`, { credentials: 'include' })
       .then(r => r.ok ? r.json() : null)
       .then(d => setData(d))
       .finally(() => setLoading(false));
-  }, [days]);
+  }, [range]);
 
   const FEATURE_LABELS: Record<string, string> = {
     game_analysis: 'Game Analysis (weaknesses)',
@@ -1884,12 +1990,7 @@ function AiUsagePanel() {
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="rounded-2xl border border-border/40 bg-card/60 p-5">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-sm font-bold flex items-center gap-2"><Sparkles className="w-4 h-4 text-purple-400" /> AI Usage &amp; Cost</h2>
-        <select value={days} onChange={(e) => setDays(Number(e.target.value))}
-          className="text-xs bg-background border border-border/40 rounded-lg px-2 py-1">
-          <option value={7}>Last 7 days</option>
-          <option value={30}>Last 30 days</option>
-          <option value={90}>Last 90 days</option>
-        </select>
+        <DateRangeFilter onChange={setRange} defaultPreset="30d" />
       </div>
 
       {loading && <p className="text-xs text-muted-foreground">Loading...</p>}
@@ -1961,16 +2062,17 @@ function UserActivityPanel() {
     }[];
   } | null>(null);
   const [loading, setLoading] = useState(true);
-  const [days, setDays] = useState(30);
+  const [range, setRange] = useState<DateRange>({ startDate: '', endDate: '' });
   const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
+    if (!range.startDate || !range.endDate) return;
     setLoading(true);
-    apiFetch(`/api/admin/user-activity?days=${days}`, { credentials: 'include' })
+    apiFetch(`/api/admin/user-activity?startDate=${range.startDate}&endDate=${range.endDate}`, { credentials: 'include' })
       .then(r => r.ok ? r.json() : null)
       .then(d => setData(d))
       .finally(() => setLoading(false));
-  }, [days]);
+  }, [range]);
 
   const fmtDate = (iso: string | null) => {
     if (!iso) return 'never';
@@ -1985,12 +2087,7 @@ function UserActivityPanel() {
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="rounded-2xl border border-border/40 bg-card/60 p-5">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-sm font-bold flex items-center gap-2"><Users className="w-4 h-4 text-blue-400" /> User Activity</h2>
-        <select value={days} onChange={(e) => setDays(Number(e.target.value))}
-          className="text-xs bg-background border border-border/40 rounded-lg px-2 py-1">
-          <option value={7}>Last 7 days</option>
-          <option value={30}>Last 30 days</option>
-          <option value={90}>Last 90 days</option>
-        </select>
+        <DateRangeFilter onChange={setRange} defaultPreset="30d" />
       </div>
 
       {loading && <p className="text-xs text-muted-foreground">Loading...</p>}
