@@ -687,7 +687,7 @@ export function GameLookup() {
                   {analysis.length > 0 && (
                     <EvalBar evalCp={currentEval} flipped={flipped} />
                   )}
-                  <div className="flex flex-col gap-1.5" style={{ width: 'min(calc(100vw - 80px), 560px)' }}>
+                  <div className="flex flex-col gap-1.5 shrink-0" style={{ width: 'min(calc(100vw - 40px), 640px)' }}>
                     {/* Top label is whoever's on top given the current
                         flip state -- black by default (index 1 in the
                         pair below), swapped to white when flipped. */}
