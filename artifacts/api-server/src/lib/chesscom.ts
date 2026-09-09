@@ -109,7 +109,7 @@ interface ChessComArchive {
   archives: string[];
 }
 
-interface ChessComGame {
+export interface ChessComGame {
   url: string;
   pgn: string;
   time_control: string;
@@ -123,10 +123,7 @@ interface ChessComMonthGames {
   games: ChessComGame[];
 }
 
-export async function fetchChessComGames(
-  username: string,
-  months: number = 3
-): Promise<ChessComGame[]> {
+export async function fetchChessComArchiveList(username: string): Promise<string[]> {
   const archivesUrl = `https://api.chess.com/pub/player/${username.toLowerCase()}/games/archives`;
 
   const archivesRes = await fetch(archivesUrl, {
@@ -138,24 +135,33 @@ export async function fetchChessComGames(
   }
 
   const archivesData = (await archivesRes.json()) as ChessComArchive;
-  const allArchives = archivesData.archives || [];
+  return archivesData.archives || [];
+}
 
+export async function fetchChessComGamesForArchive(archiveUrl: string): Promise<ChessComGame[]> {
+  try {
+    const gamesRes = await fetch(archiveUrl, {
+      headers: { "User-Agent": "ChessCoach/1.0" },
+    });
+    if (!gamesRes.ok) return [];
+    const gamesData = (await gamesRes.json()) as ChessComMonthGames;
+    return gamesData.games || [];
+  } catch (err) {
+    logger.warn({ err, archiveUrl }, "Failed to fetch archive");
+    return [];
+  }
+}
+
+export async function fetchChessComGames(
+  username: string,
+  months: number = 3
+): Promise<ChessComGame[]> {
+  const allArchives = await fetchChessComArchiveList(username);
   const recentArchives = allArchives.slice(-Math.max(1, months));
 
   const allGames: ChessComGame[] = [];
-
   for (const archiveUrl of recentArchives) {
-    try {
-      const gamesRes = await fetch(archiveUrl, {
-        headers: { "User-Agent": "ChessCoach/1.0" },
-      });
-      if (!gamesRes.ok) continue;
-
-      const gamesData = (await gamesRes.json()) as ChessComMonthGames;
-      allGames.push(...(gamesData.games || []));
-    } catch (err) {
-      logger.warn({ err, archiveUrl }, "Failed to fetch archive");
-    }
+    allGames.push(...(await fetchChessComGamesForArchive(archiveUrl)));
   }
 
   return allGames;

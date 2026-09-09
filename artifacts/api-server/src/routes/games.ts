@@ -12,7 +12,7 @@ import {
   GetGameParams,
   GetGameReplayParams,
 } from "@workspace/api-zod";
-import { fetchChessComGames, extractGameMetadata, parsePgnMoves, extractOpeningFromPgn, extractStartFen } from "../lib/chesscom";
+import { fetchChessComGames, extractGameMetadata, parsePgnMoves, extractOpeningFromPgn, extractStartFen, fetchChessComArchiveList, fetchChessComGamesForArchive } from "../lib/chesscom";
 import { fetchLichessGames, extractLichessGameMetadata } from "../lib/lichess";
 import { analyzeMoves, analyzeSingleMove, reviewFullGame, analyzeGamePgn } from "../lib/openaiAnalysis";
 import { randomUUID } from "crypto";
@@ -723,30 +723,40 @@ router.get("/games/recent-opponents", async (req, res): Promise<void> => {
   }
 
   try {
-    req.log.info({ username }, "Recent opponents: fetching games from chess.com");
-    // 2 months is normally enough to find 20 distinct opponents for any
-    // reasonably active player; for a quiet account this may come back
-    // with fewer than 20, which is fine -- the frontend just shows
-    // whatever comes back rather than treating a short list as an error.
-    const games = await fetchChessComGames(username, 2);
+    req.log.info({ username }, "Recent opponents: searching chess.com archives");
+    const archives = await fetchChessComArchiveList(username);
+    // Archives are ordered oldest-first; walk backward from the most
+    // recent month so opponents come back in actual recency order.
+    const orderedArchives = [...archives].reverse();
 
     const seen = new Set<string>();
     const opponents: { username: string; lastPlayedAt: string }[] = [];
+    // Adaptive rather than a fixed lookback window: an inactive player
+    // might not have 20 distinct opponents in 2 months, and an active
+    // one might have them in 2 weeks. Search month by month, most
+    // recent first, until there are 20 or a year's worth of archives
+    // has been checked (whichever comes first) -- stopping as soon as
+    // there's enough keeps this fast for the common case instead of
+    // always paying for a fixed, possibly-unnecessary window.
+    const MAX_ARCHIVES_TO_CHECK = 12;
 
-    const sorted = [...games].sort((a, b) => b.end_time - a.end_time);
-    for (const g of sorted) {
-      const w = g.white.username;
-      const b = g.black.username;
-      const isUserWhite = w.toLowerCase() === username;
-      const opponent = isUserWhite ? b : w;
-      const opponentKey = opponent.toLowerCase();
-      if (opponentKey === username || seen.has(opponentKey)) continue;
-      seen.add(opponentKey);
-      opponents.push({ username: opponent, lastPlayedAt: new Date(g.end_time * 1000).toISOString() });
-      if (opponents.length >= 20) break;
+    for (let i = 0; i < orderedArchives.length && i < MAX_ARCHIVES_TO_CHECK && opponents.length < 20; i++) {
+      const games = await fetchChessComGamesForArchive(orderedArchives[i]);
+      const sorted = [...games].sort((a, b) => b.end_time - a.end_time);
+      for (const g of sorted) {
+        const w = g.white.username;
+        const b = g.black.username;
+        const isUserWhite = w.toLowerCase() === username;
+        const opponent = isUserWhite ? b : w;
+        const opponentKey = opponent.toLowerCase();
+        if (opponentKey === username || seen.has(opponentKey)) continue;
+        seen.add(opponentKey);
+        opponents.push({ username: opponent, lastPlayedAt: new Date(g.end_time * 1000).toISOString() });
+        if (opponents.length >= 20) break;
+      }
     }
 
-    res.json({ username, opponents });
+    res.json({ username, opponents, monthsSearched: Math.min(orderedArchives.length, MAX_ARCHIVES_TO_CHECK) });
   } catch (err: any) {
     req.log.error({ err, username }, "Recent opponents lookup failed");
     res.status(500).json({ error: err.message || "Failed to fetch recent opponents" });
