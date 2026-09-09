@@ -65,7 +65,15 @@ export function getPieceColorScheme(hex: string): PieceColorScheme {
     // Dark pieces get a lighter tint of their own color for detail lines
     // and eyes; light pieces get a darker one -- a shade of the piece's
     // own color either way, not a fixed black or white.
-    detail: isDark ? blend(hex, 0.4) : blend(hex, -0.5),
+    //
+    // Dark side's detail was still 0.4 here, left over from before the
+    // outline-halo fix lowered outline to 0.42 -- that closed the gap
+    // between them to just 0.02, which on a neutral/gray custom color
+    // (no hue to help tell shades apart) rendered as visually identical,
+    // making the whole piece read as "one solid color, no details" even
+    // though the detail lines were technically there. Lowered to give a
+    // real gap again, similar in proportion to the light side's.
+    detail: isDark ? blend(hex, 0.2) : blend(hex, -0.5),
     gradientLight: blend(hex, 0.22),
     gradientDark: blend(hex, -0.22),
   };
