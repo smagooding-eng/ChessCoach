@@ -324,6 +324,25 @@ router.get("/auth/google", (req: Request, res: Response) => {
   res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params}`);
 });
 
+// Sends the browser to `url` via a tiny HTML page that navigates with
+// window.location.replace(), instead of a raw HTTP redirect. This
+// specifically matters for the TWA (Android app) build: navigating out
+// to accounts.google.com for the actual sign-in step can drop the
+// activity out of the TWA's trusted fullscreen mode, and a plain
+// server-side redirect landing back on our own domain doesn't reliably
+// get Android to re-promote it back into fullscreen -- users were stuck
+// seeing the desktop-style sidebar layout until they force-closed and
+// reopened the app. A page-level, client-initiated navigation back to
+// our verified origin is the documented way to get Android to
+// re-verify and snap back into fullscreen within the same session.
+function sendClientRedirect(res: Response, url: string) {
+  res.set("Content-Type", "text/html").send(
+    `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body>` +
+    `<script>window.location.replace(${JSON.stringify(url)});</script>` +
+    `</body></html>`
+  );
+}
+
 router.get("/auth/google/callback", async (req: Request, res: Response) => {
   const { code } = req.query;
   const clientId = process.env.GOOGLE_CLIENT_ID;
@@ -332,7 +351,7 @@ router.get("/auth/google/callback", async (req: Request, res: Response) => {
   const frontendOrigin = FRONTEND_URL || callbackOrigin;
 
   if (!code || !clientId || !clientSecret) {
-    res.redirect(frontendOrigin + "/?error=google_auth_failed");
+    sendClientRedirect(res, frontendOrigin + "/?error=google_auth_failed");
     return;
   }
 
@@ -355,7 +374,7 @@ router.get("/auth/google/callback", async (req: Request, res: Response) => {
     });
 
     if (!tokenRes.ok) {
-      res.redirect(frontendOrigin + "/?error=google_auth_failed");
+      sendClientRedirect(res, frontendOrigin + "/?error=google_auth_failed");
       return;
     }
 
@@ -366,7 +385,7 @@ router.get("/auth/google/callback", async (req: Request, res: Response) => {
     });
 
     if (!userInfoRes.ok) {
-      res.redirect(frontendOrigin + "/?error=google_auth_failed");
+      sendClientRedirect(res, frontendOrigin + "/?error=google_auth_failed");
       return;
     }
 
@@ -452,10 +471,10 @@ router.get("/auth/google/callback", async (req: Request, res: Response) => {
     // corresponding funnel event once, since this redirect is the only
     // place that knows which case just happened.
     const newSignupParam = isNewSignup ? "&newSignup=google" : "";
-    res.redirect(frontendOrigin + "/#token=" + sid + newSignupParam);
+    sendClientRedirect(res, frontendOrigin + "/#token=" + sid + newSignupParam);
   } catch (err: any) {
     req.log?.error?.({ err }, "Google callback error");
-    res.redirect(frontendOrigin + "/?error=google_auth_failed");
+    sendClientRedirect(res, frontendOrigin + "/?error=google_auth_failed");
   }
 });
 
