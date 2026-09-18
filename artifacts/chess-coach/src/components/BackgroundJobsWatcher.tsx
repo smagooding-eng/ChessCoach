@@ -211,11 +211,35 @@ export function BackgroundJobsWatcher() {
                 if (Date.now() - job.addedAt < 30 * 60 * 1000) stillPending.push(job);
                 continue;
               }
-              const data = await r.json() as { status: string };
+              const data = await r.json() as { status: string; total?: number; reviewedSoFar?: number };
               if (data.status === 'pending' || data.status === 'processing') {
                 stillPending.push(job);
               } else if (data.status === 'done') {
-                newlyDone.push({ ...job, config: JOB_CONFIG[type] });
+                // gamesReview specifically can legitimately finish with
+                // nothing done at all -- a brand-new user (or anyone with
+                // zero unreviewed games) has runBulkReviewJob complete
+                // immediately with total: 0, which is a correct outcome
+                // on the backend's side, not a failure. This watcher used
+                // to only check job status, so it fired the same "Your
+                // games are reviewed!" toast either way -- a misleading
+                // success message for work that never actually happened.
+                // Now it tells the user what's actually true instead: no
+                // games were found to review, with a CTA pointing at
+                // importing some rather than a nonexistent games list.
+                if (type === 'gamesReview' && !data.total) {
+                  newlyDone.push({
+                    ...job,
+                    config: {
+                      ...JOB_CONFIG[type],
+                      doneTitle: 'No games to review yet',
+                      doneSubtitle: "We didn't find any games on your account. Import some first and we'll review them for you.",
+                      ctaLabel: 'Import games',
+                      ctaPath: '/import',
+                    },
+                  });
+                } else {
+                  newlyDone.push({ ...job, config: JOB_CONFIG[type] });
+                }
               }
               // any other status (error) — drop silently, user can retry from the originating page
             } catch {
