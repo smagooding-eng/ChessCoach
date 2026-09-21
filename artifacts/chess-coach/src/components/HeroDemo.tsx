@@ -367,9 +367,10 @@ export function HeroDemo({ onUpgradeClick }: { onUpgradeClick: () => void }) {
             {/* Standard starting position -- purely a chess-identity visual
                 for this idle panel, not a claim about any data. Swapped for
                 the visitor's own real blunder position once they run the
-                demo, below. */}
-            <div className="hidden sm:block shrink-0 opacity-70">
-              <MiniBoard fen="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR" size={72} />
+                demo, below. Visible on all breakpoints -- most traffic here
+                is mobile, so this can't be sm-and-up only. */}
+            <div className="shrink-0 opacity-70">
+              <MiniBoard fen="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR" size={56} />
             </div>
           </div>
           <p className="text-xs mb-4" style={{ color: MUTED }}>
