@@ -37,7 +37,7 @@ interface DemoResult {
 // pages, not a read-only landing-page diagram, and pulling it into the
 // landing bundle would add real weight to the page we're trying to make
 // faster. This is read-only and has no other dependencies.
-function MiniBoard({ fen }: { fen: string }) {
+function MiniBoard({ fen, size = 132 }: { fen: string; size?: number }) {
   const PIECES: Record<string, string> = {
     K: '♔', Q: '♕', R: '♖', B: '♗', N: '♘', P: '♙',
     k: '♚', q: '♛', r: '♜', b: '♝', n: '♞', p: '♟',
@@ -57,9 +57,9 @@ function MiniBoard({ fen }: { fen: string }) {
     }
   });
   return (
-    <div className="grid grid-cols-8 w-full rounded-md overflow-hidden shrink-0" style={{ maxWidth: '132px', border: '1px solid rgba(255,255,255,0.15)', aspectRatio: '1' }}>
+    <div className="grid grid-cols-8 w-full rounded-md overflow-hidden shrink-0" style={{ maxWidth: `${size}px`, border: '1px solid rgba(255,255,255,0.15)', aspectRatio: '1' }}>
       {squares.map((sq, i) => (
-        <div key={i} className="flex items-center justify-center" style={{ aspectRatio: '1', background: sq.dark ? '#5c7a3a' : '#e8e6d8', fontSize: '0.85rem', lineHeight: 1 }}>
+        <div key={i} className="flex items-center justify-center" style={{ aspectRatio: '1', background: sq.dark ? '#5c7a3a' : '#e8e6d8', fontSize: `${(size / 132) * 0.85}rem`, lineHeight: 1 }}>
           {sq.piece ? PIECES[sq.piece] : ''}
         </div>
       ))}
@@ -73,8 +73,11 @@ function MiniBoard({ fen }: { fen: string }) {
 // as "fix this" vs "exploit this". frame picks the copy; the data and
 // layout are identical, matching what Analysis.tsx and
 // OpponentAnalysis.tsx actually render.
-function SampleWeaknessList({ report, frame }: { report: SampleReport; frame: 'fix' | 'exploit' }) {
+function SampleWeaknessList({ report, frame, previewCount }: { report: SampleReport; frame: 'fix' | 'exploit'; previewCount?: number }) {
+  const [expanded, setExpanded] = useState(false);
   const totalDecided = report.wins + report.losses + report.draws;
+  const hasMore = !!previewCount && !expanded && report.weaknesses.length > previewCount;
+  const visibleWeaknesses = previewCount && !expanded ? report.weaknesses.slice(0, previewCount) : report.weaknesses;
   const severityLabels: { key: string; icon: string }[] = [
     { key: 'Critical', icon: '⚡' }, { key: 'High', icon: '⚠' }, { key: 'Medium', icon: '🛡' }, { key: 'Low', icon: '👁' },
   ];
@@ -161,8 +164,8 @@ function SampleWeaknessList({ report, frame }: { report: SampleReport; frame: 'f
         </>
       )}
 
-      <div className="space-y-2.5 mb-4">
-        {report.weaknesses.map((w, i) => (
+      <div className="space-y-2.5 mb-2.5">
+        {visibleWeaknesses.map((w, i) => (
           <div key={i} className="rounded-lg p-3" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
             <div className="flex items-start gap-2.5">
               {w.previewFen && <MiniBoard fen={w.previewFen} />}
@@ -198,6 +201,16 @@ function SampleWeaknessList({ report, frame }: { report: SampleReport; frame: 'f
           </div>
         ))}
       </div>
+
+      {hasMore && (
+        <button
+          onClick={() => setExpanded(true)}
+          className="w-full text-center py-2 mb-4 text-[11px] font-black"
+          style={{ color: G }}
+        >
+          See {report.weaknesses.length - previewCount!} more weakness{report.weaknesses.length - previewCount! === 1 ? '' : 'es'} →
+        </button>
+      )}
 
       {report.favoriteOpenings.length > 0 && (
         <>
@@ -271,7 +284,11 @@ export function HeroDemo({ onUpgradeClick }: { onUpgradeClick: () => void }) {
   const [error, setError] = useState('');
   const [result, setResult] = useState<DemoResult | null>(null);
   const [showBreakdown, setShowBreakdown] = useState(true);
-  const [showProSample, setShowProSample] = useState(false);
+  // Open by default -- this is the "here's the ceiling" moment right below
+  // the visitor's own smaller result, so it shouldn't need an extra click
+  // to be seen. SampleWeaknessList still truncates its own weakness rows
+  // internally (previewCount) so this doesn't turn into a wall of stats.
+  const [showProSample, setShowProSample] = useState(true);
   const [showScoutSample, setShowScoutSample] = useState(false);
   // Static, bundled sample data (see lib/sampleReport.ts) -- this is a
   // fixed demo sample, not something that varies per visitor, so it's
@@ -343,9 +360,18 @@ export function HeroDemo({ onUpgradeClick }: { onUpgradeClick: () => void }) {
     <div id="hero-demo" className="rounded-2xl p-6 sm:p-8" style={{ background: CARD, border: `1.5px solid ${G}40`, boxShadow: `0 30px 80px -20px rgba(0,0,0,0.6), 0 0 60px ${G}12` }}>
       {state !== 'result' && (
         <>
-          <p className="text-sm font-black uppercase tracking-wide mb-1" style={{ color: G }}>
-            Try it free — no signup
-          </p>
+          <div className="flex items-start justify-between gap-4 mb-1">
+            <p className="text-sm font-black uppercase tracking-wide" style={{ color: G }}>
+              Try it free — no signup
+            </p>
+            {/* Standard starting position -- purely a chess-identity visual
+                for this idle panel, not a claim about any data. Swapped for
+                the visitor's own real blunder position once they run the
+                demo, below. */}
+            <div className="hidden sm:block shrink-0 opacity-70">
+              <MiniBoard fen="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR" size={72} />
+            </div>
+          </div>
           <p className="text-xs mb-4" style={{ color: MUTED }}>
             Real analysis of your real games, right here. Takes about 10 seconds.
           </p>
@@ -394,7 +420,7 @@ export function HeroDemo({ onUpgradeClick }: { onUpgradeClick: () => void }) {
           <p className="text-[11px] mt-2" style={{ color: MUTED }}>
             {state === 'loading' && 'Fetching your games...'}
             {state === 'analyzing' && 'Scanning for blunders...'}
-            {(state === 'idle' || state === 'error') && "We'll look at your last 2 games. No account needed."}
+            {(state === 'idle' || state === 'error') && "We'll look at your last 5 games. No account needed."}
           </p>
         </>
       )}
@@ -404,13 +430,23 @@ export function HeroDemo({ onUpgradeClick }: { onUpgradeClick: () => void }) {
           <p className="text-xs font-black uppercase tracking-wide mb-3" style={{ color: G }}>
             Your quick scan
           </p>
-          <div className="flex items-center gap-2 mb-4">
+          <div className="flex items-center gap-2 mb-2">
             <TrendingDown className="w-5 h-5" style={{ color: result.blunderRate > 3 ? '#e57373' : G }} />
             <p className="text-sm font-bold" style={{ color: TEXT }}>
               {result.blunders} blunder{result.blunders === 1 ? '' : 's'} across your last {result.gamesAnalyzed} games
               {result.topOpening && <> — mostly in the <span style={{ color: G }}>{result.topOpening}</span></>}
             </p>
           </div>
+          {result.blunders > 0 && result.totals && result.totals.total > result.gamesAnalyzed && (
+            <p className="text-xs mb-4" style={{ color: MUTED }}>
+              At this rate, that's roughly{' '}
+              <span className="font-black" style={{ color: '#e57373' }}>
+                {Math.max(1, Math.round((result.blunders / result.gamesAnalyzed) * result.totals.total))}
+              </span>{' '}
+              blunders like this across your {result.totals.total.toLocaleString()} games — an estimate from this sample, not a full review.
+            </p>
+          )}
+          {!(result.blunders > 0 && result.totals && result.totals.total > result.gamesAnalyzed) && <div className="mb-4" />}
 
           {result.worstBlunder ? (
             <div className="rounded-xl p-4 mb-4" style={{ background: '#141413', border: '1px solid rgba(255,255,255,0.08)' }}>
@@ -419,8 +455,10 @@ export function HeroDemo({ onUpgradeClick }: { onUpgradeClick: () => void }) {
                 {showBreakdown ? <ChevronUp className="w-3.5 h-3.5 shrink-0" style={{ color: MUTED }} /> : <ChevronDown className="w-3.5 h-3.5 shrink-0" style={{ color: MUTED }} />}
               </button>
               {showBreakdown && (
-                <div className="flex gap-3 mt-2">
-                  <MiniBoard fen={result.worstBlunder.fenBefore} />
+                <div className="flex flex-col sm:flex-row gap-4 mt-2">
+                  <div className="mx-auto sm:mx-0 w-full sm:w-auto flex justify-center">
+                    <MiniBoard fen={result.worstBlunder.fenBefore} size={192} />
+                  </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5 flex-wrap text-xs font-mono mb-1.5">
                       <span style={{ color: TEXT }}>{result.worstBlunder.moveNumber}.</span>
@@ -453,7 +491,7 @@ export function HeroDemo({ onUpgradeClick }: { onUpgradeClick: () => void }) {
             <div className="space-y-2">
               <div className="flex items-start gap-2">
                 <Lock className="w-3.5 h-3.5 shrink-0 mt-0.5" style={{ color: MUTED }} />
-                <p className="text-xs" style={{ color: MUTED }}>Deeper AI coaching on <strong style={{ color: TEXT }}>why</strong> it happened — this scan gives the engine's line, Pro adds the plain-English lesson</p>
+                <p className="text-xs" style={{ color: MUTED }}>Deeper coaching on <strong style={{ color: TEXT }}>why</strong> it happened — this scan gives the engine's line, Pro adds the plain-English lesson</p>
               </div>
               <div className="flex items-start gap-2">
                 <BookOpen className="w-3.5 h-3.5 shrink-0 mt-0.5" style={{ color: MUTED }} />
@@ -488,7 +526,7 @@ export function HeroDemo({ onUpgradeClick }: { onUpgradeClick: () => void }) {
           {showProSample && (
             <div className="rounded-xl p-3 mb-2" style={{ background: '#141413', border: '1px solid rgba(255,255,255,0.08)' }}>
               <p className="text-[10px] font-black uppercase tracking-wide mb-2.5" style={{ color: MUTED }}>Real sample account — not your data</p>
-              <SampleWeaknessList report={sample} frame="fix" />
+              <SampleWeaknessList report={sample} frame="fix" previewCount={2} />
             </div>
           )}
 

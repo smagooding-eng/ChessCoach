@@ -478,7 +478,7 @@ export function OpponentAnalysis() {
       {error && isLimitReached && (
         <UpgradeNudge
           headline="You've used your free basic scout"
-          subtext="Free plan includes 1 basic opponent scout. Upgrade to Pro for unlimited scouts with full AI weakness analysis."
+          subtext="Free plan includes 1 basic opponent scout. Upgrade to Pro for unlimited scouts with full weakness analysis."
         />
       )}
 
@@ -666,7 +666,7 @@ export function OpponentAnalysis() {
                 {result.weaknesses.length === 0 ? (
                   <UpgradeNudge
                     headline="Upgrade to Pro to see weaknesses"
-                    subtext={`This basic scout shows ${result.username}'s record and openings. Pro unlocks a full AI-written weakness breakdown, ready to exploit.`}
+                    subtext={`This basic scout shows ${result.username}'s record and openings. Pro unlocks a full weakness breakdown, ready to exploit.`}
                   />
                 ) : (
                   result.weaknesses.map((w, i) => (

@@ -13,7 +13,7 @@ const ROWS: { feature: string; free: boolean | string; pro: boolean; chesscomFre
   { feature: 'Cross-game pattern detection', free: false, pro: true, chesscomFree: false },
   { feature: 'Single-game review', free: true, pro: true, chesscomFree: true },
   { feature: 'Basic analysis (from reviewed games)', free: true, pro: true, chesscomFree: false },
-  { feature: 'Deep AI weakness analysis', free: false, pro: true, chesscomFree: false },
+  { feature: 'Deep weakness analysis', free: false, pro: true, chesscomFree: false },
   { feature: 'Personalized courses', free: false, pro: true, chesscomFree: false },
   { feature: 'Opponent scouting', free: '1 basic scout', pro: true, chesscomFree: false } as any,
   { feature: 'Practice bots & Opening Trainer', free: true, pro: true, chesscomFree: false },
@@ -85,7 +85,7 @@ export default function PricingPage() {
             <p className="text-xs mb-4" style={{ color: MUTED }}>or $55/year</p>
             <ul className="space-y-2 text-sm mb-6" style={{ color: TEXT }}>
               <li>Unlimited puzzles, scouts & scans</li>
-              <li>Full AI weakness analysis</li>
+              <li>Full weakness analysis</li>
               <li>Personalized courses</li>
               <li>Unlimited game history</li>
             </ul>

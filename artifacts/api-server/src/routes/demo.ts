@@ -61,10 +61,12 @@ function isRateLimited(ip: string): boolean {
   return false;
 }
 
-// Games analyzed and half-moves per game sampled -- kept small so the
-// client-side analysis (which runs a real, if shallow, minimax per move)
-// stays fast for a visitor who hasn't signed up for anything yet.
-const GAMES_TO_ANALYZE = 2;
+// Games analyzed and half-moves per game sampled. Bumped from 2 to 5 --
+// 2 games made the "here's a pattern" pitch feel like a coin flip rather
+// than a real diagnosis. Client-side analysis is chunked (see
+// analyzeMovesInChunks) so this stays responsive; the per-IP rate limit
+// below is what actually bounds cost for a visitor who hasn't signed up.
+const GAMES_TO_ANALYZE = 5;
 const MAX_MOVES_PER_GAME = 20;
 
 router.post("/demo/analyze", async (req: Request, res: Response) => {

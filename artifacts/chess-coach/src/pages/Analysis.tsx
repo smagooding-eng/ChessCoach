@@ -216,7 +216,7 @@ export function Analysis({ hideHeader = false }: { hideHeader?: boolean } = {}) 
       {analyzeError && analyzeError.includes('Not enough reviewed games') && (
         <UpgradeNudge
           headline="Review a few more games to unlock your weakness report"
-          subtext="Free plan shows patterns from games you've already reviewed. Upgrade to Pro for full AI analysis anytime, no review requirement."
+          subtext="Free plan shows patterns from games you've already reviewed. Upgrade to Pro for full analysis anytime, no review requirement."
         />
       )}
 

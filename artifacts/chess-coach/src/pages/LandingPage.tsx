@@ -737,7 +737,7 @@ export function LandingPage() {
               </div>
               <p className="text-[11px] mb-4" style={{ color: MUTED }}>
                 Free: 5 puzzles/day, 1 basic opponent scout, 2 scans/day, unlimited practice bots & Local Play, your 20 most recent games.
-                <br />Pro unlocks unlimited everything plus full AI weakness analysis and personalized courses.
+                <br />Pro unlocks unlimited everything plus full weakness analysis and personalized courses.
               </p>
               <div className="flex items-baseline justify-center gap-2">
                 <span className="text-6xl font-black" style={{ color: TEXT }}>$5</span>
