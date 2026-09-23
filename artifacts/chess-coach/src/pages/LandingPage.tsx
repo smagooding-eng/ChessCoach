@@ -495,7 +495,12 @@ export function LandingPage() {
 
         <div className="max-w-7xl mx-auto px-4 sm:px-8 relative">
           <div className="grid lg:grid-cols-2 gap-10 lg:gap-20 items-start">
-            <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }} className="pt-4 lg:pt-12">
+            {/* lg:sticky keeps this column pinned while the right column
+                (the demo card, now much taller with the Pro sample open by
+                default) scrolls past it -- without this, items-start left
+                the whole left side going blank once its shorter content
+                ran out, which is what created the empty space here. */}
+            <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }} className="pt-4 lg:pt-12 lg:sticky lg:top-8 lg:self-start">
               <motion.div
                 initial={{ scale: 0.9, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
