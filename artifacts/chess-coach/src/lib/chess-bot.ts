@@ -373,12 +373,36 @@ export function analyzeMoveQuality(fenBefore: string, san: string): MoveAnalysis
 
   const searchDepth = moves.length > 35 ? 1 : depth;
 
-  let bestMove = moves[0];
+  // The real cost here was never move/game count -- it's that every move
+  // analyzed does a full-width depth-2 search across every legal reply in
+  // the position (up to 30-35 in a busy middlegame). Pre-ranking by a
+  // cheap, non-recursive eval and only fully searching the strongest
+  // candidates keeps this fast without losing accuracy on the move that
+  // was actually played: it's always kept in the candidate set even if
+  // its quick eval looks bad, since that's exactly what a real blunder
+  // looks like and it must not get filtered out before being measured.
+  const CANDIDATE_CAP = 14;
+  let candidateMoves = moves;
+  if (moves.length > CANDIDATE_CAP) {
+    const ranked = moves.map((m) => {
+      chess.move(m);
+      const quickEval = evaluate(chess);
+      chess.undo();
+      return { m, quickEval };
+    });
+    ranked.sort((a, b) => (maximizing ? b.quickEval - a.quickEval : a.quickEval - b.quickEval));
+    candidateMoves = ranked.slice(0, CANDIDATE_CAP).map((r) => r.m);
+    if (!candidateMoves.includes(san) && moves.includes(san)) {
+      candidateMoves.push(san);
+    }
+  }
+
+  let bestMove = candidateMoves[0];
   let bestSearchEval = maximizing ? -Infinity : Infinity;
   let actualSearchEval = 0;
   const allEvals: number[] = [];
 
-  for (const move of moves) {
+  for (const move of candidateMoves) {
     chess.move(move);
     const ev = minimax(chess, searchDepth - 1, -Infinity, Infinity, !maximizing);
     chess.undo();

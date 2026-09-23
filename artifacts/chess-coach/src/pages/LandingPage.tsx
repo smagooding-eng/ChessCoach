@@ -453,7 +453,7 @@ export function LandingPage() {
   };
 
   return (
-    <div className="min-h-screen overflow-x-hidden" style={{ background: `radial-gradient(ellipse at top, #2c2925 0%, ${BG} 50%, #1c1a18 100%)` }}>
+    <div className="min-h-screen overflow-x-clip" style={{ background: `radial-gradient(ellipse at top, #2c2925 0%, ${BG} 50%, #1c1a18 100%)` }}>
       <nav className="sticky top-0 z-40 backdrop-blur-xl" style={{ background: `${BG}dd`, borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-8 h-14 flex items-center justify-between">
           <div className="flex items-center gap-0.5">
