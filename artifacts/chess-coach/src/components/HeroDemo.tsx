@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Loader2, TrendingDown, ArrowRight, Lock, Sparkles, BookOpen, Swords, ChevronDown, ChevronUp, Crown, ArrowRightLeft, Crosshair } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
-import { analyzeMoveQuality, type MoveAnalysisResult } from '@/lib/chess-bot';
+import { type MoveAnalysisResult } from '@/lib/chess-bot';
 import { SAMPLE_REPORT, type SampleReport } from '@/lib/sampleReport';
 
 const G = '#81b64c';
@@ -242,8 +242,14 @@ function SampleWeaknessList({ report, frame, previewCount }: { report: SampleRep
 // bar actually update while it works.
 async function analyzeMovesInChunks(
   allMoves: { fenBefore: string; san: string; moveNumber: number }[],
-  onProgress: (done: number, total: number) => void,
+  onProgress: (done: number, total: number, blundersSoFar: number, gameNumber: number) => void,
+  movesPerGame: number,
 ): Promise<BlunderDetail[]> {
+  // Dynamic import so the (fairly large) chess-engine module only loads
+  // once someone actually runs the demo, rather than being part of the
+  // landing page's initial bundle for every visitor. Resolves instantly
+  // on any call after the first, since the module is cached.
+  const { analyzeMoveQuality } = await import('@/lib/chess-bot');
   const BATCH_SIZE = 6;
   const results: BlunderDetail[] = [];
   for (let i = 0; i < allMoves.length; i += BATCH_SIZE) {
@@ -257,7 +263,10 @@ async function analyzeMovesInChunks(
         // whole demo over one malformed FEN/SAN edge case.
       }
     }
-    onProgress(Math.min(i + BATCH_SIZE, allMoves.length), allMoves.length);
+    const done = Math.min(i + BATCH_SIZE, allMoves.length);
+    const blundersSoFar = results.filter((r) => r.quality === 'blunder').length;
+    const gameNumber = Math.min(Math.floor(done / movesPerGame) + 1, Math.ceil(allMoves.length / movesPerGame));
+    onProgress(done, allMoves.length, blundersSoFar, gameNumber);
     // Yield to the browser so it can paint/respond before the next batch.
     await new Promise((resolve) => setTimeout(resolve, 0));
   }
@@ -281,6 +290,9 @@ export function HeroDemo({ onUpgradeClick }: { onUpgradeClick: () => void }) {
   const [platform, setPlatform] = useState<'chesscom' | 'lichess'>('chesscom');
   const [state, setState] = useState<'idle' | 'loading' | 'analyzing' | 'result' | 'error'>('idle');
   const [progress, setProgress] = useState(0);
+  const [scanGame, setScanGame] = useState(1);
+  const [scanTotalGames, setScanTotalGames] = useState(1);
+  const [scanBlunders, setScanBlunders] = useState(0);
   const [error, setError] = useState('');
   const [result, setResult] = useState<DemoResult | null>(null);
   const [showBreakdown, setShowBreakdown] = useState(true);
@@ -301,6 +313,8 @@ export function HeroDemo({ onUpgradeClick }: { onUpgradeClick: () => void }) {
     if (!username.trim()) return;
     setState('loading');
     setProgress(0);
+    setScanGame(1);
+    setScanBlunders(0);
     setError('');
     try {
       const res = await apiFetch('/api/demo/analyze', {
@@ -316,6 +330,7 @@ export function HeroDemo({ onUpgradeClick }: { onUpgradeClick: () => void }) {
       }
 
       setState('analyzing');
+      setScanTotalGames(data.gamesAnalyzed);
 
       const openingCounts: Record<string, number> = {};
       const allMoves: { fenBefore: string; san: string; moveNumber: number }[] = [];
@@ -328,9 +343,15 @@ export function HeroDemo({ onUpgradeClick }: { onUpgradeClick: () => void }) {
         });
       }
 
-      const analyzed = await analyzeMovesInChunks(allMoves, (done, total) => {
-        setProgress(Math.round((done / total) * 100));
-      });
+      const analyzed = await analyzeMovesInChunks(
+        allMoves,
+        (done, total, blundersSoFar, gameNumber) => {
+          setProgress(Math.round((done / total) * 100));
+          setScanBlunders(blundersSoFar);
+          setScanGame(Math.min(gameNumber, data.gamesAnalyzed));
+        },
+        Math.max(1, Math.round(allMoves.length / data.gamesAnalyzed)),
+      );
 
       const blunderList = analyzed.filter((a) => a.quality === 'blunder');
       const mistakes = analyzed.filter((a) => a.quality === 'mistake').length;
@@ -420,8 +441,12 @@ export function HeroDemo({ onUpgradeClick }: { onUpgradeClick: () => void }) {
           {state === 'error' && <p className="text-xs mt-2" style={{ color: '#e57373' }}>{error}</p>}
           <p className="text-[11px] mt-2" style={{ color: MUTED }}>
             {state === 'loading' && 'Fetching your games...'}
-            {state === 'analyzing' && 'Scanning for blunders...'}
-            {(state === 'idle' || state === 'error') && "We'll look at your last 5 games. No account needed."}
+            {state === 'analyzing' && (
+              scanBlunders > 0
+                ? `Game ${scanGame} of ${scanTotalGames} · ${scanBlunders} issue${scanBlunders === 1 ? '' : 's'} found so far`
+                : `Scanning game ${scanGame} of ${scanTotalGames}...`
+            )}
+            {(state === 'idle' || state === 'error') && "We'll look at your last 3 games. No account needed."}
           </p>
         </>
       )}

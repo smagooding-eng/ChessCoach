@@ -61,12 +61,13 @@ function isRateLimited(ip: string): boolean {
   return false;
 }
 
-// Games analyzed and half-moves per game sampled. Bumped from 2 to 5 --
-// 2 games made the "here's a pattern" pitch feel like a coin flip rather
-// than a real diagnosis. Client-side analysis is chunked (see
-// analyzeMovesInChunks) so this stays responsive; the per-IP rate limit
-// below is what actually bounds cost for a visitor who hasn't signed up.
-const GAMES_TO_ANALYZE = 5;
+// Games analyzed and half-moves per game sampled. Bumped from 2 to 5 in an
+// earlier pass to make the demo's finding feel like a real pattern rather
+// than a coin flip -- but that made client-side analysis (a real minimax
+// per move, on the main thread) noticeably slow. Settling on 3 as the
+// middle ground: still enough games to speak to a pattern, without the
+// wait 5 introduced.
+const GAMES_TO_ANALYZE = 3;
 const MAX_MOVES_PER_GAME = 20;
 
 router.post("/demo/analyze", async (req: Request, res: Response) => {

@@ -1,7 +1,12 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { useUser } from '@/hooks/use-user';
 import { useLocation, Link } from 'wouter';
-import { HeroDemo } from '@/components/HeroDemo';
+// Lazy-loaded: HeroDemo pulls in the full chess-engine module (chess-bot.ts)
+// for its client-side analysis. That engine has no business being in the
+// landing page's main bundle for the ~91% of visitors who never scroll
+// past the Hero or never run the demo -- it was previously a direct
+// import, which meant every visitor paid for it on first load regardless.
+const HeroDemo = lazy(() => import('@/components/HeroDemo').then((m) => ({ default: m.HeroDemo })));
 import { trackFunnelEvent } from '@/lib/funnelTracking';
 import { useLandingFunnelTracking } from '@/hooks/use-landing-funnel-tracking';
 import { ArrowRight, Mail, Eye, EyeOff, UserPlus, LogIn, Search, BarChart3, Brain, Check, X, Target, Crosshair, BookOpen, Gamepad2, Flame, Puzzle, Users, Skull, History, GraduationCap, Download as DownloadIcon, Smartphone } from 'lucide-react';
@@ -590,7 +595,16 @@ export function LandingPage() {
               transition={{ duration: 0.7, delay: 0.15 }}
               className="lg:pt-12"
             >
-              <HeroDemo onUpgradeClick={openSignup} />
+              <Suspense
+                fallback={
+                  <div
+                    className="rounded-2xl animate-pulse"
+                    style={{ minHeight: '360px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}
+                  />
+                }
+              >
+                <HeroDemo onUpgradeClick={openSignup} />
+              </Suspense>
             </motion.div>
           </div>
         </div>
