@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'wouter';
 import { PageHero, CHESSCOM_GREEN, TEXT_LIGHT, TEXT_MUTED } from '@/components/DesignSystem';
 import { apiFetch } from '@/lib/api';
-import { setPageMeta } from '@/lib/pageMeta';
+import { setPageMeta, setArticleStructuredData } from '@/lib/pageMeta';
 import { Loader2, ArrowRight, ArrowLeft } from 'lucide-react';
 
 interface ArticleSummary {
@@ -54,10 +54,23 @@ function renderMarkdown(md: string): React.ReactNode[] {
 }
 
 function renderInline(text: string): React.ReactNode {
-  const parts = text.split(/(\*\*[^*]+\*\*)/g);
+  // Splits on both **bold** and [text](/learn/slug)-style links so the
+  // internal links the SEO engine now generates actually render as
+  // clickable links instead of showing as literal markdown syntax.
+  const parts = text.split(/(\*\*[^*]+\*\*|\[[^\]]+\]\([^)]+\))/g);
   return parts.map((part, i) => {
     if (part.startsWith('**') && part.endsWith('**')) {
       return <strong key={i} style={{ color: TEXT_LIGHT }}>{part.slice(2, -2)}</strong>;
+    }
+    const linkMatch = /^\[([^\]]+)\]\(([^)]+)\)$/.exec(part);
+    if (linkMatch) {
+      const [, linkText, href] = linkMatch;
+      const isInternal = href.startsWith('/');
+      return isInternal ? (
+        <Link key={i} href={href} style={{ color: CHESSCOM_GREEN, textDecoration: 'underline' }}>{linkText}</Link>
+      ) : (
+        <a key={i} href={href} target="_blank" rel="noopener noreferrer" style={{ color: CHESSCOM_GREEN, textDecoration: 'underline' }}>{linkText}</a>
+      );
     }
     return part;
   });
@@ -86,6 +99,7 @@ export function ArticlePage() {
         article.metaDescription,
         `/learn/${article.slug}`,
       );
+      return setArticleStructuredData(article);
     }
   }, [article]);
 

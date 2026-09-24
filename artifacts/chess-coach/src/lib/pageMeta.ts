@@ -27,3 +27,41 @@ export function setPageMeta(title: string, description?: string, path?: string) 
   }
   canonical.setAttribute('href', canonicalHref);
 }
+
+/**
+ * Injects Article structured data (schema.org JSON-LD) for a single
+ * article page. Client-side only, same SPA caveat as setPageMeta above:
+ * covers Googlebot and other JS-executing crawlers, not a crawler that
+ * only reads the static HTML. Uses only real, known fields -- no
+ * fabricated ratings, author names, or engagement numbers.
+ * Returns a cleanup function that removes the tag, so callers can clean
+ * up on unmount rather than leaving stale structured data behind when
+ * navigating to a non-article page.
+ */
+export function setArticleStructuredData(article: { title: string; metaDescription: string; slug: string; createdAt: string }): () => void {
+  const script = document.createElement('script');
+  script.type = 'application/ld+json';
+  script.text = JSON.stringify({
+    '@context': 'https://schema.org',
+    '@type': 'Article',
+    headline: article.title,
+    description: article.metaDescription,
+    datePublished: article.createdAt,
+    mainEntityOfPage: {
+      '@type': 'WebPage',
+      '@id': `https://chessscout.net/learn/${article.slug}`,
+    },
+    author: {
+      '@type': 'Organization',
+      name: 'ChessScout.net',
+    },
+    publisher: {
+      '@type': 'Organization',
+      name: 'ChessScout.net',
+    },
+  });
+  document.head.appendChild(script);
+  return () => {
+    document.head.removeChild(script);
+  };
+}
