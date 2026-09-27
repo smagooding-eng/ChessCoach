@@ -14,6 +14,10 @@ export function useLandingFunnelTracking() {
   const scrolledMilestones = useRef<Set<number>>(new Set());
   const currentSection = useRef<string | null>(null);
   const exitLogged = useRef(false);
+  // Page-load timestamp, so an exit event can report how long the visitor
+  // was actually on the page before leaving -- "where" they left was
+  // already tracked, this adds "when" (elapsed time, not calendar time).
+  const pageLoadTime = useRef(Date.now());
 
   useEffect(() => {
     // Section visibility: fires `viewed_<section>` once per section the
@@ -74,7 +78,8 @@ export function useLandingFunnelTracking() {
       if (exitLogged.current) return;
       if (!currentSection.current) return;
       exitLogged.current = true;
-      trackFunnelEventBeacon(`exit_${currentSection.current}` as any);
+      const elapsedMs = Date.now() - pageLoadTime.current;
+      trackFunnelEventBeacon(`exit_${currentSection.current}` as any, elapsedMs);
     };
     const onVisibilityChange = () => {
       if (document.visibilityState === 'hidden') logExit();

@@ -1809,18 +1809,223 @@ const SECTION_LABELS: Record<string, string> = {
   final_cta: 'Final CTA',
 };
 
+function formatMs(ms: number): string {
+  if (ms < 1000) return `${ms}ms`;
+  const seconds = ms / 1000;
+  if (seconds < 60) return `${seconds.toFixed(1)}s`;
+  const minutes = Math.floor(seconds / 60);
+  const remSeconds = Math.round(seconds % 60);
+  return `${minutes}m ${remSeconds}s`;
+}
+
+type PlatformFunnelData = {
+  landingViews: number; miaStarted: number; miaSkipped: number;
+  signupClicked: number; signupFormSubmitted: number; signupError: number; signupCompleted: number;
+  opponentScoutClicked: number; googleOauthClicked: number; googleSignupCompleted: number; googleSignupError: number;
+  totalSignedUp: number; leftWithoutAction: number;
+  scrollDepth: { scroll25: number; scroll50: number; scroll75: number; scroll100: number };
+  engaged10s: number;
+  sectionViews: Record<string, number>;
+  sectionExits: Record<string, number>;
+  sectionExitTimingMs: Record<string, { medianMs: number; sampleSize: number }>;
+  visitorBreakdown: VisitorBreakdown;
+};
+
+const sectionOrder = ['hero', 'how_it_works', 'differentiators', 'features', 'faq', 'pricing', 'final_cta'];
+
+// Everything that used to be the single LandingFunnelPanel body, now
+// rendered once per platform (Website / App) under one shared date
+// filter. Pulled into its own component specifically so "Website" and
+// "App" are guaranteed to show identical metrics in identical order --
+// no risk of one drifting from the other as this evolves.
+function PlatformFunnelSection({ title, data }: { title: string; data: PlatformFunnelData }) {
+  const rows = [
+    { label: 'Landing page views', value: data.landingViews, color: 'text-foreground' },
+    { label: 'Played Mia', value: data.miaStarted, color: 'text-emerald-400' },
+    { label: 'Skipped Mia', value: data.miaSkipped, color: 'text-orange-400' },
+    { label: 'Scout an opponent clicked', value: data.opponentScoutClicked, color: 'text-cyan-400' },
+    { label: 'Left without any action', value: data.leftWithoutAction, color: 'text-red-400' },
+  ];
+
+  const signupFunnelRows = [
+    { label: 'Opened sign up', value: data.signupClicked, color: 'text-blue-400' },
+    { label: 'Submitted the form', value: data.signupFormSubmitted, color: 'text-indigo-400' },
+    { label: 'Hit an error', value: data.signupError, color: 'text-red-400' },
+    { label: 'Completed sign up', value: data.signupCompleted, color: 'text-primary' },
+  ];
+
+  // Separate funnel for the "Continue with Google" path specifically --
+  // clicked vs completed vs errored is the only way to actually see
+  // whether Google's OAuth screen (which the branding fix affects) is
+  // costing real signups, rather than guessing from the email funnel
+  // above, which never touches this path at all.
+  const googleFunnelRows = [
+    { label: 'Clicked "Continue with Google"', value: data.googleOauthClicked, color: 'text-blue-400' },
+    { label: 'Completed sign up', value: data.googleSignupCompleted, color: 'text-primary' },
+    { label: 'Hit an error', value: data.googleSignupError, color: 'text-red-400' },
+  ];
+
+  const scrollRows = [
+    { label: '25% scrolled', value: data.scrollDepth.scroll25 },
+    { label: '50% scrolled', value: data.scrollDepth.scroll50 },
+    { label: '75% scrolled', value: data.scrollDepth.scroll75 },
+    { label: '100% scrolled', value: data.scrollDepth.scroll100 },
+  ];
+
+  const heroTiming = data.sectionExitTimingMs['hero'];
+
+  return (
+    <div className="rounded-xl border border-border/30 bg-white/[0.02] p-4">
+      <h4 className="text-sm font-black text-foreground mb-3">{title}</h4>
+
+      {/* Headline pair called out on its own, above everything else --
+          "clicked sign up" vs "actually signed up" is the single most
+          asked-about number here, so it shouldn't be buried inside the
+          detailed sign-up-funnel breakdown further down. */}
+      <div className="grid grid-cols-2 gap-3 mb-4">
+        <div className="p-3 rounded-xl bg-blue-500/10 border border-blue-500/20">
+          <p className="text-2xl font-black text-blue-400">{(data.signupClicked + data.googleOauthClicked).toLocaleString()}</p>
+          <p className="text-[11px] text-muted-foreground mt-0.5">Clicked sign up (email + Google)</p>
+        </div>
+        <div className="p-3 rounded-xl bg-primary/10 border border-primary/20">
+          <p className="text-2xl font-black text-primary">{data.totalSignedUp.toLocaleString()}</p>
+          <p className="text-[11px] text-muted-foreground mt-0.5">Actually signed up (email + Google)</p>
+        </div>
+      </div>
+
+      {/* Hero exit timing -- "where" they left the Hero was already
+          tracked (sectionExits.hero below); this is "when": how long
+          into the visit before they left, specifically for the Hero. */}
+      <div className="mb-4 p-3 rounded-xl bg-red-500/5 border border-red-500/10">
+        <p className="text-lg font-black text-red-400">
+          {heroTiming ? formatMs(heroTiming.medianMs) : '—'}
+        </p>
+        <p className="text-[11px] text-muted-foreground mt-0.5">
+          Median time on page before leaving the Hero{heroTiming ? ` (${heroTiming.sampleSize.toLocaleString()} exits)` : ' (no exits recorded here yet)'}
+        </p>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        {rows.map((r) => (
+          <div key={r.label} className="p-3 rounded-xl bg-white/5 border border-white/5">
+            <p className={cn('text-xl font-black', r.color)}>{r.value.toLocaleString()}</p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">{r.label}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-5 pt-4 border-t border-border/20">
+        <p className="text-xs font-bold text-muted-foreground mb-2">
+          Sign up funnel — where the {data.signupClicked.toLocaleString()} who opened the form actually go
+        </p>
+        <div className="grid grid-cols-2 gap-2">
+          {signupFunnelRows.map((r) => (
+            <div key={r.label} className="p-3 rounded-xl bg-white/5 border border-white/5">
+              <p className={cn('text-lg font-black', r.color)}>{r.value.toLocaleString()}</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">{r.label}</p>
+            </div>
+          ))}
+        </div>
+        <p className="text-[10px] text-muted-foreground mt-2">
+          "Opened" minus "Submitted" is people who saw the form and closed it without trying. "Submitted" minus ("Errored" + "Completed") is a request that never got a clear result client-side — worth a look if it's non-zero.
+        </p>
+      </div>
+
+      <div className="mt-5 pt-4 border-t border-border/20">
+        <p className="text-xs font-bold text-muted-foreground mb-2">
+          "Continue with Google" funnel — tracked separately from the email form above
+        </p>
+        <div className="grid grid-cols-3 gap-2">
+          {googleFunnelRows.map((r) => (
+            <div key={r.label} className="p-3 rounded-xl bg-white/5 border border-white/5">
+              <p className={cn('text-lg font-black', r.color)}>{r.value.toLocaleString()}</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">{r.label}</p>
+            </div>
+          ))}
+        </div>
+        {data.googleOauthClicked > 0 && (
+          <p className="text-[10px] text-muted-foreground mt-2">
+            Completion rate: {Math.round((data.googleSignupCompleted / data.googleOauthClicked) * 100)}% — compare against the email form's completion rate above (Completed ÷ Opened) to see whether one path is genuinely underperforming the other, rather than assuming it.
+          </p>
+        )}
+      </div>
+
+      {data.visitorBreakdown && (
+        <div className="mt-5 pt-4 border-t border-border/20">
+          <p className="text-xs font-bold text-muted-foreground mb-2">New vs. returning vs. bounced (landing page visitors only)</p>
+          <div className="grid grid-cols-3 gap-2">
+            {[
+              { label: 'New', sub: 'first time seen', value: data.visitorBreakdown.new, color: 'text-primary' },
+              { label: 'Returning', sub: 'seen 2+ days', value: data.visitorBreakdown.returning, color: 'text-blue-400' },
+              { label: 'Bounced', sub: 'never signed up', value: data.visitorBreakdown.bounced, color: 'text-red-400' },
+            ].map((r) => (
+              <div key={r.label} className="p-2.5 rounded-lg bg-white/5 border border-white/5 text-center">
+                <p className={cn('text-base font-black', r.color)}>{r.value.toLocaleString()}</p>
+                <p className="text-[10px] text-muted-foreground">{r.label}</p>
+                <p className="text-[9px] text-muted-foreground/70">{r.sub}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="mt-5 pt-4 border-t border-border/20">
+        <p className="text-xs font-bold text-muted-foreground mb-2">Scroll depth &amp; engagement</p>
+        <div className="grid grid-cols-2 gap-2">
+          {scrollRows.map((r) => (
+            <div key={r.label} className="p-2.5 rounded-lg bg-white/5 border border-white/5 text-center">
+              <p className="text-base font-black text-foreground">{r.value.toLocaleString()}</p>
+              <p className="text-[10px] text-muted-foreground">{r.label}</p>
+            </div>
+          ))}
+          <div className="p-2.5 rounded-lg bg-white/5 border border-white/5 text-center">
+            <p className="text-base font-black text-emerald-400">{data.engaged10s.toLocaleString()}</p>
+            <p className="text-[10px] text-muted-foreground">Stayed 10s+</p>
+          </div>
+        </div>
+        <p className="text-[10px] text-muted-foreground mt-2">
+          Compare against landing page views ({data.landingViews.toLocaleString()}) to see how far people actually get before leaving.
+        </p>
+      </div>
+
+      <div className="mt-5 pt-4 border-t border-border/20">
+        <p className="text-xs font-bold text-muted-foreground mb-2">Section views, exits &amp; timing</p>
+        <div className="space-y-1.5">
+          {sectionOrder.map((s) => {
+            const views = data.sectionViews[s] ?? 0;
+            const exits = data.sectionExits[s] ?? 0;
+            const timing = data.sectionExitTimingMs[s];
+            return (
+              <div key={s} className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg bg-white/5">
+                <p className="text-xs font-bold text-foreground">{SECTION_LABELS[s] ?? s}</p>
+                <div className="flex items-center gap-3 text-right shrink-0">
+                  <div>
+                    <p className="text-sm font-black text-foreground">{views.toLocaleString()}</p>
+                    <p className="text-[9px] text-muted-foreground uppercase tracking-wide">Viewed</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-black text-red-400">{exits.toLocaleString()}</p>
+                    <p className="text-[9px] text-muted-foreground uppercase tracking-wide">Left here</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-black text-orange-400">{timing ? formatMs(timing.medianMs) : '—'}</p>
+                    <p className="text-[9px] text-muted-foreground uppercase tracking-wide">Median time</p>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <p className="text-[10px] text-muted-foreground mt-2">
+          "Left here" is where the visitor's tab was last visible before they closed it or navigated away. "Median time" is how long they'd been on the page when that happened -- the section with the highest exit count plus the shortest median time is where you're losing people fastest, not just most often.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 function LandingFunnelPanel() {
-  const [data, setData] = useState<{
-    landingViews: number; miaStarted: number; miaSkipped: number;
-    signupClicked: number; signupFormSubmitted: number; signupError: number; signupCompleted: number;
-    opponentScoutClicked: number; leftWithoutAction: number;
-    googleOauthClicked: number; googleSignupCompleted: number; googleSignupError: number;
-    scrollDepth: { scroll25: number; scroll50: number; scroll75: number; scroll100: number };
-    engaged10s: number;
-    sectionViews: Record<string, number>;
-    sectionExits: Record<string, number>;
-    visitorBreakdown: VisitorBreakdown;
-  } | null>(null);
+  const [data, setData] = useState<{ days: number; web: PlatformFunnelData; app: PlatformFunnelData } | null>(null);
   const [loading, setLoading] = useState(true);
   const [range, setRange] = useState<DateRange>({ startDate: '', endDate: '' });
 
@@ -1832,41 +2037,6 @@ function LandingFunnelPanel() {
       .then(d => setData(d))
       .finally(() => setLoading(false));
   }, [range]);
-
-  const rows = data ? [
-    { label: 'Landing page views', value: data.landingViews, color: 'text-foreground' },
-    { label: 'Played Mia', value: data.miaStarted, color: 'text-emerald-400' },
-    { label: 'Skipped Mia', value: data.miaSkipped, color: 'text-orange-400' },
-    { label: 'Scout an opponent clicked', value: data.opponentScoutClicked, color: 'text-cyan-400' },
-    { label: 'Left without any action', value: data.leftWithoutAction, color: 'text-red-400' },
-  ] : [];
-
-  const signupFunnelRows = data ? [
-    { label: 'Opened sign up', value: data.signupClicked, color: 'text-blue-400' },
-    { label: 'Submitted the form', value: data.signupFormSubmitted, color: 'text-indigo-400' },
-    { label: 'Hit an error', value: data.signupError, color: 'text-red-400' },
-    { label: 'Completed sign up', value: data.signupCompleted, color: 'text-primary' },
-  ] : [];
-
-  // Separate funnel for the "Continue with Google" path specifically --
-  // clicked vs completed vs errored is the only way to actually see
-  // whether Google's OAuth screen (which the branding fix affects) is
-  // costing real signups, rather than guessing from the email funnel
-  // above, which never touches this path at all.
-  const googleFunnelRows = data ? [
-    { label: 'Clicked "Continue with Google"', value: data.googleOauthClicked, color: 'text-blue-400' },
-    { label: 'Completed sign up', value: data.googleSignupCompleted, color: 'text-primary' },
-    { label: 'Hit an error', value: data.googleSignupError, color: 'text-red-400' },
-  ] : [];
-
-  const scrollRows = data ? [
-    { label: '25% scrolled', value: data.scrollDepth.scroll25 },
-    { label: '50% scrolled', value: data.scrollDepth.scroll50 },
-    { label: '75% scrolled', value: data.scrollDepth.scroll75 },
-    { label: '100% scrolled', value: data.scrollDepth.scroll100 },
-  ] : [];
-
-  const sectionOrder = ['hero', 'how_it_works', 'differentiators', 'features', 'faq', 'pricing', 'final_cta'];
 
   return (
     <motion.div
@@ -1886,118 +2056,10 @@ function LandingFunnelPanel() {
         ) : !data ? (
           <p className="text-xs text-muted-foreground text-center py-4">Failed to load funnel data.</p>
         ) : (
-          <>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              {rows.map((r) => (
-                <div key={r.label} className="p-3 rounded-xl bg-white/5 border border-white/5">
-                  <p className={cn('text-2xl font-black', r.color)}>{r.value.toLocaleString()}</p>
-                  <p className="text-[11px] text-muted-foreground mt-0.5">{r.label}</p>
-                </div>
-              ))}
-            </div>
-
-            <div className="mt-5 pt-4 border-t border-border/20">
-              <p className="text-xs font-bold text-muted-foreground mb-2">
-                Sign up funnel — where the {data.signupClicked.toLocaleString()} who opened the form actually go
-              </p>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                {signupFunnelRows.map((r) => (
-                  <div key={r.label} className="p-3 rounded-xl bg-white/5 border border-white/5">
-                    <p className={cn('text-xl font-black', r.color)}>{r.value.toLocaleString()}</p>
-                    <p className="text-[10px] text-muted-foreground mt-0.5">{r.label}</p>
-                  </div>
-                ))}
-              </div>
-              <p className="text-[10px] text-muted-foreground mt-2">
-                "Opened" minus "Submitted" is people who saw the form and closed it without trying. "Submitted" minus ("Errored" + "Completed") is a request that never got a clear result client-side — worth a look if it's non-zero.
-              </p>
-            </div>
-
-            <div className="mt-5 pt-4 border-t border-border/20">
-              <p className="text-xs font-bold text-muted-foreground mb-2">
-                "Continue with Google" funnel — tracked separately from the email form above
-              </p>
-              <div className="grid grid-cols-3 gap-2">
-                {googleFunnelRows.map((r) => (
-                  <div key={r.label} className="p-3 rounded-xl bg-white/5 border border-white/5">
-                    <p className={cn('text-xl font-black', r.color)}>{r.value.toLocaleString()}</p>
-                    <p className="text-[10px] text-muted-foreground mt-0.5">{r.label}</p>
-                  </div>
-                ))}
-              </div>
-              {data.googleOauthClicked > 0 && (
-                <p className="text-[10px] text-muted-foreground mt-2">
-                  Completion rate: {Math.round((data.googleSignupCompleted / data.googleOauthClicked) * 100)}% — compare against the email form's completion rate above (Completed ÷ Opened) to see whether one path is genuinely underperforming the other, rather than assuming it.
-                </p>
-              )}
-            </div>
-
-            {data.visitorBreakdown && (
-              <div className="mt-5 pt-4 border-t border-border/20">
-                <p className="text-xs font-bold text-muted-foreground mb-2">New vs. returning vs. bounced (landing page visitors only)</p>
-                <div className="grid grid-cols-3 gap-2">
-                  {[
-                    { label: 'New', sub: 'first time seen', value: data.visitorBreakdown.new, color: 'text-primary' },
-                    { label: 'Returning', sub: 'seen 2+ days', value: data.visitorBreakdown.returning, color: 'text-blue-400' },
-                    { label: 'Bounced', sub: 'never signed up', value: data.visitorBreakdown.bounced, color: 'text-red-400' },
-                  ].map((r) => (
-                    <div key={r.label} className="p-2.5 rounded-lg bg-white/5 border border-white/5 text-center">
-                      <p className={cn('text-lg font-black', r.color)}>{r.value.toLocaleString()}</p>
-                      <p className="text-[10px] text-muted-foreground">{r.label}</p>
-                      <p className="text-[9px] text-muted-foreground/70">{r.sub}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <div className="mt-5 pt-4 border-t border-border/20">
-              <p className="text-xs font-bold text-muted-foreground mb-2">Scroll depth &amp; engagement</p>
-              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-                {scrollRows.map((r) => (
-                  <div key={r.label} className="p-2.5 rounded-lg bg-white/5 border border-white/5 text-center">
-                    <p className="text-lg font-black text-foreground">{r.value.toLocaleString()}</p>
-                    <p className="text-[10px] text-muted-foreground">{r.label}</p>
-                  </div>
-                ))}
-                <div className="p-2.5 rounded-lg bg-white/5 border border-white/5 text-center">
-                  <p className="text-lg font-black text-emerald-400">{data.engaged10s.toLocaleString()}</p>
-                  <p className="text-[10px] text-muted-foreground">Stayed 10s+</p>
-                </div>
-              </div>
-              <p className="text-[10px] text-muted-foreground mt-2">
-                Compare against landing page views ({data.landingViews.toLocaleString()}) to see how far people actually get before leaving.
-              </p>
-            </div>
-
-            <div className="mt-5 pt-4 border-t border-border/20">
-              <p className="text-xs font-bold text-muted-foreground mb-2">Section views &amp; exits</p>
-              <div className="space-y-1.5">
-                {sectionOrder.map((s) => {
-                  const views = data.sectionViews[s] ?? 0;
-                  const exits = data.sectionExits[s] ?? 0;
-                  return (
-                    <div key={s} className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg bg-white/5">
-                      <p className="text-xs font-bold text-foreground">{SECTION_LABELS[s] ?? s}</p>
-                      <div className="flex items-center gap-4 text-right shrink-0">
-                        <div>
-                          <p className="text-sm font-black text-foreground">{views.toLocaleString()}</p>
-                          <p className="text-[9px] text-muted-foreground uppercase tracking-wide">Viewed</p>
-                        </div>
-                        <div>
-                          <p className="text-sm font-black text-red-400">{exits.toLocaleString()}</p>
-                          <p className="text-[9px] text-muted-foreground uppercase tracking-wide">Left here</p>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-              <p className="text-[10px] text-muted-foreground mt-2">
-                "Left here" is where the visitor's tab was last visible before they closed it or navigated away -- the section with the highest count is where you're losing the most people.
-              </p>
-            </div>
-          </>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <PlatformFunnelSection title="Website" data={data.web} />
+            <PlatformFunnelSection title="App (installed PWA)" data={data.app} />
+          </div>
         )}
       </div>
     </motion.div>

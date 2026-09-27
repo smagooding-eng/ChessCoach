@@ -5,7 +5,9 @@ interface BeforeInstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
 }
 
-function isRunningStandalone() {
+// Exported so funnelTracking.ts can tag every event as coming from the
+// installed app vs a regular browser tab, without duplicating this check.
+export function isRunningStandalone() {
   if (window.matchMedia('(display-mode: standalone)').matches) return true;
   if ((navigator as any).standalone === true) return true;
   return false;

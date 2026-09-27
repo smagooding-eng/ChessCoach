@@ -1,26 +1,29 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { db, landingFunnelEventsTable } from "@workspace/db";
-import { sql, gte, lte, and } from "drizzle-orm";
+import { sql, gte, lte, and, eq } from "drizzle-orm";
 import { parseDateRangeParams } from "./admin";
 
 // Same shape returned by /api/admin/stats -- kept identical so the admin
 // UI can render both with one component.
 interface VisitorBreakdown { new: number; returning: number; bounced: number }
 
+type Platform = "web" | "app";
+
 // Scoped version of the same new/returning/bounced logic used in
 // admin.ts, but restricted to visitors who actually fired a
-// `landing_view` event in this window (rather than every visitor
-// site-wide). Joins out to page_views by visitor_id -- that's the same
-// localStorage-backed id used by both the funnel tracker and the
-// generic page-view tracker, so it's a reliable join key. A visitor_id
-// with no matching page_views row at all (edge case) is treated as a
-// single-day, not-signed-up visit rather than dropped from the count.
-async function getLandingVisitorBreakdown(since: Date, until: Date): Promise<VisitorBreakdown> {
+// `landing_view` event in this window AND on this platform (rather than
+// every visitor site-wide). Joins out to page_views by visitor_id --
+// that's the same localStorage-backed id used by both the funnel tracker
+// and the generic page-view tracker, so it's a reliable join key. A
+// visitor_id with no matching page_views row at all (edge case) is
+// treated as a single-day, not-signed-up visit rather than dropped from
+// the count.
+async function getLandingVisitorBreakdown(since: Date, until: Date, platform: Platform): Promise<VisitorBreakdown> {
   const result = await db.execute(sql`
     WITH landing_visitors AS (
       SELECT DISTINCT visitor_id
       FROM landing_funnel_events
-      WHERE event_type = 'landing_view' AND created_at >= ${since} AND created_at <= ${until}
+      WHERE event_type = 'landing_view' AND platform = ${platform} AND created_at >= ${since} AND created_at <= ${until}
     ),
     visitor_agg AS (
       SELECT
@@ -75,93 +78,163 @@ const VALID_EVENTS = new Set([
 // firing these events haven't signed up yet, that's the whole point).
 router.post("/landing-funnel/track", async (req: Request, res: Response) => {
   try {
-    const { visitorId, eventType } = req.body as { visitorId?: string; eventType?: string };
+    const { visitorId, eventType, platform, elapsedMs } = req.body as {
+      visitorId?: string; eventType?: string; platform?: string; elapsedMs?: number;
+    };
     if (!visitorId || !eventType || !VALID_EVENTS.has(eventType)) {
       res.status(400).json({ error: "Invalid visitorId or eventType" });
       return;
     }
-    await db.insert(landingFunnelEventsTable).values({ visitorId, eventType });
+    // Unrecognized/missing platform falls back to 'web' rather than
+    // rejecting the event outright -- an older cached client bundle
+    // without the platform field shouldn't start dropping events.
+    const safePlatform: Platform = platform === "app" ? "app" : "web";
+    const safeElapsedMs = typeof elapsedMs === "number" && Number.isFinite(elapsedMs) && elapsedMs >= 0
+      ? Math.round(elapsedMs)
+      : null;
+    await db.insert(landingFunnelEventsTable).values({
+      visitorId,
+      eventType,
+      platform: safePlatform,
+      elapsedMs: safeElapsedMs,
+    });
     res.json({ success: true });
   } catch (err: any) {
     res.status(500).json({ error: "Failed to log event" });
   }
 });
 
+// The full stats shape for ONE platform slice. Used twice per request
+// (once for 'web', once for 'app') so the admin panel can show them
+// side by side under a single shared date filter, rather than needing
+// two separate API calls or two separate date pickers.
+async function getFunnelStatsForPlatform(since: Date, until: Date, platform: Platform) {
+  const platformFilter = eq(landingFunnelEventsTable.platform, platform);
+
+  const counts = await db
+    .select({ eventType: landingFunnelEventsTable.eventType, count: sql<number>`count(distinct ${landingFunnelEventsTable.visitorId})` })
+    .from(landingFunnelEventsTable)
+    .where(and(platformFilter, gte(landingFunnelEventsTable.createdAt, since), lte(landingFunnelEventsTable.createdAt, until)))
+    .groupBy(landingFunnelEventsTable.eventType);
+
+  const countMap: Record<string, number> = {};
+  for (const c of counts) countMap[c.eventType] = Number(c.count);
+
+  const landingViews = countMap["landing_view"] ?? 0;
+  const miaStarted = countMap["mia_started"] ?? 0;
+  const miaSkipped = countMap["mia_skipped"] ?? 0;
+  const signupClicked = countMap["signup_clicked"] ?? 0;
+  const signupFormSubmitted = countMap["signup_form_submitted"] ?? 0;
+  const signupError = countMap["signup_error"] ?? 0;
+  const signupCompleted = countMap["signup_completed"] ?? 0;
+  const opponentScoutClicked = countMap["opponent_scout_clicked"] ?? 0;
+  const googleOauthClicked = countMap["google_oauth_clicked"] ?? 0;
+  const googleSignupCompleted = countMap["google_signup_completed"] ?? 0;
+  const googleSignupError = countMap["google_signup_error"] ?? 0;
+
+  // Total "actually signed up" across both paths -- the email form and
+  // Google OAuth are tracked as separate funnels above (for good reason,
+  // they have different failure modes), but "how many actually signed
+  // up" as a single headline number needs both added together.
+  const totalSignedUp = signupCompleted + googleSignupCompleted;
+
+  const scrollDepth = {
+    scroll25: countMap["scroll_25"] ?? 0,
+    scroll50: countMap["scroll_50"] ?? 0,
+    scroll75: countMap["scroll_75"] ?? 0,
+    scroll100: countMap["scroll_100"] ?? 0,
+  };
+  const engaged10s = countMap["engaged_10s"] ?? 0;
+
+  const sectionViews: Record<string, number> = {};
+  const sectionExits: Record<string, number> = {};
+  for (const s of SECTION_IDS) {
+    sectionViews[s] = countMap[`viewed_${s}`] ?? 0;
+    sectionExits[s] = countMap[`exit_${s}`] ?? 0;
+  }
+
+  // "When" people leave each section -- median elapsed time (ms since
+  // page load) at the moment of the exit event, per section. Median
+  // rather than average since a handful of people leaving a tab open
+  // for hours before closing it would otherwise blow the average up to
+  // something meaningless.
+  const exitTimingRows = await db.execute(sql`
+    SELECT
+      event_type,
+      PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY elapsed_ms) AS median_elapsed_ms,
+      COUNT(*) FILTER (WHERE elapsed_ms IS NOT NULL) AS sample_size
+    FROM landing_funnel_events
+    WHERE platform = ${platform}
+      AND created_at >= ${since} AND created_at <= ${until}
+      AND event_type LIKE 'exit_%'
+      AND elapsed_ms IS NOT NULL
+    GROUP BY event_type
+  `);
+  const sectionExitTimingMs: Record<string, { medianMs: number; sampleSize: number }> = {};
+  for (const row of exitTimingRows.rows as { event_type: string; median_elapsed_ms: string | number | null; sample_size: string | number }[]) {
+    const section = row.event_type.replace(/^exit_/, "");
+    if (row.median_elapsed_ms == null) continue;
+    sectionExitTimingMs[section] = {
+      medianMs: Math.round(Number(row.median_elapsed_ms)),
+      sampleSize: Number(row.sample_size),
+    };
+  }
+
+  // "Left without doing anything" = viewed the landing page but never
+  // triggered any other funnel event at all (not even Mia or signup click).
+  const distinctActiveVisitors = await db
+    .select({ visitorId: landingFunnelEventsTable.visitorId })
+    .from(landingFunnelEventsTable)
+    .where(and(platformFilter, gte(landingFunnelEventsTable.createdAt, since), lte(landingFunnelEventsTable.createdAt, until)));
+  const visitorEventCounts: Record<string, number> = {};
+  for (const row of distinctActiveVisitors) {
+    visitorEventCounts[row.visitorId] = (visitorEventCounts[row.visitorId] ?? 0) + 1;
+  }
+  const leftWithoutAction = Object.values(visitorEventCounts).filter((c) => c === 1).length;
+
+  const visitorBreakdown = await getLandingVisitorBreakdown(since, until, platform);
+
+  return {
+    landingViews,
+    miaStarted,
+    miaSkipped,
+    signupClicked,
+    signupFormSubmitted,
+    signupError,
+    signupCompleted,
+    opponentScoutClicked,
+    googleOauthClicked,
+    googleSignupCompleted,
+    googleSignupError,
+    totalSignedUp,
+    leftWithoutAction,
+    scrollDepth,
+    engaged10s,
+    sectionViews,
+    sectionExits,
+    sectionExitTimingMs,
+    visitorBreakdown,
+  };
+}
+
 // Admin-only aggregation. Separate route/section from the general admin
 // dashboard's page-view stats, per explicit instruction not to mix them in.
+// Returns both platform slices in one response under a single date range,
+// so the admin panel can render Website and App side by side without a
+// second date picker or a second round trip.
 router.get("/admin/landing-funnel", requireAdmin, async (req: Request, res: Response) => {
   try {
     const { since, until } = parseDateRangeParams(req, 30);
 
-    const counts = await db
-      .select({ eventType: landingFunnelEventsTable.eventType, count: sql<number>`count(distinct ${landingFunnelEventsTable.visitorId})` })
-      .from(landingFunnelEventsTable)
-      .where(and(gte(landingFunnelEventsTable.createdAt, since), lte(landingFunnelEventsTable.createdAt, until)))
-      .groupBy(landingFunnelEventsTable.eventType);
-
-    const countMap: Record<string, number> = {};
-    for (const c of counts) countMap[c.eventType] = Number(c.count);
-
-    const landingViews = countMap["landing_view"] ?? 0;
-    const miaStarted = countMap["mia_started"] ?? 0;
-    const miaSkipped = countMap["mia_skipped"] ?? 0;
-    const signupClicked = countMap["signup_clicked"] ?? 0;
-    const signupFormSubmitted = countMap["signup_form_submitted"] ?? 0;
-    const signupError = countMap["signup_error"] ?? 0;
-    const signupCompleted = countMap["signup_completed"] ?? 0;
-    const opponentScoutClicked = countMap["opponent_scout_clicked"] ?? 0;
-    const googleOauthClicked = countMap["google_oauth_clicked"] ?? 0;
-    const googleSignupCompleted = countMap["google_signup_completed"] ?? 0;
-    const googleSignupError = countMap["google_signup_error"] ?? 0;
-
-    const scrollDepth = {
-      scroll25: countMap["scroll_25"] ?? 0,
-      scroll50: countMap["scroll_50"] ?? 0,
-      scroll75: countMap["scroll_75"] ?? 0,
-      scroll100: countMap["scroll_100"] ?? 0,
-    };
-    const engaged10s = countMap["engaged_10s"] ?? 0;
-
-    const sectionViews: Record<string, number> = {};
-    const sectionExits: Record<string, number> = {};
-    for (const s of SECTION_IDS) {
-      sectionViews[s] = countMap[`viewed_${s}`] ?? 0;
-      sectionExits[s] = countMap[`exit_${s}`] ?? 0;
-    }
-
-    // "Left without doing anything" = viewed the landing page but never
-    // triggered any other funnel event at all (not even Mia or signup click).
-    const distinctActiveVisitors = await db
-      .select({ visitorId: landingFunnelEventsTable.visitorId })
-      .from(landingFunnelEventsTable)
-      .where(and(gte(landingFunnelEventsTable.createdAt, since), lte(landingFunnelEventsTable.createdAt, until)));
-    const visitorEventCounts: Record<string, number> = {};
-    for (const row of distinctActiveVisitors) {
-      visitorEventCounts[row.visitorId] = (visitorEventCounts[row.visitorId] ?? 0) + 1;
-    }
-    const leftWithoutAction = Object.values(visitorEventCounts).filter((c) => c === 1).length;
-
-    const visitorBreakdown = await getLandingVisitorBreakdown(since, until);
+    const [web, app] = await Promise.all([
+      getFunnelStatsForPlatform(since, until, "web"),
+      getFunnelStatsForPlatform(since, until, "app"),
+    ]);
 
     res.json({
       days: Math.max(1, Math.round((until.getTime() - since.getTime()) / (24 * 60 * 60 * 1000))),
-      landingViews,
-      miaStarted,
-      miaSkipped,
-      signupClicked,
-      signupFormSubmitted,
-      signupError,
-      signupCompleted,
-      opponentScoutClicked,
-      googleOauthClicked,
-      googleSignupCompleted,
-      googleSignupError,
-      leftWithoutAction,
-      scrollDepth,
-      engaged10s,
-      sectionViews,
-      sectionExits,
-      visitorBreakdown,
+      web,
+      app,
     });
   } catch (err: any) {
     res.status(500).json({ error: "Failed to fetch landing funnel stats", details: err.message });
