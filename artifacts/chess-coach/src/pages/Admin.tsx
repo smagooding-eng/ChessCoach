@@ -2198,7 +2198,7 @@ function ShopManagementPanel() {
           <p className="text-[11px] text-orange-400 mb-2">{previewWarning}</p>
         )}
         <p className="text-[10px] text-muted-foreground mb-3">
-          Fetch pulls the title, image, description, and price straight from the page (the same info a social-media link preview shows) -- Amazon sometimes blocks automated requests, so double-check what comes back and fill in anything missing by hand.
+          Fetch tries Microlink first (a real headless-browser service built to get past bot detection), then falls back to a direct request. Pulls title, image, and description reliably; price isn't exposed as standard page metadata so it usually still needs to be typed in by hand.
         </p>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">

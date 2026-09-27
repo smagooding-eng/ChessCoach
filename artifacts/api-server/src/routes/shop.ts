@@ -106,13 +106,60 @@ router.post("/admin/shop-items/fetch-preview", requireAdmin, async (req: Request
       return;
     }
 
+    // Primary method: Microlink's metadata API. It runs a real headless
+    // Chrome session server-side (not a raw HTTP fetch with a spoofed
+    // header), which is a fundamentally different technique from the
+    // fallback below -- much closer to what a social-media unfurl bot
+    // actually does, and far more likely to get past Amazon's bot
+    // detection. Free tier: 25 requests/day, no API key needed.
+    const GENERIC_BLOCK_TITLES = new Set([
+      "amazon.com", "amazon.com: robot check", "robot check",
+      "sorry! something went wrong!", "amazon.com. spend less. smile more.",
+    ]);
+    const isGenericTitle = (t: string | null) => t != null && GENERIC_BLOCK_TITLES.has(t.trim().toLowerCase());
+
+    try {
+      const microlinkRes = await fetch(`https://api.microlink.io?url=${encodeURIComponent(parsedUrl.toString())}`, {
+        signal: AbortSignal.timeout(15_000),
+      });
+      const microlinkJson = await microlinkRes.json() as {
+        status?: string;
+        data?: { title?: string | null; description?: string | null; image?: { url?: string } | null };
+        rateLimit?: { remaining?: number };
+      };
+
+      if (microlinkJson.status === "success" && microlinkJson.data) {
+        const mTitle = microlinkJson.data.title ?? null;
+        const mImage = microlinkJson.data.image?.url ?? null;
+        if (mTitle && !isGenericTitle(mTitle)) {
+          res.json({
+            title: mTitle.trim(),
+            description: microlinkJson.data.description?.trim().slice(0, 500) ?? null,
+            imageUrl: mImage,
+            // Microlink's free metadata tier doesn't return price --
+            // that's a separate, more involved product-data extraction
+            // Amazon doesn't expose as a standard meta tag. Left for
+            // manual entry, called out below in the UI copy.
+            priceLabel: null,
+          });
+          return;
+        }
+        // Microlink itself got a generic/blocked response -- fall through
+        // to the raw-fetch attempt below rather than giving up immediately.
+      }
+    } catch {
+      // Microlink unreachable, timed out, or rate-limited (25/day free
+      // tier) -- fall through to the raw-fetch fallback below.
+    }
+
     let response: globalThis.Response;
     try {
       response = await fetch(parsedUrl.toString(), {
         // A realistic browser identity -- doesn't guarantee Amazon won't
         // block this, but a generic "node-fetch"-style default UA gets
         // blocked essentially every time, so this at least gives it a
-        // real shot.
+        // real shot. This is the fallback path now that Microlink is
+        // tried first above.
         headers: {
           "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
           "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
@@ -122,12 +169,12 @@ router.post("/admin/shop-items/fetch-preview", requireAdmin, async (req: Request
         signal: AbortSignal.timeout(10_000),
       });
     } catch (fetchErr: any) {
-      res.status(502).json({ error: "Couldn't reach that URL. It may be down, or blocking automated requests -- you can still fill in the details manually below." });
+      res.status(502).json({ error: "Couldn't reach that URL, and the Microlink fallback also didn't get through. It may be down, or blocking automated requests -- you can still fill in the details manually below." });
       return;
     }
 
     if (!response.ok) {
-      res.status(502).json({ error: `That page returned an error (HTTP ${response.status}). Amazon may be blocking this request -- you can still fill in the details manually below.` });
+      res.status(502).json({ error: `That page returned an error (HTTP ${response.status}), and the Microlink fallback also didn't get through. Amazon may be blocking this request -- you can still fill in the details manually below.` });
       return;
     }
 
@@ -144,10 +191,16 @@ router.post("/admin/shop-items/fetch-preview", requireAdmin, async (req: Request
     const imageUrl = extractMetaContent(html, "og:image");
     const priceLabel = extractPrice(html);
 
-    if (!title && !imageUrl) {
+    // Amazon's bot-block/CAPTCHA interstitial still returns HTTP 200 and
+    // still has a <title> tag -- just a generic one ("Amazon.com",
+    // "Robot Check", "Sorry! Something went wrong!") rather than the
+    // real product title. A title existing isn't proof the fetch
+    // actually reached the product page, so these known generic titles
+    // are treated the same as no title at all.
+    if ((!title || isGenericTitle(title)) && !imageUrl) {
       res.status(200).json({
         title: null, description: null, imageUrl: null, priceLabel: null,
-        warning: "Couldn't find product details on that page -- Amazon may have blocked this request or served a CAPTCHA. Please fill in the fields manually.",
+        warning: "Couldn't find product details on that page -- both Microlink and a direct fetch were blocked or served a CAPTCHA. Please fill in the fields manually.",
       });
       return;
     }
