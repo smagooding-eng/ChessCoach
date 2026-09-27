@@ -15,3 +15,4 @@ export * from "./chessTraps";
 export * from "./aiUsage";
 export * from "./beginnerCourses";
 export * from "./bulkCrawl";
+export * from "./shopItems";

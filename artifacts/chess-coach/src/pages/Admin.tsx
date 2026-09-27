@@ -11,7 +11,7 @@ import {
   Copy, CreditCard, Crown, DollarSign, Edit3, Eye, FileText, Gamepad2, Gift, GraduationCap, Heading1, Heading2,
   History, Image, Italic, Link as LinkIcon, List, ListOrdered, Loader2, LogOut, Mail, Megaphone,
   Minus, Palette, Play, Redo2, RefreshCw, Search, Send, Settings, Shield, Sparkles, Swords, Target, Trash2,
-  Trophy, Type, Undo2, User, UserCheck, UserPlus, Users, Wrench, X, Zap, TrendingUp,
+  Trophy, Type, Undo2, User, UserCheck, UserPlus, Users, Wrench, X, Zap, TrendingUp, Plus, ShoppingBag,
 } from 'lucide-react';
 
 interface VisitorBreakdown { new: number; returning: number; bounced: number }
@@ -624,6 +624,8 @@ export function Admin() {
               </div>
             </div>
           )}
+
+          <ShopManagementPanel />
 
           <LandingFunnelPanel />
         </>
@@ -2021,6 +2023,174 @@ function PlatformFunnelSection({ title, data }: { title: string; data: PlatformF
         </p>
       </div>
     </div>
+  );
+}
+
+interface ShopItemAdmin {
+  id: string;
+  title: string;
+  description: string | null;
+  imageUrl: string | null;
+  amazonUrl: string;
+  priceLabel: string | null;
+  sortOrder: number;
+}
+
+const EMPTY_SHOP_FORM = { title: '', description: '', imageUrl: '', amazonUrl: '', priceLabel: '', sortOrder: '0' };
+
+function ShopManagementPanel() {
+  const [items, setItems] = useState<ShopItemAdmin[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [form, setForm] = useState(EMPTY_SHOP_FORM);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  const load = useCallback(() => {
+    setLoading(true);
+    apiFetch('/api/admin/shop-items', { credentials: 'include' })
+      .then(r => r.ok ? r.json() : { items: [] })
+      .then(d => setItems(d.items ?? []))
+      .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const startEdit = (item: ShopItemAdmin) => {
+    setEditingId(item.id);
+    setForm({
+      title: item.title,
+      description: item.description ?? '',
+      imageUrl: item.imageUrl ?? '',
+      amazonUrl: item.amazonUrl,
+      priceLabel: item.priceLabel ?? '',
+      sortOrder: String(item.sortOrder),
+    });
+    setError('');
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setForm(EMPTY_SHOP_FORM);
+    setError('');
+  };
+
+  const submit = async () => {
+    if (!form.title.trim() || !form.amazonUrl.trim()) {
+      setError('Title and Amazon link are both required.');
+      return;
+    }
+    setSaving(true);
+    setError('');
+    try {
+      const body = {
+        title: form.title.trim(),
+        description: form.description.trim() || undefined,
+        imageUrl: form.imageUrl.trim() || undefined,
+        amazonUrl: form.amazonUrl.trim(),
+        priceLabel: form.priceLabel.trim() || undefined,
+        sortOrder: Number(form.sortOrder) || 0,
+      };
+      const res = await apiFetch(
+        editingId ? `/api/admin/shop-items/${editingId}` : '/api/admin/shop-items',
+        {
+          method: editingId ? 'PUT' : 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        }
+      );
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || 'Failed to save.');
+        return;
+      }
+      cancelEdit();
+      load();
+    } catch {
+      setError('Connection error.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const remove = async (id: string) => {
+    if (!confirm('Delete this shop item? This cannot be undone.')) return;
+    await apiFetch(`/api/admin/shop-items/${id}`, { method: 'DELETE', credentials: 'include' });
+    if (editingId === id) cancelEdit();
+    load();
+  };
+
+  const inputStyle = 'w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary/50';
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="rounded-xl border border-border/40 bg-card overflow-hidden"
+    >
+      <div className="px-5 py-3 border-b border-border/30 bg-emerald-500/5 flex items-center gap-2">
+        <ShoppingBag className="w-4 h-4 text-emerald-400" />
+        <h3 className="text-sm font-bold text-emerald-400">Shop — Amazon Affiliate Items</h3>
+      </div>
+      <div className="p-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">
+          <input className={inputStyle} placeholder="Title *" value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} />
+          <input className={inputStyle} placeholder="Price label (e.g. $49.99)" value={form.priceLabel} onChange={e => setForm(f => ({ ...f, priceLabel: e.target.value }))} />
+        </div>
+        <textarea className={cn(inputStyle, 'mb-2')} rows={2} placeholder="Description" value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">
+          <input className={inputStyle} placeholder="Image URL" value={form.imageUrl} onChange={e => setForm(f => ({ ...f, imageUrl: e.target.value }))} />
+          <input className={inputStyle} placeholder="Sort order (lower shows first)" type="number" value={form.sortOrder} onChange={e => setForm(f => ({ ...f, sortOrder: e.target.value }))} />
+        </div>
+        <input className={cn(inputStyle, 'mb-2')} placeholder="Amazon affiliate link *" value={form.amazonUrl} onChange={e => setForm(f => ({ ...f, amazonUrl: e.target.value }))} />
+
+        {error && <p className="text-xs text-red-400 mb-2">{error}</p>}
+
+        <div className="flex items-center gap-2">
+          <button
+            onClick={submit}
+            disabled={saving}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold bg-primary text-primary-foreground disabled:opacity-50"
+          >
+            {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : editingId ? <Edit3 className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
+            {editingId ? 'Save changes' : 'Add item'}
+          </button>
+          {editingId && (
+            <button onClick={cancelEdit} className="px-3 py-2 rounded-lg text-xs font-bold bg-white/5 text-muted-foreground">
+              Cancel
+            </button>
+          )}
+        </div>
+
+        <div className="mt-5 pt-4 border-t border-border/20">
+          {loading ? (
+            <div className="flex justify-center py-6"><Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /></div>
+          ) : items.length === 0 ? (
+            <p className="text-xs text-muted-foreground text-center py-4">No shop items yet -- add one above.</p>
+          ) : (
+            <div className="space-y-2">
+              {items.map((item) => (
+                <div key={item.id} className="flex items-center gap-3 p-3 rounded-lg bg-white/5 border border-white/5">
+                  {item.imageUrl ? (
+                    <img src={item.imageUrl} alt="" className="w-10 h-10 rounded-md object-contain bg-black/30 shrink-0" />
+                  ) : (
+                    <div className="w-10 h-10 rounded-md bg-black/30 shrink-0 flex items-center justify-center"><ShoppingBag className="w-4 h-4 text-muted-foreground" /></div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-bold text-foreground truncate">{item.title}</p>
+                    <p className="text-[10px] text-muted-foreground truncate">{item.amazonUrl}</p>
+                  </div>
+                  {item.priceLabel && <span className="text-xs font-bold text-primary shrink-0">{item.priceLabel}</span>}
+                  <button onClick={() => startEdit(item)} className="p-1.5 rounded-md hover:bg-white/10 shrink-0"><Edit3 className="w-3.5 h-3.5 text-blue-400" /></button>
+                  <button onClick={() => remove(item.id)} className="p-1.5 rounded-md hover:bg-white/10 shrink-0"><Trash2 className="w-3.5 h-3.5 text-red-400" /></button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </motion.div>
   );
 }
 

@@ -102,6 +102,7 @@ const GameLookup = lazy(() => import("@/pages/GameLookup").then(m => ({ default:
 const Subscription = lazy(() => import("@/pages/Subscription").then(m => ({ default: m.Subscription })));
 const Profile = lazy(() => import("@/pages/Profile").then(m => ({ default: m.Profile })));
 const Puzzles = lazy(() => import("@/pages/Puzzles").then(m => ({ default: m.Puzzles })));
+const ShopPage = lazy(() => import("@/pages/Shop").then(m => ({ default: m.ShopPage })));
 const SolvedPuzzles = lazy(() => import("@/pages/SolvedPuzzles"));
 const ScanPosition = lazy(() => import("@/pages/ScanPosition").then(m => ({ default: m.ScanPosition })));
 const Admin = lazy(() => import("@/pages/Admin").then(m => ({ default: m.Admin })));
@@ -196,6 +197,7 @@ const PGameLookup    = () => <ProtectedRoute component={GameLookup} />;
 const PSubscription  = () => <ProtectedRoute component={Subscription} />;
 const PProfile       = () => <ProtectedRoute component={Profile} />;
 const PPuzzles       = () => <ProtectedRoute component={Puzzles} />;
+const PShop          = () => <ProtectedRoute component={ShopPage} />;
 const PSolvedPuzzles = () => <ProtectedRoute component={SolvedPuzzles} />;
 const PScanPosition  = () => <ProtectedRoute component={ScanPosition} />;
 const PAdmin         = () => <ProtectedRoute component={Admin} />;
@@ -288,6 +290,7 @@ function Router() {
       <Route path="/live/history"    component={PLiveHistory} />
       <Route path="/lookup"          component={PGameLookup} />
       <Route path="/puzzles"          component={PPuzzles} />
+      <Route path="/shop"             component={PShop} />
       <Route path="/puzzles/solved"   component={PSolvedPuzzles} />
       <Route path="/scan"             component={PScanPosition} />
       <Route path="/admin"            component={PAdmin} />
