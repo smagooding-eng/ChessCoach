@@ -24,7 +24,7 @@ router.get("/shop", async (_req: Request, res: Response) => {
     const items = await db.select().from(shopItemsTable).orderBy(asc(shopItemsTable.sortOrder), asc(shopItemsTable.createdAt));
     res.json({ items });
   } catch (err: any) {
-    res.status(500).json({ error: "Failed to load shop items" });
+    res.status(500).json({ error: "Failed to load shop items", details: err.message });
   }
 });
 
@@ -35,7 +35,7 @@ router.get("/admin/shop-items", requireAdmin, async (_req: Request, res: Respons
     const items = await db.select().from(shopItemsTable).orderBy(asc(shopItemsTable.sortOrder), asc(shopItemsTable.createdAt));
     res.json({ items });
   } catch (err: any) {
-    res.status(500).json({ error: "Failed to load shop items" });
+    res.status(500).json({ error: "Failed to load shop items", details: err.message });
   }
 });
 
@@ -212,7 +212,7 @@ router.post("/admin/shop-items/fetch-preview", requireAdmin, async (req: Request
       priceLabel,
     });
   } catch (err: any) {
-    res.status(500).json({ error: "Failed to fetch preview." });
+    res.status(500).json({ error: "Failed to fetch preview.", details: err.message });
   }
 });
 
@@ -250,7 +250,7 @@ router.post("/admin/shop-items", requireAdmin, async (req: Request, res: Respons
     }).returning();
     res.json({ item: created });
   } catch (err: any) {
-    res.status(500).json({ error: "Failed to create shop item" });
+    res.status(500).json({ error: "Failed to create shop item", details: err.message });
   }
 });
 
@@ -283,7 +283,7 @@ router.put("/admin/shop-items/:id", requireAdmin, async (req: Request, res: Resp
     }
     res.json({ item: updated });
   } catch (err: any) {
-    res.status(500).json({ error: "Failed to update shop item" });
+    res.status(500).json({ error: "Failed to update shop item", details: err.message });
   }
 });
 
@@ -297,7 +297,7 @@ router.delete("/admin/shop-items/:id", requireAdmin, async (req: Request, res: R
     }
     res.json({ success: true });
   } catch (err: any) {
-    res.status(500).json({ error: "Failed to delete shop item" });
+    res.status(500).json({ error: "Failed to delete shop item", details: err.message });
   }
 });
 

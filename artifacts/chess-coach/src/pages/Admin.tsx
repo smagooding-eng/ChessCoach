@@ -2045,14 +2045,24 @@ function ShopManagementPanel() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [loadError, setLoadError] = useState('');
   const [fetchingPreview, setFetchingPreview] = useState(false);
   const [previewWarning, setPreviewWarning] = useState('');
 
   const load = useCallback(() => {
     setLoading(true);
+    setLoadError('');
     apiFetch('/api/admin/shop-items', { credentials: 'include' })
-      .then(r => r.ok ? r.json() : { items: [] })
+      .then(async r => {
+        const d = await r.json();
+        if (!r.ok) {
+          setLoadError(d.details ? `${d.error} — ${d.details}` : (d.error || 'Failed to load shop items.'));
+          return { items: [] };
+        }
+        return d;
+      })
       .then(d => setItems(d.items ?? []))
+      .catch(() => setLoadError('Connection error while loading shop items.'))
       .finally(() => setLoading(false));
   }, []);
 
@@ -2146,7 +2156,7 @@ function ShopManagementPanel() {
       );
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error || 'Failed to save.');
+        setError(data.details ? `${data.error} — ${data.details}` : (data.error || 'Failed to save.'));
         return;
       }
       cancelEdit();
@@ -2230,6 +2240,7 @@ function ShopManagementPanel() {
         </div>
 
         <div className="mt-5 pt-4 border-t border-border/20">
+          {loadError && <p className="text-xs text-red-400 mb-3">{loadError}</p>}
           {loading ? (
             <div className="flex justify-center py-6"><Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /></div>
           ) : items.length === 0 ? (
