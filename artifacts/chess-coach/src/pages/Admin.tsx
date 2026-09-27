@@ -2045,6 +2045,8 @@ function ShopManagementPanel() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [fetchingPreview, setFetchingPreview] = useState(false);
+  const [previewWarning, setPreviewWarning] = useState('');
 
   const load = useCallback(() => {
     setLoading(true);
@@ -2073,6 +2075,48 @@ function ShopManagementPanel() {
     setEditingId(null);
     setForm(EMPTY_SHOP_FORM);
     setError('');
+    setPreviewWarning('');
+  };
+
+  // Pulls title/description/image/price from the pasted Amazon link,
+  // the same way a social-media link preview does -- Open Graph tags.
+  // Amazon is known to block or rate-limit automated requests, so this
+  // is best-effort: any field it can't find is left alone rather than
+  // being blanked out, and a clear warning shows if the fetch came back
+  // empty so the admin knows to fill things in by hand instead.
+  const fetchPreview = async () => {
+    if (!form.amazonUrl.trim()) {
+      setError('Paste the Amazon link first, then fetch.');
+      return;
+    }
+    setFetchingPreview(true);
+    setError('');
+    setPreviewWarning('');
+    try {
+      const res = await apiFetch('/api/admin/shop-items/fetch-preview', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: form.amazonUrl.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || 'Could not fetch details from that link.');
+        return;
+      }
+      if (data.warning) setPreviewWarning(data.warning);
+      setForm(f => ({
+        ...f,
+        title: data.title || f.title,
+        description: data.description || f.description,
+        imageUrl: data.imageUrl || f.imageUrl,
+        priceLabel: data.priceLabel || f.priceLabel,
+      }));
+    } catch {
+      setError('Connection error while fetching preview.');
+    } finally {
+      setFetchingPreview(false);
+    }
   };
 
   const submit = async () => {
@@ -2134,6 +2178,29 @@ function ShopManagementPanel() {
         <h3 className="text-sm font-bold text-emerald-400">Shop — Amazon Affiliate Items</h3>
       </div>
       <div className="p-4">
+        <div className="flex items-center gap-2 mb-2">
+          <input
+            className={cn(inputStyle, 'flex-1')}
+            placeholder="Paste Amazon affiliate link, then Fetch *"
+            value={form.amazonUrl}
+            onChange={e => setForm(f => ({ ...f, amazonUrl: e.target.value }))}
+          />
+          <button
+            onClick={fetchPreview}
+            disabled={fetchingPreview || !form.amazonUrl.trim()}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold bg-blue-500/20 text-blue-400 disabled:opacity-40 shrink-0"
+          >
+            {fetchingPreview ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+            Fetch details
+          </button>
+        </div>
+        {previewWarning && (
+          <p className="text-[11px] text-orange-400 mb-2">{previewWarning}</p>
+        )}
+        <p className="text-[10px] text-muted-foreground mb-3">
+          Fetch pulls the title, image, description, and price straight from the page (the same info a social-media link preview shows) -- Amazon sometimes blocks automated requests, so double-check what comes back and fill in anything missing by hand.
+        </p>
+
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">
           <input className={inputStyle} placeholder="Title *" value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} />
           <input className={inputStyle} placeholder="Price label (e.g. $49.99)" value={form.priceLabel} onChange={e => setForm(f => ({ ...f, priceLabel: e.target.value }))} />
@@ -2143,7 +2210,6 @@ function ShopManagementPanel() {
           <input className={inputStyle} placeholder="Image URL" value={form.imageUrl} onChange={e => setForm(f => ({ ...f, imageUrl: e.target.value }))} />
           <input className={inputStyle} placeholder="Sort order (lower shows first)" type="number" value={form.sortOrder} onChange={e => setForm(f => ({ ...f, sortOrder: e.target.value }))} />
         </div>
-        <input className={cn(inputStyle, 'mb-2')} placeholder="Amazon affiliate link *" value={form.amazonUrl} onChange={e => setForm(f => ({ ...f, amazonUrl: e.target.value }))} />
 
         {error && <p className="text-xs text-red-400 mb-2">{error}</p>}
 
