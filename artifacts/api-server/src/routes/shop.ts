@@ -79,7 +79,7 @@ router.post("/admin/shop-items", requireAdmin, async (req: Request, res: Respons
 
 router.put("/admin/shop-items/:id", requireAdmin, async (req: Request, res: Response) => {
   try {
-    const { id } = req.params;
+    const id = String(req.params.id);
     const { title, description, imageUrl, amazonUrl, priceLabel, sortOrder } = req.body as {
       title?: string; description?: string; imageUrl?: string; amazonUrl?: string; priceLabel?: string; sortOrder?: number;
     };
@@ -112,7 +112,7 @@ router.put("/admin/shop-items/:id", requireAdmin, async (req: Request, res: Resp
 
 router.delete("/admin/shop-items/:id", requireAdmin, async (req: Request, res: Response) => {
   try {
-    const { id } = req.params;
+    const id = String(req.params.id);
     const [deleted] = await db.delete(shopItemsTable).where(eq(shopItemsTable.id, id)).returning();
     if (!deleted) {
       res.status(404).json({ error: "Shop item not found" });
