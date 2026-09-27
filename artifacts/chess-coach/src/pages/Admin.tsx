@@ -2208,7 +2208,7 @@ function ShopManagementPanel() {
           <p className="text-[11px] text-orange-400 mb-2">{previewWarning}</p>
         )}
         <p className="text-[10px] text-muted-foreground mb-3">
-          Fetch tries Microlink first (a real headless-browser service built to get past bot detection), then falls back to a direct request. Pulls title, image, and description reliably; price isn't exposed as standard page metadata so it usually still needs to be typed in by hand.
+          Fetch tries Microlink first (a real headless-browser service built to get past bot detection), then makes a best-effort attempt at price on top of that. Title, image, and description come through reliably; price is a bonus when it works, but Amazon doesn't expose it as standard page metadata, so it often still needs to be typed in by hand.
         </p>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">

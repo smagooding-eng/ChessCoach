@@ -24,7 +24,7 @@ router.get("/shop", async (_req: Request, res: Response) => {
     const items = await db.select().from(shopItemsTable).orderBy(asc(shopItemsTable.sortOrder), asc(shopItemsTable.createdAt));
     res.json({ items });
   } catch (err: any) {
-    res.status(500).json({ error: "Failed to load shop items", details: err.message });
+    res.status(500).json({ error: "Failed to load shop items", details: err.cause?.message ?? err.message });
   }
 });
 
@@ -35,7 +35,7 @@ router.get("/admin/shop-items", requireAdmin, async (_req: Request, res: Respons
     const items = await db.select().from(shopItemsTable).orderBy(asc(shopItemsTable.sortOrder), asc(shopItemsTable.createdAt));
     res.json({ items });
   } catch (err: any) {
-    res.status(500).json({ error: "Failed to load shop items", details: err.message });
+    res.status(500).json({ error: "Failed to load shop items", details: err.cause?.message ?? err.message });
   }
 });
 
@@ -91,6 +91,30 @@ function extractPrice(html: string): string | null {
   return null;
 }
 
+// Best-effort supplementary step, used only once Microlink already
+// succeeded for title/image/description -- tries a plain fetch purely to
+// scavenge a price using the existing regex patterns. Fully non-blocking:
+// any failure here (blocked, timeout, no match) just leaves price null
+// for manual entry, since the rest of the response is already good.
+async function tryExtractPriceViaRawFetch(url: string): Promise<string | null> {
+  try {
+    const res = await fetch(url, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+      },
+      redirect: "follow",
+      signal: AbortSignal.timeout(8_000),
+    });
+    if (!res.ok) return null;
+    const html = await res.text();
+    return extractPrice(html);
+  } catch {
+    return null;
+  }
+}
+
 router.post("/admin/shop-items/fetch-preview", requireAdmin, async (req: Request, res: Response) => {
   try {
     const { url } = req.body as { url?: string };
@@ -132,15 +156,20 @@ router.post("/admin/shop-items/fetch-preview", requireAdmin, async (req: Request
         const mTitle = microlinkJson.data.title ?? null;
         const mImage = microlinkJson.data.image?.url ?? null;
         if (mTitle && !isGenericTitle(mTitle)) {
+          // Microlink's free metadata tier doesn't return price itself --
+          // that's real product-catalog data, not standard page metadata,
+          // and genuinely needs Amazon's own Product Advertising API to
+          // get reliably. This is a best-effort bonus attempt on top of
+          // Microlink's already-good result, not a guarantee: it tries a
+          // plain fetch and the same regex patterns the raw-fetch
+          // fallback uses, purely to see if a price happens to be sitting
+          // in the page's initial HTML.
+          const priceLabel = await tryExtractPriceViaRawFetch(parsedUrl.toString());
           res.json({
             title: mTitle.trim(),
             description: microlinkJson.data.description?.trim().slice(0, 500) ?? null,
             imageUrl: mImage,
-            // Microlink's free metadata tier doesn't return price --
-            // that's a separate, more involved product-data extraction
-            // Amazon doesn't expose as a standard meta tag. Left for
-            // manual entry, called out below in the UI copy.
-            priceLabel: null,
+            priceLabel,
           });
           return;
         }
@@ -212,7 +241,7 @@ router.post("/admin/shop-items/fetch-preview", requireAdmin, async (req: Request
       priceLabel,
     });
   } catch (err: any) {
-    res.status(500).json({ error: "Failed to fetch preview.", details: err.message });
+    res.status(500).json({ error: "Failed to fetch preview.", details: err.cause?.message ?? err.message });
   }
 });
 
@@ -250,7 +279,7 @@ router.post("/admin/shop-items", requireAdmin, async (req: Request, res: Respons
     }).returning();
     res.json({ item: created });
   } catch (err: any) {
-    res.status(500).json({ error: "Failed to create shop item", details: err.message });
+    res.status(500).json({ error: "Failed to create shop item", details: err.cause?.message ?? err.message });
   }
 });
 
@@ -283,7 +312,7 @@ router.put("/admin/shop-items/:id", requireAdmin, async (req: Request, res: Resp
     }
     res.json({ item: updated });
   } catch (err: any) {
-    res.status(500).json({ error: "Failed to update shop item", details: err.message });
+    res.status(500).json({ error: "Failed to update shop item", details: err.cause?.message ?? err.message });
   }
 });
 
@@ -297,7 +326,7 @@ router.delete("/admin/shop-items/:id", requireAdmin, async (req: Request, res: R
     }
     res.json({ success: true });
   } catch (err: any) {
-    res.status(500).json({ error: "Failed to delete shop item", details: err.message });
+    res.status(500).json({ error: "Failed to delete shop item", details: err.cause?.message ?? err.message });
   }
 });
 
