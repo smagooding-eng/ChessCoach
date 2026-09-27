@@ -92,11 +92,15 @@ function extractPrice(html: string): string | null {
 }
 
 // Best-effort supplementary step, used only once Microlink already
-// succeeded for title/image/description -- tries a plain fetch purely to
-// scavenge a price using the existing regex patterns. Fully non-blocking:
-// any failure here (blocked, timeout, no match) just leaves price null
-// for manual entry, since the rest of the response is already good.
-async function tryExtractPriceViaRawFetch(url: string): Promise<string | null> {
+// succeeded for title (and maybe more) -- tries a plain fetch purely to
+// scavenge whatever Microlink's result is missing (price, and/or image
+// if Microlink didn't find one -- some product pages load their main
+// image via a JS-driven gallery component rather than a simple og:image
+// tag, which a raw HTML fetch's regex-based extraction sometimes still
+// catches even when Microlink's parsed result didn't). Fully
+// non-blocking: any failure here just leaves those fields null for
+// manual entry, since the rest of the response is already good.
+async function tryRawFetchSupplement(url: string): Promise<{ priceLabel: string | null; imageUrl: string | null }> {
   try {
     const res = await fetch(url, {
       headers: {
@@ -107,11 +111,14 @@ async function tryExtractPriceViaRawFetch(url: string): Promise<string | null> {
       redirect: "follow",
       signal: AbortSignal.timeout(8_000),
     });
-    if (!res.ok) return null;
+    if (!res.ok) return { priceLabel: null, imageUrl: null };
     const html = await res.text();
-    return extractPrice(html);
+    return {
+      priceLabel: extractPrice(html),
+      imageUrl: extractMetaContent(html, "og:image"),
+    };
   } catch {
-    return null;
+    return { priceLabel: null, imageUrl: null };
   }
 }
 
@@ -159,17 +166,20 @@ router.post("/admin/shop-items/fetch-preview", requireAdmin, async (req: Request
           // Microlink's free metadata tier doesn't return price itself --
           // that's real product-catalog data, not standard page metadata,
           // and genuinely needs Amazon's own Product Advertising API to
-          // get reliably. This is a best-effort bonus attempt on top of
-          // Microlink's already-good result, not a guarantee: it tries a
-          // plain fetch and the same regex patterns the raw-fetch
-          // fallback uses, purely to see if a price happens to be sitting
-          // in the page's initial HTML.
-          const priceLabel = await tryExtractPriceViaRawFetch(parsedUrl.toString());
+          // get reliably. And if Microlink didn't find an image either
+          // (some product pages load it via a JS gallery rather than a
+          // simple og:image tag), a raw fetch's regex-based extraction
+          // sometimes still catches what Microlink's parser missed. This
+          // supplementary attempt always runs (for the price shot) and
+          // covers the image gap too when needed -- fully best-effort.
+          const supplement = await tryRawFetchSupplement(parsedUrl.toString());
+          const finalImage = mImage ?? supplement.imageUrl;
           res.json({
             title: mTitle.trim(),
             description: microlinkJson.data.description?.trim().slice(0, 500) ?? null,
-            imageUrl: mImage,
-            priceLabel,
+            imageUrl: finalImage,
+            priceLabel: supplement.priceLabel,
+            warning: finalImage ? undefined : "Found the title and description, but couldn't find a product image on this page -- paste one in manually, or double-check the link.",
           });
           return;
         }
