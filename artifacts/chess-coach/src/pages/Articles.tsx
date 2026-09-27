@@ -101,6 +101,7 @@ export function ArticlePage() {
       );
       return setArticleStructuredData(article);
     }
+    return undefined;
   }, [article]);
 
   if (loading) {
