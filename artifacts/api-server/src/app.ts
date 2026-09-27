@@ -3,6 +3,7 @@ import cors from "cors";
 import cookieParser from "cookie-parser";
 import pinoHttp from "pino-http";
 import router from "./routes";
+import sitemapRouter from "./routes/sitemap";
 import { logger } from "./lib/logger";
 import { authMiddleware } from "./middlewares/authMiddleware";
 import { WebhookHandlers } from "./lib/webhookHandlers";
@@ -111,6 +112,10 @@ app.use(express.json({ limit: '20mb' }));
 app.use(express.urlencoded({ extended: true, limit: '2mb' }));
 app.use(authMiddleware);
 
+// Mounted at root, not under /api -- needs to be reachable at exactly
+// /sitemap.xml so a Vercel rewrite can proxy chessscout.net/sitemap.xml
+// straight to this route with a clean 1:1 path mapping.
+app.use(sitemapRouter);
 app.use("/api", router);
 
 export default app;
