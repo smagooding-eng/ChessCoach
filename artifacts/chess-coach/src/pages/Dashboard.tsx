@@ -227,38 +227,37 @@ export function Dashboard() {
         </div>
       </div>
 
-      <Link href="/scan" className="block px-3 md:px-0">
-        <div className="relative overflow-hidden rounded-2xl p-5 md:p-6 transition-all group cursor-pointer flex items-center gap-4 md:gap-5"
-          style={{
-            background: 'linear-gradient(180deg, #383532 0%, #2a2825 100%)',
-            border: `1px solid rgba(129,182,76,0.3)`,
-            boxShadow: '0 12px 32px -8px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.05)',
-          }}
-          onMouseEnter={(e) => (e.currentTarget.style.borderColor = 'rgba(129,182,76,0.5)')}
-          onMouseLeave={(e) => (e.currentTarget.style.borderColor = 'rgba(129,182,76,0.3)')}>
-          <div className="relative">
-            <BoardThumb size={84} />
-            <div className="absolute -bottom-1.5 -right-1.5 w-8 h-8 rounded-full flex items-center justify-center" style={{ background: `linear-gradient(135deg, #95c45a, ${CHESSCOM_GREEN})`, boxShadow: '0 4px 10px rgba(0,0,0,0.5)' }}>
-              <Camera className="w-4 h-4 text-white" />
-            </div>
-          </div>
-          <div className="flex-1 min-w-0 relative">
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-[0.18em] mb-1.5" style={{ background: 'rgba(129,182,76,0.25)', color: CHESSCOM_GREEN, border: '1px solid rgba(129,182,76,0.4)' }}>
-              <Zap className="w-2.5 h-2.5" /> Coach
-            </span>
-            <h3 className="font-semibold text-lg md:text-2xl leading-tight" style={{ color: TEXT_LIGHT, letterSpacing: '-0.02em' }}>
-              Seen a position worth studying?
-            </h3>
-            <p className="text-sm md:text-base font-bold mt-0.5" style={{ color: CHESSCOM_GREEN }}>
-              Snap a photo and explore it on the board
-            </p>
-          </div>
-          <div className="shrink-0 w-10 h-10 rounded-xl flex items-center justify-center transition-all group-hover:translate-x-1"
-            style={{ background: '#211f1c', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.05), inset 0 2px 4px rgba(0,0,0,0.4)' }}>
-            <ArrowUpRight className="w-5 h-5" style={{ color: CHESSCOM_GREEN }} />
-          </div>
-        </div>
-      </Link>
+      <div className="px-3 md:px-0">
+          <DashCard title="Key Weaknesses" visual={<PieceTile piece="♚" />} linkHref="/analysis" linkText="Full Analysis">
+            {weaknesses?.weaknesses?.length ? (
+              <div className="relative">
+                <div className="space-y-1.5">
+                  {weaknesses.weaknesses.slice(0, 3).map((w) => {
+                    const sev = SEV_COLORS[w.severity] ?? SEV_COLORS.Low;
+                    return (
+                      <Link key={w.id} href={`/analysis/${w.id}`}>
+                        <div className="group flex items-start gap-2.5 p-3 rounded-xl transition-colors cursor-pointer" style={{ background: 'transparent' }}
+                          onMouseEnter={e => (e.currentTarget.style.background = BG_CARD_HOVER)}
+                          onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                          <span className="mt-px px-1.5 py-px rounded text-[10px] font-bold shrink-0" style={{ background: sev.bg, color: sev.text }}>
+                            {w.severity}
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <p className="font-bold text-sm" style={{ color: TEXT_LIGHT }}>{w.category}</p>
+                            <p className="text-xs line-clamp-1 mt-0.5" style={{ color: TEXT_MUTED }}>{w.description}</p>
+                          </div>
+                          <ChevronRight className="w-3.5 h-3.5 shrink-0 mt-1 opacity-0 group-hover:opacity-60 transition-opacity" style={{ color: TEXT_MUTED }} />
+                        </div>
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : (
+              <EmptyState icon={<Target className="w-7 h-7" />} text="No weaknesses found yet." linkHref="/analysis" linkText="Run Deep Analysis →" />
+            )}
+          </DashCard>
+      </div>
 
       <div className="px-3 md:px-0">
         <DashCard title="Recent Games" visual={<PieceTile piece="♜" />} linkHref="/games" linkText="All Games">
@@ -300,6 +299,76 @@ export function Dashboard() {
         </DashCard>
       </div>
 
+      <Link href="/analysis" className="block px-3 md:px-0">
+        <div className="relative overflow-hidden rounded-2xl transition-all hover:scale-[1.01] active:scale-[0.99]"
+          style={{
+            background: 'linear-gradient(180deg, #383532 0%, #2a2825 100%)',
+            border: '1px solid rgba(255,255,255,0.06)',
+            boxShadow: '0 18px 50px -16px rgba(0,0,0,0.6), 0 4px 16px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04)',
+          }}>
+
+          <div className="relative grid grid-cols-2 sm:grid-cols-4">
+            {[
+              { label: 'Total Games', value: summary?.totalGames?.toLocaleString() || '0', icon: Trophy },
+              { label: 'Win Rate', value: `${winRate}%`, icon: Target },
+              { label: 'Avg Rating', value: Math.round(summary?.avgRating || 0) || '—', icon: TrendingUp },
+              { label: 'Reviewed', value: reviewedCount, icon: Activity },
+            ].map((s, i) => {
+              const isLeftColMobile = i % 2 === 0;
+              const isTopRowMobile = i < 2;
+              return (
+                <div key={s.label} className="px-3 py-2.5"
+                  style={{
+                    borderRight: isLeftColMobile ? '1px solid rgba(255,255,255,0.05)' : undefined,
+                    borderBottom: isTopRowMobile ? '1px solid rgba(255,255,255,0.05)' : undefined,
+                  }}>
+                  <div className="flex items-center gap-1 mb-0.5">
+                    <s.icon className="w-3 h-3" style={{ color: TEXT_MUTED }} />
+                    <p className="text-[9px] font-semibold uppercase tracking-[0.14em] leading-none" style={{ color: TEXT_MUTED }}>{s.label}</p>
+                  </div>
+                  <p className={t.numeric} style={{ fontSize: '1.05rem', lineHeight: 1.3, color: TEXT_LIGHT }}>{s.value}</p>
+                </div>
+              );
+            })}
+          </div>
+          <div className="relative flex items-center justify-center gap-1 py-2 text-[11px] font-bold" style={{ color: CHESSCOM_GREEN, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+            See Full Analysis <ChevronRight className="w-3 h-3" />
+          </div>
+        </div>
+      </Link>
+
+      <Link href="/scan" className="block px-3 md:px-0">
+        <div className="relative overflow-hidden rounded-2xl p-5 md:p-6 transition-all group cursor-pointer flex items-center gap-4 md:gap-5"
+          style={{
+            background: 'linear-gradient(180deg, #383532 0%, #2a2825 100%)',
+            border: `1px solid rgba(129,182,76,0.3)`,
+            boxShadow: '0 12px 32px -8px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.05)',
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.borderColor = 'rgba(129,182,76,0.5)')}
+          onMouseLeave={(e) => (e.currentTarget.style.borderColor = 'rgba(129,182,76,0.3)')}>
+          <div className="relative">
+            <BoardThumb size={84} />
+            <div className="absolute -bottom-1.5 -right-1.5 w-8 h-8 rounded-full flex items-center justify-center" style={{ background: `linear-gradient(135deg, #95c45a, ${CHESSCOM_GREEN})`, boxShadow: '0 4px 10px rgba(0,0,0,0.5)' }}>
+              <Camera className="w-4 h-4 text-white" />
+            </div>
+          </div>
+          <div className="flex-1 min-w-0 relative">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-[0.18em] mb-1.5" style={{ background: 'rgba(129,182,76,0.25)', color: CHESSCOM_GREEN, border: '1px solid rgba(129,182,76,0.4)' }}>
+              <Zap className="w-2.5 h-2.5" /> Coach
+            </span>
+            <h3 className="font-semibold text-lg md:text-2xl leading-tight" style={{ color: TEXT_LIGHT, letterSpacing: '-0.02em' }}>
+              Seen a position worth studying?
+            </h3>
+            <p className="text-sm md:text-base font-bold mt-0.5" style={{ color: CHESSCOM_GREEN }}>
+              Snap a photo and explore it on the board
+            </p>
+          </div>
+          <div className="shrink-0 w-10 h-10 rounded-xl flex items-center justify-center transition-all group-hover:translate-x-1"
+            style={{ background: '#211f1c', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.05), inset 0 2px 4px rgba(0,0,0,0.4)' }}>
+            <ArrowUpRight className="w-5 h-5" style={{ color: CHESSCOM_GREEN }} />
+          </div>
+        </div>
+      </Link>
 
       <div className="grid grid-cols-2 gap-3 px-3 md:px-0">
         <Link href="/play" className="block">
@@ -406,76 +475,8 @@ export function Dashboard() {
         </Link>
       </div>
 
-      <Link href="/analysis" className="block px-3 md:px-0">
-        <div className="relative overflow-hidden rounded-2xl transition-all hover:scale-[1.01] active:scale-[0.99]"
-          style={{
-            background: 'linear-gradient(180deg, #383532 0%, #2a2825 100%)',
-            border: '1px solid rgba(255,255,255,0.06)',
-            boxShadow: '0 18px 50px -16px rgba(0,0,0,0.6), 0 4px 16px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04)',
-          }}>
-
-          <div className="relative grid grid-cols-2 sm:grid-cols-4">
-            {[
-              { label: 'Total Games', value: summary?.totalGames?.toLocaleString() || '0', icon: Trophy },
-              { label: 'Win Rate', value: `${winRate}%`, icon: Target },
-              { label: 'Avg Rating', value: Math.round(summary?.avgRating || 0) || '—', icon: TrendingUp },
-              { label: 'Reviewed', value: reviewedCount, icon: Activity },
-            ].map((s, i) => {
-              const isLeftColMobile = i % 2 === 0;
-              const isTopRowMobile = i < 2;
-              return (
-                <div key={s.label} className="px-3 py-2.5"
-                  style={{
-                    borderRight: isLeftColMobile ? '1px solid rgba(255,255,255,0.05)' : undefined,
-                    borderBottom: isTopRowMobile ? '1px solid rgba(255,255,255,0.05)' : undefined,
-                  }}>
-                  <div className="flex items-center gap-1 mb-0.5">
-                    <s.icon className="w-3 h-3" style={{ color: TEXT_MUTED }} />
-                    <p className="text-[9px] font-semibold uppercase tracking-[0.14em] leading-none" style={{ color: TEXT_MUTED }}>{s.label}</p>
-                  </div>
-                  <p className={t.numeric} style={{ fontSize: '1.05rem', lineHeight: 1.3, color: TEXT_LIGHT }}>{s.value}</p>
-                </div>
-              );
-            })}
-          </div>
-          <div className="relative flex items-center justify-center gap-1 py-2 text-[11px] font-bold" style={{ color: CHESSCOM_GREEN, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-            See Full Analysis <ChevronRight className="w-3 h-3" />
-          </div>
-        </div>
-      </Link>
-
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 md:gap-4 px-3 md:px-0">
         <div className="lg:col-span-2 space-y-3 md:space-y-4">
-
-          <DashCard title="Key Weaknesses" visual={<PieceTile piece="♚" />} linkHref="/analysis" linkText="Full Analysis">
-            {weaknesses?.weaknesses?.length ? (
-              <div className="relative">
-                <div className="space-y-1.5">
-                  {weaknesses.weaknesses.slice(0, 3).map((w) => {
-                    const sev = SEV_COLORS[w.severity] ?? SEV_COLORS.Low;
-                    return (
-                      <Link key={w.id} href={`/analysis/${w.id}`}>
-                        <div className="group flex items-start gap-2.5 p-3 rounded-xl transition-colors cursor-pointer" style={{ background: 'transparent' }}
-                          onMouseEnter={e => (e.currentTarget.style.background = BG_CARD_HOVER)}
-                          onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-                          <span className="mt-px px-1.5 py-px rounded text-[10px] font-bold shrink-0" style={{ background: sev.bg, color: sev.text }}>
-                            {w.severity}
-                          </span>
-                          <div className="min-w-0 flex-1">
-                            <p className="font-bold text-sm" style={{ color: TEXT_LIGHT }}>{w.category}</p>
-                            <p className="text-xs line-clamp-1 mt-0.5" style={{ color: TEXT_MUTED }}>{w.description}</p>
-                          </div>
-                          <ChevronRight className="w-3.5 h-3.5 shrink-0 mt-1 opacity-0 group-hover:opacity-60 transition-opacity" style={{ color: TEXT_MUTED }} />
-                        </div>
-                      </Link>
-                    );
-                  })}
-                </div>
-              </div>
-            ) : (
-              <EmptyState icon={<Target className="w-7 h-7" />} text="No weaknesses found yet." linkHref="/analysis" linkText="Run Deep Analysis →" />
-            )}
-          </DashCard>
 
           <Link href="/opponents" className="block">
             <div className="relative overflow-hidden rounded-2xl p-4 md:p-5 transition-colors group cursor-pointer"
