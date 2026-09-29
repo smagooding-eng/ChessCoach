@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { apiFetch } from '@/lib/api';
 import { useMyAnalysisSummary, useMyWeaknesses } from '@/hooks/use-analysis';
 import { useMyCourses } from '@/hooks/use-courses';
-import { useMyGames, useImportChessGames } from '@/hooks/use-games';
+import { useMyGames } from '@/hooks/use-games';
 import { GameThumb } from '@/components/GameThumb';
 import { Link } from 'wouter';
 import { Swords, Trophy, Target, AlertTriangle, BookOpen, Clock, GraduationCap, TrendingUp, ChevronRight, Search, Play, Bot, Camera, Lock, Crown, Flame, Zap, Award, Activity, Sparkles, ArrowUpRight, Share2, Puzzle, Crosshair, ShoppingBag } from 'lucide-react';
@@ -12,6 +12,7 @@ import { useChessPlayer } from '@/hooks/use-chess-player';
 import { useMultiEloProgress } from '@/hooks/use-elo-progress';
 import { useLiveRatings, bestLiveRating } from '@/hooks/use-live-ratings';
 import { EmailVerifyBanner } from '@/components/EmailVerifyBanner';
+import { trackImportJob } from '@/components/ImportStatusWatcher';
 import { CHESSCOM_GREEN, BRASS, TEXT_LIGHT, TEXT_MUTED, t, PieceTile } from '@/components/DesignSystem';
 import { ReferralCard } from '@/pages/Profile';
 
@@ -46,34 +47,57 @@ export function Dashboard() {
   const { data: weaknesses } = useMyWeaknesses();
   const { data: coursesData } = useMyCourses();
   const { data: gamesData } = useMyGames(5);
-  const { importGames } = useImportChessGames();
 
   // Auto-fetch new games on load, instead of requiring a manual "Import"
-  // click every visit. Small months=1 window deliberately -- this runs
-  // on every dashboard load, so it's meant as a lightweight "catch
-  // anything new since last time" check, not a full resync. The import
-  // endpoint already treats existing games as updates rather than
-  // duplicates, so calling this repeatedly is safe. Runs once per
-  // mount (the ref guard also protects against React StrictMode's
-  // double-invoke in dev); failures (rate limit, free-tier import cap,
-  // network) are swallowed silently since this is a background
-  // convenience, not a user-initiated action -- a manual Import still
-  // works normally and would surface its own errors.
+  // click every visit. Uses the SAME background-job endpoint and the
+  // SAME global job tracker (ImportStatusWatcher, already mounted in
+  // App.tsx for every page) that the real Import page's "Import" button
+  // uses -- not the synchronous /api/games/import route, which nothing
+  // in the actual UI calls and isn't the real, tested path. Registering
+  // the job with trackImportJob means the already-running watcher polls
+  // it and invalidates the games/analysis caches on completion by
+  // itself; this effect doesn't need to poll or refetch anything.
+  // Small months=1 window deliberately -- this runs on every dashboard
+  // load, so it's meant as a lightweight "catch anything new since last
+  // time" check, not a full resync. Runs once per mount (the ref guard
+  // also covers React StrictMode's double-invoke in dev); failures
+  // (rate limit, free-tier import cap, network) are swallowed silently
+  // since this is a background convenience, not a user-initiated
+  // action -- a manual Import still works and surfaces its own errors.
   const autoImportedRef = useRef(false);
   useEffect(() => {
     if (autoImportedRef.current) return;
-    const platform: 'chesscom' | 'lichess' | null = authUser?.chesscomUsername
+    const platform: 'chesscom' | 'lichess' | null = username
       ? 'chesscom'
       : authUser?.lichessUsername
         ? 'lichess'
         : null;
-    const autoImportUsername = platform === 'chesscom' ? authUser?.chesscomUsername : authUser?.lichessUsername;
+    const autoImportUsername = platform === 'chesscom' ? username : authUser?.lichessUsername;
     if (!platform || !autoImportUsername) return;
     autoImportedRef.current = true;
-    importGames(autoImportUsername, 1, platform).catch(() => {
-      // Silent by design -- see comment above.
-    });
-  }, [authUser?.chesscomUsername, authUser?.lichessUsername, importGames]);
+
+    (async () => {
+      try {
+        const r = await apiFetch('/api/games/import-bg', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            username: autoImportUsername,
+            months: 1,
+            forceUpdate: false,
+            platform,
+            ownerUsername: username || autoImportUsername,
+          }),
+        });
+        if (!r.ok) return;
+        const { jobId } = await r.json() as { jobId: string };
+        if (jobId) trackImportJob(jobId, platform, autoImportUsername);
+      } catch {
+        // Silent by design -- see comment above.
+      }
+    })();
+  }, [username, authUser?.lichessUsername]);
 
   if (loadingSummary) {
     return (

@@ -37,12 +37,8 @@ export function useImportChessGames() {
   });
 
   return {
-    importGames: async (username: string, months: number = 3, platform?: 'chesscom' | 'lichess') => {
-      // platform isn't in the generated ImportGamesBody type (the OpenAPI
-      // spec is behind the actual backend route, which does accept it),
-      // but the backend reads it from the raw body regardless -- cast
-      // needed since the typed client wouldn't otherwise let us send it.
-      return importMutation.mutateAsync({ data: { username, months, ...(platform ? { platform } : {}) } as { username: string; months: number } });
+    importGames: async (username: string, months: number = 3) => {
+      return importMutation.mutateAsync({ data: { username, months } });
     },
     isImporting: importMutation.isPending,
     error: importMutation.error
