@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { apiFetch } from '@/lib/api';
 import { useMyAnalysisSummary, useMyWeaknesses } from '@/hooks/use-analysis';
 import { useMyCourses } from '@/hooks/use-courses';
-import { useMyGames } from '@/hooks/use-games';
+import { useMyGames, useImportChessGames } from '@/hooks/use-games';
 import { GameThumb } from '@/components/GameThumb';
 import { Link } from 'wouter';
 import { Swords, Trophy, Target, AlertTriangle, BookOpen, Clock, GraduationCap, TrendingUp, ChevronRight, Search, Play, Bot, Camera, Lock, Crown, Flame, Zap, Award, Activity, Sparkles, ArrowUpRight, Share2, Puzzle, Crosshair, ShoppingBag } from 'lucide-react';
@@ -46,6 +46,34 @@ export function Dashboard() {
   const { data: weaknesses } = useMyWeaknesses();
   const { data: coursesData } = useMyCourses();
   const { data: gamesData } = useMyGames(5);
+  const { importGames } = useImportChessGames();
+
+  // Auto-fetch new games on load, instead of requiring a manual "Import"
+  // click every visit. Small months=1 window deliberately -- this runs
+  // on every dashboard load, so it's meant as a lightweight "catch
+  // anything new since last time" check, not a full resync. The import
+  // endpoint already treats existing games as updates rather than
+  // duplicates, so calling this repeatedly is safe. Runs once per
+  // mount (the ref guard also protects against React StrictMode's
+  // double-invoke in dev); failures (rate limit, free-tier import cap,
+  // network) are swallowed silently since this is a background
+  // convenience, not a user-initiated action -- a manual Import still
+  // works normally and would surface its own errors.
+  const autoImportedRef = useRef(false);
+  useEffect(() => {
+    if (autoImportedRef.current) return;
+    const platform: 'chesscom' | 'lichess' | null = authUser?.chesscomUsername
+      ? 'chesscom'
+      : authUser?.lichessUsername
+        ? 'lichess'
+        : null;
+    const autoImportUsername = platform === 'chesscom' ? authUser?.chesscomUsername : authUser?.lichessUsername;
+    if (!platform || !autoImportUsername) return;
+    autoImportedRef.current = true;
+    importGames(autoImportUsername, 1, platform).catch(() => {
+      // Silent by design -- see comment above.
+    });
+  }, [authUser?.chesscomUsername, authUser?.lichessUsername, importGames]);
 
   if (loadingSummary) {
     return (
@@ -208,29 +236,46 @@ export function Dashboard() {
         </div>
       </Link>
 
-      <Link href="/opponents" className="block px-3 md:px-0">
-        <div className="relative overflow-hidden rounded-2xl p-4 md:p-5 transition-colors group cursor-pointer"
-          style={{
-            background: 'linear-gradient(180deg, #383532 0%, #2a2825 100%)',
-            border: `1px solid rgba(129,182,76,0.3)`,
-            boxShadow: '0 18px 50px -16px rgba(0,0,0,0.6), 0 4px 16px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04)',
-          }}
-          onMouseEnter={e => (e.currentTarget.style.borderColor = 'rgba(129,182,76,0.5)')}
-          onMouseLeave={e => (e.currentTarget.style.borderColor = 'rgba(129,182,76,0.3)')}>
-
-          <div className="relative flex items-center gap-3 mb-2.5">
-            <PieceTile piece="♞" size={48} />
-            <div className="flex-1 min-w-0">
-              <span className="inline-block text-[10px] font-semibold uppercase tracking-[0.18em]" style={{ color: CHESSCOM_GREEN }}>#1 Feature</span>
-              <h3 className="font-semibold text-base leading-tight" style={{ color: TEXT_LIGHT, letterSpacing: '-0.01em' }}>Opponent Scout</h3>
-            </div>
-            <ChevronRight className="w-4 h-4 shrink-0 opacity-40 group-hover:opacity-80 transition-opacity" style={{ color: CHESSCOM_GREEN }} />
+      <div className="px-3 md:px-0">
+        <DashCard title="Recent Games" visual={<PieceTile piece="♜" />} linkHref="/games" linkText="All Games">
+          <div className="space-y-0.5">
+            {gamesData?.games?.slice(0, 5).map((game, i) => {
+              const res = RESULT_COLORS[game.result] ?? RESULT_COLORS.draw;
+              const playedAsWhite = game.whiteUsername?.toLowerCase() === username?.toLowerCase();
+              return (
+                <Link key={game.id} href={`/games/${game.id}`} className="block">
+                  <div className="group flex items-center gap-3 p-2.5 rounded-xl transition-colors"
+                    onMouseEnter={e => (e.currentTarget.style.background = BG_CARD_HOVER)}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                    <GameThumb pgn={game.pgn} userColor={playedAsWhite ? 'white' : 'black'} size={56} />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="px-1.5 py-px rounded text-[10px] font-semibold shrink-0" style={{ background: res.bg, color: res.text }}>
+                          {game.result === 'win' ? 'WIN' : game.result === 'loss' ? 'LOSS' : 'DRAW'}
+                        </span>
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.18em]" style={{ color: TEXT_MUTED }}>
+                          {playedAsWhite ? 'as White' : 'as Black'}
+                        </p>
+                      </div>
+                      <p className="text-sm font-bold truncate mt-0.5" style={{ color: TEXT_LIGHT }}>
+                        vs {playedAsWhite ? game.blackUsername : game.whiteUsername}
+                      </p>
+                      <p className="text-xs truncate" style={{ color: TEXT_MUTED }}>
+                        {game.opening || 'Unknown Opening'} · {new Date(game.playedAt).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <ChevronRight className="w-4 h-4 opacity-30 group-hover:opacity-90 group-hover:translate-x-0.5 transition-all shrink-0" style={{ color: TEXT_MUTED }} />
+                  </div>
+                </Link>
+              );
+            })}
+            {!gamesData?.games?.length && (
+              <EmptyState icon={<Swords className="w-7 h-7" />} text="No games imported yet." linkHref="/import" linkText="Import Games →" />
+            )}
           </div>
-          <p className="relative text-xs leading-relaxed" style={{ color: TEXT_MUTED }}>
-            Smart scouting report on any Chess.com player. Find weaknesses, tendencies, and prep lines before your next match.
-          </p>
-        </div>
-      </Link>
+        </DashCard>
+      </div>
+
 
       <div className="grid grid-cols-2 gap-3 px-3 md:px-0">
         <Link href="/play" className="block">
@@ -408,43 +453,29 @@ export function Dashboard() {
             )}
           </DashCard>
 
-          <DashCard title="Recent Games" visual={<PieceTile piece="♜" />} linkHref="/games" linkText="All Games">
-            <div className="space-y-0.5">
-              {gamesData?.games?.slice(0, 5).map((game, i) => {
-                const res = RESULT_COLORS[game.result] ?? RESULT_COLORS.draw;
-                const playedAsWhite = game.whiteUsername?.toLowerCase() === username?.toLowerCase();
-                return (
-                  <Link key={game.id} href={`/games/${game.id}`} className="block">
-                    <div className="group flex items-center gap-3 p-2.5 rounded-xl transition-colors"
-                      onMouseEnter={e => (e.currentTarget.style.background = BG_CARD_HOVER)}
-                      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-                      <GameThumb pgn={game.pgn} userColor={playedAsWhite ? 'white' : 'black'} size={56} />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="px-1.5 py-px rounded text-[10px] font-semibold shrink-0" style={{ background: res.bg, color: res.text }}>
-                            {game.result === 'win' ? 'WIN' : game.result === 'loss' ? 'LOSS' : 'DRAW'}
-                          </span>
-                          <p className="text-[10px] font-semibold uppercase tracking-[0.18em]" style={{ color: TEXT_MUTED }}>
-                            {playedAsWhite ? 'as White' : 'as Black'}
-                          </p>
-                        </div>
-                        <p className="text-sm font-bold truncate mt-0.5" style={{ color: TEXT_LIGHT }}>
-                          vs {playedAsWhite ? game.blackUsername : game.whiteUsername}
-                        </p>
-                        <p className="text-xs truncate" style={{ color: TEXT_MUTED }}>
-                          {game.opening || 'Unknown Opening'} · {new Date(game.playedAt).toLocaleDateString()}
-                        </p>
-                      </div>
-                      <ChevronRight className="w-4 h-4 opacity-30 group-hover:opacity-90 group-hover:translate-x-0.5 transition-all shrink-0" style={{ color: TEXT_MUTED }} />
-                    </div>
-                  </Link>
-                );
-              })}
-              {!gamesData?.games?.length && (
-                <EmptyState icon={<Swords className="w-7 h-7" />} text="No games imported yet." linkHref="/import" linkText="Import Games →" />
-              )}
+          <Link href="/opponents" className="block">
+            <div className="relative overflow-hidden rounded-2xl p-4 md:p-5 transition-colors group cursor-pointer"
+              style={{
+                background: 'linear-gradient(180deg, #383532 0%, #2a2825 100%)',
+                border: `1px solid rgba(129,182,76,0.3)`,
+                boxShadow: '0 18px 50px -16px rgba(0,0,0,0.6), 0 4px 16px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04)',
+              }}
+              onMouseEnter={e => (e.currentTarget.style.borderColor = 'rgba(129,182,76,0.5)')}
+              onMouseLeave={e => (e.currentTarget.style.borderColor = 'rgba(129,182,76,0.3)')}>
+
+              <div className="relative flex items-center gap-3 mb-2.5">
+                <PieceTile piece="♞" size={48} />
+                <div className="flex-1 min-w-0">
+                  <span className="inline-block text-[10px] font-semibold uppercase tracking-[0.18em]" style={{ color: CHESSCOM_GREEN }}>Scout</span>
+                  <h3 className="font-semibold text-base leading-tight" style={{ color: TEXT_LIGHT, letterSpacing: '-0.01em' }}>Opponent Scout</h3>
+                </div>
+                <ChevronRight className="w-4 h-4 shrink-0 opacity-40 group-hover:opacity-80 transition-opacity" style={{ color: CHESSCOM_GREEN }} />
+              </div>
+              <p className="relative text-xs leading-relaxed" style={{ color: TEXT_MUTED }}>
+                Smart scouting report on any Chess.com player. Find weaknesses, tendencies, and prep lines before your next match.
+              </p>
             </div>
-          </DashCard>
+          </Link>
         </div>
 
         <div className="space-y-3 md:space-y-4">
