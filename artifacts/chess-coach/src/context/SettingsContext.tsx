@@ -2,9 +2,9 @@ import React, { createContext, useContext, useState, useEffect, useRef } from 'r
 import { useUser } from '@/context/UserContext';
 
 export type BoardTheme = 'classic' | 'green' | 'blue' | 'gray' | 'purple' | 'crimson' | 'teal' | 'coal' | 'sunset' | 'custom';
-export type BoardTexture = 'flat' | 'wood' | 'marble' | 'felt';
+export type BoardTexture = 'flat' | 'wood' | 'marble' | 'felt' | 'granite' | 'leather' | 'glass';
 export type AppBackground = 'default' | 'warm-gradient' | 'cool-gradient' | 'noise';
-export type PieceStyle = 'classic' | 'glossy' | 'outlined' | 'ocean' | 'crimson' | 'emerald' | 'royal' | 'flat' | 'depth' | 'shaded' | 'wood3d' | 'marble3d' | 'chrome' | 'custom';
+export type PieceStyle = 'classic' | 'glossy' | 'outlined' | 'ocean' | 'crimson' | 'emerald' | 'royal' | 'flat' | 'depth' | 'shaded' | 'wood3d' | 'marble3d' | 'chrome' | 'gold' | 'copper' | 'obsidian' | 'ivory' | 'custom';
 export type PieceShape = 'default' | 'cburnett';
 export type PromotionChoice = 'queen' | 'ask';
 export type BoardSize = 'compact' | 'standard' | 'large';
@@ -80,6 +80,34 @@ export const BOARD_TEXTURES: Record<BoardTexture, { label: string; backgroundIma
     backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28'%3E%3Cfilter id='f'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' seed='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.16 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23f)'/%3E%3C/svg%3E")`,
     backgroundSize: '28px 28px',
   },
+  // Isotropic (equal X/Y frequency) turbulence at a mid frequency with
+  // more octaves than felt -- reads as mottled mineral speckle rather
+  // than fabric fiber or wood grain. Neutral gray tint (not warm brown
+  // like wood, not colorless like marble's soft radial highlights) is
+  // what separates granite from the other two textured options.
+  granite: {
+    label: 'Granite',
+    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60'%3E%3Cfilter id='gr'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.35' numOctaves='5' seed='11' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 0.25  0 0 0 0 0.25  0 0 0 0 0.27  0 0 0 0.3 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23gr)'/%3E%3C/svg%3E")`,
+    backgroundSize: '60px 60px',
+  },
+  // Same fine-grain technique as felt (leather's surface is also a dense
+  // organic fiber pattern up close), but lower alpha and a warm
+  // brown-red tint instead of felt's neutral gray-black -- felt reads as
+  // matte fabric, this reads as a worn, warm hide instead.
+  leather: {
+    label: 'Leather',
+    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Cfilter id='lt'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' seed='19' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 0.3  0 0 0 0 0.15  0 0 0 0 0.08  0 0 0 0.22 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23lt)'/%3E%3C/svg%3E")`,
+    backgroundSize: '40px 40px',
+  },
+  // No turbulence at all -- glass isn't organic noise, it's a smooth
+  // surface with a hard directional highlight. A single sharp-edged
+  // diagonal band (linear-gradient with tight color stops rather than a
+  // smooth fade) reads as a reflective sheen catching the light, the way
+  // marble's soft radial gradients read as veining.
+  glass: {
+    label: 'Glass',
+    backgroundImage: 'linear-gradient(115deg, transparent 30%, rgba(255,255,255,0.10) 45%, rgba(255,255,255,0.16) 50%, rgba(255,255,255,0.10) 55%, transparent 70%)',
+  },
 };
 
 export const APP_BACKGROUNDS: Record<AppBackground, { label: string; css: React.CSSProperties }> = {
@@ -123,6 +151,14 @@ export const PIECE_STYLES: Record<Exclude<PieceStyle, 'custom'>, { light: string
     previewLight: 'linear-gradient(135deg, #ffffff 0%, #e6e6ee 60%, #c4c4d2 100%)', previewDark: 'linear-gradient(135deg, #4a4a54 0%, #26262e 60%, #0e0e12 100%)', baseLight: '#e6e6ee', baseDark: '#26262e' },
   chrome:   { light: 'url(#cc-grad-chrome-light)', dark: 'url(#cc-grad-chrome-dark)', label: 'Chrome', finish: { filter: 'drop-shadow(0 2px 3px rgba(0,0,0,0.5)) contrast(1.15)' },
     previewLight: 'linear-gradient(135deg, #ffffff 0%, #c9d3d9 35%, #eef3f5 60%, #8a97a0 100%)', previewDark: 'linear-gradient(135deg, #7a828a 0%, #2a2d31 35%, #4a4f55 60%, #0a0b0c 100%)', baseLight: '#c9d3d9', baseDark: '#2a2d31' },
+  gold:     { light: 'url(#cc-grad-gold-light)', dark: 'url(#cc-grad-gold-dark)', label: 'Gold', finish: { filter: 'drop-shadow(0 2px 2px rgba(60,40,0,0.5)) drop-shadow(0 1px 0 rgba(255,240,180,0.3)) contrast(1.08)' },
+    previewLight: 'linear-gradient(135deg, #fff4d1 0%, #e8c04a 50%, #a8791f 100%)', previewDark: 'linear-gradient(135deg, #c99a2e 0%, #7a5714 50%, #3d2a09 100%)', baseLight: '#e8c04a', baseDark: '#7a5714' },
+  copper:   { light: 'url(#cc-grad-copper-light)', dark: 'url(#cc-grad-copper-dark)', label: 'Copper', finish: { filter: 'drop-shadow(0 2px 2px rgba(50,20,0,0.5)) drop-shadow(0 1px 0 rgba(255,200,150,0.25))' },
+    previewLight: 'linear-gradient(135deg, #ffd9b8 0%, #d4823f 50%, #8a4a1e 100%)', previewDark: 'linear-gradient(135deg, #a8622e 0%, #6b3818 50%, #331a09 100%)', baseLight: '#d4823f', baseDark: '#6b3818' },
+  obsidian: { light: 'url(#cc-grad-obsidian-light)', dark: 'url(#cc-grad-obsidian-dark)', label: 'Obsidian', finish: { filter: 'drop-shadow(0 2px 3px rgba(0,0,0,0.6)) drop-shadow(0 1px 0 rgba(180,160,255,0.15))' },
+    previewLight: 'linear-gradient(135deg, #8a8494 0%, #4a4458 55%, #1c1824 100%)', previewDark: 'linear-gradient(135deg, #38333f 0%, #1a1620 55%, #05040a 100%)', baseLight: '#4a4458', baseDark: '#1a1620' },
+  ivory:    { light: 'url(#cc-grad-ivory-light)', dark: 'url(#cc-grad-ivory-dark)', label: 'Ivory', finish: { filter: 'drop-shadow(0 2px 2px rgba(60,50,20,0.35))' },
+    previewLight: 'linear-gradient(135deg, #fffdf2 0%, #f3e8c8 55%, #d9c396 100%)', previewDark: 'linear-gradient(135deg, #b8a06a 0%, #8a7345 55%, #5c4a28 100%)', baseLight: '#f3e8c8', baseDark: '#8a7345' },
 };
 
 export const BOARD_SIZES: Record<BoardSize, { maxWidth: number; label: string }> = {

@@ -530,6 +530,46 @@ export function ChessBoard({
             <stop offset="60%" stopColor="#4a4f55" />
             <stop offset="100%" stopColor="#0a0b0c" />
           </linearGradient>
+          <linearGradient id="cc-grad-gold-light" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#fff4d1" />
+            <stop offset="50%" stopColor="#e8c04a" />
+            <stop offset="100%" stopColor="#a8791f" />
+          </linearGradient>
+          <linearGradient id="cc-grad-gold-dark" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#c99a2e" />
+            <stop offset="50%" stopColor="#7a5714" />
+            <stop offset="100%" stopColor="#3d2a09" />
+          </linearGradient>
+          <linearGradient id="cc-grad-copper-light" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#ffd9b8" />
+            <stop offset="50%" stopColor="#d4823f" />
+            <stop offset="100%" stopColor="#8a4a1e" />
+          </linearGradient>
+          <linearGradient id="cc-grad-copper-dark" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#a8622e" />
+            <stop offset="50%" stopColor="#6b3818" />
+            <stop offset="100%" stopColor="#331a09" />
+          </linearGradient>
+          <linearGradient id="cc-grad-obsidian-light" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#8a8494" />
+            <stop offset="55%" stopColor="#4a4458" />
+            <stop offset="100%" stopColor="#1c1824" />
+          </linearGradient>
+          <linearGradient id="cc-grad-obsidian-dark" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#38333f" />
+            <stop offset="55%" stopColor="#1a1620" />
+            <stop offset="100%" stopColor="#05040a" />
+          </linearGradient>
+          <linearGradient id="cc-grad-ivory-light" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#fffdf2" />
+            <stop offset="55%" stopColor="#f3e8c8" />
+            <stop offset="100%" stopColor="#d9c396" />
+          </linearGradient>
+          <linearGradient id="cc-grad-ivory-dark" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#b8a06a" />
+            <stop offset="55%" stopColor="#8a7345" />
+            <stop offset="100%" stopColor="#5c4a28" />
+          </linearGradient>
           {/* Dynamic gradient for custom piece colors, computed from
               whatever hex the user picked (see getPieceColorScheme in
               lib/utils.ts) -- gives custom colors the same subtle 3D
