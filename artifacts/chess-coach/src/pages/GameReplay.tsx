@@ -1509,7 +1509,7 @@ export function GameReplay() {
             </div>
           </div>
 
-          <div ref={moveListRef} className="flex-1 overflow-y-auto overscroll-contain p-2 hide-scrollbar">
+          <div ref={moveListRef} className="flex-1 xl:overflow-y-auto xl:overscroll-contain p-2 hide-scrollbar">
             {/* Starting position */}
             <div
               onClick={() => { setCurrentMove(0); setPracticeMode(false); }}
