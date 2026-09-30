@@ -17,3 +17,4 @@ export * from "./beginnerCourses";
 export * from "./bulkCrawl";
 export * from "./shopItems";
 export * from "./pushSubscriptions";
+export * from "./correspondence";

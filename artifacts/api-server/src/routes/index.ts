@@ -22,6 +22,7 @@ import trapsRouter from "./traps";
 import beginnerCoursesRouter from "./beginnerCourses";
 import shopRouter from "./shop";
 import pushRouter from "./push";
+import correspondenceRouter from "./correspondence";
 import { requirePremium } from "../middlewares/authMiddleware";
 import { db, pageViewsTable } from "@workspace/db";
 
@@ -46,6 +47,7 @@ router.use(trapsRouter);
 router.use(beginnerCoursesRouter);
 router.use(shopRouter);
 router.use(pushRouter);
+router.use(correspondenceRouter);
 
 router.post("/track", async (req: Request, res: Response) => {
   try {
