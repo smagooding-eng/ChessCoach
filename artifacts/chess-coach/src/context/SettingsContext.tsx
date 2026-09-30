@@ -1,8 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { useUser } from '@/context/UserContext';
 
-export type BoardTheme = 'classic' | 'green' | 'blue' | 'gray' | 'purple' | 'crimson' | 'teal' | 'coal' | 'sunset' | 'custom';
-export type BoardTexture = 'flat' | 'wood' | 'marble' | 'felt' | 'granite' | 'leather' | 'glass';
+export type BoardTheme = 'classic' | 'green' | 'blue' | 'gray' | 'purple' | 'crimson' | 'teal' | 'coal' | 'sunset' | 'rose' | 'amber' | 'mint' | 'indigo' | 'midnight' | 'arctic' | 'custom';
+export type BoardTexture = 'flat' | 'wood' | 'marble' | 'felt' | 'granite' | 'leather' | 'glass' | 'canvas' | 'sandstone' | 'slate' | 'silk';
 export type AppBackground = 'default' | 'warm-gradient' | 'cool-gradient' | 'noise';
 export type PieceStyle = 'classic' | 'glossy' | 'outlined' | 'ocean' | 'crimson' | 'emerald' | 'royal' | 'flat' | 'depth' | 'shaded' | 'wood3d' | 'marble3d' | 'chrome' | 'gold' | 'copper' | 'obsidian' | 'ivory' | 'custom';
 export type PieceShape = 'default' | 'cburnett' | 'celtic' | 'chessnut' | 'fantasy' | 'spatial' | 'rhosgfx' | 'kiwen-suwi' | 'firi' | 'totoy' | 'papercut';
@@ -57,6 +57,12 @@ export const BOARD_THEMES: Record<Exclude<BoardTheme, 'custom'>, { light: string
   teal:    { light: '#dcf0ec', dark: '#3f8f7f', label: 'Teal' },
   coal:    { light: '#d6d6d6', dark: '#2b2b2b', label: 'Coal' },
   sunset:  { light: '#fbe8c9', dark: '#c8813a', label: 'Sunset' },
+  rose:     { light: '#f9e0e5', dark: '#c76b7f', label: 'Rose' },
+  amber:    { light: '#fdf0d5', dark: '#d99a3f', label: 'Amber' },
+  mint:     { light: '#e3f5ec', dark: '#4fa989', label: 'Mint' },
+  indigo:   { light: '#e5e3f7', dark: '#5b52a3', label: 'Indigo' },
+  midnight: { light: '#c9ccd6', dark: '#1a1d29', label: 'Midnight' },
+  arctic:   { light: '#f5fbff', dark: '#a8c5d6', label: 'Arctic' },
 };
 
 // CSS-only textures (no image assets exist to source/verify, so these are
@@ -133,6 +139,37 @@ export const BOARD_TEXTURES: Record<BoardTexture, { label: string; backgroundIma
   glass: {
     label: 'Glass',
     backgroundImage: 'linear-gradient(115deg, transparent 30%, rgba(255,255,255,0.10) 45%, rgba(255,255,255,0.16) 50%, rgba(255,255,255,0.10) 55%, transparent 70%)',
+  },
+  // Low frequency, few octaves -- coarser and more angular than felt's
+  // fine dense fiber, reading as a looser, chunkier weave rather than
+  // smooth fabric. Neutral beige keeps it distinct from felt's gray-black.
+  canvas: {
+    label: 'Canvas',
+    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Cfilter id='cv'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='1' seed='7' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 0.45  0 0 0 0 0.4  0 0 0 0 0.32  0 0 0 0.18 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23cv)'/%3E%3C/svg%3E")`,
+    backgroundSize: '24px 24px',
+  },
+  // Same mottled-mineral technique as granite, but warm tan instead of
+  // neutral gray, and a slightly lower frequency for softer, larger
+  // mottling -- reads as sun-worn stone rather than granite's fine speckle.
+  sandstone: {
+    label: 'Sandstone',
+    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='70' height='70'%3E%3Cfilter id='sd'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.25' numOctaves='4' seed='23' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 0.55  0 0 0 0 0.42  0 0 0 0 0.28  0 0 0 0.28 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23sd)'/%3E%3C/svg%3E")`,
+    backgroundSize: '70px 70px',
+  },
+  // High frequency, more octaves than granite for a smoother, finer grain,
+  // with a cool blue-gray tint (granite's is neutral) -- reads as
+  // polished dark stone rather than granite's rougher, warmer speckle.
+  slate: {
+    label: 'Slate',
+    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='45' height='45'%3E%3Cfilter id='sl'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.5' numOctaves='6' seed='31' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 0.2  0 0 0 0 0.24  0 0 0 0 0.3  0 0 0 0.32 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23sl)'/%3E%3C/svg%3E")`,
+    backgroundSize: '45px 45px',
+  },
+  // Gradient-based like glass, not turbulence -- but a wider, softer,
+  // warm-tinted band at a different angle reads as fabric shimmer
+  // catching the light rather than glass's hard, cool reflection.
+  silk: {
+    label: 'Silk',
+    backgroundImage: 'linear-gradient(70deg, transparent 20%, rgba(255,240,220,0.06) 35%, rgba(255,245,230,0.13) 50%, rgba(255,240,220,0.06) 65%, transparent 80%)',
   },
 };
 
