@@ -168,7 +168,16 @@ export default function SettingsPage() {
         <div className="grid grid-cols-2 gap-2 mb-2">
           {(Object.keys(PIECE_SHAPES) as PieceShape[]).filter((key) => !PIECE_SHAPES[key].hidden).map((key) => (
             <SwatchButton key={key} active={pieceShape === key} onClick={() => setPieceShape(key)} label={PIECE_SHAPES[key].label}>
-              <span className="text-3xl leading-none">♞</span>
+              {key === 'default' ? (
+                <span className="text-3xl leading-none">♞</span>
+              ) : (
+                // Every shape here is real static SVG artwork at
+                // /pieces/<key>/wN.svg -- showing the actual knight for
+                // each, instead of the same generic glyph for all of
+                // them, is the whole point: it's the only way to
+                // actually tell these shapes apart before picking one.
+                <img src={`/pieces/${key}/wN.svg`} alt={PIECE_SHAPES[key].label} className="w-9 h-9" />
+              )}
             </SwatchButton>
           ))}
         </div>
