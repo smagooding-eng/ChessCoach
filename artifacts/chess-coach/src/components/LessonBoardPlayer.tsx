@@ -11,6 +11,7 @@ import { useLocation } from 'wouter';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { buildTintedPieceSet } from './RecoloredPieces';
+import { PieceGradientDefs } from './PieceGradientDefs';
 
 const CHESSCOM_GREEN = '#81b64c';
 const BG_DARK = '#262421';
@@ -875,6 +876,7 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
           </div>
         </div>
         <div className="px-2 pb-3 max-w-[480px] mx-auto">
+          <PieceGradientDefs />
           <Chessboard
             options={{
               position: fallbackFen,
@@ -1078,6 +1080,7 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
           {/* Board */}
           <div className="px-2 pb-1 max-w-[480px] mx-auto w-full">
             <div className="relative">
+              <PieceGradientDefs />
               <Chessboard
                 options={{
                   position: step?.fen,
@@ -1388,6 +1391,7 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
                 </div>
               ) : (
                 <>
+                  <PieceGradientDefs />
                   <Chessboard
                     options={{
                       position: repeatPosition,
@@ -1517,6 +1521,7 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
           </div>
           <div className="px-2 pb-1 max-w-[480px] mx-auto w-full">
             <div className="relative rounded-xl overflow-hidden">
+              <PieceGradientDefs />
               <Chessboard
                 options={{
                   position: allChallenges[0]?.fen ?? '',
@@ -1591,6 +1596,7 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
           {/* Board */}
           <div className="px-2 pb-1 max-w-[480px] mx-auto w-full">
             <div className="relative">
+              <PieceGradientDefs />
               <Chessboard
                 options={{
                   position: (drillState === 'idle' || drillState === 'wrong') ? (activeChallenge?.fen ?? '') : drillPosition,

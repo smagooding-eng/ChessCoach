@@ -4,6 +4,7 @@ import { Chess } from 'chess.js';
 import { Chessboard, defaultPieces } from 'react-chessboard';
 import { apiFetch } from '@/lib/api';
 import { buildTintedPieceSet } from '@/components/RecoloredPieces';
+import { PieceGradientDefs } from '@/components/PieceGradientDefs';
 import { useUser } from '@/hooks/use-user';
 import { Crown, RotateCcw, ChevronRight, Trophy, Target, Flame, Zap, Lightbulb, Loader2, Lock, Share2 } from 'lucide-react';
 import { useLocation, useSearch, Link } from 'wouter';
@@ -657,6 +658,7 @@ export function Puzzles() {
                 </div>
 
                 <div className="relative w-full mx-auto mb-4" style={{ maxWidth: boardMaxWidth }}>
+                  <PieceGradientDefs />
                   <MaterialStrip fen={game?.fen() ?? ''} color={boardOrientation === 'white' ? 'b' : 'w'} className="px-1 mb-1.5" />
                   <Chessboard
                     options={{
