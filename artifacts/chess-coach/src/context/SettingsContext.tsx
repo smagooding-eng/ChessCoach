@@ -5,7 +5,7 @@ export type BoardTheme = 'classic' | 'green' | 'blue' | 'gray' | 'purple' | 'cri
 export type BoardTexture = 'flat' | 'wood' | 'marble' | 'felt' | 'granite' | 'leather' | 'glass';
 export type AppBackground = 'default' | 'warm-gradient' | 'cool-gradient' | 'noise';
 export type PieceStyle = 'classic' | 'glossy' | 'outlined' | 'ocean' | 'crimson' | 'emerald' | 'royal' | 'flat' | 'depth' | 'shaded' | 'wood3d' | 'marble3d' | 'chrome' | 'gold' | 'copper' | 'obsidian' | 'ivory' | 'custom';
-export type PieceShape = 'default' | 'cburnett';
+export type PieceShape = 'default' | 'cburnett' | 'celtic';
 export type PromotionChoice = 'queen' | 'ask';
 export type BoardSize = 'compact' | 'standard' | 'large';
 
@@ -16,9 +16,23 @@ export type BoardSize = 'compact' | 'standard' | 'large';
 // it's static SVG artwork with color baked in, the Piece Style color
 // picker doesn't apply on top of it -- shape and color are independent
 // choices, but this shape brings its own coloring.
-export const PIECE_SHAPES: Record<PieceShape, { label: string; attribution: string | null }> = {
+//
+// Celtic is the same category of thing -- a second real, distinct piece
+// artwork set, not a recolor. Sourced directly from lichess-org/lila's
+// own repository (public/piece/celtic), by Maurizio Monge, MIT licensed
+// per lila's COPYING.md -- one of only a handful of Lichess piece sets
+// that's genuinely safe for a commercial closed-source product with no
+// copyleft strings attached (most of Lichess's other sets are GPL/AGPL,
+// which would obligate releasing this app's own source).
+export const PIECE_SHAPES: Record<PieceShape, { label: string; attribution: string | null; hidden?: boolean }> = {
   default:  { label: 'Default', attribution: null },
   cburnett: { label: 'Cburnett', attribution: 'Piece set "Cburnett" by Colin M.L. Burnett, CC BY-SA 3.0 / GPLv2+' },
+  // hidden: true keeps this out of the public Settings picker (Settings.tsx
+  // filters on this flag) while it's still being reviewed -- visible only
+  // via the admin-only preview panel. Flip to false (or drop the field)
+  // once it's confirmed ready to ship to everyone; no other change needed,
+  // the rendering path is already fully wired.
+  celtic:   { label: 'Celtic', attribution: 'Piece set "Celtic" by Maurizio Monge, MIT License', hidden: true },
 };
 
 export const BOARD_THEMES: Record<Exclude<BoardTheme, 'custom'>, { light: string; dark: string; label: string }> = {

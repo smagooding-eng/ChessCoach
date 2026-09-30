@@ -166,7 +166,7 @@ export default function SettingsPage() {
         <h2 className="text-sm font-black uppercase tracking-wide mb-1" style={{ color: TEXT_MUTED }}>Piece Shape</h2>
         <p className="text-xs mb-3" style={{ color: TEXT_MUTED }}>Real alternate artwork, not just a recolor</p>
         <div className="grid grid-cols-2 gap-2 mb-2">
-          {(Object.keys(PIECE_SHAPES) as PieceShape[]).map((key) => (
+          {(Object.keys(PIECE_SHAPES) as PieceShape[]).filter((key) => !PIECE_SHAPES[key].hidden).map((key) => (
             <SwatchButton key={key} active={pieceShape === key} onClick={() => setPieceShape(key)} label={PIECE_SHAPES[key].label}>
               <span className="text-3xl leading-none">♞</span>
             </SwatchButton>

@@ -169,6 +169,16 @@ export function buildTintedPieceSet(opts: {
     return wrapped;
   }
 
+  if (pieceShape === 'celtic') {
+    const wrapped: Record<string, (props?: any) => React.ReactElement> = {};
+    for (const key of ['wP', 'wR', 'wN', 'wB', 'wQ', 'wK', 'bP', 'bR', 'bN', 'bB', 'bQ', 'bK']) {
+      wrapped[key] = ({ svgStyle }: any = {}) => (
+        <img src={`/pieces/celtic/${key}.svg`} alt={key} style={{ width: '100%', height: '100%', ...svgStyle }} />
+      );
+    }
+    return wrapped;
+  }
+
   const lightScheme = getPieceColorScheme(pieceColors.baseLight);
   const darkScheme = getPieceColorScheme(pieceColors.baseDark);
   const wrapped: Record<string, (props?: any) => React.ReactElement> = {};

@@ -625,6 +625,8 @@ export function Admin() {
             </div>
           )}
 
+          <CelticPiecePreviewPanel />
+
           <ShopManagementPanel />
 
           <LandingFunnelPanel />
@@ -2037,6 +2039,41 @@ interface ShopItemAdmin {
 }
 
 const EMPTY_SHOP_FORM = { title: '', description: '', imageUrl: '', amazonUrl: '', priceLabel: '', sortOrder: '0' };
+
+const CELTIC_PIECE_PREVIEW_ORDER = ['wK', 'wQ', 'wR', 'wB', 'wN', 'wP', 'bK', 'bQ', 'bR', 'bB', 'bN', 'bP'];
+
+// Admin-only preview for a piece shape that's built but deliberately not
+// yet public (PIECE_SHAPES marks it hidden: true, which Settings.tsx's
+// picker filters out). This is the only place it's visible right now --
+// once it's reviewed and ready, remove the `hidden: true` flag in
+// SettingsContext.tsx and it appears in the normal Settings picker with
+// no other change needed. This panel can be deleted at that point too.
+function CelticPiecePreviewPanel() {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="rounded-xl border border-border/40 bg-card overflow-hidden"
+    >
+      <div className="px-5 py-3 border-b border-border/30 bg-indigo-500/5 flex items-center gap-2">
+        <Sparkles className="w-4 h-4 text-indigo-400" />
+        <h3 className="text-sm font-bold text-indigo-400">Piece Shape Preview: Celtic (not public yet)</h3>
+      </div>
+      <div className="p-4">
+        <p className="text-xs text-muted-foreground mb-3">
+          Sourced from lichess-org/lila's own repository, by Maurizio Monge, MIT licensed. Hidden from the regular Settings picker until this is reviewed -- flip <code>hidden: true</code> off in SettingsContext.tsx's PIECE_SHAPES entry to make it public, no other change needed.
+        </p>
+        <div className="grid grid-cols-4 sm:grid-cols-6 gap-3">
+          {CELTIC_PIECE_PREVIEW_ORDER.map((key) => (
+            <div key={key} className="aspect-square rounded-lg bg-white/5 border border-white/10 p-2 flex items-center justify-center">
+              <img src={`/pieces/celtic/${key}.svg`} alt={key} className="w-full h-full" />
+            </div>
+          ))}
+        </div>
+      </div>
+    </motion.div>
+  );
+}
 
 function ShopManagementPanel() {
   const [items, setItems] = useState<ShopItemAdmin[]>([]);
