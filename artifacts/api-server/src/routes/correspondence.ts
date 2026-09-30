@@ -51,7 +51,7 @@ router.get("/correspondence/games", requireAuth, async (req: Request, res: Respo
 
 router.get("/correspondence/games/:id", requireAuth, async (req: Request, res: Response) => {
   try {
-    const game = await getGame(req.params.id, req.user!.id);
+    const game = await getGame(String(req.params.id), req.user!.id);
     if (!game) {
       res.status(404).json({ error: "Game not found" });
       return;
@@ -69,7 +69,7 @@ router.post("/correspondence/games/:id/move", requireAuth, async (req: Request, 
       res.status(400).json({ error: "san (the move in standard algebraic notation) is required" });
       return;
     }
-    const result = await makeMove(req.params.id, req.user!.id, san.trim());
+    const result = await makeMove(String(req.params.id), req.user!.id, san.trim());
     if (!result.success) {
       res.status(400).json({ error: result.error });
       return;
@@ -82,7 +82,7 @@ router.post("/correspondence/games/:id/move", requireAuth, async (req: Request, 
 
 router.post("/correspondence/games/:id/resign", requireAuth, async (req: Request, res: Response) => {
   try {
-    const result = await resignGame(req.params.id, req.user!.id);
+    const result = await resignGame(String(req.params.id), req.user!.id);
     if (!result.success) {
       res.status(400).json({ error: result.error });
       return;
