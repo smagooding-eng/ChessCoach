@@ -2049,6 +2049,10 @@ const EMPTY_PUSH_FORM = {
 
 function PushNotificationPanel() {
   const [form, setForm] = useState(EMPTY_PUSH_FORM);
+  // Explicit toggle rather than relying on "leave every filter field
+  // blank" to mean "everyone" -- that's what the backend already does
+  // with an empty filter, but it wasn't obvious enough from the UI alone.
+  const [audienceMode, setAudienceMode] = useState<'all' | 'filtered'>('all');
   const [recipientCount, setRecipientCount] = useState<number | null>(null);
   const [counting, setCounting] = useState(false);
   const [sending, setSending] = useState(false);
@@ -2058,6 +2062,10 @@ function PushNotificationPanel() {
   const filterFields = ['lastLoginBefore', 'lastLoginAfter', 'signedUpBefore', 'signedUpAfter', 'hasImportedGameSince', 'noImportedGameSince'] as const;
 
   const buildFilterBody = () => {
+    // "All devices" always means literally everyone with a subscription,
+    // full stop -- ignore whatever's sitting in the filter fields even
+    // if the admin filled some in before switching modes back.
+    if (audienceMode === 'all') return {};
     const body: Record<string, string> = {};
     for (const f of filterFields) {
       if (form[f]) body[f] = new Date(form[f]).toISOString();
@@ -2154,7 +2162,25 @@ function PushNotificationPanel() {
         <textarea className={cn(inputStyle, 'mb-3')} rows={2} placeholder="Body *" value={form.body} onChange={e => setForm(f => ({ ...f, body: e.target.value }))} />
 
         <div className="pt-3 border-t border-border/20">
-          <p className="text-xs font-bold text-muted-foreground mb-2">Audience filters — leave blank to reach everyone with an active subscription</p>
+          <p className="text-xs font-bold text-muted-foreground mb-2">Audience</p>
+          <div className="flex gap-2 mb-3">
+            <button
+              onClick={() => { setAudienceMode('all'); setRecipientCount(null); }}
+              className={cn('flex-1 px-3 py-2 rounded-lg text-xs font-bold border transition-colors',
+                audienceMode === 'all' ? 'bg-primary text-primary-foreground border-primary' : 'bg-white/5 text-muted-foreground border-white/10')}
+            >
+              All devices
+            </button>
+            <button
+              onClick={() => { setAudienceMode('filtered'); setRecipientCount(null); }}
+              className={cn('flex-1 px-3 py-2 rounded-lg text-xs font-bold border transition-colors',
+                audienceMode === 'filtered' ? 'bg-primary text-primary-foreground border-primary' : 'bg-white/5 text-muted-foreground border-white/10')}
+            >
+              Filtered audience
+            </button>
+          </div>
+
+          {audienceMode === 'filtered' && (
           <div className="grid grid-cols-2 gap-2 mb-2">
             <div>
               <label className="text-[10px] text-muted-foreground block mb-1">Hasn't logged in since</label>
@@ -2181,6 +2207,7 @@ function PushNotificationPanel() {
               <input type="date" className={inputStyle} value={form.noImportedGameSince} onChange={e => setForm(f => ({ ...f, noImportedGameSince: e.target.value }))} />
             </div>
           </div>
+          )}
         </div>
 
         {error && <p className="text-xs text-red-400 mt-2">{error}</p>}

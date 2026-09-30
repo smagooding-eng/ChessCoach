@@ -6,6 +6,7 @@ import { useMyAnalysisSummary } from '@/hooks/use-analysis';
 import { useLiveRatings } from '@/hooks/use-live-ratings';
 import { useMyGames } from '@/hooks/use-games';
 import { useMyCourses } from '@/hooks/use-courses';
+import { usePushNotifications } from '@/hooks/use-push-notifications';
 import { Link, useLocation } from 'wouter';
 import { apiFetch } from '@/lib/api';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -14,7 +15,7 @@ import {
   GraduationCap, Settings, Shield, Edit3, Check, X, Eye, Users, CreditCard,
   Activity, Send, AlertCircle, CheckCircle2, Bold, Italic, Heading1, Heading2,
   Link as LinkIcon, Image, Type, Palette, List, ListOrdered, Minus, Undo2, Redo2, FileText, Sparkles,
-  Trash2, Loader2, Zap, Gift, Copy, UserPlus, Megaphone, ChevronDown
+  Trash2, Loader2, Zap, Gift, Copy, UserPlus, Megaphone, ChevronDown, Bell
 } from 'lucide-react';
 
 interface AdminStats {
@@ -1671,6 +1672,7 @@ export function Profile() {
   const { data: liveRatings } = useLiveRatings();
   const { data: gamesData } = useMyGames();
   const { data: coursesData } = useMyCourses();
+  const push = usePushNotifications();
   const [, setLocation] = useLocation();
 
   const [editingUsername, setEditingUsername] = useState(false);
@@ -1885,6 +1887,36 @@ export function Profile() {
             <ChevronRight className="w-4 h-4" style={{ color: MUTED }} />
           </Link>
         ))}
+
+        <button
+          onClick={async () => {
+            if (push.isSubscribed) await push.unsubscribe();
+            else await push.subscribe();
+          }}
+          disabled={push.loading || !push.supported}
+          className="w-full flex items-center justify-between px-4 py-3.5 transition-colors text-left disabled:opacity-50"
+          style={{ borderBottom: `1px solid ${BORDER}` }}
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: '#3b82f61a', border: '1px solid #3b82f633' }}>
+              <Bell className="w-4 h-4" style={{ color: '#3b82f6' }} />
+            </div>
+            <div>
+              <p className="text-sm font-bold" style={{ color: TEXT }}>Notifications</p>
+              <p className="text-xs" style={{ color: MUTED }}>
+                {!push.supported ? 'Not supported in this browser'
+                  : push.loading ? 'Working…'
+                  : push.isSubscribed ? 'On — tap to turn off'
+                  : push.permission === 'denied' ? 'Blocked — enable in browser settings'
+                  : 'Off — tap to turn on'}
+              </p>
+            </div>
+          </div>
+          <div className="w-10 h-6 rounded-full flex items-center px-0.5 transition-colors shrink-0"
+            style={{ background: push.isSubscribed ? G : 'rgba(255,255,255,0.15)', justifyContent: push.isSubscribed ? 'flex-end' : 'flex-start' }}>
+            <div className="w-5 h-5 rounded-full bg-white" />
+          </div>
+        </button>
 
         <button
           onClick={handleLogout}
