@@ -159,21 +159,19 @@ export function buildTintedPieceSet(opts: {
     finish: rawPieceColors?.finish ?? {},
   };
 
-  if (pieceShape === 'cburnett') {
+  // Every shape below is real, distinct static SVG artwork (not a recolor
+  // of the default) sitting at /pieces/<shape>/<key>.svg, one folder per
+  // shape using the exact same 12-file naming convention -- so one shared
+  // branch handles all of them instead of a repeated block per shape.
+  // Each one's license is checked and recorded in PIECE_SHAPES below;
+  // this list exists only to decide which shapes take this static-asset
+  // path versus the recolorable 'default' path further down.
+  const STATIC_SVG_SHAPES: string[] = ['cburnett', 'celtic', 'chessnut', 'fantasy', 'spatial', 'rhosgfx', 'kiwen-suwi', 'firi', 'totoy', 'papercut'];
+  if (STATIC_SVG_SHAPES.includes(pieceShape)) {
     const wrapped: Record<string, (props?: any) => React.ReactElement> = {};
     for (const key of ['wP', 'wR', 'wN', 'wB', 'wQ', 'wK', 'bP', 'bR', 'bN', 'bB', 'bQ', 'bK']) {
       wrapped[key] = ({ svgStyle }: any = {}) => (
-        <img src={`/pieces/cburnett/${key}.svg`} alt={key} style={{ width: '100%', height: '100%', ...svgStyle }} />
-      );
-    }
-    return wrapped;
-  }
-
-  if (pieceShape === 'celtic') {
-    const wrapped: Record<string, (props?: any) => React.ReactElement> = {};
-    for (const key of ['wP', 'wR', 'wN', 'wB', 'wQ', 'wK', 'bP', 'bR', 'bN', 'bB', 'bQ', 'bK']) {
-      wrapped[key] = ({ svgStyle }: any = {}) => (
-        <img src={`/pieces/celtic/${key}.svg`} alt={key} style={{ width: '100%', height: '100%', ...svgStyle }} />
+        <img src={`/pieces/${pieceShape}/${key}.svg`} alt={key} style={{ width: '100%', height: '100%', ...svgStyle }} />
       );
     }
     return wrapped;

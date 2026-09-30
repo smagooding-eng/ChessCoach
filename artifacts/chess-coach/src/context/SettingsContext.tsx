@@ -5,34 +5,46 @@ export type BoardTheme = 'classic' | 'green' | 'blue' | 'gray' | 'purple' | 'cri
 export type BoardTexture = 'flat' | 'wood' | 'marble' | 'felt' | 'granite' | 'leather' | 'glass';
 export type AppBackground = 'default' | 'warm-gradient' | 'cool-gradient' | 'noise';
 export type PieceStyle = 'classic' | 'glossy' | 'outlined' | 'ocean' | 'crimson' | 'emerald' | 'royal' | 'flat' | 'depth' | 'shaded' | 'wood3d' | 'marble3d' | 'chrome' | 'gold' | 'copper' | 'obsidian' | 'ivory' | 'custom';
-export type PieceShape = 'default' | 'cburnett' | 'celtic';
+export type PieceShape = 'default' | 'cburnett' | 'celtic' | 'chessnut' | 'fantasy' | 'spatial' | 'rhosgfx' | 'kiwen-suwi' | 'firi' | 'totoy' | 'papercut';
 export type PromotionChoice = 'queen' | 'ask';
 export type BoardSize = 'compact' | 'standard' | 'large';
 
-// Cburnett is a real, distinct piece artwork set (not just a recolor of
-// the default) -- the same set Lichess uses by default. Licensed CC-BY-SA
-// 3.0 / GPLv2+ by Colin M.L. Burnett (per lichess-org/lila's own
-// COPYING.md), which permits commercial use with attribution. Because
+// Every shape below (other than 'default') is real, distinct piece
+// artwork sourced directly from lichess-org/lila's own repository
+// (public/piece/<shape>), not a recolor of the default shape. Because
 // it's static SVG artwork with color baked in, the Piece Style color
-// picker doesn't apply on top of it -- shape and color are independent
-// choices, but this shape brings its own coloring.
+// picker doesn't apply on top of any of them -- shape and color are
+// independent choices, but each of these brings its own coloring.
 //
-// Celtic is the same category of thing -- a second real, distinct piece
-// artwork set, not a recolor. Sourced directly from lichess-org/lila's
-// own repository (public/piece/celtic), by Maurizio Monge, MIT licensed
-// per lila's COPYING.md -- one of only a handful of Lichess piece sets
-// that's genuinely safe for a commercial closed-source product with no
-// copyleft strings attached (most of Lichess's other sets are GPL/AGPL,
-// which would obligate releasing this app's own source).
+// IMPORTANT LICENSING NOTE: lila bundles dozens of piece sets under very
+// different licenses -- most are GPL/AGPL (copyleft: combining them into
+// a closed-source commercial app could obligate releasing this app's own
+// source) or CC BY-NC-SA (explicitly non-commercial). Only the sets
+// below were verified against lila's own COPYING.md as safe for a
+// commercial closed-source product (permissive license, no share-alike,
+// no non-commercial restriction) -- this is not "all available sets,"
+// it's deliberately the safe subset.
+//
+// Cburnett is the one exception worth flagging: lila's current
+// COPYING.md lists it as GPLv2+ ONLY (earlier research suggested a CC
+// BY-SA 3.0 dual-license option that doesn't appear in the current file
+// -- corrected here). GPL's copyleft obligation is clearest for linked
+// code; whether serving a GPL-licensed static SVG *asset* to users
+// triggers the same obligation is a genuinely disputed question, not
+// something to resolve here -- flagged for a real legal read, not
+// removed unilaterally since it's already live.
 export const PIECE_SHAPES: Record<PieceShape, { label: string; attribution: string | null; hidden?: boolean }> = {
-  default:  { label: 'Default', attribution: null },
-  cburnett: { label: 'Cburnett', attribution: 'Piece set "Cburnett" by Colin M.L. Burnett, CC BY-SA 3.0 / GPLv2+' },
-  // hidden: true keeps this out of the public Settings picker (Settings.tsx
-  // filters on this flag) while it's still being reviewed -- visible only
-  // via the admin-only preview panel. Flip to false (or drop the field)
-  // once it's confirmed ready to ship to everyone; no other change needed,
-  // the rendering path is already fully wired.
-  celtic:   { label: 'Celtic', attribution: 'Piece set "Celtic" by Maurizio Monge, MIT License', hidden: true },
+  default:    { label: 'Default', attribution: null },
+  cburnett:   { label: 'Cburnett', attribution: 'Piece set "Cburnett" by Colin M.L. Burnett, GPLv2+ (see licensing note above)' },
+  celtic:     { label: 'Celtic', attribution: 'Piece set "Celtic" by Maurizio Monge, MIT License' },
+  chessnut:   { label: 'Chessnut', attribution: 'Piece set "Chessnut" by Alexis Luengas, Apache License 2.0' },
+  fantasy:    { label: 'Fantasy', attribution: 'Piece set "Fantasy" by Maurizio Monge, MIT License' },
+  spatial:    { label: 'Spatial', attribution: 'Piece set "Spatial" by Maurizio Monge, MIT License' },
+  rhosgfx:    { label: 'RhosGFX', attribution: 'Piece set by RhosGFX, CC0 1.0 (public domain)' },
+  'kiwen-suwi': { label: 'Kiwen-Suwi', attribution: 'Piece set "Kiwen-Suwi" by neverRare, CC BY 4.0' },
+  firi:       { label: 'Firi', attribution: 'Piece set "Firi" by James Faure, CC BY 4.0' },
+  totoy:      { label: 'Totoy', attribution: 'Piece set "Totoy" by Kosal Sen, CC BY 4.0' },
+  papercut:   { label: 'Papercut', attribution: 'Piece set "Papercut" by Nikolay Anzarov, CC BY 4.0' },
 };
 
 export const BOARD_THEMES: Record<Exclude<BoardTheme, 'custom'>, { light: string; dark: string; label: string }> = {
