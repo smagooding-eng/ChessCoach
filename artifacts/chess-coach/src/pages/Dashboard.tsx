@@ -92,7 +92,7 @@ export function Dashboard() {
         });
         if (!r.ok) return;
         const { jobId } = await r.json() as { jobId: string };
-        if (jobId) trackImportJob(jobId, platform, autoImportUsername);
+        if (jobId) trackImportJob(jobId, platform, autoImportUsername, true);
       } catch {
         // Silent by design -- see comment above.
       }

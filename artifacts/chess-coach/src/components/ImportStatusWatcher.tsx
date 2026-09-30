@@ -16,7 +16,18 @@ const TEXT_LIGHT = '#e8e6e3';
 const TEXT_MUTED = '#9e9b98';
 const BORDER = 'rgba(255,255,255,0.08)';
 
-type Job = { jobId: string; platform: 'chesscom' | 'lichess'; user: string; addedAt: number };
+// silent: true marks a job kicked off automatically in the background
+// (the dashboard's auto-fetch-on-load check) rather than a manual click
+// on the Import page's "Import" button. Silent jobs never show the
+// "We're importing your games..." starting popup at all, and only show
+// the "ready" completion popup if genuine new games actually turned up
+// (result.imported > 0) -- otherwise every dashboard visit would pop up
+// two notifications for an auto-check that found nothing new, which is
+// exactly the annoyance this flag exists to prevent. Manual imports
+// (silent undefined/false) keep showing both popups unconditionally,
+// since the user explicitly asked for that action and deserves
+// confirmation either way.
+type Job = { jobId: string; platform: 'chesscom' | 'lichess'; user: string; addedAt: number; silent?: boolean };
 
 function readJobs(userId: string | null | undefined): Job[] {
   if (!userId) return [];
@@ -54,13 +65,13 @@ function writeJobs(userId: string, jobs: Job[], skipEventIfUnchanged?: Job[]) {
   window.dispatchEvent(new CustomEvent('import-jobs-changed'));
 }
 
-export function trackImportJob(jobId: string, platform: 'chesscom' | 'lichess', user: string) {
+export function trackImportJob(jobId: string, platform: 'chesscom' | 'lichess', user: string, silent?: boolean) {
   // We don't know the userId here cheaply; store under a global key keyed by 'current'
   // Instead, append to a session list and let the watcher (which knows userId) migrate it
   try {
     const raw = sessionStorage.getItem('newImportJobs') || '[]';
     const arr = JSON.parse(raw) as Job[];
-    arr.push({ jobId, platform, user, addedAt: Date.now() });
+    arr.push({ jobId, platform, user, addedAt: Date.now(), ...(silent ? { silent: true } : {}) });
     sessionStorage.setItem('newImportJobs', JSON.stringify(arr));
     window.dispatchEvent(new CustomEvent('import-jobs-changed'));
   } catch { /* ignore */ }
@@ -108,6 +119,11 @@ export function ImportStatusWatcher() {
 
         const stillPending: Job[] = [];
         const newlyDone: Job[] = [];
+        // Jobs that finished but shouldn't pop up a banner -- either a
+        // silent (auto-triggered) job that found zero new games, which
+        // is the expected, unremarkable outcome of most background
+        // checks, not something worth interrupting the user for.
+        let anyQuietCompletion = false;
 
         for (const job of jobs) {
           try {
@@ -117,11 +133,16 @@ export function ImportStatusWatcher() {
               if (Date.now() - job.addedAt < 30 * 60 * 1000) stillPending.push(job);
               continue;
             }
-            const data = await r.json() as { status: string };
+            const data = await r.json() as { status: string; result?: { imported?: number } | null };
             if (data.status === 'pending') {
               stillPending.push(job);
             } else if (data.status === 'done') {
-              newlyDone.push(job);
+              const importedCount = data.result?.imported ?? 0;
+              if (job.silent && importedCount === 0) {
+                anyQuietCompletion = true;
+              } else {
+                newlyDone.push(job);
+              }
             } else {
               // error — drop it silently (the user can retry from Import page)
             }
@@ -131,12 +152,16 @@ export function ImportStatusWatcher() {
         }
 
         writeJobs(userId, stillPending, jobs);
-        setPendingCount(stillPending.length);
+        // Only non-silent jobs drive the "We're importing..." starting
+        // banner -- a silent background check should never show it.
+        setPendingCount(stillPending.filter(j => !j.silent).length);
 
-        if (newlyDone.length > 0) {
+        if (newlyDone.length > 0 || anyQuietCompletion) {
           invalidateEloCache();
           queryClient.invalidateQueries({ queryKey: ['/api/games'] });
           queryClient.invalidateQueries({ queryKey: ['/api/analysis/summary'] });
+        }
+        if (newlyDone.length > 0) {
           setCompleted(prev => [...prev, ...newlyDone]);
           setBannerVisible(true);
         }
