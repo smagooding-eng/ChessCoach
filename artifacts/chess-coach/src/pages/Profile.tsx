@@ -1815,6 +1815,7 @@ export function Profile() {
               { id: 'blitz_5_0', label: '5 min' },
               { id: 'blitz_5_3', label: '5 | 3' },
               { id: 'rapid_10_0', label: '10 min' },
+              { id: 'rapid_15_0', label: '15 min' },
             ].map(tc => {
               const r = liveRatings?.ratings[tc.id];
               return (

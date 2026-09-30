@@ -16,9 +16,10 @@ const TC_META: Record<LiveHistoryGame['timeControl'], { label: string; sub: stri
   blitz_5_0:  { label: '5 min',  sub: 'Blitz', icon: Zap },
   blitz_5_3:  { label: '5 | 3',  sub: 'Blitz', icon: Zap },
   rapid_10_0: { label: '10 min', sub: 'Rapid', icon: Clock },
+  rapid_15_0: { label: '15 min', sub: 'Rapid', icon: Clock },
 };
 
-const TC_ORDER: LiveHistoryGame['timeControl'][] = ['blitz_5_0', 'blitz_5_3', 'rapid_10_0'];
+const TC_ORDER: LiveHistoryGame['timeControl'][] = ['blitz_5_0', 'blitz_5_3', 'rapid_10_0', 'rapid_15_0'];
 
 function RatingChart({ points, width = 320, height = 120 }: { points: { rating: number; finishedAt: string }[]; width?: number; height?: number }) {
   if (points.length < 1) return null;
@@ -189,6 +190,7 @@ function FrequentOpponents({ games }: { games: LiveHistoryGame[] }) {
     { id: 'blitz_5_0', label: '5 min' },
     { id: 'blitz_5_3', label: '5 | 3' },
     { id: 'rapid_10_0', label: '10 min' },
+    { id: 'rapid_15_0', label: '15 min' },
   ];
 
   return (
@@ -340,6 +342,7 @@ export function LiveHistory() {
     { id: 'blitz_5_0', label: '5+0' },
     { id: 'blitz_5_3', label: '5+3' },
     { id: 'rapid_10_0', label: '10+0' },
+    { id: 'rapid_15_0', label: '15+0' },
   ];
   const listModeOptions: { id: ModeFilter; label: string }[] = [
     { id: 'all', label: 'All' },
@@ -350,7 +353,7 @@ export function LiveHistory() {
   // Build chronological rating progression per time control (rankedonly + ratingAfter present)
   const seriesByTc = useMemo(() => {
     const out: Record<string, { rating: number; finishedAt: string }[]> = {
-      blitz_5_0: [], blitz_5_3: [], rapid_10_0: [],
+      blitz_5_0: [], blitz_5_3: [], rapid_10_0: [], rapid_15_0: [],
     };
     // games come back DESC by finishedAt; reverse to get chronological order
     for (const g of [...games].reverse()) {
@@ -365,6 +368,7 @@ export function LiveHistory() {
       blitz_5_0: { w: 0, l: 0, d: 0 },
       blitz_5_3: { w: 0, l: 0, d: 0 },
       rapid_10_0: { w: 0, l: 0, d: 0 },
+      rapid_15_0: { w: 0, l: 0, d: 0 },
     };
     for (const g of games) {
       const s = out[g.timeControl];

@@ -13,6 +13,7 @@ const TC_OPTIONS = [
   { id: 'blitz_5_0',  label: '5 min',  sub: 'Blitz', icon: Zap },
   { id: 'blitz_5_3',  label: '5 | 3',  sub: 'Blitz', icon: Zap },
   { id: 'rapid_10_0', label: '10 min', sub: 'Rapid', icon: Clock },
+  { id: 'rapid_15_0', label: '15 min', sub: 'Rapid', icon: Clock },
 ];
 
 export function LivePlay() {

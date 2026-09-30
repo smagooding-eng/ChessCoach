@@ -5,7 +5,7 @@ export interface LiveHistoryGame {
   id: string;
   gamesId: number | null;
   mode: 'casual' | 'ranked';
-  timeControl: 'blitz_5_0' | 'blitz_5_3' | 'rapid_10_0';
+  timeControl: 'blitz_5_0' | 'blitz_5_3' | 'rapid_10_0' | 'rapid_15_0';
   color: 'white' | 'black';
   opponentUsername: string;
   result: 'win' | 'loss' | 'draw';

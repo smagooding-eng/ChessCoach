@@ -21,6 +21,7 @@ import landingFunnelRouter from "./landingFunnel";
 import trapsRouter from "./traps";
 import beginnerCoursesRouter from "./beginnerCourses";
 import shopRouter from "./shop";
+import pushRouter from "./push";
 import { requirePremium } from "../middlewares/authMiddleware";
 import { db, pageViewsTable } from "@workspace/db";
 
@@ -44,6 +45,7 @@ router.use(landingFunnelRouter);
 router.use(trapsRouter);
 router.use(beginnerCoursesRouter);
 router.use(shopRouter);
+router.use(pushRouter);
 
 router.post("/track", async (req: Request, res: Response) => {
   try {

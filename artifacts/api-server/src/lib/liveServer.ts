@@ -17,7 +17,7 @@ import { fetchLichessProfile } from './lichess';
 import { usersTable } from '@workspace/db';
 import { eq } from 'drizzle-orm';
 
-export type TimeControlId = 'blitz_5_0' | 'blitz_5_3' | 'rapid_10_0';
+export type TimeControlId = 'blitz_5_0' | 'blitz_5_3' | 'rapid_10_0' | 'rapid_15_0';
 export type Mode = 'casual' | 'ranked';
 
 interface TimeControlSpec { id: TimeControlId; initialMs: number; incrementMs: number; label: string; }
@@ -25,6 +25,12 @@ const TIME_CONTROLS: Record<TimeControlId, TimeControlSpec> = {
   blitz_5_0:  { id: 'blitz_5_0',  initialMs: 5 * 60 * 1000, incrementMs: 0,        label: '5 min' },
   blitz_5_3:  { id: 'blitz_5_3',  initialMs: 5 * 60 * 1000, incrementMs: 3 * 1000, label: '5 | 3' },
   rapid_10_0: { id: 'rapid_10_0', initialMs: 10 * 60 * 1000,incrementMs: 0,        label: '10 min' },
+  // Same live-clock model as the three above (continuous WebSocket
+  // connection, clock ticks the whole game) -- this is NOT the 1/3/7-day
+  // correspondence formats, which need a fundamentally different
+  // turn-based game model (clock only runs on your turn, no persistent
+  // connection expected between moves) and aren't part of this change.
+  rapid_15_0: { id: 'rapid_15_0', initialMs: 15 * 60 * 1000,incrementMs: 0,        label: '15 min' },
 };
 
 const BOT_FALLBACK_MS = 30 * 1000;        // after this, spawn a bot if still queued

@@ -10,7 +10,7 @@ import {
   Activity, AlertCircle, Bold, Brain, Camera, Check, CheckCircle2, ChevronDown, ChevronRight,
   Copy, CreditCard, Crown, DollarSign, Edit3, Eye, FileText, Gamepad2, Gift, GraduationCap, Heading1, Heading2,
   History, Image, Italic, Link as LinkIcon, List, ListOrdered, Loader2, LogOut, Mail, Megaphone,
-  Minus, Palette, Play, Redo2, RefreshCw, Search, Send, Settings, Shield, Sparkles, Swords, Target, Trash2,
+  Bell, Minus, Palette, Play, Redo2, RefreshCw, Search, Send, Settings, Shield, Sparkles, Swords, Target, Trash2,
   Trophy, Type, Undo2, User, UserCheck, UserPlus, Users, Wrench, X, Zap, TrendingUp, Plus, ShoppingBag,
 } from 'lucide-react';
 
@@ -624,6 +624,8 @@ export function Admin() {
               </div>
             </div>
           )}
+
+          <PushNotificationPanel />
 
           <ShopManagementPanel />
 
@@ -2037,6 +2039,182 @@ interface ShopItemAdmin {
 }
 
 const EMPTY_SHOP_FORM = { title: '', description: '', imageUrl: '', amazonUrl: '', priceLabel: '', sortOrder: '0' };
+
+const EMPTY_PUSH_FORM = {
+  title: '', body: '', url: '', icon: '',
+  lastLoginBefore: '', lastLoginAfter: '',
+  signedUpBefore: '', signedUpAfter: '',
+  hasImportedGameSince: '', noImportedGameSince: '',
+};
+
+function PushNotificationPanel() {
+  const [form, setForm] = useState(EMPTY_PUSH_FORM);
+  const [recipientCount, setRecipientCount] = useState<number | null>(null);
+  const [counting, setCounting] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState('');
+  const [result, setResult] = useState<{ sent: number; failed: number; pruned: number } | null>(null);
+
+  const filterFields = ['lastLoginBefore', 'lastLoginAfter', 'signedUpBefore', 'signedUpAfter', 'hasImportedGameSince', 'noImportedGameSince'] as const;
+
+  const buildFilterBody = () => {
+    const body: Record<string, string> = {};
+    for (const f of filterFields) {
+      if (form[f]) body[f] = new Date(form[f]).toISOString();
+    }
+    return body;
+  };
+
+  const previewCount = async () => {
+    setCounting(true);
+    setError('');
+    setResult(null);
+    try {
+      const res = await apiFetch('/api/admin/push/preview-count', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(buildFilterBody()),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.details ? `${data.error} — ${data.details}` : (data.error || 'Failed to count recipients.'));
+        return;
+      }
+      setRecipientCount(data.recipientCount);
+    } catch {
+      setError('Connection error while counting recipients.');
+    } finally {
+      setCounting(false);
+    }
+  };
+
+  const send = async () => {
+    if (!form.title.trim() || !form.body.trim()) {
+      setError('Title and body are both required.');
+      return;
+    }
+    if (recipientCount === null) {
+      setError('Preview the recipient count first, so you know who this is actually going to.');
+      return;
+    }
+    if (!confirm(`Send this notification to ${recipientCount.toLocaleString()} device${recipientCount === 1 ? '' : 's'}? This can't be undone.`)) return;
+
+    setSending(true);
+    setError('');
+    setResult(null);
+    try {
+      const res = await apiFetch('/api/admin/push/send', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: form.title.trim(),
+          body: form.body.trim(),
+          url: form.url.trim() || undefined,
+          icon: form.icon.trim() || undefined,
+          ...buildFilterBody(),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.details ? `${data.error} — ${data.details}` : (data.error || 'Failed to send.'));
+        return;
+      }
+      setResult(data);
+      setRecipientCount(null);
+    } catch {
+      setError('Connection error while sending.');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const inputStyle = 'w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary/50';
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="rounded-xl border border-border/40 bg-card overflow-hidden"
+    >
+      <div className="px-5 py-3 border-b border-border/30 bg-blue-500/5 flex items-center gap-2">
+        <Bell className="w-4 h-4 text-blue-400" />
+        <h3 className="text-sm font-bold text-blue-400">Send Push Notification</h3>
+      </div>
+      <div className="p-4">
+        <p className="text-xs text-muted-foreground mb-3">
+          Requires VAPID keys configured on the server. Recipients are limited to users who have actually granted notification permission on at least one device — this can never reach someone who hasn't opted in.
+        </p>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">
+          <input className={inputStyle} placeholder="Title *" value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} />
+          <input className={inputStyle} placeholder="Link to open on tap (optional)" value={form.url} onChange={e => setForm(f => ({ ...f, url: e.target.value }))} />
+        </div>
+        <textarea className={cn(inputStyle, 'mb-3')} rows={2} placeholder="Body *" value={form.body} onChange={e => setForm(f => ({ ...f, body: e.target.value }))} />
+
+        <div className="pt-3 border-t border-border/20">
+          <p className="text-xs font-bold text-muted-foreground mb-2">Audience filters — leave blank to reach everyone with an active subscription</p>
+          <div className="grid grid-cols-2 gap-2 mb-2">
+            <div>
+              <label className="text-[10px] text-muted-foreground block mb-1">Hasn't logged in since</label>
+              <input type="date" className={inputStyle} value={form.lastLoginBefore} onChange={e => setForm(f => ({ ...f, lastLoginBefore: e.target.value }))} />
+            </div>
+            <div>
+              <label className="text-[10px] text-muted-foreground block mb-1">Logged in since</label>
+              <input type="date" className={inputStyle} value={form.lastLoginAfter} onChange={e => setForm(f => ({ ...f, lastLoginAfter: e.target.value }))} />
+            </div>
+            <div>
+              <label className="text-[10px] text-muted-foreground block mb-1">Signed up before</label>
+              <input type="date" className={inputStyle} value={form.signedUpBefore} onChange={e => setForm(f => ({ ...f, signedUpBefore: e.target.value }))} />
+            </div>
+            <div>
+              <label className="text-[10px] text-muted-foreground block mb-1">Signed up since</label>
+              <input type="date" className={inputStyle} value={form.signedUpAfter} onChange={e => setForm(f => ({ ...f, signedUpAfter: e.target.value }))} />
+            </div>
+            <div>
+              <label className="text-[10px] text-muted-foreground block mb-1">Has imported a game since</label>
+              <input type="date" className={inputStyle} value={form.hasImportedGameSince} onChange={e => setForm(f => ({ ...f, hasImportedGameSince: e.target.value }))} />
+            </div>
+            <div>
+              <label className="text-[10px] text-muted-foreground block mb-1">No games imported since (inactive)</label>
+              <input type="date" className={inputStyle} value={form.noImportedGameSince} onChange={e => setForm(f => ({ ...f, noImportedGameSince: e.target.value }))} />
+            </div>
+          </div>
+        </div>
+
+        {error && <p className="text-xs text-red-400 mt-2">{error}</p>}
+        {result && (
+          <p className="text-xs text-primary mt-2">
+            Sent to {result.sent.toLocaleString()} device(s). {result.failed > 0 && `${result.failed} failed. `}{result.pruned > 0 && `${result.pruned} dead subscription(s) removed.`}
+          </p>
+        )}
+
+        <div className="flex items-center gap-2 mt-3">
+          <button
+            onClick={previewCount}
+            disabled={counting}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold bg-white/5 text-foreground border border-white/10 disabled:opacity-50"
+          >
+            {counting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Search className="w-3.5 h-3.5" />}
+            Preview recipient count
+          </button>
+          {recipientCount !== null && (
+            <span className="text-xs font-bold text-foreground">{recipientCount.toLocaleString()} recipient{recipientCount === 1 ? '' : 's'}</span>
+          )}
+          <button
+            onClick={send}
+            disabled={sending || recipientCount === null}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold bg-primary text-primary-foreground disabled:opacity-50 ml-auto"
+          >
+            {sending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+            Send
+          </button>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
 
 function ShopManagementPanel() {
   const [items, setItems] = useState<ShopItemAdmin[]>([]);
