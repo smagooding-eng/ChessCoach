@@ -1029,8 +1029,15 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
       {/* ── LESSON TAB ────────────────────────────────────────────────────── */}
       {tab === 'lesson' && (
         <div className="flex flex-col">
-          {/* Commentary bubble */}
-          <div className="px-2 pt-2 pb-0.5 md:px-3 md:pt-3 md:pb-1">
+          {/* Commentary bubble -- capped height with its own internal
+              scroll, so a longer intro message (the first screen's text
+              is often longer than a per-move comment) scrolls within
+              itself instead of pushing the board down past the
+              fullscreen container's overflow:hidden boundary, which is
+              what was clipping the board on the first screen. The board
+              below this is the thing that must never be cut off; this
+              bubble is the one allowed to need its own scroll instead. */}
+          <div className="px-2 pt-2 pb-0.5 md:px-3 md:pt-3 md:pb-1 max-h-[22vh] overflow-y-auto shrink-0">
             <AnimatePresence mode="wait">
               <motion.div
                 key={currentStep}

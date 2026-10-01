@@ -1152,7 +1152,58 @@ interface CourseOutput {
   lessons: CourseLesson[];
 }
 
-function reconstructPgnFromGames(lesson: CourseLesson, gamePgns: string[]): { pgn: string; fixPgn?: string; drillFen?: string } | null {
+// Generates real, move-specific explanations for a mistake sequence,
+// replacing the old generic placeholders ("Leading up to the critical
+// moment" / "This was the critical error" / "The consequence of the
+// mistake" / "The correct move") that told the learner nothing about
+// WHY any given move mattered. Grounded ONLY in the actual move list
+// and resulting FENs passed in -- same discipline as the other
+// fact-grounded prompts in this file, so the model explains what
+// actually happened rather than inventing tactics that aren't there.
+// Runs once per lesson at course-generation time, not live per page
+// view (see reconstructPgnFromGames's caller chain), so the extra
+// latency/cost of one more AI call here is a one-time generation cost,
+// not a per-request one.
+async function generateMoveExplanations(moves: {
+  san: string; fenAfter: string; role: 'context' | 'mistake' | 'consequence' | 'fix';
+}[]): Promise<string[] | null> {
+  const moveList = moves.map((m, idx) =>
+    `${idx + 1}. ${m.san} [${m.role}] -> position after this move: ${m.fenAfter}`
+  ).join("\n");
+
+  const prompt = `You are a chess coach annotating a real sequence of moves from a student's own game for a lesson. Each move below is labeled with its role in the story:
+- "context": a move before the mistake -- explain briefly what it accomplishes or what it's preparing/defending against.
+- "mistake": the losing move itself -- explain briefly and specifically WHY it is a mistake (what it gives up, allows, or fails to address). Do not just call it "the critical error."
+- "consequence": a REAL move that was actually played after the mistake, showing how the position actually got worse -- explain briefly HOW this specific move exploits or follows from the mistake, not just that "this is the consequence."
+- "fix": the stronger move the engine preferred instead of the mistake -- explain briefly WHY it is better than what was actually played.
+
+Moves (in order):
+${moveList}
+
+Write ONE short explanation (max 18 words, plain language, no chess notation repeated back) for EACH move above, in the same order. Ground every explanation ONLY in the move itself and the position given -- do not invent threats, tactics, or piece activity you cannot see from the move and position listed.
+
+Return valid JSON: {"explanations": ["...", "...", ...]} with exactly ${moves.length} strings, in the same order as the moves above.`;
+
+  try {
+    const response = await openai.chat.completions.create({
+      model: "gpt-5.6-luna",
+      max_completion_tokens: 700,
+      messages: [{ role: "user", content: prompt }],
+      response_format: { type: "json_object" },
+    });
+    void trackAiUsage({ userId: undefined, feature: AI_FEATURES.LESSON_CONTENT, model: "gpt-5.6-luna", usage: response.usage });
+    const parsed = JSON.parse(response.choices[0]?.message?.content ?? "{}") as { explanations?: string[] };
+    if (!Array.isArray(parsed.explanations) || parsed.explanations.length !== moves.length) return null;
+    return parsed.explanations;
+  } catch {
+    // A failed AI call here should never break lesson generation --
+    // the caller falls back to the old generic comments when this
+    // returns null, so a lesson still gets created either way.
+    return null;
+  }
+}
+
+async function reconstructPgnFromGames(lesson: CourseLesson, gamePgns: string[]): Promise<{ pgn: string; fixPgn?: string; drillFen?: string } | null> {
   const Chess = require("chess.js").Chess;
   if (!lesson.content || !gamePgns.length) return null;
 
@@ -1195,43 +1246,63 @@ function reconstructPgnFromGames(lesson: CourseLesson, gamePgns: string[]): { pg
           for (let j = 0; j < startIdx; j++) replay.move(history[j].san);
           const startFen = replay.fen();
 
-          const pgnParts: string[] = [];
+          // Pass 1: play out the moves to collect the SAN + resulting FEN
+          // + narrative role for each one, without building any comment
+          // text yet -- the AI call below needs the full move list and
+          // real positions first, so it can explain each move in context
+          // rather than one at a time with no idea what came before or after.
           const builder = new Chess(startFen);
+          const moveInfos: { j: number; mn: number; black: boolean; san: string; fenAfter: string; role: 'context' | 'mistake' | 'consequence' }[] = [];
           for (let j = startIdx; j <= endIdx; j++) {
             const m = history[j];
             const gi = baseColorOffset + j;
             const mn = baseMoveNum + Math.floor(gi / 2);
             const black = gi % 2 === 1;
-
-            let comment = "";
-            if (j === i) {
-              comment = ` {[MISTAKE] This was the critical error.}`;
-            } else if (j < i) {
-              comment = ` {Leading up to the critical moment.}`;
-            } else {
-              comment = ` {The consequence of the mistake.}`;
-            }
-
             try {
               builder.move(m.san);
             } catch {
               break;
             }
-
-            if (!black) {
-              pgnParts.push(`${mn}. ${m.san}${comment}`);
-            } else if (j === startIdx) {
-              pgnParts.push(`${mn}... ${m.san}${comment}`);
-            } else {
-              pgnParts.push(`${m.san}${comment}`);
-            }
+            moveInfos.push({
+              j, mn, black, san: m.san, fenAfter: builder.fen(),
+              role: j === i ? 'mistake' : j < i ? 'context' : 'consequence',
+            });
           }
 
-          if (pgnParts.length < 2) continue;
+          if (moveInfos.length < 2) continue;
+
+          const aiExplanations = await generateMoveExplanations(
+            moveInfos.map(mi => ({ san: mi.san, fenAfter: mi.fenAfter, role: mi.role }))
+          );
+
+          const pgnParts: string[] = moveInfos.map((mi, idx) => {
+            const explanation = aiExplanations?.[idx];
+            const comment = explanation
+              ? ` {${mi.role === 'mistake' ? '[MISTAKE] ' : ''}${explanation}}`
+              : mi.role === 'mistake'
+                ? ` {[MISTAKE] This was the critical error.}`
+                : mi.role === 'context'
+                  ? ` {Leading up to the critical moment.}`
+                  : ` {The consequence of the mistake.}`;
+            if (!mi.black) return `${mi.mn}. ${mi.san}${comment}`;
+            if (idx === 0) return `${mi.mn}... ${mi.san}${comment}`;
+            return `${mi.san}${comment}`;
+          });
 
           const preMistake = new Chess(startFen);
           for (let j = startIdx; j < i; j++) preMistake.move(history[j].san);
           const drillFen = preMistake.fen();
+
+          // Reuse the context-move explanations already generated above --
+          // the fix line shares the exact same lead-up moves, just a
+          // different continuation, so there's no reason to ask the
+          // model to explain the same moves twice.
+          const explanationByMoveIndex = new Map<number, string>();
+          if (aiExplanations) {
+            moveInfos.forEach((mi, idx) => {
+              if (aiExplanations[idx]) explanationByMoveIndex.set(mi.j, aiExplanations[idx]);
+            });
+          }
 
           let resolvedDrillFen = drillFen;
           let fixPgn: string | undefined;
@@ -1240,6 +1311,15 @@ function reconstructPgnFromGames(lesson: CourseLesson, gamePgns: string[]): { pg
               const fixTest = new Chess(drillFen);
               const fixMove = fixTest.move(fixSan);
               if (fixMove) {
+                const fixMoveFen = fixTest.fen();
+                // One small call for just the fix move itself, grounded
+                // in what it actually changes about the position -- not
+                // the whole context again, which is already covered above.
+                const fixExplanationResult = await generateMoveExplanations([
+                  { san: fixSan, fenAfter: fixMoveFen, role: 'fix' },
+                ]);
+                const fixExplanation = fixExplanationResult?.[0];
+
                 const fixPgnParts: string[] = [];
                 const fixBuilder = new Chess(startFen);
                 for (let j = startIdx; j < i; j++) {
@@ -1248,25 +1328,27 @@ function reconstructPgnFromGames(lesson: CourseLesson, gamePgns: string[]): { pg
                   const mn = baseMoveNum + Math.floor(gi / 2);
                   const black = gi % 2 === 1;
                   try { fixBuilder.move(m.san); } catch { break; }
+                  const contextComment = explanationByMoveIndex.get(j) ?? "Leading up to the key moment.";
                   if (!black) {
-                    fixPgnParts.push(`${mn}. ${m.san} {Leading up to the key moment.}`);
+                    fixPgnParts.push(`${mn}. ${m.san} {${contextComment}}`);
                   } else if (j === startIdx) {
-                    fixPgnParts.push(`${mn}... ${m.san} {Leading up to the key moment.}`);
+                    fixPgnParts.push(`${mn}... ${m.san} {${contextComment}}`);
                   } else {
-                    fixPgnParts.push(`${m.san} {Leading up to the key moment.}`);
+                    fixPgnParts.push(`${m.san} {${contextComment}}`);
                   }
                 }
                 try { fixBuilder.move(fixSan); } catch {}
                 const fixGi = baseColorOffset + i;
                 const fixMn = baseMoveNum + Math.floor(fixGi / 2);
                 const fixBlack = fixGi % 2 === 1;
+                const fixComment = `[FIX] ${fixExplanation ?? 'The correct move — this avoids the mistake.'}`;
                 if (!fixBlack) {
-                  fixPgnParts.push(`${fixMn}. ${fixSan} {[FIX] The correct move — this avoids the mistake.}`);
+                  fixPgnParts.push(`${fixMn}. ${fixSan} {${fixComment}}`);
                 } else {
                   if (fixPgnParts.length === 0) {
-                    fixPgnParts.push(`${fixMn}... ${fixSan} {[FIX] The correct move — this avoids the mistake.}`);
+                    fixPgnParts.push(`${fixMn}... ${fixSan} {${fixComment}}`);
                   } else {
-                    fixPgnParts.push(`${fixSan} {[FIX] The correct move — this avoids the mistake.}`);
+                    fixPgnParts.push(`${fixSan} {${fixComment}}`);
                   }
                 }
                 if (fixPgnParts.length >= 2) {
@@ -1289,11 +1371,11 @@ function reconstructPgnFromGames(lesson: CourseLesson, gamePgns: string[]): { pg
   return null;
 }
 
-function validateAndFixPgn(lesson: CourseLesson, gamePgns?: string[], fallbackPgn?: string): { pgn: string; fixPgn?: string; drillFen?: string } {
+async function validateAndFixPgn(lesson: CourseLesson, gamePgns?: string[], fallbackPgn?: string): Promise<{ pgn: string; fixPgn?: string; drillFen?: string }> {
   const Chess = require("chess.js").Chess;
 
   if (gamePgns && gamePgns.length > 0) {
-    const reconstructed = reconstructPgnFromGames(lesson, gamePgns);
+    const reconstructed = await reconstructPgnFromGames(lesson, gamePgns);
     if (reconstructed) {
       try {
         const chess = new Chess();
@@ -1385,19 +1467,21 @@ function validateAndFixPgn(lesson: CourseLesson, gamePgns?: string[], fallbackPg
   return { pgn: fallbackPgn ?? "1. e4 {White opens with the most popular first move.} e5 {Black mirrors, contesting the center.} 2. Nf3 {Developing a knight toward the center.} Nc6 {Defending the e5 pawn.} *" };
 }
 
-function ensureAllLessonsHavePgn(course: CourseOutput, gamePgns?: string[], fallbackPgn?: string): CourseOutput {
-  return {
-    ...course,
-    lessons: course.lessons.map(lesson => {
-      const result = validateAndFixPgn(lesson, gamePgns, fallbackPgn);
-      return {
-        ...lesson,
-        examplePgn: result.pgn,
-        ...(result.fixPgn ? { fixExamplePgn: result.fixPgn } : {}),
-        ...(result.drillFen ? { drillFen: result.drillFen } : {}),
-      };
-    }),
-  };
+async function ensureAllLessonsHavePgn(course: CourseOutput, gamePgns?: string[], fallbackPgn?: string): Promise<CourseOutput> {
+  // Promise.all rather than a plain .map() -- validateAndFixPgn is async
+  // now (it may call out to generate real move explanations), and a
+  // synchronous .map() over an async function would return an array of
+  // unresolved promises instead of actually waiting for each one.
+  const lessons = await Promise.all(course.lessons.map(async lesson => {
+    const result = await validateAndFixPgn(lesson, gamePgns, fallbackPgn);
+    return {
+      ...lesson,
+      examplePgn: result.pgn,
+      ...(result.fixPgn ? { fixExamplePgn: result.fixPgn } : {}),
+      ...(result.drillFen ? { drillFen: result.drillFen } : {}),
+    };
+  }));
+  return { ...course, lessons };
 }
 
 // ── Fact-grounded course generation ──────────────────────────────────────
@@ -2137,7 +2221,7 @@ Respond with valid JSON:
 
     const content = response.choices[0]?.message?.content ?? "{}";
     const parsed = JSON.parse(content) as CourseOutput;
-    return ensureAllLessonsHavePgn(parsed, relatedGamePgns);
+    return await ensureAllLessonsHavePgn(parsed, relatedGamePgns);
   } catch (err) {
     logger.error({ err }, "Failed to generate exploit course with OpenAI");
     throw err;
@@ -2252,7 +2336,7 @@ Respond with valid JSON:
 
     const content = response.choices[0]?.message?.content ?? "{}";
     const parsed = JSON.parse(content) as CourseOutput;
-    return ensureAllLessonsHavePgn(parsed, relatedGamePgns);
+    return await ensureAllLessonsHavePgn(parsed, relatedGamePgns);
   } catch (err) {
     logger.error({ err }, "Failed to generate course with OpenAI");
     throw err;
@@ -2483,7 +2567,7 @@ Respond with valid JSON:
 
     const content = response.choices[0]?.message?.content ?? "{}";
     const parsed = JSON.parse(content) as CourseOutput;
-    return ensureAllLessonsHavePgn(parsed, gamePgns, ENDGAME_FALLBACK_PGN);
+    return await ensureAllLessonsHavePgn(parsed, gamePgns, ENDGAME_FALLBACK_PGN);
   } catch (err) {
     logger.error({ err, type }, "Failed to generate endgame course");
     throw err;
