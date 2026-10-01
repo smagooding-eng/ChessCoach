@@ -14,15 +14,6 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-self.addEventListener('fetch', (event) => {
-  if (event.request.method !== 'GET') return;
-  const url = new URL(event.request.url);
-  if (url.pathname.includes('/api/')) return;
-  // Never cache HTML, JS, CSS bundles — always fetch fresh from network.
-  // Only the SW itself benefits from caching here, but we keep it minimal.
-  event.respondWith(fetch(event.request).catch(() => caches.match(event.request)));
-});
-
 // Fires when a push service delivers a message from the server (see
 // api-server/src/lib/pushNotifications.ts, which sends a JSON payload
 // shaped like { title, body, url?, icon? }). This only runs while the
