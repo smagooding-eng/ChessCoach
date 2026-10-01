@@ -3,6 +3,7 @@ import { PageHero } from '@/components/DesignSystem';
 import { useLocation } from 'wouter';
 import { useUser } from '@/hooks/use-user';
 import { apiFetch } from '@/lib/api';
+import { useDashboardRedesignFlag, setDashboardRedesignEnabled } from '@/hooks/use-app-config';
 import { cn } from '@/lib/utils';
 import { Link } from 'wouter';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -624,6 +625,8 @@ export function Admin() {
               </div>
             </div>
           )}
+
+          <DashboardRedesignTogglePanel />
 
           <PushNotificationPanel />
 
@@ -2046,6 +2049,69 @@ const EMPTY_PUSH_FORM = {
   signedUpBefore: '', signedUpAfter: '',
   hasImportedGameSince: '', noImportedGameSince: '',
 };
+
+// Moved here from Profile > Account on explicit instruction, then
+// upgraded from a per-account preference to a true global flag on
+// further instruction ("All users"). The value now lives server-side
+// (app_config table, see appConfig.ts) and every client -- logged in or
+// not -- reads the same one via useDashboardRedesignFlag(). Admin.tsx's
+// own page-level access is already gated on authUser?.isAdmin (enforced
+// both in App.tsx's ProtectedRoute wrapper and again in this page's own
+// render guard), so this panel being admin-only is automatic; the
+// backend route also independently enforces requireAdmin regardless of
+// what calls it.
+function DashboardRedesignTogglePanel() {
+  const { enabled, loading, refetch } = useDashboardRedesignFlag();
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  const toggle = async () => {
+    setSaving(true);
+    setError('');
+    const result = await setDashboardRedesignEnabled(!enabled);
+    if (!result) {
+      setError('Failed to update -- try again.');
+      setSaving(false);
+      return;
+    }
+    await refetch();
+    setSaving(false);
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="rounded-xl border border-border/40 bg-card overflow-hidden"
+    >
+      <div className="px-5 py-3 border-b border-border/30 bg-emerald-500/5 flex items-center gap-2">
+        <Sparkles className="w-4 h-4 text-emerald-400" />
+        <h3 className="text-sm font-bold text-emerald-400">New Dashboard Design (all users)</h3>
+      </div>
+      <div className="p-4">
+        <button
+          onClick={toggle}
+          disabled={loading || saving}
+          className="w-full flex items-center justify-between disabled:opacity-50"
+        >
+          <div className="text-left">
+            <p className="text-sm font-bold text-foreground">
+              {loading ? 'Loading…' : enabled ? 'On — every user sees the new Home, Games, and Analysis' : 'Off — every user sees the current design'}
+            </p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              This is global, not a personal preview -- flipping it changes what every signed-in and logged-out visitor sees immediately.
+            </p>
+          </div>
+          <div className="w-10 h-6 rounded-full flex items-center px-0.5 transition-colors shrink-0"
+            style={{ background: enabled ? '#7fd14f' : 'rgba(255,255,255,.15)', justifyContent: enabled ? 'flex-end' : 'flex-start' }}>
+            {saving ? <Loader2 className="w-4 h-4 animate-spin text-white" /> : <div className="w-5 h-5 rounded-full bg-white" />}
+          </div>
+        </button>
+        {error && <p className="text-xs text-red-400 mt-2">{error}</p>}
+      </div>
+    </motion.div>
+  );
+}
 
 function PushNotificationPanel() {
   const [form, setForm] = useState(EMPTY_PUSH_FORM);
