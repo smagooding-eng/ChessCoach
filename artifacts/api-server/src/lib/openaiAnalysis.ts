@@ -1879,8 +1879,17 @@ function describeMoveDeterministically(san: string, move: { piece: string; from:
   return `Continues development with the ${pieceName}.`;
 }
 
-/** Deterministically build the PGN context around a real mistake — no GPT involved. */
-function buildContextPgn(mistake: TeachableMistake, useBestMove: boolean): string {
+// Was "Deterministically build the PGN context around a real mistake —
+// no GPT involved" -- that was the actual root cause of the generic
+// board commentary ("This is the move being reviewed" / "{move} is the
+// engine's preferred move here" / mechanical move descriptions like
+// "Captures the knight on d7"), completely disconnected from the real,
+// well-grounded AI explanation writeGroundedLessonContent() already
+// generates for this exact same mistake's text panel. Now uses the same
+// generateMoveExplanations() helper that fixed reconstructPgnFromGames,
+// grounded in the real moves and positions, with the old deterministic
+// text kept only as the fallback if the AI call fails.
+async function buildContextPgn(mistake: TeachableMistake, useBestMove: boolean): Promise<string> {
   const Chess = require("chess.js").Chess;
   const replay = new Chess(mistake.fenBeforeMistake);
   const isBlackToMove = mistake.fenBeforeMistake.split(" ")[1] === "b";
@@ -1892,26 +1901,50 @@ function buildContextPgn(mistake: TeachableMistake, useBestMove: boolean): strin
 
   if (useBestMove) {
     const bestSan = mistake.bestMoveSan;
-    try { replay.move(bestSan); } catch { return `[FEN "${mistake.fenBeforeMistake}"]\n\n*`; }
-    tokens.push(`${bestSan} {[FIX] ${bestSan} is the engine's preferred move here.}`);
+    let fixResult;
+    try { fixResult = replay.move(bestSan); } catch { return `[FEN "${mistake.fenBeforeMistake}"]\n\n*`; }
+
+    const fixMoveInfos: { san: string; fenAfter: string; role: 'context' | 'mistake' | 'consequence' | 'fix' }[] =
+      [{ san: bestSan, fenAfter: replay.fen(), role: 'fix' }];
+    const fixMoveResults: typeof fixResult[] = [fixResult];
     for (let i = 1; i < mistake.bestLineSan.length && i < 5; i++) {
       const san = mistake.bestLineSan[i];
       try {
         const moveResult = replay.move(san);
-        const desc = describeMoveDeterministically(san, moveResult);
-        tokens.push(`${san} {${desc}}`);
+        fixMoveInfos.push({ san, fenAfter: replay.fen(), role: 'consequence' });
+        fixMoveResults.push(moveResult);
       } catch { break; }
     }
+    const fixExplanations = await generateMoveExplanations(fixMoveInfos);
+    fixMoveInfos.forEach((mi, idx) => {
+      const explanation = fixExplanations?.[idx];
+      const comment = mi.role === 'fix'
+        ? `[FIX] ${explanation ?? `${bestSan} is the engine's preferred move here.`}`
+        : (explanation ?? describeMoveDeterministically(mi.san, fixMoveResults[idx]!));
+      tokens.push(`${mi.san} {${comment}}`);
+    });
   } else {
-    try { replay.move(mistake.sanPlayed); } catch { return `[FEN "${mistake.fenBeforeMistake}"]\n\n*`; }
-    tokens.push(`${mistake.sanPlayed} {[MISTAKE] This is the move being reviewed.}`);
+    let mistakeResult;
+    try { mistakeResult = replay.move(mistake.sanPlayed); } catch { return `[FEN "${mistake.fenBeforeMistake}"]\n\n*`; }
+
+    const moveInfos: { san: string; fenAfter: string; role: 'context' | 'mistake' | 'consequence' | 'fix' }[] =
+      [{ san: mistake.sanPlayed, fenAfter: replay.fen(), role: 'mistake' }];
+    const moveResults: typeof mistakeResult[] = [mistakeResult];
     for (const san of mistake.consequenceSan) {
       try {
         const moveResult = replay.move(san);
-        const desc = describeMoveDeterministically(san, moveResult);
-        tokens.push(`${san} {${desc}}`);
+        moveInfos.push({ san, fenAfter: replay.fen(), role: 'consequence' });
+        moveResults.push(moveResult);
       } catch { break; }
     }
+    const explanations = await generateMoveExplanations(moveInfos);
+    moveInfos.forEach((mi, idx) => {
+      const explanation = explanations?.[idx];
+      const comment = mi.role === 'mistake'
+        ? `[MISTAKE] ${explanation ?? 'This is the move being reviewed.'}`
+        : (explanation ?? describeMoveDeterministically(mi.san, moveResults[idx]!));
+      tokens.push(`${mi.san} {${comment}}`);
+    });
   }
 
   // Number the tokens, respecting whose move it is at fenBeforeMistake.
@@ -2064,12 +2097,16 @@ Rules: The Concept section must be general chess teaching, not specific to this 
 /** Build a full CourseOutput lesson from one real, verified mistake. */
 async function buildLessonFromMistake(mistake: TeachableMistake, orderIndex: number): Promise<CourseLesson> {
   const { title, content } = await writeGroundedLessonContent(mistake);
+  const [examplePgn, fixExamplePgn] = await Promise.all([
+    buildContextPgn(mistake, false),
+    buildContextPgn(mistake, true),
+  ]);
   return {
     title,
     content,
     orderIndex,
-    examplePgn: buildContextPgn(mistake, false),
-    fixExamplePgn: buildContextPgn(mistake, true),
+    examplePgn,
+    fixExamplePgn,
     drillFen: mistake.fenBeforeMistake,
     drillExpectedMove: mistake.bestMoveSan,
     drillHint: mistake.facts.hungPiece
@@ -2106,21 +2143,28 @@ async function buildLessonFromMistakeGroup(group: TeachableMistake[], orderIndex
     ? "## The Mistake" + content.split(/##\s*The Mistake/i)[1]
     : content;
 
-  const extraChallenges: LessonChallengeOutput[] = group.slice(1).map((m) => ({
+  // Promise.all rather than a plain .map() -- buildContextPgn is async
+  // now, same reasoning as ensureAllLessonsHavePgn above.
+  const extraChallenges: LessonChallengeOutput[] = await Promise.all(group.slice(1).map(async (m) => ({
     fen: m.fenBeforeMistake,
     expectedMove: m.bestMoveSan,
     hint: m.facts.hungPiece
       ? `Watch out for the ${m.facts.hungPiece} — find the move that keeps it safe.`
       : `Look for the engine's top idea in this position.`,
-    contextPgn: buildContextPgn(m, false),
-  }));
+    contextPgn: await buildContextPgn(m, false),
+  })));
+
+  const [examplePgn, fixExamplePgn] = await Promise.all([
+    buildContextPgn(primary, false),
+    buildContextPgn(primary, true),
+  ]);
 
   return {
     title: conceptInfo ? conceptInfo.title : title,
     content: `${conceptSection}\n\n${restOfContent}`,
     orderIndex,
-    examplePgn: buildContextPgn(primary, false),
-    fixExamplePgn: buildContextPgn(primary, true),
+    examplePgn,
+    fixExamplePgn,
     drillFen: primary.fenBeforeMistake,
     drillExpectedMove: primary.bestMoveSan,
     drillHint: primary.facts.hungPiece
