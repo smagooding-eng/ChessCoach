@@ -7,6 +7,7 @@ import { useLiveRatings } from '@/hooks/use-live-ratings';
 import { useMyGames } from '@/hooks/use-games';
 import { useMyCourses } from '@/hooks/use-courses';
 import { usePushNotifications } from '@/hooks/use-push-notifications';
+import { useSettings } from '@/context/SettingsContext';
 import { Link, useLocation } from 'wouter';
 import { apiFetch } from '@/lib/api';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -1673,6 +1674,7 @@ export function Profile() {
   const { data: gamesData } = useMyGames();
   const { data: coursesData } = useMyCourses();
   const push = usePushNotifications();
+  const { useDashboardRedesign, setUseDashboardRedesign } = useSettings();
   const [, setLocation] = useLocation();
 
   const [editingUsername, setEditingUsername] = useState(false);
@@ -1914,6 +1916,31 @@ export function Profile() {
           </div>
           <div className="w-10 h-6 rounded-full flex items-center px-0.5 transition-colors shrink-0"
             style={{ background: push.isSubscribed ? G : 'rgba(255,255,255,0.15)', justifyContent: push.isSubscribed ? 'flex-end' : 'flex-start' }}>
+            <div className="w-5 h-5 rounded-full bg-white" />
+          </div>
+        </button>
+        {push.error && (
+          <p className="px-4 pb-3 text-xs" style={{ color: '#dc4343', borderBottom: `1px solid ${BORDER}` }}>{push.error}</p>
+        )}
+
+        <button
+          onClick={() => setUseDashboardRedesign(!useDashboardRedesign)}
+          className="w-full flex items-center justify-between px-4 py-3.5 transition-colors text-left"
+          style={{ borderBottom: `1px solid ${BORDER}` }}
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: '#7fd14f1a', border: '1px solid #7fd14f33' }}>
+              <Sparkles className="w-4 h-4" style={{ color: '#7fd14f' }} />
+            </div>
+            <div>
+              <p className="text-sm font-bold" style={{ color: TEXT }}>New Dashboard Design</p>
+              <p className="text-xs" style={{ color: MUTED }}>
+                {useDashboardRedesign ? 'On — tap to switch back to the current design' : 'Beta — tap to try the new design'}
+              </p>
+            </div>
+          </div>
+          <div className="w-10 h-6 rounded-full flex items-center px-0.5 transition-colors shrink-0"
+            style={{ background: useDashboardRedesign ? '#7fd14f' : 'rgba(255,255,255,.15)', justifyContent: useDashboardRedesign ? 'flex-end' : 'flex-start' }}>
             <div className="w-5 h-5 rounded-full bg-white" />
           </div>
         </button>

@@ -253,6 +253,13 @@ interface Settings {
   soundEnabled: boolean;
   promotionChoice: PromotionChoice;
   boardSize: BoardSize;
+  // Toggles the whole Home dashboard between the current layout and the
+  // new design concept (see DashboardRedesign.tsx) -- both stay fully
+  // intact and switchable, per explicit instruction not to remove the
+  // current one while trying the new one out. Defaults to false (the
+  // existing dashboard) so this ships as opt-in, not a surprise change
+  // for anyone already using the app.
+  useDashboardRedesign: boolean;
 }
 
 const APP_DEFAULT_SETTINGS: Settings = {
@@ -269,6 +276,7 @@ const APP_DEFAULT_SETTINGS: Settings = {
   soundEnabled: true,
   promotionChoice: 'queen',
   boardSize: 'standard',
+  useDashboardRedesign: false,
 };
 
 // Base key names -- actual storage keys are these suffixed with the
@@ -297,6 +305,7 @@ interface SettingsContextValue extends Settings {
   setShowCoordinates: (v: boolean) => void;
   setShowLegalMoves: (v: boolean) => void;
   setSoundEnabled: (v: boolean) => void;
+  setUseDashboardRedesign: (v: boolean) => void;
   setPromotionChoice: (v: PromotionChoice) => void;
   setBoardSize: (v: BoardSize) => void;
   boardColors: ColorPair;
@@ -388,6 +397,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     setShowCoordinates: (v) => setSettings((s) => ({ ...s, showCoordinates: v })),
     setShowLegalMoves: (v) => setSettings((s) => ({ ...s, showLegalMoves: v })),
     setSoundEnabled: (v) => setSettings((s) => ({ ...s, soundEnabled: v })),
+    setUseDashboardRedesign: (v) => setSettings((s) => ({ ...s, useDashboardRedesign: v })),
     setPromotionChoice: (v) => setSettings((s) => ({ ...s, promotionChoice: v })),
     setBoardSize: (v) => setSettings((s) => ({ ...s, boardSize: v })),
     boardColors: resolvedBoardColors,

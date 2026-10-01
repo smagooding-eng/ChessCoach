@@ -84,10 +84,33 @@ const PricingPage = lazy(() => import("@/pages/Pricing"));
 const VsImproveMyChessPage = lazy(() => import("@/pages/VsImproveMyChess"));
 const VsFreeAnalysisPage = lazy(() => import("@/pages/VsFreeAnalysis"));
 const Dashboard = lazy(() => import("@/pages/Dashboard").then(m => ({ default: m.Dashboard })));
+const DashboardRedesign = lazy(() => import("@/pages/DashboardRedesign").then(m => ({ default: m.DashboardRedesign })));
+// Picks between the current dashboard and the new design concept based
+// on the useDashboardRedesign setting -- both stay fully intact, this
+// just decides which one renders at "/". Defined here (not inside
+// Dashboard.tsx itself) so switching designs doesn't require loading
+// the other design's whole module too.
+function DashboardRouter() {
+  const { useDashboardRedesign } = useSettings();
+  return useDashboardRedesign ? <DashboardRedesign /> : <Dashboard />;
+}
 const Import = lazy(() => import("@/pages/Import").then(m => ({ default: m.Import })));
 const Games = lazy(() => import("@/pages/Games").then(m => ({ default: m.Games })));
+const GamesRedesign = lazy(() => import("@/pages/GamesRedesign").then(m => ({ default: m.GamesRedesign })));
+// Same reasoning as DashboardRouter above -- bulk review and the H2H
+// search mode only exist on the classic Games page for now, so this
+// switch is purely cosmetic for anyone who hasn't touched those features.
+function GamesRouter() {
+  const { useDashboardRedesign } = useSettings();
+  return useDashboardRedesign ? <GamesRedesign /> : <Games />;
+}
 const GameReplay = lazy(() => import("@/pages/GameReplay").then(m => ({ default: m.GameReplay })));
 const Analysis = lazy(() => import("@/pages/Analysis").then(m => ({ default: m.Analysis })));
+const AnalysisRedesign = lazy(() => import("@/pages/AnalysisRedesign").then(m => ({ default: m.AnalysisRedesign })));
+function AnalysisRouter() {
+  const { useDashboardRedesign } = useSettings();
+  return useDashboardRedesign ? <AnalysisRedesign /> : <Analysis />;
+}
 const Courses = lazy(() => import("@/pages/Courses").then(m => ({ default: m.Courses })));
 const CourseDetail = lazy(() => import("@/pages/CourseDetail").then(m => ({ default: m.CourseDetail })));
 const Endgames = lazy(() => import("@/pages/Endgames").then(m => ({ default: m.Endgames })));
@@ -173,11 +196,11 @@ function ProtectedRoute({ component: Component, fallbackNav, requireAdmin, skipW
   );
 }
 
-const PDashboard     = () => <ProtectedRoute component={Dashboard} />;
+const PDashboard     = () => <ProtectedRoute component={DashboardRouter} />;
 const PImport        = () => <ProtectedRoute component={Import} />;
-const PGames         = () => <ProtectedRoute component={Games} />;
+const PGames         = () => <ProtectedRoute component={GamesRouter} />;
 const PGameReplay    = () => <ProtectedRoute component={GameReplay} fallbackNav="/games" />;
-const PAnalysis      = () => <ProtectedRoute component={Analysis} />;
+const PAnalysis      = () => <ProtectedRoute component={AnalysisRouter} />;
 const PWeakness      = () => <ProtectedRoute component={WeaknessDetail} fallbackNav="/analysis" />;
 const PCourses       = () => <ProtectedRoute component={Courses} />;
 const PCourseDetail  = () => <ProtectedRoute component={CourseDetail} fallbackNav="/courses" />;
