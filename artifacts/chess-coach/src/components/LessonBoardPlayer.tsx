@@ -5,7 +5,7 @@ import { Chess } from 'chess.js';
 import {
   Play, Pause, SkipBack, SkipForward, ChevronLeft, ChevronRight, ChevronUp, ChevronDown,
   MessageSquare, Swords, CheckCircle2, Lightbulb, Eye, RotateCcw,
-  Trophy, Repeat2, Check, AlertTriangle, GraduationCap,
+  Trophy, Check, AlertTriangle, GraduationCap,
 } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -557,17 +557,6 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
   const [showHint, setShowHint] = useState(false);
   const [drillPosition, setDrillPosition] = useState<string>('');
 
-  // ── Repeat drill state ───────────────────────────────────────────────────────
-  const totalRepeatMoves = Math.max((steps?.length ?? 1) - 1, 0);
-  const [repeatStep, setRepeatStep] = useState(0);
-  const [repeatPosition, setRepeatPosition] = useState(() => steps?.[0]?.fen ?? START_FEN);
-  const [repeatFeedback, setRepeatFeedback] = useState<'correct' | 'wrong' | 'invalid' | null>(null);
-  const [repeatFirstTry, setRepeatFirstTry] = useState<boolean[]>(() => new Array(totalRepeatMoves).fill(true));
-  const [repeatAttempts, setRepeatAttempts] = useState(0);
-  const [repeatComplete, setRepeatComplete] = useState(false);
-
-  const repeatFirstTryScore = repeatFirstTry.filter(Boolean).length;
-
   const step = steps?.[currentStep];
   const totalSteps = steps?.length ?? 1;
   const isFirst = currentStep === 0;
@@ -637,7 +626,6 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
   }, [activeChallenge]);
 
   const [drillSelectedSq, setDrillSelectedSq] = useState<string | null>(null);
-  const [repeatSelectedSq, setRepeatSelectedSq] = useState<string | null>(null);
 
   useEffect(() => {
     if (activeChallenge) {
@@ -658,16 +646,8 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
     } catch { return []; }
   }, [activeChallenge]);
 
-  const getRepeatLegalTargets = useCallback((sq: string | null): string[] => {
-    if (!sq || !steps) return [];
-    try {
-      const chess = new Chess(steps[repeatStep]?.fen ?? START_FEN);
-      return chess.moves({ square: sq as any, verbose: true }).map(m => m.to);
-    } catch { return []; }
-  }, [steps, repeatStep]);
 
   const drillLegalTargets = useMemo(() => getDrillLegalTargets(drillSelectedSq), [drillSelectedSq, getDrillLegalTargets]);
-  const repeatLegalTargets = useMemo(() => getRepeatLegalTargets(repeatSelectedSq), [repeatSelectedSq, getRepeatLegalTargets]);
 
   const drillSquareStyles = useMemo(() => {
     const styles: Record<string, React.CSSProperties> = {};
@@ -678,14 +658,6 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
     return styles;
   }, [drillSelectedSq, drillLegalTargets, showLegalMoves]);
 
-  const repeatSquareStyles = useMemo(() => {
-    const styles: Record<string, React.CSSProperties> = {};
-    if (repeatSelectedSq) styles[repeatSelectedSq] = { background: 'rgba(100, 180, 255, 0.55)', borderRadius: '4px' };
-    if (showLegalMoves) {
-      for (const sq of repeatLegalTargets) styles[sq] = { background: 'radial-gradient(circle, rgba(100,180,255,0.55) 28%, transparent 30%)' };
-    }
-    return styles;
-  }, [repeatSelectedSq, repeatLegalTargets, showLegalMoves]);
 
   // ── Drill handlers ───────────────────────────────────────────────────────────
   const handleDrillDrop = useCallback((args: { sourceSquare: string; targetSquare: string | null; piece: unknown }) => {
@@ -761,127 +733,6 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
     setDrillState('revealed');
   };
 
-  // ── Repeat drill handlers ────────────────────────────────────────────────────
-  const repeatUserColor = steps?.[1]?.color ?? 'w';
-
-  const handleRepeatDrop = useCallback((args: { sourceSquare: string; targetSquare: string | null; piece: unknown }) => {
-    if (repeatComplete || !args.targetSquare || !steps) return false;
-    if (args.sourceSquare === args.targetSquare) return false;
-    const expected = steps[repeatStep + 1]?.san;
-    if (!expected) return false;
-
-    try {
-      const chess = new Chess(steps[repeatStep].fen);
-      const move = chess.move({ from: args.sourceSquare, to: args.targetSquare, promotion: 'q' });
-      if (!move) { flashInvalid(); return false; }
-
-      const normalize = (s: string) => s.replace(/[+#!?]/g, '').trim();
-      const isCorrect = normalize(move.san) === normalize(expected) ||
-        move.to === expected.slice(-2);
-
-      const wasFirstTry = repeatAttempts === 0;
-
-      if (isCorrect) {
-        if (!wasFirstTry) {
-          setRepeatFirstTry(prev => { const n = [...prev]; n[repeatStep] = false; return n; });
-        }
-        setRepeatPosition(chess.fen());
-        setRepeatFeedback('correct');
-        setRepeatAttempts(0);
-
-        setTimeout(() => {
-          setRepeatFeedback(null);
-          const next = repeatStep + 1;
-          if (next >= (steps.length - 1)) {
-            setRepeatComplete(true);
-          } else {
-            setRepeatStep(next);
-          }
-        }, 700);
-        return true;
-      } else {
-        setRepeatFirstTry(prev => { const n = [...prev]; n[repeatStep] = false; return n; });
-        setRepeatAttempts(a => a + 1);
-        setRepeatFeedback('wrong');
-        setTimeout(() => setRepeatFeedback(null), 700);
-        return false;
-      }
-    } catch {
-      return false;
-    }
-  }, [repeatStep, repeatComplete, steps, repeatAttempts]);
-
-  const flashInvalid = useCallback(() => {
-    setRepeatFeedback('invalid');
-    setTimeout(() => setRepeatFeedback(f => (f === 'invalid' ? null : f)), 500);
-  }, []);
-
-  const handleRepeatSquareClick = useCallback(({ square, piece }: { square: string; piece: { pieceType: string } | null }) => {
-    if (repeatComplete || !steps) return;
-    const nextMove = steps[repeatStep + 1];
-    if (!nextMove || nextMove.color !== repeatUserColor) return;
-    if (repeatSelectedSq) {
-      if (square === repeatSelectedSq) { setRepeatSelectedSq(null); return; }
-      if (repeatLegalTargets.includes(square)) {
-        handleRepeatDrop({ sourceSquare: repeatSelectedSq, targetSquare: square, piece: null });
-        setRepeatSelectedSq(null);
-        return;
-      }
-      if (piece) { setRepeatSelectedSq(square); } else { setRepeatSelectedSq(null); flashInvalid(); }
-      return;
-    }
-    if (piece) {
-      try {
-        const chess = new Chess(steps[repeatStep]?.fen ?? START_FEN);
-        if (piece.pieceType[0].toLowerCase() === chess.turn()) setRepeatSelectedSq(square);
-        else flashInvalid();
-      } catch { setRepeatSelectedSq(square); }
-    } else {
-      flashInvalid();
-    }
-  }, [repeatComplete, steps, repeatStep, repeatUserColor, repeatSelectedSq, repeatLegalTargets, handleRepeatDrop, flashInvalid]);
-
-  useEffect(() => {
-    if (tab !== 'repeat' || repeatComplete || !steps) return;
-    const nextMove = steps[repeatStep + 1];
-    if (!nextMove || !nextMove.color) return;
-    if (nextMove.color === repeatUserColor) return;
-
-    const timer = setTimeout(() => {
-      try {
-        const chess = new Chess(steps[repeatStep].fen);
-        chess.move(nextMove.san!);
-        setRepeatPosition(chess.fen());
-        const next = repeatStep + 1;
-        if (next >= steps.length - 1) {
-          setRepeatComplete(true);
-        } else {
-          setRepeatStep(next);
-        }
-      } catch {}
-    }, 600);
-    return () => clearTimeout(timer);
-  }, [tab, repeatStep, repeatComplete, steps, repeatUserColor]);
-
-  const canRepeatDrag = useCallback(({ piece }: { piece: { pieceType: string } | null }) => {
-    if (repeatComplete || !piece || !steps) return false;
-    const nextMove = steps[repeatStep + 1];
-    if (!nextMove || nextMove.color !== repeatUserColor) return false;
-    try {
-      const chess = new Chess(steps[repeatStep]?.fen ?? START_FEN);
-      return piece.pieceType[0].toLowerCase() === chess.turn();
-    } catch { return false; }
-  }, [repeatStep, repeatComplete, steps, repeatUserColor]);
-
-  const resetRepeat = () => {
-    setRepeatStep(0);
-    setRepeatPosition(steps?.[0]?.fen ?? START_FEN);
-    setRepeatFeedback(null);
-    setRepeatFirstTry(new Array(totalRepeatMoves).fill(true));
-    setRepeatAttempts(0);
-    setRepeatComplete(false);
-    setRepeatSelectedSq(null);
-  };
 
   if (!steps) {
     const fallbackFen = extractFen(activePgn) ?? START_FEN;
@@ -925,9 +776,6 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
 
   const hasComment = step && step.comment.trim().length > 0;
 
-  const repeatExpectedSan = steps[repeatStep + 1]?.san ?? null;
-  const repeatColor = steps[repeatStep + 1]?.color ?? null;
-  const repeatFullMove = steps[repeatStep + 1]?.fullMoveNumber ?? null;
 
   const userColor = steps?.[1]?.color ?? (steps?.[0]?.fen?.includes(' b ') ? 'b' : 'w');
   const boardOrientation: 'white' | 'black' = userColor === 'b' ? 'black' : 'white';
