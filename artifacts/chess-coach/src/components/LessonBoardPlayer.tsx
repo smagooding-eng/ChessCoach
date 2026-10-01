@@ -521,7 +521,16 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
     return pgn;
   }, [pgn, fixPgn, onFixTab, drillExpectedMove]);
 
-  const steps = parsePgnSteps(activePgn, content, onFixTab ? null : drillExpectedMove);
+  // drillExpectedMove here enables parsePgnSteps' own fallback: if a
+  // PGN is too short (just 1 real step) to show anything meaningful, it
+  // synthesizes a "<move> — Best Move" step from this. That fallback
+  // must only ever fire while building FIX content -- a too-short
+  // MISTAKE pgn should just show what little real data exists, never
+  // get a synthetic "Best Move" badge grafted onto it. The previous
+  // version of this line had this backwards (onFixTab ? null :
+  // drillExpectedMove), which is exactly why the Mistake tab was
+  // showing "Nxd7 — Best Move" instead of the actual mistake, 28. Ne8+.
+  const steps = parsePgnSteps(activePgn, content, onFixTab ? drillExpectedMove : null);
   const [currentStep, setCurrentStep] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   // The full move-list strip competes with the board and commentary for
