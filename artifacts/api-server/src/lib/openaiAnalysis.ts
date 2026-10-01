@@ -1192,10 +1192,24 @@ Return valid JSON: {"explanations": ["...", "...", ...]} with exactly ${moves.le
       response_format: { type: "json_object" },
     });
     void trackAiUsage({ userId: undefined, feature: AI_FEATURES.LESSON_CONTENT, model: "gpt-5.6-luna", usage: response.usage });
-    const parsed = JSON.parse(response.choices[0]?.message?.content ?? "{}") as { explanations?: string[] };
-    if (!Array.isArray(parsed.explanations) || parsed.explanations.length !== moves.length) return null;
+    const rawContent = response.choices[0]?.message?.content ?? "{}";
+    const parsed = JSON.parse(rawContent) as { explanations?: string[] };
+    if (!Array.isArray(parsed.explanations) || parsed.explanations.length !== moves.length) {
+      // This is the likely silent-failure point: the model returned
+      // something, but not shaped exactly as asked, so every call here
+      // falls back to the old generic text with zero visible trace of
+      // why. Logged loudly on purpose -- if generated courses are still
+      // showing generic narration after this, check Render's logs for
+      // this exact message to see what the model actually sent back.
+      console.error("[generateMoveExplanations] AI response did not match expected shape -- falling back to generic text.", {
+        expectedCount: moves.length,
+        rawContent,
+      });
+      return null;
+    }
     return parsed.explanations;
-  } catch {
+  } catch (err) {
+    console.error("[generateMoveExplanations] AI call threw -- falling back to generic text.", err);
     // A failed AI call here should never break lesson generation --
     // the caller falls back to the old generic comments when this
     // returns null, so a lesson still gets created either way.
