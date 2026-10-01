@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { UserProvider } from "@/context/UserContext";
 import { SettingsProvider, useSettings } from "@/context/SettingsContext";
 import { ImportStatusWatcher } from "@/components/ImportStatusWatcher";
+import { AutoPushPrompt } from "@/components/AutoPushPrompt";
 import { BackgroundJobsWatcher } from "@/components/BackgroundJobsWatcher";
 import { Layout } from "@/components/Layout";
 import { useUser } from "@/hooks/use-user";
@@ -337,6 +338,7 @@ function App() {
                   </Suspense>
                   <ImportStatusWatcher />
                   <BackgroundJobsWatcher />
+                  <AutoPushPrompt />
                 </WouterRouter>
                 <Toaster />
               </TooltipProvider>

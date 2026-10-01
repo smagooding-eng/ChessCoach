@@ -70,6 +70,23 @@ window.addEventListener("unhandledrejection", (e) => {
 
 createRoot(document.getElementById("root")!).render(<App />);
 
+// public/sw.js existed in this project already (PWA offline caching, now
+// also push notification handling -- see PieceGradientDefs... no, see
+// public/sw.js's own push/notificationclick handlers) but was never
+// actually registered anywhere. Without this, navigator.serviceWorker.
+// ready never resolves -- there's no active registration to become
+// ready -- which is why the Notifications toggle in Profile silently
+// never turned on: it was hanging forever on that line, not failing
+// with a visible error. Registered on window 'load' (standard practice)
+// so it doesn't compete with the initial page load for resources.
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/sw.js").catch((err) => {
+      console.error("Service worker registration failed:", err);
+    });
+  });
+}
+
 requestAnimationFrame(() => {
   const splash = document.getElementById("splash");
   if (splash) {
