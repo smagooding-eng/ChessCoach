@@ -6,7 +6,7 @@ import { useMyGames } from '@/hooks/use-games';
 import { GameThumb } from '@/components/GameThumb';
 import {
   Target, Puzzle, Bot, BookOpen, Camera, Crosshair, ShoppingBag,
-  ChevronRight, Swords, Sparkles,
+  ChevronRight, Swords,
 } from 'lucide-react';
 
 // This is a real, separate visual system for this one page -- not a
@@ -174,8 +174,8 @@ export function DashboardRedesign() {
             <div className="grid grid-cols-2 gap-2.5">
               {[
                 { label: 'Puzzles', sub: 'Daily puzzles', icon: Puzzle, color: RG_ORANGE, href: '/puzzles' },
-                { label: 'Practice Bots', sub: '8 opponents', icon: Bot, color: RG_VIOLET, href: '/bots' },
-                { label: 'Opening Trainer', sub: 'Drill your lines', icon: BookOpen, color: RG_GOLD, href: '/bots' },
+                { label: 'Practice Bots', sub: '8 opponents', icon: Bot, color: RG_VIOLET, href: '/practice' },
+                { label: 'Opening Trainer', sub: 'Drill your lines', icon: BookOpen, color: RG_GOLD, href: '/practice?tab=openings' },
                 { label: 'Scan Position', sub: 'Photo to board', icon: Camera, color: RG_GREEN, href: '/scan' },
               ].map((q) => (
                 <Link key={q.label} href={q.href} className="flex flex-col gap-1.5 p-3.5 rounded-2xl min-h-[110px] border transition-transform hover:-translate-y-0.5"
@@ -213,9 +213,6 @@ export function DashboardRedesign() {
         </div>
       </div>
 
-      <p style={{ color: '#6d7866' }} className="text-xs mt-5 max-w-[1280px] mx-auto flex items-center gap-1.5">
-        <Sparkles className="w-3.5 h-3.5" /> New design — beta. Switch back anytime in Settings.
-      </p>
     </div>
   );
 }
