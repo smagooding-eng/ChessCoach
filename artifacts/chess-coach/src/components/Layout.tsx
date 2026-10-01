@@ -122,8 +122,17 @@ export function Layout({ children, fullscreen }: { children: React.ReactNode; fu
   // 100vh accounts for mobile browser chrome (address bar, etc.)
   // shrinking the visible viewport, which 100vh does not.
   if (fullscreen) {
+    // overflow-y: auto, not hidden -- hidden was the actual cause of the
+    // board/intro-card getting cut off, not fixed by it. Content taller
+    // than the viewport (the lesson intro card, in particular) was
+    // becoming literally invisible rather than scrollable, which is a
+    // worse outcome than scrolling: hiding content outright is never
+    // the right fallback for "didn't fit." The compact one-screen board
+    // layout is still the goal for the interactive lesson/drill steps;
+    // this is the safety net for anything that doesn't fit that goal
+    // perfectly, not a replacement for it.
     return (
-      <div style={{ height: '100dvh', overflow: 'hidden', background: BG_DARK }}>
+      <div style={{ height: '100dvh', overflowY: 'auto', overflowX: 'hidden', background: BG_DARK }}>
         {children}
       </div>
     );

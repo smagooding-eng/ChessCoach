@@ -401,7 +401,7 @@ function parsePgnSteps(pgn: string, content?: string | null, drillExpectedMove?:
 }
 
 type DrillState = 'idle' | 'correct' | 'wrong' | 'revealed';
-type Tab = 'lesson' | 'drill' | 'repeat';
+type Tab = 'mistake' | 'fix' | 'drill';
 
 interface LessonChallengeProp {
   fen: string;
@@ -501,17 +501,27 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
     () => buildTintedPieceSet({ pieceColors, pieceShape, pieceStyle }) as unknown as typeof defaultPieces,
     [pieceColors, pieceShape, pieceStyle],
   );
+  const [tab, setTab] = useState<Tab>('mistake');
+  // tab is now the ONLY source of truth for mistake vs fix content.
+  // showFixLine (an external prop CourseDetail.tsx used to toggle based
+  // on which paragraph of the separate text narration was scrolled into
+  // view) is intentionally ignored here now -- keeping it "live" as a
+  // secondary trigger would mean scrolling unrelated text could silently
+  // override whichever tab the person actually clicked, showing fix
+  // content while the Mistake pill still looked selected. Mistake/Fix
+  // are top-level tabs the person switches explicitly now, not an
+  // implicit side effect of scroll position.
+  const onFixTab = tab === 'fix';
   const activePgn = useMemo(() => {
-    if (showFixLine) {
+    if (onFixTab) {
       if (fixPgn) return fixPgn;
       const fallback = buildFrontendFixPgn(pgn, drillExpectedMove);
       if (fallback) return fallback;
     }
     return pgn;
-  }, [pgn, fixPgn, showFixLine, drillExpectedMove]);
+  }, [pgn, fixPgn, onFixTab, drillExpectedMove]);
 
-  const steps = parsePgnSteps(activePgn, content, showFixLine ? null : drillExpectedMove);
-  const [tab, setTab] = useState<Tab>('lesson');
+  const steps = parsePgnSteps(activePgn, content, onFixTab ? null : drillExpectedMove);
   const [currentStep, setCurrentStep] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   // The full move-list strip competes with the board and commentary for
@@ -612,7 +622,7 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
   const [showingConceptIntro, setShowingConceptIntro] = useState(isMultiChallenge);
 
   const hasDrill = allChallenges.length > 0;
-  const hasRepeat = (steps?.length ?? 0) > 1;
+  const hasFix = !!fixPgn || !!drillExpectedMove;
 
   const drillMoveArrow = useMemo(() => {
     if (!activeChallenge) return null;
@@ -972,33 +982,36 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
           </linearGradient>
         </defs>
       </svg>
-      {/* ── Tab pills ─────────────────────────────────────────────────────── */}
+      {/* ── Tab pills: Mistake → Fix → Drill, in that fixed order -- this
+          is the actual narrative sequence (see the mistake and what it
+          cost, then see what should have happened instead, then prove
+          you can find it yourself), not just three unordered views. */}
       <div className="flex items-center gap-1.5 px-3 py-2 md:py-2.5 overflow-x-auto" style={{ backgroundColor: BG_CARD }}>
         <button
-          onClick={() => { setIsPlaying(false); setTab('lesson'); }}
+          onClick={() => { setIsPlaying(false); setTab('mistake'); setCurrentStep(0); }}
           className={cn(
             'flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap',
-            tab === 'lesson'
+            tab === 'mistake'
               ? 'text-white shadow-md'
               : 'text-white/50 hover:text-white/80 hover:bg-white/5'
           )}
-          style={tab === 'lesson' ? { backgroundColor: CHESSCOM_GREEN } : undefined}
+          style={tab === 'mistake' ? { backgroundColor: MISTAKE_RED } : undefined}
         >
-          <Play className="w-3 h-3" /> Lesson
+          <AlertTriangle className="w-3 h-3" /> Mistake
         </button>
 
-        {hasRepeat && (
+        {hasFix && (
           <button
-            onClick={() => { setIsPlaying(false); setTab('repeat'); resetRepeat(); }}
+            onClick={() => { setIsPlaying(false); setTab('fix'); setCurrentStep(0); }}
             className={cn(
               'flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap',
-              tab === 'repeat'
+              tab === 'fix'
                 ? 'text-white shadow-md'
                 : 'text-white/50 hover:text-white/80 hover:bg-white/5'
             )}
-            style={tab === 'repeat' ? { backgroundColor: CHESSCOM_GREEN } : undefined}
+            style={tab === 'fix' ? { backgroundColor: CHESSCOM_GREEN } : undefined}
           >
-            <Repeat2 className="w-3 h-3" /> Repeat
+            <CheckCircle2 className="w-3 h-3" /> Fix
           </button>
         )}
 
@@ -1018,16 +1031,16 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
         )}
 
         <span className="ml-auto text-[11px] text-white/40 font-mono pr-1 shrink-0">
-          {tab === 'lesson'
-            ? (currentStep > 0 ? `Move ${step?.fullMoveNumber}` : title ?? '')
-            : tab === 'repeat'
-            ? (repeatComplete ? '✓ Complete' : `${repeatStep}/${totalRepeatMoves}`)
-            : 'Find best move'}
+          {tab === 'drill' ? 'Find best move' : (currentStep > 0 ? `Move ${step?.fullMoveNumber}` : title ?? '')}
         </span>
       </div>
 
-      {/* ── LESSON TAB ────────────────────────────────────────────────────── */}
-      {tab === 'lesson' && (
+      {/* ── MISTAKE / FIX TABS ──────────────────────────────────────────────
+          Same rendering for both -- only the underlying PGN (activePgn,
+          computed above from tab) and the step data differ. The step
+          objects already carry isMistake/isFix flags that drive the red
+          "Mistake" / green "Best Move" badges correctly either way. */}
+      {(tab === 'mistake' || tab === 'fix') && (
         <div className="flex flex-col">
           {/* Commentary bubble -- capped height with its own internal
               scroll, so a longer intro message (the first screen's text
@@ -1167,9 +1180,18 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
 
               <button
                 onClick={() => {
-                  if (isPlaying) { setIsPlaying(false); }
-                  else if (isLast) { go(currentStep + 1); }
-                  else { setIsPlaying(true); }
+                  if (isPlaying) { setIsPlaying(false); return; }
+                  if (isLast) {
+                    // Reaching the end of Mistake advances into Fix;
+                    // reaching the end of Fix advances into Drill. This
+                    // is the actual point of having these as a fixed
+                    // sequence rather than three independent views --
+                    // finishing one step naturally leads into the next.
+                    if (tab === 'mistake' && hasFix) { setTab('fix'); setCurrentStep(0); return; }
+                    if (tab === 'fix' && hasDrill) { setTab('drill'); resetDrill(); return; }
+                    return;
+                  }
+                  setIsPlaying(true);
                 }}
                 className="flex items-center gap-1.5 md:gap-2 px-6 md:px-9 py-2.5 md:py-3 rounded-full text-white font-bold text-sm transition-all hover:brightness-110 shadow-lg"
                 style={{ backgroundColor: CHESSCOM_GREEN }}
@@ -1177,15 +1199,25 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
                 {isPlaying ? (
                   <><Pause className="w-4 h-4" /> <span className="hidden md:inline">Pause</span></>
                 ) : isLast ? (
-                  <><CheckCircle2 className="w-4 h-4" /> <span className="hidden md:inline">Done</span></>
+                  tab === 'mistake' && hasFix ? (
+                    <><CheckCircle2 className="w-4 h-4" /> <span className="hidden md:inline">See the Fix</span></>
+                  ) : tab === 'fix' && hasDrill ? (
+                    <><Swords className="w-4 h-4" /> <span className="hidden md:inline">Try the Drill</span></>
+                  ) : (
+                    <><CheckCircle2 className="w-4 h-4" /> <span className="hidden md:inline">Done</span></>
+                  )
                 ) : (
                   <><Play className="w-4 h-4" /> <span className="hidden md:inline">{currentStep === 0 ? 'Play' : 'Next'}</span></>
                 )}
               </button>
 
               <button
-                onClick={() => go(currentStep + 1)}
-                disabled={isLast}
+                onClick={() => {
+                  if (!isLast) { go(currentStep + 1); return; }
+                  if (tab === 'mistake' && hasFix) { setTab('fix'); setCurrentStep(0); return; }
+                  if (tab === 'fix' && hasDrill) { setTab('drill'); resetDrill(); }
+                }}
+                disabled={isLast && !((tab === 'mistake' && hasFix) || (tab === 'fix' && hasDrill))}
                 className="p-2 md:p-2.5 rounded-full text-white/70 bg-white/[0.06] hover:bg-white/[0.14] hover:text-white transition-all disabled:opacity-20"
               >
                 <ChevronRight className="w-4 h-4 md:w-5 md:h-5" />
@@ -1332,204 +1364,14 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
             />
           </div>
 
-          {/* CTA: Repeat drill */}
-          {hasRepeat && isLast && (
-            <div className="px-4 py-3" style={{ backgroundColor: BG_CARD }}>
-              <button
-                onClick={() => { setTab('repeat'); resetRepeat(); }}
-                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold text-white hover:brightness-110 transition-all"
-                style={{ backgroundColor: CHESSCOM_GREEN }}
-              >
-                <Repeat2 className="w-4 h-4" /> Practice This Sequence
-              </button>
-            </div>
-          )}
-
-          {!hasRepeat && hasDrill && isLast && (
-            <div className="px-4 py-3" style={{ backgroundColor: BG_CARD }}>
-              <button
-                onClick={() => { setTab('drill'); resetDrill(); }}
-                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold text-white hover:brightness-110 transition-all"
-                style={{ backgroundColor: CHESSCOM_GREEN }}
-              >
-                <Swords className="w-4 h-4" /> Practice Drill
-              </button>
-            </div>
-          )}
         </div>
       )}
 
-      {/* ── REPEAT DRILL TAB ──────────────────────────────────────────────── */}
-      {tab === 'repeat' && hasRepeat && (
-        <div className="flex flex-col">
-          {/* Commentary */}
-          <div className="px-2 pt-2 pb-0.5 md:px-3 md:pt-3 md:pb-1">
-            <div className="rounded-xl px-3 py-2 md:px-4 md:py-3 bg-white/95 shadow-sm">
-              <div className="flex items-start gap-3">
-                <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 mt-0.5" style={{ backgroundColor: CHESSCOM_GREEN }}>
-                  <Repeat2 className="w-3.5 h-3.5 text-white" />
-                </div>
-                <div>
-                  <p className="text-sm font-bold text-gray-900 mb-0.5">
-                    {repeatComplete ? 'Sequence Complete!' : 'Play the moves from memory'}
-                  </p>
-                  <p className="text-xs text-gray-500">
-                    {repeatComplete
-                      ? `${repeatFirstTryScore} of ${totalRepeatMoves} correct on first try`
-                      : repeatExpectedSan
-                      ? `Move ${repeatStep + 1} of ${totalRepeatMoves} — ${repeatColor === 'w' ? 'White' : 'Black'} to play`
-                      : 'Drag a piece to make the correct move.'}
-                  </p>
-                  {repeatAttempts > 0 && !repeatComplete && (
-                    <p className="text-xs text-orange-600 mt-1 font-medium">{repeatAttempts} wrong attempt{repeatAttempts !== 1 ? 's' : ''}</p>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Board */}
-          <div className="px-2 pb-1 max-w-[480px] mx-auto w-full">
-            <div className="relative">
-              {repeatComplete ? (
-                <div className="aspect-square rounded-xl flex flex-col items-center justify-center gap-4 p-6" style={{ background: 'linear-gradient(135deg, #1a4731, #1e293b)' }}>
-                  <Trophy className="w-16 h-16 text-amber-400 drop-shadow-lg" />
-                  <div className="text-center">
-                    <p className="text-xl font-black text-white mb-1">Well Done!</p>
-                    <p className="text-sm text-white/60">
-                      {repeatFirstTryScore}/{totalRepeatMoves} first-try correct
-                    </p>
-                  </div>
-                  <div className="w-full max-w-[200px] bg-white/10 rounded-full h-2 overflow-hidden">
-                    <div
-                      className="h-full rounded-full transition-all duration-700"
-                      style={{ width: `${(repeatFirstTryScore / totalRepeatMoves) * 100}%`, backgroundColor: CHESSCOM_GREEN }}
-                    />
-                  </div>
-                  <div className="flex gap-1.5 flex-wrap justify-center">
-                    {repeatFirstTry.map((ok, i) => (
-                      <div
-                        key={i}
-                        title={`Move ${i + 1}: ${steps[i + 1]?.san}`}
-                        className={cn('w-5 h-5 rounded text-[9px] font-bold flex items-center justify-center',
-                          ok ? 'bg-emerald-500/40 text-emerald-200' : 'bg-red-500/30 text-red-300')}
-                      >
-                        {ok ? '✓' : '✗'}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <>
-                  <PieceGradientDefs />
-                  <Chessboard
-                    options={{
-                      position: repeatPosition,
-                      allowDragging: !repeatComplete,
-                      boardOrientation: boardOrientation,
-                      dragActivationDistance: 8,
-                      canDragPiece: canRepeatDrag,
-                      onPieceDrop: handleRepeatDrop,
-                      onSquareClick: handleRepeatSquareClick,
-                      squareStyles: repeatSquareStyles,
-                      boardStyle: { borderRadius: '6px', overflow: 'hidden', cursor: 'pointer' },
-                      darkSquareStyle: { backgroundColor: BOARD_DARK, backgroundImage: BOARD_TEXTURE_IMAGE_DARK, backgroundSize: BOARD_TEXTURE_SIZE },
-                      lightSquareStyle: { backgroundColor: BOARD_LIGHT, backgroundImage: BOARD_TEXTURE_IMAGE, backgroundSize: BOARD_TEXTURE_SIZE },
-              pieces: tintedPieces,
-              showNotation: showCoordinates,
-                      animationDurationInMs: 180,
-                    }}
-                  />
-                  <AnimatePresence>
-                    {repeatFeedback === 'correct' && (
-                      <motion.div key="rc" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                        className="absolute inset-0 rounded-xl flex items-center justify-center pointer-events-none" style={{ backgroundColor: 'rgba(34,197,94,0.2)' }}>
-                        <div className="text-white font-black text-2xl px-6 py-3 rounded-xl shadow-lg" style={{ backgroundColor: CHESSCOM_GREEN }}>✓ Correct!</div>
-                      </motion.div>
-                    )}
-                    {repeatFeedback === 'wrong' && (
-                      <motion.div key="rw" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                        className="absolute inset-0 rounded-xl flex items-center justify-center bg-red-500/20 pointer-events-none">
-                        <div className="bg-red-500 text-white font-black text-xl px-6 py-3 rounded-xl shadow-lg">✗ Try again</div>
-                      </motion.div>
-                    )}
-                    {repeatFeedback === 'invalid' && (
-                      <motion.div key="ri" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                        className="absolute inset-0 rounded-xl flex items-center justify-center pointer-events-none">
-                        <div className="bg-black/70 text-white/90 font-bold text-sm px-4 py-2 rounded-xl shadow-lg">Select one of your own pieces</div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </>
-              )}
-            </div>
-          </div>
-
-          {/* Progress */}
-          {!repeatComplete && (
-            <div className="px-3 py-2">
-              <div className="h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: 'rgba(255,255,255,0.08)' }}>
-                <motion.div
-                  className="h-full rounded-full"
-                  style={{ backgroundColor: CHESSCOM_GREEN }}
-                  animate={{ width: `${(repeatStep / totalRepeatMoves) * 100}%` }}
-                  transition={{ duration: 0.3 }}
-                />
-              </div>
-              <div className="flex gap-1 flex-wrap mt-2">
-                {repeatFirstTry.map((ok, i) => (
-                  <div
-                    key={i}
-                    className={cn('h-1.5 flex-1 min-w-[8px] max-w-[20px] rounded-full transition-colors',
-                      i < repeatStep
-                        ? ok ? 'bg-emerald-500' : 'bg-red-400'
-                        : i === repeatStep
-                        ? 'animate-pulse'
-                        : 'bg-white/10'
-                    )}
-                    style={i === repeatStep ? { backgroundColor: CHESSCOM_GREEN } : undefined}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Move reference */}
-          {!repeatComplete && (
-            <div className="px-3 py-2 overflow-x-auto" style={{ backgroundColor: BG_CARD }}>
-              <div className="flex items-center gap-[2px] text-xs font-mono">
-                {movePairs.map(({ num, white, black }) => (
-                  <React.Fragment key={num}>
-                    <span className="text-[10px] text-white/30 px-0.5">{num}.</span>
-                    <span className={cn('px-1 rounded', repeatStep >= white ? 'text-white/80' : 'text-white/30')}>{steps[white]?.san}</span>
-                    {black != null && <span className={cn('px-1 rounded', repeatStep >= black ? 'text-white/80' : 'text-white/30')}>{steps[black]?.san}</span>}
-                  </React.Fragment>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Actions */}
-          <div className="flex items-center gap-2 px-4 py-3">
-            <button
-              onClick={resetRepeat}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-white/60 hover:text-white hover:bg-white/10 transition-all"
-            >
-              <RotateCcw className="w-3.5 h-3.5" /> {repeatComplete ? 'Go Again' : 'Reset'}
-            </button>
-            {repeatComplete && hasDrill && (
-              <button
-                onClick={() => { setTab('drill'); resetDrill(); }}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-white hover:brightness-110 transition-all"
-                style={{ backgroundColor: CHESSCOM_GREEN }}
-              >
-                <Swords className="w-3.5 h-3.5" /> Practice Drill
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-
+      {/* The old Repeat tab (re-input every move from the mistake PGN by
+          typing it back in) was removed entirely here, replaced by Fix
+          as the second tab -- the auto-advancing Play/Next buttons above
+          are now how someone moves from Mistake to Fix to Drill, not a
+          separate CTA block or a fourth navigation mode. */}
       {/* ── DRILL TAB ─────────────────────────────────────────────────────── */}
       {tab === 'drill' && hasDrill && showingConceptIntro && isMultiChallenge && (
         <div className="flex flex-col">
@@ -1745,11 +1587,11 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
             )}
             {(drillState === 'correct' || drillState === 'revealed') && (
               <button
-                onClick={() => setTab('lesson')}
+                onClick={() => { setTab('mistake'); setCurrentStep(0); }}
                 className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-white hover:brightness-110 transition-all"
                 style={{ backgroundColor: CHESSCOM_GREEN }}
               >
-                <ChevronLeft className="w-3.5 h-3.5" /> Back to Lesson
+                <ChevronLeft className="w-3.5 h-3.5" /> Back to Mistake
               </button>
             )}
           </div>
