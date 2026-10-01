@@ -85,7 +85,12 @@ function SidebarLink({ item, isActive }: { item: typeof ALL_NAV[0]; isActive: bo
   );
 }
 
-export function Layout({ children }: { children: React.ReactNode }) {
+// fullscreen skips the sidebar, mobile header, and bottom nav entirely
+// and renders children in a plain 100dvh container with no padding or
+// max-width constraint -- for pages like lesson/course playback that
+// need the whole viewport for a one-screen, no-scroll layout, where
+// persistent app chrome competing for space would defeat the purpose.
+export function Layout({ children, fullscreen }: { children: React.ReactNode; fullscreen?: boolean }) {
   const [location] = useLocation();
   const { username, logout, isAuthenticated, authLogout, isPremium, subscription, authUser } = useUser();
   const { player } = useChessPlayer(username ?? undefined);
@@ -111,6 +116,18 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const moreItems = [...PRIMARY_NAV.slice(4), ...SECONDARY_NAV, ...(authUser?.isAdmin ? ADMIN_NAV : [])];
   const activeMore = moreItems.find(i => location === i.href || location.startsWith(i.href + '/'));
   const isMoreActive = !!activeMore;
+
+  // All the hooks above still run every render regardless of this flag
+  // (rules of hooks) -- only the JSX output differs. 100dvh rather than
+  // 100vh accounts for mobile browser chrome (address bar, etc.)
+  // shrinking the visible viewport, which 100vh does not.
+  if (fullscreen) {
+    return (
+      <div style={{ height: '100dvh', overflow: 'hidden', background: BG_DARK }}>
+        {children}
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col md:flex-row" style={{ background: BG_DARK }}>

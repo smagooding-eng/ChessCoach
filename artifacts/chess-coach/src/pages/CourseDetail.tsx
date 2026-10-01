@@ -6,7 +6,7 @@ import { ChessBoard } from '@/components/ChessBoard';
 import { Chess } from 'chess.js';
 import {
   ArrowLeft, CheckCircle2, Target, X, Check,
-  ChevronLeft, ChevronRight, Award, List,
+  ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Award, List,
   Volume2, VolumeX, BookOpen, Loader,
 } from 'lucide-react';
 
@@ -266,6 +266,15 @@ function LessonContentStepper({ content, lessonId, courseCategory, conceptTitle,
   const [autoRead, setAutoRead] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  // Paired with LessonBoardPlayer below it on mobile, where CSS order
+  // puts the board first and this panel second -- meaning on a phone,
+  // the full text content used to sit below a full screen's worth of
+  // board, forcing a scroll just to reach it, and forcing a scroll back
+  // up to see the board again. Collapsed by default so the step counter
+  // and Read Aloud button are visible without pushing the board (the
+  // primary content) off-screen; the actual text expands on request
+  // rather than always claiming space whether or not it's being read.
+  const [expanded, setExpanded] = useState(false);
 
   const isFirst = step === 0;
   const isLast = step === steps.length - 1;
@@ -354,19 +363,28 @@ function LessonContentStepper({ content, lessonId, courseCategory, conceptTitle,
 
   return (
     <div className="space-y-3">
-      {/* Controls bar */}
+      {/* Controls bar -- the step counter area itself toggles expand, so
+          there's one obvious place to tap rather than a separate hidden
+          affordance. */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-2">
+        <button
+          onClick={() => setExpanded(e => !e)}
+          className="flex items-center gap-2 -ml-1 pl-1 pr-2 py-1 rounded-lg hover:bg-white/5 transition-colors"
+        >
+          {expanded ? <ChevronUp className="w-3.5 h-3.5 shrink-0 text-white/40" /> : <ChevronDown className="w-3.5 h-3.5 shrink-0 text-white/40" />}
           <BookOpen className="w-3.5 h-3.5 shrink-0" style={{ color: CHESSCOM_GREEN }} />
           <span className="text-xs text-white/50">
             Step <span className="font-bold text-white/80">{step + 1}</span> of {steps.length}
           </span>
           {steps.length > 1 && (
-            <button
-              onClick={() => setAutoRead(a => !a)}
+            <span
+              role="button"
+              tabIndex={0}
+              onClick={(e) => { e.stopPropagation(); setAutoRead(a => !a); }}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); setAutoRead(a => !a); } }}
               title={autoRead ? 'Auto-read on (click to disable)' : 'Enable auto-read on step change'}
               className={cn(
-                'ml-1 text-[10px] font-bold px-2 py-0.5 rounded-full transition-colors',
+                'ml-1 text-[10px] font-bold px-2 py-0.5 rounded-full transition-colors cursor-pointer',
                 autoRead
                   ? 'text-white'
                   : 'text-white/40 hover:text-white/70'
@@ -374,9 +392,9 @@ function LessonContentStepper({ content, lessonId, courseCategory, conceptTitle,
               style={autoRead ? { backgroundColor: CHESSCOM_GREEN } : { backgroundColor: 'rgba(255,255,255,0.08)' }}
             >
               AUTO
-            </button>
+            </span>
           )}
-        </div>
+        </button>
 
         <button
           onClick={() => (speaking || loading) ? stopReading() : readAloud(steps[step])}
@@ -396,55 +414,59 @@ function LessonContentStepper({ content, lessonId, courseCategory, conceptTitle,
         </button>
       </div>
 
-      {/* Step content */}
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={step}
-          initial={{ opacity: 0, x: 10 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -10 }}
-          transition={{ duration: 0.18 }}
-          className="min-h-[60px]"
-        >
-          {renderStep(steps[step])}
-        </motion.div>
-      </AnimatePresence>
+      {expanded && (
+        <>
+          {/* Step content */}
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={step}
+              initial={{ opacity: 0, x: 10 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -10 }}
+              transition={{ duration: 0.18 }}
+              className="min-h-[60px]"
+            >
+              {renderStep(steps[step])}
+            </motion.div>
+          </AnimatePresence>
 
-      {/* Step navigation */}
-      {steps.length > 1 && (
-        <div className="flex items-center justify-between gap-3 pt-3 mt-1" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-          <button
-            onClick={() => goTo(step - 1)}
-            disabled={isFirst}
-            className="flex items-center gap-1 pl-1.5 pr-3 py-1.5 text-xs font-semibold rounded-full transition-all disabled:opacity-0 text-white/60 hover:text-white hover:bg-white/10"
-          >
-            <ChevronLeft className="w-4 h-4" /> Prev
-          </button>
-
-          <div className="flex items-center gap-1.5">
-            {steps.map((_, i) => (
+          {/* Step navigation */}
+          {steps.length > 1 && (
+            <div className="flex items-center justify-between gap-3 pt-3 mt-1" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
               <button
-                key={i}
-                onClick={() => goTo(i)}
-                className={cn(
-                  'rounded-full transition-all',
-                  i === step ? 'w-6 h-2' : 'w-2 h-2 bg-white/15 hover:bg-white/30'
-                )}
-                style={i === step ? { backgroundColor: CHESSCOM_GREEN } : undefined}
-                title={`Step ${i + 1}`}
-              />
-            ))}
-          </div>
+                onClick={() => goTo(step - 1)}
+                disabled={isFirst}
+                className="flex items-center gap-1 pl-1.5 pr-3 py-1.5 text-xs font-semibold rounded-full transition-all disabled:opacity-0 text-white/60 hover:text-white hover:bg-white/10"
+              >
+                <ChevronLeft className="w-4 h-4" /> Prev
+              </button>
 
-          <button
-            onClick={() => goTo(step + 1)}
-            disabled={isLast}
-            className="flex items-center gap-1 pr-1.5 pl-3 py-1.5 text-xs font-semibold rounded-full transition-all disabled:opacity-0"
-            style={{ color: isLast ? undefined : CHESSCOM_GREEN }}
-          >
-            Next <ChevronRight className="w-4 h-4" />
-          </button>
-        </div>
+              <div className="flex items-center gap-1.5">
+                {steps.map((_, i) => (
+                  <button
+                    key={i}
+                    onClick={() => goTo(i)}
+                    className={cn(
+                      'rounded-full transition-all',
+                      i === step ? 'w-6 h-2' : 'w-2 h-2 bg-white/15 hover:bg-white/30'
+                    )}
+                    style={i === step ? { backgroundColor: CHESSCOM_GREEN } : undefined}
+                    title={`Step ${i + 1}`}
+                  />
+                ))}
+              </div>
+
+              <button
+                onClick={() => goTo(step + 1)}
+                disabled={isLast}
+                className="flex items-center gap-1 pr-1.5 pl-3 py-1.5 text-xs font-semibold rounded-full transition-all disabled:opacity-0"
+                style={{ color: isLast ? undefined : CHESSCOM_GREEN }}
+              >
+                Next <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

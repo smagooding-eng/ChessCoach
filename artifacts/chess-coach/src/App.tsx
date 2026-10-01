@@ -152,7 +152,7 @@ const queryClient = new QueryClient({
 });
 
 // Protected Route Wrapper
-function ProtectedRoute({ component: Component, fallbackNav, requireAdmin, skipWelcomeRedirect }: { component: React.ComponentType; fallbackNav?: string; requireAdmin?: boolean; skipWelcomeRedirect?: boolean }) {
+function ProtectedRoute({ component: Component, fallbackNav, requireAdmin, skipWelcomeRedirect, fullscreen }: { component: React.ComponentType; fallbackNav?: string; requireAdmin?: boolean; skipWelcomeRedirect?: boolean; fullscreen?: boolean }) {
   const { username, isLoaded, isAuthenticated, isAuthLoading, authUser } = useUser();
   const [location, navigate] = useLocation();
 
@@ -193,7 +193,7 @@ function ProtectedRoute({ component: Component, fallbackNav, requireAdmin, skipW
   if (requireAdmin && !authUser?.isAdmin) return null;
 
   return (
-    <Layout>
+    <Layout fullscreen={fullscreen}>
       <ErrorBoundary fallbackNav={fallbackNav ?? '/'}>
         <Component />
       </ErrorBoundary>
@@ -208,7 +208,7 @@ const PGameReplay    = () => <ProtectedRoute component={GameReplay} fallbackNav=
 const PAnalysis      = () => <ProtectedRoute component={AnalysisRouter} />;
 const PWeakness      = () => <ProtectedRoute component={WeaknessDetail} fallbackNav="/analysis" />;
 const PCourses       = () => <ProtectedRoute component={Courses} />;
-const PCourseDetail  = () => <ProtectedRoute component={CourseDetail} fallbackNav="/courses" />;
+const PCourseDetail  = () => <ProtectedRoute component={CourseDetail} fallbackNav="/courses" fullscreen />;
 const PEndgames      = () => <ProtectedRoute component={Endgames} />;
 const POpenings      = () => <ProtectedRoute component={Openings} />;
 const POpeningDetail = () => <ProtectedRoute component={OpeningDetail} fallbackNav="/openings" />;
