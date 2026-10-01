@@ -3,7 +3,7 @@ import { Chessboard, defaultPieces } from 'react-chessboard';
 import { useSettings } from '@/context/SettingsContext';
 import { Chess } from 'chess.js';
 import {
-  Play, Pause, SkipBack, SkipForward, ChevronLeft, ChevronRight,
+  Play, Pause, SkipBack, SkipForward, ChevronLeft, ChevronRight, ChevronUp, ChevronDown,
   MessageSquare, Swords, CheckCircle2, Lightbulb, Eye, RotateCcw,
   Trophy, Repeat2, Check, AlertTriangle, GraduationCap,
 } from 'lucide-react';
@@ -514,6 +514,13 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
   const [tab, setTab] = useState<Tab>('lesson');
   const [currentStep, setCurrentStep] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
+  // The full move-list strip competes with the board and commentary for
+  // attention the moment a lesson opens -- collapsed by default so the
+  // lesson tab shows one clear focus (board + commentary + a single
+  // primary action) at a time, matching how chess.com's lesson screens
+  // never show more than the current step plus one next action. Still
+  // fully available, just opt-in instead of always-on.
+  const [showMoveList, setShowMoveList] = useState(false);
   const [prevFen, setPrevFen] = useState<string | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const moveListRef = useRef<HTMLDivElement>(null);
@@ -1128,23 +1135,28 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
 
           {/* Controls */}
           <div className="flex flex-col items-center gap-2 px-2 py-3 md:px-4 max-w-[480px] mx-auto w-full">
-            <div className="flex items-center justify-center gap-2.5 md:gap-4 flex-wrap">
-              <div className="flex items-center gap-1 rounded-full p-1" style={{ background: 'rgba(0,0,0,0.22)', border: '1px solid rgba(255,255,255,0.07)' }}>
-                <button
-                  onClick={() => { setIsPlaying(false); go(0); }}
-                  disabled={isFirst}
-                  className="p-2 md:p-2.5 rounded-full text-white/70 bg-white/[0.06] hover:bg-white/[0.14] hover:text-white transition-all disabled:opacity-20"
-                >
-                  <SkipBack className="w-3.5 h-3.5 md:w-4 md:h-4" />
-                </button>
-                <button
-                  onClick={() => go(currentStep - 1)}
-                  disabled={isFirst}
-                  className="p-2 md:p-2.5 rounded-full text-white/70 bg-white/[0.06] hover:bg-white/[0.14] hover:text-white transition-all disabled:opacity-20"
-                >
-                  <ChevronLeft className="w-4 h-4 md:w-5 md:h-5" />
-                </button>
-              </div>
+            {/* One clear primary action, matching chess.com's lesson
+                screens -- Prev/Next step through, Play/Pause is the
+                dominant central action. Jump-to-start/jump-to-end are
+                real but secondary, so they're visually smaller and
+                muted rather than equal-weight with everything else;
+                nothing here was removed, only de-emphasized. */}
+            <div className="flex items-center justify-center gap-1.5 md:gap-3">
+              <button
+                onClick={() => { setIsPlaying(false); go(0); }}
+                disabled={isFirst}
+                title="Jump to start"
+                className="p-1.5 rounded-full text-white/30 hover:text-white/60 hover:bg-white/[0.06] transition-all disabled:opacity-10"
+              >
+                <SkipBack className="w-3 h-3" />
+              </button>
+              <button
+                onClick={() => go(currentStep - 1)}
+                disabled={isFirst}
+                className="p-2 md:p-2.5 rounded-full text-white/70 bg-white/[0.06] hover:bg-white/[0.14] hover:text-white transition-all disabled:opacity-20"
+              >
+                <ChevronLeft className="w-4 h-4 md:w-5 md:h-5" />
+              </button>
 
               <button
                 onClick={() => {
@@ -1164,22 +1176,21 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
                 )}
               </button>
 
-              <div className="flex items-center gap-1 rounded-full p-1" style={{ background: 'rgba(0,0,0,0.22)', border: '1px solid rgba(255,255,255,0.07)' }}>
-                <button
-                  onClick={() => go(currentStep + 1)}
-                  disabled={isLast}
-                  className="p-2 md:p-2.5 rounded-full text-white/70 bg-white/[0.06] hover:bg-white/[0.14] hover:text-white transition-all disabled:opacity-20"
-                >
-                  <ChevronRight className="w-4 h-4 md:w-5 md:h-5" />
-                </button>
-                <button
-                  onClick={() => { setIsPlaying(false); go(totalSteps - 1); }}
-                  disabled={isLast}
-                  className="p-2 md:p-2.5 rounded-full text-white/70 bg-white/[0.06] hover:bg-white/[0.14] hover:text-white transition-all disabled:opacity-20"
-                >
-                  <SkipForward className="w-3.5 h-3.5 md:w-4 md:h-4" />
-                </button>
-              </div>
+              <button
+                onClick={() => go(currentStep + 1)}
+                disabled={isLast}
+                className="p-2 md:p-2.5 rounded-full text-white/70 bg-white/[0.06] hover:bg-white/[0.14] hover:text-white transition-all disabled:opacity-20"
+              >
+                <ChevronRight className="w-4 h-4 md:w-5 md:h-5" />
+              </button>
+              <button
+                onClick={() => { setIsPlaying(false); go(totalSteps - 1); }}
+                disabled={isLast}
+                title="Jump to end"
+                className="p-1.5 rounded-full text-white/30 hover:text-white/60 hover:bg-white/[0.06] transition-all disabled:opacity-10"
+              >
+                <SkipForward className="w-3 h-3" />
+              </button>
             </div>
 
             {mistakeIdx > 0 && currentStep < mistakeIdx && (
@@ -1195,8 +1206,20 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
             )}
           </div>
 
-          {/* Horizontal move strip */}
+          {/* Move list toggle -- a single small affordance instead of the
+              full strip always competing with everything above it. */}
           {movePairs.length > 0 && (
+            <button
+              onClick={() => setShowMoveList(v => !v)}
+              className="flex items-center justify-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold text-white/40 hover:text-white/70 transition-colors"
+            >
+              {showMoveList ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+              {showMoveList ? 'Hide move list' : 'Show move list'}
+            </button>
+          )}
+
+          {/* Horizontal move strip */}
+          {movePairs.length > 0 && showMoveList && (
             <div
               ref={moveListRef}
               className="flex items-center gap-0.5 px-3 py-2 overflow-x-auto hide-scrollbar"
