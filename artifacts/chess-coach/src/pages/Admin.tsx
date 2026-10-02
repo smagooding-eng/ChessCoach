@@ -302,6 +302,8 @@ export function Admin() {
   const [emailRecipients, setEmailRecipients] = useState<string[]>([]);
   const [clearing, setClearing] = useState(false);
   const [clearResult, setClearResult] = useState<string | null>(null);
+  const [clearingCourses, setClearingCourses] = useState(false);
+  const [clearCoursesResult, setClearCoursesResult] = useState<string | null>(null);
 
   const handleEmailUsers = (emails: string[]) => {
     setEmailRecipients(emails);
@@ -325,6 +327,25 @@ export function Admin() {
       else setClearResult(data.error || 'Failed');
     } catch { setClearResult('Request failed'); }
     finally { setClearing(false); setTimeout(() => setClearResult(null), 4000); }
+  };
+
+  // Scoped to just courses/lessons -- unlike Clear Cache above, this
+  // does NOT touch games' review data or weaknesses, so it doesn't force
+  // every user's games through a full, expensive re-analysis. Only
+  // courses themselves are affected by the recent narration-generation
+  // fixes, so only courses need clearing to get everyone onto freshly
+  // generated ones.
+  const handleClearCourses = async () => {
+    if (!confirm('Delete ALL courses and lessons for every user? The next time anyone opens Courses, generation will run fresh against their existing reviews/weaknesses -- those are NOT affected.')) return;
+    setClearingCourses(true);
+    setClearCoursesResult(null);
+    try {
+      const res = await apiFetch('/api/admin/clear-courses', { method: 'POST', credentials: 'include' });
+      const data = await res.json();
+      if (res.ok) setClearCoursesResult('Courses cleared successfully');
+      else setClearCoursesResult(data.error || 'Failed');
+    } catch { setClearCoursesResult('Request failed'); }
+    finally { setClearingCourses(false); setTimeout(() => setClearCoursesResult(null), 4000); }
   };
 
   useEffect(() => {
@@ -377,6 +398,15 @@ export function Admin() {
             {clearing ? 'Clearing…' : 'Clear Cache'}
           </button>
           {clearResult && <span className="text-[11px] font-medium text-emerald-400">{clearResult}</span>}
+          <button
+            onClick={handleClearCourses}
+            disabled={clearingCourses}
+            className="text-[11px] font-black px-2.5 py-2 rounded-xl transition-colors flex items-center gap-1 bg-amber-500/25 border border-amber-500/40 text-amber-300 hover:bg-amber-500/35 disabled:opacity-50"
+          >
+            {clearingCourses ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+            {clearingCourses ? 'Clearing…' : 'Clear Courses Only'}
+          </button>
+          {clearCoursesResult && <span className="text-[11px] font-medium text-emerald-400">{clearCoursesResult}</span>}
           <button
             onClick={openComposer}
             className="text-[11px] font-bold px-2.5 py-2 rounded-xl transition-colors flex items-center gap-1 bg-amber-500/20 border border-amber-500/30 text-amber-300 hover:bg-amber-500/30"

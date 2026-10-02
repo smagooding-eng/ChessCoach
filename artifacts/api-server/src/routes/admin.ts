@@ -633,6 +633,32 @@ router.delete("/admin/seo-articles/:id", requireAdmin, async (req: Request, res:
   }
 });
 
+// Scoped to just courses/lessons, unlike /admin/clear-ai-cache above --
+// that one ALSO resets every game's review data and deletes all
+// weaknesses, forcing a full, expensive re-analysis of every user's
+// games just to get fresh courses. Games and weaknesses aren't broken
+// by anything the courses-narration fixes touched; only the courses
+// built from them are, so only those need clearing here. Next time a
+// user opens Courses, generation naturally re-runs against the
+// already-fine weaknesses/reviews with the current (fixed) generation
+// code, with no need to redo any engine analysis.
+router.post("/admin/clear-courses", requireAdmin, async (_req: Request, res: Response) => {
+  try {
+    await db.delete(lessonsTable);
+    await db.delete(coursesTable);
+
+    res.json({
+      success: true,
+      cleared: {
+        lessons: "deleted",
+        courses: "deleted",
+      },
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to clear courses", details: err.message });
+  }
+});
+
 router.post("/admin/clear-ai-cache", requireAdmin, async (_req: Request, res: Response) => {
   try {
     const gamesResult = await db.update(gamesTable)
