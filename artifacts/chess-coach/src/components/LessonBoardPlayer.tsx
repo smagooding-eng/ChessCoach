@@ -415,6 +415,10 @@ interface LessonBoardPlayerProps {
   fixPgn?: string | null;
   showFixLine?: boolean;
   title?: string;
+  // Shown at step 0 of the Mistake tab specifically, instead of the bare
+  // "Press play or click a move to begin" that told the learner nothing
+  // about what they're about to look at.
+  positionRecap?: string | null;
   drillFen?: string | null;
   drillExpectedMove?: string | null;
   drillHint?: string | null;
@@ -487,7 +491,7 @@ function buildFrontendFixPgn(mistakePgn: string, drillExpectedMove: string | nul
   }
 }
 
-export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, drillExpectedMove, drillHint, content, extraChallenges, conceptTitle }: LessonBoardPlayerProps) {
+export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, positionRecap, drillFen, drillExpectedMove, drillHint, content, extraChallenges, conceptTitle }: LessonBoardPlayerProps) {
   const [, navigate] = useLocation();
   const { boardColors, boardTextureCss, pieceColors, pieceShape, pieceStyle, showCoordinates, showLegalMoves } = useSettings();
   const BOARD_LIGHT = boardColors.light;
@@ -1044,6 +1048,8 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
                       <p className="text-sm leading-relaxed">
                         {hasComment
                           ? <FormatComment text={step!.comment} isMistake={step!.isMistake} isFix={step!.isFix} />
+                          : currentStep === 0 && tab === 'mistake' && positionRecap
+                          ? <span>{positionRecap}</span>
                           : currentStep === 0
                           ? <span style={{ color: '#9e9b98' }}>Press play or click a move to begin.</span>
                           : step?.san

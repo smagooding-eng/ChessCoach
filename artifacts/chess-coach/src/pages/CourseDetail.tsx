@@ -1060,6 +1060,7 @@ export function CourseDetail() {
                           fixPgn={lesson.fixExamplePgn ?? null}
                           showFixLine={showFixLine}
                           title={lesson.title}
+                          positionRecap={(lesson as typeof lesson & { positionRecap?: string | null }).positionRecap ?? null}
                           drillFen={lesson.drillFen ?? null}
                           drillExpectedMove={lesson.drillExpectedMove ?? null}
                           drillHint={lesson.drillHint ?? null}

@@ -1142,6 +1142,10 @@ interface CourseLesson {
   drillHint?: string | null;
   extraChallenges?: LessonChallengeOutput[];
   conceptTitle?: string | null;
+  // A brief overview of the starting position -- shown at step 0 of the
+  // Mistake tab instead of a bare "Press play or click a move to begin,"
+  // which told the learner nothing about what they're about to look at.
+  positionRecap?: string | null;
 }
 
 interface CourseOutput {
@@ -1227,17 +1231,61 @@ Reply with ONLY the explanation sentence itself. No quotes, no JSON, no preamble
 // explanations in, same order as moves in) so the four call sites below
 // don't all need rewriting -- internally this now just calls the
 // single-move version once per move, in parallel.
+// A brief, general overview of a position before any move in the lesson
+// has been reviewed -- "roughly equal material, both sides developed,
+// White's king still in the center" type framing, not a verdict on any
+// specific move. Shown once, at step 0, so a learner has some sense of
+// what they're looking at before diving into the mistake itself. Same
+// one-call, plain-text, retry-once pattern as generateOneMoveExplanation,
+// for the same reliability reasons -- this is a different request shape
+// (recapping a position, not explaining a move) so it's a separate
+// function rather than another role on that one.
+async function generatePositionRecap(fen: string): Promise<string | null> {
+  const prompt = `You are a chess coach briefly orienting a student before reviewing a mistake from their real game.
+
+Position (FEN): ${fen}
+
+Write ONE short, general recap of this position, max 25 words, plain language. Cover things like material balance, whose turn it is, and the overall character of the position (e.g. still developing, tense middlegame, simplified endgame) -- NOT a judgment on any specific upcoming move, since none has been reviewed yet. Ground this ONLY in what the FEN actually shows -- do not invent plans, threats, or weaknesses you cannot see from the position alone.
+
+Reply with ONLY the recap sentence itself. No quotes, no JSON, no preamble, nothing else.`;
+
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      const response = await openai.chat.completions.create({
+        model: "gpt-5.6-luna",
+        max_completion_tokens: 300,
+        messages: [{ role: "user", content: prompt }],
+      });
+      void trackAiUsage({ userId: undefined, feature: AI_FEATURES.LESSON_CONTENT, model: "gpt-5.6-luna", usage: response.usage });
+      const text = (response.choices[0]?.message?.content ?? "").trim().replace(/^["']|["']$/g, "");
+      if (text) return text;
+      console.error(`[generatePositionRecap] AI returned empty content on attempt ${attempt} -- ${attempt < 2 ? "retrying" : "falling back to no recap"}.`, { fen, finishReason: response.choices[0]?.finish_reason, usage: response.usage });
+    } catch (err) {
+      console.error(`[generatePositionRecap] AI call threw on attempt ${attempt} -- ${attempt < 2 ? "retrying" : "falling back to no recap"}.`, { fen, err });
+    }
+  }
+  return null;
+}
+
 async function generateMoveExplanations(moves: {
   san: string; fenAfter: string; role: 'context' | 'mistake' | 'consequence' | 'fix';
 }[]): Promise<(string | null)[]> {
   if (moves.length === 0) return [];
-  // Unlike the old batch version, a single move failing doesn't have to
-  // take the whole sequence down with it -- the callers below already
-  // fall back per-index to the old generic text when one entry is
-  // null (explanations?.[idx] ?? fallback), so a mixed array here still
-  // gives most of the sequence real explanations even if one move's
-  // call genuinely never succeeds after its retry.
-  return Promise.all(moves.map(m => generateOneMoveExplanation(m)));
+  // Sequential, NOT Promise.all -- real evidence from production use:
+  // the solo "fix" call (always exactly one move, called by itself)
+  // kept succeeding while THIS function's multi-move calls (context +
+  // mistake + consequence, previously all fired at once) kept coming
+  // back empty. That's the signature of a rate limit -- several
+  // concurrent requests to the same account/model get throttled while a
+  // lone request doesn't. Awaiting each call before starting the next
+  // one makes this slower (a 6-move sequence takes 6x one call's
+  // latency instead of 1x), but trades that for actually working,
+  // which concurrent calls were not reliably doing.
+  const results: (string | null)[] = [];
+  for (const move of moves) {
+    results.push(await generateOneMoveExplanation(move));
+  }
+  return results;
 }
 
 async function reconstructPgnFromGames(lesson: CourseLesson, gamePgns: string[]): Promise<{ pgn: string; fixPgn?: string; drillFen?: string } | null> {
@@ -2150,12 +2198,17 @@ async function buildLessonFromMistake(mistake: TeachableMistake, orderIndex: num
     buildContextPgn(mistake, false),
     buildContextPgn(mistake, true),
   ]);
+  // Sequential, after the above resolves, not a third concurrent
+  // branch -- same rate-limit caution as generateMoveExplanations now
+  // follows internally.
+  const positionRecap = await generatePositionRecap(mistake.fenBeforeMistake);
   return {
     title,
     content,
     orderIndex,
     examplePgn,
     fixExamplePgn,
+    positionRecap,
     drillFen: mistake.fenBeforeMistake,
     drillExpectedMove: mistake.bestMoveSan,
     drillHint: mistake.facts.hungPiece
@@ -2207,6 +2260,7 @@ async function buildLessonFromMistakeGroup(group: TeachableMistake[], orderIndex
     buildContextPgn(primary, false),
     buildContextPgn(primary, true),
   ]);
+  const positionRecap = await generatePositionRecap(primary.fenBeforeMistake);
 
   return {
     title: conceptInfo ? conceptInfo.title : title,
@@ -2214,6 +2268,7 @@ async function buildLessonFromMistakeGroup(group: TeachableMistake[], orderIndex
     orderIndex,
     examplePgn,
     fixExamplePgn,
+    positionRecap,
     drillFen: primary.fenBeforeMistake,
     drillExpectedMove: primary.bestMoveSan,
     drillHint: primary.facts.hungPiece
