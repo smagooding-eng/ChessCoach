@@ -647,11 +647,27 @@ router.post("/admin/clear-courses", requireAdmin, async (_req: Request, res: Res
     await db.delete(lessonsTable);
     await db.delete(coursesTable);
 
+    // This is the part the first version of this endpoint was missing,
+    // and it's the actual reason generation stayed stuck even after
+    // courses/lessons were cleared: /courses/generate-start checks for
+    // an existing "pending" course_generation job FIRST and just
+    // returns that same job's id if one exists, rather than starting a
+    // new one. A job left "pending" by a server restart mid-generation
+    // (exactly what a deploy does to an in-flight request) never gets
+    // marked complete or errored by anything else, so it sits there
+    // forever, and every subsequent generate attempt just gets handed
+    // back that same dead job id. Same clearing pattern already used
+    // for analysis/review jobs below, applied to this job type too.
+    await db.update(backgroundJobsTable)
+      .set({ result: null, status: "cleared", error: null })
+      .where(eq(backgroundJobsTable.type, "course_generation"));
+
     res.json({
       success: true,
       cleared: {
         lessons: "deleted",
         courses: "deleted",
+        jobs: "course_generation jobs cleared",
       },
     });
   } catch (err: any) {
