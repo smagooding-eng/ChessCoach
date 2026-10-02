@@ -1187,12 +1187,24 @@ Return valid JSON: {"explanations": ["...", "...", ...]} with exactly ${moves.le
   try {
     const response = await openai.chat.completions.create({
       model: "gpt-5.6-luna",
-      max_completion_tokens: 700,
+      // Was 700 -- the confirmed failure mode (real server logs: "Unexpected
+      // end of JSON input") means content came back as an empty string,
+      // the classic signature of running out of completion-token budget
+      // before any visible output gets written. 700 was less than the
+      // 1100 the other working JSON-object call in this file
+      // (writeGroundedLessonContent) actually needs, and this prompt can
+      // ask for more items (several moves' worth of explanations) in one
+      // response than that one does.
+      max_completion_tokens: 2000,
       messages: [{ role: "user", content: prompt }],
       response_format: { type: "json_object" },
     });
     void trackAiUsage({ userId: undefined, feature: AI_FEATURES.LESSON_CONTENT, model: "gpt-5.6-luna", usage: response.usage });
     const rawContent = response.choices[0]?.message?.content ?? "{}";
+    if (!rawContent.trim()) {
+      console.error("[generateMoveExplanations] AI returned empty content -- falling back to generic text.", { finishReason: response.choices[0]?.finish_reason, usage: response.usage });
+      return null;
+    }
     const parsed = JSON.parse(rawContent) as { explanations?: string[] };
     if (!Array.isArray(parsed.explanations) || parsed.explanations.length !== moves.length) {
       // This is the likely silent-failure point: the model returned
