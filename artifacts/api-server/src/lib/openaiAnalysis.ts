@@ -1164,69 +1164,80 @@ interface CourseOutput {
 // view (see reconstructPgnFromGames's caller chain), so the extra
 // latency/cost of one more AI call here is a one-time generation cost,
 // not a per-request one.
+// Redesigned after two different token budgets (700, then 2000) both
+// failed with the exact same "empty content" symptom in real production
+// logs -- that ruled out "ran out of budget" as the cause and pointed at
+// something about the SHAPE of the request being unreliable instead,
+// most likely the combination of response_format: json_object with an
+// exact-length array the model had to get precisely right. This version
+// asks for ONE plain-text sentence per move, one call per move, instead
+// of a batch JSON array for the whole sequence. Plain text has no
+// structural requirement to satisfy (no array length to match, no JSON
+// to close correctly), so there is a much smaller surface for an empty
+// or malformed response. The real tradeoff: a 6-move sequence now makes
+// 6 small calls instead of 1 larger one -- more total requests, but
+// each one is about as simple as an LLM call can be, which matters more
+// than call count when the batched version was failing close to 100% of
+// the time in practice.
+async function generateOneMoveExplanation(move: {
+  san: string; fenAfter: string; role: 'context' | 'mistake' | 'consequence' | 'fix';
+}): Promise<string | null> {
+  const roleGuidance: Record<typeof move.role, string> = {
+    context: "a move before the mistake -- explain briefly what it accomplishes or what it's preparing/defending against.",
+    mistake: 'the losing move itself -- explain briefly and specifically WHY it is a mistake (what it gives up, allows, or fails to address). Do not just call it "the critical error."',
+    consequence: 'a REAL move that was actually played after the mistake, showing how the position actually got worse -- explain briefly HOW this specific move exploits or follows from the mistake, not just that "this is the consequence."',
+    fix: "the stronger move the engine preferred instead of the mistake -- explain briefly WHY it is better than what was actually played.",
+  };
+
+  const prompt = `You are a chess coach annotating one move from a student's real game for a lesson.
+
+Move: ${move.san}
+Position after this move: ${move.fenAfter}
+This move's role in the lesson: ${roleGuidance[move.role]}
+
+Write ONE short explanation, max 18 words, plain language, no chess notation repeated back. Ground it ONLY in the move itself and the position given -- do not invent threats, tactics, or piece activity you cannot see from what's given.
+
+Reply with ONLY the explanation sentence itself. No quotes, no JSON, no preamble, nothing else.`;
+
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      const response = await openai.chat.completions.create({
+        model: "gpt-5.6-luna",
+        max_completion_tokens: 300,
+        messages: [{ role: "user", content: prompt }],
+      });
+      void trackAiUsage({ userId: undefined, feature: AI_FEATURES.LESSON_CONTENT, model: "gpt-5.6-luna", usage: response.usage });
+      const text = (response.choices[0]?.message?.content ?? "").trim().replace(/^["']|["']$/g, "");
+      if (text) return text;
+      console.error(`[generateOneMoveExplanation] AI returned empty content on attempt ${attempt} -- ${attempt < 2 ? "retrying" : "falling back to generic text"}.`, {
+        san: move.san, role: move.role, finishReason: response.choices[0]?.finish_reason, usage: response.usage,
+      });
+    } catch (err) {
+      console.error(`[generateOneMoveExplanation] AI call threw on attempt ${attempt} -- ${attempt < 2 ? "retrying" : "falling back to generic text"}.`, { san: move.san, role: move.role, err });
+    }
+  }
+  // Both attempts failed -- the caller falls back to the old generic
+  // comment for just this one move, so a lesson still gets created
+  // either way, with only this single move's text degraded rather than
+  // the whole sequence.
+  return null;
+}
+
+// Thin wrapper preserving the old batch call shape (an array of
+// explanations in, same order as moves in) so the four call sites below
+// don't all need rewriting -- internally this now just calls the
+// single-move version once per move, in parallel.
 async function generateMoveExplanations(moves: {
   san: string; fenAfter: string; role: 'context' | 'mistake' | 'consequence' | 'fix';
-}[]): Promise<string[] | null> {
-  const moveList = moves.map((m, idx) =>
-    `${idx + 1}. ${m.san} [${m.role}] -> position after this move: ${m.fenAfter}`
-  ).join("\n");
-
-  const prompt = `You are a chess coach annotating a real sequence of moves from a student's own game for a lesson. Each move below is labeled with its role in the story:
-- "context": a move before the mistake -- explain briefly what it accomplishes or what it's preparing/defending against.
-- "mistake": the losing move itself -- explain briefly and specifically WHY it is a mistake (what it gives up, allows, or fails to address). Do not just call it "the critical error."
-- "consequence": a REAL move that was actually played after the mistake, showing how the position actually got worse -- explain briefly HOW this specific move exploits or follows from the mistake, not just that "this is the consequence."
-- "fix": the stronger move the engine preferred instead of the mistake -- explain briefly WHY it is better than what was actually played.
-
-Moves (in order):
-${moveList}
-
-Write ONE short explanation (max 18 words, plain language, no chess notation repeated back) for EACH move above, in the same order. Ground every explanation ONLY in the move itself and the position given -- do not invent threats, tactics, or piece activity you cannot see from the move and position listed.
-
-Return valid JSON: {"explanations": ["...", "...", ...]} with exactly ${moves.length} strings, in the same order as the moves above.`;
-
-  try {
-    const response = await openai.chat.completions.create({
-      model: "gpt-5.6-luna",
-      // Was 700 -- the confirmed failure mode (real server logs: "Unexpected
-      // end of JSON input") means content came back as an empty string,
-      // the classic signature of running out of completion-token budget
-      // before any visible output gets written. 700 was less than the
-      // 1100 the other working JSON-object call in this file
-      // (writeGroundedLessonContent) actually needs, and this prompt can
-      // ask for more items (several moves' worth of explanations) in one
-      // response than that one does.
-      max_completion_tokens: 2000,
-      messages: [{ role: "user", content: prompt }],
-      response_format: { type: "json_object" },
-    });
-    void trackAiUsage({ userId: undefined, feature: AI_FEATURES.LESSON_CONTENT, model: "gpt-5.6-luna", usage: response.usage });
-    const rawContent = response.choices[0]?.message?.content ?? "{}";
-    if (!rawContent.trim()) {
-      console.error("[generateMoveExplanations] AI returned empty content -- falling back to generic text.", { finishReason: response.choices[0]?.finish_reason, usage: response.usage });
-      return null;
-    }
-    const parsed = JSON.parse(rawContent) as { explanations?: string[] };
-    if (!Array.isArray(parsed.explanations) || parsed.explanations.length !== moves.length) {
-      // This is the likely silent-failure point: the model returned
-      // something, but not shaped exactly as asked, so every call here
-      // falls back to the old generic text with zero visible trace of
-      // why. Logged loudly on purpose -- if generated courses are still
-      // showing generic narration after this, check Render's logs for
-      // this exact message to see what the model actually sent back.
-      console.error("[generateMoveExplanations] AI response did not match expected shape -- falling back to generic text.", {
-        expectedCount: moves.length,
-        rawContent,
-      });
-      return null;
-    }
-    return parsed.explanations;
-  } catch (err) {
-    console.error("[generateMoveExplanations] AI call threw -- falling back to generic text.", err);
-    // A failed AI call here should never break lesson generation --
-    // the caller falls back to the old generic comments when this
-    // returns null, so a lesson still gets created either way.
-    return null;
-  }
+}[]): Promise<(string | null)[]> {
+  if (moves.length === 0) return [];
+  // Unlike the old batch version, a single move failing doesn't have to
+  // take the whole sequence down with it -- the callers below already
+  // fall back per-index to the old generic text when one entry is
+  // null (explanations?.[idx] ?? fallback), so a mixed array here still
+  // gives most of the sequence real explanations even if one move's
+  // call genuinely never succeeds after its retry.
+  return Promise.all(moves.map(m => generateOneMoveExplanation(m)));
 }
 
 async function reconstructPgnFromGames(lesson: CourseLesson, gamePgns: string[]): Promise<{ pgn: string; fixPgn?: string; drillFen?: string } | null> {
