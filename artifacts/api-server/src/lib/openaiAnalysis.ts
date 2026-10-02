@@ -1168,6 +1168,27 @@ interface CourseOutput {
 // view (see reconstructPgnFromGames's caller chain), so the extra
 // latency/cost of one more AI call here is a one-time generation cost,
 // not a per-request one.
+// Runs an array through an async function with at most `limit` calls in
+// flight at once -- a middle ground between full Promise.all (caused
+// rate-limit failures: many simultaneous requests) and a strict one-at-
+// a-time loop (caused generation to apparently never finish: dozens of
+// sequential calls across a whole course, each with its own retry,
+// added up to minutes of pure serial waiting). A small concurrency pool
+// gets most of the speed back without reintroducing the request burst
+// that triggered the rate limit in the first place.
+async function mapWithConcurrencyLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let nextIndex = 0;
+  async function worker() {
+    while (nextIndex < items.length) {
+      const i = nextIndex++;
+      results[i] = await fn(items[i]);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, () => worker()));
+  return results;
+}
+
 // Redesigned after two different token budgets (700, then 2000) both
 // failed with the exact same "empty content" symptom in real production
 // logs -- that ruled out "ran out of budget" as the cause and pointed at
@@ -1205,11 +1226,16 @@ Reply with ONLY the explanation sentence itself. No quotes, no JSON, no preamble
 
   for (let attempt = 1; attempt <= 2; attempt++) {
     try {
+      // Explicit 20s timeout -- the client had none configured anywhere
+      // in this file, meaning the SDK's own (much longer) default
+      // applied. A single slow/stuck call with no timeout could stall
+      // this entire sequential pipeline for a very long time; failing
+      // fast here lets the retry (or final fallback) kick in instead.
       const response = await openai.chat.completions.create({
         model: "gpt-5.6-luna",
         max_completion_tokens: 300,
         messages: [{ role: "user", content: prompt }],
-      });
+      }, { timeout: 20_000 });
       void trackAiUsage({ userId: undefined, feature: AI_FEATURES.LESSON_CONTENT, model: "gpt-5.6-luna", usage: response.usage });
       const text = (response.choices[0]?.message?.content ?? "").trim().replace(/^["']|["']$/g, "");
       if (text) return text;
@@ -1255,7 +1281,7 @@ Reply with ONLY the recap sentence itself. No quotes, no JSON, no preamble, noth
         model: "gpt-5.6-luna",
         max_completion_tokens: 300,
         messages: [{ role: "user", content: prompt }],
-      });
+      }, { timeout: 20_000 });
       void trackAiUsage({ userId: undefined, feature: AI_FEATURES.LESSON_CONTENT, model: "gpt-5.6-luna", usage: response.usage });
       const text = (response.choices[0]?.message?.content ?? "").trim().replace(/^["']|["']$/g, "");
       if (text) return text;
@@ -1271,21 +1297,17 @@ async function generateMoveExplanations(moves: {
   san: string; fenAfter: string; role: 'context' | 'mistake' | 'consequence' | 'fix';
 }[]): Promise<(string | null)[]> {
   if (moves.length === 0) return [];
-  // Sequential, NOT Promise.all -- real evidence from production use:
-  // the solo "fix" call (always exactly one move, called by itself)
-  // kept succeeding while THIS function's multi-move calls (context +
-  // mistake + consequence, previously all fired at once) kept coming
-  // back empty. That's the signature of a rate limit -- several
-  // concurrent requests to the same account/model get throttled while a
-  // lone request doesn't. Awaiting each call before starting the next
-  // one makes this slower (a 6-move sequence takes 6x one call's
-  // latency instead of 1x), but trades that for actually working,
-  // which concurrent calls were not reliably doing.
-  const results: (string | null)[] = [];
-  for (const move of moves) {
-    results.push(await generateOneMoveExplanation(move));
-  }
-  return results;
+  // A concurrency limit of 2, NOT full Promise.all and NOT a strict
+  // one-at-a-time loop. Real evidence from production, two rounds of
+  // it: unlimited concurrency (the original design) caused the Mistake
+  // sequence's several simultaneous calls to fail while the solo Fix
+  // call kept succeeding -- a rate-limit signature. Going fully
+  // sequential "fixed" that but then made course generation take so
+  // long (every move across every lesson, one at a time, each with up
+  // to 2 attempts) that it stopped completing within any reasonable
+  // time at all. A small pool gets most of the speed back without
+  // reintroducing the burst that triggered the rate limit.
+  return mapWithConcurrencyLimit(moves, 2, m => generateOneMoveExplanation(m));
 }
 
 async function reconstructPgnFromGames(lesson: CourseLesson, gamePgns: string[]): Promise<{ pgn: string; fixPgn?: string; drillFen?: string } | null> {
@@ -1553,11 +1575,14 @@ async function validateAndFixPgn(lesson: CourseLesson, gamePgns?: string[], fall
 }
 
 async function ensureAllLessonsHavePgn(course: CourseOutput, gamePgns?: string[], fallbackPgn?: string): Promise<CourseOutput> {
-  // Promise.all rather than a plain .map() -- validateAndFixPgn is async
-  // now (it may call out to generate real move explanations), and a
-  // synchronous .map() over an async function would return an array of
-  // unresolved promises instead of actually waiting for each one.
-  const lessons = await Promise.all(course.lessons.map(async lesson => {
+  // Concurrency-limited across lessons, not a plain Promise.all --
+  // validateAndFixPgn is async (it may call out to generate real move
+  // explanations) and EACH lesson's call already runs its own moves
+  // through a concurrency pool, so letting every lesson in the course
+  // fire at once multiplies that pool size out across however many
+  // lessons the course has -- the same rate-limit risk one lesson's
+  // moves already needed protecting from, just one level up.
+  const lessons = await mapWithConcurrencyLimit(course.lessons, 2, async lesson => {
     const result = await validateAndFixPgn(lesson, gamePgns, fallbackPgn);
     return {
       ...lesson,
@@ -1565,7 +1590,7 @@ async function ensureAllLessonsHavePgn(course: CourseOutput, gamePgns?: string[]
       ...(result.fixPgn ? { fixExamplePgn: result.fixPgn } : {}),
       ...(result.drillFen ? { drillFen: result.drillFen } : {}),
     };
-  }));
+  });
   return { ...course, lessons };
 }
 
@@ -2245,16 +2270,21 @@ async function buildLessonFromMistakeGroup(group: TeachableMistake[], orderIndex
     ? "## The Mistake" + content.split(/##\s*The Mistake/i)[1]
     : content;
 
-  // Promise.all rather than a plain .map() -- buildContextPgn is async
-  // now, same reasoning as ensureAllLessonsHavePgn above.
-  const extraChallenges: LessonChallengeOutput[] = await Promise.all(group.slice(1).map(async (m) => ({
+  // Concurrency-limited, not a plain Promise.all -- each buildContextPgn
+  // call here ALSO internally runs its own moves through a concurrency
+  // pool (see generateMoveExplanations), so letting every extra
+  // challenge fire at once would multiply out to several times that
+  // pool size in simultaneous requests for a themed lesson with a few
+  // challenges -- right back into the same rate-limit territory a
+  // single lesson's moves already needed protecting from.
+  const extraChallenges: LessonChallengeOutput[] = await mapWithConcurrencyLimit(group.slice(1), 2, async (m) => ({
     fen: m.fenBeforeMistake,
     expectedMove: m.bestMoveSan,
     hint: m.facts.hungPiece
       ? `Watch out for the ${m.facts.hungPiece} — find the move that keeps it safe.`
       : `Look for the engine's top idea in this position.`,
     contextPgn: await buildContextPgn(m, false),
-  })));
+  }));
 
   const [examplePgn, fixExamplePgn] = await Promise.all([
     buildContextPgn(primary, false),
