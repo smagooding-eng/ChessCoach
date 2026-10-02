@@ -1856,6 +1856,18 @@ export async function findTeachableMistakes(
           bestMoveSan: evalBefore.bestMoveSan,
           bestLineSan: evalBefore.bestLineSan?.length ? evalBefore.bestLineSan : [evalBefore.bestMoveSan],
         });
+        // Diagnostic: drill scenarios are reportedly stopping at 1 move
+        // universally, which should only happen if the engine's own PV
+        // (evalBefore.bestLineSan) is coming back empty/length-1 for
+        // every position, not just specific short tactical lines. This
+        // confirms, from real data, whether that's actually happening at
+        // the engine layer or somewhere further down the pipeline.
+        console.error("[findTeachableMistakes] bestLineSan check", {
+          moveNumber: Math.floor(ply / 2) + 1,
+          rawBestLineSanLength: evalBefore.bestLineSan?.length ?? 0,
+          rawBestLineSan: evalBefore.bestLineSan,
+          bestMoveSan: evalBefore.bestMoveSan,
+        });
       }
     } catch (err) {
       logger.warn({ err, gameIndex }, "findTeachableMistakes: failed to replay game, skipping");

@@ -566,6 +566,27 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
   const [showHint, setShowHint] = useState(false);
   const [drillPosition, setDrillPosition] = useState<string>('');
 
+  // The drill scenario: after finding the fix move itself, keep going --
+  // the opponent auto-plays its reply, then the player finds the next
+  // best move, continuing through whatever of the fix line's best-line
+  // continuation exists (capped at a few plies by the backend already).
+  // fixPgn carries the context moves leading up to the fix too, so this
+  // locates where the fix move itself actually starts within it, rather
+  // than assuming index 0. Only available for the primary challenge
+  // (index 0) -- extraChallenges (other mistakes grouped into the same
+  // themed lesson) only carry a single expectedMove each, with no
+  // multi-move continuation data to build a scenario from.
+  const scenarioSteps = useMemo(() => {
+    if (!fixPgn) return null;
+    const parsed = parsePgnSteps(fixPgn, null, null);
+    if (!parsed) return null;
+    const fixIndex = parsed.findIndex(s => s.isFix);
+    if (fixIndex < 0) return null;
+    return parsed.slice(fixIndex);
+  }, [fixPgn]);
+  const [scenarioIndex, setScenarioIndex] = useState(0);
+  const [scenarioComplete, setScenarioComplete] = useState(false);
+
   const step = steps?.[currentStep];
   const totalSteps = steps?.length ?? 1;
   const isFirst = currentStep === 0;
@@ -621,6 +642,12 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
 
   const hasDrill = allChallenges.length > 0;
   const hasFix = !!fixPgn || !!drillExpectedMove;
+  // Whether THIS challenge (not just this lesson) actually has scenario
+  // data to continue with -- only the primary challenge (index 0) does.
+  // Needs both currentChallengeIndex and scenarioSteps to already exist,
+  // which is exactly why this declaration kept landing in the wrong
+  // place earlier and breaking the build twice over.
+  const hasScenario = currentChallengeIndex === 0 && !!scenarioSteps && scenarioSteps.length > 1;
 
   const drillMoveArrow = useMemo(() => {
     if (!activeChallenge) return null;
@@ -643,17 +670,26 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
       setDrillAttempts(0);
       setShowHint(false);
       setDrillSelectedSq(null);
+      setScenarioIndex(0);
+      setScenarioComplete(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentChallengeIndex, activeChallenge?.fen]);
 
+  // Once a scenario is past its first move, the live position
+  // (drillPosition) has moved on from the challenge's starting FEN --
+  // legal-move lookups need to use whichever one actually reflects the
+  // board right now, or they'd compute moves from the wrong position
+  // partway through a scenario.
+  const currentDrillFen = drillPosition || activeChallenge?.fen || '';
+
   const getDrillLegalTargets = useCallback((sq: string | null): string[] => {
-    if (!sq || !activeChallenge) return [];
+    if (!sq || !currentDrillFen) return [];
     try {
-      const chess = new Chess(activeChallenge.fen);
+      const chess = new Chess(currentDrillFen);
       return chess.moves({ square: sq as any, verbose: true }).map(m => m.to);
     } catch { return []; }
-  }, [activeChallenge]);
+  }, [currentDrillFen]);
 
 
   const drillLegalTargets = useMemo(() => getDrillLegalTargets(drillSelectedSq), [drillSelectedSq, getDrillLegalTargets]);
@@ -669,34 +705,77 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
 
 
   // ── Drill handlers ───────────────────────────────────────────────────────────
+  // Auto-plays the opponent's reply (scenarioSteps[idx]) after a short
+  // pause -- long enough to actually see what the player's move did to
+  // the board before the reply lands, matching the pacing used for
+  // auto-play elsewhere in this component (see the 2200ms interval
+  // above). Then lands on the next USER-turn step, or marks the
+  // scenario complete if none remain.
+  const playOpponentReplyAndAdvance = useCallback((idx: number) => {
+    if (!scenarioSteps) return;
+    const reply = scenarioSteps[idx];
+    if (!reply) { setScenarioComplete(true); setDrillState('correct'); return; }
+    setTimeout(() => {
+      setDrillPosition(reply.fen);
+      const next = idx + 1;
+      if (next >= scenarioSteps.length) {
+        setScenarioIndex(next);
+        setScenarioComplete(true);
+        setDrillState('correct');
+      } else {
+        setScenarioIndex(next);
+        setDrillState('idle');
+      }
+    }, 900);
+  }, [scenarioSteps]);
+
   const handleDrillDrop = useCallback((args: { sourceSquare: string; targetSquare: string | null; piece: unknown }) => {
     if (drillState === 'correct' || drillState === 'revealed') return false;
     if (!activeChallenge || !args.targetSquare) return false;
     if (args.sourceSquare === args.targetSquare) return false;
 
+    const expectedSan = hasScenario && scenarioSteps ? scenarioSteps[scenarioIndex]?.san : activeChallenge.expectedMove;
+    if (!expectedSan) return false;
+
     try {
-      const chess = new Chess(activeChallenge.fen);
+      const chess = new Chess(currentDrillFen);
       const move = chess.move({ from: args.sourceSquare, to: args.targetSquare, promotion: 'q' });
       if (!move) return false;
 
       const normalize = (s: string) => s.replace(/[+#!?]/g, '').trim();
-      const isCorrect = normalize(move.san) === normalize(activeChallenge.expectedMove) ||
-        move.to === activeChallenge.expectedMove.slice(-2);
+      const isCorrect = normalize(move.san) === normalize(expectedSan) || move.to === expectedSan.slice(-2);
 
       setDrillAttempts(a => a + 1);
-      if (isCorrect) {
-        setDrillPosition(chess.fen());
-        setDrillState('correct');
-        return true;
-      } else {
+      if (!isCorrect) {
         setDrillState('wrong');
         setTimeout(() => setDrillState('idle'), 1200);
         return false;
       }
+
+      setDrillPosition(chess.fen());
+
+      if (!hasScenario || !scenarioSteps) {
+        // No scenario data for this challenge (an extra challenge from a
+        // grouped lesson, which only ever carries one expected move) --
+        // same single-move behavior as before.
+        setDrillState('correct');
+        return true;
+      }
+
+      const nextIdx = scenarioIndex + 1;
+      if (nextIdx >= scenarioSteps.length) {
+        setScenarioIndex(nextIdx);
+        setScenarioComplete(true);
+        setDrillState('correct');
+      } else {
+        setDrillState('correct'); // brief "correct" flash for this one ply
+        playOpponentReplyAndAdvance(nextIdx);
+      }
+      return true;
     } catch {
       return false;
     }
-  }, [activeChallenge, drillState]);
+  }, [activeChallenge, drillState, currentDrillFen, hasScenario, scenarioSteps, scenarioIndex, playOpponentReplyAndAdvance]);
 
   const handleDrillSquareClick = useCallback(({ square, piece }: { square: string; piece: { pieceType: string } | null }) => {
     if (drillState === 'correct' || drillState === 'revealed' || !activeChallenge) return;
@@ -712,11 +791,11 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
     }
     if (piece) {
       try {
-        const chess = new Chess(activeChallenge.fen);
+        const chess = new Chess(currentDrillFen);
         if (piece.pieceType[0].toLowerCase() === chess.turn()) setDrillSelectedSq(square);
       } catch { setDrillSelectedSq(square); }
     }
-  }, [drillState, activeChallenge, drillSelectedSq, drillLegalTargets, handleDrillDrop]);
+  }, [drillState, activeChallenge, currentDrillFen, drillSelectedSq, drillLegalTargets, handleDrillDrop]);
 
   const resetDrill = () => {
     setDrillState('idle');
@@ -724,6 +803,8 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
     setShowHint(false);
     setDrillPosition(activeChallenge?.fen || '');
     setDrillSelectedSq(null);
+    setScenarioIndex(0);
+    setScenarioComplete(false);
   };
 
   const goToNextChallenge = () => {
@@ -887,8 +968,23 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
           </button>
         )}
 
-        <span className="ml-auto text-[11px] text-white/40 font-mono pr-1 shrink-0">
-          {tab === 'drill' ? 'Find best move' : (currentStep > 0 ? `Move ${step?.fullMoveNumber}` : title ?? '')}
+        {/* Shows "Next: Fix →" / "Next: Drill →" right in the tab bar
+            itself once the current tab's last step is reached -- not
+            just a relabeled button down in the controls, which turned
+            out to be invisible on mobile until the fix above. This is
+            the second, more prominent place that promise is now kept. */}
+        <span className="ml-auto text-[11px] font-mono pr-1 shrink-0" style={
+          (tab === 'mistake' && isLast && hasFix) || (tab === 'fix' && isLast && hasDrill)
+            ? { color: CHESSCOM_GREEN, fontWeight: 700 }
+            : { color: 'rgba(255,255,255,0.4)' }
+        }>
+          {tab === 'drill'
+            ? 'Find best move'
+            : tab === 'mistake' && isLast && hasFix
+            ? 'Next: Fix →'
+            : tab === 'fix' && isLast && hasDrill
+            ? 'Next: Drill →'
+            : (currentStep > 0 ? `Move ${step?.fullMoveNumber}` : title ?? '')}
         </span>
       </div>
 
@@ -1018,19 +1114,23 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
                 real but secondary, so they're visually smaller and
                 muted rather than equal-weight with everything else;
                 nothing here was removed, only de-emphasized. */}
-            <div className="flex items-center justify-center gap-1.5 md:gap-3">
+            {/* gap-2.5 on mobile (was 1.5) -- the primary button is wider
+                now that its label actually shows on phones (see the fix
+                above), so the surrounding buttons need a bit more room
+                to not look cramped against it. */}
+            <div className="flex items-center justify-center gap-2.5 md:gap-3 flex-wrap">
               <button
                 onClick={() => { setIsPlaying(false); go(0); }}
                 disabled={isFirst}
                 title="Jump to start"
-                className="p-1.5 rounded-full text-white/30 hover:text-white/60 hover:bg-white/[0.06] transition-all disabled:opacity-10"
+                className="p-1.5 rounded-full text-white/30 hover:text-white/60 hover:bg-white/[0.06] transition-all disabled:opacity-10 shrink-0"
               >
                 <SkipBack className="w-3 h-3" />
               </button>
               <button
                 onClick={() => go(currentStep - 1)}
                 disabled={isFirst}
-                className="p-2 md:p-2.5 rounded-full text-white/70 bg-white/[0.06] hover:bg-white/[0.14] hover:text-white transition-all disabled:opacity-20"
+                className="p-2 md:p-2.5 rounded-full text-white/70 bg-white/[0.06] hover:bg-white/[0.14] hover:text-white transition-all disabled:opacity-20 shrink-0"
               >
                 <ChevronLeft className="w-4 h-4 md:w-5 md:h-5" />
               </button>
@@ -1050,21 +1150,21 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
                   }
                   setIsPlaying(true);
                 }}
-                className="flex items-center gap-1.5 md:gap-2 px-6 md:px-9 py-2.5 md:py-3 rounded-full text-white font-bold text-sm transition-all hover:brightness-110 shadow-lg"
+                className="flex items-center justify-center gap-1.5 md:gap-2 px-5 md:px-9 py-2.5 md:py-3 rounded-full text-white font-bold text-sm transition-all hover:brightness-110 shadow-lg whitespace-nowrap"
                 style={{ backgroundColor: CHESSCOM_GREEN }}
               >
                 {isPlaying ? (
-                  <><Pause className="w-4 h-4" /> <span className="hidden md:inline">Pause</span></>
+                  <><Pause className="w-4 h-4 shrink-0" /> <span className="inline">Pause</span></>
                 ) : isLast ? (
                   tab === 'mistake' && hasFix ? (
-                    <><CheckCircle2 className="w-4 h-4" /> <span className="hidden md:inline">See the Fix</span></>
+                    <><CheckCircle2 className="w-4 h-4 shrink-0" /> <span className="inline">See the Fix</span></>
                   ) : tab === 'fix' && hasDrill ? (
-                    <><Swords className="w-4 h-4" /> <span className="hidden md:inline">Try the Drill</span></>
+                    <><Swords className="w-4 h-4 shrink-0" /> <span className="inline">Try the Drill</span></>
                   ) : (
-                    <><CheckCircle2 className="w-4 h-4" /> <span className="hidden md:inline">Done</span></>
+                    <><CheckCircle2 className="w-4 h-4 shrink-0" /> <span className="inline">Done</span></>
                   )
                 ) : (
-                  <><Play className="w-4 h-4" /> <span className="hidden md:inline">{currentStep === 0 ? 'Play' : 'Next'}</span></>
+                  <><Play className="w-4 h-4 shrink-0" /> <span className="inline">{currentStep === 0 ? 'Play' : 'Next'}</span></>
                 )}
               </button>
 
@@ -1075,7 +1175,7 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
                   if (tab === 'fix' && hasDrill) { setTab('drill'); resetDrill(); }
                 }}
                 disabled={isLast && !((tab === 'mistake' && hasFix) || (tab === 'fix' && hasDrill))}
-                className="p-2 md:p-2.5 rounded-full text-white/70 bg-white/[0.06] hover:bg-white/[0.14] hover:text-white transition-all disabled:opacity-20"
+                className="p-2 md:p-2.5 rounded-full text-white/70 bg-white/[0.06] hover:bg-white/[0.14] hover:text-white transition-all disabled:opacity-20 shrink-0"
               >
                 <ChevronRight className="w-4 h-4 md:w-5 md:h-5" />
               </button>
@@ -1083,7 +1183,7 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
                 onClick={() => { setIsPlaying(false); go(totalSteps - 1); }}
                 disabled={isLast}
                 title="Jump to end"
-                className="p-1.5 rounded-full text-white/30 hover:text-white/60 hover:bg-white/[0.06] transition-all disabled:opacity-10"
+                className="p-1.5 rounded-full text-white/30 hover:text-white/60 hover:bg-white/[0.06] transition-all disabled:opacity-10 shrink-0"
               >
                 <SkipForward className="w-3 h-3" />
               </button>
@@ -1371,8 +1471,22 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, drillFen, d
                   className="flex items-center gap-3 p-3 rounded-xl bg-emerald-500/15 border border-emerald-500/30">
                   <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
                   <div className="flex-1">
-                    <p className="text-sm font-bold text-emerald-400">Correct — {activeChallenge?.expectedMove}!</p>
-                    <p className="text-xs text-white/50 mt-0.5">Solved{drillAttempts > 1 ? ` in ${drillAttempts} attempts` : ' on first try'}.</p>
+                    {hasScenario && scenarioComplete ? (
+                      <>
+                        <p className="text-sm font-bold text-emerald-400">Scenario complete!</p>
+                        <p className="text-xs text-white/50 mt-0.5">You played out the full best line, move by move.</p>
+                      </>
+                    ) : hasScenario ? (
+                      <>
+                        <p className="text-sm font-bold text-emerald-400">Correct!</p>
+                        <p className="text-xs text-white/50 mt-0.5">Move {Math.min(scenarioIndex, (scenarioSteps?.length ?? 1))} of {scenarioSteps?.length ?? 1} — watch the reply, then keep going.</p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-sm font-bold text-emerald-400">Correct — {activeChallenge?.expectedMove}!</p>
+                        <p className="text-xs text-white/50 mt-0.5">Solved{drillAttempts > 1 ? ` in ${drillAttempts} attempts` : ' on first try'}.</p>
+                      </>
+                    )}
                   </div>
                   {isMultiChallenge && currentChallengeIndex < allChallenges.length - 1 && (
                     <button
