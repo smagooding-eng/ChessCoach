@@ -1224,7 +1224,15 @@ Write ONE short explanation, max 18 words, plain language, no chess notation rep
 
 Reply with ONLY the explanation sentence itself. No quotes, no JSON, no preamble, nothing else.`;
 
-  for (let attempt = 1; attempt <= 2; attempt++) {
+  // 3 attempts, was 2 -- a fresh, post-1500-token course still showed
+  // the hardcoded mistake-role fallback ("This is the move being
+  // reviewed"), with the actual comment-building logic confirmed
+  // structurally correct on review (uses the real explanation whenever
+  // one comes back). That points to a genuine residual failure rate,
+  // not a bug favoring this role specifically -- and the mistake move's
+  // explanation is arguably the single most important line in the
+  // entire lesson, worth one more attempt's worth of latency to protect.
+  for (let attempt = 1; attempt <= 3; attempt++) {
     try {
       // Explicit 20s timeout -- the client had none configured anywhere
       // in this file, meaning the SDK's own (much longer) default
@@ -1254,7 +1262,7 @@ Reply with ONLY the explanation sentence itself. No quotes, no JSON, no preamble
       console.error(`[generateOneMoveExplanation] THREW attempt=${attempt} san=${move.san} role=${move.role} name=${err?.name} status=${err?.status} code=${err?.code} type=${err?.type} message=${err?.message}`);
     }
   }
-  // Both attempts failed -- the caller falls back to the old generic
+  // All attempts failed -- the caller falls back to the old generic
   // comment for just this one move, so a lesson still gets created
   // either way, with only this single move's text degraded rather than
   // the whole sequence.
@@ -1283,7 +1291,9 @@ Write ONE short, general recap of this position, max 25 words, plain language. C
 
 Reply with ONLY the recap sentence itself. No quotes, no JSON, no preamble, nothing else.`;
 
-  for (let attempt = 1; attempt <= 2; attempt++) {
+  // 3 attempts, was 2 -- same reasoning as generateOneMoveExplanation's
+  // retry increase above.
+  for (let attempt = 1; attempt <= 3; attempt++) {
     try {
       // 1500, was 300 -- same confirmed root cause as
       // generateOneMoveExplanation: reasoningTokens=300 on every single
