@@ -1434,7 +1434,19 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, positionRec
               <PieceGradientDefs />
               <Chessboard
                 options={{
-                  position: (drillState === 'idle' || drillState === 'wrong') ? (activeChallenge?.fen ?? '') : drillPosition,
+                  // drillPosition is already the single source of truth at
+                  // every point -- initialized to activeChallenge.fen on
+                  // reset, updated after each real move (including the
+                  // scenario's auto-played opponent replies), and left
+                  // untouched on a wrong attempt. The old state-based
+                  // special-case (show activeChallenge.fen whenever
+                  // drillState is 'idle') assumed 'idle' only ever meant
+                  // "fresh start," which broke the moment the scenario
+                  // feature made drillState go back to 'idle' mid-sequence
+                  // too, while waiting for the next move -- snapping the
+                  // board back to the very first position every time, even
+                  // though drillPosition itself was already correct.
+                  position: drillPosition || activeChallenge?.fen || '',
                   allowDragging: drillState !== 'correct' && drillState !== 'revealed',
                   boardOrientation: boardOrientation,
                   dragActivationDistance: 8,

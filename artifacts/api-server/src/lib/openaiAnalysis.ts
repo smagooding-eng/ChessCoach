@@ -1974,31 +1974,50 @@ export async function findTeachableMistakes(
  * never an evaluative "this is objectively best" claim (which could be
  * wrong), just an observable description (develops a piece, controls the
  * center, captures material, etc.). No GPT call, no hallucination risk. */
-function describeMoveDeterministically(san: string, move: { piece: string; from: string; to: string; captured?: string; flags: string }): string {
+// role-aware suffix appended to every deterministic description below,
+// so even the worst case (the real AI call failed twice and this is the
+// literal fallback) gestures at why the move matters in THIS lesson's
+// story, not just what it mechanically does on the board. This is still
+// not as good as a real grounded explanation -- it's the same handful of
+// templates regardless of the actual position -- but "forcing an
+// immediate response, piling onto the trouble the mistake created" reads
+// as part of a story, where "Gives check, forcing an immediate response"
+// alone reads as a rules textbook.
+function roleFraming(role: 'context' | 'mistake' | 'consequence' | 'fix'): string {
+  switch (role) {
+    case 'consequence': return ', piling onto the trouble the mistake created';
+    case 'fix': return ', part of why this line holds up better';
+    case 'context': return ', part of the setup before the critical moment';
+    case 'mistake': return '';
+  }
+}
+
+function describeMoveDeterministically(san: string, move: { piece: string; from: string; to: string; captured?: string; flags: string }, role: 'context' | 'mistake' | 'consequence' | 'fix' = 'context'): string {
   const centralSquares = new Set(['d4', 'd5', 'e4', 'e5']);
   const pieceNames: Record<string, string> = { p: 'pawn', n: 'knight', b: 'bishop', r: 'rook', q: 'queen', k: 'king' };
   const pieceName = pieceNames[move.piece.toLowerCase()] ?? 'piece';
   const flags = typeof move.flags === 'string' ? move.flags : '';
+  const framing = roleFraming(role);
 
   if (flags.includes('k') || flags.includes('q')) {
-    return 'Castles, tucking the king away and connecting the rooks.';
+    return `Castles, tucking the king away and connecting the rooks${framing}.`;
   }
   if (move.captured) {
-    return `Captures the ${pieceNames[move.captured.toLowerCase()] ?? 'piece'} on ${move.to}.`;
+    return `Captures the ${pieceNames[move.captured.toLowerCase()] ?? 'piece'} on ${move.to}${framing}.`;
   }
   if (san.includes('+')) {
-    return 'Gives check, forcing an immediate response.';
+    return `Gives check, forcing an immediate response${framing}.`;
   }
   if (move.piece.toLowerCase() === 'p' && centralSquares.has(move.to)) {
-    return 'Stakes a claim in the center with a pawn.';
+    return `Stakes a claim in the center with a pawn${framing}.`;
   }
   if ((move.piece.toLowerCase() === 'n' || move.piece.toLowerCase() === 'b') && ['1', '8'].includes(move.from[1])) {
-    return `Develops the ${pieceName} off the back rank.`;
+    return `Develops the ${pieceName} off the back rank${framing}.`;
   }
   if (move.piece.toLowerCase() === 'q' && ['1', '8'].includes(move.from[1])) {
-    return 'Brings the queen into play.';
+    return `Brings the queen into play${framing}.`;
   }
-  return `Continues development with the ${pieceName}.`;
+  return `Continues development with the ${pieceName}${framing}.`;
 }
 
 // Was "Deterministically build the PGN context around a real mistake —
@@ -2042,7 +2061,7 @@ async function buildContextPgn(mistake: TeachableMistake, useBestMove: boolean):
       const explanation = fixExplanations?.[idx];
       const comment = mi.role === 'fix'
         ? `[FIX] ${explanation ?? `${bestSan} is the engine's preferred move here.`}`
-        : (explanation ?? describeMoveDeterministically(mi.san, fixMoveResults[idx]!));
+        : (explanation ?? describeMoveDeterministically(mi.san, fixMoveResults[idx]!, mi.role));
       tokens.push(`${mi.san} {${comment}}`);
     });
   } else {
@@ -2064,7 +2083,7 @@ async function buildContextPgn(mistake: TeachableMistake, useBestMove: boolean):
       const explanation = explanations?.[idx];
       const comment = mi.role === 'mistake'
         ? `[MISTAKE] ${explanation ?? 'This is the move being reviewed.'}`
-        : (explanation ?? describeMoveDeterministically(mi.san, moveResults[idx]!));
+        : (explanation ?? describeMoveDeterministically(mi.san, moveResults[idx]!, mi.role));
       tokens.push(`${mi.san} {${comment}}`);
     });
   }

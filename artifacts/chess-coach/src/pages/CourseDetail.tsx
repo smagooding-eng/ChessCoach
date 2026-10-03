@@ -263,7 +263,11 @@ function LessonContentStepper({ content, lessonId, courseCategory, conceptTitle,
   const [showingIntro, setShowingIntro] = useState(!!conceptText);
   const [speaking, setSpeaking] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [autoRead, setAutoRead] = useState(false);
+  // Defaults to true -- lessons read themselves aloud by default now,
+  // per explicit request, rather than needing AUTO toggled on each time.
+  // The toggle itself is unchanged and fully functional for anyone who
+  // wants to turn it off.
+  const [autoRead, setAutoRead] = useState(true);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   // Paired with LessonBoardPlayer below it on mobile, where CSS order
@@ -495,7 +499,8 @@ function LessonBeatPlayer({
   const [currentBeat, setCurrentBeat] = useState(0);
   const [speaking, setSpeaking] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [autoRead, setAutoRead] = useState(false);
+  // Defaults to true -- same reasoning as LessonContentStepper above.
+  const [autoRead, setAutoRead] = useState(true);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
