@@ -1231,21 +1231,24 @@ Reply with ONLY the explanation sentence itself. No quotes, no JSON, no preamble
       // applied. A single slow/stuck call with no timeout could stall
       // this entire sequential pipeline for a very long time; failing
       // fast here lets the retry (or final fallback) kick in instead.
+      // 1500, was 300 -- real, confirmed root cause now, not a guess:
+      // production logs showed completionTokens=300 and
+      // reasoningTokens=300 on EVERY call, meaning this model spends its
+      // entire budget on internal reasoning before writing any visible
+      // text, regardless of how short the actual answer needs to be.
+      // One of the thrown-error logs even had OpenAI's own API message
+      // say it directly: "Could not finish the message because
+      // max_tokens or model output limit was reached. Please try again
+      // with higher max_tokens." 1500 gives substantial headroom beyond
+      // the 300 reasoning was already consistently maxing out at.
       const response = await openai.chat.completions.create({
         model: "gpt-5.6-luna",
-        max_completion_tokens: 300,
+        max_completion_tokens: 1500,
         messages: [{ role: "user", content: prompt }],
       }, { timeout: 20_000 });
       void trackAiUsage({ userId: undefined, feature: AI_FEATURES.LESSON_CONTENT, model: "gpt-5.6-luna", usage: response.usage });
       const text = (response.choices[0]?.message?.content ?? "").trim().replace(/^["']|["']$/g, "");
       if (text) return text;
-      // Everything inlined into the message string itself, not a nested
-      // object -- Render's log list view was showing only the message
-      // text and cutting off at the opening "{" of any object argument,
-      // so finishReason/usage were never actually visible without an
-      // expand step that wasn't working from the mobile UI. This way
-      // the one field that actually matters (finishReason) is readable
-      // directly in the list, no tapping anything.
       console.error(`[generateOneMoveExplanation] EMPTY attempt=${attempt} san=${move.san} role=${move.role} finishReason=${response.choices[0]?.finish_reason} totalTokens=${response.usage?.total_tokens} completionTokens=${response.usage?.completion_tokens} reasoningTokens=${(response.usage?.completion_tokens_details as any)?.reasoning_tokens}`);
     } catch (err: any) {
       console.error(`[generateOneMoveExplanation] THREW attempt=${attempt} san=${move.san} role=${move.role} name=${err?.name} status=${err?.status} code=${err?.code} type=${err?.type} message=${err?.message}`);
@@ -1282,9 +1285,12 @@ Reply with ONLY the recap sentence itself. No quotes, no JSON, no preamble, noth
 
   for (let attempt = 1; attempt <= 2; attempt++) {
     try {
+      // 1500, was 300 -- same confirmed root cause as
+      // generateOneMoveExplanation: reasoningTokens=300 on every single
+      // call, maxing out the old budget on internal reasoning alone.
       const response = await openai.chat.completions.create({
         model: "gpt-5.6-luna",
-        max_completion_tokens: 300,
+        max_completion_tokens: 1500,
         messages: [{ role: "user", content: prompt }],
       }, { timeout: 20_000 });
       void trackAiUsage({ userId: undefined, feature: AI_FEATURES.LESSON_CONTENT, model: "gpt-5.6-luna", usage: response.usage });

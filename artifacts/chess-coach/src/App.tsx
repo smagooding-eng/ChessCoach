@@ -8,6 +8,7 @@ import { ImportStatusWatcher } from "@/components/ImportStatusWatcher";
 import { AutoPushPrompt } from "@/components/AutoPushPrompt";
 import { useDashboardRedesignFlag } from "@/hooks/use-app-config";
 import { BackgroundJobsWatcher } from "@/components/BackgroundJobsWatcher";
+import { AudioAutoplayUnlock } from "@/components/AudioAutoplayUnlock";
 import { Layout } from "@/components/Layout";
 import { useUser } from "@/hooks/use-user";
 import { useEffect, Component, Suspense, lazy, type ReactNode } from "react";
@@ -367,6 +368,7 @@ function App() {
                   <ImportStatusWatcher />
                   <BackgroundJobsWatcher />
                   <AutoPushPrompt />
+                  <AudioAutoplayUnlock />
                 </WouterRouter>
                 <Toaster />
               </TooltipProvider>
