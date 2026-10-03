@@ -256,8 +256,22 @@ function extractConceptText(content: string): string | null {
 }
 
 // ── Step-by-step lesson content component with TTS ────────────────────────────
-function LessonContentStepper({ content, lessonId, courseCategory, conceptTitle, onStepChange }: { content: string; lessonId: number; courseCategory: string; conceptTitle?: string | null; onStepChange?: (stepText: string) => void }) {
+function LessonContentStepper({ content, lessonId, courseCategory, conceptTitle, onStepChange, boardMoveText }: { content: string; lessonId: number; courseCategory: string; conceptTitle?: string | null; onStepChange?: (stepText: string) => void; boardMoveText?: string }) {
   const steps = useMemo(() => splitIntoSteps(content), [content]);
+  // A ref, not reading boardMoveText directly -- several of the calls
+  // below happen inside a setTimeout, whose closure would otherwise
+  // capture whatever boardMoveText was at the moment the effect ran
+  // (e.g. on lesson mount), not its latest value by the time the
+  // timeout actually fires. The ref always reflects the current prop.
+  const boardMoveTextRef = useRef(boardMoveText ?? '');
+  useEffect(() => { boardMoveTextRef.current = boardMoveText ?? ''; }, [boardMoveText]);
+  // Whatever move is currently on screen (from LessonBoardPlayer) takes
+  // priority over this panel's own static overview text for Read
+  // Aloud/AUTO -- someone looking at a specific move's explanation
+  // wants to hear THAT, not an unrelated paragraph from the lesson's
+  // general narrative. Falls back to the overview only when nothing
+  // board-specific is available (boardMoveTextRef empty, e.g. on Drill).
+  const currentReadText = (text: string) => boardMoveTextRef.current.trim() ? boardMoveTextRef.current : text;
   const conceptText = useMemo(() => extractConceptText(content), [content]);
   const [step, setStep] = useState(0);
   const [showingIntro, setShowingIntro] = useState(!!conceptText);
@@ -288,6 +302,17 @@ function LessonContentStepper({ content, lessonId, courseCategory, conceptTitle,
     setShowingIntro(!!conceptText);
     stopReading();
     onStepChange?.(steps[0] ?? '');
+    // This was the actual missing piece for "doesn't start automatically"
+    // -- defaulting autoRead to true only changes what goTo does on
+    // FUTURE navigation; nothing was ever calling readAloud for the
+    // first step a lesson opens on, since that's set here directly
+    // rather than through goTo. A small delay so this doesn't race the
+    // concept-intro card's own mount, and so it doesn't fire while a
+    // lesson switch is still settling.
+    if (autoRead && !conceptText) {
+      setTimeout(() => readAloud(currentReadText(steps[0] ?? '')), 150);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lessonId]);
 
   useEffect(() => {
@@ -348,7 +373,7 @@ function LessonContentStepper({ content, lessonId, courseCategory, conceptTitle,
     setStep(clamped);
     onStepChange?.(steps[clamped] ?? '');
     if (autoRead) {
-      setTimeout(() => readAloud(steps[clamped]), 80);
+      setTimeout(() => readAloud(currentReadText(steps[clamped])), 80);
     }
   }, [steps, autoRead, readAloud, onStepChange]);
 
@@ -360,7 +385,14 @@ function LessonContentStepper({ content, lessonId, courseCategory, conceptTitle,
         conceptTitle={conceptTitle ?? null}
         conceptText={conceptText}
         courseCategory={courseCategory}
-        onStart={() => setShowingIntro(false)}
+        onStart={() => {
+          setShowingIntro(false);
+          // Mirrors the mount-time trigger above -- that one was
+          // skipped while the intro card was still showing, so this is
+          // the actual first moment step 0's content becomes visible
+          // for a themed/grouped lesson.
+          if (autoRead) setTimeout(() => readAloud(currentReadText(steps[0] ?? '')), 150);
+        }}
       />
     );
   }
@@ -401,7 +433,7 @@ function LessonContentStepper({ content, lessonId, courseCategory, conceptTitle,
         </button>
 
         <button
-          onClick={() => (speaking || loading) ? stopReading() : readAloud(steps[step])}
+          onClick={() => (speaking || loading) ? stopReading() : readAloud(currentReadText(steps[step]))}
           className={cn(
             'flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all',
             (speaking || loading)
@@ -783,6 +815,12 @@ export function CourseDetail() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [desktopSidebarCollapsed, setDesktopSidebarCollapsed] = useState(true);
   const [showFixLine, setShowFixLine] = useState(false);
+  // Whatever LessonBoardPlayer currently has on screen (Mistake/Fix
+  // tabs) -- passed down to LessonContentStepper so its one Read
+  // Aloud/AUTO control reads the actual visible move explanation
+  // instead of only ever reading the lesson's separate static overview
+  // text.
+  const [boardMoveText, setBoardMoveText] = useState('');
   const [showCompletionShare, setShowCompletionShare] = useState(false);
   const { username } = useUser();
 
@@ -1053,6 +1091,7 @@ export function CourseDetail() {
                           courseCategory={course?.category ?? ''}
                           conceptTitle={lesson.conceptTitle}
                           onStepChange={(stepText) => setShowFixLine(/##\s*The Fix/i.test(stepText))}
+                          boardMoveText={boardMoveText}
                         />
                       </div>
                     )}
@@ -1066,6 +1105,8 @@ export function CourseDetail() {
                           showFixLine={showFixLine}
                           title={lesson.title}
                           positionRecap={(lesson as typeof lesson & { positionRecap?: string | null }).positionRecap ?? null}
+                          courseCategory={course?.category ?? null}
+                          onMoveTextChange={setBoardMoveText}
                           drillFen={lesson.drillFen ?? null}
                           drillExpectedMove={lesson.drillExpectedMove ?? null}
                           drillHint={lesson.drillHint ?? null}

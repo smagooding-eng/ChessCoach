@@ -419,6 +419,16 @@ interface LessonBoardPlayerProps {
   // "Press play or click a move to begin" that told the learner nothing
   // about what they're about to look at.
   positionRecap?: string | null;
+  // Used to link out to the existing Puzzles page, pre-filtered to this
+  // lesson's weakness category, once the Drill is solved -- see the
+  // "Practice Related Puzzles" button below.
+  courseCategory?: string | null;
+  // Reports the CURRENTLY DISPLAYED move's comment text (Mistake/Fix
+  // tabs only) up to the parent -- this is what lets the page's single
+  // Read Aloud/AUTO control actually read what's on screen, instead of
+  // only ever reading the lesson's separate static overview text while
+  // someone is looking at a specific move's explanation.
+  onMoveTextChange?: (text: string) => void;
   drillFen?: string | null;
   drillExpectedMove?: string | null;
   drillHint?: string | null;
@@ -491,7 +501,7 @@ function buildFrontendFixPgn(mistakePgn: string, drillExpectedMove: string | nul
   }
 }
 
-export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, positionRecap, drillFen, drillExpectedMove, drillHint, content, extraChallenges, conceptTitle }: LessonBoardPlayerProps) {
+export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, positionRecap, courseCategory, onMoveTextChange, drillFen, drillExpectedMove, drillHint, content, extraChallenges, conceptTitle }: LessonBoardPlayerProps) {
   const [, navigate] = useLocation();
   const { boardColors, boardTextureCss, pieceColors, pieceShape, pieceStyle, showCoordinates, showLegalMoves } = useSettings();
   const BOARD_LIGHT = boardColors.light;
@@ -595,6 +605,19 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, positionRec
   const totalSteps = steps?.length ?? 1;
   const isFirst = currentStep === 0;
   const isLast = currentStep === totalSteps - 1;
+
+  // Reports whatever text is actually visible right now, for Read
+  // Aloud/AUTO to use -- Mistake and Fix tabs only, since Drill's
+  // content isn't a narrated explanation in the same way.
+  useEffect(() => {
+    if (!onMoveTextChange) return;
+    if (tab !== 'mistake' && tab !== 'fix') return;
+    const raw = (currentStep === 0 && tab === 'mistake' && positionRecap)
+      ? positionRecap
+      : step?.comment || step?.san || '';
+    onMoveTextChange(raw.replace(/\*\*/g, ''));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, currentStep, step?.comment, step?.san, positionRecap]);
 
   const go = useCallback((idx: number) => {
     setPrevFen(steps?.[currentStep]?.fen ?? null);
@@ -1120,16 +1143,18 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, positionRec
                 real but secondary, so they're visually smaller and
                 muted rather than equal-weight with everything else;
                 nothing here was removed, only de-emphasized. */}
-            {/* gap-2.5 on mobile (was 1.5) -- the primary button is wider
-                now that its label actually shows on phones (see the fix
-                above), so the surrounding buttons need a bit more room
-                to not look cramped against it. */}
-            <div className="flex items-center justify-center gap-2.5 md:gap-3 flex-wrap">
+            {/* gap-4 on mobile (was 2.5, before that 1.5) -- still
+                reported as too tight to tap reliably even after the
+                first increase, so widening further and giving the two
+                small skip buttons a bigger touch target too (p-1.5 ->
+                p-2.5), since a small gap combined with a small target is
+                what actually causes mis-taps, not gap alone. */}
+            <div className="flex items-center justify-center gap-4 md:gap-5 flex-wrap">
               <button
                 onClick={() => { setIsPlaying(false); go(0); }}
                 disabled={isFirst}
                 title="Jump to start"
-                className="p-1.5 rounded-full text-white/30 hover:text-white/60 hover:bg-white/[0.06] transition-all disabled:opacity-10 shrink-0"
+                className="p-2.5 rounded-full text-white/30 hover:text-white/60 hover:bg-white/[0.06] transition-all disabled:opacity-10 shrink-0"
               >
                 <SkipBack className="w-3 h-3" />
               </button>
@@ -1189,7 +1214,7 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, positionRec
                 onClick={() => { setIsPlaying(false); go(totalSteps - 1); }}
                 disabled={isLast}
                 title="Jump to end"
-                className="p-1.5 rounded-full text-white/30 hover:text-white/60 hover:bg-white/[0.06] transition-all disabled:opacity-10 shrink-0"
+                className="p-2.5 rounded-full text-white/30 hover:text-white/60 hover:bg-white/[0.06] transition-all disabled:opacity-10 shrink-0"
               >
                 <SkipForward className="w-3 h-3" />
               </button>
@@ -1584,6 +1609,37 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, positionRec
               </button>
             )}
           </div>
+
+          {/* Links out to the existing Puzzles page rather than
+              rebuilding an interactive solver a third time -- Puzzles.tsx
+              already accepts ?weakness= and filters using the same
+              category-to-theme mapping the backend's /puzzles/next
+              endpoint uses, so this is 100% existing, proven
+              functionality, not a new query or a new board UI. Opens in
+              a new tab so progress in this lesson isn't lost; this is a
+              strong, prominent suggestion rather than a hard requirement
+              -- Complete & Next isn't blocked on actually solving these,
+              since verifying that server-side would need correlating
+              puzzle attempts by timestamp against this specific lesson,
+              a meaningfully bigger piece than this card. */}
+          {(drillState === 'correct' || drillState === 'revealed') && courseCategory && (
+            <div className="mx-3 mb-3 md:mx-4 md:mb-4 p-3.5 rounded-xl flex items-center gap-3" style={{ backgroundColor: 'rgba(127,209,79,0.08)', border: '1px solid rgba(127,209,79,0.25)' }}>
+              <Swords className="w-5 h-5 shrink-0" style={{ color: CHESSCOM_GREEN }} />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold text-white">Lock it in with a few puzzles</p>
+                <p className="text-xs text-white/50 mt-0.5">2–3 more like this one, before moving on.</p>
+              </div>
+              <a
+                href={`/puzzles?weakness=${encodeURIComponent(courseCategory)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="shrink-0 px-4 py-2 rounded-xl text-xs font-bold text-white hover:brightness-110 transition-all whitespace-nowrap"
+                style={{ backgroundColor: CHESSCOM_GREEN }}
+              >
+                Practice Puzzles →
+              </a>
+            </div>
+          )}
         </div>
       )}
     </div>
