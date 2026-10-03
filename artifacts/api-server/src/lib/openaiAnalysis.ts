@@ -1239,11 +1239,16 @@ Reply with ONLY the explanation sentence itself. No quotes, no JSON, no preamble
       void trackAiUsage({ userId: undefined, feature: AI_FEATURES.LESSON_CONTENT, model: "gpt-5.6-luna", usage: response.usage });
       const text = (response.choices[0]?.message?.content ?? "").trim().replace(/^["']|["']$/g, "");
       if (text) return text;
-      console.error(`[generateOneMoveExplanation] AI returned empty content on attempt ${attempt} -- ${attempt < 2 ? "retrying" : "falling back to generic text"}.`, {
-        san: move.san, role: move.role, finishReason: response.choices[0]?.finish_reason, usage: response.usage,
-      });
-    } catch (err) {
-      console.error(`[generateOneMoveExplanation] AI call threw on attempt ${attempt} -- ${attempt < 2 ? "retrying" : "falling back to generic text"}.`, { san: move.san, role: move.role, err });
+      // Everything inlined into the message string itself, not a nested
+      // object -- Render's log list view was showing only the message
+      // text and cutting off at the opening "{" of any object argument,
+      // so finishReason/usage were never actually visible without an
+      // expand step that wasn't working from the mobile UI. This way
+      // the one field that actually matters (finishReason) is readable
+      // directly in the list, no tapping anything.
+      console.error(`[generateOneMoveExplanation] EMPTY attempt=${attempt} san=${move.san} role=${move.role} finishReason=${response.choices[0]?.finish_reason} totalTokens=${response.usage?.total_tokens} completionTokens=${response.usage?.completion_tokens} reasoningTokens=${(response.usage?.completion_tokens_details as any)?.reasoning_tokens}`);
+    } catch (err: any) {
+      console.error(`[generateOneMoveExplanation] THREW attempt=${attempt} san=${move.san} role=${move.role} name=${err?.name} status=${err?.status} code=${err?.code} type=${err?.type} message=${err?.message}`);
     }
   }
   // Both attempts failed -- the caller falls back to the old generic
@@ -1285,9 +1290,11 @@ Reply with ONLY the recap sentence itself. No quotes, no JSON, no preamble, noth
       void trackAiUsage({ userId: undefined, feature: AI_FEATURES.LESSON_CONTENT, model: "gpt-5.6-luna", usage: response.usage });
       const text = (response.choices[0]?.message?.content ?? "").trim().replace(/^["']|["']$/g, "");
       if (text) return text;
-      console.error(`[generatePositionRecap] AI returned empty content on attempt ${attempt} -- ${attempt < 2 ? "retrying" : "falling back to no recap"}.`, { fen, finishReason: response.choices[0]?.finish_reason, usage: response.usage });
-    } catch (err) {
-      console.error(`[generatePositionRecap] AI call threw on attempt ${attempt} -- ${attempt < 2 ? "retrying" : "falling back to no recap"}.`, { fen, err });
+      // Same inlining fix as generateOneMoveExplanation -- see its
+      // comment for why.
+      console.error(`[generatePositionRecap] EMPTY attempt=${attempt} finishReason=${response.choices[0]?.finish_reason} totalTokens=${response.usage?.total_tokens} completionTokens=${response.usage?.completion_tokens} reasoningTokens=${(response.usage?.completion_tokens_details as any)?.reasoning_tokens}`);
+    } catch (err: any) {
+      console.error(`[generatePositionRecap] THREW attempt=${attempt} name=${err?.name} status=${err?.status} code=${err?.code} type=${err?.type} message=${err?.message}`);
     }
   }
   return null;
