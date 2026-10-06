@@ -980,16 +980,16 @@ export function GameReplay() {
             const playedOn = dm ? new Date(`${dm[1]}-${dm[2]}-${dm[3]}T12:00:00`).toLocaleDateString() : null;
             const badge = game.result === 'win' ? { t: 'Win', bg: 'rgba(46,125,50,.45)', fg: '#7BE05A' } : game.result === 'loss' ? { t: 'Loss', bg: 'rgba(150,35,45,.55)', fg: '#FF6B73' } : { t: 'Draw', bg: 'rgba(255,255,255,.12)', fg: '#C9D2CF' };
             const av = (a: string | undefined, n: string, ring: string) => a
-              ? <img src={a} alt={n} className="h-[58px] w-[58px] shrink-0 rounded-full object-cover" style={{ border: `2px solid ${ring}` }} />
-              : <span className="grid h-[58px] w-[58px] shrink-0 place-items-center rounded-full text-[22px] font-extrabold" style={{ background: 'rgba(255,255,255,.1)', border: `2px solid ${ring}` }}>{n?.[0]?.toUpperCase()}</span>;
+              ? <img src={a} alt={n} className="h-[46px] w-[46px] shrink-0 rounded-full object-cover" style={{ border: `2px solid ${ring}` }} />
+              : <span className="grid h-[46px] w-[46px] shrink-0 place-items-center rounded-full text-[22px] font-extrabold" style={{ background: 'rgba(255,255,255,.1)', border: `2px solid ${ring}` }}>{n?.[0]?.toUpperCase()}</span>;
             return (
-              <div className="order-[-5] xl:order-none rounded-[22px] p-4" style={{ background: RD.card, border: `1px solid ${RD.border}` }}>
+              <div className="order-[-5] xl:order-none rounded-[20px] p-3" style={{ background: RD.card, border: `1px solid ${RD.border}` }}>
                 <div className="flex items-center">
                   <div className="flex min-w-0 flex-1 items-center gap-3">
                     {av(me.avatar, me.name, 'rgba(255,255,255,.7)')}
                     <div className="min-w-0">
                       <p className="text-[13px]" style={{ color: RD.muted }}>You ({youWhite ? 'White' : 'Black'})</p>
-                      <b className="block text-[24px] font-extrabold leading-tight">{me.rating}</b>
+                      <b className="block text-[21px] font-extrabold leading-tight">{me.rating}</b>
                     </div>
                   </div>
                   <div className="mx-3 h-12 w-px shrink-0" style={{ background: RD.border }} />
@@ -1002,8 +1002,8 @@ export function GameReplay() {
                     </div>
                   </div>
                 </div>
-                <div className="mt-3 flex items-center gap-3">
-                  <span className="rounded-[9px] px-3.5 py-2 text-[14px] font-extrabold" style={{ background: badge.bg, color: badge.fg }}>{badge.t}</span>
+                <div className="mt-2 flex items-center gap-3">
+                  <span className="rounded-[9px] px-3 py-1.5 text-[14px] font-extrabold" style={{ background: badge.bg, color: badge.fg }}>{badge.t}</span>
                   <span className="text-[13px]" style={{ color: 'rgba(245,247,246,.8)' }}>
                     <span className="block">{badge.t}</span>
                     {playedOn ? `${playedOn} · ` : ''}{maxMoves} moves
@@ -1070,7 +1070,7 @@ export function GameReplay() {
               We always reserve a fixed-height slot above the board for the
               MistakeFixView tab toggle ("Played | Engine line") so the board
               doesn't shift up/down when navigating between bad and good moves. */}
-          <div className="mx-auto w-full max-w-[min(100%,52dvh)] md:max-w-[min(100%,55dvh)] xl:max-w-none order-[-3] xl:order-none">
+          <div className={`mx-auto w-full ${redesign ? 'max-w-[min(100%,42dvh)]' : 'max-w-[min(100%,52dvh)]'} md:max-w-[min(100%,55dvh)] xl:max-w-none order-[-3] xl:order-none`}>
             {isBad && currentReview && currentMove > 0 && !practiceMode ? (
               (() => {
                 const prevFen = currentMove <= 1 ? gameStartFen : (moves[currentMove - 2]?.fen ?? gameStartFen);
@@ -1116,7 +1116,10 @@ export function GameReplay() {
 
           {/* Playback controls */}
           {redesign && <p className="order-[-2] xl:order-none text-center text-[13px]" style={{ color: RD.muted }}>Move {currentMove} / {maxMoves}</p>}
-          <div className={redesign ? 'order-[-2] xl:order-none w-full' : 'glass-card rounded-xl px-1.5 py-1.5 md:p-3 flex items-center justify-between order-[-2] xl:order-none'}>
+          <div
+            className={redesign ? 'order-[-2] xl:order-none sticky bottom-0 z-20 w-full pb-[max(0.25rem,env(safe-area-inset-bottom))] pt-2' : 'glass-card rounded-xl px-1.5 py-1.5 md:p-3 flex items-center justify-between order-[-2] xl:order-none'}
+            style={redesign ? { background: 'linear-gradient(180deg, rgba(5,10,11,0) 0%, #050A0B 26%)' } : undefined}
+          >
             <MoveNavigationBar
               variant={redesign ? 'redesign' : undefined}
               isPlaying={isPlaying}

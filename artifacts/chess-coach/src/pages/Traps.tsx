@@ -162,7 +162,7 @@ function TrapsRedesign({ traps, loading }: { traps: TrapSummary[]; loading: bool
   const grouped = tab === 'category' ? groupBy((t) => t.category) : tab === 'level' ? groupBy((t) => t.difficulty[0].toUpperCase() + t.difficulty.slice(1)) : null;
 
   return (
-    <div className="-m-4 min-h-screen px-3 md:-m-6 md:px-6 md:pt-6 md:pb-12 pb-[calc(7.5rem+env(safe-area-inset-bottom))]" style={{ background: RD.bg, color: RD.text }}>
+    <div className="min-h-screen px-3 md:px-6 md:pt-6 md:pb-12 pb-[calc(7.5rem+env(safe-area-inset-bottom))]" style={{ background: RD.bg, color: RD.text }}>
       <div className="mx-auto w-full max-w-[640px]">
         <RedesignHeader title="Chess Traps" icon={<Crosshair size={24} />} />
 

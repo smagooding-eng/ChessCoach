@@ -88,7 +88,7 @@ export function CoursesRedesign({
   const card = { background: RD.card, border: `1px solid ${RD.border}` } as const;
 
   return (
-    <div className="-m-4 min-h-screen px-3 pt-3 md:-m-6 md:px-6 md:pt-6 md:pb-12 pb-[calc(7.5rem+env(safe-area-inset-bottom))]" style={{ background: RD.bg, color: RD.text }}>
+    <div className="min-h-screen px-3 pt-3 md:px-6 md:pt-6 md:pb-12 pb-[calc(7.5rem+env(safe-area-inset-bottom))]" style={{ background: RD.bg, color: RD.text }}>
       <div className="mx-auto grid w-full max-w-[600px] gap-5">
         <div className="px-1">
           <h1 className="text-[32px] font-extrabold leading-tight tracking-tight">Your Training Plan</h1>

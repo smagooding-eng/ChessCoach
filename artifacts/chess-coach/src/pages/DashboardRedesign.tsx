@@ -1,10 +1,18 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'wouter';
-import { Target, Search, ArrowRight, ChevronRight, Play, Puzzle, BookOpen, Crosshair, Crown } from 'lucide-react';
+import { Target, Search, ArrowRight, ArrowUpRight, ChevronRight, Play, Puzzle, BookOpen, Crosshair, Crown, Camera, Zap, ShoppingBag, Bot, Swords, Download } from 'lucide-react';
 import { useUser } from '@/hooks/use-user';
 import { useChessPlayer } from '@/hooks/use-chess-player';
 import { useMultiEloProgress } from '@/hooks/use-elo-progress';
-import { useMyAnalysisSummary } from '@/hooks/use-analysis';
+import { useMyAnalysisSummary, useMyWeaknesses } from '@/hooks/use-analysis';
+import { useMyCourses } from '@/hooks/use-courses';
+import { useLiveRatings, bestLiveRating } from '@/hooks/use-live-ratings';
+import { apiFetch } from '@/lib/api';
+import { trackImportJob } from '@/components/ImportStatusWatcher';
+import { EmailVerifyBanner } from '@/components/EmailVerifyBanner';
+import { FenThumb } from '@/components/FenThumb';
+import { encodeCard } from '@/pages/ShareCard';
+import { ReferralCard } from '@/pages/Profile';
 import { useMyGames } from '@/hooks/use-games';
 import { GameThumb } from '@/components/GameThumb';
 
@@ -62,6 +70,35 @@ export function DashboardRedesign() {
   const { data: gamesData } = useMyGames(3);
   const [opponent, setOpponent] = useState('');
   const [, navigate] = useLocation();
+  const { data: weaknessesData } = useMyWeaknesses();
+  const { data: coursesData } = useMyCourses();
+  const { data: liveRatingsData } = useLiveRatings();
+  const liveBest = bestLiveRating(liveRatingsData?.ratings);
+
+  // Same behaviour as the classic home: quietly fetch any new games (last month)
+  // once per visit, using the shared background-import tracker. Failures are
+  // swallowed on purpose -- a manual Import still works and reports its own errors.
+  const autoImportedRef = useRef(false);
+  useEffect(() => {
+    if (autoImportedRef.current) return;
+    const platform: 'chesscom' | 'lichess' | null = username ? 'chesscom' : authUser?.lichessUsername ? 'lichess' : null;
+    const autoUsername = platform === 'chesscom' ? username : authUser?.lichessUsername;
+    if (!platform || !autoUsername) return;
+    autoImportedRef.current = true;
+    (async () => {
+      try {
+        const r = await apiFetch('/api/games/import-bg', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ username: autoUsername, months: 1, forceUpdate: false, platform, ownerUsername: username || autoUsername }),
+        });
+        if (!r.ok) return;
+        const { jobId } = await r.json() as { jobId: string };
+        if (jobId) trackImportJob(jobId, platform, autoUsername, true);
+      } catch { /* silent by design */ }
+    })();
+  }, [username, authUser?.lichessUsername]);
 
   const displayName = username ?? authUser?.chesscomUsername ?? authUser?.lichessUsername ?? 'Player';
   const mine = [username, authUser?.chesscomUsername, authUser?.lichessUsername]
@@ -73,9 +110,11 @@ export function DashboardRedesign() {
   const ratings: number[] = [];
   if (multiElo?.chesscom?.hasData) ratings.push(multiElo.chesscom.currentRating);
   if (multiElo?.lichess?.hasData) ratings.push(multiElo.lichess.currentRating);
-  const scoutElo = ratings.length > 0
-    ? Math.round(ratings.reduce((a, b) => a + b, 0) / ratings.length)
-    : (chessPlayer?.rating ?? null);
+  const scoutElo = liveBest
+    ? liveBest.rating
+    : ratings.length > 0
+      ? Math.round(ratings.reduce((a, b) => a + b, 0) / ratings.length)
+      : (chessPlayer?.rating ?? null);
   const scoutDelta = multiElo?.combined?.delta ?? null;
 
   const statsLoading = summary === undefined;
@@ -93,12 +132,31 @@ export function DashboardRedesign() {
 
   const recent = gamesData?.games ?? [];
 
+  // Tapping the Scout rating shares a milestone card (same as the classic home)
+  const shareScout = async () => {
+    if (scoutElo == null) return;
+    const url = `${window.location.origin}/share/${encodeCard({ type: 'milestone', username: username ?? 'A ChessScout.net user', newRating: scoutElo })}`;
+    const shareData = { title: `My Scout ELO is ${scoutElo}`, url };
+    if (navigator.share) { try { await navigator.share(shareData); return; } catch { /* fall through to clipboard */ } }
+    try { await navigator.clipboard.writeText(url); } catch { /* nothing more we can do */ }
+  };
+
+  const SEV: Record<string, { bg: string; fg: string }> = {
+    Critical: { bg: 'rgba(255,80,88,.18)', fg: '#FF8A8F' },
+    High: { bg: 'rgba(255,138,61,.18)', fg: '#FFB07A' },
+    Medium: { bg: 'rgba(232,180,71,.18)', fg: '#F0C25C' },
+    Low: { bg: 'rgba(139,234,69,.16)', fg: GREEN },
+  };
+  const topWeaknesses = weaknessesData?.weaknesses?.slice(0, 3) ?? [];
+  const courses = coursesData?.courses?.slice(0, 3) ?? [];
+
   return (
     <div
-      className="-m-4 min-h-screen px-3 pt-3 md:-m-6 md:px-6 md:pt-6 md:pb-12 pb-[calc(7.5rem+env(safe-area-inset-bottom))]"
+      className="min-h-screen px-3 pt-3 md:px-6 md:pt-6 md:pb-12 pb-[calc(7.5rem+env(safe-area-inset-bottom))]"
       style={{ background: BG, color: '#F5F7F6', fontFamily: 'inherit' }}
     >
       <div className="mx-auto grid w-full max-w-[760px] gap-3">
+        <EmailVerifyBanner />
 
         {/* ── Player summary ── */}
         <section className="rounded-[20px] p-4" style={{ background: CARD, border: `1px solid ${BORDER}` }}>
@@ -137,7 +195,7 @@ export function DashboardRedesign() {
             </div>
 
             {scoutElo != null && (
-              <div className="shrink-0 text-right">
+              <button onClick={shareScout} aria-label="Share your Scout rating" className="shrink-0 text-right">
                 <p className="text-[10px] font-bold uppercase tracking-[.14em]" style={{ color: MUTED }}>Scout Rating</p>
                 <div className="flex items-baseline justify-end gap-1.5">
                   <span className="text-[26px] font-black leading-none">{scoutElo}</span>
@@ -147,7 +205,7 @@ export function DashboardRedesign() {
                     </span>
                   )}
                 </div>
-              </div>
+              </button>
             )}
           </div>
 
@@ -185,6 +243,15 @@ export function DashboardRedesign() {
                 </div>
               </>
             )}
+          </div>
+
+          <div className="mt-3 grid grid-cols-2 gap-2.5">
+            <Link href="/import" className="flex items-center justify-center gap-2 rounded-[13px] py-3 text-[14px] font-extrabold" style={{ background: `linear-gradient(180deg, ${GREEN}, ${GREEN_DARK})`, color: '#05100A' }}>
+              <Download size={16} /> Import
+            </Link>
+            <Link href="/opponents" className="flex items-center justify-center gap-2 rounded-[13px] py-3 text-[14px] font-bold" style={{ background: 'rgba(255,255,255,.06)', border: `1px solid ${BORDER}` }}>
+              <Swords size={16} style={{ color: GREEN }} /> Scout
+            </Link>
           </div>
         </section>
 
@@ -282,6 +349,40 @@ export function DashboardRedesign() {
           ))}
         </div>
 
+        {/* ── Key weaknesses ── */}
+        <section className="rounded-[20px]" style={{ background: CARD, border: `1px solid ${BORDER}` }}>
+          <div className="flex items-center justify-between px-4 pb-2 pt-4">
+            <div className="flex items-center gap-3">
+              <span className="grid h-9 w-9 place-items-center rounded-[10px] text-[19px]" style={{ background: 'rgba(139,234,69,.10)', border: `1px solid ${BORDER}`, color: GREEN }}>♚</span>
+              <h2 className="text-[17px] font-extrabold">Key Weaknesses</h2>
+            </div>
+            <Link href="/analysis" className="flex items-center gap-1 text-[12px] font-extrabold uppercase tracking-wider" style={{ color: GREEN }}>
+              Full Analysis <ChevronRight size={14} />
+            </Link>
+          </div>
+          {topWeaknesses.length === 0 ? (
+            <div className="border-t px-4 py-7 text-center" style={{ borderColor: BORDER }}>
+              <Target size={26} className="mx-auto mb-2 opacity-50" />
+              <p className="text-[13px]" style={{ color: MUTED }}>No weaknesses found yet.</p>
+              <Link href="/analysis" className="mt-1.5 inline-block text-[13px] font-bold" style={{ color: GREEN }}>Run Deep Analysis →</Link>
+            </div>
+          ) : (
+            topWeaknesses.map((w) => {
+              const sev = SEV[w.severity] ?? SEV.Low;
+              return (
+                <Link key={w.id} href={`/analysis/${w.id}`} className="flex items-start gap-3 border-t px-4 py-3.5 transition-colors hover:bg-white/[0.03]" style={{ borderColor: BORDER }}>
+                  <span className="mt-0.5 shrink-0 rounded-md px-2 py-0.5 text-[11px] font-extrabold" style={{ background: sev.bg, color: sev.fg }}>{w.severity}</span>
+                  <span className="min-w-0 flex-1">
+                    <b className="block text-[14.5px] font-bold">{w.category}</b>
+                    <span className="line-clamp-1 block text-[12.5px]" style={{ color: MUTED }}>{w.description}</span>
+                  </span>
+                  <ChevronRight size={15} className="mt-1 shrink-0" style={{ color: MUTED }} />
+                </Link>
+              );
+            })
+          )}
+        </section>
+
         {/* ── Recent games ── */}
         <section className="rounded-[20px]" style={{ background: CARD, border: `1px solid ${BORDER}` }}>
           <div className="flex items-center justify-between px-4 pb-3 pt-4">
@@ -336,6 +437,86 @@ export function DashboardRedesign() {
             )}
           </div>
         </section>
+
+        {/* ── Stats tile (same four numbers as the classic home) ── */}
+        <Link href="/analysis" className="block overflow-hidden rounded-[20px]" style={{ background: CARD, border: `1px solid ${BORDER}` }}>
+          <div className="grid grid-cols-2">
+            {[
+              { label: 'Total Games', value: summary?.totalGames?.toLocaleString() || '0' },
+              { label: 'Win Rate', value: winRate != null ? `${winRate}%` : '—' },
+              { label: 'Avg Rating', value: Math.round(summary?.avgRating || 0) || '—' },
+              { label: 'Reviewed', value: summary?.reviewedCount ?? 0 },
+            ].map((st, i) => (
+              <div key={st.label} className="px-4 py-3.5" style={{ borderRight: i % 2 === 0 ? `1px solid ${BORDER}` : undefined, borderBottom: i < 2 ? `1px solid ${BORDER}` : undefined }}>
+                <p className="text-[10.5px] font-bold uppercase tracking-[.14em]" style={{ color: MUTED }}>{st.label}</p>
+                <b className="mt-0.5 block text-[22px] font-extrabold leading-tight">{st.value}</b>
+              </div>
+            ))}
+          </div>
+          <div className="flex items-center justify-center gap-1 border-t py-2.5 text-[12.5px] font-extrabold" style={{ borderColor: BORDER, color: GREEN }}>
+            See Full Analysis <ChevronRight size={14} />
+          </div>
+        </Link>
+
+        {/* ── Scan a position (photo coach) ── */}
+        <Link href="/scan" className="flex items-center gap-4 overflow-hidden rounded-[20px] p-4" style={{ background: CARD, border: '1px solid rgba(139,234,69,.3)' }}>
+          <span className="relative shrink-0">
+            <FenThumb fen="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1" size={74} />
+            <span className="absolute -bottom-1.5 -right-1.5 grid h-8 w-8 place-items-center rounded-full" style={{ background: `linear-gradient(180deg, ${GREEN}, ${GREEN_DARK})`, color: '#05100A' }}><Camera size={16} /></span>
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="mb-1 inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-[.16em]" style={{ background: 'rgba(139,234,69,.12)', color: GREEN }}><Zap size={10} /> Coach</span>
+            <b className="block text-[17px] font-extrabold leading-tight">Seen a position worth studying?</b>
+            <span className="mt-0.5 block text-[13px] font-bold" style={{ color: GREEN }}>Snap a photo and explore it on the board</span>
+          </span>
+          <ArrowUpRight size={20} className="shrink-0" style={{ color: GREEN }} />
+        </Link>
+
+        {/* ── Courses progress ── */}
+        {courses.length > 0 && (
+          <section className="rounded-[20px]" style={{ background: CARD, border: `1px solid ${BORDER}` }}>
+            <div className="flex items-center justify-between px-4 pb-2 pt-4">
+              <div className="flex items-center gap-3">
+                <span className="grid h-9 w-9 place-items-center rounded-[10px] text-[19px]" style={{ background: 'rgba(139,234,69,.10)', border: `1px solid ${BORDER}`, color: GREEN }}>♝</span>
+                <h2 className="text-[17px] font-extrabold">Courses</h2>
+              </div>
+              <Link href="/courses" className="flex items-center gap-1 text-[12px] font-extrabold uppercase tracking-wider" style={{ color: GREEN }}>All <ChevronRight size={14} /></Link>
+            </div>
+            {courses.map((c) => {
+              const pct = Math.round((c.completedLessons / c.totalLessons) * 100) || 0;
+              return (
+                <Link key={c.id} href={`/courses/${c.id}`} className="flex items-center gap-3 border-t px-4 py-3.5 transition-colors hover:bg-white/[0.03]" style={{ borderColor: BORDER }}>
+                  <span className="min-w-0 flex-1">
+                    <b className="line-clamp-1 block text-[14.5px] font-bold">{c.title}</b>
+                    <span className="mt-2 block h-1.5 overflow-hidden rounded-full" style={{ background: 'rgba(255,255,255,.10)' }}>
+                      <span className="block h-full rounded-full" style={{ width: `${Math.max(pct, pct > 0 ? 3 : 0)}%`, background: GREEN }} />
+                    </span>
+                  </span>
+                  <b className="shrink-0 text-[13px]" style={{ color: GREEN }}>{pct}%</b>
+                </Link>
+              );
+            })}
+          </section>
+        )}
+
+        {/* ── Everything else from the classic home ── */}
+        <div className="grid grid-cols-3 gap-3">
+          {[
+            { label: 'Practice Bots', sub: '8 opponents', href: '/practice', icon: Bot },
+            { label: 'Local Play', sub: 'Pass and play', href: '/play/local', icon: Play },
+            { label: 'Shop', sub: 'Boards & gear', href: '/shop', icon: ShoppingBag },
+          ].map((q) => (
+            <Link key={q.label} href={q.href} className="flex flex-col items-start gap-2 rounded-[18px] p-3.5" style={{ background: CARD, border: `1px solid ${BORDER}` }}>
+              <span className="grid h-9 w-9 place-items-center rounded-[10px]" style={{ background: 'rgba(139,234,69,.12)', color: GREEN }}><q.icon size={18} /></span>
+              <span className="min-w-0">
+                <b className="block truncate text-[13.5px] font-extrabold">{q.label}</b>
+                <span className="block truncate text-[11.5px]" style={{ color: MUTED }}>{q.sub}</span>
+              </span>
+            </Link>
+          ))}
+        </div>
+
+        {authUser && <ReferralCard isPremium={isPremium} compact />}
 
       </div>
     </div>

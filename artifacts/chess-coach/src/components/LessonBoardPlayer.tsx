@@ -976,7 +976,7 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, positionRec
   );
 
   return (
-    <div className="rounded-xl overflow-hidden shadow-xl" style={{ backgroundColor: BG_DARK }}>
+    <div className={redesign ? '' : 'rounded-xl overflow-hidden shadow-xl'} style={{ backgroundColor: BG_DARK }}>
       {/* Same gradient defs as ChessBoard.tsx, duplicated here rather than
           shared, since a lesson page can render this component without a
           ChessBoard instance also mounted -- and SVG url(#id) fills need
@@ -1028,7 +1028,7 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, positionRec
               </button>
             ))}
           </div>
-          <p className="mt-2 text-right text-[12px] font-semibold" style={{ color: ((tab === 'mistake' && isLast && hasFix) || (tab === 'fix' && isLast && hasDrill)) ? RD.green : RD.muted }}>
+          <p className={`mt-1.5 text-right text-[12px] font-semibold ${(tab === 'drill' || (isLast && ((tab === 'mistake' && hasFix) || (tab === 'fix' && hasDrill)))) ? '' : 'hidden'}`} style={{ color: ((tab === 'mistake' && isLast && hasFix) || (tab === 'fix' && isLast && hasDrill)) ? RD.green : RD.muted }}>
             {tab === 'drill' ? 'Find the best move' : tab === 'mistake' && isLast && hasFix ? 'Next: Fix →' : tab === 'fix' && isLast && hasDrill ? 'Next: Drill →' : (currentStep > 0 ? `Move ${step?.fullMoveNumber}` : title ?? '')}
           </p>
         </div>
@@ -1108,14 +1108,14 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, positionRec
       {(tab === 'mistake' || tab === 'fix') && (
         <div className="flex flex-col">
           {redesign && (
-            <div className="px-4 pt-3">
+            <div className="px-4 pt-2">
               <div className="flex items-center gap-2.5">
-                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full" style={{ background: tab === 'mistake' ? 'rgba(255,80,88,.16)' : 'rgba(139,234,69,.16)', color: tab === 'mistake' ? MISTAKE_RED : CHESSCOM_GREEN }}>
+                <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full" style={{ background: tab === 'mistake' ? 'rgba(255,80,88,.16)' : 'rgba(139,234,69,.16)', color: tab === 'mistake' ? MISTAKE_RED : CHESSCOM_GREEN }}>
                   {tab === 'mistake' ? <AlertTriangle className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}
                 </span>
-                <h2 className="text-[20px] font-extrabold leading-tight">{tab === 'mistake' ? 'You missed this in your game' : 'Here’s the better move'}</h2>
+                <h2 className="text-[17px] font-extrabold leading-tight">{tab === 'mistake' ? 'You missed this in your game' : 'Here’s the better move'}</h2>
               </div>
-              <p className="mt-1 text-[13px]" style={{ color: 'rgba(245,247,246,.7)' }}>{tab === 'mistake' ? 'This position is from one of your recent games.' : 'This is what the engine recommends instead.'}</p>
+              <p className="mt-0.5 text-[12px]" style={{ color: 'rgba(245,247,246,.7)' }}>{tab === 'mistake' ? 'This position is from one of your recent games.' : 'This is what the engine recommends instead.'}</p>
             </div>
           )}
           {/* Commentary bubble -- capped height with its own internal
@@ -1128,7 +1128,7 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, positionRec
               bubble is the one allowed to need its own scroll instead. */}
           {!redesign && commentaryBlock}
           {/* Board */}
-          <div className="px-2 pb-1 max-w-[480px] mx-auto w-full">
+          <div className={`px-2 pb-1 ${redesign ? 'max-w-[min(100%,44dvh)]' : 'max-w-[480px]'} mx-auto w-full`}>
             <div className="relative">
               <PieceGradientDefs />
               <Chessboard
@@ -1178,8 +1178,10 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, positionRec
 
           {/* Controls */}
           {redesign ? (
-            <div className="mx-auto w-full max-w-[480px] px-3 pt-3">
-              <div className="grid grid-cols-5 gap-2.5">
+            <>
+              <div className="mx-auto w-full max-w-[480px] px-3 pt-2">{commentaryBlock}</div>
+              <div className="sticky bottom-0 z-20 mx-auto w-full max-w-[480px] px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-3" style={{ background: 'linear-gradient(180deg, rgba(5,10,11,0) 0%, #050A0B 24%)' }}>
+                <div className="grid grid-cols-5 gap-2.5">
                 {[
                   { label: 'Jump to start', disabled: isFirst, onClick: () => { setIsPlaying(false); go(0); }, icon: <SkipBack className="h-5 w-5" /> },
                   { label: 'Previous move', disabled: isFirst, onClick: () => go(currentStep - 1), icon: <ChevronLeft className="h-6 w-6" /> },
@@ -1200,28 +1202,27 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, positionRec
                   { label: 'Jump to end', disabled: isLast, onClick: () => { setIsPlaying(false); go(totalSteps - 1); }, icon: <SkipForward className="h-5 w-5" /> },
                 ].map((b) => (
                   <button key={b.label} onClick={b.onClick} disabled={b.disabled} aria-label={b.label}
-                    className="flex h-[58px] items-center justify-center rounded-[14px] transition-transform active:scale-95 disabled:opacity-30"
+                    className="flex h-[54px] items-center justify-center rounded-[14px] transition-transform active:scale-95 disabled:opacity-30"
                     style={{ background: RD.cardSolid, border: `1px solid ${RD.border}`, color: ('accent' in b && b.accent) ? RD.green : RD.text }}>
                     {b.icon}
                   </button>
                 ))}
               </div>
 
-              {mistakeIdx > 0 && currentStep < mistakeIdx && (
+                {mistakeIdx > 0 && currentStep < mistakeIdx && (
                 <button onClick={() => go(mistakeIdx)} className="mt-3 flex w-full items-center justify-center gap-2 rounded-[12px] py-2.5 text-[13px] font-bold" style={{ background: 'rgba(255,80,88,.12)', border: '1px solid rgba(255,80,88,.4)', color: '#FF9DA2' }}>
                   <AlertTriangle className="h-4 w-4" /> Jump to key moment
                 </button>
               )}
 
-              <div className="mt-3">{commentaryBlock}</div>
-
-              {isLast && ((tab === 'mistake' && hasFix) || (tab === 'fix' && hasDrill)) && (
+                {isLast && ((tab === 'mistake' && hasFix) || (tab === 'fix' && hasDrill)) && (
                 <button onClick={() => { if (tab === 'mistake' && hasFix) { setTab('fix'); setCurrentStep(0); return; } if (tab === 'fix' && hasDrill) { setTab('drill'); resetDrill(); } }} className="mt-3 flex w-full items-center justify-center gap-2.5 rounded-[14px] py-4 text-[16px] font-extrabold"
                   style={{ background: `linear-gradient(180deg, ${RD.green}, ${RD.greenDark})`, color: '#05100A', boxShadow: '0 12px 28px -12px rgba(139,234,69,.6)' }}>
                   {tab === 'mistake' ? 'See the Fix' : 'Try the Drill'} <ChevronRight className="h-5 w-5" />
                 </button>
               )}
-            </div>
+              </div>
+            </>
           ) : (
           <div className="flex flex-col items-center gap-2 px-2 py-3 md:px-4 max-w-[480px] mx-auto w-full">
             {/* One clear primary action, matching chess.com's lesson
@@ -1466,7 +1467,7 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, positionRec
               </div>
             </div>
           </div>
-          <div className="px-2 pb-1 max-w-[480px] mx-auto w-full">
+          <div className={`px-2 pb-1 ${redesign ? 'max-w-[min(100%,44dvh)]' : 'max-w-[480px]'} mx-auto w-full`}>
             <div className="relative rounded-xl overflow-hidden">
               <PieceGradientDefs />
               <Chessboard
@@ -1555,7 +1556,7 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, positionRec
             </>
           )}
           {/* Board */}
-          <div className="px-2 pb-1 max-w-[480px] mx-auto w-full">
+          <div className={`px-2 pb-1 ${redesign ? 'max-w-[min(100%,44dvh)]' : 'max-w-[480px]'} mx-auto w-full`}>
             <div className="relative">
               <PieceGradientDefs />
               <Chessboard

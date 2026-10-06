@@ -8,6 +8,7 @@ import { useParams, Link } from 'wouter';
 import { useCourseDetail, useMarkLessonComplete } from '@/hooks/use-courses';
 import { LessonBoardPlayer } from '@/components/LessonBoardPlayer';
 import { ChessBoard } from '@/components/ChessBoard';
+import { MoveNavigationBar } from '@/components/MoveNavigationBar';
 import { Chess } from 'chess.js';
 import {
   ArrowLeft, CheckCircle2, Target, X, Check,
@@ -556,6 +557,8 @@ function LessonBeatPlayer({
   const [drillResult, setDrillResult] = useState<'correct' | 'wrong' | null>(null);
   const { enabled: redesign } = useDashboardRedesignFlag();
   const [hintOpen, setHintOpen] = useState(false);
+  // Example boards auto-play by default; any manual step pauses them (redesign controls)
+  const [exampleAuto, setExampleAuto] = useState(true);
   const [showFix, setShowFix] = useState(false);
   const [fixFens, setFixFens] = useState<string[]>([]);
   const [fixPly, setFixPly] = useState(0);
@@ -619,6 +622,7 @@ function LessonBeatPlayer({
     setShowFix(false);
     setFixPly(0);
     setExamplePly(0);
+    setExampleAuto(true);
     stopReading();
     if (autoRead) setTimeout(() => readAloud(beatText(beat)), 80);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -657,10 +661,11 @@ function LessonBeatPlayer({
   // Auto-play example beats, one move at a time.
   useEffect(() => {
     if (beat?.kind !== 'example' || exampleFens.length === 0) return;
+    if (!exampleAuto) return;
     if (examplePly >= exampleFens.length - 1) return;
     const t = setTimeout(() => setExamplePly((p) => p + 1), 900);
     return () => clearTimeout(t);
-  }, [beat, exampleFens, examplePly]);
+  }, [beat, exampleFens, examplePly, exampleAuto]);
 
   // Build + auto-play the "show the fix" continuation for a drill.
   useEffect(() => {
@@ -753,6 +758,24 @@ function LessonBeatPlayer({
                 </div>
               )}
 
+              {beat.kind === 'example' && exampleFens.length > 1 && (
+                <MoveNavigationBar
+                  variant="redesign"
+                  isPlaying={exampleAuto && examplePly < exampleFens.length - 1}
+                  onFirst={() => { setExampleAuto(false); setExamplePly(0); }}
+                  onPrev={() => { setExampleAuto(false); setExamplePly((x) => Math.max(0, x - 1)); }}
+                  onPlayPause={() => {
+                    if (exampleAuto && examplePly < exampleFens.length - 1) { setExampleAuto(false); return; }
+                    if (examplePly >= exampleFens.length - 1) setExamplePly(0);
+                    setExampleAuto(true);
+                  }}
+                  onNext={() => { setExampleAuto(false); setExamplePly((x) => Math.min(exampleFens.length - 1, x + 1)); }}
+                  onLast={() => { setExampleAuto(false); setExamplePly(exampleFens.length - 1); }}
+                  canGoBack={examplePly > 0}
+                  canGoForward={examplePly < exampleFens.length - 1}
+                />
+              )}
+
               {beat.kind === 'example' && (
                 <div className="rounded-[20px] p-4" style={{ background: RD.card, border: `1px solid ${RD.border}` }}>
                   <div className="mb-2 flex items-center justify-between">
@@ -818,7 +841,7 @@ function LessonBeatPlayer({
           </AnimatePresence>
 
           {beats.length > 1 && (
-            <div className="flex items-center gap-3 pt-1">
+            <div className="sticky bottom-0 z-20 flex items-center gap-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-3" style={{ background: 'linear-gradient(180deg, rgba(5,10,11,0) 0%, #050A0B 24%)' }}>
               <button onClick={() => goTo(currentBeat - 1)} disabled={isFirst} className="flex h-[52px] flex-1 items-center justify-center gap-2 rounded-[14px] text-[15px] font-bold disabled:opacity-30"
                 style={{ background: RD.cardSolid, border: `1px solid ${RD.border}`, color: RD.text }}>
                 <ChevronLeft className="h-4 w-4" /> Previous

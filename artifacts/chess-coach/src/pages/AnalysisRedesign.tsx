@@ -83,7 +83,7 @@ export function AnalysisRedesign() {
 
   if (!summary) {
     return (
-      <div className="-m-4 flex min-h-screen items-center justify-center p-4 md:-m-6" style={{ background: RD.bg }}>
+      <div className="flex min-h-screen items-center justify-center p-4" style={{ background: RD.bg }}>
         <div className="h-8 w-8 animate-spin rounded-full border-4" style={{ borderColor: RD.green, borderTopColor: 'transparent' }} />
       </div>
     );
@@ -132,7 +132,7 @@ export function AnalysisRedesign() {
   const weaknesses = weaknessesData?.weaknesses ?? [];
 
   return (
-    <div className="-m-4 min-h-screen px-3 md:-m-6 md:px-6 md:pt-6 md:pb-12 pb-[calc(7.5rem+env(safe-area-inset-bottom))]" style={{ background: RD.bg, color: RD.text }}>
+    <div className="min-h-screen px-3 md:px-6 md:pt-6 md:pb-12 pb-[calc(7.5rem+env(safe-area-inset-bottom))]" style={{ background: RD.bg, color: RD.text }}>
       <div className="mx-auto grid w-full max-w-[760px] gap-3">
         <RedesignHeader title="My Analytics" icon={<span className="text-[26px] leading-none">♟</span>} />
 
