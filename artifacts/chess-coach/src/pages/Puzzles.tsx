@@ -727,7 +727,7 @@ export function Puzzles() {
                         boxShadow: '0 20px 50px rgba(0,0,0,0.5)',
                       },
                       lightSquareStyle: { backgroundColor: boardColors.light, backgroundImage: boardTextureCss.backgroundImage, backgroundSize: boardTextureCss.backgroundSize },
-                      darkSquareStyle: { backgroundColor: boardColors.dark, backgroundImage: boardTextureCss.backgroundImage, backgroundSize: boardTextureCss.backgroundSize },
+                      darkSquareStyle: { backgroundColor: boardColors.dark, backgroundImage: boardTextureCss.backgroundImageDark ?? boardTextureCss.backgroundImage, backgroundSize: boardTextureCss.backgroundSize },
                       pieces: tintedPieces,
                       animationDurationInMs: 150,
                     }}

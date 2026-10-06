@@ -2,10 +2,12 @@ import React, { createContext, useContext, useState, useEffect, useRef } from 'r
 import { useUser } from '@/context/UserContext';
 
 export type BoardTheme = 'classic' | 'green' | 'blue' | 'gray' | 'purple' | 'crimson' | 'teal' | 'coal' | 'sunset' | 'rose' | 'amber' | 'mint' | 'indigo' | 'midnight' | 'arctic' | 'custom';
-export type BoardTexture = 'flat' | 'wood' | 'marble' | 'felt' | 'granite' | 'leather' | 'glass' | 'canvas' | 'sandstone' | 'slate' | 'silk';
+export type BoardTexture = 'flat' | 'wood' | 'marble' | 'felt' | 'granite' | 'leather' | 'glass' | 'canvas' | 'sandstone' | 'slate' | 'silk'
+  // Photographic boards cut from the ChessScout asset pack (see CS_BOARDS below)
+  | 'cs-emerald' | 'cs-obsidian' | 'cs-ivory' | 'cs-walnut' | 'cs-steel' | 'cs-classic' | 'cs-slate' | 'cs-tournament';
 export type AppBackground = 'default' | 'warm-gradient' | 'cool-gradient' | 'noise';
 export type PieceStyle = 'classic' | 'glossy' | 'outlined' | 'ocean' | 'crimson' | 'emerald' | 'royal' | 'flat' | 'depth' | 'shaded' | 'wood3d' | 'marble3d' | 'chrome' | 'gold' | 'copper' | 'obsidian' | 'ivory' | 'custom';
-export type PieceShape = 'default' | 'cburnett' | 'celtic' | 'chessnut' | 'fantasy' | 'spatial' | 'rhosgfx' | 'kiwen-suwi' | 'firi' | 'totoy' | 'papercut';
+export type PieceShape = 'default' | 'cburnett' | 'celtic' | 'chessnut' | 'fantasy' | 'spatial' | 'rhosgfx' | 'kiwen-suwi' | 'firi' | 'totoy' | 'papercut' | 'marble';
 export type PromotionChoice = 'queen' | 'ask';
 export type BoardSize = 'compact' | 'standard' | 'large';
 
@@ -33,7 +35,7 @@ export type BoardSize = 'compact' | 'standard' | 'large';
 // triggers the same obligation is a genuinely disputed question, not
 // something to resolve here -- flagged for a real legal read, not
 // removed unilaterally since it's already live.
-export const PIECE_SHAPES: Record<PieceShape, { label: string; attribution: string | null; hidden?: boolean }> = {
+export const PIECE_SHAPES: Record<PieceShape, { label: string; attribution: string | null; hidden?: boolean; raster?: boolean }> = {
   default:    { label: 'Default', attribution: null },
   cburnett:   { label: 'Cburnett', attribution: 'Piece set "Cburnett" by Colin M.L. Burnett, GPLv2+ (see licensing note above)' },
   celtic:     { label: 'Celtic', attribution: 'Piece set "Celtic" by Maurizio Monge, MIT License' },
@@ -45,6 +47,8 @@ export const PIECE_SHAPES: Record<PieceShape, { label: string; attribution: stri
   firi:       { label: 'Firi', attribution: 'Piece set "Firi" by James Faure, CC BY 4.0' },
   totoy:      { label: 'Totoy', attribution: 'Piece set "Totoy" by Kosal Sen, CC BY 4.0' },
   papercut:   { label: 'Papercut', attribution: 'Piece set "Papercut" by Nikolay Anzarov, CC BY 4.0' },
+  // ChessScout's own artwork (obsidian + ivory marble), shipped as WebP rather than SVG
+  marble:     { label: 'Marble', attribution: null, raster: true },
 };
 
 export const BOARD_THEMES: Record<Exclude<BoardTheme, 'custom'>, { light: string; dark: string; label: string }> = {
@@ -69,8 +73,28 @@ export const BOARD_THEMES: Record<Exclude<BoardTheme, 'custom'>, { light: string
 // gradient/pattern-based rather than photographic). Applied as an overlay
 // backgroundImage on top of the existing solid boardColors, so texture and
 // color stay independent choices.
+// Photographic boards from the ChessScout asset pack. The pack's full-board images
+// are framed and AI-drawn (irregular grid), so instead of aligning one big image
+// behind the pieces, each board contributes a clean light-square tile and a
+// dark-square tile that every square of that colour uses. They replace the board
+// colour entirely (the tiles are opaque), unlike the subtle CSS textures below.
+const csBoard = (file: string, label: string) => ({
+  label,
+  backgroundImage: `url('/boards/${file}-light.webp')`,
+  backgroundImageDark: `url('/boards/${file}-dark.webp')`,
+  backgroundSize: 'cover',
+});
+
 export const BOARD_TEXTURES: Record<BoardTexture, { label: string; backgroundImage: string; backgroundImageDark?: string; backgroundSize?: string }> = {
   flat:   { label: 'Flat', backgroundImage: 'none' },
+  'cs-emerald':    csBoard('emerald', 'Emerald Marble'),
+  'cs-obsidian':   csBoard('obsidian', 'Obsidian'),
+  'cs-ivory':      csBoard('ivory', 'Ivory'),
+  'cs-walnut':     csBoard('walnut', 'Walnut'),
+  'cs-steel':      csBoard('steel', 'Steel'),
+  'cs-classic':    csBoard('classic', 'Classic Wood'),
+  'cs-slate':      csBoard('slate', 'Slate Stone'),
+  'cs-tournament': csBoard('tournament', 'Tournament'),
   // Plain CSS gradients are inherently regular/mathematical -- a
   // repeating-linear-gradient can only ever look like a hatch pattern or
   // a grid of dots, never organic grain or fabric fiber. An inline SVG

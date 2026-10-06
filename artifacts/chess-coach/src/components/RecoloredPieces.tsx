@@ -166,12 +166,14 @@ export function buildTintedPieceSet(opts: {
   // Each one's license is checked and recorded in PIECE_SHAPES below;
   // this list exists only to decide which shapes take this static-asset
   // path versus the recolorable 'default' path further down.
-  const STATIC_SVG_SHAPES: string[] = ['cburnett', 'celtic', 'chessnut', 'fantasy', 'spatial', 'rhosgfx', 'kiwen-suwi', 'firi', 'totoy', 'papercut'];
+  const STATIC_SVG_SHAPES: string[] = ['cburnett', 'celtic', 'chessnut', 'fantasy', 'spatial', 'rhosgfx', 'kiwen-suwi', 'firi', 'totoy', 'papercut', 'marble'];
   if (STATIC_SVG_SHAPES.includes(pieceShape)) {
+    // 'marble' is raster artwork (WebP); every other static shape is SVG
+    const ext = pieceShape === 'marble' ? 'webp' : 'svg';
     const wrapped: Record<string, (props?: any) => React.ReactElement> = {};
     for (const key of ['wP', 'wR', 'wN', 'wB', 'wQ', 'wK', 'bP', 'bR', 'bN', 'bB', 'bQ', 'bK']) {
       wrapped[key] = ({ svgStyle }: any = {}) => (
-        <img src={`/pieces/${pieceShape}/${key}.svg`} alt={key} style={{ width: '100%', height: '100%', ...svgStyle }} />
+        <img src={`/pieces/${pieceShape}/${key}.${ext}`} alt={key} draggable={false} style={{ width: '100%', height: '100%', ...svgStyle }} />
       );
     }
     return wrapped;

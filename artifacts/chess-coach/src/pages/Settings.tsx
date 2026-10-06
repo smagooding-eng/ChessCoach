@@ -175,11 +175,31 @@ export default function SettingsPage() {
         <h2 className="text-sm font-black uppercase tracking-wide mb-1" style={{ color: TEXT_MUTED }}>Board Texture</h2>
         <p className="text-xs mb-3" style={{ color: TEXT_MUTED }}>A subtle surface pattern on top of your board color</p>
         <div className="grid grid-cols-4 gap-2">
-          {(Object.keys(BOARD_TEXTURES) as BoardTexture[]).map((key) => {
+          {(Object.keys(BOARD_TEXTURES) as BoardTexture[]).filter((key) => !key.startsWith('cs-')).map((key) => {
             const t = BOARD_TEXTURES[key];
             return (
               <SwatchButton key={key} active={boardTexture === key} onClick={() => setBoardTexture(key)} label={t.label}>
                 <div className="w-full aspect-square rounded-lg" style={{ background: '#769656', backgroundImage: t.backgroundImage, backgroundSize: t.backgroundSize, border: '1px solid rgba(255,255,255,0.1)' }} />
+              </SwatchButton>
+            );
+          })}
+        </div>
+      </section>
+
+      <section>
+        <h2 className="text-sm font-black uppercase tracking-wide mb-1" style={{ color: TEXT_MUTED }}>Premium Boards</h2>
+        <p className="text-xs mb-3" style={{ color: TEXT_MUTED }}>Photographic marble, stone and wood. These replace your board color.</p>
+        <div className="grid grid-cols-4 gap-2">
+          {(Object.keys(BOARD_TEXTURES) as BoardTexture[]).filter((key) => key.startsWith('cs-')).map((key) => {
+            const t = BOARD_TEXTURES[key];
+            const dark = t.backgroundImageDark ?? t.backgroundImage;
+            return (
+              <SwatchButton key={key} active={boardTexture === key} onClick={() => setBoardTexture(key)} label={t.label}>
+                <div className="w-full aspect-square rounded-lg overflow-hidden grid grid-cols-2 grid-rows-2" style={{ border: '1px solid rgba(255,255,255,0.1)' }}>
+                  {[t.backgroundImage, dark, dark, t.backgroundImage].map((img, i) => (
+                    <div key={i} style={{ backgroundImage: img, backgroundSize: 'cover' }} />
+                  ))}
+                </div>
               </SwatchButton>
             );
           })}
@@ -200,7 +220,15 @@ export default function SettingsPage() {
                 // each, instead of the same generic glyph for all of
                 // them, is the whole point: it's the only way to
                 // actually tell these shapes apart before picking one.
-                <img src={`/pieces/${key}/wN.svg`} alt={PIECE_SHAPES[key].label} className="w-9 h-9" />
+                PIECE_SHAPES[key].raster ? (
+                  // Raster sets (e.g. Marble) show both sides: the white/black contrast is the point
+                  <span className="flex items-end">
+                    <img src={`/pieces/${key}/wN.webp`} alt="" className="w-9 h-9 object-contain" />
+                    <img src={`/pieces/${key}/bN.webp`} alt={PIECE_SHAPES[key].label} className="w-9 h-9 object-contain" />
+                  </span>
+                ) : (
+                  <img src={`/pieces/${key}/wN.svg`} alt={PIECE_SHAPES[key].label} className="w-9 h-9" />
+                )
               )}
             </SwatchButton>
           ))}
