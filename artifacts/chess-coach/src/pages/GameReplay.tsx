@@ -1,3 +1,5 @@
+import { useDashboardRedesignFlag } from '@/hooks/use-app-config';
+import { RD } from '@/lib/redesignTheme';
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useParams, Link, useLocation } from 'wouter';
 import { useGameViewer } from '@/hooks/use-games';
@@ -56,6 +58,15 @@ type ReviewMove = {
   coachStatus?: 'engine-aligned' | 'fallback';
   /** SAN sequence of the engine's recommended continuation. Up to 6 plies. */
   bestLineSan?: string[];
+};
+
+const MOMENT_STYLE: Record<string, { bg: string; fg: string; label: string }> = {
+  blunder: { bg: 'rgba(255,80,88,.16)', fg: '#FF7A80', label: 'BLUNDER' },
+  missed_win: { bg: 'rgba(255,80,88,.16)', fg: '#FF7A80', label: 'MISSED WIN' },
+  mistake: { bg: 'rgba(255,138,61,.16)', fg: '#FFB07A', label: 'MISTAKE' },
+  inaccuracy: { bg: 'rgba(232,180,71,.16)', fg: '#E8B447', label: 'INACCURACY' },
+  brilliant: { bg: 'rgba(53,198,244,.16)', fg: '#5FD3F7', label: 'BRILLIANT' },
+  great: { bg: 'rgba(139,234,69,.16)', fg: '#8BEA45', label: 'GREAT' },
 };
 
 type KeyMistake = {
@@ -616,6 +627,10 @@ export function GameReplay() {
   const { player: blackPlayer } = useChessPlayer(game?.blackUsername);
 
   const [currentMove, setCurrentMove] = useState(0);
+  // Redesign only: Analysis / Key Moments / Report. Classic shows everything
+  // in one stack exactly as before (the wrappers below are display:contents).
+  const { enabled: redesign } = useDashboardRedesignFlag();
+  const [gtab, setGtab] = useState<'analysis' | 'moments' | 'report'>('analysis');
   // Lifted from MistakeFixView so the existing move-navigation buttons
   // below can drive stepping through the engine's suggested
   // continuation while that tab is active, instead of a separate
@@ -839,6 +854,10 @@ export function GameReplay() {
   }, [currentMove, moves, gameStartFen]);
 
   // Current move's review data
+  // Turning points: every bad move plus the standout good ones, in game order
+  const keyMoments = reviewMoves
+    .filter(m => ['blunder', 'mistake', 'missed_win', 'inaccuracy', 'brilliant', 'great'].includes(m.classification))
+    .sort((a, b) => a.moveIndex - b.moveIndex);
   const currentReview: ReviewMove | null = currentMove > 0
     ? (reviewMoves.find(r => r.moveIndex === currentMove - 1) ?? null)
     : null;
@@ -1117,6 +1136,29 @@ export function GameReplay() {
             </div>
           )}
 
+          {redesign && (
+            <div className="order-[-1] xl:order-none flex items-center gap-1 rounded-[14px] p-1" style={{ background: RD.cardSolid, border: `1px solid ${RD.border}` }}>
+              {([
+                ['analysis', 'Analysis'],
+                ['moments', `Key Moments${keyMoments.length ? ` (${keyMoments.length})` : ''}`],
+                ['report', 'Report'],
+              ] as const).map(([id, label]) => {
+                const active = gtab === id;
+                return (
+                  <button
+                    key={id}
+                    onClick={() => setGtab(id)}
+                    className="flex-1 rounded-[10px] py-2 text-[12.5px] font-bold transition-colors"
+                    style={active ? { background: 'rgba(139,234,69,.10)', color: RD.green, boxShadow: `inset 0 0 0 1px ${RD.green}` } : { background: 'transparent', color: RD.muted }}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          <div className={redesign && gtab !== 'analysis' ? 'hidden' : 'contents'}>
           {/* Per-move analysis panel — positioned right below controls for easy follow-along */}
           {currentMove > 0 && reviewMoves.length > 0 && (() => {
             const move = moves[currentMove - 1];
@@ -1409,6 +1451,58 @@ export function GameReplay() {
             </AICoachCard>
           )}
 
+          </div>
+
+          {redesign && gtab === 'moments' && (
+            <div className="order-[-1] xl:order-none rounded-[18px] overflow-hidden" style={{ background: RD.card, border: `1px solid ${RD.border}` }}>
+              {reviewMoves.length === 0 ? (
+                <div className="px-5 py-8 text-center">
+                  <p className="text-[14px] font-bold" style={{ color: RD.text }}>No review yet</p>
+                  <p className="mt-1 text-[12.5px]" style={{ color: RD.muted }}>Review this game to see your turning points.</p>
+                  <button onClick={() => handleReview(false)} disabled={reviewing} className="mt-3 rounded-[11px] px-4 py-2.5 text-[13px] font-extrabold disabled:opacity-60" style={{ background: RD.green, color: '#05100A' }}>
+                    {reviewing ? 'Reviewing…' : 'Review this game'}
+                  </button>
+                </div>
+              ) : keyMoments.length === 0 ? (
+                <p className="px-5 py-8 text-center text-[13px]" style={{ color: RD.muted }}>No standout moments in this game.</p>
+              ) : (
+                keyMoments.map((m, i) => {
+                  const tone = MOMENT_STYLE[m.classification] ?? MOMENT_STYLE.inaccuracy;
+                  const num = Math.floor(m.moveIndex / 2) + 1;
+                  return (
+                    <button
+                      key={m.moveIndex}
+                      onClick={() => { setCurrentMove(m.moveIndex + 1); setGtab('analysis'); }}
+                      className="flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-white/[0.03]"
+                      style={{ borderTop: i ? `1px solid ${RD.border}` : undefined }}
+                    >
+                      <span className="mt-0.5 w-[74px] shrink-0 rounded-md px-1.5 py-1 text-center text-[10.5px] font-extrabold" style={{ background: tone.bg, color: tone.fg }}>{tone.label}</span>
+                      <span className="min-w-0 flex-1">
+                        <b className="block text-[14px] font-bold">{num}{m.color === 'white' ? '.' : '...'} {m.san}</b>
+                        {m.betterMove && ['blunder', 'mistake', 'missed_win', 'inaccuracy'].includes(m.classification) && (
+                          <span className="block text-[12px]" style={{ color: RD.green }}>Better: {m.betterMove}</span>
+                        )}
+                        {m.explanation && <span className="mt-0.5 line-clamp-2 block text-[12px]" style={{ color: RD.muted }}>{m.explanation}</span>}
+                      </span>
+                      <ChevronRight className="mt-1 h-4 w-4 shrink-0" style={{ color: RD.muted }} />
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          )}
+
+          {redesign && gtab === 'report' && reviewMoves.length === 0 && (
+            <div className="order-[-1] xl:order-none rounded-[18px] px-5 py-8 text-center" style={{ background: RD.card, border: `1px solid ${RD.border}` }}>
+              <p className="text-[14px] font-bold" style={{ color: RD.text }}>No report yet</p>
+              <p className="mt-1 text-[12.5px]" style={{ color: RD.muted }}>Review this game to get your accuracy, rating and summary.</p>
+              <button onClick={() => handleReview(false)} disabled={reviewing} className="mt-3 rounded-[11px] px-4 py-2.5 text-[13px] font-extrabold disabled:opacity-60" style={{ background: RD.green, color: '#05100A' }}>
+                {reviewing ? 'Reviewing…' : 'Review this game'}
+              </button>
+            </div>
+          )}
+
+          <div className={redesign && gtab !== 'report' ? 'hidden' : 'contents'}>
           {/* Game Rating Panel — shown after review completes */}
           {reviewMoves.length > 0 && (
             <GameRatingPanel
@@ -1493,6 +1587,7 @@ export function GameReplay() {
               </div>
             </div>
           )}
+          </div>
         </div>
 
         {/* ── Right col: move list ── */}

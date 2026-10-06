@@ -569,7 +569,7 @@ export function Import() {
                 {pgnResult.invalid > 0 && <li>{pgnResult.invalid} couldn&apos;t be read as a valid game</li>}
               </ul>
               {pgnResult.imported > 0 && (
-                <Link href="/games" className="mt-3 inline-flex items-center gap-1.5 font-bold" style={{ color: RD.green }}>View Games <ArrowRight className="h-4 w-4" /></Link>
+                <Link href="/games" className="mt-3 inline-flex items-center gap-1.5 font-bold" style={{ color: RD.green }}>Open Games to review them <ArrowRight className="h-4 w-4" /></Link>
               )}
             </div>
           )}

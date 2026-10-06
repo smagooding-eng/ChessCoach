@@ -1,3 +1,6 @@
+import { LessonQuizScreen, LessonCompleteScreen, findQuizMoves, type QuizMoves } from '@/components/LessonFlow';
+import { RD } from '@/lib/redesignTheme';
+import { artFor, ART_BASE } from './CoursesRedesign';
 import { useDashboardRedesignFlag } from '@/hooks/use-app-config';
 import { CourseOverview } from './CourseOverview';
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
@@ -66,6 +69,8 @@ function LessonIntroCard({
   onStart: () => void;
 }) {
   const { data: weaknessData } = useMyWeaknesses();
+  const { enabled: redesign } = useDashboardRedesignFlag();
+  const introArt = artFor({ id: 0, category: courseCategory, title: '' });
   const matchedWeakness = weaknessData?.weaknesses?.find(
     (w) => w.category.toLowerCase() === courseCategory.toLowerCase()
   );
@@ -76,9 +81,17 @@ function LessonIntroCard({
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      className="rounded-2xl p-5 md:p-6 mb-3"
-      style={{ background: 'linear-gradient(160deg, #302e2b 0%, #262421 100%)', border: '1px solid rgba(255,255,255,0.08)' }}
+      className="rounded-2xl p-5 md:p-6 mb-3 overflow-hidden"
+      style={redesign
+        ? { background: RD.card, border: `1px solid ${RD.border}` }
+        : { background: 'linear-gradient(160deg, #302e2b 0%, #262421 100%)', border: '1px solid rgba(255,255,255,0.08)' }}
     >
+      {redesign && (
+        <div className="relative -mx-5 -mt-5 mb-4 h-28 md:-mx-6 md:-mt-6">
+          <img src={`${ART_BASE}${introArt.img}.webp`} alt="" className="h-full w-full object-cover" />
+          <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, rgba(5,10,11,.15) 0%, #0D1516 100%)' }} />
+        </div>
+      )}
       <div className="flex items-center gap-2 mb-3">
         <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0"
           style={{ background: `linear-gradient(160deg, ${CHESSCOM_GREEN}, #5f8a3a)` }}>
@@ -115,9 +128,11 @@ function LessonIntroCard({
       <button
         onClick={onStart}
         className="w-full mt-4 py-3 rounded-xl text-sm font-black text-white flex items-center justify-center gap-2 transition-transform hover:scale-[1.01]"
-        style={{ background: `linear-gradient(180deg, #95c45a 0%, ${CHESSCOM_GREEN} 100%)` }}
+        style={redesign
+          ? { background: `linear-gradient(180deg, ${RD.green}, ${RD.greenDark})`, color: '#05100A' }
+          : { background: `linear-gradient(180deg, #95c45a 0%, ${CHESSCOM_GREEN} 100%)` }}
       >
-        Start <ChevronRight className="w-4 h-4" />
+        {redesign ? 'Start Lesson' : 'Start'} <ChevronRight className="w-4 h-4" />
       </button>
     </motion.div>
   );
@@ -818,6 +833,10 @@ export function CourseDetail() {
   // hands off to the existing lesson player unchanged.
   const { enabled: redesign } = useDashboardRedesignFlag();
   const [showOverview, setShowOverview] = useState(true);
+  // Redesign only: after a lesson is completed, a quick check (when the lesson
+  // has a verifiable position) and then a completion screen replace the old
+  // silent auto-advance.
+  const [post, setPost] = useState<null | { idx: number; step: 'quiz' | 'complete'; quiz: QuizMoves | null }>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [desktopSidebarCollapsed, setDesktopSidebarCollapsed] = useState(true);
   const [showFixLine, setShowFixLine] = useState(false);
@@ -851,6 +870,11 @@ export function CourseDetail() {
   const handleMarkComplete = async (completed: boolean) => {
     if (!lesson) return;
     await markComplete(courseId, lesson.id, completed);
+    if (completed && redesign) {
+      const quiz = findQuizMoves(lesson.examplePgn, lesson.drillFen, lesson.drillExpectedMove);
+      setPost({ idx: currentIdx, step: quiz ? 'quiz' : 'complete', quiz });
+      return;
+    }
     if (completed && !isLast) {
       setTimeout(() => setCurrentIdx(i => i + 1), 350);
     } else if (completed && isLast) {
@@ -1185,6 +1209,21 @@ export function CourseDetail() {
       )}
 
       <AnimatePresence>
+        {redesign && post?.step === 'quiz' && post.quiz && (
+          <LessonQuizScreen quiz={post.quiz} onContinue={() => setPost({ ...post, step: 'complete' })} />
+        )}
+        {redesign && post?.step === 'complete' && (
+          <LessonCompleteScreen
+            lessonTitle={sortedLessons[post.idx]?.title ?? ''}
+            lessonsDone={Math.max(sortedLessons.filter(l => l.completed).length, course.completedLessons)}
+            lessonsTotal={sortedLessons.length}
+            hasNext={post.idx < sortedLessons.length - 1}
+            onNext={() => { setCurrentIdx(post.idx + 1); setPost(null); }}
+            onViewCourse={() => { setPost(null); setShowOverview(true); }}
+            onShare={() => setShowCompletionShare(true)}
+          />
+        )}
+
         {showCompletionShare && (
           <motion.div
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}

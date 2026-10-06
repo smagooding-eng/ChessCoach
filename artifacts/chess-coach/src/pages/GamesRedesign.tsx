@@ -1,6 +1,9 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Link } from 'wouter';
-import { Search, ChevronRight } from 'lucide-react';
+import { Search, ChevronRight, RefreshCw, Users } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
+import { apiFetch } from '@/lib/api';
+import { useMyAnalysisSummary } from '@/hooks/use-analysis';
 import { useMyGames } from '@/hooks/use-games';
 import { useUser } from '@/hooks/use-user';
 import { GameThumb } from '@/components/GameThumb';
@@ -10,10 +13,10 @@ import { RD, RESULT_BADGE } from '@/lib/redesignTheme';
 // tabs with a filter button that reveals the result filter, a search
 // field, and real game rows with their real board thumbnails.
 //
-// Scope note (unchanged from the previous version of this page): the
-// classic Games page also has bulk-review job polling and a head-to-head
-// opponent search mode, which this view does not reproduce -- the mockup
-// doesn't depict them. They still work in the classic design.
+// Everything the classic Games page can do is available here too: bulk
+// review of unreviewed games (same endpoints + polling), head-to-head
+// search against a specific opponent (filtered server-side across the
+// full history), and loading more than the first page.
 
 const COLOR_TABS = [
   { id: 'all', label: 'All Games' },
@@ -42,8 +45,67 @@ export function GamesRedesign() {
   const [colorTab, setColorTab] = useState<(typeof COLOR_TABS)[number]['id']>('all');
   const [resultFilter, setResultFilter] = useState('all');
   const [showFilters, setShowFilters] = useState(false);
-  const { data } = useMyGames(100);
+  const [pageSize, setPageSize] = useState(100);
+  const [h2hOpponent, setH2hOpponent] = useState('');
+  const [debouncedH2h, setDebouncedH2h] = useState('');
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedH2h(h2hOpponent.trim()), 350);
+    return () => clearTimeout(t);
+  }, [h2hOpponent]);
+  // Opponent filtering happens server-side across the whole history, so an
+  // H2H record is never silently limited to whatever page happens to be loaded.
+  const { data } = useMyGames(pageSize, { opponent: debouncedH2h || undefined });
   const games = data?.games ?? [];
+  const total = data?.total ?? 0;
+  const { data: summary } = useMyAnalysisSummary();
+  const queryClient = useQueryClient();
+  const unreviewedCount = Math.max(0, (summary ? total : 0) - (summary?.reviewedCount ?? 0));
+
+  // Bulk review: trigger + poll (same endpoints as the classic page)
+  const [bulkJobId, setBulkJobId] = useState<string | null>(null);
+  const [bulkProgress, setBulkProgress] = useState<{ reviewedSoFar: number; total: number } | null>(null);
+  const [bulkError, setBulkError] = useState<string | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    apiFetch('/api/games/review-all-active', { credentials: 'include' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { jobId: string | null } | null) => { if (d?.jobId) setBulkJobId(d.jobId); })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (!bulkJobId) return;
+    const poll = async () => {
+      try {
+        const res = await apiFetch(`/api/games/review-all-status/${bulkJobId}`, { credentials: 'include' });
+        if (!res.ok) return;
+        const st = await res.json() as { status: string; error?: string; reviewedSoFar?: number; total?: number };
+        if (typeof st.reviewedSoFar === 'number' && typeof st.total === 'number') setBulkProgress({ reviewedSoFar: st.reviewedSoFar, total: st.total });
+        if (st.status === 'done' || st.status === 'error') {
+          if (pollRef.current) clearInterval(pollRef.current);
+          pollRef.current = null;
+          if (st.status === 'error') setBulkError(st.error ?? 'Review failed');
+          setBulkJobId(null);
+          queryClient.invalidateQueries();
+        }
+      } catch { /* transient network error: keep polling */ }
+    };
+    poll();
+    pollRef.current = setInterval(poll, 3000);
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+  }, [bulkJobId, queryClient]);
+
+  const startBulkReview = async () => {
+    setBulkError(null);
+    setBulkProgress(null);
+    try {
+      const res = await apiFetch('/api/games/review-all', { method: 'POST', credentials: 'include' });
+      if (!res.ok) { setBulkError('Failed to start review'); return; }
+      const { jobId } = await res.json() as { jobId: string };
+      setBulkJobId(jobId);
+    } catch { setBulkError('Failed to start review'); }
+  };
 
   const mine = useMemo(
     () => [username, authUser?.chesscomUsername, authUser?.lichessUsername].filter((n): n is string => !!n).map((n) => n.toLowerCase()),
@@ -69,7 +131,7 @@ export function GamesRedesign() {
         <div className="flex items-end justify-between px-1">
           <h1 className="text-[24px] font-extrabold tracking-tight">My Games</h1>
           <p className="pb-1 text-[12px]" style={{ color: RD.muted }}>
-            {data === undefined ? 'Loading…' : `${filtered.length} game${filtered.length === 1 ? '' : 's'}`}
+            {data === undefined ? 'Loading…' : `${filtered.length} of ${total.toLocaleString()} game${total === 1 ? '' : 's'}`}
           </p>
         </div>
 
@@ -121,6 +183,29 @@ export function GamesRedesign() {
           </div>
         )}
 
+        {unreviewedCount > 0 && (
+          <div className="flex items-center gap-3 rounded-[16px] px-4 py-3" style={{ background: 'rgba(139,234,69,.07)', border: '1px solid rgba(139,234,69,.28)' }}>
+            <div className="min-w-0 flex-1 text-[13px]">
+              {bulkJobId && bulkProgress ? (
+                <span><b>Reviewing…</b> <span style={{ color: RD.muted }}>{bulkProgress.reviewedSoFar} of {bulkProgress.total} done</span></span>
+              ) : bulkJobId ? (
+                <b>Starting review…</b>
+              ) : (
+                <span><b>{unreviewedCount}</b> <span style={{ color: RD.muted }}>of your {total} games {unreviewedCount === 1 ? "hasn't" : "haven't"} been reviewed yet</span></span>
+              )}
+              {bulkError && <p className="mt-0.5 text-[12px]" style={{ color: RD.red }}>{bulkError}</p>}
+            </div>
+            <button
+              onClick={startBulkReview}
+              disabled={!!bulkJobId}
+              className="flex shrink-0 items-center gap-1.5 rounded-[11px] px-3.5 py-2 text-[12.5px] font-extrabold transition-opacity disabled:opacity-60"
+              style={{ background: RD.green, color: '#05100A' }}
+            >
+              <RefreshCw size={14} className={bulkJobId ? 'animate-spin' : ''} />{bulkJobId ? 'Reviewing…' : 'Review all'}
+            </button>
+          </div>
+        )}
+
         <div className="flex items-center gap-2.5 rounded-[14px] px-3.5" style={{ background: RD.cardSolid, border: `1px solid ${RD.border}` }}>
           <Search size={17} className="shrink-0" style={{ color: RD.muted }} />
           <input
@@ -131,6 +216,25 @@ export function GamesRedesign() {
             className="h-[46px] min-w-0 flex-1 bg-transparent text-[14px] outline-none placeholder:text-[#87918E]"
             style={{ color: RD.text }}
           />
+        </div>
+
+        <div className="flex items-center gap-2.5 rounded-[14px] px-3.5" style={{ background: RD.cardSolid, border: `1px solid ${h2hOpponent.trim() ? RD.green : RD.border}` }}>
+          <Users size={17} className="shrink-0" style={{ color: RD.muted }} />
+          <input
+            value={h2hOpponent}
+            onChange={(e) => setH2hOpponent(e.target.value)}
+            placeholder="Head-to-head: opponent username…"
+            aria-label="Head-to-head opponent"
+            className="h-[46px] min-w-0 flex-1 bg-transparent text-[14px] outline-none placeholder:text-[#87918E]"
+            style={{ color: RD.text }}
+          />
+          {h2hOpponent.trim() && (
+            <span className="flex shrink-0 items-center gap-2 text-[12px] font-extrabold">
+              <span style={{ color: RD.green }}>W {filtered.filter((g) => g.result === 'win').length}</span>
+              <span style={{ color: RD.muted }}>D {filtered.filter((g) => g.result === 'draw').length}</span>
+              <span style={{ color: RD.red }}>L {filtered.filter((g) => g.result === 'loss').length}</span>
+            </span>
+          )}
         </div>
 
         {/* List */}
@@ -176,6 +280,16 @@ export function GamesRedesign() {
             </div>
           )}
         </section>
+
+        {games.length < total && (
+          <button
+            onClick={() => setPageSize((n) => n + 100)}
+            className="rounded-[14px] py-3 text-[13.5px] font-extrabold"
+            style={{ background: RD.cardSolid, border: `1px solid ${RD.border}`, color: RD.green }}
+          >
+            Load more games ({total - games.length} remaining)
+          </button>
+        )}
       </div>
     </div>
   );
