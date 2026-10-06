@@ -916,6 +916,21 @@ export function CourseDetail() {
 
   return (
     <div className="pb-20 max-w-7xl mx-auto space-y-2 md:space-y-4 px-3 md:px-0">
+      {redesign ? (
+        // Lesson top bar: back to the overview, "Lesson X of Y", and a green progress bar
+        <div className="pt-[max(0.5rem,env(safe-area-inset-top))]">
+          <div className="relative flex items-center justify-center py-2.5">
+            <button onClick={() => setShowOverview(true)} aria-label="Back to course overview" className="absolute left-0 grid h-10 w-10 place-items-center rounded-full" style={{ color: RD.text }}>
+              <ArrowLeft className="h-[22px] w-[22px]" />
+            </button>
+            <b className="text-[16px]" style={{ color: RD.text }}>Lesson {currentIdx + 1} of {sortedLessons.length}</b>
+          </div>
+          <div className="h-1.5 overflow-hidden rounded-full" style={{ background: 'rgba(255,255,255,.12)' }}>
+            <div className="h-full rounded-full transition-all duration-500" style={{ width: `${sortedLessons.length ? ((currentIdx + 1) / sortedLessons.length) * 100 : 0}%`, background: RD.green }} />
+          </div>
+        </div>
+      ) : (
+        <>
       {/* Compact back + course info header */}
       <div className="flex items-center gap-2 md:gap-3">
         <Link href="/courses" className="p-2 rounded-xl hover:bg-white/10 transition-colors text-white/50 hover:text-white">
@@ -945,6 +960,8 @@ export function CourseDetail() {
           style={{ width: `${progress}%`, backgroundColor: CHESSCOM_GREEN }}
         />
       </div>
+        </>
+      )}
 
       {sortedLessons.length === 0 ? (
         <div className="rounded-xl p-12 text-center text-white/50" style={{ backgroundColor: BG_DARK }}>No lessons available.</div>

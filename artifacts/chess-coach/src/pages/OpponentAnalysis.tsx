@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useDashboardRedesignFlag } from '@/hooks/use-app-config';
 import { RD } from '@/lib/redesignTheme';
+import { ScoutRedesign } from './ScoutRedesign';
 import { PageHero } from '@/components/DesignSystem';
 import { UpgradeNudge } from '@/components/UpgradeNudge';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -405,6 +406,122 @@ export function OpponentAnalysis() {
 
   const totalGames = result ? result.wins + result.losses + result.draws : 0;
   const winPct = totalGames > 0 ? Math.round((result!.wins / totalGames) * 100) : 0;
+
+  // The exploit-courses generator, shared by the classic page and the redesign
+  const exploitBlock = result ? (
+    <>
+            {/* ── Generate Exploit Courses ── */}
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
+              className={`glass-card rounded-xl overflow-hidden border border-primary/20 ${redesign && scoutTab === 'openings' ? 'hidden' : ''}`}
+            >
+              <div className="p-5 flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center shrink-0">
+                    <GraduationCap className="w-5 h-5 text-primary-foreground" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-black text-sm">Generate Exploit Courses</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      We build {Math.min(result.weaknesses.length, 3)} courses teaching you how to punish{' '}
+                      <span className="text-foreground font-bold">{result.username}</span>'s top weaknesses
+                    </p>
+                  </div>
+                </div>
+
+                {courseGenState === 'idle' && (
+                  <button
+                    onClick={handleGenerateCourses}
+                    className="shrink-0 px-5 py-2.5 rounded-xl bg-primary text-primary-foreground font-black text-sm hover:bg-primary/90 transition-colors flex items-center gap-2"
+                  >
+                    <BookOpen className="w-4 h-4" />
+                    Build Courses
+                  </button>
+                )}
+
+                {courseGenState === 'generating' && (
+                  <div className="shrink-0 flex items-center gap-2 text-primary text-sm font-bold">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Generating… this takes 2–3 min
+                  </div>
+                )}
+
+                {courseGenState === 'done' && (
+                  <Link href="/courses">
+                    <div className="shrink-0 flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-black text-sm hover:bg-emerald-500/25 transition-colors cursor-pointer">
+                      <CheckCircle2 className="w-4 h-4" />
+                      {coursesCreated} course{coursesCreated !== 1 ? 's' : ''} ready → View
+                    </div>
+                  </Link>
+                )}
+
+                {courseGenState === 'error' && courseGenError === 'Premium subscription required' && (
+                  <div className="shrink-0 w-full sm:w-auto">
+                    <UpgradeNudge headline="Upgrade to Pro to generate exploit courses" compact />
+                  </div>
+                )}
+
+                {courseGenState === 'error' && courseGenError !== 'Premium subscription required' && (
+                  <div className="shrink-0 flex flex-col items-end gap-2">
+                    <p className="text-xs text-red-400">{courseGenError}</p>
+                    <button
+                      onClick={handleGenerateCourses}
+                      className="px-4 py-2 rounded-xl bg-red-500/15 text-red-400 border border-red-500/30 font-bold text-xs hover:bg-red-500/25 transition-colors"
+                    >
+                      Retry
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {courseGenState === 'generating' && (
+                <div className="px-5 pb-4">
+                  <div className="h-1 bg-secondary rounded-full overflow-hidden">
+                    <div className="h-full bg-primary rounded-full animate-pulse" style={{ width: '60%' }} />
+                  </div>
+                  <p className="text-[11px] text-muted-foreground mt-2">
+                    Crafting personalised lessons to exploit each weakness…
+                  </p>
+                </div>
+              )}
+
+              {courseGenState === 'done' && (
+                <div className="px-5 pb-4 pt-0">
+                  <div className="flex flex-wrap gap-2">
+                    {result.weaknesses.slice(0, 3).map((w, i) => (
+                      <span key={i} className="px-2.5 py-1 rounded-xl bg-primary text-primary-foreground text-xs font-bold">
+                        vs {result.username}: Exploit {w.category}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </motion.div>
+    </>
+  ) : null;
+
+  if (redesign) {
+    return (
+      <ScoutRedesign
+        inputUsername={inputUsername}
+        setInputUsername={setInputUsername}
+        onSubmit={handleAnalyze}
+        loading={loading}
+        statusMsg={statusMsg}
+        error={error}
+        isLimitReached={isLimitReached}
+        limitNudge={<UpgradeNudge headline="You've used your free basic scout" subtext="Free plan includes 1 basic opponent scout. Upgrade to Pro for unlimited scouts with full weakness analysis." />}
+        result={result}
+        topPlayers={topPlayers}
+        history={scoutHistory}
+        loadingHistory={loadingHistory}
+        onLoadHistory={loadHistoricScout}
+        exploit={exploitBlock}
+      />
+    );
+  }
 
   return (
     <div className="space-y-8 pb-10 px-4 pt-4 md:px-0 md:pt-0">
@@ -840,95 +957,7 @@ export function OpponentAnalysis() {
               </div>
             </div>
 
-            {/* ── Generate Exploit Courses ── */}
-            <motion.div
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 }}
-              className={`glass-card rounded-xl overflow-hidden border border-primary/20 ${redesign && scoutTab === 'openings' ? 'hidden' : ''}`}
-            >
-              <div className="p-5 flex flex-col sm:flex-row items-start sm:items-center gap-4">
-                <div className="flex items-center gap-3 flex-1 min-w-0">
-                  <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center shrink-0">
-                    <GraduationCap className="w-5 h-5 text-primary-foreground" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="font-black text-sm">Generate Exploit Courses</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      We build {Math.min(result.weaknesses.length, 3)} courses teaching you how to punish{' '}
-                      <span className="text-foreground font-bold">{result.username}</span>'s top weaknesses
-                    </p>
-                  </div>
-                </div>
-
-                {courseGenState === 'idle' && (
-                  <button
-                    onClick={handleGenerateCourses}
-                    className="shrink-0 px-5 py-2.5 rounded-xl bg-primary text-primary-foreground font-black text-sm hover:bg-primary/90 transition-colors flex items-center gap-2"
-                  >
-                    <BookOpen className="w-4 h-4" />
-                    Build Courses
-                  </button>
-                )}
-
-                {courseGenState === 'generating' && (
-                  <div className="shrink-0 flex items-center gap-2 text-primary text-sm font-bold">
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Generating… this takes 2–3 min
-                  </div>
-                )}
-
-                {courseGenState === 'done' && (
-                  <Link href="/courses">
-                    <div className="shrink-0 flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-black text-sm hover:bg-emerald-500/25 transition-colors cursor-pointer">
-                      <CheckCircle2 className="w-4 h-4" />
-                      {coursesCreated} course{coursesCreated !== 1 ? 's' : ''} ready → View
-                    </div>
-                  </Link>
-                )}
-
-                {courseGenState === 'error' && courseGenError === 'Premium subscription required' && (
-                  <div className="shrink-0 w-full sm:w-auto">
-                    <UpgradeNudge headline="Upgrade to Pro to generate exploit courses" compact />
-                  </div>
-                )}
-
-                {courseGenState === 'error' && courseGenError !== 'Premium subscription required' && (
-                  <div className="shrink-0 flex flex-col items-end gap-2">
-                    <p className="text-xs text-red-400">{courseGenError}</p>
-                    <button
-                      onClick={handleGenerateCourses}
-                      className="px-4 py-2 rounded-xl bg-red-500/15 text-red-400 border border-red-500/30 font-bold text-xs hover:bg-red-500/25 transition-colors"
-                    >
-                      Retry
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              {courseGenState === 'generating' && (
-                <div className="px-5 pb-4">
-                  <div className="h-1 bg-secondary rounded-full overflow-hidden">
-                    <div className="h-full bg-primary rounded-full animate-pulse" style={{ width: '60%' }} />
-                  </div>
-                  <p className="text-[11px] text-muted-foreground mt-2">
-                    Crafting personalised lessons to exploit each weakness…
-                  </p>
-                </div>
-              )}
-
-              {courseGenState === 'done' && (
-                <div className="px-5 pb-4 pt-0">
-                  <div className="flex flex-wrap gap-2">
-                    {result.weaknesses.slice(0, 3).map((w, i) => (
-                      <span key={i} className="px-2.5 py-1 rounded-xl bg-primary text-primary-foreground text-xs font-bold">
-                        vs {result.username}: Exploit {w.category}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </motion.div>
+            {exploitBlock}
           </motion.div>
         )}
       </AnimatePresence>

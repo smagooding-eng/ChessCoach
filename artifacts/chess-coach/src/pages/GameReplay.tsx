@@ -1,3 +1,6 @@
+import { RedesignHeader } from '@/components/RedesignHeader';
+import { MoveTimeline } from '@/components/MoveTimeline';
+import { Search as SearchIcon } from 'lucide-react';
 import { useDashboardRedesignFlag } from '@/hooks/use-app-config';
 import { RD } from '@/lib/redesignTheme';
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
@@ -620,7 +623,7 @@ const SandboxBoard = React.memo(function SandboxBoard({ playerRating }: { player
 
 export function GameReplay() {
   const { id } = useParams();
-  const { username } = useUser();
+  const { username, authUser } = useUser();
   const [, navigate] = useLocation();
   const { data: game, isLoading, error } = useGameViewer(parseInt(id || '0'));
   const { player: whitePlayer } = useChessPlayer(game?.whiteUsername);
@@ -938,8 +941,17 @@ export function GameReplay() {
   const isBad = currentReview && ['inaccuracy', 'mistake', 'blunder', 'missed_win'].includes(currentReview.classification);
 
   return (
-    <div className="gap-2 md:gap-3 px-3 pt-3 md:px-0 md:pt-0 pb-2 md:pb-0 h-[calc(100dvh-8rem)] md:h-[calc(100vh-3.5rem)] xl:h-[calc(100vh-3rem)] flex flex-col overflow-hidden">
-      <Link href="/games" className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors text-sm shrink-0 order-3 xl:order-none">
+    <div className={`gap-2 md:gap-3 px-3 ${redesign ? 'pt-0' : 'pt-3'} md:px-0 md:pt-0 pb-2 md:pb-0 ${redesign ? 'h-[calc(100dvh-5.75rem)]' : 'h-[calc(100dvh-8rem)]'} md:h-[calc(100vh-3.5rem)] xl:h-[calc(100vh-3rem)] flex flex-col overflow-hidden`}>
+      {redesign && (
+        <div className="shrink-0">
+          <RedesignHeader
+            title="Game Analysis"
+            backHref="/games"
+            right={<Link href="/lookup" aria-label="Look up a game" className="grid h-9 w-9 place-items-center rounded-full"><SearchIcon size={21} /></Link>}
+          />
+        </div>
+      )}
+      <Link href="/games" className={`inline-flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors text-sm shrink-0 order-3 xl:order-none ${redesign ? 'hidden' : ''}`}>
         <ArrowLeft className="w-4 h-4" /> Back to Games
       </Link>
 
@@ -956,8 +968,68 @@ export function GameReplay() {
         {/* ── Left col: board + controls ── */}
         <div className="flex flex-col gap-2 md:gap-4 xl:min-h-0 xl:overflow-y-auto xl:pr-2 hide-scrollbar">
 
+          {redesign && (() => {
+            const names = [username, authUser?.chesscomUsername, authUser?.lichessUsername].filter(Boolean).map((n) => String(n).toLowerCase());
+            const meWhite = names.includes((game.whiteUsername ?? '').toLowerCase());
+            const meBlack = !meWhite && names.includes((game.blackUsername ?? '').toLowerCase());
+            const youWhite = !meBlack;
+            const me = youWhite ? { name: game.whiteUsername, rating: game.whiteRating, avatar: whitePlayer?.avatar } : { name: game.blackUsername, rating: game.blackRating, avatar: blackPlayer?.avatar };
+            const opp = youWhite ? { name: game.blackUsername, rating: game.blackRating, avatar: blackPlayer?.avatar } : { name: game.whiteUsername, rating: game.whiteRating, avatar: whitePlayer?.avatar };
+            const badge = game.result === 'win' ? { t: 'Win', bg: 'rgba(46,125,50,.45)', fg: '#7BE05A' } : game.result === 'loss' ? { t: 'Loss', bg: 'rgba(150,35,45,.55)', fg: '#FF6B73' } : { t: 'Draw', bg: 'rgba(255,255,255,.12)', fg: '#C9D2CF' };
+            const av = (a: string | undefined, n: string, ring: string) => a
+              ? <img src={a} alt={n} className="h-[58px] w-[58px] shrink-0 rounded-full object-cover" style={{ border: `2px solid ${ring}` }} />
+              : <span className="grid h-[58px] w-[58px] shrink-0 place-items-center rounded-full text-[22px] font-extrabold" style={{ background: 'rgba(255,255,255,.1)', border: `2px solid ${ring}` }}>{n?.[0]?.toUpperCase()}</span>;
+            return (
+              <div className="order-[-5] xl:order-none rounded-[22px] p-4" style={{ background: RD.card, border: `1px solid ${RD.border}` }}>
+                <div className="flex items-center">
+                  <div className="flex min-w-0 flex-1 items-center gap-3">
+                    {av(me.avatar, me.name, 'rgba(255,255,255,.7)')}
+                    <div className="min-w-0">
+                      <p className="text-[13px]" style={{ color: RD.muted }}>You ({youWhite ? 'White' : 'Black'})</p>
+                      <b className="block text-[24px] font-extrabold leading-tight">{me.rating}</b>
+                    </div>
+                  </div>
+                  <div className="mx-3 h-12 w-px shrink-0" style={{ background: RD.border }} />
+                  <div className="flex min-w-0 flex-1 items-center gap-3">
+                    {av(opp.avatar, opp.name, 'rgba(255,138,100,.8)')}
+                    <div className="min-w-0">
+                      <p className="text-[13px]" style={{ color: RD.muted }}>Opponent</p>
+                      <b className="block truncate text-[15px] font-extrabold leading-tight">{opp.name}</b>
+                      <span className="text-[17px] font-extrabold">{opp.rating?.toLocaleString()}</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-3 flex items-center gap-3">
+                  <span className="rounded-[9px] px-3.5 py-2 text-[14px] font-extrabold" style={{ background: badge.bg, color: badge.fg }}>{badge.t}</span>
+                  <span className="text-[13px]" style={{ color: 'rgba(245,247,246,.8)' }}>
+                    <span className="block">{badge.t}</span>
+                    {new Date(game.playedAt).toLocaleDateString()} · {maxMoves} moves
+                  </span>
+                </div>
+              </div>
+            );
+          })()}
+
+          {redesign && (
+            <div className="order-[-4] xl:order-none grid grid-cols-3 gap-1 rounded-[16px] p-1" style={{ background: RD.cardSolid, border: `1px solid ${RD.border}` }}>
+              {([
+                ['analysis', 'Analysis'],
+                ['moments', `Key Moments${keyMoments.length ? ` (${keyMoments.length})` : ''}`],
+                ['report', 'Report'],
+              ] as const).map(([id, label]) => {
+                const active = gtab === id;
+                return (
+                  <button key={id} onClick={() => setGtab(id)} className="rounded-[12px] py-2.5 text-[13.5px] font-bold transition-colors"
+                    style={active ? { background: 'rgba(139,234,69,.10)', color: RD.text, boxShadow: `inset 0 0 0 1.5px ${RD.green}` } : { background: 'transparent', color: RD.muted }}>
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
           {/* Players banner — compact on mobile, pushed below board on mobile */}
-          <div className="glass-card rounded-xl overflow-hidden order-last xl:order-none">
+          <div className={`glass-card rounded-xl overflow-hidden order-last xl:order-none ${redesign ? 'hidden' : ''}`}>
             <div className="flex items-stretch">
               <div className="flex-1 flex items-center gap-2 px-3 py-2 md:py-3">
                 {whitePlayer?.avatar
@@ -1040,8 +1112,10 @@ export function GameReplay() {
           </div>
 
           {/* Playback controls */}
-          <div className="glass-card rounded-xl px-1.5 py-1.5 md:p-3 flex items-center justify-between order-[-2] xl:order-none">
+          {redesign && <p className="order-[-2] xl:order-none text-center text-[13px]" style={{ color: RD.muted }}>Move {currentMove} / {maxMoves}</p>}
+          <div className={redesign ? 'order-[-2] xl:order-none w-full' : 'glass-card rounded-xl px-1.5 py-1.5 md:p-3 flex items-center justify-between order-[-2] xl:order-none'}>
             <MoveNavigationBar
+              variant={redesign ? 'redesign' : undefined}
               isPlaying={isPlaying}
               onFirst={() => { setCurrentMove(0); setIsPlaying(false); }}
               onPrev={() => {
@@ -1136,25 +1210,9 @@ export function GameReplay() {
             </div>
           )}
 
-          {redesign && (
-            <div className="order-[-1] xl:order-none flex items-center gap-1 rounded-[14px] p-1" style={{ background: RD.cardSolid, border: `1px solid ${RD.border}` }}>
-              {([
-                ['analysis', 'Analysis'],
-                ['moments', `Key Moments${keyMoments.length ? ` (${keyMoments.length})` : ''}`],
-                ['report', 'Report'],
-              ] as const).map(([id, label]) => {
-                const active = gtab === id;
-                return (
-                  <button
-                    key={id}
-                    onClick={() => setGtab(id)}
-                    className="flex-1 rounded-[10px] py-2 text-[12.5px] font-bold transition-colors"
-                    style={active ? { background: 'rgba(139,234,69,.10)', color: RD.green, boxShadow: `inset 0 0 0 1px ${RD.green}` } : { background: 'transparent', color: RD.muted }}
-                  >
-                    {label}
-                  </button>
-                );
-              })}
+          {redesign && reviewMoves.length > 0 && (
+            <div className="order-[-1] xl:order-none">
+              <MoveTimeline moves={reviewMoves} current={currentMove} onSelect={(ply) => setCurrentMove(ply)} />
             </div>
           )}
 

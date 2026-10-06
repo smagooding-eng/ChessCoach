@@ -1,18 +1,14 @@
 import React, { useState } from 'react';
 import { Link } from 'wouter';
-import { ArrowRight, BookOpen, CheckCircle2, GraduationCap, Target, Trophy, X, AlertCircle } from 'lucide-react';
+import { ArrowRight, BookOpen, CheckCircle2, GraduationCap, Play, Target, Trophy, X, AlertCircle } from 'lucide-react';
 import { useCourseDetail } from '@/hooks/use-courses';
 import { RD } from '@/lib/redesignTheme';
 
-// "Your Training Plan" (redesign). Everything here is derived from the
-// player's real course progress -- nothing is invented:
-//  - Next Move: the in-progress course closest to done (else the first
-//    unfinished one), with its real current lesson from the course detail.
-//  - Stats: sums over the real completed/total lesson counts.
-//  - Priorities: the player's courses grouped by category (courses are
-//    generated from their detected weaknesses), progress = lessons done.
-//  - No "estimated time" is shown because courses don't store one, and
-//    there's no XP system, so no XP is shown anywhere.
+// Courses (redesign): "Your Training Plan" -- next-move hero, flat stat
+// columns, priority rows, a recommended-course card and compact course rows,
+// as in the course mockups. Everything is derived from the player's real
+// course progress; nothing is invented. Estimated durations and XP are not
+// shown because courses don't store them.
 export interface CourseLike {
   id: number;
   title: string;
@@ -23,31 +19,27 @@ export interface CourseLike {
   completedLessons: number;
 }
 
-export type Art = { img: string; accent: string; icon: React.ElementType };
+export type Art = { img: string; accent: string; tile: string; bar: string; icon: React.ElementType };
 export const ART_BASE = `${import.meta.env.BASE_URL}assets/courses/`;
 
 export function artFor(c: { id: number; category: string; title: string }): Art {
   const t = `${c.category} ${c.title}`.toLowerCase();
-  if (/discover/.test(t)) return { img: 'course-discovered', accent: RD.gold, icon: Target };
-  if (/tactic|fork|pin|skewer|combin|attack|blunder|calculation/.test(t)) return { img: 'course-tactical', accent: RD.gold, icon: Target };
-  if (/open/.test(t)) return { img: 'course-opening', accent: '#35C6F4', icon: BookOpen };
-  if (/endgame|end game|conversion|rook|pawn ending/.test(t)) return { img: 'course-endgame', accent: '#A98BFF', icon: Trophy };
+  if (/discover/.test(t)) return { img: 'course-discovered', accent: RD.gold, tile: '#E0454F', bar: RD.green, icon: Target };
+  if (/tactic|fork|pin|skewer|combin|attack|blunder|calculation/.test(t)) return { img: 'course-tactical', accent: RD.gold, tile: '#E0454F', bar: RD.green, icon: Target };
+  if (/open/.test(t)) return { img: 'course-opening', accent: '#35C6F4', tile: '#3B82F6', bar: '#3B82F6', icon: BookOpen };
+  if (/endgame|end game|conversion|rook|pawn ending/.test(t)) return { img: 'course-endgame', accent: '#A98BFF', tile: '#A855F7', bar: '#A855F7', icon: Trophy };
   const pool = ['course-library', 'course-training-hero', 'course-opening', 'course-tactical'];
-  return { img: pool[c.id % pool.length], accent: RD.green, icon: GraduationCap };
+  return { img: pool[c.id % pool.length], accent: RD.green, tile: RD.green, bar: RD.green, icon: GraduationCap };
 }
 
-const DIFF_STYLE: Record<string, { bg: string; fg: string }> = {
-  Beginner: { bg: 'rgba(139,234,69,.16)', fg: RD.green },
-  Intermediate: { bg: 'rgba(53,198,244,.16)', fg: '#5FD3F7' },
-  Advanced: { bg: 'rgba(169,139,255,.18)', fg: '#BBA4FF' },
-};
+const DIFF_DOT: Record<string, string> = { Beginner: RD.green, Intermediate: '#35C6F4', Advanced: '#A98BFF' };
 
 const pctOf = (c: { completedLessons: number; totalLessons: number }) =>
   c.totalLessons > 0 ? Math.round((c.completedLessons / c.totalLessons) * 100) : 0;
 
-function Bar({ value, color = RD.green }: { value: number; color?: string }) {
+function Bar({ value, color = RD.green, h = 6 }: { value: number; color?: string; h?: number }) {
   return (
-    <div className="h-1.5 overflow-hidden rounded-full" style={{ background: 'rgba(255,255,255,.10)' }}>
+    <div className="overflow-hidden rounded-full" style={{ height: h, background: 'rgba(255,255,255,.12)' }}>
       <div className="h-full rounded-full" style={{ width: `${Math.max(value, value > 0 ? 3 : 0)}%`, background: color }} />
     </div>
   );
@@ -62,7 +54,7 @@ export function CoursesRedesign({
   onGenerate: () => void;
   onArchive: (id: number) => void;
 }) {
-  const [tab, setTab] = useState<'all' | 'progress' | 'done'>('all');
+  const [tab, setTab] = useState<'all' | 'progress'>('all');
 
   const inProgress = courses
     .filter((c) => c.totalLessons > 0 && c.completedLessons > 0 && c.completedLessons < c.totalLessons)
@@ -91,86 +83,99 @@ export function CoursesRedesign({
     .sort((a, b) => (b.total - b.done) - (a.total - a.done))
     .slice(0, 4);
 
-  const visible = courses.filter((c) => {
-    const p = pctOf(c);
-    if (tab === 'progress') return p > 0 && p < 100;
-    if (tab === 'done') return p === 100;
-    return true;
-  });
-
-  const nextArt = nextCourse ? artFor(nextCourse) : null;
+  const visible = courses.filter((c) => (tab === 'progress' ? c.completedLessons > 0 : true));
+  const recommended = nextCourse ?? courses[0] ?? null;
+  const card = { background: RD.card, border: `1px solid ${RD.border}` } as const;
 
   return (
     <div className="-m-4 min-h-screen px-3 pt-3 md:-m-6 md:px-6 md:pt-6 md:pb-12 pb-[calc(7.5rem+env(safe-area-inset-bottom))]" style={{ background: RD.bg, color: RD.text }}>
-      <div className="mx-auto grid w-full max-w-[860px] gap-4">
+      <div className="mx-auto grid w-full max-w-[600px] gap-5">
         <div className="px-1">
-          <h1 className="text-[28px] font-extrabold leading-tight tracking-tight">Your Training Plan</h1>
-          <p className="mt-1 text-[13.5px]" style={{ color: RD.muted }}>Built from your games. Focus on what will improve your rating the fastest.</p>
+          <h1 className="text-[32px] font-extrabold leading-tight tracking-tight">Your Training Plan</h1>
+          <p className="mt-1.5 text-[15px] leading-snug" style={{ color: 'rgba(245,247,246,.82)' }}>Built from your games. Focus on what will improve your rating the fastest.</p>
         </div>
 
         {/* YOUR NEXT MOVE */}
-        {nextCourse && nextArt && (
-          <section className="relative overflow-hidden rounded-[22px]" style={{ border: `1px solid ${RD.green}`, boxShadow: '0 0 0 1px rgba(139,234,69,.25), 0 18px 50px -20px rgba(139,234,69,.35)' }}>
-            <img src={`${ART_BASE}course-training-hero.webp`} alt="" loading="eager" className="absolute inset-0 h-full w-full object-cover" style={{ objectPosition: '80% center' }} />
-            <div className="absolute inset-0" style={{ background: 'linear-gradient(90deg, rgba(5,10,11,.96) 0%, rgba(5,10,11,.82) 45%, rgba(5,10,11,.15) 100%)' }} />
-            <div className="relative z-10 p-5 md:p-7">
-              <p className="text-[11px] font-extrabold uppercase tracking-[.16em]" style={{ color: RD.green }}>Your next move</p>
-              <h2 className="mt-1.5 max-w-[70%] text-[24px] font-extrabold leading-tight md:text-[30px]">{nextCourse.title}</h2>
-              <p className="mt-1 max-w-[70%] text-[13px]" style={{ color: 'rgba(245,247,246,.78)' }}>
+        {nextCourse && (
+          <section className="relative overflow-hidden rounded-[22px]" style={{ border: `1.5px solid ${RD.green}`, boxShadow: '0 0 0 1px rgba(139,234,69,.18), 0 18px 50px -22px rgba(139,234,69,.5)' }}>
+            <img src={`${ART_BASE}course-training-hero.webp`} alt="" className="absolute inset-0 h-full w-full object-cover" style={{ objectPosition: '82% center' }} />
+            <div className="absolute inset-0" style={{ background: 'linear-gradient(90deg, rgba(5,10,11,.94) 0%, rgba(5,10,11,.78) 48%, rgba(5,10,11,.05) 100%)' }} />
+            <div className="relative z-10 p-5">
+              <p className="text-[12px] font-extrabold uppercase tracking-[.18em]" style={{ color: '#D9C46A' }}>Your next move</p>
+              <h2 className="mt-2 max-w-[68%] text-[26px] font-extrabold leading-tight">{nextCourse.title}</h2>
+              <p className="mt-1.5 max-w-[68%] text-[14px] leading-snug" style={{ color: 'rgba(245,247,246,.85)' }}>
                 Lesson {Math.min(nextCourse.completedLessons + 1, nextCourse.totalLessons)} of {nextCourse.totalLessons}
                 {currentLesson ? <><br />{currentLesson.title}</> : null}
               </p>
-              <div className="mt-3 max-w-[70%]"><Bar value={pctOf(nextCourse)} /></div>
-              <Link href={`/courses/${nextCourse.id}`} className="mt-4 inline-flex items-center gap-2 rounded-[12px] px-5 py-3 text-[14px] font-extrabold" style={{ background: `linear-gradient(180deg, ${RD.green}, ${RD.greenDark})`, color: '#05100A', boxShadow: '0 10px 26px -10px rgba(139,234,69,.6)' }}>
-                Continue Training <ArrowRight size={16} />
+              <Link href={`/courses/${nextCourse.id}`} className="mt-4 inline-flex items-center gap-2.5 rounded-[12px] px-6 py-3.5 text-[15px] font-extrabold" style={{ background: `linear-gradient(180deg, ${RD.green}, ${RD.greenDark})`, color: '#05100A', boxShadow: '0 10px 26px -10px rgba(139,234,69,.6)' }}>
+                Continue Training <ArrowRight size={17} />
               </Link>
             </div>
           </section>
         )}
 
-        {/* Stats */}
+        {/* Stats: flat columns */}
         {courses.length > 0 && (
-          <div className="grid grid-cols-3 gap-2.5">
-            {[
-              { v: lessonsDone, l: 'Lessons completed' },
-              { v: started, l: 'Courses started' },
-              { v: `${overall}%`, l: 'Training progress' },
-            ].map((s) => (
-              <div key={s.l} className="rounded-[16px] px-3 py-3.5 text-center" style={{ background: RD.card, border: `1px solid ${RD.border}` }}>
-                <b className="block text-[24px] font-extrabold leading-none">{s.v}</b>
-                <span className="mt-1.5 block text-[11px]" style={{ color: RD.muted }}>{s.l}</span>
+          <div className="grid grid-cols-3 text-center">
+            {[{ v: lessonsDone, l: 'Lessons completed' }, { v: started, l: 'Courses started' }, { v: `${overall}%`, l: 'Training progress' }].map((s, i) => (
+              <div key={s.l} className="px-2 py-1" style={{ borderLeft: i ? `1px solid ${RD.border}` : undefined }}>
+                <b className="block text-[30px] font-extrabold leading-tight">{s.v}</b>
+                <span className="text-[12px]" style={{ color: RD.muted }}>{s.l}</span>
               </div>
             ))}
           </div>
         )}
 
-        {/* Priorities */}
+        {/* Your Priorities */}
         {byCategory.length > 0 && (
-          <section className="grid gap-2.5">
+          <section className="grid gap-3">
             <div className="px-1">
-              <h2 className="text-[19px] font-extrabold">Your Priorities</h2>
-              <p className="text-[12.5px]" style={{ color: RD.muted }}>From the weaknesses found in your games.</p>
+              <h2 className="text-[26px] font-extrabold leading-tight">Your Priorities</h2>
+              <p className="text-[14px]" style={{ color: RD.muted }}>Based on your recent games.</p>
             </div>
             {byCategory.map((g) => {
               const a = artFor({ id: g.probe.id, category: g.name, title: g.probe.title });
               const p = g.total > 0 ? Math.round((g.done / g.total) * 100) : 0;
               const left = g.total - g.done;
               return (
-                <div key={g.name} className="flex items-center gap-3.5 rounded-[18px] p-3.5" style={{ background: RD.card, border: `1px solid ${RD.border}` }}>
-                  <span className="grid h-12 w-12 shrink-0 place-items-center rounded-[13px]" style={{ background: `${a.accent}22`, color: a.accent, border: `1px solid ${a.accent}44` }}>
-                    <a.icon size={22} />
+                <div key={g.name} className="flex items-center gap-3.5 rounded-[20px] p-3.5" style={card}>
+                  <span className="grid h-[68px] w-[68px] shrink-0 place-items-center rounded-[16px]" style={{ background: `${a.tile}30`, border: `1.5px solid ${a.tile}99`, color: a.tile }}>
+                    <a.icon size={30} />
                   </span>
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-baseline justify-between gap-3">
-                      <b className="truncate text-[15px] font-bold">{g.name}</b>
-                      <b className="text-[15px] font-extrabold">{p}%</b>
-                    </div>
-                    <div className="my-1.5"><Bar value={p} color={a.accent === RD.gold ? RD.green : a.accent} /></div>
-                    <span className="text-[11.5px]" style={{ color: RD.muted }}>{left} lesson{left === 1 ? '' : 's'} ready</span>
+                    <b className="block truncate text-[17px] font-extrabold">{g.name}</b>
+                    <div className="my-2"><Bar value={p} color={a.bar} h={8} /></div>
+                    <span className="text-[12.5px] font-semibold" style={{ color: a.bar }}>{left} lesson{left === 1 ? '' : 's'} ready</span>
                   </div>
+                  <b className="shrink-0 text-[20px] font-extrabold">{p}%</b>
                 </div>
               );
             })}
+          </section>
+        )}
+
+        {/* Recommended for you */}
+        {recommended && (
+          <section className="grid gap-2.5">
+            <h2 className="px-1 text-[20px] font-extrabold">Recommended for you</h2>
+            <Link href={`/courses/${recommended.id}`} className="relative block overflow-hidden rounded-[22px]" style={{ border: `1px solid ${RD.border}` }}>
+              <img src={`${ART_BASE}${artFor(recommended).img}.webp`} alt="" className="absolute inset-0 h-full w-full object-cover" style={{ objectPosition: '75% center' }} />
+              <div className="absolute inset-0" style={{ background: 'linear-gradient(90deg, rgba(5,10,11,.92) 0%, rgba(5,10,11,.7) 55%, rgba(5,10,11,.1) 100%)' }} />
+              <div className="relative z-10 flex min-h-[210px] flex-col p-5">
+                <h3 className="max-w-[75%] text-[26px] font-extrabold leading-tight">{recommended.title}</h3>
+                <p className="mt-1.5 line-clamp-2 max-w-[70%] text-[14.5px] leading-snug" style={{ color: 'rgba(245,247,246,.9)' }}>{recommended.description}</p>
+                <div className="mt-auto pt-4">
+                  <p className="mb-1.5 text-[13px] font-bold">{pctOf(recommended)}% complete</p>
+                  <div className="max-w-[78%]"><Bar value={pctOf(recommended)} h={7} /></div>
+                  <div className="mt-3 flex items-end justify-between">
+                    <span className="flex items-center gap-2 text-[13px]" style={{ color: 'rgba(245,247,246,.85)' }}>
+                      <span className="h-2.5 w-2.5 rounded-full" style={{ background: DIFF_DOT[recommended.difficulty] ?? RD.green }} />{recommended.difficulty} • {recommended.totalLessons} lessons
+                    </span>
+                    <span className="grid h-11 w-11 place-items-center rounded-[12px]" style={{ background: RD.green, color: '#05100A' }}><ArrowRight size={20} /></span>
+                  </div>
+                </div>
+              </div>
+            </Link>
           </section>
         )}
 
@@ -178,15 +183,10 @@ export function CoursesRedesign({
         <section className="grid gap-3">
           <div className="flex items-end justify-between gap-3 px-1">
             <div>
-              <h2 className="text-[19px] font-extrabold">All Courses</h2>
-              <p className="text-[12.5px]" style={{ color: RD.muted }}>Build the skills that matter most.</p>
+              <h2 className="text-[26px] font-extrabold leading-tight">All Courses</h2>
+              <p className="text-[14px]" style={{ color: RD.muted }}>Build the skills that matter most.</p>
             </div>
-            <button
-              onClick={onGenerate}
-              disabled={isGenerating}
-              className="flex shrink-0 items-center gap-2 rounded-[12px] px-3.5 py-2.5 text-[12.5px] font-extrabold transition-opacity disabled:opacity-60"
-              style={{ background: 'rgba(139,234,69,.10)', color: RD.green, border: `1px solid ${RD.green}` }}
-            >
+            <button onClick={onGenerate} disabled={isGenerating} className="flex shrink-0 items-center gap-2 rounded-[12px] px-3.5 py-2.5 text-[12.5px] font-extrabold disabled:opacity-60" style={{ background: 'rgba(139,234,69,.10)', color: RD.green, border: `1px solid ${RD.green}` }}>
               {isGenerating ? <><span className="h-3.5 w-3.5 animate-spin rounded-full border-2" style={{ borderColor: RD.green, borderTopColor: 'transparent' }} />Building…</> : <><GraduationCap size={15} />New courses</>}
             </button>
           </div>
@@ -198,12 +198,12 @@ export function CoursesRedesign({
           )}
 
           {courses.length > 0 && (
-            <div className="flex items-center gap-1 rounded-[14px] p-1" style={{ background: RD.cardSolid, border: `1px solid ${RD.border}` }}>
-              {([['all', 'Courses'], ['progress', 'In Progress'], ['done', 'Completed']] as const).map(([id, label]) => {
+            <div className="grid grid-cols-2 overflow-hidden rounded-[14px]" style={{ background: RD.cardSolid, border: `1px solid ${RD.border}` }}>
+              {([['all', 'Courses'], ['progress', 'My Progress']] as const).map(([id, label]) => {
                 const active = tab === id;
                 return (
-                  <button key={id} onClick={() => setTab(id)} className="flex-1 rounded-[10px] py-2 text-[12.5px] font-bold transition-colors"
-                    style={active ? { background: 'rgba(139,234,69,.10)', color: RD.green, boxShadow: `inset 0 0 0 1px ${RD.green}` } : { background: 'transparent', color: RD.muted }}>
+                  <button key={id} onClick={() => setTab(id)} className="py-3 text-[14.5px] font-bold transition-colors"
+                    style={active ? { background: 'rgba(139,234,69,.12)', color: RD.green, boxShadow: `inset 0 -2px 0 ${RD.green}` } : { color: RD.muted }}>
                     {label}
                   </button>
                 );
@@ -229,49 +229,39 @@ export function CoursesRedesign({
           )}
 
           {courses.length > 0 && visible.length === 0 && !isGenerating && (
-            <div className="rounded-[20px] px-6 py-10 text-center text-[13px]" style={{ background: RD.card, border: `1px solid ${RD.border}`, color: RD.muted }}>Nothing here yet.</div>
+            <div className="rounded-[20px] px-6 py-10 text-center text-[13px]" style={{ background: RD.card, border: `1px solid ${RD.border}`, color: RD.muted }}>You haven&apos;t started a course yet.</div>
           )}
 
-          <div className="grid gap-3 md:grid-cols-2">
-            {visible.map((c) => {
-              const a = artFor(c);
-              const p = pctOf(c);
-              const done = p === 100;
-              const diff = DIFF_STYLE[c.difficulty] ?? { bg: 'rgba(255,255,255,.10)', fg: RD.muted };
-              return (
-                <article key={c.id} className="relative overflow-hidden rounded-[20px]" style={{ border: `1px solid ${RD.border}` }}>
-                  <img src={`${ART_BASE}${a.img}.webp`} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
-                  <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, rgba(5,10,11,.55) 0%, rgba(5,10,11,.92) 62%)' }} />
-                  <div className="relative z-10 flex min-h-[210px] flex-col p-4">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="rounded-md px-2 py-1 text-[10.5px] font-extrabold" style={{ background: 'rgba(0,0,0,.45)', color: RD.text, border: `1px solid ${RD.border}` }}>{c.category}</span>
-                      <span className="rounded-md px-2 py-1 text-[10.5px] font-extrabold" style={{ background: diff.bg, color: diff.fg }}>{c.difficulty}</span>
-                    </div>
-                    <h3 className="mt-3 text-[18px] font-extrabold leading-snug">{c.title}</h3>
-                    <p className="mt-1 line-clamp-2 text-[12.5px]" style={{ color: 'rgba(245,247,246,.72)' }}>{c.description}</p>
-                    <div className="mt-auto pt-4">
-                      <div className="mb-1.5 flex items-center justify-between text-[12px]">
-                        <span className="flex items-center gap-1" style={{ color: done ? RD.green : RD.muted }}>
-                          {done && <CheckCircle2 size={13} />}{c.completedLessons} / {c.totalLessons} lessons
-                        </span>
-                        <b style={{ color: RD.green }}>{p}%</b>
-                      </div>
-                      <Bar value={p} />
-                      <div className="mt-3 flex gap-2">
-                        <Link href={`/courses/${c.id}`} className="flex flex-1 items-center justify-center gap-2 rounded-[12px] py-2.5 text-[13.5px] font-extrabold"
-                          style={done ? { background: 'rgba(255,255,255,.08)', color: RD.text, border: `1px solid ${RD.border}` } : { background: `linear-gradient(180deg, ${RD.green}, ${RD.greenDark})`, color: '#05100A' }}>
-                          {done ? 'Review course' : p > 0 ? 'Continue' : 'Start'}{!done && <ArrowRight size={15} />}
-                        </Link>
-                        <button onClick={() => onArchive(c.id)} title="Clear this course" aria-label={`Clear course ${c.title}`} className="grid w-11 place-items-center rounded-[12px]" style={{ background: 'rgba(0,0,0,.4)', border: `1px solid ${RD.border}`, color: RD.muted }}>
-                          <X size={16} />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </article>
-              );
-            })}
-          </div>
+          {visible.map((c) => {
+            const a = artFor(c);
+            const p = pctOf(c);
+            const done = p === 100;
+            return (
+              <div key={c.id} className="flex items-stretch overflow-hidden rounded-[20px]" style={card}>
+                <Link href={`/courses/${c.id}`} className="flex min-w-0 flex-1 items-stretch">
+                  <span className="relative w-[96px] shrink-0 overflow-hidden">
+                    <img src={`${ART_BASE}${a.img}.webp`} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
+                  </span>
+                  <span className="min-w-0 flex-1 px-3.5 py-3.5">
+                    <b className="block truncate text-[16.5px] font-extrabold">{c.title}</b>
+                    <span className="mt-0.5 line-clamp-1 block text-[13px]" style={{ color: RD.muted }}>{c.description}</span>
+                    <span className="mt-2 flex items-center gap-2 text-[12.5px]" style={{ color: 'rgba(245,247,246,.8)' }}>
+                      <span className="h-2.5 w-2.5 rounded-full" style={{ background: DIFF_DOT[c.difficulty] ?? RD.green }} />{c.difficulty} • {c.totalLessons} lessons
+                    </span>
+                  </span>
+                  <span className="flex shrink-0 flex-col items-center justify-center gap-1.5 pr-2">
+                    <span className="grid h-9 w-9 place-items-center rounded-full" style={{ background: done ? 'rgba(139,234,69,.16)' : RD.green, color: done ? RD.green : '#05100A' }}>
+                      {done ? <CheckCircle2 size={20} aria-label="Completed" /> : <Play size={16} fill="currentColor" aria-label="Open course" />}
+                    </span>
+                    <b className="text-[13px]" style={{ color: p > 0 ? RD.green : RD.muted }}>{p}%</b>
+                  </span>
+                </Link>
+                <button onClick={() => onArchive(c.id)} title="Clear this course" aria-label={`Clear course ${c.title}`} className="grid w-9 shrink-0 place-items-center" style={{ color: RD.muted, borderLeft: `1px solid ${RD.border}` }}>
+                  <X size={15} />
+                </button>
+              </div>
+            );
+          })}
         </section>
       </div>
     </div>

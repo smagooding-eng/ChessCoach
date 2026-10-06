@@ -3,7 +3,10 @@ import { Link } from 'wouter';
 import { Crosshair, ChevronRight, Swords, Loader2 } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { useDashboardRedesignFlag } from '@/hooks/use-app-config';
-import { RD, DIFFICULTY_BADGE } from '@/lib/redesignTheme';
+import { RD } from '@/lib/redesignTheme';
+import { Chess } from 'chess.js';
+import { FenThumb } from '@/components/FenThumb';
+import { RedesignHeader } from '@/components/RedesignHeader';
 
 const BG = '#141413';
 const CARD = '#1c1b19';
@@ -18,6 +21,10 @@ interface TrapSummary {
   difficulty: string;
   trapSide: string;
   summary: string;
+  // Present in the list response (full rows); used for the thumbnail position
+  startingFen?: string;
+  trapLineSan?: string[];
+  criticalMoveIndex?: number;
 }
 
 const DIFFICULTY_COLOR: Record<string, string> = {
@@ -109,85 +116,82 @@ function TrapsClassic({ traps, loading }: { traps: TrapSummary[]; loading: boole
 }
 
 // ── Redesign (toggle ON) ────────────────────────────────────────────────
-// Mockup structure: title, All / By Category tabs, rows with a tile,
-// name + summary, a difficulty chip and a chevron. The list API returns
-// no board positions or popularity data, so there are no per-trap board
-// thumbnails and no "Popular" tab -- neither would be real.
+// Each row's thumbnail is the trap's real position: its starting FEN with the
+// trap line played up to (not including) the critical mistake.
+function trapFen(t: TrapSummary): string {
+  const start = t.startingFen ?? 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+  try {
+    const c = new Chess(start);
+    const upTo = Math.max(0, Math.min(t.criticalMoveIndex ?? 0, (t.trapLineSan ?? []).length));
+    for (let i = 0; i < upTo; i++) c.move((t.trapLineSan ?? [])[i]);
+    return c.fen();
+  } catch {
+    return start;
+  }
+}
+
+const CHIP: Record<string, { bg: string; fg: string; bd: string }> = {
+  beginner: { bg: 'rgba(40,120,50,.45)', fg: '#7BE05A', bd: 'rgba(95,213,51,.35)' },
+  intermediate: { bg: 'rgba(150,110,20,.45)', fg: '#F2C14E', bd: 'rgba(232,180,71,.35)' },
+  advanced: { bg: 'rgba(150,35,45,.5)', fg: '#FF7A80', bd: 'rgba(255,80,88,.35)' },
+};
+
 function TrapsRedesign({ traps, loading }: { traps: TrapSummary[]; loading: boolean }) {
-  const [tab, setTab] = useState<'all' | 'category'>('all');
+  const [tab, setTab] = useState<'all' | 'category' | 'level'>('all');
 
-  const grouped = traps.reduce<Record<string, TrapSummary[]>>((acc, t) => {
-    (acc[t.category] ??= []).push(t);
-    return acc;
-  }, {});
+  const groupBy = (key: (t: TrapSummary) => string) =>
+    traps.reduce<Record<string, TrapSummary[]>>((acc, t) => { (acc[key(t)] ??= []).push(t); return acc; }, {});
 
-  const renderRow = (trap: TrapSummary, i: number) => {
-    const chip = DIFFICULTY_BADGE[trap.difficulty] ?? { bg: 'rgba(255,255,255,.10)', fg: RD.muted };
+  const row = (trap: TrapSummary) => {
+    const chip = CHIP[trap.difficulty] ?? { bg: 'rgba(255,255,255,.1)', fg: RD.muted, bd: RD.border };
     return (
-      <Link
-        key={trap.id}
-        href={`/traps/${trap.id}`}
-        className="flex items-center gap-3 px-4 py-3.5 transition-colors hover:bg-white/[0.03]"
-        style={{ borderTop: i ? `1px solid ${RD.border}` : undefined }}
-      >
-        <span
-          className="grid h-11 w-11 shrink-0 place-items-center rounded-[12px]"
-          style={{ background: trap.trapSide === 'white' ? 'rgba(255,255,255,.10)' : 'rgba(0,0,0,.45)', border: `1px solid ${RD.border}` }}
-        >
-          <Swords size={18} style={{ color: RD.text }} />
+      <Link key={trap.id} href={`/traps/${trap.id}`} className="flex items-center gap-3 transition-opacity active:opacity-80">
+        <FenThumb fen={trapFen(trap)} size={58} />
+        <span className="flex min-w-0 flex-1 items-center gap-2 rounded-[16px] py-3 pl-4 pr-3" style={{ background: RD.card, border: `1px solid ${RD.border}` }}>
+          <span className="min-w-0 flex-1">
+            <b className="block truncate text-[16px] font-extrabold">{trap.name}</b>
+            <span className="block truncate text-[13px]" style={{ color: RD.muted }}>{trap.summary}</span>
+          </span>
+          <span className="shrink-0 rounded-[8px] px-2.5 py-1.5 text-[12px] font-extrabold capitalize" style={{ background: chip.bg, color: chip.fg, border: `1px solid ${chip.bd}` }}>{trap.difficulty}</span>
+          <ChevronRight size={16} className="shrink-0" style={{ color: RD.muted }} />
         </span>
-        <div className="min-w-0 flex-1">
-          <b className="block truncate text-[14.5px] font-bold">{trap.name}</b>
-          <span className="block truncate text-[12px]" style={{ color: RD.muted }}>{trap.summary}</span>
-        </div>
-        <span className="shrink-0 rounded-md px-2 py-1 text-[10.5px] font-extrabold capitalize" style={{ background: chip.bg, color: chip.fg }}>
-          {trap.difficulty}
-        </span>
-        <ChevronRight size={15} className="shrink-0" style={{ color: RD.muted }} />
       </Link>
     );
   };
 
-  return (
-    <div className="-m-4 min-h-screen px-3 pt-3 md:-m-6 md:px-6 md:pt-6 md:pb-12 pb-[calc(7.5rem+env(safe-area-inset-bottom))]" style={{ background: RD.bg, color: RD.text }}>
-      <div className="mx-auto grid w-full max-w-[760px] gap-3">
-        <div className="px-1">
-          <h1 className="text-[24px] font-extrabold tracking-tight">Chess Traps</h1>
-          <p className="mt-1 text-[13px]" style={{ color: RD.muted }}>Learn the classics from both sides — how to set them, and how to spot them coming.</p>
-        </div>
+  const grouped = tab === 'category' ? groupBy((t) => t.category) : tab === 'level' ? groupBy((t) => t.difficulty[0].toUpperCase() + t.difficulty.slice(1)) : null;
 
-        <div className="flex items-center gap-1.5 rounded-[14px] p-1" style={{ background: RD.cardSolid, border: `1px solid ${RD.border}` }}>
-          {([['all', 'All'], ['category', 'By Category']] as const).map(([id, label]) => {
+  return (
+    <div className="-m-4 min-h-screen px-3 md:-m-6 md:px-6 md:pt-6 md:pb-12 pb-[calc(7.5rem+env(safe-area-inset-bottom))]" style={{ background: RD.bg, color: RD.text }}>
+      <div className="mx-auto w-full max-w-[640px]">
+        <RedesignHeader title="Chess Traps" icon={<Crosshair size={24} />} />
+
+        <div className="grid grid-cols-3 gap-1 rounded-[16px] p-1" style={{ background: RD.cardSolid, border: `1px solid ${RD.border}` }}>
+          {([['all', 'All'], ['category', 'By Category'], ['level', 'By Level']] as const).map(([id, label]) => {
             const active = tab === id;
             return (
-              <button
-                key={id}
-                onClick={() => setTab(id)}
-                className="flex-1 rounded-[10px] py-2 text-[13px] font-bold transition-colors"
-                style={active ? { background: 'rgba(139,234,69,.10)', color: RD.green, boxShadow: `inset 0 0 0 1px ${RD.green}` } : { background: 'transparent', color: RD.muted }}
-              >
+              <button key={id} onClick={() => setTab(id)} className="rounded-[12px] py-2.5 text-[13.5px] font-bold transition-colors"
+                style={active ? { background: 'rgba(139,234,69,.10)', color: RD.text, boxShadow: `inset 0 0 0 1.5px ${RD.green}` } : { background: 'transparent', color: RD.muted }}>
                 {label}
               </button>
             );
           })}
         </div>
 
-        {loading ? (
-          <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin" style={{ color: RD.green }} /></div>
-        ) : traps.length === 0 ? (
-          <div className="rounded-[20px] p-8 text-center text-[13px]" style={{ background: RD.card, border: `1px solid ${RD.border}`, color: RD.muted }}>No traps added yet.</div>
-        ) : tab === 'all' ? (
-          <section className="overflow-hidden rounded-[20px]" style={{ background: RD.card, border: `1px solid ${RD.border}` }}>
-            {traps.map(renderRow)}
-          </section>
-        ) : (
-          (Object.entries(grouped) as [string, TrapSummary[]][]).map(([category, list]) => (
-            <section key={category} className="overflow-hidden rounded-[20px]" style={{ background: RD.card, border: `1px solid ${RD.border}` }}>
-              <p className="px-4 pb-1 pt-3.5 text-[11px] font-extrabold uppercase tracking-[.14em]" style={{ color: RD.muted }}>{category}</p>
-              {list.map(renderRow)}
-            </section>
-          ))
-        )}
+        <div className="mt-3 grid gap-2.5">
+          {loading ? (
+            <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin" style={{ color: RD.green }} /></div>
+          ) : traps.length === 0 ? (
+            <div className="rounded-[20px] p-8 text-center text-[13px]" style={{ background: RD.card, border: `1px solid ${RD.border}`, color: RD.muted }}>No traps added yet.</div>
+          ) : grouped ? (
+            (Object.entries(grouped) as [string, TrapSummary[]][]).map(([name, list]) => (
+              <div key={name} className="grid gap-2.5">
+                <p className="mt-2 px-1 text-[11.5px] font-extrabold uppercase tracking-[.14em]" style={{ color: RD.muted }}>{name}</p>
+                {list.map(row)}
+              </div>
+            ))
+          ) : traps.map(row)}
+        </div>
       </div>
     </div>
   );

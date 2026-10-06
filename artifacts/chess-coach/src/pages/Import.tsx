@@ -2,10 +2,11 @@ import React, { useState, useRef, useEffect } from 'react';
 import { PieceTile } from '@/components/DesignSystem';
 import { useDashboardRedesignFlag } from '@/hooks/use-app-config';
 import { RD } from '@/lib/redesignTheme';
+import { RedesignHeader } from '@/components/RedesignHeader';
 import { useUser } from '@/hooks/use-user';
 import { invalidateEloCache } from '@/hooks/use-elo-progress';
 import { motion } from 'framer-motion';
-import { CloudDownload, CheckCircle2, AlertCircle, RefreshCw, ArrowRight, Edit3, Check, X, FileUp } from 'lucide-react';
+import { CloudDownload, CheckCircle2, AlertCircle, RefreshCw, ArrowRight, Edit3, Check, X, FileUp, History } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
 import { apiFetch } from '@/lib/api';
 import { cn } from '@/lib/utils';
@@ -33,6 +34,7 @@ export function Import() {
   const [pgnResult, setPgnResult] = useState<PgnSummary | null>(null);
   const [pgnDrag, setPgnDrag] = useState(false);
   const fileRef = useRef<HTMLInputElement | null>(null);
+  const [sourceOpen, setSourceOpen] = useState(false);
 
   const [editing, setEditing] = useState(false);
   const [editValue, setEditValue] = useState('');
@@ -482,101 +484,105 @@ export function Import() {
         );
 
   if (redesign) {
-    const sources: { id: Platform; label: string; linked: string | null | undefined; icon: React.ReactNode }[] = [
-      { id: 'chesscom', label: 'Chess.com', linked: username, icon: <img src="https://images.chesscomfiles.com/uploads/v1/images_users/tiny_mce/SamCopeland/phpmeXx6V.png" alt="" className="h-5 w-5 rounded-sm" /> },
-      { id: 'lichess', label: 'Lichess', linked: authUser?.lichessUsername, icon: <svg viewBox="0 0 50 50" className="w-5 h-5" fill="currentColor"><path d="M11.8 33.5c0-6.9 3.9-9.6 6.4-12.5L23 15.5l-4.6-8.5c-.5-1-1.7-1.6-2.8-1.3l-2.1.7C8 8.3 3.3 13.7 3.3 20.5c0 2.2.5 4.3 1.5 6.2l7 6.8zM38.3 17.6c-1.3-4.3-4.3-7.8-8.3-9.8l-5.1 5.2 4.5 7.8c2.7 2.8 6.8 5.5 6.8 12.7 0 1.2-.2 2.3-.5 3.4l5.9-5c1.5-2.5 2.4-5.5 2.4-8.5 0-2-.3-3.9-1-5.7l-4.7.1z"/><path d="M25 44.1c-4.3 0-8.2-1.7-11-4.5l-2.2 1.4c3.6 4 8.7 6.5 14.4 6.5 5.2 0 10-2.1 13.4-5.6l-2.3-1.5c-3 2.3-6.4 3.7-10.2 3.7h-2.1z"/></svg> },
+    // Import Games (redesign): source cards reveal the real import form (the
+    // same one the classic page uses) only once a source is tapped; the PGN
+    // upload zone sits below.
+    const sources: { id: Platform; label: string; icon: React.ReactNode; tile: boolean }[] = [
+      { id: 'chesscom', label: 'Chess.com', tile: true, icon: <span className="text-[34px] leading-none" style={{ color: RD.green }}>♞</span> },
+      { id: 'lichess', label: 'Lichess', tile: false, icon: <svg viewBox="0 0 50 50" className="h-9 w-9" fill="currentColor"><path d="M11.8 33.5c0-6.9 3.9-9.6 6.4-12.5L23 15.5l-4.6-8.5c-.5-1-1.7-1.6-2.8-1.3l-2.1.7C8 8.3 3.3 13.7 3.3 20.5c0 2.2.5 4.3 1.5 6.2l7 6.8zM38.3 17.6c-1.3-4.3-4.3-7.8-8.3-9.8l-5.1 5.2 4.5 7.8c2.7 2.8 6.8 5.5 6.8 12.7 0 1.2-.2 2.3-.5 3.4l5.9-5c1.5-2.5 2.4-5.5 2.4-8.5 0-2-.3-3.9-1-5.7l-4.7.1z"/><path d="M25 44.1c-4.3 0-8.2-1.7-11-4.5l-2.2 1.4c3.6 4 8.7 6.5 14.4 6.5 5.2 0 10-2.1 13.4-5.6l-2.3-1.5c-3 2.3-6.4 3.7-10.2 3.7h-2.1z"/></svg> },
     ];
+    const card = { background: RD.card, border: `1px solid ${RD.border}` } as const;
     return (
-      <div className="-m-4 min-h-screen px-3 pt-3 md:-m-6 md:px-6 md:pt-6 md:pb-12 pb-[calc(7.5rem+env(safe-area-inset-bottom))]" style={{ background: RD.bg, color: RD.text }}>
-        <div className="mx-auto grid w-full max-w-[560px] gap-3">
-          <div className="px-1 pt-2 text-center">
-            <h1 className="text-[26px] font-extrabold tracking-tight">Add your games</h1>
-            <p className="mt-1 text-[13.5px]" style={{ color: RD.muted }}>Get a deeper analysis and improve faster.</p>
-          </div>
+      <div className="-m-4 min-h-screen px-3 md:-m-6 md:px-6 md:pt-6 md:pb-12 pb-[calc(7.5rem+env(safe-area-inset-bottom))]" style={{ background: RD.bg, color: RD.text }}>
+        <div className="mx-auto w-full max-w-[600px]">
+          <RedesignHeader title="Import Games" backHref="/games" right={<Link href="/games" aria-label="Your games" className="grid h-9 w-9 place-items-center rounded-full"><History size={20} /></Link>} />
 
-          <div className="grid grid-cols-2 gap-3">
-            {sources.map((src) => {
-              const active = platform === src.id;
-              return (
-                <button
-                  key={src.id}
-                  onClick={() => { setPlatform(src.id); handleReset(); }}
-                  className="flex items-center gap-3 rounded-[18px] p-3.5 text-left transition-colors"
-                  style={{ background: active ? 'rgba(139,234,69,.07)' : RD.card, border: `1px solid ${active ? RD.green : RD.border}`, boxShadow: active ? '0 0 0 1px rgba(139,234,69,.25)' : undefined }}
-                  aria-pressed={active}
-                >
-                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[12px]" style={{ background: 'rgba(255,255,255,.07)', color: RD.text }}>{src.icon}</span>
-                  <span className="min-w-0">
-                    <b className="block text-[14px] font-bold">{src.label}</b>
-                    <span className="block truncate text-[11.5px]" style={{ color: RD.muted }}>{src.linked ? src.linked : 'Import your games'}</span>
-                  </span>
-                </button>
-              );
-            })}
-          </div>
+          <section className="rounded-[22px] p-4" style={card}>
+            <div className="px-2 pb-4 pt-2 text-center">
+              <h2 className="text-[30px] font-extrabold leading-tight tracking-tight">Add your games</h2>
+              <p className="mt-2 text-[15px]" style={{ color: 'rgba(245,247,246,.82)' }}>Get a deeper analysis and improve faster.</p>
+            </div>
 
-          <section className="rounded-[20px] p-4" style={{ background: RD.card, border: `1px solid ${RD.border}` }}>
-            <div className="text-left">{resultOrForm}</div>
-          </section>
+            <div className="grid grid-cols-2 gap-3">
+              {sources.map((src) => {
+                const active = sourceOpen && platform === src.id;
+                const linked = src.id === 'chesscom' ? username : authUser?.lichessUsername;
+                return (
+                  <button
+                    key={src.id}
+                    onClick={() => { setPlatform(src.id); handleReset(); setSourceOpen(true); }}
+                    aria-pressed={active}
+                    className="flex items-center gap-3 rounded-[18px] p-3 text-left transition-colors"
+                    style={{ background: active ? 'rgba(139,234,69,.08)' : 'rgba(255,255,255,.04)', border: `1px solid ${active ? RD.green : RD.border}` }}
+                  >
+                    <span className="grid h-[58px] w-[58px] shrink-0 place-items-center rounded-[14px]" style={{ background: src.tile ? 'rgba(139,234,69,.16)' : 'transparent', color: RD.text }}>{src.icon}</span>
+                    <span className="min-w-0">
+                      <b className="block text-[16px] font-extrabold">{src.label}</b>
+                      <span className="block truncate text-[12.5px]" style={{ color: RD.muted }}>{linked ? linked : 'Import your games'}</span>
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
 
-          <div className="flex items-center gap-3 px-2 text-[12px]" style={{ color: RD.muted }}>
-            <span className="h-px flex-1" style={{ background: RD.border }} />or<span className="h-px flex-1" style={{ background: RD.border }} />
-          </div>
-
-          <input
-            ref={fileRef}
-            type="file"
-            accept=".pgn,text/plain,application/x-chess-pgn"
-            className="hidden"
-            onChange={(e) => { void handlePgnFile(e.target.files?.[0]); e.target.value = ''; }}
-          />
-          <button
-            type="button"
-            onClick={() => fileRef.current?.click()}
-            onDragOver={(e) => { e.preventDefault(); setPgnDrag(true); }}
-            onDragLeave={() => setPgnDrag(false)}
-            onDrop={(e) => { e.preventDefault(); setPgnDrag(false); void handlePgnFile(e.dataTransfer.files?.[0]); }}
-            disabled={pgnBusy}
-            className="flex flex-col items-center gap-2 rounded-[20px] px-4 py-7 text-center transition-colors disabled:opacity-60"
-            style={{ background: pgnDrag ? 'rgba(139,234,69,.06)' : 'transparent', border: `1.5px dashed ${pgnDrag ? RD.green : 'rgba(255,255,255,.18)'}` }}
-          >
-            {pgnBusy ? (
-              <div className="h-6 w-6 animate-spin rounded-full border-2" style={{ borderColor: RD.green, borderTopColor: 'transparent' }} />
-            ) : (
-              <FileUp size={26} style={{ color: RD.text }} />
+            {sourceOpen && (
+              <div className="mt-4 rounded-[18px] p-4 text-left" style={{ background: 'rgba(0,0,0,.25)', border: `1px solid ${RD.border}` }}>{resultOrForm}</div>
             )}
-            <b className="text-[16px] font-bold">{pgnBusy ? 'Importing games…' : 'Upload PGN File'}</b>
-            <span className="text-[12.5px]" style={{ color: RD.muted }}>Drag and drop or choose a file</span>
-          </button>
 
-          {pgnError && (
-            <div className="flex items-start gap-3 rounded-[14px] p-3.5 text-[13px]" style={{ background: 'rgba(255,80,88,.10)', border: '1px solid rgba(255,80,88,.30)', color: '#FF9DA2' }}>
-              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-              <p className="break-words">{pgnError}</p>
+            <div className="my-4 flex items-center gap-3 text-[13px]" style={{ color: RD.muted }}>
+              <span className="h-px flex-1" style={{ background: RD.border }} />or<span className="h-px flex-1" style={{ background: RD.border }} />
             </div>
-          )}
 
-          {pgnResult && (
-            <div className="rounded-[14px] p-4 text-[13px]" style={{ background: 'rgba(139,234,69,.07)', border: '1px solid rgba(139,234,69,.28)' }}>
-              <p className="flex items-center gap-2 text-[14px] font-bold" style={{ color: RD.green }}>
-                <CheckCircle2 className="h-4 w-4" />
-                {pgnResult.imported > 0 ? `Added ${pgnResult.imported} game${pgnResult.imported === 1 ? '' : 's'} to your library` : 'No new games added'}
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".pgn,text/plain,application/x-chess-pgn"
+              className="hidden"
+              onChange={(e) => { void handlePgnFile(e.target.files?.[0]); e.target.value = ''; }}
+            />
+            <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
+              onDragOver={(e) => { e.preventDefault(); setPgnDrag(true); }}
+              onDragLeave={() => setPgnDrag(false)}
+              onDrop={(e) => { e.preventDefault(); setPgnDrag(false); void handlePgnFile(e.dataTransfer.files?.[0]); }}
+              disabled={pgnBusy}
+              className="flex min-h-[210px] w-full flex-col items-center justify-center gap-2.5 rounded-[20px] px-4 text-center transition-colors disabled:opacity-60"
+              style={{ background: pgnDrag ? 'rgba(139,234,69,.06)' : 'rgba(255,255,255,.02)', border: `1.5px dashed ${pgnDrag ? RD.green : 'rgba(255,255,255,.35)'}` }}
+            >
+              {pgnBusy ? <div className="h-8 w-8 animate-spin rounded-full border-2" style={{ borderColor: RD.green, borderTopColor: 'transparent' }} /> : <FileUp size={34} style={{ color: RD.text }} />}
+              <b className="text-[21px] font-extrabold">{pgnBusy ? 'Importing games…' : 'Upload PGN File'}</b>
+              <span className="text-[14.5px]" style={{ color: 'rgba(245,247,246,.8)' }}>Drag and drop or choose a file</span>
+            </button>
+
+            {pgnError && (
+              <div className="mt-3 flex items-start gap-3 rounded-[14px] p-3.5 text-[13px]" style={{ background: 'rgba(255,80,88,.10)', border: '1px solid rgba(255,80,88,.30)', color: '#FF9DA2' }}>
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /><p className="break-words">{pgnError}</p>
+              </div>
+            )}
+            {pgnResult && (
+              <div className="mt-3 rounded-[14px] p-4 text-[13px]" style={{ background: 'rgba(139,234,69,.07)', border: '1px solid rgba(139,234,69,.28)' }}>
+                <p className="flex items-center gap-2 text-[14px] font-bold" style={{ color: RD.green }}>
+                  <CheckCircle2 className="h-4 w-4" />
+                  {pgnResult.imported > 0 ? `Added ${pgnResult.imported} game${pgnResult.imported === 1 ? '' : 's'} to your library` : 'No new games added'}
+                </p>
+                <ul className="mt-2 space-y-1" style={{ color: RD.muted }}>
+                  {pgnResult.duplicates > 0 && <li>{pgnResult.duplicates} already in your library</li>}
+                  {pgnResult.notYours > 0 && <li>{pgnResult.notYours} skipped — neither player matched your linked Chess.com/Lichess username</li>}
+                  {pgnResult.unfinished > 0 && <li>{pgnResult.unfinished} skipped — unfinished game (no result)</li>}
+                  {pgnResult.invalid > 0 && <li>{pgnResult.invalid} couldn&apos;t be read as a valid game</li>}
+                </ul>
+                {pgnResult.imported > 0 && <Link href="/games" className="mt-3 inline-flex items-center gap-1.5 font-bold" style={{ color: RD.green }}>Open Games to review them <ArrowRight className="h-4 w-4" /></Link>}
+              </div>
+            )}
+
+            <div className="mt-4 rounded-[16px] px-4 py-3.5" style={{ background: 'rgba(255,255,255,.03)', border: `1px solid ${RD.border}` }}>
+              <p className="text-[14px]" style={{ color: 'rgba(245,247,246,.85)' }}>Supported formats</p>
+              <p className="mt-1.5 flex flex-wrap gap-x-5 gap-y-1 text-[13px]" style={{ color: 'rgba(245,247,246,.75)' }}>
+                <span>• PGN files</span><span>• Chess.com export</span><span>• Lichess export</span>
               </p>
-              <ul className="mt-2 space-y-1" style={{ color: RD.muted }}>
-                {pgnResult.duplicates > 0 && <li>{pgnResult.duplicates} already in your library</li>}
-                {pgnResult.notYours > 0 && <li>{pgnResult.notYours} skipped — neither player matched your linked Chess.com/Lichess username</li>}
-                {pgnResult.unfinished > 0 && <li>{pgnResult.unfinished} skipped — unfinished game (no result)</li>}
-                {pgnResult.invalid > 0 && <li>{pgnResult.invalid} couldn&apos;t be read as a valid game</li>}
-              </ul>
-              {pgnResult.imported > 0 && (
-                <Link href="/games" className="mt-3 inline-flex items-center gap-1.5 font-bold" style={{ color: RD.green }}>Open Games to review them <ArrowRight className="h-4 w-4" /></Link>
-              )}
             </div>
-          )}
-
-          <p className="px-2 text-center text-[11.5px]" style={{ color: RD.muted }}>
-            Supported: .pgn files, including Chess.com and Lichess exports. Games are matched to your linked username so results are recorded from your side.
-          </p>
+          </section>
         </div>
       </div>
     );

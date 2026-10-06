@@ -10,6 +10,7 @@ import {
 import { useMyOpenings, type OpeningStat } from '@/hooks/use-openings';
 import { useDashboardRedesignFlag } from '@/hooks/use-app-config';
 import { RD } from '@/lib/redesignTheme';
+import { RedesignHeader } from '@/components/RedesignHeader';
 
 type SortKey = 'totalGames' | 'winRate' | 'opening' | 'whiteWinRate' | 'blackWinRate';
 type ColorFilter = 'all' | 'white' | 'black';
@@ -44,7 +45,7 @@ export function Openings() {
   const [sortAsc, setSortAsc] = useState(false);
   const [colorFilter, setColorFilter] = useState<ColorFilter>('all');
   const { enabled: redesign } = useDashboardRedesignFlag();
-  const [tab, setTab] = useState<'played' | 'best' | 'needs'>('played');
+  const [tab, setTab] = useState<'foryou' | 'popular' | 'repertoire'>('foryou');
 
   const openings = data?.openings ?? [];
   const totalGames = data?.totalGames ?? 0;
@@ -94,129 +95,96 @@ export function Openings() {
   );
 
   if (redesign) {
-    // Redesigned layout. Everything shown is the user's own per-opening
-    // stats. The mockup's "Popular" and "For You" tabs would need a
-    // catalogue of openings the user hasn't played; none exists here, so
-    // the tabs are real slices of the user's own data instead.
+    // Openings Trainer (redesign). Everything shown is the player's own
+    // per-opening record. The mockup's tabs map onto real slices of it:
+    //   For You       -> openings that need the most work (lowest win rate, 3+ games)
+    //   Popular       -> the openings you play most
+    //   My Repertoire -> all your openings, best results first
+    // The thumbnails are decorative artwork (supplied), cycled by opening.
     const q = search.trim().toLowerCase();
-    const base = openings.filter(o => {
-      if (colorFilter === 'white' && o.white.games === 0) return false;
-      if (colorFilter === 'black' && o.black.games === 0) return false;
-      return !q || o.opening.toLowerCase().includes(q) || (o.eco?.toLowerCase().includes(q) ?? false);
-    });
+    const base = openings.filter(o => !q || o.opening.toLowerCase().includes(q) || (o.eco?.toLowerCase().includes(q) ?? false));
     const rated = base.filter(o => o.totalGames >= 3);
-    const list = tab === 'best'
-      ? [...rated].sort((a, b) => b.winRate - a.winRate)
-      : tab === 'needs'
-        ? [...rated].sort((a, b) => a.winRate - b.winRate)
-        : [...base].sort((a, b) => b.totalGames - a.totalGames);
+    const list = tab === 'foryou'
+      ? [...rated].sort((a, b) => a.winRate - b.winRate)
+      : tab === 'popular'
+        ? [...base].sort((a, b) => b.totalGames - a.totalGames)
+        : [...base].sort((a, b) => b.winRate - a.winRate || b.totalGames - a.totalGames);
     const TABS: { id: typeof tab; label: string }[] = [
-      { id: 'played', label: 'Most Played' },
-      { id: 'best', label: 'Best Results' },
-      { id: 'needs', label: 'Needs Work' },
+      { id: 'foryou', label: 'For You' },
+      { id: 'popular', label: 'Popular' },
+      { id: 'repertoire', label: 'My Repertoire' },
     ];
-    const rateColor = (r: number) => (r >= 55 ? RD.green : r >= 45 ? RD.gold : RD.red);
+    const thumb = (name: string) => `${import.meta.env.BASE_URL}assets/openings/thumb-${[...name].reduce((n, c) => n + c.charCodeAt(0), 0) % 6}.webp`;
 
     return (
-      <div className="-m-4 min-h-screen px-3 pt-3 md:-m-6 md:px-6 md:pt-6 md:pb-12 pb-[calc(7.5rem+env(safe-area-inset-bottom))]" style={{ background: RD.bg, color: RD.text }}>
-        <div className="mx-auto grid w-full max-w-[760px] gap-3">
-          <div className="px-1">
-            <h1 className="text-[24px] font-extrabold tracking-tight">Openings</h1>
-            <p className="mt-1 text-[13px]" style={{ color: RD.muted }}>{totalGames.toLocaleString()} games analysed · tap an opening to see its stats and practise it</p>
-          </div>
+      <div className="-m-4 min-h-screen px-3 md:-m-6 md:px-6 md:pt-6 md:pb-12 pb-[calc(7.5rem+env(safe-area-inset-bottom))]" style={{ background: RD.bg, color: RD.text }}>
+        <div className="mx-auto w-full max-w-[640px]">
+          <RedesignHeader title="Openings Trainer" icon={<BookOpen size={24} />} />
 
-          <button
-            onClick={() => navigate('/practice?tab=openings')}
-            className="flex items-center justify-center gap-2 rounded-[16px] px-4 py-3.5 text-[14px] font-extrabold transition-transform active:scale-[.99]"
-            style={{ background: `linear-gradient(180deg, ${RD.green}, ${RD.greenDark})`, color: '#05100A', boxShadow: '0 10px 26px -10px rgba(139,234,69,.55)' }}
-          >
-            <BookOpen className="h-4 w-4" /> Practice against the Trainer Bot
-          </button>
-
-          <div className="flex items-center gap-2.5 rounded-[14px] px-3.5" style={{ background: RD.cardSolid, border: `1px solid ${RD.border}` }}>
-            <Search size={17} className="shrink-0" style={{ color: RD.muted }} />
+          <div className="flex items-center gap-3 rounded-[16px] px-4" style={{ background: RD.cardSolid, border: `1px solid ${RD.border}` }}>
+            <Search size={19} className="shrink-0" style={{ color: RD.text }} />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search openings (e.g. Sicilian)"
               aria-label="Search openings"
-              className="h-[46px] min-w-0 flex-1 bg-transparent text-[14px] outline-none placeholder:text-[#87918E]"
+              className="h-[52px] min-w-0 flex-1 bg-transparent text-[15px] outline-none placeholder:text-[#87918E]"
               style={{ color: RD.text }}
             />
           </div>
 
-          <div className="flex items-center gap-1 rounded-[14px] p-1" style={{ background: RD.cardSolid, border: `1px solid ${RD.border}` }}>
+          <div className="mt-3 grid grid-cols-3 gap-1 rounded-[16px] p-1" style={{ background: RD.cardSolid, border: `1px solid ${RD.border}` }}>
             {TABS.map((t) => {
               const active = tab === t.id;
               return (
-                <button
-                  key={t.id}
-                  onClick={() => setTab(t.id)}
-                  className="flex-1 rounded-[10px] py-2 text-[12.5px] font-bold transition-colors"
-                  style={active ? { background: 'rgba(139,234,69,.10)', color: RD.green, boxShadow: `inset 0 0 0 1px ${RD.green}` } : { background: 'transparent', color: RD.muted }}
-                >
+                <button key={t.id} onClick={() => setTab(t.id)} className="rounded-[12px] py-2.5 text-[13.5px] font-bold transition-colors"
+                  style={active ? { background: 'rgba(139,234,69,.10)', color: RD.text, boxShadow: `inset 0 0 0 1.5px ${RD.green}` } : { background: 'transparent', color: RD.muted }}>
                   {t.label}
                 </button>
               );
             })}
           </div>
 
-          <div className="flex gap-1.5 px-1">
-            {(['all', 'white', 'black'] as ColorFilter[]).map((c) => (
-              <button
-                key={c}
-                onClick={() => setColorFilter(c)}
-                className="rounded-full px-3.5 py-1.5 text-[12.5px] font-semibold capitalize transition-colors"
-                style={colorFilter === c
-                  ? { background: RD.green, color: '#05100A', border: `1px solid ${RD.green}` }
-                  : { background: 'transparent', color: RD.muted, border: `1px solid ${RD.border}` }}
-              >
-                {c === 'all' ? 'All colors' : `As ${c}`}
-              </button>
-            ))}
+          <div className="mt-3 grid gap-3">
+            {openings.length === 0 ? (
+              <div className="rounded-[20px] px-6 py-12 text-center" style={{ background: RD.card, border: `1px solid ${RD.border}`, color: RD.muted }}>
+                <p className="text-[15px] font-bold" style={{ color: RD.text }}>No games imported yet</p>
+                <p className="mt-1 text-[13px]">Import your games to see how you do in each opening.</p>
+                <Link href="/import" className="mt-4 inline-block rounded-xl px-4 py-2.5 text-[13px] font-extrabold" style={{ background: RD.green, color: '#05100A' }}>Import games</Link>
+              </div>
+            ) : list.length === 0 ? (
+              <div className="rounded-[20px] px-6 py-10 text-center text-[13px]" style={{ background: RD.card, border: `1px solid ${RD.border}`, color: RD.muted }}>
+                {tab === 'foryou' ? 'Nothing to work on yet — an opening needs at least 3 games to be ranked.' : 'No openings match your search.'}
+              </div>
+            ) : list.map((o) => {
+              const linkParam = encodeURIComponent(o.eco ?? o.opening);
+              return (
+                <Link key={o.opening} href={`/openings/${linkParam}`} className="flex items-stretch overflow-hidden rounded-[18px] transition-transform active:scale-[.99]" style={{ background: RD.card, border: `1px solid ${RD.border}` }}>
+                  <span className="relative w-[104px] shrink-0 overflow-hidden">
+                    <img src={thumb(o.opening)} alt="" loading="lazy" className="absolute inset-0 h-full w-full scale-[1.08] object-cover" />
+                  </span>
+                  <span className="min-w-0 flex-1 px-4 py-3.5">
+                    <b className="block truncate text-[16px] font-extrabold">{o.opening}</b>
+                    <span className="block truncate text-[13px]" style={{ color: RD.muted }}>{o.wins}W {o.draws}D {o.losses}L · {o.totalGames} game{o.totalGames === 1 ? '' : 's'}</span>
+                    <span className="mt-2.5 flex items-center gap-3">
+                      <span className="h-2 flex-1 overflow-hidden rounded-full" style={{ background: 'rgba(255,255,255,.10)' }}>
+                        <span className="block h-full rounded-full" style={{ width: `${Math.max(o.winRate, 4)}%`, background: `linear-gradient(90deg, ${RD.greenDark}, ${RD.green})` }} />
+                      </span>
+                      <b className="w-10 text-right text-[13.5px]">{o.winRate}%</b>
+                    </span>
+                  </span>
+                </Link>
+              );
+            })}
           </div>
 
-          {openings.length === 0 ? (
-            <div className="rounded-[20px] px-6 py-12 text-center" style={{ background: RD.card, border: `1px solid ${RD.border}`, color: RD.muted }}>
-              <BookOpen className="mx-auto mb-3 h-9 w-9 opacity-40" />
-              <p className="text-[15px] font-bold" style={{ color: RD.text }}>No games imported yet</p>
-              <p className="mt-1 text-[13px]">Import your games to see how you do in each opening.</p>
-              <Link href="/import" className="mt-4 inline-block rounded-xl px-4 py-2.5 text-[13px] font-extrabold" style={{ background: RD.green, color: '#05100A' }}>Import games</Link>
-            </div>
-          ) : list.length === 0 ? (
-            <div className="rounded-[20px] px-6 py-10 text-center text-[13px]" style={{ background: RD.card, border: `1px solid ${RD.border}`, color: RD.muted }}>
-              {tab === 'played' ? 'No openings match your search.' : 'Nothing here yet — an opening needs at least 3 games to be ranked.'}
-            </div>
-          ) : (
-            <section className="overflow-hidden rounded-[20px]" style={{ background: RD.card, border: `1px solid ${RD.border}` }}>
-              {list.map((o, i) => {
-                const linkParam = encodeURIComponent(o.eco ?? o.opening);
-                return (
-                  <Link
-                    key={o.opening}
-                    href={`/openings/${linkParam}`}
-                    className="flex items-center gap-3 px-4 py-3.5 transition-colors hover:bg-white/[0.03]"
-                    style={{ borderTop: i ? `1px solid ${RD.border}` : undefined }}
-                  >
-                    <span className="grid h-12 w-12 shrink-0 place-items-center rounded-[12px] text-[13px] font-extrabold" style={{ background: 'rgba(255,255,255,.07)', border: `1px solid ${RD.border}`, color: RD.text }}>
-                      {o.eco ?? '♞'}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <b className="block truncate text-[14.5px] font-bold">{o.opening}</b>
-                      <span className="block truncate text-[12px]" style={{ color: RD.muted }}>
-                        {o.totalGames} game{o.totalGames === 1 ? '' : 's'} · {o.wins}W {o.draws}D {o.losses}L
-                      </span>
-                      <div className="mt-1.5 h-1.5 overflow-hidden rounded-full" style={{ background: 'rgba(255,255,255,.08)' }}>
-                        <div className="h-full rounded-full" style={{ width: `${Math.max(o.winRate, 3)}%`, background: rateColor(o.winRate) }} />
-                      </div>
-                    </div>
-                    <b className="w-11 shrink-0 text-right text-[15px] font-extrabold" style={{ color: rateColor(o.winRate) }}>{o.winRate}%</b>
-                    <ChevronRight size={15} className="shrink-0" style={{ color: RD.muted }} />
-                  </Link>
-                );
-              })}
-            </section>
-          )}
+          <button
+            onClick={() => navigate('/practice?tab=openings')}
+            className="mt-4 flex w-full items-center justify-center gap-2 rounded-[16px] py-3.5 text-[14.5px] font-extrabold"
+            style={{ background: `linear-gradient(180deg, ${RD.green}, ${RD.greenDark})`, color: '#05100A', boxShadow: '0 12px 28px -12px rgba(139,234,69,.55)' }}
+          >
+            <BookOpen className="h-4 w-4" /> Practice against the Trainer Bot
+          </button>
         </div>
       </div>
     );

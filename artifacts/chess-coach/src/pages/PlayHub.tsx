@@ -5,6 +5,7 @@ import { BOTS } from '@/lib/chess-bot';
 import { useBotAvatar } from '@/lib/botAvatars';
 import { useUser } from '@/hooks/use-user';
 import { RD } from '@/lib/redesignTheme';
+import { RedesignHeader } from '@/components/RedesignHeader';
 
 // "Play Chess" hub (redesign). Only offers what the app can actually do:
 //  - Play a Bot: the real roster (count and rating range read from BOTS).
@@ -26,12 +27,9 @@ export function PlayHub() {
   ];
 
   return (
-    <div className="-m-4 min-h-screen px-3 pt-3 md:-m-6 md:px-6 md:pt-6 md:pb-12 pb-[calc(7.5rem+env(safe-area-inset-bottom))]" style={{ background: RD.bg, color: RD.text }}>
+    <div className="-m-4 min-h-screen px-3 md:-m-6 md:px-6 md:pt-6 md:pb-12 pb-[calc(7.5rem+env(safe-area-inset-bottom))]" style={{ background: RD.bg, color: RD.text }}>
       <div className="mx-auto grid w-full max-w-[560px] gap-3">
-        <div className="px-1">
-          <h1 className="text-[24px] font-extrabold tracking-tight">Play Chess</h1>
-          <p className="mt-1 text-[13px]" style={{ color: RD.muted }}>Pick an opponent and start a game.</p>
-        </div>
+        <RedesignHeader title="Play Chess" backHref="/" />
 
         <section className="grid gap-3">
           {rows.filter((r) => r.show).map((r) => (

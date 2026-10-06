@@ -7,6 +7,7 @@ import { useMyOpenings } from '@/hooks/use-openings';
 import { useMultiEloProgress } from '@/hooks/use-elo-progress';
 import { useUser } from '@/hooks/use-user';
 import { RD } from '@/lib/redesignTheme';
+import { RedesignHeader } from '@/components/RedesignHeader';
 
 // "My Analytics" (redesign). Every number on this page is real data.
 //
@@ -44,17 +45,19 @@ function Card({ children, className = '' }: { children: React.ReactNode; classNa
   );
 }
 
-function Sparkline({ values, color }: { values: number[]; color: string }) {
-  if (values.length < 2) return <div className="h-10 w-full" />;
+function Sparkline({ values, color, id }: { values: number[]; color: string; id: string }) {
+  if (values.length < 2) return <div className="h-full w-full" />;
   const data = values.map((v, i) => ({ i, v }));
   return (
-    <div className="h-10 w-full">
-      <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={data} margin={{ top: 4, right: 2, bottom: 4, left: 2 }}>
-          <Line type="monotone" dataKey="v" stroke={color} strokeWidth={2.2} dot={false} isAnimationActive={false} />
-        </LineChart>
-      </ResponsiveContainer>
-    </div>
+    <ResponsiveContainer width="100%" height="100%">
+      <AreaChart data={data} margin={{ top: 6, right: 0, bottom: 0, left: 0 }}>
+        <defs>
+          <linearGradient id={id} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={color} stopOpacity={0.45} /><stop offset="100%" stopColor={color} stopOpacity={0.03} /></linearGradient>
+        </defs>
+        <YAxis hide domain={['dataMin', 'dataMax']} />
+        <Area type="monotone" dataKey="v" stroke={color} strokeWidth={2.4} fill={`url(#${id})`} dot={false} isAnimationActive={false} />
+      </AreaChart>
+    </ResponsiveContainer>
   );
 }
 
@@ -129,22 +132,19 @@ export function AnalysisRedesign() {
   const weaknesses = weaknessesData?.weaknesses ?? [];
 
   return (
-    <div className="-m-4 min-h-screen px-3 pt-3 md:-m-6 md:px-6 md:pt-6 md:pb-12 pb-[calc(7.5rem+env(safe-area-inset-bottom))]" style={{ background: RD.bg, color: RD.text }}>
+    <div className="-m-4 min-h-screen px-3 md:-m-6 md:px-6 md:pt-6 md:pb-12 pb-[calc(7.5rem+env(safe-area-inset-bottom))]" style={{ background: RD.bg, color: RD.text }}>
       <div className="mx-auto grid w-full max-w-[760px] gap-3">
-        <div className="px-1">
-          <h1 className="text-[24px] font-extrabold tracking-tight">My Analytics</h1>
-          <p className="mt-1 text-[13px]" style={{ color: RD.muted }}>Patterns, accuracy, and trends across your {summary.totalGames.toLocaleString()} games.</p>
-        </div>
+        <RedesignHeader title="My Analytics" icon={<span className="text-[26px] leading-none">♟</span>} />
 
-        <div className="flex items-center gap-1 rounded-[14px] p-1" style={{ background: RD.cardSolid, border: `1px solid ${RD.border}` }}>
+        <div className="grid grid-cols-4 gap-1 rounded-[16px] p-1" style={{ background: RD.cardSolid, border: `1px solid ${RD.border}` }}>
           {TABS.map((t) => {
             const active = tab === t.id;
             return (
               <button
                 key={t.id}
                 onClick={() => setTab(t.id)}
-                className="flex-1 rounded-[10px] py-2 text-[12.5px] font-bold transition-colors"
-                style={active ? { background: 'rgba(139,234,69,.10)', color: RD.green, boxShadow: `inset 0 0 0 1px ${RD.green}` } : { background: 'transparent', color: RD.muted }}
+                className="rounded-[12px] py-2.5 text-[13px] font-bold transition-colors"
+                style={active ? { background: 'rgba(139,234,69,.10)', color: RD.text, boxShadow: `inset 0 0 0 1.5px ${RD.green}` } : { background: 'transparent', color: RD.muted }}
               >
                 {t.label}
               </button>
@@ -155,69 +155,65 @@ export function AnalysisRedesign() {
         {tab === 'overview' && (
           <>
             <div className="grid grid-cols-2 gap-3">
-              <Card>
-                <p className="text-[12px]" style={{ color: RD.muted }}>Rating</p>
-                <div className="mt-1 flex items-baseline gap-2">
-                  <b className="text-[28px] font-extrabold leading-none">{rating ?? '—'}</b>
+              <Card className="flex items-stretch gap-2 !p-3.5">
+                <div className="shrink-0 self-center">
+                  <p className="text-[12.5px]" style={{ color: RD.muted }}>Rating</p>
+                  <b className="block text-[30px] font-extrabold leading-tight">{rating ?? '—'}</b>
                   <Delta value={ratingDelta} />
                 </div>
-                <div className="mt-2"><Sparkline values={ratingSpark} color={RD.green} /></div>
+                <div className="min-h-[62px] min-w-0 flex-1"><Sparkline id="rdRatingSpark" values={ratingSpark} color={RD.green} /></div>
               </Card>
-              <Card>
-                <p className="text-[12px]" style={{ color: RD.muted }}>Win Rate</p>
-                <div className="mt-1 flex items-baseline gap-2">
-                  <b className="text-[28px] font-extrabold leading-none">{decided > 0 ? `${winRate.toFixed(1)}%` : '—'}</b>
+              <Card className="flex items-stretch gap-2 !p-3.5">
+                <div className="shrink-0 self-center">
+                  <p className="text-[12.5px]" style={{ color: RD.muted }}>Win Rate</p>
+                  <b className="block text-[26px] font-extrabold leading-tight">{decided > 0 ? `${winRate.toFixed(1)}%` : '—'}</b>
                   <Delta value={winDelta} suffix="%" />
                 </div>
-                <div className="mt-2"><Sparkline values={monthly.map((m) => m.winPct)} color={RD.green} /></div>
+                <div className="min-h-[62px] min-w-0 flex-1"><Sparkline id="rdWinSpark" values={monthly.map((m) => m.winPct)} color={RD.green} /></div>
               </Card>
             </div>
 
-            <Card>
-              <h2 className="mb-3 text-[16px] font-extrabold">Results Breakdown</h2>
-              <div className="flex items-center gap-5">
-                <div className="grid h-[118px] w-[118px] shrink-0 place-items-center rounded-full" style={{ background: decided > 0 ? donut : RD.cardLight }}>
-                  <div className="grid h-[84px] w-[84px] place-items-center rounded-full text-center" style={{ background: RD.cardSolid }}>
+            <section>
+              <h2 className="mb-2 px-1 text-[17px] font-extrabold">Results Breakdown</h2>
+              <div className="flex items-center gap-4 px-1">
+                <div className="grid h-[150px] w-[150px] shrink-0 place-items-center rounded-full" style={{ background: decided > 0 ? donut : RD.cardLight }}>
+                  <div className="grid h-[96px] w-[96px] place-items-center rounded-full text-center" style={{ background: RD.bg }}>
                     <div>
-                      <b className="block text-[20px] font-extrabold leading-none">{decided.toLocaleString()}</b>
-                      <span className="text-[10px]" style={{ color: RD.muted }}>Total</span>
+                      <b className="block text-[26px] font-extrabold leading-none">{decided.toLocaleString()}</b>
+                      <span className="text-[12px]" style={{ color: RD.muted }}>Total</span>
                     </div>
                   </div>
                 </div>
-                <div className="grid flex-1 gap-2">
+                <div className="grid flex-1 gap-2.5">
                   {legend.map((l) => (
-                    <div key={l.label} className="flex items-center gap-2 text-[13px]">
-                      <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: l.color }} />
-                      <span className="flex-1" style={{ color: RD.muted }}>{l.label}</span>
-                      <b>{l.n.toLocaleString()}</b>
-                      <span className="w-10 text-right text-[12px]" style={{ color: RD.muted }}>{pct(l.n).toFixed(0)}%</span>
+                    <div key={l.label} className="flex items-center gap-2.5 text-[13.5px]">
+                      <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: l.color }} />
+                      <span className="flex-1" style={{ color: 'rgba(245,247,246,.85)' }}>{l.label}</span>
+                      <b>{pct(l.n).toFixed(0)}%</b>
                     </div>
                   ))}
                 </div>
               </div>
-            </Card>
+            </section>
 
             {phases.length > 0 && (
-              <Card>
-                <div className="mb-3 flex items-center justify-between">
-                  <h2 className="text-[16px] font-extrabold">Accuracy by Phase</h2>
-                  <span className="text-[11px]" style={{ color: RD.muted }}>{summary.phaseAccuracy!.gamesAnalyzed} reviewed game{summary.phaseAccuracy!.gamesAnalyzed === 1 ? '' : 's'}</span>
+              <section>
+                <div className="mb-2 flex items-baseline justify-between px-1">
+                  <h2 className="text-[17px] font-extrabold">Accuracy by Phase</h2>
+                  <span className="text-[11.5px]" style={{ color: RD.muted }}>{summary.phaseAccuracy!.gamesAnalyzed} reviewed game{summary.phaseAccuracy!.gamesAnalyzed === 1 ? '' : 's'}</span>
                 </div>
-                <div className="grid gap-3">
-                  {phases.map((p) => (
-                    <div key={p.label}>
-                      <div className="mb-1 flex items-center justify-between text-[13px]">
-                        <span>{p.label}</span>
-                        <b>{p.moves > 0 ? `${p.accuracy}%` : '—'}</b>
+                <div className="grid gap-2.5">
+                  {phases.map((ph) => (
+                    <div key={ph.label} className="flex items-center gap-3">
+                      <div className="relative h-[36px] flex-1 overflow-hidden rounded-[9px]" style={{ background: 'rgba(255,255,255,.06)' }}>
+                        <div className="absolute inset-y-0 left-0 rounded-[9px]" style={{ width: `${ph.moves > 0 ? Math.max(ph.accuracy, 10) : 0}%`, background: `linear-gradient(90deg, ${RD.greenDark}, ${RD.green})` }} />
+                        <span className="relative z-10 flex h-full items-center px-3 text-[14px] font-bold text-white" style={{ textShadow: '0 1px 2px rgba(0,0,0,.65)' }}>{ph.label}</span>
                       </div>
-                      <div className="h-2 overflow-hidden rounded-full" style={{ background: 'rgba(255,255,255,.08)' }}>
-                        <div className="h-full rounded-full" style={{ width: `${p.moves > 0 ? Math.max(p.accuracy, 3) : 0}%`, background: `linear-gradient(90deg, ${RD.greenDark}, ${RD.green})` }} />
-                      </div>
-                      <span className="text-[11px]" style={{ color: RD.muted }}>{p.moves.toLocaleString()} moves</span>
+                      <b className="w-12 text-right text-[14px]" style={{ color: RD.green }}>{ph.moves > 0 ? `${ph.accuracy}%` : '—'}</b>
                     </div>
                   ))}
                 </div>
-              </Card>
+              </section>
             )}
           </>
         )}

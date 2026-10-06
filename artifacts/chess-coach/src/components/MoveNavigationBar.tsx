@@ -19,7 +19,8 @@ interface MoveNavigationBarProps {
   // as a second row of small icon buttons below the core transport
   // controls, so each page can keep its own actions without every page
   // needing to hand-build the whole bar from scratch.
-  extra?: React.ReactNode;
+  extra?: React.ReactNode;  /** 'redesign' renders the wide five-button row from the redesign mockups */
+  variant?: 'redesign';
 }
 
 // One shared control cluster for all three move-by-move players (Game
@@ -32,8 +33,27 @@ interface MoveNavigationBarProps {
 // intentional transport control rather than a row of leftover icons.
 export function MoveNavigationBar({
   isPlaying, onFirst, onPrev, onPlayPause, onNext, onLast,
-  canGoBack = true, canGoForward = true, extra,
+  canGoBack = true, canGoForward = true, extra, variant,
 }: MoveNavigationBarProps) {
+  if (variant === 'redesign') {
+    // Five wide rounded buttons across the row (redesign mockup)
+    const wide = (onClick: () => void, disabled: boolean, icon: React.ReactNode, label: string) => (
+      <button onClick={onClick} disabled={disabled} aria-label={label}
+        className="flex h-[58px] items-center justify-center rounded-[14px] transition-transform active:scale-95 disabled:opacity-30"
+        style={{ background: 'var(--cs-bg-card, #0D1516)', border: '1px solid var(--cs-border, rgba(255,255,255,.08))', color: TEXT_LIGHT }}>
+        {icon}
+      </button>
+    );
+    return (
+      <div className="grid w-full grid-cols-5 gap-2.5">
+        {wide(onFirst, !canGoBack, <ChevronsLeft className="h-[22px] w-[22px]" />, 'Go to start')}
+        {wide(onPrev, !canGoBack, <ChevronLeft className="h-[22px] w-[22px]" />, 'Previous move')}
+        {wide(onPlayPause, false, isPlaying ? <Pause className="h-6 w-6" fill="currentColor" style={{ color: GREEN }} /> : <Play className="h-6 w-6" fill="currentColor" style={{ color: GREEN }} />, isPlaying ? 'Pause' : 'Play')}
+        {wide(onNext, !canGoForward, <ChevronRight className="h-[22px] w-[22px]" />, 'Next move')}
+        {wide(onLast, !canGoForward, <ChevronsRight className="h-[22px] w-[22px]" />, 'Go to end')}
+      </div>
+    );
+  }
   const navBtn = (onClick: () => void, disabled: boolean, icon: React.ReactNode, label: string) => (
     <button
       onClick={onClick}

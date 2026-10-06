@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useDashboardRedesignFlag } from '@/hooks/use-app-config';
+import { RedesignHeader } from '@/components/RedesignHeader';
 import { PieceTile } from '@/components/DesignSystem';
 import { Chess } from 'chess.js';
 import { Chessboard, defaultPieces } from 'react-chessboard';
@@ -484,7 +485,40 @@ export function Puzzles() {
           </linearGradient>
         </defs>
       </svg>
-      <div className="max-w-2xl mx-auto px-4 pt-6">
+      <div className={redesign ? 'max-w-[640px] mx-auto px-3 pb-[calc(7.5rem+env(safe-area-inset-bottom))]' : 'max-w-2xl mx-auto px-4 pt-6'}>
+        {redesign && (
+          <>
+            <RedesignHeader
+              title="Puzzles"
+              icon={<Crown size={24} />}
+              right={<Link href="/puzzles/solved" aria-label="Solved puzzles" className="grid h-9 w-9 place-items-center rounded-full"><Trophy size={20} /></Link>}
+            />
+            <div className="grid grid-cols-3 gap-1 rounded-[16px] p-1 mb-3" style={{ background: 'var(--cs-bg-card, #0D1516)', border: '1px solid var(--cs-border, rgba(255,255,255,.08))' }}>
+              {([['daily', 'Daily'], ['themes', 'Themes'], ['custom', 'Custom']] as const).map(([id, label]) => {
+                const active = ptab === id;
+                return (
+                  <button
+                    key={id}
+                    onClick={() => {
+                      setPtab(id);
+                      // Daily = the plain unfiltered mix, so clear any filters picked in the other tabs
+                      if (id === 'daily') { setPuzzleTheme(''); setSacrificePiece(''); setRatingBand(''); }
+                      if (id === 'themes') setRatingBand('');
+                    }}
+                    className="rounded-[12px] py-2.5 text-[14px] font-bold transition-colors"
+                    style={active
+                      ? { background: 'rgba(139,234,69,.10)', color: '#F5F7F6', boxShadow: 'inset 0 0 0 1.5px var(--cs-green, #8BEA45)' }
+                      : { background: 'transparent', color: TEXT_MUTED }}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+          </>
+        )}
+        {!redesign && (
+        <>
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
             <PieceTile piece="♛" size={44} />
@@ -504,6 +538,8 @@ export function Puzzles() {
         <Link href="/puzzles/solved" className="inline-flex items-center gap-1.5 mb-4 text-xs font-bold" style={{ color: CHESSCOM_GREEN }}>
           View Solved Puzzles Archive
         </Link>
+        </>
+        )}
 
         {targetTheme && (
           <div className="flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-xl mb-4"
@@ -520,42 +556,6 @@ export function Puzzles() {
               Clear
             </button>
           </div>
-        )}
-
-        {redesign && (
-          <>
-            <div className="flex items-center gap-1 rounded-[14px] p-1 mb-3" style={{ background: 'var(--cs-bg-card, #0D1516)', border: '1px solid var(--cs-border, rgba(255,255,255,.08))' }}>
-              {([['daily', 'Daily'], ['themes', 'Themes'], ['custom', 'Custom']] as const).map(([id, label]) => {
-                const active = ptab === id;
-                return (
-                  <button
-                    key={id}
-                    onClick={() => {
-                      setPtab(id);
-                      // Daily = the plain unfiltered mix, so clear any filters picked in the other tabs
-                      if (id === 'daily') { setPuzzleTheme(''); setSacrificePiece(''); setRatingBand(''); }
-                      if (id === 'themes') setRatingBand('');
-                    }}
-                    className="flex-1 rounded-[10px] py-2 text-[13px] font-bold transition-colors"
-                    style={active
-                      ? { background: 'rgba(139,234,69,.10)', color: CHESSCOM_GREEN, boxShadow: 'inset 0 0 0 1px var(--cs-green, #8BEA45)' }
-                      : { background: 'transparent', color: TEXT_MUTED }}
-                  >
-                    {label}
-                  </button>
-                );
-              })}
-            </div>
-            {stats && (
-              <div className="flex items-center justify-between rounded-[16px] px-4 py-3 mb-4" style={{ background: 'var(--cs-bg-card, #0D1516)', border: '1px solid var(--cs-border, rgba(255,255,255,.08))' }}>
-                <div>
-                  <p className="text-[11px] font-bold uppercase tracking-[.14em]" style={{ color: TEXT_MUTED }}>Today&apos;s progress</p>
-                  <p className="text-[15px] font-extrabold" style={{ color: TEXT_LIGHT }}>{stats.todayCount} puzzle{stats.todayCount === 1 ? '' : 's'} solved today</p>
-                </div>
-                <span className="flex items-center gap-1 text-[13px] font-bold" style={{ color: TEXT_MUTED }}><Flame size={15} style={{ color: '#f59e0b' }} />{stats.streak} streak</span>
-              </div>
-            )}
-          </>
         )}
 
         {(!redesign || ptab !== 'daily') && (
@@ -627,7 +627,22 @@ export function Puzzles() {
         )}
 
         {(
-          <>
+          <div
+            className={redesign ? 'rounded-[22px] p-4' : ''}
+            style={redesign ? { background: 'var(--cs-card-gradient, #0D1516)', border: '1px solid var(--cs-border, rgba(255,255,255,.08))' } : undefined}
+          >
+            {redesign && (
+              <div className="mb-3 flex items-center gap-3">
+                <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full" style={{ background: 'rgba(232,180,71,.14)', border: '1px solid rgba(232,180,71,.4)', color: '#E8B447' }}><Trophy size={24} /></span>
+                <div className="min-w-0 flex-1">
+                  <b className="block text-[19px] font-extrabold leading-tight" style={{ color: TEXT_LIGHT }}>{puzzleTheme || targetTheme ? 'Theme Puzzle' : 'Daily Puzzle'}</b>
+                  <span className="text-[13px]" style={{ color: TEXT_MUTED }}>Find the best move</span>
+                </div>
+                {stats && stats.streak > 0 && (
+                  <span className="flex shrink-0 items-center gap-1.5 rounded-[10px] px-2.5 py-1.5 text-[12px] font-extrabold" style={{ background: 'rgba(232,180,71,.14)', border: '1px solid rgba(232,180,71,.35)', color: '#F2C14E' }}><Flame size={14} />Streak: {stats.streak} day{stats.streak === 1 ? '' : 's'}</span>
+                )}
+              </div>
+            )}
             {/* The "X/Y free puzzles today" banner that used to render here
                 is gone -- puzzles have no usage cap anymore, so daily.limit
                 is always null now and this condition can never be true. */}
@@ -892,7 +907,46 @@ export function Puzzles() {
                 <Flame size={15} /> Share your {stats.streak}-day streak
               </button>
             )}
-          </>
+          </div>
+        )}
+
+        {redesign && stats && (
+          <div className="mt-3 flex items-center gap-3.5 rounded-[18px] p-4" style={{ background: 'var(--cs-card-gradient, #0D1516)', border: '1px solid var(--cs-border, rgba(255,255,255,.08))' }}>
+            <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full" style={{ background: 'rgba(139,234,69,.14)', color: 'var(--cs-green, #8BEA45)' }}><Target size={22} /></span>
+            <div className="min-w-0 flex-1">
+              <b className="block text-[15px] font-extrabold" style={{ color: TEXT_LIGHT }}>Today&apos;s Progress</b>
+              <span className="text-[14px]" style={{ color: TEXT_LIGHT }}><b className="text-[18px]">{Math.min(stats.todayCount, 5)} / 5</b> <span style={{ color: TEXT_MUTED }}>puzzles completed{stats.todayCount > 5 ? ` (${stats.todayCount} total)` : ''}</span></span>
+              <div className="mt-2 h-2 overflow-hidden rounded-full" style={{ background: 'rgba(255,255,255,.10)' }}>
+                <div className="h-full rounded-full" style={{ width: `${Math.min(stats.todayCount / 5, 1) * 100}%`, background: 'var(--cs-green, #8BEA45)' }} />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {redesign && (
+          <div className="mt-5">
+            <h2 className="mb-2 px-1 text-[17px] font-extrabold" style={{ color: TEXT_LIGHT }}>Recommended Themes</h2>
+            <div className="grid gap-2">
+              {PUZZLE_TYPE_OPTIONS.filter(o => ['fork', 'pin', 'skewer', 'discoveredAttack', 'sacrifice', 'hangingPiece', 'mateIn2'].includes(o.value)).map((o, i) => {
+                const tint = ['#3B82F6', '#A855F7', '#E8B447', '#22C55E', '#EF4444', '#06B6D4', '#F97316'][i % 7];
+                return (
+                  <button
+                    key={o.value}
+                    onClick={() => { setPtab('themes'); setPuzzleTheme(o.value); if (o.value !== 'sacrifice' && !o.value.startsWith('mateIn')) setSacrificePiece(''); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                    className="flex items-center gap-3.5 rounded-[16px] p-3 text-left"
+                    style={{ background: 'var(--cs-card-gradient, #0D1516)', border: '1px solid var(--cs-border, rgba(255,255,255,.08))' }}
+                  >
+                    <span className="grid h-11 w-11 shrink-0 place-items-center rounded-[12px] text-[20px]" style={{ background: `${tint}33`, color: tint }}>♞</span>
+                    <span className="min-w-0 flex-1">
+                      <b className="block text-[15px] font-bold" style={{ color: TEXT_LIGHT }}>{o.label}</b>
+                      <span className="text-[12.5px]" style={{ color: TEXT_MUTED }}>Practice {o.label.toLowerCase()} puzzles</span>
+                    </span>
+                    <ChevronRight size={17} style={{ color: TEXT_MUTED }} />
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         )}
       </div>
     </div>

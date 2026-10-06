@@ -127,6 +127,11 @@ function SidebarLink({ item, isActive }: { item: typeof ALL_NAV[0]; isActive: bo
 export function Layout({ children, fullscreen }: { children: React.ReactNode; fullscreen?: boolean }) {
   const [location] = useLocation();
   const { enabled: redesign } = useDashboardRedesignFlag();
+  // The redesigned inner screens (games list + game analysis, analysis, puzzles,
+  // openings, traps, import, play hub) draw their own header, as in the mockups,
+  // so Layout's logo bar is skipped there on mobile. Detail pages that weren't
+  // redesigned (an opening, a trap lesson, local play) keep it.
+  const pageOwnsHeader = redesign && /^\/(games|analysis|puzzles|openings|traps|import|play)$|^\/games\/\d+$/.test(location);
   // While the redesign toggle is on, <html> carries `cs-redesign`, which
   // index.css uses to swap the whole app's theme (incl. portaled dialogs).
   // Layout only wraps the signed-in app, so public/marketing pages never get it.
@@ -233,6 +238,7 @@ export function Layout({ children, fullscreen }: { children: React.ReactNode; fu
         </div>
       </aside>
 
+      {!pageOwnsHeader && (
       <header className="md:hidden sticky top-0 z-50 top-nav-safe" style={{ background: BG_SIDEBAR_95 }}>
         {redesign ? (
           <div className="flex items-center justify-between px-4 h-[60px]" style={{ borderBottom: `1px solid ${BORDER_COLOR}`, backdropFilter: 'blur(16px)' }}>
@@ -320,6 +326,7 @@ export function Layout({ children, fullscreen }: { children: React.ReactNode; fu
           )}
         </AnimatePresence>
       </header>
+      )}
 
       <main className="flex-1 min-h-screen overflow-x-hidden pb-20 md:pb-6 md:px-5 md:pt-5">
         <div className="md:max-w-5xl md:mx-auto">
