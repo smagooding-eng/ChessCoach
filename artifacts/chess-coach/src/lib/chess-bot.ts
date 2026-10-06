@@ -1,5 +1,6 @@
 import { Chess } from 'chess.js';
 import { isBookPosition } from './openingBook';
+import { apiFetch } from './api';
 
 const PIECE_VALUES: Record<string, number> = {
   p: 100, n: 320, b: 330, r: 500, q: 900, k: 20000,
@@ -247,10 +248,45 @@ export const BOTS: BotConfig[] = [
   },
 ];
 
+// The built-in search below only looks 1-4 moves ahead with a simple material
+// evaluation, which plays far below 1200+ ratings. Bots at or above this rating
+// get their move from real Stockfish on the server (limited to the bot's rating),
+// and only fall back to the local search if the server can't answer in time.
+const STOCKFISH_MIN_RATING = 1200;
+
+async function serverBotMove(fen: string, elo: number): Promise<string | null> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 6000);
+  try {
+    const res = await apiFetch('/api/bots/move', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fen, elo }),
+      signal: controller.signal,
+    });
+    if (!res.ok) return null;
+    const data = await res.json() as { san?: string };
+    if (!data.san) return null;
+    // Never trust the network blindly: the move must be legal in this exact position.
+    new Chess(fen).move(data.san);
+    return data.san;
+  } catch {
+    return null; // offline, timed out, or an illegal move came back -> local fallback
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export async function getBotMove(fen: string, bot: BotConfig): Promise<string | null> {
   const chess = new Chess(fen);
   const moves = chess.moves();
   if (moves.length === 0) return null;
+
+  if (bot.rating >= STOCKFISH_MIN_RATING) {
+    const engineMove = await serverBotMove(fen, bot.rating);
+    if (engineMove) return engineMove;
+  }
 
   if (Math.random() < bot.blunderRate) {
     return moves[Math.floor(Math.random() * moves.length)];

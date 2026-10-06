@@ -315,6 +315,24 @@ export class StockfishProcess {
     return { cpWhite: bestCp, bestMoveUci, secondBestUci, bestMoveSan, bestLineSan, depth: bestDepth };
   }
 
+  // Best move for a bot opponent: Stockfish with its built-in strength limiter
+  // (UCI_LimitStrength + UCI_Elo), thinking for a short fixed time. Returns the
+  // move in UCI form (e.g. "e2e4"), or null if the engine returned none.
+  async bestMoveAtElo(fen: string, elo: number, movetimeMs: number): Promise<string | null> {
+    if (!this.proc || this.dead) throw new Error("Stockfish not started or dead");
+    // Stockfish ignores UCI_Elo values below its minimum (1320 in recent builds,
+    // 1350 in older ones), so never ask for less than 1350.
+    const clamped = Math.max(1350, Math.min(3190, Math.round(elo)));
+    await this.sendAndWait("setoption name UCI_LimitStrength value true", "");
+    await this.sendAndWait(`setoption name UCI_Elo value ${clamped}`, "");
+    await this.sendAndWait(`position fen ${fen}`, "");
+    await this.sendAndWait("isready", "readyok");
+    const lines = await this.sendAndWait(`go movetime ${Math.round(movetimeMs)}`, "bestmove");
+    const line = lines.find((l) => l.startsWith("bestmove"));
+    const uci = line?.split(" ")[1];
+    return uci && uci !== "(none)" ? uci : null;
+  }
+
   destroy(): void {
     if (this.proc) {
       this.proc.stdin.write("quit\n");
@@ -365,6 +383,37 @@ async function getEngine(): Promise<StockfishProcess> {
   });
   await engineInitPromise;
   return globalEngine!;
+}
+
+// Bots get their OWN engine process (and queue). The shared engine above is used
+// for game review / course generation and must never have a strength limit left
+// switched on, so bot moves can't borrow it.
+let botStockfish: StockfishProcess | null = null;
+let botStockfishInit: Promise<void> | null = null;
+let botQueue: Promise<unknown> = Promise.resolve();
+
+async function getBotStockfish(): Promise<StockfishProcess> {
+  if (botStockfish && !botStockfish["dead"]) return botStockfish;
+  if (botStockfish?.["dead"]) { botStockfish = null; botStockfishInit = null; }
+  if (botStockfishInit) { await botStockfishInit; return botStockfish!; }
+  botStockfish = new StockfishProcess(() => { botStockfish = null; botStockfishInit = null; });
+  botStockfishInit = botStockfish.init().catch((err) => {
+    logger.error({ err }, "Failed to initialize bot Stockfish");
+    botStockfish = null;
+    botStockfishInit = null;
+    throw err;
+  });
+  await botStockfishInit;
+  return botStockfish!;
+}
+
+// UCI move for a bot of the given rating, thinking briefly (longer for stronger bots).
+export function stockfishBotMove(fen: string, elo: number): Promise<string | null> {
+  const movetimeMs = Math.max(200, Math.min(700, 200 + (elo - 1200) * 0.4));
+  const run = async () => (await getBotStockfish()).bestMoveAtElo(fen, elo, movetimeMs);
+  const result = botQueue.then(run, run);
+  botQueue = result.then(() => undefined, () => undefined);
+  return result;
 }
 
 export async function evaluateAllPositions(

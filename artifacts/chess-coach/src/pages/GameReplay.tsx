@@ -945,6 +945,7 @@ export function GameReplay() {
       {redesign && (
         <div className="shrink-0">
           <RedesignHeader
+            dense
             title="Game Analysis"
             backHref="/games"
             right={<Link href="/lookup" aria-label="Look up a game" className="grid h-9 w-9 place-items-center rounded-full"><SearchIcon size={21} /></Link>}
@@ -975,40 +976,23 @@ export function GameReplay() {
             const youWhite = !meBlack;
             const me = youWhite ? { name: game.whiteUsername, rating: game.whiteRating, avatar: whitePlayer?.avatar } : { name: game.blackUsername, rating: game.blackRating, avatar: blackPlayer?.avatar };
             const opp = youWhite ? { name: game.blackUsername, rating: game.blackRating, avatar: blackPlayer?.avatar } : { name: game.whiteUsername, rating: game.whiteRating, avatar: whitePlayer?.avatar };
-            // The replay payload has no date field, so read it from the PGN's own header
-            const dm = game.pgn.match(/\[(?:UTCDate|Date) "(\d{4})\.(\d{2})\.(\d{2})"\]/);
-            const playedOn = dm ? new Date(`${dm[1]}-${dm[2]}-${dm[3]}T12:00:00`).toLocaleDateString() : null;
             const badge = game.result === 'win' ? { t: 'Win', bg: 'rgba(46,125,50,.45)', fg: '#7BE05A' } : game.result === 'loss' ? { t: 'Loss', bg: 'rgba(150,35,45,.55)', fg: '#FF6B73' } : { t: 'Draw', bg: 'rgba(255,255,255,.12)', fg: '#C9D2CF' };
             const av = (a: string | undefined, n: string, ring: string) => a
-              ? <img src={a} alt={n} className="h-[46px] w-[46px] shrink-0 rounded-full object-cover" style={{ border: `2px solid ${ring}` }} />
-              : <span className="grid h-[46px] w-[46px] shrink-0 place-items-center rounded-full text-[22px] font-extrabold" style={{ background: 'rgba(255,255,255,.1)', border: `2px solid ${ring}` }}>{n?.[0]?.toUpperCase()}</span>;
+              ? <img src={a} alt={n} className="h-[34px] w-[34px] shrink-0 rounded-full object-cover" style={{ border: `2px solid ${ring}` }} />
+              : <span className="grid h-[34px] w-[34px] shrink-0 place-items-center rounded-full text-[14px] font-extrabold" style={{ background: 'rgba(255,255,255,.1)', border: `2px solid ${ring}` }}>{n?.[0]?.toUpperCase()}</span>;
             return (
-              <div className="order-[-5] xl:order-none rounded-[20px] p-3" style={{ background: RD.card, border: `1px solid ${RD.border}` }}>
-                <div className="flex items-center">
-                  <div className="flex min-w-0 flex-1 items-center gap-3">
-                    {av(me.avatar, me.name, 'rgba(255,255,255,.7)')}
-                    <div className="min-w-0">
-                      <p className="text-[13px]" style={{ color: RD.muted }}>You ({youWhite ? 'White' : 'Black'})</p>
-                      <b className="block text-[21px] font-extrabold leading-tight">{me.rating}</b>
-                    </div>
-                  </div>
-                  <div className="mx-3 h-12 w-px shrink-0" style={{ background: RD.border }} />
-                  <div className="flex min-w-0 flex-1 items-center gap-3">
-                    {av(opp.avatar, opp.name, 'rgba(255,138,100,.8)')}
-                    <div className="min-w-0">
-                      <p className="text-[13px]" style={{ color: RD.muted }}>Opponent</p>
-                      <b className="block truncate text-[15px] font-extrabold leading-tight">{opp.name}</b>
-                      <span className="text-[17px] font-extrabold">{opp.rating?.toLocaleString()}</span>
-                    </div>
-                  </div>
+              <div className="order-[-5] xl:order-none flex items-center gap-2 rounded-[16px] px-3 py-2" style={{ background: RD.card, border: `1px solid ${RD.border}` }}>
+                {av(me.avatar, me.name, 'rgba(255,255,255,.7)')}
+                <div className="min-w-0 flex-1 leading-tight">
+                  <p className="text-[10.5px]" style={{ color: RD.muted }}>You ({youWhite ? 'White' : 'Black'})</p>
+                  <b className="text-[15px] font-extrabold">{me.rating}</b>
                 </div>
-                <div className="mt-2 flex items-center gap-3">
-                  <span className="rounded-[9px] px-3 py-1.5 text-[14px] font-extrabold" style={{ background: badge.bg, color: badge.fg }}>{badge.t}</span>
-                  <span className="text-[13px]" style={{ color: 'rgba(245,247,246,.8)' }}>
-                    <span className="block">{badge.t}</span>
-                    {playedOn ? `${playedOn} · ` : ''}{maxMoves} moves
-                  </span>
+                <span className="rounded-[7px] px-2 py-1 text-[11px] font-extrabold" style={{ background: badge.bg, color: badge.fg }}>{badge.t}</span>
+                <div className="min-w-0 flex-1 text-right leading-tight">
+                  <p className="truncate text-[10.5px]" style={{ color: RD.muted }}>{opp.name}</p>
+                  <b className="text-[15px] font-extrabold">{opp.rating?.toLocaleString()}</b>
                 </div>
+                {av(opp.avatar, opp.name, 'rgba(255,138,100,.8)')}
               </div>
             );
           })()}
@@ -1022,7 +1006,7 @@ export function GameReplay() {
               ] as const).map(([id, label]) => {
                 const active = gtab === id;
                 return (
-                  <button key={id} onClick={() => setGtab(id)} className="rounded-[12px] py-2.5 text-[13.5px] font-bold transition-colors"
+                  <button key={id} onClick={() => setGtab(id)} className="rounded-[12px] py-2 text-[13.5px] font-bold transition-colors"
                     style={active ? { background: 'rgba(139,234,69,.10)', color: RD.text, boxShadow: `inset 0 0 0 1.5px ${RD.green}` } : { background: 'transparent', color: RD.muted }}>
                     {label}
                   </button>
@@ -1072,7 +1056,7 @@ export function GameReplay() {
               doesn't shift up/down when navigating between bad and good moves. */}
           <div
             className={`mx-auto w-full ${redesign ? '' : 'max-w-[min(100%,52dvh)]'} md:max-w-[min(100%,55dvh)] xl:max-w-none order-[-3] xl:order-none`}
-            style={redesign ? { maxWidth: 'min(100%, max(240px, calc(100dvh - 480px)))' } : undefined}
+            style={redesign ? { maxWidth: 'min(100%, max(220px, calc(100dvh - 520px)))' } : undefined}
           >
             {isBad && currentReview && currentMove > 0 && !practiceMode ? (
               (() => {
@@ -1100,8 +1084,8 @@ export function GameReplay() {
                 {/* Invisible spacer matching MistakeFixView's tab toggle height
                     so the board occupies the same vertical position whether or
                     not the move is classified as bad. */}
-                <div aria-hidden className={`h-[34px] invisible ${redesign ? 'hidden' : ''}`} />
-                <MaterialStrip fen={currentFen} color={flipped ? 'w' : 'b'} className="px-1" />
+                <div aria-hidden className="h-[34px] invisible" />
+                <div className={redesign ? 'hidden md:block' : ''}><MaterialStrip fen={currentFen} color={flipped ? 'w' : 'b'} className="px-1" /></div>
                 <ChessBoard
                   fen={currentFen}
                   flipped={flipped}
@@ -1111,15 +1095,15 @@ export function GameReplay() {
                   lastMove={lastMove}
                   moveQuality={currentReview?.classification ?? null}
                 />
-                <MaterialStrip fen={currentFen} color={flipped ? 'b' : 'w'} className="px-1" />
-                <EvalBar fen={currentFen} />
+                <div className={redesign ? 'hidden md:block' : ''}><MaterialStrip fen={currentFen} color={flipped ? 'b' : 'w'} className="px-1" /></div>
+                <div className={redesign ? 'hidden md:block' : ''}><EvalBar fen={currentFen} /></div>
               </div>
             )}
           </div>
 
           {/* Playback controls */}
           <div
-            className={redesign ? 'order-[-2] xl:order-none sticky bottom-0 z-20 flex w-full flex-col-reverse gap-2 pb-[max(0.25rem,env(safe-area-inset-bottom))] pt-2' : 'glass-card rounded-xl px-1.5 py-1.5 md:p-3 flex items-center justify-between order-[-2] xl:order-none'}
+            className={redesign ? 'order-[-1] xl:order-none sticky bottom-0 z-20 flex w-full flex-col-reverse gap-2 pb-[max(0.25rem,env(safe-area-inset-bottom))] pt-2' : 'glass-card rounded-xl px-1.5 py-1.5 md:p-3 flex items-center justify-between order-[-2] xl:order-none'}
             style={redesign ? { background: 'linear-gradient(180deg, rgba(5,10,11,0) 0%, #050A0B 26%)' } : undefined}
           >
             <MoveNavigationBar
@@ -1219,12 +1203,17 @@ export function GameReplay() {
           )}
 
           {redesign && reviewMoves.length > 0 && (
-            <div className="order-[-1] xl:order-none">
+            <div className="order-1 xl:order-none">
               <MoveTimeline moves={reviewMoves} current={currentMove} onSelect={(ply) => setCurrentMove(ply)} />
             </div>
           )}
 
-          <div className={redesign && gtab !== 'analysis' ? 'hidden' : 'contents'}>
+          <div
+            className={redesign ? (gtab !== 'analysis' ? 'hidden' : 'order-[-2] xl:order-none h-[116px] shrink-0 overflow-y-auto rounded-[16px] xl:h-auto xl:overflow-visible') : 'contents'}
+          >
+            {redesign && currentMove === 0 && reviewMoves.length > 0 && (
+              <p className="px-1 pt-1 text-[13px] leading-snug" style={{ color: RD.muted }}>Step through the game with the buttons below. The coach explains each move here.</p>
+            )}
           {/* Per-move analysis panel — positioned right below controls for easy follow-along */}
           {currentMove > 0 && reviewMoves.length > 0 && (() => {
             const move = moves[currentMove - 1];

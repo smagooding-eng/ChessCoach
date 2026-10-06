@@ -1,15 +1,19 @@
 import { useState } from 'react';
 import { Link } from 'wouter';
 import { ArrowLeft, Check, Save, Trash2, RotateCcw, Star } from 'lucide-react';
+import { useDashboardRedesignFlag } from '@/hooks/use-app-config';
+import { RedesignHeader } from '@/components/RedesignHeader';
+import { RD, REDESIGN_ON } from '@/lib/redesignTheme';
 import {
   useSettings, BOARD_THEMES, BOARD_TEXTURES, PIECE_STYLES, PIECE_SHAPES, BOARD_SIZES, APP_BACKGROUNDS,
   type BoardTheme, type BoardTexture, type PieceStyle, type PieceShape, type BoardSize, type AppBackground, type SavedTheme,
 } from '@/context/SettingsContext';
 
-const CHESSCOM_GREEN = '#81b64c';
-const TEXT_LIGHT = '#e8e6e3';
-const TEXT_MUTED = '#9e9b98';
-const BG_CARD = '#302e2b';
+const CHESSCOM_GREEN = REDESIGN_ON ? RD.green : '#81b64c';
+const TEXT_LIGHT = REDESIGN_ON ? RD.text : '#e8e6e3';
+const TEXT_MUTED = REDESIGN_ON ? RD.muted : '#9e9b98';
+const BG_CARD = REDESIGN_ON ? RD.cardSolid : '#302e2b';
+const SELECTED_BG = REDESIGN_ON ? 'rgba(139,234,69,0.12)' : 'rgba(129,182,76,0.35)';
 
 function SwatchButton({ active, onClick, children, label }: { active: boolean; onClick: () => void; children: React.ReactNode; label: string }) {
   return (
@@ -17,7 +21,7 @@ function SwatchButton({ active, onClick, children, label }: { active: boolean; o
       onClick={onClick}
       className="flex flex-col items-center gap-2 p-3 rounded-xl transition-all"
       style={{
-        background: active ? 'rgba(129,182,76,0.35)' : 'rgba(255,255,255,0.05)',
+        background: active ? SELECTED_BG : 'rgba(255,255,255,0.05)',
         border: active ? `1.5px solid ${CHESSCOM_GREEN}` : '1px solid rgba(255,255,255,0.1)',
       }}
     >
@@ -97,8 +101,26 @@ export default function SettingsPage() {
     setTimeout(() => setDefaultFlash(false), 1500);
   };
 
+  const { enabled: redesign } = useDashboardRedesignFlag();
+
   return (
-    <div className="p-4 md:p-0 max-w-2xl mx-auto space-y-6">
+    <div className={`cs-settings max-w-2xl mx-auto ${redesign ? 'space-y-3 px-3 pb-[calc(7.5rem+env(safe-area-inset-bottom))] md:px-0 md:pb-6' : 'space-y-6 p-4 md:p-0'}`}>
+      {redesign && (
+        <>
+          <RedesignHeader
+            title="Settings"
+            backHref="/"
+            right={
+              <button onClick={revertToDefault} aria-label={hasCustomDefault ? 'Revert to my default' : 'Revert to default'} className="flex items-center gap-1.5 rounded-full px-3 py-2 text-[12px] font-bold" style={{ background: 'rgba(255,255,255,.06)', border: `1px solid ${RD.border}`, color: RD.text }}>
+                <RotateCcw size={14} /> Revert
+              </button>
+            }
+          />
+          <p className="-mt-1 px-1 pb-1 text-[13px]" style={{ color: RD.muted }}>Customize how ChessScout.net looks and plays</p>
+        </>
+      )}
+      {!redesign && (
+      <>
       <div className="flex items-center justify-between">
         <Link href="/" className="inline-flex items-center gap-1.5 text-sm" style={{ color: TEXT_MUTED }}>
           <ArrowLeft className="w-4 h-4" /> Back
@@ -117,6 +139,8 @@ export default function SettingsPage() {
         <h1 className="text-2xl font-black" style={{ color: TEXT_LIGHT }}>Settings</h1>
         <p className="text-sm mt-1" style={{ color: TEXT_MUTED }}>Customize how ChessScout.net looks and plays</p>
       </div>
+      </>
+      )}
 
       <section>
         <h2 className="text-sm font-black uppercase tracking-wide mb-3" style={{ color: TEXT_MUTED }}>Board Color</h2>

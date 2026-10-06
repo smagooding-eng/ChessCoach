@@ -497,3 +497,21 @@ html.cs-redesign .text-gradient {
 html.cs-redesign .grid:not([class*='grid-cols']) {
   grid-template-columns: minmax(0, 1fr);
 }
+
+/* Settings (redesign): each section becomes a card with a proper heading, matching
+   the other redesigned screens. Scoped to .cs-settings so nothing else is touched;
+   !important is needed because the page sets heading colours inline. */
+html.cs-redesign .cs-settings > section {
+  background: linear-gradient(160deg, #0F1819 0%, #0B1213 100%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  padding: 16px;
+}
+html.cs-redesign .cs-settings > section > h2 {
+  text-transform: none !important;
+  letter-spacing: -0.01em !important;
+  font-size: 17px !important;
+  font-weight: 800 !important;
+  color: #F5F7F6 !important;
+  margin-bottom: 12px !important;
+}
