@@ -488,3 +488,12 @@ html.cs-redesign .card-depth-lg {
 html.cs-redesign .text-gradient {
   background-image: linear-gradient(135deg, #C9F59E 0%, #8BEA45 100%);
 }
+
+/* Redesign: a `grid` with no explicit columns gets an implicit column sized to
+   its widest child, which let wide rows (stat strips, horizontally scrolling
+   bot lists) stretch the whole page past the screen edge, where the layout's
+   overflow-x:hidden clipped it. Pin such grids to a single column that can
+   never exceed its container. Grids that set their own columns are untouched. */
+html.cs-redesign .grid:not([class*='grid-cols']) {
+  grid-template-columns: minmax(0, 1fr);
+}

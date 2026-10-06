@@ -285,6 +285,37 @@ async function runCourseGenerationJob(username: string, jobId: string, log: Logg
   }
 }
 
+// A "pending" job whose server process died (a restart or redeploy mid-run)
+// never finishes, and the routes below reuse any pending job instead of
+// starting a new one -- so one interrupted run would block generation forever.
+// Anything pending for longer than this is treated as dead: it's marked as
+// interrupted and a fresh run is allowed to start.
+const STALE_JOB_MS = 15 * 60 * 1000;
+
+async function livePendingJob(userId: string, type: string) {
+  const rows = await db.select().from(backgroundJobsTable).where(
+    and(
+      eq(backgroundJobsTable.userId, userId),
+      eq(backgroundJobsTable.type, type),
+      eq(backgroundJobsTable.status, "pending"),
+    ),
+  );
+  let live: (typeof rows)[number] | null = null;
+  for (const j of rows) {
+    const ageMs = Date.now() - new Date(j.createdAt).getTime();
+    if (ageMs > STALE_JOB_MS) {
+      await db.update(backgroundJobsTable).set({
+        status: "error",
+        error: "That run was interrupted. Please generate again.",
+        completedAt: new Date(),
+      }).where(eq(backgroundJobsTable.id, j.id));
+    } else if (!live) {
+      live = j;
+    }
+  }
+  return live;
+}
+
 router.post("/courses/generate-start", async (req, res): Promise<void> => {
   const parsed = GenerateCoursesBody.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
@@ -292,13 +323,7 @@ router.post("/courses/generate-start", async (req, res): Promise<void> => {
   const userId = req.user?.id;
   if (!userId) { res.status(401).json({ error: "Authentication required" }); return; }
 
-  const [pending] = await db.select().from(backgroundJobsTable).where(
-    and(
-      eq(backgroundJobsTable.userId, userId),
-      eq(backgroundJobsTable.type, "course_generation"),
-      eq(backgroundJobsTable.status, "pending"),
-    )
-  );
+  const pending = await livePendingJob(userId, "course_generation");
   if (pending) {
     res.json({ jobId: pending.id });
     return;
@@ -343,13 +368,7 @@ router.get("/courses/active-job", async (req, res): Promise<void> => {
   const userId = req.user?.id;
   if (!userId) { res.json({ job: null }); return; }
 
-  const [job] = await db.select().from(backgroundJobsTable).where(
-    and(
-      eq(backgroundJobsTable.userId, userId),
-      eq(backgroundJobsTable.type, "course_generation"),
-      eq(backgroundJobsTable.status, "pending"),
-    )
-  );
+  const job = await livePendingJob(userId, "course_generation");
   res.setHeader("Cache-Control", "no-store");
   res.json({ job: job ? { jobId: job.id, status: job.status } : null });
 });
@@ -610,13 +629,7 @@ router.post("/courses/endgame/generate-start", async (req, res): Promise<void> =
   if (!userId) { res.status(401).json({ error: "Authentication required" }); return; }
 
   const endgameJobType = `endgame_${type}`;
-  const [pending] = await db.select().from(backgroundJobsTable).where(
-    and(
-      eq(backgroundJobsTable.userId, userId),
-      eq(backgroundJobsTable.type, endgameJobType),
-      eq(backgroundJobsTable.status, "pending"),
-    )
-  );
+  const pending = await livePendingJob(userId, endgameJobType);
   if (pending) {
     res.json({ jobId: pending.id });
     return;
@@ -665,6 +678,7 @@ router.get("/courses/endgame/active-job", async (req, res): Promise<void> => {
     id: backgroundJobsTable.id,
     type: backgroundJobsTable.type,
     status: backgroundJobsTable.status,
+    createdAt: backgroundJobsTable.createdAt,
   }).from(backgroundJobsTable).where(
     and(
       eq(backgroundJobsTable.userId, userId),
@@ -672,7 +686,7 @@ router.get("/courses/endgame/active-job", async (req, res): Promise<void> => {
     )
   );
 
-  const endgameJobs = jobs.filter(j => j.type.startsWith("endgame_"));
+  const endgameJobs = jobs.filter(j => j.type.startsWith("endgame_") && Date.now() - new Date(j.createdAt).getTime() <= STALE_JOB_MS);
   res.setHeader("Cache-Control", "no-store");
   res.json({
     jobs: endgameJobs.map(j => ({

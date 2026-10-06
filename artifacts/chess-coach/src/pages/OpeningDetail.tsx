@@ -1,3 +1,6 @@
+import { useDashboardRedesignFlag } from '@/hooks/use-app-config';
+import { MoveNavigationBar } from '@/components/MoveNavigationBar';
+import { RD } from '@/lib/redesignTheme';
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { useParams, Link } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
@@ -93,6 +96,16 @@ export function OpeningDetail() {
   const [step, setStep] = useState(0);
   const mainLine = data?.mainLine ?? [];
   const maxStep = mainLine.length;
+  // Redesign: the same five-button control as game review. Play steps through the
+  // line one move at a time (opt-in; nothing moves until you press it).
+  const { enabled: redesign } = useDashboardRedesignFlag();
+  const [lineAuto, setLineAuto] = useState(false);
+  useEffect(() => {
+    if (!lineAuto) return;
+    if (step >= maxStep) { setLineAuto(false); return; }
+    const t = setTimeout(() => setStep((x) => Math.min(maxStep, x + 1)), 1500);
+    return () => clearTimeout(t);
+  }, [lineAuto, step, maxStep]);
 
   const currentFen = step === 0 ? null : mainLine[step - 1]?.fen ?? null;
 
@@ -445,6 +458,36 @@ export function OpeningDetail() {
               </div>
 
               {/* Controls */}
+              {redesign ? (
+                <div className="sticky bottom-0 z-20 space-y-2.5 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2" style={{ background: 'linear-gradient(180deg, rgba(5,10,11,0) 0%, #050A0B 22%)' }}>
+                  <MoveNavigationBar
+                    variant="redesign"
+                    isPlaying={lineAuto}
+                    onFirst={() => { setLineAuto(false); setStep(0); }}
+                    onPrev={() => { setLineAuto(false); setStep((x) => Math.max(0, x - 1)); }}
+                    onPlayPause={() => { if (lineAuto) { setLineAuto(false); return; } if (step >= maxStep) setStep(0); setLineAuto(true); }}
+                    onNext={() => { setLineAuto(false); setStep((x) => Math.min(maxStep, x + 1)); }}
+                    onLast={() => { setLineAuto(false); setStep(maxStep); }}
+                    canGoBack={step > 0}
+                    canGoForward={step < maxStep}
+                  />
+                  <div className="flex items-center gap-3 px-1">
+                    <span className="shrink-0 text-[13px] font-semibold" style={{ color: RD.muted }}>Move {step} / {maxStep}</span>
+                    <div className="flex flex-1 flex-wrap justify-end gap-1">
+                      {mainLine.map((m, i) => (
+                        <button
+                          key={i}
+                          onClick={() => { setLineAuto(false); setStep(i + 1); }}
+                          className="rounded-lg px-2 py-1 font-mono text-xs transition-colors"
+                          style={step === i + 1 ? { background: RD.green, color: '#05100A', fontWeight: 700 } : { background: 'rgba(255,255,255,.07)' }}
+                        >
+                          {m.color === 'white' ? `${m.moveNumber}.` : ''}{m.san}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ) : (
               <div className="glass-card rounded-xl p-3 flex items-center justify-between gap-3">
                 <div className="flex items-center gap-1 md:gap-1.5">
                   <button onClick={() => setStep(0)} disabled={step === 0}
@@ -481,6 +524,7 @@ export function OpeningDetail() {
                   ))}
                 </div>
               </div>
+              )}
             </>
           )}
 

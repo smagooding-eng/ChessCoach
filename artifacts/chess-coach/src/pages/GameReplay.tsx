@@ -1070,7 +1070,10 @@ export function GameReplay() {
               We always reserve a fixed-height slot above the board for the
               MistakeFixView tab toggle ("Played | Engine line") so the board
               doesn't shift up/down when navigating between bad and good moves. */}
-          <div className={`mx-auto w-full ${redesign ? 'max-w-[min(100%,42dvh)]' : 'max-w-[min(100%,52dvh)]'} md:max-w-[min(100%,55dvh)] xl:max-w-none order-[-3] xl:order-none`}>
+          <div
+            className={`mx-auto w-full ${redesign ? '' : 'max-w-[min(100%,52dvh)]'} md:max-w-[min(100%,55dvh)] xl:max-w-none order-[-3] xl:order-none`}
+            style={redesign ? { maxWidth: 'min(100%, max(240px, calc(100dvh - 480px)))' } : undefined}
+          >
             {isBad && currentReview && currentMove > 0 && !practiceMode ? (
               (() => {
                 const prevFen = currentMove <= 1 ? gameStartFen : (moves[currentMove - 2]?.fen ?? gameStartFen);
@@ -1097,7 +1100,7 @@ export function GameReplay() {
                 {/* Invisible spacer matching MistakeFixView's tab toggle height
                     so the board occupies the same vertical position whether or
                     not the move is classified as bad. */}
-                <div aria-hidden className="h-[34px] invisible" />
+                <div aria-hidden className={`h-[34px] invisible ${redesign ? 'hidden' : ''}`} />
                 <MaterialStrip fen={currentFen} color={flipped ? 'w' : 'b'} className="px-1" />
                 <ChessBoard
                   fen={currentFen}
@@ -1115,9 +1118,8 @@ export function GameReplay() {
           </div>
 
           {/* Playback controls */}
-          {redesign && <p className="order-[-2] xl:order-none text-center text-[13px]" style={{ color: RD.muted }}>Move {currentMove} / {maxMoves}</p>}
           <div
-            className={redesign ? 'order-[-2] xl:order-none sticky bottom-0 z-20 w-full pb-[max(0.25rem,env(safe-area-inset-bottom))] pt-2' : 'glass-card rounded-xl px-1.5 py-1.5 md:p-3 flex items-center justify-between order-[-2] xl:order-none'}
+            className={redesign ? 'order-[-2] xl:order-none sticky bottom-0 z-20 flex w-full flex-col-reverse gap-2 pb-[max(0.25rem,env(safe-area-inset-bottom))] pt-2' : 'glass-card rounded-xl px-1.5 py-1.5 md:p-3 flex items-center justify-between order-[-2] xl:order-none'}
             style={redesign ? { background: 'linear-gradient(180deg, rgba(5,10,11,0) 0%, #050A0B 26%)' } : undefined}
           >
             <MoveNavigationBar
@@ -1148,8 +1150,8 @@ export function GameReplay() {
               })()}
             />
 
-            <div className="flex items-center gap-0.5 md:gap-2">
-              <span className="text-[10px] md:text-xs text-muted-foreground font-mono">{currentMove}/{maxMoves}</span>
+            <div className={`flex items-center gap-0.5 md:gap-2 ${redesign ? 'w-full' : ''}`}>
+              <span className={redesign ? 'mr-auto text-[13px] font-semibold' : 'text-[10px] md:text-xs text-muted-foreground font-mono'} style={redesign ? { color: RD.muted } : undefined}>{redesign ? `Move ${currentMove} / ${maxMoves}` : `${currentMove}/${maxMoves}`}</span>
 
               <button onClick={() => setFlipped(f => !f)} title="Flip board"
                 className="p-2.5 md:p-2.5 rounded-xl bg-secondary hover:bg-primary/20 hover:text-primary transition-colors active:scale-90">
