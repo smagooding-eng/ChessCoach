@@ -1,5 +1,5 @@
-import { LessonQuizScreen, LessonCompleteScreen, findQuizMoves, type QuizMoves } from '@/components/LessonFlow';
-import { RD } from '@/lib/redesignTheme';
+import { RD, REDESIGN_ON } from '@/lib/redesignTheme';
+import { LessonQuizScreen, LessonCompleteScreen, LessonIntroScreen, findQuizMoves, type QuizMoves, type IntroBullet } from '@/components/LessonFlow';
 import { artFor, ART_BASE } from './CoursesRedesign';
 import { useDashboardRedesignFlag } from '@/hooks/use-app-config';
 import { CourseOverview } from './CourseOverview';
@@ -12,7 +12,7 @@ import { Chess } from 'chess.js';
 import {
   ArrowLeft, CheckCircle2, Target, X, Check,
   ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Award, List,
-  Volume2, VolumeX, BookOpen, Loader,
+  Volume2, VolumeX, BookOpen, Loader, Lightbulb,
 } from 'lucide-react';
 
 // Mirrors lib/db/src/schema/courses.ts's LessonBeat type -- kept as a
@@ -27,9 +27,9 @@ type LessonBeat =
   | { kind: 'drill'; text: string; fen: string; expectedMove: string; hint?: string | null; followUpSan?: string[] }
   | { kind: 'summary'; text: string };
 
-const CHESSCOM_GREEN = '#81b64c';
-const BG_DARK = '#262421';
-const BG_CARD = '#302e2b';
+const CHESSCOM_GREEN = REDESIGN_ON ? RD.green : '#81b64c';
+const BG_DARK = REDESIGN_ON ? RD.bg : '#262421';
+const BG_CARD = REDESIGN_ON ? RD.cardSolid : '#302e2b';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { apiFetch } from '@/lib/api';
@@ -38,7 +38,7 @@ import { useMyWeaknesses } from '@/hooks/use-analysis';
 import { encodeCard } from '@/pages/ShareCard';
 
 // ── Markdown render helpers ────────────────────────────────────────────────────
-const MISTAKE_RED = '#dc4343';
+const MISTAKE_RED = REDESIGN_ON ? RD.red : '#dc4343';
 
 function renderInline(text: string): React.ReactNode {
   const parts = text.split(/(\*\*[^*]+\*\*)/g);
@@ -554,6 +554,8 @@ function LessonBeatPlayer({
   const abortRef = useRef<AbortController | null>(null);
 
   const [drillResult, setDrillResult] = useState<'correct' | 'wrong' | null>(null);
+  const { enabled: redesign } = useDashboardRedesignFlag();
+  const [hintOpen, setHintOpen] = useState(false);
   const [showFix, setShowFix] = useState(false);
   const [fixFens, setFixFens] = useState<string[]>([]);
   const [fixPly, setFixPly] = useState(0);
@@ -613,6 +615,7 @@ function LessonBeatPlayer({
   // Reset per-beat interactive state whenever the current beat changes.
   useEffect(() => {
     setDrillResult(null);
+    setHintOpen(false);
     setShowFix(false);
     setFixPly(0);
     setExamplePly(0);
@@ -695,6 +698,14 @@ function LessonBeatPlayer({
 
   if (beats.length === 0) return null;
 
+  // Redesign: which kinds of step this lesson has (for the tab strip) and where we are in them
+  const KIND_LABEL: Record<string, string> = { concept: 'Explanation', example: 'Example', drill: 'Practice', summary: 'Summary' };
+  const kindGroups = (['concept', 'example', 'drill', 'summary'] as const)
+    .map((k) => ({ kind: k as string, label: KIND_LABEL[k], first: beats.findIndex((b) => b.kind === k) }))
+    .filter((g) => g.first >= 0);
+  const kindIndex = beats.slice(0, currentBeat + 1).filter((b) => b.kind === beat.kind).length;
+  const kindTotal = beats.filter((b) => b.kind === beat.kind).length;
+
   const boardFen = beat.kind === 'drill'
     ? (showFix ? fixFens[fixPly] ?? beat.fen : beat.fen)
     : beat.kind === 'example'
@@ -703,6 +714,124 @@ function LessonBeatPlayer({
 
   return (
     <div className="xl:grid xl:grid-cols-[1fr_520px] xl:gap-5 xl:items-start">
+      {redesign ? (
+        <div className="order-2 xl:order-1 mt-3 space-y-3 xl:mt-0 xl:max-h-[85vh] xl:overflow-y-auto">
+          {kindGroups.length > 1 && (
+            <div className="grid gap-1 rounded-[16px] p-1" style={{ gridTemplateColumns: `repeat(${kindGroups.length}, minmax(0, 1fr))`, background: RD.cardSolid, border: `1px solid ${RD.border}` }}>
+              {kindGroups.map((g) => {
+                const active = beat.kind === g.kind;
+                return (
+                  <button key={g.kind} onClick={() => goTo(g.first)} className="rounded-[12px] py-2.5 text-[13px] font-bold transition-colors"
+                    style={active ? { background: 'rgba(139,234,69,.10)', color: RD.text, boxShadow: `inset 0 0 0 1.5px ${RD.green}` } : { background: 'transparent', color: RD.muted }}>
+                    {g.label}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          <div className="flex items-center justify-between gap-3 px-1">
+            <span className="text-[12.5px]" style={{ color: RD.muted }}>Step <b style={{ color: RD.text }}>{currentBeat + 1}</b> of {beats.length}</span>
+            <div className="flex items-center gap-2">
+              {beats.length > 1 && (
+                <button onClick={() => setAutoRead((x) => !x)} aria-pressed={autoRead} className="rounded-full px-2.5 py-1 text-[11px] font-extrabold"
+                  style={autoRead ? { background: RD.green, color: '#05100A' } : { background: 'rgba(255,255,255,.08)', color: RD.muted }}>AUTO</button>
+              )}
+              <button onClick={() => (speaking || loading) ? stopReading() : readAloud(beatText(beat))} className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-bold"
+                style={(speaking || loading) ? { background: RD.green, color: '#05100A' } : { background: 'rgba(255,255,255,.08)', color: RD.text }}>
+                {loading ? <><Loader className="h-3.5 w-3.5 animate-spin" /> Loading…</> : speaking ? <><VolumeX className="h-3.5 w-3.5" /> Stop</> : <><Volume2 className="h-3.5 w-3.5" /> Listen</>}
+              </button>
+            </div>
+          </div>
+
+          <AnimatePresence mode="wait">
+            <motion.div key={currentBeat} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.18 }} className="space-y-3">
+              {beat.kind === 'concept' && (
+                <div className="rounded-[20px] p-4" style={{ background: RD.card, border: `1px solid ${RD.border}` }}>
+                  <h2 className="text-[26px] font-extrabold leading-tight">{beat.title}</h2>
+                  <div className="mt-2">{renderStep(beat.text)}</div>
+                </div>
+              )}
+
+              {beat.kind === 'example' && (
+                <div className="rounded-[20px] p-4" style={{ background: RD.card, border: `1px solid ${RD.border}` }}>
+                  <div className="mb-2 flex items-center justify-between">
+                    <p className="text-[12px] font-extrabold uppercase tracking-[.14em]" style={{ color: RD.green }}>Example {kindIndex} of {kindTotal}</p>
+                    {exampleFens.length > 1 && <button onClick={() => setExamplePly(0)} className="text-[12px] font-bold" style={{ color: RD.muted }}>Replay</button>}
+                  </div>
+                  {renderStep(beat.text)}
+                </div>
+              )}
+
+              {beat.kind === 'drill' && (
+                <>
+                  <div className="rounded-[20px] p-4" style={{ background: RD.card, border: `1px solid ${RD.border}` }}>
+                    <p className="text-[12px] font-extrabold uppercase tracking-[.14em]" style={{ color: RD.green }}>Practice {kindIndex} of {kindTotal}</p>
+                    <h2 className="mt-1 text-[22px] font-extrabold leading-tight">Find the best move</h2>
+                    <div className="mt-1.5">{renderStep(beat.text)}</div>
+                  </div>
+
+                  {drillResult === 'correct' && (
+                    <div className="flex items-center gap-3 rounded-[16px] p-3.5" style={{ background: 'rgba(139,234,69,.08)', border: '1px solid rgba(139,234,69,.35)' }}>
+                      <Check className="h-5 w-5 shrink-0" style={{ color: RD.green }} />
+                      <p className="text-[14.5px] font-extrabold" style={{ color: RD.green }}>Correct! Well done.</p>
+                    </div>
+                  )}
+                  {drillResult === 'wrong' && (
+                    <div className="flex items-start gap-3 rounded-[16px] p-3.5" style={{ background: 'rgba(255,80,88,.08)', border: '1px solid rgba(255,80,88,.35)' }}>
+                      <X className="mt-0.5 h-5 w-5 shrink-0" style={{ color: RD.red }} />
+                      <p className="text-[14px]"><b style={{ color: '#FF8A8F' }}>Not quite.</b>{beat.hint ? ` ${beat.hint}` : ' Try again.'}</p>
+                    </div>
+                  )}
+
+                  {!drillResult && beat.hint && (
+                    <div>
+                      <h3 className="mb-2 px-1 text-[16px] font-extrabold">Hints (1)</h3>
+                      {hintOpen ? (
+                        <div className="flex items-start gap-3 rounded-[16px] p-3.5" style={{ background: RD.card, border: `1px solid ${RD.border}` }}>
+                          <Lightbulb className="mt-0.5 h-5 w-5 shrink-0" style={{ color: '#F2C14E' }} />
+                          <p className="text-[13.5px] leading-snug">{beat.hint}</p>
+                        </div>
+                      ) : (
+                        <button onClick={() => setHintOpen(true)} className="flex w-full items-center gap-3 rounded-[16px] p-3.5 text-left" style={{ background: RD.card, border: `1px solid ${RD.border}` }}>
+                          <Lightbulb className="h-5 w-5 shrink-0" style={{ color: '#F2C14E' }} /><span className="text-[14px] font-bold">Show hint</span>
+                        </button>
+                      )}
+                    </div>
+                  )}
+
+                  {drillResult && (beat.followUpSan?.length ?? 0) > 0 && (
+                    <button onClick={() => setShowFix((v) => !v)} className="w-full rounded-[14px] py-3 text-[14px] font-bold" style={{ background: RD.cardSolid, border: `1px solid ${RD.border}`, color: RD.green }}>
+                      {showFix ? 'Hide the line' : 'Show the correct line'}
+                    </button>
+                  )}
+                </>
+              )}
+
+              {beat.kind === 'summary' && (
+                <div className="rounded-[20px] p-4" style={{ background: RD.card, border: `1px solid ${RD.border}` }}>
+                  <p className="mb-2 flex items-center gap-2 text-[12px] font-extrabold uppercase tracking-[.14em]" style={{ color: RD.gold }}><Award className="h-4 w-4" />Lesson recap</p>
+                  {renderStep(beat.text)}
+                </div>
+              )}
+            </motion.div>
+          </AnimatePresence>
+
+          {beats.length > 1 && (
+            <div className="flex items-center gap-3 pt-1">
+              <button onClick={() => goTo(currentBeat - 1)} disabled={isFirst} className="flex h-[52px] flex-1 items-center justify-center gap-2 rounded-[14px] text-[15px] font-bold disabled:opacity-30"
+                style={{ background: RD.cardSolid, border: `1px solid ${RD.border}`, color: RD.text }}>
+                <ChevronLeft className="h-4 w-4" /> Previous
+              </button>
+              <button onClick={handleNext} disabled={beat.kind === 'drill' && !drillResult} className="flex h-[52px] flex-[1.4] items-center justify-center gap-2 rounded-[14px] text-[15px] font-extrabold transition-opacity disabled:opacity-40"
+                style={{ background: `linear-gradient(180deg, ${RD.green}, ${RD.greenDark})`, color: '#05100A' }}>
+                {isLastBeat ? (isLastLesson ? 'Complete Course' : 'Complete & Next') : 'Next'} <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+          )}
+        </div>
+      ) : (
+        <>
       {/* Text panel */}
       <div className="rounded-xl p-3 md:p-4 mt-2 md:mt-3 xl:mt-0 order-2 xl:order-1 xl:max-h-[85vh] xl:overflow-y-auto space-y-3" style={{ backgroundColor: BG_DARK }}>
         <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -784,6 +913,8 @@ function LessonBeatPlayer({
           </div>
         )}
       </div>
+        </>
+      )}
 
       {/* Board panel */}
       <div className="order-1 xl:order-2">
@@ -833,6 +964,8 @@ export function CourseDetail() {
   // hands off to the existing lesson player unchanged.
   const { enabled: redesign } = useDashboardRedesignFlag();
   const [showOverview, setShowOverview] = useState(true);
+  // Redesign: lessons whose intro screen has been dismissed this visit
+  const [introDone, setIntroDone] = useState<number[]>([]);
   // Redesign only: after a lesson is completed, a quick check (when the lesson
   // has a verifiable position) and then a completion screen replace the old
   // silent auto-advance.
@@ -1226,6 +1359,30 @@ export function CourseDetail() {
       )}
 
       <AnimatePresence>
+        {redesign && usingBeatPlayer && lesson && !post && !introDone.includes(lesson.id) && (() => {
+          // "What you'll learn" is built from the lesson's real parts, never invented
+          const parts: IntroBullet[] = [];
+          for (const b of ((lesson as any).beats ?? []) as LessonBeat[]) {
+            const item: IntroBullet | null =
+              b.kind === 'concept' ? { kind: 'concept', text: b.title || 'The core idea' }
+              : b.kind === 'example' ? { kind: 'example', text: 'A real position from your own game' }
+              : b.kind === 'drill' ? { kind: 'drill', text: 'Find the better move yourself' }
+              : null;
+            if (item && !parts.some((x) => x.text === item.text)) parts.push(item);
+          }
+          return (
+            <LessonIntroScreen
+              index={currentIdx}
+              total={sortedLessons.length}
+              title={lesson.title}
+              subtitle={lesson.conceptTitle ?? course.category}
+              artSrc={`${ART_BASE}${artFor({ id: course.id, category: course.category, title: course.title }).img}.webp`}
+              bullets={parts}
+              onStart={() => setIntroDone((d) => [...d, lesson.id])}
+              onBack={() => setShowOverview(true)}
+            />
+          );
+        })()}
         {redesign && post?.step === 'quiz' && post.quiz && (
           <LessonQuizScreen quiz={post.quiz} onContinue={() => setPost({ ...post, step: 'complete' })} />
         )}

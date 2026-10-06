@@ -29,3 +29,11 @@ export const DIFFICULTY_BADGE: Record<string, { bg: string; fg: string }> = {
   intermediate: { bg: 'rgba(232,180,71,.16)', fg: '#E8B447' },
   advanced: { bg: 'rgba(255,80,88,.16)', fg: '#FF7A80' },
 };
+
+// The redesign toggle's last known value (cached by useDashboardRedesignFlag),
+// readable at module load. Files that define plain-hex colour constants (which
+// are concatenated with alpha suffixes or used in SVG attributes, so can't be
+// CSS variables) use this to pick the redesign palette.
+export const REDESIGN_ON: boolean = (() => {
+  try { return localStorage.getItem('cs_dashboard_redesign') === '1'; } catch { return false; }
+})();

@@ -1,3 +1,5 @@
+import { useDashboardRedesignFlag } from '@/hooks/use-app-config';
+import { RD, REDESIGN_ON } from '@/lib/redesignTheme';
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Chessboard, defaultPieces } from 'react-chessboard';
 import { useSettings } from '@/context/SettingsContext';
@@ -13,10 +15,10 @@ import { cn } from '@/lib/utils';
 import { buildTintedPieceSet } from './RecoloredPieces';
 import { PieceGradientDefs } from './PieceGradientDefs';
 
-const CHESSCOM_GREEN = '#81b64c';
-const BG_DARK = '#262421';
-const BG_CARD = '#302e2b';
-const MISTAKE_RED = '#dc4343';
+const CHESSCOM_GREEN = REDESIGN_ON ? RD.green : '#81b64c';
+const BG_DARK = REDESIGN_ON ? RD.bg : '#262421';
+const BG_CARD = REDESIGN_ON ? RD.cardSolid : '#302e2b';
+const MISTAKE_RED = REDESIGN_ON ? RD.red : '#dc4343';
 
 const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
 
@@ -503,6 +505,7 @@ function buildFrontendFixPgn(mistakePgn: string, drillExpectedMove: string | nul
 
 export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, positionRecap, courseCategory, onMoveTextChange, drillFen, drillExpectedMove, drillHint, content, extraChallenges, conceptTitle }: LessonBoardPlayerProps) {
   const [, navigate] = useLocation();
+  const { enabled: redesign } = useDashboardRedesignFlag();
   const { boardColors, boardTextureCss, pieceColors, pieceShape, pieceStyle, showCoordinates, showLegalMoves } = useSettings();
   const BOARD_LIGHT = boardColors.light;
   const BOARD_DARK = boardColors.dark;
@@ -912,6 +915,66 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, positionRec
     return styles;
   })();
 
+  // The per-move commentary card: above the board in the classic layout, below the
+  // controls in the redesign ("You played: 18. Qe2??" as in the mockup).
+  const commentaryBlock = (
+          <div className="px-2 pt-2 pb-0.5 md:px-3 md:pt-3 md:pb-1 max-h-[22vh] overflow-y-auto shrink-0">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={currentStep}
+                initial={{ opacity: 0, y: 4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }}
+                transition={{ duration: 0.15 }}
+              >
+                <div className="rounded-xl px-3 py-2 md:px-4 md:py-3 shadow-sm" style={{
+                  background: BG_CARD,
+                  borderLeft: step?.isMistake
+                    ? `3px solid ${MISTAKE_RED}`
+                    : step?.isFix
+                    ? `3px solid ${CHESSCOM_GREEN}`
+                    : '3px solid rgba(255,255,255,0.06)',
+                }}>
+                  <div className="flex items-start gap-3">
+                    {step?.isMistake ? (
+                      <div className="w-7 h-7 rounded-full bg-red-500 flex items-center justify-center shrink-0 mt-0.5">
+                        <AlertTriangle className="w-3.5 h-3.5 text-white" />
+                      </div>
+                    ) : step?.isFix ? (
+                      <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 mt-0.5" style={{ backgroundColor: CHESSCOM_GREEN }}>
+                        <Check className="w-3.5 h-3.5 text-white" />
+                      </div>
+                    ) : null}
+                    <div className="flex-1 min-w-0">
+                      {step?.san && currentStep > 0 && (
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-sm font-bold" style={{
+                            color: step.isMistake ? MISTAKE_RED : step.isFix ? CHESSCOM_GREEN : '#e8e6e3'
+                          }}>
+                            {step.color === 'w' ? '' : ''}{step.fullMoveNumber}.{step.color === 'b' ? '..' : ''} {step.san}
+                            {step.isMistake ? ' — Mistake' : step.isFix ? ' — Best Move' : ''}
+                          </span>
+                        </div>
+                      )}
+                      <p className="text-sm leading-relaxed">
+                        {hasComment
+                          ? <FormatComment text={step!.comment} isMistake={step!.isMistake} isFix={step!.isFix} />
+                          : currentStep === 0 && tab === 'mistake' && positionRecap
+                          ? <span>{positionRecap}</span>
+                          : currentStep === 0
+                          ? <span style={{ color: '#9e9b98' }}>Press play or click a move to begin.</span>
+                          : step?.san
+                          ? <span style={{ color: '#9e9b98' }}>{step.color === 'w' ? 'White' : 'Black'} plays {step.san}.</span>
+                          : ''}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            </AnimatePresence>
+          </div>
+  );
+
   return (
     <div className="rounded-xl overflow-hidden shadow-xl" style={{ backgroundColor: BG_DARK }}>
       {/* Same gradient defs as ChessBoard.tsx, duplicated here rather than
@@ -951,6 +1014,26 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, positionRec
           is the actual narrative sequence (see the mistake and what it
           cost, then see what should have happened instead, then prove
           you can find it yourself), not just three unordered views. */}
+      {redesign ? (
+        <div className="px-3 pt-3">
+          <div className="grid gap-1 rounded-[16px] p-1" style={{ gridTemplateColumns: `repeat(${1 + (hasFix ? 1 : 0) + (hasDrill ? 1 : 0)}, minmax(0, 1fr))`, background: RD.cardSolid, border: `1px solid ${RD.border}` }}>
+            {([
+              { id: 'mistake' as Tab, label: 'Mistake', show: true, onClick: () => { setIsPlaying(false); setTab('mistake'); setCurrentStep(0); } },
+              { id: 'fix' as Tab, label: 'Fix', show: hasFix, onClick: () => { setIsPlaying(false); setTab('fix'); setCurrentStep(0); } },
+              { id: 'drill' as Tab, label: 'Drill', show: hasDrill, onClick: () => { setIsPlaying(false); setTab('drill'); resetDrill(); } },
+            ]).filter((t) => t.show).map((t) => (
+              <button key={t.id} onClick={t.onClick} className="rounded-[12px] py-2.5 text-[14px] font-bold transition-colors"
+                style={tab === t.id ? { background: 'rgba(139,234,69,.10)', color: RD.text, boxShadow: `inset 0 0 0 1.5px ${RD.green}` } : { background: 'transparent', color: RD.muted }}>
+                {t.label}
+              </button>
+            ))}
+          </div>
+          <p className="mt-2 text-right text-[12px] font-semibold" style={{ color: ((tab === 'mistake' && isLast && hasFix) || (tab === 'fix' && isLast && hasDrill)) ? RD.green : RD.muted }}>
+            {tab === 'drill' ? 'Find the best move' : tab === 'mistake' && isLast && hasFix ? 'Next: Fix →' : tab === 'fix' && isLast && hasDrill ? 'Next: Drill →' : (currentStep > 0 ? `Move ${step?.fullMoveNumber}` : title ?? '')}
+          </p>
+        </div>
+      ) : (
+        <>
       <div className="flex items-center gap-1.5 px-3 py-2 md:py-2.5 overflow-x-auto" style={{ backgroundColor: BG_CARD }}>
         <button
           onClick={() => { setIsPlaying(false); setTab('mistake'); setCurrentStep(0); }}
@@ -1014,6 +1097,8 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, positionRec
             : (currentStep > 0 ? `Move ${step?.fullMoveNumber}` : title ?? '')}
         </span>
       </div>
+        </>
+      )}
 
       {/* ── MISTAKE / FIX TABS ──────────────────────────────────────────────
           Same rendering for both -- only the underlying PGN (activePgn,
@@ -1022,6 +1107,17 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, positionRec
           "Mistake" / green "Best Move" badges correctly either way. */}
       {(tab === 'mistake' || tab === 'fix') && (
         <div className="flex flex-col">
+          {redesign && (
+            <div className="px-4 pt-3">
+              <div className="flex items-center gap-2.5">
+                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full" style={{ background: tab === 'mistake' ? 'rgba(255,80,88,.16)' : 'rgba(139,234,69,.16)', color: tab === 'mistake' ? MISTAKE_RED : CHESSCOM_GREEN }}>
+                  {tab === 'mistake' ? <AlertTriangle className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}
+                </span>
+                <h2 className="text-[20px] font-extrabold leading-tight">{tab === 'mistake' ? 'You missed this in your game' : 'Here’s the better move'}</h2>
+              </div>
+              <p className="mt-1 text-[13px]" style={{ color: 'rgba(245,247,246,.7)' }}>{tab === 'mistake' ? 'This position is from one of your recent games.' : 'This is what the engine recommends instead.'}</p>
+            </div>
+          )}
           {/* Commentary bubble -- capped height with its own internal
               scroll, so a longer intro message (the first screen's text
               is often longer than a per-move comment) scrolls within
@@ -1030,62 +1126,7 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, positionRec
               what was clipping the board on the first screen. The board
               below this is the thing that must never be cut off; this
               bubble is the one allowed to need its own scroll instead. */}
-          <div className="px-2 pt-2 pb-0.5 md:px-3 md:pt-3 md:pb-1 max-h-[22vh] overflow-y-auto shrink-0">
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={currentStep}
-                initial={{ opacity: 0, y: 4 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -4 }}
-                transition={{ duration: 0.15 }}
-              >
-                <div className="rounded-xl px-3 py-2 md:px-4 md:py-3 shadow-sm" style={{
-                  background: BG_CARD,
-                  borderLeft: step?.isMistake
-                    ? `3px solid ${MISTAKE_RED}`
-                    : step?.isFix
-                    ? `3px solid ${CHESSCOM_GREEN}`
-                    : '3px solid rgba(255,255,255,0.06)',
-                }}>
-                  <div className="flex items-start gap-3">
-                    {step?.isMistake ? (
-                      <div className="w-7 h-7 rounded-full bg-red-500 flex items-center justify-center shrink-0 mt-0.5">
-                        <AlertTriangle className="w-3.5 h-3.5 text-white" />
-                      </div>
-                    ) : step?.isFix ? (
-                      <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 mt-0.5" style={{ backgroundColor: CHESSCOM_GREEN }}>
-                        <Check className="w-3.5 h-3.5 text-white" />
-                      </div>
-                    ) : null}
-                    <div className="flex-1 min-w-0">
-                      {step?.san && currentStep > 0 && (
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-sm font-bold" style={{
-                            color: step.isMistake ? MISTAKE_RED : step.isFix ? CHESSCOM_GREEN : '#e8e6e3'
-                          }}>
-                            {step.color === 'w' ? '' : ''}{step.fullMoveNumber}.{step.color === 'b' ? '..' : ''} {step.san}
-                            {step.isMistake ? ' — Mistake' : step.isFix ? ' — Best Move' : ''}
-                          </span>
-                        </div>
-                      )}
-                      <p className="text-sm leading-relaxed">
-                        {hasComment
-                          ? <FormatComment text={step!.comment} isMistake={step!.isMistake} isFix={step!.isFix} />
-                          : currentStep === 0 && tab === 'mistake' && positionRecap
-                          ? <span>{positionRecap}</span>
-                          : currentStep === 0
-                          ? <span style={{ color: '#9e9b98' }}>Press play or click a move to begin.</span>
-                          : step?.san
-                          ? <span style={{ color: '#9e9b98' }}>{step.color === 'w' ? 'White' : 'Black'} plays {step.san}.</span>
-                          : ''}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
-            </AnimatePresence>
-          </div>
-
+          {!redesign && commentaryBlock}
           {/* Board */}
           <div className="px-2 pb-1 max-w-[480px] mx-auto w-full">
             <div className="relative">
@@ -1136,6 +1177,52 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, positionRec
           </div>
 
           {/* Controls */}
+          {redesign ? (
+            <div className="mx-auto w-full max-w-[480px] px-3 pt-3">
+              <div className="grid grid-cols-5 gap-2.5">
+                {[
+                  { label: 'Jump to start', disabled: isFirst, onClick: () => { setIsPlaying(false); go(0); }, icon: <SkipBack className="h-5 w-5" /> },
+                  { label: 'Previous move', disabled: isFirst, onClick: () => go(currentStep - 1), icon: <ChevronLeft className="h-6 w-6" /> },
+                  { label: isPlaying ? 'Pause' : 'Play', disabled: false, accent: true,
+                    onClick: () => {
+                      if (isPlaying) { setIsPlaying(false); return; }
+                      if (isLast) {
+                        if (tab === 'mistake' && hasFix) { setTab('fix'); setCurrentStep(0); return; }
+                        if (tab === 'fix' && hasDrill) { setTab('drill'); resetDrill(); return; }
+                        return;
+                      }
+                      setIsPlaying(true);
+                    },
+                    icon: isPlaying ? <Pause className="h-6 w-6" fill="currentColor" /> : <Play className="h-6 w-6" fill="currentColor" /> },
+                  { label: 'Next move', disabled: isLast && !((tab === 'mistake' && hasFix) || (tab === 'fix' && hasDrill)),
+                    onClick: () => { if (!isLast) { go(currentStep + 1); return; } if (tab === 'mistake' && hasFix) { setTab('fix'); setCurrentStep(0); return; } if (tab === 'fix' && hasDrill) { setTab('drill'); resetDrill(); } },
+                    icon: <ChevronRight className="h-6 w-6" /> },
+                  { label: 'Jump to end', disabled: isLast, onClick: () => { setIsPlaying(false); go(totalSteps - 1); }, icon: <SkipForward className="h-5 w-5" /> },
+                ].map((b) => (
+                  <button key={b.label} onClick={b.onClick} disabled={b.disabled} aria-label={b.label}
+                    className="flex h-[58px] items-center justify-center rounded-[14px] transition-transform active:scale-95 disabled:opacity-30"
+                    style={{ background: RD.cardSolid, border: `1px solid ${RD.border}`, color: ('accent' in b && b.accent) ? RD.green : RD.text }}>
+                    {b.icon}
+                  </button>
+                ))}
+              </div>
+
+              {mistakeIdx > 0 && currentStep < mistakeIdx && (
+                <button onClick={() => go(mistakeIdx)} className="mt-3 flex w-full items-center justify-center gap-2 rounded-[12px] py-2.5 text-[13px] font-bold" style={{ background: 'rgba(255,80,88,.12)', border: '1px solid rgba(255,80,88,.4)', color: '#FF9DA2' }}>
+                  <AlertTriangle className="h-4 w-4" /> Jump to key moment
+                </button>
+              )}
+
+              <div className="mt-3">{commentaryBlock}</div>
+
+              {isLast && ((tab === 'mistake' && hasFix) || (tab === 'fix' && hasDrill)) && (
+                <button onClick={() => { if (tab === 'mistake' && hasFix) { setTab('fix'); setCurrentStep(0); return; } if (tab === 'fix' && hasDrill) { setTab('drill'); resetDrill(); } }} className="mt-3 flex w-full items-center justify-center gap-2.5 rounded-[14px] py-4 text-[16px] font-extrabold"
+                  style={{ background: `linear-gradient(180deg, ${RD.green}, ${RD.greenDark})`, color: '#05100A', boxShadow: '0 12px 28px -12px rgba(139,234,69,.6)' }}>
+                  {tab === 'mistake' ? 'See the Fix' : 'Try the Drill'} <ChevronRight className="h-5 w-5" />
+                </button>
+              )}
+            </div>
+          ) : (
           <div className="flex flex-col items-center gap-2 px-2 py-3 md:px-4 max-w-[480px] mx-auto w-full">
             {/* One clear primary action, matching chess.com's lesson
                 screens -- Prev/Next step through, Play/Pause is the
@@ -1232,7 +1319,7 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, positionRec
               </button>
             )}
           </div>
-
+          )}
           {/* Move list toggle -- a single small affordance instead of the
               full strip always competing with everything above it. */}
           {movePairs.length > 0 && (
@@ -1410,6 +1497,19 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, positionRec
 
       {tab === 'drill' && hasDrill && !(showingConceptIntro && isMultiChallenge) && (
         <div className="flex flex-col">
+          {redesign ? (
+            <div className="px-4 pt-3">
+              {isMultiChallenge && <p className="text-[12px] font-bold uppercase tracking-[.14em]" style={{ color: RD.muted }}>Practice {currentChallengeIndex + 1} of {allChallenges.length}</p>}
+              <h2 className="mt-0.5 text-[22px] font-extrabold leading-tight">Find the best move</h2>
+              <p className="mt-1 text-[13.5px]" style={{ color: 'rgba(245,247,246,.75)' }}>
+                {drillState === 'correct' ? `Excellent! ${activeChallenge?.expectedMove} is correct!` : drillState === 'revealed' ? `The answer was ${activeChallenge?.expectedMove}.` : 'Drag a piece on the board to make your move.'}
+              </p>
+              {drillAttempts > 0 && drillState !== 'correct' && drillState !== 'revealed' && (
+                <p className="mt-1 text-[12.5px] font-semibold" style={{ color: '#FFB07A' }}>{drillAttempts} attempt{drillAttempts > 1 ? 's' : ''} so far</p>
+              )}
+            </div>
+          ) : (
+            <>
           {/* Commentary */}
           <div className="px-2 pt-2 pb-0.5 md:px-3 md:pt-3 md:pb-1">
             <div className="flex items-end gap-2">
@@ -1452,7 +1552,8 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, positionRec
               </div>
             </div>
           </div>
-
+            </>
+          )}
           {/* Board */}
           <div className="px-2 pb-1 max-w-[480px] mx-auto w-full">
             <div className="relative">
@@ -1563,6 +1664,25 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, positionRec
               )}
             </AnimatePresence>
 
+            {redesign ? (
+              activeChallenge?.hint && drillState === 'idle' ? (
+                <div className="mt-3">
+                  <h3 className="mb-2 text-[16px] font-extrabold">Hints (1)</h3>
+                  {showHint ? (
+                    <div className="flex items-start gap-3 rounded-[16px] p-3.5" style={{ background: RD.card, border: `1px solid ${RD.border}` }}>
+                      <Lightbulb className="mt-0.5 h-5 w-5 shrink-0" style={{ color: '#F2C14E' }} />
+                      <p className="text-[13.5px] leading-snug">{activeChallenge.hint}</p>
+                    </div>
+                  ) : (
+                    <button onClick={() => setShowHint(true)} className="flex w-full items-center gap-3 rounded-[16px] p-3.5 text-left" style={{ background: RD.card, border: `1px solid ${RD.border}` }}>
+                      <Lightbulb className="h-5 w-5 shrink-0" style={{ color: '#F2C14E' }} />
+                      <span className="text-[14px] font-bold">Show hint</span>
+                    </button>
+                  )}
+                </div>
+              ) : null
+            ) : (
+              <>
             {activeChallenge?.hint && drillState === 'idle' && (
               <div className="mt-2">
                 {showHint ? (
@@ -1580,6 +1700,8 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, positionRec
                   </button>
                 )}
               </div>
+            )}
+              </>
             )}
           </div>
 

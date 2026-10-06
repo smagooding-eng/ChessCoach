@@ -975,6 +975,9 @@ export function GameReplay() {
             const youWhite = !meBlack;
             const me = youWhite ? { name: game.whiteUsername, rating: game.whiteRating, avatar: whitePlayer?.avatar } : { name: game.blackUsername, rating: game.blackRating, avatar: blackPlayer?.avatar };
             const opp = youWhite ? { name: game.blackUsername, rating: game.blackRating, avatar: blackPlayer?.avatar } : { name: game.whiteUsername, rating: game.whiteRating, avatar: whitePlayer?.avatar };
+            // The replay payload has no date field, so read it from the PGN's own header
+            const dm = game.pgn.match(/\[(?:UTCDate|Date) "(\d{4})\.(\d{2})\.(\d{2})"\]/);
+            const playedOn = dm ? new Date(`${dm[1]}-${dm[2]}-${dm[3]}T12:00:00`).toLocaleDateString() : null;
             const badge = game.result === 'win' ? { t: 'Win', bg: 'rgba(46,125,50,.45)', fg: '#7BE05A' } : game.result === 'loss' ? { t: 'Loss', bg: 'rgba(150,35,45,.55)', fg: '#FF6B73' } : { t: 'Draw', bg: 'rgba(255,255,255,.12)', fg: '#C9D2CF' };
             const av = (a: string | undefined, n: string, ring: string) => a
               ? <img src={a} alt={n} className="h-[58px] w-[58px] shrink-0 rounded-full object-cover" style={{ border: `2px solid ${ring}` }} />
@@ -1003,7 +1006,7 @@ export function GameReplay() {
                   <span className="rounded-[9px] px-3.5 py-2 text-[14px] font-extrabold" style={{ background: badge.bg, color: badge.fg }}>{badge.t}</span>
                   <span className="text-[13px]" style={{ color: 'rgba(245,247,246,.8)' }}>
                     <span className="block">{badge.t}</span>
-                    {new Date(game.playedAt).toLocaleDateString()} · {maxMoves} moves
+                    {playedOn ? `${playedOn} · ` : ''}{maxMoves} moves
                   </span>
                 </div>
               </div>
