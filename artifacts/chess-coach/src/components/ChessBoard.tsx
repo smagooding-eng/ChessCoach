@@ -4,7 +4,7 @@ import { Chess } from 'chess.js';
 import { normalizeFen, getPieceColorScheme } from '@/lib/utils';
 import { buildTintedPieceSet } from './RecoloredPieces';
 import { PieceGradientDefs } from './PieceGradientDefs';
-import { useSettings, playMoveSound } from '@/context/SettingsContext';
+import { useSettings, playMoveSound, boardSkin } from '@/context/SettingsContext';
 import { Trophy, X } from 'lucide-react';
 
 class BoardErrorBoundary extends Component<
@@ -223,6 +223,7 @@ export function ChessBoard({
     () => buildTintedPieceSet({ pieceColors, pieceShape, pieceStyle, useGradientForCustom: true }) as unknown as typeof defaultPieces,
     [pieceColors, pieceShape, pieceStyle],
   );
+  const skin = boardSkin(boardColors, boardTextureCss);
 
 
   useEffect(() => {
@@ -529,12 +530,13 @@ export function ChessBoard({
               color: a.color ?? 'rgba(255,170,0,0.8)',
             })),
             boardStyle: {
+              ...skin.boardStyle,
               borderRadius: '10px',
               boxShadow: '0 30px 60px rgba(0,0,0,0.6)',
               cursor: (practiceMode || premoveMode) && !pendingMove ? 'pointer' : 'default',
             },
-            lightSquareStyle: { backgroundColor: boardColors.light, backgroundImage: boardTextureCss.backgroundImage, backgroundSize: boardTextureCss.backgroundSize },
-            darkSquareStyle: { backgroundColor: boardColors.dark, backgroundImage: boardTextureCss.backgroundImageDark ?? boardTextureCss.backgroundImage, backgroundSize: boardTextureCss.backgroundSize },
+            lightSquareStyle: skin.lightSquareStyle,
+            darkSquareStyle: skin.darkSquareStyle,
             pieces: tintedPieces,
             animationDurationInMs: 150,
           }}

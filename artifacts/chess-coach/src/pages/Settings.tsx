@@ -192,14 +192,10 @@ export default function SettingsPage() {
         <div className="grid grid-cols-4 gap-2">
           {(Object.keys(BOARD_TEXTURES) as BoardTexture[]).filter((key) => key.startsWith('cs-')).map((key) => {
             const t = BOARD_TEXTURES[key];
-            const dark = t.backgroundImageDark ?? t.backgroundImage;
             return (
               <SwatchButton key={key} active={boardTexture === key} onClick={() => setBoardTexture(key)} label={t.label}>
-                <div className="w-full aspect-square rounded-lg overflow-hidden grid grid-cols-2 grid-rows-2" style={{ border: '1px solid rgba(255,255,255,0.1)' }}>
-                  {[t.backgroundImage, dark, dark, t.backgroundImage].map((img, i) => (
-                    <div key={i} style={{ backgroundImage: img, backgroundSize: 'cover' }} />
-                  ))}
-                </div>
+                {/* The whole board, exactly as it will look behind the pieces */}
+                <div className="w-full aspect-square rounded-lg" style={{ backgroundImage: t.boardImage ? `url('${t.boardImage}')` : t.backgroundImage, backgroundSize: '100% 100%', border: '1px solid rgba(255,255,255,0.1)' }} />
               </SwatchButton>
             );
           })}

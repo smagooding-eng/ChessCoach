@@ -4,7 +4,7 @@ import { useUser } from '@/context/UserContext';
 export type BoardTheme = 'classic' | 'green' | 'blue' | 'gray' | 'purple' | 'crimson' | 'teal' | 'coal' | 'sunset' | 'rose' | 'amber' | 'mint' | 'indigo' | 'midnight' | 'arctic' | 'custom';
 export type BoardTexture = 'flat' | 'wood' | 'marble' | 'felt' | 'granite' | 'leather' | 'glass' | 'canvas' | 'sandstone' | 'slate' | 'silk'
   // Photographic boards cut from the ChessScout asset pack (see CS_BOARDS below)
-  | 'cs-emerald' | 'cs-obsidian' | 'cs-ivory' | 'cs-walnut' | 'cs-steel' | 'cs-classic' | 'cs-slate' | 'cs-tournament';
+  | 'cs-emerald' | 'cs-obsidian' | 'cs-ivory' | 'cs-walnut' | 'cs-steel' | 'cs-tournament';
 export type AppBackground = 'default' | 'warm-gradient' | 'cool-gradient' | 'noise';
 export type PieceStyle = 'classic' | 'glossy' | 'outlined' | 'ocean' | 'crimson' | 'emerald' | 'royal' | 'flat' | 'depth' | 'shaded' | 'wood3d' | 'marble3d' | 'chrome' | 'gold' | 'copper' | 'obsidian' | 'ivory' | 'custom';
 export type PieceShape = 'default' | 'cburnett' | 'celtic' | 'chessnut' | 'fantasy' | 'spatial' | 'rhosgfx' | 'kiwen-suwi' | 'firi' | 'totoy' | 'papercut' | 'marble';
@@ -48,7 +48,7 @@ export const PIECE_SHAPES: Record<PieceShape, { label: string; attribution: stri
   totoy:      { label: 'Totoy', attribution: 'Piece set "Totoy" by Kosal Sen, CC BY 4.0' },
   papercut:   { label: 'Papercut', attribution: 'Piece set "Papercut" by Nikolay Anzarov, CC BY 4.0' },
   // ChessScout's own artwork (obsidian + ivory marble), shipped as WebP rather than SVG
-  marble:     { label: 'Marble', attribution: null, raster: true },
+  marble:     { label: 'Ivory & Obsidian', attribution: null, raster: true },
 };
 
 export const BOARD_THEMES: Record<Exclude<BoardTheme, 'custom'>, { light: string; dark: string; label: string }> = {
@@ -73,27 +73,27 @@ export const BOARD_THEMES: Record<Exclude<BoardTheme, 'custom'>, { light: string
 // gradient/pattern-based rather than photographic). Applied as an overlay
 // backgroundImage on top of the existing solid boardColors, so texture and
 // color stay independent choices.
-// Photographic boards from the ChessScout asset pack. The pack's full-board images
-// are framed and AI-drawn (irregular grid), so instead of aligning one big image
-// behind the pieces, each board contributes a clean light-square tile and a
-// dark-square tile that every square of that colour uses. They replace the board
-// colour entirely (the tiles are opaque), unlike the subtle CSS textures below.
+// Photographic boards from the ChessScout asset pack. Each is a true edge-to-edge
+// 8x8 image, so it is used as ONE continuous background behind transparent squares
+// (marble veins and wood grain flow across squares, rather than one tile repeating).
+// `boardImage` drives that; the light/dark tiles cut from the same board remain as a
+// fallback for any surface that can only style individual squares. The boards replace
+// the board colour entirely, unlike the subtle CSS textures below.
 const csBoard = (file: string, label: string) => ({
   label,
+  boardImage: `/boards/${file}.webp`,
   backgroundImage: `url('/boards/${file}-light.webp')`,
   backgroundImageDark: `url('/boards/${file}-dark.webp')`,
   backgroundSize: 'cover',
 });
 
-export const BOARD_TEXTURES: Record<BoardTexture, { label: string; backgroundImage: string; backgroundImageDark?: string; backgroundSize?: string }> = {
+export const BOARD_TEXTURES: Record<BoardTexture, { label: string; backgroundImage: string; backgroundImageDark?: string; backgroundSize?: string; boardImage?: string }> = {
   flat:   { label: 'Flat', backgroundImage: 'none' },
   'cs-emerald':    csBoard('emerald', 'Emerald Marble'),
   'cs-obsidian':   csBoard('obsidian', 'Obsidian'),
   'cs-ivory':      csBoard('ivory', 'Ivory'),
   'cs-walnut':     csBoard('walnut', 'Walnut'),
   'cs-steel':      csBoard('steel', 'Steel'),
-  'cs-classic':    csBoard('classic', 'Classic Wood'),
-  'cs-slate':      csBoard('slate', 'Slate Stone'),
   'cs-tournament': csBoard('tournament', 'Tournament'),
   // Plain CSS gradients are inherently regular/mathematical -- a
   // repeating-linear-gradient can only ever look like a hatch pattern or
@@ -248,6 +248,28 @@ export const PIECE_STYLES: Record<Exclude<PieceStyle, 'custom'>, { light: string
     previewLight: 'linear-gradient(135deg, #fffdf2 0%, #f3e8c8 55%, #d9c396 100%)', previewDark: 'linear-gradient(135deg, #b8a06a 0%, #8a7345 55%, #5c4a28 100%)', baseLight: '#f3e8c8', baseDark: '#8a7345' },
 };
 
+// Square styling for react-chessboard, shared by every themed board. A photographic
+// board is painted once on the board itself with transparent squares (so highlights,
+// legal-move dots and last-move marks still draw on top); everything else keeps the
+// per-square colour + optional texture it always had.
+export function boardSkin(
+  colors: { light: string; dark: string },
+  tex: { backgroundImage: string; backgroundImageDark?: string; backgroundSize?: string; boardImage?: string },
+): { boardStyle: React.CSSProperties; lightSquareStyle: React.CSSProperties; darkSquareStyle: React.CSSProperties } {
+  if (tex.boardImage) {
+    return {
+      boardStyle: { backgroundImage: `url('${tex.boardImage}')`, backgroundSize: '100% 100%' },
+      lightSquareStyle: { backgroundColor: 'transparent' },
+      darkSquareStyle: { backgroundColor: 'transparent' },
+    };
+  }
+  return {
+    boardStyle: {},
+    lightSquareStyle: { backgroundColor: colors.light, backgroundImage: tex.backgroundImage, backgroundSize: tex.backgroundSize },
+    darkSquareStyle: { backgroundColor: colors.dark, backgroundImage: tex.backgroundImageDark ?? tex.backgroundImage, backgroundSize: tex.backgroundSize },
+  };
+}
+
 export const BOARD_SIZES: Record<BoardSize, { maxWidth: number; label: string }> = {
   compact:  { maxWidth: 420, label: 'Compact' },
   standard: { maxWidth: 580, label: 'Standard' },
@@ -324,7 +346,7 @@ interface SettingsContextValue extends Settings {
   setPromotionChoice: (v: PromotionChoice) => void;
   setBoardSize: (v: BoardSize) => void;
   boardColors: ColorPair;
-  boardTextureCss: { backgroundImage: string; backgroundImageDark?: string; backgroundSize?: string };
+  boardTextureCss: { backgroundImage: string; backgroundImageDark?: string; backgroundSize?: string; boardImage?: string };
   appBackgroundCss: React.CSSProperties;
   pieceColors: ColorPair & { finish: React.CSSProperties; baseLight: string; baseDark: string };
   boardMaxWidth: number;
@@ -415,7 +437,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     setPromotionChoice: (v) => setSettings((s) => ({ ...s, promotionChoice: v })),
     setBoardSize: (v) => setSettings((s) => ({ ...s, boardSize: v })),
     boardColors: resolvedBoardColors,
-    boardTextureCss: BOARD_TEXTURES[settings.boardTexture],
+    boardTextureCss: BOARD_TEXTURES[settings.boardTexture] ?? BOARD_TEXTURES.flat,
     appBackgroundCss: APP_BACKGROUNDS[settings.appBackground].css,
     pieceColors: resolvedPieceStyle,
     boardMaxWidth: BOARD_SIZES[settings.boardSize].maxWidth,
