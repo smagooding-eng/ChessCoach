@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'wouter';
 import { ChevronRight, Bot, Play, Swords } from 'lucide-react';
 import { BOTS } from '@/lib/chess-bot';
+import { useBotAvatar } from '@/lib/botAvatars';
 import { useUser } from '@/hooks/use-user';
 import { RD } from '@/lib/redesignTheme';
 
@@ -14,6 +15,7 @@ import { RD } from '@/lib/redesignTheme';
 // correspondence UI that doesn't exist yet, so they're intentionally absent.
 export function PlayHub() {
   const { authUser } = useUser();
+  const botAvatar = useBotAvatar();
   const lowest = Math.min(...BOTS.map((b) => b.rating));
   const highest = Math.max(...BOTS.map((b) => b.rating));
 
@@ -57,7 +59,7 @@ export function PlayHub() {
           <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-1">
             {BOTS.map((b) => (
               <Link key={b.name} href="/practice" className="flex w-[78px] shrink-0 flex-col items-center gap-1.5 text-center">
-                <img src={b.avatar} alt="" className="h-14 w-14 rounded-full object-cover" style={{ border: `2px solid ${RD.border}`, background: RD.cardLight }} loading="lazy" />
+                <img src={botAvatar(b)} alt={b.name} className="h-14 w-14 rounded-full object-cover" style={{ border: `2px solid ${RD.border}`, background: RD.cardLight }} loading="lazy" />
                 <span className="w-full truncate text-[12px] font-bold">{b.name}</span>
                 <span className="text-[11px]" style={{ color: RD.muted }}>{b.rating}</span>
               </Link>

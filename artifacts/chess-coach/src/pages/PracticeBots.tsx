@@ -5,6 +5,7 @@ import { Chess } from 'chess.js';
 import { ChessBoard, type MoveQuality } from '@/components/ChessBoard';
 import { normalizeFen } from '@/lib/utils';
 import { BOTS, getBotMove, BotConfig, analyzeMoveQuality, type MoveAnalysisResult } from '@/lib/chess-bot';
+import { useBotAvatar } from '@/lib/botAvatars';
 import { OPENINGS, type OpeningLine } from '@/lib/openings';
 import { AICoachCard, type AICoachTone } from '@/components/AICoachCard';
 import { ArrowLeft, RotateCcw, Flag, Clock, Trophy, Swords, Zap, ChevronRight, ChevronDown, ChevronUp, BookOpen, Check, X, Lightbulb } from 'lucide-react';
@@ -140,6 +141,7 @@ function MoveAnalysisPanel({ move, playerColor }: { move: MoveRecord; playerColo
 }
 
 function BotCard({ bot, onSelect }: { bot: BotConfig; onSelect: (b: BotConfig) => void }) {
+  const botAvatar = useBotAvatar();
   const gradient = TIER_COLORS[bot.personality] ?? 'from-slate-800 to-slate-900 border-white/10';
   return (
     <motion.button
@@ -154,7 +156,7 @@ function BotCard({ bot, onSelect }: { bot: BotConfig; onSelect: (b: BotConfig) =
       )}
     >
       <div className="flex items-center justify-between">
-        <img src={bot.avatar} alt={bot.name} className="w-10 h-10 rounded-full border-2 border-white/20 shadow-md" />
+        <img src={botAvatar(bot)} alt={bot.name} className="w-10 h-10 rounded-full border-2 border-white/20 shadow-md object-cover" />
         <span className="text-xs font-bold px-2.5 py-1 rounded-xl bg-black/30 border border-white/10 text-white/80">
           {bot.rating} ELO
         </span>
@@ -172,6 +174,7 @@ function BotCard({ bot, onSelect }: { bot: BotConfig; onSelect: (b: BotConfig) =
 }
 
 function GameView({ bot, onBack, startFen, startColor, isOnboarding }: { bot: BotConfig; onBack: () => void; startFen?: string; startColor?: 'w' | 'b'; isOnboarding?: boolean }) {
+  const botAvatar = useBotAvatar();
   const [playerColor, setPlayerColor] = useState<'w' | 'b'>(() => {
     if (startColor) return startColor;
     if (startFen) {
@@ -462,7 +465,7 @@ function GameView({ bot, onBack, startFen, startColor, isOnboarding }: { bot: Bo
           <div className="glass-card rounded-xl p-2.5">
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2 min-w-0">
-                <img src={bot.avatar} alt={bot.name} className="w-8 h-8 rounded-full border border-white/20 shadow shrink-0" />
+                <img src={botAvatar(bot)} alt={bot.name} className="w-8 h-8 rounded-full border border-white/20 shadow shrink-0 object-cover" />
                 <div className="min-w-0">
                   <p className="font-bold text-sm truncate">{bot.name}</p>
                   <p className="text-[10px] text-muted-foreground truncate">{bot.personality} · {bot.rating} ELO</p>
