@@ -219,8 +219,8 @@ export default function SettingsPage() {
                 PIECE_SHAPES[key].raster ? (
                   // Raster sets (e.g. Marble) show both sides: the white/black contrast is the point
                   <span className="flex items-end">
-                    <img src={`/pieces/${key}/wN.webp`} alt="" className="w-9 h-9 object-contain" />
-                    <img src={`/pieces/${key}/bN.webp`} alt={PIECE_SHAPES[key].label} className="w-9 h-9 object-contain" />
+                    <img src={`/pieces/${key}/wN.webp?v=3`} alt="" className="w-9 h-9 object-contain" />
+                    <img src={`/pieces/${key}/bN.webp?v=3`} alt={PIECE_SHAPES[key].label} className="w-9 h-9 object-contain" />
                   </span>
                 ) : (
                   <img src={`/pieces/${key}/wN.svg`} alt={PIECE_SHAPES[key].label} className="w-9 h-9" />

@@ -170,10 +170,12 @@ export function buildTintedPieceSet(opts: {
   if (STATIC_SVG_SHAPES.includes(pieceShape)) {
     // 'marble' is raster artwork (WebP); every other static shape is SVG
     const ext = pieceShape === 'marble' ? 'webp' : 'svg';
+    // Version tag so a replaced set of sprites (same file names) is never served from a stale cache
+    const ver = pieceShape === 'marble' ? '?v=3' : '';
     const wrapped: Record<string, (props?: any) => React.ReactElement> = {};
     for (const key of ['wP', 'wR', 'wN', 'wB', 'wQ', 'wK', 'bP', 'bR', 'bN', 'bB', 'bQ', 'bK']) {
       wrapped[key] = ({ svgStyle }: any = {}) => (
-        <img src={`/pieces/${pieceShape}/${key}.${ext}`} alt={key} draggable={false} style={{ width: '100%', height: '100%', ...svgStyle }} />
+        <img src={`/pieces/${pieceShape}/${key}.${ext}${ver}`} alt={key} draggable={false} style={{ width: '100%', height: '100%', ...svgStyle }} />
       );
     }
     return wrapped;
