@@ -1,245 +1,335 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'wouter';
+import { ChevronRight, Target } from 'lucide-react';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip, LineChart, Line } from 'recharts';
 import { useMyAnalysisSummary, useMyWeaknesses } from '@/hooks/use-analysis';
 import { useMyOpenings } from '@/hooks/use-openings';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
-import { BookOpen, Brain, Trophy, Target, ChevronRight } from 'lucide-react';
+import { useMultiEloProgress } from '@/hooks/use-elo-progress';
+import { useUser } from '@/hooks/use-user';
+import { RD } from '@/lib/redesignTheme';
 
-// Same scoped visual system as DashboardRedesign.tsx / GamesRedesign.tsx.
-const RG_BG = '#070906';
-const RG_CARD = 'linear-gradient(180deg,#1b2215,#141a10)';
-const RG_LINE = 'rgba(255,255,255,.12)';
-const RG_TEXT = '#f2f6eb';
-const RG_MUTED = '#a3ad98';
-const RG_GREEN = '#7fd14f';
-const RG_RED = '#ff6a4a';
-const RG_GOLD = '#f2d04a';
+// "My Analytics" (redesign). Every number on this page is real data.
+//
+// Differences from the mockup, on purpose:
+//  - Tabs are Overview / Openings / Weaknesses / Trends. The mockup's
+//    "Tactics" and "Endgame" tabs have no dedicated data behind them
+//    here, so those two would have been empty or misleading.
+//  - The mockup's "Key Improvements" (+42% etc.) needs an
+//    improvement-over-time metric that doesn't exist. It's replaced by
+//    real accuracy-by-phase bars in the same visual style.
+//  - The mockup's "Mistakes Breakdown" donut (blunders/inaccuracies/...)
+//    would need per-type mistake counts that aren't stored as structured
+//    data. The donut shown is the real win/draw/loss breakdown.
 
-const SEV_STYLE: Record<string, { bg: string; text: string }> = {
-  Critical: { bg: 'rgba(255,106,74,.22)', text: '#ffb3a0' },
-  High: { bg: 'rgba(255,138,61,.2)', text: '#ffb37a' },
-  Medium: { bg: 'rgba(242,208,74,.2)', text: RG_GOLD },
-  Low: { bg: 'rgba(127,209,79,.2)', text: RG_GREEN },
+const SEV_STYLE: Record<string, { bg: string; fg: string }> = {
+  Critical: { bg: 'rgba(255,80,88,.18)', fg: '#FF8A8F' },
+  High: { bg: 'rgba(255,138,61,.18)', fg: '#FFB07A' },
+  Medium: { bg: 'rgba(232,180,71,.18)', fg: RD.gold },
+  Low: { bg: 'rgba(95,213,51,.16)', fg: '#7BE05A' },
 };
 
-function Card({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
+const TABS = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'openings', label: 'Openings' },
+  { id: 'weaknesses', label: 'Weaknesses' },
+  { id: 'trends', label: 'Trends' },
+] as const;
+type TabId = (typeof TABS)[number]['id'];
+
+function Card({ children, className = '' }: { children: React.ReactNode; className?: string }) {
   return (
-    <section style={{ background: RG_CARD, border: `1px solid ${RG_LINE}`, borderRadius: 18, padding: '1.25rem', ...style }}>
+    <section className={`rounded-[20px] p-4 ${className}`} style={{ background: RD.card, border: `1px solid ${RD.border}` }}>
       {children}
     </section>
   );
 }
 
-// Every section here, including "Top openings win rate," is backed by
-// real data -- the latter comes from useMyOpenings() (the same hook the
-// classic Openings.tsx page uses), not useMyAnalysisSummary(). An
-// earlier version of this file incorrectly omitted that section as
-// "no real data exists" -- that was a research gap (this hook wasn't
-// checked), not actually true, and has been corrected.
+function Sparkline({ values, color }: { values: number[]; color: string }) {
+  if (values.length < 2) return <div className="h-10 w-full" />;
+  const data = values.map((v, i) => ({ i, v }));
+  return (
+    <div className="h-10 w-full">
+      <ResponsiveContainer width="100%" height="100%">
+        <LineChart data={data} margin={{ top: 4, right: 2, bottom: 4, left: 2 }}>
+          <Line type="monotone" dataKey="v" stroke={color} strokeWidth={2.2} dot={false} isAnimationActive={false} />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+function Delta({ value, suffix = '' }: { value: number; suffix?: string }) {
+  if (!value) return null;
+  const up = value > 0;
+  return (
+    <span className="text-[12px] font-extrabold" style={{ color: up ? RD.green : RD.red }}>
+      {up ? '▲' : '▼'} {Math.abs(value)}{suffix}
+    </span>
+  );
+}
+
+const tooltipStyle = { background: RD.cardSolid, border: `1px solid ${RD.border}`, borderRadius: 10, color: RD.text, fontSize: 12 };
+
 export function AnalysisRedesign() {
+  const { username } = useUser();
   const { data: summary } = useMyAnalysisSummary();
   const { data: weaknessesData } = useMyWeaknesses();
   const { data: openingsData } = useMyOpenings();
+  const { data: multiElo } = useMultiEloProgress(username ?? undefined);
+  const [tab, setTab] = useState<TabId>('overview');
 
   if (!summary) {
     return (
-      <div style={{ background: RG_BG, color: RG_TEXT, minHeight: '100vh' }} className="-m-4 p-4 md:-m-6 md:p-6 flex items-center justify-center">
-        <div className="w-8 h-8 border-4 rounded-full animate-spin" style={{ borderColor: RG_GREEN, borderTopColor: 'transparent' }} />
+      <div className="-m-4 flex min-h-screen items-center justify-center p-4 md:-m-6" style={{ background: RD.bg }}>
+        <div className="h-8 w-8 animate-spin rounded-full border-4" style={{ borderColor: RD.green, borderTopColor: 'transparent' }} />
       </div>
     );
   }
 
-  const totalDecided = summary.wins + summary.losses + summary.draws;
-  const winPct = totalDecided > 0 ? Math.round((summary.wins / totalDecided) * 100) : 0;
-  const donutStops = totalDecided > 0
-    ? `${RG_GREEN} 0 ${winPct}%, #8b8f84 ${winPct}% ${winPct + Math.round((summary.draws / totalDecided) * 100)}%, ${RG_RED} ${winPct + Math.round((summary.draws / totalDecided) * 100)}% 100%`
-    : `${RG_MUTED} 0 100%`;
+  const decided = summary.wins + summary.losses + summary.draws;
+  const pct = (n: number) => (decided > 0 ? (n / decided) * 100 : 0);
+  const winRate = pct(summary.wins);
 
-  const monthlyTrend = (summary.monthlyTrend ?? []).filter(p => p.games > 0).map(p => {
+  // Rating: same "average of the platforms" figure the dashboard shows
+  const ratings: number[] = [];
+  if (multiElo?.chesscom?.hasData) ratings.push(multiElo.chesscom.currentRating);
+  if (multiElo?.lichess?.hasData) ratings.push(multiElo.lichess.currentRating);
+  const rating = ratings.length ? Math.round(ratings.reduce((a, b) => a + b, 0) / ratings.length) : null;
+  const ratingDelta = multiElo?.combined?.delta ?? 0;
+  const ratingSpark = multiElo?.combined?.sparkline ?? [];
+
+  const monthly = (summary.monthlyTrend ?? []).filter((p) => p.games > 0).map((p) => {
     const [y, m] = p.month.split('-');
     return { ...p, label: new Date(parseInt(y), parseInt(m) - 1, 1).toLocaleString('en-US', { month: 'short' }), winPct: Math.round((p.winRate || 0) * 100) };
   });
-  const accuracyTrend = (summary.accuracyTrend ?? []).map(p => {
+  const accuracy = (summary.accuracyTrend ?? []).map((p) => {
     const [y, m] = p.month.split('-');
     return { ...p, label: new Date(parseInt(y), parseInt(m) - 1, 1).toLocaleString('en-US', { month: 'short' }) };
   });
+  // Month-over-month change in win rate, in percentage points -- only
+  // shown when there are at least two months of data to compare.
+  const winDelta = monthly.length >= 2
+    ? Math.round((monthly[monthly.length - 1].winRate - monthly[monthly.length - 2].winRate) * 1000) / 10
+    : 0;
 
-  const phases: Array<{ key: 'opening' | 'middlegame' | 'endgame'; label: string; icon: typeof BookOpen }> = [
-    { key: 'opening', label: 'Opening', icon: BookOpen },
-    { key: 'middlegame', label: 'Middlegame', icon: Brain },
-    { key: 'endgame', label: 'Endgame', icon: Trophy },
+  const donut = `conic-gradient(${RD.green} 0 ${pct(summary.wins)}%, #8A949B ${pct(summary.wins)}% ${pct(summary.wins) + pct(summary.draws)}%, ${RD.red} ${pct(summary.wins) + pct(summary.draws)}% 100%)`;
+  const legend = [
+    { label: 'Wins', n: summary.wins, color: RD.green },
+    { label: 'Draws', n: summary.draws, color: '#8A949B' },
+    { label: 'Losses', n: summary.losses, color: RD.red },
   ];
 
+  const phases = summary.phaseAccuracy && summary.phaseAccuracy.gamesAnalyzed > 0
+    ? ([['Opening', 'opening'], ['Middlegame', 'middlegame'], ['Endgame', 'endgame']] as const).map(([label, key]) => ({ label, ...summary.phaseAccuracy![key] }))
+    : [];
+
+  const openings = openingsData?.openings
+    ? [...openingsData.openings].filter((o) => o.totalGames >= 3).sort((a, b) => b.winRate - a.winRate).slice(0, 8)
+    : [];
+  const weaknesses = weaknessesData?.weaknesses ?? [];
+
   return (
-    <div style={{ background: RG_BG, color: RG_TEXT, minHeight: '100vh', fontFamily: '"Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", sans-serif' }} className="-m-4 p-4 md:-m-6 md:p-6">
-      <div className="max-w-[1000px] mx-auto grid gap-4">
-        <div>
-          <h1 className="text-2xl font-extrabold tracking-tight">Deep Analysis</h1>
-          <p style={{ color: RG_MUTED }} className="text-sm mt-1">Patterns, accuracy, and trends across your {summary.totalGames.toLocaleString()} games.</p>
+    <div className="-m-4 min-h-screen px-3 pt-3 md:-m-6 md:px-6 md:pt-6 md:pb-12 pb-[calc(7.5rem+env(safe-area-inset-bottom))]" style={{ background: RD.bg, color: RD.text }}>
+      <div className="mx-auto grid w-full max-w-[760px] gap-3">
+        <div className="px-1">
+          <h1 className="text-[24px] font-extrabold tracking-tight">My Analytics</h1>
+          <p className="mt-1 text-[13px]" style={{ color: RD.muted }}>Patterns, accuracy, and trends across your {summary.totalGames.toLocaleString()} games.</p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Performance breakdown */}
-          <Card>
-            <h2 className="text-base font-extrabold mb-3">Performance breakdown</h2>
-            <div className="flex items-center gap-5">
-              <div className="w-[110px] h-[110px] rounded-full flex items-center justify-center shrink-0" style={{ background: `conic-gradient(${donutStops})` }}>
-                <div className="w-20 h-20 rounded-full flex flex-col items-center justify-center text-center" style={{ background: '#161c11' }}>
-                  <b className="text-xl font-extrabold">{winPct}%</b>
-                  <small style={{ color: RG_MUTED }} className="text-[10px]">win</small>
+        <div className="flex items-center gap-1 rounded-[14px] p-1" style={{ background: RD.cardSolid, border: `1px solid ${RD.border}` }}>
+          {TABS.map((t) => {
+            const active = tab === t.id;
+            return (
+              <button
+                key={t.id}
+                onClick={() => setTab(t.id)}
+                className="flex-1 rounded-[10px] py-2 text-[12.5px] font-bold transition-colors"
+                style={active ? { background: 'rgba(139,234,69,.10)', color: RD.green, boxShadow: `inset 0 0 0 1px ${RD.green}` } : { background: 'transparent', color: RD.muted }}
+              >
+                {t.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {tab === 'overview' && (
+          <>
+            <div className="grid grid-cols-2 gap-3">
+              <Card>
+                <p className="text-[12px]" style={{ color: RD.muted }}>Rating</p>
+                <div className="mt-1 flex items-baseline gap-2">
+                  <b className="text-[28px] font-extrabold leading-none">{rating ?? '—'}</b>
+                  <Delta value={ratingDelta} />
+                </div>
+                <div className="mt-2"><Sparkline values={ratingSpark} color={RD.green} /></div>
+              </Card>
+              <Card>
+                <p className="text-[12px]" style={{ color: RD.muted }}>Win Rate</p>
+                <div className="mt-1 flex items-baseline gap-2">
+                  <b className="text-[28px] font-extrabold leading-none">{decided > 0 ? `${winRate.toFixed(1)}%` : '—'}</b>
+                  <Delta value={winDelta} suffix="%" />
+                </div>
+                <div className="mt-2"><Sparkline values={monthly.map((m) => m.winPct)} color={RD.green} /></div>
+              </Card>
+            </div>
+
+            <Card>
+              <h2 className="mb-3 text-[16px] font-extrabold">Results Breakdown</h2>
+              <div className="flex items-center gap-5">
+                <div className="grid h-[118px] w-[118px] shrink-0 place-items-center rounded-full" style={{ background: decided > 0 ? donut : RD.cardLight }}>
+                  <div className="grid h-[84px] w-[84px] place-items-center rounded-full text-center" style={{ background: RD.cardSolid }}>
+                    <div>
+                      <b className="block text-[20px] font-extrabold leading-none">{decided.toLocaleString()}</b>
+                      <span className="text-[10px]" style={{ color: RD.muted }}>Total</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="grid flex-1 gap-2">
+                  {legend.map((l) => (
+                    <div key={l.label} className="flex items-center gap-2 text-[13px]">
+                      <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: l.color }} />
+                      <span className="flex-1" style={{ color: RD.muted }}>{l.label}</span>
+                      <b>{l.n.toLocaleString()}</b>
+                      <span className="w-10 text-right text-[12px]" style={{ color: RD.muted }}>{pct(l.n).toFixed(0)}%</span>
+                    </div>
+                  ))}
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-2 flex-1">
-                {[
-                  { label: 'Wins', value: summary.wins },
-                  { label: 'Losses', value: summary.losses },
-                  { label: 'Draws', value: summary.draws },
-                  { label: 'Avg Rating', value: summary.avgRating || '—' },
-                ].map((s) => (
-                  <div key={s.label} className="rounded-lg p-2.5" style={{ background: 'rgba(0,0,0,.22)' }}>
-                    <b className="text-lg font-extrabold block">{s.value}</b>
-                    <small style={{ color: RG_MUTED }} className="text-xs">{s.label}</small>
+            </Card>
+
+            {phases.length > 0 && (
+              <Card>
+                <div className="mb-3 flex items-center justify-between">
+                  <h2 className="text-[16px] font-extrabold">Accuracy by Phase</h2>
+                  <span className="text-[11px]" style={{ color: RD.muted }}>{summary.phaseAccuracy!.gamesAnalyzed} reviewed game{summary.phaseAccuracy!.gamesAnalyzed === 1 ? '' : 's'}</span>
+                </div>
+                <div className="grid gap-3">
+                  {phases.map((p) => (
+                    <div key={p.label}>
+                      <div className="mb-1 flex items-center justify-between text-[13px]">
+                        <span>{p.label}</span>
+                        <b>{p.moves > 0 ? `${p.accuracy}%` : '—'}</b>
+                      </div>
+                      <div className="h-2 overflow-hidden rounded-full" style={{ background: 'rgba(255,255,255,.08)' }}>
+                        <div className="h-full rounded-full" style={{ width: `${p.moves > 0 ? Math.max(p.accuracy, 3) : 0}%`, background: `linear-gradient(90deg, ${RD.greenDark}, ${RD.green})` }} />
+                      </div>
+                      <span className="text-[11px]" style={{ color: RD.muted }}>{p.moves.toLocaleString()} moves</span>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            )}
+          </>
+        )}
+
+        {tab === 'openings' && (
+          <Card>
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-[16px] font-extrabold">Top Openings by Win Rate</h2>
+              <Link href="/openings" className="flex items-center gap-1 text-[12px] font-extrabold uppercase tracking-wider" style={{ color: RD.green }}>All openings <ChevronRight size={14} /></Link>
+            </div>
+            {openings.length ? (
+              <div className="grid gap-3">
+                {openings.map((o) => (
+                  <div key={o.opening}>
+                    <div className="mb-1 flex items-center justify-between gap-3 text-[13px]">
+                      <span className="truncate">{o.opening}</span>
+                      <b>{o.winRate}%</b>
+                    </div>
+                    <div className="h-2 overflow-hidden rounded-full" style={{ background: 'rgba(255,255,255,.08)' }}>
+                      <div className="h-full rounded-full" style={{ width: `${Math.max(o.winRate, 3)}%`, background: o.winRate >= 50 ? `linear-gradient(90deg, ${RD.greenDark}, ${RD.green})` : RD.red }} />
+                    </div>
+                    <span className="text-[11px]" style={{ color: RD.muted }}>{o.totalGames} games</span>
                   </div>
                 ))}
-              </div>
-            </div>
-          </Card>
-
-          {/* Identified weaknesses */}
-          <Card>
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-base font-extrabold">Identified weaknesses</h2>
-              {!!weaknessesData?.weaknesses?.length && (
-                <span style={{ color: RG_MUTED }} className="text-xs">{weaknessesData.weaknesses.length} found</span>
-              )}
-            </div>
-            {weaknessesData?.weaknesses?.length ? (
-              <div className="grid gap-1.5">
-                {weaknessesData.weaknesses.slice(0, 4).map((w) => {
-                  const sev = SEV_STYLE[w.severity] ?? SEV_STYLE.Low;
-                  return (
-                    <Link key={w.id} href={`/analysis/${w.id}`} className="flex items-center gap-2.5 p-2 rounded-xl hover:bg-white/5 transition-colors">
-                      <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded shrink-0" style={{ background: sev.bg, color: sev.text }}>{w.severity}</span>
-                      <div className="flex-1 min-w-0">
-                        <b className="text-sm block truncate">{w.category}</b>
-                        <small style={{ color: RG_MUTED }} className="block text-xs truncate">{w.description}</small>
-                      </div>
-                      <ChevronRight className="w-4 h-4 shrink-0" style={{ color: RG_MUTED }} />
-                    </Link>
-                  );
-                })}
+                <p className="text-[11.5px]" style={{ color: RD.muted }}>Openings played fewer than 3 times aren't shown — their win rate isn't reliable yet.</p>
               </div>
             ) : (
-              <div className="text-center py-6" style={{ color: RG_MUTED }}>
-                <Target className="w-7 h-7 mx-auto mb-2 opacity-50" />
-                <p className="text-sm">No weaknesses found yet.</p>
-                <p className="text-xs mt-0.5">Run Deep Analysis to discover your patterns.</p>
-              </div>
+              <p className="py-8 text-center text-[13px]" style={{ color: RD.muted }}>Play an opening at least 3 times to see its win rate here.</p>
             )}
-          </Card>
-        </div>
-
-        {/* Top openings win rate -- real data via useMyOpenings(), same
-            hook the classic Openings.tsx page uses. Filtered to openings
-            with at least 3 games, matching that page's own convention,
-            since a single game is either 0% or 100% and isn't a
-            meaningful "win rate" yet. */}
-        {!!openingsData?.openings?.length && (() => {
-          const ranked = [...openingsData.openings].filter(o => o.totalGames >= 3).sort((a, b) => b.winRate - a.winRate).slice(0, 5);
-          if (ranked.length === 0) return null;
-          return (
-            <Card>
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="text-base font-extrabold">Top openings win rate</h2>
-                <Link href="/openings" className="text-xs font-extrabold uppercase tracking-wide" style={{ color: RG_GREEN }}>All openings →</Link>
-              </div>
-              <div className="grid gap-2">
-                {ranked.map((o) => (
-                  <div key={o.opening} className="grid grid-cols-[minmax(0,1fr)_1fr_44px] items-center gap-3 text-sm">
-                    <span style={{ color: RG_MUTED }} className="truncate">{o.opening}</span>
-                    <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,.1)' }}>
-                      <div style={{ width: `${Math.max(o.winRate, 2)}%`, height: '100%', background: o.winRate >= 50 ? RG_GREEN : RG_RED }} />
-                    </div>
-                    <b className="text-right">{o.winRate}%</b>
-                  </div>
-                ))}
-              </div>
-              <p style={{ color: RG_MUTED }} className="text-xs mt-3">Openings played fewer than 3 times aren't shown — their win rate isn't reliable yet.</p>
-            </Card>
-          );
-        })()}
-
-        {/* Accuracy by phase */}
-        {summary.phaseAccuracy && summary.phaseAccuracy.gamesAnalyzed > 0 && (
-          <Card>
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-base font-extrabold">Accuracy by game phase</h2>
-              <span style={{ color: RG_MUTED }} className="text-xs">From {summary.phaseAccuracy.gamesAnalyzed} reviewed game{summary.phaseAccuracy.gamesAnalyzed === 1 ? '' : 's'}</span>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              {phases.map((p) => {
-                const stat = summary.phaseAccuracy![p.key];
-                return (
-                  <div key={p.key} className="rounded-xl p-3.5" style={{ background: 'rgba(0,0,0,.22)' }}>
-                    <div className="flex items-center gap-2 mb-1.5">
-                      <p.icon className="w-4 h-4" style={{ color: RG_GREEN }} />
-                      <span style={{ color: RG_MUTED }} className="text-xs font-bold uppercase tracking-wide">{p.label} · {stat.moves} moves</span>
-                    </div>
-                    <b className="text-2xl font-extrabold">{stat.moves > 0 ? `${stat.accuracy}%` : '—'}</b>
-                  </div>
-                );
-              })}
-            </div>
           </Card>
         )}
 
-        {/* Trend charts */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {monthlyTrend.length > 0 && (
-            <Card>
-              <h2 className="text-base font-extrabold mb-3">Win rate, last 6 months</h2>
-              <div style={{ height: 176, marginLeft: -12 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={monthlyTrend} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
-                    <defs>
-                      <linearGradient id="rgWinGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor={RG_GREEN} stopOpacity={0.5} />
-                        <stop offset="100%" stopColor={RG_GREEN} stopOpacity={0.02} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,.08)" vertical={false} />
-                    <XAxis dataKey="label" tick={{ fill: RG_MUTED, fontSize: 11 }} axisLine={false} tickLine={false} />
-                    <YAxis domain={[0, 100]} tick={{ fill: RG_MUTED, fontSize: 11 }} axisLine={false} tickLine={false} width={32} unit="%" />
-                    <RechartsTooltip contentStyle={{ background: '#141a10', border: `1px solid ${RG_LINE}`, borderRadius: 8, color: RG_TEXT, fontSize: 12 }} />
-                    <Area type="monotone" dataKey="winPct" stroke={RG_GREEN} strokeWidth={2.5} fill="url(#rgWinGradient)" dot={{ r: 3, fill: RG_GREEN, strokeWidth: 0 }} />
-                  </AreaChart>
-                </ResponsiveContainer>
+        {tab === 'weaknesses' && (
+          <Card className="!p-2">
+            <div className="flex items-center justify-between px-2 pb-2 pt-2">
+              <h2 className="text-[16px] font-extrabold">Identified Weaknesses</h2>
+              {weaknesses.length > 0 && <span className="text-[12px]" style={{ color: RD.muted }}>{weaknesses.length} found</span>}
+            </div>
+            {weaknesses.length ? (
+              weaknesses.map((w, i) => {
+                const sev = SEV_STYLE[w.severity] ?? SEV_STYLE.Low;
+                return (
+                  <Link
+                    key={w.id}
+                    href={`/analysis/${w.id}`}
+                    className="flex items-center gap-3 rounded-xl px-2.5 py-3 transition-colors hover:bg-white/[0.03]"
+                    style={{ borderTop: i ? `1px solid ${RD.border}` : `1px solid ${RD.border}` }}
+                  >
+                    <span className="shrink-0 rounded-md px-2 py-1 text-[10.5px] font-extrabold" style={{ background: sev.bg, color: sev.fg }}>{w.severity}</span>
+                    <div className="min-w-0 flex-1">
+                      <b className="block truncate text-[14px]">{w.category}</b>
+                      <span className="block truncate text-[12px]" style={{ color: RD.muted }}>{w.description}</span>
+                    </div>
+                    <ChevronRight size={15} className="shrink-0" style={{ color: RD.muted }} />
+                  </Link>
+                );
+              })
+            ) : (
+              <div className="py-10 text-center" style={{ color: RD.muted }}>
+                <Target size={28} className="mx-auto mb-2 opacity-50" />
+                <p className="text-[13px]">No weaknesses found yet.</p>
+                <p className="mt-0.5 text-[12px]">Run Deep Analysis to discover your patterns.</p>
               </div>
-            </Card>
-          )}
-          {accuracyTrend.length > 0 && (
-            <Card>
-              <h2 className="text-base font-extrabold mb-3">Accuracy over time</h2>
-              <div style={{ height: 176, marginLeft: -12 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={accuracyTrend} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
-                    <defs>
-                      <linearGradient id="rgAccGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor={RG_GOLD} stopOpacity={0.5} />
-                        <stop offset="100%" stopColor={RG_GOLD} stopOpacity={0.02} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,.08)" vertical={false} />
-                    <XAxis dataKey="label" tick={{ fill: RG_MUTED, fontSize: 11 }} axisLine={false} tickLine={false} />
-                    <YAxis domain={[0, 100]} tick={{ fill: RG_MUTED, fontSize: 11 }} axisLine={false} tickLine={false} width={32} unit="%" />
-                    <RechartsTooltip contentStyle={{ background: '#141a10', border: `1px solid ${RG_LINE}`, borderRadius: 8, color: RG_TEXT, fontSize: 12 }} />
-                    <Area type="monotone" dataKey="accuracy" stroke={RG_GOLD} strokeWidth={2.5} fill="url(#rgAccGradient)" dot={{ r: 3, fill: RG_GOLD, strokeWidth: 0 }} />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-            </Card>
-          )}
-        </div>
+            )}
+          </Card>
+        )}
+
+        {tab === 'trends' && (
+          <>
+            {monthly.length > 0 ? (
+              <Card>
+                <h2 className="mb-3 text-[16px] font-extrabold">Win Rate, Last 6 Months</h2>
+                <div style={{ height: 190, marginLeft: -12 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={monthly} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
+                      <defs>
+                        <linearGradient id="rdWin" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={RD.green} stopOpacity={0.45} /><stop offset="100%" stopColor={RD.green} stopOpacity={0.02} /></linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,.07)" vertical={false} />
+                      <XAxis dataKey="label" tick={{ fill: RD.muted, fontSize: 11 }} axisLine={false} tickLine={false} />
+                      <YAxis domain={[0, 100]} tick={{ fill: RD.muted, fontSize: 11 }} axisLine={false} tickLine={false} width={34} unit="%" />
+                      <RechartsTooltip contentStyle={tooltipStyle} />
+                      <Area type="monotone" dataKey="winPct" stroke={RD.green} strokeWidth={2.5} fill="url(#rdWin)" dot={{ r: 3, fill: RD.green, strokeWidth: 0 }} />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </Card>
+            ) : null}
+            {accuracy.length > 0 ? (
+              <Card>
+                <h2 className="mb-3 text-[16px] font-extrabold">Accuracy Over Time</h2>
+                <div style={{ height: 190, marginLeft: -12 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={accuracy} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
+                      <defs>
+                        <linearGradient id="rdAcc" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={RD.gold} stopOpacity={0.45} /><stop offset="100%" stopColor={RD.gold} stopOpacity={0.02} /></linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,.07)" vertical={false} />
+                      <XAxis dataKey="label" tick={{ fill: RD.muted, fontSize: 11 }} axisLine={false} tickLine={false} />
+                      <YAxis domain={[0, 100]} tick={{ fill: RD.muted, fontSize: 11 }} axisLine={false} tickLine={false} width={34} unit="%" />
+                      <RechartsTooltip contentStyle={tooltipStyle} />
+                      <Area type="monotone" dataKey="accuracy" stroke={RD.gold} strokeWidth={2.5} fill="url(#rdAcc)" dot={{ r: 3, fill: RD.gold, strokeWidth: 0 }} />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </Card>
+            ) : null}
+            {monthly.length === 0 && accuracy.length === 0 && (
+              <Card><p className="py-8 text-center text-[13px]" style={{ color: RD.muted }}>Trends appear once you have a few months of games.</p></Card>
+            )}
+          </>
+        )}
       </div>
     </div>
   );

@@ -1,5 +1,5 @@
 import { Router, type IRouter, type Request, type Response } from "express";
-import { requireAdmin, requireAuth, isUserPremium } from "../middlewares/authMiddleware";
+import { requireAdmin, requireAuth } from "../middlewares/authMiddleware";
 import { db, chessTrapsTable, trapProgressTable } from "@workspace/db";
 import { eq, and, asc } from "drizzle-orm";
 
@@ -33,30 +33,9 @@ router.get("/traps/:id", requireAuth, async (req: Request, res: Response) => {
       return;
     }
 
-    // Paywall: beginner traps are free for every logged-in user.
-    // Intermediate/advanced require Pro -- checked server-side so this
-    // can't be bypassed by calling the API directly. Non-premium users
-    // get the summary (for the upgrade prompt) but not the actual
-    // training content.
-    if (trap.difficulty !== "beginner") {
-      const premium = await isUserPremium(req.user!.id);
-      if (!premium) {
-        res.json({
-          trap: {
-            id: trap.id,
-            name: trap.name,
-            category: trap.category,
-            difficulty: trap.difficulty,
-            trapSide: trap.trapSide,
-            summary: trap.summary,
-          },
-          locked: true,
-          progress: { commit: false, avoid: false },
-        });
-        return;
-      }
-    }
-
+    // No paywall: traps are static training content with no AI/API cost,
+    // so every difficulty is free for any logged-in user. (This used to
+    // return summary-only + locked:true for non-beginner traps.)
     let progress: { commit: boolean; avoid: boolean } = { commit: false, avoid: false };
     const rows = await db.select().from(trapProgressTable)
       .where(and(eq(trapProgressTable.trapId, id), eq(trapProgressTable.userId, req.user!.id)));
@@ -83,19 +62,13 @@ router.post("/traps/:id/attempt", requireAuth, async (req: Request, res: Respons
       return;
     }
 
-    // Re-check the paywall here too -- prevents recording progress on
-    // locked content via a direct API call.
+    // Progress recording follows the same rule as viewing: no paywall.
+    // The existence check stays -- it's what turns a bad id into a clean
+    // 404 instead of a failed insert.
     const [trap] = await db.select().from(chessTrapsTable).where(eq(chessTrapsTable.id, id));
     if (!trap) {
       res.status(404).json({ error: "Trap not found" });
       return;
-    }
-    if (trap.difficulty !== "beginner") {
-      const premium = await isUserPremium(req.user!.id);
-      if (!premium) {
-        res.status(403).json({ error: "Premium subscription required" });
-        return;
-      }
     }
 
     const [existing] = await db.select().from(trapProgressTable)

@@ -1,22 +1,56 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useLayoutEffect } from 'react';
 import { Link, useLocation } from 'wouter';
 import { useUser } from '@/hooks/use-user';
 import { useChessPlayer } from '@/hooks/use-chess-player';
 import { useMultiEloProgress } from '@/hooks/use-elo-progress';
+import { useDashboardRedesignFlag } from '@/hooks/use-app-config';
 import { useLiveRatings, bestLiveRating } from '@/hooks/use-live-ratings';
-import { LayoutDashboard, Import, History, BrainCircuit, GraduationCap, Swords, BookOpen, LogOut, MoreHorizontal, ChevronRight, Bot, Crown, Trophy, Play, Search, Download, Puzzle, User, Settings, CreditCard, Camera, Shield } from 'lucide-react';
+import { LayoutDashboard, Import, History, BrainCircuit, GraduationCap, Swords, BookOpen, LogOut, MoreHorizontal, ChevronRight, Bot, Crown, Trophy, Play, Search, Download, Puzzle, User, Settings, CreditCard, Camera, Shield, Target, BarChart3 } from 'lucide-react';
 import { usePwaInstall } from '@/hooks/use-pwa-install';
 import { InstallGuide } from '@/components/InstallGuide';
 import { cn } from '@/lib/utils';
 import { AnimatePresence, motion } from 'framer-motion';
 
-const CHESSCOM_GREEN = '#81b64c';
-const BG_DARK = '#262421';
-const BG_SIDEBAR = '#1e1c1a';
-const BG_CARD = '#302e2b';
-const TEXT_LIGHT = '#e8e6e3';
-const TEXT_MUTED = '#9e9b98';
-const BORDER_COLOR = 'rgba(129,182,76,0.06)';
+// Palette is CSS variables with the original values as fallbacks: with the
+// redesign toggle OFF nothing sets the --cs-* variables, so every value
+// resolves to exactly what it was before. With it ON, index.css's
+// `html.cs-redesign` block supplies the new near-black / neon-green set.
+const CHESSCOM_GREEN = 'var(--cs-green, #81b64c)';
+const BG_DARK = 'var(--cs-bg-dark, #262421)';
+const BG_SIDEBAR = 'var(--cs-bg-sidebar, #1e1c1a)';
+const BG_CARD = 'var(--cs-bg-card, #302e2b)';
+const TEXT_LIGHT = 'var(--cs-text-light, #e8e6e3)';
+const TEXT_MUTED = 'var(--cs-text-muted, #9e9b98)';
+const BORDER_COLOR = 'var(--cs-border, rgba(129,182,76,0.06))';
+// Translucent sidebar backgrounds used to be `${BG_SIDEBAR}f5` / `f8` hex
+// alpha suffixes, which can't be built from a var() -- own variables now.
+const BG_SIDEBAR_95 = 'var(--cs-sidebar-a95, #1e1c1af5)';
+const BG_SIDEBAR_97 = 'var(--cs-sidebar-a97, #1e1c1af8)';
+
+// Inline outline icons for the redesigned nav/header (avoids depending on
+// icon names this app doesn't already import elsewhere).
+function HouseIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z" />
+    </svg>
+  );
+}
+function BellIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+      <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+    </svg>
+  );
+}
+// Bottom-nav icons the redesign mockup uses (house / target / swords / bars)
+const REDESIGN_NAV_ICON: Record<string, React.ElementType> = {
+  '/': HouseIcon,
+  '/opponents': Target,
+  '/games': Swords,
+  '/analysis': BarChart3,
+};
 
 const PRIMARY_NAV = [
   { href: '/',          label: 'Home',            icon: LayoutDashboard },
@@ -48,11 +82,11 @@ const ALL_NAV = [...PRIMARY_NAV, ...SECONDARY_NAV, ...ADMIN_NAV];
 function PlayerAvatar({ avatar, username, size = 'md' }: { avatar?: string; username?: string; size?: 'sm' | 'md' | 'lg' }) {
   const dim = size === 'sm' ? 28 : size === 'lg' ? 44 : 34;
   if (avatar) {
-    return <img src={avatar} alt={username} className="rounded-full object-cover" style={{ width: dim, height: dim, border: `2px solid rgba(129,182,76,0.3)` }} />;
+    return <img src={avatar} alt={username} className="rounded-full object-cover" style={{ width: dim, height: dim, border: '2px solid var(--cs-avatar-border, rgba(129,182,76,0.3))' }} />;
   }
   return (
     <div className="rounded-full flex items-center justify-center shrink-0"
-      style={{ width: dim, height: dim, background: 'rgba(129,182,76,0.12)', border: `2px solid rgba(129,182,76,0.25)` }}>
+      style={{ width: dim, height: dim, background: 'rgba(129,182,76,0.12)', border: '2px solid var(--cs-avatar-border, rgba(129,182,76,0.25))' }}>
       <span className="font-black" style={{ color: CHESSCOM_GREEN, fontSize: dim * 0.35 }}>{username?.[0]?.toUpperCase()}</span>
     </div>
   );
@@ -92,6 +126,14 @@ function SidebarLink({ item, isActive }: { item: typeof ALL_NAV[0]; isActive: bo
 // persistent app chrome competing for space would defeat the purpose.
 export function Layout({ children, fullscreen }: { children: React.ReactNode; fullscreen?: boolean }) {
   const [location] = useLocation();
+  const { enabled: redesign } = useDashboardRedesignFlag();
+  // While the redesign toggle is on, <html> carries `cs-redesign`, which
+  // index.css uses to swap the whole app's theme (incl. portaled dialogs).
+  // Layout only wraps the signed-in app, so public/marketing pages never get it.
+  useLayoutEffect(() => {
+    document.documentElement.classList.toggle('cs-redesign', redesign);
+    return () => document.documentElement.classList.remove('cs-redesign');
+  }, [redesign]);
   const { username, logout, isAuthenticated, authLogout, isPremium, subscription, authUser } = useUser();
   const { player } = useChessPlayer(username ?? undefined);
   const { data: multiElo } = useMultiEloProgress(username ?? undefined);
@@ -191,7 +233,30 @@ export function Layout({ children, fullscreen }: { children: React.ReactNode; fu
         </div>
       </aside>
 
-      <header className="md:hidden sticky top-0 z-50 top-nav-safe" style={{ background: `${BG_SIDEBAR}f5` }}>
+      <header className="md:hidden sticky top-0 z-50 top-nav-safe" style={{ background: BG_SIDEBAR_95 }}>
+        {redesign ? (
+          <div className="flex items-center justify-between px-4 h-[60px]" style={{ borderBottom: `1px solid ${BORDER_COLOR}`, backdropFilter: 'blur(16px)' }}>
+            <Link href="/" className="flex items-center gap-2.5 active:opacity-70 transition-opacity">
+              <img src={`${import.meta.env.BASE_URL}images/logo.svg`} alt="ChessScout.net" className="w-8 h-8 object-contain" />
+              <span className="text-[20px] font-extrabold tracking-tight leading-none" style={{ color: TEXT_LIGHT }}>
+                Chess<span style={{ color: CHESSCOM_GREEN }}>Scout</span>.net
+              </span>
+            </Link>
+            <div className="flex items-center gap-0.5">
+              <Link href="/lookup" className="grid h-10 w-10 place-items-center rounded-full active:bg-white/5" style={{ color: TEXT_LIGHT }} aria-label="Look up a player or game">
+                <Search className="w-[22px] h-[22px]" />
+              </Link>
+              {/* No notification inbox exists in the app, so no unread dot is
+                  shown; push notification settings live on Profile. */}
+              <Link href="/profile" className="grid h-10 w-10 place-items-center rounded-full active:bg-white/5" style={{ color: TEXT_LIGHT }} aria-label="Notification settings">
+                <BellIcon className="w-[22px] h-[22px]" />
+              </Link>
+              <button onClick={() => setProfileOpen(o => !o)} className="ml-1.5 active:opacity-70 transition-opacity" aria-label="Account menu">
+                <PlayerAvatar avatar={player?.avatar} username={username ?? ''} size="md" />
+              </button>
+            </div>
+          </div>
+        ) : (
         <div className="flex items-center justify-between px-4 h-12" style={{ borderBottom: `1px solid ${BORDER_COLOR}`, backdropFilter: 'blur(16px)' }}>
           <Link href="/" className="flex items-center gap-2 active:opacity-70 transition-opacity">
             <img src={`${import.meta.env.BASE_URL}images/logo.svg`} alt="ChessScout.net" className="w-6 h-6 object-contain" />
@@ -215,6 +280,7 @@ export function Layout({ children, fullscreen }: { children: React.ReactNode; fu
             </button>
           </div>
         </div>
+        )}
         <AnimatePresence>
           {profileOpen && (
             <motion.div
@@ -261,18 +327,19 @@ export function Layout({ children, fullscreen }: { children: React.ReactNode; fu
         </div>
       </main>
 
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bottom-nav-safe" style={{ background: `${BG_SIDEBAR}f8`, borderTop: `1px solid ${BORDER_COLOR}`, backdropFilter: 'blur(16px)' }}>
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bottom-nav-safe" style={{ background: BG_SIDEBAR_97, borderTop: `1px solid ${BORDER_COLOR}`, backdropFilter: 'blur(16px)' }}>
         <div className="flex items-stretch">
           {PRIMARY_NAV.slice(0, 4).map(item => {
             const isActive = location === item.href;
+            const NavIcon: React.ElementType = redesign ? (REDESIGN_NAV_ICON[item.href] ?? item.icon) : item.icon;
             return (
               <Link key={item.href} href={item.href} className="flex-1">
                 <div className="relative flex flex-col items-center justify-center gap-0.5 pt-2 pb-1.5 min-h-[52px] transition-all active:scale-95">
                   {isActive && (
                     <span className="absolute top-0 left-1/2 -translate-x-1/2 h-[2px] w-8 rounded-full" style={{ background: CHESSCOM_GREEN }} />
                   )}
-                  <item.icon className="w-5 h-5 transition-transform" style={{ color: isActive ? CHESSCOM_GREEN : TEXT_MUTED, transform: isActive ? 'scale(1.1)' : 'scale(1)' }} />
-                  <span className="text-[10px] leading-none font-bold" style={{ color: isActive ? CHESSCOM_GREEN : TEXT_MUTED, opacity: isActive ? 1 : 0.6 }}>{item.label}</span>
+                  <NavIcon className="w-5 h-5 transition-transform" style={{ color: isActive ? CHESSCOM_GREEN : TEXT_MUTED, transform: isActive ? 'scale(1.1)' : 'scale(1)' }} />
+                  <span className="text-[10px] leading-none font-bold" style={{ color: isActive ? CHESSCOM_GREEN : TEXT_MUTED, opacity: isActive ? 1 : 0.6 }}>{redesign && item.href === '/opponents' ? 'Scout' : item.label}</span>
                 </div>
               </Link>
             );

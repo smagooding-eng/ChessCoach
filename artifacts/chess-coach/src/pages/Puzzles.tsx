@@ -14,11 +14,14 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { useSettings, playMoveSound } from '@/context/SettingsContext';
 import { EvalBar, MaterialStrip } from '@/components/GameStatusStrip';
 
-const BG_DARK = '#262421';
-const BG_CARD = 'linear-gradient(180deg, #383532 0%, #2a2825 100%)';
-const CHESSCOM_GREEN = '#81b64c';
-const TEXT_LIGHT = '#e8e6e3';
-const TEXT_MUTED = '#9e9b98';
+// CSS variables with the original values as fallbacks: unchanged with the
+// redesign toggle off, near-black / neon green with it on (the --cs-*
+// values are set by `html.cs-redesign` in index.css).
+const BG_DARK = 'var(--cs-bg-dark, #262421)';
+const BG_CARD = 'var(--cs-card-gradient, linear-gradient(180deg, #383532 0%, #2a2825 100%))';
+const CHESSCOM_GREEN = 'var(--cs-green, #81b64c)';
+const TEXT_LIGHT = 'var(--cs-text-light, #e8e6e3)';
+const TEXT_MUTED = 'var(--cs-text-muted, #9e9b98)';
 const CARD_SHADOW = '0 18px 50px -16px rgba(0,0,0,0.6), 0 4px 16px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04)';
 const CARD_BORDER = '1px solid rgba(129,182,76,0.08)';
 

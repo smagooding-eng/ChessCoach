@@ -414,3 +414,77 @@ main h2, [data-page] h2 {
   letter-spacing: -0.01em;
   color: #e8e6e3;
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   Redesign theme -- applied when the global "dashboard redesign" admin
+   toggle is ON (Layout adds the `cs-redesign` class to <html> while the
+   flag is enabled and removes it otherwise). Everything is scoped under
+   that class, so with the toggle OFF none of this applies at all.
+
+   Pages that style themselves with the shared tokens (bg-card,
+   text-primary, border-border, btn-primary, ...) pick the new palette up
+   automatically from the variable overrides below; the --cs-* variables
+   drive Layout's own palette constants. Applied to <html>, not a wrapper
+   div, so portaled UI (dialogs, toasts, sheets) is themed too.
+   ═══════════════════════════════════════════════════════════════════ */
+html.cs-redesign {
+  --background: 190 38% 3%;               /* #050A0B near-black */
+  --foreground: 150 12% 96%;              /* #F5F7F6 */
+  --card: 187 26% 7%;                     /* #0D1516 */
+  --card-foreground: 150 12% 96%;
+  --popover: 187 26% 8%;
+  --popover-foreground: 150 12% 96%;
+  --primary: 95 80% 59%;                  /* #8BEA45 neon green */
+  --primary-foreground: 147 52% 4%;       /* dark text on green */
+  --secondary: 191 23% 9%;                /* #121B1D */
+  --secondary-foreground: 150 12% 96%;
+  --muted: 191 23% 9%;
+  --muted-foreground: 162 4% 55%;         /* #87918E */
+  --accent: 95 80% 59%;
+  --accent-foreground: 147 52% 4%;
+  --destructive: 357 100% 66%;            /* #FF5058 */
+  --destructive-foreground: 0 0% 100%;
+  --border: 187 12% 14%;                  /* ~rgba(255,255,255,.08) on card */
+  --input: 191 23% 9%;
+  --ring: 95 80% 59%;
+  --radius: 1rem;
+
+  /* Layout chrome palette (see the CSS-variable constants in Layout.tsx) */
+  --cs-bg-dark: #050A0B;
+  --cs-bg-sidebar: #070D0E;
+  --cs-bg-card: #0D1516;
+  --cs-border: rgba(255, 255, 255, 0.08);
+  --cs-green: #8BEA45;
+  --cs-text-light: #F5F7F6;
+  --cs-text-muted: #87918E;
+  --cs-sidebar-a95: #070D0Ef5;
+  --cs-sidebar-a97: #070D0Ef8;
+  --cs-avatar-border: #8BEA45;
+  --cs-card-gradient: linear-gradient(160deg, #0F1819 0%, #0B1213 100%);
+}
+/* Flat near-black page, no olive radial washes */
+html.cs-redesign body { background-image: none; }
+/* Headings: clean heavy sans (mockup) instead of the serif display face */
+html.cs-redesign h1, html.cs-redesign h2, html.cs-redesign h3,
+html.cs-redesign h4, html.cs-redesign h5, html.cs-redesign h6,
+html.cs-redesign .font-display {
+  font-family: 'DM Sans', ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: -0.02em;
+}
+/* Cards that hardcode their own warm-brown gradient */
+html.cs-redesign .glass-card {
+  background: linear-gradient(160deg, #0F1819 0%, #0B1213 100%);
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 18px 45px -24px rgba(0, 0, 0, 0.9), inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+html.cs-redesign .glass-card:hover {
+  background: linear-gradient(160deg, #121D1F 0%, #0D1516 100%);
+  border-color: rgba(139, 234, 69, 0.28);
+}
+html.cs-redesign .card-depth,
+html.cs-redesign .card-depth-lg {
+  box-shadow: 0 1px 0 rgba(255,255,255,0.04) inset, 0 24px 60px -24px rgba(0,0,0,0.85), 0 0 60px rgba(139,234,69,0.05);
+}
+html.cs-redesign .text-gradient {
+  background-image: linear-gradient(135deg, #C9F59E 0%, #8BEA45 100%);
+}

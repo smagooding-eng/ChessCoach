@@ -415,20 +415,12 @@ router.get("/games", requireAuth, async (req, res): Promise<void> => {
   const platform = query.success ? query.data.platform : undefined;
   const opponent = query.success ? query.data.opponent?.trim() : undefined;
 
-  // Free users can only ever VIEW their most recent 20 games, even if
-  // more exist in their library (e.g. imported while previously on Pro).
-  // The import-side 20-game cap only ever restricted pulling NEW games
-  // in -- this route had no awareness of premium status at all, so
-  // anyone with older/pre-existing games could see everything regardless
-  // of plan. The true total is still returned unrestricted so the
-  // frontend can show "you have X games -- upgrade to see them all".
-  const { hasFullAccess } = await import("../lib/accessControl");
-  const { full: isFullAccess } = await hasFullAccess(req.user!.id);
-  const FREE_VIEW_LIMIT = 20;
-  const pastFreeLimit = !isFullAccess && offset >= FREE_VIEW_LIMIT;
-  if (!isFullAccess && !pastFreeLimit) {
-    limit = Math.min(limit, FREE_VIEW_LIMIT - offset);
-  }
+  // No view cap: listing stored games has no per-call cost (it's a plain
+  // database read), so free users see everything they've imported. This
+  // used to clamp free accounts to their latest 20 games, which quietly
+  // undid the point of making import free. The response keeps its
+  // isViewLimited/viewLimit fields (always false/null now) so existing
+  // frontend code that reads them keeps working unchanged.
 
   const conditions = [eq(gamesTable.userId, req.user!.id)];
   if (platform && (platform === "chesscom" || platform === "lichess" || platform === "chessscout")) {
@@ -447,19 +439,6 @@ router.get("/games", requireAuth, async (req, res): Promise<void> => {
   if (conditions.length > 0) {
     // @ts-ignore
     countQuery = countQuery.where(and(...conditions));
-  }
-
-  // Explicit short-circuit rather than relying on .limit(0) behavior,
-  // which isn't guaranteed across ORMs/drivers to mean "zero rows".
-  if (pastFreeLimit) {
-    const [[{ value: total }]] = await Promise.all([countQuery]);
-    res.json({
-      games: [],
-      total: Number(total),
-      isViewLimited: true,
-      viewLimit: FREE_VIEW_LIMIT,
-    });
-    return;
   }
 
   let dbQuery = db
@@ -485,8 +464,8 @@ router.get("/games", requireAuth, async (req, res): Promise<void> => {
       platform: g.platform || "chesscom",
     })),
     total: Number(total),
-    isViewLimited: !isFullAccess && Number(total) > FREE_VIEW_LIMIT,
-    viewLimit: !isFullAccess ? FREE_VIEW_LIMIT : null,
+    isViewLimited: false,
+    viewLimit: null,
   });
 
   triggerBackgroundReReviewForStaleReviews(req.user!.id, req.log).catch(() => {});
