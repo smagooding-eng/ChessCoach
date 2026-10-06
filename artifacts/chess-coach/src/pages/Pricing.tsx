@@ -59,13 +59,13 @@ export default function PricingPage() {
             <h2 className="text-lg font-black mb-1" style={{ color: TEXT }}>Free</h2>
             <p className="text-3xl font-black mb-4" style={{ color: TEXT }}>$0</p>
             <ul className="space-y-2 text-sm mb-6" style={{ color: MUTED }}>
-              <li>5 puzzles/day</li>
+              <li>Unlimited puzzles</li>
               <li>1 basic opponent scout</li>
               <li>2 Scan Position uses/day</li>
               <li>Basic analysis from reviewed games</li>
               <li>Unlimited practice bots & Opening Trainer</li>
               <li>Unlimited Local Play</li>
-              <li>Your 20 most recent games</li>
+              <li>Unlimited game import & review</li>
             </ul>
             <Link href="/#pricing" className="block text-center py-2.5 rounded-xl text-sm font-bold"
               style={{ background: 'rgba(255,255,255,0.06)', color: TEXT }}>
@@ -84,10 +84,10 @@ export default function PricingPage() {
             <p className="text-3xl font-black mb-1" style={{ color: TEXT }}>$5<span className="text-sm font-normal" style={{ color: MUTED }}>/mo</span></p>
             <p className="text-xs mb-4" style={{ color: MUTED }}>or $55/year</p>
             <ul className="space-y-2 text-sm mb-6" style={{ color: TEXT }}>
-              <li>Unlimited puzzles, scouts & scans</li>
+              <li>Unlimited opponent scouts & scans</li>
               <li>Full weakness analysis</li>
               <li>Personalized courses</li>
-              <li>Unlimited game history</li>
+              <li>AI puzzle explanations & read-aloud lessons</li>
             </ul>
             <Link href="/#pricing" className="block text-center py-2.5 rounded-xl text-sm font-black"
               style={{ background: G, color: '#fff' }}>

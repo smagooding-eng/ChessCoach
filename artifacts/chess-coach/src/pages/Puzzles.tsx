@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
+import { useDashboardRedesignFlag } from '@/hooks/use-app-config';
 import { PieceTile } from '@/components/DesignSystem';
 import { Chess } from 'chess.js';
 import { Chessboard, defaultPieces } from 'react-chessboard';
@@ -112,6 +113,9 @@ export function Puzzles() {
   const [sacrificePiece, setSacrificePiece] = useState<string>('');
   const [pieceTypeMismatch, setPieceTypeMismatch] = useState(false);
   const [ratingBand, setRatingBand] = useState<string>('');
+  // Redesign only: Daily (no filters) / Themes (theme chips) / Custom (theme + rating).
+  const { enabled: redesign } = useDashboardRedesignFlag();
+  const [ptab, setPtab] = useState<'daily' | 'themes' | 'custom'>('daily');
   const feedbackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [explanation, setExplanation] = useState<string | null>(null);
   const [loadingExplanation, setLoadingExplanation] = useState(false);
@@ -518,6 +522,44 @@ export function Puzzles() {
           </div>
         )}
 
+        {redesign && (
+          <>
+            <div className="flex items-center gap-1 rounded-[14px] p-1 mb-3" style={{ background: 'var(--cs-bg-card, #0D1516)', border: '1px solid var(--cs-border, rgba(255,255,255,.08))' }}>
+              {([['daily', 'Daily'], ['themes', 'Themes'], ['custom', 'Custom']] as const).map(([id, label]) => {
+                const active = ptab === id;
+                return (
+                  <button
+                    key={id}
+                    onClick={() => {
+                      setPtab(id);
+                      // Daily = the plain unfiltered mix, so clear any filters picked in the other tabs
+                      if (id === 'daily') { setPuzzleTheme(''); setSacrificePiece(''); setRatingBand(''); }
+                      if (id === 'themes') setRatingBand('');
+                    }}
+                    className="flex-1 rounded-[10px] py-2 text-[13px] font-bold transition-colors"
+                    style={active
+                      ? { background: 'rgba(139,234,69,.10)', color: CHESSCOM_GREEN, boxShadow: 'inset 0 0 0 1px var(--cs-green, #8BEA45)' }
+                      : { background: 'transparent', color: TEXT_MUTED }}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+            {stats && (
+              <div className="flex items-center justify-between rounded-[16px] px-4 py-3 mb-4" style={{ background: 'var(--cs-bg-card, #0D1516)', border: '1px solid var(--cs-border, rgba(255,255,255,.08))' }}>
+                <div>
+                  <p className="text-[11px] font-bold uppercase tracking-[.14em]" style={{ color: TEXT_MUTED }}>Today&apos;s progress</p>
+                  <p className="text-[15px] font-extrabold" style={{ color: TEXT_LIGHT }}>{stats.todayCount} puzzle{stats.todayCount === 1 ? '' : 's'} solved today</p>
+                </div>
+                <span className="flex items-center gap-1 text-[13px] font-bold" style={{ color: TEXT_MUTED }}><Flame size={15} style={{ color: '#f59e0b' }} />{stats.streak} streak</span>
+              </div>
+            )}
+          </>
+        )}
+
+        {(!redesign || ptab !== 'daily') && (
+        <>
         <div className="flex gap-1.5 mb-4 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
           {PUZZLE_TYPE_OPTIONS.map(opt => (
             <button
@@ -562,7 +604,10 @@ export function Puzzles() {
             </div>
           </div>
         )}
+        </>
+        )}
 
+        {(!redesign || ptab === 'custom') && (
         <div className="flex gap-1.5 mb-4 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
           {RATING_BAND_OPTIONS.map(opt => (
             <button
@@ -579,6 +624,7 @@ export function Puzzles() {
             </button>
           ))}
         </div>
+        )}
 
         {(
           <>

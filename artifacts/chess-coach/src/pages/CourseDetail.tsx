@@ -1,3 +1,5 @@
+import { useDashboardRedesignFlag } from '@/hooks/use-app-config';
+import { CourseOverview } from './CourseOverview';
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useParams, Link } from 'wouter';
 import { useCourseDetail, useMarkLessonComplete } from '@/hooks/use-courses';
@@ -812,6 +814,10 @@ export function CourseDetail() {
   const { markComplete, isUpdating } = useMarkLessonComplete();
 
   const [currentIdx, setCurrentIdx] = useState<number>(0);
+  // Redesign only: land on a course overview first; picking a lesson there
+  // hands off to the existing lesson player unchanged.
+  const { enabled: redesign } = useDashboardRedesignFlag();
+  const [showOverview, setShowOverview] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [desktopSidebarCollapsed, setDesktopSidebarCollapsed] = useState(true);
   const [showFixLine, setShowFixLine] = useState(false);
@@ -873,6 +879,16 @@ export function CourseDetail() {
   );
 
   const progress = Math.round((course.completedLessons / course.totalLessons) * 100) || 0;
+
+  if (redesign && showOverview) {
+    return (
+      <CourseOverview
+        course={course}
+        lessons={sortedLessons}
+        onOpen={(idx) => { setCurrentIdx(idx); setShowOverview(false); }}
+      />
+    );
+  }
 
   return (
     <div className="pb-20 max-w-7xl mx-auto space-y-2 md:space-y-4 px-3 md:px-0">

@@ -9,11 +9,14 @@ import { BookOpen, GraduationCap, CheckCircle2, PlayCircle, AlertCircle, Filter,
 import { apiFetch } from '@/lib/api';
 import { trackBackgroundJob } from '@/components/BackgroundJobsWatcher';
 import { cn } from '@/lib/utils';
+import { useDashboardRedesignFlag } from '@/hooks/use-app-config';
+import { CoursesRedesign } from './CoursesRedesign';
 
 export function Courses() {
   const { username, authUser } = useUser();
   const queryClient = useQueryClient();
   const { data, isLoading, refetch } = useMyCourses();
+  const { enabled: redesign } = useDashboardRedesignFlag();
 
   const [isGenerating, setIsGenerating] = useState(false);
   const [genError, setGenError] = useState<string | null>(null);
@@ -164,6 +167,20 @@ export function Courses() {
       <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
     </div>
   );
+
+  // Redesign shares this page's real generate / archive / polling logic;
+  // only the presentation differs.
+  if (redesign) {
+    return (
+      <CoursesRedesign
+        courses={courses}
+        isGenerating={isGenerating}
+        genError={genError}
+        onGenerate={handleGenerate}
+        onArchive={archiveCourse}
+      />
+    );
+  }
 
   return (
     <div className="space-y-8 pb-20 px-4 pt-4 md:px-0 md:pt-0">

@@ -18,6 +18,7 @@ import { analyzeMoves, analyzeSingleMove, reviewFullGame, analyzeGamePgn } from 
 import { randomUUID } from "crypto";
 import type { Logger } from "pino";
 import { trackAiUsage, AI_FEATURES } from "../lib/aiUsageTracker";
+import { Chess } from "chess.js";
 
 const router: IRouter = Router();
 
@@ -802,6 +803,139 @@ router.get("/games/review-status/:jobId", async (req, res): Promise<void> => {
     progress: progress?.progress ?? null,
     total: progress?.total ?? null,
   });
+});
+
+// ── PGN upload ───────────────────────────────────────────────────────────
+// Adds games from a .pgn file (or pasted PGN text) to the user's library.
+// Unlike /games/analyze-pgn (a one-off analysis of a single game that
+// never touches the library), this inserts real rows, shaped exactly like
+// the Chess.com/Lichess importers' rows so everything downstream (game
+// list, reviews, analytics, puzzles) treats them the same.
+//
+// Which side is "you" is decided by matching the PGN's White/Black names
+// against the account's linked Chess.com/Lichess usernames -- results are
+// stored from the user's perspective, same as every other imported game.
+// Games where neither player matches are skipped (and counted), because
+// there's no way to know whose perspective to record them from.
+function splitPgnGames(text: string): string[] {
+  const t = text.replace(/\r\n?/g, "\n").trim();
+  if (!t) return [];
+  return t.split(/\n\s*\n(?=\[Event\s)/).map((g) => g.trim()).filter(Boolean);
+}
+function pgnHeader(pgn: string, name: string): string | null {
+  const m = pgn.match(new RegExp(`\\[${name}\\s+"([^"]*)"\\]`));
+  return m ? m[1] : null;
+}
+function pgnPlayedAt(pgn: string): Date {
+  const d = pgnHeader(pgn, "UTCDate") ?? pgnHeader(pgn, "Date");
+  const tRaw = pgnHeader(pgn, "UTCTime") ?? pgnHeader(pgn, "Time") ?? "";
+  const t = /^\d{2}:\d{2}:\d{2}$/.test(tRaw) ? tRaw : "00:00:00";
+  if (d && /^\d{4}\.\d{2}\.\d{2}$/.test(d)) {
+    const dt = new Date(`${d.replace(/\./g, "-")}T${t}Z`);
+    if (!isNaN(dt.getTime())) return dt;
+  }
+  return new Date();
+}
+
+router.post("/games/import-pgn", requireAuth, async (req, res): Promise<void> => {
+  const { pgn } = req.body as { pgn?: string };
+  if (!pgn || typeof pgn !== "string" || !pgn.trim()) {
+    res.status(400).json({ error: "Choose a PGN file or paste PGN text first." });
+    return;
+  }
+  const userId = req.user!.id;
+  const mine = [req.user!.chesscomUsername, req.user!.lichessUsername]
+    .filter((n): n is string => !!n)
+    .map((n) => n.toLowerCase());
+  if (mine.length === 0) {
+    res.status(400).json({ error: "Link your Chess.com or Lichess username first, so we know which player in each game is you.", code: "no_linked_username" });
+    return;
+  }
+
+  const games = splitPgnGames(pgn);
+  const MAX_GAMES = 1000;
+  if (games.length === 0) {
+    res.status(400).json({ error: "No games found in that PGN." });
+    return;
+  }
+  if (games.length > MAX_GAMES) {
+    res.status(400).json({ error: `That file has ${games.length} games; the limit is ${MAX_GAMES} per upload. Split it into parts and upload each.` });
+    return;
+  }
+
+  let imported = 0, duplicates = 0, notYours = 0, invalid = 0, unfinished = 0;
+  for (const g of games) {
+    try {
+      const white = pgnHeader(g, "White");
+      const black = pgnHeader(g, "Black");
+      if (!white || !black) { invalid++; continue; }
+
+      try {
+        const c = new Chess();
+        // strict:false matches puzzleVerifier.ts -- tolerate the small format
+        // quirks PGNs exported from other tools commonly have.
+        c.loadPgn(g, { strict: false });
+        if (c.history().length === 0) { invalid++; continue; }
+      } catch { invalid++; continue; }
+
+      const whiteIsMe = mine.includes(white.toLowerCase());
+      const blackIsMe = mine.includes(black.toLowerCase());
+      if (!whiteIsMe && !blackIsMe) { notYours++; continue; }
+
+      const tagResult = pgnHeader(g, "Result");
+      let result: string;
+      if (tagResult === "1-0") result = whiteIsMe ? "win" : "loss";
+      else if (tagResult === "0-1") result = blackIsMe ? "win" : "loss";
+      else if (tagResult === "1/2-1/2") result = "draw";
+      else { unfinished++; continue; }
+
+      const site = pgnHeader(g, "Link") ?? pgnHeader(g, "Site") ?? "";
+      const isUrl = /^https?:\/\//i.test(site);
+      let platform: "chesscom" | "lichess" | "chessscout" = "chessscout";
+      let chesscomGameId: string | null = null;
+      let lichessGameId: string | null = null;
+      if (/chess\.com\//i.test(site)) {
+        platform = "chesscom";
+        chesscomGameId = site.split("?")[0].split("/").pop() || null;
+      } else if (/lichess\.org\//i.test(site)) {
+        platform = "lichess";
+        lichessGameId = site.replace(/^https?:\/\/lichess\.org\//i, "").split(/[/?#]/)[0].slice(0, 8) || null;
+      }
+
+      const dupe = chesscomGameId
+        ? await db.select({ id: gamesTable.id }).from(gamesTable).where(and(eq(gamesTable.userId, userId), eq(gamesTable.chesscomGameId, chesscomGameId))).limit(1)
+        : lichessGameId
+          ? await db.select({ id: gamesTable.id }).from(gamesTable).where(and(eq(gamesTable.userId, userId), eq(gamesTable.lichessGameId, lichessGameId))).limit(1)
+          : await db.select({ id: gamesTable.id }).from(gamesTable).where(and(eq(gamesTable.userId, userId), eq(gamesTable.pgn, g))).limit(1);
+      if (dupe.length > 0) { duplicates++; continue; }
+
+      const { opening, eco } = extractOpeningFromPgn(g);
+      const [row] = await db.insert(gamesTable).values({
+        userId,
+        username: (whiteIsMe ? white : black).toLowerCase(),
+        pgn: g,
+        whiteUsername: white,
+        blackUsername: black,
+        whiteRating: parseInt(pgnHeader(g, "WhiteElo") ?? "", 10) || 0,
+        blackRating: parseInt(pgnHeader(g, "BlackElo") ?? "", 10) || 0,
+        result,
+        timeControl: pgnHeader(g, "TimeControl") ?? "-",
+        opening,
+        eco,
+        playedAt: pgnPlayedAt(g),
+        url: isUrl ? site : null,
+        chesscomGameId,
+        lichessGameId,
+        platform,
+      }).onConflictDoNothing().returning({ id: gamesTable.id });
+      if (row) imported++; else duplicates++;
+    } catch (err) {
+      req.log.warn({ err }, "Failed to import one game from uploaded PGN");
+      invalid++;
+    }
+  }
+
+  res.json({ imported, duplicates, notYours, invalid, unfinished, total: games.length });
 });
 
 router.post("/games/analyze-pgn", async (req, res): Promise<void> => {

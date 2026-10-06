@@ -7,6 +7,7 @@
  */
 import type { MonthlyTrendPoint } from "./monthlyTrendPoint";
 import type { OpeningStat } from "./openingStat";
+import type { PerformanceSummaryAccuracyTrendItem } from "./performanceSummaryAccuracyTrendItem";
 import type { PhaseAccuracy } from "./phaseAccuracy";
 import type { TimeControlStat } from "./timeControlStat";
 
@@ -18,8 +19,12 @@ export interface PerformanceSummary {
   draws: number;
   winRate: number;
   avgRating: number;
+  /** Number of the user's games that have completed AI move-by-move review. */
+  reviewedCount: number;
   openingStats: OpeningStat[];
   resultsByTimeControl: TimeControlStat[];
   monthlyTrend?: MonthlyTrendPoint[];
   phaseAccuracy?: PhaseAccuracy;
+  /** Real progression over time — accuracy and blunder rate by month, computed from engine-verified move classifications across all reviewed games. */
+  accuracyTrend?: PerformanceSummaryAccuracyTrendItem[];
 }

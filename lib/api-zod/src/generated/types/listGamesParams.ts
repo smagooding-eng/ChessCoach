@@ -5,12 +5,21 @@
  * Chess Coach API
  * OpenAPI spec version: 0.1.0
  */
+import type { ListGamesPlatform } from "./listGamesPlatform";
 
 export type ListGamesParams = {
   /**
    * Filter by username
    */
   username?: string;
+  /**
+   * Filter by platform
+   */
+  platform?: ListGamesPlatform;
+  /**
+   * Filter to games played against this opponent username
+   */
+  opponent?: string;
   /**
    * Limit results
    */

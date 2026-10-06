@@ -1,4 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useDashboardRedesignFlag } from '@/hooks/use-app-config';
+import { RD } from '@/lib/redesignTheme';
 import { PageHero } from '@/components/DesignSystem';
 import { UpgradeNudge } from '@/components/UpgradeNudge';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -138,6 +140,10 @@ export function OpponentAnalysis() {
   const { username, authUser } = useUser();
   const { data: eloData } = useEloProgress(username ?? undefined);
   const [inputUsername, setInputUsername] = useState('');
+  // Redesign only: split the long result page into tabs. 'overview' shows
+  // everything exactly as the classic page does.
+  const { enabled: redesign } = useDashboardRedesignFlag();
+  const [scoutTab, setScoutTab] = useState<'overview' | 'weaknesses' | 'openings'>('overview');
   const [topPlayers, setTopPlayers] = useState<{ username: string; rating: number; rank: number }[]>([]);
   const [showTopPlayers, setShowTopPlayers] = useState(false);
 
@@ -678,9 +684,31 @@ export function OpponentAnalysis() {
               )}
             </div>
 
+            {redesign && (
+              <div className="flex items-center gap-1 rounded-[14px] p-1" style={{ background: RD.cardSolid, border: `1px solid ${RD.border}` }}>
+                {([
+                  ['overview', 'Overview'],
+                  ['weaknesses', `Weaknesses${result.weaknesses.length ? ` (${result.weaknesses.length})` : ''}`],
+                  ['openings', `Openings${result.topOpenings.length ? ` (${result.topOpenings.length})` : ''}`],
+                ] as const).map(([id, label]) => {
+                  const active = scoutTab === id;
+                  return (
+                    <button
+                      key={id}
+                      onClick={() => setScoutTab(id)}
+                      className="flex-1 rounded-[10px] py-2 text-[12.5px] font-bold transition-colors"
+                      style={active ? { background: 'rgba(139,234,69,.10)', color: RD.green, boxShadow: `inset 0 0 0 1px ${RD.green}` } : { background: 'transparent', color: RD.muted }}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Weaknesses */}
-              <div className="lg:col-span-2 space-y-4">
+              <div className={`lg:col-span-2 space-y-4 ${redesign && scoutTab === 'openings' ? 'hidden' : ''}`}>
                 <h3 className="text-lg font-bold flex items-center gap-2">
                   <AlertTriangle className="w-5 h-5 text-amber-400" />
                   Identified Weaknesses
@@ -758,7 +786,7 @@ export function OpponentAnalysis() {
               </div>
 
               {/* Right column: Top Openings + Scout Tip */}
-              <div className="space-y-6">
+              <div className={`space-y-6 ${redesign && scoutTab === 'weaknesses' ? 'hidden' : ''}`}>
                 <div>
                   <h3 className="text-lg font-bold flex items-center gap-2 mb-4">
                     <TrendingUp className="w-5 h-5 text-accent" />
@@ -817,7 +845,7 @@ export function OpponentAnalysis() {
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3 }}
-              className="glass-card rounded-xl overflow-hidden border border-primary/20"
+              className={`glass-card rounded-xl overflow-hidden border border-primary/20 ${redesign && scoutTab === 'openings' ? 'hidden' : ''}`}
             >
               <div className="p-5 flex flex-col sm:flex-row items-start sm:items-center gap-4">
                 <div className="flex items-center gap-3 flex-1 min-w-0">

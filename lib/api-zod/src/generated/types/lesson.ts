@@ -5,6 +5,8 @@
  * Chess Coach API
  * OpenAPI spec version: 0.1.0
  */
+import type { LessonBeatsItem } from "./lessonBeatsItem";
+import type { LessonExtraChallengesItem } from "./lessonExtraChallengesItem";
 
 export interface Lesson {
   id: number;
@@ -23,4 +25,13 @@ export interface Lesson {
   drillExpectedMove?: string | null;
   /** @nullable */
   drillHint?: string | null;
+  /** @nullable */
+  extraChallenges?: LessonExtraChallengesItem[] | null;
+  /** @nullable */
+  conceptTitle?: string | null;
+  /**
+   * Unified lesson-beat sequence from the courses redesign. Each beat is one of concept/example/drill/summary -- see lib/db/src/schema/courses.ts (LessonBeat type) for the authoritative shape. Left loosely typed here (generic object) rather than a full discriminated-union schema, since the frontend narrows on `kind` itself and a strict oneOf here would need updating in lockstep with every future beat-shape change for no real safety benefit.
+   * @nullable
+   */
+  beats?: LessonBeatsItem[] | null;
 }

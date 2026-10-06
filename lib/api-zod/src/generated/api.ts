@@ -37,8 +37,14 @@ export const ImportGamesResponse = zod.object({
  */
 export const ListGamesQueryParams = zod.object({
   username: zod.coerce.string().optional().describe("Filter by username"),
-  platform: zod.enum(["chesscom", "lichess", "chessscout"]).optional().describe("Filter by platform"),
-  opponent: zod.coerce.string().optional().describe("Filter to games played against this opponent username"),
+  platform: zod
+    .enum(["chesscom", "lichess", "chessscout"])
+    .optional()
+    .describe("Filter by platform"),
+  opponent: zod.coerce
+    .string()
+    .optional()
+    .describe("Filter to games played against this opponent username"),
   limit: zod.coerce.number().optional().describe("Limit results"),
   offset: zod.coerce.number().optional().describe("Offset for pagination"),
 });
@@ -194,7 +200,11 @@ export const GetAnalysisSummaryResponse = zod.object({
   draws: zod.number(),
   winRate: zod.number(),
   avgRating: zod.number(),
-  reviewedCount: zod.number(),
+  reviewedCount: zod
+    .number()
+    .describe(
+      "Number of the user's games that have completed AI move-by-move review.",
+    ),
   openingStats: zod.array(
     zod.object({
       opening: zod.string(),
@@ -300,9 +310,9 @@ export const GetAnalysisSummaryResponse = zod.object({
     .array(
       zod.object({
         month: zod.string(),
-        accuracy: zod.number().describe("Average accuracy percent (0-100) for this month."),
+        accuracy: zod.number(),
         moves: zod.number(),
-        blunderRate: zod.number().describe("Percent of moves that month classified as blunders."),
+        blunderRate: zod.number(),
       }),
     )
     .optional()
@@ -387,6 +397,23 @@ export const GetCourseResponse = zod.object({
       drillFen: zod.string().nullish(),
       drillExpectedMove: zod.string().nullish(),
       drillHint: zod.string().nullish(),
+      extraChallenges: zod
+        .array(
+          zod.object({
+            fen: zod.string(),
+            expectedMove: zod.string(),
+            hint: zod.string(),
+            contextPgn: zod.string().nullish(),
+          }),
+        )
+        .nullish(),
+      conceptTitle: zod.string().nullish(),
+      beats: zod
+        .array(zod.object({}).passthrough())
+        .nullish()
+        .describe(
+          "Unified lesson-beat sequence from the courses redesign. Each beat is one of concept\/example\/drill\/summary -- see lib\/db\/src\/schema\/courses.ts (LessonBeat type) for the authoritative shape. Left loosely typed here (generic object) rather than a full discriminated-union schema, since the frontend narrows on `kind` itself and a strict oneOf here would need updating in lockstep with every future beat-shape change for no real safety benefit.",
+        ),
     }),
   ),
 });
@@ -426,6 +453,23 @@ export const UpdateCourseProgressResponse = zod.object({
       drillFen: zod.string().nullish(),
       drillExpectedMove: zod.string().nullish(),
       drillHint: zod.string().nullish(),
+      extraChallenges: zod
+        .array(
+          zod.object({
+            fen: zod.string(),
+            expectedMove: zod.string(),
+            hint: zod.string(),
+            contextPgn: zod.string().nullish(),
+          }),
+        )
+        .nullish(),
+      conceptTitle: zod.string().nullish(),
+      beats: zod
+        .array(zod.object({}).passthrough())
+        .nullish()
+        .describe(
+          "Unified lesson-beat sequence from the courses redesign. Each beat is one of concept\/example\/drill\/summary -- see lib\/db\/src\/schema\/courses.ts (LessonBeat type) for the authoritative shape. Left loosely typed here (generic object) rather than a full discriminated-union schema, since the frontend narrows on `kind` itself and a strict oneOf here would need updating in lockstep with every future beat-shape change for no real safety benefit.",
+        ),
     }),
   ),
 });

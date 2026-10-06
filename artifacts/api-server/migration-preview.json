@@ -1,0 +1,109 @@
+{
+  "preview": [
+    {
+      "lessonId": 3,
+      "title": "Queen + Rook Battery: heavy pieces on a file",
+      "beatCount": 2,
+      "beats": [
+        {
+          "kind": "example",
+          "text": "## The Mistake\nPlayers often defend the wrong square and allow a rook-and-queen “battery” (stacked on the same file) to crash through. A common error is **1... h6??**, making a pawn move while the real threat is immediate mate on the open file.",
+          "pgn": "[FEN \"6k1/5ppp/8/8/8/8/5PPP/5RQK b - - 0 1\"]\n\n1... h6 *",
+          "replayable": false
+        },
+        {
+          "kind": "example",
+          "text": "## The Fix\nAgainst a battery, you must either (1) block the file, (2) trade one attacker, or (3) give the king a flight square in time. Here the simplest defense is **1... Rxf7**, removing the rook that supports the queen’s mate.",
+          "pgn": "[FEN \"6k1/5ppp/8/8/8/8/5PPP/5RQK b - - 0 1\"]\n\n1... h6 *",
+          "replayable": false
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "lessonId": 1,
+      "title": "Back Rank Mate: trapped behind pawns",
+      "beatCount": 2,
+      "beats": [
+        {
+          "kind": "example",
+          "text": "## The Mistake\nPlayers often grab material or play a slow move while their king is stuck on the back rank with no escape square (usually because pawns on f7/g7/h7 haven’t moved). A classic blunder is **1... Qxc7??**, ignoring the threat on the back rank.",
+          "pgn": "",
+          "replayable": false
+        },
+        {
+          "kind": "drill",
+          "text": "## The Fix\nAlways ask: “Does my king have an escape square?” If not, you must either (1) give the king luft (like ...h6 or ...g6), (2) trade off the attacker, or (3) meet the threat tactically. Here the correct technique is to create luft immediately with **1... h6**, so **2. Qc8+** is no longer mate because the king can run to h7.",
+          "fen": "6k1/2q2ppp/8/8/8/8/5PPP/5RK1 b - - 0 1",
+          "expectedMove": "h6",
+          "hint": "If your king is stuck behind pawns, make “luft” (an escape square) before grabbing material.",
+          "followUpSan": [
+            "h6"
+          ]
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "lessonId": 6,
+      "title": "Blunder: 8...Nf6 missed the key defense (Qe7)",
+      "beatCount": 2,
+      "beats": [
+        {
+          "kind": "example",
+          "text": "## The Mistake\nOn move **8... Nf6**, you made a **blunder** that turned a manageable position (about **+1.15**) into a completely **lost** one (swinging to **9999**), a huge **39.6%** drop in win chances. Even though the move didn’t *hang* a piece, it failed to address what the engine considered the critical moment.\n\nThe key point is that after **8... Nf6**, the engine’s continuation shows White getting a forcing sequence: **Bc4**, then **Qxf7+**, followed by exchanges and **Bxf7+**. Your knight move didn’t prevent this sequence from becoming decisive.",
+          "pgn": "[FEN \"r2qkbnr/p2b1ppp/2np4/2pQp1N1/4P3/2P4P/PP3PP1/RNB1KB1R b KQkq - 3 8\"]\n\n8... Nf6 {[MISTAKE] This is the move being reviewed.} 9. Qxf7# *",
+          "replayable": false
+        },
+        {
+          "kind": "example",
+          "text": "## The Fix\nThe engine’s best move was **8... Qe7**. In the main line given, **Qe7** meets **Bc4** and **Nf6** in a way that makes **Qxf7+** lead to **Qxf7** in response, and the line continues **Bxf7+**—but crucially this is the engine-approved way to handle it compared to playing **Nf6** immediately.\n\nFollowing the engine line (**Qe7 Bc4 Nf6 Qxf7+ Qxf7 Bxf7+**) keeps the defense coordinated rather than letting the position collapse at once. **Takeaway: when a forcing check-and-capture sequence is available (like Qxf7+), prioritize the move the engine shows that best controls that sequence—in this case, 8...Qe7.**",
+          "pgn": "[FEN \"r2qkbnr/p2b1ppp/2np4/2pQp1N1/4P3/2P4P/PP3PP1/RNB1KB1R b KQkq - 3 8\"]\n\n8... Nf6 {[MISTAKE] This is the move being reviewed.} 9. Qxf7# *",
+          "replayable": false
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "lessonId": 2,
+      "title": "Smothered Mate: knight + boxed-in king",
+      "beatCount": 2,
+      "beats": [
+        {
+          "kind": "example",
+          "text": "## The Mistake\nBeginners often “fix” a check by capturing the attacker, without noticing their own pieces are trapping their king. Here, after **1... Qxh7??**, Black grabs a queen but allows a smothered mate.",
+          "pgn": "",
+          "replayable": false
+        },
+        {
+          "kind": "example",
+          "text": "## The Fix\nWhen the king is boxed in by friendly pieces, checks by a knight can become deadly because the king can’t capture the knight and can’t run away. The key technique is: don’t open the smothered-mate net—remove the knight or stop the forcing sequence. Here **1... Nxd5** eliminates the key knight before it can jump to f7/h7.",
+          "pgn": "",
+          "replayable": false
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "lessonId": 29,
+      "title": "Bishop + Queen: Diagonal mate on the kingside",
+      "beatCount": 2,
+      "beats": [
+        {
+          "kind": "example",
+          "text": "## The Mistake\nBeginners often weaken dark squares around their king by pushing pawns without thinking, especially **...g6** when the diagonal to g7/h8 is sensitive. In the example, Black plays **1... g6??**, and White immediately mates with a queen-and-bishop diagonal attack.",
+          "pgn": "[FEN \"6k1/5ppp/8/8/8/6B1/5PPP/6KQ b - - 0 1\"]\n\n1... g6 *",
+          "replayable": false
+        },
+        {
+          "kind": "example",
+          "text": "## The Fix\nBefore playing pawn moves in front of your king, check if they open a diagonal toward your king. A safe defensive idea is to create luft without weakening the diagonal. Here the fix is **1... h6**, keeping the diagonal intact and giving the king an escape square.",
+          "pgn": "[FEN \"6k1/5ppp/8/8/8/6B1/5PPP/6KQ b - - 0 1\"]\n\n1... g6 *",
+          "replayable": false
+        }
+      ],
+      "warnings": []
+    }
+  ],
+  "allWarnings": []
+}

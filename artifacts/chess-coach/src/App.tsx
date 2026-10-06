@@ -8,6 +8,7 @@ import { ImportStatusWatcher } from "@/components/ImportStatusWatcher";
 import { AutoPushPrompt } from "@/components/AutoPushPrompt";
 import { useDashboardRedesignFlag } from "@/hooks/use-app-config";
 import { BackgroundJobsWatcher } from "@/components/BackgroundJobsWatcher";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { AudioAutoplayUnlock } from "@/components/AudioAutoplayUnlock";
 import { Layout } from "@/components/Layout";
 import { useUser } from "@/hooks/use-user";
@@ -64,6 +65,7 @@ class ErrorBoundary extends Component<
 // Admin and ScanPosition) being bundled into the initial page load.
 const Setup = lazy(() => import("@/pages/Setup").then(m => ({ default: m.Setup })));
 const LandingPage = lazy(() => import("@/pages/LandingPage").then(m => ({ default: m.LandingPage })));
+const MobileSetup = lazy(() => import("@/pages/MobileSetup").then(m => ({ default: m.MobileSetup })));
 const ScoutShare = lazy(() => import("@/pages/ScoutShare").then(m => ({ default: m.ScoutShare })));
 const ArticlesIndex = lazy(() => import("@/pages/Articles").then(m => ({ default: m.ArticlesIndex })));
 const ArticlePage = lazy(() => import("@/pages/Articles").then(m => ({ default: m.ArticlePage })));
@@ -126,6 +128,13 @@ const Openings = lazy(() => import("@/pages/Openings").then(m => ({ default: m.O
 const OpeningDetail = lazy(() => import("@/pages/OpeningDetail").then(m => ({ default: m.OpeningDetail })));
 const PracticeBots = lazy(() => import("@/pages/PracticeBots").then(m => ({ default: m.PracticeBots })));
 const LocalPlay = lazy(() => import("@/pages/LocalPlay").then(m => ({ default: m.LocalPlay })));
+const PlayHub = lazy(() => import("@/pages/PlayHub").then(m => ({ default: m.PlayHub })));
+// /play is the Play hub when the redesign is on; the original Local Play
+// board otherwise. The board itself is always reachable at /play/local.
+function PlayRouter() {
+  const { enabled } = useDashboardRedesignFlag();
+  return enabled ? <PlayHub /> : <LocalPlay />;
+}
 const LivePlay = lazy(() => import("@/pages/LivePlay").then(m => ({ default: m.LivePlay })));
 const LiveHistory = lazy(() => import("@/pages/LiveHistory").then(m => ({ default: m.LiveHistory })));
 const GameLookup = lazy(() => import("@/pages/GameLookup").then(m => ({ default: m.GameLookup })));
@@ -215,7 +224,8 @@ const POpenings      = () => <ProtectedRoute component={Openings} />;
 const POpeningDetail = () => <ProtectedRoute component={OpeningDetail} fallbackNav="/openings" />;
 const POpponents     = () => <ProtectedRoute component={OpponentAnalysis} />;
 const PPracticeBots  = () => <ProtectedRoute component={PracticeBots} />;
-const PLocalPlay     = () => <ProtectedRoute component={LocalPlay} />;
+const PLocalPlay     = () => <ProtectedRoute component={PlayRouter} />;
+const PLocalBoard    = () => <ProtectedRoute component={LocalPlay} />;
 const PLivePlay      = () => <ProtectedRoute component={LivePlay} requireAdmin />;
 const PTraps         = () => <ProtectedRoute component={TrapsPage} />;
 const PTrapTraining  = () => <ProtectedRoute component={TrapTrainingPage} />;
@@ -274,10 +284,19 @@ function ScrollToTop() {
   return null;
 }
 
+// Mobile gets a minimal, non-scrollable sign-up/log-in screen instead of
+// the full marketing LandingPage -- most mobile apps' pattern (download,
+// sign up, go) rather than a scrollable pitch. Desktop is unaffected;
+// this only changes what /setup renders when useIsMobile() is true.
+function SetupRouter() {
+  const isMobile = useIsMobile();
+  return isMobile ? <MobileSetup /> : <LandingPage />;
+}
+
 function Router() {
   return (
     <><ScrollToTop /><PageTracker /><Switch>
-      <Route path="/setup" component={LandingPage} />
+      <Route path="/setup" component={SetupRouter} />
       <Route path="/scout/:data" component={ScoutShare} />
       <Route path="/learn" component={ArticlesIndex} />
       <Route path="/learn/:slug" component={ArticlePage} />
@@ -311,6 +330,7 @@ function Router() {
       <Route path="/opponents"       component={POpponents} />
       <Route path="/practice"        component={PPracticeBots} />
       <Route path="/play"            component={PLocalPlay} />
+      <Route path="/play/local"      component={PLocalBoard} />
       <Route path="/live"            component={PLivePlay} />
       <Route path="/traps/:id" component={PTrapTraining} />
 <Route path="/admin/beginner-courses/:id" component={PBeginnerCourseDetail} />
