@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { useLocation } from 'wouter';
 import { useUser } from '@/hooks/use-user';
 import { apiFetch } from '@/lib/api';
 import { OnboardingStartModal } from '@/components/OnboardingStartModal';
@@ -13,7 +12,6 @@ const BORDER = 'rgba(255,255,255,0.08)';
 
 export function Welcome() {
   const { authUser, refreshAuth, login } = useUser();
-  const [, navigate] = useLocation();
   const [chesscom, setChesscom] = useState('');
   const [lichess, setLichess] = useState('');
   const [saving, setSaving] = useState(false);
@@ -50,8 +48,6 @@ export function Welcome() {
       setSaving(false);
     }
   };
-
-  const skip = () => navigate('/', { replace: true } as never);
 
   return (
     <div className="min-h-screen flex items-center justify-center px-4 py-10" style={{ background: BG_DARK }}>
@@ -114,16 +110,6 @@ export function Welcome() {
             style={{ background: `linear-gradient(180deg, #95c45a 0%, ${CHESSCOM_GREEN} 100%)`, color: 'white' }}
           >
             {saving ? 'Saving…' : 'Continue'}
-          </button>
-
-          <button
-            type="button"
-            onClick={skip}
-            disabled={saving}
-            className="w-full text-xs font-bold uppercase tracking-widest disabled:opacity-50"
-            style={{ color: TEXT_MUTED }}
-          >
-            Skip for now
           </button>
         </form>
       </div>

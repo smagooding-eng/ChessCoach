@@ -416,14 +416,13 @@ export function Import() {
               </div>
             </div>
 
-            {apiError && isLimitReached && (
-              <UpgradeNudge
-                headline="Want to load the rest of your games?"
-                subtext="Free plan imports your most recent 20 games. Upgrade to Pro now for unlimited game import."
-              />
-            )}
-
-            {apiError && !isLimitReached && (
+            {/* The isLimitReached branch that used to render here is gone
+                -- game import has no usage cap anymore, so the backend
+                never sends error: 'usage_limit' for this action, and
+                isLimitReached can no longer become true. Left the state
+                itself in place rather than touch its setter elsewhere in
+                this file for a change that's purely dead-code cleanup. */}
+            {apiError && (
               <div className="p-4 bg-destructive/20 border border-destructive/40 text-destructive rounded-xl text-sm flex gap-3 items-start">
                 <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
                 <div>

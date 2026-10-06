@@ -5,7 +5,7 @@ import { requireAuth, requirePremium } from "../middlewares/authMiddleware";
 import { Chess } from "chess.js";
 
 const router: IRouter = Router();
-const FREE_DAILY_LIMIT = 5;
+
 
 // Maps a weakness category / theme group to the actual Lichess theme tags
 // to match against. Mirrors the grouping used when curating the imported
@@ -95,19 +95,14 @@ async function getTodayAttemptCount(userId: string): Promise<number> {
 router.get("/puzzles/next", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
+    // No daily cap enforced here anymore -- puzzles have no AI/API cost,
+    // same reasoning as accessControl.ts's FREE_TIER_LIMITS. premium and
+    // todayCount are still computed and returned below (in `daily`)
+    // purely for display -- e.g. a "Pro" badge or a "solved today" count
+    // -- with limit always null now rather than conditionally capped.
     const { hasFullAccess } = await import("../lib/accessControl");
     const { full: premium } = await hasFullAccess(userId);
-
     const todayCount = await getTodayAttemptCount(userId);
-    if (!premium && todayCount >= FREE_DAILY_LIMIT) {
-      res.status(403).json({
-        error: "daily_limit",
-        message: `Free users can solve ${FREE_DAILY_LIMIT} puzzles per day. Upgrade to Pro for unlimited puzzles!`,
-        used: todayCount,
-        limit: FREE_DAILY_LIMIT,
-      });
-      return;
-    }
 
     const attempted = await db
       .select({ puzzleId: puzzleAttemptsTable.puzzleId })
@@ -347,7 +342,7 @@ router.get("/puzzles/next", requireAuth, async (req: Request, res: Response) => 
       },
       daily: {
         used: todayCount,
-        limit: premium ? null : FREE_DAILY_LIMIT,
+        limit: null, // No cap anymore, regardless of premium status.
         premium,
       },
     });
@@ -404,7 +399,7 @@ router.get("/puzzles/stats", requireAuth, async (req: Request, res: Response) =>
       accuracy: total > 0 ? Math.round((solved / total) * 100) : 0,
       streak,
       todayCount,
-      dailyLimit: premium ? null : FREE_DAILY_LIMIT,
+      dailyLimit: null, // No cap anymore, regardless of premium status.
       used: todayCount,
       premium,
     });
@@ -677,18 +672,10 @@ router.post("/puzzles/:id/explain", requireAuth, requirePremium, async (req: Req
 router.post("/puzzles/generate-from-games", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
-    const { checkUsageLimit } = await import("../lib/accessControl");
-    const limitCheck = await checkUsageLimit(userId, "puzzles");
-    if (!limitCheck.allowed) {
-      res.status(403).json({
-        error: "usage_limit",
-        message: `Free plan includes ${limitCheck.limit} game-derived puzzles. Upgrade to Pro for unlimited puzzles!`,
-        used: limitCheck.used,
-        limit: limitCheck.limit,
-      });
-      return;
-    }
-
+    // No usage limit here -- verified these puzzles are derived purely
+    // from already-reviewed games' stored engine data (reviewData,
+    // itself already free), with no incremental OpenAI/AI call anywhere
+    // in this route or in puzzleVerifier.ts.
     const { storage } = await import("../lib/storage");
     const user = await storage.getUser(userId);
     const primaryUsername = user?.chesscomUsername || user?.lichessUsername;

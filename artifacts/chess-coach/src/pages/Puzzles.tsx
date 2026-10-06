@@ -82,7 +82,7 @@ interface PuzzleStats {
   premium: boolean;
 }
 
-type PuzzleState = 'loading' | 'ready' | 'solving' | 'correct' | 'wrong' | 'showing_solution' | 'limit_reached' | 'no_puzzles';
+type PuzzleState = 'loading' | 'ready' | 'solving' | 'correct' | 'wrong' | 'showing_solution' | 'no_puzzles';
 
 export function Puzzles() {
   const { authUser } = useUser();
@@ -150,14 +150,10 @@ export function Puzzles() {
       }
       const qs = params.toString() ? `?${params.toString()}` : '';
       const res = await apiFetch(`/api/puzzles/next${qs}`);
-      if (res.status === 403) {
-        const data = await res.json();
-        if (data.error === 'daily_limit') {
-          setDaily({ used: data.used, limit: data.limit, premium: false });
-          setState('limit_reached');
-          return;
-        }
-      }
+      // The 403/'daily_limit' handling that used to be here is gone --
+      // the backend never sends that anymore, puzzles have no usage cap.
+      // Any other non-OK response still falls through to the generic
+      // no_puzzles handling right below.
       if (!res.ok) {
         setState('no_puzzles');
         return;
@@ -583,24 +579,15 @@ export function Puzzles() {
 
         {(
           <>
-            {daily && !daily.premium && daily.limit && state !== 'limit_reached' && (
-              <div className="mb-3">
-                <UpgradeNudge headline={`${daily.used}/${daily.limit} free puzzles today — upgrade for unlimited`} compact />
-              </div>
-            )}
+            {/* The "X/Y free puzzles today" banner that used to render here
+                is gone -- puzzles have no usage cap anymore, so daily.limit
+                is always null now and this condition can never be true. */}
 
             {state === 'loading' && (
               <div className="flex flex-col items-center justify-center py-20">
                 <Loader2 className="animate-spin mb-3" size={32} style={{ color: CHESSCOM_GREEN }} />
                 <p className="text-sm" style={{ color: TEXT_MUTED }}>Loading puzzle...</p>
               </div>
-            )}
-
-            {state === 'limit_reached' && (
-              <UpgradeNudge
-                headline="You've used today's free puzzles"
-                subtext={`Free plan includes ${daily?.limit ?? 5} puzzles per day. Upgrade to Pro for unlimited puzzles!`}
-              />
             )}
 
             {state === 'no_puzzles' && (

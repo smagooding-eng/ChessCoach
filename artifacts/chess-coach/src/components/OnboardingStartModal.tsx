@@ -190,14 +190,6 @@ export function OnboardingStartModal({ username: initialUsername, platform: init
           >
             {linking ? 'Saving…' : 'Continue'}
           </button>
-          <button
-            onClick={skip}
-            disabled={linking}
-            className="w-full text-xs font-bold uppercase tracking-widest disabled:opacity-50"
-            style={{ color: TEXT_MUTED }}
-          >
-            Skip for now
-          </button>
         </div>
       </div>
     );

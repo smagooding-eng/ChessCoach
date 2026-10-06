@@ -160,7 +160,7 @@ export function Subscription() {
         <p className="text-muted-foreground max-w-lg mx-auto">
           {isPremium
             ? 'You have access to all Pro features.'
-            : "You're on the Free plan. Subscribe to ChessScout.net Pro to unlock unlimited puzzles, opponent scouting, and courses."}
+            : "You're on the Free plan. Subscribe to ChessScout.net Pro to unlock unlimited opponent scouting and courses."}
         </p>
       </div>
 

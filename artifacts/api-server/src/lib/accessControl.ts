@@ -1,13 +1,19 @@
-import { db, gamesTable, puzzleAttemptsTable, puzzlesTable, backgroundJobsTable, coursesTable } from "@workspace/db";
+import { db, backgroundJobsTable, coursesTable } from "@workspace/db";
 import { eq, and, count } from "drizzle-orm";
 import { storage } from "./storage";
 import { ADMIN_EMAILS } from "./auth";
 
+// Only features with real, metered third-party API cost stay gated --
+// opponentScouts and courses both run the full OpenAI-backed analysis
+// pipeline, and scanPositionsPerDay uses metered vision AI. puzzles,
+// game import, and game review (Stockfish, run on our own server, not
+// billed per call the way OpenAI is) were previously limited too, but
+// none of them cost anything beyond server compute, so they're no
+// longer rate-limited at all -- see hasFullAccess/checkUsageLimit below,
+// which now only ever check the three keys still listed here.
 export const FREE_TIER_LIMITS = {
-  puzzles: 10,
   opponentScouts: 1,
   courses: 5,
-  initialGameImport: 20,
   scanPositionsPerDay: 2,
 } as const;
 
@@ -45,7 +51,7 @@ export async function hasFullAccess(userId: string): Promise<{ full: boolean; us
  */
 export async function checkUsageLimit(
   userId: string,
-  feature: "puzzles" | "opponentScouts" | "courses",
+  feature: "opponentScouts" | "courses",
 ): Promise<{ allowed: boolean; used: number; limit: number }> {
   const { full, user } = await hasFullAccess(userId);
   if (full) return { allowed: true, used: 0, limit: Infinity };
@@ -53,14 +59,7 @@ export async function checkUsageLimit(
   const limit = FREE_TIER_LIMITS[feature];
   let used = 0;
 
-  if (feature === "puzzles") {
-    const [row] = await db
-      .select({ c: count() })
-      .from(puzzleAttemptsTable)
-      .innerJoin(puzzlesTable, eq(puzzleAttemptsTable.puzzleId, puzzlesTable.id))
-      .where(and(eq(puzzleAttemptsTable.userId, userId), eq(puzzlesTable.source, "personal")));
-    used = row?.c ?? 0;
-  } else if (feature === "opponentScouts") {
+  if (feature === "opponentScouts") {
     const [row] = await db
       .select({ c: count() })
       .from(backgroundJobsTable)
@@ -79,25 +78,3 @@ export async function checkUsageLimit(
   return { allowed: used < limit, used, limit };
 }
 
-/**
- * True if importing more games would exceed the free-tier's initial
- * import allowance. Free-tier users can still review and view the games
- * they already have — this only blocks pulling in additional ones.
- */
-export async function wouldExceedImportLimit(userId: string, username: string): Promise<boolean> {
-  const { full } = await hasFullAccess(userId);
-  if (full) return false;
-
-  // Must be scoped to this user's own games -- username alone matches
-  // every row anyone has ever imported or opponent-scouted under that
-  // chess.com/lichess handle, so a common or previously-scouted username
-  // (e.g. a well-known GM) could already show a high count from other
-  // accounts' activity, incorrectly blocking a brand-new user's very
-  // first import.
-  const [row] = await db
-    .select({ c: count() })
-    .from(gamesTable)
-    .where(and(eq(gamesTable.username, username.toLowerCase()), eq(gamesTable.userId, userId)));
-
-  return (row?.c ?? 0) >= FREE_TIER_LIMITS.initialGameImport;
-}
