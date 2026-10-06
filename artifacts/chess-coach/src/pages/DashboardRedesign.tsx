@@ -1,89 +1,58 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'wouter';
-import {
-  Target, Puzzle, BookOpen, Play, Crosshair, ChevronRight, Crown,
-} from 'lucide-react';
+import { Target, Search, ArrowRight, ChevronRight, Play, Puzzle, BookOpen, Crosshair, Crown } from 'lucide-react';
 import { useUser } from '@/hooks/use-user';
 import { useChessPlayer } from '@/hooks/use-chess-player';
 import { useMultiEloProgress } from '@/hooks/use-elo-progress';
 import { useMyAnalysisSummary } from '@/hooks/use-analysis';
 import { useMyGames } from '@/hooks/use-games';
+import { GameThumb } from '@/components/GameThumb';
 
-// New design target -- matches the provided screenshot/palette. The
-// header (logo/search/bell/avatar) and bottom nav (Home/Scout/Games/
-// Analysis/More) shown in that screenshot are the app's existing shared
-// Layout chrome, not rebuilt here; this component is the page content
-// Layout renders between them.
-const GREEN = '#8bea45';
-const BG = '#080c0d';
-const CARD = 'linear-gradient(145deg,#151c1e,#0e1415)';
-const BORDER = 'rgba(255,255,255,.09)';
-const MUTED = '#8d9795';
-const RED = '#ff5656';
-const GOLD = '#eab44b';
+// Dashboard shown when the global "dashboard redesign" flag is ON (see
+// DashboardRouter in App.tsx). The mobile header and bottom nav in the
+// design reference are the app's shared Layout chrome and are not
+// rebuilt here -- this component is the page content between them.
+// Hero/tile artwork is the supplied cinematic imagery (cropped from the
+// provided sheet into /public/chessscout/*.webp, served locally -- no
+// external URLs). Each image carries its own focal position (`pos`) so
+// the subject stays on the right and clear of the text on narrow phone
+// cards. Avatars, ratings, stats and game thumbnails all come from the
+// app's existing hooks/components, nothing is mocked.
 
-const RESULT_STYLE: Record<string, { bg: string; text: string; label: string }> = {
-  win: { bg: 'rgba(139,234,69,.18)', text: GREEN, label: 'WIN' },
-  loss: { bg: 'rgba(255,86,86,.18)', text: '#ff9d8f', label: 'LOSS' },
-  draw: { bg: 'rgba(255,255,255,.12)', text: '#d0d4c8', label: 'DRAW' },
+const BG = '#050A0B';
+const CARD = 'linear-gradient(160deg, #0F1819 0%, #0B1213 100%)';
+const GREEN = '#8BEA45';
+const GREEN_DARK = '#5FD533';
+const MUTED = '#87918E';
+const RED = '#FF5058';
+const BORDER = 'rgba(255,255,255,.08)';
+
+const asset = (file: string) => `${import.meta.env.BASE_URL}chessscout/${file}`;
+
+const RESULT_STYLE: Record<string, { bg: string; fg: string; label: string }> = {
+  win: { bg: 'rgba(95,213,51,.16)', fg: '#7BE05A', label: 'WIN' },
+  loss: { bg: 'rgba(255,80,88,.16)', fg: '#FF7A80', label: 'LOSS' },
+  draw: { bg: 'rgba(255,255,255,.10)', fg: '#B9C2BF', label: 'DRAW' },
 };
 
-function Card({ children, className = '', style = {} }: { children: React.ReactNode; className?: string; style?: React.CSSProperties }) {
-  return (
-    <section
-      className={className}
-      style={{
-        background: CARD,
-        border: `1px solid ${BORDER}`,
-        borderRadius: 20,
-        boxShadow: '0 18px 45px -30px rgba(0,0,0,.95)',
-        ...style,
-      }}
-    >
-      {children}
-    </section>
-  );
-}
-
-// Small checkerboard swatch used as a placeholder game thumbnail where a
-// real per-game board preview isn't available -- same role as the
-// partial script's MiniBoard, kept here so Recent Games has a visual
-// without depending on a screenshot/FEN-render for every row.
-function MiniBoard() {
-  return (
-    <div
-      className="grid grid-cols-4 grid-rows-2 overflow-hidden shrink-0"
-      style={{ width: 44, height: 44, borderRadius: 8, border: '1px solid rgba(255,255,255,.16)', background: '#d6b08b' }}
-    >
-      {Array.from({ length: 8 }).map((_, i) => (
-        <span key={i} style={{ background: i % 2 ? '#9e704f' : '#f1d0a5' }} />
-      ))}
-    </div>
-  );
-}
-
-const QUICK_LINKS = [
-  {
-    label: 'Play', sub: 'Friends or bots', icon: Play, href: '/play',
-    bg: 'linear-gradient(160deg, rgba(139,234,69,.32), rgba(139,234,69,.05) 70%), #10201a',
-    iconBg: 'rgba(139,234,69,.22)', iconColor: GREEN,
-  },
-  {
-    label: 'Puzzles', sub: 'Smart training', icon: Puzzle, href: '/puzzles',
-    bg: 'linear-gradient(160deg, rgba(92,150,255,.32), rgba(92,150,255,.05) 70%), #0f1a28',
-    iconBg: 'rgba(92,150,255,.22)', iconColor: '#5c96ff',
-  },
-  {
-    label: 'Openings', sub: 'Drill and learn', icon: BookOpen, href: '/openings',
-    bg: 'linear-gradient(160deg, rgba(168,120,255,.32), rgba(168,120,255,.05) 70%), #1a1428',
-    iconBg: 'rgba(168,120,255,.22)', iconColor: '#a878ff',
-  },
-  {
-    label: 'Chess Traps', sub: 'Learn the classics', icon: Crosshair, href: '/traps',
-    bg: 'linear-gradient(160deg, rgba(234,180,75,.32), rgba(234,180,75,.05) 70%), #221a0f',
-    iconBg: 'rgba(234,180,75,.22)', iconColor: GOLD,
-  },
+const TILES = [
+  { label: 'Play', sub: 'Friends or bots', href: '/play', img: 'play.webp', pos: '78% center', icon: Play, c1: '#2f9e3a', c2: '#8BEA45', glow: 'rgba(139,234,69,.28)' },
+  { label: 'Puzzles', sub: 'Smart training', href: '/puzzles', img: 'puzzles.webp', pos: '73% center', icon: Puzzle, c1: '#1e5bff', c2: '#5cc8ff', glow: 'rgba(92,150,255,.30)' },
+  { label: 'Openings', sub: 'Drill and learn', href: '/openings', img: 'openings.webp', pos: '68% center', icon: BookOpen, c1: '#6a3fc7', c2: '#b48cff', glow: 'rgba(168,120,255,.30)' },
+  { label: 'Chess Traps', sub: 'Learn the classics', href: '/traps', img: 'traps.webp', pos: '59% center', icon: Crosshair, c1: '#b9791a', c2: '#ffd27a', glow: 'rgba(232,180,71,.30)' },
 ];
+
+function RookIcon({ size = 18, color = GREEN }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill={color} aria-hidden="true">
+      <path d="M5 3h3v2h2V3h4v2h2V3h3v6l-2 2v6l2 2v2H5v-2l2-2v-6L5 9V3z" />
+    </svg>
+  );
+}
+
+function Skeleton({ className = '' }: { className?: string }) {
+  return <div className={`animate-pulse rounded-md ${className}`} style={{ background: 'rgba(255,255,255,.07)' }} />;
+}
 
 export function DashboardRedesign() {
   const { username, isPremium, authUser } = useUser();
@@ -95,9 +64,12 @@ export function DashboardRedesign() {
   const [, navigate] = useLocation();
 
   const displayName = username ?? authUser?.chesscomUsername ?? authUser?.lichessUsername ?? 'Player';
+  const mine = [username, authUser?.chesscomUsername, authUser?.lichessUsername]
+    .filter((n): n is string => !!n)
+    .map((n) => n.toLowerCase());
 
-  // Same "best available rating" logic already used in Layout.tsx's own
-  // header, so the number shown here always matches what's shown there.
+  // Same "best available rating" logic as the Layout header so the two
+  // numbers can never disagree.
   const ratings: number[] = [];
   if (multiElo?.chesscom?.hasData) ratings.push(multiElo.chesscom.currentRating);
   if (multiElo?.lichess?.hasData) ratings.push(multiElo.lichess.currentRating);
@@ -106,67 +78,72 @@ export function DashboardRedesign() {
     : (chessPlayer?.rating ?? null);
   const scoutDelta = multiElo?.combined?.delta ?? null;
 
+  const statsLoading = summary === undefined;
   const games = summary?.totalGames ?? 0;
   const wins = summary?.wins ?? 0;
   const draws = summary?.draws ?? 0;
   const losses = summary?.losses ?? 0;
-  const winRatePct = games > 0 ? Math.round((wins / games) * 100) : null;
+  const winRate = games > 0 ? ((wins / games) * 100).toFixed(1) : null;
 
   const submitScout = (e: React.FormEvent) => {
     e.preventDefault();
-    const trimmed = opponent.trim();
-    navigate(trimmed ? `/opponents?username=${encodeURIComponent(trimmed)}` : '/opponents');
+    const target = opponent.trim();
+    navigate(target ? `/opponents?username=${encodeURIComponent(target)}` : '/opponents');
   };
+
+  const recent = gamesData?.games ?? [];
 
   return (
     <div
-      className="-m-4 min-h-screen px-3 pb-8 pt-2 md:-m-6 md:px-6 md:pt-4"
-      style={{ background: BG, color: '#f3f5f4', fontFamily: 'Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif' }}
+      className="-m-4 min-h-screen px-3 pt-3 md:-m-6 md:px-6 md:pt-6 md:pb-12 pb-[calc(7.5rem+env(safe-area-inset-bottom))]"
+      style={{ background: BG, color: '#F5F7F6', fontFamily: 'inherit' }}
     >
-      <div className="mx-auto grid max-w-[1050px] gap-3">
+      <div className="mx-auto grid w-full max-w-[760px] gap-3">
 
-        {/* Profile summary */}
-        <Card className="p-4 md:p-5">
+        {/* ── Player summary ── */}
+        <section className="rounded-[20px] p-4" style={{ background: CARD, border: `1px solid ${BORDER}` }}>
           <div className="flex items-center gap-3">
-            <div
-              className="grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-full"
-              style={{ border: `2px solid ${GREEN}`, background: 'rgba(139,234,69,.12)' }}
-            >
-              {chessPlayer?.avatar ? (
-                <img src={chessPlayer.avatar} alt="" className="h-full w-full object-cover" />
-              ) : (
-                <span className="text-xl font-black" style={{ color: GREEN }}>{displayName.charAt(0).toUpperCase()}</span>
-              )}
+            <div className="relative shrink-0">
+              <div
+                className="grid h-[60px] w-[60px] place-items-center overflow-hidden rounded-full"
+                style={{ border: `2px solid ${GREEN}`, background: 'rgba(139,234,69,.10)' }}
+              >
+                {chessPlayer?.avatar ? (
+                  <img src={chessPlayer.avatar} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  <span className="text-xl font-black" style={{ color: GREEN }}>{displayName.charAt(0).toUpperCase()}</span>
+                )}
+              </div>
             </div>
 
             <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <h1 className="truncate text-lg font-extrabold tracking-tight">{displayName}</h1>
+              <div className="flex items-center gap-2">
+                <h1 className="truncate text-[20px] font-extrabold leading-tight tracking-tight">{displayName}</h1>
                 {isPremium && (
                   <span
-                    className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[9px] font-black uppercase tracking-wider"
-                    style={{ background: GOLD, color: '#17130b' }}
+                    className="inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-[3px] text-[10px] font-black uppercase tracking-wider"
+                    style={{ background: 'linear-gradient(180deg,#F2C560,#D99A24)', color: '#1A1205' }}
                   >
-                    <Crown size={10} /> Pro
+                    <Crown size={11} /> Pro
                   </span>
                 )}
               </div>
-              <p className="truncate text-xs" style={{ color: MUTED }}>
-                {authUser?.chesscomUsername && `Chess.com ${multiElo?.chesscom?.currentRating ?? '—'}`}
-                {authUser?.chesscomUsername && authUser?.lichessUsername && '  |  '}
-                {authUser?.lichessUsername && `Lichess ${multiElo?.lichess?.currentRating ?? '—'}`}
+              <p className="mt-0.5 truncate text-[13px]" style={{ color: MUTED }}>
+                {authUser?.chesscomUsername && <>Chess.com {multiElo?.chesscom?.currentRating ?? '—'}</>}
+                {authUser?.chesscomUsername && authUser?.lichessUsername && <span className="mx-2 opacity-50">|</span>}
+                {authUser?.lichessUsername && <>Lichess {multiElo?.lichess?.currentRating ?? '—'}</>}
                 {!authUser?.chesscomUsername && !authUser?.lichessUsername && 'Link an account from Profile'}
               </p>
             </div>
 
             {scoutElo != null && (
               <div className="shrink-0 text-right">
-                <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: MUTED }}>Scout Rating</p>
+                <p className="text-[10px] font-bold uppercase tracking-[.14em]" style={{ color: MUTED }}>Scout Rating</p>
                 <div className="flex items-baseline justify-end gap-1.5">
-                  <span className="text-xl font-black">{scoutElo}</span>
+                  <span className="text-[26px] font-black leading-none">{scoutElo}</span>
                   {scoutDelta != null && scoutDelta !== 0 && (
-                    <span className="text-xs font-bold" style={{ color: scoutDelta > 0 ? GREEN : RED }}>
-                      {scoutDelta > 0 ? '▲' : '▼'}{Math.abs(scoutDelta)}
+                    <span className="text-[12px] font-extrabold" style={{ color: scoutDelta > 0 ? GREEN : RED }}>
+                      {scoutDelta > 0 ? '▲' : '▼'} {scoutDelta > 0 ? '+' : '-'}{Math.abs(scoutDelta)}
                     </span>
                   )}
                 </div>
@@ -174,111 +151,191 @@ export function DashboardRedesign() {
             )}
           </div>
 
-          {games > 0 && (
-            <div className="mt-4 flex flex-wrap items-center gap-4 border-t pt-3" style={{ borderColor: BORDER }}>
-              <div>
-                <span className="block text-lg font-black leading-none">{games.toLocaleString()}</span>
-                <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: MUTED }}>Games</span>
-              </div>
-              <div className="flex-1 min-w-[120px]">
-                <div className="flex items-center justify-between text-[11px] font-bold mb-1">
-                  <span style={{ color: GREEN }}>{wins}W</span>
-                  <span style={{ color: MUTED }}>{draws}D</span>
-                  <span style={{ color: RED }}>{losses}L</span>
+          {/* Stats strip */}
+          <div className="mt-3.5 flex items-center gap-3.5 rounded-[14px] px-3.5 py-2.5" style={{ background: 'rgba(255,255,255,.03)', border: `1px solid ${BORDER}` }}>
+            {statsLoading ? (
+              <>
+                <Skeleton className="h-9 w-14" />
+                <Skeleton className="h-3 flex-1" />
+                <Skeleton className="h-9 w-14" />
+              </>
+            ) : games === 0 ? (
+              <p className="w-full py-1 text-center text-[13px]" style={{ color: MUTED }}>Your stats appear here once games finish importing.</p>
+            ) : (
+              <>
+                <div className="shrink-0 text-center">
+                  <b className="block text-[20px] font-extrabold leading-none">{games.toLocaleString()}</b>
+                  <span className="text-[11px]" style={{ color: MUTED }}>Games</span>
                 </div>
-                <div className="flex h-1.5 rounded-full overflow-hidden">
-                  <div style={{ width: `${(wins / games) * 100}%`, background: GREEN }} />
-                  <div style={{ width: `${(draws / games) * 100}%`, background: MUTED }} />
-                  <div style={{ width: `${(losses / games) * 100}%`, background: RED }} />
+                <div className="min-w-0 flex-1 border-x px-3.5" style={{ borderColor: BORDER }}>
+                  <div className="mb-1.5 flex items-center justify-between text-[12px] font-extrabold">
+                    <span style={{ color: '#7BE05A' }}>{wins}W</span>
+                    <span style={{ color: MUTED }}>{draws}D</span>
+                    <span style={{ color: RED }}>{losses}L</span>
+                  </div>
+                  <div className="flex h-[7px] overflow-hidden rounded-full">
+                    <div style={{ width: `${(wins / games) * 100}%`, background: `linear-gradient(90deg, ${GREEN_DARK}, ${GREEN})` }} />
+                    <div style={{ width: `${(draws / games) * 100}%`, background: '#8A949B' }} />
+                    <div style={{ width: `${(losses / games) * 100}%`, background: RED }} />
+                  </div>
                 </div>
-              </div>
-              <div className="text-right">
-                <span className="block text-lg font-black leading-none">{winRatePct}%</span>
-                <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: MUTED }}>Win Rate</span>
-              </div>
-            </div>
-          )}
-        </Card>
+                <div className="shrink-0 text-center">
+                  <b className="block text-[20px] font-extrabold leading-none">{winRate}%</b>
+                  <span className="text-[11px]" style={{ color: MUTED }}>Win Rate</span>
+                </div>
+              </>
+            )}
+          </div>
+        </section>
 
-        {/* Scout hero */}
-        <Card className="relative overflow-hidden p-5">
-          <div className="relative z-10 max-w-[75%]">
-            <p className="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-widest" style={{ color: GREEN }}>
-              <Target size={13} /> Know your opponent.
+        {/* ── Scout hero ── */}
+        <section
+          className="relative min-h-[340px] overflow-hidden rounded-[20px]"
+          style={{
+            background: BG,
+            border: `1px solid ${BORDER}`,
+            backgroundImage: `url(${asset('scout-knight.webp')})`,
+            backgroundSize: 'auto 100%',
+            backgroundPosition: '68% center',
+            backgroundRepeat: 'no-repeat',
+          }}
+        >
+          <div className="absolute inset-0" style={{ background: 'linear-gradient(90deg, rgba(5,10,11,.94) 0%, rgba(5,10,11,.72) 46%, rgba(5,10,11,0) 78%)' }} />
+          <div className="relative z-10 flex min-h-[340px] flex-col p-5">
+            <p className="flex items-center gap-2 text-[11px] font-extrabold uppercase tracking-[.22em]" style={{ color: GREEN }}>
+              <Target size={18} /> Know your opponent.
             </p>
-            <h2 className="mt-1.5 text-2xl font-black leading-tight">
+            <h2 className="mt-3 text-[26px] font-black leading-[1.04] tracking-tight min-[400px]:text-[28px] sm:text-[36px]" style={{ textShadow: '0 2px 14px rgba(0,0,0,.85)' }}>
               Scout Any<br />
-              <span style={{ background: `linear-gradient(90deg, ${GREEN}, ${GOLD})`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-                Chess.com Player
-              </span>
+              <span style={{ color: GREEN, textShadow: '0 0 26px rgba(139,234,69,.35), 0 2px 14px rgba(0,0,0,.85)' }}>Chess.com Player</span>
             </h2>
-            <p className="mt-2 text-sm" style={{ color: MUTED }}>
+            <p className="mt-2.5 max-w-[58%] text-[14px] leading-snug sm:max-w-[48%]" style={{ color: '#C9D1CE', textShadow: '0 2px 10px rgba(0,0,0,.9)' }}>
               Get instant analysis, weaknesses, tendencies, and custom prep lines.
             </p>
-            <form onSubmit={submitScout} className="mt-4 flex items-center gap-2 rounded-xl p-1" style={{ background: 'rgba(0,0,0,.35)', border: `1px solid ${BORDER}` }}>
+
+            <form
+              onSubmit={submitScout}
+              className="mt-auto flex items-center overflow-hidden rounded-[16px]"
+              style={{ background: 'rgba(8,14,15,.82)', border: `1px solid rgba(255,255,255,.12)`, boxShadow: '0 0 28px rgba(139,234,69,.16)' }}
+            >
+              <Search size={20} className="ml-4 shrink-0" style={{ color: '#C9D1CE' }} />
               <input
                 value={opponent}
                 onChange={(e) => setOpponent(e.target.value)}
                 placeholder="Enter a Chess.com username"
-                className="flex-1 bg-transparent px-3 py-2 text-sm outline-none"
-                style={{ color: '#f3f5f4' }}
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                enterKeyHint="go"
+                className="h-[54px] min-w-0 flex-1 bg-transparent px-3 text-[15px] outline-none placeholder:text-[#87918E]"
+                style={{ color: '#F5F7F6' }}
+                aria-label="Chess.com username to scout"
               />
-              <button type="submit" className="grid h-9 w-9 shrink-0 place-items-center rounded-lg" style={{ background: GREEN, color: '#071007' }}>
-                <ChevronRight size={18} />
+              <button
+                type="submit"
+                className="grid h-[54px] w-[62px] shrink-0 place-items-center transition-transform active:scale-95"
+                style={{ background: `linear-gradient(180deg, ${GREEN} 0%, ${GREEN_DARK} 100%)`, color: '#05100A', boxShadow: '0 0 22px rgba(139,234,69,.45)' }}
+                aria-label="Scout this player"
+              >
+                <ArrowRight size={26} strokeWidth={2.6} />
               </button>
             </form>
           </div>
-        </Card>
+        </section>
 
-        {/* Quick links */}
+        {/* ── Feature tiles ── */}
         <div className="grid grid-cols-2 gap-3">
-          {QUICK_LINKS.map((q) => (
-            <Link key={q.label} href={q.href}>
-              <Card className="flex flex-col justify-between p-4 min-h-[128px] cursor-pointer transition-transform hover:-translate-y-0.5" style={{ background: q.bg }}>
-                <span className="grid h-9 w-9 place-items-center rounded-xl" style={{ background: q.iconBg, color: q.iconColor }}>
-                  <q.icon size={18} />
+          {TILES.map((t) => (
+            <Link
+              key={t.label}
+              href={t.href}
+              className="relative block min-h-[128px] overflow-hidden rounded-[18px] transition-transform active:scale-[.98]"
+              style={{
+                background: BG,
+                border: `1px solid ${BORDER}`,
+                backgroundImage: `url(${asset(t.img)})`,
+                backgroundSize: 'auto 100%',
+                backgroundPosition: t.pos,
+                backgroundRepeat: 'no-repeat',
+                boxShadow: `inset 0 0 40px ${t.glow}`,
+              }}
+            >
+              <div className="absolute inset-0" style={{ background: 'linear-gradient(90deg, rgba(5,10,11,.78) 0%, rgba(5,10,11,.25) 62%, rgba(5,10,11,0) 100%), linear-gradient(0deg, rgba(5,10,11,.65) 0%, rgba(5,10,11,0) 55%)' }} />
+              <div className="relative z-10 flex h-full min-h-[128px] flex-col justify-between p-3.5">
+                <span
+                  className="grid h-10 w-10 place-items-center rounded-[11px]"
+                  style={{ background: `linear-gradient(160deg, ${t.c2}, ${t.c1})`, boxShadow: `0 0 18px ${t.glow}`, border: '1px solid rgba(255,255,255,.18)' }}
+                >
+                  <t.icon size={21} color="#fff" fill={t.label === 'Play' ? '#fff' : 'none'} />
                 </span>
-                <div className="flex items-end justify-between">
-                  <div>
-                    <b className="block text-base font-extrabold">{q.label}</b>
-                    <span className="text-xs" style={{ color: MUTED }}>{q.sub}</span>
+                <div className="flex items-end justify-between gap-2">
+                  <div className="min-w-0">
+                    <b className="block truncate text-[19px] font-extrabold leading-tight">{t.label}</b>
+                    <span className="block truncate text-[12.5px]" style={{ color: '#C4CCC9' }}>{t.sub}</span>
                   </div>
-                  <ChevronRight size={16} style={{ color: MUTED }} />
+                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full" style={{ border: '1.5px solid rgba(255,255,255,.7)', background: 'rgba(5,10,11,.45)' }}>
+                    <ArrowRight size={16} />
+                  </span>
                 </div>
-              </Card>
+              </div>
             </Link>
           ))}
         </div>
 
-        {/* Recent games */}
-        <Card className="p-4 md:p-5">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-base font-extrabold">Recent Games</h2>
-            <Link href="/games" className="text-xs font-extrabold uppercase tracking-wide" style={{ color: GREEN }}>All Games →</Link>
+        {/* ── Recent games ── */}
+        <section className="rounded-[20px]" style={{ background: CARD, border: `1px solid ${BORDER}` }}>
+          <div className="flex items-center justify-between px-4 pb-3 pt-4">
+            <div className="flex items-center gap-3">
+              <span className="grid h-9 w-9 place-items-center rounded-[10px]" style={{ background: 'rgba(139,234,69,.10)', border: `1px solid ${BORDER}` }}>
+                <RookIcon size={19} />
+              </span>
+              <h2 className="text-[17px] font-extrabold">Recent Games</h2>
+            </div>
+            <Link href="/games" className="flex items-center gap-1 text-[12px] font-extrabold uppercase tracking-wider" style={{ color: GREEN }}>
+              All Games <ChevronRight size={14} />
+            </Link>
           </div>
-          <div className="grid gap-1">
-            {gamesData?.games?.length ? gamesData.games.map((game) => {
-              const isWhite = game.whiteUsername?.toLowerCase() === (username ?? '').toLowerCase();
-              const rs = RESULT_STYLE[game.result] ?? RESULT_STYLE.draw;
-              return (
-                <Link key={game.id} href={`/games/${game.id}`} className="flex items-center gap-3 p-2 rounded-xl transition-colors hover:bg-white/5">
-                  <MiniBoard />
-                  <span className="w-[52px] text-center text-[10px] font-extrabold tracking-wide rounded-lg py-1 shrink-0" style={{ background: rs.bg, color: rs.text }}>{rs.label}</span>
-                  <div className="flex-1 min-w-0">
-                    <b className="text-sm block truncate">vs {isWhite ? game.blackUsername : game.whiteUsername}</b>
-                    <small style={{ color: MUTED }} className="block text-xs truncate">{game.opening || 'Unknown opening'}</small>
-                  </div>
-                  <div className="flex items-center gap-1 shrink-0">
-                    <span className="text-xs" style={{ color: MUTED }}>{new Date(game.playedAt).toLocaleDateString()}</span>
-                    <ChevronRight size={14} style={{ color: MUTED }} />
-                  </div>
-                </Link>
-              );
-            }) : (
-              <p style={{ color: MUTED }} className="text-sm text-center py-6">No games yet — import to get started.</p>
+
+          <div>
+            {gamesData === undefined ? (
+              [0, 1, 2].map((i) => (
+                <div key={i} className="flex items-center gap-3 border-t px-4 py-3" style={{ borderColor: BORDER }}>
+                  <Skeleton className="h-11 w-11" />
+                  <Skeleton className="h-4 w-12" />
+                  <div className="flex-1 space-y-2"><Skeleton className="h-3.5 w-3/5" /><Skeleton className="h-3 w-2/5" /></div>
+                </div>
+              ))
+            ) : recent.length === 0 ? (
+              <p className="border-t px-4 py-8 text-center text-[13px]" style={{ borderColor: BORDER, color: MUTED }}>No games yet — import some to see them here.</p>
+            ) : (
+              recent.map((game) => {
+                const isWhite = mine.includes((game.whiteUsername ?? '').toLowerCase());
+                const rs = RESULT_STYLE[game.result] ?? RESULT_STYLE.draw;
+                return (
+                  <Link
+                    key={game.id}
+                    href={`/games/${game.id}`}
+                    className="flex items-center gap-3 border-t px-4 py-3 transition-colors hover:bg-white/[0.03]"
+                    style={{ borderColor: BORDER }}
+                  >
+                    <GameThumb pgn={game.pgn} userColor={isWhite ? 'white' : 'black'} size={44} />
+                    <span className="w-[52px] shrink-0 rounded-md py-1 text-center text-[11px] font-extrabold tracking-wide" style={{ background: rs.bg, color: rs.fg }}>
+                      {rs.label}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <b className="block truncate text-[14px] font-bold">
+                        <span className="font-normal" style={{ color: MUTED }}>vs </span>{isWhite ? game.blackUsername : game.whiteUsername}
+                      </b>
+                      <span className="block truncate text-[12px]" style={{ color: MUTED }}>{game.opening || 'Unknown opening'}</span>
+                    </div>
+                    <span className="shrink-0 text-[12px]" style={{ color: MUTED }}>{new Date(game.playedAt).toLocaleDateString()}</span>
+                    <ChevronRight size={15} className="shrink-0" style={{ color: MUTED }} />
+                  </Link>
+                );
+              })
             )}
           </div>
-        </Card>
+        </section>
 
       </div>
     </div>

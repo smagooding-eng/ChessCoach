@@ -276,6 +276,29 @@ export function OpponentAnalysis() {
     };
   }, []);
 
+  // Lets the dashboard's hero search hand a username straight to this
+  // page (/opponents?username=...) and have the EXISTING scout flow
+  // start -- prefilled, then submitted through handleAnalyze itself, so
+  // every existing check (usage limit, errors, polling, active-job
+  // resume) still applies unchanged. The param is stripped from the URL
+  // immediately so a refresh or back-navigation can't re-trigger it.
+  const autoStartRef = useRef<string | null>(null);
+  useEffect(() => {
+    const param = new URLSearchParams(window.location.search).get('username')?.trim();
+    if (!param) return;
+    window.history.replaceState({}, '', window.location.pathname);
+    autoStartRef.current = param;
+    setInputUsername(param);
+  }, []);
+  useEffect(() => {
+    const pending = autoStartRef.current;
+    if (!pending || inputUsername.trim() !== pending) return;
+    autoStartRef.current = null;
+    if (loading) return;
+    handleAnalyze({ preventDefault: () => {} } as React.FormEvent);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inputUsername]);
+
   const handleAnalyze = async (e: React.FormEvent) => {
     e.preventDefault();
     const target = inputUsername.trim();
