@@ -7,7 +7,7 @@ export type BoardTexture = 'flat' | 'wood' | 'marble' | 'felt' | 'granite' | 'le
   | 'cs-emerald' | 'cs-obsidian' | 'cs-ivory' | 'cs-walnut' | 'cs-steel' | 'cs-tournament';
 export type AppBackground = 'default' | 'warm-gradient' | 'cool-gradient' | 'noise';
 export type PieceStyle = 'classic' | 'glossy' | 'outlined' | 'ocean' | 'crimson' | 'emerald' | 'royal' | 'flat' | 'depth' | 'shaded' | 'wood3d' | 'marble3d' | 'chrome' | 'gold' | 'copper' | 'obsidian' | 'ivory' | 'custom';
-export type PieceShape = 'default' | 'cburnett' | 'celtic' | 'chessnut' | 'fantasy' | 'spatial' | 'rhosgfx' | 'kiwen-suwi' | 'firi' | 'totoy' | 'papercut' | 'marble' | 'bronze';
+export type PieceShape = 'default' | 'cburnett' | 'celtic' | 'chessnut' | 'fantasy' | 'spatial' | 'rhosgfx' | 'kiwen-suwi' | 'firi' | 'totoy' | 'papercut' | 'marble' | 'bronze' | 'set-marble-gold' | 'set-classic' | 'set-classic-alt' | 'set-emerald' | 'set-ruby' | 'set-sapphire' | 'set-amethyst' | 'set-crystal' | 'set-steel' | 'set-bronze' | 'set-royal-gold' | 'set-marble' | 'set-carved-stone' | 'set-wood' | 'set-celtic' | 'set-gothic' | 'set-faceted';
 export type PromotionChoice = 'queen' | 'ask';
 export type BoardSize = 'compact' | 'standard' | 'large';
 
@@ -51,6 +51,24 @@ export const PIECE_SHAPES: Record<PieceShape, { label: string; attribution: stri
   // ChessScout's own artwork (cream + black Staunton), shipped as WebP rather than SVG
   marble:     { label: 'Cream & Black', attribution: null, raster: true, version: 4 },
   bronze:     { label: 'Ivory & Bronze', attribution: null, raster: true, version: 1 },
+  // Sets cut from the ChessScout material grid and the Marble & Gold source (see lib/pieceThemes.ts for how they're grouped)
+  'set-marble-gold': { label: 'Marble & Gold', attribution: null, raster: true, version: 1 },
+  'set-classic': { label: 'Classic', attribution: null, raster: true, version: 1 },
+  'set-classic-alt': { label: 'Classic II', attribution: null, raster: true, version: 1 },
+  'set-emerald': { label: 'Emerald', attribution: null, raster: true, version: 1 },
+  'set-ruby': { label: 'Ruby', attribution: null, raster: true, version: 1 },
+  'set-sapphire': { label: 'Sapphire', attribution: null, raster: true, version: 1 },
+  'set-amethyst': { label: 'Amethyst', attribution: null, raster: true, version: 1 },
+  'set-crystal': { label: 'Crystal', attribution: null, raster: true, version: 1 },
+  'set-steel': { label: 'Steel', attribution: null, raster: true, version: 1 },
+  'set-bronze': { label: 'Antique Bronze', attribution: null, raster: true, version: 1 },
+  'set-royal-gold': { label: 'Royal Gold', attribution: null, raster: true, version: 1 },
+  'set-marble': { label: 'Marble', attribution: null, raster: true, version: 1 },
+  'set-carved-stone': { label: 'Carved Stone', attribution: null, raster: true, version: 1 },
+  'set-wood': { label: 'Wood', attribution: null, raster: true, version: 1 },
+  'set-celtic': { label: 'Celtic', attribution: null, raster: true, version: 1 },
+  'set-gothic': { label: 'Gothic', attribution: null, raster: true, version: 1 },
+  'set-faceted': { label: 'Faceted', attribution: null, raster: true, version: 1 },
 };
 
 export const BOARD_THEMES: Record<Exclude<BoardTheme, 'custom'>, { light: string; dark: string; label: string }> = {

@@ -166,7 +166,7 @@ export default function SettingsPage() {
           <p className="text-xs mb-4" style={{ color: TEXT_MUTED }}>Choose your pieces by type, then style, and a board to play on.</p>
 
           <h3 className="mb-2 text-[13px] font-extrabold" style={{ color: TEXT_LIGHT }}>Pieces</h3>
-          <div className="grid gap-1 rounded-[14px] p-1 mb-2" style={{ gridTemplateColumns: `repeat(${PIECE_THEME_TYPES.length}, minmax(0, 1fr))`, background: RD.cardSolid, border: `1px solid ${RD.border}` }}>
+          <div className="grid gap-1 rounded-[14px] p-1 mb-2" style={{ gridTemplateColumns: `repeat(${Math.min(3, PIECE_THEME_TYPES.length)}, minmax(0, 1fr))`, background: RD.cardSolid, border: `1px solid ${RD.border}` }}>
             {PIECE_THEME_TYPES.map((t) => {
               const on = t.id === activeType.id;
               return (

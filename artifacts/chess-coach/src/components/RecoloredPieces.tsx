@@ -168,7 +168,7 @@ export function buildTintedPieceSet(opts: {
   // this list exists only to decide which shapes take this static-asset
   // path versus the recolorable 'default' path further down.
   const STATIC_SVG_SHAPES: string[] = ['cburnett', 'celtic', 'chessnut', 'fantasy', 'spatial', 'rhosgfx', 'kiwen-suwi', 'firi', 'totoy', 'papercut', 'marble', 'bronze'];
-  if (STATIC_SVG_SHAPES.includes(pieceShape)) {
+  if (STATIC_SVG_SHAPES.includes(pieceShape) || PIECE_SHAPES[pieceShape as keyof typeof PIECE_SHAPES]?.raster) {
     // Raster sets are WebP sprites; every other static shape is SVG. The version tag means a
     // replaced set of sprites (same file names) is never served from a stale cache.
     const info = PIECE_SHAPES[pieceShape as keyof typeof PIECE_SHAPES];
