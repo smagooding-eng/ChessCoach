@@ -8,7 +8,6 @@ import { ImportStatusWatcher } from "@/components/ImportStatusWatcher";
 import { AutoPushPrompt } from "@/components/AutoPushPrompt";
 import { useDashboardRedesignFlag } from "@/hooks/use-app-config";
 import { BackgroundJobsWatcher } from "@/components/BackgroundJobsWatcher";
-import { useIsMobile } from "@/hooks/use-mobile";
 import { AudioAutoplayUnlock } from "@/components/AudioAutoplayUnlock";
 import { Layout } from "@/components/Layout";
 import { useUser } from "@/hooks/use-user";
@@ -284,13 +283,13 @@ function ScrollToTop() {
   return null;
 }
 
-// Mobile gets a minimal, non-scrollable sign-up/log-in screen instead of
-// the full marketing LandingPage -- most mobile apps' pattern (download,
-// sign up, go) rather than a scrollable pitch. Desktop is unaffected;
-// this only changes what /setup renders when useIsMobile() is true.
+// Every device now gets the full LandingPage. It used to be desktop-only: phones
+// (including the installed app) were sent to the minimal one-screen sign-up, so a
+// landing-page redesign was never visible on mobile. That minimal screen is kept,
+// not removed -- open /setup?quick=1 to get it (e.g. for a deep link from the app).
 function SetupRouter() {
-  const isMobile = useIsMobile();
-  return isMobile ? <MobileSetup /> : <LandingPage />;
+  const quick = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('quick') === '1';
+  return quick ? <MobileSetup /> : <LandingPage />;
 }
 
 function Router() {
