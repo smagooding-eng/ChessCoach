@@ -329,7 +329,7 @@ export function Layout({ children, fullscreen }: { children: React.ReactNode; fu
       )}
 
       <main className="flex-1 min-h-screen overflow-x-hidden pb-20 md:pb-6 md:px-5 md:pt-5">
-        <div className="md:max-w-5xl md:mx-auto">
+        <div className={`md:mx-auto ${redesign ? 'md:max-w-[1280px]' : 'md:max-w-5xl'}`}>
           {children}
         </div>
       </main>

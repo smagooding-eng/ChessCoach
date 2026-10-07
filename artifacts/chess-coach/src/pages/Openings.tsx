@@ -119,7 +119,7 @@ export function Openings() {
 
     return (
       <div className="min-h-screen px-3 md:px-6 md:pt-6 md:pb-12 pb-[calc(7.5rem+env(safe-area-inset-bottom))]" style={{ background: RD.bg, color: RD.text }}>
-        <div className="mx-auto w-full max-w-[640px]">
+        <div className="mx-auto w-full max-w-[640px] lg:max-w-[1200px]">
           <RedesignHeader title="Openings Trainer" icon={<BookOpen size={24} />} />
 
           <div className="flex items-center gap-3 rounded-[16px] px-4" style={{ background: RD.cardSolid, border: `1px solid ${RD.border}` }}>
@@ -146,7 +146,7 @@ export function Openings() {
             })}
           </div>
 
-          <div className="mt-3 grid gap-3">
+          <div className="mt-3 grid gap-3 lg:grid-cols-2">
             {openings.length === 0 ? (
               <div className="rounded-[20px] px-6 py-12 text-center" style={{ background: RD.card, border: `1px solid ${RD.border}`, color: RD.muted }}>
                 <p className="text-[15px] font-bold" style={{ color: RD.text }}>No games imported yet</p>

@@ -163,7 +163,7 @@ function TrapsRedesign({ traps, loading }: { traps: TrapSummary[]; loading: bool
 
   return (
     <div className="min-h-screen px-3 md:px-6 md:pt-6 md:pb-12 pb-[calc(7.5rem+env(safe-area-inset-bottom))]" style={{ background: RD.bg, color: RD.text }}>
-      <div className="mx-auto w-full max-w-[640px]">
+      <div className="mx-auto w-full max-w-[640px] lg:max-w-[1200px]">
         <RedesignHeader title="Chess Traps" icon={<Crosshair size={24} />} />
 
         <div className="grid grid-cols-3 gap-1 rounded-[16px] p-1" style={{ background: RD.cardSolid, border: `1px solid ${RD.border}` }}>
@@ -178,14 +178,14 @@ function TrapsRedesign({ traps, loading }: { traps: TrapSummary[]; loading: bool
           })}
         </div>
 
-        <div className="mt-3 grid gap-2.5">
+        <div className="mt-3 grid gap-2.5 lg:grid-cols-2 lg:gap-3">
           {loading ? (
             <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin" style={{ color: RD.green }} /></div>
           ) : traps.length === 0 ? (
             <div className="rounded-[20px] p-8 text-center text-[13px]" style={{ background: RD.card, border: `1px solid ${RD.border}`, color: RD.muted }}>No traps added yet.</div>
           ) : grouped ? (
             (Object.entries(grouped) as [string, TrapSummary[]][]).map(([name, list]) => (
-              <div key={name} className="grid gap-2.5">
+              <div key={name} className="grid gap-2.5 lg:col-span-2 lg:grid-cols-2">
                 <p className="mt-2 px-1 text-[11.5px] font-extrabold uppercase tracking-[.14em]" style={{ color: RD.muted }}>{name}</p>
                 {list.map(row)}
               </div>

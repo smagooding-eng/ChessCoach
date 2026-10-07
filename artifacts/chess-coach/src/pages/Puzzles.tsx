@@ -488,7 +488,7 @@ export function Puzzles() {
           </linearGradient>
         </defs>
       </svg>
-      <div className={redesign ? 'max-w-[640px] mx-auto px-3 pb-[calc(7.5rem+env(safe-area-inset-bottom))]' : 'max-w-2xl mx-auto px-4 pt-6'}>
+      <div className={redesign ? 'max-w-[640px] lg:max-w-[820px] mx-auto px-3 pb-[calc(7.5rem+env(safe-area-inset-bottom))] md:pb-12' : 'max-w-2xl mx-auto px-4 pt-6'}>
         {redesign && (
           <>
             <RedesignHeader

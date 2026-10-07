@@ -314,10 +314,10 @@ export function AnalysisRedesign() {
 
   return (
     <div className="min-h-screen px-3 md:px-6 md:pt-6 md:pb-12 pb-[calc(7.5rem+env(safe-area-inset-bottom))]" style={{ background: RD.bg, color: RD.text }}>
-      <div className="mx-auto grid grid-cols-1 w-full max-w-[760px] gap-3">
+      <div className="mx-auto grid grid-cols-1 w-full max-w-[760px] gap-3 lg:max-w-[1200px]">
         <RedesignHeader title="My Analytics" icon={<span className="text-[26px] leading-none">♟</span>} />
 
-        <div className="grid grid-cols-4 gap-1 rounded-[16px] p-1" style={{ background: RD.cardSolid, border: `1px solid ${RD.border}` }}>
+        <div className="grid grid-cols-4 gap-1 rounded-[16px] p-1 lg:max-w-[640px]" style={{ background: RD.cardSolid, border: `1px solid ${RD.border}` }}>
           {TABS.map((t) => {
             const active = tab === t.id;
             return (
@@ -330,8 +330,8 @@ export function AnalysisRedesign() {
         </div>
 
         {tab === 'overview' && (
-          <>
-            <div className="grid grid-cols-2 gap-3">
+          <div className="grid gap-3 lg:grid-cols-2 lg:items-start lg:gap-4">
+            <div className="grid grid-cols-2 gap-3 lg:col-span-2 lg:gap-4">
               <Card className="!p-3.5">
                 <div className="flex items-center justify-between">
                   <p className="text-[13px]" style={{ color: RD.muted }}>Rating</p>
@@ -409,9 +409,9 @@ export function AnalysisRedesign() {
             )}
 
             {keyInsight && (
-              <InsightCard icon={<Lightbulb size={30} style={{ color: RD.gold }} />} title="Key Insight" text={keyInsight} onClick={() => setTab('weaknesses')} />
+              <div className="lg:col-span-2"><InsightCard icon={<Lightbulb size={30} style={{ color: RD.gold }} />} title="Key Insight" text={keyInsight} onClick={() => setTab('weaknesses')} /></div>
             )}
-          </>
+          </div>
         )}
 
         {tab === 'openings' && (
@@ -422,7 +422,7 @@ export function AnalysisRedesign() {
                 <Link href="/openings" className="flex items-center gap-0.5 text-[12.5px] font-bold" style={{ color: RD.green }}>All Openings <ChevronRight size={14} /></Link>
               </div>
               {openings.length ? (
-                <div className="grid gap-2">
+                <div className="grid gap-2 lg:grid-cols-2">
                   {openings.map((o, i) => {
                     const [family, variation] = splitOpening(o.opening);
                     return (
@@ -466,7 +466,7 @@ export function AnalysisRedesign() {
               {weaknesses.length > 0 && <span className="text-[12px]" style={{ color: RD.muted }}>{weaknesses.length} found</span>}
             </div>
             {weaknesses.length ? (
-              <>
+              <div className="grid gap-3 lg:grid-cols-2 lg:gap-4">
                 {weaknesses.map((w) => {
                   const sev = SEV_STYLE[w.severity] ?? SEV_STYLE.Low;
                   const v = weaknessView(w, openingWinRate);
@@ -498,8 +498,8 @@ export function AnalysisRedesign() {
                     </Card>
                   );
                 })}
-                <InsightCard icon={<GraduationCap size={30} style={{ color: RD.green }} />} title="Where to start" text="Work on your High priority areas first — they show up most often in your games." />
-              </>
+                <div className="lg:col-span-2"><InsightCard icon={<GraduationCap size={30} style={{ color: RD.green }} />} title="Where to start" text="Work on your High priority areas first — they show up most often in your games." /></div>
+              </div>
             ) : (
               <Card>
                 <div className="py-8 text-center" style={{ color: RD.muted }}>
@@ -513,7 +513,7 @@ export function AnalysisRedesign() {
         )}
 
         {tab === 'trends' && (
-          <>
+          <div className="grid gap-3 lg:grid-cols-2 lg:items-start lg:gap-4">
             {monthlyAll.length > 0 && (
               <Card>
                 <div className="mb-1 flex items-center justify-between gap-2">
@@ -551,14 +551,14 @@ export function AnalysisRedesign() {
               </Card>
             )}
             {trend && (
-              <InsightCard
+              <div className="lg:col-span-2"><InsightCard
                 icon={trend.up ? <TrendingUp size={30} style={{ color: RD.green }} /> : <TrendingDown size={30} style={{ color: RD.red }} />}
-                title={trend.title} text={trend.text} onClick={trend.up ? undefined : () => setTab('weaknesses')} />
+                title={trend.title} text={trend.text} onClick={trend.up ? undefined : () => setTab('weaknesses')} /></div>
             )}
             {monthlyAll.length === 0 && accuracyAll.length === 0 && (
-              <Card><p className="py-8 text-center text-[13px]" style={{ color: RD.muted }}>Trends appear once you have a few months of games.</p></Card>
+              <div className="lg:col-span-2"><Card><p className="py-8 text-center text-[13px]" style={{ color: RD.muted }}>Trends appear once you have a few months of games.</p></Card></div>
             )}
-          </>
+          </div>
         )}
       </div>
     </div>

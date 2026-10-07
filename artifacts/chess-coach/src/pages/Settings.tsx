@@ -140,7 +140,7 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className={`cs-settings max-w-2xl mx-auto ${redesign ? 'space-y-3 px-3 pb-[calc(7.5rem+env(safe-area-inset-bottom))] md:px-0 md:pb-6' : 'space-y-6 p-4 md:p-0'}`}>
+    <div className={`cs-settings max-w-2xl mx-auto ${redesign ? 'lg:max-w-[1100px] space-y-3 px-3 pb-[calc(7.5rem+env(safe-area-inset-bottom))] md:px-0 md:pb-6' : 'space-y-6 p-4 md:p-0'}`}>
       {redesign && (
         <>
           <RedesignHeader
@@ -154,7 +154,7 @@ export default function SettingsPage() {
           />
           <p className="-mt-1 px-1 pb-1 text-[13px]" style={{ color: RD.muted }}>Customize how ChessScout.net looks and plays</p>
           <div className="sticky top-0 z-20 -mx-1 px-1 pb-1 pt-1" style={{ background: RD.bg }}>
-            <div className="grid grid-cols-4 gap-1 rounded-[16px] p-1" style={{ background: RD.cardSolid, border: `1px solid ${RD.border}` }}>
+            <div className="grid grid-cols-4 gap-1 rounded-[16px] p-1 lg:max-w-[640px]" style={{ background: RD.cardSolid, border: `1px solid ${RD.border}` }}>
               {([['boards', 'Boards'], ['pieces', 'Pieces'], ['themes', 'Themes'], ['play', 'Play & Sound']] as const).map(([id, label]) => {
                 const on = stab === id;
                 return (
@@ -231,7 +231,7 @@ export default function SettingsPage() {
             <span className="rounded-md px-1.5 py-0.5 text-[10px] font-extrabold" style={{ background: 'rgba(139,234,69,.14)', color: RD.green }}>NEW</span>
           </div>
           <p className="text-xs mb-3" style={{ color: TEXT_MUTED }}>Our new photographic collection — woods, marbles, stone, leather, felt and metal.</p>
-          <div className="grid grid-cols-4 gap-2">
+          <div className={`grid grid-cols-4 gap-2 ${redesign ? 'lg:grid-cols-8' : ''}`}>
             {(Object.keys(BOARD_TEXTURES) as BoardTexture[]).filter((key) => key.startsWith('ex-')).map((key) => {
               const t = BOARD_TEXTURES[key];
               const img = t.thumb ?? t.boardImage;
@@ -249,7 +249,7 @@ export default function SettingsPage() {
         <section className={vis('boards')}>
           <h2 className="text-sm font-black uppercase tracking-wide mb-1" style={{ color: TEXT_MUTED }}>Premium Boards</h2>
           <p className="text-xs mb-3" style={{ color: TEXT_MUTED }}>The original photographic set. These replace your board color.</p>
-          <div className="grid grid-cols-4 gap-2">
+          <div className={`grid grid-cols-4 gap-2 ${redesign ? 'lg:grid-cols-8' : ''}`}>
             {(Object.keys(BOARD_TEXTURES) as BoardTexture[]).filter((key) => key.startsWith('cs-')).map((key) => {
               const t = BOARD_TEXTURES[key];
               return (
@@ -296,7 +296,7 @@ export default function SettingsPage() {
       <section className={vis('boards')}>
         <h2 className="text-sm font-black uppercase tracking-wide mb-1" style={{ color: TEXT_MUTED }}>{redesign ? 'Classic Board Texture' : 'Board Texture'}</h2>
         <p className="text-xs mb-3" style={{ color: TEXT_MUTED }}>A subtle surface pattern on top of your board color</p>
-        <div className="grid grid-cols-4 gap-2">
+        <div className={`grid grid-cols-4 gap-2 ${redesign ? 'lg:grid-cols-8' : ''}`}>
           {(Object.keys(BOARD_TEXTURES) as BoardTexture[]).filter((key) => !isPhotoBoard(key)).map((key) => {
             const t = BOARD_TEXTURES[key];
             return (
@@ -313,7 +313,7 @@ export default function SettingsPage() {
       <section>
         <h2 className="text-sm font-black uppercase tracking-wide mb-1" style={{ color: TEXT_MUTED }}>Premium Boards</h2>
         <p className="text-xs mb-3" style={{ color: TEXT_MUTED }}>Photographic marble, stone and wood. These replace your board color.</p>
-        <div className="grid grid-cols-4 gap-2">
+        <div className={`grid grid-cols-4 gap-2 ${redesign ? 'lg:grid-cols-8' : ''}`}>
           {(Object.keys(BOARD_TEXTURES) as BoardTexture[]).filter((key) => key.startsWith('cs-')).map((key) => {
             const t = BOARD_TEXTURES[key];
             return (
@@ -399,7 +399,7 @@ export default function SettingsPage() {
       <section className={vis('themes')}>
         <h2 className="text-sm font-black uppercase tracking-wide mb-1" style={{ color: TEXT_MUTED }}>App Background</h2>
         <p className="text-xs mb-3" style={{ color: TEXT_MUTED }}>A subtle tint behind the whole app, not just the board</p>
-        <div className="grid grid-cols-4 gap-2">
+        <div className={`grid grid-cols-4 gap-2 ${redesign ? 'lg:grid-cols-8' : ''}`}>
           {(Object.keys(APP_BACKGROUNDS) as AppBackground[]).map((key) => {
             const t = APP_BACKGROUNDS[key];
             return (

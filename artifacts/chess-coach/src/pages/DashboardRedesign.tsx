@@ -155,11 +155,12 @@ export function DashboardRedesign() {
       className="min-h-screen px-3 pt-3 md:px-6 md:pt-6 md:pb-12 pb-[calc(7.5rem+env(safe-area-inset-bottom))]"
       style={{ background: BG, color: '#F5F7F6', fontFamily: 'inherit' }}
     >
-      <div className="mx-auto grid grid-cols-1 w-full max-w-[760px] gap-3">
-        <EmailVerifyBanner />
+      {/* Desktop (lg+): two columns at full width instead of the phone column centred */}
+      <div className="mx-auto grid grid-cols-1 w-full max-w-[760px] gap-3 lg:max-w-[1200px] lg:grid-cols-2 lg:gap-4 lg:items-start">
+        <div className="lg:col-span-2 empty:hidden"><EmailVerifyBanner /></div>
 
         {/* ── Player summary ── */}
-        <section className="rounded-[20px] p-4" style={{ background: CARD, border: `1px solid ${BORDER}` }}>
+        <section className="rounded-[20px] p-4 lg:col-span-2" style={{ background: CARD, border: `1px solid ${BORDER}` }}>
           <div className="flex items-center gap-3">
             <div className="relative shrink-0">
               <div
@@ -311,7 +312,7 @@ export function DashboardRedesign() {
         </section>
 
         {/* ── Feature tiles ── */}
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-3 lg:self-stretch lg:auto-rows-fr">
           {TILES.map((t) => (
             <Link
               key={t.label}
@@ -516,7 +517,7 @@ export function DashboardRedesign() {
           ))}
         </div>
 
-        {authUser && <ReferralCard isPremium={isPremium} compact />}
+        {authUser && <div className="lg:col-span-2"><ReferralCard isPremium={isPremium} compact /></div>}
 
       </div>
     </div>

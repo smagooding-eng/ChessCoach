@@ -11,7 +11,7 @@ import { BackgroundJobsWatcher } from "@/components/BackgroundJobsWatcher";
 import { AudioAutoplayUnlock } from "@/components/AudioAutoplayUnlock";
 import { Layout } from "@/components/Layout";
 import { useUser } from "@/hooks/use-user";
-import { useEffect, Component, Suspense, lazy, type ReactNode } from "react";
+import React, { useEffect, Component, Suspense, lazy, type ReactNode } from "react";
 import { apiFetch } from "@/lib/api";
 
 function ErrorFallback({ error, fallbackNav, onReset }: { error: Error | null; fallbackNav: string; onReset: () => void }) {
@@ -59,35 +59,63 @@ class ErrorBoundary extends Component<
   }
 }
 
+// After a new deploy, a tab that was already open still points at the OLD
+// page bundles, which no longer exist on the server -- so opening any page it
+// hasn't loaded yet fails ("most pages don't load", usually on a desktop tab
+// left open across releases). When a page bundle fails to download, reload once
+// to pick up the new release; the guard stops a reload loop if the failure is
+// something else.
+const CHUNK_RELOAD_KEY = 'cs_chunk_reload_at';
+export function reloadForNewRelease(): boolean {
+  try {
+    const last = parseInt(sessionStorage.getItem(CHUNK_RELOAD_KEY) || '0', 10);
+    if (Date.now() - last < 15000) return false;
+    sessionStorage.setItem(CHUNK_RELOAD_KEY, String(Date.now()));
+  } catch { /* storage blocked: still try once */ }
+  window.location.reload();
+  return true;
+}
+function lazyRetry<T extends React.ComponentType<any>>(factory: () => Promise<{ default: T }>) {
+  return lazy(() => factory().catch((err) => {
+    if (reloadForNewRelease()) return new Promise<{ default: T }>(() => {}); // page is reloading
+    throw err;
+  }));
+}
+if (typeof window !== 'undefined') {
+  window.addEventListener('vite:preloadError', (e) => {
+    if (reloadForNewRelease()) e.preventDefault();
+  });
+}
+
 // Pages — lazy-loaded so each page's JS only downloads when that route is
 // actually visited, instead of every page (including rarely-used ones like
 // Admin and ScanPosition) being bundled into the initial page load.
-const Setup = lazy(() => import("@/pages/Setup").then(m => ({ default: m.Setup })));
-const LandingPage = lazy(() => import("@/pages/LandingPage").then(m => ({ default: m.LandingPage })));
-const MobileSetup = lazy(() => import("@/pages/MobileSetup").then(m => ({ default: m.MobileSetup })));
-const ScoutShare = lazy(() => import("@/pages/ScoutShare").then(m => ({ default: m.ScoutShare })));
-const ArticlesIndex = lazy(() => import("@/pages/Articles").then(m => ({ default: m.ArticlesIndex })));
-const ArticlePage = lazy(() => import("@/pages/Articles").then(m => ({ default: m.ArticlePage })));
-const ShareCard = lazy(() => import("@/pages/ShareCard").then(m => ({ default: m.ShareCard })));
-const DownloadPage = lazy(() => import("@/pages/Download"));
-const SettingsPage = lazy(() => import("@/pages/Settings"));
-const ScanArchivePage = lazy(() => import("@/pages/ScanArchive"));
-const PrivacyPage = lazy(() => import("@/pages/Privacy"));
-const RafflePage = lazy(() => import("@/pages/Raffle"));
-const RaffleRulesPage = lazy(() => import("@/pages/RaffleRules"));
-const AffiliatePage = lazy(() => import("@/pages/Affiliate"));
-const TrapsPage = lazy(() => import("@/pages/Traps"));
-const BeginnerCoursesPage = lazy(() => import("@/pages/BeginnerCourses"));
-const BeginnerCourseDetailPage = lazy(() => import("@/pages/BeginnerCourseDetail"));
-const BeginnerLessonPage = lazy(() => import("@/pages/BeginnerLesson"));
-const TrapTrainingPage = lazy(() => import("@/pages/TrapTraining"));
-const TermsPage = lazy(() => import("@/pages/Terms"));
-const VsAimchessPage = lazy(() => import("@/pages/VsAimchess"));
-const PricingPage = lazy(() => import("@/pages/Pricing"));
-const VsImproveMyChessPage = lazy(() => import("@/pages/VsImproveMyChess"));
-const VsFreeAnalysisPage = lazy(() => import("@/pages/VsFreeAnalysis"));
-const Dashboard = lazy(() => import("@/pages/Dashboard").then(m => ({ default: m.Dashboard })));
-const DashboardRedesign = lazy(() => import("@/pages/DashboardRedesign").then(m => ({ default: m.DashboardRedesign })));
+const Setup = lazyRetry(() => import("@/pages/Setup").then(m => ({ default: m.Setup })));
+const LandingPage = lazyRetry(() => import("@/pages/LandingPage").then(m => ({ default: m.LandingPage })));
+const MobileSetup = lazyRetry(() => import("@/pages/MobileSetup").then(m => ({ default: m.MobileSetup })));
+const ScoutShare = lazyRetry(() => import("@/pages/ScoutShare").then(m => ({ default: m.ScoutShare })));
+const ArticlesIndex = lazyRetry(() => import("@/pages/Articles").then(m => ({ default: m.ArticlesIndex })));
+const ArticlePage = lazyRetry(() => import("@/pages/Articles").then(m => ({ default: m.ArticlePage })));
+const ShareCard = lazyRetry(() => import("@/pages/ShareCard").then(m => ({ default: m.ShareCard })));
+const DownloadPage = lazyRetry(() => import("@/pages/Download"));
+const SettingsPage = lazyRetry(() => import("@/pages/Settings"));
+const ScanArchivePage = lazyRetry(() => import("@/pages/ScanArchive"));
+const PrivacyPage = lazyRetry(() => import("@/pages/Privacy"));
+const RafflePage = lazyRetry(() => import("@/pages/Raffle"));
+const RaffleRulesPage = lazyRetry(() => import("@/pages/RaffleRules"));
+const AffiliatePage = lazyRetry(() => import("@/pages/Affiliate"));
+const TrapsPage = lazyRetry(() => import("@/pages/Traps"));
+const BeginnerCoursesPage = lazyRetry(() => import("@/pages/BeginnerCourses"));
+const BeginnerCourseDetailPage = lazyRetry(() => import("@/pages/BeginnerCourseDetail"));
+const BeginnerLessonPage = lazyRetry(() => import("@/pages/BeginnerLesson"));
+const TrapTrainingPage = lazyRetry(() => import("@/pages/TrapTraining"));
+const TermsPage = lazyRetry(() => import("@/pages/Terms"));
+const VsAimchessPage = lazyRetry(() => import("@/pages/VsAimchess"));
+const PricingPage = lazyRetry(() => import("@/pages/Pricing"));
+const VsImproveMyChessPage = lazyRetry(() => import("@/pages/VsImproveMyChess"));
+const VsFreeAnalysisPage = lazyRetry(() => import("@/pages/VsFreeAnalysis"));
+const Dashboard = lazyRetry(() => import("@/pages/Dashboard").then(m => ({ default: m.Dashboard })));
+const DashboardRedesign = lazyRetry(() => import("@/pages/DashboardRedesign").then(m => ({ default: m.DashboardRedesign })));
 // Picks between the current dashboard and the new design concept based
 // on the GLOBAL dashboard-redesign flag (admin-controlled, same value
 // for every user -- see use-app-config.ts) -- both stay fully intact,
@@ -101,9 +129,9 @@ function DashboardRouter() {
   const { enabled } = useDashboardRedesignFlag();
   return enabled ? <DashboardRedesign /> : <Dashboard />;
 }
-const Import = lazy(() => import("@/pages/Import").then(m => ({ default: m.Import })));
-const Games = lazy(() => import("@/pages/Games").then(m => ({ default: m.Games })));
-const GamesRedesign = lazy(() => import("@/pages/GamesRedesign").then(m => ({ default: m.GamesRedesign })));
+const Import = lazyRetry(() => import("@/pages/Import").then(m => ({ default: m.Import })));
+const Games = lazyRetry(() => import("@/pages/Games").then(m => ({ default: m.Games })));
+const GamesRedesign = lazyRetry(() => import("@/pages/GamesRedesign").then(m => ({ default: m.GamesRedesign })));
 // Same global flag as DashboardRouter above -- bulk review and the H2H
 // search mode only exist on the classic Games page for now, so this
 // switch is purely cosmetic for anyone who hasn't touched those features.
@@ -111,41 +139,41 @@ function GamesRouter() {
   const { enabled } = useDashboardRedesignFlag();
   return enabled ? <GamesRedesign /> : <Games />;
 }
-const GameReplay = lazy(() => import("@/pages/GameReplay").then(m => ({ default: m.GameReplay })));
-const Analysis = lazy(() => import("@/pages/Analysis").then(m => ({ default: m.Analysis })));
-const AnalysisRedesign = lazy(() => import("@/pages/AnalysisRedesign").then(m => ({ default: m.AnalysisRedesign })));
+const GameReplay = lazyRetry(() => import("@/pages/GameReplay").then(m => ({ default: m.GameReplay })));
+const Analysis = lazyRetry(() => import("@/pages/Analysis").then(m => ({ default: m.Analysis })));
+const AnalysisRedesign = lazyRetry(() => import("@/pages/AnalysisRedesign").then(m => ({ default: m.AnalysisRedesign })));
 function AnalysisRouter() {
   const { enabled } = useDashboardRedesignFlag();
   return enabled ? <AnalysisRedesign /> : <Analysis />;
 }
-const Courses = lazy(() => import("@/pages/Courses").then(m => ({ default: m.Courses })));
-const CourseDetail = lazy(() => import("@/pages/CourseDetail").then(m => ({ default: m.CourseDetail })));
-const Endgames = lazy(() => import("@/pages/Endgames").then(m => ({ default: m.Endgames })));
-const WeaknessDetail = lazy(() => import("@/pages/WeaknessDetail").then(m => ({ default: m.WeaknessDetail })));
-const OpponentAnalysis = lazy(() => import("@/pages/OpponentAnalysis").then(m => ({ default: m.OpponentAnalysis })));
-const Openings = lazy(() => import("@/pages/Openings").then(m => ({ default: m.Openings })));
-const OpeningDetail = lazy(() => import("@/pages/OpeningDetail").then(m => ({ default: m.OpeningDetail })));
-const PracticeBots = lazy(() => import("@/pages/PracticeBots").then(m => ({ default: m.PracticeBots })));
-const LocalPlay = lazy(() => import("@/pages/LocalPlay").then(m => ({ default: m.LocalPlay })));
-const PlayHub = lazy(() => import("@/pages/PlayHub").then(m => ({ default: m.PlayHub })));
+const Courses = lazyRetry(() => import("@/pages/Courses").then(m => ({ default: m.Courses })));
+const CourseDetail = lazyRetry(() => import("@/pages/CourseDetail").then(m => ({ default: m.CourseDetail })));
+const Endgames = lazyRetry(() => import("@/pages/Endgames").then(m => ({ default: m.Endgames })));
+const WeaknessDetail = lazyRetry(() => import("@/pages/WeaknessDetail").then(m => ({ default: m.WeaknessDetail })));
+const OpponentAnalysis = lazyRetry(() => import("@/pages/OpponentAnalysis").then(m => ({ default: m.OpponentAnalysis })));
+const Openings = lazyRetry(() => import("@/pages/Openings").then(m => ({ default: m.Openings })));
+const OpeningDetail = lazyRetry(() => import("@/pages/OpeningDetail").then(m => ({ default: m.OpeningDetail })));
+const PracticeBots = lazyRetry(() => import("@/pages/PracticeBots").then(m => ({ default: m.PracticeBots })));
+const LocalPlay = lazyRetry(() => import("@/pages/LocalPlay").then(m => ({ default: m.LocalPlay })));
+const PlayHub = lazyRetry(() => import("@/pages/PlayHub").then(m => ({ default: m.PlayHub })));
 // /play is the Play hub when the redesign is on; the original Local Play
 // board otherwise. The board itself is always reachable at /play/local.
 function PlayRouter() {
   const { enabled } = useDashboardRedesignFlag();
   return enabled ? <PlayHub /> : <LocalPlay />;
 }
-const LivePlay = lazy(() => import("@/pages/LivePlay").then(m => ({ default: m.LivePlay })));
-const LiveHistory = lazy(() => import("@/pages/LiveHistory").then(m => ({ default: m.LiveHistory })));
-const GameLookup = lazy(() => import("@/pages/GameLookup").then(m => ({ default: m.GameLookup })));
-const Subscription = lazy(() => import("@/pages/Subscription").then(m => ({ default: m.Subscription })));
-const Profile = lazy(() => import("@/pages/Profile").then(m => ({ default: m.Profile })));
-const Puzzles = lazy(() => import("@/pages/Puzzles").then(m => ({ default: m.Puzzles })));
-const ShopPage = lazy(() => import("@/pages/Shop").then(m => ({ default: m.ShopPage })));
-const SolvedPuzzles = lazy(() => import("@/pages/SolvedPuzzles"));
-const ScanPosition = lazy(() => import("@/pages/ScanPosition").then(m => ({ default: m.ScanPosition })));
-const Admin = lazy(() => import("@/pages/Admin").then(m => ({ default: m.Admin })));
-const Welcome = lazy(() => import("@/pages/Welcome").then(m => ({ default: m.Welcome })));
-const NotFound = lazy(() => import("@/pages/not-found"));
+const LivePlay = lazyRetry(() => import("@/pages/LivePlay").then(m => ({ default: m.LivePlay })));
+const LiveHistory = lazyRetry(() => import("@/pages/LiveHistory").then(m => ({ default: m.LiveHistory })));
+const GameLookup = lazyRetry(() => import("@/pages/GameLookup").then(m => ({ default: m.GameLookup })));
+const Subscription = lazyRetry(() => import("@/pages/Subscription").then(m => ({ default: m.Subscription })));
+const Profile = lazyRetry(() => import("@/pages/Profile").then(m => ({ default: m.Profile })));
+const Puzzles = lazyRetry(() => import("@/pages/Puzzles").then(m => ({ default: m.Puzzles })));
+const ShopPage = lazyRetry(() => import("@/pages/Shop").then(m => ({ default: m.ShopPage })));
+const SolvedPuzzles = lazyRetry(() => import("@/pages/SolvedPuzzles"));
+const ScanPosition = lazyRetry(() => import("@/pages/ScanPosition").then(m => ({ default: m.ScanPosition })));
+const Admin = lazyRetry(() => import("@/pages/Admin").then(m => ({ default: m.Admin })));
+const Welcome = lazyRetry(() => import("@/pages/Welcome").then(m => ({ default: m.Welcome })));
+const NotFound = lazyRetry(() => import("@/pages/not-found"));
 
 const queryClient = new QueryClient({
   defaultOptions: {

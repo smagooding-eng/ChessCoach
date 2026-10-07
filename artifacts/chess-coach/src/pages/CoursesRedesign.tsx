@@ -89,7 +89,7 @@ export function CoursesRedesign({
 
   return (
     <div className="min-h-screen px-3 pt-3 md:px-6 md:pt-6 md:pb-12 pb-[calc(7.5rem+env(safe-area-inset-bottom))]" style={{ background: RD.bg, color: RD.text }}>
-      <div className="mx-auto grid grid-cols-1 w-full max-w-[600px] gap-5">
+      <div className="mx-auto grid grid-cols-1 w-full max-w-[600px] gap-5 lg:max-w-[1100px]">
         <div className="px-1">
           <h1 className="text-[32px] font-extrabold leading-tight tracking-tight">Your Training Plan</h1>
           <p className="mt-1.5 text-[15px] leading-snug" style={{ color: 'rgba(245,247,246,.82)' }}>Built from your games. Focus on what will improve your rating the fastest.</p>
@@ -128,8 +128,8 @@ export function CoursesRedesign({
 
         {/* Your Priorities */}
         {byCategory.length > 0 && (
-          <section className="grid gap-3">
-            <div className="px-1">
+          <section className="grid gap-3 lg:grid-cols-2">
+            <div className="px-1 lg:col-span-2">
               <h2 className="text-[26px] font-extrabold leading-tight">Your Priorities</h2>
               <p className="text-[14px]" style={{ color: RD.muted }}>Based on your recent games.</p>
             </div>

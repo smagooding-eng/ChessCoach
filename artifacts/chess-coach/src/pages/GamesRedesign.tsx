@@ -135,7 +135,7 @@ export function GamesRedesign() {
 
   return (
     <div className="min-h-screen px-3 md:px-6 md:pt-6 md:pb-12 pb-[calc(7.5rem+env(safe-area-inset-bottom))]" style={{ background: RD.bg, color: RD.text }}>
-      <div className="mx-auto w-full max-w-[680px]">
+      <div className="mx-auto w-full max-w-[680px] lg:max-w-[1200px]">
         <RedesignHeader
           title="My Games"
           icon={<span className="text-[26px] leading-none">♟</span>}
@@ -217,7 +217,7 @@ export function GamesRedesign() {
           </div>
         )}
 
-        <div className="mt-3 grid gap-2.5">
+        <div className="mt-3 grid gap-2.5 lg:grid-cols-2 lg:gap-3">
           {data === undefined ? (
             [0, 1, 2, 3, 4].map((i) => (
               <div key={i} className="flex items-center gap-3">

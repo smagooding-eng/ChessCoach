@@ -67,7 +67,7 @@ export function ScoutRedesign(props: {
 
   return (
     <div className="min-h-screen px-3 pt-3 md:px-6 md:pt-6 md:pb-12 pb-[calc(7.5rem+env(safe-area-inset-bottom))]" style={{ background: RD.bg, color: RD.text }}>
-      <div className="mx-auto grid grid-cols-1 w-full max-w-[620px] gap-3">
+      <div className="mx-auto grid grid-cols-1 w-full max-w-[620px] gap-3 lg:max-w-[1000px]">
         {/* Title + search */}
         <section className="rounded-[22px] p-4" style={card}>
           <div className="flex items-center gap-3">
@@ -256,7 +256,7 @@ export function ScoutRedesign(props: {
             )}
 
             {tab === 'weaknesses' && (
-              <section className="grid gap-3">
+              <section className="grid gap-3 lg:grid-cols-2">
                 {result.weaknesses.length === 0 ? <div className="rounded-[22px] p-4" style={card}>{limitNudgeFree()}</div> : result.weaknesses.map((w, i) => {
                   const s = SEV[w.severity] ?? SEV.Low;
                   const isOpen = open === i;

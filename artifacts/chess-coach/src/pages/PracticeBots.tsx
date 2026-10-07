@@ -1137,9 +1137,9 @@ export function PracticeBots() {
   if (redesign) {
     return (
       <div className="min-h-screen px-3 md:px-6 md:pt-6 md:pb-12 pb-[calc(7.5rem+env(safe-area-inset-bottom))]" style={{ background: RD.bg, color: RD.text }}>
-        <div className="mx-auto w-full max-w-[640px]">
+        <div className="mx-auto w-full max-w-[640px] lg:max-w-[1200px]">
           <RedesignHeader title="Practice" icon={<Swords size={24} />} />
-          <div className="grid grid-cols-2 gap-1 rounded-[16px] p-1" style={{ background: RD.cardSolid, border: `1px solid ${RD.border}` }}>
+          <div className="grid grid-cols-2 gap-1 rounded-[16px] p-1 lg:max-w-[420px]" style={{ background: RD.cardSolid, border: `1px solid ${RD.border}` }}>
             {([['bots', 'Bots'], ['openings', 'Opening Trainer']] as const).map(([id, label]) => {
               const active = tab === id;
               return (
@@ -1150,7 +1150,7 @@ export function PracticeBots() {
               );
             })}
           </div>
-          <div className="mt-3 space-y-2.5">
+          <div className="mt-3 grid gap-2.5 lg:grid-cols-2 lg:gap-3">
             {tab === 'bots'
               ? BOTS.map((bot) => <BotTileRD key={bot.name} bot={bot} onSelect={setSelectedBot} />)
               : OPENINGS.map((o) => <OpeningTileRD key={o.id} opening={o} onSelect={setSelectedOpening} />)}
