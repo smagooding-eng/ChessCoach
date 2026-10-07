@@ -67,7 +67,7 @@ export function ScoutRedesign(props: {
 
   return (
     <div className="min-h-screen px-3 pt-3 md:px-6 md:pt-6 md:pb-12 pb-[calc(7.5rem+env(safe-area-inset-bottom))]" style={{ background: RD.bg, color: RD.text }}>
-      <div className="mx-auto grid grid-cols-1 w-full max-w-[620px] gap-3">
+      <div className="mx-auto grid w-full max-w-[620px] gap-3">
         {/* Title + search */}
         <section className="rounded-[22px] p-4" style={card}>
           <div className="flex items-center gap-3">

@@ -2,7 +2,7 @@ import { useDashboardRedesignFlag } from '@/hooks/use-app-config';
 import { RD, REDESIGN_ON } from '@/lib/redesignTheme';
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Chessboard, defaultPieces } from 'react-chessboard';
-import { useSettings, boardSkin } from '@/context/SettingsContext';
+import { useSettings } from '@/context/SettingsContext';
 import { Chess } from 'chess.js';
 import {
   Play, Pause, SkipBack, SkipForward, ChevronLeft, ChevronRight, ChevronUp, ChevronDown,
@@ -512,7 +512,6 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, positionRec
   const BOARD_TEXTURE_IMAGE = boardTextureCss.backgroundImage;
   const BOARD_TEXTURE_IMAGE_DARK = boardTextureCss.backgroundImageDark ?? boardTextureCss.backgroundImage;
   const BOARD_TEXTURE_SIZE = boardTextureCss.backgroundSize;
-  const SKIN = boardSkin(boardColors, boardTextureCss);
   // Now built by the one shared function every board calls -- see
   // buildTintedPieceSet in RecoloredPieces.tsx.
   const tintedPieces = useMemo(
@@ -870,9 +869,9 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, positionRec
             options={{
               position: fallbackFen,
               allowDragging: false,
-              boardStyle: { ...SKIN.boardStyle, borderRadius: '6px', overflow: 'hidden' },
-              darkSquareStyle: SKIN.darkSquareStyle,
-              lightSquareStyle: SKIN.lightSquareStyle,
+              boardStyle: { borderRadius: '6px', overflow: 'hidden' },
+              darkSquareStyle: { backgroundColor: BOARD_DARK, backgroundImage: BOARD_TEXTURE_IMAGE_DARK, backgroundSize: BOARD_TEXTURE_SIZE },
+              lightSquareStyle: { backgroundColor: BOARD_LIGHT, backgroundImage: BOARD_TEXTURE_IMAGE, backgroundSize: BOARD_TEXTURE_SIZE },
               pieces: tintedPieces,
               showNotation: showCoordinates,
             }}
@@ -1137,9 +1136,9 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, positionRec
                   position: step?.fen,
                   allowDragging: false,
                   boardOrientation: boardOrientation,
-                  boardStyle: { ...SKIN.boardStyle, borderRadius: '6px', overflow: 'hidden' },
-                  darkSquareStyle: SKIN.darkSquareStyle,
-                  lightSquareStyle: SKIN.lightSquareStyle,
+                  boardStyle: { borderRadius: '6px', overflow: 'hidden' },
+                  darkSquareStyle: { backgroundColor: BOARD_DARK, backgroundImage: BOARD_TEXTURE_IMAGE_DARK, backgroundSize: BOARD_TEXTURE_SIZE },
+                  lightSquareStyle: { backgroundColor: BOARD_LIGHT, backgroundImage: BOARD_TEXTURE_IMAGE, backgroundSize: BOARD_TEXTURE_SIZE },
               pieces: tintedPieces,
               showNotation: showCoordinates,
                   animationDurationInMs: 180,
@@ -1476,9 +1475,9 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, positionRec
                   position: allChallenges[0]?.fen ?? '',
                   allowDragging: false,
                   boardOrientation: boardOrientation,
-                  boardStyle: { ...SKIN.boardStyle, borderRadius: '6px', overflow: 'hidden' },
-                  darkSquareStyle: SKIN.darkSquareStyle,
-                  lightSquareStyle: SKIN.lightSquareStyle,
+                  boardStyle: { borderRadius: '6px', overflow: 'hidden' },
+                  darkSquareStyle: { backgroundColor: BOARD_DARK, backgroundImage: BOARD_TEXTURE_IMAGE_DARK, backgroundSize: BOARD_TEXTURE_SIZE },
+                  lightSquareStyle: { backgroundColor: BOARD_LIGHT, backgroundImage: BOARD_TEXTURE_IMAGE, backgroundSize: BOARD_TEXTURE_SIZE },
               pieces: tintedPieces,
               showNotation: showCoordinates,
                 }}
@@ -1584,9 +1583,9 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, positionRec
                   arrows: (drillState === 'correct' || drillState === 'revealed') && drillMoveArrow
                     ? [{ startSquare: drillMoveArrow.from, endSquare: drillMoveArrow.to, color: drillState === 'correct' ? 'rgba(52,211,153,0.85)' : 'rgba(245,158,11,0.85)' }]
                     : undefined,
-                  boardStyle: { ...SKIN.boardStyle, borderRadius: '6px', overflow: 'hidden', cursor: 'pointer' },
-                  darkSquareStyle: SKIN.darkSquareStyle,
-                  lightSquareStyle: SKIN.lightSquareStyle,
+                  boardStyle: { borderRadius: '6px', overflow: 'hidden', cursor: 'pointer' },
+                  darkSquareStyle: { backgroundColor: BOARD_DARK, backgroundImage: BOARD_TEXTURE_IMAGE_DARK, backgroundSize: BOARD_TEXTURE_SIZE },
+                  lightSquareStyle: { backgroundColor: BOARD_LIGHT, backgroundImage: BOARD_TEXTURE_IMAGE, backgroundSize: BOARD_TEXTURE_SIZE },
               pieces: tintedPieces,
               showNotation: showCoordinates,
                   animationDurationInMs: 180,

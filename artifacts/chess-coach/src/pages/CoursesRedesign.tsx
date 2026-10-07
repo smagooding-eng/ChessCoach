@@ -89,7 +89,7 @@ export function CoursesRedesign({
 
   return (
     <div className="min-h-screen px-3 pt-3 md:px-6 md:pt-6 md:pb-12 pb-[calc(7.5rem+env(safe-area-inset-bottom))]" style={{ background: RD.bg, color: RD.text }}>
-      <div className="mx-auto grid grid-cols-1 w-full max-w-[600px] gap-5">
+      <div className="mx-auto grid w-full max-w-[600px] gap-5">
         <div className="px-1">
           <h1 className="text-[32px] font-extrabold leading-tight tracking-tight">Your Training Plan</h1>
           <p className="mt-1.5 text-[15px] leading-snug" style={{ color: 'rgba(245,247,246,.82)' }}>Built from your games. Focus on what will improve your rating the fastest.</p>

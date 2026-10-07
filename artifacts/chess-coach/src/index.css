@@ -488,30 +488,3 @@ html.cs-redesign .card-depth-lg {
 html.cs-redesign .text-gradient {
   background-image: linear-gradient(135deg, #C9F59E 0%, #8BEA45 100%);
 }
-
-/* Redesign: a `grid` with no explicit columns gets an implicit column sized to
-   its widest child, which let wide rows (stat strips, horizontally scrolling
-   bot lists) stretch the whole page past the screen edge, where the layout's
-   overflow-x:hidden clipped it. Pin such grids to a single column that can
-   never exceed its container. Grids that set their own columns are untouched. */
-html.cs-redesign .grid:not([class*='grid-cols']) {
-  grid-template-columns: minmax(0, 1fr);
-}
-
-/* Settings (redesign): each section becomes a card with a proper heading, matching
-   the other redesigned screens. Scoped to .cs-settings so nothing else is touched;
-   !important is needed because the page sets heading colours inline. */
-html.cs-redesign .cs-settings > section {
-  background: linear-gradient(160deg, #0F1819 0%, #0B1213 100%);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 20px;
-  padding: 16px;
-}
-html.cs-redesign .cs-settings > section > h2 {
-  text-transform: none !important;
-  letter-spacing: -0.01em !important;
-  font-size: 17px !important;
-  font-weight: 800 !important;
-  color: #F5F7F6 !important;
-  margin-bottom: 12px !important;
-}

@@ -14,23 +14,6 @@ import { trackImportJob } from '@/components/ImportStatusWatcher';
 
 type Platform = 'chesscom' | 'lichess';
 
-// Real brand marks for the source cards. If an image can't load (offline, blocked),
-// a clean knight glyph is shown instead -- never a broken-image icon.
-const BRAND_IMG = {
-  chesscom: 'https://images.chesscomfiles.com/uploads/v1/images_users/tiny_mce/SamCopeland/phpmeXx6V.png',
-  lichess: 'https://lichess1.org/assets/logo/lichess-favicon-64.png',
-} as const;
-
-function BrandLogo({ kind }: { kind: 'chesscom' | 'lichess' }) {
-  const [failed, setFailed] = useState(false);
-  if (!failed) {
-    return <img src={BRAND_IMG[kind]} alt="" className="h-10 w-10 rounded-[8px] object-contain" loading="lazy" onError={() => setFailed(true)} />;
-  }
-  return kind === 'chesscom'
-    ? <span className="text-[34px] leading-none" style={{ color: '#8BEA45' }} aria-hidden="true">♞</span>
-    : <span className="grid h-10 w-10 place-items-center rounded-full text-[22px] leading-none" style={{ border: '2px solid #F5F7F6', color: '#F5F7F6' }} aria-hidden="true">♞</span>;
-}
-
 export function Import() {
   const { username, isLoaded, login, authUser, refreshAuth, isPremium } = useUser();
   const [months, setMonths] = useState(3);
@@ -505,8 +488,8 @@ export function Import() {
     // same one the classic page uses) only once a source is tapped; the PGN
     // upload zone sits below.
     const sources: { id: Platform; label: string; icon: React.ReactNode; tile: boolean }[] = [
-      { id: 'chesscom', label: 'Chess.com', tile: true, icon: <BrandLogo kind="chesscom" /> },
-      { id: 'lichess', label: 'Lichess', tile: false, icon: <BrandLogo kind="lichess" /> },
+      { id: 'chesscom', label: 'Chess.com', tile: true, icon: <span className="text-[34px] leading-none" style={{ color: RD.green }}>♞</span> },
+      { id: 'lichess', label: 'Lichess', tile: false, icon: <svg viewBox="0 0 50 50" className="h-9 w-9" fill="currentColor"><path d="M11.8 33.5c0-6.9 3.9-9.6 6.4-12.5L23 15.5l-4.6-8.5c-.5-1-1.7-1.6-2.8-1.3l-2.1.7C8 8.3 3.3 13.7 3.3 20.5c0 2.2.5 4.3 1.5 6.2l7 6.8zM38.3 17.6c-1.3-4.3-4.3-7.8-8.3-9.8l-5.1 5.2 4.5 7.8c2.7 2.8 6.8 5.5 6.8 12.7 0 1.2-.2 2.3-.5 3.4l5.9-5c1.5-2.5 2.4-5.5 2.4-8.5 0-2-.3-3.9-1-5.7l-4.7.1z"/><path d="M25 44.1c-4.3 0-8.2-1.7-11-4.5l-2.2 1.4c3.6 4 8.7 6.5 14.4 6.5 5.2 0 10-2.1 13.4-5.6l-2.3-1.5c-3 2.3-6.4 3.7-10.2 3.7h-2.1z"/></svg> },
     ];
     const card = { background: RD.card, border: `1px solid ${RD.border}` } as const;
     return (

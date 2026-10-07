@@ -131,7 +131,7 @@ export function Layout({ children, fullscreen }: { children: React.ReactNode; fu
   // openings, traps, import, play hub) draw their own header, as in the mockups,
   // so Layout's logo bar is skipped there on mobile. Detail pages that weren't
   // redesigned (an opening, a trap lesson, local play) keep it.
-  const pageOwnsHeader = redesign && /^\/(games|analysis|puzzles|openings|traps|import|play|settings)$|^\/games\/\d+$/.test(location);
+  const pageOwnsHeader = redesign && /^\/(games|analysis|puzzles|openings|traps|import|play)$|^\/games\/\d+$/.test(location);
   // While the redesign toggle is on, <html> carries `cs-redesign`, which
   // index.css uses to swap the whole app's theme (incl. portaled dialogs).
   // Layout only wraps the signed-in app, so public/marketing pages never get it.

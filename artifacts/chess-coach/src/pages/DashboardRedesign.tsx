@@ -155,7 +155,7 @@ export function DashboardRedesign() {
       className="min-h-screen px-3 pt-3 md:px-6 md:pt-6 md:pb-12 pb-[calc(7.5rem+env(safe-area-inset-bottom))]"
       style={{ background: BG, color: '#F5F7F6', fontFamily: 'inherit' }}
     >
-      <div className="mx-auto grid grid-cols-1 w-full max-w-[760px] gap-3">
+      <div className="mx-auto grid w-full max-w-[760px] gap-3">
         <EmailVerifyBanner />
 
         {/* ── Player summary ── */}

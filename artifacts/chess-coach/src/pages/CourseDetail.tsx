@@ -557,8 +557,8 @@ function LessonBeatPlayer({
   const [drillResult, setDrillResult] = useState<'correct' | 'wrong' | null>(null);
   const { enabled: redesign } = useDashboardRedesignFlag();
   const [hintOpen, setHintOpen] = useState(false);
-  // Example boards are manual (step with the navigation bar); Play is opt-in
-  const [exampleAuto, setExampleAuto] = useState(false);
+  // Example boards auto-play by default; any manual step pauses them (redesign controls)
+  const [exampleAuto, setExampleAuto] = useState(true);
   const [showFix, setShowFix] = useState(false);
   const [fixFens, setFixFens] = useState<string[]>([]);
   const [fixPly, setFixPly] = useState(0);
@@ -622,7 +622,7 @@ function LessonBeatPlayer({
     setShowFix(false);
     setFixPly(0);
     setExamplePly(0);
-    setExampleAuto(false);
+    setExampleAuto(true);
     stopReading();
     if (autoRead) setTimeout(() => readAloud(beatText(beat)), 80);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1012,14 +1012,7 @@ export function CourseDetail() {
   // redundant footer lesson-switcher shows (the new player has its own
   // Prev/Next + Complete&Next, so showing both would just reintroduce the
   // duplicate-navigation problem the redesign exists to fix).
-  // Every generated lesson also gets a beats[] copy at save time, but that copy is
-  // lossy: all its "example" beats reuse the one real-game PGN, the fix line is
-  // folded into a single drill, and the per-move commentary is gone. A lesson that
-  // carries a real game (examplePgn) therefore uses the original Mistake -> Fix ->
-  // Drill player, which keeps all of that (step through the mistake and what
-  // followed, the best move and its continuation, repeating the best moves, then
-  // related puzzles). The beat player is only for lessons with no real game.
-  const usingBeatPlayer = !!(lesson && Array.isArray((lesson as any).beats) && (lesson as any).beats.length > 0 && !lesson.examplePgn);
+  const usingBeatPlayer = !!(lesson && Array.isArray((lesson as any).beats) && (lesson as any).beats.length > 0);
   const isFirst = currentIdx === 0;
   const isLast = currentIdx === sortedLessons.length - 1;
 

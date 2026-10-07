@@ -13,7 +13,7 @@ import { useLocation, useSearch, Link } from 'wouter';
 import { encodeCard } from '@/pages/ShareCard';
 import { UpgradeNudge } from '@/components/UpgradeNudge';
 import { AnimatePresence, motion } from 'framer-motion';
-import { useSettings, playMoveSound, boardSkin } from '@/context/SettingsContext';
+import { useSettings, playMoveSound } from '@/context/SettingsContext';
 import { EvalBar, MaterialStrip } from '@/components/GameStatusStrip';
 
 // CSS variables with the original values as fallbacks: unchanged with the
@@ -723,12 +723,11 @@ export function Puzzles() {
                       squareStyles,
                       showNotation: showCoordinates,
                       boardStyle: {
-                      ...boardSkin(boardColors, boardTextureCss).boardStyle,
                         borderRadius: '10px',
                         boxShadow: '0 20px 50px rgba(0,0,0,0.5)',
                       },
-                      lightSquareStyle: boardSkin(boardColors, boardTextureCss).lightSquareStyle,
-                      darkSquareStyle: boardSkin(boardColors, boardTextureCss).darkSquareStyle,
+                      lightSquareStyle: { backgroundColor: boardColors.light, backgroundImage: boardTextureCss.backgroundImage, backgroundSize: boardTextureCss.backgroundSize },
+                      darkSquareStyle: { backgroundColor: boardColors.dark, backgroundImage: boardTextureCss.backgroundImage, backgroundSize: boardTextureCss.backgroundSize },
                       pieces: tintedPieces,
                       animationDurationInMs: 150,
                     }}
