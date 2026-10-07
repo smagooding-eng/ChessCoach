@@ -385,7 +385,7 @@ function ExampleBoard() {
       else cells.push(ch);
     }
   });
-  const sprite = (ch: string) => `${import.meta.env.BASE_URL}pieces/marble/${ch === ch.toUpperCase() ? 'w' : 'b'}${ch.toUpperCase()}.webp?v=4`;
+  const sprite = (ch: string) => `${import.meta.env.BASE_URL}pieces/chessnut/${ch === ch.toUpperCase() ? 'w' : 'b'}${ch.toUpperCase()}.svg`;
   const hl = (f: number, r: number, color: string) => (
     <div key={`${f}${r}`} className="absolute" style={{ left: `${f * 12.5}%`, top: `${r * 12.5}%`, width: '12.5%', height: '12.5%', background: color }} />
   );

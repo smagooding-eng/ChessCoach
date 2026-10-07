@@ -7,7 +7,7 @@ export type BoardTexture = 'flat' | 'wood' | 'marble' | 'felt' | 'granite' | 'le
   | 'cs-emerald' | 'cs-obsidian' | 'cs-ivory' | 'cs-walnut' | 'cs-steel' | 'cs-tournament';
 export type AppBackground = 'default' | 'warm-gradient' | 'cool-gradient' | 'noise';
 export type PieceStyle = 'classic' | 'glossy' | 'outlined' | 'ocean' | 'crimson' | 'emerald' | 'royal' | 'flat' | 'depth' | 'shaded' | 'wood3d' | 'marble3d' | 'chrome' | 'gold' | 'copper' | 'obsidian' | 'ivory' | 'custom';
-export type PieceShape = 'default' | 'cburnett' | 'celtic' | 'chessnut' | 'fantasy' | 'spatial' | 'rhosgfx' | 'kiwen-suwi' | 'firi' | 'totoy' | 'papercut' | 'marble' | 'bronze' | 'set-marble-gold' | 'set-classic' | 'set-classic-alt' | 'set-emerald' | 'set-ruby' | 'set-sapphire' | 'set-amethyst' | 'set-crystal' | 'set-steel' | 'set-bronze' | 'set-royal-gold' | 'set-marble' | 'set-carved-stone' | 'set-wood' | 'set-celtic' | 'set-gothic' | 'set-faceted' | 'sty-classic' | 'sty-glossy' | 'sty-outlined' | 'sty-ivory' | 'sty-silver' | 'sty-steel' | 'sty-amethyst' | 'sty-emerald' | 'sty-ruby' | 'sty-sapphire' | 'sty-ocean' | 'sty-neon' | 'sty-bronze' | 'sty-copper' | 'sty-gold' | 'sty-obsidian';
+export type PieceShape = 'default' | 'cburnett' | 'celtic' | 'chessnut' | 'fantasy' | 'spatial' | 'rhosgfx' | 'kiwen-suwi' | 'firi' | 'totoy' | 'papercut';
 export type PromotionChoice = 'queen' | 'ask';
 export type BoardSize = 'compact' | 'standard' | 'large';
 
@@ -48,44 +48,6 @@ export const PIECE_SHAPES: Record<PieceShape, { label: string; attribution: stri
   firi:       { label: 'Firi', attribution: 'Piece set "Firi" by James Faure, CC BY 4.0' },
   totoy:      { label: 'Totoy', attribution: 'Piece set "Totoy" by Kosal Sen, CC BY 4.0' },
   papercut:   { label: 'Papercut', attribution: 'Piece set "Papercut" by Nikolay Anzarov, CC BY 4.0' },
-  // ChessScout's own artwork (cream + black Staunton), shipped as WebP rather than SVG
-  marble:     { label: 'Cream & Black', attribution: null, raster: true, version: 4 },
-  bronze:     { label: 'Ivory & Bronze', attribution: null, raster: true, version: 1 },
-  // Sets cut from the ChessScout material grid and the Marble & Gold source (see lib/pieceThemes.ts for how they're grouped)
-  'set-marble-gold': { label: 'Marble & Gold', attribution: null, raster: true, version: 1 },
-  'set-classic': { label: 'Classic', attribution: null, raster: true, version: 1 },
-  'set-classic-alt': { label: 'Classic II', attribution: null, raster: true, version: 1 },
-  'set-emerald': { label: 'Emerald', attribution: null, raster: true, version: 1 },
-  'set-ruby': { label: 'Ruby', attribution: null, raster: true, version: 1 },
-  'set-sapphire': { label: 'Sapphire', attribution: null, raster: true, version: 1 },
-  'set-amethyst': { label: 'Amethyst', attribution: null, raster: true, version: 1 },
-  'set-crystal': { label: 'Crystal', attribution: null, raster: true, version: 1 },
-  'set-steel': { label: 'Steel', attribution: null, raster: true, version: 1 },
-  'set-bronze': { label: 'Antique Bronze', attribution: null, raster: true, version: 1 },
-  'set-royal-gold': { label: 'Royal Gold', attribution: null, raster: true, version: 1 },
-  'set-marble': { label: 'Marble', attribution: null, raster: true, version: 1 },
-  'set-carved-stone': { label: 'Carved Stone', attribution: null, raster: true, version: 1 },
-  'set-wood': { label: 'Wood', attribution: null, raster: true, version: 1 },
-  'set-celtic': { label: 'Celtic', attribution: null, raster: true, version: 1 },
-  'set-gothic': { label: 'Gothic', attribution: null, raster: true, version: 1 },
-  'set-faceted': { label: 'Faceted', attribution: null, raster: true, version: 1 },
-  // The illustrated "Stylized" family: one chunky outlined design in 16 colourways (see lib/pieceThemes.ts)
-  'sty-classic': { label: 'Classic', attribution: null, raster: true, version: 1 },
-  'sty-glossy': { label: 'Glossy', attribution: null, raster: true, version: 1 },
-  'sty-outlined': { label: 'Outlined', attribution: null, raster: true, version: 1 },
-  'sty-ivory': { label: 'Ivory', attribution: null, raster: true, version: 1 },
-  'sty-silver': { label: 'Silver', attribution: null, raster: true, version: 1 },
-  'sty-steel': { label: 'Steel', attribution: null, raster: true, version: 1 },
-  'sty-amethyst': { label: 'Amethyst', attribution: null, raster: true, version: 1 },
-  'sty-emerald': { label: 'Emerald', attribution: null, raster: true, version: 1 },
-  'sty-ruby': { label: 'Ruby', attribution: null, raster: true, version: 1 },
-  'sty-sapphire': { label: 'Sapphire', attribution: null, raster: true, version: 1 },
-  'sty-ocean': { label: 'Ocean', attribution: null, raster: true, version: 1 },
-  'sty-neon': { label: 'Neon', attribution: null, raster: true, version: 1 },
-  'sty-bronze': { label: 'Bronze', attribution: null, raster: true, version: 1 },
-  'sty-copper': { label: 'Copper', attribution: null, raster: true, version: 1 },
-  'sty-gold': { label: 'Gold', attribution: null, raster: true, version: 1 },
-  'sty-obsidian': { label: 'Obsidian', attribution: null, raster: true, version: 1 },
 };
 
 export const BOARD_THEMES: Record<Exclude<BoardTheme, 'custom'>, { light: string; dark: string; label: string }> = {
@@ -398,6 +360,12 @@ interface SettingsContextValue extends Settings {
 
 const SettingsContext = createContext<SettingsContextValue | null>(null);
 
+// A saved piece choice that no longer exists (e.g. a retired set) must not leave the user with a blank
+// selection or a missing-image board: fall back to the default pieces.
+function sanitizeSettings(st: Settings): Settings {
+  return PIECE_SHAPES[st.pieceShape as PieceShape] ? st : { ...st, pieceShape: 'default' };
+}
+
 function loadJSON<T>(key: string, fallback: T): T {
   try {
     const raw = localStorage.getItem(key);
@@ -430,8 +398,8 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       const raw = localStorage.getItem(scopedKey(DEFAULT_KEY, userId));
       loadedDefault = raw ? JSON.parse(raw) : null;
     } catch {}
-    setUserDefault(loadedDefault);
-    setSettings(loadJSON(scopedKey(STORAGE_KEY, userId), loadedDefault ?? APP_DEFAULT_SETTINGS));
+    setUserDefault(loadedDefault ? sanitizeSettings(loadedDefault) : null);
+    setSettings(sanitizeSettings(loadJSON(scopedKey(STORAGE_KEY, userId), loadedDefault ?? APP_DEFAULT_SETTINGS)));
 
     try {
       const raw = localStorage.getItem(scopedKey(THEMES_KEY, userId));
