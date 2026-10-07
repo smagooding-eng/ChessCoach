@@ -1,12 +1,6 @@
 import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { useUser } from '@/hooks/use-user';
 import { useLocation, Link } from 'wouter';
-// Lazy-loaded: HeroDemo pulls in the full chess-engine module (chess-bot.ts)
-// for its client-side analysis. That engine has no business being in the
-// landing page's main bundle for the ~91% of visitors who never scroll
-// past the Hero or never run the demo -- it was previously a direct
-// import, which meant every visitor paid for it on first load regardless.
-const HeroDemo = lazy(() => import('@/components/HeroDemo').then((m) => ({ default: m.HeroDemo })));
 import { trackFunnelEvent } from '@/lib/funnelTracking';
 import { useLandingFunnelTracking } from '@/hooks/use-landing-funnel-tracking';
 import { ArrowRight, Mail, Eye, EyeOff, UserPlus, LogIn, Search, BarChart3, Brain, Check, X, Target, Crosshair, BookOpen, Gamepad2, Flame, Puzzle, Users, Skull, History, GraduationCap, Download as DownloadIcon, Smartphone } from 'lucide-react';
@@ -378,11 +372,12 @@ function SocialProofBar() {
   );
 }
 
-// ── Example report (illustrative, and labelled as such) ────────────────────────────────
-// A real, checked tactic: White to move wins with 18.Qxd8! Rxd8 19.Rxd8# (back-rank mate).
+// ── One-screen landing page ──────────────────────────────────────────────────────────────
+// The position in the example board is a real tactic (checked): White wins with 18.Qxd8!, and after
+// ...Rxd8 19.Rxd8 is checkmate. The card text below only claims "a winning combination".
 const SAMPLE_FEN = '3r1rk1/pp3ppp/4b3/8/2B5/3Q1N2/PP3PPP/3R2K1';
 
-function SampleBoard() {
+function ExampleBoard() {
   const cells: (string | null)[] = [];
   SAMPLE_FEN.split('/').forEach((row) => {
     for (const ch of row) {
@@ -391,96 +386,69 @@ function SampleBoard() {
     }
   });
   const sprite = (ch: string) => `${import.meta.env.BASE_URL}pieces/marble/${ch === ch.toUpperCase() ? 'w' : 'b'}${ch.toUpperCase()}.webp?v=4`;
-  // squares are (file 0-7, row-from-top 0-7)
-  const kingSq = { f: 6, r: 0 };      // g8: the king that gets mated
-  const queenFrom = { f: 3, r: 5 };   // d3
-  const queenTo = { f: 3, r: 0 };     // d8
-  const sq = (c: { f: number; r: number }, color: string) => (
-    <div key={`${c.f}${c.r}${color}`} className="absolute" style={{ left: `${c.f * 12.5}%`, top: `${c.r * 12.5}%`, width: '12.5%', height: '12.5%', background: color }} />
+  const hl = (f: number, r: number, color: string) => (
+    <div key={`${f}${r}`} className="absolute" style={{ left: `${f * 12.5}%`, top: `${r * 12.5}%`, width: '12.5%', height: '12.5%', background: color }} />
   );
   return (
-    <div className="relative aspect-square w-full overflow-hidden rounded-xl" style={{ border: '1px solid rgba(255,255,255,0.1)' }} role="img" aria-label="Example chess position with a missed winning tactic">
+    <div className="relative aspect-square w-full overflow-hidden rounded-lg" style={{ border: '1px solid rgba(255,255,255,0.12)' }} role="img" aria-label="Example position with a missed winning tactic">
       <div className="grid h-full w-full grid-cols-8">
         {cells.slice(0, 64).map((ch, i) => {
           const dark = (Math.floor(i / 8) + (i % 8)) % 2 === 1;
           return (
-            <div key={i} style={{ background: dark ? '#6E8F5B' : '#E4EBD6' }}>
+            <div key={i} style={{ background: dark ? '#4F6B45' : '#C9D3B6' }}>
               {ch && <img src={sprite(ch)} alt="" draggable={false} className="h-full w-full object-contain" />}
             </div>
           );
         })}
       </div>
-      {sq(kingSq, 'rgba(255,80,88,0.55)')}
-      {sq(queenTo, 'rgba(139,234,69,0.45)')}
+      {hl(6, 0, 'rgba(255,80,88,0.6)')}
+      {hl(3, 0, 'rgba(139,234,69,0.5)')}
       <svg viewBox="0 0 8 8" className="pointer-events-none absolute inset-0 h-full w-full">
-        {/* starts just above the queen and ends pointing AT the rook from below, so neither piece is hidden */}
-        <line x1={queenFrom.f + 0.5} y1={queenFrom.r + 0.12} x2={queenTo.f + 0.5} y2={queenTo.r + 1.45} stroke={G} strokeWidth="0.2" strokeLinecap="round" opacity="0.95" />
-        <polygon points={`${queenTo.f + 0.5},${queenTo.r + 0.9} ${queenTo.f + 0.2},${queenTo.r + 1.5} ${queenTo.f + 0.8},${queenTo.r + 1.5}`} fill={G} opacity="0.95" />
+        <line x1="3.5" y1="5.12" x2="3.5" y2="1.45" stroke={G} strokeWidth="0.2" strokeLinecap="round" />
+        <polygon points="3.5,0.9 3.2,1.5 3.8,1.5" fill={G} />
       </svg>
     </div>
   );
 }
 
-function SampleReport() {
+function PersonalAnalysisCard() {
   const rows = [
-    { icon: Crosshair, name: 'Tactical Awareness', level: 'HIGH', pct: 72, color: '#FF5058', note: 'Missed tactical opportunities in 7 of 20 games.' },
+    { icon: Crosshair, name: 'Tactical Awareness', level: 'HIGH', pct: 72, color: '#FF5058', note: 'You missed tactical opportunities in 7 of your last 20 games.' },
     { icon: BookOpen, name: 'Opening Preparation', level: 'MEDIUM', pct: 38, color: '#F2A93B', note: '' },
     { icon: Brain, name: 'Positional Play', level: 'LOW', pct: 22, color: G, note: '' },
   ];
   return (
-    <div className="rounded-3xl p-5 sm:p-6" style={{ background: 'linear-gradient(160deg, rgba(14,24,25,0.92), rgba(6,12,13,0.92))', border: '1px solid rgba(139,234,69,0.22)', boxShadow: '0 24px 60px -30px rgba(139,234,69,0.35)' }}>
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2.5">
-          <span className="grid h-9 w-9 place-items-center rounded-full" style={{ background: 'rgba(139,234,69,0.12)', border: '1px solid rgba(139,234,69,0.35)' }}><Target className="h-4 w-4" style={{ color: G }} /></span>
-          <span className="text-[12px] font-black uppercase tracking-[0.14em]" style={{ color: G }}>Sample analysis</span>
+    <div className="grid grid-cols-[1.45fr_1fr] overflow-hidden rounded-[20px]"
+      style={{ background: 'linear-gradient(160deg, rgba(14,26,24,0.9), rgba(6,13,12,0.92))', border: '1px solid rgba(139,234,69,0.22)', boxShadow: '0 24px 60px -30px rgba(139,234,69,0.35)' }}>
+      <div className="min-w-0 p-2.5 sm:p-5">
+        <div className="mb-2 flex items-center gap-2 sm:mb-4">
+          <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full sm:h-9 sm:w-9" style={{ background: 'rgba(139,234,69,0.12)', border: '1px solid rgba(139,234,69,0.35)' }}><Target className="h-3.5 w-3.5 sm:h-4 sm:w-4" style={{ color: G }} /></span>
+          <span className="text-[10px] font-black uppercase leading-tight tracking-[0.08em] sm:text-[12px]" style={{ color: G }}>Your personal analysis</span>
         </div>
-        <span className="rounded-full px-2.5 py-1 text-[10px] font-black tracking-widest" style={{ background: 'rgba(255,255,255,0.07)', color: MUTED, border: '1px solid rgba(255,255,255,0.1)' }}>EXAMPLE</span>
-      </div>
-      <div className="grid gap-5 min-[420px]:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
-        <div className="space-y-4">
+        <div className="space-y-2 sm:space-y-4">
           {rows.map((r) => (
             <div key={r.name}>
-              <div className="mb-1.5 flex items-center justify-between gap-2">
-                <span className="flex items-center gap-2 text-[14px] font-bold" style={{ color: TEXT }}><r.icon className="h-4 w-4 shrink-0" style={{ color: r.color }} />{r.name}</span>
-                <span className="rounded-md px-1.5 py-0.5 text-[10px] font-black tracking-wider" style={{ color: r.color, background: `${r.color}22`, border: `1px solid ${r.color}55` }}>{r.level}</span>
+              <div className="mb-1 flex items-center justify-between gap-1.5">
+                <span className="flex min-w-0 items-center gap-1.5 text-[12px] font-bold sm:gap-2 sm:text-[15px]" style={{ color: TEXT }}>
+                  <r.icon className="hidden h-4 w-4 shrink-0 sm:block" style={{ color: r.color }} />
+                  <span className="truncate">{r.name}</span>
+                </span>
+                <span className="shrink-0 rounded px-1 py-px text-[8.5px] font-black tracking-wider sm:px-1.5 sm:py-0.5 sm:text-[10px]" style={{ color: r.color, background: `${r.color}22`, border: `1px solid ${r.color}55` }}>{r.level}</span>
               </div>
-              <div className="flex items-center gap-2.5">
-                <div className="h-2 flex-1 overflow-hidden rounded-full" style={{ background: 'rgba(255,255,255,0.09)' }}><div className="h-full rounded-full" style={{ width: `${r.pct}%`, background: r.color }} /></div>
-                <span className="w-9 text-right text-[11px] font-bold" style={{ color: MUTED }}>{r.pct}%</span>
+              <div className="flex items-center gap-2">
+                <div className="h-1.5 flex-1 overflow-hidden rounded-full sm:h-2" style={{ background: 'rgba(255,255,255,0.09)' }}><div className="h-full rounded-full" style={{ width: `${r.pct}%`, background: r.color }} /></div>
+                <span className="w-8 text-right text-[10.5px] font-bold sm:text-[12px]" style={{ color: MUTED }}>{r.pct}%</span>
               </div>
-              {r.note && <p className="mt-1.5 text-[12px] leading-snug" style={{ color: MUTED }}>{r.note}</p>}
+              {r.note && <p className="mt-1 text-[11px] leading-snug [@media(max-height:780px)]:hidden sm:text-[12.5px]" style={{ color: MUTED }}>{r.note}</p>}
             </div>
           ))}
         </div>
-        <div>
-          <p className="mb-2 text-[10.5px] font-black uppercase tracking-[0.12em]" style={{ color: MUTED }}>Example from a game</p>
-          <SampleBoard />
-          <p className="mt-2.5 text-[13px] font-bold" style={{ color: TEXT }}>You played 18. Qe2<span style={{ color: '#FF5058' }}>?</span></p>
-          <p className="text-[12px] leading-snug" style={{ color: MUTED }}>18. Qxd8! was the move: after ...Rxd8, 19. Rxd8 is checkmate. ChessScout shows you the move you missed and how to fix it.</p>
-        </div>
       </div>
-      <p className="mt-4 text-[10.5px]" style={{ color: MUTED }}>Illustrative example. Your own report is built from your real games.</p>
-    </div>
-  );
-}
-
-function FeatureStrip() {
-  const items = [
-    { icon: BarChart3, title: 'Deep Analysis', desc: 'Move-by-move breakdown of every game' },
-    { icon: GraduationCap, title: 'Personalized Courses', desc: 'Lessons built from your own mistakes' },
-    { icon: Crosshair, title: 'Opponent Scout', desc: 'Prep for a specific rival or tournament' },
-    { icon: Gamepad2, title: 'Practice Bots', desc: '8 bots from 400 to 2000 ELO' },
-  ];
-  return (
-    <div className="mx-auto max-w-7xl px-4 pb-10 sm:px-8">
-      <div className="grid grid-cols-4 rounded-2xl py-5" style={{ background: 'rgba(13,21,22,0.7)', border: '1px solid rgba(255,255,255,0.07)' }}>
-        {items.map((it, i) => (
-          <div key={it.title} className="flex flex-col items-center px-1.5 text-center sm:px-4" style={{ borderLeft: i ? '1px solid rgba(255,255,255,0.08)' : undefined }}>
-            <it.icon className="mb-2 h-6 w-6 sm:h-7 sm:w-7" style={{ color: G }} />
-            <h3 className="text-[12.5px] font-bold leading-tight sm:text-[15px]" style={{ color: TEXT }}>{it.title}</h3>
-            <p className="mt-1 hidden text-[12.5px] leading-snug sm:block" style={{ color: MUTED }}>{it.desc}</p>
-          </div>
-        ))}
+      <div className="min-w-0 p-2.5 sm:p-5" style={{ borderLeft: '1px solid rgba(255,255,255,0.08)' }}>
+        <p className="mb-1.5 text-[9px] font-black uppercase leading-tight tracking-[0.06em] sm:mb-2 sm:text-[11px]" style={{ color: MUTED }}>A real example from your game</p>
+        <ExampleBoard />
+        <p className="mt-1.5 text-[12px] font-bold sm:mt-2 sm:text-[14px]" style={{ color: TEXT }}>You played <span style={{ color: '#FF5058' }}>18. Qe2?</span></p>
+        <p className="mt-0.5 text-[10px] leading-snug [@media(max-height:780px)]:hidden sm:text-[12px]" style={{ color: MUTED }}>You missed a winning combination. ChessScout shows you exactly what to look for and how to fix it.</p>
       </div>
     </div>
   );
@@ -536,440 +504,105 @@ export function LandingPage() {
   const openOpponentScout = () => { trackFunnelEvent('opponent_scout_clicked'); setAuthMode('register'); setAuthContext('opponent_scout'); setAuthOpen(true); };
   const openLogin = () => { setAuthMode('login'); setAuthOpen(true); };
 
-  // Sends first-touch clicks ("Try Free" in the nav, the hero CTA, the
-  // mobile sticky bar) into the free no-signup demo instead of straight
-  // into the signup wall -- a visitor who's never seen the product
-  // shouldn't hit a form before they've seen any value. Pricing and the
-  // final CTA further down the page skip this and go straight to
-  // openSignup: by that point they've already scrolled past the demo
-  // (or deliberately ignored it), so re-routing them back up to it would
-  // be the wrong call.
-  const scrollToDemo = () => {
-    const el = document.getElementById('hero-demo');
-    if (!el) { openSignup(); return; }
-    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    window.setTimeout(() => {
-      document.getElementById('demo-username-input')?.focus();
-    }, 450);
-  };
-
-  // Pricing now lives as a full section on this same page (right after
-  // "Everything You Get"), so the nav link should jump to it instead of
-  // navigating to the separate /pricing page -- that page still exists
-  // and stays linked from the footer, for SEO/ad-landing traffic that
-  // arrives directly on it, but a visitor already scrolling this page
-  // shouldn't get pulled off it just to see the price.
-  const scrollToPricing = () => {
-    document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  };
+  const features = [
+    { icon: BarChart3, title: 'Deep Analysis', onClick: openSignup },
+    { icon: GraduationCap, title: 'Personalized Courses', onClick: openSignup },
+    { icon: Crosshair, title: 'Opponent Scout', onClick: openOpponentScout },
+    { icon: Gamepad2, title: 'Practice Bots', onClick: openSignup },
+  ];
 
   return (
-    <div className="min-h-screen overflow-x-clip" style={{ background: `radial-gradient(ellipse at 75% 0%, #0F2B1D 0%, #07130F 34%, ${BG} 68%)` }}>
-      <nav className="sticky top-0 z-40 backdrop-blur-xl" style={{ background: `${BG}cc`, borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-8 h-16 flex items-center justify-between">
+    <div className="relative flex min-h-[100dvh] flex-col overflow-x-hidden" style={{ background: `radial-gradient(ellipse at 75% 0%, #0F2B1D 0%, #07130F 34%, ${BG} 68%)` }}>
+      {/* knight art: bleeds off the right edge on phones (as in the mockup), sits fully in view on desktop */}
+      <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
+        <img src={`${import.meta.env.BASE_URL}chessscout/scout-knight.webp`} alt=""
+          className="absolute right-[-34%] top-[7%] h-[58%] w-auto max-w-none sm:right-[-6%] sm:top-[4%] sm:h-[70%] lg:right-0 lg:top-0 lg:h-[88%]"
+          style={{ WebkitMaskImage: 'linear-gradient(180deg, transparent 0%, #000 14%, #000 58%, transparent 100%)', maskImage: 'linear-gradient(180deg, transparent 0%, #000 14%, #000 58%, transparent 100%)' }} />
+        <div className="absolute inset-0" style={{ background: `linear-gradient(90deg, ${BG} 0%, ${BG}f2 34%, ${BG}b3 60%, ${BG}00 100%)` }} />
+        <div className="absolute inset-x-0 bottom-0 h-[34%]" style={{ background: `linear-gradient(180deg, ${BG}00, ${BG})` }} />
+      </div>
+
+      <nav className="relative z-20 shrink-0">
+        <div className="mx-auto flex h-12 max-w-7xl items-center justify-between px-4 sm:h-16 sm:px-8">
           <div className="flex items-baseline gap-0.5">
-            <span className="text-[1.35rem] font-black tracking-tight" style={{ color: TEXT }}>Chess</span>
-            <span className="text-[1.35rem] font-black tracking-tight" style={{ color: G }}>Scout</span>
-            <span className="text-sm font-bold ml-0.5" style={{ color: MUTED }}>.net</span>
+            <span className="text-[1.3rem] font-black tracking-tight" style={{ color: TEXT }}>Chess</span>
+            <span className="text-[1.3rem] font-black tracking-tight" style={{ color: G }}>Scout</span>
+            <span className="ml-0.5 text-sm font-bold" style={{ color: MUTED }}>.net</span>
           </div>
-          <div className="flex items-center gap-3 sm:gap-6">
-            <a href={`${import.meta.env.BASE_URL}download`}
-              className="hidden sm:inline-flex items-center gap-1.5 text-sm font-medium transition-colors"
-              style={{ color: MUTED }}
-              onMouseEnter={e => (e.currentTarget.style.color = TEXT)} onMouseLeave={e => (e.currentTarget.style.color = MUTED)}>
-              <Smartphone className="w-3.5 h-3.5" /> Download
-            </a>
-            <button onClick={scrollToPricing}
-              className="hidden sm:inline-flex text-sm font-medium transition-colors"
-              style={{ color: MUTED }}
-              onMouseEnter={e => (e.currentTarget.style.color = TEXT)} onMouseLeave={e => (e.currentTarget.style.color = MUTED)}>
-              Pricing
-            </button>
-            <button onClick={openLogin} className="text-sm font-medium transition-colors" style={{ color: MUTED }}
-              onMouseEnter={e => (e.currentTarget.style.color = TEXT)} onMouseLeave={e => (e.currentTarget.style.color = MUTED)}>
-              Sign In
-            </button>
-            <button onClick={scrollToDemo} className="text-sm font-extrabold px-5 py-2.5 rounded-xl transition-all"
+          <div className="flex items-center gap-4 sm:gap-6">
+            <Link href="/pricing" className="hidden text-sm font-medium transition-colors hover:text-white sm:inline" style={{ color: MUTED }}>Pricing</Link>
+            <button onClick={openLogin} className="text-sm font-medium transition-colors hover:text-white" style={{ color: MUTED }}>Sign In</button>
+            <button onClick={openSignup} className="rounded-xl px-4 py-2 text-sm font-extrabold transition-all sm:px-5 sm:py-2.5"
               style={{ background: G, color: ON_G, boxShadow: `0 6px 22px ${G}40` }}
-              onMouseEnter={e => (e.currentTarget.style.background = G_HOVER)}
-              onMouseLeave={e => (e.currentTarget.style.background = G)}>
+              onMouseEnter={e => (e.currentTarget.style.background = G_HOVER)} onMouseLeave={e => (e.currentTarget.style.background = G)}>
               Try Free
             </button>
           </div>
         </div>
       </nav>
 
-      {/* The hero section keeps the "hero" tracking name and now contains the art, the pitch, the
-          live no-signup demo and the example report, so funnel numbers stay comparable. */}
-      <section data-track-section="hero" className="relative overflow-hidden">
-        {/* knight art: bleeds off the right edge on phones (like the mockup), sits fully in view on desktop */}
-        <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[600px] sm:h-[680px] lg:h-[740px]">
-          <img src={`${import.meta.env.BASE_URL}chessscout/scout-knight.webp`} alt=""
-            className="absolute right-[-30%] top-4 h-[560px] w-auto max-w-none sm:right-[-8%] sm:h-[650px] lg:right-0 lg:top-0 lg:h-[740px]" />
-          <div className="absolute inset-0" style={{ background: `linear-gradient(90deg, ${BG} 0%, ${BG}f0 30%, ${BG}8c 58%, ${BG}00 100%)` }} />
-          <div className="absolute inset-x-0 bottom-0 h-56" style={{ background: `linear-gradient(180deg, ${BG}00, ${BG})` }} />
-        </div>
-
-        <div className="relative mx-auto max-w-7xl px-4 pb-10 pt-8 sm:px-8 sm:pt-14 lg:pt-20">
-          <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }} className="max-w-[640px]">
-            <div className="mb-5 inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-[11px] font-black uppercase tracking-[0.12em]"
-              style={{ background: 'rgba(139,234,69,0.08)', color: G, border: '1px solid rgba(139,234,69,0.4)' }}>
-              <HeroTrophy className="h-3.5 w-3.5" /> Turn games into progress
-            </div>
-
-            <h1 className="text-[2.45rem] font-black leading-[1.03] tracking-tight sm:text-6xl lg:text-[4.4rem]" style={{ color: TEXT, fontFamily: "Georgia, 'Times New Roman', serif" }}>
-              Stop Guessing.<br />
-              Find What&rsquo;s<br />
-              <span className="relative inline-block">
-                <span style={{ color: G }}>Holding You Back.</span>
-                <motion.span aria-hidden initial={{ scaleX: 0 }} animate={{ scaleX: 1 }} transition={{ delay: 0.5, duration: 0.7, ease: 'easeOut' }}
-                  className="absolute -bottom-2 left-0 right-0 h-1 origin-left rounded-full" style={{ background: `linear-gradient(90deg, ${G}, ${G}00)` }} />
-              </span>
-            </h1>
-
-            <p className="mt-7 max-w-[34rem] text-[15.5px] leading-relaxed sm:text-lg" style={{ color: 'rgba(245,247,246,0.78)' }}>
-              ChessScout analyzes your Chess.com or Lichess games to find the 2&ndash;3 biggest mistakes and patterns keeping you from your next rating level.
-            </p>
-            <p className="mt-2 text-xs" style={{ color: MUTED }}>For club players 400&ndash;2000 ELO. Not for titled players or grandmasters.</p>
-
-            <div className="mt-8 flex flex-col items-start gap-4 sm:flex-row sm:items-center">
-              <button onClick={scrollToDemo}
-                className="group flex w-full items-center justify-center gap-2.5 rounded-2xl px-8 py-4 text-base font-extrabold transition-all sm:w-auto"
-                style={{ background: `linear-gradient(180deg, #9BF04F, ${G_HOVER})`, color: ON_G, boxShadow: `0 14px 36px -12px ${G}90` }}
-                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; }}
-                onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; }}>
-                <BarChart3 className="h-5 w-5" />
-                Analyze My Games Free
-                <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
-              </button>
-              <div className="flex items-center gap-5 text-sm font-medium">
-                <button onClick={openOpponentScout} className="flex items-center gap-1.5 transition-colors" style={{ color: MUTED }}
-                  onMouseEnter={e => { e.currentTarget.style.color = TEXT; }} onMouseLeave={e => { e.currentTarget.style.color = MUTED; }}>
-                  <Crosshair className="h-4 w-4" /> Scout an opponent
-                </button>
-                <a href={`${import.meta.env.BASE_URL}download`} className="flex items-center gap-1.5 transition-colors" style={{ color: MUTED }}
-                  onMouseEnter={e => { e.currentTarget.style.color = TEXT; }} onMouseLeave={e => { e.currentTarget.style.color = MUTED; }}>
-                  <DownloadIcon className="h-4 w-4" /> Get the app
-                </a>
-              </div>
-            </div>
-
-            <div className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-2 text-[13px] font-semibold" style={{ color: 'rgba(245,247,246,0.8)' }}>
-              <span className="flex items-center gap-1.5"><Check className="h-4 w-4" style={{ color: G }} /> Free to start</span>
-              <span className="flex items-center gap-1.5"><Check className="h-4 w-4" style={{ color: G }} /> No credit card required</span>
-              <span className="flex items-center gap-1.5"><Check className="h-4 w-4" style={{ color: G }} /> Cancel anytime</span>
-            </div>
-          </motion.div>
-        </div>
-
-        {/* the live, no-signup demo (every "Try Free" / "Analyze My Games Free" click scrolls here) beside an example report */}
-        <div className="relative mx-auto max-w-7xl px-4 pb-14 sm:px-8 sm:pb-20">
-          <div className="grid items-start gap-6 lg:grid-cols-[1.1fr_0.9fr] lg:gap-8">
-            <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: '-60px' }} transition={{ duration: 0.6 }}>
-              <Suspense
-                fallback={
-                  <div className="rounded-2xl animate-pulse" style={{ minHeight: '360px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }} />
-                }
-              >
-                <HeroDemo onUpgradeClick={openSignup} />
-              </Suspense>
-            </motion.div>
-            <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: '-60px' }} transition={{ duration: 0.6, delay: 0.1 }}>
-              <SampleReport />
-            </motion.div>
-          </div>
-        </div>
-      </section>
-
-      <FeatureStrip />
-
-      <SocialProofBar />
-
-      <section data-track-section="differentiators" className="py-16 sm:py-20" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
-        <div className="max-w-5xl mx-auto px-4 sm:px-8">
-          <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} className="text-center mb-10">
-            <h2 className="text-2xl sm:text-3xl font-black" style={{ color: TEXT }}>
-              Everything You Get
-            </h2>
-            <p className="mt-2 text-sm" style={{ color: MUTED }}>One subscription, a full toolkit — not just a report card</p>
-          </motion.div>
-
-          <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} className="text-center mb-4">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-black tracking-wider"
-              style={{ background: `${G}15`, color: G, border: `1px solid ${G}30` }}>
-              NOBODY ELSE HAS THIS
-            </div>
-          </motion.div>
-          <div className="grid sm:grid-cols-2 gap-5 mb-12">
-            {[
-              { icon: Search, title: 'Scan Position', desc: 'See a position anywhere — your game, a book, a stream — snap a photo and practice it out from any position. Play it against a bot or explore every line. No one else lets you do this.' },
-              { icon: Gamepad2, title: 'Practice Bots', desc: '8 bot opponents from 400 to 2000 ELO with live move analysis as you play — build new habits in real games, not just puzzles.' },
-            ].map((item, i) => (
-              <motion.div
-                key={item.title}
-                initial={{ opacity: 0, y: 16 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: i * 0.1 }}
-                className="rounded-2xl p-7"
-                style={{ background: `linear-gradient(180deg, ${G}0f 0%, ${G}05 100%)`, border: `1.5px solid ${G}35`, boxShadow: `0 24px 60px -14px ${G}20` }}
-              >
-                <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-4" style={{ background: `${G}20` }}>
-                  <item.icon className="w-6 h-6" style={{ color: G }} />
-                </div>
-                <h3 className="text-lg font-black mb-2" style={{ color: TEXT }}>{item.title}</h3>
-                <p className="text-sm leading-relaxed" style={{ color: MUTED }}>{item.desc}</p>
-              </motion.div>
-            ))}
+      <main data-track-section="hero" className="relative z-10 mx-auto flex w-full max-w-7xl flex-1 flex-col justify-center gap-3 px-4 pb-3 sm:px-8 lg:grid lg:grid-cols-2 lg:gap-12 lg:pb-6">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }} className="lg:self-center">
+          <div className="mb-2.5 inline-flex items-center gap-2 rounded-full px-3 py-1 text-[10.5px] font-black uppercase tracking-[0.12em] sm:text-[11px]"
+            style={{ background: 'rgba(139,234,69,0.08)', color: G, border: '1px solid rgba(139,234,69,0.4)' }}>
+            <HeroTrophy className="h-3.5 w-3.5" /> Turn games into progress
           </div>
 
-          <p className="text-xs font-black uppercase tracking-widest mb-4" style={{ color: MUTED }}>You'll use these every day</p>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
-            {[
-              { icon: Puzzle, title: 'Puzzles', desc: 'Fresh sets daily' },
-              { icon: Users, title: 'Local Play', desc: 'Play offline anytime' },
-              { icon: BookOpen, title: 'Opening Trainer', desc: 'Drill your repertoire' },
-              { icon: Skull, title: 'Chess Traps', desc: 'Learn the classics, both sides' },
-            ].map((item, i) => (
-              <motion.div
-                key={item.title}
-                initial={{ opacity: 0, y: 16 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: i * 0.06 }}
-                className="rounded-xl p-5"
-                style={{ background: CARD, border: '1px solid rgba(255,255,255,0.04)' }}
-              >
-                <item.icon className="w-5 h-5 mb-3" style={{ color: TEXT }} />
-                <h3 className="text-sm font-bold mb-1" style={{ color: TEXT }}>{item.title}</h3>
-                <p className="text-xs leading-relaxed" style={{ color: MUTED }}>{item.desc}</p>
-              </motion.div>
-            ))}
-          </div>
+          <h1 className="font-black leading-[1.04] tracking-tight text-[clamp(1.65rem,8.4vw,2.75rem)] sm:text-[3.4rem] lg:text-[4.6rem]" style={{ color: TEXT, fontFamily: "Georgia, 'Times New Roman', serif" }}>
+            Stop Guessing.<br />
+            Find What&rsquo;s<br />
+            <span className="relative inline-block">
+              <span style={{ color: G }}>Holding You Back.</span>
+              <motion.span aria-hidden initial={{ scaleX: 0 }} animate={{ scaleX: 1 }} transition={{ delay: 0.5, duration: 0.7, ease: 'easeOut' }}
+                className="absolute -bottom-1.5 left-0 right-0 h-1 origin-left rounded-full" style={{ background: `linear-gradient(90deg, ${G}, ${G}00)` }} />
+            </span>
+          </h1>
 
-          <p className="text-xs font-black uppercase tracking-widest mb-4" style={{ color: MUTED }}>Plus, whenever you need them</p>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            {[
-              { icon: BarChart3, title: 'Deep Analysis', desc: 'Move-by-move breakdown of every game' },
-              { icon: Crosshair, title: 'Opponent Scout', desc: 'Prep for a specific rival or tournament' },
-              { icon: History, title: 'Game Lookup', desc: 'Every past game, one search away' },
-              { icon: GraduationCap, title: 'Courses', desc: 'Personalized lessons from your mistakes' },
-            ].map((item, i) => (
-              <motion.div
-                key={item.title}
-                initial={{ opacity: 0, y: 16 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: i * 0.06 }}
-                className="rounded-xl p-5"
-                style={{ background: CARD, border: '1px solid rgba(255,255,255,0.04)' }}
-              >
-                <item.icon className="w-5 h-5 mb-3" style={{ color: MUTED }} />
-                <h3 className="text-sm font-bold mb-1" style={{ color: TEXT }}>{item.title}</h3>
-                <p className="text-xs leading-relaxed" style={{ color: MUTED }}>{item.desc}</p>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section data-track-section="pricing" id="pricing" className="py-16 sm:py-20" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
-        <div className="max-w-lg mx-auto px-4 sm:px-8">
-          <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} className="text-center mb-10">
-            <p className="text-xs font-black uppercase tracking-widest mb-3" style={{ color: G }}>
-              Fix your biggest mistakes in your next 3 games
-            </p>
-            <h2 className="text-2xl sm:text-3xl font-black" style={{ color: TEXT }}>
-              Simple Pricing
-            </h2>
-            <p className="mt-2 text-sm" style={{ color: MUTED }}>No surprises. Cancel anytime.</p>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="rounded-xl p-8 relative overflow-hidden"
-            style={{
-              background: CARD,
-              border: `2px solid ${G}50`,
-              boxShadow: `0 0 0 1px ${G}20, 0 30px 80px ${G}15, 0 0 60px ${G}10`,
-            }}
-          >
-            {/* Animated glow border */}
-            <motion.div
-              aria-hidden
-              className="absolute -top-px left-0 right-0 h-[2px]"
-              style={{ background: `linear-gradient(90deg, transparent, ${G}, transparent)` }}
-              animate={{ x: ['-100%', '100%'] }}
-              transition={{ duration: 3, repeat: Infinity, ease: 'linear' }}
-            />
-
-            {/* "MOST POPULAR" tilted ribbon */}
-            <div
-              className="absolute -right-12 top-5 px-12 py-1 text-[10px] font-black tracking-widest text-white"
-              style={{
-                background: `linear-gradient(90deg, #ea9733, #dc4343)`,
-                transform: 'rotate(35deg)',
-                boxShadow: '0 4px 12px rgba(220,67,67,0.4)',
-              }}
-            >
-              MOST POPULAR
-            </div>
-
-            <div className="text-center mb-6">
-              <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs font-black mb-4"
-                style={{ background: `${G}15`, color: G, border: `1px solid ${G}40` }}>
-                <Flame className="w-3 h-3" /> FREE TIER AVAILABLE
-              </div>
-              <p className="text-[11px] mb-4" style={{ color: MUTED }}>
-                Free: game import and review, unlimited puzzles, chess traps, practice bots & Local Play, plus 1 opponent scout, 5 courses and 2 scans/day.
-                <br />Pro unlocks unlimited scouting, courses and scans, plus full weakness analysis.
-              </p>
-              <div className="flex items-baseline justify-center gap-2">
-                <span className="text-6xl font-black" style={{ color: TEXT }}>$5</span>
-                <span className="text-lg" style={{ color: MUTED }}>/month</span>
-              </div>
-              <p className="text-sm mt-1" style={{ color: MUTED }}>or just <span style={{ color: G, fontWeight: 800 }}>$55/year</span> <span style={{ color: G, fontSize: 11, fontWeight: 700 }}>(save 8%)</span></p>
-              <p className="text-[11px] font-bold mt-2" style={{ color: '#ffc34d' }}>
-                💡 Less than one cup of coffee · cancel anytime
-              </p>
-            </div>
-
-            <div className="space-y-3 mb-8">
-              {[
-                'Full deep analysis of every game you play',
-                'Personalized courses built from your mistakes',
-                'Scan any position for the best move',
-                'Practice against 8 bots (400–2000 ELO)',
-                'Opponent scouting when you need it',
-              ].map((feature) => (
-                <div key={feature} className="flex items-center gap-3">
-                  <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: `${G}18` }}>
-                    <Check className="w-3 h-3" style={{ color: G }} />
-                  </div>
-                  <span className="text-sm" style={{ color: TEXT }}>{feature}</span>
-                </div>
-              ))}
-            </div>
-
-            <button onClick={openSignup}
-              className="w-full group flex items-center justify-center gap-2 py-3.5 rounded-xl font-bold text-sm transition-all"
-              style={{ background: G, color: ON_G, boxShadow: `0 4px 20px ${G}40` }}
-              onMouseEnter={e => { e.currentTarget.style.background = G_HOVER; e.currentTarget.style.transform = 'translateY(-1px)'; }}
-              onMouseLeave={e => { e.currentTarget.style.background = G; e.currentTarget.style.transform = 'translateY(0)'; }}>
-              Analyze My Games Free
-              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-            </button>
-          </motion.div>
-        </div>
-      </section>
-
-      <section data-track-section="how_it_works" className="py-16 sm:py-20" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
-        <div className="max-w-5xl mx-auto px-4 sm:px-8">
-          <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} className="text-center mb-12">
-            <h2 className="text-2xl sm:text-3xl font-black" style={{ color: TEXT }}>
-              How It Works
-            </h2>
-            <p className="mt-2 text-sm" style={{ color: MUTED }}>Three steps to your next win</p>
-          </motion.div>
-
-          <div className="grid sm:grid-cols-3 gap-6">
-            {[
-              { num: '01', icon: BarChart3, title: 'Import Your Games', desc: 'Connect your Chess.com or Lichess account. We pull your recent games in seconds.' },
-              { num: '02', icon: Brain, title: 'We Find Your Mistakes', desc: 'Our engine spots the patterns costing you points — across openings, endgames, and time trouble.' },
-              { num: '03', icon: Target, title: 'Get a Clear Game Plan', desc: 'A short, focused list of what to fix first — with drills built around your actual weaknesses.' },
-            ].map((item, i) => (
-              <motion.div
-                key={item.num}
-                initial={{ opacity: 0, y: 16 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: i * 0.1 }}
-                className="rounded-xl p-6 relative overflow-hidden group"
-                style={{ background: `linear-gradient(180deg, ${CARD} 0%, #2a2825 100%)`, border: '1px solid rgba(255,255,255,0.06)', boxShadow: '0 24px 60px -14px rgba(0,0,0,0.6), 0 1px 0 rgba(255,255,255,0.05) inset' }}
-              >
-                <span className="absolute top-4 right-4 text-4xl font-black" style={{ color: 'rgba(255,255,255,0.03)' }}>{item.num}</span>
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-4" style={{ background: `${G}15` }}>
-                  <item.icon className="w-5 h-5" style={{ color: G }} />
-                </div>
-                <h3 className="text-base font-bold mb-1.5" style={{ color: TEXT }}>{item.title}</h3>
-                <p className="text-sm leading-relaxed" style={{ color: MUTED }}>{item.desc}</p>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section data-track-section="faq" className="py-16 sm:py-20" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
-        <div className="max-w-2xl mx-auto px-4 sm:px-8">
-          <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} className="text-center mb-10">
-            <h2 className="text-2xl sm:text-3xl font-black" style={{ color: TEXT }}>Questions</h2>
-          </motion.div>
-          <div className="space-y-4">
-            {[
-              { q: 'How is this different from Chess.com game review?', a: 'Chess.com reviews one game at a time. ChessScout.net looks across all your games to find the mistake you keep making — not just what happened in this one.' },
-              { q: 'What does the free tier include?', a: 'Game import and review, unlimited puzzles, chess traps, practice bots, Opening Trainer and Local Play are all free. You also get 1 opponent scout, 5 personalized courses and 2 Scan Position uses a day — no card required.' },
-              { q: 'Will I understand the analysis at my level?', a: 'Yes. Explanations are written in plain language, not engine notation — built for players working on real improvement, not just engine output.' },
-              { q: 'Does it work with Lichess?', a: 'Yes, both Chess.com and Lichess are supported.' },
-              { q: 'Can I cancel anytime?', a: 'Yes, cancel anytime from your account settings — no phone call, no retention flow.' },
-            ].map((item) => (
-              <motion.div key={item.q} initial={{ opacity: 0, y: 12 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
-                className="rounded-xl p-5" style={{ background: CARD, border: '1px solid rgba(255,255,255,0.04)' }}>
-                <h3 className="text-sm font-bold mb-1.5" style={{ color: TEXT }}>{item.q}</h3>
-                <p className="text-sm leading-relaxed" style={{ color: MUTED }}>{item.a}</p>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section data-track-section="final_cta" className="py-20 sm:py-28" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
-        <div className="max-w-3xl mx-auto px-4 sm:px-8 text-center">
-          <motion.div initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}>
-            <h2 className="text-2xl sm:text-3xl font-black leading-snug" style={{ color: TEXT }}>
-              Most players lose for the same reasons every game.{' '}
-              <span style={{ color: G }}>Find yours.</span>
-            </h2>
-            <div className="mt-8">
-              <button onClick={openSignup}
-                className="group inline-flex items-center justify-center gap-2 px-8 py-4 rounded-xl font-bold text-sm transition-all"
-                style={{ background: G, color: ON_G, boxShadow: `0 4px 20px ${G}40` }}
-                onMouseEnter={e => { e.currentTarget.style.background = G_HOVER; e.currentTarget.style.transform = 'translateY(-1px)'; }}
-                onMouseLeave={e => { e.currentTarget.style.background = G; e.currentTarget.style.transform = 'translateY(0)'; }}>
-                Analyze My Games Free
-                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-              </button>
-            </div>
-          </motion.div>
-        </div>
-      </section>
-
-      <footer style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }} className="py-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-8">
-          <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 mb-4 text-xs" style={{ color: MUTED }}>
-            <Link href="/learn" className="hover:underline">Learn</Link>
-            <Link href="/pricing" className="hover:underline">Pricing</Link>
-            <Link href="/vs/aimchess" className="hover:underline">vs Aimchess</Link>
-            <Link href="/vs/improve-my-chess" className="hover:underline">vs Improve My Chess</Link>
-            <Link href="/vs/free-chess-analysis" className="hover:underline">vs Free Analysis</Link>
-            <Link href="/privacy" className="hover:underline">Privacy</Link>
-            <Link href="/terms" className="hover:underline">Terms</Link>
-          </div>
-          <p className="text-xs text-center" style={{ color: MUTED }}>
-            ChessScout.net &middot; Improve your game, one move at a time.
+          <p className="mt-3 max-w-[34rem] text-[14px] leading-snug [@media(max-height:760px)]:hidden sm:text-base sm:leading-relaxed lg:text-lg" style={{ color: 'rgba(245,247,246,0.78)' }}>
+            ChessScout analyzes your Chess.com or Lichess games to find the <span className="whitespace-nowrap">2&ndash;3</span> biggest mistakes and patterns keeping you from your next rating level.
           </p>
-        </div>
-      </footer>
 
-      <div className="fixed bottom-0 left-0 right-0 z-30 sm:hidden p-3 bottom-nav-safe" style={{ background: `${BG}f0`, backdropFilter: 'blur(12px)', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-        <button onClick={openSignup}
-          className="w-full group flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm"
-          style={{ background: G, color: ON_G }}>
-          Analyze My Games Free
-          <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-        </button>
+          <button onClick={openSignup}
+            className="group mt-3 inline-flex items-center justify-center gap-2.5 rounded-2xl px-7 py-3 text-[15px] font-extrabold transition-all sm:px-9 sm:py-3.5 sm:text-base"
+            style={{ background: `linear-gradient(180deg, #9BF04F, ${G_HOVER})`, color: ON_G, boxShadow: `0 14px 36px -12px ${G}90` }}
+            onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; }} onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; }}>
+            <BarChart3 className="h-5 w-5" />
+            Analyze My Games Free
+            <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
+          </button>
+
+          <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11.5px] font-semibold sm:gap-x-5 sm:text-[13px]" style={{ color: 'rgba(245,247,246,0.82)' }}>
+            <span className="flex items-center gap-1.5"><Check className="h-3.5 w-3.5" style={{ color: G }} /> Free to start</span>
+            <span className="flex items-center gap-1.5"><Check className="h-3.5 w-3.5" style={{ color: G }} /> No credit card required</span>
+            <span className="flex items-center gap-1.5"><Check className="h-3.5 w-3.5" style={{ color: G }} /> Cancel anytime</span>
+          </div>
+        </motion.div>
+
+        <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, delay: 0.12 }} className="lg:self-end">
+          <PersonalAnalysisCard />
+        </motion.div>
+      </main>
+
+      <div className="relative z-10 mx-auto w-full max-w-7xl shrink-0 px-4 sm:px-8">
+        <div className="grid grid-cols-4 rounded-2xl py-2 sm:py-3 lg:py-4" style={{ background: 'rgba(13,21,22,0.72)', border: '1px solid rgba(255,255,255,0.07)' }}>
+          {features.map((f, i) => (
+            <button key={f.title} onClick={f.onClick} className="flex flex-col items-center px-1.5 text-center transition-colors hover:bg-white/[0.03] sm:px-4"
+              style={{ borderLeft: i ? '1px solid rgba(255,255,255,0.08)' : undefined }}>
+              <f.icon className="mb-1 h-5 w-5 sm:mb-1.5 sm:h-7 sm:w-7" style={{ color: G }} />
+              <span className="text-[11px] font-bold leading-tight sm:text-[15px]" style={{ color: TEXT }}>{f.title}</span>
+            </button>
+          ))}
+        </div>
       </div>
+
+      <footer className="relative z-10 shrink-0 px-4 pb-[max(0.4rem,env(safe-area-inset-bottom))] pt-2 text-center text-[11px]" style={{ color: MUTED }}>
+        <span className="mr-3 hidden sm:inline">For club players 400&ndash;2000 ELO.</span>
+        <Link href="/pricing" className="mx-1.5 hover:underline">Pricing</Link>
+        <Link href="/learn" className="mx-1.5 hover:underline">Learn</Link>
+        <a href={`${import.meta.env.BASE_URL}download`} className="mx-1.5 hover:underline">Get the app</a>
+        <Link href="/privacy" className="mx-1.5 hover:underline">Privacy</Link>
+        <Link href="/terms" className="mx-1.5 hover:underline">Terms</Link>
+      </footer>
 
       <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} initialMode={authMode} externalError={oauthError} context={authContext} />
     </div>
