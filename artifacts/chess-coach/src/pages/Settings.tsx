@@ -6,7 +6,7 @@ import { RedesignHeader } from '@/components/RedesignHeader';
 import { RD, REDESIGN_ON } from '@/lib/redesignTheme';
 import { PIECE_THEME_TYPES, themeTypeOf } from '@/lib/pieceThemes';
 import {
-  useSettings, BOARD_THEMES, BOARD_TEXTURES, PIECE_STYLES, PIECE_SHAPES, BOARD_SIZES, APP_BACKGROUNDS,
+  useSettings, BOARD_THEMES, BOARD_TEXTURES, isPhotoBoard, PIECE_STYLES, PIECE_SHAPES, BOARD_SIZES, APP_BACKGROUNDS,
   type BoardTheme, type BoardTexture, type PieceStyle, type PieceShape, type BoardSize, type AppBackground, type SavedTheme,
 } from '@/context/SettingsContext';
 
@@ -194,11 +194,12 @@ export default function SettingsPage() {
           <h3 className="mt-5 mb-1 text-[13px] font-extrabold" style={{ color: TEXT_LIGHT }}>Boards</h3>
           <p className="text-xs mb-3" style={{ color: TEXT_MUTED }}>Photographic marble, stone and wood. These replace your board color.</p>
           <div className="grid grid-cols-4 gap-2">
-            {(Object.keys(BOARD_TEXTURES) as BoardTexture[]).filter((key) => key.startsWith('cs-')).map((key) => {
+            {(Object.keys(BOARD_TEXTURES) as BoardTexture[]).filter((key) => isPhotoBoard(key)).map((key) => {
               const t = BOARD_TEXTURES[key];
+              const img = t.thumb ?? t.boardImage;
               return (
                 <SwatchButton key={key} active={boardTexture === key} onClick={() => setBoardTexture(key)} label={t.label}>
-                  <div className="w-full aspect-square rounded-lg" style={{ backgroundImage: t.boardImage ? `url('${t.boardImage}')` : t.backgroundImage, backgroundSize: '100% 100%', border: '1px solid rgba(255,255,255,0.1)' }} />
+                  <div className="w-full aspect-square rounded-lg" style={{ backgroundImage: img ? `url('${img}')` : t.backgroundImage, backgroundSize: '100% 100%', border: '1px solid rgba(255,255,255,0.1)' }} />
                 </SwatchButton>
               );
             })}
@@ -239,7 +240,7 @@ export default function SettingsPage() {
         <h2 className="text-sm font-black uppercase tracking-wide mb-1" style={{ color: TEXT_MUTED }}>Board Texture</h2>
         <p className="text-xs mb-3" style={{ color: TEXT_MUTED }}>A subtle surface pattern on top of your board color</p>
         <div className="grid grid-cols-4 gap-2">
-          {(Object.keys(BOARD_TEXTURES) as BoardTexture[]).filter((key) => !key.startsWith('cs-')).map((key) => {
+          {(Object.keys(BOARD_TEXTURES) as BoardTexture[]).filter((key) => !isPhotoBoard(key)).map((key) => {
             const t = BOARD_TEXTURES[key];
             return (
               <SwatchButton key={key} active={boardTexture === key} onClick={() => setBoardTexture(key)} label={t.label}>

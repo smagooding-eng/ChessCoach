@@ -1,10 +1,13 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { useUser } from '@/context/UserContext';
+import { useDashboardRedesignFlag } from '@/hooks/use-app-config';
 
 export type BoardTheme = 'classic' | 'green' | 'blue' | 'gray' | 'purple' | 'crimson' | 'teal' | 'coal' | 'sunset' | 'rose' | 'amber' | 'mint' | 'indigo' | 'midnight' | 'arctic' | 'custom';
 export type BoardTexture = 'flat' | 'wood' | 'marble' | 'felt' | 'granite' | 'leather' | 'glass' | 'canvas' | 'sandstone' | 'slate' | 'silk'
   // Photographic boards cut from the ChessScout asset pack (see CS_BOARDS below)
-  | 'cs-emerald' | 'cs-obsidian' | 'cs-ivory' | 'cs-walnut' | 'cs-steel' | 'cs-tournament';
+  | 'cs-emerald' | 'cs-obsidian' | 'cs-ivory' | 'cs-walnut' | 'cs-steel' | 'cs-tournament'
+  // Enhanced-UI-only photographic boards (see ENHANCED_BOARD_KEYS below)
+  | 'ex-rosewood-blue-marble' | 'ex-green-felt' | 'ex-brushed-aluminum' | 'ex-oak-walnut' | 'ex-sahara-noir' | 'ex-granite' | 'ex-nero-gold' | 'ex-copper-patina' | 'ex-burl-rosewood' | 'ex-travertine' | 'ex-saddle-leather' | 'ex-grigio-marble' | 'ex-maple-ebony' | 'ex-soapstone' | 'ex-crema-marfil' | 'ex-jade-marble' | 'ex-verde-alpi' | 'ex-classic-oak' | 'ex-birch-rosewood';
 export type AppBackground = 'default' | 'warm-gradient' | 'cool-gradient' | 'noise';
 export type PieceStyle = 'classic' | 'glossy' | 'outlined' | 'ocean' | 'crimson' | 'emerald' | 'royal' | 'flat' | 'depth' | 'shaded' | 'wood3d' | 'marble3d' | 'chrome' | 'gold' | 'copper' | 'obsidian' | 'ivory' | 'custom';
 export type PieceShape = 'default' | 'cburnett' | 'celtic' | 'chessnut' | 'fantasy' | 'spatial' | 'rhosgfx' | 'kiwen-suwi' | 'firi' | 'totoy' | 'papercut' | 'ink-cream' | 'frost-mosaic' | 'walnut-maple' | 'carved-jade' | 'brushed-steel' | 'futuristic-ceramic' | 'crystal-ice' | 'marble-gold' | 'glossy-vinyl' | 'ruby-sapphire' | 'pixel-art' | 'stained-glass' | 'minimal-rounded' | 'pixel-art-2' | 'chunky-cartoon' | 'steampunk-brass' | 'gothic-spires' | 'bronze-silver' | 'celtic-stone';
@@ -106,7 +109,13 @@ const csBoard = (file: string, label: string) => ({
   backgroundSize: 'cover',
 });
 
-export const BOARD_TEXTURES: Record<BoardTexture, { label: string; backgroundImage: string; backgroundImageDark?: string; backgroundSize?: string; boardImage?: string }> = {
+export type BoardTextureDef = { label: string; backgroundImage: string; backgroundImageDark?: string; backgroundSize?: string; boardImage?: string; thumb?: string; enhancedOnly?: boolean };
+
+// Photographic boards (both the original cs- set and the enhanced-only ex- set) replace
+// the board colour, so they're listed in the board pickers rather than the texture list.
+export const isPhotoBoard = (key: string) => key.startsWith('cs-') || key.startsWith('ex-');
+
+export const BOARD_TEXTURES: Record<BoardTexture, BoardTextureDef> = {
   flat:   { label: 'Flat', backgroundImage: 'none' },
   'cs-emerald':    csBoard('emerald', 'Emerald Marble'),
   'cs-obsidian':   csBoard('obsidian', 'Obsidian'),
@@ -114,6 +123,27 @@ export const BOARD_TEXTURES: Record<BoardTexture, { label: string; backgroundIma
   'cs-walnut':     csBoard('walnut', 'Walnut'),
   'cs-steel':      csBoard('steel', 'Steel'),
   'cs-tournament': csBoard('tournament', 'Tournament'),
+  // Enhanced UI only. Same continuous-image technique as the cs- boards, plus a small
+  // thumbnail so the Settings picker doesn't download every full-size board at once.
+  'ex-rosewood-blue-marble': { ...csBoard('rosewood-blue-marble', 'Rosewood & Blue Marble'), thumb: '/boards/rosewood-blue-marble-thumb.webp', enhancedOnly: true },
+  'ex-green-felt': { ...csBoard('green-felt', 'Green Felt'), thumb: '/boards/green-felt-thumb.webp', enhancedOnly: true },
+  'ex-brushed-aluminum': { ...csBoard('brushed-aluminum', 'Brushed Aluminum'), thumb: '/boards/brushed-aluminum-thumb.webp', enhancedOnly: true },
+  'ex-oak-walnut': { ...csBoard('oak-walnut', 'Oak & Walnut'), thumb: '/boards/oak-walnut-thumb.webp', enhancedOnly: true },
+  'ex-sahara-noir': { ...csBoard('sahara-noir', 'Sahara Noir'), thumb: '/boards/sahara-noir-thumb.webp', enhancedOnly: true },
+  'ex-granite': { ...csBoard('granite', 'Granite'), thumb: '/boards/granite-thumb.webp', enhancedOnly: true },
+  'ex-nero-gold': { ...csBoard('nero-gold', 'Nero Gold'), thumb: '/boards/nero-gold-thumb.webp', enhancedOnly: true },
+  'ex-copper-patina': { ...csBoard('copper-patina', 'Copper Patina'), thumb: '/boards/copper-patina-thumb.webp', enhancedOnly: true },
+  'ex-burl-rosewood': { ...csBoard('burl-rosewood', 'Burl & Rosewood'), thumb: '/boards/burl-rosewood-thumb.webp', enhancedOnly: true },
+  'ex-travertine': { ...csBoard('travertine', 'Travertine'), thumb: '/boards/travertine-thumb.webp', enhancedOnly: true },
+  'ex-saddle-leather': { ...csBoard('saddle-leather', 'Saddle Leather'), thumb: '/boards/saddle-leather-thumb.webp', enhancedOnly: true },
+  'ex-grigio-marble': { ...csBoard('grigio-marble', 'Grigio Marble'), thumb: '/boards/grigio-marble-thumb.webp', enhancedOnly: true },
+  'ex-maple-ebony': { ...csBoard('maple-ebony', 'Maple & Ebony'), thumb: '/boards/maple-ebony-thumb.webp', enhancedOnly: true },
+  'ex-soapstone': { ...csBoard('soapstone', 'Soapstone'), thumb: '/boards/soapstone-thumb.webp', enhancedOnly: true },
+  'ex-crema-marfil': { ...csBoard('crema-marfil', 'Crema Marfil'), thumb: '/boards/crema-marfil-thumb.webp', enhancedOnly: true },
+  'ex-jade-marble': { ...csBoard('jade-marble', 'Jade Marble'), thumb: '/boards/jade-marble-thumb.webp', enhancedOnly: true },
+  'ex-verde-alpi': { ...csBoard('verde-alpi', 'Verde Alpi'), thumb: '/boards/verde-alpi-thumb.webp', enhancedOnly: true },
+  'ex-classic-oak': { ...csBoard('classic-oak', 'Classic Oak'), thumb: '/boards/classic-oak-thumb.webp', enhancedOnly: true },
+  'ex-birch-rosewood': { ...csBoard('birch-rosewood', 'Birch & Rosewood'), thumb: '/boards/birch-rosewood-thumb.webp', enhancedOnly: true },
   // Plain CSS gradients are inherently regular/mathematical -- a
   // repeating-linear-gradient can only ever look like a hatch pattern or
   // a grid of dots, never organic grain or fabric fiber. An inline SVG
@@ -437,6 +467,13 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     try { localStorage.setItem(scopedKey(THEMES_KEY, userId), JSON.stringify(savedThemes)); } catch {}
   }, [savedThemes, userId]);
 
+  // Enhanced-only boards render only while the enhanced UI is on. If the flag is off, the
+  // board quietly shows the plain board colour instead; the saved choice is kept, so it
+  // comes back as soon as the enhanced UI is switched on again.
+  const { enabled: enhancedUi } = useDashboardRedesignFlag();
+  const chosenTexture = BOARD_TEXTURES[settings.boardTexture] ?? BOARD_TEXTURES.flat;
+  const resolvedBoardTexture = chosenTexture.enhancedOnly && !enhancedUi ? BOARD_TEXTURES.flat : chosenTexture;
+
   const resolvedBoardColors: ColorPair =
     settings.boardTheme === 'custom' ? settings.boardCustomColors : BOARD_THEMES[settings.boardTheme];
   const resolvedPieceStyle =
@@ -462,7 +499,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     setPromotionChoice: (v) => setSettings((s) => ({ ...s, promotionChoice: v })),
     setBoardSize: (v) => setSettings((s) => ({ ...s, boardSize: v })),
     boardColors: resolvedBoardColors,
-    boardTextureCss: BOARD_TEXTURES[settings.boardTexture] ?? BOARD_TEXTURES.flat,
+    boardTextureCss: resolvedBoardTexture,
     appBackgroundCss: APP_BACKGROUNDS[settings.appBackground].css,
     pieceColors: resolvedPieceStyle,
     boardMaxWidth: BOARD_SIZES[settings.boardSize].maxWidth,

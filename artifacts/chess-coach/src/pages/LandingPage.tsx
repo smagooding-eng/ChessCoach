@@ -386,26 +386,28 @@ function ExampleBoard() {
     }
   });
   const sprite = (ch: string) => `${import.meta.env.BASE_URL}pieces/chessnut/${ch === ch.toUpperCase() ? 'w' : 'b'}${ch.toUpperCase()}.svg`;
-  const hl = (f: number, r: number, color: string) => (
-    <div key={`${f}${r}`} className="absolute" style={{ left: `${f * 12.5}%`, top: `${r * 12.5}%`, width: '12.5%', height: '12.5%', background: color }} />
-  );
+  // Drawn as ONE svg in an 8x8 coordinate space. The previous CSS-grid version let the
+  // rows size themselves from inline <img> line boxes, so rows came out unequal and a
+  // seam showed across the board; squares, pieces, highlights and the arrow now all share
+  // the same exact grid. Light squares are a single background rect, so there are no
+  // light/light edges at all, and dark squares use crispEdges to avoid hairline gaps.
   return (
     <div className="relative aspect-square w-full overflow-hidden rounded-lg" style={{ border: '1px solid rgba(255,255,255,0.12)' }} role="img" aria-label="Example position with a missed winning tactic">
-      <div className="grid h-full w-full grid-cols-8">
-        {cells.slice(0, 64).map((ch, i) => {
-          const dark = (Math.floor(i / 8) + (i % 8)) % 2 === 1;
-          return (
-            <div key={i} style={{ background: dark ? '#4F6B45' : '#C9D3B6' }}>
-              {ch && <img src={sprite(ch)} alt="" draggable={false} className="h-full w-full object-contain" />}
-            </div>
-          );
+      <svg viewBox="0 0 8 8" className="block h-full w-full" preserveAspectRatio="none">
+        <rect x="0" y="0" width="8" height="8" fill="#C9D3B6" />
+        {Array.from({ length: 64 }, (_, i) => {
+          const f = i % 8, r = Math.floor(i / 8);
+          return (r + f) % 2 === 1 ? <rect key={`d${i}`} x={f} y={r} width="1" height="1" fill="#4F6B45" shapeRendering="crispEdges" /> : null;
         })}
-      </div>
-      {hl(6, 0, 'rgba(255,80,88,0.6)')}
-      {hl(3, 0, 'rgba(139,234,69,0.5)')}
-      <svg viewBox="0 0 8 8" className="pointer-events-none absolute inset-0 h-full w-full">
-        <line x1="3.5" y1="5.12" x2="3.5" y2="1.45" stroke={G} strokeWidth="0.2" strokeLinecap="round" />
-        <polygon points="3.5,0.9 3.2,1.5 3.8,1.5" fill={G} />
+        <rect x="6" y="0" width="1" height="1" fill="rgba(255,80,88,0.6)" shapeRendering="crispEdges" />
+        <rect x="3" y="0" width="1" height="1" fill="rgba(139,234,69,0.5)" shapeRendering="crispEdges" />
+        {cells.slice(0, 64).map((ch, i) => ch ? (
+          <image key={`p${i}`} href={sprite(ch)} x={i % 8} y={Math.floor(i / 8)} width="1" height="1" preserveAspectRatio="xMidYMid meet" />
+        ) : null)}
+        <g className="pointer-events-none">
+          <line x1="3.5" y1="5.12" x2="3.5" y2="1.45" stroke={G} strokeWidth="0.2" strokeLinecap="round" />
+          <polygon points="3.5,0.9 3.2,1.5 3.8,1.5" fill={G} />
+        </g>
       </svg>
     </div>
   );
