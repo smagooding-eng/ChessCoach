@@ -13,6 +13,12 @@ export interface PieceThemeType {
 
 export const PIECE_THEME_TYPES: PieceThemeType[] = [
   {
+    id: 'tops',
+    label: 'Tops',
+    blurb: 'Squat, chunky "tops only" pieces: the decorative top of each piece on a short collar and base.',
+    shapes: ['ink-cream'],
+  },
+  {
     id: 'classic',
     label: 'Classic',
     blurb: 'Traditional vector sets, plus the default pieces you can recolor under Piece Style.',
