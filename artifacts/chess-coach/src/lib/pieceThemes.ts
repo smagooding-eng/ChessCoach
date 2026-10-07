@@ -13,10 +13,16 @@ export interface PieceThemeType {
 
 export const PIECE_THEME_TYPES: PieceThemeType[] = [
   {
-    id: 'tops',
-    label: 'Tops',
-    blurb: 'Squat, chunky "tops only" pieces: the decorative top of each piece on a short collar and base.',
-    shapes: ['ink-cream'],
+    id: 'tops-3d',
+    label: '3D Tops',
+    blurb: 'Squat, chunky "tops only" pieces rendered in 3D: marble, wood, jade, metal, crystal and more.',
+    shapes: ['frost-mosaic', 'walnut-maple', 'carved-jade', 'brushed-steel', 'futuristic-ceramic', 'crystal-ice', 'marble-gold', 'glossy-vinyl', 'ruby-sapphire', 'steampunk-brass', 'gothic-spires', 'bronze-silver', 'celtic-stone'],
+  },
+  {
+    id: 'tops-2d',
+    label: '2D Tops',
+    blurb: 'Squat, chunky "tops only" pieces in flat illustrated styles: ink, cartoon, pixel art and stained glass.',
+    shapes: ['ink-cream', 'pixel-art', 'stained-glass', 'minimal-rounded', 'pixel-art-2', 'chunky-cartoon'],
   },
   {
     id: 'classic',

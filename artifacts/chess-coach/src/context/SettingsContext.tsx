@@ -7,7 +7,7 @@ export type BoardTexture = 'flat' | 'wood' | 'marble' | 'felt' | 'granite' | 'le
   | 'cs-emerald' | 'cs-obsidian' | 'cs-ivory' | 'cs-walnut' | 'cs-steel' | 'cs-tournament';
 export type AppBackground = 'default' | 'warm-gradient' | 'cool-gradient' | 'noise';
 export type PieceStyle = 'classic' | 'glossy' | 'outlined' | 'ocean' | 'crimson' | 'emerald' | 'royal' | 'flat' | 'depth' | 'shaded' | 'wood3d' | 'marble3d' | 'chrome' | 'gold' | 'copper' | 'obsidian' | 'ivory' | 'custom';
-export type PieceShape = 'default' | 'cburnett' | 'celtic' | 'chessnut' | 'fantasy' | 'spatial' | 'rhosgfx' | 'kiwen-suwi' | 'firi' | 'totoy' | 'papercut' | 'ink-cream';
+export type PieceShape = 'default' | 'cburnett' | 'celtic' | 'chessnut' | 'fantasy' | 'spatial' | 'rhosgfx' | 'kiwen-suwi' | 'firi' | 'totoy' | 'papercut' | 'ink-cream' | 'frost-mosaic' | 'walnut-maple' | 'carved-jade' | 'brushed-steel' | 'futuristic-ceramic' | 'crystal-ice' | 'marble-gold' | 'glossy-vinyl' | 'ruby-sapphire' | 'pixel-art' | 'stained-glass' | 'minimal-rounded' | 'pixel-art-2' | 'chunky-cartoon' | 'steampunk-brass' | 'gothic-spires' | 'bronze-silver' | 'celtic-stone';
 export type PromotionChoice = 'queen' | 'ask';
 export type BoardSize = 'compact' | 'standard' | 'large';
 
@@ -50,6 +50,24 @@ export const PIECE_SHAPES: Record<PieceShape, { label: string; attribution: stri
   papercut:   { label: 'Papercut', attribution: 'Piece set "Papercut" by Nikolay Anzarov, CC BY 4.0' },
   // ChessScout's own artwork: squat "tops only" pieces (see lib/pieceThemes.ts). Raster = WebP sprites in /pieces/<key>/.
   'ink-cream': { label: 'Ink & Cream', attribution: null, raster: true, version: 1 },
+  'frost-mosaic': { label: 'Frost Mosaic', attribution: null, raster: true, version: 1 },
+  'walnut-maple': { label: 'Walnut & Maple', attribution: null, raster: true, version: 1 },
+  'carved-jade': { label: 'Carved Jade', attribution: null, raster: true, version: 1 },
+  'brushed-steel': { label: 'Brushed Steel', attribution: null, raster: true, version: 1 },
+  'futuristic-ceramic': { label: 'Futuristic Ceramic', attribution: null, raster: true, version: 1 },
+  'crystal-ice': { label: 'Crystal & Ice', attribution: null, raster: true, version: 1 },
+  'marble-gold': { label: 'Marble & Gold', attribution: null, raster: true, version: 1 },
+  'glossy-vinyl': { label: 'Glossy Toy Vinyl', attribution: null, raster: true, version: 1 },
+  'ruby-sapphire': { label: 'Ruby & Sapphire', attribution: null, raster: true, version: 1 },
+  'pixel-art': { label: 'Pixel Art', attribution: null, raster: true, version: 1 },
+  'stained-glass': { label: 'Stained Glass', attribution: null, raster: true, version: 1 },
+  'minimal-rounded': { label: 'Minimal Rounded', attribution: null, raster: true, version: 1 },
+  'pixel-art-2': { label: 'Pixel Art II', attribution: null, raster: true, version: 1 },
+  'chunky-cartoon': { label: 'Chunky Cartoon', attribution: null, raster: true, version: 1 },
+  'steampunk-brass': { label: 'Steampunk Brass', attribution: null, raster: true, version: 1 },
+  'gothic-spires': { label: 'Gothic Spires', attribution: null, raster: true, version: 1 },
+  'bronze-silver': { label: 'Antique Bronze & Silver', attribution: null, raster: true, version: 1 },
+  'celtic-stone': { label: 'Celtic Stone', attribution: null, raster: true, version: 1 },
 };
 
 export const BOARD_THEMES: Record<Exclude<BoardTheme, 'custom'>, { light: string; dark: string; label: string }> = {
