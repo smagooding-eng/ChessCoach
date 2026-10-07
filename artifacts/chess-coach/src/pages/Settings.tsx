@@ -4,6 +4,7 @@ import { ArrowLeft, Check, Save, Trash2, RotateCcw, Star } from 'lucide-react';
 import { useDashboardRedesignFlag } from '@/hooks/use-app-config';
 import { RedesignHeader } from '@/components/RedesignHeader';
 import { RD, REDESIGN_ON } from '@/lib/redesignTheme';
+import { PIECE_THEME_TYPES, themeTypeOf } from '@/lib/pieceThemes';
 import {
   useSettings, BOARD_THEMES, BOARD_TEXTURES, PIECE_STYLES, PIECE_SHAPES, BOARD_SIZES, APP_BACKGROUNDS,
   type BoardTheme, type BoardTexture, type PieceStyle, type PieceShape, type BoardSize, type AppBackground, type SavedTheme,
@@ -102,6 +103,23 @@ export default function SettingsPage() {
   };
 
   const { enabled: redesign } = useDashboardRedesignFlag();
+  const [themeType, setThemeType] = useState<string>(() => themeTypeOf(pieceShape));
+  const activeType = PIECE_THEME_TYPES.find((t) => t.id === themeType) ?? PIECE_THEME_TYPES[0];
+
+  // One piece-set swatch, shared by the Theme section: the knight of each side, so sets can be told apart
+  const pieceSwatch = (key: PieceShape) => {
+    const info = PIECE_SHAPES[key];
+    if (key === 'default') return <span className="text-3xl leading-none">♞</span>;
+    if (info.raster) {
+      return (
+        <span className="flex items-end">
+          <img src={`/pieces/${key}/wN.webp?v=${info.version ?? 1}`} alt="" className="w-9 h-9 object-contain" />
+          <img src={`/pieces/${key}/bN.webp?v=${info.version ?? 1}`} alt={info.label} className="w-9 h-9 object-contain" />
+        </span>
+      );
+    }
+    return <img src={`/pieces/${key}/wN.svg`} alt={info.label} className="w-9 h-9" />;
+  };
 
   return (
     <div className={`cs-settings max-w-2xl mx-auto ${redesign ? 'space-y-3 px-3 pb-[calc(7.5rem+env(safe-area-inset-bottom))] md:px-0 md:pb-6' : 'space-y-6 p-4 md:p-0'}`}>
@@ -140,6 +158,50 @@ export default function SettingsPage() {
         <p className="text-sm mt-1" style={{ color: TEXT_MUTED }}>Customize how ChessScout.net looks and plays</p>
       </div>
       </>
+      )}
+
+      {redesign && (
+        <section>
+          <h2 className="text-sm font-black uppercase tracking-wide mb-1" style={{ color: TEXT_MUTED }}>Theme</h2>
+          <p className="text-xs mb-4" style={{ color: TEXT_MUTED }}>Choose your pieces by type, then style, and a board to play on.</p>
+
+          <h3 className="mb-2 text-[13px] font-extrabold" style={{ color: TEXT_LIGHT }}>Pieces</h3>
+          <div className="grid gap-1 rounded-[14px] p-1 mb-2" style={{ gridTemplateColumns: `repeat(${PIECE_THEME_TYPES.length}, minmax(0, 1fr))`, background: RD.cardSolid, border: `1px solid ${RD.border}` }}>
+            {PIECE_THEME_TYPES.map((t) => {
+              const on = t.id === activeType.id;
+              return (
+                <button key={t.id} onClick={() => setThemeType(t.id)} aria-pressed={on} className="rounded-[10px] py-2 text-[13px] font-bold transition-colors"
+                  style={on ? { background: 'rgba(139,234,69,.10)', color: RD.text, boxShadow: `inset 0 0 0 1.5px ${RD.green}` } : { background: 'transparent', color: RD.muted }}>
+                  {t.label} <span className="text-[11px] opacity-70">{t.shapes.length}</span>
+                </button>
+              );
+            })}
+          </div>
+          <p className="text-xs mb-3" style={{ color: TEXT_MUTED }}>{activeType.blurb}</p>
+          <div className="grid grid-cols-2 gap-2 mb-2">
+            {activeType.shapes.map((key) => (
+              <SwatchButton key={key} active={pieceShape === key} onClick={() => setPieceShape(key)} label={PIECE_SHAPES[key].label}>
+                {pieceSwatch(key)}
+              </SwatchButton>
+            ))}
+          </div>
+          {PIECE_SHAPES[pieceShape]?.attribution && pieceShape !== 'default' && (
+            <p className="text-[10px] mb-1" style={{ color: TEXT_MUTED }}>{PIECE_SHAPES[pieceShape].attribution}</p>
+          )}
+
+          <h3 className="mt-5 mb-1 text-[13px] font-extrabold" style={{ color: TEXT_LIGHT }}>Boards</h3>
+          <p className="text-xs mb-3" style={{ color: TEXT_MUTED }}>Photographic marble, stone and wood. These replace your board color.</p>
+          <div className="grid grid-cols-4 gap-2">
+            {(Object.keys(BOARD_TEXTURES) as BoardTexture[]).filter((key) => key.startsWith('cs-')).map((key) => {
+              const t = BOARD_TEXTURES[key];
+              return (
+                <SwatchButton key={key} active={boardTexture === key} onClick={() => setBoardTexture(key)} label={t.label}>
+                  <div className="w-full aspect-square rounded-lg" style={{ backgroundImage: t.boardImage ? `url('${t.boardImage}')` : t.backgroundImage, backgroundSize: '100% 100%', border: '1px solid rgba(255,255,255,0.1)' }} />
+                </SwatchButton>
+              );
+            })}
+          </div>
+        </section>
       )}
 
       <section>
@@ -186,6 +248,8 @@ export default function SettingsPage() {
         </div>
       </section>
 
+      {!redesign && (
+      <>
       <section>
         <h2 className="text-sm font-black uppercase tracking-wide mb-1" style={{ color: TEXT_MUTED }}>Premium Boards</h2>
         <p className="text-xs mb-3" style={{ color: TEXT_MUTED }}>Photographic marble, stone and wood. These replace your board color.</p>
@@ -206,7 +270,7 @@ export default function SettingsPage() {
         <h2 className="text-sm font-black uppercase tracking-wide mb-1" style={{ color: TEXT_MUTED }}>Piece Shape</h2>
         <p className="text-xs mb-3" style={{ color: TEXT_MUTED }}>Real alternate artwork, not just a recolor</p>
         <div className="grid grid-cols-2 gap-2 mb-2">
-          {(Object.keys(PIECE_SHAPES) as PieceShape[]).filter((key) => !PIECE_SHAPES[key].hidden).map((key) => (
+          {(Object.keys(PIECE_SHAPES) as PieceShape[]).filter((key) => !PIECE_SHAPES[key].hidden && !PIECE_SHAPES[key].raster).map((key) => (
             <SwatchButton key={key} active={pieceShape === key} onClick={() => setPieceShape(key)} label={PIECE_SHAPES[key].label}>
               {key === 'default' ? (
                 <span className="text-3xl leading-none">♞</span>
@@ -219,8 +283,8 @@ export default function SettingsPage() {
                 PIECE_SHAPES[key].raster ? (
                   // Raster sets (e.g. Marble) show both sides: the white/black contrast is the point
                   <span className="flex items-end">
-                    <img src={`/pieces/${key}/wN.webp?v=3`} alt="" className="w-9 h-9 object-contain" />
-                    <img src={`/pieces/${key}/bN.webp?v=3`} alt={PIECE_SHAPES[key].label} className="w-9 h-9 object-contain" />
+                    <img src={`/pieces/${key}/wN.webp?v=4`} alt="" className="w-9 h-9 object-contain" />
+                    <img src={`/pieces/${key}/bN.webp?v=4`} alt={PIECE_SHAPES[key].label} className="w-9 h-9 object-contain" />
                   </span>
                 ) : (
                   <img src={`/pieces/${key}/wN.svg`} alt={PIECE_SHAPES[key].label} className="w-9 h-9" />
@@ -233,6 +297,8 @@ export default function SettingsPage() {
           <p className="text-[10px]" style={{ color: TEXT_MUTED }}>{PIECE_SHAPES[pieceShape].attribution}</p>
         )}
       </section>
+      </>
+      )}
 
       <section>
         <h2 className="text-sm font-black uppercase tracking-wide mb-1" style={{ color: TEXT_MUTED }}>Piece Style</h2>

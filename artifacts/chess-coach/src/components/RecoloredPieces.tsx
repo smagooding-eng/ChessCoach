@@ -1,6 +1,7 @@
 import React from 'react';
 import { defaultPieces } from 'react-chessboard';
 import { getPieceColorScheme } from '@/lib/utils';
+import { PIECE_SHAPES } from '@/context/SettingsContext';
 
 // Recolors react-chessboard's own stock piece SVGs by walking the
 // rendered element tree and remapping specific style values, instead of
@@ -166,12 +167,13 @@ export function buildTintedPieceSet(opts: {
   // Each one's license is checked and recorded in PIECE_SHAPES below;
   // this list exists only to decide which shapes take this static-asset
   // path versus the recolorable 'default' path further down.
-  const STATIC_SVG_SHAPES: string[] = ['cburnett', 'celtic', 'chessnut', 'fantasy', 'spatial', 'rhosgfx', 'kiwen-suwi', 'firi', 'totoy', 'papercut', 'marble'];
+  const STATIC_SVG_SHAPES: string[] = ['cburnett', 'celtic', 'chessnut', 'fantasy', 'spatial', 'rhosgfx', 'kiwen-suwi', 'firi', 'totoy', 'papercut', 'marble', 'bronze'];
   if (STATIC_SVG_SHAPES.includes(pieceShape)) {
-    // 'marble' is raster artwork (WebP); every other static shape is SVG
-    const ext = pieceShape === 'marble' ? 'webp' : 'svg';
-    // Version tag so a replaced set of sprites (same file names) is never served from a stale cache
-    const ver = pieceShape === 'marble' ? '?v=3' : '';
+    // Raster sets are WebP sprites; every other static shape is SVG. The version tag means a
+    // replaced set of sprites (same file names) is never served from a stale cache.
+    const info = PIECE_SHAPES[pieceShape as keyof typeof PIECE_SHAPES];
+    const ext = info?.raster ? 'webp' : 'svg';
+    const ver = info?.raster ? `?v=${info.version ?? 1}` : '';
     const wrapped: Record<string, (props?: any) => React.ReactElement> = {};
     for (const key of ['wP', 'wR', 'wN', 'wB', 'wQ', 'wK', 'bP', 'bR', 'bN', 'bB', 'bQ', 'bK']) {
       wrapped[key] = ({ svgStyle }: any = {}) => (

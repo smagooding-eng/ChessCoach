@@ -7,7 +7,7 @@ export type BoardTexture = 'flat' | 'wood' | 'marble' | 'felt' | 'granite' | 'le
   | 'cs-emerald' | 'cs-obsidian' | 'cs-ivory' | 'cs-walnut' | 'cs-steel' | 'cs-tournament';
 export type AppBackground = 'default' | 'warm-gradient' | 'cool-gradient' | 'noise';
 export type PieceStyle = 'classic' | 'glossy' | 'outlined' | 'ocean' | 'crimson' | 'emerald' | 'royal' | 'flat' | 'depth' | 'shaded' | 'wood3d' | 'marble3d' | 'chrome' | 'gold' | 'copper' | 'obsidian' | 'ivory' | 'custom';
-export type PieceShape = 'default' | 'cburnett' | 'celtic' | 'chessnut' | 'fantasy' | 'spatial' | 'rhosgfx' | 'kiwen-suwi' | 'firi' | 'totoy' | 'papercut' | 'marble';
+export type PieceShape = 'default' | 'cburnett' | 'celtic' | 'chessnut' | 'fantasy' | 'spatial' | 'rhosgfx' | 'kiwen-suwi' | 'firi' | 'totoy' | 'papercut' | 'marble' | 'bronze';
 export type PromotionChoice = 'queen' | 'ask';
 export type BoardSize = 'compact' | 'standard' | 'large';
 
@@ -35,7 +35,8 @@ export type BoardSize = 'compact' | 'standard' | 'large';
 // triggers the same obligation is a genuinely disputed question, not
 // something to resolve here -- flagged for a real legal read, not
 // removed unilaterally since it's already live.
-export const PIECE_SHAPES: Record<PieceShape, { label: string; attribution: string | null; hidden?: boolean; raster?: boolean }> = {
+// `raster` sets are WebP sprites in /pieces/<key>/ rather than SVG; bump `version` when their files are replaced.
+export const PIECE_SHAPES: Record<PieceShape, { label: string; attribution: string | null; hidden?: boolean; raster?: boolean; version?: number }> = {
   default:    { label: 'Default', attribution: null },
   cburnett:   { label: 'Cburnett', attribution: 'Piece set "Cburnett" by Colin M.L. Burnett, GPLv2+ (see licensing note above)' },
   celtic:     { label: 'Celtic', attribution: 'Piece set "Celtic" by Maurizio Monge, MIT License' },
@@ -47,8 +48,9 @@ export const PIECE_SHAPES: Record<PieceShape, { label: string; attribution: stri
   firi:       { label: 'Firi', attribution: 'Piece set "Firi" by James Faure, CC BY 4.0' },
   totoy:      { label: 'Totoy', attribution: 'Piece set "Totoy" by Kosal Sen, CC BY 4.0' },
   papercut:   { label: 'Papercut', attribution: 'Piece set "Papercut" by Nikolay Anzarov, CC BY 4.0' },
-  // ChessScout's own artwork (obsidian + ivory marble), shipped as WebP rather than SVG
-  marble:     { label: 'Ivory & Obsidian', attribution: null, raster: true },
+  // ChessScout's own artwork (cream + black Staunton), shipped as WebP rather than SVG
+  marble:     { label: 'Cream & Black', attribution: null, raster: true, version: 4 },
+  bronze:     { label: 'Ivory & Bronze', attribution: null, raster: true, version: 1 },
 };
 
 export const BOARD_THEMES: Record<Exclude<BoardTheme, 'custom'>, { light: string; dark: string; label: string }> = {
