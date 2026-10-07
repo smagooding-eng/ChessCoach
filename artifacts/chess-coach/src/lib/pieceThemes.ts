@@ -13,6 +13,24 @@ export interface PieceThemeType {
 
 export const PIECE_THEME_TYPES: PieceThemeType[] = [
   {
+    id: 'stylized-neutral',
+    label: 'Neutral',
+    blurb: 'Stylized illustrated pieces in light, grey and steel tones.',
+    shapes: ['sty-classic', 'sty-glossy', 'sty-outlined', 'sty-ivory', 'sty-silver', 'sty-steel'],
+  },
+  {
+    id: 'stylized-gems',
+    label: 'Jewel Tones',
+    blurb: 'Stylized illustrated pieces in bold jewel and glow colours.',
+    shapes: ['sty-amethyst', 'sty-emerald', 'sty-ruby', 'sty-sapphire', 'sty-ocean', 'sty-neon'],
+  },
+  {
+    id: 'stylized-metals',
+    label: 'Warm Metals',
+    blurb: 'Stylized illustrated pieces in bronze, copper and gold, plus dark obsidian.',
+    shapes: ['sty-bronze', 'sty-copper', 'sty-gold', 'sty-obsidian'],
+  },
+  {
     id: 'classic',
     label: 'Classic',
     blurb: 'Traditional vector sets, plus the default pieces you can recolor under Piece Style.',
