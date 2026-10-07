@@ -1,3 +1,4 @@
+import { SquareBadge } from './SquareBadge';
 import { useDashboardRedesignFlag } from '@/hooks/use-app-config';
 import { RD, REDESIGN_ON } from '@/lib/redesignTheme';
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
@@ -900,6 +901,10 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, positionRec
 
   const userColor = steps?.[1]?.color ?? (steps?.[0]?.fen?.includes(' b ') ? 'b' : 'w');
   const boardOrientation: 'white' | 'black' = userColor === 'b' ? 'black' : 'white';
+  // Practice/challenge boards face whoever is to move in THAT position, not the side
+  // from the walkthrough game -- the related puzzles often come from the other colour.
+  const sideToMoveOrientation = (fen?: string | null): 'white' | 'black' =>
+    fen && fen.split(' ')[1] === 'b' ? 'black' : fen ? 'white' : boardOrientation;
 
   const boardSquareStyles = (() => {
     const styles: Record<string, React.CSSProperties> = {};
@@ -1146,19 +1151,13 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, positionRec
                   squareStyles: boardSquareStyles,
                 }}
               />
-              {step?.isMistake && (
-                <div className="absolute top-2 right-2 pointer-events-none z-10">
-                  <div className="flex items-center gap-1 px-2 py-1 rounded-xl text-xs font-bold bg-red-600 text-white shadow-lg">
-                    <AlertTriangle className="w-3 h-3" /> Mistake
-                  </div>
-                </div>
+              {/* Mistake / best-move markers sit in the corner of the square the move
+                  landed on, so they never cover the board's top-right squares. */}
+              {step?.isMistake && step.to && (
+                <SquareBadge square={step.to} flipped={boardOrientation === 'black'} color="#CA3431" glyph="?" label="Mistake" />
               )}
-              {step?.isFix && (
-                <div className="absolute top-2 right-2 pointer-events-none z-10">
-                  <div className="flex items-center gap-1 px-2 py-1 rounded-xl text-xs font-bold text-white shadow-lg" style={{ backgroundColor: CHESSCOM_GREEN }}>
-                    <Check className="w-3 h-3" /> Best Move
-                  </div>
-                </div>
+              {step?.isFix && step.to && (
+                <SquareBadge square={step.to} flipped={boardOrientation === 'black'} color={CHESSCOM_GREEN} glyph="★" label="Best move" />
               )}
               <AnimatePresence>
                 {prevFen !== step?.fen && step?.san && (
@@ -1475,7 +1474,7 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, positionRec
                 options={{
                   position: allChallenges[0]?.fen ?? '',
                   allowDragging: false,
-                  boardOrientation: boardOrientation,
+                  boardOrientation: sideToMoveOrientation(allChallenges[0]?.fen),
                   boardStyle: { ...SKIN.boardStyle, borderRadius: '6px', overflow: 'hidden' },
                   darkSquareStyle: SKIN.darkSquareStyle,
                   lightSquareStyle: SKIN.lightSquareStyle,
@@ -1576,7 +1575,7 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, positionRec
                   // though drillPosition itself was already correct.
                   position: drillPosition || activeChallenge?.fen || '',
                   allowDragging: drillState !== 'correct' && drillState !== 'revealed',
-                  boardOrientation: boardOrientation,
+                  boardOrientation: sideToMoveOrientation(activeChallenge?.fen),
                   dragActivationDistance: 8,
                   onPieceDrop: drillState === 'correct' || drillState === 'revealed' ? () => false : handleDrillDrop,
                   onSquareClick: handleDrillSquareClick,

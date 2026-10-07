@@ -11,6 +11,7 @@ import { useMyOpenings, type OpeningStat } from '@/hooks/use-openings';
 import { useDashboardRedesignFlag } from '@/hooks/use-app-config';
 import { RD } from '@/lib/redesignTheme';
 import { RedesignHeader } from '@/components/RedesignHeader';
+import { openingThumb } from '@/lib/openingThumb';
 
 type SortKey = 'totalGames' | 'winRate' | 'opening' | 'whiteWinRate' | 'blackWinRate';
 type ColorFilter = 'all' | 'white' | 'black';
@@ -114,7 +115,7 @@ export function Openings() {
       { id: 'popular', label: 'Popular' },
       { id: 'repertoire', label: 'My Repertoire' },
     ];
-    const thumb = (name: string) => `${import.meta.env.BASE_URL}assets/openings/thumb-${[...name].reduce((n, c) => n + c.charCodeAt(0), 0) % 6}.webp`;
+    const thumb = openingThumb;
 
     return (
       <div className="min-h-screen px-3 md:px-6 md:pt-6 md:pb-12 pb-[calc(7.5rem+env(safe-area-inset-bottom))]" style={{ background: RD.bg, color: RD.text }}>

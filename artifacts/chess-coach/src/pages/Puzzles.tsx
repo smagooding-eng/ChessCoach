@@ -14,6 +14,8 @@ import { encodeCard } from '@/pages/ShareCard';
 import { UpgradeNudge } from '@/components/UpgradeNudge';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useSettings, playMoveSound, boardSkin } from '@/context/SettingsContext';
+import { eventForMove } from '@/lib/sounds';
+import { CheckmateOverlay, checkmateSquares } from '@/components/CheckmateOverlay';
 import { EvalBar, MaterialStrip } from '@/components/GameStatusStrip';
 
 // CSS variables with the original values as fallbacks: unchanged with the
@@ -216,7 +218,7 @@ export function Puzzles() {
       const gameCopy = new Chess(game.fen());
       const move = gameCopy.move({ from, to, promotion: 'q' });
       if (!move) return false;
-      if (soundEnabled) playMoveSound(move.captured ? 'capture' : 'move');
+      if (soundEnabled) playMoveSound(eventForMove(move, gameCopy));
 
       const uciMove = from + to + (move.flags.includes('p') ? 'q' : '');
 
@@ -262,7 +264,8 @@ export function Puzzles() {
                 const omTo = om.slice(2, 4);
                 const promo = om.length > 4 ? om[4] : undefined;
                 const nextGame = new Chess(gameCopy.fen());
-                nextGame.move({ from: omFrom, to: omTo, promotion: promo });
+                const omMove = nextGame.move({ from: omFrom, to: omTo, promotion: promo });
+                if (soundEnabled && omMove) playMoveSound(eventForMove(omMove, nextGame));
                 setGame(nextGame);
                 setLastMove({ from: omFrom, to: omTo });
                 setCurrentMoveIndex(data.nextMoveIndex);
@@ -711,6 +714,7 @@ export function Puzzles() {
                 <div className="relative w-full mx-auto mb-4" style={{ maxWidth: boardMaxWidth }}>
                   <PieceGradientDefs />
                   <MaterialStrip fen={game?.fen() ?? ''} color={boardOrientation === 'white' ? 'b' : 'w'} className="px-1 mb-1.5" />
+                  <div className="relative">
                   <Chessboard
                     options={{
                       position: game.fen(),
@@ -733,6 +737,11 @@ export function Puzzles() {
                       animationDurationInMs: 150,
                     }}
                   />
+                  {(() => {
+                    const mate = checkmateSquares(game.fen());
+                    return mate ? <CheckmateOverlay {...mate} flipped={boardOrientation === 'black'} positionKey={game.fen()} /> : null;
+                  })()}
+                  </div>
 
                   <AnimatePresence>
                     {feedback && (

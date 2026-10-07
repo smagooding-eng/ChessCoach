@@ -34,6 +34,7 @@ const BG_CARD = REDESIGN_ON ? RD.cardSolid : '#302e2b';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { apiFetch } from '@/lib/api';
+import { useNarrator } from '@/lib/useNarrator';
 import { useUser } from '@/hooks/use-user';
 import { useMyWeaknesses } from '@/hooks/use-analysis';
 import { encodeCard } from '@/pages/ShareCard';
@@ -293,15 +294,17 @@ function LessonContentStepper({ content, lessonId, courseCategory, conceptTitle,
   const conceptText = useMemo(() => extractConceptText(content), [content]);
   const [step, setStep] = useState(0);
   const [showingIntro, setShowingIntro] = useState(!!conceptText);
-  const [speaking, setSpeaking] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const narrator = useNarrator(toPlainText);
+  const { speaking, loading } = narrator;
   // Defaults to true -- lessons read themselves aloud by default now,
   // per explicit request, rather than needing AUTO toggled on each time.
   // The toggle itself is unchanged and fully functional for anyone who
   // wants to turn it off.
   const [autoRead, setAutoRead] = useState(true);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const abortRef = useRef<AbortController | null>(null);
+  const autoReadRef = useRef(autoRead);
+  autoReadRef.current = autoRead;
+  const showingIntroRef = useRef(showingIntro);
+  showingIntroRef.current = showingIntro;
   // Paired with LessonBoardPlayer below it on mobile, where CSS order
   // puts the board first and this panel second -- meaning on a phone,
   // the full text content used to sit below a full screen's worth of
@@ -328,62 +331,27 @@ function LessonContentStepper({ content, lessonId, courseCategory, conceptTitle,
     // concept-intro card's own mount, and so it doesn't fire while a
     // lesson switch is still settling.
     if (autoRead && !conceptText) {
-      setTimeout(() => readAloud(currentReadText(steps[0] ?? '')), 150);
+      narrator.speakSoon(() => currentReadText(steps[0] ?? ''), 150);
     }
+    narrator.prefetch(steps[1]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lessonId]);
 
+  const stopReading = narrator.stop;
+  const readAloud = narrator.speak;
+
+  // Follow the learner: when the board steps to a different move (its own "page"
+  // of explanation), narration moves to that move's text instead of finishing the
+  // old one. The first value after a lesson switch is handled by the effect above.
+  const lastBoardTextRef = useRef(boardMoveText ?? '');
   useEffect(() => {
-    return () => { stopReading(); };
-  }, []);
-
-  function stopReading() {
-    abortRef.current?.abort();
-    abortRef.current = null;
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.src = '';
-      audioRef.current = null;
-    }
-    setSpeaking(false);
-    setLoading(false);
-  }
-
-  const readAloud = useCallback(async (text: string) => {
-    stopReading();
-    const plain = toPlainText(text);
-    if (!plain) return;
-
-    const controller = new AbortController();
-    abortRef.current = controller;
-    setLoading(true);
-
-    try {
-      const res = await apiFetch('/api/tts/speak', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: plain, voice: 'nova' }),
-        signal: controller.signal,
-      });
-
-      if (!res.ok) throw new Error('TTS failed');
-
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const audio = new Audio(url);
-      audioRef.current = audio;
-
-      audio.onplay = () => { setLoading(false); setSpeaking(true); };
-      audio.onended = () => { setSpeaking(false); URL.revokeObjectURL(url); };
-      audio.onerror = () => { setSpeaking(false); setLoading(false); URL.revokeObjectURL(url); };
-
-      await audio.play();
-    } catch (err: unknown) {
-      if (err instanceof Error && err.name === 'AbortError') return;
-      setLoading(false);
-      setSpeaking(false);
-    }
-  }, []);
+    const next = (boardMoveText ?? '').trim();
+    if (next === lastBoardTextRef.current.trim()) return;
+    lastBoardTextRef.current = next;
+    if (!next || !autoReadRef.current || showingIntroRef.current) return;
+    narrator.speakSoon(() => currentReadText(steps[step] ?? ''), 200);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [boardMoveText]);
 
   const goTo = useCallback((idx: number) => {
     const clamped = Math.max(0, Math.min(idx, steps.length - 1));
@@ -391,9 +359,11 @@ function LessonContentStepper({ content, lessonId, courseCategory, conceptTitle,
     setStep(clamped);
     onStepChange?.(steps[clamped] ?? '');
     if (autoRead) {
-      setTimeout(() => readAloud(currentReadText(steps[clamped])), 80);
+      narrator.speakSoon(() => currentReadText(steps[clamped]), 80);
     }
-  }, [steps, autoRead, readAloud, onStepChange]);
+    narrator.prefetch(steps[clamped + 1]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [steps, autoRead, onStepChange]);
 
   if (steps.length === 0) return null;
 
@@ -409,7 +379,7 @@ function LessonContentStepper({ content, lessonId, courseCategory, conceptTitle,
           // skipped while the intro card was still showing, so this is
           // the actual first moment step 0's content becomes visible
           // for a themed/grouped lesson.
-          if (autoRead) setTimeout(() => readAloud(currentReadText(steps[0] ?? '')), 150);
+          if (autoRead) narrator.speakSoon(() => currentReadText(steps[0] ?? ''), 150);
         }}
       />
     );
@@ -547,12 +517,10 @@ function LessonBeatPlayer({
   isLastLesson: boolean;
 }) {
   const [currentBeat, setCurrentBeat] = useState(0);
-  const [speaking, setSpeaking] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const narrator = useNarrator(toPlainText);
+  const { speaking, loading } = narrator;
   // Defaults to true -- same reasoning as LessonContentStepper above.
   const [autoRead, setAutoRead] = useState(true);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const abortRef = useRef<AbortController | null>(null);
 
   const [drillResult, setDrillResult] = useState<'correct' | 'wrong' | null>(null);
   const { enabled: redesign } = useDashboardRedesignFlag();
@@ -570,43 +538,8 @@ function LessonBeatPlayer({
   const isFirst = currentBeat === 0;
   const isLastBeat = currentBeat === beats.length - 1;
 
-  function stopReading() {
-    abortRef.current?.abort();
-    abortRef.current = null;
-    if (audioRef.current) { audioRef.current.pause(); audioRef.current.src = ''; audioRef.current = null; }
-    setSpeaking(false);
-    setLoading(false);
-  }
-
-  const readAloud = useCallback(async (text: string) => {
-    stopReading();
-    const plain = toPlainText(text);
-    if (!plain) return;
-    const controller = new AbortController();
-    abortRef.current = controller;
-    setLoading(true);
-    try {
-      const res = await apiFetch('/api/tts/speak', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: plain, voice: 'nova' }),
-        signal: controller.signal,
-      });
-      if (!res.ok) throw new Error('TTS failed');
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const audio = new Audio(url);
-      audioRef.current = audio;
-      audio.onplay = () => { setLoading(false); setSpeaking(true); };
-      audio.onended = () => { setSpeaking(false); URL.revokeObjectURL(url); };
-      audio.onerror = () => { setSpeaking(false); setLoading(false); URL.revokeObjectURL(url); };
-      await audio.play();
-    } catch (err: unknown) {
-      if (err instanceof Error && err.name === 'AbortError') return;
-      setLoading(false);
-      setSpeaking(false);
-    }
-  }, []);
+  const stopReading = narrator.stop;
+  const readAloud = narrator.speak;
 
   // Reset to beat 0 whenever the lesson itself changes.
   useEffect(() => {
@@ -624,11 +557,12 @@ function LessonBeatPlayer({
     setExamplePly(0);
     setExampleAuto(false);
     stopReading();
-    if (autoRead) setTimeout(() => readAloud(beatText(beat)), 80);
+    if (autoRead) narrator.speakSoon(beatText(beat), 80);
+    // Warm the next beat so moving on starts speaking right away.
+    if (beats[currentBeat + 1]) narrator.prefetch(beatText(beats[currentBeat + 1]));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentBeat, lessonId]);
 
-  useEffect(() => () => { stopReading(); }, []);
 
   // Build the FEN sequence for an example beat's pgn, once per beat.
   useEffect(() => {
@@ -945,6 +879,9 @@ function LessonBeatPlayer({
           <ChessBoard
             key={`${lessonId}-${currentBeat}-${showFix}`}
             fen={boardFen ?? beat.fen}
+            // Face the board from the side that has to move in the drill position, so the
+            // learner always plays "up" the board -- kept fixed while the fix line plays out.
+            flipped={beat.fen.split(' ')[1] === 'b'}
             practiceMode={!drillResult && !showFix}
             expectedMoveSan={!showFix ? beat.expectedMove : undefined}
             onMovePlayed={(_san, isCorrect) => setDrillResult(isCorrect ? 'correct' : 'wrong')}

@@ -247,6 +247,7 @@ export default function BeginnerLessonPage() {
               <div className="mb-4">
                 <ChessBoard
                   fen={step.fen}
+                  flipped={step.type === 'practice' && step.fen.split(' ')[1] === 'b'}
                   practiceMode={step.type === 'practice' && !practiceDone}
                   expectedMoveSan={step.type === 'practice' ? step.expectedMoveSan : null}
                   onMovePlayed={() => {

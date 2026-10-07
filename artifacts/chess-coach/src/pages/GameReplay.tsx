@@ -861,6 +861,37 @@ export function GameReplay() {
   const keyMoments = reviewMoves
     .filter(m => ['blunder', 'mistake', 'missed_win', 'inaccuracy', 'brilliant', 'great'].includes(m.classification))
     .sort((a, b) => a.moveIndex - b.moveIndex);
+  // Jump the board to a key moment: stop autoplay/practice, show the analysis tab
+  // (redesign), and bring the board into view -- on mobile the moments list sits
+  // below the board, so without the scroll the position changed off-screen and the
+  // tap looked like it did nothing.
+  const boardAnchorRef = useRef<HTMLDivElement>(null);
+  const jumpToPly = (ply: number) => {
+    setIsPlaying(false);
+    setPracticeMode(false);
+    setCurrentMove(Math.max(0, Math.min(maxMoves, ply)));
+    if (redesign) setGtab('analysis');
+    requestAnimationFrame(() => {
+      const el = boardAnchorRef.current;
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      if (r.top < 0 || r.bottom > window.innerHeight) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  };
+  // The AI summary's moveIndex is the 0-based ply OF the mistake (and the model
+  // occasionally gets it slightly wrong), so the old setCurrentMove(km.moveIndex)
+  // landed one move early. Match the SAN against the engine review nearest that
+  // index, then show the position after the mistake (ply = index + 1).
+  const keyMistakePly = (km: KeyMistake) => {
+    const san = (km.move || '').replace(/^\d+\.(\.\.)?\s*/, '').trim();
+    const hits = reviewMoves.filter(r => r.san === san);
+    if (hits.length) {
+      const best = hits.reduce((a, b) => Math.abs(b.moveIndex - km.moveIndex) < Math.abs(a.moveIndex - km.moveIndex) ? b : a);
+      return best.moveIndex + 1;
+    }
+    const byMoves = moves.findIndex((m, i) => m.san === san && Math.abs(i - km.moveIndex) <= 2);
+    return byMoves >= 0 ? byMoves + 1 : km.moveIndex + 1;
+  };
   const currentReview: ReviewMove | null = currentMove > 0
     ? (reviewMoves.find(r => r.moveIndex === currentMove - 1) ?? null)
     : null;
@@ -1055,7 +1086,8 @@ export function GameReplay() {
               MistakeFixView tab toggle ("Played | Engine line") so the board
               doesn't shift up/down when navigating between bad and good moves. */}
           <div
-            className={`mx-auto w-full ${redesign ? '' : 'max-w-[min(100%,52dvh)]'} md:max-w-[min(100%,55dvh)] xl:max-w-none order-[-3] xl:order-none`}
+            ref={boardAnchorRef}
+            className={`scroll-mt-16 mx-auto w-full ${redesign ? '' : 'max-w-[min(100%,52dvh)]'} md:max-w-[min(100%,55dvh)] xl:max-w-none order-[-3] xl:order-none`}
             style={redesign ? { maxWidth: 'min(100%, max(220px, calc(100dvh - 520px)))' } : undefined}
           >
             {isBad && currentReview && currentMove > 0 && !practiceMode ? (
@@ -1527,7 +1559,7 @@ export function GameReplay() {
                   return (
                     <button
                       key={m.moveIndex}
-                      onClick={() => { setCurrentMove(m.moveIndex + 1); setGtab('analysis'); }}
+                      onClick={() => jumpToPly(m.moveIndex + 1)}
                       className="flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-white/[0.03]"
                       style={{ borderTop: i ? `1px solid ${RD.border}` : undefined }}
                     >
@@ -1587,7 +1619,7 @@ export function GameReplay() {
                     {gameSummary.keyMistakes.map((km, i) => (
                       <div key={i} className="rounded-xl border border-white/5 overflow-hidden">
                         <button
-                          onClick={() => setCurrentMove(km.moveIndex)}
+                          onClick={() => jumpToPly(keyMistakePly(km))}
                           className="w-full text-left px-3 py-2 bg-red-500/8 border-b border-red-500/15 hover:bg-red-500/12 transition-colors flex items-center gap-2"
                         >
                           <span className="text-red-400 font-mono text-xs font-bold shrink-0">{km.move}</span>

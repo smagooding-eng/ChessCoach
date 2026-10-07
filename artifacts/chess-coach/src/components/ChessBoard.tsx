@@ -5,7 +5,9 @@ import { normalizeFen, getPieceColorScheme } from '@/lib/utils';
 import { buildTintedPieceSet } from './RecoloredPieces';
 import { PieceGradientDefs } from './PieceGradientDefs';
 import { useSettings, playMoveSound, boardSkin } from '@/context/SettingsContext';
-import { Trophy, X } from 'lucide-react';
+import { eventForMove, detectSingleMove } from '@/lib/sounds';
+import { SquareBadge } from './SquareBadge';
+import { CheckmateOverlay } from './CheckmateOverlay';
 
 class BoardErrorBoundary extends Component<
   { children: ReactNode; position: string; renderKey: number },
@@ -86,6 +88,16 @@ const QUALITY_LABEL: Record<MoveQuality, { text: string; icon: string }> = {
   mistake:     { text: 'Mistake',       icon: '?' },
   blunder:     { text: 'Blunder??',     icon: '??' },
   missed_win:  { text: 'Missed Win',    icon: '✗' },
+};
+
+// Solid badge colours + short glyphs for the corner marker on the destination square.
+const QUALITY_BADGE: Record<MoveQuality, string> = {
+  checkmate: '#C9971C', brilliant: '#1BACA6', great: '#4A8BD6', best: '#5FA83A', excellent: '#7DB94A',
+  good: '#8AA86E', book: '#A88865', inaccuracy: '#E3AE2A', mistake: '#E5822A', blunder: '#CA3431', missed_win: '#B8343E',
+};
+const QUALITY_GLYPH: Record<MoveQuality, string> = {
+  checkmate: '#', brilliant: '!!', great: '!', best: '★', excellent: '!', good: '✓', book: '📖',
+  inaccuracy: '?!', mistake: '?', blunder: '??', missed_win: '✗',
 };
 
 interface ChessBoardProps {
@@ -195,6 +207,23 @@ export function ChessBoard({
   onMovePlayedRef.current = onMovePlayed;
   const positionRef = useRef(position);
   positionRef.current = position;
+
+  // Voice moves that arrive from outside (bot/opponent replies, stepping forward
+  // through a game, auto-played drill replies). Only a change that is exactly one
+  // legal move sounds -- jumps, resets and stepping backwards stay silent -- and the
+  // user's own move (already voiced in finishMove) is skipped.
+  const userMoveFenRef = useRef<string | null>(null);
+  const soundPrevRef = useRef(position);
+  useEffect(() => {
+    const prev = soundPrevRef.current;
+    soundPrevRef.current = position;
+    if (prev === position) return;
+    const placed = position.split(' ')[0];
+    if (userMoveFenRef.current === placed) { userMoveFenRef.current = null; return; }
+    if (!soundEnabledRef.current) return;
+    const hit = detectSingleMove(prev, position);
+    if (hit) playMoveSound(eventForMove(hit.move, hit.after));
+  }, [position]);
   const expectedMoveSanRef = useRef(expectedMoveSan);
   expectedMoveSanRef.current = expectedMoveSan;
   // When "Confirm Moves" is on, a legal move is staged here (shown on the
@@ -280,7 +309,8 @@ export function ChessBoard({
       const chess = new Chess(positionRef.current);
       const move = chess.move({ from, to, promotion });
       if (!move) return false;
-      if (soundEnabledRef.current) playMoveSound(move.captured ? 'capture' : 'move');
+      if (soundEnabledRef.current) playMoveSound(eventForMove(move, chess));
+      userMoveFenRef.current = chess.fen().split(' ')[0];
       const san = move.san;
       const expected = expectedMoveSanRef.current;
       const isCorrect = !expected || san === expected;
@@ -543,38 +573,19 @@ export function ChessBoard({
         />
       </BoardErrorBoundary>
 
-      {/* Checkmate indicator directly on the board -- green on the
-          winning king's square, red on the losing king's, instead of a
-          separate result banner elsewhere that's easy to miss. */}
+      {/* Checkmate indicator directly on the board -- gold crown on the winning
+          king, crimson mark on the mated king, and a brief ribbon. */}
+      {/* Overlays live in a square box matching the board itself, so they stay
+          aligned even when the promotion picker / confirm bar below adds height. */}
       {checkmateInfo && (
-        <>
-          <div
-            className="absolute pointer-events-none flex items-center justify-center"
-            style={{
-              ...squareToPercent(checkmateInfo.winningKingSquare),
-              width: '12.5%',
-              height: '12.5%',
-            }}
-          >
-            <div className="w-[55%] h-[55%] rounded-full flex items-center justify-center"
-              style={{ background: 'rgba(34,197,94,0.92)', boxShadow: '0 0 0 3px rgba(255,255,255,0.5), 0 4px 12px rgba(0,0,0,0.5)' }}>
-              <Trophy className="w-[55%] h-[55%] text-white" strokeWidth={2.5} />
-            </div>
-          </div>
-          <div
-            className="absolute pointer-events-none flex items-center justify-center"
-            style={{
-              ...squareToPercent(checkmateInfo.losingKingSquare),
-              width: '12.5%',
-              height: '12.5%',
-            }}
-          >
-            <div className="w-[55%] h-[55%] rounded-full flex items-center justify-center"
-              style={{ background: 'rgba(220,38,38,0.92)', boxShadow: '0 0 0 3px rgba(255,255,255,0.5), 0 4px 12px rgba(0,0,0,0.5)' }}>
-              <X className="w-[55%] h-[55%] text-white" strokeWidth={3} />
-            </div>
-          </div>
-        </>
+        <div className="absolute inset-x-0 top-0 aspect-square pointer-events-none">
+        <CheckmateOverlay
+          winningKingSquare={checkmateInfo.winningKingSquare}
+          losingKingSquare={checkmateInfo.losingKingSquare}
+          flipped={flipped}
+          positionKey={position}
+        />
+        </div>
       )}
 
       {/* Confirm-move bar -- in normal document flow (not absolutely
@@ -647,23 +658,18 @@ export function ChessBoard({
         </div>
       )}
 
-      {/* Move quality badge — shown in top-right corner of the board */}
-      {moveQuality && !practiceMode && !feedback && (
-        <div className="absolute top-2 right-2 pointer-events-none z-10">
-          <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold shadow-lg backdrop-blur-sm border
-            ${moveQuality === 'checkmate'   ? 'bg-amber-950/90 text-amber-300 border-amber-400/40' :
-              moveQuality === 'brilliant'   ? 'bg-cyan-950/90 text-cyan-300 border-cyan-400/40' :
-              moveQuality === 'great'       ? 'bg-sky-950/90 text-sky-300 border-sky-400/40' :
-              moveQuality === 'best'        ? 'bg-emerald-950/90 text-emerald-300 border-emerald-400/40' :
-              moveQuality === 'excellent'   ? 'bg-teal-950/90 text-teal-300 border-teal-400/40' :
-              moveQuality === 'good'        ? 'bg-green-950/90 text-green-300 border-green-400/40' :
-              moveQuality === 'book'        ? 'bg-blue-950/90 text-blue-300 border-blue-400/40' :
-              moveQuality === 'inaccuracy'  ? 'bg-yellow-950/90 text-yellow-300 border-yellow-400/40' :
-              moveQuality === 'mistake'     ? 'bg-orange-950/90 text-orange-300 border-orange-400/40' :
-                                              'bg-red-950/90 text-red-300 border-red-400/40'}`}>
-            <span>{QUALITY_LABEL[moveQuality].icon}</span>
-            <span>{QUALITY_LABEL[moveQuality].text}</span>
-          </div>
+      {/* Move quality marker -- a small badge in the corner of the square the move
+          landed on, instead of a large label over the board's top-right squares.
+          Checkmate has its own overlay above, so it isn't badged twice. */}
+      {moveQuality && moveQuality !== 'checkmate' && !practiceMode && !feedback && lastMove?.to && (
+        <div className="absolute inset-x-0 top-0 aspect-square pointer-events-none">
+        <SquareBadge
+          square={lastMove.to}
+          flipped={flipped}
+          color={QUALITY_BADGE[moveQuality]}
+          glyph={QUALITY_GLYPH[moveQuality]}
+          label={QUALITY_LABEL[moveQuality].text}
+        />
         </div>
       )}
     </div>

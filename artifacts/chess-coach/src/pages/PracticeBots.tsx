@@ -13,6 +13,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { apiFetch } from '@/lib/api';
 import { useLocation } from 'wouter';
+import { useDashboardRedesignFlag } from '@/hooks/use-app-config';
+import { RD } from '@/lib/redesignTheme';
+import { RedesignHeader } from '@/components/RedesignHeader';
+import { openingThumb, openingFamily } from '@/lib/openingThumb';
 
 const QUALITY_TO_TONE: Record<string, AICoachTone> = {
   checkmate: 'gold',
@@ -985,6 +989,82 @@ function OpeningCard({ opening, onSelect }: { opening: OpeningLine; onSelect: (o
   );
 }
 
+// ── Enhanced UI tiles ──────────────────────────────────────────────────────
+// Same data and click behaviour as BotCard / OpeningCard above; only the look
+// changes to the enhanced theme (near-black cards, neon-green accent). Classic
+// keeps the original gradient tiles.
+const TIER_ACCENT: Record<string, string> = {
+  Beginner: '#A8A29E', Casual: '#34D399', Improving: '#2DD4BF', 'Club Player': '#60A5FA',
+  Tournament: '#818CF8', Advanced: '#C084FC', Expert: '#F472B6', Master: '#E8B447',
+};
+
+function BotTileRD({ bot, onSelect }: { bot: BotConfig; onSelect: (b: BotConfig) => void }) {
+  const botAvatar = useBotAvatar();
+  const accent = TIER_ACCENT[bot.personality] ?? RD.green;
+  return (
+    <button
+      onClick={() => onSelect(bot)}
+      className="group flex w-full items-center gap-3.5 rounded-[18px] px-3.5 py-3 text-left transition-transform active:scale-[.99]"
+      style={{ background: RD.card, border: `1px solid ${RD.border}` }}
+    >
+      <span className="relative shrink-0">
+        <img src={botAvatar(bot)} alt="" className="h-14 w-14 rounded-[14px] object-cover" style={{ boxShadow: `0 0 0 2px ${accent}55` }} />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="flex items-center gap-2">
+          <b className="truncate text-[16px] font-extrabold" style={{ color: RD.text }}>{bot.name}</b>
+          <span className="shrink-0 rounded-md px-1.5 py-0.5 text-[10.5px] font-extrabold uppercase tracking-wide" style={{ background: `${accent}22`, color: accent }}>{bot.personality}</span>
+        </span>
+        <span className="mt-0.5 block text-[12.5px] leading-snug line-clamp-2" style={{ color: RD.muted }}>{bot.description}</span>
+      </span>
+      <span className="flex shrink-0 flex-col items-end gap-1">
+        <b className="text-[15px] font-extrabold" style={{ color: RD.text }}>{bot.rating}</b>
+        <span className="flex items-center text-[11px] font-bold" style={{ color: RD.green }}>Play <ChevronRight className="h-3.5 w-3.5" /></span>
+      </span>
+    </button>
+  );
+}
+
+function OpeningTileRD({ opening, onSelect }: { opening: OpeningLine; onSelect: (o: OpeningLine) => void }) {
+  return (
+    <button
+      onClick={() => onSelect(opening)}
+      className="flex w-full items-stretch overflow-hidden rounded-[18px] text-left transition-transform active:scale-[.99]"
+      style={{ background: RD.card, border: `1px solid ${RD.border}` }}
+    >
+      <span className="relative w-[104px] shrink-0 overflow-hidden">
+        <img src={openingThumb(openingFamily(opening.name))} alt="" loading="lazy" className="absolute inset-0 h-full w-full scale-[1.08] object-cover" />
+      </span>
+      <span className="min-w-0 flex-1 px-4 py-3.5">
+        <span className="flex items-center gap-2">
+          <b className="truncate text-[16px] font-extrabold" style={{ color: RD.text }}>{opening.name}</b>
+        </span>
+        <span className="block truncate text-[13px]" style={{ color: RD.muted }}>
+          {opening.eco} · Play as {opening.userColor === 'w' ? 'White' : 'Black'} · {Math.ceil(opening.moves.length / 2)} moves deep
+        </span>
+        <span className="mt-1.5 block text-[12.5px] leading-snug line-clamp-2" style={{ color: RD.muted }}>{opening.description}</span>
+      </span>
+      <span className="flex items-center pr-3" style={{ color: RD.green }}><ChevronRight className="h-5 w-5" /></span>
+    </button>
+  );
+}
+
+function HowItWorksRD({ title, steps }: { title: string; steps: string[] }) {
+  return (
+    <div className="rounded-[18px] p-4" style={{ background: RD.card, border: `1px solid ${RD.border}` }}>
+      <p className="mb-3 text-[14px] font-extrabold" style={{ color: RD.text }}>{title}</p>
+      <div className="space-y-2.5">
+        {steps.map((s, i) => (
+          <div key={i} className="flex gap-3 text-[13px] leading-snug" style={{ color: RD.muted }}>
+            <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full text-[12px] font-extrabold" style={{ background: 'rgba(139,234,69,.12)', color: RD.green }}>{i + 1}</span>
+            <p>{s}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function findBotAboveRating(rating: number): BotConfig {
   const sorted = [...BOTS].sort((a, b) => a.rating - b.rating);
   for (const bot of sorted) {
@@ -1029,6 +1109,7 @@ export function PracticeBots() {
   );
   const [selectedOpening, setSelectedOpening] = useState<OpeningLine | null>(readInitialOpeningParam);
   const [tab, setTab] = useState<'bots' | 'openings'>(() => readInitialOpeningParam() ? 'openings' : readInitialTabParam());
+  const { enabled: redesign } = useDashboardRedesignFlag();
 
   // Strip the ?fen=&rating=&color=&onboarding= params from the URL exactly
   // once, after mount — not as a side effect inside the useState
@@ -1051,6 +1132,47 @@ export function PracticeBots() {
 
   if (selectedOpening) {
     return <OpeningTrainerView opening={selectedOpening} onBack={() => setSelectedOpening(null)} />;
+  }
+
+  if (redesign) {
+    return (
+      <div className="min-h-screen px-3 md:px-6 md:pt-6 md:pb-12 pb-[calc(7.5rem+env(safe-area-inset-bottom))]" style={{ background: RD.bg, color: RD.text }}>
+        <div className="mx-auto w-full max-w-[640px]">
+          <RedesignHeader title="Practice" icon={<Swords size={24} />} />
+          <div className="grid grid-cols-2 gap-1 rounded-[16px] p-1" style={{ background: RD.cardSolid, border: `1px solid ${RD.border}` }}>
+            {([['bots', 'Bots'], ['openings', 'Opening Trainer']] as const).map(([id, label]) => {
+              const active = tab === id;
+              return (
+                <button key={id} onClick={() => setTab(id)} className="rounded-[12px] py-2.5 text-[13.5px] font-bold transition-colors"
+                  style={active ? { background: 'rgba(139,234,69,.10)', color: RD.text, boxShadow: `inset 0 0 0 1.5px ${RD.green}` } : { background: 'transparent', color: RD.muted }}>
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+          <div className="mt-3 space-y-2.5">
+            {tab === 'bots'
+              ? BOTS.map((bot) => <BotTileRD key={bot.name} bot={bot} onSelect={setSelectedBot} />)
+              : OPENINGS.map((o) => <OpeningTileRD key={o.id} opening={o} onSelect={setSelectedOpening} />)}
+          </div>
+          <div className="mt-3">
+            {tab === 'bots' ? (
+              <HowItWorksRD title="How it works" steps={[
+                'Pick a bot that matches your current rating or slightly above for a good challenge.',
+                'Play a full game. The bot thinks using real chess evaluation — no random moves (except at lower levels).',
+                'Win consistently? Move up to the next bot and keep climbing!',
+              ]} />
+            ) : (
+              <HowItWorksRD title="How opening drills work" steps={[
+                'Pick an opening. The bot will play the opposite side following the main theory line.',
+                "Play the expected book move. If you deviate, you'll get instant feedback and a chance to retry.",
+                'Stuck? Tap the Hint button to reveal the next move and lock in the pattern.',
+              ]} />
+            )}
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (

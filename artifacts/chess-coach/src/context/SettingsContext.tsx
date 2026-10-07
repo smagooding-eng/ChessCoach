@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { useUser } from '@/context/UserContext';
 import { useDashboardRedesignFlag } from '@/hooks/use-app-config';
+import { playSound, SOUND_PACKS, type SoundPack, type SoundEvent } from '@/lib/sounds';
+export { SOUND_PACKS, type SoundPack };
 
 export type BoardTheme = 'classic' | 'green' | 'blue' | 'gray' | 'purple' | 'crimson' | 'teal' | 'coal' | 'sunset' | 'rose' | 'amber' | 'mint' | 'indigo' | 'midnight' | 'arctic' | 'custom';
 export type BoardTexture = 'flat' | 'wood' | 'marble' | 'felt' | 'granite' | 'leather' | 'glass' | 'canvas' | 'sandstone' | 'slate' | 'silk'
@@ -346,6 +348,7 @@ interface Settings {
   showCoordinates: boolean;
   showLegalMoves: boolean;
   soundEnabled: boolean;
+  soundPack: SoundPack;
   promotionChoice: PromotionChoice;
   boardSize: BoardSize;
 }
@@ -362,6 +365,7 @@ const APP_DEFAULT_SETTINGS: Settings = {
   showCoordinates: true,
   showLegalMoves: true,
   soundEnabled: true,
+  soundPack: 'classic',
   promotionChoice: 'queen',
   boardSize: 'standard',
 };
@@ -393,6 +397,7 @@ interface SettingsContextValue extends Settings {
   setShowLegalMoves: (v: boolean) => void;
   setSoundEnabled: (v: boolean) => void;
   setPromotionChoice: (v: PromotionChoice) => void;
+  setSoundPack: (v: SoundPack) => void;
   setBoardSize: (v: BoardSize) => void;
   boardColors: ColorPair;
   boardTextureCss: { backgroundImage: string; backgroundImageDark?: string; backgroundSize?: string; boardImage?: string };
@@ -413,7 +418,9 @@ const SettingsContext = createContext<SettingsContextValue | null>(null);
 // A saved piece choice that no longer exists (e.g. a retired set) must not leave the user with a blank
 // selection or a missing-image board: fall back to the default pieces.
 function sanitizeSettings(st: Settings): Settings {
-  return PIECE_SHAPES[st.pieceShape as PieceShape] ? st : { ...st, pieceShape: 'default' };
+  let out = PIECE_SHAPES[st.pieceShape as PieceShape] ? st : { ...st, pieceShape: 'default' as PieceShape };
+  if (!SOUND_PACKS[out.soundPack as SoundPack]) out = { ...out, soundPack: 'classic' };
+  return out;
 }
 
 function loadJSON<T>(key: string, fallback: T): T {
@@ -481,6 +488,8 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       ? { ...settings.pieceCustomColors, finish: {} as React.CSSProperties, baseLight: settings.pieceCustomColors.light, baseDark: settings.pieceCustomColors.dark }
       : { ...PIECE_STYLES[settings.pieceStyle] };
 
+  activeSoundPack = settings.soundPack ?? 'classic';
+
   const value: SettingsContextValue = {
     ...settings,
     setBoardTheme: (t) => setSettings((s) => ({ ...s, boardTheme: t })),
@@ -497,6 +506,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     setShowLegalMoves: (v) => setSettings((s) => ({ ...s, showLegalMoves: v })),
     setSoundEnabled: (v) => setSettings((s) => ({ ...s, soundEnabled: v })),
     setPromotionChoice: (v) => setSettings((s) => ({ ...s, promotionChoice: v })),
+    setSoundPack: (v) => setSettings((s) => ({ ...s, soundPack: v })),
     setBoardSize: (v) => setSettings((s) => ({ ...s, boardSize: v })),
     boardColors: resolvedBoardColors,
     boardTextureCss: resolvedBoardTexture,
@@ -552,20 +562,9 @@ export function useSettings() {
   return ctx;
 }
 
-let audioCtx: AudioContext | null = null;
-export function playMoveSound(kind: 'move' | 'capture' = 'move') {
-  try {
-    if (!audioCtx) audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-    const ctx = audioCtx;
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = 'sine';
-    osc.frequency.value = kind === 'capture' ? 220 : 440;
-    gain.gain.setValueAtTime(0.15, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.12);
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start();
-    osc.stop(ctx.currentTime + 0.12);
-  } catch {}
+// The selected sound pack, mirrored here by SettingsProvider so the plain
+// playMoveSound() function (called from boards and the puzzle page) always uses it.
+let activeSoundPack: SoundPack = 'classic';
+export function playMoveSound(kind: SoundEvent = 'move') {
+  playSound(kind, activeSoundPack);
 }

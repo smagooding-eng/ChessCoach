@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { Link } from 'wouter';
-import { ArrowLeft, Check, Save, Trash2, RotateCcw, Star } from 'lucide-react';
+import { ArrowLeft, Check, Save, Trash2, RotateCcw, Star, Volume2 } from 'lucide-react';
+import { playSound } from '@/lib/sounds';
 import { useDashboardRedesignFlag } from '@/hooks/use-app-config';
 import { RedesignHeader } from '@/components/RedesignHeader';
 import { RD, REDESIGN_ON } from '@/lib/redesignTheme';
 import { PIECE_THEME_TYPES, themeTypeOf } from '@/lib/pieceThemes';
 import {
-  useSettings, BOARD_THEMES, BOARD_TEXTURES, isPhotoBoard, PIECE_STYLES, PIECE_SHAPES, BOARD_SIZES, APP_BACKGROUNDS,
+  useSettings, BOARD_THEMES, BOARD_TEXTURES, isPhotoBoard, SOUND_PACKS, type SoundPack, PIECE_STYLES, PIECE_SHAPES, BOARD_SIZES, APP_BACKGROUNDS,
   type BoardTheme, type BoardTexture, type PieceStyle, type PieceShape, type BoardSize, type AppBackground, type SavedTheme,
 } from '@/context/SettingsContext';
 
@@ -66,6 +67,13 @@ function ColorPickerRow({ label, value, onChange }: { label: string; value: stri
   );
 }
 
+// Plays a short sample of a sound pack: a move, a capture, then a check.
+function previewSoundPack(pack: SoundPack) {
+  playSound('move', pack);
+  setTimeout(() => playSound('capture', pack), 380);
+  setTimeout(() => playSound('check', pack), 800);
+}
+
 export default function SettingsPage() {
   const {
     boardTheme, setBoardTheme,
@@ -78,7 +86,7 @@ export default function SettingsPage() {
     confirmMoves, setConfirmMoves,
     showCoordinates, setShowCoordinates,
     showLegalMoves, setShowLegalMoves,
-    soundEnabled, setSoundEnabled,
+    soundEnabled, setSoundEnabled, soundPack, setSoundPack,
     promotionChoice, setPromotionChoice,
     boardSize, setBoardSize,
     savedThemes, saveCurrentAsTheme, applyTheme, deleteTheme,
@@ -103,6 +111,16 @@ export default function SettingsPage() {
   };
 
   const { enabled: redesign } = useDashboardRedesignFlag();
+  // Enhanced UI groups the page into tabs; classic shows everything in one list as before.
+  const [stab, setStab] = useState<'pieces' | 'boards' | 'themes' | 'play'>('boards');
+  const vis = (k: typeof stab) => (!redesign || stab === k ? '' : 'hidden');
+  // In the enhanced UI the board groups are separate choices: picking a classic
+  // colour switches off a photographic board (otherwise the photo would keep
+  // covering it and the tap would look like it did nothing). Classic UI unchanged.
+  const pickClassicBoard = (key: BoardTheme) => {
+    setBoardTheme(key);
+    if (redesign && isPhotoBoard(boardTexture)) setBoardTexture('flat');
+  };
   const [themeType, setThemeType] = useState<string>(() => themeTypeOf(pieceShape));
   const activeType = PIECE_THEME_TYPES.find((t) => t.id === themeType) ?? PIECE_THEME_TYPES[0];
 
@@ -135,6 +153,19 @@ export default function SettingsPage() {
             }
           />
           <p className="-mt-1 px-1 pb-1 text-[13px]" style={{ color: RD.muted }}>Customize how ChessScout.net looks and plays</p>
+          <div className="sticky top-0 z-20 -mx-1 px-1 pb-1 pt-1" style={{ background: RD.bg }}>
+            <div className="grid grid-cols-4 gap-1 rounded-[16px] p-1" style={{ background: RD.cardSolid, border: `1px solid ${RD.border}` }}>
+              {([['boards', 'Boards'], ['pieces', 'Pieces'], ['themes', 'Themes'], ['play', 'Play & Sound']] as const).map(([id, label]) => {
+                const on = stab === id;
+                return (
+                  <button key={id} onClick={() => setStab(id)} aria-pressed={on} className="rounded-[12px] py-2.5 text-[12.5px] font-bold transition-colors"
+                    style={on ? { background: 'rgba(139,234,69,.10)', color: RD.text, boxShadow: `inset 0 0 0 1.5px ${RD.green}` } : { background: 'transparent', color: RD.muted }}>
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         </>
       )}
       {!redesign && (
@@ -161,11 +192,10 @@ export default function SettingsPage() {
       )}
 
       {redesign && (
-        <section>
-          <h2 className="text-sm font-black uppercase tracking-wide mb-1" style={{ color: TEXT_MUTED }}>Theme</h2>
-          <p className="text-xs mb-4" style={{ color: TEXT_MUTED }}>Choose your pieces by type, then style, and a board to play on.</p>
+        <section className={vis('pieces')}>
+          <h2 className="text-sm font-black uppercase tracking-wide mb-1" style={{ color: TEXT_MUTED }}>Piece Sets</h2>
+          <p className="text-xs mb-4" style={{ color: TEXT_MUTED }}>Choose your pieces by type, then style.</p>
 
-          <h3 className="mb-2 text-[13px] font-extrabold" style={{ color: TEXT_LIGHT }}>Pieces</h3>
           {PIECE_THEME_TYPES.length > 1 && (
           <div className="grid gap-1 rounded-[14px] p-1 mb-2" style={{ gridTemplateColumns: `repeat(${Math.min(3, PIECE_THEME_TYPES.length)}, minmax(0, 1fr))`, background: RD.cardSolid, border: `1px solid ${RD.border}` }}>
             {PIECE_THEME_TYPES.map((t) => {
@@ -191,10 +221,18 @@ export default function SettingsPage() {
             <p className="text-[10px] mb-1" style={{ color: TEXT_MUTED }}>{PIECE_SHAPES[pieceShape].attribution}</p>
           )}
 
-          <h3 className="mt-5 mb-1 text-[13px] font-extrabold" style={{ color: TEXT_LIGHT }}>Boards</h3>
-          <p className="text-xs mb-3" style={{ color: TEXT_MUTED }}>Photographic marble, stone and wood. These replace your board color.</p>
+        </section>
+      )}
+
+      {redesign && (
+        <section className={vis('boards')}>
+          <div className="mb-1 flex items-center gap-2">
+            <h2 className="text-sm font-black uppercase tracking-wide" style={{ color: TEXT_MUTED }}>Signature Boards</h2>
+            <span className="rounded-md px-1.5 py-0.5 text-[10px] font-extrabold" style={{ background: 'rgba(139,234,69,.14)', color: RD.green }}>NEW</span>
+          </div>
+          <p className="text-xs mb-3" style={{ color: TEXT_MUTED }}>Our new photographic collection — woods, marbles, stone, leather, felt and metal.</p>
           <div className="grid grid-cols-4 gap-2">
-            {(Object.keys(BOARD_TEXTURES) as BoardTexture[]).filter((key) => isPhotoBoard(key)).map((key) => {
+            {(Object.keys(BOARD_TEXTURES) as BoardTexture[]).filter((key) => key.startsWith('ex-')).map((key) => {
               const t = BOARD_TEXTURES[key];
               const img = t.thumb ?? t.boardImage;
               return (
@@ -207,13 +245,32 @@ export default function SettingsPage() {
         </section>
       )}
 
-      <section>
-        <h2 className="text-sm font-black uppercase tracking-wide mb-3" style={{ color: TEXT_MUTED }}>Board Color</h2>
+      {redesign && (
+        <section className={vis('boards')}>
+          <h2 className="text-sm font-black uppercase tracking-wide mb-1" style={{ color: TEXT_MUTED }}>Premium Boards</h2>
+          <p className="text-xs mb-3" style={{ color: TEXT_MUTED }}>The original photographic set. These replace your board color.</p>
+          <div className="grid grid-cols-4 gap-2">
+            {(Object.keys(BOARD_TEXTURES) as BoardTexture[]).filter((key) => key.startsWith('cs-')).map((key) => {
+              const t = BOARD_TEXTURES[key];
+              return (
+                <SwatchButton key={key} active={boardTexture === key} onClick={() => setBoardTexture(key)} label={t.label}>
+                  <div className="w-full aspect-square rounded-lg" style={{ backgroundImage: t.boardImage ? `url('${t.boardImage}')` : t.backgroundImage, backgroundSize: '100% 100%', border: '1px solid rgba(255,255,255,0.1)' }} />
+                </SwatchButton>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      <section className={vis('boards')}>
+        <h2 className="text-sm font-black uppercase tracking-wide mb-1" style={{ color: TEXT_MUTED }}>{redesign ? 'Classic Boards' : 'Board Color'}</h2>
+        {redesign && <p className="text-xs mb-3" style={{ color: TEXT_MUTED }}>Plain two-tone boards, or pick your own colors with Custom.</p>}
+        {!redesign && <div className="mb-2" />}
         <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 mb-3">
           {(Object.keys(BOARD_THEMES) as Exclude<BoardTheme, 'custom'>[]).map((key) => {
             const t = BOARD_THEMES[key];
             return (
-              <SwatchButton key={key} active={boardTheme === key} onClick={() => setBoardTheme(key)} label={t.label}>
+              <SwatchButton key={key} active={boardTheme === key} onClick={() => pickClassicBoard(key)} label={t.label}>
                 <div className="w-full aspect-square rounded-lg overflow-hidden grid grid-cols-2 grid-rows-2" style={{ border: '1px solid rgba(255,255,255,0.1)' }}>
                   <div style={{ background: t.light }} /><div style={{ background: t.dark }} />
                   <div style={{ background: t.dark }} /><div style={{ background: t.light }} />
@@ -221,7 +278,7 @@ export default function SettingsPage() {
               </SwatchButton>
             );
           })}
-          <SwatchButton active={boardTheme === 'custom'} onClick={() => setBoardTheme('custom')} label="Custom">
+          <SwatchButton active={boardTheme === 'custom'} onClick={() => pickClassicBoard('custom')} label="Custom">
             <div className="w-full aspect-square rounded-lg overflow-hidden grid grid-cols-2 grid-rows-2" style={{ border: '1px solid rgba(255,255,255,0.1)' }}>
               <div style={{ background: boardCustomColors.light }} /><div style={{ background: boardCustomColors.dark }} />
               <div style={{ background: boardCustomColors.dark }} /><div style={{ background: boardCustomColors.light }} />
@@ -236,8 +293,8 @@ export default function SettingsPage() {
         )}
       </section>
 
-      <section>
-        <h2 className="text-sm font-black uppercase tracking-wide mb-1" style={{ color: TEXT_MUTED }}>Board Texture</h2>
+      <section className={vis('boards')}>
+        <h2 className="text-sm font-black uppercase tracking-wide mb-1" style={{ color: TEXT_MUTED }}>{redesign ? 'Classic Board Texture' : 'Board Texture'}</h2>
         <p className="text-xs mb-3" style={{ color: TEXT_MUTED }}>A subtle surface pattern on top of your board color</p>
         <div className="grid grid-cols-4 gap-2">
           {(Object.keys(BOARD_TEXTURES) as BoardTexture[]).filter((key) => !isPhotoBoard(key)).map((key) => {
@@ -303,7 +360,7 @@ export default function SettingsPage() {
       </>
       )}
 
-      <section>
+      <section className={vis('pieces')}>
         <h2 className="text-sm font-black uppercase tracking-wide mb-1" style={{ color: TEXT_MUTED }}>Piece Style</h2>
         <p className="text-xs mb-3" style={{ color: TEXT_MUTED }}>
           Color and finish for the pieces themselves{pieceShape !== 'default' ? ' — not used with a non-default shape' : ''}
@@ -339,7 +396,7 @@ export default function SettingsPage() {
         )}
       </section>
 
-      <section>
+      <section className={vis('themes')}>
         <h2 className="text-sm font-black uppercase tracking-wide mb-1" style={{ color: TEXT_MUTED }}>App Background</h2>
         <p className="text-xs mb-3" style={{ color: TEXT_MUTED }}>A subtle tint behind the whole app, not just the board</p>
         <div className="grid grid-cols-4 gap-2">
@@ -354,7 +411,7 @@ export default function SettingsPage() {
         </div>
       </section>
 
-      <section>
+      <section className={vis('themes')}>
         <h2 className="text-sm font-black uppercase tracking-wide mb-3" style={{ color: TEXT_MUTED }}>My Themes</h2>
         <div className="flex gap-2 mb-3">
           <input
@@ -394,7 +451,7 @@ export default function SettingsPage() {
         )}
       </section>
 
-      <section>
+      <section className={vis('boards')}>
         <h2 className="text-sm font-black uppercase tracking-wide mb-3" style={{ color: TEXT_MUTED }}>Board Size</h2>
         <div className="grid grid-cols-3 gap-2">
           {(Object.keys(BOARD_SIZES) as BoardSize[]).map((key) => {
@@ -410,13 +467,36 @@ export default function SettingsPage() {
         </div>
       </section>
 
-      <section className="space-y-2">
+      <section className={`space-y-2 ${vis('play')}`}>
         <h2 className="text-sm font-black uppercase tracking-wide mb-1" style={{ color: TEXT_MUTED }}>Gameplay</h2>
         <ToggleRow label="Confirm Moves" description="Tap a big confirm button before your move is played — like pressing a chess clock" checked={confirmMoves} onChange={setConfirmMoves} />
         <ToggleRow label="Board Coordinates" description="Show file/rank labels (a-h, 1-8) around the board edge" checked={showCoordinates} onChange={setShowCoordinates} />
         <ToggleRow label="Legal Move Dots" description="Highlight where a selected piece can move — turn off if you'd rather not see them" checked={showLegalMoves} onChange={setShowLegalMoves} />
         <ToggleRow label="Ask on Promotion" description="Choose which piece to promote to, instead of always auto-queening" checked={promotionChoice === 'ask'} onChange={(v) => setPromotionChoice(v ? 'ask' : 'queen')} />
         <ToggleRow label="Move Sounds" description="Play a short sound when a move or capture is made" checked={soundEnabled} onChange={setSoundEnabled} />
+      </section>
+
+      <section className={vis('play')}>
+        <h2 className="text-sm font-black uppercase tracking-wide mb-1" style={{ color: TEXT_MUTED }}>Sound Pack</h2>
+        <p className="text-xs mb-3" style={{ color: TEXT_MUTED }}>
+          {soundEnabled ? 'Moves, captures, checks, castling, promotions and game end each get their own sound. Tap to preview.' : 'Move Sounds is off — turn it on above to hear these during play.'}
+        </p>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+          {(Object.keys(SOUND_PACKS) as SoundPack[]).map((key) => {
+            const t = SOUND_PACKS[key];
+            const on = soundPack === key;
+            return (
+              <button key={key} onClick={() => { setSoundPack(key); previewSoundPack(key); }} aria-pressed={on}
+                className="rounded-xl px-3 py-2.5 text-left transition-colors"
+                style={{ background: on ? 'rgba(129,182,76,0.12)' : BG_CARD, border: `1px solid ${on ? CHESSCOM_GREEN : 'rgba(255,255,255,0.08)'}` }}>
+                <span className="flex items-center gap-1.5 text-sm font-bold" style={{ color: TEXT_LIGHT }}>
+                  <Volume2 className="w-3.5 h-3.5" style={{ color: on ? CHESSCOM_GREEN : TEXT_MUTED }} /> {t.label}
+                </span>
+                <span className="mt-0.5 block text-[11px]" style={{ color: TEXT_MUTED }}>{t.blurb}</span>
+              </button>
+            );
+          })}
+        </div>
       </section>
 
       <button
