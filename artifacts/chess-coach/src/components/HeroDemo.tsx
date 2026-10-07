@@ -4,10 +4,10 @@ import { apiFetch } from '@/lib/api';
 import { type MoveAnalysisResult } from '@/lib/chess-bot';
 import { SAMPLE_REPORT, type SampleReport } from '@/lib/sampleReport';
 
-const G = '#81b64c';
-const TEXT = '#e8e6e3';
-const MUTED = '#9e9b98';
-const CARD = '#1c1b19';
+const G = '#8BEA45';
+const TEXT = '#F5F7F6';
+const MUTED = '#9AA8A5';
+const CARD = '#0D1516';
 const SEV_COLORS: Record<string, string> = { Critical: '#ef4444', High: '#f97316', Medium: '#f59e0b', Low: '#10b981' };
 
 interface BlunderDetail extends MoveAnalysisResult {
@@ -475,7 +475,7 @@ export function HeroDemo({ onUpgradeClick }: { onUpgradeClick: () => void }) {
           {!(result.blunders > 0 && result.totals && result.totals.total > result.gamesAnalyzed) && <div className="mb-4" />}
 
           {result.worstBlunder ? (
-            <div className="rounded-xl p-4 mb-4" style={{ background: '#141413', border: '1px solid rgba(255,255,255,0.08)' }}>
+            <div className="rounded-xl p-4 mb-4" style={{ background: '#050A0B', border: '1px solid rgba(255,255,255,0.08)' }}>
               <button onClick={() => setShowBreakdown((v) => !v)} className="w-full flex items-center justify-between gap-2 mb-1">
                 <p className="text-[10px] font-black uppercase tracking-wide" style={{ color: MUTED }}>Your biggest blunder — real, from your games</p>
                 {showBreakdown ? <ChevronUp className="w-3.5 h-3.5 shrink-0" style={{ color: MUTED }} /> : <ChevronDown className="w-3.5 h-3.5 shrink-0" style={{ color: MUTED }} />}
@@ -504,7 +504,7 @@ export function HeroDemo({ onUpgradeClick }: { onUpgradeClick: () => void }) {
               )}
             </div>
           ) : (
-            <div className="rounded-xl p-4 mb-4 flex items-center gap-2" style={{ background: '#141413', border: '1px solid rgba(255,255,255,0.08)' }}>
+            <div className="rounded-xl p-4 mb-4 flex items-center gap-2" style={{ background: '#050A0B', border: '1px solid rgba(255,255,255,0.08)' }}>
               <Sparkles className="w-4 h-4 shrink-0" style={{ color: G }} />
               <p className="text-xs" style={{ color: MUTED }}>No outright blunders in these games — solid control. Go Pro to see the smaller mistakes still costing you points.</p>
             </div>
@@ -550,7 +550,7 @@ export function HeroDemo({ onUpgradeClick }: { onUpgradeClick: () => void }) {
             {showProSample ? <ChevronUp className="w-4 h-4 shrink-0" style={{ color: MUTED }} /> : <ChevronDown className="w-4 h-4 shrink-0" style={{ color: MUTED }} />}
           </button>
           {showProSample && (
-            <div className="rounded-xl p-3 mb-2" style={{ background: '#141413', border: '1px solid rgba(255,255,255,0.08)' }}>
+            <div className="rounded-xl p-3 mb-2" style={{ background: '#050A0B', border: '1px solid rgba(255,255,255,0.08)' }}>
               <p className="text-[10px] font-black uppercase tracking-wide mb-2.5" style={{ color: MUTED }}>Real sample account — not your data</p>
               <SampleWeaknessList report={sample} frame="fix" previewCount={2} />
             </div>
@@ -565,7 +565,7 @@ export function HeroDemo({ onUpgradeClick }: { onUpgradeClick: () => void }) {
             {showScoutSample ? <ChevronUp className="w-4 h-4 shrink-0" style={{ color: MUTED }} /> : <ChevronDown className="w-4 h-4 shrink-0" style={{ color: MUTED }} />}
           </button>
           {showScoutSample && (
-            <div className="rounded-xl p-3 mb-4" style={{ background: '#141413', border: '1px solid rgba(255,255,255,0.08)' }}>
+            <div className="rounded-xl p-3 mb-4" style={{ background: '#050A0B', border: '1px solid rgba(255,255,255,0.08)' }}>
               <p className="text-[10px] font-black uppercase tracking-wide mb-2.5" style={{ color: MUTED }}>Scouting a real account — same real report, before playing them</p>
               <SampleWeaknessList report={sample} frame="exploit" />
             </div>
