@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { PieceTile } from '@/components/DesignSystem';
+import { useSettings } from '@/context/SettingsContext';
 import { MaterialStrip } from '@/components/GameStatusStrip';
 import { Chess } from 'chess.js';
 import { ChessBoard, type MoveQuality } from '@/components/ChessBoard';
@@ -187,6 +188,28 @@ function GameView({ bot, onBack, startFen, startColor, isOnboarding }: { bot: Bo
   const botName = useBotName();
   const botBlurb = useBotDescription();
   const botTag = useBotTag();
+  // Board fits on screen when a game opens: never taller than the viewport
+  // minus the app header, bot banner and bottom nav, and the page is scrolled
+  // so the whole board is in view (picking a bot from far down the list used
+  // to open the game part-way down the page).
+  const { boardMaxWidth, confirmMoves } = useSettings();
+  const boardFitWidth = `max(260px, min(${boardMaxWidth}px, calc(100svh - 300px)))`;
+  const boardWrapRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    window.scrollTo(0, 0);
+    const id = requestAnimationFrame(() => {
+      const el = boardWrapRef.current;
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      const header = 72;   // sticky app header
+      const nav = 96;      // bottom tab bar + safe area
+      // the reserved Cancel/Confirm space under the board needn't be on screen
+      const boardBottom = r.bottom - (confirmMoves ? 68 : 0);
+      const overflow = boardBottom - (window.innerHeight - nav);
+      if (overflow > 0) window.scrollTo({ top: Math.max(0, Math.min(overflow, r.top - header)) });
+    });
+    return () => cancelAnimationFrame(id);
+  }, []);
   // Viewing only: turns the board around without touching the game.
   const [boardTurned, setBoardTurned] = useState(false);
   const [playerColor, setPlayerColor] = useState<'w' | 'b'>(() => {
@@ -507,9 +530,11 @@ function GameView({ bot, onBack, startFen, startColor, isOnboarding }: { bot: Bo
             </div>
           </div>
 
+          <div ref={boardWrapRef}>
           <ChessBoard
             fen={fen}
             flipped={(playerColor === 'b') !== boardTurned}
+            maxWidthOverride={boardFitWidth}
             practiceMode={result === 'playing' && isPlayerTurn && !thinking}
             expectedMoveSan={null}
             onMovePlayed={handleMovePlayed}
@@ -517,6 +542,7 @@ function GameView({ bot, onBack, startFen, startColor, isOnboarding }: { bot: Bo
             moveQuality={latestQuality}
             reserveConfirmSpace
           />
+          </div>
 
           <div className="glass-card rounded-xl p-2.5 flex items-center justify-between">
             <div className="flex items-center gap-2">
