@@ -16,7 +16,7 @@ import { ReferralCard } from '@/pages/Profile';
 import { useMyGames } from '@/hooks/use-games';
 import { GameThumb } from '@/components/GameThumb';
 import { ProUpsell } from '@/components/ProUpsell';
-import { useSiteImg, usePhotoImagesFlag } from '@/hooks/use-app-config';
+import { useSiteImg } from '@/hooks/use-app-config';
 import { scene } from '@/components/PhotoHero';
 
 // Dashboard shown when the global "dashboard redesign" flag is ON (see
@@ -67,7 +67,6 @@ function Skeleton({ className = '' }: { className?: string }) {
 
 export function DashboardRedesign() {
   const siteImg = useSiteImg();
-  const photoImgs = usePhotoImagesFlag();
   const { username, isPremium, authUser, isSubscriptionLoaded } = useUser();
   // Only once the plan is known, so Pro members never see an upsell flash.
   const freePlan = isSubscriptionLoaded && !!authUser && !isPremium;
@@ -332,16 +331,16 @@ export function DashboardRedesign() {
                 backgroundSize: 'auto 100%',
                 backgroundPosition: t.pos,
                 backgroundRepeat: 'no-repeat',
-                // The coloured inner glow suits the dark AI art; on real photos it
-                // reads as an uneven coloured rim on the brighter tiles.
-                boxShadow: photoImgs ? 'none' : `inset 0 0 40px ${t.glow}`,
+                // No coloured glow on these tiles: it read as a bright rim down the
+                // left side of Play and Openings.
+                boxShadow: 'none',
               }}
             >
               <div className="absolute inset-0" style={{ background: 'linear-gradient(90deg, rgba(5,10,11,.78) 0%, rgba(5,10,11,.25) 62%, rgba(5,10,11,0) 100%), linear-gradient(0deg, rgba(5,10,11,.65) 0%, rgba(5,10,11,0) 55%)' }} />
               <div className="relative z-10 flex h-full min-h-[128px] flex-col justify-between p-3.5">
                 <span
                   className="grid h-10 w-10 place-items-center rounded-[11px]"
-                  style={{ background: `linear-gradient(160deg, ${t.c2}, ${t.c1})`, boxShadow: `0 0 18px ${t.glow}`, border: '1px solid rgba(255,255,255,.18)' }}
+                  style={{ background: `linear-gradient(160deg, ${t.c2}, ${t.c1})`, boxShadow: '0 2px 8px rgba(0,0,0,.45)', border: '1px solid rgba(255,255,255,.18)' }}
                 >
                   <t.icon size={21} color="#fff" fill={t.label === 'Play' ? '#fff' : 'none'} />
                 </span>
