@@ -8,18 +8,18 @@ import { apiFetch, apiFetchLocal } from '@/lib/api';
 import { EmbeddedCheckoutForm } from '@/components/EmbeddedCheckoutForm';
 
 const PREMIUM_FEATURES = [
-  { icon: BrainCircuit, label: 'Deep Game Analysis', desc: 'In-depth analysis of every game you play' },
-  { icon: GraduationCap, label: 'Personalized Courses', desc: 'Custom courses built from your weaknesses' },
-  { icon: Volume2, label: 'TTS Narration', desc: 'Listen to lesson content with text-to-speech' },
-  { icon: Swords, label: 'Opponent Scouting', desc: 'Analyze your opponents\' strengths and weaknesses' },
+  { icon: BrainCircuit, label: 'AI Coach on Every Game', desc: 'Plain-English explanations for every move, plus a summary of what decided the game' },
+  { icon: GraduationCap, label: 'Personalized Courses', desc: 'Lessons built from the real mistakes in your own games' },
+  { icon: Swords, label: 'AI Scouting Reports', desc: 'Your opponent\'s weaknesses and how to exploit them' },
+  { icon: Volume2, label: 'Natural Coach Voice', desc: 'Lessons read aloud in a natural voice, plus AI puzzle explanations and board scanning from a photo' },
 ];
 
 const FREE_FEATURES = [
-  'Import games from chess.com',
-  'View game history & replay moves',
-  'Basic performance dashboard',
-  'Practice against bots (all levels)',
-  'Opening repertoire explorer',
+  'Import unlimited games from Chess.com & Lichess',
+  'Stockfish review of every game (labels, accuracy, best moves)',
+  'Weaknesses and stats from your reviewed games',
+  'Unlimited opponent scouts (record, openings, head-to-head)',
+  'Unlimited puzzles, practice bots and Opening Trainer',
 ];
 
 interface PriceInfo {

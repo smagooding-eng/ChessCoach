@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { Link } from 'wouter';
 import { AlertTriangle, ArrowLeft, ArrowRight, ChevronDown, ChevronRight, History, Loader2, Search } from 'lucide-react';
 import { RD } from '@/lib/redesignTheme';
+import { useUser } from '@/hooks/use-user';
+import { ProUpsell } from '@/components/ProUpsell';
 
 // Opponent Scout (redesign): header card with search, profile card, tabs,
 // win-rate / vs-you split card and key weaknesses. All values come from the
@@ -53,6 +55,7 @@ export function ScoutRedesign(props: {
 }) {
   const { inputUsername, setInputUsername, onSubmit, loading, statusMsg, error, isLimitReached, limitNudge, result, topPlayers, history, loadingHistory, onLoadHistory, exploit } = props;
   const [tab, setTab] = useState<'overview' | 'openings' | 'weaknesses' | 'courses'>('overview');
+  const { isPremium, isSubscriptionLoaded } = useUser();
   const [showTop, setShowTop] = useState(false);
   const [open, setOpen] = useState<number | null>(null);
 
@@ -292,6 +295,14 @@ export function ScoutRedesign(props: {
   );
 
   function limitNudgeFree() {
-    return <p className="text-[13px]" style={{ color: RD.muted }}>This basic scout shows the record and openings. Pro unlocks the full weakness breakdown.</p>;
+    if (!isSubscriptionLoaded) return null;
+    if (isPremium) return <p className="text-[13px]" style={{ color: RD.muted }}>No clear weaknesses stood out in this player's recent games.</p>;
+    return (
+      <ProUpsell
+        compact
+        title={`See ${result?.username ?? 'this player'}'s weaknesses`}
+        text="Pro adds an AI scouting report: where they go wrong, and how to exploit it."
+      />
+    );
   }
 }

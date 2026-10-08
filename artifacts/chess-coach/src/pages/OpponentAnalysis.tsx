@@ -512,7 +512,7 @@ export function OpponentAnalysis() {
         statusMsg={statusMsg}
         error={error}
         isLimitReached={isLimitReached}
-        limitNudge={<UpgradeNudge headline="You've used your free basic scout" subtext="Free plan includes 1 basic opponent scout. Upgrade to Pro for unlimited scouts with full weakness analysis." />}
+        limitNudge={<UpgradeNudge headline="See this player's weaknesses" subtext="Free scouts show the record, openings and head-to-head. Pro adds an AI scouting report: their weaknesses and how to exploit them." />}
         result={result}
         topPlayers={topPlayers}
         history={scoutHistory}
@@ -623,8 +623,8 @@ export function OpponentAnalysis() {
       {/* Error */}
       {error && isLimitReached && (
         <UpgradeNudge
-          headline="You've used your free basic scout"
-          subtext="Free plan includes 1 basic opponent scout. Upgrade to Pro for unlimited scouts with full weakness analysis."
+          headline="See this player's weaknesses"
+          subtext="Free scouts show the record, openings and head-to-head. Pro adds an AI scouting report: their weaknesses and how to exploit them."
         />
       )}
 

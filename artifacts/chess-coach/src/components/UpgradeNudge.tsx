@@ -1,5 +1,7 @@
 import { Link } from 'wouter';
 import { Sparkles, ArrowRight } from 'lucide-react';
+import { useDashboardRedesignFlag } from '@/hooks/use-app-config';
+import { ProUpsell } from '@/components/ProUpsell';
 
 const CHESSCOM_GREEN = '#81b64c';
 const TEXT_LIGHT = '#e8e6e3';
@@ -17,6 +19,9 @@ interface UpgradeNudgeProps {
 // failure message. Used both for hard blocks (a Pro-only feature) and
 // soft nudges (a persistent upsell near a feature that's still usable).
 export function UpgradeNudge({ headline, subtext, compact = false }: UpgradeNudgeProps) {
+  // In the enhanced UI every upgrade prompt uses the same Pro card.
+  const { enabled: redesign } = useDashboardRedesignFlag();
+  if (redesign) return <ProUpsell title={headline} text={subtext} compact={compact} />;
   if (compact) {
     return (
       <div className="flex items-center gap-3 px-4 py-3 rounded-xl"

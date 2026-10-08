@@ -723,30 +723,15 @@ router.post("/analysis/scan-position", async (req: Request, res: Response): Prom
     const { hasFullAccess } = await import("../lib/accessControl");
     const { full: isFullAccess } = await hasFullAccess(userId);
 
+    // Reading a board from a photo needs the vision model (OpenAI) -- there is
+    // no free engine alternative for this step, so it's Pro-only.
     if (!isFullAccess) {
-      const { db: dbClient, scanAttemptsTable: scanAttempts } = await import("@workspace/db");
-      const { and: andOp, eq: eqOp, gte: gteOp, count: countOp } = await import("drizzle-orm");
-      const { FREE_TIER_LIMITS } = await import("../lib/accessControl");
-      const todayStart = new Date();
-      todayStart.setHours(0, 0, 0, 0);
-      const [todayResult] = await dbClient
-        .select({ c: countOp() })
-        .from(scanAttempts)
-        .where(andOp(
-          eqOp(scanAttempts.userId, userId),
-          eqOp(scanAttempts.success, true),
-          gteOp(scanAttempts.createdAt, todayStart),
-        ));
-      const usedToday = todayResult?.c ?? 0;
-      if (usedToday >= FREE_TIER_LIMITS.scanPositionsPerDay) {
-        res.status(403).json({
-          error: "usage_limit",
-          message: `Free plan includes ${FREE_TIER_LIMITS.scanPositionsPerDay} successful scans per day. Upgrade to Pro for unlimited scans!`,
-          used: usedToday,
-          limit: FREE_TIER_LIMITS.scanPositionsPerDay,
-        });
-        return;
-      }
+      res.status(403).json({
+        error: "pro_required",
+        feature: "scan_position",
+        message: "Scanning a board from a photo uses AI vision and is part of Pro.",
+      });
+      return;
     }
 
     const { image } = req.body as { image: string };

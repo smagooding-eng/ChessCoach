@@ -1,5 +1,6 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { PageHero } from '@/components/DesignSystem';
+import { ProUpsell } from '@/components/ProUpsell';
 import { trackBackgroundJob } from '@/components/BackgroundJobsWatcher';
 import { useMyCourses } from '@/hooks/use-courses';
 import { useUser } from '@/hooks/use-user';
@@ -46,7 +47,7 @@ const API_TYPE_TO_TAB: Record<string, EndgameTab> = {
 };
 
 export function Endgames() {
-  const { username, authUser } = useUser();
+  const { username, authUser, isPremium, isSubscriptionLoaded } = useUser();
   const queryClient = useQueryClient();
   const { data, isLoading, refetch } = useMyCourses();
 
@@ -178,6 +179,20 @@ export function Endgames() {
 
   const currentTab = TABS.find(t => t.id === activeTab)!;
   const tabCourses = coursesForTab(activeTab);
+
+  // Endgame courses are written by the AI, so they're Pro.
+  if (authUser && isSubscriptionLoaded && !isPremium) {
+    return (
+      <div className="mx-auto max-w-[640px] space-y-4 px-4 pt-4 pb-20 md:px-0 md:pt-0">
+        <PageHero piece="♚" title="Endgames" subtitle="Courses built from the endgames in your own games." />
+        <ProUpsell
+          title="Master the endgames you actually reach"
+          text="Pro finds the endgames from your own games and turns them into lessons and drills, from basic checkmates to rook endings."
+          perks={['Checkmate patterns, pawn and rook endings', 'Positions taken from your own games', 'Plus the AI coach on every game you review']}
+        />
+      </div>
+    );
+  }
 
   if (isLoading) return (
     <div className="flex justify-center py-20">

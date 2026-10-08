@@ -11,9 +11,43 @@ import { trackBackgroundJob } from '@/components/BackgroundJobsWatcher';
 import { cn } from '@/lib/utils';
 import { useDashboardRedesignFlag } from '@/hooks/use-app-config';
 import { CoursesRedesign } from './CoursesRedesign';
+import { ProUpsell } from '@/components/ProUpsell';
+import { RedesignHeader } from '@/components/RedesignHeader';
+import { RD } from '@/lib/redesignTheme';
+
+function CoursesProShowcase({ redesign }: { redesign: boolean }) {
+  const steps = [
+    { t: 'We find the mistakes that cost you games', d: 'Stockfish scans your reviewed games for the patterns that keep coming up.' },
+    { t: 'The AI coach turns them into lessons', d: 'Each lesson uses a real position from your own games: the idea, your move, and the fix.' },
+    { t: 'You practise until it sticks', d: 'Drills from your own positions, with the lesson read aloud as you go.' },
+  ];
+  return (
+    <div className={redesign ? 'min-h-screen px-3 md:px-6 md:pt-6 pb-[calc(7.5rem+env(safe-area-inset-bottom))]' : 'px-4 pt-4 pb-20 md:px-0 md:pt-0'} style={redesign ? { background: RD.bg, color: RD.text } : undefined}>
+      <div className="mx-auto grid w-full max-w-[640px] gap-4">
+        {redesign ? <RedesignHeader title="Courses" icon={<GraduationCap size={24} />} /> : <PageHero piece="♝" title="My Courses" subtitle="Personalized lesson plans built from your own games." />}
+        <div className="grid gap-2.5">
+          {steps.map((st, i) => (
+            <div key={st.t} className="flex items-start gap-3 rounded-[16px] p-4" style={{ background: redesign ? RD.card : 'rgba(255,255,255,0.03)', border: `1px solid ${redesign ? RD.border : 'rgba(255,255,255,0.06)'}` }}>
+              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-[14px] font-extrabold" style={{ background: 'rgba(139,234,69,.14)', color: '#8BEA45' }}>{i + 1}</span>
+              <span>
+                <b className="block text-[14.5px] font-bold">{st.t}</b>
+                <span className="block text-[13px] leading-snug opacity-70">{st.d}</span>
+              </span>
+            </div>
+          ))}
+        </div>
+        <ProUpsell
+          title="Get courses built from your own games"
+          perks={['Lessons from the real mistakes in your games', 'Drills from your own positions', 'Natural-voice read-aloud', 'Plus the AI coach on every game you review']}
+          cta="Unlock my courses"
+        />
+      </div>
+    </div>
+  );
+}
 
 export function Courses() {
-  const { username, authUser } = useUser();
+  const { username, authUser, isPremium, isSubscriptionLoaded } = useUser();
   const queryClient = useQueryClient();
   const { data, isLoading, refetch } = useMyCourses();
   const { enabled: redesign } = useDashboardRedesignFlag();
@@ -161,6 +195,12 @@ export function Courses() {
       }
     } catch { /* course stays visible, user can retry */ }
   };
+
+  // Courses are written by the AI, so they're Pro. Free members see what
+  // they'd get (inline, not a popup) instead of an empty or broken list.
+  if (authUser && isSubscriptionLoaded && !isPremium) {
+    return <CoursesProShowcase redesign={redesign} />;
+  }
 
   if (isLoading) return (
     <div className="flex justify-center py-20">

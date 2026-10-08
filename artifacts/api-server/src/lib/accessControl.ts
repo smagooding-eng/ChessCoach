@@ -11,10 +11,15 @@ import { ADMIN_EMAILS } from "./auth";
 // none of them cost anything beyond server compute, so they're no
 // longer rate-limited at all -- see hasFullAccess/checkUsageLimit below,
 // which now only ever check the three keys still listed here.
+// Every OpenAI-backed feature is now Pro-only (game review's AI coach, AI
+// weakness analysis, courses, read-aloud, puzzle explanations, photo scan).
+// Free users get the Stockfish-only versions, which have no per-use cost, so
+// nothing below is enforced any more. Kept (opponentScouts unlimited, scans 0)
+// so anything still importing it compiles.
 export const FREE_TIER_LIMITS = {
-  opponentScouts: 1,
+  opponentScouts: Number.POSITIVE_INFINITY,
   courses: 5,
-  scanPositionsPerDay: 2,
+  scanPositionsPerDay: 0,
 } as const;
 
 /**

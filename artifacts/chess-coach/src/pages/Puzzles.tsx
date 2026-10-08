@@ -12,6 +12,7 @@ import { Crown, RotateCcw, ChevronRight, Trophy, Target, Flame, Zap, Lightbulb, 
 import { useLocation, useSearch, Link } from 'wouter';
 import { encodeCard } from '@/pages/ShareCard';
 import { UpgradeNudge } from '@/components/UpgradeNudge';
+import { ProUpsell } from '@/components/ProUpsell';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useSettings, playMoveSound, boardSkin } from '@/context/SettingsContext';
 import { eventForMove } from '@/lib/sounds';
@@ -121,6 +122,8 @@ export function Puzzles() {
   const [ptab, setPtab] = useState<'daily' | 'themes' | 'custom'>('daily');
   const feedbackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [explanation, setExplanation] = useState<string | null>(null);
+  // The AI explanation is Pro; free members see an inline invite instead.
+  const [explainLocked, setExplainLocked] = useState(false);
   const [loadingExplanation, setLoadingExplanation] = useState(false);
   const seenPuzzleIds = useRef<number[]>([]);
 
@@ -143,6 +146,7 @@ export function Puzzles() {
     setCurrentMoveIndex(0);
     setSelectedSquare(null);
     setExplanation(null);
+    setExplainLocked(false);
     setLoadingExplanation(false);
 
     try {
@@ -249,6 +253,8 @@ export function Puzzles() {
                 if (er.ok) {
                   const ed = await er.json();
                   setExplanation(ed.explanation);
+                } else if (er.status === 403) {
+                  setExplainLocked(true);
                 }
               })
               .catch(() => {})
@@ -871,6 +877,8 @@ export function Puzzles() {
                       </div>
                     ) : explanation ? (
                       <p className="text-sm leading-relaxed" style={{ color: TEXT_MUTED }}>{explanation}</p>
+                    ) : explainLocked ? (
+                      <ProUpsell compact title="Get the coach's explanation" text="Pro explains why the winning move works, on every puzzle." />
                     ) : null}
                   </div>
                 )}

@@ -15,6 +15,7 @@ import { encodeCard } from '@/pages/ShareCard';
 import { ReferralCard } from '@/pages/Profile';
 import { useMyGames } from '@/hooks/use-games';
 import { GameThumb } from '@/components/GameThumb';
+import { ProUpsell } from '@/components/ProUpsell';
 
 // Dashboard shown when the global "dashboard redesign" flag is ON (see
 // DashboardRouter in App.tsx). The mobile header and bottom nav in the
@@ -63,7 +64,9 @@ function Skeleton({ className = '' }: { className?: string }) {
 }
 
 export function DashboardRedesign() {
-  const { username, isPremium, authUser } = useUser();
+  const { username, isPremium, authUser, isSubscriptionLoaded } = useUser();
+  // Only once the plan is known, so Pro members never see an upsell flash.
+  const freePlan = isSubscriptionLoaded && !!authUser && !isPremium;
   const { player: chessPlayer } = useChessPlayer(username ?? authUser?.chesscomUsername ?? undefined);
   const { data: multiElo } = useMultiEloProgress(username ?? undefined);
   const { data: summary } = useMyAnalysisSummary();
@@ -382,6 +385,11 @@ export function DashboardRedesign() {
               );
             })
           )}
+          {freePlan && topWeaknesses.length > 0 && (
+            <div className="border-t p-3" style={{ borderColor: BORDER }}>
+              <ProUpsell compact title="Turn these into a course" text="Pro builds lessons from the exact positions where you went wrong." />
+            </div>
+          )}
         </section>
 
         {/* ── Recent games ── */}
@@ -466,12 +474,23 @@ export function DashboardRedesign() {
             <span className="absolute -bottom-1.5 -right-1.5 grid h-8 w-8 place-items-center rounded-full" style={{ background: `linear-gradient(180deg, ${GREEN}, ${GREEN_DARK})`, color: '#05100A' }}><Camera size={16} /></span>
           </span>
           <span className="min-w-0 flex-1">
-            <span className="mb-1 inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-[.16em]" style={{ background: 'rgba(139,234,69,.12)', color: GREEN }}><Zap size={10} /> Coach</span>
+            {!freePlan
+              ? <span className="mb-1 inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-[.16em]" style={{ background: 'rgba(139,234,69,.12)', color: GREEN }}><Zap size={10} /> Coach</span>
+              : <span className="mb-1 inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-[.16em]" style={{ background: 'linear-gradient(180deg,#F2C560,#D99A24)', color: '#1A1205' }}><Crown size={10} /> Pro</span>}
             <b className="block text-[17px] font-extrabold leading-tight">Seen a position worth studying?</b>
             <span className="mt-0.5 block text-[13px] font-bold" style={{ color: GREEN }}>Snap a photo and explore it on the board</span>
           </span>
           <ArrowUpRight size={20} className="shrink-0" style={{ color: GREEN }} />
         </Link>
+
+        {/* ── Courses: Pro. Free members see what they'd get, inline. ── */}
+        {freePlan && (
+          <ProUpsell
+            title="Get courses built from your own games"
+            text="The AI coach turns the mistakes Stockfish finds in your games into short lessons and drills."
+            perks={['Lessons from your real positions', 'The AI coach on every game you review', 'AI scouting reports on your opponents']}
+          />
+        )}
 
         {/* ── Courses progress ── */}
         {courses.length > 0 && (

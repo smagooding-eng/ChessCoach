@@ -131,7 +131,7 @@ export function Layout({ children, fullscreen }: { children: React.ReactNode; fu
   // openings, traps, import, play hub) draw their own header, as in the mockups,
   // so Layout's logo bar is skipped there on mobile. Detail pages that weren't
   // redesigned (an opening, a trap lesson, local play) keep it.
-  const pageOwnsHeader = redesign && /^\/(games|analysis|puzzles|openings|traps|import|play|settings)$|^\/games\/\d+$/.test(location);
+  const pageOwnsHeader = redesign && /^\/(games|analysis|puzzles|openings|traps|import|play|settings|profile)$|^\/games\/\d+$/.test(location);
   // While the redesign toggle is on, <html> carries `cs-redesign`, which
   // index.css uses to swap the whole app's theme (incl. portaled dialogs).
   // Layout only wraps the signed-in app, so public/marketing pages never get it.
@@ -139,7 +139,8 @@ export function Layout({ children, fullscreen }: { children: React.ReactNode; fu
     document.documentElement.classList.toggle('cs-redesign', redesign);
     return () => document.documentElement.classList.remove('cs-redesign');
   }, [redesign]);
-  const { username, logout, isAuthenticated, authLogout, isPremium, subscription, authUser } = useUser();
+  const { username, logout, isAuthenticated, authLogout, isPremium, subscription, authUser, isSubscriptionLoaded } = useUser();
+  const freePlan = isSubscriptionLoaded && !!authUser && !isPremium;
   const { player } = useChessPlayer(username ?? undefined);
   const { data: multiElo } = useMultiEloProgress(username ?? undefined);
   const [moreOpen, setMoreOpen] = useState(false);
@@ -213,6 +214,13 @@ export function Layout({ children, fullscreen }: { children: React.ReactNode; fu
         </nav>
 
         <div className="p-2.5" style={{ borderTop: `1px solid ${BORDER_COLOR}` }}>
+          {freePlan && (
+            <Link href="/subscription" className="mb-2 flex items-center gap-2 rounded-xl px-3 py-2.5 text-[12.5px] font-extrabold transition-transform active:scale-[.98]"
+              style={{ background: 'linear-gradient(180deg,#F2C560,#D99A24)', color: '#1A1205' }}>
+              <Crown className="w-4 h-4" /> Go Pro
+              <span className="ml-auto text-[10.5px] font-bold opacity-80">from $5/mo</span>
+            </Link>
+          )}
           <div className="flex items-center gap-1.5 px-2 py-2 rounded-xl" style={{ background: BG_CARD }}>
             <Link href="/profile" className="flex items-center gap-2 min-w-0 flex-1 hover:opacity-80 transition-opacity">
               <PlayerAvatar avatar={player?.avatar} username={username ?? ''} size="sm" />
@@ -389,6 +397,18 @@ export function Layout({ children, fullscreen }: { children: React.ReactNode; fu
             >
               <div className="w-10 h-1 rounded-full mx-auto mt-2.5" style={{ background: 'rgba(255,255,255,0.1)' }} />
               <nav className="px-3 pt-3 pb-8 space-y-0.5">
+                {freePlan && (
+                  <Link href="/subscription" onClick={() => setMoreOpen(false)} className="mb-2 block">
+                    <div className="flex items-center gap-3 rounded-xl px-3.5 py-3" style={{ background: 'linear-gradient(135deg, rgba(232,180,71,.16), rgba(139,234,69,.06))', border: '1px solid rgba(232,180,71,.4)' }}>
+                      <Crown className="w-5 h-5" style={{ color: '#E8B447' }} />
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-sm font-extrabold" style={{ color: TEXT_LIGHT }}>Go Pro</span>
+                        <span className="block text-[11.5px]" style={{ color: TEXT_MUTED }}>AI coach, courses and scouting reports · from $5/mo</span>
+                      </span>
+                      <ChevronRight className="w-4 h-4" style={{ color: '#E8B447' }} />
+                    </div>
+                  </Link>
+                )}
                 {moreItems.map(item => {
                   const active = location === item.href || location.startsWith(item.href + '/');
                   const badge = (item as any).badge as string | undefined;

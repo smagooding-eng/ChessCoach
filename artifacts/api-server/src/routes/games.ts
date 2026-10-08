@@ -1,6 +1,6 @@
 import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
 import { db, gamesTable, backgroundJobsTable, usersTable } from "@workspace/db";
-import { requireAuth } from "../middlewares/authMiddleware";
+import { requireAuth, requirePremium, isUserPremium } from "../middlewares/authMiddleware";
 import { eq, desc, count, isNull, and, or, ilike, asc, sql, gte, inArray } from "drizzle-orm";
 import {
   ImportGamesBody,
@@ -791,7 +791,7 @@ router.get("/games/review-status/:jobId", async (req, res): Promise<void> => {
       const gameSummary = cached.gameSummary ?? null;
       const whiteAccuracy = cached.whiteAccuracy ?? null;
       const blackAccuracy = cached.blackAccuracy ?? null;
-      res.json({ status: "done", reviewData: { moves, gameSummary, whiteAccuracy, blackAccuracy } });
+      res.json({ status: "done", reviewData: { moves, gameSummary, whiteAccuracy, blackAccuracy, aiCoach: cached.aiCoach === undefined ? true : cached.aiCoach === true } });
       return;
     }
   }
@@ -1099,7 +1099,7 @@ router.post("/games/:id/analyze-moves", async (req, res): Promise<void> => {
   res.json({ classifications });
 });
 
-router.post("/games/:id/analyze-move", async (req, res): Promise<void> => {
+router.post("/games/:id/analyze-move", requireAuth, requirePremium, async (req, res): Promise<void> => {
   const params = GetGameReplayParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
@@ -1178,6 +1178,15 @@ async function runAnalyzePgnJob(pgn: string, jobId: string, log: Logger): Promis
   }
 }
 
+// The OpenAI coach is a Pro feature. A review runs it only when the game's
+// OWNER is Pro / admin / complimentary Pro -- whoever happens to trigger the
+// review (bulk job, stale re-review, a page view). Everyone else gets the
+// Stockfish-only review. Never throws: on any lookup error it says "no AI".
+async function aiCoachForOwner(ownerId: string | null | undefined): Promise<boolean> {
+  if (!ownerId) return false;
+  try { return await isUserPremium(ownerId); } catch { return false; }
+}
+
 // Reviews a single game and writes its reviewData — the same core logic
 // runReviewJob uses for a single manually-triggered review, factored out so
 // bulk review can reuse it without creating a backgroundJobsTable row per
@@ -1186,6 +1195,7 @@ async function reviewOneGame(
   game: typeof gamesTable.$inferSelect,
   onProgress?: (done: number, total: number) => void,
   userId?: string,
+  aiCoachOverride?: boolean,
 ): Promise<void> {
   const moves = parsePgnMoves(game.pgn);
   const startFen = extractStartFen(game.pgn);
@@ -1199,6 +1209,7 @@ async function reviewOneGame(
     startFen: startFen !== "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1" ? startFen : undefined,
     onProgress,
     userId,
+    aiCoach: aiCoachOverride ?? await aiCoachForOwner(game.userId),
   });
 
   await db.update(gamesTable)
@@ -1230,6 +1241,8 @@ export async function runBulkReviewJob(
 
     const total = unreviewed.length;
     let reviewedSoFar = 0;
+    // Same owner for every game in a bulk job, so look the plan up once.
+    const aiCoach = await aiCoachForOwner(userId);
 
     if (total === 0) {
       await db.update(backgroundJobsTable).set({
@@ -1242,7 +1255,7 @@ export async function runBulkReviewJob(
 
     for (const game of unreviewed) {
       try {
-        await reviewOneGame(game, undefined, userId);
+        await reviewOneGame(game, undefined, userId, aiCoach);
         reviewedSoFar++;
       } catch (err) {
         log.warn({ err, gameId: game.id }, "Bulk review: one game failed, continuing with the rest");
@@ -1365,6 +1378,7 @@ async function runReviewJob(gameId: number, jobId: string, log: Logger): Promise
         }).where(eq(backgroundJobsTable.id, jobId)).catch(() => {});
       },
       userId: game.userId ?? undefined,
+      aiCoach: await aiCoachForOwner(game.userId),
     });
 
     await db.update(gamesTable)
@@ -1507,7 +1521,7 @@ router.get("/games/:id/review", async (req, res): Promise<void> => {
         return rest;
       });
     }
-    res.json({ status: "done", reviewData: { moves, gameSummary, whiteAccuracy, blackAccuracy } });
+    res.json({ status: "done", reviewData: { moves, gameSummary, whiteAccuracy, blackAccuracy, aiCoach: cached.aiCoach === undefined ? true : cached.aiCoach === true } });
     return;
   }
 
@@ -1538,7 +1552,19 @@ router.post("/games/:id/review", async (req, res): Promise<void> => {
     return;
   }
 
-  const forceReview = req.query.force === "true";
+  // A forced re-review (e.g. a Pro member adding the AI coach to a review
+  // that was done while they were on the free plan) is only for the game's
+  // owner or an admin -- otherwise anyone could re-run reviews on any game.
+  let forceReview = req.query.force === "true";
+  if (forceReview) {
+    const requesterId = req.user?.id;
+    let allowed = !!requesterId && requesterId === game.userId;
+    if (!allowed && requesterId) {
+      const [u] = await db.select({ isAdmin: usersTable.isAdmin }).from(usersTable).where(eq(usersTable.id, requesterId));
+      allowed = !!u?.isAdmin;
+    }
+    if (!allowed) forceReview = false;
+  }
 
   if (game.reviewData && !forceReview) {
     const cached = game.reviewData as Record<string, unknown>;
@@ -1552,7 +1578,7 @@ router.post("/games/:id/review", async (req, res): Promise<void> => {
         return rest;
       });
     }
-    res.json({ status: "done", reviewData: { moves, gameSummary, whiteAccuracy, blackAccuracy } });
+    res.json({ status: "done", reviewData: { moves, gameSummary, whiteAccuracy, blackAccuracy, aiCoach: cached.aiCoach === undefined ? true : cached.aiCoach === true } });
     return;
   }
 

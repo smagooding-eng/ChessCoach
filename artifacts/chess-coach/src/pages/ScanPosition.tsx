@@ -2,6 +2,8 @@ import React, { useState, useRef, useCallback } from 'react';
 import { Link } from 'wouter';
 import { PieceTile } from '@/components/DesignSystem';
 import { UpgradeNudge } from '@/components/UpgradeNudge';
+import { ProUpsell } from '@/components/ProUpsell';
+import { useUser } from '@/hooks/use-user';
 import { Chess } from 'chess.js';
 import { ChessBoard } from '@/components/ChessBoard';
 import { apiFetch } from '@/lib/api';
@@ -158,6 +160,7 @@ function BuilderBoard({
 }
 
 export function ScanPosition() {
+  const { isPremium, isSubscriptionLoaded } = useUser();
   const [state, setState] = useState<ScanState>('idle');
   const [error, setError] = useState('');
   const [fen, setFen] = useState('');
@@ -211,8 +214,8 @@ export function ScanPosition() {
         const data = await res.json() as { fen?: string; confidence?: string; notes?: string; croppedImage?: string; annotatedImage?: string; error?: string; message?: string };
 
         if (!res.ok || !data.fen) {
-          setIsLimitReached(data.error === 'usage_limit');
-          setError((data.error === 'usage_limit' ? data.message : data.error) || 'Could not recognize a chess position.');
+          setIsLimitReached(data.error === 'usage_limit' || data.error === 'pro_required');
+          setError((data.error === 'usage_limit' || data.error === 'pro_required' ? data.message : data.error) || 'Could not recognize a chess position.');
           setState('error');
           return;
         }
@@ -352,6 +355,14 @@ export function ScanPosition() {
         </Link>
       </div>
 
+      {state === 'idle' && !isPremium && isSubscriptionLoaded && (
+        <ProUpsell
+          compact
+          title="Photo scanning is part of Pro"
+          text="AI vision reads the board for you. The position editor below is free: set up any position by hand."
+        />
+      )}
+
       {state === 'idle' && (
         <div className="space-y-3">
           <div
@@ -446,8 +457,8 @@ export function ScanPosition() {
 
       {state === 'error' && isLimitReached && (
         <UpgradeNudge
-          headline="You've used today's 2 free scans"
-          subtext="Upgrade to Pro for unlimited Scan Position uses — or use the position editor below, which is always free."
+          headline="Scanning a photo is part of Pro"
+          subtext="Reading a board from a photo uses AI vision. The position editor below is always free: set up any position and play it against Stockfish."
         />
       )}
 

@@ -875,6 +875,8 @@ export interface GameReviewResult {
    *  for the same underlying moves. */
   whiteAccuracy: number;
   blackAccuracy: number;
+  /** True when the OpenAI coach ran (Pro). False = Stockfish-only review. */
+  aiCoach?: boolean;
 }
 
 export async function reviewFullGame(input: {
@@ -887,8 +889,15 @@ export async function reviewFullGame(input: {
   startFen?: string;
   onProgress?: (done: number, total: number) => void;
   userId?: string;
+  /** Run the OpenAI coach (move explanations + game summary). Only for Pro,
+   *  admin and complimentary-Pro accounts -- everyone else gets the
+   *  Stockfish-only review (engine labels, accuracy, best move/line, and
+   *  the deterministic fact-based explanations), at no OpenAI cost.
+   *  Defaults to false so a new call site can never spend by accident. */
+  aiCoach?: boolean;
 }): Promise<GameReviewResult> {
   const { moves, opening, eco, result, whiteUsername, blackUsername, startFen, onProgress, userId } = input;
+  const aiCoach = input.aiCoach === true;
   const ecoBookFens = getBookFensForEco(eco);
   const startTime = Date.now();
 
@@ -986,7 +995,7 @@ JSON format:
       chunks.push({ start: i, end, details: moveDetails.slice(i, end + 1) });
     }
 
-    const gptPromises = chunks.map((chunk, ci) => {
+    const gptPromises = !aiCoach ? [] : chunks.map((chunk, ci) => {
       const includeSummary = ci === 0;
       const chunkMoveCount = chunk.end - chunk.start + 1;
       const chunkTokens = Math.min(16384, Math.max(4096, chunkMoveCount * 350 + (includeSummary ? 1500 : 0)));
@@ -1031,7 +1040,7 @@ JSON format:
     // a full game review fans out into several parallel chunk calls, and
     // for cost-attribution purposes what matters is total tokens per
     // review, not a row per internal chunk.
-    void trackAiUsage({
+    if (aiCoach) void trackAiUsage({
       userId,
       feature: AI_FEATURES.FULL_GAME_REVIEW,
       model: "gpt-5.6-luna",
@@ -1068,7 +1077,7 @@ JSON format:
 
     const validClassifications = ["brilliant", "great", "best", "excellent", "good", "book", "inaccuracy", "mistake", "blunder", "missed_win"];
 
-    if (allParsedMoves.length < moves.length) {
+    if (aiCoach && allParsedMoves.length < moves.length) {
       logger.warn({ expected: moves.length, received: allParsedMoves.length }, "GPT returned fewer moves than expected — remaining use engine-only data");
     }
 
@@ -1117,6 +1126,7 @@ JSON format:
       gameSummary,
       whiteAccuracy: accuracyFor("white"),
       blackAccuracy: accuracyFor("black"),
+      aiCoach,
     };
   } catch (err) {
     logger.error({ err }, "Failed to review full game with OpenAI");

@@ -10,12 +10,17 @@ import { usePushNotifications } from '@/hooks/use-push-notifications';
 import { Link, useLocation } from 'wouter';
 import { apiFetch } from '@/lib/api';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useDashboardRedesignFlag } from '@/hooks/use-app-config';
+import { useMultiEloProgress } from '@/hooks/use-elo-progress';
+import { RD } from '@/lib/redesignTheme';
+import { RedesignHeader } from '@/components/RedesignHeader';
+import { ProUpsell } from '@/components/ProUpsell';
 import {
   User, Mail, Crown, LogOut, ChevronRight, Trophy, Swords, Target, DollarSign,
   GraduationCap, Settings, Shield, Edit3, Check, X, Eye, Users, CreditCard,
   Activity, Send, AlertCircle, CheckCircle2, Bold, Italic, Heading1, Heading2,
   Link as LinkIcon, Image, Type, Palette, List, ListOrdered, Minus, Undo2, Redo2, FileText, Sparkles,
-  Trash2, Loader2, Zap, Gift, Copy, UserPlus, Megaphone, ChevronDown, Bell
+  Trash2, Loader2, Zap, Gift, Copy, UserPlus, Megaphone, ChevronDown, Bell, SlidersHorizontal, BarChart3
 } from 'lucide-react';
 
 interface AdminStats {
@@ -1665,7 +1670,15 @@ export function ReferralCard({ isPremium, compact = false }: { isPremium: boolea
   );
 }
 
+// Enhanced UI renders ProfileRedesign; classic keeps the original page unchanged.
+// (Separate components so the flag arriving after first render never changes
+// the hook order inside either one.)
 export function Profile() {
+  const { enabled: redesign } = useDashboardRedesignFlag();
+  return redesign ? <ProfileRedesign /> : <ProfileClassic />;
+}
+
+function ProfileClassic() {
   const { username, authUser, isPremium, subscription, authLogout, login, logout } = useUser();
   const { player } = useChessPlayer(username ?? undefined);
   const { data: summary } = useMyAnalysisSummary();
@@ -1935,5 +1948,237 @@ export function Profile() {
       </motion.div>
 
     </motion.div>
+  );
+}
+
+// ── Enhanced UI profile ─────────────────────────────────────────────────────
+// Same data and actions as the classic page (edit Chess.com username, stats,
+// referral, subscription, notifications, sign out, admin tools), in the
+// enhanced theme. Two columns on desktop.
+function ProfileRedesign() {
+  const { username, authUser, isPremium, authLogout, login, logout, isSubscriptionLoaded } = useUser();
+  const { player } = useChessPlayer(username ?? undefined);
+  const { data: summary } = useMyAnalysisSummary();
+  const { data: liveRatings } = useLiveRatings();
+  const { data: coursesData } = useMyCourses();
+  const { data: multiElo } = useMultiEloProgress(username ?? undefined);
+  const push = usePushNotifications();
+
+  const [editingUsername, setEditingUsername] = useState(false);
+  const [newUsername, setNewUsername] = useState(username ?? '');
+  const [saving, setSaving] = useState(false);
+
+  const totalGames = summary ? summary.wins + summary.losses + summary.draws : null;
+  const winRate = summary && totalGames ? ((summary.wins / totalGames) * 100).toFixed(1) : null;
+  const ratings: number[] = [];
+  if (multiElo?.chesscom?.hasData) ratings.push(multiElo.chesscom.currentRating);
+  if (multiElo?.lichess?.hasData) ratings.push(multiElo.lichess.currentRating);
+  const rating = ratings.length ? Math.round(ratings.reduce((a, b) => a + b, 0) / ratings.length) : (player?.rating ?? null);
+  const courses = coursesData?.courses ?? [];
+  const completedCourses = courses.filter(c => c.completedLessons >= c.totalLessons).length;
+  const activeCourses = courses.length - completedCourses;
+
+  const handleSaveUsername = async () => {
+    const trimmed = newUsername.trim();
+    if (!trimmed || trimmed === username) { setEditingUsername(false); return; }
+    setSaving(true);
+    try {
+      login(trimmed);
+      if (authUser) {
+        await apiFetch('/api/auth/update-profile', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+          body: JSON.stringify({ chesscomUsername: trimmed }),
+        });
+      }
+      setEditingUsername(false);
+    } finally { setSaving(false); }
+  };
+  const handleLogout = () => { if (authUser) authLogout(); else logout(); };
+
+  const card: React.CSSProperties = { background: RD.card, border: `1px solid ${RD.border}` };
+  const chip = (bg: string, fg: string) => ({ background: bg, color: fg, border: `1px solid ${fg}44` });
+
+  const accounts = [
+    { label: 'Chess.com', name: authUser?.chesscomUsername ?? username, rating: multiElo?.chesscom?.hasData ? multiElo.chesscom.currentRating : null },
+    { label: 'Lichess', name: authUser?.lichessUsername ?? null, rating: multiElo?.lichess?.hasData ? multiElo.lichess.currentRating : null },
+  ];
+
+  const stats = [
+    { label: 'Games', value: totalGames != null ? totalGames.toLocaleString() : '—', icon: Swords },
+    { label: 'Win Rate', value: winRate ? `${winRate}%` : '—', icon: Trophy },
+    { label: 'Rating', value: rating ?? '—', icon: BarChart3 },
+    { label: 'Courses', value: courses.length ? `${completedCourses}/${courses.length}` : '—', icon: GraduationCap },
+  ];
+
+  const rows = [
+    { href: '/subscription', icon: Crown, title: 'Subscription', sub: isPremium ? 'Pro — Active' : 'Free plan', accent: RD.gold },
+    { href: '/settings', icon: SlidersHorizontal, title: 'Settings', sub: 'Boards, pieces, sounds and gameplay', accent: RD.green },
+    { href: '/analysis', icon: Target, title: 'My Analytics', sub: 'Your stats, openings and weaknesses', accent: '#5FD3F7' },
+    { href: '/courses', icon: GraduationCap, title: 'Courses', sub: courses.length ? `${activeCourses} active, ${completedCourses} completed` : 'Lessons built from your games', accent: '#C084FC' },
+  ];
+
+  return (
+    <div className="min-h-screen px-3 md:px-6 md:pt-6 md:pb-12 pb-[calc(7.5rem+env(safe-area-inset-bottom))]" style={{ background: RD.bg, color: RD.text }}>
+      <div className="mx-auto grid w-full max-w-[760px] grid-cols-1 gap-3 lg:max-w-[1200px] lg:grid-cols-2 lg:items-start lg:gap-4">
+        <div className="lg:col-span-2">
+          <RedesignHeader
+            title="Profile"
+            backHref="/"
+            right={<Link href="/settings" aria-label="Settings" className="grid h-9 w-9 place-items-center rounded-full" style={{ color: RD.text }}><Settings size={21} /></Link>}
+          />
+        </div>
+
+        {/* Identity */}
+        <section className="relative overflow-hidden rounded-[22px] p-5 lg:col-span-2" style={{ ...card, border: '1px solid rgba(139,234,69,.22)' }}>
+          <div className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full" style={{ background: 'radial-gradient(circle, rgba(139,234,69,.16) 0%, transparent 70%)' }} />
+          <div className="relative flex items-center gap-4">
+            <div className="grid h-[76px] w-[76px] shrink-0 place-items-center overflow-hidden rounded-full" style={{ border: `2.5px solid ${RD.green}`, background: 'rgba(139,234,69,.10)', boxShadow: '0 0 0 4px rgba(139,234,69,.10)' }}>
+              {player?.avatar
+                ? <img src={player.avatar} alt="" className="h-full w-full object-cover" />
+                : <span className="text-[30px] font-black" style={{ color: RD.green }}>{(player?.name || username || '?').charAt(0).toUpperCase()}</span>}
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="mb-1 flex flex-wrap items-center gap-1.5">
+                {player?.title && <span className="rounded-md px-1.5 py-0.5 text-[10.5px] font-extrabold" style={chip('rgba(232,180,71,.16)', RD.gold)}>{player.title}</span>}
+                {authUser?.isAdmin && <span className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10.5px] font-extrabold" style={chip('rgba(232,180,71,.16)', RD.gold)}><Shield size={11} /> Admin</span>}
+                {isPremium && !authUser?.isAdmin && (
+                  <span className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10.5px] font-extrabold" style={{ background: 'linear-gradient(180deg,#F2C560,#D99A24)', color: '#1A1205' }}><Crown size={11} /> PRO</span>
+                )}
+              </div>
+              {editingUsername ? (
+                <div className="flex items-center gap-1.5">
+                  <input
+                    value={newUsername}
+                    onChange={e => setNewUsername(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleSaveUsername()}
+                    autoFocus
+                    placeholder="Chess.com username"
+                    className="w-full max-w-[240px] rounded-[10px] px-3 py-2 text-[14px] font-bold outline-none"
+                    style={{ background: 'rgba(255,255,255,.05)', border: `1px solid ${RD.green}`, color: RD.text }}
+                  />
+                  <button onClick={handleSaveUsername} disabled={saving} aria-label="Save" className="grid h-9 w-9 place-items-center rounded-[10px]" style={{ background: 'rgba(139,234,69,.14)', color: RD.green }}><Check size={17} /></button>
+                  <button onClick={() => { setEditingUsername(false); setNewUsername(username ?? ''); }} aria-label="Cancel" className="grid h-9 w-9 place-items-center rounded-[10px]" style={{ background: 'rgba(255,255,255,.05)', color: RD.muted }}><X size={17} /></button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <h1 className="truncate text-[24px] font-extrabold tracking-tight">{player?.name || username || 'Player'}</h1>
+                  <button onClick={() => setEditingUsername(true)} aria-label="Edit Chess.com username" className="grid h-8 w-8 shrink-0 place-items-center rounded-full" style={{ color: RD.muted, background: 'rgba(255,255,255,.04)' }}><Edit3 size={14} /></button>
+                </div>
+              )}
+              {username && <p className="text-[13px]" style={{ color: RD.muted }}>@{username}</p>}
+              {authUser?.email && <p className="mt-0.5 flex items-center gap-1 truncate text-[12px]" style={{ color: RD.muted }}><Mail size={12} /> {authUser.email}</p>}
+            </div>
+          </div>
+
+          {/* Linked accounts */}
+          <div className="relative mt-4 grid grid-cols-2 gap-2">
+            {accounts.map(a => (
+              <div key={a.label} className="rounded-[14px] px-3 py-2.5" style={{ background: 'rgba(255,255,255,.035)', border: `1px solid ${RD.border}` }}>
+                <p className="text-[11px] font-bold uppercase tracking-wider" style={{ color: RD.muted }}>{a.label}</p>
+                {a.name ? (
+                  <div className="flex items-baseline justify-between gap-2">
+                    <b className="truncate text-[14px] font-bold">{a.name}</b>
+                    {a.rating != null && <b className="shrink-0 text-[15px] font-extrabold" style={{ color: RD.green }}>{a.rating}</b>}
+                  </div>
+                ) : (
+                  <p className="text-[13px]" style={{ color: RD.muted }}>Not linked</p>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* Stats */}
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:col-span-2 lg:gap-4">
+          {stats.map(st => (
+            <div key={st.label} className="rounded-[18px] p-4" style={card}>
+              <div className="flex items-center justify-between">
+                <span className="text-[12.5px]" style={{ color: RD.muted }}>{st.label}</span>
+                <st.icon size={17} style={{ color: RD.green }} />
+              </div>
+              <b className="mt-1 block text-[24px] font-extrabold leading-tight">{st.value}</b>
+            </div>
+          ))}
+        </div>
+
+        {authUser?.isAdmin && <div className="lg:col-span-2"><AdminTicker /></div>}
+
+        {authUser?.isAdmin && (
+          <section className="rounded-[20px] p-4 lg:col-span-2" style={card}>
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="flex items-center gap-2 text-[15px] font-extrabold"><Trophy size={16} style={{ color: RD.green }} /> ChessScout.net Live ELO</h2>
+              <Link href="/live" className="text-[12px] font-bold" style={{ color: RD.green }}>Play Live →</Link>
+            </div>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {[
+                { id: 'blitz_5_0', label: '5 min' }, { id: 'blitz_5_3', label: '5 | 3' },
+                { id: 'rapid_10_0', label: '10 min' }, { id: 'rapid_15_0', label: '15 min' },
+              ].map(tc => {
+                const r = liveRatings?.ratings[tc.id];
+                return (
+                  <div key={tc.id} className="rounded-[14px] p-3 text-center" style={{ background: 'rgba(255,255,255,.035)', border: `1px solid ${RD.border}` }}>
+                    <p className="text-[11px] font-bold uppercase tracking-wider" style={{ color: RD.muted }}>{tc.label}</p>
+                    <b className="mt-1 block text-[22px] font-extrabold">{r && r.gamesPlayed > 0 ? `${r.rating}${r.isProvisional ? '?' : ''}` : '—'}</b>
+                    <p className="text-[11px]" style={{ color: RD.muted }}>{r?.gamesPlayed ?? 0} {(r?.gamesPlayed ?? 0) === 1 ? 'game' : 'games'}</p>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        )}
+
+        {!isPremium && isSubscriptionLoaded && authUser && (
+          <div className="lg:col-span-2">
+            <ProUpsell
+              title="Get the full coach"
+              perks={['The AI coach on every game you review', 'Courses built from your own mistakes', 'AI scouting reports on your opponents']}
+            />
+          </div>
+        )}
+
+        {/* Account */}
+        <section className="overflow-hidden rounded-[20px]" style={card}>
+          <h2 className="px-4 pb-2 pt-4 text-[15px] font-extrabold">Account</h2>
+          {rows.map(row => (
+            <Link key={row.href} href={row.href} className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-white/[0.03]" style={{ borderTop: `1px solid ${RD.border}` }}>
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[12px]" style={{ background: `${row.accent}1f`, border: `1px solid ${row.accent}44`, color: row.accent }}><row.icon size={18} /></span>
+              <span className="min-w-0 flex-1">
+                <b className="block text-[14.5px] font-bold">{row.title}</b>
+                <span className="block truncate text-[12px]" style={{ color: RD.muted }}>{row.sub}</span>
+              </span>
+              <ChevronRight size={17} style={{ color: RD.muted }} />
+            </Link>
+          ))}
+          <button
+            onClick={async () => { if (push.isSubscribed) await push.unsubscribe(); else await push.subscribe(); }}
+            disabled={push.loading || !push.supported}
+            className="flex w-full items-center gap-3 px-4 py-3 text-left disabled:opacity-50"
+            style={{ borderTop: `1px solid ${RD.border}` }}
+          >
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[12px]" style={{ background: 'rgba(95,211,247,.12)', border: '1px solid rgba(95,211,247,.3)', color: '#5FD3F7' }}><Bell size={18} /></span>
+            <span className="min-w-0 flex-1">
+              <b className="block text-[14.5px] font-bold">Notifications</b>
+              <span className="block truncate text-[12px]" style={{ color: RD.muted }}>
+                {!push.supported ? 'Not supported in this browser'
+                  : push.loading ? 'Working…'
+                  : push.isSubscribed ? 'On — tap to turn off'
+                  : push.permission === 'denied' ? 'Blocked — enable in browser settings'
+                  : 'Off — tap to turn on'}
+              </span>
+            </span>
+            <span className="flex h-6 w-11 shrink-0 items-center rounded-full px-0.5 transition-colors" style={{ background: push.isSubscribed ? RD.green : 'rgba(255,255,255,.15)', justifyContent: push.isSubscribed ? 'flex-end' : 'flex-start' }}>
+              <span className="h-5 w-5 rounded-full bg-white" />
+            </span>
+          </button>
+          {push.error && <p className="px-4 pb-3 text-[12px]" style={{ color: RD.red }}>{push.error}</p>}
+          <button onClick={handleLogout} className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-[rgba(255,80,88,.06)]" style={{ borderTop: `1px solid ${RD.border}` }}>
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[12px]" style={{ background: 'rgba(255,80,88,.14)', border: '1px solid rgba(255,80,88,.35)', color: RD.red }}><LogOut size={18} /></span>
+            <b className="text-[14.5px] font-bold" style={{ color: RD.red }}>Sign Out</b>
+          </button>
+        </section>
+
+        {authUser && <div><ReferralCard isPremium={isPremium} /></div>}
+      </div>
+    </div>
   );
 }

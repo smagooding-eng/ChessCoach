@@ -79,20 +79,9 @@ router.post("/opponents/start", async (req, res): Promise<void> => {
   const { hasFullAccess } = await import("../lib/accessControl");
   const { full: isFullAccess } = await hasFullAccess(userId);
 
-  if (!isFullAccess) {
-    const { checkUsageLimit } = await import("../lib/accessControl");
-    const limitCheck = await checkUsageLimit(userId, "opponentScouts");
-    if (!limitCheck.allowed) {
-      res.status(403).json({
-        error: "usage_limit",
-        message: `Free plan includes ${limitCheck.limit} basic opponent scout. Upgrade to Pro for unlimited scouts with full weakness analysis!`,
-        used: limitCheck.used,
-        limit: limitCheck.limit,
-      });
-      return;
-    }
-  }
-
+  // Free scouts are unlimited: they never call OpenAI (record, openings,
+  // head-to-head only -- see runAnalysis). The AI weakness analysis and prep
+  // are what Pro adds.
   const jobId = randomUUID();
   await db.insert(backgroundJobsTable).values({
     id: jobId,

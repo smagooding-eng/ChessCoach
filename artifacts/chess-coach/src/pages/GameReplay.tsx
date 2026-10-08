@@ -22,6 +22,7 @@ import { useChessPlayer } from '@/hooks/use-chess-player';
 import { apiFetch } from '@/lib/api';
 import { WaitTipCarousel } from '@/components/WaitTipCarousel';
 import { AICoachCard, type AICoachTone } from '@/components/AICoachCard';
+import { ProUpsell } from '@/components/ProUpsell';
 import { MistakeFixView } from '@/components/MistakeFixView';
 import { AnimatePresence, motion } from 'framer-motion';
 
@@ -623,7 +624,7 @@ const SandboxBoard = React.memo(function SandboxBoard({ playerRating }: { player
 
 export function GameReplay() {
   const { id } = useParams();
-  const { username, authUser } = useUser();
+  const { username, authUser, isPremium, isSubscriptionLoaded } = useUser();
   const [, navigate] = useLocation();
   const { data: game, isLoading, error } = useGameViewer(parseInt(id || '0'));
   const { player: whitePlayer } = useChessPlayer(game?.whiteUsername);
@@ -660,6 +661,8 @@ export function GameReplay() {
   const [reviewMoves, setReviewMoves]   = useState<ReviewMove[]>([]);
   const [reviewError, setReviewError]   = useState<string | null>(null);
   const [gameSummary, setGameSummary]   = useState<GameSummary | null>(null);
+  // false = Stockfish-only review (free plan); the AI coach is Pro.
+  const [reviewAi, setReviewAi]         = useState<boolean | null>(null);
   const [loadingSavedReview, setLoadingSavedReview] = useState(true);
   const [reviewProgress, setReviewProgress] = useState<{ done: number; total: number } | null>(null);
   // Computed once, authoritatively, by the backend (reviewFullGame) using
@@ -685,6 +688,7 @@ export function GameReplay() {
           if (d.reviewData.length > 0) setReviewMoves(d.reviewData);
         } else if (d.reviewData.moves && Array.isArray(d.reviewData.moves)) {
           setReviewMoves(d.reviewData.moves);
+          setReviewAi((d.reviewData as { aiCoach?: boolean }).aiCoach !== false);
           if (d.reviewData.gameSummary) setGameSummary(d.reviewData.gameSummary);
           if (d.reviewData.whiteAccuracy != null && d.reviewData.blackAccuracy != null) {
             setGameAccuracy({ white: d.reviewData.whiteAccuracy, black: d.reviewData.blackAccuracy });
@@ -776,6 +780,7 @@ export function GameReplay() {
           const moves = data.reviewData.moves ?? [];
           if (moves.length > 0) setReviewMoves(moves);
           else setReviewError('Review returned no data. Please try again.');
+          setReviewAi((data.reviewData as { aiCoach?: boolean }).aiCoach !== false);
           if (data.reviewData.gameSummary) setGameSummary(data.reviewData.gameSummary);
           if (data.reviewData.whiteAccuracy != null && data.reviewData.blackAccuracy != null) {
             setGameAccuracy({ white: data.reviewData.whiteAccuracy, black: data.reviewData.blackAccuracy });
@@ -820,6 +825,7 @@ export function GameReplay() {
         const moves = data.reviewData.moves ?? [];
         if (moves.length > 0) setReviewMoves(moves);
         else setReviewError('Review returned no data. Please try again.');
+        setReviewAi((data.reviewData as { aiCoach?: boolean }).aiCoach !== false);
         if (data.reviewData.gameSummary) setGameSummary(data.reviewData.gameSummary);
         if (data.reviewData.whiteAccuracy != null && data.reviewData.blackAccuracy != null) {
           setGameAccuracy({ white: data.reviewData.whiteAccuracy, black: data.reviewData.blackAccuracy });
@@ -1325,6 +1331,25 @@ export function GameReplay() {
             );
           })()}
 
+          {/* Stockfish-only review (free plan): one slim line under the coach,
+              not a popup. Pro members whose review predates their upgrade can
+              add the AI coach in place. */}
+          {isSubscriptionLoaded && reviewMoves.length > 0 && reviewAi === false && !reviewing && (
+            <div className={redesign ? (gtab !== 'analysis' ? 'hidden' : 'order-[-1] xl:order-none') : ''}>
+              {isPremium ? (
+                <button onClick={() => handleReview(true)}
+                  className="flex w-full items-center gap-3 rounded-[14px] px-3.5 py-3 text-left"
+                  style={{ background: 'rgba(139,234,69,.08)', border: '1px solid rgba(139,234,69,.35)' }}>
+                  <Sparkles className="h-4 w-4 shrink-0" style={{ color: '#8BEA45' }} />
+                  <span className="flex-1 text-[13px] font-bold">This game was reviewed before you went Pro. Add the AI coach's explanations.</span>
+                  <span className="text-[12.5px] font-extrabold" style={{ color: '#8BEA45' }}>Add</span>
+                </button>
+              ) : (
+                <ProUpsell compact title="Stockfish review" text="Get the AI coach's plain-English explanation for every move and a summary of the game." />
+              )}
+            </div>
+          )}
+
           {/* Review loading — enhanced engagement */}
           {reviewing && (() => {
             const totalMoves = moves.length;
@@ -1598,6 +1623,14 @@ export function GameReplay() {
               whiteAvatar={whitePlayer?.avatar}
               blackAvatar={blackPlayer?.avatar}
               serverAccuracy={gameAccuracy}
+            />
+          )}
+
+          {isSubscriptionLoaded && !isPremium && reviewMoves.length > 0 && reviewAi === false && (
+            <ProUpsell
+              title="See why the game was won or lost"
+              text="This report is from Stockfish. Pro adds the AI coach on every game you review."
+              perks={['A plain-English explanation for every move', 'A game summary: key mistakes, strengths and what to work on', 'Courses built from these mistakes']}
             />
           )}
 
