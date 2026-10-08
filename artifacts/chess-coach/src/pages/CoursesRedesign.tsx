@@ -33,6 +33,34 @@ export function artFor(c: { id: number; category: string; title: string }): Art 
   return { img: pool[c.id % pool.length], accent: RD.green, tile: RD.green, bar: RD.green, icon: GraduationCap };
 }
 
+// Every course picture, for lists that should not show the same one twice in a row.
+export const ART_POOL = ['course-library', 'course-training-hero', 'course-opening', 'course-tactical', 'course-discovered', 'course-endgame'];
+
+// Pictures for a list of courses, top to bottom: each keeps its own art unless
+// one of the two rows above already used it, then it moves to the next free one.
+export function distinctArtImgs(list: { id: number; category: string; title: string }[]): string[] {
+  const recent: string[] = [];
+  return list.map((c) => {
+    let img = artFor(c).img;
+    let i = ART_POOL.indexOf(img);
+    for (let t = 0; t < ART_POOL.length && recent.includes(img); t++) { i = (i + 1) % ART_POOL.length; img = ART_POOL[i]; }
+    recent.push(img);
+    if (recent.length > 2) recent.shift();
+    return img;
+  });
+}
+
+// Small per-lesson thumbnails inside one course: start with the course's own
+// art, then rotate through the others so neighbouring lessons never match.
+// With real photos on there are more pictures to rotate through.
+export function lessonThumbSrc(i: number, courseImg: string, photo: boolean): string {
+  const courses = [courseImg, ...ART_POOL.filter((x) => x !== courseImg)].map((x) => `${ART_BASE}${x}.webp`);
+  const pool = photo
+    ? [...courses, ...Array.from({ length: 12 }, (_, k) => `${import.meta.env.BASE_URL}assets/openings/thumb-${k}.webp`)]
+    : courses;
+  return pool[i % pool.length];
+}
+
 const DIFF_DOT: Record<string, string> = { Beginner: RD.green, Intermediate: '#35C6F4', Advanced: '#A98BFF' };
 
 const pctOf = (c: { completedLessons: number; totalLessons: number }) =>
@@ -86,6 +114,7 @@ export function CoursesRedesign({
     .slice(0, 4);
 
   const visible = courses.filter((c) => (tab === 'progress' ? c.completedLessons > 0 : true));
+  const visibleImgs = distinctArtImgs(visible);
   const recommended = nextCourse ?? courses[0] ?? null;
   const card = { background: RD.card, border: `1px solid ${RD.border}` } as const;
 
@@ -234,7 +263,7 @@ export function CoursesRedesign({
             <div className="rounded-[20px] px-6 py-10 text-center text-[13px]" style={{ background: RD.card, border: `1px solid ${RD.border}`, color: RD.muted }}>You haven&apos;t started a course yet.</div>
           )}
 
-          {visible.map((c) => {
+          {visible.map((c, ci) => {
             const a = artFor(c);
             const p = pctOf(c);
             const done = p === 100;
@@ -242,7 +271,7 @@ export function CoursesRedesign({
               <div key={c.id} className="flex items-stretch overflow-hidden rounded-[20px]" style={card}>
                 <Link href={`/courses/${c.id}`} className="flex min-w-0 flex-1 items-stretch">
                   <span className="relative w-[96px] shrink-0 overflow-hidden">
-                    <img src={siteImg(`${ART_BASE}${a.img}.webp`)} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
+                    <img src={siteImg(`${ART_BASE}${visibleImgs[ci]}.webp`)} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
                   </span>
                   <span className="min-w-0 flex-1 px-3.5 py-3.5">
                     <b className="block truncate text-[16.5px] font-extrabold">{c.title}</b>

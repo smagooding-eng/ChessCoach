@@ -16,7 +16,7 @@ import { useLocation } from 'wouter';
 import { useDashboardRedesignFlag, usePhotoImagesFlag } from '@/hooks/use-app-config';
 import { RD } from '@/lib/redesignTheme';
 import { RedesignHeader } from '@/components/RedesignHeader';
-import { openingThumb, openingFamily } from '@/lib/openingThumb';
+import { openingThumbList, openingFamily } from '@/lib/openingThumb';
 
 const QUALITY_TO_TONE: Record<string, AICoachTone> = {
   checkmate: 'gold',
@@ -1025,8 +1025,14 @@ function BotTileRD({ bot, onSelect }: { bot: BotConfig; onSelect: (b: BotConfig)
   );
 }
 
-function OpeningTileRD({ opening, onSelect }: { opening: OpeningLine; onSelect: (o: OpeningLine) => void }) {
+// Trainer list is fixed, so its thumbnails are worked out once, with no picture
+// repeated in neighbouring rows.
+const TRAINER_THUMBS_AI = openingThumbList(OPENINGS.map((o) => openingFamily(o.name)), false);
+const TRAINER_THUMBS_PHOTO = openingThumbList(OPENINGS.map((o) => openingFamily(o.name)), true);
+
+function OpeningTileRD({ opening, index, onSelect }: { opening: OpeningLine; index: number; onSelect: (o: OpeningLine) => void }) {
   const photoImgs = usePhotoImagesFlag();
+  const thumb = (photoImgs ? TRAINER_THUMBS_PHOTO : TRAINER_THUMBS_AI)[index];
   return (
     <button
       onClick={() => onSelect(opening)}
@@ -1034,7 +1040,7 @@ function OpeningTileRD({ opening, onSelect }: { opening: OpeningLine; onSelect: 
       style={{ background: RD.card, border: `1px solid ${RD.border}` }}
     >
       <span className="relative w-[104px] shrink-0 overflow-hidden">
-        <img src={openingThumb(openingFamily(opening.name), photoImgs)} alt="" loading="lazy" className="absolute inset-0 h-full w-full scale-[1.08] object-cover" />
+        <img src={thumb} alt="" loading="lazy" className="absolute inset-0 h-full w-full scale-[1.08] object-cover" />
       </span>
       <span className="min-w-0 flex-1 px-4 py-3.5">
         <span className="flex items-center gap-2">
@@ -1154,7 +1160,7 @@ export function PracticeBots() {
           <div className="mt-3 grid gap-2.5 lg:grid-cols-2 lg:gap-3">
             {tab === 'bots'
               ? BOTS.map((bot) => <BotTileRD key={bot.name} bot={bot} onSelect={setSelectedBot} />)
-              : OPENINGS.map((o) => <OpeningTileRD key={o.id} opening={o} onSelect={setSelectedOpening} />)}
+              : OPENINGS.map((o, i) => <OpeningTileRD key={o.id} opening={o} index={i} onSelect={setSelectedOpening} />)}
           </div>
           <div className="mt-3">
             {tab === 'bots' ? (

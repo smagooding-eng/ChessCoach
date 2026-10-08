@@ -16,7 +16,7 @@ import { ReferralCard } from '@/pages/Profile';
 import { useMyGames } from '@/hooks/use-games';
 import { GameThumb } from '@/components/GameThumb';
 import { ProUpsell } from '@/components/ProUpsell';
-import { useSiteImg } from '@/hooks/use-app-config';
+import { useSiteImg, usePhotoImagesFlag } from '@/hooks/use-app-config';
 
 // Dashboard shown when the global "dashboard redesign" flag is ON (see
 // DashboardRouter in App.tsx). The mobile header and bottom nav in the
@@ -66,6 +66,7 @@ function Skeleton({ className = '' }: { className?: string }) {
 
 export function DashboardRedesign() {
   const siteImg = useSiteImg();
+  const photoImgs = usePhotoImagesFlag();
   const { username, isPremium, authUser, isSubscriptionLoaded } = useUser();
   // Only once the plan is known, so Pro members never see an upsell flash.
   const freePlan = isSubscriptionLoaded && !!authUser && !isPremium;
@@ -330,7 +331,9 @@ export function DashboardRedesign() {
                 backgroundSize: 'auto 100%',
                 backgroundPosition: t.pos,
                 backgroundRepeat: 'no-repeat',
-                boxShadow: `inset 0 0 40px ${t.glow}`,
+                // The coloured inner glow suits the dark AI art; on real photos it
+                // reads as an uneven coloured rim on the brighter tiles.
+                boxShadow: photoImgs ? 'none' : `inset 0 0 40px ${t.glow}`,
               }}
             >
               <div className="absolute inset-0" style={{ background: 'linear-gradient(90deg, rgba(5,10,11,.78) 0%, rgba(5,10,11,.25) 62%, rgba(5,10,11,0) 100%), linear-gradient(0deg, rgba(5,10,11,.65) 0%, rgba(5,10,11,0) 55%)' }} />

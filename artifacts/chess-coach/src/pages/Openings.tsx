@@ -11,7 +11,7 @@ import { useMyOpenings, type OpeningStat } from '@/hooks/use-openings';
 import { useDashboardRedesignFlag, usePhotoImagesFlag } from '@/hooks/use-app-config';
 import { RD } from '@/lib/redesignTheme';
 import { RedesignHeader } from '@/components/RedesignHeader';
-import { openingThumb } from '@/lib/openingThumb';
+import { openingThumbList } from '@/lib/openingThumb';
 
 type SortKey = 'totalGames' | 'winRate' | 'opening' | 'whiteWinRate' | 'blackWinRate';
 type ColorFilter = 'all' | 'white' | 'black';
@@ -116,7 +116,7 @@ export function Openings() {
       { id: 'popular', label: 'Popular' },
       { id: 'repertoire', label: 'My Repertoire' },
     ];
-    const thumb = (name: string) => openingThumb(name, photoImgs);
+    const thumbs = openingThumbList(list.map((o) => o.opening), photoImgs);
 
     return (
       <div className="min-h-screen px-3 md:px-6 md:pt-6 md:pb-12 pb-[calc(7.5rem+env(safe-area-inset-bottom))]" style={{ background: RD.bg, color: RD.text }}>
@@ -158,12 +158,12 @@ export function Openings() {
               <div className="rounded-[20px] px-6 py-10 text-center text-[13px]" style={{ background: RD.card, border: `1px solid ${RD.border}`, color: RD.muted }}>
                 {tab === 'foryou' ? 'Nothing to work on yet — an opening needs at least 3 games to be ranked.' : 'No openings match your search.'}
               </div>
-            ) : list.map((o) => {
+            ) : list.map((o, oi) => {
               const linkParam = encodeURIComponent(o.eco ?? o.opening);
               return (
                 <Link key={o.opening} href={`/openings/${linkParam}`} className="flex items-stretch overflow-hidden rounded-[18px] transition-transform active:scale-[.99]" style={{ background: RD.card, border: `1px solid ${RD.border}` }}>
                   <span className="relative w-[104px] shrink-0 overflow-hidden">
-                    <img src={thumb(o.opening)} alt="" loading="lazy" className="absolute inset-0 h-full w-full scale-[1.08] object-cover" />
+                    <img src={thumbs[oi]} alt="" loading="lazy" className="absolute inset-0 h-full w-full scale-[1.08] object-cover" />
                   </span>
                   <span className="min-w-0 flex-1 px-4 py-3.5">
                     <b className="block truncate text-[16px] font-extrabold">{o.opening}</b>

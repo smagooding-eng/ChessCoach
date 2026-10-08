@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import { Link } from 'wouter';
 import { ArrowLeft, ArrowRight, CheckCircle2, Layers, Play } from 'lucide-react';
 import { RD } from '@/lib/redesignTheme';
-import { artFor, ART_BASE, type CourseLike } from './CoursesRedesign';
-import { useSiteImg } from '@/hooks/use-app-config';
+import { artFor, ART_BASE, lessonThumbSrc, type CourseLike } from './CoursesRedesign';
+import { useSiteImg, usePhotoImagesFlag } from '@/hooks/use-app-config';
 
 // Course Overview (redesign), per the course mockup: top bar, full-bleed art,
 // title / description / meta, progress, one primary action, and a Lessons /
@@ -18,6 +18,7 @@ export function CourseOverview({
   onOpen: (index: number) => void;
 }) {
   const siteImg = useSiteImg();
+  const photoImgs = usePhotoImagesFlag();
   const [tab, setTab] = useState<'lessons' | 'about'>('lessons');
   const art = artFor(course);
   const total = course.totalLessons || lessons.length;
@@ -93,7 +94,7 @@ export function CourseOverview({
                     style={{ background: isCurrent ? 'rgba(139,234,69,.08)' : 'transparent', boxShadow: isCurrent ? `inset 0 0 0 1.5px ${RD.green}` : undefined }}
                   >
                     <span className="relative h-11 w-11 shrink-0 overflow-hidden rounded-[9px]" style={{ border: `1px solid ${RD.border}` }}>
-                      <img src={siteImg(`${ART_BASE}${art.img}.webp`)} alt="" loading="lazy" className="h-full w-full object-cover" style={{ objectPosition: `${(i * 37) % 100}% center` }} />
+                      <img src={siteImg(lessonThumbSrc(i, art.img, photoImgs))} alt="" loading="lazy" className="h-full w-full object-cover" />
                     </span>
                     <span className="w-5 shrink-0 text-center text-[13px]" style={{ color: RD.muted }}>{i + 1}</span>
                     <span className="min-w-0 flex-1 text-[15px] font-semibold leading-snug" style={{ color: l.completed || isCurrent ? RD.text : 'rgba(245,247,246,.75)' }}>{l.title}</span>

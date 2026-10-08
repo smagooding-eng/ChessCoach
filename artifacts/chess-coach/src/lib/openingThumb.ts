@@ -15,3 +15,22 @@ export function openingThumb(name: string, photo = false): string {
 export function openingFamily(name: string): string {
   return name.split(/\s+[—–-]\s+|\s*\(|:/)[0].trim();
 }
+
+// Thumbnails for a whole list, top to bottom. Each row still starts from its
+// opening's own picture, but if that picture was used in any of the previous
+// few rows it moves on to the next free one -- so the same image never shows
+// twice in a row (or close together) in a list.
+export function openingThumbList(names: string[], photo = false): string[] {
+  const n = photo ? PHOTO_THUMB_COUNT : 6;
+  const window = Math.min(4, n - 1);
+  const recent: number[] = [];
+  return names.map((name) => {
+    let idx = [...name].reduce((acc, c) => acc + c.charCodeAt(0), 0) % n;
+    for (let tries = 0; tries < n && recent.includes(idx); tries++) idx = (idx + 1) % n;
+    recent.push(idx);
+    if (recent.length > window) recent.shift();
+    return photo
+      ? `${import.meta.env.BASE_URL}photo/assets/openings/thumb-${idx}.webp`
+      : `${import.meta.env.BASE_URL}assets/openings/thumb-${idx}.webp`;
+  });
+}
