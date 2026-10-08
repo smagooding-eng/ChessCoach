@@ -168,6 +168,14 @@ export interface BotConfig {
   rating: number;
   depth: number;
   blunderRate: number;
+  /** Beginner realism (local-engine bots only): chance the bot notices a
+   *  capture that's on the board. Unnoticed captures aren't considered. */
+  captureSight?: number;
+  /** Chance the bot notices a mate-in-one when it has one. */
+  mateSight?: number;
+  /** Random wobble (centipawns) added to each move's score, so it doesn't
+   *  always pick the textbook move among the ones it does see. */
+  evalNoise?: number;
   description: string;
   avatar: string;
   personality: string;
@@ -179,6 +187,10 @@ export const BOTS: BotConfig[] = [
     rating: 400,
     depth: 1,
     blunderRate: 0.5,
+    // A real 400 misses most free pieces and even some mates in one.
+    captureSight: 0.4,
+    mateSight: 0.45,
+    evalNoise: 60,
     description: 'Just learned the rules last week. Makes lots of random moves.',
     avatar: 'https://api.dicebear.com/9.x/personas/svg?seed=Tommy&backgroundColor=b6e3f4',
     personality: 'Beginner',
@@ -188,6 +200,9 @@ export const BOTS: BotConfig[] = [
     rating: 800,
     depth: 1,
     blunderRate: 0.3,
+    captureSight: 0.75,
+    mateSight: 0.8,
+    evalNoise: 30,
     description: 'Plays at the park on weekends. Knows the basics but misses tactics.',
     avatar: 'https://api.dicebear.com/9.x/personas/svg?seed=Rosa&backgroundColor=ffd5dc',
     personality: 'Casual',
@@ -197,6 +212,8 @@ export const BOTS: BotConfig[] = [
     rating: 1000,
     depth: 2,
     blunderRate: 0.2,
+    captureSight: 0.9,
+    mateSight: 0.95,
     description: 'School chess club regular. Captures free pieces and controls the center.',
     avatar: 'https://api.dicebear.com/9.x/personas/svg?seed=Derek&backgroundColor=c0aede',
     personality: 'Improving',
@@ -292,8 +309,28 @@ export async function getBotMove(fen: string, bot: BotConfig): Promise<string | 
     return moves[Math.floor(Math.random() * moves.length)];
   }
 
+  // Beginner bots don't see everything: drop the captures / mates they
+  // "missed" this move. (1200+ bots never get here when the server engine
+  // answers, and don't set these fields anyway.)
+  let candidates = moves;
+  if (bot.captureSight !== undefined || bot.mateSight !== undefined) {
+    const notices = (p?: number) => p === undefined || Math.random() < p;
+    const kept = moves.filter((m) => {
+      if (m.includes('#')) return notices(bot.mateSight);
+      if (m.includes('x')) return notices(bot.captureSight);
+      return true;
+    });
+    if (kept.length > 0) candidates = kept;
+  }
+  const noise = () => {
+    if (!bot.evalNoise) return 0;
+    // Box-Muller normal sample
+    const u = 1 - Math.random(), v = Math.random();
+    return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v) * bot.evalNoise;
+  };
+
   const maximizing = chess.turn() === 'w';
-  let bestMove = moves[0];
+  let bestMove = candidates[0];
   let bestEval = maximizing ? -Infinity : Infinity;
 
   let effectiveDepth = bot.depth;
@@ -303,7 +340,7 @@ export async function getBotMove(fen: string, bot: BotConfig): Promise<string | 
   // Shuffle within each ordering tier (captures/promotions vs the rest) so
   // there's still variety among similarly-good moves, without losing the
   // pruning benefit of trying captures first.
-  const ordered = orderMoves(moves);
+  const ordered = orderMoves(candidates);
   const captureCount = ordered.findIndex(m => !m.includes('x') && !m.includes('='));
   const splitAt = captureCount === -1 ? ordered.length : captureCount;
   const shuffled = [
@@ -314,7 +351,7 @@ export async function getBotMove(fen: string, bot: BotConfig): Promise<string | 
   let i = 0;
   for (const move of shuffled) {
     chess.move(move);
-    const eval_ = minimax(chess, effectiveDepth - 1, -Infinity, Infinity, !maximizing);
+    const eval_ = minimax(chess, effectiveDepth - 1, -Infinity, Infinity, !maximizing) + noise();
     chess.undo();
 
     if (maximizing ? eval_ > bestEval : eval_ < bestEval) {
