@@ -13,7 +13,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { apiFetch } from '@/lib/api';
 import { useLocation } from 'wouter';
-import { useDashboardRedesignFlag } from '@/hooks/use-app-config';
+import { useDashboardRedesignFlag, usePhotoImagesFlag } from '@/hooks/use-app-config';
 import { RD } from '@/lib/redesignTheme';
 import { RedesignHeader } from '@/components/RedesignHeader';
 import { openingThumb, openingFamily } from '@/lib/openingThumb';
@@ -1026,6 +1026,7 @@ function BotTileRD({ bot, onSelect }: { bot: BotConfig; onSelect: (b: BotConfig)
 }
 
 function OpeningTileRD({ opening, onSelect }: { opening: OpeningLine; onSelect: (o: OpeningLine) => void }) {
+  const photoImgs = usePhotoImagesFlag();
   return (
     <button
       onClick={() => onSelect(opening)}
@@ -1033,7 +1034,7 @@ function OpeningTileRD({ opening, onSelect }: { opening: OpeningLine; onSelect: 
       style={{ background: RD.card, border: `1px solid ${RD.border}` }}
     >
       <span className="relative w-[104px] shrink-0 overflow-hidden">
-        <img src={openingThumb(openingFamily(opening.name))} alt="" loading="lazy" className="absolute inset-0 h-full w-full scale-[1.08] object-cover" />
+        <img src={openingThumb(openingFamily(opening.name), photoImgs)} alt="" loading="lazy" className="absolute inset-0 h-full w-full scale-[1.08] object-cover" />
       </span>
       <span className="min-w-0 flex-1 px-4 py-3.5">
         <span className="flex items-center gap-2">

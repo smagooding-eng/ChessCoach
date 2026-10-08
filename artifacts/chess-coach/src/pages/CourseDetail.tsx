@@ -1,7 +1,7 @@
 import { RD, REDESIGN_ON } from '@/lib/redesignTheme';
 import { LessonQuizScreen, LessonCompleteScreen, LessonIntroScreen, findQuizMoves, type QuizMoves, type IntroBullet } from '@/components/LessonFlow';
 import { artFor, ART_BASE } from './CoursesRedesign';
-import { useDashboardRedesignFlag } from '@/hooks/use-app-config';
+import { useDashboardRedesignFlag, useSiteImg } from '@/hooks/use-app-config';
 import { CourseOverview } from './CourseOverview';
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useParams, Link } from 'wouter';
@@ -70,6 +70,7 @@ function LessonIntroCard({
   courseCategory: string;
   onStart: () => void;
 }) {
+  const siteImg = useSiteImg();
   const { data: weaknessData } = useMyWeaknesses();
   const { enabled: redesign } = useDashboardRedesignFlag();
   const introArt = artFor({ id: 0, category: courseCategory, title: '' });
@@ -90,7 +91,7 @@ function LessonIntroCard({
     >
       {redesign && (
         <div className="relative -mx-5 -mt-5 mb-4 h-28 md:-mx-6 md:-mt-6">
-          <img src={`${ART_BASE}${introArt.img}.webp`} alt="" className="h-full w-full object-cover" />
+          <img src={siteImg(`${ART_BASE}${introArt.img}.webp`)} alt="" className="h-full w-full object-cover" />
           <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, rgba(5,10,11,.15) 0%, #0D1516 100%)' }} />
         </div>
       )}
@@ -914,6 +915,7 @@ function LessonBeatPlayer({
 
 // ── Main CourseDetail page ─────────────────────────────────────────────────────
 export function CourseDetail() {
+  const siteImg = useSiteImg();
   const { id } = useParams();
   const courseId = parseInt(id || '0');
   const { data: course, isLoading } = useCourseDetail(courseId);
@@ -1343,7 +1345,7 @@ export function CourseDetail() {
               total={sortedLessons.length}
               title={lesson.title}
               subtitle={lesson.conceptTitle ?? course.category}
-              artSrc={`${ART_BASE}${artFor({ id: course.id, category: course.category, title: course.title }).img}.webp`}
+              artSrc={siteImg(`${ART_BASE}${artFor({ id: course.id, category: course.category, title: course.title }).img}.webp`)}
               bullets={parts}
               onStart={() => setIntroDone((d) => [...d, lesson.id])}
               onBack={() => setShowOverview(true)}

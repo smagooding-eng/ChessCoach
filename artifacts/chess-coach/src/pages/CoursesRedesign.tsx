@@ -3,6 +3,7 @@ import { Link } from 'wouter';
 import { ArrowRight, BookOpen, CheckCircle2, GraduationCap, Play, Target, Trophy, X, AlertCircle } from 'lucide-react';
 import { useCourseDetail } from '@/hooks/use-courses';
 import { RD } from '@/lib/redesignTheme';
+import { useSiteImg } from '@/hooks/use-app-config';
 
 // Courses (redesign): "Your Training Plan" -- next-move hero, flat stat
 // columns, priority rows, a recommended-course card and compact course rows,
@@ -54,6 +55,7 @@ export function CoursesRedesign({
   onGenerate: () => void;
   onArchive: (id: number) => void;
 }) {
+  const siteImg = useSiteImg();
   const [tab, setTab] = useState<'all' | 'progress'>('all');
 
   const inProgress = courses
@@ -98,7 +100,7 @@ export function CoursesRedesign({
         {/* YOUR NEXT MOVE */}
         {nextCourse && (
           <section className="relative overflow-hidden rounded-[22px]" style={{ border: `1.5px solid ${RD.green}`, boxShadow: '0 0 0 1px rgba(139,234,69,.18), 0 18px 50px -22px rgba(139,234,69,.5)' }}>
-            <img src={`${ART_BASE}course-training-hero.webp`} alt="" className="absolute inset-0 h-full w-full object-cover" style={{ objectPosition: '82% center' }} />
+            <img src={siteImg(`${ART_BASE}course-training-hero.webp`)} alt="" className="absolute inset-0 h-full w-full object-cover" style={{ objectPosition: '82% center' }} />
             <div className="absolute inset-0" style={{ background: 'linear-gradient(90deg, rgba(5,10,11,.94) 0%, rgba(5,10,11,.78) 48%, rgba(5,10,11,.05) 100%)' }} />
             <div className="relative z-10 p-5">
               <p className="text-[12px] font-extrabold uppercase tracking-[.18em]" style={{ color: '#D9C46A' }}>Your next move</p>
@@ -159,7 +161,7 @@ export function CoursesRedesign({
           <section className="grid gap-2.5">
             <h2 className="px-1 text-[20px] font-extrabold">Recommended for you</h2>
             <Link href={`/courses/${recommended.id}`} className="relative block overflow-hidden rounded-[22px]" style={{ border: `1px solid ${RD.border}` }}>
-              <img src={`${ART_BASE}${artFor(recommended).img}.webp`} alt="" className="absolute inset-0 h-full w-full object-cover" style={{ objectPosition: '75% center' }} />
+              <img src={siteImg(`${ART_BASE}${artFor(recommended).img}.webp`)} alt="" className="absolute inset-0 h-full w-full object-cover" style={{ objectPosition: '75% center' }} />
               <div className="absolute inset-0" style={{ background: 'linear-gradient(90deg, rgba(5,10,11,.92) 0%, rgba(5,10,11,.7) 55%, rgba(5,10,11,.1) 100%)' }} />
               <div className="relative z-10 flex min-h-[210px] flex-col p-5">
                 <h3 className="max-w-[75%] text-[26px] font-extrabold leading-tight">{recommended.title}</h3>
@@ -240,7 +242,7 @@ export function CoursesRedesign({
               <div key={c.id} className="flex items-stretch overflow-hidden rounded-[20px]" style={card}>
                 <Link href={`/courses/${c.id}`} className="flex min-w-0 flex-1 items-stretch">
                   <span className="relative w-[96px] shrink-0 overflow-hidden">
-                    <img src={`${ART_BASE}${a.img}.webp`} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
+                    <img src={siteImg(`${ART_BASE}${a.img}.webp`)} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
                   </span>
                   <span className="min-w-0 flex-1 px-3.5 py-3.5">
                     <b className="block truncate text-[16.5px] font-extrabold">{c.title}</b>

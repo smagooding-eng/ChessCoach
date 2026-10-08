@@ -3,7 +3,7 @@ import { PageHero } from '@/components/DesignSystem';
 import { useLocation } from 'wouter';
 import { useUser } from '@/hooks/use-user';
 import { apiFetch } from '@/lib/api';
-import { useDashboardRedesignFlag, setDashboardRedesignEnabled } from '@/hooks/use-app-config';
+import { useDashboardRedesignFlag, setDashboardRedesignEnabled, usePhotoImagesFlag, setPhotoImagesEnabled } from '@/hooks/use-app-config';
 import { cn } from '@/lib/utils';
 import { Link } from 'wouter';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -657,6 +657,7 @@ export function Admin() {
           )}
 
           <DashboardRedesignTogglePanel />
+          <PhotoImagesTogglePanel />
 
           <PushNotificationPanel />
 
@@ -2134,6 +2135,54 @@ function DashboardRedesignTogglePanel() {
           </div>
           <div className="w-10 h-6 rounded-full flex items-center px-0.5 transition-colors shrink-0"
             style={{ background: enabled ? '#7fd14f' : 'rgba(255,255,255,.15)', justifyContent: enabled ? 'flex-end' : 'flex-start' }}>
+            {saving ? <Loader2 className="w-4 h-4 animate-spin text-white" /> : <div className="w-5 h-5 rounded-full bg-white" />}
+          </div>
+        </button>
+        {error && <p className="text-xs text-red-400 mt-2">{error}</p>}
+      </div>
+    </motion.div>
+  );
+}
+
+function PhotoImagesTogglePanel() {
+  const enabled = usePhotoImagesFlag();
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  const toggle = async () => {
+    setSaving(true);
+    setError('');
+    const result = await setPhotoImagesEnabled(!enabled);
+    if (!result) setError('Failed to update -- try again.');
+    setSaving(false);
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="rounded-xl border border-border/40 bg-card overflow-hidden"
+    >
+      <div className="px-5 py-3 border-b border-border/30 bg-amber-500/5 flex items-center gap-2">
+        <Sparkles className="w-4 h-4 text-amber-400" />
+        <h3 className="text-sm font-bold text-amber-400">Images: AI art vs real photos (all users)</h3>
+      </div>
+      <div className="p-4">
+        <button
+          onClick={toggle}
+          disabled={saving}
+          className="w-full flex items-center justify-between disabled:opacity-50"
+        >
+          <div className="text-left">
+            <p className="text-sm font-bold text-foreground">
+              {enabled ? 'Photos — real chess photography everywhere' : 'AI art — the original generated artwork'}
+            </p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Swaps the home hero and tiles, opening thumbnails, course art, landing hero and setup background. Global, like the design toggle. Boards, pieces and bot avatars are unaffected.
+            </p>
+          </div>
+          <div className="w-10 h-6 rounded-full flex items-center px-0.5 transition-colors shrink-0"
+            style={{ background: enabled ? '#E8B447' : 'rgba(255,255,255,.15)', justifyContent: enabled ? 'flex-end' : 'flex-start' }}>
             {saving ? <Loader2 className="w-4 h-4 animate-spin text-white" /> : <div className="w-5 h-5 rounded-full bg-white" />}
           </div>
         </button>

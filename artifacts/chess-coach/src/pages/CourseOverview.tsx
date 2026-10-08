@@ -3,6 +3,7 @@ import { Link } from 'wouter';
 import { ArrowLeft, ArrowRight, CheckCircle2, Layers, Play } from 'lucide-react';
 import { RD } from '@/lib/redesignTheme';
 import { artFor, ART_BASE, type CourseLike } from './CoursesRedesign';
+import { useSiteImg } from '@/hooks/use-app-config';
 
 // Course Overview (redesign), per the course mockup: top bar, full-bleed art,
 // title / description / meta, progress, one primary action, and a Lessons /
@@ -16,6 +17,7 @@ export function CourseOverview({
   lessons: { id: number; title: string; completed: boolean }[];
   onOpen: (index: number) => void;
 }) {
+  const siteImg = useSiteImg();
   const [tab, setTab] = useState<'lessons' | 'about'>('lessons');
   const art = artFor(course);
   const total = course.totalLessons || lessons.length;
@@ -34,7 +36,7 @@ export function CourseOverview({
         </div>
 
         <div className="relative h-[210px] overflow-hidden">
-          <img src={`${ART_BASE}${art.img}.webp`} alt="" className="absolute inset-0 h-full w-full object-cover" />
+          <img src={siteImg(`${ART_BASE}${art.img}.webp`)} alt="" className="absolute inset-0 h-full w-full object-cover" />
           <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, rgba(5,10,11,0) 40%, #050A0B 100%)' }} />
         </div>
 
@@ -91,7 +93,7 @@ export function CourseOverview({
                     style={{ background: isCurrent ? 'rgba(139,234,69,.08)' : 'transparent', boxShadow: isCurrent ? `inset 0 0 0 1.5px ${RD.green}` : undefined }}
                   >
                     <span className="relative h-11 w-11 shrink-0 overflow-hidden rounded-[9px]" style={{ border: `1px solid ${RD.border}` }}>
-                      <img src={`${ART_BASE}${art.img}.webp`} alt="" loading="lazy" className="h-full w-full object-cover" style={{ objectPosition: `${(i * 37) % 100}% center` }} />
+                      <img src={siteImg(`${ART_BASE}${art.img}.webp`)} alt="" loading="lazy" className="h-full w-full object-cover" style={{ objectPosition: `${(i * 37) % 100}% center` }} />
                     </span>
                     <span className="w-5 shrink-0 text-center text-[13px]" style={{ color: RD.muted }}>{i + 1}</span>
                     <span className="min-w-0 flex-1 text-[15px] font-semibold leading-snug" style={{ color: l.completed || isCurrent ? RD.text : 'rgba(245,247,246,.75)' }}>{l.title}</span>

@@ -4,6 +4,7 @@ import { Chess } from 'chess.js';
 import { ArrowLeft, ArrowRight, BookOpen, CheckCircle2, Swords, Target, Trophy, XCircle } from 'lucide-react';
 import { ChessBoard } from '@/components/ChessBoard';
 import { RD } from '@/lib/redesignTheme';
+import { useSiteImg } from '@/hooks/use-app-config';
 
 // Post-lesson screens for the redesign: a quick check, then a completion
 // screen. Both use only real lesson data. There is no XP system in the app,
@@ -147,11 +148,12 @@ export function LessonCompleteScreen({
   onViewCourse: () => void;
   onShare?: () => void;
 }) {
+  const siteImg = useSiteImg();
   const pct = lessonsTotal > 0 ? Math.round((lessonsDone / lessonsTotal) * 100) : 0;
   return (
     <div className="fixed inset-0 z-40 overflow-y-auto" style={{ background: RD.bg, color: RD.text }}>
       <div className="relative">
-        <img src={`${import.meta.env.BASE_URL}assets/courses/course-tactical.webp`} alt="" className="absolute inset-0 h-[300px] w-full object-cover" />
+        <img src={siteImg(`${import.meta.env.BASE_URL}assets/courses/course-tactical.webp`)} alt="" className="absolute inset-0 h-[300px] w-full object-cover" />
         <div className="absolute inset-0 h-[300px]" style={{ background: 'linear-gradient(180deg, rgba(5,10,11,.55) 0%, #050A0B 100%)' }} />
         <div className="relative mx-auto w-full max-w-[520px] px-4 pb-10 pt-[max(2.5rem,env(safe-area-inset-top))] text-center">
           <div className="mx-auto grid h-24 w-24 place-items-center rounded-full" style={{ background: 'rgba(232,180,71,.14)', border: '1px solid rgba(232,180,71,.45)', boxShadow: '0 0 60px rgba(232,180,71,.35)' }}>

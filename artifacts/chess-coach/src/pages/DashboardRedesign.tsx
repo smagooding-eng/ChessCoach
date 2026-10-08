@@ -16,6 +16,7 @@ import { ReferralCard } from '@/pages/Profile';
 import { useMyGames } from '@/hooks/use-games';
 import { GameThumb } from '@/components/GameThumb';
 import { ProUpsell } from '@/components/ProUpsell';
+import { useSiteImg } from '@/hooks/use-app-config';
 
 // Dashboard shown when the global "dashboard redesign" flag is ON (see
 // DashboardRouter in App.tsx). The mobile header and bottom nav in the
@@ -64,6 +65,7 @@ function Skeleton({ className = '' }: { className?: string }) {
 }
 
 export function DashboardRedesign() {
+  const siteImg = useSiteImg();
   const { username, isPremium, authUser, isSubscriptionLoaded } = useUser();
   // Only once the plan is known, so Pro members never see an upsell flash.
   const freePlan = isSubscriptionLoaded && !!authUser && !isPremium;
@@ -265,7 +267,7 @@ export function DashboardRedesign() {
           style={{
             background: BG,
             border: `1px solid ${BORDER}`,
-            backgroundImage: `url(${asset('scout-knight.webp')})`,
+            backgroundImage: `url(${siteImg(asset('scout-knight.webp'))})`,
             backgroundSize: 'auto 100%',
             backgroundPosition: '68% center',
             backgroundRepeat: 'no-repeat',
@@ -324,7 +326,7 @@ export function DashboardRedesign() {
               style={{
                 background: BG,
                 border: `1px solid ${BORDER}`,
-                backgroundImage: `url(${asset(t.img)})`,
+                backgroundImage: `url(${siteImg(asset(t.img))})`,
                 backgroundSize: 'auto 100%',
                 backgroundPosition: t.pos,
                 backgroundRepeat: 'no-repeat',

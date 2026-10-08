@@ -30,3 +30,15 @@ export async function isDashboardRedesignEnabled(): Promise<boolean> {
 export async function setDashboardRedesignEnabled(enabled: boolean, adminUserId: string): Promise<void> {
   await setConfigValue(DASHBOARD_REDESIGN_KEY, enabled ? "true" : "false", adminUserId);
 }
+
+const PHOTO_IMAGES_KEY = "photo_images_enabled";
+
+// Admin toggle: swap the app's AI-generated artwork for real chess photography.
+// Global (same for everyone), defaults to off (AI artwork) until an admin flips it.
+export async function isPhotoImagesEnabled(): Promise<boolean> {
+  return (await getConfigValue(PHOTO_IMAGES_KEY)) === "true";
+}
+
+export async function setPhotoImagesEnabled(enabled: boolean, adminUserId: string): Promise<void> {
+  await setConfigValue(PHOTO_IMAGES_KEY, enabled ? "true" : "false", adminUserId);
+}

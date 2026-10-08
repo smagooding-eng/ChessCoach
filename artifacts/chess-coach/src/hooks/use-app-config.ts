@@ -54,3 +54,69 @@ export async function setDashboardRedesignEnabled(enabled: boolean): Promise<{ e
   if (!res.ok) return null;
   return res.json();
 }
+
+// ── Photo vs AI artwork ─────────────────────────────────────────────────────
+// Second GLOBAL flag (admin toggle "AI vs non-AI images"). When on, every
+// decorative image in the app -- home hero + tiles, opening thumbnails, course
+// art, landing hero, setup background -- is swapped for the real-photograph
+// version that lives under public/photo/ at the same relative path.
+//
+// Many components need this at once, so the flag lives in a tiny shared store
+// (one request per page load, not one per component) with the same
+// localStorage first-paint cache as the redesign flag.
+const PHOTO_CACHE_KEY = 'cs_photo_images';
+let photoOn: boolean = (() => { try { return localStorage.getItem(PHOTO_CACHE_KEY) === '1'; } catch { return false; } })();
+let photoFetched = false;
+const photoListeners = new Set<() => void>();
+function setPhotoOn(v: boolean) {
+  photoOn = v;
+  try { localStorage.setItem(PHOTO_CACHE_KEY, v ? '1' : '0'); } catch { /* storage unavailable */ }
+  photoListeners.forEach((l) => l());
+}
+function fetchPhotoFlag() {
+  photoFetched = true;
+  apiFetch('/api/app-config/photo-images')
+    .then((r) => (r.ok ? r.json() : null))
+    .then((d) => { if (d && typeof d.enabled === 'boolean' && d.enabled !== photoOn) setPhotoOn(d.enabled); })
+    .catch(() => { /* keep cached value */ });
+}
+
+export function usePhotoImagesFlag(): boolean {
+  const [on, setOn] = useState(photoOn);
+  useEffect(() => {
+    const l = () => setOn(photoOn);
+    photoListeners.add(l);
+    if (!photoFetched) fetchPhotoFlag();
+    l();
+    return () => { photoListeners.delete(l); };
+  }, []);
+  return on;
+}
+
+// Decorative image paths that have a photo twin under public/photo/.
+const PHOTO_SWAP = /(chessscout\/|assets\/openings\/|assets\/courses\/|images\/hero-bg\.)/;
+export function toPhotoPath(url: string): string {
+  const i = url.search(PHOTO_SWAP);
+  if (i < 0) return url;
+  return url.slice(0, i) + 'photo/' + url.slice(i).replace(/\.(png|jpe?g|webp)$/i, '.webp');
+}
+
+/** `const img = useSiteImg(); <img src={img(url)} />` -- returns the photo
+ *  twin when the admin photo toggle is on, otherwise the url unchanged. */
+export function useSiteImg(): (url: string) => string {
+  const on = usePhotoImagesFlag();
+  return useCallback((url: string) => (on ? toPhotoPath(url) : url), [on]);
+}
+
+export async function setPhotoImagesEnabled(enabled: boolean): Promise<{ enabled: boolean } | null> {
+  const res = await apiFetch('/api/admin/app-config/photo-images', {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ enabled }),
+  });
+  if (!res.ok) return null;
+  const d = await res.json();
+  if (d && typeof d.enabled === 'boolean') setPhotoOn(d.enabled);
+  return d;
+}

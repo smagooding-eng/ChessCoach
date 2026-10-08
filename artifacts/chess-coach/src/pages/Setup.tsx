@@ -4,8 +4,10 @@ import { useLocation } from 'wouter';
 import { ArrowRight, Trophy, Mail, Eye, EyeOff, UserPlus, LogIn } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { apiFetch, apiUrl, setAuthToken } from '@/lib/api';
+import { useSiteImg } from '@/hooks/use-app-config';
 
 export function Setup() {
+  const siteImg = useSiteImg();
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -142,7 +144,7 @@ export function Setup() {
     <div className="min-h-screen relative flex items-center justify-center p-4">
       <div className="absolute inset-0 z-0">
         <img
-          src={`${import.meta.env.BASE_URL}images/hero-bg.png`}
+          src={siteImg(`${import.meta.env.BASE_URL}images/hero-bg.png`)}
           alt="Hero background"
           className="w-full h-full object-cover opacity-60 mix-blend-overlay"
         />

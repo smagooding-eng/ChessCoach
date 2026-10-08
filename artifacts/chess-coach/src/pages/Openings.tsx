@@ -8,7 +8,7 @@ import {
   GraduationCap, Target, Swords
 } from 'lucide-react';
 import { useMyOpenings, type OpeningStat } from '@/hooks/use-openings';
-import { useDashboardRedesignFlag } from '@/hooks/use-app-config';
+import { useDashboardRedesignFlag, usePhotoImagesFlag } from '@/hooks/use-app-config';
 import { RD } from '@/lib/redesignTheme';
 import { RedesignHeader } from '@/components/RedesignHeader';
 import { openingThumb } from '@/lib/openingThumb';
@@ -46,6 +46,7 @@ export function Openings() {
   const [sortAsc, setSortAsc] = useState(false);
   const [colorFilter, setColorFilter] = useState<ColorFilter>('all');
   const { enabled: redesign } = useDashboardRedesignFlag();
+  const photoImgs = usePhotoImagesFlag();
   const [tab, setTab] = useState<'foryou' | 'popular' | 'repertoire'>('foryou');
 
   const openings = data?.openings ?? [];
@@ -115,7 +116,7 @@ export function Openings() {
       { id: 'popular', label: 'Popular' },
       { id: 'repertoire', label: 'My Repertoire' },
     ];
-    const thumb = openingThumb;
+    const thumb = (name: string) => openingThumb(name, photoImgs);
 
     return (
       <div className="min-h-screen px-3 md:px-6 md:pt-6 md:pb-12 pb-[calc(7.5rem+env(safe-area-inset-bottom))]" style={{ background: RD.bg, color: RD.text }}>

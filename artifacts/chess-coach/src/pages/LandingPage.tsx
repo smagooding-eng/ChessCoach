@@ -7,6 +7,7 @@ import { ArrowRight, Mail, Eye, EyeOff, UserPlus, LogIn, Search, BarChart3, Brai
 import { motion, AnimatePresence } from 'framer-motion';
 import { Trophy as HeroTrophy } from 'lucide-react';
 import { apiFetch, apiUrl, setAuthToken } from '@/lib/api';
+import { useSiteImg } from '@/hooks/use-app-config';
 
 const G = '#8BEA45';
 const G_HOVER = '#79D338';
@@ -457,6 +458,7 @@ function PersonalAnalysisCard() {
 }
 
 export function LandingPage() {
+  const siteImg = useSiteImg();
   const [authOpen, setAuthOpen] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'register'>('register');
   const [authContext, setAuthContext] = useState<'default' | 'opponent_scout'>('default');
@@ -517,7 +519,7 @@ export function LandingPage() {
     <div className="relative flex min-h-[100dvh] flex-col overflow-x-hidden" style={{ background: `radial-gradient(ellipse at 75% 0%, #0F2B1D 0%, #07130F 34%, ${BG} 68%)` }}>
       {/* knight art: bleeds off the right edge on phones (as in the mockup), sits fully in view on desktop */}
       <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
-        <img src={`${import.meta.env.BASE_URL}chessscout/scout-knight.webp`} alt=""
+        <img src={siteImg(`${import.meta.env.BASE_URL}chessscout/scout-knight.webp`)} alt=""
           className="absolute right-[-34%] top-[7%] h-[58%] w-auto max-w-none sm:right-[-6%] sm:top-[4%] sm:h-[70%] lg:right-0 lg:top-0 lg:h-[88%]"
           style={{ WebkitMaskImage: 'linear-gradient(180deg, transparent 0%, #000 14%, #000 58%, transparent 100%)', maskImage: 'linear-gradient(180deg, transparent 0%, #000 14%, #000 58%, transparent 100%)' }} />
         <div className="absolute inset-0" style={{ background: `linear-gradient(90deg, ${BG} 0%, ${BG}f2 34%, ${BG}b3 60%, ${BG}00 100%)` }} />
