@@ -12,12 +12,14 @@ const PORTRAIT: Record<string, string> = {
   Nadia: 'nadia',
   'Grandmaster Chen': 'grandmaster-chen',
   'Dr. Fischer': 'dr-fischer',
+  'IM Sato': 'im-sato',
+  'GM Ivanova': 'gm-ivanova',
 };
 
 // With the admin "real photos" toggle on, each bot is instead a photographed
 // chess piece that climbs with its rating: white pawn (400), black pawn,
-// white knight, black knight, white bishop, black bishop, black rook and the
-// queen (2000). Lives at public/photo/assets/bots/<slug>.webp.
+// white knight, black knight, white bishop, black bishop, black rook, white
+// rook (2000), then the queens: white (2600) and black (3000). Lives at public/photo/assets/bots/<slug>.webp.
 export function useBotAvatar() {
   const { enabled } = useDashboardRedesignFlag();
   const photo = usePhotoImagesFlag();
@@ -39,7 +41,9 @@ const PIECE_NAME: Record<string, string> = {
   Viktor: 'White Bishop',
   Nadia: 'Black Bishop',
   'Grandmaster Chen': 'Black Rook',
-  'Dr. Fischer': 'Queen',
+  'Dr. Fischer': 'White Rook',
+  'IM Sato': 'White Queen',
+  'GM Ivanova': 'Black Queen',
 };
 
 export function useBotName() {
@@ -63,6 +67,8 @@ const PIECE_BLURB: Record<string, string> = {
   Nadia: 'Strong positional play and endgames.',
   'Grandmaster Chen': 'Deep calculation and relentless pressure.',
   'Dr. Fischer': 'Near-master strength. Punishes the slightest inaccuracy.',
+  'IM Sato': 'International Master strength. Precise, patient and very hard to trick.',
+  'GM Ivanova': 'Grandmaster strength. Turns the smallest edge into a win.',
 };
 
 export function useBotDescription() {

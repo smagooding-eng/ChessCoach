@@ -409,7 +409,9 @@ async function getBotStockfish(): Promise<StockfishProcess> {
 
 // UCI move for a bot of the given rating, thinking briefly (longer for stronger bots).
 export function stockfishBotMove(fen: string, elo: number): Promise<string | null> {
-  const movetimeMs = Math.max(200, Math.min(700, 200 + (elo - 1200) * 0.4));
+  // 200ms at 1200 up to ~1s for the 2600/3000 bots (still well inside the
+  // client's 6s timeout).
+  const movetimeMs = Math.max(200, Math.min(1000, 200 + (elo - 1200) * 0.4));
   const run = async () => (await getBotStockfish()).bestMoveAtElo(fen, elo, movetimeMs);
   const result = botQueue.then(run, run);
   botQueue = result.then(() => undefined, () => undefined);

@@ -43,6 +43,8 @@ const TIER_COLORS: Record<string, string> = {
   Advanced: 'from-purple-900 to-purple-950 border-purple-600/40',
   Expert: 'from-pink-900 to-pink-950 border-pink-600/40',
   Master: 'from-amber-900 to-amber-950 border-amber-600/40',
+  'International Master': 'from-orange-900 to-orange-950 border-orange-600/40',
+  Grandmaster: 'from-red-900 to-red-950 border-red-600/40',
 };
 
 const QUALITY_CFG: Record<string, { label: string; icon: string; bg: string; text: string; border: string; dot: string }> = {
@@ -1009,7 +1011,7 @@ function OpeningCard({ opening, onSelect }: { opening: OpeningLine; onSelect: (o
 // keeps the original gradient tiles.
 const TIER_ACCENT: Record<string, string> = {
   Beginner: '#A8A29E', Casual: '#34D399', Improving: '#2DD4BF', 'Club Player': '#60A5FA',
-  Tournament: '#818CF8', Advanced: '#C084FC', Expert: '#F472B6', Master: '#E8B447',
+  Tournament: '#818CF8', Advanced: '#C084FC', Expert: '#F472B6', Master: '#E8B447', 'International Master': '#FB923C', Grandmaster: '#F87171',
 };
 
 function BotTileRD({ bot, onSelect }: { bot: BotConfig; onSelect: (b: BotConfig) => void }) {

@@ -263,6 +263,24 @@ export const BOTS: BotConfig[] = [
     avatar: 'https://api.dicebear.com/9.x/personas/svg?seed=Fischer&backgroundColor=c9a15c',
     personality: 'Master',
   },
+  {
+    name: 'IM Sato',
+    rating: 2600,
+    depth: 4,
+    blunderRate: 0,
+    description: 'International Master. Precise, patient and very hard to trick.',
+    avatar: 'https://api.dicebear.com/9.x/personas/svg?seed=Sato&backgroundColor=c9a15c',
+    personality: 'International Master',
+  },
+  {
+    name: 'GM Ivanova',
+    rating: 3000,
+    depth: 4,
+    blunderRate: 0,
+    description: 'Grandmaster. Turns the smallest edge into a win.',
+    avatar: 'https://api.dicebear.com/9.x/personas/svg?seed=Ivanova&backgroundColor=c9a15c',
+    personality: 'Grandmaster',
+  },
 ];
 
 // The built-in search below only looks 1-4 moves ahead with a simple material

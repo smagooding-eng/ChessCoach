@@ -15,6 +15,7 @@ import { EmailVerifyBanner } from '@/components/EmailVerifyBanner';
 import { trackImportJob } from '@/components/ImportStatusWatcher';
 import { CHESSCOM_GREEN, BRASS, TEXT_LIGHT, TEXT_MUTED, t, PieceTile } from '@/components/DesignSystem';
 import { ReferralCard } from '@/pages/Profile';
+import { BOTS } from '@/lib/chess-bot';
 
 const BG_DARK = '#262421';
 const BG_CARD = 'linear-gradient(180deg, #383532 0%, #2a2825 100%)';
@@ -418,7 +419,7 @@ export function Dashboard() {
             </div>
             <div className="flex-1">
               <h3 className="font-semibold text-sm" style={{ color: TEXT_LIGHT }}>Practice Bots</h3>
-              <p className="text-xs mt-0.5" style={{ color: TEXT_MUTED }}>8 opponents, 400–2000 ELO</p>
+              <p className="text-xs mt-0.5" style={{ color: TEXT_MUTED }}>{BOTS.length} opponents, {Math.min(...BOTS.map(b => b.rating))}–{Math.max(...BOTS.map(b => b.rating))} ELO</p>
             </div>
           </div>
         </Link>

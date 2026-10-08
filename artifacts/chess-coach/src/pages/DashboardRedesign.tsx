@@ -18,6 +18,7 @@ import { GameThumb } from '@/components/GameThumb';
 import { ProUpsell } from '@/components/ProUpsell';
 import { useSiteImg } from '@/hooks/use-app-config';
 import { scene } from '@/components/PhotoHero';
+import { BOTS } from '@/lib/chess-bot';
 
 // Dashboard shown when the global "dashboard redesign" flag is ON (see
 // DashboardRouter in App.tsx). The mobile header and bottom nav in the
@@ -532,7 +533,7 @@ export function DashboardRedesign() {
         {/* ── Everything else from the classic home ── */}
         <div className="grid grid-cols-3 gap-3">
           {[
-            { label: 'Practice Bots', sub: '8 opponents', href: '/practice', icon: Bot, img: 'quick-bots' },
+            { label: 'Practice Bots', sub: `${BOTS.length} opponents`, href: '/practice', icon: Bot, img: 'quick-bots' },
             { label: 'Local Play', sub: 'Pass and play', href: '/play/local', icon: Play, img: 'quick-local' },
             { label: 'Shop', sub: 'Boards & gear', href: '/shop', icon: ShoppingBag, img: 'quick-shop' },
           ].map((q) => (

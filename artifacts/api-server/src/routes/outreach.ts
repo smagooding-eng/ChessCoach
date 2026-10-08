@@ -73,7 +73,7 @@ const PRODUCT_INFO = `PRODUCT INFO — ChessScout.net:
 - Smart opponent scouting reports that expose weaknesses of any Chess.com or Lichess player
 - Move-by-move game analysis powered by Stockfish 17 + coaching, grounded in real engine data (not generic advice)
 - Personalized training courses and puzzles generated from your actual mistakes
-- 8 practice bots from 400 to 2000 ELO
+- 10 practice bots from 400 to 3000 ELO
 - ELO tracking across Chess.com and Lichess
 - 3-day free trial, $4/month or $1/week, no credit card required
 - A free, no-signup live demo on the homepage that scouts your last 5 games and your last opponent's

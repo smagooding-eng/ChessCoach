@@ -14,7 +14,7 @@ ChessScout imports your games from Chess.com or Lichess and finds recurring patt
 
 - Cross-game pattern analysis: finds recurring mistakes across your whole game history, not just one game
 - Scan Position: photograph any chess position (your game, a book, a stream) and practice it out from that exact position — no other chess tool offers this
-- Practice Bots: 8 bot opponents from 400–2000 ELO with live move-quality feedback
+- Practice Bots: 10 bot opponents from 400–3000 ELO with live move-quality feedback
 - Opponent Scout: prepare for a specific opponent before you play them
 - Personalized Courses: lessons built from your own recurring mistakes, not generic theory
 - Daily Puzzles: filterable by type (mate in 1/2/3, forks, pins, skewers, endgames)
