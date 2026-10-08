@@ -13,6 +13,10 @@ import {
 } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import { useDashboardRedesignFlag, useSiteImg } from '@/hooks/use-app-config';
+import { RD } from '@/lib/redesignTheme';
+import { PhotoHero, scene } from '@/components/PhotoHero';
+import { ART_BASE, distinctArtImgs } from './CoursesRedesign';
 
 type EndgameTab = 'checkmate' | 'essential' | 'personal';
 
@@ -50,6 +54,8 @@ export function Endgames() {
   const { username, authUser, isPremium, isSubscriptionLoaded } = useUser();
   const queryClient = useQueryClient();
   const { data, isLoading, refetch } = useMyCourses();
+  const { enabled: redesign } = useDashboardRedesignFlag();
+  const siteImg = useSiteImg();
 
   const [activeTab, setActiveTab] = useState<EndgameTab>('checkmate');
   const [generatingType, setGeneratingType] = useState<string | null>(null);
@@ -182,6 +188,16 @@ export function Endgames() {
 
   // Endgame courses are written by the AI, so they're Pro.
   if (authUser && isSubscriptionLoaded && !isPremium) {
+    if (redesign) return (
+      <div className="mx-auto max-w-[640px] space-y-4 px-3 pt-3 pb-24 md:px-0 md:pt-0">
+        <PhotoHero img={scene('hero-endgames')} icon={<Crown size={20} />} title="Endgames" subtitle="Courses built from the endgames in your own games." />
+        <ProUpsell
+          title="Master the endgames you actually reach"
+          text="Pro finds the endgames from your own games and turns them into lessons and drills, from basic checkmates to rook endings."
+          perks={['Checkmate patterns, pawn and rook endings', 'Positions taken from your own games', 'Plus the AI coach on every game you review']}
+        />
+      </div>
+    );
     return (
       <div className="mx-auto max-w-[640px] space-y-4 px-4 pt-4 pb-20 md:px-0 md:pt-0">
         <PageHero piece="♚" title="Endgames" subtitle="Courses built from the endgames in your own games." />
@@ -199,6 +215,94 @@ export function Endgames() {
       <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
     </div>
   );
+
+  if (redesign) {
+    const imgs = distinctArtImgs(tabCourses);
+    const generating = generatingType === currentTab.apiType;
+    const genLabel = activeTab === 'personal' ? 'Generate From My Games' : 'Generate Course';
+    return (
+      <div className="mx-auto max-w-[760px] space-y-4 px-3 pt-3 pb-24 md:px-0 md:pt-0">
+        <PhotoHero img={scene('hero-endgames')} icon={<Crown size={20} />} title="Endgame Training" subtitle="Master the endgame — the most important phase of chess." />
+
+        <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+          {TABS.map((tab) => {
+            const on = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className="flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-4 py-2.5 text-[13.5px] font-extrabold transition-colors"
+                style={on ? { background: RD.green, color: '#05100A' } : { background: RD.cardSolid, color: RD.muted, border: `1px solid ${RD.border}` }}
+              >
+                <tab.icon size={16} /> {tab.label}
+              </button>
+            );
+          })}
+        </div>
+
+        <section className="rounded-[20px] p-4" style={{ background: RD.card, border: `1px solid ${RD.border}` }}>
+          <div className="flex items-start gap-3">
+            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-[12px]" style={{ background: 'rgba(139,234,69,.14)', color: RD.green, border: '1px solid rgba(139,234,69,.25)' }}>
+              <currentTab.icon size={20} />
+            </span>
+            <div className="min-w-0 flex-1">
+              <h2 className="text-[17px] font-extrabold" style={{ color: RD.text }}>{currentTab.label}</h2>
+              <p className="mt-0.5 text-[13px] leading-snug" style={{ color: RD.muted }}>{currentTab.desc}</p>
+            </div>
+          </div>
+          <button
+            onClick={() => handleGenerate(currentTab.apiType)}
+            disabled={!!generatingType}
+            className="mt-4 flex w-full items-center justify-center gap-2 rounded-[12px] py-3 text-[14px] font-extrabold transition-transform active:scale-[.98] disabled:opacity-50"
+            style={{ background: RD.green, color: '#05100A' }}
+          >
+            {generating ? (<><span className="h-4 w-4 animate-spin rounded-full border-2 border-[#05100A] border-t-transparent" /> Generating…</>) : (<><Sparkles size={16} /> {genLabel}</>)}
+          </button>
+          {generating && <p className="mt-2 text-center text-[12px] animate-pulse" style={{ color: RD.muted }}>Building your endgame course — this takes 1–2 minutes…</p>}
+          {genError && <p className="mt-2 flex items-center gap-1.5 text-[13px]" style={{ color: RD.red }}><AlertCircle size={15} className="shrink-0" /> {genError}</p>}
+        </section>
+
+        {tabCourses.length > 0 ? (
+          <div className="grid gap-2.5 md:grid-cols-2">
+            {tabCourses.map((course, i) => {
+              const progress = Math.round((course.completedLessons / course.totalLessons) * 100) || 0;
+              const done = progress === 100;
+              return (
+                <Link key={course.id} href={`/courses/${course.id}`} className="flex items-stretch overflow-hidden rounded-[18px] transition-transform active:scale-[.99]" style={{ background: RD.card, border: `1px solid ${RD.border}` }}>
+                  <span className="relative w-[96px] shrink-0 overflow-hidden">
+                    <img src={siteImg(`${ART_BASE}${imgs[i]}.webp`)} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
+                  </span>
+                  <span className="min-w-0 flex-1 px-3.5 py-3">
+                    <b className="block truncate text-[15.5px] font-extrabold" style={{ color: RD.text }}>{course.title}</b>
+                    <span className="mt-0.5 flex items-center gap-1 text-[12px]" style={{ color: done ? RD.green : RD.muted }}>
+                      {done && <CheckCircle2 size={12} />} {course.completedLessons}/{course.totalLessons} lessons · {course.difficulty}
+                    </span>
+                    <span className="mt-2.5 flex items-center gap-2.5">
+                      <span className="h-1.5 flex-1 overflow-hidden rounded-full" style={{ background: 'rgba(255,255,255,.10)' }}>
+                        <span className="block h-full rounded-full" style={{ width: `${progress}%`, background: RD.green }} />
+                      </span>
+                      <b className="text-[12.5px]" style={{ color: RD.text }}>{progress}%</b>
+                    </span>
+                  </span>
+                  <ChevronRight size={17} className="mr-3 shrink-0 self-center" style={{ color: RD.muted }} />
+                </Link>
+              );
+            })}
+          </div>
+        ) : (
+          <section className="rounded-[20px] px-6 py-10 text-center" style={{ background: RD.card, border: `1px solid ${RD.border}` }}>
+            <BookOpen size={36} className="mx-auto mb-3" style={{ color: RD.muted, opacity: .6 }} />
+            <h3 className="text-[17px] font-extrabold" style={{ color: RD.text }}>No {currentTab.label} yet</h3>
+            <p className="mx-auto mt-1 max-w-sm text-[13px]" style={{ color: RD.muted }}>
+              {activeTab === 'personal'
+                ? 'Generate a personalized endgame course based on mistakes from your actual games.'
+                : `Generate a structured ${currentTab.label.toLowerCase()} training course.`}
+            </p>
+          </section>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 pb-20 px-4 pt-4 md:px-0 md:pt-0">

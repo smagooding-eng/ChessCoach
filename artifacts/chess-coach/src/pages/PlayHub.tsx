@@ -6,6 +6,8 @@ import { useBotAvatar } from '@/lib/botAvatars';
 import { useUser } from '@/hooks/use-user';
 import { RD } from '@/lib/redesignTheme';
 import { RedesignHeader } from '@/components/RedesignHeader';
+import { scene } from '@/components/PhotoHero';
+import { useSiteImg } from '@/hooks/use-app-config';
 
 // "Play Chess" hub (redesign). Only offers what the app can actually do:
 //  - Play a Bot: the real roster (count and rating range read from BOTS).
@@ -17,13 +19,14 @@ import { RedesignHeader } from '@/components/RedesignHeader';
 export function PlayHub() {
   const { authUser } = useUser();
   const botAvatar = useBotAvatar();
+  const siteImg = useSiteImg();
   const lowest = Math.min(...BOTS.map((b) => b.rating));
   const highest = Math.max(...BOTS.map((b) => b.rating));
 
-  const rows: { href: string; title: string; sub: string; icon: React.ReactNode; tint: string; show: boolean }[] = [
-    { href: '/practice', title: 'Play a Bot', sub: `${BOTS.length} opponents • ${lowest}–${highest} ELO`, icon: <Bot size={22} />, tint: '#5BA8FF', show: true },
-    { href: '/play/local', title: 'Play a Friend', sub: 'Two players, one device', icon: <Play size={22} />, tint: RD.green, show: true },
-    { href: '/live', title: 'Play Online', sub: 'Live games (admin preview)', icon: <Swords size={22} />, tint: RD.gold, show: !!authUser?.isAdmin },
+  const rows: { href: string; title: string; sub: string; icon: React.ReactNode; tint: string; show: boolean; img: string }[] = [
+    { href: '/practice', title: 'Play a Bot', sub: `${BOTS.length} opponents • ${lowest}–${highest} ELO`, icon: <Bot size={22} />, tint: '#5BA8FF', show: true, img: 'play-bot' },
+    { href: '/play/local', title: 'Play a Friend', sub: 'Two players, one device', icon: <Play size={22} />, tint: RD.green, show: true, img: 'play-friend' },
+    { href: '/live', title: 'Play Online', sub: 'Live games (admin preview)', icon: <Swords size={22} />, tint: RD.gold, show: !!authUser?.isAdmin, img: 'play-online' },
   ];
 
   return (
@@ -36,15 +39,17 @@ export function PlayHub() {
             <Link
               key={r.href}
               href={r.href}
-              className="flex items-center gap-3.5 rounded-[20px] p-4 transition-transform active:scale-[.99]"
+              className="relative flex min-h-[104px] items-center gap-3.5 overflow-hidden rounded-[20px] p-4 transition-transform active:scale-[.99]"
               style={{ background: RD.card, border: `1px solid ${RD.border}` }}
             >
-              <span className="grid h-12 w-12 shrink-0 place-items-center rounded-[14px]" style={{ background: `${r.tint}22`, color: r.tint, border: `1px solid ${r.tint}44` }}>{r.icon}</span>
-              <span className="min-w-0 flex-1">
+              <img src={siteImg(scene(r.img))} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" style={{ objectPosition: '75% center' }} />
+              <span className="absolute inset-0" style={{ background: 'linear-gradient(90deg, rgba(5,10,11,.95) 0%, rgba(5,10,11,.8) 42%, rgba(5,10,11,.1) 100%)' }} />
+              <span className="relative grid h-12 w-12 shrink-0 place-items-center rounded-[14px]" style={{ background: 'rgba(5,10,11,.55)', color: r.tint, border: `1px solid ${r.tint}55` }}>{r.icon}</span>
+              <span className="relative min-w-0 flex-1">
                 <b className="block text-[16px] font-bold">{r.title}</b>
                 <span className="block text-[12.5px]" style={{ color: RD.muted }}>{r.sub}</span>
               </span>
-              <ChevronRight size={18} className="shrink-0" style={{ color: RD.muted }} />
+              <ChevronRight size={18} className="relative shrink-0" style={{ color: RD.text }} />
             </Link>
           ))}
         </section>

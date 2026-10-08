@@ -1,5 +1,7 @@
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { PageHero } from '@/components/DesignSystem';
+import { PhotoHero, scene } from '@/components/PhotoHero';
+import { RD, REDESIGN_ON } from '@/lib/redesignTheme';
 import { ChessBoard } from '@/components/ChessBoard';
 import { MoveNavigationBar } from '@/components/MoveNavigationBar';
 import { Chess } from 'chess.js';
@@ -11,14 +13,21 @@ import {
   BookOpen, Lightbulb, Target, AlertTriangle, Trophy, TrendingDown, TrendingUp, X
 } from 'lucide-react';
 
-const BG_DARK = '#262421';
-const BG_CARD = 'linear-gradient(180deg, #383532 0%, #2a2825 100%)';
-const TEXT_LIGHT = '#e8e6e3';
-const TEXT_MUTED = '#9e9b98';
-const CHESSCOM_GREEN = '#81b64c';
-const MISTAKE_RED = '#dc4343';
-const CARD_SHADOW = '0 18px 50px -16px rgba(0,0,0,0.6), 0 4px 16px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04)';
-const CARD_BORDER = '1px solid rgba(129,182,76,0.08)';
+// Classic colours, or the enhanced-UI tokens when that design is on.
+const BG_DARK = REDESIGN_ON ? RD.bg : '#262421';
+const BG_CARD = REDESIGN_ON ? RD.card : 'linear-gradient(180deg, #383532 0%, #2a2825 100%)';
+const TEXT_LIGHT = REDESIGN_ON ? RD.text : '#e8e6e3';
+const TEXT_MUTED = REDESIGN_ON ? RD.muted : '#9e9b98';
+const CHESSCOM_GREEN = REDESIGN_ON ? RD.green : '#81b64c';
+const MISTAKE_RED = REDESIGN_ON ? RD.red : '#dc4343';
+const CARD_SHADOW = REDESIGN_ON ? 'none' : '0 18px 50px -16px rgba(0,0,0,0.6), 0 4px 16px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04)';
+const CARD_BORDER = REDESIGN_ON ? `1px solid ${RD.border}` : '1px solid rgba(129,182,76,0.08)';
+// Text on a green button: dark on the bright enhanced-UI green, white on classic.
+const ON_GREEN = REDESIGN_ON ? '#05100A' : '#fff';
+const GREEN_SOFT = REDESIGN_ON ? 'rgba(139,234,69,0.14)' : 'rgba(129,182,76,0.25)';
+const CHIP_STYLE: React.CSSProperties = REDESIGN_ON
+  ? { background: RD.cardSolid, border: `1px solid ${RD.border}`, color: TEXT_LIGHT }
+  : { background: 'rgba(129,182,76,0.25)', border: '1px solid rgba(129,182,76,0.5)', color: TEXT_LIGHT };
 
 type Classification = 'checkmate' | 'brilliant' | 'great' | 'best' | 'excellent' | 'good' | 'book' | 'inaccuracy' | 'mistake' | 'blunder' | 'missed_win';
 
@@ -658,7 +667,7 @@ export function GameLookup() {
                   <button
                     onClick={runAnalysis}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all hover:opacity-90"
-                    style={{ background: CHESSCOM_GREEN, color: '#fff' }}
+                    style={{ background: CHESSCOM_GREEN, color: ON_GREEN }}
                   >
                     <Lightbulb size={13} /> Analyze Game
                   </button>
@@ -750,7 +759,7 @@ export function GameLookup() {
                           className="flex-1 py-0.5 px-1.5 rounded text-left font-mono transition-colors hover:bg-white/10"
                           style={{
                             color: moveIndex === pair.white.index + 1 ? '#fff' : TEXT_LIGHT,
-                            background: moveIndex === pair.white.index + 1 ? 'rgba(129,182,76,0.25)' : 'transparent',
+                            background: moveIndex === pair.white.index + 1 ? GREEN_SOFT : 'transparent',
                           }}
                         >
                           {pair.white.san}
@@ -769,7 +778,7 @@ export function GameLookup() {
                           className="flex-1 py-0.5 px-1.5 rounded text-left font-mono transition-colors hover:bg-white/10"
                           style={{
                             color: moveIndex === pair.black.index + 1 ? '#fff' : TEXT_LIGHT,
-                            background: moveIndex === pair.black.index + 1 ? 'rgba(129,182,76,0.25)' : 'transparent',
+                            background: moveIndex === pair.black.index + 1 ? GREEN_SOFT : 'transparent',
                           }}
                         >
                           {pair.black.san}
@@ -825,7 +834,9 @@ export function GameLookup() {
   return (
     <div className="min-h-screen p-3 md:p-6" style={{ background: BG_DARK }}>
       <div className="max-w-4xl mx-auto space-y-6">
-        <PageHero piece="♜" title="Game Lookup" subtitle="Find and analyze games between any two Chess.com players" />
+        {REDESIGN_ON
+          ? <PhotoHero img={scene('hero-lookup')} icon={<Swords size={20} />} title="Game Lookup" subtitle="Find and analyze games between any two Chess.com players" />
+          : <PageHero piece="♜" title="Game Lookup" subtitle="Find and analyze games between any two Chess.com players" />}
 
         <div className="rounded-xl border p-5" style={{ background: BG_CARD, border: CARD_BORDER, boxShadow: CARD_SHADOW }}>
           <div className="flex flex-col sm:flex-row gap-3 items-end">
@@ -868,7 +879,7 @@ export function GameLookup() {
               {showOpponentsDropdown && player1.trim() && (recentOpponents.length > 0 || loadingOpponents) && (
                 <div
                   className="absolute z-20 top-full left-0 right-0 mt-1 rounded-xl border overflow-hidden max-h-64 overflow-y-auto"
-                  style={{ background: BG_CARD, borderColor: CARD_BORDER, boxShadow: CARD_SHADOW }}
+                  style={{ background: BG_CARD, border: CARD_BORDER, boxShadow: CARD_SHADOW }}
                 >
                   <p className="px-3 py-1.5 text-[11px] font-medium" style={{ color: TEXT_MUTED }}>
                     {loadingOpponents ? 'Loading recent opponents…' : `${player1.trim()}'s recent opponents`}
@@ -897,11 +908,11 @@ export function GameLookup() {
               onClick={handleSearch}
               disabled={loading || !player1.trim() || !player2.trim()}
               className="px-5 py-2.5 rounded-xl font-bold text-sm transition-all hover:opacity-90 disabled:opacity-40 shrink-0"
-              style={{ background: CHESSCOM_GREEN, color: '#fff' }}
+              style={{ background: CHESSCOM_GREEN, color: ON_GREEN }}
             >
               {loading ? (
                 <span className="flex items-center gap-2">
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <div className="w-4 h-4 border-2 rounded-full animate-spin" style={{ borderColor: `${ON_GREEN}55`, borderTopColor: ON_GREEN }} />
                   Searching...
                 </span>
               ) : (
@@ -927,7 +938,7 @@ export function GameLookup() {
                     doSearch(h.player1, h.player2);
                   }}
                   className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm transition-all hover:opacity-80"
-                  style={{ background: 'rgba(129,182,76,0.25)', border: '1px solid rgba(129,182,76,0.5)', color: TEXT_LIGHT }}
+                  style={CHIP_STYLE}
                 >
                   <Swords size={12} style={{ color: CHESSCOM_GREEN }} />
                   <span className="font-medium">{h.player1}</span>

@@ -17,6 +17,7 @@ import { useMyGames } from '@/hooks/use-games';
 import { GameThumb } from '@/components/GameThumb';
 import { ProUpsell } from '@/components/ProUpsell';
 import { useSiteImg, usePhotoImagesFlag } from '@/hooks/use-app-config';
+import { scene } from '@/components/PhotoHero';
 
 // Dashboard shown when the global "dashboard redesign" flag is ON (see
 // DashboardRouter in App.tsx). The mobile header and bottom nav in the
@@ -527,15 +528,17 @@ export function DashboardRedesign() {
         {/* ── Everything else from the classic home ── */}
         <div className="grid grid-cols-3 gap-3">
           {[
-            { label: 'Practice Bots', sub: '8 opponents', href: '/practice', icon: Bot },
-            { label: 'Local Play', sub: 'Pass and play', href: '/play/local', icon: Play },
-            { label: 'Shop', sub: 'Boards & gear', href: '/shop', icon: ShoppingBag },
+            { label: 'Practice Bots', sub: '8 opponents', href: '/practice', icon: Bot, img: 'quick-bots' },
+            { label: 'Local Play', sub: 'Pass and play', href: '/play/local', icon: Play, img: 'quick-local' },
+            { label: 'Shop', sub: 'Boards & gear', href: '/shop', icon: ShoppingBag, img: 'quick-shop' },
           ].map((q) => (
-            <Link key={q.label} href={q.href} className="flex flex-col items-start gap-2 rounded-[18px] p-3.5" style={{ background: CARD, border: `1px solid ${BORDER}` }}>
-              <span className="grid h-9 w-9 place-items-center rounded-[10px]" style={{ background: 'rgba(139,234,69,.12)', color: GREEN }}><q.icon size={18} /></span>
-              <span className="min-w-0">
+            <Link key={q.label} href={q.href} className="relative flex min-h-[124px] flex-col items-start justify-between gap-2 overflow-hidden rounded-[18px] p-3.5 transition-transform active:scale-[.98]" style={{ background: CARD, border: `1px solid ${BORDER}` }}>
+              <img src={siteImg(scene(q.img))} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
+              <span className="absolute inset-0" style={{ background: 'linear-gradient(0deg, rgba(5,10,11,.92) 0%, rgba(5,10,11,.55) 50%, rgba(5,10,11,.15) 100%)' }} />
+              <span className="relative grid h-9 w-9 place-items-center rounded-[10px]" style={{ background: 'rgba(5,10,11,.6)', color: GREEN, border: '1px solid rgba(139,234,69,.3)' }}><q.icon size={18} /></span>
+              <span className="relative min-w-0 max-w-full">
                 <b className="block truncate text-[13.5px] font-extrabold">{q.label}</b>
-                <span className="block truncate text-[11.5px]" style={{ color: MUTED }}>{q.sub}</span>
+                <span className="block truncate text-[11.5px]" style={{ color: '#C4CCC9' }}>{q.sub}</span>
               </span>
             </Link>
           ))}

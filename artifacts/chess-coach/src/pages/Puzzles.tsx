@@ -18,6 +18,13 @@ import { useSettings, playMoveSound, boardSkin } from '@/context/SettingsContext
 import { eventForMove } from '@/lib/sounds';
 import { CheckmateOverlay, checkmateSquares } from '@/components/CheckmateOverlay';
 import { EvalBar, MaterialStrip } from '@/components/GameStatusStrip';
+import { scene } from '@/components/PhotoHero';
+import { useSiteImg } from '@/hooks/use-app-config';
+
+const THEME_SCENE: Record<string, string> = {
+  mateIn2: 'theme-mate', fork: 'theme-fork', pin: 'theme-pin', skewer: 'theme-skewer',
+  sacrifice: 'theme-sacrifice', discoveredAttack: 'theme-discovered', hangingPiece: 'theme-hanging',
+};
 
 // CSS variables with the original values as fallbacks: unchanged with the
 // redesign toggle off, near-black / neon green with it on (the --cs-*
@@ -119,6 +126,7 @@ export function Puzzles() {
   const [ratingBand, setRatingBand] = useState<string>('');
   // Redesign only: Daily (no filters) / Themes (theme chips) / Custom (theme + rating).
   const { enabled: redesign } = useDashboardRedesignFlag();
+  const siteImg = useSiteImg();
   const [ptab, setPtab] = useState<'daily' | 'themes' | 'custom'>('daily');
   const feedbackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [explanation, setExplanation] = useState<string | null>(null);
@@ -947,19 +955,27 @@ export function Puzzles() {
             <div className="grid gap-2">
               {PUZZLE_TYPE_OPTIONS.filter(o => ['fork', 'pin', 'skewer', 'discoveredAttack', 'sacrifice', 'hangingPiece', 'mateIn2'].includes(o.value)).map((o, i) => {
                 const tint = ['#3B82F6', '#A855F7', '#E8B447', '#22C55E', '#EF4444', '#06B6D4', '#F97316'][i % 7];
+                const img = THEME_SCENE[o.value];
                 return (
                   <button
                     key={o.value}
                     onClick={() => { setPtab('themes'); setPuzzleTheme(o.value); if (o.value !== 'sacrifice' && !o.value.startsWith('mateIn')) setSacrificePiece(''); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-                    className="flex items-center gap-3.5 rounded-[16px] p-3 text-left"
+                    className="flex items-stretch overflow-hidden rounded-[16px] text-left transition-transform active:scale-[.99]"
                     style={{ background: 'var(--cs-card-gradient, #0D1516)', border: '1px solid var(--cs-border, rgba(255,255,255,.08))' }}
                   >
-                    <span className="grid h-11 w-11 shrink-0 place-items-center rounded-[12px] text-[20px]" style={{ background: `${tint}33`, color: tint }}>♞</span>
-                    <span className="min-w-0 flex-1">
+                    {img ? (
+                      <span className="relative w-[96px] shrink-0 overflow-hidden">
+                        <img src={siteImg(scene(img))} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
+                        <span className="absolute inset-y-0 left-0 w-[3px]" style={{ background: tint }} />
+                      </span>
+                    ) : (
+                      <span className="ml-3 grid h-11 w-11 shrink-0 self-center place-items-center rounded-[12px] text-[20px]" style={{ background: `${tint}33`, color: tint }}>♞</span>
+                    )}
+                    <span className="min-w-0 flex-1 py-3.5 pl-3.5">
                       <b className="block text-[15px] font-bold" style={{ color: TEXT_LIGHT }}>{o.label}</b>
                       <span className="text-[12.5px]" style={{ color: TEXT_MUTED }}>Practice {o.label.toLowerCase()} puzzles</span>
                     </span>
-                    <ChevronRight size={17} style={{ color: TEXT_MUTED }} />
+                    <ChevronRight size={17} className="mr-3 shrink-0 self-center" style={{ color: TEXT_MUTED }} />
                   </button>
                 );
               })}
