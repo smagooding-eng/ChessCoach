@@ -5,7 +5,7 @@ import { Chess } from 'chess.js';
 import { ChessBoard, type MoveQuality } from '@/components/ChessBoard';
 import { normalizeFen } from '@/lib/utils';
 import { BOTS, getBotMove, BotConfig, analyzeMoveQuality, type MoveAnalysisResult } from '@/lib/chess-bot';
-import { useBotAvatar, useBotName, useBotDescription } from '@/lib/botAvatars';
+import { useBotAvatar, useBotName, useBotDescription, useBotTag } from '@/lib/botAvatars';
 import { OPENINGS, type OpeningLine } from '@/lib/openings';
 import { AICoachCard, type AICoachTone } from '@/components/AICoachCard';
 import { ArrowLeft, RotateCcw, Flag, Clock, Trophy, Swords, Zap, ChevronRight, ChevronDown, ChevronUp, BookOpen, Check, X, Lightbulb } from 'lucide-react';
@@ -148,6 +148,7 @@ function BotCard({ bot, onSelect }: { bot: BotConfig; onSelect: (b: BotConfig) =
   const botAvatar = useBotAvatar();
   const botName = useBotName();
   const botBlurb = useBotDescription();
+  const botTag = useBotTag();
   const gradient = TIER_COLORS[bot.personality] ?? 'from-slate-800 to-slate-900 border-white/10';
   return (
     <motion.button
@@ -169,7 +170,7 @@ function BotCard({ bot, onSelect }: { bot: BotConfig; onSelect: (b: BotConfig) =
       </div>
       <div>
         <h3 className="text-lg font-black text-white">{botName(bot)}</h3>
-        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/50 mt-0.5">{bot.personality}</p>
+        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/50 mt-0.5">{botTag(bot)}</p>
       </div>
       <p className="text-xs text-white/60 leading-relaxed">{botBlurb(bot)}</p>
       <div className="flex items-center gap-1.5 text-xs font-bold text-white/40 group-hover:text-white/70 transition-colors mt-auto pt-2">
@@ -183,6 +184,7 @@ function GameView({ bot, onBack, startFen, startColor, isOnboarding }: { bot: Bo
   const botAvatar = useBotAvatar();
   const botName = useBotName();
   const botBlurb = useBotDescription();
+  const botTag = useBotTag();
   // Viewing only: turns the board around without touching the game.
   const [boardTurned, setBoardTurned] = useState(false);
   const [playerColor, setPlayerColor] = useState<'w' | 'b'>(() => {
@@ -479,7 +481,7 @@ function GameView({ bot, onBack, startFen, startColor, isOnboarding }: { bot: Bo
                 <img src={botAvatar(bot)} alt={botName(bot)} className="w-8 h-8 rounded-full border border-white/20 shadow shrink-0 object-cover" />
                 <div className="min-w-0">
                   <p className="font-bold text-sm truncate">{botName(bot)}</p>
-                  <p className="text-[10px] text-muted-foreground truncate">{bot.personality} · {bot.rating} ELO</p>
+                  <p className="text-[10px] text-muted-foreground truncate">{botTag(bot)} · {bot.rating} ELO</p>
                 </div>
               </div>
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground shrink-0">
@@ -1009,6 +1011,7 @@ function BotTileRD({ bot, onSelect }: { bot: BotConfig; onSelect: (b: BotConfig)
   const botAvatar = useBotAvatar();
   const botName = useBotName();
   const botBlurb = useBotDescription();
+  const botTag = useBotTag();
   const accent = TIER_ACCENT[bot.personality] ?? RD.green;
   return (
     <button
@@ -1022,7 +1025,7 @@ function BotTileRD({ bot, onSelect }: { bot: BotConfig; onSelect: (b: BotConfig)
       <span className="min-w-0 flex-1">
         <span className="flex items-center gap-2">
           <b className="truncate text-[16px] font-extrabold" style={{ color: RD.text }}>{botName(bot)}</b>
-          <span className="shrink-0 rounded-md px-1.5 py-0.5 text-[10.5px] font-extrabold uppercase tracking-wide" style={{ background: `${accent}22`, color: accent }}>{bot.personality}</span>
+          <span className="shrink-0 rounded-md px-1.5 py-0.5 text-[10.5px] font-extrabold uppercase tracking-wide" style={{ background: `${accent}22`, color: accent }}>{botTag(bot)}</span>
         </span>
         <span className="mt-0.5 block text-[12.5px] leading-snug line-clamp-2" style={{ color: RD.muted }}>{botBlurb(bot)}</span>
       </span>

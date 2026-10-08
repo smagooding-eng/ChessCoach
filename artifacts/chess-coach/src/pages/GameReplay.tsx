@@ -17,7 +17,7 @@ import {
   Swords, Clock, Zap, BookOpen, Cpu, Lightbulb, Sparkles, Trophy, Target, RotateCcw, Bot
 } from 'lucide-react';
 import { BOTS, getBotMove, type BotConfig } from '@/lib/chess-bot';
-import { useBotName } from '@/lib/botAvatars';
+import { useBotName, useBotTag } from '@/lib/botAvatars';
 import { useUser } from '@/hooks/use-user';
 import { useChessPlayer } from '@/hooks/use-chess-player';
 import { apiFetch } from '@/lib/api';
@@ -447,6 +447,7 @@ function MiniBoard({
 
 const SandboxBoard = React.memo(function SandboxBoard({ playerRating }: { playerRating: number }) {
   const botName = useBotName();
+  const botTag = useBotTag();
   const [bot] = useState(() => pickBot(playerRating));
   const [playerColor] = useState<'w' | 'b'>(() => Math.random() < 0.5 ? 'w' : 'b');
   const [chess] = useState(() => new Chess());
@@ -574,7 +575,7 @@ const SandboxBoard = React.memo(function SandboxBoard({ playerRating }: { player
           </div>
           <div className="min-w-0">
             <p className="text-[11px] font-bold text-white/80 truncate">{botName(bot)} <span className="text-white/30">({bot.rating})</span></p>
-            <p className="text-[9px] text-white/30">{bot.personality}</p>
+            <p className="text-[9px] text-white/30">{botTag(bot)}</p>
           </div>
         </div>
         <div className="flex items-center gap-1.5 shrink-0">

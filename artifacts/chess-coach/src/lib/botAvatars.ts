@@ -28,9 +28,9 @@ export function useBotAvatar() {
   };
 }
 
-// Names to go with the photographed pieces: with the photo toggle on, a bot
-// is called by its piece ("White Pawn" ... "Queen") instead of a person's
-// name. The rank (Beginner ... Master) and rating still show beside it.
+// With the photo toggle on, a bot is called by its rank (Beginner ... Master)
+// instead of a person's name, and the small tag that normally shows the rank
+// shows its piece instead (White Pawn ... Queen).
 const PIECE_NAME: Record<string, string> = {
   Tommy: 'White Pawn',
   Rosa: 'Black Pawn',
@@ -39,12 +39,18 @@ const PIECE_NAME: Record<string, string> = {
   Viktor: 'White Bishop',
   Nadia: 'Black Bishop',
   'Grandmaster Chen': 'Black Rook',
-  'Dr. Fischer': 'The Queen',
+  'Dr. Fischer': 'Queen',
 };
 
 export function useBotName() {
   const photo = usePhotoImagesFlag();
-  return (bot: { name: string }): string => (photo && PIECE_NAME[bot.name]) || bot.name;
+  return (bot: { name: string; personality: string }): string => (photo && PIECE_NAME[bot.name] ? bot.personality : bot.name);
+}
+
+/** The small label under/next to the name: the rank normally, the piece in photo mode. */
+export function useBotTag() {
+  const photo = usePhotoImagesFlag();
+  return (bot: { name: string; personality: string }): string => (photo && PIECE_NAME[bot.name]) || bot.personality;
 }
 
 // Descriptions without the people in them, for the piece versions.
