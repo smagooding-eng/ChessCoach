@@ -166,7 +166,11 @@ export function DashboardRedesign() {
         <div className="lg:col-span-2 empty:hidden"><EmailVerifyBanner /></div>
 
         {/* ── Player summary ── */}
-        <section className="rounded-[20px] p-4 lg:col-span-2" style={{ background: CARD, border: `1px solid ${BORDER}` }}>
+        <section className="relative overflow-hidden rounded-[20px] p-4 lg:col-span-2" style={{ background: CARD, border: `1px solid ${BORDER}` }}>
+          {/* faint background picture behind the name card */}
+          <img src={siteImg(scene('profile-card'))} alt="" className="pointer-events-none absolute inset-0 h-full w-full object-cover" style={{ opacity: 0.22 }} />
+          <div className="pointer-events-none absolute inset-0" style={{ background: 'linear-gradient(90deg, rgba(11,18,19,.92) 0%, rgba(11,18,19,.6) 55%, rgba(11,18,19,.35) 100%)' }} />
+          <div className="relative">
           <div className="flex items-center gap-3">
             <div className="relative shrink-0">
               <div
@@ -259,6 +263,7 @@ export function DashboardRedesign() {
             <Link href="/opponents" className="flex items-center justify-center gap-2 rounded-[13px] py-3 text-[14px] font-bold" style={{ background: 'rgba(255,255,255,.06)', border: `1px solid ${BORDER}` }}>
               <Swords size={16} style={{ color: GREEN }} /> Scout
             </Link>
+          </div>
           </div>
         </section>
 
