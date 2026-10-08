@@ -110,6 +110,7 @@ const BeginnerCourseDetailPage = lazyRetry(() => import("@/pages/BeginnerCourseD
 const BeginnerLessonPage = lazyRetry(() => import("@/pages/BeginnerLesson"));
 const TrapTrainingPage = lazyRetry(() => import("@/pages/TrapTraining"));
 const TermsPage = lazyRetry(() => import("@/pages/Terms"));
+const CreditsPage = lazyRetry(() => import("@/pages/Credits"));
 const VsAimchessPage = lazyRetry(() => import("@/pages/VsAimchess"));
 const PricingPage = lazyRetry(() => import("@/pages/Pricing"));
 const VsImproveMyChessPage = lazyRetry(() => import("@/pages/VsImproveMyChess"));
@@ -336,6 +337,7 @@ function Router() {
       <Route path="/raffle-rules" component={RaffleRulesPage} />
       <Route path="/affiliate" component={AffiliatePage} />
       <Route path="/terms" component={TermsPage} />
+      <Route path="/credits" component={CreditsPage} />
       <Route path="/vs/aimchess" component={VsAimchessPage} />
       <Route path="/pricing" component={PricingPage} />
       <Route path="/vs/improve-my-chess" component={VsImproveMyChessPage} />

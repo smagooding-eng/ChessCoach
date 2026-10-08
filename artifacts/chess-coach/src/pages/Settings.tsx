@@ -510,6 +510,9 @@ export default function SettingsPage() {
       <p className="text-xs text-center" style={{ color: TEXT_MUTED }}>
         Your default is what "Revert to Default" restores, and what new sessions on this device start with.
       </p>
+      <p className="text-xs text-center" style={{ color: TEXT_MUTED }}>
+        <Link href="/credits" className="underline">Photo credits</Link>
+      </p>
     </div>
   );
 }

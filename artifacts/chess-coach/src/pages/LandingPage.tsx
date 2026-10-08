@@ -606,6 +606,7 @@ export function LandingPage() {
         <a href={`${import.meta.env.BASE_URL}download`} className="mx-1.5 hover:underline">Get the app</a>
         <Link href="/privacy" className="mx-1.5 hover:underline">Privacy</Link>
         <Link href="/terms" className="mx-1.5 hover:underline">Terms</Link>
+        <Link href="/credits" className="mx-1.5 hover:underline">Photo credits</Link>
       </footer>
 
       <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} initialMode={authMode} externalError={oauthError} context={authContext} />
