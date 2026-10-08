@@ -168,8 +168,8 @@ export function DashboardRedesign() {
         {/* ── Player summary ── */}
         <section className="relative overflow-hidden rounded-[20px] p-4 lg:col-span-2" style={{ background: CARD, border: `1px solid ${BORDER}` }}>
           {/* faint background picture behind the name card */}
-          <img src={siteImg(scene('profile-card'))} alt="" className="pointer-events-none absolute inset-0 h-full w-full object-cover" style={{ opacity: 0.22 }} />
-          <div className="pointer-events-none absolute inset-0" style={{ background: 'linear-gradient(90deg, rgba(11,18,19,.92) 0%, rgba(11,18,19,.6) 55%, rgba(11,18,19,.35) 100%)' }} />
+          <img src={siteImg(scene('profile-card'))} alt="" className="pointer-events-none absolute inset-0 h-full w-full object-cover" style={{ opacity: 0.6 }} />
+          <div className="pointer-events-none absolute inset-0" style={{ background: 'linear-gradient(90deg, rgba(11,18,19,.82) 0%, rgba(11,18,19,.5) 50%, rgba(11,18,19,.22) 100%), linear-gradient(0deg, rgba(11,18,19,.55) 0%, rgba(11,18,19,0) 45%)' }} />
           <div className="relative">
           <div className="flex items-center gap-3">
             <div className="relative shrink-0">
