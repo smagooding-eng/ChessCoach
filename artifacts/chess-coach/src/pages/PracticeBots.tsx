@@ -179,6 +179,8 @@ function BotCard({ bot, onSelect }: { bot: BotConfig; onSelect: (b: BotConfig) =
 
 function GameView({ bot, onBack, startFen, startColor, isOnboarding }: { bot: BotConfig; onBack: () => void; startFen?: string; startColor?: 'w' | 'b'; isOnboarding?: boolean }) {
   const botAvatar = useBotAvatar();
+  // Viewing only: turns the board around without touching the game.
+  const [boardTurned, setBoardTurned] = useState(false);
   const [playerColor, setPlayerColor] = useState<'w' | 'b'>(() => {
     if (startColor) return startColor;
     if (startFen) {
@@ -392,6 +394,7 @@ function GameView({ bot, onBack, startFen, startColor, isOnboarding }: { bot: Bo
 
   const handleNewGame = (color: 'w' | 'b') => {
     clearBotTimeout();
+    setBoardTurned(false);
     gameIdRef.current++;
     if (startFen) {
       chess.load(startFen);
@@ -495,7 +498,7 @@ function GameView({ bot, onBack, startFen, startColor, isOnboarding }: { bot: Bo
 
           <ChessBoard
             fen={fen}
-            flipped={playerColor === 'b'}
+            flipped={(playerColor === 'b') !== boardTurned}
             practiceMode={result === 'playing' && isPlayerTurn && !thinking}
             expectedMoveSan={null}
             onMovePlayed={handleMovePlayed}
@@ -512,8 +515,8 @@ function GameView({ bot, onBack, startFen, startColor, isOnboarding }: { bot: Bo
             </div>
             <div className="flex items-center gap-2">
               {result === 'playing' && (
-                <button onClick={() => handleNewGame(playerColor === 'w' ? 'b' : 'w')}
-                  title="Switch color"
+                <button onClick={() => setBoardTurned((t) => !t)}
+                  title="Turn the board around (the game carries on)"
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 text-muted-foreground text-xs font-bold hover:bg-white/10 transition-colors">
                   <RotateCcw className="w-3 h-3" /> Switch
                 </button>
