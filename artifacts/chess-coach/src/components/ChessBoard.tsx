@@ -126,6 +126,9 @@ interface ChessBoardProps {
   // own dedicated confirmation mechanic (e.g. Local Play's tap-your-clock
   // flow), where showing both at once would be redundant/conflicting.
   suppressConfirmMoves?: boolean;
+  /** Keep the confirm-bar's space under the board even when no move is
+   *  staged, so the page doesn't shift every time it appears/disappears. */
+  reserveConfirmSpace?: boolean;
 }
 
 export function ChessBoard({
@@ -143,6 +146,7 @@ export function ChessBoard({
   arrows,
   maxWidthOverride,
   suppressConfirmMoves = false,
+  reserveConfirmSpace = false,
 }: ChessBoardProps) {
   const { confirmMoves, boardColors, boardTextureCss, showCoordinates, showLegalMoves, pieceColors, pieceShape, pieceStyle, soundEnabled, promotionChoice, boardMaxWidth: settingsMaxWidth } = useSettings();
   const boardMaxWidth = maxWidthOverride ?? settingsMaxWidth;
@@ -611,6 +615,9 @@ export function ChessBoard({
         </div>
       )}
 
+      {!pendingMove && !promotionPending && reserveConfirmSpace && confirmMoves && !suppressConfirmMoves && (
+        <div aria-hidden className="mt-3 h-14" />
+      )}
       {pendingMove && (
         // The chess-clock bar: left paddle cancels the staged move, right
         // paddle plays it. (The left half used to be a dead "MOVE" label that

@@ -458,7 +458,10 @@ function GameView({ bot, onBack, startFen, startColor, isOnboarding }: { bot: Bo
   const analysisMove = selectedMoveIdx !== null && moves[selectedMoveIdx] ? moves[selectedMoveIdx] : null;
 
   return (
-    <div className="space-y-3 pb-20 px-4 pt-4 md:px-0 md:pt-0">
+    // overflow-anchor: none -- stops the browser "keeping its place" by
+    // scrolling the page when things below the board (confirm bar, captured
+    // pieces, move analysis) change height, which made the board jump.
+    <div className="space-y-3 pb-20 px-4 pt-4 md:px-0 md:pt-0" style={{ overflowAnchor: 'none' }}>
       {isOnboarding ? (
         <div className="rounded-xl p-3 flex items-center gap-2.5" style={{ background: 'rgba(129,182,76,0.08)', border: '1px solid rgba(129,182,76,0.2)' }}>
           <div className="w-2 h-2 rounded-full shrink-0 animate-pulse" style={{ background: '#81b64c' }} />
@@ -510,6 +513,7 @@ function GameView({ bot, onBack, startFen, startColor, isOnboarding }: { bot: Bo
             onMovePlayed={handleMovePlayed}
             lastMove={lastMove}
             moveQuality={latestQuality}
+            reserveConfirmSpace
           />
 
           <div className="glass-card rounded-xl p-2.5 flex items-center justify-between">
@@ -789,7 +793,7 @@ function OpeningTrainerView({ opening, onBack }: { opening: OpeningLine; onBack:
   const accuracy = score.total === 0 ? 100 : Math.round((score.correct / score.total) * 100);
 
   return (
-    <div className="space-y-3 pb-20 px-4 pt-4 md:px-0 md:pt-0">
+    <div className="space-y-3 pb-20 px-4 pt-4 md:px-0 md:pt-0" style={{ overflowAnchor: 'none' }}>
       <button onClick={onBack}
         className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors text-sm">
         <ArrowLeft className="w-4 h-4" /> All Openings
@@ -839,6 +843,7 @@ function OpeningTrainerView({ opening, onBack }: { opening: OpeningLine; onBack:
             onMovePlayed={handleMovePlayed}
             lastMove={lastMove}
             moveQuality={null}
+            reserveConfirmSpace
           />
 
           <div className="glass-card rounded-xl p-2.5 flex items-center justify-between flex-wrap gap-2">
