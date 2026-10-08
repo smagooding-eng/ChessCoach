@@ -612,40 +612,35 @@ export function ChessBoard({
       )}
 
       {pendingMove && (
-        <div className="mt-3 flex items-stretch gap-2">
+        // The chess-clock bar: left paddle cancels the staged move, right
+        // paddle plays it. (The left half used to be a dead "MOVE" label that
+        // still submitted the move, with a separate X to cancel.)
+        <div
+          className="relative mt-3 flex h-14 overflow-hidden rounded-xl"
+          style={{
+            boxShadow: '0 4px 0 #2a2a2a, 0 8px 16px rgba(0,0,0,0.4)',
+            border: '1px solid rgba(0,0,0,0.25)',
+            opacity: confirming ? 0.6 : 1,
+          }}
+        >
           <button
             onClick={cancelPendingMove}
-            className="w-12 shrink-0 rounded-xl flex items-center justify-center transition-transform active:scale-95"
-            style={{ background: 'rgba(255,255,255,0.35)', color: '#ffffff', border: '1px solid rgba(255,255,255,0.15)' }}
-            title="Cancel"
+            disabled={confirming}
+            className="flex flex-1 items-center justify-center gap-1.5 text-xs font-black tracking-wider transition-transform active:scale-[0.97]"
+            style={{ background: 'linear-gradient(180deg, #3a3a3a 0%, #232323 100%)', color: 'rgba(255,255,255,0.75)' }}
           >
-            <span className="text-base font-black">✕</span>
+            <span className="text-sm">✕</span> CANCEL
           </button>
           <button
             onClick={confirmPendingMove}
             disabled={confirming}
-            className="relative flex-1 h-14 rounded-xl overflow-hidden flex transition-all active:scale-[0.98]"
-            style={{
-              boxShadow: '0 4px 0 #2a2a2a, 0 8px 16px rgba(0,0,0,0.4)',
-              border: '1px solid rgba(0,0,0,0.25)',
-              opacity: confirming ? 0.6 : 1,
-            }}
+            className="flex flex-1 items-center justify-center text-xs font-black tracking-wider transition-transform active:scale-[0.97]"
+            style={{ background: 'linear-gradient(180deg, #a8d876 0%, #81b64c 55%, #5f8f36 100%)', color: '#fff' }}
           >
-            <span
-              className="flex-1 flex items-center justify-center font-black text-xs tracking-wider"
-              style={{ background: 'linear-gradient(180deg, #3a3a3a 0%, #232323 100%)', color: 'rgba(255,255,255,0.5)' }}
-            >
-              MOVE
-            </span>
-            <span
-              className="flex-1 flex items-center justify-center font-black text-xs tracking-wider"
-              style={{ background: 'linear-gradient(180deg, #a8d876 0%, #81b64c 55%, #5f8f36 100%)', color: '#fff' }}
-            >
-              {confirming ? '✓' : 'CONFIRM'}
-            </span>
-            {/* center seam */}
-            <div className="absolute left-1/2 top-0 bottom-0 w-[2px] -translate-x-1/2" style={{ background: 'rgba(0,0,0,0.35)' }} />
+            {confirming ? '✓' : 'CONFIRM'}
           </button>
+          {/* center seam */}
+          <div className="pointer-events-none absolute bottom-0 left-1/2 top-0 w-[2px] -translate-x-1/2" style={{ background: 'rgba(0,0,0,0.35)' }} />
         </div>
       )}
       {/* Practice feedback overlay */}
