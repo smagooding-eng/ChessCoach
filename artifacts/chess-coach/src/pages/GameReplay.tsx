@@ -17,6 +17,7 @@ import {
   Swords, Clock, Zap, BookOpen, Cpu, Lightbulb, Sparkles, Trophy, Target, RotateCcw, Bot
 } from 'lucide-react';
 import { BOTS, getBotMove, type BotConfig } from '@/lib/chess-bot';
+import { useBotName } from '@/lib/botAvatars';
 import { useUser } from '@/hooks/use-user';
 import { useChessPlayer } from '@/hooks/use-chess-player';
 import { apiFetch } from '@/lib/api';
@@ -445,6 +446,7 @@ function MiniBoard({
 }
 
 const SandboxBoard = React.memo(function SandboxBoard({ playerRating }: { playerRating: number }) {
+  const botName = useBotName();
   const [bot] = useState(() => pickBot(playerRating));
   const [playerColor] = useState<'w' | 'b'>(() => Math.random() < 0.5 ? 'w' : 'b');
   const [chess] = useState(() => new Chess());
@@ -561,7 +563,7 @@ const SandboxBoard = React.memo(function SandboxBoard({ playerRating }: { player
     } catch {}
   }, [moveHistory.length, chess]);
 
-  const resultLabel = result === 'win' ? 'You win!' : result === 'loss' ? `${bot.name} wins` : result === 'draw' ? 'Draw' : null;
+  const resultLabel = result === 'win' ? 'You win!' : result === 'loss' ? `${botName(bot)} wins` : result === 'draw' ? 'Draw' : null;
 
   return (
     <div>
@@ -571,7 +573,7 @@ const SandboxBoard = React.memo(function SandboxBoard({ playerRating }: { player
             <Bot className="w-3.5 h-3.5 text-primary" />
           </div>
           <div className="min-w-0">
-            <p className="text-[11px] font-bold text-white/80 truncate">{bot.name} <span className="text-white/30">({bot.rating})</span></p>
+            <p className="text-[11px] font-bold text-white/80 truncate">{botName(bot)} <span className="text-white/30">({bot.rating})</span></p>
             <p className="text-[9px] text-white/30">{bot.personality}</p>
           </div>
         </div>

@@ -5,7 +5,7 @@ import { Chess } from 'chess.js';
 import { ChessBoard, type MoveQuality } from '@/components/ChessBoard';
 import { normalizeFen } from '@/lib/utils';
 import { BOTS, getBotMove, BotConfig, analyzeMoveQuality, type MoveAnalysisResult } from '@/lib/chess-bot';
-import { useBotAvatar } from '@/lib/botAvatars';
+import { useBotAvatar, useBotName, useBotDescription } from '@/lib/botAvatars';
 import { OPENINGS, type OpeningLine } from '@/lib/openings';
 import { AICoachCard, type AICoachTone } from '@/components/AICoachCard';
 import { ArrowLeft, RotateCcw, Flag, Clock, Trophy, Swords, Zap, ChevronRight, ChevronDown, ChevronUp, BookOpen, Check, X, Lightbulb } from 'lucide-react';
@@ -146,6 +146,8 @@ function MoveAnalysisPanel({ move, playerColor }: { move: MoveRecord; playerColo
 
 function BotCard({ bot, onSelect }: { bot: BotConfig; onSelect: (b: BotConfig) => void }) {
   const botAvatar = useBotAvatar();
+  const botName = useBotName();
+  const botBlurb = useBotDescription();
   const gradient = TIER_COLORS[bot.personality] ?? 'from-slate-800 to-slate-900 border-white/10';
   return (
     <motion.button
@@ -160,16 +162,16 @@ function BotCard({ bot, onSelect }: { bot: BotConfig; onSelect: (b: BotConfig) =
       )}
     >
       <div className="flex items-center justify-between">
-        <img src={botAvatar(bot)} alt={bot.name} className="w-10 h-10 rounded-full border-2 border-white/20 shadow-md object-cover" />
+        <img src={botAvatar(bot)} alt={botName(bot)} className="w-10 h-10 rounded-full border-2 border-white/20 shadow-md object-cover" />
         <span className="text-xs font-bold px-2.5 py-1 rounded-xl bg-black/30 border border-white/10 text-white/80">
           {bot.rating} ELO
         </span>
       </div>
       <div>
-        <h3 className="text-lg font-black text-white">{bot.name}</h3>
+        <h3 className="text-lg font-black text-white">{botName(bot)}</h3>
         <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/50 mt-0.5">{bot.personality}</p>
       </div>
-      <p className="text-xs text-white/60 leading-relaxed">{bot.description}</p>
+      <p className="text-xs text-white/60 leading-relaxed">{botBlurb(bot)}</p>
       <div className="flex items-center gap-1.5 text-xs font-bold text-white/40 group-hover:text-white/70 transition-colors mt-auto pt-2">
         Challenge <ChevronRight className="w-3.5 h-3.5" />
       </div>
@@ -179,6 +181,8 @@ function BotCard({ bot, onSelect }: { bot: BotConfig; onSelect: (b: BotConfig) =
 
 function GameView({ bot, onBack, startFen, startColor, isOnboarding }: { bot: BotConfig; onBack: () => void; startFen?: string; startColor?: 'w' | 'b'; isOnboarding?: boolean }) {
   const botAvatar = useBotAvatar();
+  const botName = useBotName();
+  const botBlurb = useBotDescription();
   // Viewing only: turns the board around without touching the game.
   const [boardTurned, setBoardTurned] = useState(false);
   const [playerColor, setPlayerColor] = useState<'w' | 'b'>(() => {
@@ -472,9 +476,9 @@ function GameView({ bot, onBack, startFen, startColor, isOnboarding }: { bot: Bo
           <div className="glass-card rounded-xl p-2.5">
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2 min-w-0">
-                <img src={botAvatar(bot)} alt={bot.name} className="w-8 h-8 rounded-full border border-white/20 shadow shrink-0 object-cover" />
+                <img src={botAvatar(bot)} alt={botName(bot)} className="w-8 h-8 rounded-full border border-white/20 shadow shrink-0 object-cover" />
                 <div className="min-w-0">
-                  <p className="font-bold text-sm truncate">{bot.name}</p>
+                  <p className="font-bold text-sm truncate">{botName(bot)}</p>
                   <p className="text-[10px] text-muted-foreground truncate">{bot.personality} · {bot.rating} ELO</p>
                 </div>
               </div>
@@ -627,7 +631,7 @@ function GameView({ bot, onBack, startFen, startColor, isOnboarding }: { bot: Bo
                   {result === 'win' ? 'You Win!' : result === 'loss' ? 'You Lost' : 'Draw'}
                 </h3>
                 <p className="text-xs text-muted-foreground">
-                  vs {bot.name} ({bot.rating}) · {moves.length} moves · {formatTime(elapsedSec)}
+                  vs {botName(bot)} ({bot.rating}) · {moves.length} moves · {formatTime(elapsedSec)}
                 </p>
                 {isOnboarding ? (
                   <div className="pt-2 space-y-3">
@@ -1003,6 +1007,8 @@ const TIER_ACCENT: Record<string, string> = {
 
 function BotTileRD({ bot, onSelect }: { bot: BotConfig; onSelect: (b: BotConfig) => void }) {
   const botAvatar = useBotAvatar();
+  const botName = useBotName();
+  const botBlurb = useBotDescription();
   const accent = TIER_ACCENT[bot.personality] ?? RD.green;
   return (
     <button
@@ -1015,10 +1021,10 @@ function BotTileRD({ bot, onSelect }: { bot: BotConfig; onSelect: (b: BotConfig)
       </span>
       <span className="min-w-0 flex-1">
         <span className="flex items-center gap-2">
-          <b className="truncate text-[16px] font-extrabold" style={{ color: RD.text }}>{bot.name}</b>
+          <b className="truncate text-[16px] font-extrabold" style={{ color: RD.text }}>{botName(bot)}</b>
           <span className="shrink-0 rounded-md px-1.5 py-0.5 text-[10.5px] font-extrabold uppercase tracking-wide" style={{ background: `${accent}22`, color: accent }}>{bot.personality}</span>
         </span>
-        <span className="mt-0.5 block text-[12.5px] leading-snug line-clamp-2" style={{ color: RD.muted }}>{bot.description}</span>
+        <span className="mt-0.5 block text-[12.5px] leading-snug line-clamp-2" style={{ color: RD.muted }}>{botBlurb(bot)}</span>
       </span>
       <span className="flex shrink-0 flex-col items-end gap-1">
         <b className="text-[15px] font-extrabold" style={{ color: RD.text }}>{bot.rating}</b>
