@@ -287,7 +287,7 @@ export function MistakeFixView({
                     arrows={(current.key === 'engine' && current.lastMove) ? [{
                       from: current.lastMove.from,
                       to: current.lastMove.to,
-                      color: 'rgba(52,211,153,0.9)',
+                      color: 'rgba(149,196,90,0.9)',
                     }] : undefined}
                   />
                 </div>

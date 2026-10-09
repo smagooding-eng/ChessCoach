@@ -22,7 +22,7 @@ const SEV_STYLE: Record<string, { bg: string; fg: string; border: string }> = {
   Critical: { bg: 'rgba(255,80,88,.22)', fg: '#FF8A8F', border: 'rgba(255,80,88,.45)' },
   High: { bg: 'rgba(255,80,88,.20)', fg: '#FF8A8F', border: 'rgba(255,80,88,.40)' },
   Medium: { bg: 'rgba(232,180,71,.20)', fg: RD.gold, border: 'rgba(232,180,71,.40)' },
-  Low: { bg: 'rgba(95,213,51,.16)', fg: '#7BE05A', border: 'rgba(95,213,51,.35)' },
+  Low: { bg: 'rgba(95,143,54,.16)', fg: '#95C45A', border: 'rgba(95,143,54,.35)' },
 };
 const SEV_RANK: Record<string, number> = { Critical: 0, High: 1, Medium: 2, Low: 3 };
 
@@ -36,7 +36,7 @@ type TabId = (typeof TABS)[number]['id'];
 
 const CARD_STYLE: React.CSSProperties = {
   background: RD.card,
-  border: '1px solid rgba(139,234,69,.14)',
+  border: '1px solid rgba(129,182,76,.14)',
   boxShadow: 'inset 0 1px 0 rgba(255,255,255,.03)',
 };
 
@@ -185,7 +185,7 @@ function InsightCard({ icon, title, text, onClick }: { icon: React.ReactNode; ti
   const Tag = onClick ? 'button' : 'div';
   return (
     <Tag onClick={onClick} className="flex w-full items-center gap-3 rounded-[18px] p-4 text-left"
-      style={{ background: 'linear-gradient(135deg, rgba(139,234,69,.10), rgba(139,234,69,.03))', border: '1px solid rgba(139,234,69,.35)' }}>
+      style={{ background: 'linear-gradient(135deg, rgba(129,182,76,.10), rgba(129,182,76,.03))', border: '1px solid rgba(129,182,76,.35)' }}>
       <span className="shrink-0">{icon}</span>
       <span className="min-w-0 flex-1">
         <b className="block text-[15px] font-extrabold" style={{ color: RD.green }}>{title}</b>
@@ -322,7 +322,7 @@ export function AnalysisRedesign() {
             const active = tab === t.id;
             return (
               <button key={t.id} onClick={() => setTab(t.id)} className="rounded-[12px] py-2.5 text-[13px] font-bold transition-colors"
-                style={active ? { background: 'rgba(139,234,69,.10)', color: RD.text, boxShadow: `inset 0 0 0 1.5px ${RD.green}` } : { background: 'transparent', color: RD.muted }}>
+                style={active ? { background: 'rgba(129,182,76,.10)', color: RD.text, boxShadow: `inset 0 0 0 1.5px ${RD.green}` } : { background: 'transparent', color: RD.muted }}>
                 {t.label}
               </button>
             );
@@ -429,7 +429,7 @@ export function AnalysisRedesign() {
                       <Link key={o.opening} href={`/openings/${encodeURIComponent(o.eco ?? o.opening)}`}
                         className="flex items-center gap-3 rounded-[14px] px-2.5 py-2.5 transition-transform active:scale-[.99]"
                         style={{ background: 'rgba(255,255,255,.025)', border: `1px solid ${RD.border}` }}>
-                        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px] text-[15px] font-extrabold" style={{ background: 'rgba(139,234,69,.12)', color: RD.green }}>{i + 1}</span>
+                        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px] text-[15px] font-extrabold" style={{ background: 'rgba(129,182,76,.12)', color: RD.green }}>{i + 1}</span>
                         <span className="min-w-0 flex-1">
                           <b className="block truncate text-[14px] font-bold">{family}</b>
                           {variation && <span className="block truncate text-[13px]" style={{ color: 'rgba(245,247,246,.85)' }}>{variation}</span>}

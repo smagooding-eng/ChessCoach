@@ -71,7 +71,7 @@ const MOMENT_STYLE: Record<string, { bg: string; fg: string; label: string }> = 
   mistake: { bg: 'rgba(255,138,61,.16)', fg: '#FFB07A', label: 'MISTAKE' },
   inaccuracy: { bg: 'rgba(232,180,71,.16)', fg: '#E8B447', label: 'INACCURACY' },
   brilliant: { bg: 'rgba(53,198,244,.16)', fg: '#5FD3F7', label: 'BRILLIANT' },
-  great: { bg: 'rgba(139,234,69,.16)', fg: '#8BEA45', label: 'GREAT' },
+  great: { bg: 'rgba(129,182,76,.16)', fg: '#81B64C', label: 'GREAT' },
 };
 
 type KeyMistake = {
@@ -1016,7 +1016,7 @@ export function GameReplay() {
             const youWhite = !meBlack;
             const me = youWhite ? { name: game.whiteUsername, rating: game.whiteRating, avatar: whitePlayer?.avatar } : { name: game.blackUsername, rating: game.blackRating, avatar: blackPlayer?.avatar };
             const opp = youWhite ? { name: game.blackUsername, rating: game.blackRating, avatar: blackPlayer?.avatar } : { name: game.whiteUsername, rating: game.whiteRating, avatar: whitePlayer?.avatar };
-            const badge = game.result === 'win' ? { t: 'Win', bg: 'rgba(46,125,50,.45)', fg: '#7BE05A' } : game.result === 'loss' ? { t: 'Loss', bg: 'rgba(150,35,45,.55)', fg: '#FF6B73' } : { t: 'Draw', bg: 'rgba(255,255,255,.12)', fg: '#C9D2CF' };
+            const badge = game.result === 'win' ? { t: 'Win', bg: 'rgba(46,125,50,.45)', fg: '#95C45A' } : game.result === 'loss' ? { t: 'Loss', bg: 'rgba(150,35,45,.55)', fg: '#FF6B73' } : { t: 'Draw', bg: 'rgba(255,255,255,.12)', fg: '#C9D2CF' };
             const av = (a: string | undefined, n: string, ring: string) => a
               ? <img src={a} alt={n} className="h-[34px] w-[34px] shrink-0 rounded-full object-cover" style={{ border: `2px solid ${ring}` }} />
               : <span className="grid h-[34px] w-[34px] shrink-0 place-items-center rounded-full text-[14px] font-extrabold" style={{ background: 'rgba(255,255,255,.1)', border: `2px solid ${ring}` }}>{n?.[0]?.toUpperCase()}</span>;
@@ -1047,7 +1047,7 @@ export function GameReplay() {
                 const active = gtab === id;
                 return (
                   <button key={id} onClick={() => setGtab(id)} className="rounded-[12px] py-2 text-[13.5px] font-bold transition-colors"
-                    style={active ? { background: 'rgba(139,234,69,.10)', color: RD.text, boxShadow: `inset 0 0 0 1.5px ${RD.green}` } : { background: 'transparent', color: RD.muted }}>
+                    style={active ? { background: 'rgba(129,182,76,.10)', color: RD.text, boxShadow: `inset 0 0 0 1.5px ${RD.green}` } : { background: 'transparent', color: RD.muted }}>
                     {label}
                   </button>
                 );
@@ -1346,10 +1346,10 @@ export function GameReplay() {
               {isPremium ? (
                 <button onClick={() => handleReview(true)}
                   className="flex w-full items-center gap-3 rounded-[14px] px-3.5 py-3 text-left"
-                  style={{ background: 'rgba(139,234,69,.08)', border: '1px solid rgba(139,234,69,.35)' }}>
-                  <Sparkles className="h-4 w-4 shrink-0" style={{ color: '#8BEA45' }} />
+                  style={{ background: 'rgba(129,182,76,.08)', border: '1px solid rgba(129,182,76,.35)' }}>
+                  <Sparkles className="h-4 w-4 shrink-0" style={{ color: '#81B64C' }} />
                   <span className="flex-1 text-[13px] font-bold">This game was reviewed before you went Pro. Add the AI coach's explanations.</span>
-                  <span className="text-[12.5px] font-extrabold" style={{ color: '#8BEA45' }}>Add</span>
+                  <span className="text-[12.5px] font-extrabold" style={{ color: '#81B64C' }}>Add</span>
                 </button>
               ) : (
                 <ProUpsell compact title="Stockfish review" text="Get the AI coach's plain-English explanation for every move and a summary of the game." />

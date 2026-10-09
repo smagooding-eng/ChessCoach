@@ -128,7 +128,7 @@ export function CoursesRedesign({
 
         {/* YOUR NEXT MOVE */}
         {nextCourse && (
-          <section className="relative overflow-hidden rounded-[22px]" style={{ border: `1.5px solid ${RD.green}`, boxShadow: '0 0 0 1px rgba(139,234,69,.18), 0 18px 50px -22px rgba(139,234,69,.5)' }}>
+          <section className="relative overflow-hidden rounded-[22px]" style={{ border: `1.5px solid ${RD.green}`, boxShadow: '0 0 0 1px rgba(129,182,76,.18), 0 18px 50px -22px rgba(129,182,76,.5)' }}>
             <img src={siteImg(`${ART_BASE}course-training-hero.webp`)} alt="" className="absolute inset-0 h-full w-full object-cover" style={{ objectPosition: '82% center' }} />
             <div className="absolute inset-0" style={{ background: 'linear-gradient(90deg, rgba(5,10,11,.94) 0%, rgba(5,10,11,.78) 48%, rgba(5,10,11,.05) 100%)' }} />
             <div className="relative z-10 p-5">
@@ -138,7 +138,7 @@ export function CoursesRedesign({
                 Lesson {Math.min(nextCourse.completedLessons + 1, nextCourse.totalLessons)} of {nextCourse.totalLessons}
                 {currentLesson ? <><br />{currentLesson.title}</> : null}
               </p>
-              <Link href={`/courses/${nextCourse.id}`} className="mt-4 inline-flex items-center gap-2.5 rounded-[12px] px-6 py-3.5 text-[15px] font-extrabold" style={{ background: `linear-gradient(180deg, ${RD.green}, ${RD.greenDark})`, color: '#05100A', boxShadow: '0 10px 26px -10px rgba(139,234,69,.6)' }}>
+              <Link href={`/courses/${nextCourse.id}`} className="mt-4 inline-flex items-center gap-2.5 rounded-[12px] px-6 py-3.5 text-[15px] font-extrabold" style={{ background: `linear-gradient(180deg, ${RD.green}, ${RD.greenDark})`, color: '#05100A', boxShadow: '0 10px 26px -10px rgba(129,182,76,.6)' }}>
                 Continue Training <ArrowRight size={17} />
               </Link>
             </div>
@@ -217,7 +217,7 @@ export function CoursesRedesign({
               <h2 className="text-[26px] font-extrabold leading-tight">All Courses</h2>
               <p className="text-[14px]" style={{ color: RD.muted }}>Build the skills that matter most.</p>
             </div>
-            <button onClick={onGenerate} disabled={isGenerating} className="flex shrink-0 items-center gap-2 rounded-[12px] px-3.5 py-2.5 text-[12.5px] font-extrabold disabled:opacity-60" style={{ background: 'rgba(139,234,69,.10)', color: RD.green, border: `1px solid ${RD.green}` }}>
+            <button onClick={onGenerate} disabled={isGenerating} className="flex shrink-0 items-center gap-2 rounded-[12px] px-3.5 py-2.5 text-[12.5px] font-extrabold disabled:opacity-60" style={{ background: 'rgba(129,182,76,.10)', color: RD.green, border: `1px solid ${RD.green}` }}>
               {isGenerating ? <><span className="h-3.5 w-3.5 animate-spin rounded-full border-2" style={{ borderColor: RD.green, borderTopColor: 'transparent' }} />Building…</> : <><GraduationCap size={15} />New courses</>}
             </button>
           </div>
@@ -234,7 +234,7 @@ export function CoursesRedesign({
                 const active = tab === id;
                 return (
                   <button key={id} onClick={() => setTab(id)} className="py-3 text-[14.5px] font-bold transition-colors"
-                    style={active ? { background: 'rgba(139,234,69,.12)', color: RD.green, boxShadow: `inset 0 -2px 0 ${RD.green}` } : { color: RD.muted }}>
+                    style={active ? { background: 'rgba(129,182,76,.12)', color: RD.green, boxShadow: `inset 0 -2px 0 ${RD.green}` } : { color: RD.muted }}>
                     {label}
                   </button>
                 );
@@ -281,7 +281,7 @@ export function CoursesRedesign({
                     </span>
                   </span>
                   <span className="flex shrink-0 flex-col items-center justify-center gap-1.5 pr-2">
-                    <span className="grid h-9 w-9 place-items-center rounded-full" style={{ background: done ? 'rgba(139,234,69,.16)' : RD.green, color: done ? RD.green : '#05100A' }}>
+                    <span className="grid h-9 w-9 place-items-center rounded-full" style={{ background: done ? 'rgba(129,182,76,.16)' : RD.green, color: done ? RD.green : '#05100A' }}>
                       {done ? <CheckCircle2 size={20} aria-label="Completed" /> : <Play size={16} fill="currentColor" aria-label="Open course" />}
                     </span>
                     <b className="text-[13px]" style={{ color: p > 0 ? RD.green : RD.muted }}>{p}%</b>

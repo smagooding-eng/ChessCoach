@@ -662,7 +662,7 @@ function LessonBeatPlayer({
                 const active = beat.kind === g.kind;
                 return (
                   <button key={g.kind} onClick={() => goTo(g.first)} className="rounded-[12px] py-2.5 text-[13px] font-bold transition-colors"
-                    style={active ? { background: 'rgba(139,234,69,.10)', color: RD.text, boxShadow: `inset 0 0 0 1.5px ${RD.green}` } : { background: 'transparent', color: RD.muted }}>
+                    style={active ? { background: 'rgba(129,182,76,.10)', color: RD.text, boxShadow: `inset 0 0 0 1.5px ${RD.green}` } : { background: 'transparent', color: RD.muted }}>
                     {g.label}
                   </button>
                 );
@@ -730,7 +730,7 @@ function LessonBeatPlayer({
                   </div>
 
                   {drillResult === 'correct' && (
-                    <div className="flex items-center gap-3 rounded-[16px] p-3.5" style={{ background: 'rgba(139,234,69,.08)', border: '1px solid rgba(139,234,69,.35)' }}>
+                    <div className="flex items-center gap-3 rounded-[16px] p-3.5" style={{ background: 'rgba(129,182,76,.08)', border: '1px solid rgba(129,182,76,.35)' }}>
                       <Check className="h-5 w-5 shrink-0" style={{ color: RD.green }} />
                       <p className="text-[14.5px] font-extrabold" style={{ color: RD.green }}>Correct! Well done.</p>
                     </div>

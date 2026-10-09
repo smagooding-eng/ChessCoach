@@ -9,8 +9,8 @@ import { Trophy as HeroTrophy } from 'lucide-react';
 import { apiFetch, apiUrl, setAuthToken } from '@/lib/api';
 import { useSiteImg } from '@/hooks/use-app-config';
 
-const G = '#8BEA45';
-const G_HOVER = '#79D338';
+const G = '#81B64C';
+const G_HOVER = '#6FA23E';
 const BG = '#050A0B';
 const CARD = '#0D1516';
 const TEXT = '#F5F7F6';
@@ -401,7 +401,7 @@ function ExampleBoard() {
           return (r + f) % 2 === 1 ? <rect key={`d${i}`} x={f} y={r} width="1" height="1" fill="#4F6B45" shapeRendering="crispEdges" /> : null;
         })}
         <rect x="6" y="0" width="1" height="1" fill="rgba(255,80,88,0.6)" shapeRendering="crispEdges" />
-        <rect x="3" y="0" width="1" height="1" fill="rgba(139,234,69,0.5)" shapeRendering="crispEdges" />
+        <rect x="3" y="0" width="1" height="1" fill="rgba(129,182,76,0.5)" shapeRendering="crispEdges" />
         {cells.slice(0, 64).map((ch, i) => ch ? (
           <image key={`p${i}`} href={sprite(ch)} x={i % 8} y={Math.floor(i / 8)} width="1" height="1" preserveAspectRatio="xMidYMid meet" />
         ) : null)}
@@ -422,10 +422,10 @@ function PersonalAnalysisCard() {
   ];
   return (
     <div className="grid grid-cols-[1.45fr_1fr] overflow-hidden rounded-[20px]"
-      style={{ background: 'linear-gradient(160deg, rgba(14,26,24,0.9), rgba(6,13,12,0.92))', border: '1px solid rgba(139,234,69,0.22)', boxShadow: '0 24px 60px -30px rgba(139,234,69,0.35)' }}>
+      style={{ background: 'linear-gradient(160deg, rgba(14,26,24,0.9), rgba(6,13,12,0.92))', border: '1px solid rgba(129,182,76,0.22)', boxShadow: '0 24px 60px -30px rgba(129,182,76,0.35)' }}>
       <div className="min-w-0 p-2.5 sm:p-5">
         <div className="mb-2 flex items-center gap-2 sm:mb-4">
-          <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full sm:h-9 sm:w-9" style={{ background: 'rgba(139,234,69,0.12)', border: '1px solid rgba(139,234,69,0.35)' }}><Target className="h-3.5 w-3.5 sm:h-4 sm:w-4" style={{ color: G }} /></span>
+          <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full sm:h-9 sm:w-9" style={{ background: 'rgba(129,182,76,0.12)', border: '1px solid rgba(129,182,76,0.35)' }}><Target className="h-3.5 w-3.5 sm:h-4 sm:w-4" style={{ color: G }} /></span>
           <span className="text-[10px] font-black uppercase leading-tight tracking-[0.08em] sm:text-[12px]" style={{ color: G }}>Your personal analysis</span>
         </div>
         <div className="space-y-2 sm:space-y-4">
@@ -548,7 +548,7 @@ export function LandingPage() {
       <main data-track-section="hero" className="relative z-10 mx-auto flex w-full max-w-7xl flex-1 flex-col justify-center gap-3 px-4 pb-3 sm:px-8 lg:grid lg:grid-cols-2 lg:gap-12 lg:pb-6">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }} className="lg:self-center">
           <div className="mb-2.5 inline-flex items-center gap-2 rounded-full px-3 py-1 text-[10.5px] font-black uppercase tracking-[0.12em] sm:text-[11px]"
-            style={{ background: 'rgba(139,234,69,0.08)', color: G, border: '1px solid rgba(139,234,69,0.4)' }}>
+            style={{ background: 'rgba(129,182,76,0.08)', color: G, border: '1px solid rgba(129,182,76,0.4)' }}>
             <HeroTrophy className="h-3.5 w-3.5" /> Turn games into progress
           </div>
 
@@ -568,7 +568,7 @@ export function LandingPage() {
 
           <button onClick={openSignup}
             className="group mt-3 inline-flex items-center justify-center gap-2.5 rounded-2xl px-7 py-3 text-[15px] font-extrabold transition-all sm:px-9 sm:py-3.5 sm:text-base"
-            style={{ background: `linear-gradient(180deg, #9BF04F, ${G_HOVER})`, color: ON_G, boxShadow: `0 14px 36px -12px ${G}90` }}
+            style={{ background: `linear-gradient(180deg, #A8D876, ${G_HOVER})`, color: ON_G, boxShadow: `0 14px 36px -12px ${G}90` }}
             onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; }} onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; }}>
             <BarChart3 className="h-5 w-5" />
             Analyze My Games Free

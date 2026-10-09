@@ -131,7 +131,7 @@ function trapFen(t: TrapSummary): string {
 }
 
 const CHIP: Record<string, { bg: string; fg: string; bd: string }> = {
-  beginner: { bg: 'rgba(40,120,50,.45)', fg: '#7BE05A', bd: 'rgba(95,213,51,.35)' },
+  beginner: { bg: 'rgba(40,120,50,.45)', fg: '#95C45A', bd: 'rgba(95,143,54,.35)' },
   intermediate: { bg: 'rgba(150,110,20,.45)', fg: '#F2C14E', bd: 'rgba(232,180,71,.35)' },
   advanced: { bg: 'rgba(150,35,45,.5)', fg: '#FF7A80', bd: 'rgba(255,80,88,.35)' },
 };
@@ -171,7 +171,7 @@ function TrapsRedesign({ traps, loading }: { traps: TrapSummary[]; loading: bool
             const active = tab === id;
             return (
               <button key={id} onClick={() => setTab(id)} className="rounded-[12px] py-2.5 text-[13.5px] font-bold transition-colors"
-                style={active ? { background: 'rgba(139,234,69,.10)', color: RD.text, boxShadow: `inset 0 0 0 1.5px ${RD.green}` } : { background: 'transparent', color: RD.muted }}>
+                style={active ? { background: 'rgba(129,182,76,.10)', color: RD.text, boxShadow: `inset 0 0 0 1.5px ${RD.green}` } : { background: 'transparent', color: RD.muted }}>
                 {label}
               </button>
             );

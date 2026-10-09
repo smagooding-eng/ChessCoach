@@ -34,8 +34,8 @@ import { ActiveGamesCard } from '@/components/play/ActiveGamesCard';
 
 const BG = '#050A0B';
 const CARD = 'linear-gradient(160deg, #0F1819 0%, #0B1213 100%)';
-const GREEN = '#8BEA45';
-const GREEN_DARK = '#5FD533';
+const GREEN = '#81B64C';
+const GREEN_DARK = '#5F8F36';
 const MUTED = '#87918E';
 const RED = '#FF5058';
 const BORDER = 'rgba(255,255,255,.08)';
@@ -43,13 +43,13 @@ const BORDER = 'rgba(255,255,255,.08)';
 const asset = (file: string) => `${import.meta.env.BASE_URL}chessscout/${file}`;
 
 const RESULT_STYLE: Record<string, { bg: string; fg: string; label: string }> = {
-  win: { bg: 'rgba(95,213,51,.16)', fg: '#7BE05A', label: 'WIN' },
+  win: { bg: 'rgba(95,143,54,.16)', fg: '#95C45A', label: 'WIN' },
   loss: { bg: 'rgba(255,80,88,.16)', fg: '#FF7A80', label: 'LOSS' },
   draw: { bg: 'rgba(255,255,255,.10)', fg: '#B9C2BF', label: 'DRAW' },
 };
 
 const TILES = [
-  { label: 'Play', sub: 'Friends or bots', href: '/play', img: 'play.webp', pos: '78% center', icon: Play, c1: '#2f9e3a', c2: '#8BEA45', glow: 'rgba(139,234,69,.28)' },
+  { label: 'Play', sub: 'Friends or bots', href: '/play', img: 'play.webp', pos: '78% center', icon: Play, c1: '#5f8f36', c2: '#81B64C', glow: 'rgba(129,182,76,.28)' },
   { label: 'Puzzles', sub: 'Smart training', href: '/puzzles', img: 'puzzles.webp', pos: '73% center', icon: Puzzle, c1: '#1e5bff', c2: '#5cc8ff', glow: 'rgba(92,150,255,.30)' },
   { label: 'Openings', sub: 'Drill and learn', href: '/openings', img: 'openings.webp', pos: '68% center', icon: BookOpen, c1: '#6a3fc7', c2: '#b48cff', glow: 'rgba(168,120,255,.30)' },
   { label: 'Chess Traps', sub: 'Learn the classics', href: '/traps', img: 'traps.webp', pos: '59% center', icon: Crosshair, c1: '#b9791a', c2: '#ffd27a', glow: 'rgba(232,180,71,.30)' },
@@ -153,7 +153,7 @@ export function DashboardRedesign() {
     Critical: { bg: 'rgba(255,80,88,.18)', fg: '#FF8A8F' },
     High: { bg: 'rgba(255,138,61,.18)', fg: '#FFB07A' },
     Medium: { bg: 'rgba(232,180,71,.18)', fg: '#F0C25C' },
-    Low: { bg: 'rgba(139,234,69,.16)', fg: GREEN },
+    Low: { bg: 'rgba(129,182,76,.16)', fg: GREEN },
   };
   const topWeaknesses = weaknessesData?.weaknesses?.slice(0, 3) ?? [];
   const courses = coursesData?.courses?.slice(0, 3) ?? [];
@@ -177,7 +177,7 @@ export function DashboardRedesign() {
             <div className="relative shrink-0">
               <div
                 className="grid h-[60px] w-[60px] place-items-center overflow-hidden rounded-full"
-                style={{ border: `2px solid ${GREEN}`, background: 'rgba(139,234,69,.10)' }}
+                style={{ border: `2px solid ${GREEN}`, background: 'rgba(129,182,76,.10)' }}
               >
                 {chessPlayer?.avatar ? (
                   <img src={chessPlayer.avatar} alt="" className="h-full w-full object-cover" />
@@ -240,7 +240,7 @@ export function DashboardRedesign() {
                 </div>
                 <div className="min-w-0 flex-1 border-x px-3.5" style={{ borderColor: BORDER }}>
                   <div className="mb-1.5 flex items-center justify-between text-[12px] font-extrabold">
-                    <span style={{ color: '#7BE05A' }}>{wins}W</span>
+                    <span style={{ color: '#95C45A' }}>{wins}W</span>
                     <span style={{ color: MUTED }}>{draws}D</span>
                     <span style={{ color: RED }}>{losses}L</span>
                   </div>
@@ -291,7 +291,7 @@ export function DashboardRedesign() {
             </p>
             <h2 className="mt-3 text-[26px] font-black leading-[1.04] tracking-tight min-[400px]:text-[28px] sm:text-[36px]" style={{ textShadow: '0 2px 14px rgba(0,0,0,.85)' }}>
               Scout Any<br />
-              <span style={{ color: GREEN, textShadow: '0 0 26px rgba(139,234,69,.35), 0 2px 14px rgba(0,0,0,.85)' }}>Chess.com Player</span>
+              <span style={{ color: GREEN, textShadow: '0 0 26px rgba(129,182,76,.35), 0 2px 14px rgba(0,0,0,.85)' }}>Chess.com Player</span>
             </h2>
             <p className="mt-2.5 max-w-[58%] text-[14px] leading-snug sm:max-w-[48%]" style={{ color: '#C9D1CE', textShadow: '0 2px 10px rgba(0,0,0,.9)' }}>
               Get instant analysis, weaknesses, tendencies, and custom prep lines.
@@ -300,7 +300,7 @@ export function DashboardRedesign() {
             <form
               onSubmit={submitScout}
               className="mt-auto flex items-center overflow-hidden rounded-[16px]"
-              style={{ background: 'rgba(8,14,15,.82)', border: `1px solid rgba(255,255,255,.12)`, boxShadow: '0 0 28px rgba(139,234,69,.16)' }}
+              style={{ background: 'rgba(8,14,15,.82)', border: `1px solid rgba(255,255,255,.12)`, boxShadow: '0 0 28px rgba(129,182,76,.16)' }}
             >
               <Search size={20} className="ml-4 shrink-0" style={{ color: '#C9D1CE' }} />
               <input
@@ -318,7 +318,7 @@ export function DashboardRedesign() {
               <button
                 type="submit"
                 className="grid h-[54px] w-[62px] shrink-0 place-items-center transition-transform active:scale-95"
-                style={{ background: `linear-gradient(180deg, ${GREEN} 0%, ${GREEN_DARK} 100%)`, color: '#05100A', boxShadow: '0 0 22px rgba(139,234,69,.45)' }}
+                style={{ background: `linear-gradient(180deg, ${GREEN} 0%, ${GREEN_DARK} 100%)`, color: '#05100A', boxShadow: '0 0 22px rgba(129,182,76,.45)' }}
                 aria-label="Scout this player"
               >
                 <ArrowRight size={26} strokeWidth={2.6} />
@@ -372,7 +372,7 @@ export function DashboardRedesign() {
         <section className="rounded-[20px]" style={{ background: CARD, border: `1px solid ${BORDER}` }}>
           <div className="flex items-center justify-between px-4 pb-2 pt-4">
             <div className="flex items-center gap-3">
-              <span className="grid h-9 w-9 place-items-center rounded-[10px] text-[19px]" style={{ background: 'rgba(139,234,69,.10)', border: `1px solid ${BORDER}`, color: GREEN }}>♚</span>
+              <span className="grid h-9 w-9 place-items-center rounded-[10px] text-[19px]" style={{ background: 'rgba(129,182,76,.10)', border: `1px solid ${BORDER}`, color: GREEN }}>♚</span>
               <h2 className="text-[17px] font-extrabold">Key Weaknesses</h2>
             </div>
             <Link href="/analysis" className="flex items-center gap-1 text-[12px] font-extrabold uppercase tracking-wider" style={{ color: GREEN }}>
@@ -411,7 +411,7 @@ export function DashboardRedesign() {
         <section className="rounded-[20px]" style={{ background: CARD, border: `1px solid ${BORDER}` }}>
           <div className="flex items-center justify-between px-4 pb-3 pt-4">
             <div className="flex items-center gap-3">
-              <span className="grid h-9 w-9 place-items-center rounded-[10px]" style={{ background: 'rgba(139,234,69,.10)', border: `1px solid ${BORDER}` }}>
+              <span className="grid h-9 w-9 place-items-center rounded-[10px]" style={{ background: 'rgba(129,182,76,.10)', border: `1px solid ${BORDER}` }}>
                 <RookIcon size={19} />
               </span>
               <h2 className="text-[17px] font-extrabold">Recent Games</h2>
@@ -483,14 +483,14 @@ export function DashboardRedesign() {
         </Link>
 
         {/* ── Scan a position (photo coach) ── */}
-        <Link href="/scan" className="flex items-center gap-4 overflow-hidden rounded-[20px] p-4" style={{ background: CARD, border: '1px solid rgba(139,234,69,.3)' }}>
+        <Link href="/scan" className="flex items-center gap-4 overflow-hidden rounded-[20px] p-4" style={{ background: CARD, border: '1px solid rgba(129,182,76,.3)' }}>
           <span className="relative shrink-0">
             <FenThumb fen="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1" size={74} />
             <span className="absolute -bottom-1.5 -right-1.5 grid h-8 w-8 place-items-center rounded-full" style={{ background: `linear-gradient(180deg, ${GREEN}, ${GREEN_DARK})`, color: '#05100A' }}><Camera size={16} /></span>
           </span>
           <span className="min-w-0 flex-1">
             {!freePlan
-              ? <span className="mb-1 inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-[.16em]" style={{ background: 'rgba(139,234,69,.12)', color: GREEN }}><Zap size={10} /> Coach</span>
+              ? <span className="mb-1 inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-[.16em]" style={{ background: 'rgba(129,182,76,.12)', color: GREEN }}><Zap size={10} /> Coach</span>
               : <span className="mb-1 inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-[.16em]" style={{ background: 'linear-gradient(180deg,#F2C560,#D99A24)', color: '#1A1205' }}><Crown size={10} /> Pro</span>}
             <b className="block text-[17px] font-extrabold leading-tight">Seen a position worth studying?</b>
             <span className="mt-0.5 block text-[13px] font-bold" style={{ color: GREEN }}>Snap a photo and explore it on the board</span>
@@ -512,7 +512,7 @@ export function DashboardRedesign() {
           <section className="rounded-[20px]" style={{ background: CARD, border: `1px solid ${BORDER}` }}>
             <div className="flex items-center justify-between px-4 pb-2 pt-4">
               <div className="flex items-center gap-3">
-                <span className="grid h-9 w-9 place-items-center rounded-[10px] text-[19px]" style={{ background: 'rgba(139,234,69,.10)', border: `1px solid ${BORDER}`, color: GREEN }}>♝</span>
+                <span className="grid h-9 w-9 place-items-center rounded-[10px] text-[19px]" style={{ background: 'rgba(129,182,76,.10)', border: `1px solid ${BORDER}`, color: GREEN }}>♝</span>
                 <h2 className="text-[17px] font-extrabold">Courses</h2>
               </div>
               <Link href="/courses" className="flex items-center gap-1 text-[12px] font-extrabold uppercase tracking-wider" style={{ color: GREEN }}>All <ChevronRight size={14} /></Link>
@@ -544,7 +544,7 @@ export function DashboardRedesign() {
             <Link key={q.label} href={q.href} className="relative flex min-h-[124px] flex-col items-start justify-between gap-2 overflow-hidden rounded-[18px] p-3.5 transition-transform active:scale-[.98]" style={{ background: CARD, border: `1px solid ${BORDER}` }}>
               <img src={siteImg(scene(q.img))} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
               <span className="absolute inset-0" style={{ background: 'linear-gradient(0deg, rgba(5,10,11,.92) 0%, rgba(5,10,11,.55) 50%, rgba(5,10,11,.15) 100%)' }} />
-              <span className="relative grid h-9 w-9 place-items-center rounded-[10px]" style={{ background: 'rgba(5,10,11,.6)', color: GREEN, border: '1px solid rgba(139,234,69,.3)' }}><q.icon size={18} /></span>
+              <span className="relative grid h-9 w-9 place-items-center rounded-[10px]" style={{ background: 'rgba(5,10,11,.6)', color: GREEN, border: '1px solid rgba(129,182,76,.3)' }}><q.icon size={18} /></span>
               <span className="relative min-w-0 max-w-full">
                 <b className="block truncate text-[13.5px] font-extrabold">{q.label}</b>
                 <span className="block truncate text-[11.5px]" style={{ color: '#C4CCC9' }}>{q.sub}</span>

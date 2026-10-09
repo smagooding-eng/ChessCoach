@@ -1850,7 +1850,7 @@ function ProfileClassic() {
       <motion.div variants={item} className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
           { label: 'Games', value: totalGames, icon: Swords, accent: '#3b82f6' },
-          { label: 'Win Rate', value: winRate ? `${winRate}%` : '—', icon: Trophy, accent: '#10b981' },
+          { label: 'Win Rate', value: winRate ? `${winRate}%` : '—', icon: Trophy, accent: '#81b64c' },
           { label: 'Rating', value: player?.rating ?? '—', icon: Target, accent: G },
           { label: 'Courses', value: `${completedCourses}/${(completedCourses + activeCourses) || 0}`, icon: GraduationCap, accent: '#f59e0b' },
         ].map(stat => (
@@ -2029,10 +2029,10 @@ function ProfileRedesign() {
         </div>
 
         {/* Identity */}
-        <section className="relative overflow-hidden rounded-[22px] p-5 lg:col-span-2" style={{ ...card, border: '1px solid rgba(139,234,69,.22)' }}>
-          <div className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full" style={{ background: 'radial-gradient(circle, rgba(139,234,69,.16) 0%, transparent 70%)' }} />
+        <section className="relative overflow-hidden rounded-[22px] p-5 lg:col-span-2" style={{ ...card, border: '1px solid rgba(129,182,76,.22)' }}>
+          <div className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full" style={{ background: 'radial-gradient(circle, rgba(129,182,76,.16) 0%, transparent 70%)' }} />
           <div className="relative flex items-center gap-4">
-            <div className="grid h-[76px] w-[76px] shrink-0 place-items-center overflow-hidden rounded-full" style={{ border: `2.5px solid ${RD.green}`, background: 'rgba(139,234,69,.10)', boxShadow: '0 0 0 4px rgba(139,234,69,.10)' }}>
+            <div className="grid h-[76px] w-[76px] shrink-0 place-items-center overflow-hidden rounded-full" style={{ border: `2.5px solid ${RD.green}`, background: 'rgba(129,182,76,.10)', boxShadow: '0 0 0 4px rgba(129,182,76,.10)' }}>
               {player?.avatar
                 ? <img src={player.avatar} alt="" className="h-full w-full object-cover" />
                 : <span className="text-[30px] font-black" style={{ color: RD.green }}>{(player?.name || username || '?').charAt(0).toUpperCase()}</span>}
@@ -2056,7 +2056,7 @@ function ProfileRedesign() {
                     className="w-full max-w-[240px] rounded-[10px] px-3 py-2 text-[14px] font-bold outline-none"
                     style={{ background: 'rgba(255,255,255,.05)', border: `1px solid ${RD.green}`, color: RD.text }}
                   />
-                  <button onClick={handleSaveUsername} disabled={saving} aria-label="Save" className="grid h-9 w-9 place-items-center rounded-[10px]" style={{ background: 'rgba(139,234,69,.14)', color: RD.green }}><Check size={17} /></button>
+                  <button onClick={handleSaveUsername} disabled={saving} aria-label="Save" className="grid h-9 w-9 place-items-center rounded-[10px]" style={{ background: 'rgba(129,182,76,.14)', color: RD.green }}><Check size={17} /></button>
                   <button onClick={() => { setEditingUsername(false); setNewUsername(username ?? ''); }} aria-label="Cancel" className="grid h-9 w-9 place-items-center rounded-[10px]" style={{ background: 'rgba(255,255,255,.05)', color: RD.muted }}><X size={17} /></button>
                 </div>
               ) : (

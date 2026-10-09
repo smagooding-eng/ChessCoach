@@ -512,7 +512,7 @@ export function Analysis({ hideHeader = false }: { hideHeader?: boolean } = {}) 
               { key: 'endgame',    label: 'Endgame',    icon: Trophy },
             ];
             const accColor = (acc: number) =>
-              acc >= 85 ? '#10b981' :
+              acc >= 85 ? '#81b64c' :
               acc >= 70 ? CHESSCOM_GREEN :
               acc >= 55 ? '#ea9733' :
               acc >= 40 ? '#f97316' : '#dc4343';

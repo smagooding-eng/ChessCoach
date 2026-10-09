@@ -64,7 +64,7 @@ export function CourseOverview({
           <button
             onClick={() => onOpen(allDone ? 0 : Math.max(currentIdx, 0))}
             className="mt-5 flex w-full items-center justify-center gap-2.5 rounded-[14px] py-4 text-[16px] font-extrabold"
-            style={{ background: `linear-gradient(180deg, ${RD.green}, ${RD.greenDark})`, color: '#05100A', boxShadow: '0 14px 30px -14px rgba(139,234,69,.65)' }}
+            style={{ background: `linear-gradient(180deg, ${RD.green}, ${RD.greenDark})`, color: '#05100A', boxShadow: '0 14px 30px -14px rgba(129,182,76,.65)' }}
           >
             {allDone ? 'Review from the start' : `Continue Lesson ${currentIdx + 1}`} <ArrowRight size={18} />
           </button>
@@ -74,7 +74,7 @@ export function CourseOverview({
               const active = tab === id;
               return (
                 <button key={id} onClick={() => setTab(id)} className="py-3 text-[14.5px] font-bold transition-colors"
-                  style={active ? { background: 'rgba(139,234,69,.12)', color: RD.green, boxShadow: `inset 0 -2px 0 ${RD.green}` } : { color: RD.muted }}>
+                  style={active ? { background: 'rgba(129,182,76,.12)', color: RD.green, boxShadow: `inset 0 -2px 0 ${RD.green}` } : { color: RD.muted }}>
                   {label}
                 </button>
               );
@@ -91,7 +91,7 @@ export function CourseOverview({
                     onClick={() => onOpen(i)}
                     aria-current={isCurrent ? 'step' : undefined}
                     className="flex w-full items-center gap-3 rounded-[14px] px-2.5 py-2 text-left"
-                    style={{ background: isCurrent ? 'rgba(139,234,69,.08)' : 'transparent', boxShadow: isCurrent ? `inset 0 0 0 1.5px ${RD.green}` : undefined }}
+                    style={{ background: isCurrent ? 'rgba(129,182,76,.08)' : 'transparent', boxShadow: isCurrent ? `inset 0 0 0 1.5px ${RD.green}` : undefined }}
                   >
                     <span className="relative h-11 w-11 shrink-0 overflow-hidden rounded-[9px]" style={{ border: `1px solid ${RD.border}` }}>
                       <img src={siteImg(lessonThumbSrc(i, art.img, photoImgs))} alt="" loading="lazy" className="h-full w-full object-cover" />

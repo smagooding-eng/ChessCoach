@@ -2134,7 +2134,7 @@ function DashboardRedesignTogglePanel() {
             </p>
           </div>
           <div className="w-10 h-6 rounded-full flex items-center px-0.5 transition-colors shrink-0"
-            style={{ background: enabled ? '#7fd14f' : 'rgba(255,255,255,.15)', justifyContent: enabled ? 'flex-end' : 'flex-start' }}>
+            style={{ background: enabled ? '#81b64c' : 'rgba(255,255,255,.15)', justifyContent: enabled ? 'flex-end' : 'flex-start' }}>
             {saving ? <Loader2 className="w-4 h-4 animate-spin text-white" /> : <div className="w-5 h-5 rounded-full bg-white" />}
           </div>
         </button>

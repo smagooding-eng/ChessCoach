@@ -28,7 +28,7 @@ function CoursesProShowcase({ redesign }: { redesign: boolean }) {
         <div className="grid gap-2.5">
           {steps.map((st, i) => (
             <div key={st.t} className="flex items-start gap-3 rounded-[16px] p-4" style={{ background: redesign ? RD.card : 'rgba(255,255,255,0.03)', border: `1px solid ${redesign ? RD.border : 'rgba(255,255,255,0.06)'}` }}>
-              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-[14px] font-extrabold" style={{ background: 'rgba(139,234,69,.14)', color: '#8BEA45' }}>{i + 1}</span>
+              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-[14px] font-extrabold" style={{ background: 'rgba(129,182,76,.14)', color: '#81B64C' }}>{i + 1}</span>
               <span>
                 <b className="block text-[14.5px] font-bold">{st.t}</b>
                 <span className="block text-[13px] leading-snug opacity-70">{st.d}</span>

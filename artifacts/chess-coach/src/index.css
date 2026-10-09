@@ -1,6 +1,45 @@
 @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=IBM+Plex+Mono:wght@500;600&display=swap');
 @import "tailwindcss";
 
+/* Brand green everywhere: Tailwind's emerald / green / lime shades are retuned
+   to the original ChessScout green (#81b64c, the phone status-bar colour)
+   so no screen uses a brighter, neon green. */
+@theme {
+  --color-emerald-50: #f3f8ec;
+  --color-emerald-100: #e4efd5;
+  --color-emerald-200: #cbe1ad;
+  --color-emerald-300: #b0d184;
+  --color-emerald-400: #95c45a;
+  --color-emerald-500: #81b64c;
+  --color-emerald-600: #6a9a3c;
+  --color-emerald-700: #557c31;
+  --color-emerald-800: #43622a;
+  --color-emerald-900: #364f24;
+  --color-emerald-950: #1d2b13;
+  --color-green-50: #f3f8ec;
+  --color-green-100: #e4efd5;
+  --color-green-200: #cbe1ad;
+  --color-green-300: #b0d184;
+  --color-green-400: #95c45a;
+  --color-green-500: #81b64c;
+  --color-green-600: #6a9a3c;
+  --color-green-700: #557c31;
+  --color-green-800: #43622a;
+  --color-green-900: #364f24;
+  --color-green-950: #1d2b13;
+  --color-lime-50: #f3f8ec;
+  --color-lime-100: #e4efd5;
+  --color-lime-200: #cbe1ad;
+  --color-lime-300: #b0d184;
+  --color-lime-400: #95c45a;
+  --color-lime-500: #81b64c;
+  --color-lime-600: #6a9a3c;
+  --color-lime-700: #557c31;
+  --color-lime-800: #43622a;
+  --color-lime-900: #364f24;
+  --color-lime-950: #1d2b13;
+}
+
 @theme inline {
   --font-sans: 'DM Sans', sans-serif;
   --font-display: 'Fraunces', serif;
@@ -434,7 +473,7 @@ html.cs-redesign {
   --card-foreground: 150 12% 96%;
   --popover: 187 26% 8%;
   --popover-foreground: 150 12% 96%;
-  --primary: 95 80% 59%;                  /* #8BEA45 neon green */
+  --primary: 95 80% 59%;                  /* #81B64C neon green */
   --primary-foreground: 147 52% 4%;       /* dark text on green */
   --secondary: 191 23% 9%;                /* #121B1D */
   --secondary-foreground: 150 12% 96%;
@@ -454,12 +493,12 @@ html.cs-redesign {
   --cs-bg-sidebar: #070D0E;
   --cs-bg-card: #0D1516;
   --cs-border: rgba(255, 255, 255, 0.08);
-  --cs-green: #8BEA45;
+  --cs-green: #81B64C;
   --cs-text-light: #F5F7F6;
   --cs-text-muted: #87918E;
   --cs-sidebar-a95: #070D0Ef5;
   --cs-sidebar-a97: #070D0Ef8;
-  --cs-avatar-border: #8BEA45;
+  --cs-avatar-border: #81B64C;
   --cs-card-gradient: linear-gradient(160deg, #0F1819 0%, #0B1213 100%);
 }
 /* Flat near-black page, no olive radial washes */
@@ -479,14 +518,14 @@ html.cs-redesign .glass-card {
 }
 html.cs-redesign .glass-card:hover {
   background: linear-gradient(160deg, #121D1F 0%, #0D1516 100%);
-  border-color: rgba(139, 234, 69, 0.28);
+  border-color: rgba(129, 182, 76, 0.28);
 }
 html.cs-redesign .card-depth,
 html.cs-redesign .card-depth-lg {
-  box-shadow: 0 1px 0 rgba(255,255,255,0.04) inset, 0 24px 60px -24px rgba(0,0,0,0.85), 0 0 60px rgba(139,234,69,0.05);
+  box-shadow: 0 1px 0 rgba(255,255,255,0.04) inset, 0 24px 60px -24px rgba(0,0,0,0.85), 0 0 60px rgba(129,182,76,0.05);
 }
 html.cs-redesign .text-gradient {
-  background-image: linear-gradient(135deg, #C9F59E 0%, #8BEA45 100%);
+  background-image: linear-gradient(135deg, #C5DFA6 0%, #81B64C 100%);
 }
 
 /* Redesign: a `grid` with no explicit columns gets an implicit column sized to

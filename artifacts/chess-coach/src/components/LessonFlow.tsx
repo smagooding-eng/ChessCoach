@@ -61,7 +61,7 @@ export function LessonQuizScreen({ quiz, onContinue }: { quiz: QuizMoves; onCont
     const out: Array<{ from: string; to: string; color?: string }> = [];
     try {
       const b = new Chess(quiz.fen).move(quiz.best);
-      if (b) out.push({ from: b.from, to: b.to, color: '#8BEA45' });
+      if (b) out.push({ from: b.from, to: b.to, color: '#81B64C' });
       const p = new Chess(quiz.fen).move(quiz.played);
       if (p) out.push({ from: p.from, to: p.to, color: '#FF5058' });
     } catch { /* arrows are optional */ }
@@ -99,7 +99,7 @@ export function LessonQuizScreen({ quiz, onContinue }: { quiz: QuizMoves; onCont
                 disabled={!!picked}
                 className="flex w-full items-center gap-3.5 rounded-[14px] px-4 py-3.5 text-left transition-colors"
                 style={{
-                  background: state === 'right' ? 'rgba(139,234,69,.10)' : state === 'wrong' ? 'rgba(255,80,88,.10)' : RD.cardSolid,
+                  background: state === 'right' ? 'rgba(129,182,76,.10)' : state === 'wrong' ? 'rgba(255,80,88,.10)' : RD.cardSolid,
                   border: `1.5px solid ${state === 'right' ? RD.green : state === 'wrong' ? RD.red : RD.border}`,
                   opacity: state === 'dim' ? 0.5 : 1,
                 }}
@@ -114,7 +114,7 @@ export function LessonQuizScreen({ quiz, onContinue }: { quiz: QuizMoves; onCont
         </div>
 
         {picked && (
-          <div className="mt-4 rounded-[16px] p-4 text-[13.5px] leading-relaxed" style={{ background: correct ? 'rgba(139,234,69,.07)' : 'rgba(255,80,88,.07)', border: `1px solid ${correct ? 'rgba(139,234,69,.3)' : 'rgba(255,80,88,.3)'}` }}>
+          <div className="mt-4 rounded-[16px] p-4 text-[13.5px] leading-relaxed" style={{ background: correct ? 'rgba(129,182,76,.07)' : 'rgba(255,80,88,.07)', border: `1px solid ${correct ? 'rgba(129,182,76,.3)' : 'rgba(255,80,88,.3)'}` }}>
             <b style={{ color: correct ? RD.green : '#FF8A8F' }}>{correct ? 'Correct!' : 'Not quite.'}</b>{' '}
             {correct
               ? <>{quiz.best} is the stronger move. In your game you played {quiz.played}.</>
@@ -176,7 +176,7 @@ export function LessonCompleteScreen({
           </div>
 
           {hasNext ? (
-            <button onClick={onNext} className="mt-6 flex w-full items-center justify-center gap-2 rounded-[14px] py-3.5 text-[15px] font-extrabold" style={{ background: `linear-gradient(180deg, ${RD.green}, ${RD.greenDark})`, color: '#05100A', boxShadow: '0 12px 28px -12px rgba(139,234,69,.6)' }}>
+            <button onClick={onNext} className="mt-6 flex w-full items-center justify-center gap-2 rounded-[14px] py-3.5 text-[15px] font-extrabold" style={{ background: `linear-gradient(180deg, ${RD.green}, ${RD.greenDark})`, color: '#05100A', boxShadow: '0 12px 28px -12px rgba(129,182,76,.6)' }}>
               Next Lesson <ArrowRight size={17} />
             </button>
           ) : (
@@ -259,7 +259,7 @@ export function LessonIntroScreen({
         )}
 
         <button onClick={onStart} className="mt-5 flex w-full items-center justify-center gap-2.5 rounded-[14px] py-4 text-[16px] font-extrabold"
-          style={{ background: `linear-gradient(180deg, ${RD.green}, ${RD.greenDark})`, color: '#05100A', boxShadow: '0 14px 30px -14px rgba(139,234,69,.65)' }}>
+          style={{ background: `linear-gradient(180deg, ${RD.green}, ${RD.greenDark})`, color: '#05100A', boxShadow: '0 14px 30px -14px rgba(129,182,76,.65)' }}>
           Start Lesson <ArrowRight size={18} />
         </button>
       </div>

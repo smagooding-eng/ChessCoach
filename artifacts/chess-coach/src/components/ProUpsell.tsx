@@ -39,7 +39,7 @@ export function ProUpsell({
       <Link
         href="/subscription"
         className={`flex items-center gap-3 rounded-[14px] px-3.5 py-3 transition-transform active:scale-[.99] ${className}`}
-        style={{ background: 'linear-gradient(135deg, rgba(232,180,71,.12), rgba(139,234,69,.06))', border: '1px solid rgba(232,180,71,.35)' }}
+        style={{ background: 'linear-gradient(135deg, rgba(232,180,71,.12), rgba(129,182,76,.06))', border: '1px solid rgba(232,180,71,.35)' }}
       >
         <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[10px]" style={{ background: 'rgba(232,180,71,.16)', color: RD.gold }}>
           <Crown size={16} />

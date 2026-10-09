@@ -111,7 +111,7 @@ function MoveAnalysisPanel({ move, playerColor }: { move: MoveRecord; playerColo
       {(pros.length > 0 || cons.length > 0) && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
           {pros.length > 0 && (
-            <div className="pl-3" style={{ borderLeft: '3px solid #34d399' }}>
+            <div className="pl-3" style={{ borderLeft: '3px solid #95c45a' }}>
               <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-wide mb-1">Pros</p>
               <ul className="space-y-1">
                 {pros.map((p, i) => (
@@ -1057,7 +1057,7 @@ function OpeningCard({ opening, onSelect }: { opening: OpeningLine; onSelect: (o
 // changes to the enhanced theme (near-black cards, neon-green accent). Classic
 // keeps the original gradient tiles.
 const TIER_ACCENT: Record<string, string> = {
-  Beginner: '#A8A29E', Casual: '#34D399', Improving: '#2DD4BF', 'Club Player': '#60A5FA',
+  Beginner: '#A8A29E', Casual: '#95C45A', Improving: '#2DD4BF', 'Club Player': '#60A5FA',
   Tournament: '#818CF8', Advanced: '#C084FC', Expert: '#F472B6', Master: '#E8B447', 'International Master': '#FB923C', Grandmaster: '#F87171',
 };
 
@@ -1129,7 +1129,7 @@ function HowItWorksRD({ title, steps }: { title: string; steps: string[] }) {
       <div className="space-y-2.5">
         {steps.map((s, i) => (
           <div key={i} className="flex gap-3 text-[13px] leading-snug" style={{ color: RD.muted }}>
-            <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full text-[12px] font-extrabold" style={{ background: 'rgba(139,234,69,.12)', color: RD.green }}>{i + 1}</span>
+            <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full text-[12px] font-extrabold" style={{ background: 'rgba(129,182,76,.12)', color: RD.green }}>{i + 1}</span>
             <p>{s}</p>
           </div>
         ))}
@@ -1217,7 +1217,7 @@ export function PracticeBots() {
               const active = tab === id;
               return (
                 <button key={id} onClick={() => setTab(id)} className="rounded-[12px] py-2.5 text-[13.5px] font-bold transition-colors"
-                  style={active ? { background: 'rgba(139,234,69,.10)', color: RD.text, boxShadow: `inset 0 0 0 1.5px ${RD.green}` } : { background: 'transparent', color: RD.muted }}>
+                  style={active ? { background: 'rgba(129,182,76,.10)', color: RD.text, boxShadow: `inset 0 0 0 1.5px ${RD.green}` } : { background: 'transparent', color: RD.muted }}>
                   {label}
                 </button>
               );

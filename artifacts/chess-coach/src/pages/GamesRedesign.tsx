@@ -128,7 +128,7 @@ export function GamesRedesign() {
   const filtersActive = resultFilter !== 'all';
 
   const BADGE: Record<string, { bg: string; fg: string; label: string }> = {
-    win: { bg: 'rgba(46,125,50,.45)', fg: '#7BE05A', label: 'WIN' },
+    win: { bg: 'rgba(46,125,50,.45)', fg: '#95C45A', label: 'WIN' },
     loss: { bg: 'rgba(150,35,45,.55)', fg: '#FF6B73', label: 'LOSS' },
     draw: { bg: 'rgba(255,255,255,.12)', fg: '#C9D2CF', label: 'DRAW' },
   };
@@ -152,7 +152,7 @@ export function GamesRedesign() {
               const active = colorTab === t.id;
               return (
                 <button key={t.id} onClick={() => setColorTab(t.id)} className="rounded-[12px] py-2.5 text-[14px] font-bold transition-colors"
-                  style={active ? { background: 'rgba(139,234,69,.10)', color: RD.text, boxShadow: `inset 0 0 0 1.5px ${RD.green}` } : { background: 'transparent', color: RD.muted }}>
+                  style={active ? { background: 'rgba(129,182,76,.10)', color: RD.text, boxShadow: `inset 0 0 0 1.5px ${RD.green}` } : { background: 'transparent', color: RD.muted }}>
                   {t.label}
                 </button>
               );
@@ -202,7 +202,7 @@ export function GamesRedesign() {
         )}
 
         {unreviewedCount > 0 && (
-          <div className="mt-3 flex items-center gap-3 rounded-[16px] px-4 py-3" style={{ background: 'rgba(139,234,69,.07)', border: '1px solid rgba(139,234,69,.28)' }}>
+          <div className="mt-3 flex items-center gap-3 rounded-[16px] px-4 py-3" style={{ background: 'rgba(129,182,76,.07)', border: '1px solid rgba(129,182,76,.28)' }}>
             <div className="min-w-0 flex-1 text-[13px]">
               {bulkJobId && bulkProgress ? (
                 <span><b>Reviewing…</b> <span style={{ color: RD.muted }}>{bulkProgress.reviewedSoFar} of {bulkProgress.total} done</span></span>

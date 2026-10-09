@@ -29,7 +29,7 @@ const SEV: Record<string, { bg: string; fg: string }> = {
   Critical: { bg: 'rgba(255,80,88,.22)', fg: '#FF8A8F' },
   High: { bg: 'rgba(255,80,88,.22)', fg: '#FF8A8F' },
   Medium: { bg: 'rgba(232,180,71,.22)', fg: '#F0C25C' },
-  Low: { bg: 'rgba(139,234,69,.18)', fg: '#8BEA45' },
+  Low: { bg: 'rgba(129,182,76,.18)', fg: '#81B64C' },
 };
 
 const flag = (country?: string) => {
@@ -128,7 +128,7 @@ export function ScoutRedesign(props: {
         </section>
 
         {loading && statusMsg && (
-          <div className="flex items-center gap-3 rounded-[16px] p-4 text-[13.5px]" style={{ background: 'rgba(139,234,69,.07)', border: '1px solid rgba(139,234,69,.28)' }}>
+          <div className="flex items-center gap-3 rounded-[16px] p-4 text-[13.5px]" style={{ background: 'rgba(129,182,76,.07)', border: '1px solid rgba(129,182,76,.28)' }}>
             <Loader2 size={17} className="shrink-0 animate-spin" style={{ color: RD.green }} />{statusMsg}
           </div>
         )}
@@ -154,7 +154,7 @@ export function ScoutRedesign(props: {
                 {p?.avatar ? (
                   <img src={p.avatar} alt={result.username} className="h-[64px] w-[64px] shrink-0 rounded-[16px] object-cover" style={{ border: `1px solid ${RD.border}` }} />
                 ) : (
-                  <span className="grid h-[64px] w-[64px] shrink-0 place-items-center rounded-[16px] text-[26px] font-extrabold" style={{ background: 'rgba(139,234,69,.12)', color: RD.green }}>{result.username[0]?.toUpperCase()}</span>
+                  <span className="grid h-[64px] w-[64px] shrink-0 place-items-center rounded-[16px] text-[26px] font-extrabold" style={{ background: 'rgba(129,182,76,.12)', color: RD.green }}>{result.username[0]?.toUpperCase()}</span>
                 )}
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
@@ -179,7 +179,7 @@ export function ScoutRedesign(props: {
                 const active = tab === id;
                 return (
                   <button key={id} onClick={() => setTab(id)} className="rounded-[12px] py-2.5 text-[13px] font-bold transition-colors"
-                    style={active ? { background: 'rgba(139,234,69,.10)', color: RD.text, boxShadow: `inset 0 0 0 1.5px ${RD.green}` } : { background: 'transparent', color: RD.muted }}>
+                    style={active ? { background: 'rgba(129,182,76,.10)', color: RD.text, boxShadow: `inset 0 0 0 1.5px ${RD.green}` } : { background: 'transparent', color: RD.muted }}>
                     {label}
                   </button>
                 );

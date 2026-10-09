@@ -15,7 +15,7 @@ const CHESSCOM_GREEN = REDESIGN_ON ? RD.green : '#81b64c';
 const TEXT_LIGHT = REDESIGN_ON ? RD.text : '#e8e6e3';
 const TEXT_MUTED = REDESIGN_ON ? RD.muted : '#9e9b98';
 const BG_CARD = REDESIGN_ON ? RD.cardSolid : '#302e2b';
-const SELECTED_BG = REDESIGN_ON ? 'rgba(139,234,69,0.12)' : 'rgba(129,182,76,0.35)';
+const SELECTED_BG = REDESIGN_ON ? 'rgba(129,182,76,0.12)' : 'rgba(129,182,76,0.35)';
 
 function SwatchButton({ active, onClick, children, label }: { active: boolean; onClick: () => void; children: React.ReactNode; label: string }) {
   return (
@@ -159,7 +159,7 @@ export default function SettingsPage() {
                 const on = stab === id;
                 return (
                   <button key={id} onClick={() => setStab(id)} aria-pressed={on} className="rounded-[12px] py-2.5 text-[12.5px] font-bold transition-colors"
-                    style={on ? { background: 'rgba(139,234,69,.10)', color: RD.text, boxShadow: `inset 0 0 0 1.5px ${RD.green}` } : { background: 'transparent', color: RD.muted }}>
+                    style={on ? { background: 'rgba(129,182,76,.10)', color: RD.text, boxShadow: `inset 0 0 0 1.5px ${RD.green}` } : { background: 'transparent', color: RD.muted }}>
                     {label}
                   </button>
                 );
@@ -202,7 +202,7 @@ export default function SettingsPage() {
               const on = t.id === activeType.id;
               return (
                 <button key={t.id} onClick={() => setThemeType(t.id)} aria-pressed={on} className="rounded-[10px] py-2 text-[13px] font-bold transition-colors"
-                  style={on ? { background: 'rgba(139,234,69,.10)', color: RD.text, boxShadow: `inset 0 0 0 1.5px ${RD.green}` } : { background: 'transparent', color: RD.muted }}>
+                  style={on ? { background: 'rgba(129,182,76,.10)', color: RD.text, boxShadow: `inset 0 0 0 1.5px ${RD.green}` } : { background: 'transparent', color: RD.muted }}>
                   {t.label} <span className="text-[11px] opacity-70">{t.shapes.length}</span>
                 </button>
               );
@@ -228,7 +228,7 @@ export default function SettingsPage() {
         <section className={vis('boards')}>
           <div className="mb-1 flex items-center gap-2">
             <h2 className="text-sm font-black uppercase tracking-wide" style={{ color: TEXT_MUTED }}>Signature Boards</h2>
-            <span className="rounded-md px-1.5 py-0.5 text-[10px] font-extrabold" style={{ background: 'rgba(139,234,69,.14)', color: RD.green }}>NEW</span>
+            <span className="rounded-md px-1.5 py-0.5 text-[10px] font-extrabold" style={{ background: 'rgba(129,182,76,.14)', color: RD.green }}>NEW</span>
           </div>
           <p className="text-xs mb-3" style={{ color: TEXT_MUTED }}>Our new photographic collection — woods, marbles, stone, leather, felt and metal.</p>
           <div className={`grid grid-cols-4 gap-2 ${redesign ? 'lg:grid-cols-8' : ''}`}>

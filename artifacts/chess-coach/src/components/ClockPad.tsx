@@ -6,7 +6,7 @@ import { Check, X, Hand } from 'lucide-react';
 // white digits, the other is grey with dark digits, and a dark strip holds the
 // small controls -- like a physical / app chess clock.
 export const CLOCK = {
-  on: '#7FA650',
+  on: '#81B64C',
   onText: '#FFFFFF',
   onSub: 'rgba(255,255,255,.78)',
   off: '#8A8A88',

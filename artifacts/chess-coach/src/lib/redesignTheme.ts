@@ -9,8 +9,8 @@ export const RD = {
   cardSolid: '#0D1516',
   cardLight: '#121B1D',
   border: 'rgba(255,255,255,.08)',
-  green: '#8BEA45',
-  greenDark: '#5FD533',
+  green: '#81B64C',
+  greenDark: '#5F8F36',
   text: '#F5F7F6',
   muted: '#87918E',
   red: '#FF5058',
@@ -18,14 +18,14 @@ export const RD = {
 } as const;
 
 export const RESULT_BADGE: Record<string, { bg: string; fg: string; label: string }> = {
-  win: { bg: 'rgba(95,213,51,.16)', fg: '#7BE05A', label: 'WIN' },
+  win: { bg: 'rgba(95,143,54,.16)', fg: '#95C45A', label: 'WIN' },
   loss: { bg: 'rgba(255,80,88,.16)', fg: '#FF7A80', label: 'LOSS' },
   draw: { bg: 'rgba(255,255,255,.10)', fg: '#B9C2BF', label: 'DRAW' },
 };
 
 // Difficulty chips (Chess Traps etc.)
 export const DIFFICULTY_BADGE: Record<string, { bg: string; fg: string }> = {
-  beginner: { bg: 'rgba(95,213,51,.16)', fg: '#7BE05A' },
+  beginner: { bg: 'rgba(95,143,54,.16)', fg: '#95C45A' },
   intermediate: { bg: 'rgba(232,180,71,.16)', fg: '#E8B447' },
   advanced: { bg: 'rgba(255,80,88,.16)', fg: '#FF7A80' },
 };

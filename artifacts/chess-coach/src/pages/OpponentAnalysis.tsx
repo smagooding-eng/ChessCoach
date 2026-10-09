@@ -814,7 +814,7 @@ export function OpponentAnalysis() {
                       key={id}
                       onClick={() => setScoutTab(id)}
                       className="flex-1 rounded-[10px] py-2 text-[12.5px] font-bold transition-colors"
-                      style={active ? { background: 'rgba(139,234,69,.10)', color: RD.green, boxShadow: `inset 0 0 0 1px ${RD.green}` } : { background: 'transparent', color: RD.muted }}
+                      style={active ? { background: 'rgba(129,182,76,.10)', color: RD.green, boxShadow: `inset 0 0 0 1px ${RD.green}` } : { background: 'transparent', color: RD.muted }}
                     >
                       {label}
                     </button>

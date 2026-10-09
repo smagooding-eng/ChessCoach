@@ -4,11 +4,11 @@ import { apiFetch } from '@/lib/api';
 import { type MoveAnalysisResult } from '@/lib/chess-bot';
 import { SAMPLE_REPORT, type SampleReport } from '@/lib/sampleReport';
 
-const G = '#8BEA45';
+const G = '#81B64C';
 const TEXT = '#F5F7F6';
 const MUTED = '#9AA8A5';
 const CARD = '#0D1516';
-const SEV_COLORS: Record<string, string> = { Critical: '#ef4444', High: '#f97316', Medium: '#f59e0b', Low: '#10b981' };
+const SEV_COLORS: Record<string, string> = { Critical: '#ef4444', High: '#f97316', Medium: '#f59e0b', Low: '#81b64c' };
 
 interface BlunderDetail extends MoveAnalysisResult {
   fenBefore: string;

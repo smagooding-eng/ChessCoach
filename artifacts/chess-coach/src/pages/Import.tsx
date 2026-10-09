@@ -27,7 +27,7 @@ function BrandLogo({ kind }: { kind: 'chesscom' | 'lichess' }) {
     return <img src={BRAND_IMG[kind]} alt="" className="h-10 w-10 rounded-[8px] object-contain" loading="lazy" onError={() => setFailed(true)} />;
   }
   return kind === 'chesscom'
-    ? <span className="text-[34px] leading-none" style={{ color: '#8BEA45' }} aria-hidden="true">♞</span>
+    ? <span className="text-[34px] leading-none" style={{ color: '#81B64C' }} aria-hidden="true">♞</span>
     : <span className="grid h-10 w-10 place-items-center rounded-full text-[22px] leading-none" style={{ border: '2px solid #F5F7F6', color: '#F5F7F6' }} aria-hidden="true">♞</span>;
 }
 
@@ -530,9 +530,9 @@ export function Import() {
                     onClick={() => { setPlatform(src.id); handleReset(); setSourceOpen(true); }}
                     aria-pressed={active}
                     className="flex items-center gap-3 rounded-[18px] p-3 text-left transition-colors"
-                    style={{ background: active ? 'rgba(139,234,69,.08)' : 'rgba(255,255,255,.04)', border: `1px solid ${active ? RD.green : RD.border}` }}
+                    style={{ background: active ? 'rgba(129,182,76,.08)' : 'rgba(255,255,255,.04)', border: `1px solid ${active ? RD.green : RD.border}` }}
                   >
-                    <span className="grid h-[58px] w-[58px] shrink-0 place-items-center rounded-[14px]" style={{ background: src.tile ? 'rgba(139,234,69,.16)' : 'transparent', color: RD.text }}>{src.icon}</span>
+                    <span className="grid h-[58px] w-[58px] shrink-0 place-items-center rounded-[14px]" style={{ background: src.tile ? 'rgba(129,182,76,.16)' : 'transparent', color: RD.text }}>{src.icon}</span>
                     <span className="min-w-0">
                       <b className="block text-[16px] font-extrabold">{src.label}</b>
                       <span className="block truncate text-[12.5px]" style={{ color: RD.muted }}>{linked ? linked : 'Import your games'}</span>
@@ -565,7 +565,7 @@ export function Import() {
               onDrop={(e) => { e.preventDefault(); setPgnDrag(false); void handlePgnFile(e.dataTransfer.files?.[0]); }}
               disabled={pgnBusy}
               className="flex min-h-[210px] w-full flex-col items-center justify-center gap-2.5 rounded-[20px] px-4 text-center transition-colors disabled:opacity-60"
-              style={{ background: pgnDrag ? 'rgba(139,234,69,.06)' : 'rgba(255,255,255,.02)', border: `1.5px dashed ${pgnDrag ? RD.green : 'rgba(255,255,255,.35)'}` }}
+              style={{ background: pgnDrag ? 'rgba(129,182,76,.06)' : 'rgba(255,255,255,.02)', border: `1.5px dashed ${pgnDrag ? RD.green : 'rgba(255,255,255,.35)'}` }}
             >
               {pgnBusy ? <div className="h-8 w-8 animate-spin rounded-full border-2" style={{ borderColor: RD.green, borderTopColor: 'transparent' }} /> : <FileUp size={34} style={{ color: RD.text }} />}
               <b className="text-[21px] font-extrabold">{pgnBusy ? 'Importing games…' : 'Upload PGN File'}</b>
@@ -578,7 +578,7 @@ export function Import() {
               </div>
             )}
             {pgnResult && (
-              <div className="mt-3 rounded-[14px] p-4 text-[13px]" style={{ background: 'rgba(139,234,69,.07)', border: '1px solid rgba(139,234,69,.28)' }}>
+              <div className="mt-3 rounded-[14px] p-4 text-[13px]" style={{ background: 'rgba(129,182,76,.07)', border: '1px solid rgba(129,182,76,.28)' }}>
                 <p className="flex items-center gap-2 text-[14px] font-bold" style={{ color: RD.green }}>
                   <CheckCircle2 className="h-4 w-4" />
                   {pgnResult.imported > 0 ? `Added ${pgnResult.imported} game${pgnResult.imported === 1 ? '' : 's'} to your library` : 'No new games added'}

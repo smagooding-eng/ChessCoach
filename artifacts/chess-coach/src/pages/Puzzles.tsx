@@ -546,7 +546,7 @@ export function Puzzles() {
                     }}
                     className="rounded-[12px] py-2.5 text-[14px] font-bold transition-colors"
                     style={active
-                      ? { background: 'rgba(139,234,69,.10)', color: '#F5F7F6', boxShadow: 'inset 0 0 0 1.5px var(--cs-green, #8BEA45)' }
+                      ? { background: 'rgba(129,182,76,.10)', color: '#F5F7F6', boxShadow: 'inset 0 0 0 1.5px var(--cs-green, #81B64C)' }
                       : { background: 'transparent', color: TEXT_MUTED }}
                   >
                     {label}
@@ -740,7 +740,7 @@ export function Puzzles() {
                         {game.turn() === 'w' ? '⬜ White' : '⬛ Black'} to move — find the best move!
                       </span>
                     ) : state === 'correct' ? (
-                      <span style={{ color: '#4ade80' }}>✓ Correct! Well done!</span>
+                      <span style={{ color: '#95c45a' }}>✓ Correct! Well done!</span>
                     ) : state === 'wrong' ? (
                       <span style={{ color: '#f87171' }}>✗ Incorrect</span>
                     ) : null}
@@ -967,12 +967,12 @@ export function Puzzles() {
 
         {redesign && stats && (
           <div className="mt-3 flex items-center gap-3.5 rounded-[18px] p-4" style={{ background: 'var(--cs-card-gradient, #0D1516)', border: '1px solid var(--cs-border, rgba(255,255,255,.08))' }}>
-            <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full" style={{ background: 'rgba(139,234,69,.14)', color: 'var(--cs-green, #8BEA45)' }}><Target size={22} /></span>
+            <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full" style={{ background: 'rgba(129,182,76,.14)', color: 'var(--cs-green, #81B64C)' }}><Target size={22} /></span>
             <div className="min-w-0 flex-1">
               <b className="block text-[15px] font-extrabold" style={{ color: TEXT_LIGHT }}>Today&apos;s Progress</b>
               <span className="text-[14px]" style={{ color: TEXT_LIGHT }}><b className="text-[18px]">{Math.min(stats.todayCount, 5)} / 5</b> <span style={{ color: TEXT_MUTED }}>puzzles completed{stats.todayCount > 5 ? ` (${stats.todayCount} total)` : ''}</span></span>
               <div className="mt-2 h-2 overflow-hidden rounded-full" style={{ background: 'rgba(255,255,255,.10)' }}>
-                <div className="h-full rounded-full" style={{ width: `${Math.min(stats.todayCount / 5, 1) * 100}%`, background: 'var(--cs-green, #8BEA45)' }} />
+                <div className="h-full rounded-full" style={{ width: `${Math.min(stats.todayCount / 5, 1) * 100}%`, background: 'var(--cs-green, #81B64C)' }} />
               </div>
             </div>
           </div>
@@ -983,7 +983,7 @@ export function Puzzles() {
             <h2 className="mb-2 px-1 text-[17px] font-extrabold" style={{ color: TEXT_LIGHT }}>Recommended Themes</h2>
             <div className="grid gap-2">
               {PUZZLE_TYPE_OPTIONS.filter(o => ['fork', 'pin', 'skewer', 'discoveredAttack', 'sacrifice', 'hangingPiece', 'mateIn2'].includes(o.value)).map((o, i) => {
-                const tint = ['#3B82F6', '#A855F7', '#E8B447', '#22C55E', '#EF4444', '#06B6D4', '#F97316'][i % 7];
+                const tint = ['#3B82F6', '#A855F7', '#E8B447', '#81B64C', '#EF4444', '#06B6D4', '#F97316'][i % 7];
                 const img = THEME_SCENE[o.value];
                 return (
                   <button

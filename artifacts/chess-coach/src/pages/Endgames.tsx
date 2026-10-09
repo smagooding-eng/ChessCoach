@@ -242,7 +242,7 @@ export function Endgames() {
 
         <section className="rounded-[20px] p-4" style={{ background: RD.card, border: `1px solid ${RD.border}` }}>
           <div className="flex items-start gap-3">
-            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-[12px]" style={{ background: 'rgba(139,234,69,.14)', color: RD.green, border: '1px solid rgba(139,234,69,.25)' }}>
+            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-[12px]" style={{ background: 'rgba(129,182,76,.14)', color: RD.green, border: '1px solid rgba(129,182,76,.25)' }}>
               <currentTab.icon size={20} />
             </span>
             <div className="min-w-0 flex-1">

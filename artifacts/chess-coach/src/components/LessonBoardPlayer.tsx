@@ -912,8 +912,8 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, positionRec
       if (step.from) styles[step.from] = { background: 'rgba(220, 50, 50, 0.45)', boxShadow: 'inset 0 0 0 2px rgba(220,50,50,0.7)' };
       styles[step.to] = { background: 'rgba(220, 50, 50, 0.6)', boxShadow: 'inset 0 0 0 2px rgba(220,50,50,0.8)' };
     } else if (step?.isFix && step.to) {
-      if (step.from) styles[step.from] = { background: 'rgba(34, 197, 94, 0.35)', boxShadow: 'inset 0 0 0 2px rgba(34,197,94,0.5)' };
-      styles[step.to] = { background: 'rgba(34, 197, 94, 0.55)', boxShadow: 'inset 0 0 0 2px rgba(34,197,94,0.7)' };
+      if (step.from) styles[step.from] = { background: 'rgba(129, 182, 76, 0.35)', boxShadow: 'inset 0 0 0 2px rgba(129,182,76,0.5)' };
+      styles[step.to] = { background: 'rgba(129, 182, 76, 0.55)', boxShadow: 'inset 0 0 0 2px rgba(129,182,76,0.7)' };
     } else if (step?.to && currentStep > 0) {
       if (step.from) styles[step.from] = { background: 'rgba(255, 240, 80, 0.25)' };
       styles[step.to] = { background: 'rgba(255, 240, 80, 0.45)' };
@@ -1029,7 +1029,7 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, positionRec
               { id: 'drill' as Tab, label: 'Drill', show: hasDrill, onClick: () => { setIsPlaying(false); setTab('drill'); resetDrill(); } },
             ]).filter((t) => t.show).map((t) => (
               <button key={t.id} onClick={t.onClick} className="rounded-[12px] py-2.5 text-[14px] font-bold transition-colors"
-                style={tab === t.id ? { background: 'rgba(139,234,69,.10)', color: RD.text, boxShadow: `inset 0 0 0 1.5px ${RD.green}` } : { background: 'transparent', color: RD.muted }}>
+                style={tab === t.id ? { background: 'rgba(129,182,76,.10)', color: RD.text, boxShadow: `inset 0 0 0 1.5px ${RD.green}` } : { background: 'transparent', color: RD.muted }}>
                 {t.label}
               </button>
             ))}
@@ -1116,7 +1116,7 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, positionRec
           {redesign && (
             <div className="px-4 pt-2">
               <div className="flex items-center gap-2.5">
-                <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full" style={{ background: tab === 'mistake' ? 'rgba(255,80,88,.16)' : 'rgba(139,234,69,.16)', color: tab === 'mistake' ? MISTAKE_RED : CHESSCOM_GREEN }}>
+                <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full" style={{ background: tab === 'mistake' ? 'rgba(255,80,88,.16)' : 'rgba(129,182,76,.16)', color: tab === 'mistake' ? MISTAKE_RED : CHESSCOM_GREEN }}>
                   {tab === 'mistake' ? <AlertTriangle className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}
                 </span>
                 <h2 className="text-[17px] font-extrabold leading-tight">{tab === 'mistake' ? 'You missed this in your game' : 'Here’s the better move'}</h2>
@@ -1217,7 +1217,7 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, positionRec
 
                 {isLast && ((tab === 'mistake' && hasFix) || (tab === 'fix' && hasDrill)) && (
                 <button onClick={() => { if (tab === 'mistake' && hasFix) { setTab('fix'); setCurrentStep(0); return; } if (tab === 'fix' && hasDrill) { setTab('drill'); resetDrill(); } }} className="mt-3 flex w-full items-center justify-center gap-2.5 rounded-[14px] py-4 text-[16px] font-extrabold"
-                  style={{ background: `linear-gradient(180deg, ${RD.green}, ${RD.greenDark})`, color: '#05100A', boxShadow: '0 12px 28px -12px rgba(139,234,69,.6)' }}>
+                  style={{ background: `linear-gradient(180deg, ${RD.green}, ${RD.greenDark})`, color: '#05100A', boxShadow: '0 12px 28px -12px rgba(129,182,76,.6)' }}>
                   {tab === 'mistake' ? 'See the Fix' : 'Try the Drill'} <ChevronRight className="h-5 w-5" />
                 </button>
               )}
@@ -1369,7 +1369,7 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, positionRec
                               : 'text-white/70 hover:bg-white/10'
                           )}
                           style={currentStep === white ? {
-                            backgroundColor: wStep2.isMistake ? '#ef4444' : wStep2.isFix ? '#22c55e' : CHESSCOM_GREEN
+                            backgroundColor: wStep2.isMistake ? '#ef4444' : wStep2.isFix ? '#81b64c' : CHESSCOM_GREEN
                           } : undefined}
                         >
                           {wStep2.isMistake ? '?!' : wStep2.isFix ? '✓' : ''}{wStep2.san}
@@ -1392,7 +1392,7 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, positionRec
                               : 'text-white/70 hover:bg-white/10'
                           )}
                           style={currentStep === black ? {
-                            backgroundColor: bStep2.isMistake ? '#ef4444' : bStep2.isFix ? '#22c55e' : CHESSCOM_GREEN
+                            backgroundColor: bStep2.isMistake ? '#ef4444' : bStep2.isFix ? '#81b64c' : CHESSCOM_GREEN
                           } : undefined}
                         >
                           {bStep2.isMistake ? '?!' : bStep2.isFix ? '✓' : ''}{bStep2.san}
@@ -1581,7 +1581,7 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, positionRec
                   onSquareClick: handleDrillSquareClick,
                   squareStyles: drillSquareStyles,
                   arrows: (drillState === 'correct' || drillState === 'revealed') && drillMoveArrow
-                    ? [{ startSquare: drillMoveArrow.from, endSquare: drillMoveArrow.to, color: drillState === 'correct' ? 'rgba(52,211,153,0.85)' : 'rgba(245,158,11,0.85)' }]
+                    ? [{ startSquare: drillMoveArrow.from, endSquare: drillMoveArrow.to, color: drillState === 'correct' ? 'rgba(149,196,90,0.85)' : 'rgba(245,158,11,0.85)' }]
                     : undefined,
                   boardStyle: { ...SKIN.boardStyle, borderRadius: '6px', overflow: 'hidden', cursor: 'pointer' },
                   darkSquareStyle: SKIN.darkSquareStyle,
@@ -1594,7 +1594,7 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, positionRec
               <AnimatePresence>
                 {drillState === 'correct' && (
                   <motion.div key="correct" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                    className="absolute inset-0 rounded-xl flex items-center justify-center pointer-events-none" style={{ backgroundColor: 'rgba(34,197,94,0.2)' }}>
+                    className="absolute inset-0 rounded-xl flex items-center justify-center pointer-events-none" style={{ backgroundColor: 'rgba(129,182,76,0.2)' }}>
                     <div className="text-white font-black text-2xl px-6 py-3 rounded-xl shadow-lg" style={{ backgroundColor: CHESSCOM_GREEN }}>✓ Correct!</div>
                   </motion.div>
                 )}
@@ -1746,7 +1746,7 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, positionRec
               puzzle attempts by timestamp against this specific lesson,
               a meaningfully bigger piece than this card. */}
           {(drillState === 'correct' || drillState === 'revealed') && courseCategory && (
-            <div className="mx-3 mb-3 md:mx-4 md:mb-4 p-3.5 rounded-xl flex items-center gap-3" style={{ backgroundColor: 'rgba(127,209,79,0.08)', border: '1px solid rgba(127,209,79,0.25)' }}>
+            <div className="mx-3 mb-3 md:mx-4 md:mb-4 p-3.5 rounded-xl flex items-center gap-3" style={{ backgroundColor: 'rgba(129,182,76,0.08)', border: '1px solid rgba(129,182,76,0.25)' }}>
               <Swords className="w-5 h-5 shrink-0" style={{ color: CHESSCOM_GREEN }} />
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-bold text-white">Lock it in with a few puzzles</p>

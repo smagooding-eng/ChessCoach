@@ -140,7 +140,7 @@ export function Openings() {
               const active = tab === t.id;
               return (
                 <button key={t.id} onClick={() => setTab(t.id)} className="rounded-[12px] py-2.5 text-[13.5px] font-bold transition-colors"
-                  style={active ? { background: 'rgba(139,234,69,.10)', color: RD.text, boxShadow: `inset 0 0 0 1.5px ${RD.green}` } : { background: 'transparent', color: RD.muted }}>
+                  style={active ? { background: 'rgba(129,182,76,.10)', color: RD.text, boxShadow: `inset 0 0 0 1.5px ${RD.green}` } : { background: 'transparent', color: RD.muted }}>
                   {t.label}
                 </button>
               );
@@ -183,7 +183,7 @@ export function Openings() {
           <button
             onClick={() => navigate('/practice?tab=openings')}
             className="mt-4 flex w-full items-center justify-center gap-2 rounded-[16px] py-3.5 text-[14.5px] font-extrabold"
-            style={{ background: `linear-gradient(180deg, ${RD.green}, ${RD.greenDark})`, color: '#05100A', boxShadow: '0 12px 28px -12px rgba(139,234,69,.55)' }}
+            style={{ background: `linear-gradient(180deg, ${RD.green}, ${RD.greenDark})`, color: '#05100A', boxShadow: '0 12px 28px -12px rgba(129,182,76,.55)' }}
           >
             <BookOpen className="h-4 w-4" /> Practice against the Trainer Bot
           </button>

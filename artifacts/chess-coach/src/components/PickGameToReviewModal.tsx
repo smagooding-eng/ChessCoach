@@ -10,7 +10,7 @@ const TEXT_MUTED = '#9e9b98';
 const BORDER = 'rgba(255,255,255,0.08)';
 
 const RESULT_BADGE: Record<string, { color: string; bg: string; icon: typeof Trophy; label: string }> = {
-  win:  { color: '#9bd152', bg: 'rgba(129,182,76,0.18)',  icon: Trophy, label: 'Win'  },
+  win:  { color: '#95c45a', bg: 'rgba(129,182,76,0.18)',  icon: Trophy, label: 'Win'  },
   loss: { color: '#dc4343', bg: 'rgba(220,67,67,0.18)',   icon: Skull,  label: 'Loss' },
   draw: { color: '#cfa84a', bg: 'rgba(207,168,74,0.18)',  icon: Minus,  label: 'Draw' },
 };
