@@ -3,7 +3,7 @@ import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/authMiddleware";
 import { getSession } from "../lib/auth";
-import { addStream, notifyUser } from "../lib/notify";
+import { addStream, notifyUser, setView, clearView } from "../lib/notify";
 import { isPushConfigured } from "../lib/pushNotifications";
 
 const router: IRouter = Router();
@@ -32,8 +32,34 @@ router.get("/events", async (req: Request, res: Response) => {
   res.write(`retry: 5000\n\nevent: ready\ndata: {}\n\n`);
 
   const remove = addStream(userId, res);
+  const tabId = typeof req.query.tab === "string" ? req.query.tab.slice(0, 64) : "";
+  const path = typeof req.query.path === "string" ? req.query.path.slice(0, 200) : "";
+  if (tabId && path) setView(userId, tabId, path, req.query.visible !== "0");
   const heartbeat = setInterval(() => { try { res.write(`: ping\n\n`); } catch { /* closed */ } }, 25_000);
-  req.on("close", () => { clearInterval(heartbeat); remove(); });
+  req.on("close", () => { clearInterval(heartbeat); remove(); if (tabId) clearView(userId, tabId); });
+});
+
+// The open app tells us which page it's showing (and whether it's on screen)
+// so notifyUser can skip alerts about a game you're already looking at.
+// Opening a page also clears that page's unread alerts.
+router.post("/events/view", requireAuth, async (req: Request, res: Response) => {
+  const tabId = typeof req.body?.tab === "string" ? req.body.tab.slice(0, 64) : "";
+  const path = typeof req.body?.path === "string" ? req.body.path.slice(0, 200) : "";
+  const visible = req.body?.visible !== false;
+  if (!tabId || !path) { res.status(400).json({ error: "tab and path required" }); return; }
+  setView(req.user!.id, tabId, path, visible);
+  let cleared = 0;
+  if (visible) {
+    try {
+      const r = await db.execute(sql`
+        UPDATE notifications SET read_at = now()
+        WHERE user_id = ${req.user!.id} AND url = ${path} AND read_at IS NULL
+        RETURNING id
+      `);
+      cleared = rowsOf(r).length;
+    } catch { /* ignore */ }
+  }
+  res.json({ ok: true, cleared });
 });
 
 router.get("/notifications", requireAuth, async (req: Request, res: Response) => {

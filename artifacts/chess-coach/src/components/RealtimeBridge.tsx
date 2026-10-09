@@ -28,11 +28,26 @@ export async function refreshUnread() {
   } catch { /* ignore */ }
 }
 
+// One id per open tab/app window, so the server can tell which page each of
+// your open apps is showing (used to skip alerts about the game on screen).
+const TAB_ID = Math.random().toString(36).slice(2) + Date.now().toString(36);
+
+function reportView(keepalive = false, leaving = false) {
+  const visible = !leaving && document.visibilityState === 'visible';
+  apiFetch('/api/events/view', {
+    method: 'POST', keepalive,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tab: TAB_ID, path: window.location.pathname, visible }),
+  }).then(async (r) => {
+    if (r.ok && visible && ((await r.json().catch(() => null))?.cleared ?? 0) > 0) void refreshUnread();
+  }).catch(() => { /* ignore */ });
+}
+
 interface Incoming { id: string | null; title: string; body: string; url: string | null; kind: string }
 
 export function RealtimeBridge() {
   const { isAuthenticated, authUser } = useUser();
-  const [, navigate] = useLocation();
+  const [location, navigate] = useLocation();
   const [banner, setBanner] = useState<Incoming | null>(null);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -40,7 +55,9 @@ export function RealtimeBridge() {
     if (!isAuthenticated || !authUser?.id) return;
     void refreshUnread();
     const token = getAuthToken();
-    const url = `${getApiBase()}/api/events${token ? `?token=${encodeURIComponent(token)}` : ''}`;
+    const qs = new URLSearchParams({ tab: TAB_ID, path: window.location.pathname, visible: document.visibilityState === 'visible' ? '1' : '0' });
+    if (token) qs.set('token', token);
+    const url = `${getApiBase()}/api/events?${qs.toString()}`;
     let es: EventSource | null = null;
     try { es = new EventSource(url, { withCredentials: true }); } catch { return; }
 
@@ -59,6 +76,23 @@ export function RealtimeBridge() {
       try { window.dispatchEvent(new CustomEvent('cs:daily-update', { detail: JSON.parse((e as MessageEvent).data) })); } catch { /* ignore */ }
     });
     return () => { es?.close(); if (hideTimer.current) clearTimeout(hideTimer.current); };
+  }, [isAuthenticated, authUser?.id]);
+
+  // Tell the server what's on screen: on every page change, when the app is
+  // hidden/shown (phone locked, tab switched), and every 30s while visible.
+  useEffect(() => {
+    if (!isAuthenticated || !authUser?.id) return;
+    reportView();
+  }, [isAuthenticated, authUser?.id, location]);
+
+  useEffect(() => {
+    if (!isAuthenticated || !authUser?.id) return;
+    const onVis = () => reportView(document.visibilityState !== 'visible');
+    document.addEventListener('visibilitychange', onVis);
+    const onHide = () => reportView(true, true);
+    window.addEventListener('pagehide', onHide);
+    const t = setInterval(() => { if (document.visibilityState === 'visible') reportView(); }, 30_000);
+    return () => { document.removeEventListener('visibilitychange', onVis); window.removeEventListener('pagehide', onHide); clearInterval(t); };
   }, [isAuthenticated, authUser?.id]);
 
   if (!banner) return null;
