@@ -17,6 +17,7 @@ import { CHESSCOM_GREEN, BRASS, TEXT_LIGHT, TEXT_MUTED, t, PieceTile } from '@/c
 import { ReferralCard } from '@/pages/Profile';
 import { BOTS } from '@/lib/chess-bot';
 import { ActiveGamesCard } from '@/components/play/ActiveGamesCard';
+import { PlayAppCard } from '@/components/GooglePlayBadge';
 
 const BG_DARK = '#262421';
 const BG_CARD = 'linear-gradient(180deg, #383532 0%, #2a2825 100%)';
@@ -117,6 +118,7 @@ export function Dashboard() {
     <div className="space-y-4 md:space-y-5">
       <EmailVerifyBanner />
       <ActiveGamesCard />
+      <PlayAppCard />
 
       <div
         className="relative overflow-hidden p-4 md:p-5 rounded-2xl"

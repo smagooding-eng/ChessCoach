@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Trophy as HeroTrophy } from 'lucide-react';
 import { apiFetch, apiUrl, setAuthToken } from '@/lib/api';
 import { useSiteImg } from '@/hooks/use-app-config';
+import { GooglePlayBadge } from '@/components/GooglePlayBadge';
 
 const G = '#81B64C';
 const G_HOVER = '#6FA23E';
@@ -580,6 +581,7 @@ export function LandingPage() {
             <span className="flex items-center gap-1.5"><Check className="h-3.5 w-3.5" style={{ color: G }} /> No credit card required</span>
             <span className="flex items-center gap-1.5"><Check className="h-3.5 w-3.5" style={{ color: G }} /> Cancel anytime</span>
           </div>
+          <GooglePlayBadge height={44} className="mt-3" />
         </motion.div>
 
         <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, delay: 0.12 }} className="lg:self-end">

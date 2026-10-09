@@ -4,6 +4,10 @@ import { setBaseUrl, setAuthTokenGetter } from "@workspace/api-client-react";
 import { getApiBase, getAuthToken } from "./lib/api";
 import App from "./App";
 import "./index.css";
+import { rememberPlayAppLaunch } from "./lib/playApp";
+
+// Note if we were opened by the Google Play app (hides the Play badges).
+rememberPlayAppLaunch();
 
 // HeyCatch analytics. Module scope, static import, no window/SSR guards --
 // per https://heycatch.ai/agents.md, init is idempotent and a no-op

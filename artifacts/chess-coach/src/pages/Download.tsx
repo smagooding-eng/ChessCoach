@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { Link } from 'wouter';
+import { GooglePlayBadge } from '@/components/GooglePlayBadge';
 import { ArrowLeft, Smartphone, ShieldCheck, Sparkles, Check } from 'lucide-react';
 
 const G = '#81b64c';
@@ -66,20 +67,7 @@ export default function DownloadPage() {
                 Available on Google Play · works on Android 8.0 and above
               </p>
             </div>
-            <a
-              href={PLAY_STORE_HREF}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="group inline-flex items-center gap-2 px-6 py-3.5 rounded-xl font-black text-sm transition-all shrink-0"
-              style={{ background: G, color: '#fff', boxShadow: `0 12px 30px -6px ${G}66` }}
-              onMouseEnter={e => { e.currentTarget.style.background = '#6fa23e'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
-              onMouseLeave={e => { e.currentTarget.style.background = G; e.currentTarget.style.transform = 'translateY(0)'; }}
-            >
-              <svg className="w-4 h-4" viewBox="0 0 512 512" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
-                <path d="M325.3 234.3L104.6 13l280.8 161.2-60.1 60.1zM47 0C34 6.8 25.3 19.2 25.3 35.3v441.3c0 16.1 8.7 28.5 21.7 35.3l256.6-256L47 0zm425.2 225.6l-58.9-34.1-65.7 64.5 65.7 64.5 60.1-34.1c18-14.3 18-46.5-1.2-60.8zM104.6 499l280.8-161.2-60.1-60.1L104.6 499z"/>
-              </svg>
-              Download from Google Play
-            </a>
+            <GooglePlayBadge force height={54} />
           </div>
 
           <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-3">
