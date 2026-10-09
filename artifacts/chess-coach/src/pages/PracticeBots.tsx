@@ -4,6 +4,7 @@ import { useSettings } from '@/context/SettingsContext';
 import { MaterialStrip } from '@/components/GameStatusStrip';
 import { Chess } from 'chess.js';
 import { ChessBoard, type MoveQuality } from '@/components/ChessBoard';
+import { GameOverOverlay, OverlayButton } from '@/components/GameOverOverlay';
 import { normalizeFen } from '@/lib/utils';
 import { BOTS, getBotMove, BotConfig, analyzeMoveQuality, type MoveAnalysisResult } from '@/lib/chess-bot';
 import { useBotAvatar, useBotName, useBotDescription, useBotTag } from '@/lib/botAvatars';
@@ -541,6 +542,22 @@ function GameView({ bot, onBack, startFen, startColor, isOnboarding }: { bot: Bo
             lastMove={lastMove}
             moveQuality={latestQuality}
             reserveConfirmSpace
+            boardOverlay={result !== 'playing' ? (
+              <GameOverOverlay
+                gameKey={String(gameIdRef.current)}
+                outcome={result === 'win' ? 'win' : result === 'loss' ? 'loss' : 'draw'}
+                subtitle={chess.isCheckmate() ? 'by checkmate' : chess.isStalemate() ? 'by stalemate'
+                  : chess.isThreefoldRepetition() ? 'by repetition' : chess.isInsufficientMaterial() ? 'insufficient material'
+                  : chess.isDraw() ? 'by the 50-move rule' : result === 'loss' ? 'You resigned' : undefined}
+                delayMs={chess.isCheckmate() ? 1400 : 250}
+                actions={isOnboarding ? undefined : <>
+                  <OverlayButton primary onClick={() => handleNewGame(playerColor === 'w' ? 'b' : 'w')}>
+                    <RotateCcw className="w-4 h-4" /> Rematch
+                  </OverlayButton>
+                  <OverlayButton onClick={() => handleNewGame(playerColor)}>Play again as {playerColor === 'w' ? 'White' : 'Black'}</OverlayButton>
+                </>}
+              />
+            ) : null}
             sidePanel={{
               // Desktop: Confirm / Cancel on the right of the board.
               status: result !== 'playing' ? 'Game over' : thinking ? `${botName(bot)} is thinking…` : isPlayerTurn ? 'Your move' : '',

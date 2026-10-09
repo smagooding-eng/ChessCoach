@@ -133,6 +133,8 @@ interface ChessBoardProps {
   /** Desktop (lg+) layout: a chess-clock column on the right of the board
    *  holding both clocks and the Confirm / Cancel paddles, and a panel on the
    *  left for game messages (draw offers etc.). Phones keep the normal layout. */
+  /** Shown on top of the board (e.g. the game-over card). */
+  boardOverlay?: React.ReactNode;
   sidePanel?: {
     left?: React.ReactNode;
     clocks?: { top: ClockFace; bottom: ClockFace };
@@ -159,6 +161,7 @@ export function ChessBoard({
   maxWidthOverride,
   suppressConfirmMoves = false,
   reserveConfirmSpace = false,
+  boardOverlay,
   sidePanel,
 }: ChessBoardProps) {
   const { confirmMoves, boardColors, boardTextureCss, showCoordinates, showLegalMoves, pieceColors, pieceShape, pieceStyle, soundEnabled, promotionChoice, boardMaxWidth: settingsMaxWidth } = useSettings();
@@ -606,6 +609,10 @@ export function ChessBoard({
           positionKey={position}
         />
         </div>
+      )}
+
+      {boardOverlay && (
+        <div className="absolute inset-x-0 top-0 z-20 aspect-square">{boardOverlay}</div>
       )}
 
       {/* Confirm-move bar -- in normal document flow (not absolutely

@@ -3,6 +3,7 @@ import { PageHero } from '@/components/DesignSystem';
 import { Chess } from 'chess.js';
 import { ChessBoard } from '@/components/ChessBoard';
 import { CLOCK } from '@/components/ClockPad';
+import { GameOverOverlay, OverlayButton } from '@/components/GameOverOverlay';
 import { MaterialStrip } from '@/components/GameStatusStrip';
 import { motion, AnimatePresence } from 'framer-motion';
 import { RotateCcw, Flag, Clock, Play, ArrowLeft, Trophy, Handshake, Hand } from 'lucide-react';
@@ -398,6 +399,19 @@ export function LocalPlay() {
             onMovePlayed={handleMove}
             maxWidthOverride={fullscreen ? 'min(100vw, 62vh)' : undefined}
             suppressConfirmMoves
+            boardOverlay={result !== 'playing' ? (
+              <GameOverOverlay
+                gameKey={`${moves.length}-${result}`}
+                outcome={result === 'draw' ? 'draw' : 'win'}
+                title={result === 'draw' ? 'Draw!' : `${result === 'white' ? 'White' : 'Black'} wins!`}
+                subtitle={chess.isCheckmate() ? 'by checkmate' : chess.isStalemate() ? 'by stalemate' : chess.isThreefoldRepetition() ? 'by repetition' : chess.isInsufficientMaterial() ? 'insufficient material' : hasTimer && whiteTime === 0 ? 'White ran out of time' : hasTimer && blackTime === 0 ? 'Black ran out of time' : `${result === 'white' ? 'Black' : 'White'} resigned`}
+                delayMs={chess.isCheckmate() ? 1400 : 250}
+                actions={<>
+                  {timeControl && <OverlayButton primary onClick={() => startGame(timeControl)}><RotateCcw className="w-4 h-4" /> Rematch</OverlayButton>}
+                  <OverlayButton onClick={resetGame}>New game</OverlayButton>
+                </>}
+              />
+            ) : null}
           />
         </div>
 

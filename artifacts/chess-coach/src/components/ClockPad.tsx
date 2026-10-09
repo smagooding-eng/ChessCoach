@@ -17,7 +17,11 @@ export const CLOCK = {
   low: '#E5484D',
 } as const;
 
-export interface ClockFaceData { name?: string; text: string; active: boolean; low?: boolean; moves?: number }
+export interface ClockFaceData {
+  name?: string; text: string; active: boolean; low?: boolean; moves?: number;
+  /** Urgent line on the clock, e.g. an abandonment countdown ("Away · 0:24"). */
+  alert?: string;
+}
 
 /** One clock panel. Tapping it calls onTap (used for "tap your clock to confirm"). */
 export function ClockPanel({
@@ -46,6 +50,12 @@ export function ClockPanel({
         style={{ color: face.low ? CLOCK.low : on ? CLOCK.onText : CLOCK.offText, letterSpacing: '-0.02em' }}>
         {face.text}
       </span>
+      {face.alert && (
+        <span className="mt-2 inline-flex animate-pulse items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-black uppercase tracking-wider"
+          style={{ background: CLOCK.low, color: '#fff' }}>
+          {face.alert}
+        </span>
+      )}
       {hint && (
         <span className="mt-1.5 inline-flex items-center gap-1 text-[11px] font-extrabold uppercase tracking-wider" style={{ color: on ? CLOCK.onSub : CLOCK.offSub }}>
           <Hand size={12} /> {hint}

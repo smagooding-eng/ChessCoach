@@ -189,9 +189,24 @@ interface LiveGame {
   // (after a decline or otherwise) until at least one move has been
   // played to advance the ply. Indexed by side.
   lastDrawOfferPly: { w: number; b: number };
-  // Disconnect tracking → 30s grace
+  // Abandonment: a player who leaves the game (switches app/tab, closes it,
+  // or loses connection) has 30s to come back or they lose. `away` holds the
+  // deadline for each side that's currently gone; the timers live in
+  // disconnectTimers.
   disconnectTimers: { w?: ReturnType<typeof setTimeout>; b?: ReturnType<typeof setTimeout> };
+  away: { w?: AwayInfo; b?: AwayInfo };
+  // Last time each side's app said "I'm here and on screen", and whether
+  // their app sends those heartbeats at all (older builds don't).
+  lastSeen: { w: number; b: number };
+  heartbeat: { w: boolean; b: boolean };
+  // Rematch: which side has asked, the new game once it starts, and who has
+  // gone back to the lobby (so offers to them fail fast).
+  rematchFrom?: 'w' | 'b';
+  rematchGameId?: string;
+  leftAfter: { w: boolean; b: boolean };
 }
+
+interface AwayInfo { deadline: number; reason: 'left' | 'offline' }
 
 interface WaitingPlayer {
   userId: string;
@@ -252,6 +267,9 @@ function gamePublicState(g: LiveGame) {
     drawOfferFrom: g.drawOfferFrom,
     ratingDelta: g.status === 'finished' ? g.ratingDelta : undefined,
     dbGameIds: g.status === 'finished' ? g.dbGameIds : undefined,
+    away: g.status === 'active' ? { w: g.away.w, b: g.away.b } : {},
+    serverNow: Date.now(),
+    rematchFrom: g.status === 'finished' ? g.rematchFrom : undefined,
   };
 }
 
@@ -378,6 +396,10 @@ async function createGame(white: Player, black: Player, tc: TimeControlSpec, mod
     dbGameIds: {},
     lastDrawOfferPly: { w: -1, b: -1 },
     disconnectTimers: {},
+    away: {},
+    lastSeen: { w: Date.now(), b: Date.now() },
+    heartbeat: { w: false, b: false },
+    leftAfter: { w: false, b: false },
   };
 
   for (const color of ['white', 'black'] as const) {
@@ -470,6 +492,7 @@ function finishGame(g: LiveGame, result: 'white' | 'black' | 'draw', termination
   if (g.botTimer) { clearTimeout(g.botTimer); g.botTimer = undefined; }
   if (g.disconnectTimers.w) { clearTimeout(g.disconnectTimers.w); g.disconnectTimers.w = undefined; }
   if (g.disconnectTimers.b) { clearTimeout(g.disconnectTimers.b); g.disconnectTimers.b = undefined; }
+  g.away = {};
 
   void persistFinishedGame(g)
     .then(() => broadcast(g.id, { type: 'state', state: gamePublicState(g) }))
@@ -824,8 +847,179 @@ function handleMove(ws: WebSocket, userId: string, gameId: string, san: string) 
   if (player.kind !== 'human' || player.userId !== userId) {
     return send(ws, { type: 'error', message: 'Not your turn' });
   }
+  markBack(g, turn);
   const ok = applyMoveInternal(g, san);
   if (!ok) return send(ws, { type: 'error', message: 'Illegal move' });
+}
+
+// ── Abandonment ────────────────────────────────────────────────────────────
+const AWAY_LIMIT_MS = DISCONNECT_GRACE_MS;   // 30s away = loss by abandonment
+const HEARTBEAT_STALE_MS = 12_000;           // app pings every 5s while on screen
+const socketVisible = new WeakMap<WebSocket, boolean>();
+
+function sideOfUser(g: LiveGame, userId: string | undefined): 'w' | 'b' | null {
+  if (!userId) return null;
+  if (g.white.kind === 'human' && g.white.userId === userId) return 'w';
+  if (g.black.kind === 'human' && g.black.userId === userId) return 'b';
+  return null;
+}
+
+function markAway(g: LiveGame, side: 'w' | 'b', deadline: number, reason: AwayInfo['reason']) {
+  if (g.status !== 'active') return;
+  const player = side === 'w' ? g.white : g.black;
+  if (player.kind !== 'human') return;
+  const cur = g.away[side];
+  if (cur) {
+    // Already counting down: never extend it; just note a lost connection.
+    if (reason === 'offline' && cur.reason !== 'offline') { cur.reason = 'offline'; broadcast(g.id, { type: 'state', state: gamePublicState(g) }); }
+    return;
+  }
+  g.away[side] = { deadline, reason };
+  if (g.disconnectTimers[side]) clearTimeout(g.disconnectTimers[side]!);
+  g.disconnectTimers[side] = setTimeout(() => {
+    g.disconnectTimers[side] = undefined;
+    if (g.status !== 'active' || !g.away[side]) return;
+    finishGame(g, side === 'w' ? 'black' : 'white', 'abandoned');
+  }, Math.max(0, deadline - Date.now()));
+  broadcast(g.id, { type: 'state', state: gamePublicState(g) });
+  // Nudge them on their phone/desktop -- they're not looking at the game.
+  if (player.userId) {
+    const secs = Math.max(1, Math.round((deadline - Date.now()) / 1000));
+    notifyUser(player.userId, {
+      kind: 'live',
+      title: 'Come back to your game!',
+      body: `You'll lose by abandonment in ${secs} seconds.`,
+      url: '/live',
+      tag: `cs:live:${g.id}`,
+    }).catch(() => {});
+  }
+}
+
+function markBack(g: LiveGame, side: 'w' | 'b') {
+  g.lastSeen[side] = Date.now();
+  if (!g.away[side]) return;
+  g.away[side] = undefined;
+  if (g.disconnectTimers[side]) { clearTimeout(g.disconnectTimers[side]!); g.disconnectTimers[side] = undefined; }
+  if (g.status === 'active') broadcast(g.id, { type: 'state', state: gamePublicState(g) });
+}
+
+/** Any of this user's sockets watching the game and on screen (besides `except`)? */
+function hasVisibleSocket(g: LiveGame, userId: string, except?: WebSocket): boolean {
+  const subs = subscribers.get(g.id);
+  const mine = userSockets.get(userId);
+  if (!subs || !mine) return false;
+  for (const s of mine) {
+    if (s === except || s.readyState !== WebSocket.OPEN) continue;
+    if (subs.has(s) && socketVisible.get(s) !== false) return true;
+  }
+  return false;
+}
+
+// The app reports when the game goes off screen (other app/tab, phone
+// locked) and pings every 5s while it's on screen.
+function handlePresence(ws: WebSocket, userId: string, gameId: string, visible: boolean) {
+  const g = games.get(gameId);
+  if (!g || g.status !== 'active') return;
+  const side = sideOfUser(g, userId);
+  if (!side) return;
+  socketVisible.set(ws, visible);
+  if (visible) {
+    g.heartbeat[side] = true;
+    markBack(g, side);
+  } else if (!hasVisibleSocket(g, userId, ws)) {
+    markAway(g, side, Date.now() + AWAY_LIMIT_MS, 'left');
+  }
+}
+
+// Catch apps that went away without saying so (phone suspended the page,
+// browser killed the tab): no heartbeat for 12s counts as gone, with the
+// 30s measured from the last time we heard from them.
+setInterval(() => {
+  const now = Date.now();
+  for (const g of games.values()) {
+    if (g.status !== 'active') continue;
+    for (const side of ['w', 'b'] as const) {
+      if (!g.heartbeat[side] || g.away[side]) continue;
+      if (now - g.lastSeen[side] > HEARTBEAT_STALE_MS) {
+        markAway(g, side, Math.max(g.lastSeen[side] + AWAY_LIMIT_MS, now + 5_000), 'left');
+      }
+    }
+  }
+}, 2_000).unref();
+
+// ── Rematch ────────────────────────────────────────────────────────────────
+// Either player can ask once the game is over; it starts when the other one
+// says yes (straight away against a bot). Colors swap, same time control and
+// mode.
+async function handleRematchOffer(ws: WebSocket, userId: string, gameId: string) {
+  const g = games.get(gameId);
+  if (!g || g.status !== 'finished') return send(ws, { type: 'error', message: 'Rematch is no longer available' });
+  const side = sideOfUser(g, userId);
+  if (!side) return;
+  if (g.rematchGameId) return;
+  const other: 'w' | 'b' = side === 'w' ? 'b' : 'w';
+  const opp = other === 'w' ? g.white : g.black;
+  if (opp.kind === 'human') {
+    if (g.leftAfter[other] || !opp.userId || !userSockets.has(opp.userId)) {
+      return send(ws, { type: 'error', message: 'Your opponent has left' });
+    }
+    if (userActiveGame.has(opp.userId)) return send(ws, { type: 'error', message: 'Your opponent is already in another game' });
+  }
+  if (userActiveGame.has(userId)) return send(ws, { type: 'error', message: 'Finish your current game first' });
+  if (opp.kind === 'bot' || g.rematchFrom === other) { await startRematch(g); return; }
+  g.rematchFrom = side;
+  broadcast(g.id, { type: 'state', state: gamePublicState(g) });
+}
+
+function handleRematchDecline(userId: string, gameId: string) {
+  const g = games.get(gameId);
+  if (!g || g.status !== 'finished' || !g.rematchFrom) return;
+  const side = sideOfUser(g, userId);
+  if (!side) return;
+  g.rematchFrom = undefined;
+  broadcast(g.id, { type: 'rematch_declined', by: side });
+  broadcast(g.id, { type: 'state', state: gamePublicState(g) });
+}
+
+// Player went back to the lobby after the game: cancel any rematch request.
+function handleLeaveFinished(userId: string, gameId: string) {
+  const g = games.get(gameId);
+  if (!g || g.status !== 'finished') return;
+  const side = sideOfUser(g, userId);
+  if (!side) return;
+  g.leftAfter[side] = true;
+  if (g.rematchFrom) {
+    g.rematchFrom = undefined;
+    broadcast(g.id, { type: 'rematch_declined', by: side, left: true });
+    broadcast(g.id, { type: 'state', state: gamePublicState(g) });
+  }
+}
+
+async function startRematch(g: LiveGame) {
+  if (g.rematchGameId) return;
+  g.rematchGameId = 'starting';
+  const refresh = async (p: Player): Promise<Player> => {
+    if (p.kind !== 'human' || !p.userId) return p;
+    const r = await loadUserRating(p.userId, g.tc.id).catch(() => null);
+    return r ? { ...p, rating: r.rating } : p;
+  };
+  try {
+    const [newWhite, newBlack] = await Promise.all([refresh(g.black), refresh(g.white)]);
+    const ng = await createGame(newWhite, newBlack, g.tc, g.mode);
+    g.rematchGameId = ng.id;
+    g.rematchFrom = undefined;
+    for (const s of subscribers.get(g.id) ?? []) {
+      const uid = wsUser.get(s)?.userId;
+      const color = uid ? sideOfUser(ng, uid) : null;
+      if (!color) continue;
+      subscribeWs(s, ng.id);
+      send(s, { type: 'match_found', state: gamePublicState(ng), color });
+    }
+  } catch (err) {
+    g.rematchGameId = undefined;
+    logger.warn({ err, gameId: g.id }, 'rematch failed');
+    broadcast(g.id, { type: 'error', message: "Couldn't start the rematch" });
+  }
 }
 
 function handleResign(ws: WebSocket, userId: string, gameId: string) {
@@ -904,12 +1098,10 @@ function handleSubscribe(ws: WebSocket, gameId: string) {
   else if (g.black.userId === userId) color = 'b';
   if (!color) return send(ws, { type: 'error', message: 'Not a participant' });
   subscribeWs(ws, gameId);
-  // Cancel any pending disconnect timer for this side
-  if (g.disconnectTimers[color]) {
-    clearTimeout(g.disconnectTimers[color]!);
-    g.disconnectTimers[color] = undefined;
-    broadcast(g.id, { type: 'opponent_reconnected', side: color });
-  }
+  // Back in the game: stop any abandonment countdown for this side
+  // (the app follows up with a presence message if it's actually hidden).
+  socketVisible.set(ws, true);
+  if (g.status === 'active') markBack(g, color);
   send(ws, { type: 'match_found', state: gamePublicState(g), color });
 }
 
@@ -932,15 +1124,7 @@ function handleSocketClose(ws: WebSocket) {
           const side: 'w' | 'b' | null =
             g.white.userId === info.userId ? 'w' :
             g.black.userId === info.userId ? 'b' : null;
-          if (side) {
-            broadcast(g.id, { type: 'opponent_disconnected', side, graceMs: DISCONNECT_GRACE_MS });
-            if (g.disconnectTimers[side]) clearTimeout(g.disconnectTimers[side]!);
-            g.disconnectTimers[side] = setTimeout(() => {
-              if (g.status !== 'active') return;
-              if (userSockets.has(info.userId)) return; // reconnected
-              finishGame(g, side === 'w' ? 'black' : 'white', 'abandoned');
-            }, DISCONNECT_GRACE_MS);
-          }
+          if (side) markAway(g, side, Date.now() + AWAY_LIMIT_MS, 'offline');
         }
       }
     }
@@ -1073,6 +1257,18 @@ export function attachLiveServer(server: HttpServer) {
             break;
           case 'ping':
             send(ws, { type: 'pong' });
+            break;
+          case 'presence':
+            handlePresence(ws, info.userId, msg.gameId, msg.visible !== false);
+            break;
+          case 'rematch_offer':
+            await handleRematchOffer(ws, info.userId, msg.gameId);
+            break;
+          case 'rematch_decline':
+            handleRematchDecline(info.userId, msg.gameId);
+            break;
+          case 'leave_game':
+            handleLeaveFinished(info.userId, msg.gameId);
             break;
         }
       } catch (err) {

@@ -33,6 +33,12 @@ export interface LiveGameState {
   drawOfferFrom?: 'w' | 'b';
   ratingDelta?: { white: number; black: number };
   dbGameIds?: { white?: number; black?: number };
+  /** Sides that have left the game, with the server time they lose by abandonment. */
+  away?: { w?: { deadline: number; reason: 'left' | 'offline' }; b?: { deadline: number; reason: 'left' | 'offline' } };
+  /** Server clock when this state was sent (to line countdowns up). */
+  serverNow?: number;
+  /** After the game: which side has asked for a rematch. */
+  rematchFrom?: 'w' | 'b';
 }
 
 export interface OpponentDisconnect { side: 'w' | 'b'; graceMs: number; until: number }
@@ -72,6 +78,9 @@ export function useLivePlay() {
   // Accepted a friend's challenge but they're not online yet.
   const [waitingFor, setWaitingFor] = useState<string | null>(null);
   const pendingAcceptRef = useRef<string | null>(null);
+  // serverTime - localTime, so abandonment countdowns match the server.
+  const [serverOffset, setServerOffset] = useState(0);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -125,7 +134,10 @@ export function useLivePlay() {
         ws.send(JSON.stringify({ type: 'accept_challenge', code: pendingAcceptRef.current }));
         return;
       }
-      if (g && g.status === 'active') ws.send(JSON.stringify({ type: 'subscribe', gameId: g.id }));
+      if (g && g.status === 'active') {
+        ws.send(JSON.stringify({ type: 'subscribe', gameId: g.id }));
+        ws.send(JSON.stringify({ type: 'presence', gameId: g.id, visible: document.visibilityState === 'visible' }));
+      }
       else if (queuedTcRef.current && queuedModeRef.current) ws.send(JSON.stringify({ type: 'queue', timeControl: queuedTcRef.current, mode: queuedModeRef.current }));
     };
     ws.onmessage = (ev) => {
@@ -152,6 +164,9 @@ export function useLivePlay() {
           setStatus('idle');
           break;
         case 'match_found':
+          if (typeof msg.state?.serverNow === 'number') setServerOffset(msg.state.serverNow - Date.now());
+          setNotice(null);
+          setPremove(null);
           pendingAcceptRef.current = null;
           setWaitingFor(null);
           setQueuedAt(null);
@@ -163,6 +178,7 @@ export function useLivePlay() {
           setStatus(msg.state.status === 'finished' ? 'finished' : 'in_game');
           break;
         case 'state':
+          if (typeof msg.state?.serverNow === 'number') setServerOffset(msg.state.serverNow - Date.now());
           setGame(msg.state);
           if (msg.state.status === 'finished') setStatus('finished');
           // Premove is replayed by LiveGame from the new state's `turn` and `fen`.
@@ -172,6 +188,15 @@ export function useLivePlay() {
           break;
         case 'opponent_reconnected':
           setOpponentDisconnect(null);
+          break;
+        case 'rematch_declined':
+          if (gameRef.current && colorRef.current) {
+            const mine = msg.by === colorRef.current;
+            if (!mine) {
+              setNotice(msg.left ? 'Your opponent left — no rematch.' : 'Rematch declined.');
+              setTimeout(() => setNotice(null), 4000);
+            }
+          }
           break;
         case 'draw_declined':
           setError('Draw declined');
@@ -242,15 +267,41 @@ export function useLivePlay() {
   const offerDraw = useCallback(() => { if (game) send({ type: 'draw_offer', gameId: game.id }); }, [game, send]);
   const acceptDraw = useCallback(() => { if (game) send({ type: 'draw_accept', gameId: game.id }); }, [game, send]);
   const declineDraw = useCallback(() => { if (game) send({ type: 'draw_decline', gameId: game.id }); }, [game, send]);
+  // Presence: tell the server when the game goes off screen (other app/tab,
+  // phone locked) and ping every 5s while it's on screen. Leaving for 30s
+  // loses the game by abandonment.
+  const activeGameId = game && game.status === 'active' ? game.id : null;
+  useEffect(() => {
+    if (!activeGameId) return;
+    const report = () => send({ type: 'presence', gameId: activeGameId, visible: document.visibilityState === 'visible' });
+    report();
+    const onVis = () => report();
+    const onHide = () => send({ type: 'presence', gameId: activeGameId, visible: false });
+    document.addEventListener('visibilitychange', onVis);
+    window.addEventListener('pagehide', onHide);
+    const t = setInterval(() => { if (document.visibilityState === 'visible') report(); }, 5000);
+    return () => {
+      document.removeEventListener('visibilitychange', onVis);
+      window.removeEventListener('pagehide', onHide);
+      clearInterval(t);
+    };
+  }, [activeGameId, send]);
+
+  const offerRematch = useCallback(() => { if (game) { setNotice(null); send({ type: 'rematch_offer', gameId: game.id }); } }, [game, send]);
+  const declineRematch = useCallback(() => { if (game) send({ type: 'rematch_decline', gameId: game.id }); }, [game, send]);
+
   const reset = useCallback(() => {
+    const g = gameRef.current;
+    if (g && g.status === 'finished') send({ type: 'leave_game', gameId: g.id });
+    setNotice(null);
     setGame(null); setColor(null); setError(null); setStatus('idle');
     setQueuedTc(null); setQueuedMode(null); setOpponentDisconnect(null); setPremove(null);
-  }, []);
+  }, [send]);
 
   return {
     status, error, game, color, queuedTc, queuedMode, opponentDisconnect, premove, setPremove,
-    queuedAt, botOfferMs, waitingFor,
-    enterQueue, cancel, playBot, acceptChallenge, move, resign, offerDraw, acceptDraw, declineDraw,
+    queuedAt, botOfferMs, waitingFor, serverOffset, notice,
+    enterQueue, offerRematch, declineRematch, cancel, playBot, acceptChallenge, move, resign, offerDraw, acceptDraw, declineDraw,
     reset,
   };
 }

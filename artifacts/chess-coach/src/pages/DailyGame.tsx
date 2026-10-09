@@ -3,6 +3,7 @@ import { Link, useLocation, useParams } from 'wouter';
 import { Chess } from 'chess.js';
 import { ArrowLeft, Flag, Handshake, Loader2, BookOpen, Clock } from 'lucide-react';
 import { ChessBoard } from '@/components/ChessBoard';
+import { GameOverOverlay, OverlayButton } from '@/components/GameOverOverlay';
 import { MaterialStrip } from '@/components/GameStatusStrip';
 import { apiFetch } from '@/lib/api';
 import { useUser } from '@/hooks/use-user';
@@ -215,6 +216,23 @@ export function DailyGame() {
         }}
         lastMove={lastMove}
         moveQuality={null}
+        boardOverlay={game.status === 'finished' && game.termination !== 'aborted' ? (() => {
+          const won = (game.result === 'white' && white) || (game.result === 'black' && !white);
+          const after = white ? game.whiteRatingAfter : game.blackRatingAfter;
+          return (
+            <GameOverOverlay
+              gameKey={game.id}
+              outcome={game.result === 'draw' ? 'draw' : won ? 'win' : 'loss'}
+              subtitle={HOW[game.termination ?? ''] ?? game.termination ?? undefined}
+              ratingDelta={myRating != null && after != null ? after - myRating : null}
+              delayMs={game.termination === 'checkmate' ? 1400 : 250}
+              actions={<>
+                <OverlayButton primary onClick={() => navigate(reviewId ? `/games/${reviewId}` : '/games')}>Review game</OverlayButton>
+                <OverlayButton onClick={() => navigate('/daily')}>Daily games</OverlayButton>
+              </>}
+            />
+          );
+        })() : null}
         sidePanel={{
           left: <div className="space-y-3">{messages}</div>,
           clocks: {

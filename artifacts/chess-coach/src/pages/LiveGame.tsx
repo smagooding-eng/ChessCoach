@@ -3,7 +3,8 @@ import { ChessBoard } from '@/components/ChessBoard';
 import { EvalBar, MaterialStrip } from '@/components/GameStatusStrip';
 import { Chess } from 'chess.js';
 import type { useLivePlay } from '@/hooks/use-live-play';
-import { Flag, ArrowLeft, Trophy, Clock, Handshake, X, WifiOff, BookOpen } from 'lucide-react';
+import { Flag, ArrowLeft, Trophy, Clock, Handshake, X, WifiOff, BookOpen, RotateCcw } from 'lucide-react';
+import { GameOverOverlay, OverlayButton, describeEnding } from '@/components/GameOverOverlay';
 import { useLocation } from 'wouter';
 
 import { PT } from '@/lib/playTheme';
@@ -28,7 +29,12 @@ function countryToFlag(code?: string): string | null {
   return String.fromCodePoint(A + (cc.charCodeAt(0) - 65), A + (cc.charCodeAt(1) - 65));
 }
 
-function PlayerStrip({ p, ms, active, isYou }: { p: { username: string; rating: number; country?: string; title?: string | null; avatar?: string; isBot?: boolean }; ms: number; active: boolean; isYou: boolean }) {
+function awayText(ms: number): string {
+  const s = Math.max(0, Math.ceil(ms / 1000));
+  return `Away · 0:${String(s).padStart(2, '0')}`;
+}
+
+function PlayerStrip({ p, ms, active, isYou, awayMs }: { p: { username: string; rating: number; country?: string; title?: string | null; avatar?: string; isBot?: boolean }; ms: number; active: boolean; isYou: boolean; awayMs?: number | null }) {
   const flag = countryToFlag(p.country);
   return (
     <div className="flex items-center justify-between p-2.5 rounded-xl"
@@ -49,6 +55,12 @@ function PlayerStrip({ p, ms, active, isYou }: { p: { username: string; rating: 
           <p className="text-[10px]" style={{ color: TEXT_MUTED }}>{Math.round(p.rating)} ELO</p>
         </div>
       </div>
+      {typeof awayMs === 'number' && (
+        <span className="mr-2 shrink-0 animate-pulse rounded-full px-2.5 py-1 text-[11px] font-black uppercase tracking-wider lg:hidden"
+          style={{ background: '#E5484D', color: '#fff' }}>
+          {awayText(awayMs)}
+        </span>
+      )}
       <div className="flex lg:hidden items-center gap-1.5 px-3 py-2 rounded-lg font-mono font-black tabular-nums text-lg"
         style={{ background: active ? 'rgba(0,0,0,0.4)' : 'rgba(0,0,0,0.2)', color: ms < 10_000 ? '#ec6b6b' : TEXT_LIGHT }}>
         <Clock className="w-3.5 h-3.5" /> {fmtClock(ms)}
@@ -58,7 +70,7 @@ function PlayerStrip({ p, ms, active, isYou }: { p: { username: string; rating: 
 }
 
 export function LiveGame({ live, onLeave }: { live: ReturnType<typeof useLivePlay>; onLeave: () => void }) {
-  const { game, color, move, resign, status, opponentDisconnect, premove, setPremove, offerDraw, acceptDraw, declineDraw } = live;
+  const { game, color, move, resign, premove, setPremove, offerDraw, acceptDraw, declineDraw, serverOffset, notice, offerRematch, declineRematch } = live;
   const [, navigate] = useLocation();
   const [tick, setTick] = useState(0);
   const reviewId = game?.dbGameIds && color
@@ -126,8 +138,36 @@ export function LiveGame({ live, onLeave }: { live: ReturnType<typeof useLivePla
 
   const onMovePlayed = (san: string) => { move(san); };
 
+  // Abandonment countdowns (ms left before that side loses), synced to the server clock.
+  const oppColor: 'w' | 'b' = youAreWhite ? 'b' : 'w';
+  const awayLeft = (side: 'w' | 'b'): number | null => {
+    const a = game.status === 'active' ? game.away?.[side] : undefined;
+    return a ? Math.max(0, a.deadline - (Date.now() + serverOffset)) : null;
+  };
+  const oppAwayMs = awayLeft(oppColor);
+  const myAwayMs = awayLeft(color);
+  const oppAwayReason = game.away?.[oppColor]?.reason;
+
   const opponentOfferedDraw = game.drawOfferFrom && game.drawOfferFrom !== color;
   const youOfferedDraw = game.drawOfferFrom && game.drawOfferFrom === color;
+
+  const finished = game.status === 'finished';
+  const youWonGame = (game.result === 'white' && youAreWhite) || (game.result === 'black' && !youAreWhite);
+  const outcome: 'win' | 'loss' | 'draw' = game.result === 'draw' ? 'draw' : youWonGame ? 'win' : 'loss';
+  const myRatingDelta = game.mode === 'ranked' ? (youAreWhite ? game.ratingDelta?.white : game.ratingDelta?.black) : null;
+  const opponentIsBot = (youAreWhite ? game.black : game.white).isBot;
+  const rematchAskedByOpp = finished && !!game.rematchFrom && game.rematchFrom !== color;
+  const rematchAskedByMe = finished && game.rematchFrom === color;
+  const rematchButtons = rematchAskedByOpp ? (
+    <>
+      <OverlayButton primary onClick={offerRematch}><RotateCcw className="w-4 h-4" /> Accept rematch</OverlayButton>
+      <OverlayButton onClick={declineRematch}>Decline</OverlayButton>
+    </>
+  ) : (
+    <OverlayButton primary onClick={offerRematch} disabled={rematchAskedByMe}>
+      <RotateCcw className="w-4 h-4" /> {rematchAskedByMe ? 'Rematch sent — waiting…' : 'Rematch'}
+    </OverlayButton>
+  );
 
   const resultBanner = (() => {
     if (game.status !== 'finished') return null;
@@ -142,7 +182,7 @@ export function LiveGame({ live, onLeave }: { live: ReturnType<typeof useLivePla
         <Trophy className="w-8 h-8 mx-auto" style={{ color: accent }} />
         <div>
           <p className="text-xl font-black" style={{ color: TEXT_LIGHT }}>{title}</p>
-          <p className="text-xs mt-1 capitalize" style={{ color: TEXT_MUTED }}>by {String(game.termination ?? '').replace(/_/g, ' ')}</p>
+          <p className="text-xs mt-1 first-letter:uppercase" style={{ color: TEXT_MUTED }}>{describeEnding(game.termination, draw ? 'draw' : youWon ? 'win' : 'loss')}</p>
         </div>
         {game.mode === 'ranked' && typeof myDelta === 'number' && myDelta !== 0 ? (
           <p className="text-sm font-bold" style={{ color: myDelta > 0 ? CHESSCOM_GREEN : '#ec6b6b' }}>
@@ -151,11 +191,16 @@ export function LiveGame({ live, onLeave }: { live: ReturnType<typeof useLivePla
         ) : (
           <p className="text-xs" style={{ color: TEXT_MUTED }}>{game.mode === 'casual' ? 'Casual game — no rating change' : ''}</p>
         )}
+        {rematchAskedByOpp && (
+          <p className="text-sm font-bold" style={{ color: TEXT_LIGHT }}>{opponentIsBot ? 'The bot' : 'Your opponent'} wants a rematch!</p>
+        )}
+        {notice && <p className="text-xs font-bold" style={{ color: '#ec6b6b' }}>{notice}</p>}
+        <div className="mx-auto flex max-w-[320px] flex-col gap-2">{rematchButtons}</div>
         <div className="flex justify-center gap-2 pt-2 flex-wrap">
           <button onClick={onLeave}
             className="px-4 py-2 rounded-lg font-black text-xs"
             style={{ background: CHESSCOM_GREEN, color: PT.onGreen }}>
-            Play Again
+            New Opponent
           </button>
           <button onClick={() => navigate(reviewId ? `/games/${reviewId}` : '/games')}
             disabled={!reviewId}
@@ -178,11 +223,21 @@ export function LiveGame({ live, onLeave }: { live: ReturnType<typeof useLivePla
   // under the board as before.
   const messages = (
     <>
-      {opponentDisconnect && opponentDisconnect.side !== color && (
+      {oppAwayMs !== null && (
         <div className="rounded-lg px-3 py-2 text-xs flex items-center gap-2"
-          style={{ background: 'rgba(234,151,51,0.35)', color: '#ffffff', border: '1px solid rgba(234,151,51,0.6)' }}>
-          <WifiOff className="w-3.5 h-3.5 shrink-0" /> Opponent disconnected. They have ~{Math.max(0, Math.ceil((opponentDisconnect.until - Date.now()) / 1000))}s to reconnect.
+          style={{ background: 'rgba(229,72,77,0.3)', color: '#ffffff', border: '1px solid rgba(229,72,77,0.6)' }}>
+          <WifiOff className="w-3.5 h-3.5 shrink-0" />
+          <span>{oppAwayReason === 'offline' ? 'Opponent lost connection.' : 'Opponent left the game.'} They lose by abandonment in <b>{Math.ceil(oppAwayMs / 1000)}s</b> unless they come back.</span>
         </div>
+      )}
+      {myAwayMs !== null && (
+        <div className="rounded-lg px-3 py-2 text-xs font-bold"
+          style={{ background: 'rgba(229,72,77,0.3)', color: '#ffffff', border: '1px solid rgba(229,72,77,0.6)' }}>
+          Stay on this screen — leaving a timed game for 30 seconds loses it ({Math.ceil(myAwayMs / 1000)}s left).
+        </div>
+      )}
+      {finished && notice && (
+        <div className="rounded-lg px-3 py-2 text-xs font-bold" style={{ background: 'rgba(255,255,255,0.06)', color: TEXT_LIGHT }}>{notice}</div>
       )}
       {premove && !isPlayerTurn && (
         <div className="flex items-center justify-between rounded-lg px-3 py-2 text-xs"
@@ -230,7 +285,7 @@ export function LiveGame({ live, onLeave }: { live: ReturnType<typeof useLivePla
         <ArrowLeft className="w-4 h-4" /> Lobby
       </button>
 
-      <PlayerStrip p={top} ms={topMs} active={topActive} isYou={false} />
+      <PlayerStrip p={top} ms={topMs} active={topActive} isYou={false} awayMs={oppAwayMs} />
       <MaterialStrip fen={game.fen} color={youAreWhite ? 'b' : 'w'} className="px-1" />
 
       {/* Engine evaluation only after the game -- showing it during a game
@@ -249,18 +304,34 @@ export function LiveGame({ live, onLeave }: { live: ReturnType<typeof useLivePla
         premoveColor={color}
         premove={premove}
         onPremoveSet={(p) => setPremove(p)}
+        boardOverlay={finished ? (
+          <GameOverOverlay
+            gameKey={game.id}
+            outcome={outcome}
+            subtitle={describeEnding(game.termination, outcome)}
+            ratingDelta={myRatingDelta}
+            delayMs={game.termination === 'checkmate' ? 1400 : 250}
+            actions={<>
+              {rematchAskedByOpp && <p className="text-[13px] font-bold" style={{ color: '#EDEDED' }}>{opponentIsBot ? 'The bot' : 'Your opponent'} wants a rematch!</p>}
+              {notice && <p className="text-[12px] font-bold" style={{ color: '#ec6b6b' }}>{notice}</p>}
+              {rematchButtons}
+              {reviewId && <OverlayButton onClick={() => navigate(`/games/${reviewId}`)}><BookOpen className="w-4 h-4" /> Review game</OverlayButton>}
+              <OverlayButton onClick={onLeave}>New opponent</OverlayButton>
+            </>}
+          />
+        ) : null}
         sidePanel={{
           left: <div className="space-y-3">{messages}</div>,
           clocks: {
-            top: { name: top.username, text: fmtClock(topMs), active: topActive, low: topMs < 10_000, moves: youAreWhite ? Math.floor(game.sanMoves.length / 2) : Math.ceil(game.sanMoves.length / 2) },
-            bottom: { name: 'You', text: fmtClock(bottomMs), active: bottomActive, low: bottomMs < 10_000, moves: youAreWhite ? Math.ceil(game.sanMoves.length / 2) : Math.floor(game.sanMoves.length / 2) },
+            top: { name: top.username, text: fmtClock(topMs), active: topActive, low: topMs < 10_000, alert: oppAwayMs !== null ? awayText(oppAwayMs) : undefined, moves: youAreWhite ? Math.floor(game.sanMoves.length / 2) : Math.ceil(game.sanMoves.length / 2) },
+            bottom: { name: 'You', text: fmtClock(bottomMs), active: bottomActive, low: bottomMs < 10_000, alert: myAwayMs !== null ? awayText(myAwayMs) : undefined, moves: youAreWhite ? Math.ceil(game.sanMoves.length / 2) : Math.floor(game.sanMoves.length / 2) },
           },
           status: game.status !== 'active' ? 'Game over' : isPlayerTurn ? 'Your move' : 'Opponent to move',
         }}
       />
 
       <MaterialStrip fen={game.fen} color={youAreWhite ? 'w' : 'b'} className="px-1" />
-      <PlayerStrip p={bottom} ms={bottomMs} active={bottomActive} isYou={true} />
+      <PlayerStrip p={bottom} ms={bottomMs} active={bottomActive} isYou={true} awayMs={myAwayMs} />
 
       <div className="space-y-3 lg:hidden">{messages}</div>
 
