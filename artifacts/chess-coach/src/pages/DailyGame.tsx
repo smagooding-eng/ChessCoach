@@ -52,7 +52,9 @@ export function DailyGame() {
   }, [id, load]);
   useEffect(() => {
     if (!game || game.status !== 'active' || myTurn) return;
-    const t = setInterval(load, 15_000); // fallback if the live connection drops
+    // Fallback if the instant connection drops: re-check every 4s while the
+    // page is visible and it's the opponent's move (a tiny request).
+    const t = setInterval(() => { if (document.visibilityState === 'visible') void load(); }, 4_000);
     return () => clearInterval(t);
   }, [game?.status, myTurn, load]);
   useEffect(() => { const t = setInterval(() => setTick(x => x + 1), 30_000); return () => clearInterval(t); }, []);
