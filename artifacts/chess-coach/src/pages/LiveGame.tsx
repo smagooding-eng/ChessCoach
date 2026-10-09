@@ -252,8 +252,8 @@ export function LiveGame({ live, onLeave }: { live: ReturnType<typeof useLivePla
         sidePanel={{
           left: <div className="space-y-3">{messages}</div>,
           clocks: {
-            top: { name: top.username, text: fmtClock(topMs), active: topActive, low: topMs < 10_000 },
-            bottom: { name: 'You', text: fmtClock(bottomMs), active: bottomActive, low: bottomMs < 10_000 },
+            top: { name: top.username, text: fmtClock(topMs), active: topActive, low: topMs < 10_000, moves: youAreWhite ? Math.floor(game.sanMoves.length / 2) : Math.ceil(game.sanMoves.length / 2) },
+            bottom: { name: 'You', text: fmtClock(bottomMs), active: bottomActive, low: bottomMs < 10_000, moves: youAreWhite ? Math.ceil(game.sanMoves.length / 2) : Math.floor(game.sanMoves.length / 2) },
           },
           status: game.status !== 'active' ? 'Game over' : isPlayerTurn ? 'Your move' : 'Opponent to move',
         }}

@@ -18,6 +18,7 @@ import { useSettings, playMoveSound, boardSkin } from '@/context/SettingsContext
 import { eventForMove } from '@/lib/sounds';
 import { CheckmateOverlay, checkmateSquares } from '@/components/CheckmateOverlay';
 import { EvalBar, MaterialStrip } from '@/components/GameStatusStrip';
+import { ConfirmPad } from '@/components/ClockPad';
 import { scene } from '@/components/PhotoHero';
 import { useSiteImg } from '@/hooks/use-app-config';
 
@@ -779,20 +780,10 @@ export function Puzzles() {
                   })()}
                   </div>
                   {pendingMove && (
-                    // Same chess-clock Cancel / Confirm bar as every other board.
-                    <div className="relative mt-3 flex h-14 overflow-hidden rounded-xl" style={{ boxShadow: '0 4px 0 #2a2a2a, 0 8px 16px rgba(0,0,0,0.4)', border: '1px solid rgba(0,0,0,0.25)' }}>
-                      <button onClick={() => setPendingMove(null)}
-                        className="flex flex-1 items-center justify-center gap-1.5 text-xs font-black tracking-wider active:scale-[0.97]"
-                        style={{ background: 'linear-gradient(180deg, #3a3a3a 0%, #232323 100%)', color: 'rgba(255,255,255,0.75)' }}>
-                        <span className="text-sm">✕</span> CANCEL
-                      </button>
-                      <button onClick={() => { const p = pendingMove; setPendingMove(null); tryMoveFromTo(p.from, p.to); }}
-                        className="flex flex-1 items-center justify-center text-xs font-black tracking-wider active:scale-[0.97]"
-                        style={{ background: 'linear-gradient(180deg, #a8d876 0%, #81b64c 55%, #5f8f36 100%)', color: '#fff' }}>
-                        CONFIRM
-                      </button>
-                      <div className="pointer-events-none absolute bottom-0 left-1/2 top-0 w-[2px] -translate-x-1/2" style={{ background: 'rgba(0,0,0,0.35)' }} />
-                    </div>
+                    // Same chess-clock Cancel / Confirm pad as every other board.
+                    <ConfirmPad className="mt-3"
+                      onConfirm={() => { const p = pendingMove; setPendingMove(null); tryMoveFromTo(p.from, p.to); }}
+                      onCancel={() => setPendingMove(null)} />
                   )}
 
                   <AnimatePresence>

@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useMemo, useRef, useEffect, Component, type ReactNode } from 'react';
+import { ClockPanel, ConfirmPad, CLOCK, type ClockFaceData } from '@/components/ClockPad';
 import { Chessboard, defaultPieces } from 'react-chessboard';
 import { Chess } from 'chess.js';
 import { normalizeFen, getPieceColorScheme } from '@/lib/utils';
@@ -140,7 +141,7 @@ interface ChessBoardProps {
   };
 }
 
-export interface ClockFace { name?: string; text: string; active: boolean; low?: boolean }
+export type ClockFace = ClockFaceData;
 
 export function ChessBoard({
   fen,
@@ -631,39 +632,18 @@ export function ChessBoard({
       )}
 
       {!pendingMove && !promotionPending && reserveConfirmSpace && confirmMoves && !suppressConfirmMoves && (
-        <div aria-hidden className={`mt-3 h-14 ${sidePanel ? 'lg:hidden' : ''}`} />
+        <div aria-hidden className={`mt-3 h-[68px] ${sidePanel ? 'lg:hidden' : ''}`} />
       )}
       {pendingMove && (
-        // The chess-clock bar: left paddle cancels the staged move, right
-        // paddle plays it. (The left half used to be a dead "MOVE" label that
-        // still submitted the move, with a separate X to cancel.)
-        <div
-          className={`relative mt-3 flex h-14 overflow-hidden rounded-xl ${sidePanel ? 'lg:hidden' : ''}`}
-          style={{
-            boxShadow: '0 4px 0 #2a2a2a, 0 8px 16px rgba(0,0,0,0.4)',
-            border: '1px solid rgba(0,0,0,0.25)',
-            opacity: confirming ? 0.6 : 1,
-          }}
-        >
-          <button
-            onClick={cancelPendingMove}
-            disabled={confirming}
-            className="flex flex-1 items-center justify-center gap-1.5 text-xs font-black tracking-wider transition-transform active:scale-[0.97]"
-            style={{ background: 'linear-gradient(180deg, #3a3a3a 0%, #232323 100%)', color: 'rgba(255,255,255,0.75)' }}
-          >
-            <span className="text-sm">✕</span> CANCEL
-          </button>
-          <button
-            onClick={confirmPendingMove}
-            disabled={confirming}
-            className="flex flex-1 items-center justify-center text-xs font-black tracking-wider transition-transform active:scale-[0.97]"
-            style={{ background: 'linear-gradient(180deg, #a8d876 0%, #81b64c 55%, #5f8f36 100%)', color: '#fff' }}
-          >
-            {confirming ? '✓' : 'CONFIRM'}
-          </button>
-          {/* center seam */}
-          <div className="pointer-events-none absolute bottom-0 left-1/2 top-0 w-[2px] -translate-x-1/2" style={{ background: 'rgba(0,0,0,0.35)' }} />
-        </div>
+        // Confirm Move: dark Cancel strip + a big green clock you tap to play
+        // the move (shows your time when the game has a clock).
+        <ConfirmPad
+          className={`mt-3 ${sidePanel ? 'lg:hidden' : ''}`}
+          onConfirm={confirmPendingMove}
+          onCancel={cancelPendingMove}
+          busy={confirming}
+          time={sidePanel?.clocks?.bottom.text}
+        />
       )}
       {/* Practice feedback overlay */}
       {feedback && (
@@ -695,15 +675,6 @@ export function ChessBoard({
   if (!sidePanel) return boardEl;
 
   const clocks = sidePanel.clocks;
-  const Face = ({ f }: { f: ClockFace }) => (
-    <div className="rounded-xl px-3 py-3 text-center" style={{
-      background: f.active ? 'linear-gradient(180deg, #f4f1ea 0%, #d9d4c7 100%)' : 'linear-gradient(180deg, #2c2c2c 0%, #1c1c1c 100%)',
-      boxShadow: f.active ? 'inset 0 -3px 0 rgba(0,0,0,.18), 0 0 0 2px rgba(139,234,69,.55)' : 'inset 0 -3px 0 rgba(0,0,0,.4)',
-    }}>
-      {f.name && <div className="truncate text-[11px] font-bold" style={{ color: f.active ? '#3a3a3a' : 'rgba(255,255,255,.55)' }}>{f.name}</div>}
-      <div className="font-mono text-[26px] font-black tabular-nums leading-tight" style={{ color: f.low ? '#e5484d' : f.active ? '#111' : 'rgba(255,255,255,.85)' }}>{f.text}</div>
-    </div>
-  );
 
   return (
     <div className="lg:flex lg:items-stretch lg:justify-center lg:gap-4">
@@ -716,31 +687,50 @@ export function ChessBoard({
 
       {boardEl}
 
-      {/* Right: chess clock with the confirm paddles (desktop) */}
-      <aside className="hidden lg:flex w-[150px] shrink-0 flex-col justify-between gap-3 rounded-2xl p-2.5"
-        style={{ background: 'linear-gradient(180deg, #3a3a3a 0%, #1f1f1f 100%)', boxShadow: '0 18px 40px -12px rgba(0,0,0,.7), inset 0 1px 0 rgba(255,255,255,.08)' }}>
-        {clocks ? <Face f={clocks.top} /> : <div />}
-        <div className="flex flex-1 flex-col justify-center gap-2">
+      {/* Right: chess clock (desktop). Opponent on top, you at the bottom;
+          the side to move is green. With a move waiting, tap your clock (or
+          the check) to play it, or the X to take it back. */}
+      <aside className="hidden lg:flex w-[170px] shrink-0 flex-col gap-2 overflow-hidden rounded-2xl p-2" style={{ background: CLOCK.strip }}>
+        {clocks
+          ? <ClockPanel face={clocks.top} className="flex-1" />
+          : <div className="flex-1 rounded-2xl" style={{ background: CLOCK.off, opacity: 0.35 }} />}
+        <div className="flex min-h-[64px] items-center justify-center gap-3 px-1">
           {pendingMove ? (
             <>
-              <button onClick={confirmPendingMove} disabled={confirming}
-                className="flex min-h-[96px] flex-1 items-center justify-center rounded-xl text-sm font-black tracking-wider transition-transform active:scale-[0.97]"
-                style={{ background: 'linear-gradient(180deg, #a8d876 0%, #81b64c 55%, #5f8f36 100%)', color: '#fff', boxShadow: '0 4px 0 #3d5e22', opacity: confirming ? 0.6 : 1 }}>
-                {confirming ? '✓' : 'CONFIRM'}
+              <button type="button" onClick={cancelPendingMove} disabled={confirming} aria-label="Cancel move"
+                className="grid h-12 w-12 place-items-center rounded-full transition-transform active:scale-95"
+                style={{ background: 'rgba(255,255,255,.08)', color: CLOCK.stripIcon }}>
+                <span className="text-[22px] font-black leading-none">✕</span>
               </button>
-              <button onClick={cancelPendingMove} disabled={confirming}
-                className="flex h-12 items-center justify-center gap-1.5 rounded-xl text-xs font-black tracking-wider transition-transform active:scale-[0.97]"
-                style={{ background: 'linear-gradient(180deg, #3a3a3a 0%, #232323 100%)', color: 'rgba(255,255,255,0.75)', boxShadow: '0 3px 0 #111' }}>
-                <span className="text-sm">✕</span> CANCEL
+              <button type="button" onClick={confirmPendingMove} disabled={confirming} aria-label="Confirm move"
+                className="grid h-12 w-12 place-items-center rounded-full transition-transform active:scale-95"
+                style={{ background: CLOCK.on, color: CLOCK.onText }}>
+                <span className="text-[22px] font-black leading-none">✓</span>
               </button>
             </>
           ) : (
-            <p className="px-1 text-center text-[12px] font-bold leading-snug" style={{ color: 'rgba(255,255,255,.55)' }}>
-              {sidePanel.status ?? (confirmMoves && !suppressConfirmMoves ? 'Make a move, then confirm it here' : '')}
+            <p className="text-center text-[12px] font-bold leading-snug" style={{ color: CLOCK.stripIcon }}>
+              {sidePanel.status ?? (confirmMoves && !suppressConfirmMoves ? 'Make a move, then confirm it' : '')}
             </p>
           )}
         </div>
-        {clocks ? <Face f={clocks.bottom} /> : <div />}
+        {clocks ? (
+          <ClockPanel
+            face={pendingMove ? { ...clocks.bottom, active: true } : clocks.bottom}
+            className="flex-1"
+            onTap={pendingMove ? confirmPendingMove : undefined}
+            hint={pendingMove ? 'Tap to confirm' : undefined}
+          />
+        ) : pendingMove ? (
+          <button type="button" onClick={confirmPendingMove} disabled={confirming}
+            className="flex flex-1 flex-col items-center justify-center rounded-2xl transition-transform active:scale-[0.98]"
+            style={{ background: CLOCK.on, color: CLOCK.onText }}>
+            <span className="text-[26px] font-black">CONFIRM</span>
+            <span className="mt-1 text-[11px] font-extrabold uppercase tracking-wider" style={{ color: CLOCK.onSub }}>Tap to play your move</span>
+          </button>
+        ) : (
+          <div className="flex-1 rounded-2xl" style={{ background: CLOCK.off, opacity: 0.35 }} />
+        )}
       </aside>
     </div>
   );

@@ -218,8 +218,8 @@ export function DailyGame() {
         sidePanel={{
           left: <div className="space-y-3">{messages}</div>,
           clocks: {
-            top: { name: opp, text: game.status === 'active' && !myTurn ? formatLeft(left) : '—', active: game.status === 'active' && !myTurn, low: !myTurn && left < 3_600_000 },
-            bottom: { name: 'You', text: myTurn ? formatLeft(left) : '—', active: myTurn, low: myTurn && left < 3_600_000 },
+            top: { name: opp, text: game.status === 'active' && !myTurn ? formatLeft(left) : '—', active: game.status === 'active' && !myTurn, low: !myTurn && left < 3_600_000, moves: white ? Math.floor(moveList.length / 2) : Math.ceil(moveList.length / 2) },
+            bottom: { name: 'You', text: myTurn ? formatLeft(left) : '—', active: myTurn, low: myTurn && left < 3_600_000, moves: white ? Math.ceil(moveList.length / 2) : Math.floor(moveList.length / 2) },
           },
           status: game.status !== 'active' ? 'Game over' : myTurn ? 'Your move' : `Waiting for ${opp}`,
         }}

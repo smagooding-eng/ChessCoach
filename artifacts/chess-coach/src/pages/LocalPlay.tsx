@@ -2,6 +2,7 @@ import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { PageHero } from '@/components/DesignSystem';
 import { Chess } from 'chess.js';
 import { ChessBoard } from '@/components/ChessBoard';
+import { CLOCK } from '@/components/ClockPad';
 import { MaterialStrip } from '@/components/GameStatusStrip';
 import { motion, AnimatePresence } from 'framer-motion';
 import { RotateCcw, Flag, Clock, Play, ArrowLeft, Trophy, Handshake, Hand } from 'lucide-react';
@@ -262,43 +263,50 @@ export function LocalPlay() {
     const canSubmit = isActive && awaitingSubmit && (!hasTimer || clockStarted);
     // White's clock before a timed game has started ticking -- tapping
     // it here starts the game clock rather than submitting a move.
-    // Untimed games have no clock to start, so this never applies there.
     const needsStart = hasTimer && side === 'w' && !clockStarted && result === 'playing';
     const isTappable = canSubmit || needsStart;
+    const on = isActive || needsStart;
     const time = side === 'w' ? whiteTime : blackTime;
+    const low = hasTimer && time < 20 && isActive;
+    const sideMoves = side === 'w' ? Math.ceil(moves.length / 2) : Math.floor(moves.length / 2);
+    const sub = on ? CLOCK.onSub : CLOCK.offSub;
+    // Flat chess-clock panel: green with big white digits when it's this
+    // side's turn, grey with dark digits otherwise.
     return (
       <button
         onClick={() => (needsStart ? startClock() : submitClock(side))}
         disabled={!isTappable}
         className={cn(
-          'flex-1 rounded-2xl font-mono font-black text-left transition-transform',
-          fullscreen ? 'px-6 py-5' : 'px-3 py-2.5',
-          isTappable && 'active:scale-[0.97] active:translate-y-0.5',
+          'relative flex flex-1 flex-col items-center justify-center overflow-hidden rounded-2xl text-center transition-transform',
+          fullscreen ? 'min-h-[132px] px-6 py-5' : 'min-h-[92px] px-3 py-3',
+          isTappable && 'active:scale-[0.98]',
         )}
-        style={{
-          background: (isActive || needsStart)
-            ? 'linear-gradient(180deg, #a8d876 0%, #81b64c 55%, #5f8f36 100%)'
-            : 'linear-gradient(180deg, #3a3a3a 0%, #232323 100%)',
-          color: (isActive || needsStart) ? '#fff' : 'rgba(255,255,255,0.45)',
-          boxShadow: (isActive || needsStart)
-            ? '0 4px 0 #4a7028, 0 8px 16px rgba(0,0,0,0.4), inset 0 1px 1px rgba(255,255,255,0.3)'
-            : '0 4px 0 #141414, 0 8px 16px rgba(0,0,0,0.4)',
-          border: '1px solid rgba(0,0,0,0.25)',
-        }}
+        style={{ background: on ? CLOCK.on : CLOCK.off }}
       >
-        <span className={cn('font-normal block opacity-80', fullscreen ? 'text-sm mb-0.5' : 'text-[10px]')}>
-          {needsStart ? 'Tap to start' : (side === 'w' ? 'White' : 'Black')}
+        <span className="absolute left-3 top-2 text-[11px] font-bold" style={{ color: sub }}>
+          {side === 'w' ? 'White' : 'Black'}
+        </span>
+        <span className="absolute right-3 top-2 text-[11px] font-bold" style={{ color: sub }}>
+          Moves: {sideMoves}
         </span>
         {hasTimer ? (
-          <span className={fullscreen ? 'text-4xl' : 'text-lg'}>{formatClock(time)}</span>
+          <span className={cn('font-black tabular-nums leading-none', fullscreen ? 'text-[64px]' : 'text-[40px]')}
+            style={{ color: low ? CLOCK.low : on ? CLOCK.onText : CLOCK.offText, letterSpacing: '-0.02em' }}>
+            {formatClock(time)}
+          </span>
         ) : (
-          <span className={fullscreen ? 'text-2xl' : 'text-base'}>
-            {canSubmit ? 'Tap to pass turn' : 'Waiting…'}
+          <span className={cn('font-black leading-none', fullscreen ? 'text-[30px]' : 'text-[22px]')}
+            style={{ color: on ? CLOCK.onText : CLOCK.offText }}>
+            {canSubmit ? 'Your move' : on ? 'Thinking…' : 'Waiting'}
           </span>
         )}
-        {isTappable && <Hand className={cn('inline ml-2', fullscreen ? 'w-6 h-6 -mt-3' : 'w-3.5 h-3.5 -mt-1')} />}
+        {isTappable && (
+          <span className="mt-1.5 inline-flex items-center gap-1 text-[11px] font-extrabold uppercase tracking-wider" style={{ color: sub }}>
+            <Hand className="h-3 w-3" /> {needsStart ? 'Tap to start' : 'Tap to pass turn'}
+          </span>
+        )}
         {fullscreen && (
-          <div className="mt-1">
+          <div className="mt-2">
             <MaterialStrip fen={fen} color={side} />
           </div>
         )}
@@ -341,17 +349,12 @@ export function LocalPlay() {
               <button
                 onClick={() => resign('b')}
                 className={cn(
-                  'flex items-center gap-1.5 rounded-2xl font-black transition-transform active:scale-[0.97] shrink-0',
-                  fullscreen ? 'px-5 py-5' : 'px-3 py-2.5 text-xs',
+                  'flex flex-col items-center justify-center gap-1 self-stretch rounded-2xl font-extrabold uppercase tracking-wider transition-transform active:scale-[0.97] shrink-0',
+                  fullscreen ? 'w-24 text-xs' : 'w-[68px] text-[10.5px]',
                 )}
-                style={{
-                  background: 'linear-gradient(180deg, #e05a5a 0%, #c93535 55%, #a02828 100%)',
-                  color: '#fff',
-                  boxShadow: '0 4px 0 #7a1f1f, 0 8px 16px rgba(0,0,0,0.4), inset 0 1px 1px rgba(255,255,255,0.25)',
-                  border: '1px solid rgba(0,0,0,0.25)',
-                }}
+                style={{ background: CLOCK.strip, color: CLOCK.stripIcon }}
               >
-                <Flag className={fullscreen ? 'w-5 h-5' : 'w-3.5 h-3.5'} /> Resign
+                <Flag className={fullscreen ? 'w-6 h-6' : 'w-5 h-5'} /> Resign
               </button>
             )}
           </div>
@@ -406,17 +409,12 @@ export function LocalPlay() {
               <button
                 onClick={() => resign('w')}
                 className={cn(
-                  'flex items-center gap-1.5 rounded-2xl font-black transition-transform active:scale-[0.97] shrink-0',
-                  fullscreen ? 'px-5 py-5' : 'px-3 py-2.5 text-xs',
+                  'flex flex-col items-center justify-center gap-1 self-stretch rounded-2xl font-extrabold uppercase tracking-wider transition-transform active:scale-[0.97] shrink-0',
+                  fullscreen ? 'w-24 text-xs' : 'w-[68px] text-[10.5px]',
                 )}
-                style={{
-                  background: 'linear-gradient(180deg, #e05a5a 0%, #c93535 55%, #a02828 100%)',
-                  color: '#fff',
-                  boxShadow: '0 4px 0 #7a1f1f, 0 8px 16px rgba(0,0,0,0.4), inset 0 1px 1px rgba(255,255,255,0.25)',
-                  border: '1px solid rgba(0,0,0,0.25)',
-                }}
+                style={{ background: CLOCK.strip, color: CLOCK.stripIcon }}
               >
-                <Flag className={fullscreen ? 'w-5 h-5' : 'w-3.5 h-3.5'} /> Resign
+                <Flag className={fullscreen ? 'w-6 h-6' : 'w-5 h-5'} /> Resign
               </button>
             )}
           </div>
