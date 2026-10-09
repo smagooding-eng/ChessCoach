@@ -41,7 +41,9 @@ export function Challenge() {
       .then(async r => {
         if (!r.ok) { setMissing(true); return; }
         const d = await r.json();
-        setCh(d.challenge); setIsCreator(!!d.isCreator); setIsRequester(!!d.isRequester);
+        let sentHere = false;
+        try { sentHere = sessionStorage.getItem(`cs_sent_request_${d.challenge?.code}`) === '1'; } catch { /* ignore */ }
+        setCh(d.challenge); setIsCreator(!!d.isCreator); setIsRequester(!!d.isRequester || (sentHere && !d.isCreator));
       })
       .catch(() => setMissing(true));
   }, [code]);
@@ -81,6 +83,7 @@ export function Challenge() {
     }
     const d = await post('request');
     if (!d?.request) return;
+    try { sessionStorage.setItem(`cs_sent_request_${d.request.code}`, '1'); } catch { /* ignore */ }
     if (d.request.kind === 'live') navigate(`/live?challenge=${d.request.code}`);
     else navigate(`/challenge/${d.request.code}`);
   };
@@ -140,7 +143,7 @@ export function Challenge() {
               </span>
               <p className="text-[20px] font-black" style={{ color: PT.text }}>
                 {ch.isRequest
-                  ? (isCreator ? `${ch.requesterUsername ?? 'Someone'} wants to play you` : `Your challenge to ${ch.creatorUsername}`)
+                  ? (isCreator ? `${ch.requesterUsername ?? 'Someone'} wants to play you` : isRequester ? `Your challenge to ${ch.creatorUsername}` : 'Challenge request')
                   : ch.open
                     ? (isCreator ? 'Your open challenge link' : `Challenge ${ch.creatorUsername}`)
                     : isCreator ? 'Your challenge' : `${ch.creatorUsername} challenges you`}
@@ -153,7 +156,8 @@ export function Challenge() {
             </div>
 
             {ch.isRequest ? (
-              <RequestView ch={ch} isCreator={isCreator} isRequester={isRequester} busy={busy}
+              <RequestView ch={ch} isCreator={isCreator} isRequester={isRequester} busy={busy} signedIn={isAuthenticated}
+                onSignIn={() => { try { localStorage.setItem(PENDING_CHALLENGE_KEY, ch.code); } catch { /* ignore */ } navigate('/setup'); }}
                 onApprove={approve} onDecline={decline} onWithdraw={withdraw}
                 onGoLive={() => navigate(`/live?challenge=${ch.code}`)}
                 onOpenGame={() => ch.gameId && navigate(`/daily/${ch.gameId}`)} />
@@ -195,6 +199,15 @@ export function Challenge() {
             {error && <p className="text-center text-[13px]" style={{ color: PT.red }}>{error}</p>}
           </div>
         )}
+        {/* Always a way out of this page */}
+        <div className="flex justify-center gap-2">
+          <Link href="/" className="rounded-xl px-4 py-2.5 text-[13px] font-bold" style={ghostBtn}>Home</Link>
+          {isAuthenticated && ch && (
+            <Link href={ch.kind === 'live' ? '/live' : '/daily'} className="rounded-xl px-4 py-2.5 text-[13px] font-bold" style={ghostBtn}>
+              {ch.kind === 'live' ? 'Live play' : 'Daily games'}
+            </Link>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -202,8 +215,8 @@ export function Challenge() {
 
 // A request made through someone's open link: the owner answers it, the
 // person who sent it sees where it stands.
-function RequestView({ ch, isCreator, isRequester, busy, onApprove, onDecline, onWithdraw, onGoLive, onOpenGame }: {
-  ch: ChallengeInfo; isCreator: boolean; isRequester: boolean; busy: boolean;
+function RequestView({ ch, isCreator, isRequester, busy, signedIn, onSignIn, onApprove, onDecline, onWithdraw, onGoLive, onOpenGame }: {
+  ch: ChallengeInfo; isCreator: boolean; isRequester: boolean; busy: boolean; signedIn: boolean; onSignIn: () => void;
   onApprove: () => void; onDecline: () => void; onWithdraw: () => void; onGoLive: () => void; onOpenGame: () => void;
 }) {
   const note = (t: string) => <p className="text-center text-[13.5px]" style={{ color: PT.muted }}>{t}</p>;
@@ -241,5 +254,13 @@ function RequestView({ ch, isCreator, isRequester, busy, onApprove, onDecline, o
       </>
     );
   }
-  return note('This challenge request is private.');
+  if (!signedIn) {
+    return (
+      <>
+        {note('Sign in to see and answer this challenge request.')}
+        <button onClick={onSignIn} className="w-full rounded-xl py-3 text-[14px] font-extrabold" style={greenBtn}>Sign in</button>
+      </>
+    );
+  }
+  return note('This request is between other players. If it was sent to you, make sure you are signed in to the right account.');
 }

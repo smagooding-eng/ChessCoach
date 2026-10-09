@@ -123,6 +123,23 @@ router.get("/challenges/invites", requireAuth, async (req: Request, res: Respons
   }
 });
 
+// Requests you've sent through other people's open links, still waiting.
+router.get("/challenges/sent", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const rows = await db.select().from(gameChallengesTable)
+      .where(and(
+        eq(gameChallengesTable.acceptedByUserId, req.user!.id),
+        isNotNull(gameChallengesTable.parentCode),
+        inArray(gameChallengesTable.status, ["requested", "approved"]),
+        gt(gameChallengesTable.expiresAt, new Date()),
+      ))
+      .orderBy(desc(gameChallengesTable.createdAt)).limit(20);
+    res.json({ sent: rows.map(publicChallenge) });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to load", details: err.cause?.message ?? err.message });
+  }
+});
+
 // Challenge requests waiting for the owner's answer (newest first).
 router.get("/challenges/requests", requireAuth, async (req: Request, res: Response) => {
   try {

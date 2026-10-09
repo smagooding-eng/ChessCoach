@@ -41,12 +41,15 @@ export function useChallengeInbox() {
   const [links, setLinks] = useState<ChallengeRow[]>([]);
   const [requests, setRequests] = useState<ChallengeRow[]>([]);
   const [invites, setInvites] = useState<ChallengeRow[]>([]);
+  const [sent, setSent] = useState<ChallengeRow[]>([]);
   const reload = useCallback(async () => {
-    const [m, q, inv] = await Promise.all([
+    const [m, q, inv, snt] = await Promise.all([
       apiFetch('/api/challenges/mine').then(r => r.ok ? r.json() : null).catch(() => null),
       apiFetch('/api/challenges/requests').then(r => r.ok ? r.json() : null).catch(() => null),
       apiFetch('/api/challenges/invites').then(r => r.ok ? r.json() : null).catch(() => null),
+      apiFetch('/api/challenges/sent').then(r => r.ok ? r.json() : null).catch(() => null),
     ]);
+    if (snt) setSent((snt.sent ?? []) as ChallengeRow[]);
     if (m) setLinks(((m.challenges ?? []) as ChallengeRow[]).filter(c => c.open));
     if (q) setRequests((q.requests ?? []) as ChallengeRow[]);
     if (inv) setInvites((inv.invites ?? []) as ChallengeRow[]);
@@ -59,7 +62,7 @@ export function useChallengeInbox() {
     const t = setInterval(reload, 30_000);
     return () => { window.removeEventListener(CHANGED, on); window.removeEventListener('cs:notification', on); clearInterval(t); };
   }, [reload]);
-  return { links, requests, invites, reload };
+  return { links, requests, invites, sent, reload };
 }
 
 const describe = (c: ChallengeRow) =>
@@ -185,14 +188,43 @@ export function ChallengeInvitesCard({ invites, onChanged }: { invites: Challeng
   );
 }
 
-/** Home / Play screens: requests to answer + challenges waiting for you. */
+/** Requests you've sent that are waiting for an answer. */
+export function SentRequestsCard({ sent, onChanged }: { sent: ChallengeRow[]; onChanged: () => void }) {
+  const [, navigate] = useLocation();
+  if (sent.length === 0) return null;
+  const withdraw = async (code: string) => {
+    await apiFetch(`/api/challenges/${code}/withdraw`, { method: 'POST' }).catch(() => {});
+    onChanged();
+  };
+  return (
+    <section className="overflow-hidden" style={cardStyle}>
+      <h2 className="px-4 pb-2 pt-3.5 text-[13px] font-black uppercase tracking-[0.14em]" style={{ color: PT.muted }}>Waiting for an answer</h2>
+      {sent.map(c => (
+        <div key={c.code} className="flex items-center gap-3 px-4 py-3" style={{ borderTop: `1px solid ${PT.border}` }}>
+          <button onClick={() => navigate(c.kind === 'live' ? `/live?challenge=${c.code}` : `/challenge/${c.code}`)} className="min-w-0 flex-1 text-left">
+            <b className="block truncate text-[14px] font-extrabold" style={{ color: PT.text }}>You challenged {c.creatorUsername}</b>
+            <span className="block text-[12px]" style={{ color: c.status === 'approved' ? PT.green : PT.muted }}>
+              {c.status === 'approved' ? 'Accepted! Tap to play' : `${c.kind === 'live' ? 'Live' : 'Daily'} · ${describe(c)}`}
+            </span>
+          </button>
+          <button onClick={() => withdraw(c.code)} className="shrink-0 rounded-xl px-3 py-2 text-[12px] font-bold" style={ghostBtn}>Withdraw</button>
+        </div>
+      ))}
+    </section>
+  );
+}
+
+/** Home / Play screens: requests to answer, challenges waiting for you, and
+ *  requests you've sent. */
 export function ChallengeInbox({ className = '' }: { className?: string }) {
   const inbox = useChallengeInbox();
-  if (inbox.requests.length === 0 && inbox.invites.length === 0) return null;
+  if (inbox.requests.length === 0 && inbox.invites.length === 0 && inbox.sent.length === 0) return null;
+  const changed = () => { void inbox.reload(); };
   return (
     <div className={`space-y-3 ${className}`}>
-      <ChallengeRequestsCard requests={inbox.requests} onChanged={() => { void inbox.reload(); }} />
-      <ChallengeInvitesCard invites={inbox.invites} onChanged={() => { void inbox.reload(); }} />
+      <ChallengeRequestsCard requests={inbox.requests} onChanged={changed} />
+      <ChallengeInvitesCard invites={inbox.invites} onChanged={changed} />
+      <SentRequestsCard sent={inbox.sent} onChanged={changed} />
     </div>
   );
 }

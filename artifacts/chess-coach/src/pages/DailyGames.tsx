@@ -6,7 +6,7 @@ import { useUser } from '@/hooks/use-user';
 import { PT, cardStyle, greenBtn, ghostBtn, formatLeft } from '@/lib/playTheme';
 import { ShareLink } from '@/components/play/ShareLink';
 import { NotifyPrompt } from '@/components/play/NotifyPrompt';
-import { useChallengeInbox, ChallengeRequestsCard, ChallengeInvitesCard, OpenLinksCard, createOpenLink } from '@/components/play/OpenChallenges';
+import { useChallengeInbox, ChallengeRequestsCard, ChallengeInvitesCard, SentRequestsCard, OpenLinksCard, createOpenLink } from '@/components/play/OpenChallenges';
 
 export const DAILY_TC = [
   { id: 'corr_1d', label: '1 day' },
@@ -193,6 +193,7 @@ export function DailyGames() {
 
       <ChallengeRequestsCard requests={inbox.requests} onChanged={() => { void inbox.reload(); }} />
       <ChallengeInvitesCard invites={inbox.invites} onChanged={() => { void inbox.reload(); }} />
+      <SentRequestsCard sent={inbox.sent} onChanged={() => { void inbox.reload(); }} />
       <OpenLinksCard links={inbox.links} kind="daily" onChanged={() => { void inbox.reload(); }} />
 
       {/* New game */}
