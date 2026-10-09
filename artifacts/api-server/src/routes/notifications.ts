@@ -93,6 +93,25 @@ router.post("/notifications/read-all", requireAuth, async (req: Request, res: Re
   }
 });
 
+// Clear one notification, or all of them.
+router.delete("/notifications/:id", requireAuth, async (req: Request, res: Response) => {
+  try {
+    await db.execute(sql`DELETE FROM notifications WHERE user_id = ${req.user!.id} AND id::text = ${String(req.params.id)}`);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed", details: err.cause?.message ?? err.message });
+  }
+});
+
+router.delete("/notifications", requireAuth, async (req: Request, res: Response) => {
+  try {
+    await db.execute(sql`DELETE FROM notifications WHERE user_id = ${req.user!.id}`);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed", details: err.cause?.message ?? err.message });
+  }
+});
+
 // "Send me a test" -- shows exactly what works: in-app always, push only if
 // the server has VAPID keys and this account has a subscribed device.
 router.post("/notifications/test", requireAuth, async (req: Request, res: Response) => {

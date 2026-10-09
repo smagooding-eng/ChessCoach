@@ -79,6 +79,11 @@ export async function notifyUser(userId: string, n: NotifyInput): Promise<void> 
   const watching = !!n.url && isViewing(userId, n.url);
   let id: string | null = null;
   try {
+    // One entry per game in the inbox: a newer alert about the same game
+    // replaces the older ones ("Your move" after "Your move"...).
+    if (n.url && /^\/(daily|correspondence)\//.test(n.url)) {
+      await db.execute(sql`DELETE FROM notifications WHERE user_id = ${userId} AND url = ${n.url}`);
+    }
     const rows = await db.execute(sql`
       INSERT INTO notifications (user_id, title, body, url, kind, read_at)
       VALUES (${userId}, ${n.title}, ${n.body}, ${n.url ?? null}, ${n.kind ?? "general"}, ${watching ? sql`now()` : sql`NULL`})
