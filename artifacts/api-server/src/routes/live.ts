@@ -1,6 +1,7 @@
 import { Router, type IRouter, type Request, type Response } from 'express';
 import { requireAuth } from '../middlewares/authMiddleware';
 import { getUserRatings, listTimeControls, getActiveGameForUser, getUserLiveHistory, seedRatingFromOnboardingGame } from '../lib/liveServer';
+import { getDailyRating } from '../lib/correspondence';
 
 const router: IRouter = Router();
 
@@ -25,7 +26,9 @@ router.post('/live/onboarding-seed', requireAuth, async (req: Request, res: Resp
 router.get('/live/ratings', requireAuth, async (req: Request, res: Response) => {
   try {
     const ratings = await getUserRatings(req.user!.id);
-    res.json({ ratings });
+    // Daily games share one rating across 1 / 3 / 7 days.
+    const daily = await getDailyRating(req.user!.id);
+    res.json({ ratings: { ...ratings, daily } });
   } catch (err) {
     res.status(500).json({ error: 'Failed to load ratings' });
   }

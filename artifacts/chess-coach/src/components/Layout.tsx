@@ -125,7 +125,19 @@ function SidebarLink({ item, isActive }: { item: typeof ALL_NAV[0]; isActive: bo
 // need the whole viewport for a one-screen, no-scroll layout, where
 // persistent app chrome competing for space would defeat the purpose.
 export function Layout({ children, fullscreen }: { children: React.ReactNode; fullscreen?: boolean }) {
-  const [location] = useLocation();
+  const [location, navigateTo] = useLocation();
+  const { authUser: layoutAuthUser } = useUser();
+  // Came from a friend's challenge link while signed out: once signed in
+  // (and past onboarding, which needs a linked chess account), go back to it.
+  useEffect(() => {
+    if (location === '/welcome' || location === '/setup') return;
+    if (!layoutAuthUser || (!layoutAuthUser.chesscomUsername && !layoutAuthUser.lichessUsername)) return;
+    let code: string | null = null;
+    try { code = localStorage.getItem('cs_pending_challenge'); } catch { /* ignore */ }
+    if (!code) return;
+    try { localStorage.removeItem('cs_pending_challenge'); } catch { /* ignore */ }
+    navigateTo(`/challenge/${code}`);
+  }, [location, navigateTo, layoutAuthUser]);
   const { enabled: redesign } = useDashboardRedesignFlag();
   // The redesigned inner screens (games list + game analysis, analysis, puzzles,
   // openings, traps, import, play hub) draw their own header, as in the mockups,

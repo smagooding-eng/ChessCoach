@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getApiBase, apiFetch } from '@/lib/api';
 
-export type LiveStatus = 'idle' | 'connecting' | 'queued' | 'in_game' | 'finished' | 'disconnected' | 'error';
+export type LiveStatus = 'idle' | 'connecting' | 'queued' | 'challenge_waiting' | 'in_game' | 'finished' | 'disconnected' | 'error';
 export type LiveMode = 'casual' | 'ranked';
 
 export interface LivePlayer {
@@ -11,6 +11,8 @@ export interface LivePlayer {
   title?: string | null;
   avatar?: string;
   memberSinceYear?: number;
+  /** Server-labeled bot opponent (only ever offered, never disguised). */
+  isBot?: boolean;
 }
 
 export interface LiveGameState {
@@ -57,6 +59,12 @@ export function useLivePlay() {
   const [queuedMode, setQueuedMode] = useState<LiveMode | null>(null);
   const [opponentDisconnect, setOpponentDisconnect] = useState<OpponentDisconnect | null>(null);
   const [premove, setPremove] = useState<{ from: string; to: string; promotion?: string } | null>(null);
+  // When queued: when we joined and when the "play a bot instead" offer appears.
+  const [queuedAt, setQueuedAt] = useState<number | null>(null);
+  const [botOfferMs, setBotOfferMs] = useState<number>(20000);
+  // Accepted a friend's challenge but they're not online yet.
+  const [waitingFor, setWaitingFor] = useState<string | null>(null);
+  const pendingAcceptRef = useRef<string | null>(null);
 
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -106,6 +114,10 @@ export function useLivePlay() {
           }
         } catch {}
       }
+      if (pendingAcceptRef.current && !(g && g.status === 'active')) {
+        ws.send(JSON.stringify({ type: 'accept_challenge', code: pendingAcceptRef.current }));
+        return;
+      }
       if (g && g.status === 'active') ws.send(JSON.stringify({ type: 'subscribe', gameId: g.id }));
       else if (queuedTcRef.current && queuedModeRef.current) ws.send(JSON.stringify({ type: 'queue', timeControl: queuedTcRef.current, mode: queuedModeRef.current }));
     };
@@ -116,14 +128,26 @@ export function useLivePlay() {
         case 'queued':
           setQueuedTc(msg.tcId);
           setQueuedMode(msg.mode);
+          setQueuedAt(Date.now());
+          if (typeof msg.botOfferMs === 'number') setBotOfferMs(msg.botOfferMs);
           setStatus('queued');
+          break;
+        case 'challenge_waiting':
+          setWaitingFor(msg.creator ?? 'your friend');
+          setStatus('challenge_waiting');
           break;
         case 'queue_cancelled':
           setQueuedTc(null);
           setQueuedMode(null);
+          setQueuedAt(null);
+          setWaitingFor(null);
+          pendingAcceptRef.current = null;
           setStatus('idle');
           break;
         case 'match_found':
+          pendingAcceptRef.current = null;
+          setWaitingFor(null);
+          setQueuedAt(null);
           setGame(msg.state);
           setColor(msg.color);
           setQueuedTc(null);
@@ -152,6 +176,12 @@ export function useLivePlay() {
           break;
         case 'error':
           setError(msg.message);
+          if (pendingAcceptRef.current) {
+            // a failed challenge accept must not be re-sent on reconnect
+            pendingAcceptRef.current = null;
+            setWaitingFor(null);
+            if (statusRef.current === 'challenge_waiting') setStatus('idle');
+          }
           break;
       }
     };
@@ -190,6 +220,16 @@ export function useLivePlay() {
   }, [send]);
 
   const cancel = useCallback(() => { send({ type: 'cancel' }); }, [send]);
+  // Opt-in, clearly labeled bot game (always casual) when nobody's free.
+  const playBot = useCallback((timeControl: string) => { setError(null); send({ type: 'play_bot', timeControl }); }, [send]);
+  // Accept a friend's live challenge link. Sent now if connected, or as soon
+  // as the socket opens.
+  const acceptChallenge = useCallback((code: string) => {
+    setError(null);
+    pendingAcceptRef.current = code;
+    const ws = wsRef.current;
+    if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'accept_challenge', code }));
+  }, []);
   const move = useCallback((san: string) => { if (game) send({ type: 'move', gameId: game.id, san }); }, [game, send]);
   const resign = useCallback(() => { if (game) send({ type: 'resign', gameId: game.id }); }, [game, send]);
   const offerDraw = useCallback(() => { if (game) send({ type: 'draw_offer', gameId: game.id }); }, [game, send]);
@@ -202,7 +242,8 @@ export function useLivePlay() {
 
   return {
     status, error, game, color, queuedTc, queuedMode, opponentDisconnect, premove, setPremove,
-    enterQueue, cancel, move, resign, offerDraw, acceptDraw, declineDraw,
+    queuedAt, botOfferMs, waitingFor,
+    enterQueue, cancel, playBot, acceptChallenge, move, resign, offerDraw, acceptDraw, declineDraw,
     reset,
   };
 }

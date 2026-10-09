@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'wouter';
-import { ChevronRight, Bot, Play, Swords } from 'lucide-react';
+import { ChevronRight, Bot, Play, Swords, CalendarDays } from 'lucide-react';
 import { BOTS } from '@/lib/chess-bot';
 import { useBotAvatar, useBotName } from '@/lib/botAvatars';
 import { useUser } from '@/hooks/use-user';
@@ -12,10 +12,8 @@ import { useSiteImg } from '@/hooks/use-app-config';
 // "Play Chess" hub (redesign). Only offers what the app can actually do:
 //  - Play a Bot: the real roster (count and rating range read from BOTS).
 //  - Play a Friend: two players on this device (the existing Local Play).
-//  - Play Online: shown to admins only, because /live is admin-only today.
-// The mockup's online "Quick Match Settings" (time control / colour /
-// Find a Game) and "share a link" friend games need matchmaking /
-// correspondence UI that doesn't exist yet, so they're intentionally absent.
+//  - Play Online: live games with matchmaking and challenge links.
+//  - Daily Games: 1 / 3 / 7 days per move, with push notifications.
 export function PlayHub() {
   const { authUser } = useUser();
   const botAvatar = useBotAvatar();
@@ -27,7 +25,8 @@ export function PlayHub() {
   const rows: { href: string; title: string; sub: string; icon: React.ReactNode; tint: string; show: boolean; img: string }[] = [
     { href: '/practice', title: 'Play a Bot', sub: `${BOTS.length} opponents • ${lowest}–${highest} ELO`, icon: <Bot size={22} />, tint: '#5BA8FF', show: true, img: 'play-bot' },
     { href: '/play/local', title: 'Play a Friend', sub: 'Two players, one device', icon: <Play size={22} />, tint: RD.green, show: true, img: 'play-friend' },
-    { href: '/live', title: 'Play Online', sub: 'Live games (admin preview)', icon: <Swords size={22} />, tint: RD.gold, show: !!authUser?.isAdmin, img: 'play-online' },
+    { href: '/live', title: 'Play Online', sub: 'Live 5–15 min games · challenge a friend', icon: <Swords size={22} />, tint: RD.gold, show: !!authUser, img: 'play-online' },
+    { href: '/daily', title: 'Daily Games', sub: '1, 3 or 7 days per move', icon: <CalendarDays size={22} />, tint: '#A98BFF', show: !!authUser, img: 'play-daily' },
   ];
 
   return (

@@ -6,6 +6,7 @@ import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { createServer } from "http";
 import { attachLiveServer, seedBotPersonas } from "./lib/liveServer";
+import { startDailySweep } from "./lib/correspondence";
 
 async function initStripe() {
   const databaseUrl = process.env.DATABASE_URL;
@@ -158,6 +159,75 @@ async function runSchemaMigrations() {
     await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_live_games_white_user ON live_games(white_user_id, finished_at DESC)`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_live_games_black_user ON live_games(black_user_id, finished_at DESC)`);
 
+    // Daily (correspondence) games + challenge links. Created here as well as
+    // in the drizzle schema so production gets them without a manual push.
+    await db.execute(sql`CREATE TABLE IF NOT EXISTS correspondence_games (
+      id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+      time_control VARCHAR NOT NULL,
+      mode VARCHAR NOT NULL DEFAULT 'casual',
+      white_user_id VARCHAR NOT NULL,
+      black_user_id VARCHAR NOT NULL,
+      white_username VARCHAR NOT NULL,
+      black_username VARCHAR NOT NULL,
+      white_is_bot INTEGER NOT NULL DEFAULT 0,
+      black_is_bot INTEGER NOT NULL DEFAULT 0,
+      pgn TEXT NOT NULL DEFAULT '',
+      fen TEXT NOT NULL,
+      turn_user_id VARCHAR NOT NULL,
+      white_bank_ms INTEGER NOT NULL,
+      black_bank_ms INTEGER NOT NULL,
+      last_move_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      status VARCHAR NOT NULL DEFAULT 'active',
+      result VARCHAR,
+      termination VARCHAR,
+      started_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      finished_at TIMESTAMPTZ
+    )`);
+    for (const col of [
+      sql`ALTER TABLE correspondence_games ADD COLUMN IF NOT EXISTS mode VARCHAR NOT NULL DEFAULT 'casual'`,
+      sql`ALTER TABLE correspondence_games ADD COLUMN IF NOT EXISTS white_rating_before INTEGER`,
+      sql`ALTER TABLE correspondence_games ADD COLUMN IF NOT EXISTS black_rating_before INTEGER`,
+      sql`ALTER TABLE correspondence_games ADD COLUMN IF NOT EXISTS white_rating_after INTEGER`,
+      sql`ALTER TABLE correspondence_games ADD COLUMN IF NOT EXISTS black_rating_after INTEGER`,
+      sql`ALTER TABLE correspondence_games ADD COLUMN IF NOT EXISTS white_games_id INTEGER`,
+      sql`ALTER TABLE correspondence_games ADD COLUMN IF NOT EXISTS black_games_id INTEGER`,
+      sql`ALTER TABLE correspondence_games ADD COLUMN IF NOT EXISTS draw_offer_from VARCHAR`,
+      sql`ALTER TABLE correspondence_games ADD COLUMN IF NOT EXISTS low_time_notified_at TIMESTAMPTZ`,
+    ]) await db.execute(col);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_correspondence_white_user ON correspondence_games(white_user_id, status)`);
+    // Daily games are people-only now: close any still-running games against
+    // the old automatic daily bot (it never actually moved).
+    await db.execute(sql`UPDATE correspondence_games SET status = 'finished', termination = 'aborted', finished_at = now()
+      WHERE status = 'active' AND (white_is_bot = 1 OR black_is_bot = 1)`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_correspondence_black_user ON correspondence_games(black_user_id, status)`);
+    await db.execute(sql`CREATE TABLE IF NOT EXISTS correspondence_queue (
+      id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id VARCHAR NOT NULL,
+      username VARCHAR NOT NULL,
+      time_control VARCHAR NOT NULL,
+      mode VARCHAR NOT NULL DEFAULT 'casual',
+      rating INTEGER NOT NULL DEFAULT 1200,
+      joined_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )`);
+    await db.execute(sql`ALTER TABLE correspondence_queue ADD COLUMN IF NOT EXISTS mode VARCHAR NOT NULL DEFAULT 'casual'`);
+    await db.execute(sql`ALTER TABLE correspondence_queue ADD COLUMN IF NOT EXISTS rating INTEGER NOT NULL DEFAULT 1200`);
+    await db.execute(sql`CREATE TABLE IF NOT EXISTS game_challenges (
+      code VARCHAR PRIMARY KEY,
+      creator_user_id VARCHAR NOT NULL,
+      creator_username VARCHAR NOT NULL,
+      kind VARCHAR NOT NULL,
+      time_control VARCHAR NOT NULL,
+      mode VARCHAR NOT NULL DEFAULT 'casual',
+      color VARCHAR NOT NULL DEFAULT 'random',
+      status VARCHAR NOT NULL DEFAULT 'open',
+      accepted_by_user_id VARCHAR,
+      accepted_by_username VARCHAR,
+      game_id VARCHAR,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      expires_at TIMESTAMPTZ NOT NULL
+    )`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_game_challenges_creator ON game_challenges(creator_user_id, status)`);
+
     logger.info('Schema migrations complete');
   } catch (err) {
     logger.error({ err }, 'Schema migration failed');
@@ -167,6 +237,7 @@ async function runSchemaMigrations() {
 
 const httpServer = createServer(app);
 attachLiveServer(httpServer);
+startDailySweep();
 httpServer.listen(port, (err?: Error) => {
   if (err) {
     logger.error({ err }, "Error listening on port");

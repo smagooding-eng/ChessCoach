@@ -6,9 +6,10 @@ import type { useLivePlay } from '@/hooks/use-live-play';
 import { Flag, ArrowLeft, Trophy, Clock, Handshake, X, WifiOff, BookOpen } from 'lucide-react';
 import { useLocation } from 'wouter';
 
-const CHESSCOM_GREEN = '#81b64c';
-const TEXT_LIGHT = '#e8e6e3';
-const TEXT_MUTED = '#9e9b98';
+import { PT } from '@/lib/playTheme';
+const CHESSCOM_GREEN = PT.green;
+const TEXT_LIGHT = PT.text;
+const TEXT_MUTED = PT.muted;
 
 function fmtClock(ms: number): string {
   if (ms <= 0) return '0:00';
@@ -27,11 +28,11 @@ function countryToFlag(code?: string): string | null {
   return String.fromCodePoint(A + (cc.charCodeAt(0) - 65), A + (cc.charCodeAt(1) - 65));
 }
 
-function PlayerStrip({ p, ms, active, isYou }: { p: { username: string; rating: number; country?: string; title?: string | null; avatar?: string }; ms: number; active: boolean; isYou: boolean }) {
+function PlayerStrip({ p, ms, active, isYou }: { p: { username: string; rating: number; country?: string; title?: string | null; avatar?: string; isBot?: boolean }; ms: number; active: boolean; isYou: boolean }) {
   const flag = countryToFlag(p.country);
   return (
     <div className="flex items-center justify-between p-2.5 rounded-xl"
-      style={{ background: active ? 'rgba(129,182,76,0.12)' : 'rgba(255,255,255,0.04)', border: active ? `1px solid ${CHESSCOM_GREEN}` : '1px solid rgba(255,255,255,0.06)' }}>
+      style={{ background: active ? PT.greenSoft : 'rgba(255,255,255,0.04)', border: active ? `1px solid ${CHESSCOM_GREEN}` : '1px solid rgba(255,255,255,0.06)' }}>
       <div className="flex items-center gap-2 min-w-0">
         {p.avatar
           ? <img src={p.avatar} alt={p.username} className="w-9 h-9 rounded-full object-cover bg-white/10" style={{ border: '1px solid rgba(255,255,255,0.15)' }} />
@@ -39,6 +40,7 @@ function PlayerStrip({ p, ms, active, isYou }: { p: { username: string; rating: 
         <div className="min-w-0">
           <div className="flex items-center gap-1.5">
             {p.title && <span className="text-[10px] font-black px-1 py-0.5 rounded text-black" style={{ background: 'linear-gradient(135deg,#f5c460,#e5a631)' }}>{p.title}</span>}
+            {p.isBot && <span className="text-[9px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider" style={{ background: 'rgba(255,255,255,0.12)', color: TEXT_LIGHT }}>Bot</span>}
             {flag && <span className="text-sm leading-none" title={p.country ?? undefined} aria-label={p.country ?? undefined}>{flag}</span>}
             {p.country && <span className="text-[10px] uppercase tracking-wider" style={{ color: TEXT_MUTED }}>{p.country}</span>}
             {isYou && <span className="text-[9px] font-black uppercase tracking-[0.14em]" style={{ color: CHESSCOM_GREEN }}>You</span>}
@@ -136,7 +138,7 @@ export function LiveGame({ live, onLeave }: { live: ReturnType<typeof useLivePla
     const myDelta = youAreWhite ? game.ratingDelta?.white : game.ratingDelta?.black;
     return (
       <div className="rounded-2xl p-5 text-center space-y-3"
-        style={{ background: 'linear-gradient(180deg, #383532 0%, #2a2825 100%)', border: `1px solid ${accent}55` }}>
+        style={{ background: PT.card, border: `1px solid ${accent}55` }}>
         <Trophy className="w-8 h-8 mx-auto" style={{ color: accent }} />
         <div>
           <p className="text-xl font-black" style={{ color: TEXT_LIGHT }}>{title}</p>
@@ -152,7 +154,7 @@ export function LiveGame({ live, onLeave }: { live: ReturnType<typeof useLivePla
         <div className="flex justify-center gap-2 pt-2 flex-wrap">
           <button onClick={onLeave}
             className="px-4 py-2 rounded-lg font-black text-xs"
-            style={{ background: `linear-gradient(180deg, #95c45a 0%, ${CHESSCOM_GREEN} 100%)`, color: 'white' }}>
+            style={{ background: CHESSCOM_GREEN, color: PT.onGreen }}>
             Play Again
           </button>
           <button onClick={() => navigate(reviewId ? `/games/${reviewId}` : '/games')}
@@ -187,7 +189,9 @@ export function LiveGame({ live, onLeave }: { live: ReturnType<typeof useLivePla
         </div>
       )}
 
-      <EvalBar fen={game.fen} />
+      {/* Engine evaluation only after the game -- showing it during a game
+          against a real person would be an engine aid. */}
+      {game.status === 'finished' && <EvalBar fen={game.fen} />}
 
       <ChessBoard
         fen={game.fen}

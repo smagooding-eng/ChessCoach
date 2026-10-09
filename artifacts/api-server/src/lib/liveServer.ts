@@ -14,8 +14,9 @@ import { findPersonaForRating, getAllPersonas, type Persona } from './personaPoo
 import { updateRating, DEFAULT_RATING } from './glicko2';
 import { fetchChessComProfile } from './chesscom';
 import { fetchLichessProfile } from './lichess';
-import { usersTable } from '@workspace/db';
-import { eq } from 'drizzle-orm';
+import { usersTable, gameChallengesTable } from '@workspace/db';
+import { eq, and } from 'drizzle-orm';
+import { sendPushToUser } from './pushNotifications';
 
 export type TimeControlId = 'blitz_5_0' | 'blitz_5_3' | 'rapid_10_0' | 'rapid_15_0';
 export type Mode = 'casual' | 'ranked';
@@ -33,7 +34,9 @@ const TIME_CONTROLS: Record<TimeControlId, TimeControlSpec> = {
   rapid_15_0: { id: 'rapid_15_0', initialMs: 15 * 60 * 1000,incrementMs: 0,        label: '15 min' },
 };
 
-const BOT_FALLBACK_MS = 30 * 1000;        // after this, spawn a bot if still queued
+// No automatic bot: after this long in the queue the client offers a clearly
+// labeled bot game (casual only) that the player can choose to start.
+const BOT_OFFER_MS = 20 * 1000;
 const DISCONNECT_GRACE_MS = 30 * 1000;    // opponent disconnect → 30s to reconnect
 const WIDEN_INTERVAL_MS = 2_000;          // periodic match scanner
 const HUMAN_COUNTRIES = [
@@ -48,8 +51,12 @@ interface HumanProfileData { country: string; title: string | null; avatar: stri
 
 function defaultHumanProfile(userId: string, username: string, createdAtIso?: string): HumanProfileData {
   const h = hashStr(userId);
-  const country = HUMAN_COUNTRIES[h % HUMAN_COUNTRIES.length];
-  const title = HUMAN_TITLES[(h >>> 7) % HUMAN_TITLES.length];
+  // Only real data is shown for people: no invented country or title.
+  // (Country/title come from their linked chess.com / Lichess profile when
+  // available; otherwise they're left blank.)
+  const country = '';
+  const title: string | null = null;
+  void HUMAN_COUNTRIES; void HUMAN_TITLES;
   const memberSinceYear = createdAtIso ? new Date(createdAtIso).getFullYear() : (2014 + ((h >>> 13) % 11));
   const avatar = `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(username)}&backgroundType=gradientLinear`;
   return { country, title, avatar, memberSinceYear };
@@ -194,7 +201,6 @@ interface WaitingPlayer {
   tc: TimeControlSpec;
   mode: Mode;
   joinedAt: number;
-  fallbackTimer: ReturnType<typeof setTimeout>;
 }
 
 const games = new Map<string, LiveGame>();
@@ -250,7 +256,7 @@ function gamePublicState(g: LiveGame) {
 }
 
 function publicPlayer(p: Player) {
-  // Identical shape for humans and bots — disguise via uniformity.
+  // Bots are always labeled (isBot) so players know who they're playing.
   return {
     username: p.username,
     rating: Math.round(p.rating),
@@ -258,6 +264,7 @@ function publicPlayer(p: Player) {
     title: p.title,
     avatar: p.avatar,
     memberSinceYear: p.memberSinceYear,
+    isBot: p.kind === 'bot',
   };
 }
 
@@ -269,7 +276,7 @@ function rowsOf<T>(res: unknown): T[] {
 }
 
 interface RatingRow { rating: number | string; rd: number | string; vol: number | string; games_played: number | string }
-async function loadUserRating(userId: string, tc: TimeControlId): Promise<{ rating: number; rd: number; vol: number; gamesPlayed: number }> {
+export async function loadUserRating(userId: string, tc: TimeControlId | string): Promise<{ rating: number; rd: number; vol: number; gamesPlayed: number }> {
   const res = await db.execute(sql`SELECT rating, rd, vol, games_played FROM user_live_ratings WHERE user_id = ${userId} AND time_control = ${tc}`);
   const rows = rowsOf<RatingRow>(res);
   if (rows.length > 0) {
@@ -279,7 +286,7 @@ async function loadUserRating(userId: string, tc: TimeControlId): Promise<{ rati
   return { ...DEFAULT_RATING, gamesPlayed: 0 };
 }
 
-async function saveUserRating(userId: string, tc: TimeControlId, rating: number, rd: number, vol: number, gamesPlayedDelta: number) {
+export async function saveUserRating(userId: string, tc: TimeControlId | string, rating: number, rd: number, vol: number, gamesPlayedDelta: number) {
   await db.execute(sql`
     INSERT INTO user_live_ratings (user_id, time_control, rating, rd, vol, games_played, updated_at)
     VALUES (${userId}, ${tc}, ${rating}, ${rd}, ${vol}, ${gamesPlayedDelta}, now())
@@ -290,7 +297,7 @@ async function saveUserRating(userId: string, tc: TimeControlId, rating: number,
   `);
 }
 
-async function seedRatingFromImports(userId: string, tc: TimeControlId): Promise<{ rating: number; rd: number; vol: number; gamesPlayed: number }> {
+export async function seedRatingFromImports(userId: string, tc: TimeControlId | string): Promise<{ rating: number; rd: number; vol: number; gamesPlayed: number }> {
   const existing = await loadUserRating(userId, tc);
   if (existing.gamesPlayed > 0 || existing.rating !== DEFAULT_RATING.rating) return existing;
   try {
@@ -473,6 +480,9 @@ function finishGame(g: LiveGame, result: 'white' | 'black' | 'draw', termination
 
   if (g.white.kind === 'human' && g.white.userId) userActiveGame.delete(g.white.userId);
   if (g.black.kind === 'human' && g.black.userId) userActiveGame.delete(g.black.userId);
+  for (const p of [g.white, g.black]) {
+    if (p.kind === 'human' && p.userId) void startPendingForCreator(p.userId).catch(() => {});
+  }
 
   setTimeout(() => {
     games.delete(g.id);
@@ -594,9 +604,11 @@ function tryMatchInQueue(key: string) {
   const sorted = [...queue].sort((a, b) => a.joinedAt - b.joinedAt);
   for (let i = 0; i < sorted.length; i++) {
     const a = sorted[i];
+    if (userActiveGame.has(a.userId)) continue;
     const aWin = matchWindowFor(a.joinedAt);
     for (let j = i + 1; j < sorted.length; j++) {
       const b = sorted[j];
+      if (userActiveGame.has(b.userId)) continue;
       const bWin = matchWindowFor(b.joinedAt);
       const window = Math.max(aWin, bWin);
       if (Math.abs(a.rating - b.rating) <= window) {
@@ -607,8 +619,6 @@ function tryMatchInQueue(key: string) {
         // Remove highest index first
         if (idxA > idxB) { queue.splice(idxA, 1); queue.splice(idxB, 1); }
         else { queue.splice(idxB, 1); queue.splice(idxA, 1); }
-        clearTimeout(a.fallbackTimer);
-        clearTimeout(b.fallbackTimer);
         void startHumanMatch(a, b);
         return;
       }
@@ -655,9 +665,8 @@ async function joinQueue(ws: WebSocket, userId: string, username: string, tcId: 
 
   const key = queueKey(tcId, mode);
   const queue = queues.get(key)!;
-  const fallbackTimer = setTimeout(() => spawnBotMatch(userId, username, myRating, tcId, mode), BOT_FALLBACK_MS);
-  queue.push({ userId, username, rating: myRating, ws, tc, mode, joinedAt: Date.now(), fallbackTimer });
-  send(ws, { type: 'queued', tcId, mode, eta: BOT_FALLBACK_MS });
+  queue.push({ userId, username, rating: myRating, ws, tc, mode, joinedAt: Date.now() });
+  send(ws, { type: 'queued', tcId, mode, botOfferMs: BOT_OFFER_MS });
   // Try immediate match
   tryMatchInQueue(key);
 }
@@ -665,23 +674,23 @@ async function joinQueue(ws: WebSocket, userId: string, username: string, tcId: 
 function cancelQueue(userId: string) {
   for (const list of queues.values()) {
     const idx = list.findIndex(w => w.userId === userId);
-    if (idx >= 0) {
-      clearTimeout(list[idx].fallbackTimer);
-      list.splice(idx, 1);
-    }
+    if (idx >= 0) list.splice(idx, 1);
   }
 }
 
 // Track the last bot persona served per user so they don't see the same one twice in a row.
 const userLastPersona = new Map<string, string>();
 
-async function spawnBotMatch(userId: string, username: string, userRating: number, tcId: TimeControlId, mode: Mode) {
-  const queue = queues.get(queueKey(tcId, mode))!;
-  const idx = queue.findIndex(w => w.userId === userId);
-  if (idx < 0) return;
-  const waiter = queue.splice(idx, 1)[0];
-  clearTimeout(waiter.fallbackTimer);
+// Player chose "play a bot" (offered after BOT_OFFER_MS in the queue).
+// The bot is labeled as a bot everywhere and the game is always casual, so
+// it never affects anyone's rating.
+async function spawnBotMatch(ws: WebSocket, userId: string, username: string, tcId: TimeControlId) {
+  cancelQueue(userId);
   const tc = TIME_CONTROLS[tcId];
+  if (!tc) { send(ws, { type: 'error', message: 'Invalid time control' }); return; }
+  if (userActiveGame.has(userId)) return;
+  const seed = await seedRatingFromImports(userId, tcId);
+  const userRating = seed.rating;
   const targetRating = Math.max(600, Math.min(2200, userRating + (Math.random() * 200 - 100)));
   const exclude = new Set<string>();
   const last = userLastPersona.get(userId);
@@ -690,15 +699,109 @@ async function spawnBotMatch(userId: string, username: string, userRating: numbe
   userLastPersona.set(userId, persona.id);
   const userProfile = await resolveHumanProfile(userId, username);
   const userPlayer: Player = { kind: 'human', userId, username, rating: userRating, ...userProfile };
+  const botRating = Math.round(persona.rating);
   const botPlayer: Player = {
-    kind: 'bot', username: persona.username, rating: persona.rating,
-    country: persona.country, title: persona.title, avatar: persona.avatar,
-    memberSinceYear: persona.memberSinceYear, personaId: persona.id,
+    kind: 'bot', username: `ChessScout Bot (${botRating})`, rating: botRating,
+    country: '', title: null,
+    avatar: `https://api.dicebear.com/7.x/bottts-neutral/svg?seed=${encodeURIComponent(persona.id)}`,
+    memberSinceYear: new Date().getFullYear(), personaId: persona.id,
   };
   const userIsWhite = Math.random() < 0.5;
-  const game = await createGame(userIsWhite ? userPlayer : botPlayer, userIsWhite ? botPlayer : userPlayer, tc, mode);
-  subscribeWs(waiter.ws, game.id);
-  send(waiter.ws, { type: 'match_found', state: gamePublicState(game), color: userIsWhite ? 'w' : 'b' });
+  const game = await createGame(userIsWhite ? userPlayer : botPlayer, userIsWhite ? botPlayer : userPlayer, tc, 'casual');
+  subscribeWs(ws, game.id);
+  send(ws, { type: 'match_found', state: gamePublicState(game), color: userIsWhite ? 'w' : 'b' });
+}
+
+// ── Challenge links (live) ─────────────────────────────────────────────────
+// A friend opens /challenge/<code> and accepts. If the creator has the app
+// open the game starts straight away; if not, they get a push notification
+// and the game starts the moment they open Live play (the friend waits on a
+// "waiting for <name>" screen meanwhile).
+interface PendingChallenge { code: string; creatorUserId: string; acceptorUserId: string; acceptorUsername: string; acceptorWs: WebSocket }
+const pendingChallenges = new Map<string, PendingChallenge>(); // code -> waiting acceptor
+
+async function startChallengeGame(code: string): Promise<boolean> {
+  const pending = pendingChallenges.get(code);
+  if (!pending) return false;
+  const creatorSockets = userSockets.get(pending.creatorUserId);
+  if (!creatorSockets || creatorSockets.size === 0) return false;
+  if (pending.acceptorWs.readyState !== WebSocket.OPEN) { pendingChallenges.delete(code); return false; }
+  if (userActiveGame.has(pending.creatorUserId) || userActiveGame.has(pending.acceptorUserId)) return false;
+  // Claim it before any await so two callers can't both start it.
+  pendingChallenges.delete(code);
+  const [ch] = await db.select().from(gameChallengesTable).where(eq(gameChallengesTable.code, code));
+  const tc = ch ? TIME_CONTROLS[ch.timeControl as TimeControlId] : undefined;
+  if (!ch || !tc || ch.gameId) return false;
+  cancelQueue(pending.creatorUserId);
+  cancelQueue(pending.acceptorUserId);
+
+  const mode: Mode = ch.mode === 'ranked' ? 'ranked' : 'casual';
+  const [cr, ar] = await Promise.all([
+    seedRatingFromImports(pending.creatorUserId, tc.id),
+    seedRatingFromImports(pending.acceptorUserId, tc.id),
+  ]);
+  const [cp, ap] = await Promise.all([
+    resolveHumanProfile(pending.creatorUserId, ch.creatorUsername),
+    resolveHumanProfile(pending.acceptorUserId, pending.acceptorUsername),
+  ]);
+  const creator: Player = { kind: 'human', userId: pending.creatorUserId, username: ch.creatorUsername, rating: cr.rating, ...cp };
+  const acceptor: Player = { kind: 'human', userId: pending.acceptorUserId, username: pending.acceptorUsername, rating: ar.rating, ...ap };
+  const creatorWhite = ch.color === 'white' ? true : ch.color === 'black' ? false : Math.random() < 0.5;
+  const game = await createGame(creatorWhite ? creator : acceptor, creatorWhite ? acceptor : creator, tc, mode);
+  await db.update(gameChallengesTable).set({ gameId: game.id, status: 'started' }).where(eq(gameChallengesTable.code, code));
+
+  for (const cws of creatorSockets) {
+    subscribeWs(cws, game.id);
+    send(cws, { type: 'match_found', state: gamePublicState(game), color: creatorWhite ? 'w' : 'b' });
+  }
+  subscribeWs(pending.acceptorWs, game.id);
+  send(pending.acceptorWs, { type: 'match_found', state: gamePublicState(game), color: creatorWhite ? 'b' : 'w' });
+  return true;
+}
+
+async function acceptLiveChallenge(ws: WebSocket, userId: string, username: string, code: string) {
+  const [ch] = await db.select().from(gameChallengesTable).where(eq(gameChallengesTable.code, String(code)));
+  if (!ch || ch.kind !== 'live') return send(ws, { type: 'error', message: 'Challenge not found' });
+  if (ch.creatorUserId === userId) return send(ws, { type: 'error', message: "That's your own challenge — send the link to a friend." });
+  if (new Date(ch.expiresAt).getTime() < Date.now()) return send(ws, { type: 'error', message: 'This challenge has expired' });
+  if (ch.status === 'cancelled') return send(ws, { type: 'error', message: 'This challenge was cancelled' });
+  if (ch.status === 'started' || ch.gameId) return send(ws, { type: 'error', message: 'This challenge has already been played' });
+  if (ch.status === 'accepted' && ch.acceptedByUserId !== userId) return send(ws, { type: 'error', message: 'Someone already accepted this challenge' });
+  if (userActiveGame.has(userId)) return send(ws, { type: 'error', message: 'Finish your current game first' });
+
+  const claimed = await db.update(gameChallengesTable).set({ status: 'accepted', acceptedByUserId: userId, acceptedByUsername: username })
+    .where(and(eq(gameChallengesTable.code, ch.code), eq(gameChallengesTable.status, ch.status)))
+    .returning({ code: gameChallengesTable.code });
+  if (claimed.length === 0) return send(ws, { type: 'error', message: 'Someone already accepted this challenge' });
+  pendingChallenges.set(ch.code, { code: ch.code, creatorUserId: ch.creatorUserId, acceptorUserId: userId, acceptorUsername: username, acceptorWs: ws });
+  cancelQueue(userId);
+
+  if (await startChallengeGame(ch.code)) return;
+  // Creator isn't online -- tell them, and let the friend wait.
+  send(ws, { type: 'challenge_waiting', code: ch.code, creator: ch.creatorUsername });
+  sendPushToUser(ch.creatorUserId, {
+    title: 'Challenge accepted',
+    body: `${username} accepted your ${TIME_CONTROLS[ch.timeControl as TimeControlId]?.label ?? ''} challenge and is waiting. Tap to play.`,
+    url: '/live',
+  }).catch(err => logger.warn({ err }, 'challenge accepted push failed'));
+}
+
+function dropPendingForSocket(ws: WebSocket) {
+  for (const [code, p] of pendingChallenges) {
+    if (p.acceptorWs === ws) {
+      pendingChallenges.delete(code);
+      // reopen so the link works again
+      void db.update(gameChallengesTable).set({ status: 'open', acceptedByUserId: null, acceptedByUsername: null })
+        .where(and(eq(gameChallengesTable.code, code), eq(gameChallengesTable.status, 'accepted')))
+        .catch(() => {});
+    }
+  }
+}
+
+async function startPendingForCreator(userId: string) {
+  for (const p of pendingChallenges.values()) {
+    if (p.creatorUserId === userId) await startChallengeGame(p.code);
+  }
 }
 
 function subscribeWs(ws: WebSocket, gameId: string) {
@@ -810,6 +913,7 @@ function handleSubscribe(ws: WebSocket, gameId: string) {
 }
 
 function handleSocketClose(ws: WebSocket) {
+  dropPendingForSocket(ws);
   const info = wsUser.get(ws);
   if (info) {
     const set = userSockets.get(info.userId);
@@ -906,6 +1010,7 @@ export function attachLiveServer(server: HttpServer) {
     const info = wsUser.get(ws);
     if (!info) { ws.close(); return; }
     send(ws, { type: 'hello', username: info.username });
+    void startPendingForCreator(info.userId).catch(err => logger.warn({ err }, 'start pending challenge failed'));
 
     ws.on('message', async (raw) => {
       let msg: any;
@@ -917,7 +1022,14 @@ export function attachLiveServer(server: HttpServer) {
             break;
           case 'cancel':
             cancelQueue(info.userId);
+            dropPendingForSocket(ws);
             send(ws, { type: 'queue_cancelled' });
+            break;
+          case 'play_bot':
+            await spawnBotMatch(ws, info.userId, info.username, msg.timeControl);
+            break;
+          case 'accept_challenge':
+            await acceptLiveChallenge(ws, info.userId, info.username, msg.code);
             break;
           case 'move':
             handleMove(ws, info.userId, msg.gameId, msg.san);

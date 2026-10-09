@@ -12,6 +12,7 @@ import { pgTable, varchar, integer, text, timestamp, index } from "drizzle-orm/p
 export const correspondenceGamesTable = pgTable("correspondence_games", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   timeControl: varchar("time_control").notNull(), // 'corr_1d' | 'corr_3d' | 'corr_7d'
+  mode: varchar("mode").notNull().default("casual"), // 'casual' | 'ranked'
   whiteUserId: varchar("white_user_id").notNull(),
   blackUserId: varchar("black_user_id").notNull(),
   whiteUsername: varchar("white_username").notNull(),
@@ -36,6 +37,17 @@ export const correspondenceGamesTable = pgTable("correspondence_games", {
   termination: varchar("termination"), // 'checkmate' | 'stalemate' | 'draw_50' | 'resignation' | 'timeout', set on finish
   startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
   finishedAt: timestamp("finished_at", { withTimezone: true }),
+  // Ranked games: each side's daily rating before/after (null for casual).
+  whiteRatingBefore: integer("white_rating_before"),
+  blackRatingBefore: integer("black_rating_before"),
+  whiteRatingAfter: integer("white_rating_after"),
+  blackRatingAfter: integer("black_rating_after"),
+  // Rows written into the main games table when the game ends, so it shows
+  // in Games / Analysis like any imported game.
+  whiteGamesId: integer("white_games_id"),
+  blackGamesId: integer("black_games_id"),
+  drawOfferFrom: varchar("draw_offer_from"), // 'white' | 'black' while an offer stands
+  lowTimeNotifiedAt: timestamp("low_time_notified_at", { withTimezone: true }),
 }, (table) => [
   index("idx_correspondence_white_user").on(table.whiteUserId, table.status),
   index("idx_correspondence_black_user").on(table.blackUserId, table.status),
@@ -47,13 +59,36 @@ export const correspondenceGamesTable = pgTable("correspondence_games", {
 // player waits. No lobby, no browsing -- purely a first-come-first-served
 // pairing table, matched automatically the next time someone else at the
 // same time control tries to start a game, or by a bot fallback after
-// it's sat long enough (checked lazily on read, not by a background job).
+// (No bot fallback: daily games are fine to wait for a real opponent; the
+// player gets a push notification when one is found.)
 export const correspondenceQueueTable = pgTable("correspondence_queue", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull(),
   username: varchar("username").notNull(),
   timeControl: varchar("time_control").notNull(),
+  mode: varchar("mode").notNull().default("casual"),
+  rating: integer("rating").notNull().default(1200),
   joinedAt: timestamp("joined_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+// "Challenge a friend" links, for live and daily games. The creator gets a
+// short code to share; whoever opens it and accepts plays them.
+export const gameChallengesTable = pgTable("game_challenges", {
+  code: varchar("code").primaryKey(),
+  creatorUserId: varchar("creator_user_id").notNull(),
+  creatorUsername: varchar("creator_username").notNull(),
+  kind: varchar("kind").notNull(), // 'live' | 'daily'
+  timeControl: varchar("time_control").notNull(),
+  mode: varchar("mode").notNull().default("casual"),
+  color: varchar("color").notNull().default("random"), // creator's colour: 'random' | 'white' | 'black'
+  status: varchar("status").notNull().default("open"), // 'open' | 'accepted' | 'cancelled'
+  acceptedByUserId: varchar("accepted_by_user_id"),
+  acceptedByUsername: varchar("accepted_by_username"),
+  gameId: varchar("game_id"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+});
+
+export type GameChallenge = typeof gameChallengesTable.$inferSelect;
 
 export type CorrespondenceGame = typeof correspondenceGamesTable.$inferSelect;

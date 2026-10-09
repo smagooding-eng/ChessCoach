@@ -175,6 +175,9 @@ const ScanPosition = lazyRetry(() => import("@/pages/ScanPosition").then(m => ({
 const Admin = lazyRetry(() => import("@/pages/Admin").then(m => ({ default: m.Admin })));
 const Welcome = lazyRetry(() => import("@/pages/Welcome").then(m => ({ default: m.Welcome })));
 const NotFound = lazyRetry(() => import("@/pages/not-found"));
+const DailyGames = lazyRetry(() => import("@/pages/DailyGames").then(m => ({ default: m.DailyGames })));
+const DailyGame = lazyRetry(() => import("@/pages/DailyGame").then(m => ({ default: m.DailyGame })));
+const ChallengePage = lazyRetry(() => import("@/pages/Challenge").then(m => ({ default: m.Challenge })));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -254,13 +257,15 @@ const POpponents     = () => <ProtectedRoute component={OpponentAnalysis} />;
 const PPracticeBots  = () => <ProtectedRoute component={PracticeBots} />;
 const PLocalPlay     = () => <ProtectedRoute component={PlayRouter} />;
 const PLocalBoard    = () => <ProtectedRoute component={LocalPlay} />;
-const PLivePlay      = () => <ProtectedRoute component={LivePlay} requireAdmin />;
+const PLivePlay      = () => <ProtectedRoute component={LivePlay} />;
+const PDailyGames    = () => <ProtectedRoute component={DailyGames} />;
+const PDailyGame     = () => <ProtectedRoute component={DailyGame} />;
 const PTraps         = () => <ProtectedRoute component={TrapsPage} />;
 const PTrapTraining  = () => <ProtectedRoute component={TrapTrainingPage} />;
 const PBeginnerCourses = () => <ProtectedRoute component={BeginnerCoursesPage} requireAdmin />;
 const PBeginnerCourseDetail = () => <ProtectedRoute component={BeginnerCourseDetailPage} requireAdmin />;
 const PBeginnerLesson = () => <ProtectedRoute component={BeginnerLessonPage} requireAdmin />;
-const PLiveHistory   = () => <ProtectedRoute component={LiveHistory} fallbackNav="/live" requireAdmin />;
+const PLiveHistory   = () => <ProtectedRoute component={LiveHistory} fallbackNav="/live" />;
 const PGameLookup    = () => <ProtectedRoute component={GameLookup} />;
 const PSubscription  = () => <ProtectedRoute component={Subscription} />;
 const PProfile       = () => <ProtectedRoute component={Profile} />;
@@ -333,6 +338,7 @@ function Router() {
       <Route path="/settings" component={SettingsPage} />
       <Route path="/scan-archive" component={ScanArchivePage} />
       <Route path="/privacy" component={PrivacyPage} />
+      <Route path="/challenge/:code" component={ChallengePage} />
       <Route path="/raffle" component={RafflePage} />
       <Route path="/raffle-rules" component={RaffleRulesPage} />
       <Route path="/affiliate" component={AffiliatePage} />
@@ -361,6 +367,9 @@ function Router() {
       <Route path="/play"            component={PLocalPlay} />
       <Route path="/play/local"      component={PLocalBoard} />
       <Route path="/live"            component={PLivePlay} />
+      <Route path="/daily"           component={PDailyGames} />
+      <Route path="/daily/:id"       component={PDailyGame} />
+      <Route path="/correspondence/:id" component={PDailyGame} />
       <Route path="/traps/:id" component={PTrapTraining} />
 <Route path="/admin/beginner-courses/:id" component={PBeginnerCourseDetail} />
 <Route path="/admin/beginner-courses" component={PBeginnerCourses} />
