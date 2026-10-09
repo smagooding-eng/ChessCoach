@@ -47,7 +47,8 @@ export async function notifyUser(userId: string, n: NotifyInput): Promise<void> 
       VALUES (${userId}, ${n.title}, ${n.body}, ${n.url ?? null}, ${n.kind ?? "general"})
       RETURNING id, created_at
     `);
-    const r = (Array.isArray(rows) ? rows : (rows as { rows?: { id: string }[] }).rows ?? [])[0] as { id: string } | undefined;
+    const list: unknown[] = Array.isArray(rows) ? rows : ((rows as unknown as { rows?: unknown[] }).rows ?? []);
+    const r = list[0] as { id: string } | undefined;
     id = r?.id ?? null;
   } catch (err) {
     logger.warn({ err, userId }, "[notify] save failed");
