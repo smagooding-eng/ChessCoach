@@ -962,20 +962,33 @@ function parseCookie(req: IncomingMessage): Record<string, string> {
 export function attachLiveServer(server: HttpServer) {
   const wss = new WebSocketServer({ noServer: true });
 
+  // Hosts allowed to open the live-play WebSocket. Accepts entries written
+  // either as bare hosts ("chessscout.net") or full URLs
+  // ("https://chessscout.net/") -- previously only bare hosts matched, so a
+  // full URL in LIVE_WS_ALLOWED_ORIGINS silently blocked every connection.
+  // The frontend's CORS_ORIGIN and the ChessScout domains are always allowed.
+  const toHost = (v: string): string | null => {
+    const t = v.trim().replace(/\/+$/, '');
+    if (!t) return null;
+    try { return t.includes('://') ? new URL(t).host : t.toLowerCase(); } catch { return null; }
+  };
+  const allowedHosts = new Set<string>(['chessscout.net', 'www.chessscout.net']);
+  for (const src of [process.env.LIVE_WS_ALLOWED_ORIGINS, process.env.CORS_ORIGIN]) {
+    if (!src) continue;
+    for (const part of src.split(',')) { const h = toHost(part); if (h) allowedHosts.add(h.toLowerCase()); }
+  }
+
   function isOriginAllowed(origin: string | undefined): boolean {
     if (!origin) return false;
     let host: string;
-    try { host = new URL(origin).host; } catch { return false; }
-    const allow = new Set<string>();
-    const allowed = process.env.LIVE_WS_ALLOWED_ORIGINS;
-    if (allowed) for (const d of allowed.split(',')) allow.add(d.trim());
+    try { host = new URL(origin).host.toLowerCase(); } catch { return false; }
     // Same-origin loopback only in dev.
     if (process.env.NODE_ENV !== 'production') {
       if (host === 'localhost' || host.startsWith('localhost:')) return true;
       if (host === '127.0.0.1' || host.startsWith('127.0.0.1:')) return true;
       if (host === '0.0.0.0' || host.startsWith('0.0.0.0:')) return true;
     }
-    return allow.has(host);
+    return allowedHosts.has(host);
   }
 
   server.on('upgrade', async (req, socket, head) => {
@@ -983,6 +996,7 @@ export function attachLiveServer(server: HttpServer) {
     if (!url.startsWith('/api/live/ws')) return;
     const origin = req.headers.origin as string | undefined;
     if (!isOriginAllowed(origin)) {
+      logger.warn({ origin, allowed: [...allowedHosts] }, 'live ws: origin not allowed');
       socket.write('HTTP/1.1 403 Forbidden\r\n\r\n'); socket.destroy(); return;
     }
     let session: Awaited<ReturnType<typeof getSession>> = null;
@@ -998,6 +1012,7 @@ export function attachLiveServer(server: HttpServer) {
       if (sid) session = await getSession(sid);
     } catch {}
     if (!session?.user?.id) {
+      logger.warn({ origin }, 'live ws: not signed in (no session cookie or token)');
       socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n'); socket.destroy(); return;
     }
     const userInfo: { userId: string; username: string } = {

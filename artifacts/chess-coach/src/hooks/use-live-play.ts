@@ -204,7 +204,7 @@ export function useLivePlay() {
         }
       }
     };
-    ws.onerror = () => { setError('Connection error'); };
+    ws.onerror = () => { setError("Couldn't connect to live play — retrying…"); };
   }, []);
 
   useEffect(() => {
