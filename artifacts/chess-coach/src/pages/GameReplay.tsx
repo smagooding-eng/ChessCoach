@@ -1096,8 +1096,12 @@ export function GameReplay() {
               doesn't shift up/down when navigating between bad and good moves. */}
           <div
             ref={boardAnchorRef}
-            className={`scroll-mt-16 mx-auto w-full ${redesign ? '' : 'max-w-[min(100%,52dvh)]'} md:max-w-[min(100%,55dvh)] xl:max-w-none order-[-3] xl:order-none`}
-            style={redesign ? { maxWidth: 'min(100%, max(220px, calc(100dvh - 520px)))' } : undefined}
+            className={`scroll-mt-16 mx-auto w-full ${redesign ? '[--bw:calc(100dvh-520px)] md:[--bw:calc(100dvh-290px)]' : 'max-w-[min(100%,52dvh)] md:max-w-[min(100%,55dvh)] xl:max-w-none'} order-[-3] xl:order-none`}
+            // Phones reserve room under the board for the coach card; on
+            // desktop the move list and coach sit beside it, so the board only
+            // gives up room for the header and the controls row (was the phone
+            // formula everywhere, which shrank it to ~220px on laptop screens).
+            style={redesign ? { maxWidth: 'min(100%, max(260px, var(--bw)))' } : undefined}
           >
             {isBad && currentReview && currentMove > 0 && !practiceMode ? (
               (() => {
@@ -1121,7 +1125,7 @@ export function GameReplay() {
                 );
               })()
             ) : (
-              <div className="max-w-[520px] mx-auto space-y-1.5 md:space-y-2">
+              <div className="max-w-[520px] xl:max-w-[680px] mx-auto space-y-1.5 md:space-y-2">
                 {/* Invisible spacer matching MistakeFixView's tab toggle height
                     so the board occupies the same vertical position whether or
                     not the move is classified as bad. */}

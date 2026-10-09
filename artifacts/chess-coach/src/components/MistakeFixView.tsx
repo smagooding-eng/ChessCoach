@@ -187,7 +187,7 @@ export function MistakeFixView({
   const goNext = () => onSlideChange(1);
 
   return (
-    <div className="space-y-1.5 md:space-y-2 max-w-[520px] mx-auto">
+    <div className="space-y-1.5 md:space-y-2 max-w-[520px] xl:max-w-[680px] mx-auto">
       {/* Tab toggle */}
       <div role="tablist" aria-label="Compare your move with the engine" className="flex items-stretch gap-1 p-1 rounded-lg bg-white/5 border border-white/10">
         {slides.map((s, idx) => {
