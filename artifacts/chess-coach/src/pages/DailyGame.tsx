@@ -160,8 +160,38 @@ export function DailyGame() {
     );
   })();
 
+  // Draw offers, errors and actions: left of the board on desktop, under it on phones.
+  const messages = (
+    <>
+      {theyOffered && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl p-3" style={{ background: PT.greenSoft, border: `1px solid ${PT.greenLine}` }}>
+          <span className="text-[13.5px] font-bold" style={{ color: PT.text }}>{opp} offered a draw.</span>
+          <div className="flex gap-2">
+            <button onClick={() => post('draw-accept')} disabled={sending} className="rounded-lg px-3 py-1.5 text-[12px] font-extrabold" style={greenBtn}>Accept</button>
+            <button onClick={() => post('draw-decline')} disabled={sending} className="rounded-lg px-3 py-1.5 text-[12px] font-extrabold" style={ghostBtn}>Decline</button>
+          </div>
+        </div>
+      )}
+      {iOffered && <p className="text-center text-[12px]" style={{ color: PT.muted }}>Draw offer sent — waiting for {opp}.</p>}
+
+      {error && <p className="text-center text-[13px]" style={{ color: PT.red }}>{error}</p>}
+
+      {game.status === 'active' && (
+        <div className="flex flex-wrap justify-end gap-2 lg:justify-start">
+          <button onClick={() => post('draw-offer')} disabled={sending || !!iOffered || !!theyOffered} className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-[12px] font-bold disabled:opacity-50" style={ghostBtn}>
+            <Handshake size={14} /> Offer draw
+          </button>
+          <button onClick={() => { if (confirm('Resign this game?')) void post('resign'); }} disabled={sending} className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-[12px] font-bold" style={{ background: 'rgba(220,67,67,0.25)', color: PT.text, border: '1px solid rgba(220,67,67,0.5)' }}>
+            <Flag size={14} /> Resign
+          </button>
+        </div>
+      )}
+
+    </>
+  );
+
   return (
-    <div className="mx-auto max-w-[620px] space-y-3 p-4 md:p-0 pb-24">
+    <div className="mx-auto max-w-[620px] lg:max-w-[1080px] space-y-3 p-4 md:p-0 pb-24">
       <div className="flex items-center justify-between gap-3">
         <Link href="/daily" className="inline-flex items-center gap-1.5 text-sm" style={{ color: PT.muted }}><ArrowLeft size={16} /> Daily games</Link>
         <span className="text-[12px] font-bold" style={{ color: PT.muted }}>{dailyTcLabel(game.timeControl)} per move · {game.mode === 'ranked' ? 'Ranked' : 'Casual'}</span>
@@ -185,6 +215,14 @@ export function DailyGame() {
         }}
         lastMove={lastMove}
         moveQuality={null}
+        sidePanel={{
+          left: <div className="space-y-3">{messages}</div>,
+          clocks: {
+            top: { name: opp, text: game.status === 'active' && !myTurn ? formatLeft(left) : '—', active: game.status === 'active' && !myTurn, low: !myTurn && left < 3_600_000 },
+            bottom: { name: 'You', text: myTurn ? formatLeft(left) : '—', active: myTurn, low: myTurn && left < 3_600_000 },
+          },
+          status: game.status !== 'active' ? 'Game over' : myTurn ? 'Your move' : `Waiting for ${opp}`,
+        }}
       />
 
       <MaterialStrip fen={game.fen} color={white ? 'w' : 'b'} className="px-1" />
@@ -196,29 +234,7 @@ export function DailyGame() {
         </p>
       )}
 
-      {theyOffered && (
-        <div className="flex items-center justify-between gap-3 rounded-xl p-3" style={{ background: PT.greenSoft, border: `1px solid ${PT.greenLine}` }}>
-          <span className="text-[13.5px] font-bold" style={{ color: PT.text }}>{opp} offered a draw.</span>
-          <div className="flex gap-2">
-            <button onClick={() => post('draw-accept')} disabled={sending} className="rounded-lg px-3 py-1.5 text-[12px] font-extrabold" style={greenBtn}>Accept</button>
-            <button onClick={() => post('draw-decline')} disabled={sending} className="rounded-lg px-3 py-1.5 text-[12px] font-extrabold" style={ghostBtn}>Decline</button>
-          </div>
-        </div>
-      )}
-      {iOffered && <p className="text-center text-[12px]" style={{ color: PT.muted }}>Draw offer sent — waiting for {opp}.</p>}
-
-      {error && <p className="text-center text-[13px]" style={{ color: PT.red }}>{error}</p>}
-
-      {game.status === 'active' && (
-        <div className="flex justify-end gap-2">
-          <button onClick={() => post('draw-offer')} disabled={sending || !!iOffered || !!theyOffered} className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-[12px] font-bold disabled:opacity-50" style={ghostBtn}>
-            <Handshake size={14} /> Offer draw
-          </button>
-          <button onClick={() => { if (confirm('Resign this game?')) void post('resign'); }} disabled={sending} className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-[12px] font-bold" style={{ background: 'rgba(220,67,67,0.25)', color: PT.text, border: '1px solid rgba(220,67,67,0.5)' }}>
-            <Flag size={14} /> Resign
-          </button>
-        </div>
-      )}
+      <div className="space-y-3 lg:hidden">{messages}</div>
 
       {result}
 

@@ -129,7 +129,18 @@ interface ChessBoardProps {
   /** Keep the confirm-bar's space under the board even when no move is
    *  staged, so the page doesn't shift every time it appears/disappears. */
   reserveConfirmSpace?: boolean;
+  /** Desktop (lg+) layout: a chess-clock column on the right of the board
+   *  holding both clocks and the Confirm / Cancel paddles, and a panel on the
+   *  left for game messages (draw offers etc.). Phones keep the normal layout. */
+  sidePanel?: {
+    left?: React.ReactNode;
+    clocks?: { top: ClockFace; bottom: ClockFace };
+    /** Shown in the middle of the clock when no move is waiting to be confirmed. */
+    status?: string;
+  };
 }
+
+export interface ClockFace { name?: string; text: string; active: boolean; low?: boolean }
 
 export function ChessBoard({
   fen,
@@ -147,6 +158,7 @@ export function ChessBoard({
   maxWidthOverride,
   suppressConfirmMoves = false,
   reserveConfirmSpace = false,
+  sidePanel,
 }: ChessBoardProps) {
   const { confirmMoves, boardColors, boardTextureCss, showCoordinates, showLegalMoves, pieceColors, pieceShape, pieceStyle, soundEnabled, promotionChoice, boardMaxWidth: settingsMaxWidth } = useSettings();
   const boardMaxWidth = maxWidthOverride ?? settingsMaxWidth;
@@ -514,8 +526,8 @@ export function ChessBoard({
 
   const boardKeyRef = useRef(0);
 
-  return (
-    <div className="relative w-full mx-auto" style={{ maxWidth: boardMaxWidth }}>
+  const boardEl = (
+    <div className={`relative w-full mx-auto ${sidePanel ? 'lg:mx-0 lg:min-w-0 lg:flex-1' : ''}`} style={{ maxWidth: boardMaxWidth }}>
       {/* Static gradient presets (Shaded/3D Wood/3D Marble/Chrome/Gold/
           Copper/Obsidian/Ivory) now live in the shared PieceGradientDefs
           component so every board can use them, not just this one -- see
@@ -619,14 +631,14 @@ export function ChessBoard({
       )}
 
       {!pendingMove && !promotionPending && reserveConfirmSpace && confirmMoves && !suppressConfirmMoves && (
-        <div aria-hidden className="mt-3 h-14" />
+        <div aria-hidden className={`mt-3 h-14 ${sidePanel ? 'lg:hidden' : ''}`} />
       )}
       {pendingMove && (
         // The chess-clock bar: left paddle cancels the staged move, right
         // paddle plays it. (The left half used to be a dead "MOVE" label that
         // still submitted the move, with a separate X to cancel.)
         <div
-          className="relative mt-3 flex h-14 overflow-hidden rounded-xl"
+          className={`relative mt-3 flex h-14 overflow-hidden rounded-xl ${sidePanel ? 'lg:hidden' : ''}`}
           style={{
             boxShadow: '0 4px 0 #2a2a2a, 0 8px 16px rgba(0,0,0,0.4)',
             border: '1px solid rgba(0,0,0,0.25)',
@@ -677,6 +689,59 @@ export function ChessBoard({
         />
         </div>
       )}
+    </div>
+  );
+
+  if (!sidePanel) return boardEl;
+
+  const clocks = sidePanel.clocks;
+  const Face = ({ f }: { f: ClockFace }) => (
+    <div className="rounded-xl px-3 py-3 text-center" style={{
+      background: f.active ? 'linear-gradient(180deg, #f4f1ea 0%, #d9d4c7 100%)' : 'linear-gradient(180deg, #2c2c2c 0%, #1c1c1c 100%)',
+      boxShadow: f.active ? 'inset 0 -3px 0 rgba(0,0,0,.18), 0 0 0 2px rgba(139,234,69,.55)' : 'inset 0 -3px 0 rgba(0,0,0,.4)',
+    }}>
+      {f.name && <div className="truncate text-[11px] font-bold" style={{ color: f.active ? '#3a3a3a' : 'rgba(255,255,255,.55)' }}>{f.name}</div>}
+      <div className="font-mono text-[26px] font-black tabular-nums leading-tight" style={{ color: f.low ? '#e5484d' : f.active ? '#111' : 'rgba(255,255,255,.85)' }}>{f.text}</div>
+    </div>
+  );
+
+  return (
+    <div className="lg:flex lg:items-stretch lg:justify-center lg:gap-4">
+      {/* Left: game messages (desktop) */}
+      {sidePanel.left && (
+        <aside className="hidden lg:flex w-[230px] shrink-0 flex-col justify-center gap-3">
+          {sidePanel.left}
+        </aside>
+      )}
+
+      {boardEl}
+
+      {/* Right: chess clock with the confirm paddles (desktop) */}
+      <aside className="hidden lg:flex w-[150px] shrink-0 flex-col justify-between gap-3 rounded-2xl p-2.5"
+        style={{ background: 'linear-gradient(180deg, #3a3a3a 0%, #1f1f1f 100%)', boxShadow: '0 18px 40px -12px rgba(0,0,0,.7), inset 0 1px 0 rgba(255,255,255,.08)' }}>
+        {clocks ? <Face f={clocks.top} /> : <div />}
+        <div className="flex flex-1 flex-col justify-center gap-2">
+          {pendingMove ? (
+            <>
+              <button onClick={confirmPendingMove} disabled={confirming}
+                className="flex min-h-[96px] flex-1 items-center justify-center rounded-xl text-sm font-black tracking-wider transition-transform active:scale-[0.97]"
+                style={{ background: 'linear-gradient(180deg, #a8d876 0%, #81b64c 55%, #5f8f36 100%)', color: '#fff', boxShadow: '0 4px 0 #3d5e22', opacity: confirming ? 0.6 : 1 }}>
+                {confirming ? '✓' : 'CONFIRM'}
+              </button>
+              <button onClick={cancelPendingMove} disabled={confirming}
+                className="flex h-12 items-center justify-center gap-1.5 rounded-xl text-xs font-black tracking-wider transition-transform active:scale-[0.97]"
+                style={{ background: 'linear-gradient(180deg, #3a3a3a 0%, #232323 100%)', color: 'rgba(255,255,255,0.75)', boxShadow: '0 3px 0 #111' }}>
+                <span className="text-sm">✕</span> CANCEL
+              </button>
+            </>
+          ) : (
+            <p className="px-1 text-center text-[12px] font-bold leading-snug" style={{ color: 'rgba(255,255,255,.55)' }}>
+              {sidePanel.status ?? (confirmMoves && !suppressConfirmMoves ? 'Make a move, then confirm it here' : '')}
+            </p>
+          )}
+        </div>
+        {clocks ? <Face f={clocks.bottom} /> : <div />}
+      </aside>
     </div>
   );
 }

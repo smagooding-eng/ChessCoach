@@ -541,6 +541,10 @@ function GameView({ bot, onBack, startFen, startColor, isOnboarding }: { bot: Bo
             lastMove={lastMove}
             moveQuality={latestQuality}
             reserveConfirmSpace
+            sidePanel={{
+              // Desktop: Confirm / Cancel on the right of the board.
+              status: result !== 'playing' ? 'Game over' : thinking ? `${botName(bot)} is thinking…` : isPlayerTurn ? 'Your move' : '',
+            }}
           />
           </div>
 
