@@ -1,6 +1,7 @@
 import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
+import { RealtimeBridge } from "@/components/RealtimeBridge";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { UserProvider } from "@/context/UserContext";
 import { SettingsProvider, useSettings } from "@/context/SettingsContext";
@@ -177,6 +178,7 @@ const Welcome = lazyRetry(() => import("@/pages/Welcome").then(m => ({ default: 
 const NotFound = lazyRetry(() => import("@/pages/not-found"));
 const DailyGames = lazyRetry(() => import("@/pages/DailyGames").then(m => ({ default: m.DailyGames })));
 const DailyGame = lazyRetry(() => import("@/pages/DailyGame").then(m => ({ default: m.DailyGame })));
+const NotificationsPage = lazyRetry(() => import("@/pages/Notifications").then(m => ({ default: m.Notifications })));
 const ChallengePage = lazyRetry(() => import("@/pages/Challenge").then(m => ({ default: m.Challenge })));
 
 const queryClient = new QueryClient({
@@ -260,6 +262,7 @@ const PLocalBoard    = () => <ProtectedRoute component={LocalPlay} />;
 const PLivePlay      = () => <ProtectedRoute component={LivePlay} />;
 const PDailyGames    = () => <ProtectedRoute component={DailyGames} />;
 const PDailyGame     = () => <ProtectedRoute component={DailyGame} />;
+const PNotifications = () => <ProtectedRoute component={NotificationsPage} />;
 const PTraps         = () => <ProtectedRoute component={TrapsPage} />;
 const PTrapTraining  = () => <ProtectedRoute component={TrapTrainingPage} />;
 const PBeginnerCourses = () => <ProtectedRoute component={BeginnerCoursesPage} requireAdmin />;
@@ -368,6 +371,7 @@ function Router() {
       <Route path="/play/local"      component={PLocalBoard} />
       <Route path="/live"            component={PLivePlay} />
       <Route path="/daily"           component={PDailyGames} />
+      <Route path="/notifications"   component={PNotifications} />
       <Route path="/daily/:id"       component={PDailyGame} />
       <Route path="/correspondence/:id" component={PDailyGame} />
       <Route path="/traps/:id" component={PTrapTraining} />
@@ -426,6 +430,7 @@ function App() {
                   <ImportStatusWatcher />
                   <BackgroundJobsWatcher />
                   <AutoPushPrompt />
+                  <RealtimeBridge />
                   <AudioAutoplayUnlock />
                 </WouterRouter>
                 <Toaster />

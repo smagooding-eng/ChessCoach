@@ -16,7 +16,7 @@ import { fetchChessComProfile } from './chesscom';
 import { fetchLichessProfile } from './lichess';
 import { usersTable, gameChallengesTable } from '@workspace/db';
 import { eq, and } from 'drizzle-orm';
-import { sendPushToUser } from './pushNotifications';
+import { notifyUser } from './notify';
 
 export type TimeControlId = 'blitz_5_0' | 'blitz_5_3' | 'rapid_10_0' | 'rapid_15_0';
 export type Mode = 'casual' | 'ranked';
@@ -779,7 +779,8 @@ async function acceptLiveChallenge(ws: WebSocket, userId: string, username: stri
   if (await startChallengeGame(ch.code)) return;
   // Creator isn't online -- tell them, and let the friend wait.
   send(ws, { type: 'challenge_waiting', code: ch.code, creator: ch.creatorUsername });
-  sendPushToUser(ch.creatorUserId, {
+  notifyUser(ch.creatorUserId, {
+    kind: 'challenge',
     title: 'Challenge accepted',
     body: `${username} accepted your ${TIME_CONTROLS[ch.timeControl as TimeControlId]?.label ?? ''} challenge and is waiting. Tap to play.`,
     url: '/live',
@@ -987,7 +988,13 @@ export function attachLiveServer(server: HttpServer) {
     let session: Awaited<ReturnType<typeof getSession>> = null;
     try {
       const cookies = parseCookie(req);
-      const sid = cookies[SESSION_COOKIE];
+      let sid: string | undefined = cookies[SESSION_COOKIE];
+      // Browsers that block cross-site cookies (Safari, some Android
+      // webviews) can't send the session cookie to the API host, so the app
+      // also passes its session token as ?token=.
+      if (!sid) {
+        try { sid = new URL(url, 'http://x').searchParams.get('token') ?? undefined; } catch { /* ignore */ }
+      }
       if (sid) session = await getSession(sid);
     } catch {}
     if (!session?.user?.id) {

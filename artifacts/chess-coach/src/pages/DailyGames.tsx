@@ -82,7 +82,9 @@ export function DailyGames() {
   useEffect(() => {
     void load();
     const id = setInterval(load, 30_000);
-    return () => clearInterval(id);
+    const on = () => { void load(); };
+    window.addEventListener('cs:daily-update', on);
+    return () => { clearInterval(id); window.removeEventListener('cs:daily-update', on); };
   }, [load]);
 
   const findOpponent = async () => {

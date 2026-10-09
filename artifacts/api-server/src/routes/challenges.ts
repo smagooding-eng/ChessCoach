@@ -5,7 +5,7 @@ import { and, eq, desc } from "drizzle-orm";
 import { requireAuth } from "../middlewares/authMiddleware";
 import { listTimeControls } from "../lib/liveServer";
 import { isValidTimeControl, startGame, dailyLabel } from "../lib/correspondence";
-import { sendPushToUser } from "../lib/pushNotifications";
+import { notifyUser } from "../lib/notify";
 import { logger } from "../lib/logger";
 
 // "Challenge a friend" links for live and daily games.
@@ -128,7 +128,8 @@ router.post("/challenges/:code/accept", requireAuth, async (req: Request, res: R
       : await startGame(me.id, me.name, ch.creatorUserId, ch.creatorUsername, ch.timeControl, ch.mode === "ranked" ? "ranked" : "casual");
     await db.update(gameChallengesTable).set({ gameId: game.id, status: "started" }).where(eq(gameChallengesTable.code, ch.code));
 
-    sendPushToUser(ch.creatorUserId, {
+    notifyUser(ch.creatorUserId, {
+      kind: "challenge",
       title: "Challenge accepted",
       body: `${me.name} accepted your daily challenge (${dailyLabel(ch.timeControl)} per move). You're ${creatorWhite ? "White — your move!" : "Black."}`,
       url: `/daily/${game.id}`,

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { getApiBase, apiFetch } from '@/lib/api';
+import { getApiBase, apiFetch, getAuthToken } from '@/lib/api';
 
 export type LiveStatus = 'idle' | 'connecting' | 'queued' | 'challenge_waiting' | 'in_game' | 'finished' | 'disconnected' | 'error';
 export type LiveMode = 'casual' | 'ranked';
@@ -38,6 +38,13 @@ export interface LiveGameState {
 export interface OpponentDisconnect { side: 'w' | 'b'; graceMs: number; until: number }
 
 function buildWsUrl(): string {
+  // Session token as a query param too: browsers that block cross-site
+  // cookies (Safari, some Android webviews) can't authenticate otherwise.
+  const t = getAuthToken();
+  const q = t ? `?token=${encodeURIComponent(t)}` : '';
+  return buildBaseWsUrl() + q;
+}
+function buildBaseWsUrl(): string {
   const apiBase = getApiBase();
   if (apiBase) {
     // apiBase is an absolute http(s) URL to the backend (e.g. Render) —

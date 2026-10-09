@@ -25,6 +25,7 @@ import shopRouter from "./shop";
 import pushRouter from "./push";
 import correspondenceRouter from "./correspondence";
 import challengesRouter from "./challenges";
+import notificationsRouter from "./notifications";
 import appConfigRouter from "./appConfig";
 import { requirePremium } from "../middlewares/authMiddleware";
 import { db, pageViewsTable } from "@workspace/db";
@@ -53,6 +54,7 @@ router.use(shopRouter);
 router.use(pushRouter);
 router.use(correspondenceRouter);
 router.use(challengesRouter);
+router.use(notificationsRouter);
 router.use(appConfigRouter);
 
 router.post("/track", async (req: Request, res: Response) => {

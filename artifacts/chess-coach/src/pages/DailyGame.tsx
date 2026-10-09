@@ -42,9 +42,17 @@ export function DailyGame() {
 
   // Poll while waiting for the opponent; tick the clock every 30s.
   useEffect(() => { void load(); }, [load]);
+  // Real-time: refresh the moment the server says this game changed.
+  useEffect(() => {
+    const on = (e: Event) => { if ((e as CustomEvent).detail?.gameId === id) void load(); };
+    window.addEventListener('cs:daily-update', on);
+    const onVisible = () => { if (document.visibilityState === 'visible') void load(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => { window.removeEventListener('cs:daily-update', on); document.removeEventListener('visibilitychange', onVisible); };
+  }, [id, load]);
   useEffect(() => {
     if (!game || game.status !== 'active' || myTurn) return;
-    const t = setInterval(load, 20_000);
+    const t = setInterval(load, 15_000); // fallback if the live connection drops
     return () => clearInterval(t);
   }, [game?.status, myTurn, load]);
   useEffect(() => { const t = setInterval(() => setTick(x => x + 1), 30_000); return () => clearInterval(t); }, []);

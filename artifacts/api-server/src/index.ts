@@ -227,6 +227,18 @@ async function runSchemaMigrations() {
       expires_at TIMESTAMPTZ NOT NULL
     )`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_game_challenges_creator ON game_challenges(creator_user_id, status)`);
+    // In-app notifications (the bell). Push is a copy of these for when the app is closed.
+    await db.execute(sql`CREATE TABLE IF NOT EXISTS notifications (
+      id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id VARCHAR NOT NULL,
+      title VARCHAR NOT NULL,
+      body TEXT NOT NULL,
+      url VARCHAR,
+      kind VARCHAR NOT NULL DEFAULT 'general',
+      read_at TIMESTAMPTZ,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, created_at DESC)`);
 
     logger.info('Schema migrations complete');
   } catch (err) {

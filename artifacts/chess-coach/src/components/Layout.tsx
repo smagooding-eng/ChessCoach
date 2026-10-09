@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useLayoutEffect } from 'react';
 import { Link, useLocation } from 'wouter';
 import { useUser } from '@/hooks/use-user';
+import { useUnreadCount } from '@/components/RealtimeBridge';
 import { useChessPlayer } from '@/hooks/use-chess-player';
 import { useMultiEloProgress } from '@/hooks/use-elo-progress';
 import { useDashboardRedesignFlag } from '@/hooks/use-app-config';
@@ -127,6 +128,7 @@ function SidebarLink({ item, isActive }: { item: typeof ALL_NAV[0]; isActive: bo
 export function Layout({ children, fullscreen }: { children: React.ReactNode; fullscreen?: boolean }) {
   const [location, navigateTo] = useLocation();
   const { authUser: layoutAuthUser } = useUser();
+  const unreadCount = useUnreadCount();
   // Came from a friend's challenge link while signed out: once signed in
   // (and past onboarding, which needs a linked chess account), go back to it.
   useEffect(() => {
@@ -272,10 +274,14 @@ export function Layout({ children, fullscreen }: { children: React.ReactNode; fu
               <Link href="/lookup" className="grid h-10 w-10 place-items-center rounded-full active:bg-white/5" style={{ color: TEXT_LIGHT }} aria-label="Look up a player or game">
                 <Search className="w-[22px] h-[22px]" />
               </Link>
-              {/* No notification inbox exists in the app, so no unread dot is
-                  shown; push notification settings live on Profile. */}
-              <Link href="/profile" className="grid h-10 w-10 place-items-center rounded-full active:bg-white/5" style={{ color: TEXT_LIGHT }} aria-label="Notification settings">
+              {/* Notifications inbox, with an unread dot */}
+              <Link href="/notifications" className="relative grid h-10 w-10 place-items-center rounded-full active:bg-white/5" style={{ color: TEXT_LIGHT }} aria-label={unreadCount ? `Notifications, ${unreadCount} unread` : 'Notifications'}>
                 <BellIcon className="w-[22px] h-[22px]" />
+                {unreadCount > 0 && (
+                  <span className="absolute right-1 top-1 grid min-w-[17px] h-[17px] place-items-center rounded-full px-1 text-[10px] font-black" style={{ background: '#FF5058', color: '#fff' }}>
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </span>
+                )}
               </Link>
               <button onClick={() => setProfileOpen(o => !o)} className="ml-1.5 active:opacity-70 transition-opacity" aria-label="Account menu">
                 <PlayerAvatar avatar={player?.avatar} username={username ?? ''} size="md" />

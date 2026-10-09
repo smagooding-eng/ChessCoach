@@ -16,7 +16,7 @@ import {
   db, gamesTable, correspondenceGamesTable, correspondenceQueueTable, type CorrespondenceGame,
 } from "@workspace/db";
 import { eq, and, or, ne, desc } from "drizzle-orm";
-import { sendPushToUser } from "./pushNotifications";
+import { notifyUser, emitToUser } from "./notify";
 import { logger } from "./logger";
 import { updateRating } from "./glicko2";
 import { loadUserRating, saveUserRating, seedRatingFromImports } from "./liveServer";
@@ -48,8 +48,14 @@ export function dailyLabel(id: string): string {
 
 const gameUrl = (id: string) => `/daily/${id}`;
 const push = (userId: string, title: string, body: string, url: string) => {
-  sendPushToUser(userId, { title, body, url })
-    .catch((err) => logger.warn({ err, userId, title }, "[daily] push failed"));
+  notifyUser(userId, { title, body, url, kind: "daily" })
+    .catch((err) => logger.warn({ err, userId, title }, "[daily] notify failed"));
+};
+// Silent "this game changed" to both players' open tabs, so the board and
+// lists refresh immediately.
+const touched = (g: { id: string; whiteUserId: string; blackUserId: string }) => {
+  emitToUser(g.whiteUserId, "daily_update", { gameId: g.id });
+  emitToUser(g.blackUserId, "daily_update", { gameId: g.id });
 };
 
 // ── Matchmaking ─────────────────────────────────────────────────────────────
@@ -190,6 +196,7 @@ export async function startGame(
     whiteRatingBefore,
     blackRatingBefore,
   }).returning();
+  touched(game);
   return game;
 }
 
@@ -323,6 +330,7 @@ async function finishGame(game: CorrespondenceGame, result: Result, termination:
     const [u] = await db.update(correspondenceGamesTable).set(updates).where(eq(correspondenceGamesTable.id, claimed.id)).returning();
     if (u) final = u;
   }
+  touched(final);
 
   // Tell both players.
   const how: Record<string, string> = {
@@ -446,6 +454,7 @@ export async function makeMove(gameId: string, userId: string, san: string): Pro
       eq(correspondenceGamesTable.pgn, game.pgn),
     )).returning();
   if (!updated) return { success: false, error: "The game changed — reload and try again" };
+  touched(updated);
 
   const mover = isWhite ? game.whiteUsername : game.blackUsername;
   push(nextTurnUserId, "Your move", `${mover} played ${moveResult.san}. You have ${dailyLabel(game.timeControl)} to reply.`, gameUrl(gameId));
@@ -472,6 +481,7 @@ export async function offerDraw(gameId: string, userId: string): Promise<MoveRes
     return { success: true, game: await finishGame(game, "draw", "draw_agreement", game.pgn, game.fen) };
   }
   const [updated] = await db.update(correspondenceGamesTable).set({ drawOfferFrom: side }).where(eq(correspondenceGamesTable.id, gameId)).returning();
+  touched(updated);
   const otherId = side === "white" ? game.blackUserId : game.whiteUserId;
   const me = side === "white" ? game.whiteUsername : game.blackUsername;
   push(otherId, "Draw offer", `${me} offered a draw in your daily game.`, gameUrl(gameId));
@@ -485,6 +495,7 @@ export async function respondDraw(gameId: string, userId: string, accept: boolea
   if (!side || side === game.drawOfferFrom) return { success: false, error: "Not your offer to answer" };
   if (accept) return { success: true, game: await finishGame(game, "draw", "draw_agreement", game.pgn, game.fen) };
   const [updated] = await db.update(correspondenceGamesTable).set({ drawOfferFrom: null }).where(eq(correspondenceGamesTable.id, gameId)).returning();
+  touched(updated);
   return { success: true, game: updated };
 }
 
