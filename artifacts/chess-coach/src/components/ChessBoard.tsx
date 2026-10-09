@@ -554,6 +554,9 @@ export function ChessBoard({
             allowDragging: (practiceMode || premoveMode) && !pendingMove && !promotionPending,
             dragActivationDistance: 8,
             canDragPiece,
+            // picking a piece up shows its legal moves (if that setting is on),
+            // same as tapping it
+            onPieceDrag: ({ square }) => { if (practiceMode && square) setSelectedSquare(square); },
             onPieceDrop: handlePieceDrop,
             squareStyles,
             onSquareClick: handleSquareClick,

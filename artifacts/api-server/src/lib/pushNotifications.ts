@@ -35,6 +35,9 @@ export interface PushPayload {
   body: string;
   url?: string;
   icon?: string;
+  /** Notifications with the same tag replace each other on the device
+   *  (e.g. one per daily game: only the latest "your move" stays). */
+  tag?: string;
 }
 
 // Segment filters for the admin "send to a targeted group" tool. Every

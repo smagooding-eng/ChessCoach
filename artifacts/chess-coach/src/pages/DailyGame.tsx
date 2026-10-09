@@ -42,6 +42,14 @@ export function DailyGame() {
 
   // Poll while waiting for the opponent; tick the clock every 30s.
   useEffect(() => { void load(); }, [load]);
+  // Opening the game clears its notifications from the device.
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return;
+    navigator.serviceWorker.ready
+      .then((reg) => reg.getNotifications({ tag: `cs:/daily/${id}` }))
+      .then((list) => list.forEach((n) => n.close()))
+      .catch(() => { /* not supported */ });
+  }, [id]);
   // Real-time: refresh the moment the server says this game changed.
   useEffect(() => {
     const on = (e: Event) => { if ((e as CustomEvent).detail?.gameId === id) void load(); };

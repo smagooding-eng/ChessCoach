@@ -101,7 +101,7 @@ type PuzzleState = 'loading' | 'ready' | 'solving' | 'correct' | 'wrong' | 'show
 
 export function Puzzles() {
   const { authUser } = useUser();
-  const { boardColors, boardTextureCss, pieceColors, pieceShape, pieceStyle, showCoordinates, soundEnabled, boardMaxWidth } = useSettings();
+  const { boardColors, boardTextureCss, pieceColors, pieceShape, pieceStyle, showCoordinates, soundEnabled, boardMaxWidth, showLegalMoves, confirmMoves } = useSettings();
   const [, navigate] = useLocation();
   const search = useSearch();
   const targetTheme = new URLSearchParams(search).get('theme') ?? new URLSearchParams(search).get('weakness');
@@ -116,6 +116,8 @@ export function Puzzles() {
   const [feedback, setFeedback] = useState<'correct' | 'wrong' | null>(null);
   const [showHint, setShowHint] = useState(false);
   const [selectedSquare, setSelectedSquare] = useState<string | null>(null);
+  // Confirm Moves: a move staged on the board until Confirm is tapped.
+  const [pendingMove, setPendingMove] = useState<{ from: string; to: string; fen: string } | null>(null);
   const startTimeRef = useRef<number>(0);
 
   // "My Game Puzzles" tab removed -- Daily Puzzles is now the only mode,
@@ -306,11 +308,30 @@ export function Puzzles() {
     }
   }, [game, puzzle, state, currentMoveIndex, fetchStats, soundEnabled]);
 
+  // With Confirm Moves on, a legal move is shown on the board but only
+  // submitted when the player taps Confirm (Cancel puts the piece back).
+  const playOrStage = useCallback((from: string, to: string): boolean => {
+    if (!confirmMoves) return tryMoveFromTo(from, to);
+    if (!game || state !== 'ready') return false;
+    try {
+      const copy = new Chess(game.fen());
+      const m = copy.move({ from, to, promotion: 'q' });
+      if (!m) return false;
+      setSelectedSquare(null);
+      setPendingMove({ from, to, fen: copy.fen() });
+      return true;
+    } catch { return false; }
+  }, [confirmMoves, tryMoveFromTo, game, state]);
+
+  // A new position (next puzzle, opponent reply, reset) drops any staged move.
+  useEffect(() => { setPendingMove(null); }, [game]);
+
   const handlePieceDrop = useCallback(({ sourceSquare, targetSquare }: { piece: unknown; sourceSquare: string; targetSquare: string | null }): boolean => {
-    if (!targetSquare) return false;
+    if (!targetSquare || pendingMove) return false;
     setSelectedSquare(null);
-    return tryMoveFromTo(sourceSquare, targetSquare);
-  }, [tryMoveFromTo]);
+    if (sourceSquare === targetSquare) return false;
+    return playOrStage(sourceSquare, targetSquare);
+  }, [playOrStage, pendingMove]);
 
   const legalMoveInfo = useMemo(() => {
     if (!selectedSquare || !game || state !== 'ready') return { targets: [] as string[], captures: new Set<string>() };
@@ -337,7 +358,7 @@ export function Puzzles() {
   );
 
   const handleSquareClick = useCallback(({ square, piece }: { square: string; piece: { pieceType: string } | null }) => {
-    if (state !== 'ready' || !game) return;
+    if (state !== 'ready' || !game || pendingMove) return;
 
     if (selectedSquare) {
       if (square === selectedSquare) {
@@ -345,7 +366,7 @@ export function Puzzles() {
         return;
       }
       if (legalTargets.includes(square)) {
-        tryMoveFromTo(selectedSquare, square);
+        playOrStage(selectedSquare, square);
         return;
       }
       if (piece) {
@@ -367,14 +388,14 @@ export function Puzzles() {
         setSelectedSquare(square);
       }
     }
-  }, [state, game, selectedSquare, legalTargets, tryMoveFromTo]);
+  }, [state, game, selectedSquare, legalTargets, playOrStage, pendingMove]);
 
   const canDragPiece = useCallback(({ piece }: { piece: { pieceType: string } | null }) => {
-    if (state !== 'ready' || !game || !piece) return false;
+    if (state !== 'ready' || !game || !piece || pendingMove) return false;
     const turn = game.turn();
     const pieceColor = piece.pieceType[0].toLowerCase();
     return pieceColor === turn;
-  }, [state, game]);
+  }, [state, game, pendingMove]);
 
   const squareStyles = useMemo(() => {
     const styles: Record<string, React.CSSProperties> = {};
@@ -385,7 +406,7 @@ export function Puzzles() {
     if (selectedSquare) {
       styles[selectedSquare] = { background: 'rgba(100, 180, 255, 0.55)', borderRadius: '4px' };
     }
-    for (const sq of legalTargets) {
+    for (const sq of showLegalMoves ? legalTargets : []) {
       if (legalMoveInfo.captures.has(sq)) {
         styles[sq] = {
           background: 'radial-gradient(circle, transparent 55%, rgba(100,180,255,0.55) 56%)',
@@ -417,7 +438,7 @@ export function Puzzles() {
       }
     }
     return styles;
-  }, [lastMove, feedback, selectedSquare, legalTargets, legalMoveInfo, showHint, solutionMoves, currentMoveIndex, game]);
+  }, [lastMove, feedback, selectedSquare, legalTargets, legalMoveInfo, showHint, solutionMoves, currentMoveIndex, game, showLegalMoves]);
 
   const themeLabels: Record<string, string> = {
     'fork': 'Fork',
@@ -731,11 +752,12 @@ export function Puzzles() {
                   <div className="relative">
                   <Chessboard
                     options={{
-                      position: game.fen(),
+                      position: pendingMove ? pendingMove.fen : game.fen(),
                       boardOrientation: boardOrientation,
-                      allowDragging: true,
+                      allowDragging: !pendingMove,
                       dragActivationDistance: 8,
                       canDragPiece: canDragPiece,
+                      onPieceDrag: ({ square }) => { if (square && state === 'ready' && !pendingMove) setSelectedSquare(square); },
                       onPieceDrop: handlePieceDrop,
                       onSquareClick: handleSquareClick,
                       squareStyles,
@@ -756,6 +778,22 @@ export function Puzzles() {
                     return mate ? <CheckmateOverlay {...mate} flipped={boardOrientation === 'black'} positionKey={game.fen()} /> : null;
                   })()}
                   </div>
+                  {pendingMove && (
+                    // Same chess-clock Cancel / Confirm bar as every other board.
+                    <div className="relative mt-3 flex h-14 overflow-hidden rounded-xl" style={{ boxShadow: '0 4px 0 #2a2a2a, 0 8px 16px rgba(0,0,0,0.4)', border: '1px solid rgba(0,0,0,0.25)' }}>
+                      <button onClick={() => setPendingMove(null)}
+                        className="flex flex-1 items-center justify-center gap-1.5 text-xs font-black tracking-wider active:scale-[0.97]"
+                        style={{ background: 'linear-gradient(180deg, #3a3a3a 0%, #232323 100%)', color: 'rgba(255,255,255,0.75)' }}>
+                        <span className="text-sm">✕</span> CANCEL
+                      </button>
+                      <button onClick={() => { const p = pendingMove; setPendingMove(null); tryMoveFromTo(p.from, p.to); }}
+                        className="flex flex-1 items-center justify-center text-xs font-black tracking-wider active:scale-[0.97]"
+                        style={{ background: 'linear-gradient(180deg, #a8d876 0%, #81b64c 55%, #5f8f36 100%)', color: '#fff' }}>
+                        CONFIRM
+                      </button>
+                      <div className="pointer-events-none absolute bottom-0 left-1/2 top-0 w-[2px] -translate-x-1/2" style={{ background: 'rgba(0,0,0,0.35)' }} />
+                    </div>
+                  )}
 
                   <AnimatePresence>
                     {feedback && (

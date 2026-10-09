@@ -29,14 +29,28 @@ self.addEventListener('push', (event) => {
     if (event.data) data.body = event.data.text();
   }
 
-  event.waitUntil(
-    self.registration.showNotification(data.title, {
+  event.waitUntil((async () => {
+    const url = data.url || '/';
+    // Don't notify about a page the player is already looking at (e.g. the
+    // daily game whose opponent just moved) -- the open app updates itself.
+    const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    const lookingAtIt = windows.some((c) => {
+      try {
+        return c.visibilityState === 'visible' && new URL(c.url).pathname === url;
+      } catch { return false; }
+    });
+    if (lookingAtIt) return;
+    await self.registration.showNotification(data.title, {
       body: data.body,
       icon: data.icon || '/icons/icon-192.png',
       badge: '/icons/icon-192.png',
-      data: { url: data.url || '/' },
-    })
-  );
+      data: { url },
+      // Same tag = replaces the previous notification for that game, so only
+      // the latest one stays on the device; renotify still buzzes for it.
+      tag: data.tag || undefined,
+      renotify: !!data.tag,
+    });
+  })());
 });
 
 // Clicking the notification focuses an existing ChessScout tab if one is

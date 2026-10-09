@@ -37,7 +37,7 @@ export function emitToUser(userId: string, event: string, data: unknown): void {
   }
 }
 
-export interface NotifyInput { title: string; body: string; url?: string; kind?: string }
+export interface NotifyInput { title: string; body: string; url?: string; kind?: string; tag?: string }
 
 export async function notifyUser(userId: string, n: NotifyInput): Promise<void> {
   let id: string | null = null;
@@ -55,7 +55,9 @@ export async function notifyUser(userId: string, n: NotifyInput): Promise<void> 
   }
   emitToUser(userId, "notification", { id, title: n.title, body: n.body, url: n.url ?? null, kind: n.kind ?? "general", createdAt: new Date().toISOString() });
   if (isPushConfigured()) {
-    sendPushToUser(userId, { title: n.title, body: n.body, url: n.url })
+    // Tagged by page (e.g. one tag per daily game) so a newer alert about the
+    // same game replaces the older one on the device instead of stacking.
+    sendPushToUser(userId, { title: n.title, body: n.body, url: n.url, tag: n.tag ?? (n.url ? `cs:${n.url}` : undefined) })
       .catch((err) => logger.warn({ err, userId }, "[notify] push failed"));
   }
 }
