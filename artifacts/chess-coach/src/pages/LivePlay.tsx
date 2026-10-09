@@ -8,6 +8,7 @@ import { apiFetch } from '@/lib/api';
 import { PT, cardStyle, greenBtn, ghostBtn } from '@/lib/playTheme';
 import { ShareLink } from '@/components/play/ShareLink';
 import { NotifyPrompt } from '@/components/play/NotifyPrompt';
+import { useChallengeInbox, ChallengeRequestsCard, OpenLinksCard, createOpenLink } from '@/components/play/OpenChallenges';
 
 const TC_OPTIONS = [
   { id: 'blitz_5_0',  label: '5 min',  sub: 'Blitz', icon: Zap },
@@ -27,6 +28,8 @@ export function LivePlay() {
   const [hosted, setHosted] = useState<Hosted | null>(null);
   const [creating, setCreating] = useState(false);
   const [now, setNow] = useState(Date.now());
+  const inbox = useChallengeInbox();
+  const [creatingOpen, setCreatingOpen] = useState(false);
 
   useEffect(() => { if (live.status === 'finished') void refetch(); }, [live.status, refetch]);
   useEffect(() => { if (live.status === 'in_game') setHosted(null); }, [live.status]);
@@ -40,8 +43,15 @@ export function LivePlay() {
   const acceptedRef = useRef(false);
   useEffect(() => {
     if (acceptedRef.current) return;
-    const code = new URLSearchParams(window.location.search).get('challenge');
-    if (code) {
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get('challenge');
+    const approve = params.get('approve');
+    if (approve) {
+      // Accepting a request someone sent through your open link.
+      acceptedRef.current = true;
+      live.approveRequest(approve);
+      try { window.history.replaceState(null, '', window.location.pathname); } catch { /* ignore */ }
+    } else if (code) {
       acceptedRef.current = true;
       live.acceptChallenge(code);
       // so a refresh after the game doesn't try to accept it again
@@ -66,6 +76,12 @@ export function LivePlay() {
     } catch (e) {
       alert(e instanceof Error ? e.message : 'Could not create the link');
     } finally { setCreating(false); }
+  };
+  const makeOpenLink = async () => {
+    setCreatingOpen(true);
+    try { await createOpenLink('live', friendTc, mode, friendColor); }
+    catch (e) { alert(e instanceof Error ? e.message : 'Could not create the link'); }
+    finally { setCreatingOpen(false); }
   };
   const cancelHosted = async () => {
     if (hosted) await apiFetch(`/api/challenges/${hosted.code}/cancel`, { method: 'POST', credentials: 'include' }).catch(() => {});
@@ -119,8 +135,16 @@ export function LivePlay() {
         <div className="p-6 text-center space-y-4" style={cardStyle}>
           <Loader2 className="w-10 h-10 mx-auto animate-spin" style={{ color: PT.green }} />
           <div>
-            <p className="text-lg font-black" style={{ color: PT.text }}>Waiting for {live.waitingFor}…</p>
-            <p className="text-sm mt-1" style={{ color: PT.muted }}>You accepted their challenge. We've sent them a notification; the game starts as soon as they open ChessScout. Keep this screen open.</p>
+            <p className="text-lg font-black" style={{ color: PT.text }}>
+              {live.waitingKind === 'request' ? `Waiting for ${live.waitingFor} to accept…` : `Waiting for ${live.waitingFor}…`}
+            </p>
+            <p className="text-sm mt-1" style={{ color: PT.muted }}>
+              {live.waitingKind === 'request'
+                ? "Your challenge request was sent. The game starts the moment they accept. Keep this screen open."
+                : live.waitingKind === 'approving'
+                  ? "You accepted their challenge. We've told them; the game starts as soon as they're back on Live play. Keep this screen open."
+                  : "You accepted their challenge. We've sent them a notification; the game starts as soon as they open ChessScout. Keep this screen open."}
+            </p>
           </div>
           <button onClick={live.cancel} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm" style={ghostBtn}>
             <X className="w-4 h-4" /> Cancel
@@ -143,6 +167,8 @@ export function LivePlay() {
         </div>
       ) : (
         <>
+          <ChallengeRequestsCard requests={inbox.requests} onAcceptLive={(code) => live.approveRequest(code)} onChanged={() => { void inbox.reload(); }} />
+          <OpenLinksCard links={inbox.links} kind="live" onChanged={() => { void inbox.reload(); }} />
           <div className="inline-flex rounded-xl p-1" style={{ background: 'rgba(0,0,0,0.3)', border: `1px solid ${PT.border}` }}>
             {(['casual', 'ranked'] as LiveMode[]).map(m => (
               <button key={m} onClick={() => setMode(m)}
@@ -200,9 +226,17 @@ export function LivePlay() {
                   style={friendColor === c ? greenBtn : ghostBtn}>{c === 'random' ? 'Random colour' : `I play ${c}`}</button>
               ))}
             </div>
-            <button onClick={createChallenge} disabled={creating} className="w-full rounded-xl py-3 text-[14px] font-extrabold disabled:opacity-60" style={greenBtn}>
-              {creating ? 'Creating…' : 'Create challenge link'}
-            </button>
+            <div className="grid grid-cols-2 gap-2">
+              <button onClick={createChallenge} disabled={creating} className="rounded-xl py-3 text-[13.5px] font-extrabold disabled:opacity-60" style={greenBtn}>
+                {creating ? 'Creating…' : 'One-time link'}
+              </button>
+              <button onClick={makeOpenLink} disabled={creatingOpen} className="rounded-xl py-3 text-[13.5px] font-extrabold disabled:opacity-60" style={ghostBtn}>
+                {creatingOpen ? 'Creating…' : 'Open link (anyone)'}
+              </button>
+            </div>
+            <p className="text-[11.5px]" style={{ color: PT.muted }}>
+              <b style={{ color: PT.text }}>One-time:</b> for one friend, starts when they accept. <b style={{ color: PT.text }}>Open:</b> post it anywhere; anyone can challenge you and you pick who to play.
+            </p>
           </div>
 
           <Link href="/daily" className="flex items-center gap-3 p-4" style={cardStyle}>

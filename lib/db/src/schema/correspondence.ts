@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, varchar, integer, text, timestamp, index } from "drizzle-orm/pg-core";
+import { pgTable, varchar, integer, text, timestamp, index, boolean } from "drizzle-orm/pg-core";
 
 // Deliberately a separate table from liveGamesTable, not a variant of
 // it. liveGamesTable only ever stores FINISHED games -- the live
@@ -81,7 +81,11 @@ export const gameChallengesTable = pgTable("game_challenges", {
   timeControl: varchar("time_control").notNull(),
   mode: varchar("mode").notNull().default("casual"),
   color: varchar("color").notNull().default("random"), // creator's colour: 'random' | 'white' | 'black'
-  status: varchar("status").notNull().default("open"), // 'open' | 'accepted' | 'cancelled'
+  status: varchar("status").notNull().default("open"), // 'open' | 'accepted' | 'started' | 'cancelled' | requests: 'requested' | 'approved' | 'declined'
+  // Open link: anyone can use it, again and again. Each use creates a
+  // request row (parentCode = this code) that the creator must accept.
+  open: boolean("open").notNull().default(false),
+  parentCode: varchar("parent_code"),
   acceptedByUserId: varchar("accepted_by_user_id"),
   acceptedByUsername: varchar("accepted_by_username"),
   gameId: varchar("game_id"),

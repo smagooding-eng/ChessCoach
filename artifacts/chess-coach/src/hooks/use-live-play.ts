@@ -78,6 +78,11 @@ export function useLivePlay() {
   // Accepted a friend's challenge but they're not online yet.
   const [waitingFor, setWaitingFor] = useState<string | null>(null);
   const pendingAcceptRef = useRef<string | null>(null);
+  // Owner accepting a request made through their open link.
+  const pendingApproveRef = useRef<string | null>(null);
+  // What the "waiting" screen is about: you accepted a link, you sent a
+  // request and they haven't answered yet, or you accepted a request.
+  const [waitingKind, setWaitingKind] = useState<'accepted' | 'request' | 'approving'>('accepted');
   // serverTime - localTime, so abandonment countdowns match the server.
   const [serverOffset, setServerOffset] = useState(0);
   const [notice, setNotice] = useState<string | null>(null);
@@ -130,6 +135,10 @@ export function useLivePlay() {
           }
         } catch {}
       }
+      if (pendingApproveRef.current && !(g && g.status === 'active')) {
+        ws.send(JSON.stringify({ type: 'approve_request', code: pendingApproveRef.current }));
+        return;
+      }
       if (pendingAcceptRef.current && !(g && g.status === 'active')) {
         ws.send(JSON.stringify({ type: 'accept_challenge', code: pendingAcceptRef.current }));
         return;
@@ -152,6 +161,7 @@ export function useLivePlay() {
           setStatus('queued');
           break;
         case 'challenge_waiting':
+          setWaitingKind(msg.request ? 'request' : msg.approving ? 'approving' : 'accepted');
           setWaitingFor(msg.creator ?? 'your friend');
           setStatus('challenge_waiting');
           break;
@@ -161,9 +171,11 @@ export function useLivePlay() {
           setQueuedAt(null);
           setWaitingFor(null);
           pendingAcceptRef.current = null;
+          pendingApproveRef.current = null;
           setStatus('idle');
           break;
         case 'match_found':
+          pendingApproveRef.current = null;
           if (typeof msg.state?.serverNow === 'number') setServerOffset(msg.state.serverNow - Date.now());
           setNotice(null);
           setPremove(null);
@@ -208,9 +220,10 @@ export function useLivePlay() {
           break;
         case 'error':
           setError(msg.message);
-          if (pendingAcceptRef.current) {
+          if (pendingAcceptRef.current || pendingApproveRef.current) {
             // a failed challenge accept must not be re-sent on reconnect
             pendingAcceptRef.current = null;
+            pendingApproveRef.current = null;
             setWaitingFor(null);
             if (statusRef.current === 'challenge_waiting') setStatus('idle');
           }
@@ -262,6 +275,13 @@ export function useLivePlay() {
     const ws = wsRef.current;
     if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'accept_challenge', code }));
   }, []);
+  // Accept a request someone made through your open challenge link.
+  const approveRequest = useCallback((code: string) => {
+    setError(null);
+    pendingApproveRef.current = code;
+    const ws = wsRef.current;
+    if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'approve_request', code }));
+  }, []);
   const move = useCallback((san: string) => { if (game) send({ type: 'move', gameId: game.id, san }); }, [game, send]);
   const resign = useCallback(() => { if (game) send({ type: 'resign', gameId: game.id }); }, [game, send]);
   const offerDraw = useCallback(() => { if (game) send({ type: 'draw_offer', gameId: game.id }); }, [game, send]);
@@ -300,7 +320,7 @@ export function useLivePlay() {
 
   return {
     status, error, game, color, queuedTc, queuedMode, opponentDisconnect, premove, setPremove,
-    queuedAt, botOfferMs, waitingFor, serverOffset, notice,
+    queuedAt, botOfferMs, waitingFor, waitingKind, serverOffset, notice, approveRequest,
     enterQueue, offerRematch, declineRematch, cancel, playBot, acceptChallenge, move, resign, offerDraw, acceptDraw, declineDraw,
     reset,
   };

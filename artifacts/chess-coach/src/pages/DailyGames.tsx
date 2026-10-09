@@ -6,6 +6,7 @@ import { useUser } from '@/hooks/use-user';
 import { PT, cardStyle, greenBtn, ghostBtn, formatLeft } from '@/lib/playTheme';
 import { ShareLink } from '@/components/play/ShareLink';
 import { NotifyPrompt } from '@/components/play/NotifyPrompt';
+import { useChallengeInbox, ChallengeRequestsCard, OpenLinksCard, createOpenLink } from '@/components/play/OpenChallenges';
 
 export const DAILY_TC = [
   { id: 'corr_1d', label: '1 day' },
@@ -65,6 +66,7 @@ export function DailyGames() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [link, setLink] = useState<{ url: string; code: string } | null>(null);
+  const inbox = useChallengeInbox();
 
   const load = useCallback(async () => {
     try {
@@ -113,6 +115,13 @@ export function DailyGames() {
       if (!res.ok) throw new Error(d.error || 'Could not create the link');
       setLink({ code: d.challenge.code, url: `${window.location.origin}/challenge/${d.challenge.code}` });
     } catch (e) { setError(e instanceof Error ? e.message : 'Could not create the link'); }
+    finally { setBusy(false); }
+  };
+
+  const openLink = async () => {
+    setBusy(true); setError('');
+    try { await createOpenLink('daily', tc, mode, 'random'); setLink(null); }
+    catch (e) { setError(e instanceof Error ? e.message : 'Could not create the link'); }
     finally { setBusy(false); }
   };
 
@@ -182,6 +191,9 @@ export function DailyGames() {
 
       <NotifyPrompt reason="Turn on notifications so you know when it's your move, when an opponent is found and when time is running low." />
 
+      <ChallengeRequestsCard requests={inbox.requests} onChanged={() => { void inbox.reload(); }} />
+      <OpenLinksCard links={inbox.links} kind="daily" onChanged={() => { void inbox.reload(); }} />
+
       {/* New game */}
       <section className="p-4 space-y-3" style={cardStyle}>
         <div className="flex items-center gap-2">
@@ -210,6 +222,9 @@ export function DailyGames() {
             <Users size={16} /> Challenge friend
           </button>
         </div>
+        <button onClick={openLink} disabled={busy} className="w-full rounded-xl py-2.5 text-[13px] font-bold disabled:opacity-60" style={ghostBtn}>
+          Create an open link (anyone can challenge you)
+        </button>
         {link && (
           <div className="space-y-2 rounded-xl p-3" style={{ background: 'rgba(0,0,0,.2)' }}>
             <p className="text-[12.5px]" style={{ color: PT.text }}>Send this link. The game starts as soon as your friend accepts; we'll notify you.</p>

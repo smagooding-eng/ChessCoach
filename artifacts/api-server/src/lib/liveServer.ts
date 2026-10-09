@@ -740,7 +740,7 @@ async function spawnBotMatch(ws: WebSocket, userId: string, username: string, tc
 // open the game starts straight away; if not, they get a push notification
 // and the game starts the moment they open Live play (the friend waits on a
 // "waiting for <name>" screen meanwhile).
-interface PendingChallenge { code: string; creatorUserId: string; acceptorUserId: string; acceptorUsername: string; acceptorWs: WebSocket }
+interface PendingChallenge { code: string; creatorUserId: string; acceptorUserId: string; acceptorUsername: string; acceptorWs: WebSocket; isRequest?: boolean }
 const pendingChallenges = new Map<string, PendingChallenge>(); // code -> waiting acceptor
 
 async function startChallengeGame(code: string): Promise<boolean> {
@@ -755,6 +755,11 @@ async function startChallengeGame(code: string): Promise<boolean> {
   const [ch] = await db.select().from(gameChallengesTable).where(eq(gameChallengesTable.code, code));
   const tc = ch ? TIME_CONTROLS[ch.timeControl as TimeControlId] : undefined;
   if (!ch || !tc || ch.gameId) return false;
+  // A request through an open link only starts once the owner has accepted it.
+  if (ch.parentCode && ch.status !== 'approved') {
+    if (!pendingChallenges.has(code)) pendingChallenges.set(code, pending);
+    return false;
+  }
   cancelQueue(pending.creatorUserId);
   cancelQueue(pending.acceptorUserId);
 
@@ -786,6 +791,21 @@ async function acceptLiveChallenge(ws: WebSocket, userId: string, username: stri
   const [ch] = await db.select().from(gameChallengesTable).where(eq(gameChallengesTable.code, String(code)));
   if (!ch || ch.kind !== 'live') return send(ws, { type: 'error', message: 'Challenge not found' });
   if (ch.creatorUserId === userId) return send(ws, { type: 'error', message: "That's your own challenge — send the link to a friend." });
+  if (ch.open) return send(ws, { type: 'error', message: 'Send a challenge request from the link page first' });
+  // Request made through someone's open link: wait here until they accept.
+  if (ch.parentCode) {
+    if (ch.acceptedByUserId !== userId) return send(ws, { type: 'error', message: 'This challenge request belongs to someone else' });
+    if (ch.status === 'declined') return send(ws, { type: 'error', message: `${ch.creatorUsername} declined your challenge` });
+    if (ch.status === 'cancelled') return send(ws, { type: 'error', message: 'This request was withdrawn' });
+    if (ch.status === 'started' || ch.gameId) return send(ws, { type: 'error', message: 'This challenge has already been played' });
+    if (new Date(ch.expiresAt).getTime() < Date.now()) return send(ws, { type: 'error', message: 'This request has expired — send a new one' });
+    if (userActiveGame.has(userId)) return send(ws, { type: 'error', message: 'Finish your current game first' });
+    pendingChallenges.set(ch.code, { code: ch.code, creatorUserId: ch.creatorUserId, acceptorUserId: userId, acceptorUsername: username, acceptorWs: ws, isRequest: true });
+    cancelQueue(userId);
+    if (await startChallengeGame(ch.code)) return;
+    send(ws, { type: 'challenge_waiting', code: ch.code, creator: ch.creatorUsername, request: ch.status !== 'approved' });
+    return;
+  }
   if (new Date(ch.expiresAt).getTime() < Date.now()) return send(ws, { type: 'error', message: 'This challenge has expired' });
   if (ch.status === 'cancelled') return send(ws, { type: 'error', message: 'This challenge was cancelled' });
   if (ch.status === 'started' || ch.gameId) return send(ws, { type: 'error', message: 'This challenge has already been played' });
@@ -808,6 +828,42 @@ async function acceptLiveChallenge(ws: WebSocket, userId: string, username: stri
     body: `${username} accepted your ${TIME_CONTROLS[ch.timeControl as TimeControlId]?.label ?? ''} challenge and is waiting. Tap to play.`,
     url: '/live',
   }).catch(err => logger.warn({ err }, 'challenge accepted push failed'));
+}
+
+// Owner accepts a live request (from the request page -> /live?approve=CODE).
+// Starts right away if the requester is waiting; otherwise tells them to come
+// back and keeps the owner on a waiting screen.
+async function approveLiveRequest(ws: WebSocket, userId: string, code: string) {
+  const [ch] = await db.select().from(gameChallengesTable).where(eq(gameChallengesTable.code, String(code)));
+  if (!ch || !ch.parentCode || ch.kind !== 'live' || ch.creatorUserId !== userId) return send(ws, { type: 'error', message: 'Challenge request not found' });
+  if (ch.status === 'cancelled') return send(ws, { type: 'error', message: `${ch.acceptedByUsername ?? 'They'} withdrew the request` });
+  if (ch.status === 'declined') return send(ws, { type: 'error', message: 'You declined this request' });
+  if (ch.status === 'started' || ch.gameId) return send(ws, { type: 'error', message: 'This challenge has already been played' });
+  if (new Date(ch.expiresAt).getTime() < Date.now()) return send(ws, { type: 'error', message: 'This request has expired' });
+  if (userActiveGame.has(userId)) return send(ws, { type: 'error', message: 'Finish your current game first' });
+  if (ch.status === 'requested') {
+    await db.update(gameChallengesTable).set({ status: 'approved' })
+      .where(and(eq(gameChallengesTable.code, ch.code), eq(gameChallengesTable.status, 'requested')));
+  }
+  cancelQueue(userId);
+  if (await startChallengeGame(ch.code)) return;
+  send(ws, { type: 'challenge_waiting', code: ch.code, creator: ch.acceptedByUsername ?? 'your opponent', approving: true });
+  if (ch.acceptedByUserId) {
+    notifyUser(ch.acceptedByUserId, {
+      kind: 'challenge',
+      title: 'Challenge accepted!',
+      body: `${ch.creatorUsername} accepted your ${TIME_CONTROLS[ch.timeControl as TimeControlId]?.label ?? ''} challenge and is waiting. Tap to play now.`,
+      url: `/live?challenge=${ch.code}`,
+    }).catch(err => logger.warn({ err }, 'request approved push failed'));
+  }
+}
+
+/** Tell someone waiting on a live request that it's off (declined/withdrawn). */
+export function cancelLiveRequestWaiter(code: string, message: string) {
+  const p = pendingChallenges.get(code);
+  if (!p) return;
+  pendingChallenges.delete(code);
+  send(p.acceptorWs, { type: 'error', message });
 }
 
 function dropPendingForSocket(ws: WebSocket) {
@@ -1227,6 +1283,14 @@ export function attachLiveServer(server: HttpServer) {
             await joinQueue(ws, info.userId, info.username, msg.timeControl, (msg.mode as Mode) || 'casual');
             break;
           case 'cancel':
+            // Stop waiting on a request made through someone's open link.
+            for (const [code, p] of pendingChallenges) {
+              if (p.acceptorWs === ws && p.isRequest) {
+                void db.update(gameChallengesTable).set({ status: 'cancelled' })
+                  .where(and(eq(gameChallengesTable.code, code), eq(gameChallengesTable.status, 'requested')))
+                  .catch(() => {});
+              }
+            }
             cancelQueue(info.userId);
             dropPendingForSocket(ws);
             send(ws, { type: 'queue_cancelled' });
@@ -1236,6 +1300,9 @@ export function attachLiveServer(server: HttpServer) {
             break;
           case 'accept_challenge':
             await acceptLiveChallenge(ws, info.userId, info.username, msg.code);
+            break;
+          case 'approve_request':
+            await approveLiveRequest(ws, info.userId, msg.code);
             break;
           case 'move':
             handleMove(ws, info.userId, msg.gameId, msg.san);
