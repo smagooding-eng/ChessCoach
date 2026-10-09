@@ -1,8 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useLocation } from 'wouter';
 import { apiFetch } from '@/lib/api';
-import { trackBackgroundJob } from '@/components/BackgroundJobsWatcher';
-import { trackImportJob } from '@/components/ImportStatusWatcher';
+import { startOnboardingImport } from '@/lib/onboardingImport';
 import { trackFunnelEvent } from '@/lib/funnelTracking';
 
 const CHESSCOM_GREEN = '#81b64c';
@@ -22,10 +21,8 @@ interface OnboardingStartModalProps {
  * platform username was provided at signup — if not, it asks for one
  * inline before proceeding, so this is a single reliable trigger point
  * rather than depending on a separate step being completed first.
- * Kicks off the game import + background review, then offers a quick bot
- * game while the user waits — sets their starting Scout ELO in the
- * process. "Skip" doesn't cancel the import/review; it just lets the user
- * head to the dashboard while it keeps running in the background.
+ * Kicks off the game import + background review, then sends the player to
+ * their dashboard (the import/review keep running in the background).
  */
 export function OnboardingStartModal({ username: initialUsername, platform: initialPlatform, onDone }: OnboardingStartModalProps) {
   const [, navigate] = useLocation();
@@ -66,73 +63,27 @@ export function OnboardingStartModal({ username: initialUsername, platform: init
     }
   };
 
+  // Start the import (and the review after it). It carries on in the
+  // background if the player leaves this screen; we only follow it here to
+  // show "all set" or ask again if the username was wrong.
+  const mounted = useRef(true);
+  useEffect(() => () => { mounted.current = false; }, []);
   useEffect(() => {
     if (status !== 'starting' || !username) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const importRes = await apiFetch('/api/games/import-bg', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ username, platform, months: 3 }),
-        });
-        if (!importRes.ok) {
-          const errBody = await importRes.json().catch(() => null) as { error?: string; message?: string } | null;
-          throw new Error(errBody?.message || errBody?.error || `Import failed (${importRes.status})`);
-        }
-        const { jobId: importJobId } = await importRes.json() as { jobId: string };
-
-        // This registers with the same global watcher/popup used by manual
-        // imports elsewhere in the app -- the "your games are ready, click
-        // here to browse them" notification. It'll keep showing and
-        // updating regardless of what page this modal itself is on, or
-        // even after this modal closes.
-        trackImportJob(importJobId, platform, username);
-
-        // Poll locally too, purely so this modal knows when to move on
-        // to kicking off the review and advancing its own "ready" step --
-        // a separate concern from the global popup above, which polls
-        // independently.
-        let importStatus = 'pending';
-        while (!cancelled && importStatus === 'pending') {
-          await new Promise((r) => setTimeout(r, 3000));
-          if (cancelled) return;
-          const statusRes = await apiFetch(`/api/games/import-status/${importJobId}`, { credentials: 'include' });
-          if (!statusRes.ok) continue; // transient — keep polling
-          const statusData = await statusRes.json() as { status: string; error?: string | null };
-          importStatus = statusData.status;
-          if (importStatus === 'error') throw new Error(statusData.error || 'Import failed');
-        }
-        if (cancelled) return;
-
-        const reviewRes = await apiFetch('/api/games/review-all', { method: 'POST', credentials: 'include' });
-        if (!reviewRes.ok) {
-          const errBody = await reviewRes.json().catch(() => null) as { error?: string } | null;
-          throw new Error(errBody?.error || `Review failed (${reviewRes.status})`);
-        }
-        const reviewData = await reviewRes.json().catch(() => null) as { jobId?: string } | null;
-        if (reviewData?.jobId) trackBackgroundJob('gamesReview', reviewData.jobId);
-        if (!cancelled) setStatus('ready');
-      } catch (err) {
-        if (!cancelled) {
-          setImportErrorMessage(err instanceof Error ? err.message : 'Something went wrong importing your games.');
-          setUsernameInput(username);
-          setStatus('need-username');
-        }
-      }
-    })();
-    return () => { cancelled = true; };
+    const fail = (message: string) => {
+      if (!mounted.current) return;
+      setImportErrorMessage(message);
+      setUsernameInput(username);
+      setStatus('need-username');
+    };
+    startOnboardingImport(username, platform, {
+      onReady: () => { if (mounted.current) setStatus('ready'); },
+      onError: fail,
+    }).catch((err) => fail(err instanceof Error ? err.message : 'Something went wrong importing your games.'));
   }, [status, username, platform]);
 
-  const playNow = () => {
-    trackFunnelEvent('mia_started');
-    onDone();
-    navigate('/practice?onboarding=true');
-  };
-
-  const skip = () => {
-    trackFunnelEvent('mia_skipped');
+  const finish = () => {
+    trackFunnelEvent('onboarding_finished');
     onDone();
     navigate('/', { replace: true } as never);
   };
@@ -211,29 +162,14 @@ export function OnboardingStartModal({ username: initialUsername, platform: init
           </p>
         </div>
 
-        <div className="rounded-xl p-4 text-left" style={{ background: 'rgba(129,182,76,0.08)', border: '1px solid rgba(129,182,76,0.2)' }}>
-          <p className="text-sm font-bold mb-1" style={{ color: CHESSCOM_GREEN }}>While you wait</p>
-          <p className="text-xs leading-relaxed" style={{ color: TEXT_MUTED }}>
-            Play a quick game against Mia (1200 ELO) to set your starting Scout ELO — takes just a few minutes.
-          </p>
-        </div>
-
-        <div className="space-y-2">
-          <button
-            onClick={playNow}
-            className="w-full py-3 rounded-xl font-black text-sm"
-            style={{ background: `linear-gradient(180deg, #95c45a 0%, ${CHESSCOM_GREEN} 100%)`, color: 'white' }}
-          >
-            Play Mia Now
-          </button>
-          <button
-            onClick={skip}
-            className="w-full text-xs font-bold uppercase tracking-widest"
-            style={{ color: TEXT_MUTED }}
-          >
-            Skip — take me to my dashboard
-          </button>
-        </div>
+        <button
+          onClick={finish}
+          className="w-full py-3 rounded-xl font-black text-sm"
+          style={{ background: `linear-gradient(180deg, #95c45a 0%, ${CHESSCOM_GREEN} 100%)`, color: 'white' }}
+        >
+          Go to my dashboard
+        </button>
+        <p className="text-[11px]" style={{ color: TEXT_MUTED }}>Your games keep importing in the background.</p>
       </div>
     </div>
   );

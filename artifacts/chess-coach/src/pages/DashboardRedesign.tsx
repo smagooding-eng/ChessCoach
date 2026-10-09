@@ -21,6 +21,7 @@ import { scene } from '@/components/PhotoHero';
 import { BOTS } from '@/lib/chess-bot';
 import { ActiveGamesCard } from '@/components/play/ActiveGamesCard';
 import { PlayAppCard } from '@/components/GooglePlayBadge';
+import { ChallengeInbox } from '@/components/play/OpenChallenges';
 
 // Dashboard shown when the global "dashboard redesign" flag is ON (see
 // DashboardRouter in App.tsx). The mobile header and bottom nav in the
@@ -271,6 +272,7 @@ export function DashboardRedesign() {
         </section>
 
         {/* ── Your live / daily games (hidden when none) ── */}
+        <ChallengeInbox className="lg:col-span-2" />
         <ActiveGamesCard />
         <PlayAppCard className="lg:col-span-2" />
 

@@ -45,6 +45,13 @@ export function Challenge() {
       })
       .catch(() => setMissing(true));
   }, [code]);
+  // Signed in and it's someone else's challenge: keep it on your home and
+  // Play screens until you answer or dismiss it.
+  useEffect(() => {
+    if (!isAuthenticated || !ch || isCreator || ch.isRequest) return;
+    apiFetch(`/api/challenges/${ch.code}/seen`, { method: 'POST' }).catch(() => {});
+  }, [isAuthenticated, ch?.code, isCreator]);  // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     load();
     // a request's status changes when the other side answers

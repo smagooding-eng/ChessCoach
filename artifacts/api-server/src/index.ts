@@ -231,6 +231,14 @@ async function runSchemaMigrations() {
     await db.execute(sql`ALTER TABLE game_challenges ADD COLUMN IF NOT EXISTS open BOOLEAN NOT NULL DEFAULT false`);
     await db.execute(sql`ALTER TABLE game_challenges ADD COLUMN IF NOT EXISTS parent_code VARCHAR`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_game_challenges_parent ON game_challenges(parent_code, status)`);
+    // Challenges someone opened but hasn't answered yet (shown on their home + Play screens).
+    await db.execute(sql`CREATE TABLE IF NOT EXISTS challenge_invites (
+      user_id VARCHAR NOT NULL,
+      code VARCHAR NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      dismissed_at TIMESTAMPTZ,
+      PRIMARY KEY (user_id, code)
+    )`);
     // In-app notifications (the bell). Push is a copy of these for when the app is closed.
     await db.execute(sql`CREATE TABLE IF NOT EXISTS notifications (
       id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),

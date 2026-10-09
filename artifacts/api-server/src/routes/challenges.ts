@@ -1,7 +1,7 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import crypto from "crypto";
 import { db, gameChallengesTable } from "@workspace/db";
-import { and, eq, desc, inArray, isNotNull, gt } from "drizzle-orm";
+import { and, eq, desc, inArray, isNotNull, gt, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/authMiddleware";
 import { listTimeControls, cancelLiveRequestWaiter } from "../lib/liveServer";
 import { isValidTimeControl, startGame, dailyLabel } from "../lib/correspondence";
@@ -99,6 +99,30 @@ router.get("/challenges/mine", requireAuth, async (req: Request, res: Response) 
   }
 });
 
+// Challenges you've opened but not answered yet -- shown on your home and
+// Play screens so a link you looked at (e.g. right before signing up) isn't lost.
+router.get("/challenges/invites", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const r = await db.execute(sql`
+      SELECT ci.code FROM challenge_invites ci
+      JOIN game_challenges gc ON gc.code = ci.code
+      WHERE ci.user_id = ${req.user!.id} AND ci.dismissed_at IS NULL
+        AND gc.status = 'open' AND gc.expires_at > now()
+        AND gc.creator_user_id <> ${req.user!.id} AND gc.parent_code IS NULL
+      ORDER BY ci.created_at DESC LIMIT 10
+    `);
+    const list = (Array.isArray(r) ? r : ((r as unknown as { rows?: unknown[] }).rows ?? [])) as { code: string }[];
+    const codes = list.map((x) => x.code);
+    if (codes.length === 0) { res.json({ invites: [] }); return; }
+    const rows = await db.select().from(gameChallengesTable).where(inArray(gameChallengesTable.code, codes));
+    const order = new Map(codes.map((c, i) => [c, i]));
+    rows.sort((a, b) => (order.get(a.code) ?? 0) - (order.get(b.code) ?? 0));
+    res.json({ invites: rows.map(publicChallenge) });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to load invites", details: err.cause?.message ?? err.message });
+  }
+});
+
 // Challenge requests waiting for the owner's answer (newest first).
 router.get("/challenges/requests", requireAuth, async (req: Request, res: Response) => {
   try {
@@ -179,6 +203,30 @@ router.post("/challenges/:code/accept", requireAuth, async (req: Request, res: R
   }
 });
 
+// The signed-in person opened this challenge link: remember it for them.
+router.post("/challenges/:code/seen", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const [ch] = await db.select().from(gameChallengesTable).where(eq(gameChallengesTable.code, String(req.params.code)));
+    if (!ch || ch.parentCode || ch.creatorUserId === req.user!.id) { res.json({ success: false }); return; }
+    await db.execute(sql`
+      INSERT INTO challenge_invites (user_id, code) VALUES (${req.user!.id}, ${ch.code})
+      ON CONFLICT (user_id, code) DO NOTHING
+    `);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed", details: err.cause?.message ?? err.message });
+  }
+});
+
+router.post("/challenges/:code/dismiss", requireAuth, async (req: Request, res: Response) => {
+  try {
+    await db.execute(sql`UPDATE challenge_invites SET dismissed_at = now() WHERE user_id = ${req.user!.id} AND code = ${String(req.params.code)}`);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed", details: err.cause?.message ?? err.message });
+  }
+});
+
 // ── Open links: requests ───────────────────────────────────────────────────
 
 // Someone opened an open link and wants to play its owner.
@@ -200,6 +248,7 @@ router.post("/challenges/:code/request", requireAuth, async (req: Request, res: 
     if (existing) { res.json({ request: publicChallenge(existing) }); return; }
 
     const name = displayName(req);
+    await db.execute(sql`UPDATE challenge_invites SET dismissed_at = now() WHERE user_id = ${req.user!.id} AND code = ${link.code}`).catch(() => {});
     const [row] = await db.insert(gameChallengesTable).values({
       code: newCode(),
       creatorUserId: link.creatorUserId,

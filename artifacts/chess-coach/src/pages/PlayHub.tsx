@@ -8,6 +8,8 @@ import { RD } from '@/lib/redesignTheme';
 import { RedesignHeader } from '@/components/RedesignHeader';
 import { scene } from '@/components/PhotoHero';
 import { useSiteImg } from '@/hooks/use-app-config';
+import { ChallengeInbox } from '@/components/play/OpenChallenges';
+import { ActiveGamesCard } from '@/components/play/ActiveGamesCard';
 
 // "Play Chess" hub (redesign). Only offers what the app can actually do:
 //  - Play a Bot: the real roster (count and rating range read from BOTS).
@@ -33,6 +35,8 @@ export function PlayHub() {
     <div className="min-h-screen px-3 md:px-6 md:pt-6 md:pb-12 pb-[calc(7.5rem+env(safe-area-inset-bottom))]" style={{ background: RD.bg, color: RD.text }}>
       <div className="mx-auto grid grid-cols-1 w-full max-w-[560px] gap-3 lg:max-w-[1000px]">
         <RedesignHeader title="Play Chess" backHref="/" />
+        {authUser && <ChallengeInbox />}
+        {authUser && <div><ActiveGamesCard /></div>}
 
         <section className="grid gap-3 lg:grid-cols-2">
           {rows.filter((r) => r.show).map((r) => (

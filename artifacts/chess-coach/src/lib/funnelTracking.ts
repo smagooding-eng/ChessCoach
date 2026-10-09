@@ -20,7 +20,7 @@ const PLATFORM: 'web' | 'app' = isRunningStandalone() ? 'app' : 'web';
 export type LandingSectionId = 'hero' | 'how_it_works' | 'differentiators' | 'features' | 'faq' | 'pricing' | 'final_cta';
 
 export type LandingFunnelEvent =
-  | 'landing_view' | 'mia_started' | 'mia_skipped' | 'signup_clicked' | 'signup_completed'
+  | 'landing_view' | 'mia_started' | 'mia_skipped' | 'onboarding_finished' | 'signup_clicked' | 'signup_completed'
   | 'signup_form_submitted' | 'signup_error' | 'opponent_scout_clicked'
   | 'google_oauth_clicked' | 'google_signup_completed' | 'google_signup_error'
   | 'scroll_25' | 'scroll_50' | 'scroll_75' | 'scroll_100'

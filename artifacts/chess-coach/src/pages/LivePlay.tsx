@@ -8,7 +8,7 @@ import { apiFetch } from '@/lib/api';
 import { PT, cardStyle, greenBtn, ghostBtn } from '@/lib/playTheme';
 import { ShareLink } from '@/components/play/ShareLink';
 import { NotifyPrompt } from '@/components/play/NotifyPrompt';
-import { useChallengeInbox, ChallengeRequestsCard, OpenLinksCard, createOpenLink } from '@/components/play/OpenChallenges';
+import { useChallengeInbox, ChallengeRequestsCard, ChallengeInvitesCard, OpenLinksCard, createOpenLink } from '@/components/play/OpenChallenges';
 
 const TC_OPTIONS = [
   { id: 'blitz_5_0',  label: '5 min',  sub: 'Blitz', icon: Zap },
@@ -168,6 +168,7 @@ export function LivePlay() {
       ) : (
         <>
           <ChallengeRequestsCard requests={inbox.requests} onAcceptLive={(code) => live.approveRequest(code)} onChanged={() => { void inbox.reload(); }} />
+          <ChallengeInvitesCard invites={inbox.invites} onChanged={() => { void inbox.reload(); }} />
           <OpenLinksCard links={inbox.links} kind="live" onChanged={() => { void inbox.reload(); }} />
           <div className="inline-flex rounded-xl p-1" style={{ background: 'rgba(0,0,0,0.3)', border: `1px solid ${PT.border}` }}>
             {(['casual', 'ranked'] as LiveMode[]).map(m => (

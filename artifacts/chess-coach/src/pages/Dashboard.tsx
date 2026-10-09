@@ -18,6 +18,7 @@ import { ReferralCard } from '@/pages/Profile';
 import { BOTS } from '@/lib/chess-bot';
 import { ActiveGamesCard } from '@/components/play/ActiveGamesCard';
 import { PlayAppCard } from '@/components/GooglePlayBadge';
+import { ChallengeInbox } from '@/components/play/OpenChallenges';
 
 const BG_DARK = '#262421';
 const BG_CARD = 'linear-gradient(180deg, #383532 0%, #2a2825 100%)';
@@ -117,6 +118,7 @@ export function Dashboard() {
   return (
     <div className="space-y-4 md:space-y-5">
       <EmailVerifyBanner />
+      <ChallengeInbox />
       <ActiveGamesCard />
       <PlayAppCard />
 

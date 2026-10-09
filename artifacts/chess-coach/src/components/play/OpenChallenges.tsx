@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useLocation } from 'wouter';
-import { Link2, Check, X, Inbox } from 'lucide-react';
+import { Link2, Check, X, Inbox, Swords, CalendarDays, ChevronRight } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { PT, cardStyle, greenBtn, ghostBtn } from '@/lib/playTheme';
 import { ShareLink } from '@/components/play/ShareLink';
@@ -40,13 +40,16 @@ export async function createOpenLink(kind: 'live' | 'daily', timeControl: string
 export function useChallengeInbox() {
   const [links, setLinks] = useState<ChallengeRow[]>([]);
   const [requests, setRequests] = useState<ChallengeRow[]>([]);
+  const [invites, setInvites] = useState<ChallengeRow[]>([]);
   const reload = useCallback(async () => {
-    const [m, q] = await Promise.all([
+    const [m, q, inv] = await Promise.all([
       apiFetch('/api/challenges/mine').then(r => r.ok ? r.json() : null).catch(() => null),
       apiFetch('/api/challenges/requests').then(r => r.ok ? r.json() : null).catch(() => null),
+      apiFetch('/api/challenges/invites').then(r => r.ok ? r.json() : null).catch(() => null),
     ]);
     if (m) setLinks(((m.challenges ?? []) as ChallengeRow[]).filter(c => c.open));
     if (q) setRequests((q.requests ?? []) as ChallengeRow[]);
+    if (inv) setInvites((inv.invites ?? []) as ChallengeRow[]);
   }, []);
   useEffect(() => {
     void reload();
@@ -56,7 +59,7 @@ export function useChallengeInbox() {
     const t = setInterval(reload, 30_000);
     return () => { window.removeEventListener(CHANGED, on); window.removeEventListener('cs:notification', on); clearInterval(t); };
   }, [reload]);
-  return { links, requests, reload };
+  return { links, requests, invites, reload };
 }
 
 const describe = (c: ChallengeRow) =>
@@ -145,5 +148,51 @@ export function OpenLinksCard({ links, kind, onChanged }: { links: ChallengeRow[
         </div>
       ))}
     </section>
+  );
+}
+
+/** Challenges you opened but haven't answered: tap to open, ✕ to dismiss. */
+export function ChallengeInvitesCard({ invites, onChanged }: { invites: ChallengeRow[]; onChanged: () => void }) {
+  const [, navigate] = useLocation();
+  if (invites.length === 0) return null;
+  const dismiss = async (code: string) => {
+    await apiFetch(`/api/challenges/${code}/dismiss`, { method: 'POST' }).catch(() => {});
+    onChanged();
+  };
+  return (
+    <section className="overflow-hidden" style={{ ...cardStyle, border: `1px solid ${PT.greenLine}` }}>
+      <h2 className="flex items-center gap-2 px-4 pb-2 pt-3.5 text-[15px] font-extrabold" style={{ color: PT.text }}>
+        <Swords size={17} style={{ color: PT.green }} /> You've been challenged
+      </h2>
+      {invites.map(c => (
+        <div key={c.code} className="flex items-center gap-3 px-4 py-3" style={{ borderTop: `1px solid ${PT.border}` }}>
+          <button onClick={() => navigate(`/challenge/${c.code}`)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl" style={{ background: PT.greenSoft, color: PT.green }}>
+              {c.kind === 'live' ? <Swords size={18} /> : <CalendarDays size={18} />}
+            </span>
+            <span className="min-w-0 flex-1">
+              <b className="block truncate text-[14px] font-extrabold" style={{ color: PT.text }}>{c.creatorUsername}</b>
+              <span className="block text-[12px]" style={{ color: PT.muted }}>{c.kind === 'live' ? 'Live' : 'Daily'} · {describe(c)}</span>
+            </span>
+            <span className="inline-flex shrink-0 items-center gap-1 rounded-xl px-3 py-2 text-[12.5px] font-extrabold" style={greenBtn}>
+              {c.open ? 'Challenge' : 'Play'} <ChevronRight size={14} />
+            </span>
+          </button>
+          <button onClick={() => dismiss(c.code)} aria-label="Dismiss" className="grid h-9 w-9 shrink-0 place-items-center rounded-xl" style={ghostBtn}><X size={15} /></button>
+        </div>
+      ))}
+    </section>
+  );
+}
+
+/** Home / Play screens: requests to answer + challenges waiting for you. */
+export function ChallengeInbox({ className = '' }: { className?: string }) {
+  const inbox = useChallengeInbox();
+  if (inbox.requests.length === 0 && inbox.invites.length === 0) return null;
+  return (
+    <div className={`space-y-3 ${className}`}>
+      <ChallengeRequestsCard requests={inbox.requests} onChanged={() => { void inbox.reload(); }} />
+      <ChallengeInvitesCard invites={inbox.invites} onChanged={() => { void inbox.reload(); }} />
+    </div>
   );
 }
