@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useRef } from 'r
 import { useUser } from '@/context/UserContext';
 import { useDashboardRedesignFlag } from '@/hooks/use-app-config';
 import { playSound, SOUND_PACKS, type SoundPack, type SoundEvent } from '@/lib/sounds';
+import { REDESIGN_ON } from '@/lib/redesignTheme';
 export { SOUND_PACKS, type SoundPack };
 
 export type BoardTheme = 'classic' | 'green' | 'blue' | 'gray' | 'purple' | 'crimson' | 'teal' | 'coal' | 'sunset' | 'rose' | 'amber' | 'mint' | 'indigo' | 'midnight' | 'arctic' | 'custom';
@@ -353,11 +354,16 @@ interface Settings {
   boardSize: BoardSize;
 }
 
+// Out-of-the-box look. In the enhanced UI that's the Tournament board with
+// the Ink & Cream pieces; the classic UI keeps its original green board and
+// default pieces. Only applies to people who haven't picked their own (saved
+// settings always win), and to "Revert to Default" when no personal default
+// has been set.
 const APP_DEFAULT_SETTINGS: Settings = {
   boardTheme: 'green',
-  boardTexture: 'flat',
+  boardTexture: REDESIGN_ON ? 'cs-tournament' : 'flat',
   pieceStyle: 'classic',
-  pieceShape: 'default',
+  pieceShape: REDESIGN_ON ? 'ink-cream' : 'default',
   appBackground: 'default',
   boardCustomColors: { light: '#eeeed2', dark: '#769656' },
   pieceCustomColors: { light: '#ffffff', dark: '#2b2b2b' },

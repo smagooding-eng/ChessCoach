@@ -12,17 +12,18 @@ export interface PieceThemeType {
 }
 
 export const PIECE_THEME_TYPES: PieceThemeType[] = [
-  {
-    id: 'tops-3d',
-    label: '3D Tops',
-    blurb: 'Squat, chunky "tops only" pieces rendered in 3D: marble, wood, jade, metal, crystal and more.',
-    shapes: ['frost-mosaic', 'walnut-maple', 'carved-jade', 'brushed-steel', 'futuristic-ceramic', 'crystal-ice', 'marble-gold', 'glossy-vinyl', 'ruby-sapphire', 'steampunk-brass', 'gothic-spires', 'bronze-silver', 'celtic-stone'],
-  },
+  // 2D first: the default set (Ink & Cream) lives here.
   {
     id: 'tops-2d',
-    label: '2D Tops',
-    blurb: 'Squat, chunky "tops only" pieces in flat illustrated styles: ink, cartoon, pixel art and stained glass.',
+    label: 'ChessScout2D',
+    blurb: "ChessScout's own squat, chunky pieces in flat illustrated styles: ink, cartoon, pixel art and stained glass.",
     shapes: ['ink-cream', 'pixel-art', 'stained-glass', 'minimal-rounded', 'pixel-art-2', 'chunky-cartoon'],
+  },
+  {
+    id: 'tops-3d',
+    label: 'ChessScout3D',
+    blurb: "ChessScout's own squat, chunky pieces rendered in 3D: marble, wood, jade, metal, crystal and more.",
+    shapes: ['frost-mosaic', 'walnut-maple', 'carved-jade', 'brushed-steel', 'futuristic-ceramic', 'crystal-ice', 'marble-gold', 'glossy-vinyl', 'ruby-sapphire', 'steampunk-brass', 'gothic-spires', 'bronze-silver', 'celtic-stone'],
   },
   {
     id: 'classic',
