@@ -13,14 +13,16 @@ import { useEffect } from 'react';
 type Handler = (dir: 1 | -1) => boolean;
 let pageHandler: Handler | null = null;
 
-export function useSwipeTabs<T extends string>(ids: readonly T[], current: T, setTab: (t: T) => void, enabled = true): void {
+// setTab is typed loosely on purpose: a React state setter for a union of
+// tab ids (Dispatch<SetStateAction<'a' | 'b'>>) must be accepted as-is.
+export function useSwipeTabs<T extends string>(ids: readonly T[], current: T, setTab: (t: never) => void, enabled = true): void {
   useEffect(() => {
     if (!enabled) return;
     const h: Handler = (dir) => {
       const i = ids.indexOf(current);
       const next = i + dir;
       if (i < 0 || next < 0 || next >= ids.length) return false;
-      setTab(ids[next]);
+      (setTab as (t: T) => void)(ids[next]);
       return true;
     };
     pageHandler = h;
