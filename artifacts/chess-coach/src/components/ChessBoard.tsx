@@ -531,7 +531,7 @@ export function ChessBoard({
   const boardKeyRef = useRef(0);
 
   const boardEl = (
-    <div className={`relative w-full mx-auto ${sidePanel ? 'lg:mx-0 lg:min-w-0 lg:flex-1' : ''}`} style={{ maxWidth: boardMaxWidth }}>
+    <div data-no-swipe className={`relative w-full mx-auto ${sidePanel ? 'lg:mx-0 lg:min-w-0 lg:flex-1' : ''}`} style={{ maxWidth: boardMaxWidth }}>
       {/* Static gradient presets (Shaded/3D Wood/3D Marble/Chrome/Gold/
           Copper/Obsidian/Ivory) now live in the shared PieceGradientDefs
           component so every board can use them, not just this one -- see

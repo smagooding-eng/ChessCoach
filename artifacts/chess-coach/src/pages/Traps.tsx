@@ -7,6 +7,7 @@ import { RD } from '@/lib/redesignTheme';
 import { Chess } from 'chess.js';
 import { FenThumb } from '@/components/FenThumb';
 import { RedesignHeader } from '@/components/RedesignHeader';
+import { useSwipeTabs } from '@/lib/swipeNav';
 
 const BG = '#141413';
 const CARD = '#1c1b19';
@@ -138,6 +139,7 @@ const CHIP: Record<string, { bg: string; fg: string; bd: string }> = {
 
 function TrapsRedesign({ traps, loading }: { traps: TrapSummary[]; loading: boolean }) {
   const [tab, setTab] = useState<'all' | 'category' | 'level'>('all');
+  useSwipeTabs(['all', 'category', 'level'] as const, tab, setTab);
 
   const groupBy = (key: (t: TrapSummary) => string) =>
     traps.reduce<Record<string, TrapSummary[]>>((acc, t) => { (acc[key(t)] ??= []).push(t); return acc; }, {});

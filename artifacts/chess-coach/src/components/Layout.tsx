@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useLayoutEffect } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { Link, useLocation } from 'wouter';
 import { useUser } from '@/hooks/use-user';
 import { useUnreadCount } from '@/components/RealtimeBridge';
@@ -7,6 +7,7 @@ import { useMultiEloProgress } from '@/hooks/use-elo-progress';
 import { useDashboardRedesignFlag } from '@/hooks/use-app-config';
 import { GooglePlayBadge, PlayLogo } from '@/components/GooglePlayBadge';
 import { PLAY_STORE_URL, shouldShowPlayBadge } from '@/lib/playApp';
+import { runPageSwipe, swipeAllowedFrom } from '@/lib/swipeNav';
 import { useLiveRatings, bestLiveRating } from '@/hooks/use-live-ratings';
 import { LayoutDashboard, Import, History, BrainCircuit, GraduationCap, Swords, BookOpen, LogOut, MoreHorizontal, ChevronRight, Bot, Crown, Trophy, Play, Search, Download, Puzzle, User, Settings, CreditCard, Camera, Shield, Target, BarChart3 } from 'lucide-react';
 import { usePwaInstall } from '@/hooks/use-pwa-install';
@@ -160,6 +161,40 @@ export function Layout({ children, fullscreen }: { children: React.ReactNode; fu
   const { player } = useChessPlayer(username ?? undefined);
   const { data: multiElo } = useMultiEloProgress(username ?? undefined);
   const [moreOpen, setMoreOpen] = useState(false);
+
+  // Swipe left/right between menus on phones: a page's own tabs first, then
+  // the bottom-nav sections (Home, Scout, Games, Analysis).
+  const mainRef = useRef<HTMLElement | null>(null);
+  const swipeState = useRef({ location, moreOpen });
+  swipeState.current = { location, moreOpen };
+  useEffect(() => {
+    const el = mainRef.current;
+    if (!el) return;
+    const sections = PRIMARY_NAV.slice(0, 4).map((i) => i.href);
+    let start: { x: number; y: number; t: number; ok: boolean } | null = null;
+    const onStart = (e: TouchEvent) => {
+      if (e.touches.length !== 1 || window.innerWidth >= 768) { start = null; return; }
+      const t = e.touches[0];
+      // Leave the screen edges to the phone's own back/forward gestures.
+      const edge = t.clientX < 24 || t.clientX > window.innerWidth - 24;
+      start = { x: t.clientX, y: t.clientY, t: Date.now(), ok: !edge && swipeAllowedFrom(e.target) };
+    };
+    const onEnd = (e: TouchEvent) => {
+      const s0 = start; start = null;
+      if (!s0 || !s0.ok || swipeState.current.moreOpen) return;
+      const t = e.changedTouches[0];
+      const dx = t.clientX - s0.x, dy = t.clientY - s0.y;
+      if (Date.now() - s0.t > 700 || Math.abs(dx) < 70 || Math.abs(dx) < Math.abs(dy) * 1.8) return;
+      const dir: 1 | -1 = dx < 0 ? 1 : -1; // swipe left = next
+      if (runPageSwipe(dir)) return;
+      const i = sections.indexOf(swipeState.current.location);
+      const next = i + dir;
+      if (i >= 0 && next >= 0 && next < sections.length) navigateTo(sections[next]);
+    };
+    el.addEventListener('touchstart', onStart, { passive: true });
+    el.addEventListener('touchend', onEnd, { passive: true });
+    return () => { el.removeEventListener('touchstart', onStart); el.removeEventListener('touchend', onEnd); };
+  }, [navigateTo]);
   const [profileOpen, setProfileOpen] = useState(false);
   const handleLogout = isAuthenticated ? authLogout : logout;
   const { showGuide, setShowGuide, dismissInstall, platform } = usePwaInstall();
@@ -365,7 +400,7 @@ export function Layout({ children, fullscreen }: { children: React.ReactNode; fu
       </header>
       )}
 
-      <main className="flex-1 min-h-screen overflow-x-hidden pb-20 md:pb-6 md:px-5 md:pt-5">
+      <main ref={mainRef} className="flex-1 min-h-screen overflow-x-hidden pb-20 md:pb-6 md:px-5 md:pt-5">
         <div className={`md:mx-auto ${redesign ? 'md:max-w-[1280px]' : 'md:max-w-5xl'}`}>
           {children}
         </div>

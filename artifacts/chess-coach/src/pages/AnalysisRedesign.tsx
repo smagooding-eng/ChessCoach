@@ -11,6 +11,7 @@ import { useUser } from '@/hooks/use-user';
 import { RD } from '@/lib/redesignTheme';
 import { RedesignHeader } from '@/components/RedesignHeader';
 import type { WeaknessRecord } from '@workspace/api-client-react';
+import { useSwipeTabs } from '@/lib/swipeNav';
 
 // "My Analytics" (enhanced UI), laid out from the supplied concept. Every
 // number on this page is real data:
@@ -228,6 +229,7 @@ export function AnalysisRedesign() {
     setTabState(t);
     try { window.history.replaceState(null, '', t === 'overview' ? window.location.pathname : `${window.location.pathname}?tab=${t}`); } catch { /* ignore */ }
   };
+  useSwipeTabs(TABS.map((t) => t.id), tab, setTab);
   const [winRange, setWinRange] = useState(6);
   const [accRange, setAccRange] = useState(6);
 

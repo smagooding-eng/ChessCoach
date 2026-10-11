@@ -22,7 +22,7 @@ function SwipeRow({ onClear, children }: { onClear: () => void; children: React.
   const start = React.useRef<{ x: number; y: number; horizontal: boolean | null } | null>(null);
   const clear = () => { setGone(true); setTimeout(onClear, 180); };
   return (
-    <div className="relative overflow-hidden" style={{ background: PT.red }}>
+    <div data-no-swipe className="relative overflow-hidden" style={{ background: PT.red }}>
       <span className="absolute inset-y-0 right-4 flex items-center gap-1.5 text-[12px] font-black uppercase tracking-wider text-white"><Trash2 size={15} /> Clear</span>
       <div
         onTouchStart={(e) => { const t = e.touches[0]; start.current = { x: t.clientX, y: t.clientY, horizontal: null }; }}

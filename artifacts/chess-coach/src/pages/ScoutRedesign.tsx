@@ -4,6 +4,7 @@ import { AlertTriangle, ArrowLeft, ArrowRight, ChevronDown, ChevronRight, Histor
 import { RD } from '@/lib/redesignTheme';
 import { useUser } from '@/hooks/use-user';
 import { ProUpsell } from '@/components/ProUpsell';
+import { useSwipeTabs } from '@/lib/swipeNav';
 
 // Opponent Scout (redesign): header card with search, profile card, tabs,
 // win-rate / vs-you split card and key weaknesses. All values come from the
@@ -55,6 +56,7 @@ export function ScoutRedesign(props: {
 }) {
   const { inputUsername, setInputUsername, onSubmit, loading, statusMsg, error, isLimitReached, limitNudge, result, topPlayers, history, loadingHistory, onLoadHistory, exploit } = props;
   const [tab, setTab] = useState<'overview' | 'openings' | 'weaknesses' | 'courses'>('overview');
+  useSwipeTabs(['overview', 'openings', 'weaknesses', 'courses'] as const, tab, setTab);
   const { isPremium, isSubscriptionLoaded } = useUser();
   const [showTop, setShowTop] = useState(false);
   const [open, setOpen] = useState<number | null>(null);

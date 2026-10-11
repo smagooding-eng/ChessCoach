@@ -4,6 +4,7 @@ import { ArrowRight, BookOpen, CheckCircle2, GraduationCap, Play, Target, Trophy
 import { useCourseDetail } from '@/hooks/use-courses';
 import { RD } from '@/lib/redesignTheme';
 import { useSiteImg } from '@/hooks/use-app-config';
+import { useSwipeTabs } from '@/lib/swipeNav';
 
 // Courses (redesign): "Your Training Plan" -- next-move hero, flat stat
 // columns, priority rows, a recommended-course card and compact course rows,
@@ -85,6 +86,7 @@ export function CoursesRedesign({
 }) {
   const siteImg = useSiteImg();
   const [tab, setTab] = useState<'all' | 'progress'>('all');
+  useSwipeTabs(['all', 'progress'] as const, tab, setTab);
 
   const inProgress = courses
     .filter((c) => c.totalLessons > 0 && c.completedLessons > 0 && c.completedLessons < c.totalLessons)

@@ -12,6 +12,7 @@ import { useDashboardRedesignFlag, usePhotoImagesFlag } from '@/hooks/use-app-co
 import { RD } from '@/lib/redesignTheme';
 import { RedesignHeader } from '@/components/RedesignHeader';
 import { openingThumbList } from '@/lib/openingThumb';
+import { useSwipeTabs } from '@/lib/swipeNav';
 
 type SortKey = 'totalGames' | 'winRate' | 'opening' | 'whiteWinRate' | 'blackWinRate';
 type ColorFilter = 'all' | 'white' | 'black';
@@ -48,6 +49,7 @@ export function Openings() {
   const { enabled: redesign } = useDashboardRedesignFlag();
   const photoImgs = usePhotoImagesFlag();
   const [tab, setTab] = useState<'foryou' | 'popular' | 'repertoire'>('foryou');
+  useSwipeTabs(['foryou', 'popular', 'repertoire'] as const, tab, setTab);
 
   const openings = data?.openings ?? [];
   const totalGames = data?.totalGames ?? 0;

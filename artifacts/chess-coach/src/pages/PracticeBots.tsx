@@ -19,6 +19,7 @@ import { useDashboardRedesignFlag, usePhotoImagesFlag } from '@/hooks/use-app-co
 import { RD } from '@/lib/redesignTheme';
 import { RedesignHeader } from '@/components/RedesignHeader';
 import { openingThumbList, openingFamily } from '@/lib/openingThumb';
+import { useSwipeTabs } from '@/lib/swipeNav';
 
 const QUALITY_TO_TONE: Record<string, AICoachTone> = {
   checkmate: 'gold',
@@ -1198,6 +1199,9 @@ export function PracticeBots() {
     strippedUrlRef.current = true;
     if (jumpIn || isOnboarding) window.history.replaceState({}, '', window.location.pathname);
   }, [jumpIn, isOnboarding]);
+
+  // Swipe between the Bots / Openings tabs (not while a game is open).
+  useSwipeTabs(['bots', 'openings'] as const, tab, setTab, !selectedBot && !selectedOpening);
 
   if (selectedBot) {
     return <GameView bot={selectedBot} onBack={() => setSelectedBot(null)} startFen={jumpIn?.fen} startColor={jumpIn?.color} isOnboarding={isOnboarding} />;

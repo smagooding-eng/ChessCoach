@@ -17,6 +17,7 @@ import { useDashboardRedesignFlag, useSiteImg } from '@/hooks/use-app-config';
 import { RD } from '@/lib/redesignTheme';
 import { PhotoHero, scene } from '@/components/PhotoHero';
 import { ART_BASE, distinctArtImgs } from './CoursesRedesign';
+import { useSwipeTabs } from '@/lib/swipeNav';
 
 type EndgameTab = 'checkmate' | 'essential' | 'personal';
 
@@ -58,6 +59,7 @@ export function Endgames() {
   const siteImg = useSiteImg();
 
   const [activeTab, setActiveTab] = useState<EndgameTab>('checkmate');
+  useSwipeTabs(TABS.map((t) => t.id), activeTab, setActiveTab);
   const [generatingType, setGeneratingType] = useState<string | null>(null);
   const [genError, setGenError] = useState<string | null>(null);
   const mountedRef = useRef(true);

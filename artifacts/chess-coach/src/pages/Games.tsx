@@ -14,9 +14,11 @@ import { GameThumb } from '@/components/GameThumb';
 import { UpgradeNudge } from '@/components/UpgradeNudge';
 import { Import } from '@/pages/Import';
 import { Analysis } from '@/pages/Analysis';
+import { useSwipeTabs } from '@/lib/swipeNav';
 
 export function Games() {
   const [tab, setTab] = useState<'games' | 'import' | 'analysis'>('games');
+  useSwipeTabs(['games', 'import', 'analysis'] as const, tab, setTab);
   const [pageSize, setPageSize] = useState(100);
   const [filter, setFilter] = useState('all');
   const [platformFilter, setPlatformFilter] = useState<'all' | 'chesscom' | 'lichess' | 'chessscout'>('all');
