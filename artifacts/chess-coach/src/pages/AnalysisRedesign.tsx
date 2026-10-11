@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Link } from 'wouter';
-import { ChevronRight, ChevronDown, Target, BarChart3, Trophy, BookOpen, Lightbulb, Swords, Crosshair, Gamepad2, GraduationCap, Calendar, TrendingUp, TrendingDown, ArrowUp, ArrowDown, Gauge } from 'lucide-react';
+import { ChevronRight, ChevronDown, Target, BarChart3, Trophy, BookOpen, Lightbulb, Swords, Crosshair, Gamepad2, GraduationCap, Calendar, TrendingUp, TrendingDown, ArrowUp, ArrowDown, Gauge, CheckCircle2 } from 'lucide-react';
+import { useMyCourses } from '@/hooks/use-courses';
+import { ProUpsell } from '@/components/ProUpsell';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from 'recharts';
 import { useMyAnalysisSummary, useMyWeaknesses } from '@/hooks/use-analysis';
 import { useMyOpenings } from '@/hooks/use-openings';
@@ -28,11 +30,28 @@ const SEV_RANK: Record<string, number> = { Critical: 0, High: 1, Medium: 2, Low:
 
 const TABS = [
   { id: 'overview', label: 'Overview' },
-  { id: 'openings', label: 'Openings' },
   { id: 'weaknesses', label: 'Weaknesses' },
+  { id: 'courses', label: 'Courses' },
+  { id: 'openings', label: 'Openings' },
   { id: 'trends', label: 'Trends' },
 ] as const;
 type TabId = (typeof TABS)[number]['id'];
+// /analysis?tab=weaknesses etc. opens straight on that tab
+const initialTab = (): TabId => {
+  try {
+    const t = new URLSearchParams(window.location.search).get('tab');
+    return (TABS.find((x) => x.id === t)?.id ?? 'overview') as TabId;
+  } catch { return 'overview'; }
+};
+
+function SectionHead({ title, onMore, more = 'See all' }: { title: string; onMore?: () => void; more?: string }) {
+  return (
+    <div className="mb-2 flex items-center justify-between">
+      <h2 className="text-[17px] font-extrabold">{title}</h2>
+      {onMore && <button onClick={onMore} className="flex items-center gap-0.5 text-[12.5px] font-bold" style={{ color: RD.green }}>{more} <ChevronRight size={14} /></button>}
+    </div>
+  );
+}
 
 const CARD_STYLE: React.CSSProperties = {
   background: RD.card,
@@ -197,12 +216,18 @@ function InsightCard({ icon, title, text, onClick }: { icon: React.ReactNode; ti
 }
 
 export function AnalysisRedesign() {
-  const { username } = useUser();
+  const { username, isPremium, authUser, isSubscriptionLoaded } = useUser();
+  const freePlan = isSubscriptionLoaded && !!authUser && !isPremium;
+  const { data: coursesData } = useMyCourses();
   const { data: summary } = useMyAnalysisSummary();
   const { data: weaknessesData } = useMyWeaknesses();
   const { data: openingsData } = useMyOpenings();
   const { data: multiElo } = useMultiEloProgress(username ?? undefined);
-  const [tab, setTab] = useState<TabId>('overview');
+  const [tab, setTabState] = useState<TabId>(initialTab);
+  const setTab = (t: TabId) => {
+    setTabState(t);
+    try { window.history.replaceState(null, '', t === 'overview' ? window.location.pathname : `${window.location.pathname}?tab=${t}`); } catch { /* ignore */ }
+  };
   const [winRange, setWinRange] = useState(6);
   const [accRange, setAccRange] = useState(6);
 
@@ -311,17 +336,41 @@ export function AnalysisRedesign() {
   }
 
   const signed = (n: number) => `${n > 0 ? '+' : ''}${n}%`;
+  const courses = coursesData?.courses ?? [];
+  const coursePct = (c: { completedLessons: number; totalLessons: number }) => Math.round((c.completedLessons / Math.max(1, c.totalLessons)) * 100) || 0;
+
+  const courseRow = (c: { id: number; title: string; completedLessons: number; totalLessons: number }) => {
+    const p = coursePct(c);
+    return (
+      <Link key={c.id} href={`/courses/${c.id}`} className="flex items-center gap-3 rounded-[14px] px-3 py-3 transition-transform active:scale-[.99]"
+        style={{ background: 'rgba(255,255,255,.025)', border: `1px solid ${RD.border}` }}>
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px]" style={{ background: 'rgba(129,182,76,.12)', color: RD.green }}>
+          {p >= 100 ? <CheckCircle2 size={18} /> : <GraduationCap size={18} />}
+        </span>
+        <span className="min-w-0 flex-1">
+          <b className="line-clamp-1 block text-[14px] font-bold">{c.title}</b>
+          <span className="mt-1.5 flex items-center gap-2">
+            <span className="h-1.5 flex-1 overflow-hidden rounded-full" style={{ background: 'rgba(255,255,255,.10)' }}>
+              <span className="block h-full rounded-full" style={{ width: `${Math.max(p, p > 0 ? 3 : 0)}%`, background: RD.green }} />
+            </span>
+            <span className="text-[11px]" style={{ color: RD.muted }}>{c.completedLessons}/{c.totalLessons}</span>
+          </span>
+        </span>
+        <b className="w-10 shrink-0 text-right text-[13px]" style={{ color: RD.green }}>{p}%</b>
+      </Link>
+    );
+  };
 
   return (
     <div className="min-h-screen px-3 md:px-6 md:pt-6 md:pb-12 pb-[calc(7.5rem+env(safe-area-inset-bottom))]" style={{ background: RD.bg, color: RD.text }}>
       <div className="mx-auto grid grid-cols-1 w-full max-w-[760px] gap-3 lg:max-w-[1200px]">
         <RedesignHeader title="My Analytics" icon={<span className="text-[26px] leading-none">♟</span>} />
 
-        <div className="grid grid-cols-4 gap-1 rounded-[16px] p-1 lg:max-w-[640px]" style={{ background: RD.cardSolid, border: `1px solid ${RD.border}` }}>
+        <div className="hide-scrollbar flex gap-1 overflow-x-auto rounded-[16px] p-1 lg:max-w-[720px]" style={{ background: RD.cardSolid, border: `1px solid ${RD.border}` }}>
           {TABS.map((t) => {
             const active = tab === t.id;
             return (
-              <button key={t.id} onClick={() => setTab(t.id)} className="rounded-[12px] py-2.5 text-[13px] font-bold transition-colors"
+              <button key={t.id} onClick={() => setTab(t.id)} className="flex-1 shrink-0 whitespace-nowrap rounded-[12px] px-3 py-2.5 text-[13px] font-bold transition-colors"
                 style={active ? { background: 'rgba(129,182,76,.10)', color: RD.text, boxShadow: `inset 0 0 0 1.5px ${RD.green}` } : { background: 'transparent', color: RD.muted }}>
                 {t.label}
               </button>
@@ -331,6 +380,25 @@ export function AnalysisRedesign() {
 
         {tab === 'overview' && (
           <div className="grid gap-3 lg:grid-cols-2 lg:items-start lg:gap-4">
+            {/* Totals (moved here from the home screen) */}
+            <section className="grid grid-cols-2 overflow-hidden rounded-[20px] sm:grid-cols-4 lg:col-span-2" style={CARD_STYLE}>
+              {[
+                { label: 'Total Games', value: summary.totalGames?.toLocaleString() || '0' },
+                { label: 'Reviewed', value: (summary.reviewedCount ?? 0).toLocaleString() },
+                { label: 'Avg Rating', value: String(Math.round(summary.avgRating || 0) || '—') },
+                { label: 'Weaknesses', value: String(weaknesses.length), onClick: () => setTab('weaknesses') },
+              ].map((st, i) => {
+                const Tag = st.onClick ? 'button' : 'div';
+                return (
+                  <Tag key={st.label} onClick={st.onClick} className="px-4 py-3.5 text-left"
+                    style={{ borderRight: `1px solid ${RD.border}`, borderBottom: i < 2 ? `1px solid ${RD.border}` : undefined }}>
+                    <p className="text-[10.5px] font-bold uppercase tracking-[.14em]" style={{ color: RD.muted }}>{st.label}</p>
+                    <b className="mt-0.5 block text-[22px] font-extrabold leading-tight" style={st.onClick && weaknesses.length ? { color: RD.green } : undefined}>{st.value}</b>
+                  </Tag>
+                );
+              })}
+            </section>
+
             <div className="grid grid-cols-2 gap-3 lg:col-span-2 lg:gap-4">
               <Card className="!p-3.5">
                 <div className="flex items-center justify-between">
@@ -411,7 +479,83 @@ export function AnalysisRedesign() {
             {keyInsight && (
               <div className="lg:col-span-2"><InsightCard icon={<Lightbulb size={30} style={{ color: RD.gold }} />} title="Key Insight" text={keyInsight} onClick={() => setTab('weaknesses')} /></div>
             )}
+
+            {/* What to work on: top weaknesses + course progress */}
+            <Card>
+              <SectionHead title="Top Weaknesses" onMore={weaknesses.length ? () => setTab('weaknesses') : undefined} />
+              {weaknesses.length ? (
+                <div className="grid gap-2">
+                  {weaknesses.slice(0, 3).map((w) => {
+                    const sev = SEV_STYLE[w.severity] ?? SEV_STYLE.Low;
+                    return (
+                      <Link key={w.id} href={`/analysis/${w.id}`} className="flex items-center gap-3 rounded-[14px] px-3 py-3" style={{ background: 'rgba(255,255,255,.025)', border: `1px solid ${RD.border}` }}>
+                        <span className="shrink-0 rounded-[7px] px-2 py-1 text-[11px] font-extrabold" style={{ background: sev.bg, color: sev.fg, border: `1px solid ${sev.border}` }}>{w.severity}</span>
+                        <span className="min-w-0 flex-1">
+                          <b className="block truncate text-[14px] font-bold">{w.category}</b>
+                          <span className="line-clamp-1 block text-[12px]" style={{ color: RD.muted }}>{w.description}</span>
+                        </span>
+                        <ChevronRight size={15} className="shrink-0" style={{ color: RD.muted }} />
+                      </Link>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="py-6 text-center text-[13px]" style={{ color: RD.muted }}>No weaknesses found yet. They appear once your games are reviewed.</p>
+              )}
+            </Card>
+
+            <Card>
+              <SectionHead title="Your Courses" onMore={() => setTab('courses')} more={courses.length ? 'See all' : 'Learn more'} />
+              {courses.length ? (
+                <div className="grid gap-2">{courses.slice(0, 3).map(courseRow)}</div>
+              ) : freePlan ? (
+                <ProUpsell compact title="Courses from your own games" text="Pro turns the mistakes in your games into short lessons and drills." />
+              ) : (
+                <p className="py-6 text-center text-[13px]" style={{ color: RD.muted }}>No courses yet. Open a weakness and build a course from it.</p>
+              )}
+            </Card>
           </div>
+        )}
+
+        {tab === 'courses' && (
+          <>
+            <div className="flex items-baseline justify-between px-1 pt-1">
+              <h2 className="text-[17px] font-extrabold">Your Courses</h2>
+              <Link href="/courses" className="flex items-center gap-0.5 text-[12.5px] font-bold" style={{ color: RD.green }}>Course library <ChevronRight size={14} /></Link>
+            </div>
+            {freePlan && (
+              <ProUpsell
+                title="Get courses built from your own games"
+                text="The AI coach turns the mistakes Stockfish finds in your games into short lessons and drills."
+                perks={['Lessons from your real positions', 'The AI coach on every game you review', 'AI scouting reports on your opponents']}
+              />
+            )}
+            {courses.length ? (
+              <>
+                {courses.some((c) => coursePct(c) < 100) && (
+                  <Card className="!p-2.5">
+                    <p className="px-1.5 pb-2 pt-1 text-[12px] font-black uppercase tracking-[.14em]" style={{ color: RD.muted }}>In progress</p>
+                    <div className="grid gap-2 lg:grid-cols-2">{courses.filter((c) => coursePct(c) < 100).map(courseRow)}</div>
+                  </Card>
+                )}
+                {courses.some((c) => coursePct(c) >= 100) && (
+                  <Card className="!p-2.5">
+                    <p className="px-1.5 pb-2 pt-1 text-[12px] font-black uppercase tracking-[.14em]" style={{ color: RD.muted }}>Completed</p>
+                    <div className="grid gap-2 lg:grid-cols-2">{courses.filter((c) => coursePct(c) >= 100).map(courseRow)}</div>
+                  </Card>
+                )}
+              </>
+            ) : !freePlan && (
+              <Card>
+                <div className="py-8 text-center" style={{ color: RD.muted }}>
+                  <GraduationCap size={28} className="mx-auto mb-2 opacity-50" />
+                  <p className="text-[13px]">No courses yet.</p>
+                  <p className="mt-0.5 text-[12px]">Open one of your weaknesses and build a course from it.</p>
+                  <button onClick={() => setTab('weaknesses')} className="mt-3 rounded-[11px] px-4 py-2 text-[13px] font-extrabold" style={{ color: RD.green, border: `1.5px solid ${RD.green}` }}>See weaknesses</button>
+                </div>
+              </Card>
+            )}
+          </>
         )}
 
         {tab === 'openings' && (
@@ -499,6 +643,7 @@ export function AnalysisRedesign() {
                   );
                 })}
                 <div className="lg:col-span-2"><InsightCard icon={<GraduationCap size={30} style={{ color: RD.green }} />} title="Where to start" text="Work on your High priority areas first — they show up most often in your games." /></div>
+                {freePlan && <div className="lg:col-span-2"><ProUpsell compact title="Turn these into a course" text="Pro builds lessons from the exact positions where you went wrong." /></div>}
               </div>
             ) : (
               <Card>
