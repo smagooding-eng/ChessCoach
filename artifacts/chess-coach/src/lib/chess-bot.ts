@@ -127,16 +127,30 @@ function orderMoves(moves: string[]): string[] {
 
 const MATE_SCORE = 100000;
 
+// Search time limit. A full-width search in a sharp position (lots of checks
+// and captures) could run for many seconds on a phone and freeze the game, so
+// the bot's search stops at a deadline and uses the deepest result it finished.
+let searchDeadline = Infinity;
+let searchNodes = 0;
+const SEARCH_TIMEOUT = new Error('search timeout');
+
 function minimax(chess: Chess, depth: number, alpha: number, beta: number, maximizing: boolean): number {
-  if (chess.isGameOver()) {
-    if (chess.isCheckmate()) return maximizing ? -MATE_SCORE - depth : MATE_SCORE + depth;
-    return 0;
-  }
+  if ((++searchNodes & 511) === 0 && Date.now() > searchDeadline) throw SEARCH_TIMEOUT;
   if (depth === 0) {
+    // Leaf: only checkmate matters here, and that needs the side to move to be
+    // in check -- so skip the (expensive) full game-over test otherwise.
+    if (chess.inCheck() && chess.moves().length === 0) return maximizing ? -MATE_SCORE : MATE_SCORE;
     return evaluate(chess);
   }
 
-  const moves = orderMoves(chess.moves());
+  const legal = chess.moves();
+  if (legal.length === 0) {
+    if (chess.inCheck()) return maximizing ? -MATE_SCORE - depth : MATE_SCORE + depth;
+    return 0; // stalemate
+  }
+  if (chess.isInsufficientMaterial() || chess.isThreefoldRepetition()) return 0;
+
+  const moves = orderMoves(legal);
 
   if (maximizing) {
     let maxEval = -Infinity;
@@ -366,24 +380,43 @@ export async function getBotMove(fen: string, bot: BotConfig): Promise<string | 
     ...ordered.slice(splitAt).sort(() => Math.random() - 0.5),
   ];
 
-  let i = 0;
-  for (const move of shuffled) {
-    chess.move(move);
-    const eval_ = minimax(chess, effectiveDepth - 1, -Infinity, Infinity, !maximizing) + noise();
-    chess.undo();
-
-    if (maximizing ? eval_ > bestEval : eval_ < bestEval) {
-      bestEval = eval_;
-      bestMove = move;
+  // Iterative deepening under a time budget: search 1 ply, then 2, ... up to
+  // the bot's depth, keeping the best move from the deepest search that
+  // finished. Yields to the browser after every root move so the board,
+  // clock and buttons stay responsive while the bot thinks.
+  const BUDGET_MS = 1200;
+  const started = Date.now();
+  searchDeadline = started + BUDGET_MS;
+  searchNodes = 0;
+  let order = shuffled;
+  try {
+    for (let d = 1; d <= effectiveDepth; d++) {
+      let iterBest = order[0];
+      let iterEval = maximizing ? -Infinity : Infinity;
+      const scored: { move: string; ev: number }[] = [];
+      for (const move of order) {
+        chess.move(move);
+        let ev: number;
+        try {
+          ev = minimax(chess, d - 1, -Infinity, Infinity, !maximizing) + noise();
+        } finally {
+          chess.undo();
+        }
+        scored.push({ move, ev });
+        if (maximizing ? ev > iterEval : ev < iterEval) { iterEval = ev; iterBest = move; }
+        await new Promise(resolve => setTimeout(resolve, 0));
+        if (Date.now() > searchDeadline) throw SEARCH_TIMEOUT;
+      }
+      bestMove = iterBest;
+      bestEval = iterEval;
+      // Search the most promising moves first next time (better pruning).
+      order = scored.sort((a, b) => (maximizing ? b.ev - a.ev : a.ev - b.ev)).map(x => x.move);
     }
-
-    // Yield to the browser every few root moves so a deep search can't
-    // fully block rendering/input for its whole duration — previously this
-    // ran as one uninterrupted synchronous block.
-    i++;
-    if (i % 2 === 0) {
-      await new Promise(resolve => setTimeout(resolve, 0));
-    }
+  } catch (err) {
+    if (err !== SEARCH_TIMEOUT) throw err;
+    // Out of time: keep the best move from the last depth that completed.
+  } finally {
+    searchDeadline = Infinity;
   }
 
   return bestMove;
@@ -423,7 +456,16 @@ function isRealSacrifice(fenAfterMove: string, movedPiece: string, toSquare: str
   }
 }
 
+// Move labels run while the bot may be mid-search: give them their own
+// unlimited search so they never trip over the bot's deadline.
 export function analyzeMoveQuality(fenBefore: string, san: string): MoveAnalysisResult {
+  const saved = searchDeadline;
+  searchDeadline = Infinity;
+  try { return analyzeMoveQualityInner(fenBefore, san); }
+  finally { searchDeadline = saved; }
+}
+
+function analyzeMoveQualityInner(fenBefore: string, san: string): MoveAnalysisResult {
   const chess = new Chess(fenBefore);
   const turn = chess.turn();
   const maximizing = turn === 'w';
