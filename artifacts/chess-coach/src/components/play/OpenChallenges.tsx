@@ -221,7 +221,7 @@ export function ChallengeInbox({ className = '' }: { className?: string }) {
   if (inbox.requests.length === 0 && inbox.invites.length === 0 && inbox.sent.length === 0) return null;
   const changed = () => { void inbox.reload(); };
   return (
-    <div className={`space-y-3 ${className}`}>
+    <div className={`space-y-5 ${className}`}>
       <ChallengeRequestsCard requests={inbox.requests} onChanged={changed} />
       <ChallengeInvitesCard invites={inbox.invites} onChanged={changed} />
       <SentRequestsCard sent={inbox.sent} onChanged={changed} />

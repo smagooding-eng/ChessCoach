@@ -153,15 +153,15 @@ export function DashboardRedesign() {
 
   return (
     <div
-      className="min-h-screen px-3 pt-3 md:px-6 md:pt-6 md:pb-12 pb-[calc(7.5rem+env(safe-area-inset-bottom))]"
+      className="min-h-screen px-4 pt-4 md:px-8 md:pt-8 md:pb-14 pb-[calc(7.5rem+env(safe-area-inset-bottom))]"
       style={{ background: BG, color: '#F5F7F6', fontFamily: 'inherit' }}
     >
       {/* Desktop (lg+): two columns at full width instead of the phone column centred */}
-      <div className="mx-auto grid grid-cols-1 w-full max-w-[760px] gap-3 lg:max-w-[1200px] lg:grid-cols-2 lg:gap-4 lg:items-start">
+      <div className="mx-auto grid grid-cols-1 w-full max-w-[760px] gap-5 lg:max-w-[1200px] lg:grid-cols-2 lg:gap-6 lg:items-start">
         <div className="lg:col-span-2 empty:hidden"><EmailVerifyBanner /></div>
 
         {/* ── Player summary ── */}
-        <section className="relative overflow-hidden rounded-[20px] p-4 lg:col-span-2" style={{ background: CARD, border: `1px solid ${BORDER}` }}>
+        <section className="relative overflow-hidden rounded-[20px] p-5 lg:col-span-2" style={{ background: CARD, border: `1px solid ${BORDER}` }}>
           {/* faint background picture behind the name card */}
           <img src={siteImg(scene('profile-card'))} alt="" className="pointer-events-none absolute inset-0 h-full w-full object-cover" style={{ opacity: 0.6 }} />
           <div className="pointer-events-none absolute inset-0" style={{ background: 'linear-gradient(90deg, rgba(11,18,19,.82) 0%, rgba(11,18,19,.5) 50%, rgba(11,18,19,.22) 100%), linear-gradient(0deg, rgba(11,18,19,.55) 0%, rgba(11,18,19,0) 45%)' }} />
@@ -215,7 +215,7 @@ export function DashboardRedesign() {
             )}
           </div>
 
-          <div className="mt-3 grid grid-cols-2 gap-2.5">
+          <div className="mt-5 grid grid-cols-2 gap-3">
             <Link href="/import" className="flex items-center justify-center gap-2 rounded-[13px] py-3 text-[14px] font-extrabold" style={{ background: `linear-gradient(180deg, ${GREEN}, ${GREEN_DARK})`, color: '#05100A' }}>
               <Download size={16} /> Import
             </Link>
@@ -287,7 +287,7 @@ export function DashboardRedesign() {
         </section>
 
         {/* ── Feature tiles ── */}
-        <div className="grid grid-cols-2 gap-3 lg:self-stretch lg:auto-rows-fr">
+        <div className="grid grid-cols-2 gap-4 lg:self-stretch lg:auto-rows-fr">
           {TILES.map((t) => (
             <Link
               key={t.label}
@@ -329,7 +329,7 @@ export function DashboardRedesign() {
 
         {/* ── Recent games ── */}
         <section className="rounded-[20px]" style={{ background: CARD, border: `1px solid ${BORDER}` }}>
-          <div className="flex items-center justify-between px-4 pb-3 pt-4">
+          <div className="flex items-center justify-between px-5 pb-3.5 pt-5">
             <div className="flex items-center gap-3">
               <span className="grid h-9 w-9 place-items-center rounded-[10px]" style={{ background: 'rgba(129,182,76,.10)', border: `1px solid ${BORDER}` }}>
                 <RookIcon size={19} />
@@ -360,7 +360,7 @@ export function DashboardRedesign() {
                   <Link
                     key={game.id}
                     href={`/games/${game.id}`}
-                    className="flex items-center gap-3 border-t px-4 py-3 transition-colors hover:bg-white/[0.03]"
+                    className="flex items-center gap-3 border-t px-5 py-3.5 transition-colors hover:bg-white/[0.03]"
                     style={{ borderColor: BORDER }}
                   >
                     <GameThumb pgn={game.pgn} userColor={isWhite ? 'white' : 'black'} size={44} />
@@ -383,7 +383,7 @@ export function DashboardRedesign() {
         </section>
 
         {/* ── My Analytics: stats, weaknesses and courses now live there ── */}
-        <Link href="/analysis" className="flex items-center gap-3.5 rounded-[20px] p-4 transition-transform active:scale-[.99]" style={{ background: CARD, border: `1px solid ${BORDER}` }}>
+        <Link href="/analysis" className="flex items-center gap-3.5 rounded-[20px] p-5 transition-transform active:scale-[.99]" style={{ background: CARD, border: `1px solid ${BORDER}` }}>
           <span className="grid h-11 w-11 shrink-0 place-items-center rounded-[12px]" style={{ background: 'rgba(129,182,76,.10)', border: `1px solid ${BORDER}`, color: GREEN }}><BarChart3 size={21} /></span>
           <span className="min-w-0 flex-1">
             <b className="block text-[16px] font-extrabold">My Analytics</b>
@@ -397,7 +397,7 @@ export function DashboardRedesign() {
         </Link>
 
         {/* ── Scan a position (photo coach) ── */}
-        <Link href="/scan" className="flex items-center gap-4 overflow-hidden rounded-[20px] p-4" style={{ background: CARD, border: '1px solid rgba(129,182,76,.3)' }}>
+        <Link href="/scan" className="flex items-center gap-4 overflow-hidden rounded-[20px] p-5" style={{ background: CARD, border: '1px solid rgba(129,182,76,.3)' }}>
           <span className="relative shrink-0">
             <FenThumb fen="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1" size={74} />
             <span className="absolute -bottom-1.5 -right-1.5 grid h-8 w-8 place-items-center rounded-full" style={{ background: `linear-gradient(180deg, ${GREEN}, ${GREEN_DARK})`, color: '#05100A' }}><Camera size={16} /></span>
@@ -413,7 +413,7 @@ export function DashboardRedesign() {
         </Link>
 
         {/* ── Everything else from the classic home ── */}
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-3 gap-4">
           {[
             { label: 'Practice Bots', sub: `${BOTS.length} opponents`, href: '/practice', icon: Bot, img: 'quick-bots' },
             { label: 'Local Play', sub: 'Pass and play', href: '/play/local', icon: Play, img: 'quick-local' },
