@@ -4,9 +4,38 @@
   "outputDirectory": "artifacts/chess-coach/dist/public",
   "framework": null,
   "redirects": [
-    { "source": "/:l([a-z0-9])", "destination": "/?utm_source=heycatch&utm_campaign=:l", "permanent": false }
+    {
+      "source": "/:l([a-z0-9])",
+      "destination": "/?utm_source=heycatch&utm_campaign=:l",
+      "permanent": false
+    }
   ],
   "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html" }
+    {
+      "source": "/challenge/:code",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": ".*(bot|Bot|BOT|crawler|spider|facebookexternalhit|Facebot|WhatsApp|Slack|Discord|Telegram|Twitter|LinkedIn|Pinterest|Embedly|Iframely|Quora|Skype|redditbot|Applebot|vkShare|Google-PageRenderer|Snapchat|Viber|Line/|KakaoTalk|Mastodon|preview|Preview).*"
+        }
+      ],
+      "destination": "/api/og?kind=challenge&code=:code"
+    },
+    {
+      "source": "/share/:data",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": ".*(bot|Bot|BOT|crawler|spider|facebookexternalhit|Facebot|WhatsApp|Slack|Discord|Telegram|Twitter|LinkedIn|Pinterest|Embedly|Iframely|Quora|Skype|redditbot|Applebot|vkShare|Google-PageRenderer|Snapchat|Viber|Line/|KakaoTalk|Mastodon|preview|Preview).*"
+        }
+      ],
+      "destination": "/api/og?kind=share&data=:data"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
   ]
 }
