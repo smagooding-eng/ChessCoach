@@ -232,6 +232,20 @@ async function runSchemaMigrations() {
     await db.execute(sql`ALTER TABLE game_challenges ADD COLUMN IF NOT EXISTS parent_code VARCHAR`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_game_challenges_parent ON game_challenges(parent_code, status)`);
     // Challenges someone opened but hasn't answered yet (shown on their home + Play screens).
+    // Landing-page funnel events. This table existed only in the schema file
+    // and was never created on the production database, so every funnel event
+    // failed to save and the admin Funnel panel always errored.
+    await db.execute(sql`CREATE TABLE IF NOT EXISTS landing_funnel_events (
+      id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+      visitor_id VARCHAR NOT NULL,
+      event_type VARCHAR NOT NULL,
+      platform VARCHAR NOT NULL DEFAULT 'web',
+      elapsed_ms INTEGER,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )`);
+    await db.execute(sql`ALTER TABLE landing_funnel_events ADD COLUMN IF NOT EXISTS platform VARCHAR NOT NULL DEFAULT 'web'`);
+    await db.execute(sql`ALTER TABLE landing_funnel_events ADD COLUMN IF NOT EXISTS elapsed_ms INTEGER`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_landing_funnel_created ON landing_funnel_events(created_at, platform)`);
     await db.execute(sql`CREATE TABLE IF NOT EXISTS challenge_invites (
       user_id VARCHAR NOT NULL,
       code VARCHAR NOT NULL,

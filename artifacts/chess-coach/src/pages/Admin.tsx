@@ -19,6 +19,7 @@ interface VisitorBreakdown { new: number; returning: number; bounced: number }
 
 interface AdminStats {
   pageViews: { total: number; today: number };
+  todayWho?: { anonViews: number; memberViews: number; adminViews: number; anonVisitors: number; activeMembers: number };
   uniqueVisitors: { total: number; today: number; totalByIp: number; todayByIp: number };
   visitorBreakdown: VisitorBreakdown;
   funnel: { landingPageUniqueIps: number; signups: number; paying: number };
@@ -492,6 +493,7 @@ export function Admin() {
             primaryLabel="Total"
             secondary={stats.pageViews.today}
             secondaryLabel="Today"
+            footnote={stats.todayWho ? `Today: ${fmt(stats.todayWho.anonViews)} by people not signed in · ${fmt(stats.todayWho.memberViews)} by members · ${fmt(stats.todayWho.adminViews)} by admins (you).` : undefined}
           />
           <StatCard
             icon={UserCheck}
@@ -500,7 +502,7 @@ export function Admin() {
             primaryLabel="Total"
             secondary={stats.uniqueVisitors.today}
             secondaryLabel="Today"
-            footnote={`By IP address: ${fmt(stats.uniqueVisitors.totalByIp)} total, ${fmt(stats.uniqueVisitors.todayByIp)} today — often more accurate, since the number above double-counts anyone using multiple browsers or the installed app.`}
+            footnote={`${stats.todayWho ? `Today: ${fmt(stats.todayWho.anonVisitors)} not signed in (could sign up) · ${fmt(stats.todayWho.activeMembers)} existing members. ` : ''}By IP address: ${fmt(stats.uniqueVisitors.totalByIp)} total, ${fmt(stats.uniqueVisitors.todayByIp)} today — often more accurate, since the number above double-counts anyone using multiple browsers or the installed app.`}
           />
           <StatCard
             icon={CreditCard}
@@ -2625,13 +2627,20 @@ function LandingFunnelPanel() {
   const [data, setData] = useState<{ days: number; web: PlatformFunnelData; app: PlatformFunnelData } | null>(null);
   const [loading, setLoading] = useState(true);
   const [range, setRange] = useState<DateRange>({ startDate: '', endDate: '' });
+  const [funnelError, setFunnelError] = useState('');
 
   useEffect(() => {
     if (!range.startDate || !range.endDate) return;
     setLoading(true);
+    setFunnelError('');
     apiFetch(`/api/admin/landing-funnel?startDate=${range.startDate}&endDate=${range.endDate}`, { credentials: 'include' })
-      .then(r => r.ok ? r.json() : null)
+      .then(async r => {
+        const d = await r.json().catch(() => null);
+        if (!r.ok) { setFunnelError(d?.details || d?.error || `HTTP ${r.status}`); return null; }
+        return d;
+      })
       .then(d => setData(d))
+      .catch(e => setFunnelError(e instanceof Error ? e.message : 'Network error'))
       .finally(() => setLoading(false));
   }, [range]);
 
@@ -2651,7 +2660,7 @@ function LandingFunnelPanel() {
         {loading ? (
           <div className="flex justify-center py-6"><Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /></div>
         ) : !data ? (
-          <p className="text-xs text-muted-foreground text-center py-4">Failed to load funnel data.</p>
+          <p className="text-xs text-muted-foreground text-center py-4">Failed to load funnel data.{funnelError ? ` (${funnelError})` : ''}</p>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <PlatformFunnelSection title="Website" data={data.web} />

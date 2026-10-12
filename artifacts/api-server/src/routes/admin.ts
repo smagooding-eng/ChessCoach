@@ -85,10 +85,21 @@ router.post("/admin/puzzle-explanations/generate", requireAdmin, async (req: Req
   }
 });
 
+// Midnight today in US Eastern time. The server runs in UTC, so "today"
+// used to start at 8pm Eastern the evening before.
+function startOfTodayEastern(): Date {
+  const now = new Date();
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false,
+  }).formatToParts(now);
+  const get = (t: string) => Number(parts.find((p) => p.type === t)?.value ?? 0);
+  const secondsIntoDay = (get("hour") % 24) * 3600 + get("minute") * 60 + get("second");
+  return new Date(now.getTime() - secondsIntoDay * 1000 - now.getMilliseconds());
+}
+
 router.get("/admin/stats", requireAdmin, async (_req: Request, res: Response) => {
   try {
-    const now = new Date();
-    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const todayStart = startOfTodayEastern();
 
     const [totalUsersResult] = await db
       .select({ count: count() })
@@ -164,6 +175,39 @@ router.get("/admin/stats", requireAdmin, async (_req: Request, res: Response) =>
       bounced: Number(visitorBreakdownRow.bounced_visitors ?? 0),
     };
 
+    // Who today's traffic actually is: people who aren't signed in (new
+    // visitors -- the ones who could sign up), signed-in members, and admins
+    // (you testing the app). A browser that signed in at any point today
+    // counts as a member, not an anonymous visitor.
+    const todayWhoResult = await db.execute(sql`
+      WITH today AS (
+        SELECT pv.visitor_id, pv.user_id, COALESCE(u.is_admin, false) AS is_admin
+        FROM page_views pv LEFT JOIN users u ON u.id = pv.user_id
+        WHERE pv.created_at >= ${todayStart}
+      ),
+      signed_browsers AS (
+        SELECT DISTINCT visitor_id FROM today WHERE user_id IS NOT NULL
+      ),
+      admin_browsers AS (
+        SELECT DISTINCT visitor_id FROM today WHERE is_admin
+      )
+      SELECT
+        COUNT(*) FILTER (WHERE t.visitor_id IN (SELECT visitor_id FROM admin_browsers)) AS admin_views,
+        COUNT(*) FILTER (WHERE t.visitor_id NOT IN (SELECT visitor_id FROM admin_browsers) AND t.visitor_id IN (SELECT visitor_id FROM signed_browsers)) AS member_views,
+        COUNT(*) FILTER (WHERE t.visitor_id NOT IN (SELECT visitor_id FROM signed_browsers)) AS anon_views,
+        COUNT(DISTINCT t.visitor_id) FILTER (WHERE t.visitor_id NOT IN (SELECT visitor_id FROM signed_browsers)) AS anon_visitors,
+        COUNT(DISTINCT t.user_id) FILTER (WHERE t.user_id IS NOT NULL AND NOT t.is_admin) AS active_members
+      FROM today t
+    `);
+    const tw = (todayWhoResult.rows[0] ?? {}) as Record<string, string | number | null>;
+    const todayWho = {
+      anonViews: Number(tw.anon_views ?? 0),
+      memberViews: Number(tw.member_views ?? 0),
+      adminViews: Number(tw.admin_views ?? 0),
+      anonVisitors: Number(tw.anon_visitors ?? 0),
+      activeMembers: Number(tw.active_members ?? 0),
+    };
+
     let subBreakdown = { active: 0, trialing: 0, canceled: 0, pastDue: 0, total: 0 };
     try {
       const stripe = await getUncachableStripeClient();
@@ -217,6 +261,7 @@ router.get("/admin/stats", requireAdmin, async (_req: Request, res: Response) =>
         todayByIp: todayUniqueByIpResult.count,
       },
       visitorBreakdown,
+      todayWho,
       users: { total: totalUsersResult.count, today: todayUsersResult.count },
       subscriptions: subBreakdown,
       games: {

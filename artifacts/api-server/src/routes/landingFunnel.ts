@@ -237,7 +237,7 @@ router.get("/admin/landing-funnel", requireAdmin, async (req: Request, res: Resp
       app,
     });
   } catch (err: any) {
-    res.status(500).json({ error: "Failed to fetch landing funnel stats", details: err.message });
+    res.status(500).json({ error: "Failed to fetch landing funnel stats", details: err?.cause?.message ?? err?.message });
   }
 });
 
