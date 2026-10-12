@@ -17,10 +17,14 @@ interface Meta { title: string; description: string; image: string; url: string 
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
-async function fetchWithTimeout(url: string, ms: number): Promise<Response | null> {
+// The function's TypeScript setup has no browser "Response" type, so describe
+// just the bits of a fetch response we use.
+interface FetchRes { ok: boolean; status: number; json(): Promise<unknown>; text(): Promise<string> }
+
+async function fetchWithTimeout(url: string, ms: number): Promise<FetchRes | null> {
   const c = new AbortController();
   const t = setTimeout(() => c.abort(), ms);
-  try { return await fetch(url, { signal: c.signal }); } catch { return null; } finally { clearTimeout(t); }
+  try { return (await fetch(url, { signal: c.signal })) as unknown as FetchRes; } catch { return null; } finally { clearTimeout(t); }
 }
 
 interface Challenge {
