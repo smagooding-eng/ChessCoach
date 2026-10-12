@@ -246,6 +246,19 @@ async function runSchemaMigrations() {
     await db.execute(sql`ALTER TABLE landing_funnel_events ADD COLUMN IF NOT EXISTS platform VARCHAR NOT NULL DEFAULT 'web'`);
     await db.execute(sql`ALTER TABLE landing_funnel_events ADD COLUMN IF NOT EXISTS elapsed_ms INTEGER`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_landing_funnel_created ON landing_funnel_events(created_at, platform)`);
+    // Practice-bot results: each player's record against each bot, and how
+    // many different players have beaten it.
+    await db.execute(sql`CREATE TABLE IF NOT EXISTS bot_results (
+      id SERIAL PRIMARY KEY,
+      user_id VARCHAR NOT NULL,
+      bot VARCHAR NOT NULL,
+      result VARCHAR NOT NULL,
+      moves INTEGER NOT NULL DEFAULT 0,
+      game_key VARCHAR NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      UNIQUE (user_id, game_key)
+    )`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_bot_results_bot ON bot_results(bot, result)`);
     await db.execute(sql`CREATE TABLE IF NOT EXISTS challenge_invites (
       user_id VARCHAR NOT NULL,
       code VARCHAR NOT NULL,

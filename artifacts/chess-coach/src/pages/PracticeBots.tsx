@@ -14,6 +14,8 @@ import { ArrowLeft, RotateCcw, Flag, Clock, Trophy, Swords, Zap, ChevronRight, C
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { apiFetch } from '@/lib/api';
+import { useBotStats, reportBotResult, type BotStats } from '@/hooks/use-bot-stats';
+import { useUser } from '@/hooks/use-user';
 import { useLocation } from 'wouter';
 import { useDashboardRedesignFlag, usePhotoImagesFlag } from '@/hooks/use-app-config';
 import { RD } from '@/lib/redesignTheme';
@@ -149,7 +151,26 @@ function MoveAnalysisPanel({ move, playerColor }: { move: MoveRecord; playerColo
   );
 }
 
+// "You 3W · 1L" and "12 beat" for a bot card.
+function botRecordText(stats: BotStats | null, bot: BotConfig): string | null {
+  const r = stats?.mine[bot.name];
+  if (!r || r.wins + r.losses + r.draws === 0) return null;
+  return `You ${r.wins}W · ${r.losses}L${r.draws ? ` · ${r.draws}D` : ''}`;
+}
+function BeatenBadge({ count }: { count: number }) {
+  return (
+    <span className="absolute -bottom-1.5 -right-1.5 flex items-center gap-0.5 rounded-full px-1.5 py-[2px] text-[10px] font-black leading-none"
+      title={`${count} player${count === 1 ? ' has' : 's have'} beaten this bot`}
+      style={{ background: '#E8B447', color: '#1A1205', boxShadow: '0 1px 4px rgba(0,0,0,.5)' }}>
+      <Trophy className="h-2.5 w-2.5" /> {count}
+    </span>
+  );
+}
+
 function BotCard({ bot, onSelect }: { bot: BotConfig; onSelect: (b: BotConfig) => void }) {
+  const stats = useBotStats();
+  const record = botRecordText(stats, bot);
+  const beaten = stats?.beatenBy[bot.name] ?? 0;
   const botAvatar = useBotAvatar();
   const botName = useBotName();
   const botBlurb = useBotDescription();
@@ -168,7 +189,10 @@ function BotCard({ bot, onSelect }: { bot: BotConfig; onSelect: (b: BotConfig) =
       )}
     >
       <div className="flex items-center justify-between">
-        <img src={botAvatar(bot)} alt={botName(bot)} className="w-10 h-10 rounded-full border-2 border-white/20 shadow-md object-cover" />
+        <span className="relative">
+          <img src={botAvatar(bot)} alt={botName(bot)} className="w-10 h-10 rounded-full border-2 border-white/20 shadow-md object-cover" />
+          {beaten > 0 && <BeatenBadge count={beaten} />}
+        </span>
         <span className="text-xs font-bold px-2.5 py-1 rounded-xl bg-black/30 border border-white/10 text-white/80">
           {bot.rating} ELO
         </span>
@@ -178,6 +202,9 @@ function BotCard({ bot, onSelect }: { bot: BotConfig; onSelect: (b: BotConfig) =
         <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/50 mt-0.5">{botTag(bot)}</p>
       </div>
       <p className="text-xs text-white/60 leading-relaxed">{botBlurb(bot)}</p>
+      <p className="text-[11px] font-bold text-white/70">
+        {record ?? 'Not played yet'}{beaten > 0 ? ` · beaten by ${beaten} player${beaten === 1 ? '' : 's'}` : ' · unbeaten so far'}
+      </p>
       <div className="flex items-center gap-1.5 text-xs font-bold text-white/40 group-hover:text-white/70 transition-colors mt-auto pt-2">
         Challenge <ChevronRight className="w-3.5 h-3.5" />
       </div>
@@ -227,6 +254,18 @@ function GameView({ bot, onBack, startFen, startColor, isOnboarding }: { bot: Bo
   const [result, setResult] = useState<GameResult>('playing');
   const [moves, setMoves] = useState<MoveRecord[]>([]);
   const [thinking, setThinking] = useState(false);
+  const { isAuthenticated: signedIn } = useUser();
+  // One key per game, so a result is saved exactly once.
+  const gameKeyRef = useRef(`${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`);
+  const reportedRef = useRef<string | null>(null);
+  // Save the result for the bot cards' records (games from the normal start
+  // position only -- "play from this position" practice doesn't count).
+  useEffect(() => {
+    if (result === 'playing' || !signedIn || startFen) return;
+    if (reportedRef.current === gameKeyRef.current) return;
+    reportedRef.current = gameKeyRef.current;
+    reportBotResult(bot.name, result, moves.length, gameKeyRef.current);
+  }, [result, signedIn, startFen, bot.name, moves.length]);
   const [, navigate] = useLocation();
   const [seededRating, setSeededRating] = useState<number | null>(null);
   const seedRequestedRef = useRef(false);
@@ -429,6 +468,7 @@ function GameView({ bot, onBack, startFen, startColor, isOnboarding }: { bot: Bo
     clearBotTimeout();
     setBoardTurned(false);
     gameIdRef.current++;
+    gameKeyRef.current = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
     if (startFen) {
       chess.load(startFen);
     } else {
@@ -1063,6 +1103,9 @@ const TIER_ACCENT: Record<string, string> = {
 };
 
 function BotTileRD({ bot, onSelect }: { bot: BotConfig; onSelect: (b: BotConfig) => void }) {
+  const stats = useBotStats();
+  const record = botRecordText(stats, bot);
+  const beaten = stats?.beatenBy[bot.name] ?? 0;
   const botAvatar = useBotAvatar();
   const botName = useBotName();
   const botBlurb = useBotDescription();
@@ -1076,6 +1119,7 @@ function BotTileRD({ bot, onSelect }: { bot: BotConfig; onSelect: (b: BotConfig)
     >
       <span className="relative shrink-0">
         <img src={botAvatar(bot)} alt="" className="h-14 w-14 rounded-[14px] object-cover" style={{ boxShadow: `0 0 0 2px ${accent}55` }} />
+        {beaten > 0 && <BeatenBadge count={beaten} />}
       </span>
       <span className="min-w-0 flex-1">
         <span className="flex items-center gap-2">
@@ -1083,6 +1127,10 @@ function BotTileRD({ bot, onSelect }: { bot: BotConfig; onSelect: (b: BotConfig)
           <span className="shrink-0 rounded-md px-1.5 py-0.5 text-[10.5px] font-extrabold uppercase tracking-wide" style={{ background: `${accent}22`, color: accent }}>{botTag(bot)}</span>
         </span>
         <span className="mt-0.5 block text-[12.5px] leading-snug line-clamp-2" style={{ color: RD.muted }}>{botBlurb(bot)}</span>
+        <span className="mt-1 block text-[11.5px] font-bold" style={{ color: record ? RD.text : RD.muted }}>
+          {record ?? 'Not played yet'}
+          <span className="font-semibold" style={{ color: RD.muted }}>{beaten > 0 ? ` · beaten by ${beaten}` : ' · unbeaten'}</span>
+        </span>
       </span>
       <span className="flex shrink-0 flex-col items-end gap-1">
         <b className="text-[15px] font-extrabold" style={{ color: RD.text }}>{bot.rating}</b>
