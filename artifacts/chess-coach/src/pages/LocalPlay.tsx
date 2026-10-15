@@ -403,6 +403,7 @@ export function LocalPlay() {
               <GameOverOverlay
                 gameKey={`${moves.length}-${result}`}
                 outcome={result === 'draw' ? 'draw' : 'win'}
+                yourColor={result === 'black' ? 'black' : 'white'}
                 title={result === 'draw' ? 'Draw!' : `${result === 'white' ? 'White' : 'Black'} wins!`}
                 subtitle={chess.isCheckmate() ? 'by checkmate' : chess.isStalemate() ? 'by stalemate' : chess.isThreefoldRepetition() ? 'by repetition' : chess.isInsufficientMaterial() ? 'insufficient material' : hasTimer && whiteTime === 0 ? 'White ran out of time' : hasTimer && blackTime === 0 ? 'Black ran out of time' : `${result === 'white' ? 'Black' : 'White'} resigned`}
                 delayMs={chess.isCheckmate() ? 1400 : 250}

@@ -223,6 +223,7 @@ export function DailyGame() {
             <GameOverOverlay
               gameKey={game.id}
               outcome={game.result === 'draw' ? 'draw' : won ? 'win' : 'loss'}
+              yourColor={mySide}
               subtitle={HOW[game.termination ?? ''] ?? game.termination ?? undefined}
               ratingDelta={myRating != null && after != null ? after - myRating : null}
               delayMs={game.termination === 'checkmate' ? 1400 : 250}

@@ -678,6 +678,7 @@ function GameView({ bot, onBack, startFen, startColor, isOnboarding }: { bot: Bo
               <GameOverOverlay
                 gameKey={String(gameIdRef.current)}
                 outcome={result === 'win' ? 'win' : result === 'loss' ? 'loss' : 'draw'}
+                yourColor={playerColor === 'w' ? 'white' : 'black'}
                 subtitle={chess.isCheckmate() ? 'by checkmate' : chess.isStalemate() ? 'by stalemate'
                   : chess.isThreefoldRepetition() ? 'by repetition' : chess.isInsufficientMaterial() ? 'insufficient material'
                   : chess.isDraw() ? 'by the 50-move rule' : result === 'loss' ? 'You resigned' : undefined}

@@ -343,6 +343,7 @@ export function LiveGame({ live, onLeave }: { live: ReturnType<typeof useLivePla
           <GameOverOverlay
             gameKey={game.id}
             outcome={outcome}
+            yourColor={youAreWhite ? 'white' : 'black'}
             subtitle={describeEnding(game.termination, outcome)}
             ratingDelta={myRatingDelta}
             delayMs={game.termination === 'checkmate' ? 1400 : 250}
