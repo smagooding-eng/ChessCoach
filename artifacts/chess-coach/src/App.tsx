@@ -5,6 +5,13 @@ import { RealtimeBridge } from "@/components/RealtimeBridge";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { UserProvider } from "@/context/UserContext";
 import { SettingsProvider, useSettings, BG_PHOTOS } from "@/context/SettingsContext";
+// The four bottom-bar sections (Home, Play, Games, Analysis) are bundled up
+// front rather than code-split: swiping between them must show the next
+// page straight away, never a loading screen first.
+import { DashboardRedesign } from "@/pages/DashboardRedesign";
+import { PlayHub } from "@/pages/PlayHub";
+import { GamesRedesign } from "@/pages/GamesRedesign";
+import { AnalysisRedesign } from "@/pages/AnalysisRedesign";
 import { ImportStatusWatcher } from "@/components/ImportStatusWatcher";
 import { AutoPushPrompt } from "@/components/AutoPushPrompt";
 import { useDashboardRedesignFlag } from "@/hooks/use-app-config";
@@ -118,7 +125,6 @@ const PricingPage = lazyRetry(() => import("@/pages/Pricing"));
 const VsImproveMyChessPage = lazyRetry(() => import("@/pages/VsImproveMyChess"));
 const VsFreeAnalysisPage = lazyRetry(() => import("@/pages/VsFreeAnalysis"));
 const Dashboard = lazyRetry(() => import("@/pages/Dashboard").then(m => ({ default: m.Dashboard })));
-const DashboardRedesign = lazyRetry(() => import("@/pages/DashboardRedesign").then(m => ({ default: m.DashboardRedesign })));
 // Picks between the current dashboard and the new design concept based
 // on the GLOBAL dashboard-redesign flag (admin-controlled, same value
 // for every user -- see use-app-config.ts) -- both stay fully intact,
@@ -134,7 +140,6 @@ function DashboardRouter() {
 }
 const Import = lazyRetry(() => import("@/pages/Import").then(m => ({ default: m.Import })));
 const Games = lazyRetry(() => import("@/pages/Games").then(m => ({ default: m.Games })));
-const GamesRedesign = lazyRetry(() => import("@/pages/GamesRedesign").then(m => ({ default: m.GamesRedesign })));
 // Same global flag as DashboardRouter above -- bulk review and the H2H
 // search mode only exist on the classic Games page for now, so this
 // switch is purely cosmetic for anyone who hasn't touched those features.
@@ -144,7 +149,6 @@ function GamesRouter() {
 }
 const GameReplay = lazyRetry(() => import("@/pages/GameReplay").then(m => ({ default: m.GameReplay })));
 const Analysis = lazyRetry(() => import("@/pages/Analysis").then(m => ({ default: m.Analysis })));
-const AnalysisRedesign = lazyRetry(() => import("@/pages/AnalysisRedesign").then(m => ({ default: m.AnalysisRedesign })));
 function AnalysisRouter() {
   const { enabled } = useDashboardRedesignFlag();
   return enabled ? <AnalysisRedesign /> : <Analysis />;
@@ -158,7 +162,6 @@ const Openings = lazyRetry(() => import("@/pages/Openings").then(m => ({ default
 const OpeningDetail = lazyRetry(() => import("@/pages/OpeningDetail").then(m => ({ default: m.OpeningDetail })));
 const PracticeBots = lazyRetry(() => import("@/pages/PracticeBots").then(m => ({ default: m.PracticeBots })));
 const LocalPlay = lazyRetry(() => import("@/pages/LocalPlay").then(m => ({ default: m.LocalPlay })));
-const PlayHub = lazyRetry(() => import("@/pages/PlayHub").then(m => ({ default: m.PlayHub })));
 // /play is the Play hub when the redesign is on; the original Local Play
 // board otherwise. The board itself is always reachable at /play/local.
 function PlayRouter() {
@@ -409,25 +412,7 @@ function PageLoadingFallback() {
   return <PageLoader />;
 }
 
-// The four swipeable sections (Home, Play, Games, Analysis) are fetched in
-// the background once the app is idle, so swiping between them never waits
-// on a download (which used to flash the loader mid-swipe).
-function usePrefetchSections() {
-  useEffect(() => {
-    const go = () => {
-      void import("@/pages/DashboardRedesign").catch(() => {});
-      void import("@/pages/PlayHub").catch(() => {});
-      void import("@/pages/GamesRedesign").catch(() => {});
-      void import("@/pages/AnalysisRedesign").catch(() => {});
-    };
-    const w = window as Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number };
-    if (w.requestIdleCallback) w.requestIdleCallback(go, { timeout: 4000 });
-    else window.setTimeout(go, 2500);
-  }, []);
-}
-
 function AppBackgroundWrapper({ children }: { children: React.ReactNode }) {
-  usePrefetchSections();
   const { appBackgroundCss, uiStyle, bgPhoto, cardGlass } = useSettings();
   const photo = uiStyle === 'photo' ? BG_PHOTOS.find((p) => p.id === bgPhoto) ?? BG_PHOTOS[0] : null;
   // Photo look: the html class switches every card to see-through (index.css).
