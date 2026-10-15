@@ -23,6 +23,8 @@ import { RedesignHeader } from '@/components/RedesignHeader';
 import { openingThumbList, openingFamily } from '@/lib/openingThumb';
 import { useSwipeTabs } from '@/lib/swipeNav';
 import { usePhotoLook } from '@/context/SettingsContext';
+import { useMoveBrowser, type BrowsePosition } from '@/hooks/use-move-browser';
+import { MoveBrowserBar } from '@/components/MoveBrowserBar';
 
 const QUALITY_TO_TONE: Record<string, AICoachTone> = {
   checkmate: 'gold',
@@ -498,6 +500,20 @@ function GameView({ bot, onBack, startFen, startColor, isOnboarding }: { bot: Bo
     } catch { return null; }
   }, [moves]);
 
+  // Look back through the game's moves; one tap returns to the live position.
+  const browsePositions = useMemo<BrowsePosition[]>(() => {
+    const start = moves[0]?.fenBefore ?? fen;
+    const list: BrowsePosition[] = [{ fen: start, lastMove: null }];
+    for (const m of moves) {
+      let lm: { from: string; to: string } | null = null;
+      try { const r = new Chess(m.fenBefore).move(m.san); if (r) lm = { from: r.from, to: r.to }; } catch { /* ignore */ }
+      list.push({ fen: m.fen, lastMove: lm });
+    }
+    return list;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [moves]);
+  const browser = useMoveBrowser(browsePositions, gameIdRef.current);
+
   const latestQuality: MoveQuality | null = moves.length > 0 ? (moves[moves.length - 1].analysis?.quality as MoveQuality ?? null) : null;
 
   const currentEval = useMemo(() => {
@@ -575,16 +591,16 @@ function GameView({ bot, onBack, startFen, startColor, isOnboarding }: { bot: Bo
 
           <div ref={boardWrapRef}>
           <ChessBoard
-            fen={fen}
+            fen={browser.viewing && browser.fen ? browser.fen : fen}
             flipped={(playerColor === 'b') !== boardTurned}
             maxWidthOverride={boardFitWidth}
-            practiceMode={result === 'playing' && isPlayerTurn && !thinking}
+            practiceMode={result === 'playing' && isPlayerTurn && !thinking && !browser.viewing}
             expectedMoveSan={null}
             onMovePlayed={handleMovePlayed}
-            lastMove={lastMove}
-            moveQuality={latestQuality}
+            lastMove={browser.viewing ? browser.lastMove : lastMove}
+            moveQuality={browser.viewing ? null : latestQuality}
             reserveConfirmSpace
-            boardOverlay={result !== 'playing' ? (
+            boardOverlay={result !== 'playing' && !browser.viewing ? (
               <GameOverOverlay
                 gameKey={String(gameIdRef.current)}
                 outcome={result === 'win' ? 'win' : result === 'loss' ? 'loss' : 'draw'}
@@ -606,6 +622,8 @@ function GameView({ bot, onBack, startFen, startColor, isOnboarding }: { bot: Bo
             }}
           />
           </div>
+
+          <MoveBrowserBar browser={browser} yourTurn={result === 'playing' && isPlayerTurn} />
 
           <div className="glass-card rounded-xl p-2.5 flex items-center justify-between">
             <div className="flex items-center gap-2">

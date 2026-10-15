@@ -5,6 +5,8 @@ import { Chess } from 'chess.js';
 import type { useLivePlay } from '@/hooks/use-live-play';
 import { Flag, ArrowLeft, Trophy, Clock, Handshake, X, WifiOff, BookOpen, RotateCcw, UserPlus, Check } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
+import { useMoveBrowser, positionsFromSan } from '@/hooks/use-move-browser';
+import { MoveBrowserBar } from '@/components/MoveBrowserBar';
 import { GameOverOverlay, OverlayButton, describeEnding } from '@/components/GameOverOverlay';
 import { useLocation } from 'wouter';
 
@@ -120,6 +122,10 @@ export function LiveGame({ live, onLeave }: { live: ReturnType<typeof useLivePla
       return m ? { from: m.from, to: m.to } : null;
     } catch { return null; }
   }, [game?.sanMoves]);
+
+  // Look back through the moves mid-game; one tap returns to the live board.
+  const browsePositions = useMemo(() => positionsFromSan(game?.sanMoves ?? []), [game?.sanMoves]);
+  const browser = useMoveBrowser(browsePositions, game?.id);
 
   // When it becomes our turn and we have a stored premove, attempt to play it.
   const lastFenForPremove = useRef<string | null>(null);
@@ -322,18 +328,18 @@ export function LiveGame({ live, onLeave }: { live: ReturnType<typeof useLivePla
       {game.status === 'finished' && <EvalBar fen={game.fen} />}
 
       <ChessBoard
-        fen={game.fen}
+        fen={browser.viewing && browser.fen ? browser.fen : game.fen}
         flipped={!youAreWhite}
-        practiceMode={isPlayerTurn}
+        practiceMode={isPlayerTurn && !browser.viewing}
         expectedMoveSan={null}
         onMovePlayed={onMovePlayed}
-        lastMove={lastMoveSquares}
+        lastMove={browser.viewing ? browser.lastMove : lastMoveSquares}
         moveQuality={null}
-        premoveMode={!isPlayerTurn && game.status === 'active' && connected}
+        premoveMode={!isPlayerTurn && game.status === 'active' && connected && !browser.viewing}
         premoveColor={color}
         premove={premove}
         onPremoveSet={(p) => setPremove(p)}
-        boardOverlay={finished ? (
+        boardOverlay={finished && !browser.viewing ? (
           <GameOverOverlay
             gameKey={game.id}
             outcome={outcome}
@@ -363,6 +369,7 @@ export function LiveGame({ live, onLeave }: { live: ReturnType<typeof useLivePla
 
       <MaterialStrip fen={game.fen} color={youAreWhite ? 'w' : 'b'} className="px-1" />
       <PlayerStrip p={bottom} ms={bottomMs} active={bottomActive} isYou={true} awayMs={myAwayMs} />
+      <MoveBrowserBar browser={browser} yourTurn={isPlayerTurn} />
 
       <div className="space-y-3 lg:hidden">{messages}</div>
 

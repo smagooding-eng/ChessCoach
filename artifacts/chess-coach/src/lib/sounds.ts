@@ -277,10 +277,14 @@ const PACKS: Record<SoundPack, Record<SoundEvent, Voice>> = {
   },
 };
 
+// Checks use the capture sound and captures the check sound (every pack).
+const VOICE_FOR: Partial<Record<SoundEvent, SoundEvent>> = { check: 'capture', capture: 'check' };
+
 export function playSound(event: SoundEvent, pack: SoundPack = 'classic') {
   const ac = audio();
   if (!ac) return;
-  try { (PACKS[pack] ?? PACKS.classic)[event](ac, ac.currentTime + 0.005); } catch {}
+  const voice = VOICE_FOR[event] ?? event;
+  try { (PACKS[pack] ?? PACKS.classic)[voice](ac, ac.currentTime + 0.005); } catch {}
 }
 
 /** Which event a played move should sound like (most important wins). */
