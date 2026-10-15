@@ -32,11 +32,11 @@ export default function RafflePage() {
         </Link>
 
         <div className="text-center mb-10">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-5" style={{ background: 'rgba(129,182,76,0.15)' }}>
-            <Trophy className="w-8 h-8" style={{ color: G }} />
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-5" style={{ background: '#81B64C' }}>
+            <Trophy className="w-8 h-8" style={{ color: '#FFFFFF' }} />
           </div>
           <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs font-black mb-4"
-            style={{ background: `${G}15`, color: G, border: `1px solid ${G}40` }}>
+            style={{ background: '#81B64C', color: '#FFFFFF' }}>
             <Sparkles className="w-3 h-3" /> LIMITED-TIME RAFFLE
           </div>
           <h1 className="text-3xl sm:text-4xl font-black mb-3" style={{ letterSpacing: '-0.02em' }}>

@@ -92,7 +92,7 @@ function PlayerAvatar({ avatar, username, size = 'md' }: { avatar?: string; user
   }
   return (
     <div className="rounded-full flex items-center justify-center shrink-0"
-      style={{ width: dim, height: dim, background: 'rgba(129,182,76,0.12)', border: '2px solid var(--cs-avatar-border, rgba(129,182,76,0.25))' }}>
+      style={{ width: dim, height: dim, background: 'rgba(255,255,255,.06)', border: '2px solid var(--cs-avatar-border, rgba(129,182,76,0.25))' }}>
       <span className="font-black" style={{ color: CHESSCOM_GREEN, fontSize: dim * 0.35 }}>{username?.[0]?.toUpperCase()}</span>
     </div>
   );
@@ -105,8 +105,8 @@ function SidebarLink({ item, isActive }: { item: typeof ALL_NAV[0]; isActive: bo
       <div className={cn(
         "relative flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all duration-150 cursor-pointer text-[13px] font-semibold",
       )} style={{
-        background: isActive ? 'rgba(129,182,76,0.12)' : 'transparent',
-        color: isActive ? CHESSCOM_GREEN : TEXT_MUTED,
+        background: isActive ? 'rgba(255,255,255,0.07)' : 'transparent',
+        color: isActive ? TEXT_LIGHT : TEXT_MUTED,
       }}
         onMouseEnter={e => { if (!isActive) { e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; e.currentTarget.style.color = TEXT_LIGHT; } }}
         onMouseLeave={e => { if (!isActive) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = TEXT_MUTED; } }}>
@@ -385,7 +385,7 @@ export function Layout({ children, fullscreen }: { children: React.ReactNode; fu
                   <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors active:bg-white/5" style={{ color: TEXT_LIGHT }}>
                     <Crown className="w-4.5 h-4.5" style={{ color: '#eaa631' }} />
                     <span className="font-semibold text-sm">Subscription</span>
-                    {isPremium && <span className="ml-auto text-[9px] font-black px-1.5 py-px rounded" style={{ background: 'rgba(129,182,76,0.15)', color: CHESSCOM_GREEN }}>PRO</span>}
+                    {isPremium && <span className="ml-auto text-[9px] font-black px-1.5 py-px rounded" style={{ background: '#81B64C', color: '#FFFFFF' }}>PRO</span>}
                   </div>
                 </Link>
                 <div className="pt-1 mt-1" style={{ borderTop: `1px solid ${BORDER_COLOR}` }}>
@@ -485,8 +485,8 @@ export function Layout({ children, fullscreen }: { children: React.ReactNode; fu
                     <Link key={item.href} href={item.href} className="block">
                       <div className="flex items-center gap-3 px-3.5 py-3 rounded-xl transition-colors"
                         style={{
-                          background: active ? 'rgba(129,182,76,0.1)' : 'transparent',
-                          color: active ? CHESSCOM_GREEN : TEXT_LIGHT,
+                          background: active ? 'rgba(255,255,255,0.07)' : 'transparent',
+                          color: TEXT_LIGHT,
                         }}>
                         <item.icon className="w-5 h-5" />
                         <span className="font-semibold text-sm">{item.label}</span>

@@ -206,7 +206,7 @@ export function Analysis({ hideHeader = false }: { hideHeader?: boolean } = {}) 
           initial={{ opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}
           className="p-3.5 rounded-xl flex items-center gap-3 text-sm"
-          style={{ background: 'rgba(129,182,76,0.08)', border: '1px solid rgba(129,182,76,0.2)', color: CHESSCOM_GREEN }}
+          style={{ background: '#81B64C', color: '#FFFFFF' }}
         >
           <Loader2 className="w-4 h-4 animate-spin shrink-0" />
           <span>{statusMsg}</span>

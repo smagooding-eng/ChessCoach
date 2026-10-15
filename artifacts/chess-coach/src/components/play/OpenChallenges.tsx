@@ -170,7 +170,7 @@ export function ChallengeInvitesCard({ invites, onChanged }: { invites: Challeng
       {invites.map(c => (
         <div key={c.code} className="flex items-center gap-3 px-4 py-3" style={{ borderTop: `1px solid ${PT.border}` }}>
           <button onClick={() => navigate(`/challenge/${c.code}`)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
-            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl" style={{ background: PT.greenSoft, color: PT.green }}>
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl" style={{ background: '#81B64C', color: '#FFFFFF' }}>
               {c.kind === 'live' ? <Swords size={18} /> : <CalendarDays size={18} />}
             </span>
             <span className="min-w-0 flex-1">

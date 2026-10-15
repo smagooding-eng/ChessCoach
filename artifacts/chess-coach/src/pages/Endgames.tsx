@@ -246,7 +246,7 @@ export function Endgames() {
 
         <section className="rounded-[20px] p-4" style={{ background: RD.card, border: `1px solid ${RD.border}` }}>
           <div className="flex items-start gap-3">
-            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-[12px]" style={{ background: 'rgba(129,182,76,.14)', color: RD.green, border: '1px solid rgba(129,182,76,.25)' }}>
+            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-[12px]" style={{ background: '#81B64C', color: '#FFFFFF' }}>
               <currentTab.icon size={20} />
             </span>
             <div className="min-w-0 flex-1">
@@ -274,7 +274,7 @@ export function Endgames() {
               return (
                 <Link key={course.id} href={`/courses/${course.id}`} className="flex items-stretch overflow-hidden rounded-[18px] transition-transform active:scale-[.99]" style={{ background: RD.card, border: `1px solid ${RD.border}` }}>
                   {photoLook ? (
-                    <span className="ml-3.5 grid h-11 w-11 shrink-0 self-center place-items-center rounded-[12px]" style={{ background: 'rgba(129,182,76,.12)', color: RD.green, border: '1px solid rgba(129,182,76,.25)' }}><Crown size={20} /></span>
+                    <span className="ml-3.5 grid h-11 w-11 shrink-0 self-center place-items-center rounded-[12px]" style={{ background: '#81B64C', color: '#FFFFFF' }}><Crown size={20} /></span>
                   ) : (
                   <span className="relative w-[96px] shrink-0 overflow-hidden">
                     <img src={siteImg(`${ART_BASE}${imgs[i]}.webp`)} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />

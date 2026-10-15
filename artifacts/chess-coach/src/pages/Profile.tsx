@@ -49,7 +49,7 @@ function TierBadge({ user }: { user: AdminUser }) {
 
   if (user.tier === 'admin') {
     return (
-      <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 font-bold">
+      <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/[0.07] text-white font-bold">
         Admin
       </span>
     );
@@ -298,7 +298,7 @@ function UserListPanel({ onClose, onEmailUsers }: { onClose: () => void; onEmail
             <>
               <button
                 onClick={handleEmailSelected}
-                className="text-[10px] font-bold px-2.5 py-1 rounded bg-amber-500/15 text-amber-400 hover:bg-amber-500/25 transition-colors flex items-center gap-1"
+                className="text-[10px] font-bold px-2.5 py-1 rounded bg-white/[0.07] text-white hover:bg-amber-500/25 transition-colors flex items-center gap-1"
               >
                 <Mail className="w-3 h-3" /> Email {selected.size}
               </button>
@@ -329,7 +329,7 @@ function UserListPanel({ onClose, onEmailUsers }: { onClose: () => void; onEmail
         <div className="px-3 py-2 flex items-center gap-1 overflow-x-auto border-b border-border/20">
           <button
             onClick={toggleAll}
-            className={`text-[11px] font-bold px-2 py-1 rounded transition-colors mr-1 ${allSelected ? 'bg-amber-500/20 text-amber-400' : 'bg-secondary/30 text-muted-foreground hover:text-foreground'}`}
+            className={`text-[11px] font-bold px-2 py-1 rounded transition-colors mr-1 ${allSelected ? 'bg-white/[0.07] text-white' : 'bg-secondary/30 text-muted-foreground hover:text-foreground'}`}
           >
             {allSelected ? 'Deselect All' : 'Select All'}
           </button>
@@ -863,7 +863,7 @@ ${sanitized}
   };
 
   const toolbarBtn = (active: boolean = false) =>
-    `p-1.5 rounded transition-colors ${active ? 'bg-amber-500/20 text-amber-400' : 'text-muted-foreground hover:text-foreground hover:bg-secondary/50'}`;
+    `p-1.5 rounded transition-colors ${active ? 'bg-white/[0.07] text-white' : 'text-muted-foreground hover:text-foreground hover:bg-secondary/50'}`;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0,0,0,0.7)' }}>
@@ -880,7 +880,7 @@ ${sanitized}
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowTemplates(v => !v)}
-              className={`text-xs px-2.5 py-1.5 rounded transition-colors flex items-center gap-1 ${showTemplates ? 'bg-amber-500/30 text-amber-300' : 'bg-amber-500/20 text-amber-300 hover:bg-amber-500/30'}`}
+              className={`text-xs px-2.5 py-1.5 rounded transition-colors flex items-center gap-1 ${showTemplates ? 'bg-white/[0.07] text-white' : 'bg-white/[0.07] text-white hover:bg-amber-500/30'}`}
             >
               <Sparkles className="w-3.5 h-3.5" /> Templates
             </button>
@@ -921,7 +921,7 @@ ${sanitized}
               <div className="bg-[#262421] border border-border/40 rounded-xl p-2 min-h-[40px]">
                 <div className="flex flex-wrap gap-1.5 mb-1">
                   {broadcastAll && (
-                    <span className="inline-flex items-center gap-1 text-xs bg-amber-500/15 text-amber-400 px-2 py-1 rounded-xl font-medium">
+                    <span className="inline-flex items-center gap-1 text-xs bg-white/[0.07] text-white px-2 py-1 rounded-xl font-medium">
                       All Users
                       <button onClick={() => setBroadcastAll(false)} className="hover:text-amber-200 transition-colors">
                         <X className="w-3 h-3" />
@@ -948,7 +948,7 @@ ${sanitized}
                     />
                     <button
                       onClick={() => setBroadcastAll(true)}
-                      className="text-[10px] px-2 py-1 rounded bg-amber-500/25 text-amber-300 hover:bg-amber-500/35 hover:text-amber-200 transition-colors whitespace-nowrap"
+                      className="text-[10px] px-2 py-1 rounded bg-white/[0.07] text-white hover:bg-amber-500/35 hover:text-amber-200 transition-colors whitespace-nowrap"
                     >
                       All Users
                     </button>
@@ -973,13 +973,13 @@ ${sanitized}
                 <div className="flex gap-1 p-0.5 bg-[#262421] rounded-xl">
                   <button
                     onClick={() => setMode('compose')}
-                    className={`text-[10px] font-bold px-2 py-1 rounded transition-colors ${mode === 'compose' ? 'bg-amber-500/15 text-amber-400' : 'text-muted-foreground'}`}
+                    className={`text-[10px] font-bold px-2 py-1 rounded transition-colors ${mode === 'compose' ? 'bg-white/[0.07] text-white' : 'text-muted-foreground'}`}
                   >
                     Compose
                   </button>
                   <button
                     onClick={() => setMode('preview')}
-                    className={`text-[10px] font-bold px-2 py-1 rounded transition-colors ${mode === 'preview' ? 'bg-amber-500/15 text-amber-400' : 'text-muted-foreground'}`}
+                    className={`text-[10px] font-bold px-2 py-1 rounded transition-colors ${mode === 'preview' ? 'bg-white/[0.07] text-white' : 'text-muted-foreground'}`}
                   >
                     Preview
                   </button>
@@ -1176,7 +1176,7 @@ ${sanitized}
             <button
               onClick={handleSend}
               disabled={sending}
-              className="flex-1 bg-amber-500/15 text-amber-400 hover:bg-amber-500/25 disabled:opacity-50 text-sm font-bold py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2"
+              className="flex-1 bg-white/[0.07] text-white hover:bg-amber-500/25 disabled:opacity-50 text-sm font-bold py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2"
             >
               <Send className="w-4 h-4" />
               {sending ? 'Sending...' : broadcastAll ? 'Send to All Users' : `Send to ${recipients.length} Recipient${recipients.length !== 1 ? 's' : ''}`}
@@ -1257,7 +1257,7 @@ function AdminTicker() {
               )}
               <button
                 onClick={openComposer}
-                className="text-[10px] font-bold px-2 py-1 rounded transition-colors flex items-center gap-1 bg-amber-500/25 text-amber-300 hover:bg-amber-500/35 hover:text-amber-200"
+                className="text-[10px] font-bold px-2 py-1 rounded transition-colors flex items-center gap-1 bg-white/[0.07] text-white hover:bg-amber-500/35 hover:text-amber-200"
               >
                 <Mail className="w-3 h-3" /> Compose
               </button>
@@ -1768,7 +1768,7 @@ function ProfileClassic() {
                 </span>
               )}
               {isPremium && !authUser?.isAdmin && (
-                <span className="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded inline-flex items-center gap-1" style={{ background: `${G}22`, color: G, border: `1px solid ${G}33` }}>
+                <span className="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded inline-flex items-center gap-1" style={{ background: '#81B64C', color: '#FFFFFF' }}>
                   <Crown className="w-3 h-3" /> Pro
                 </span>
               )}
@@ -2056,7 +2056,7 @@ function ProfileRedesign() {
                     className="w-full max-w-[240px] rounded-[10px] px-3 py-2 text-[14px] font-bold outline-none"
                     style={{ background: 'rgba(255,255,255,.05)', border: `1px solid ${RD.green}`, color: RD.text }}
                   />
-                  <button onClick={handleSaveUsername} disabled={saving} aria-label="Save" className="grid h-9 w-9 place-items-center rounded-[10px]" style={{ background: 'rgba(129,182,76,.14)', color: RD.green }}><Check size={17} /></button>
+                  <button onClick={handleSaveUsername} disabled={saving} aria-label="Save" className="grid h-9 w-9 place-items-center rounded-[10px]" style={{ background: '#81B64C', color: '#FFFFFF' }}><Check size={17} /></button>
                   <button onClick={() => { setEditingUsername(false); setNewUsername(username ?? ''); }} aria-label="Cancel" className="grid h-9 w-9 place-items-center rounded-[10px]" style={{ background: 'rgba(255,255,255,.05)', color: RD.muted }}><X size={17} /></button>
                 </div>
               ) : (

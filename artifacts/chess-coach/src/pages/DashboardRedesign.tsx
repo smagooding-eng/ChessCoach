@@ -392,7 +392,7 @@ export function DashboardRedesign() {
 
         {/* ── My Analytics: stats, weaknesses and courses now live there ── */}
         <Link href="/analysis" className="flex items-center gap-3.5 rounded-[20px] p-5 transition-transform active:scale-[.99]" style={{ background: CARD, border: `1px solid ${BORDER}` }}>
-          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-[12px]" style={{ background: 'rgba(129,182,76,.10)', border: `1px solid ${BORDER}`, color: GREEN }}><BarChart3 size={21} /></span>
+          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-[12px]" style={{ background: '#81B64C', color: '#FFFFFF' }}><BarChart3 size={21} /></span>
           <span className="min-w-0 flex-1">
             <b className="block text-[16px] font-extrabold">My Analytics</b>
             <span className="block truncate text-[12.5px]" style={{ color: MUTED }}>

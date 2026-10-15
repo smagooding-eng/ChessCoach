@@ -154,7 +154,7 @@ export function GamesRedesign() {
               const active = colorTab === t.id;
               return (
                 <button key={t.id} onClick={() => setColorTab(t.id)} className="rounded-[12px] py-2.5 text-[14px] font-bold transition-colors"
-                  style={active ? { background: 'rgba(129,182,76,.10)', color: RD.text, boxShadow: `inset 0 0 0 1.5px ${RD.green}` } : { background: 'transparent', color: RD.muted }}>
+                  style={active ? { background: 'rgba(255,255,255,.08)', color: RD.text, boxShadow: `inset 0 0 0 1.5px ${RD.green}` } : { background: 'transparent', color: RD.muted }}>
                   {t.label}
                 </button>
               );

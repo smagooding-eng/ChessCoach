@@ -559,7 +559,7 @@ export function Puzzles() {
                     }}
                     className="rounded-[12px] py-2.5 text-[14px] font-bold transition-colors"
                     style={active
-                      ? { background: 'rgba(129,182,76,.10)', color: '#F5F7F6', boxShadow: 'inset 0 0 0 1.5px var(--cs-green, #81B64C)' }
+                      ? { background: 'rgba(255,255,255,.08)', color: '#F5F7F6', boxShadow: 'inset 0 0 0 1.5px var(--cs-green, #81B64C)' }
                       : { background: 'transparent', color: TEXT_MUTED }}
                   >
                     {label}
@@ -685,13 +685,13 @@ export function Puzzles() {
           >
             {redesign && (
               <div className="mb-3 flex items-center gap-3">
-                <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full" style={{ background: 'rgba(232,180,71,.14)', border: '1px solid rgba(232,180,71,.4)', color: '#E8B447' }}><Trophy size={24} /></span>
+                <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full" style={{ background: 'rgba(255,255,255,.07)', border: '1px solid rgba(255,255,255,.10)', color: '#F5F7F6' }}><Trophy size={24} /></span>
                 <div className="min-w-0 flex-1">
                   <b className="block text-[19px] font-extrabold leading-tight" style={{ color: TEXT_LIGHT }}>{puzzleTheme || targetTheme ? 'Theme Puzzle' : 'Daily Puzzle'}</b>
                   <span className="text-[13px]" style={{ color: TEXT_MUTED }}>Find the best move</span>
                 </div>
                 {stats && stats.streak > 0 && (
-                  <span className="flex shrink-0 items-center gap-1.5 rounded-[10px] px-2.5 py-1.5 text-[12px] font-extrabold" style={{ background: 'rgba(232,180,71,.14)', border: '1px solid rgba(232,180,71,.35)', color: '#F2C14E' }}><Flame size={14} />Streak: {stats.streak} day{stats.streak === 1 ? '' : 's'}</span>
+                  <span className="flex shrink-0 items-center gap-1.5 rounded-[10px] px-2.5 py-1.5 text-[12px] font-extrabold" style={{ background: 'rgba(255,255,255,.07)', border: '1px solid rgba(255,255,255,.10)', color: '#F5F7F6' }}><Flame size={14} />Streak: {stats.streak} day{stats.streak === 1 ? '' : 's'}</span>
                 )}
               </div>
             )}

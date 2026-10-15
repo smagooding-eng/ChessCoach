@@ -172,7 +172,7 @@ export function WeaknessDetail() {
 
   const diffColor = (d: string) =>
     d === 'Beginner' ? 'text-emerald-400 bg-emerald-500/15 border-emerald-500/30' :
-    d === 'Intermediate' ? 'text-amber-400 bg-amber-500/15 border-amber-500/30' :
+    d === 'Intermediate' ? 'text-white bg-white/[0.07] border-white/10' :
     'text-rose-400 bg-rose-500/15 border-rose-500/30';
 
   return (

@@ -550,7 +550,7 @@ export function LiveHistory() {
                       </span>
                       <span className={cn(
                         'inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide',
-                        g.mode === 'ranked' ? 'bg-amber-500/15 text-amber-400' : 'bg-white/5 text-muted-foreground'
+                        g.mode === 'ranked' ? 'bg-white/[0.07] text-white' : 'bg-white/5 text-muted-foreground'
                       )}>
                         {g.mode}
                       </span>

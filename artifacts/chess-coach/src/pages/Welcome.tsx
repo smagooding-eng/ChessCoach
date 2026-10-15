@@ -95,7 +95,7 @@ export function Welcome() {
         </div>
 
         {pendingCode && (
-          <div className="flex items-center gap-3 rounded-xl p-3" style={{ background: 'rgba(129,182,76,0.1)', border: '1px solid rgba(129,182,76,0.35)' }}>
+          <div className="flex items-center gap-3 rounded-xl p-3" style={{ background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.10)' }}>
             <Swords className="h-5 w-5 shrink-0" style={{ color: CHESSCOM_GREEN }} />
             <p className="text-[13px]" style={{ color: TEXT_LIGHT }}>
               {challenger ? <><b>{challenger.name}</b> challenged you to a {challenger.what}.</> : 'You have a challenge waiting.'} Enter your username and we'll take you straight to it.

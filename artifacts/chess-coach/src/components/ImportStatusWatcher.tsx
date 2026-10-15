@@ -213,7 +213,7 @@ export function ImportStatusWatcher() {
         <div className="fixed bottom-5 right-5 z-50 max-w-sm rounded-2xl p-4 shadow-2xl"
           style={{ background: BG_CARD, border: `1px solid ${BORDER}`, boxShadow: '0 18px 50px rgba(0,0,0,0.55)' }}>
           <div className="flex items-start gap-3">
-            <div className="rounded-xl p-2 shrink-0" style={{ background: 'rgba(129,182,76,0.15)', color: CHESSCOM_GREEN }}>
+            <div className="rounded-xl p-2 shrink-0" style={{ background: '#81B64C', color: '#FFFFFF' }}>
               <div className="w-5 h-5 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: `${CHESSCOM_GREEN} transparent ${CHESSCOM_GREEN} ${CHESSCOM_GREEN}` }} />
             </div>
             <div className="flex-1 min-w-0">
@@ -234,7 +234,7 @@ export function ImportStatusWatcher() {
         <div className="fixed bottom-5 right-5 z-50 max-w-sm rounded-2xl p-4 shadow-2xl"
           style={{ background: BG_CARD, border: `1px solid ${BORDER}`, boxShadow: '0 18px 50px rgba(0,0,0,0.55)' }}>
           <div className="flex items-start gap-3">
-            <div className="rounded-xl p-2" style={{ background: 'rgba(129,182,76,0.15)', color: CHESSCOM_GREEN }}>
+            <div className="rounded-xl p-2" style={{ background: '#81B64C', color: '#FFFFFF' }}>
               <CheckCircle2 size={20} />
             </div>
             <div className="flex-1 min-w-0">

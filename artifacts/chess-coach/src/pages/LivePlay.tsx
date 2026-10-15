@@ -119,7 +119,7 @@ export function LivePlay({ initialTab }: { initialTab?: OnlineTab } = {}) {
         </div>
         <div className="flex shrink-0 flex-col gap-1.5 sm:flex-row">
           <Link href="/friends" className="relative inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-black uppercase tracking-wider"
-            style={{ background: PT.greenSoft, color: PT.green, border: `1px solid ${PT.greenLine}` }} aria-label={social.total ? `Friends, ${social.total} new` : 'Friends'}>
+            style={{ background: '#81B64C', color: '#FFFFFF' }} aria-label={social.total ? `Friends, ${social.total} new` : 'Friends'}>
             <Users className="w-3.5 h-3.5" /> Friends
             {social.total > 0 && (
               <span className="absolute -right-1.5 -top-1.5 grid h-[18px] min-w-[18px] place-items-center rounded-full px-1 text-[10px] font-black" style={{ background: '#FF5058', color: '#fff' }}>
@@ -128,7 +128,7 @@ export function LivePlay({ initialTab }: { initialTab?: OnlineTab } = {}) {
             )}
           </Link>
           <Link href="/live/history" className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-black uppercase tracking-wider"
-            style={{ background: PT.greenSoft, color: PT.green, border: `1px solid ${PT.greenLine}` }}>
+            style={{ background: '#81B64C', color: '#FFFFFF' }}>
             <History className="w-3.5 h-3.5" /> History
           </Link>
         </div>
@@ -150,7 +150,7 @@ export function LivePlay({ initialTab }: { initialTab?: OnlineTab } = {}) {
           </div>
           {showBotOffer && live.queuedTc && (
             <div className="flex items-center gap-3 p-4" style={cardStyle}>
-              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl" style={{ background: PT.greenSoft, color: PT.green }}><Bot size={22} /></span>
+              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl" style={{ background: '#81B64C', color: '#FFFFFF' }}><Bot size={22} /></span>
               <div className="min-w-0 flex-1">
                 <p className="text-[14.5px] font-extrabold" style={{ color: PT.text }}>No one's free in your range right now</p>
                 <p className="text-[12.5px]" style={{ color: PT.muted }}>Play a ChessScout bot at your level instead. It's labeled as a bot and the game is casual (no rating change). Or keep searching.</p>

@@ -26,8 +26,8 @@ export function UpgradeNudge({ headline, subtext, compact = false }: UpgradeNudg
     return (
       <div className="flex items-center gap-3 px-4 py-3 rounded-xl"
         style={{ background: 'rgba(129,182,76,0.08)', border: '1px solid rgba(129,182,76,0.25)' }}>
-        <div className="shrink-0 w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(129,182,76,0.15)' }}>
-          <Sparkles className="w-4 h-4" style={{ color: CHESSCOM_GREEN }} />
+        <div className="shrink-0 w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: '#81B64C' }}>
+          <Sparkles className="w-4 h-4" style={{ color: '#FFFFFF' }} />
         </div>
         <p className="flex-1 text-xs font-bold" style={{ color: TEXT_LIGHT }}>{headline}</p>
         <Link href="/subscription"
@@ -42,8 +42,8 @@ export function UpgradeNudge({ headline, subtext, compact = false }: UpgradeNudg
   return (
     <div className="flex flex-col items-center text-center py-10 px-6 rounded-2xl"
       style={{ background: 'linear-gradient(180deg, #383532 0%, #2a2825 100%)', border: '1px solid rgba(129,182,76,0.3)' }}>
-      <div className="w-14 h-14 rounded-full flex items-center justify-center mb-4" style={{ background: 'rgba(129,182,76,0.12)' }}>
-        <Sparkles className="w-7 h-7" style={{ color: CHESSCOM_GREEN }} />
+      <div className="w-14 h-14 rounded-full flex items-center justify-center mb-4" style={{ background: '#81B64C' }}>
+        <Sparkles className="w-7 h-7" style={{ color: '#FFFFFF' }} />
       </div>
       <h3 className="text-lg font-bold mb-1.5 max-w-sm" style={{ color: TEXT_LIGHT }}>{headline}</h3>
       {subtext && (

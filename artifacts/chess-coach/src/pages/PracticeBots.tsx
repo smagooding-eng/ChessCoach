@@ -702,8 +702,8 @@ function GameView({ bot, onBack, startFen, startColor, isOnboarding }: { bot: Bo
 
           <div className="glass-card rounded-xl p-2.5 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-full bg-primary/20 border-2 border-primary/30 flex items-center justify-center">
-                <span className="text-[10px] font-black text-primary">You</span>
+              <div className="w-7 h-7 rounded-full bg-primary border-2 border-primary/30 flex items-center justify-center">
+                <span className="text-[10px] font-black text-white">You</span>
               </div>
               <p className="font-bold text-sm">You ({playerColor === 'w' ? 'White' : 'Black'})</p>
             </div>
@@ -1032,8 +1032,8 @@ function OpeningTrainerView({ opening, onBack }: { opening: OpeningLine; onBack:
 
           <div className="glass-card rounded-xl p-2.5 flex items-center justify-between flex-wrap gap-2">
             <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-full bg-primary/20 border-2 border-primary/30 flex items-center justify-center">
-                <span className="text-[10px] font-black text-primary">You</span>
+              <div className="w-7 h-7 rounded-full bg-primary border-2 border-primary/30 flex items-center justify-center">
+                <span className="text-[10px] font-black text-white">You</span>
               </div>
               <p className="font-bold text-sm">You ({playerColor === 'w' ? 'White' : 'Black'})</p>
               {phase === 'theory' && isPlayerTurn && (
@@ -1218,7 +1218,7 @@ function BotTileRD({ bot, onSelect }: { bot: BotConfig; onSelect: (b: BotConfig)
       <span className="min-w-0 flex-1">
         <span className="flex items-center gap-2">
           <b className="truncate text-[16px] font-extrabold" style={{ color: RD.text }}>{botName(bot)}</b>
-          <span className="shrink-0 rounded-md px-1.5 py-0.5 text-[10.5px] font-extrabold uppercase tracking-wide" style={{ background: `${accent}22`, color: accent }}>{botTag(bot)}</span>
+          <span className="inline-flex shrink-0 items-center gap-1.5 rounded-md px-1.5 py-0.5 text-[10.5px] font-extrabold uppercase tracking-wide" style={{ background: 'rgba(255,255,255,.07)', color: RD.text, border: '1px solid rgba(255,255,255,.10)' }}><span className="h-1.5 w-1.5 rounded-full" style={{ background: accent }} />{botTag(bot)}</span>
         </span>
         <span className="mt-0.5 block text-[12.5px] leading-snug line-clamp-2" style={{ color: RD.muted }}>{botBlurb(bot)}</span>
         <span className="mt-1 block text-[11.5px] font-bold" style={{ color: record ? RD.text : RD.muted }}>
@@ -1275,7 +1275,7 @@ function HowItWorksRD({ title, steps }: { title: string; steps: string[] }) {
       <div className="space-y-2.5">
         {steps.map((s, i) => (
           <div key={i} className="flex gap-3 text-[13px] leading-snug" style={{ color: RD.muted }}>
-            <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full text-[12px] font-extrabold" style={{ background: 'rgba(129,182,76,.12)', color: RD.green }}>{i + 1}</span>
+            <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full text-[12px] font-extrabold" style={{ background: '#81B64C', color: '#FFFFFF' }}>{i + 1}</span>
             <p>{s}</p>
           </div>
         ))}
@@ -1375,7 +1375,7 @@ export function PracticeBots() {
               const active = tab === id;
               return (
                 <button key={id} onClick={() => setTab(id)} className="rounded-[12px] py-2.5 text-[13.5px] font-bold transition-colors"
-                  style={active ? { background: 'rgba(129,182,76,.10)', color: RD.text, boxShadow: `inset 0 0 0 1.5px ${RD.green}` } : { background: 'transparent', color: RD.muted }}>
+                  style={active ? { background: 'rgba(255,255,255,.08)', color: RD.text, boxShadow: `inset 0 0 0 1.5px ${RD.green}` } : { background: 'transparent', color: RD.muted }}>
                   {label}
                 </button>
               );

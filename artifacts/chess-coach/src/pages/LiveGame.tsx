@@ -45,7 +45,7 @@ function PlayerStrip({ p, ms, active, isYou, awayMs }: { p: { username: string; 
       <div className="flex items-center gap-2 min-w-0">
         {p.avatar
           ? <img src={p.avatar} alt={p.username} className="w-9 h-9 rounded-full object-cover bg-white/10" style={{ border: '1px solid rgba(255,255,255,0.15)' }} />
-          : <div className="w-9 h-9 rounded-full flex items-center justify-center font-black text-sm" style={{ background: 'rgba(129,182,76,0.18)', color: CHESSCOM_GREEN }}>{p.username[0]?.toUpperCase()}</div>}
+          : <div className="w-9 h-9 rounded-full flex items-center justify-center font-black text-sm" style={{ background: '#81B64C', color: '#FFFFFF' }}>{p.username[0]?.toUpperCase()}</div>}
         <div className="min-w-0">
           <div className="flex items-center gap-1.5">
             {p.title && <span className="text-[10px] font-black px-1 py-0.5 rounded text-black" style={{ background: 'linear-gradient(135deg,#f5c460,#e5a631)' }}>{p.title}</span>}
@@ -234,7 +234,7 @@ export function LiveGame({ live, onLeave }: { live: ReturnType<typeof useLivePla
           <button onClick={() => navigate(reviewId ? `/games/${reviewId}` : '/games')}
             disabled={!reviewId}
             className="px-4 py-2 rounded-lg font-black text-xs inline-flex items-center gap-1.5 disabled:opacity-50"
-            style={{ background: 'rgba(129,182,76,0.18)', color: CHESSCOM_GREEN, border: '1px solid rgba(129,182,76,0.4)' }}>
+            style={{ background: '#81B64C', color: '#FFFFFF' }}>
             <BookOpen className="w-3.5 h-3.5" /> Review Game
           </button>
           <button onClick={() => navigate('/games')}
@@ -301,7 +301,7 @@ export function LiveGame({ live, onLeave }: { live: ReturnType<typeof useLivePla
           <button onClick={offerDraw} disabled={!!youOfferedDraw || !!opponentOfferedDraw || game.turn !== color}
             title={game.turn !== color ? 'You can only offer a draw on your own turn' : 'Offer your opponent a draw'}
             className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold disabled:opacity-50"
-            style={{ background: PT.greenSoft, color: CHESSCOM_GREEN, border: `1px solid ${PT.greenLine}` }}>
+            style={{ background: '#81B64C', color: '#FFFFFF' }}>
             <Handshake className="w-3.5 h-3.5" /> Offer Draw
           </button>
           <button onClick={() => { if (confirm('Resign this game?')) resign(); }}

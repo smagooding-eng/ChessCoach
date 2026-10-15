@@ -75,8 +75,8 @@ export default function ScanArchivePage() {
         </div>
       ) : positions.length === 0 ? (
         <div className="text-center py-16">
-          <div className="w-14 h-14 rounded-xl flex items-center justify-center mx-auto mb-3" style={{ background: 'rgba(129,182,76,0.1)' }}>
-            <ArchiveIcon className="w-6 h-6" style={{ color: CHESSCOM_GREEN }} />
+          <div className="w-14 h-14 rounded-xl flex items-center justify-center mx-auto mb-3" style={{ background: '#81B64C' }}>
+            <ArchiveIcon className="w-6 h-6" style={{ color: '#FFFFFF' }} />
           </div>
           <p className="text-sm font-bold mb-1" style={{ color: TEXT_LIGHT }}>No saved positions yet</p>
           <p className="text-xs mb-4" style={{ color: TEXT_MUTED }}>
@@ -103,7 +103,7 @@ export default function ScanArchivePage() {
                 <button
                   onClick={() => playFrom(p.fen)}
                   className="p-2 rounded-lg transition-colors"
-                  style={{ background: 'rgba(129,182,76,0.12)', color: CHESSCOM_GREEN }}
+                  style={{ background: '#81B64C', color: '#FFFFFF' }}
                   title="Play from this position"
                 >
                   <Swords className="w-4 h-4" />

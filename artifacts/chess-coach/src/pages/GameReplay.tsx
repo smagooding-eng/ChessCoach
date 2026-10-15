@@ -573,8 +573,8 @@ const SandboxBoard = React.memo(function SandboxBoard({ playerRating }: { player
     <div>
       <div className="flex items-center justify-between mb-2 px-1">
         <div className="flex items-center gap-2 min-w-0">
-          <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
-            <Bot className="w-3.5 h-3.5 text-primary" />
+          <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center shrink-0">
+            <Bot className="w-3.5 h-3.5 text-white" />
           </div>
           <div className="min-w-0">
             <p className="text-[11px] font-bold text-white/80 truncate">{botName(bot)} <span className="text-white/30">({bot.rating})</span></p>
@@ -607,7 +607,7 @@ const SandboxBoard = React.memo(function SandboxBoard({ playerRating }: { player
             </p>
             <button
               onClick={resetGame}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary/20 hover:bg-primary/30 text-primary text-xs font-bold transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary hover:bg-primary/30 text-white text-xs font-bold transition-colors"
             >
               <RotateCcw className="w-3 h-3" /> Play Again
             </button>
@@ -1058,7 +1058,7 @@ export function GameReplay() {
                 const active = gtab === id;
                 return (
                   <button key={id} onClick={() => setGtab(id)} className="rounded-[12px] py-2 text-[13.5px] font-bold transition-colors"
-                    style={active ? { background: 'rgba(129,182,76,.10)', color: RD.text, boxShadow: `inset 0 0 0 1.5px ${RD.green}` } : { background: 'transparent', color: RD.muted }}>
+                    style={active ? { background: 'rgba(255,255,255,.08)', color: RD.text, boxShadow: `inset 0 0 0 1.5px ${RD.green}` } : { background: 'transparent', color: RD.muted }}>
                     {label}
                   </button>
                 );
@@ -1381,7 +1381,7 @@ export function GameReplay() {
               {isPremium ? (
                 <button onClick={() => handleReview(true)}
                   className="flex w-full items-center gap-3 rounded-[14px] px-3.5 py-3 text-left"
-                  style={{ background: 'rgba(129,182,76,.08)', border: '1px solid rgba(129,182,76,.35)' }}>
+                  style={{ background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.10)' }}>
                   <Sparkles className="h-4 w-4 shrink-0" style={{ color: '#81B64C' }} />
                   <span className="flex-1 text-[13px] font-bold">This game was reviewed before you went Pro. Add the AI coach's explanations.</span>
                   <span className="text-[12.5px] font-extrabold" style={{ color: '#81B64C' }}>Add</span>

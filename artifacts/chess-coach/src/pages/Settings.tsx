@@ -16,7 +16,7 @@ const CHESSCOM_GREEN = REDESIGN_ON ? RD.green : '#81b64c';
 const TEXT_LIGHT = REDESIGN_ON ? RD.text : '#e8e6e3';
 const TEXT_MUTED = REDESIGN_ON ? RD.muted : '#9e9b98';
 const BG_CARD = REDESIGN_ON ? RD.cardSolid : '#302e2b';
-const SELECTED_BG = REDESIGN_ON ? 'rgba(129,182,76,0.12)' : 'rgba(129,182,76,0.35)';
+const SELECTED_BG = 'rgba(255,255,255,0.08)';
 
 function SwatchButton({ active, onClick, children, label }: { active: boolean; onClick: () => void; children: React.ReactNode; label: string }) {
   return (
@@ -29,8 +29,8 @@ function SwatchButton({ active, onClick, children, label }: { active: boolean; o
       }}
     >
       {children}
-      <span className="text-[11px] font-bold flex items-center gap-1 text-center leading-tight" style={{ color: active ? CHESSCOM_GREEN : TEXT_MUTED }}>
-        {active && <Check className="w-3 h-3 shrink-0" />} {label}
+      <span className="text-[11px] font-bold flex items-center gap-1 text-center leading-tight" style={{ color: active ? TEXT_LIGHT : TEXT_MUTED }}>
+        {active && <Check className="w-3 h-3 shrink-0" style={{ color: CHESSCOM_GREEN }} />} {label}
       </span>
     </button>
   );
@@ -164,7 +164,7 @@ export default function SettingsPage() {
                 const on = stab === id;
                 return (
                   <button key={id} onClick={() => setStab(id)} aria-pressed={on} className="rounded-[12px] py-2.5 text-[12.5px] font-bold transition-colors"
-                    style={on ? { background: 'rgba(129,182,76,.10)', color: RD.text, boxShadow: `inset 0 0 0 1.5px ${RD.green}` } : { background: 'transparent', color: RD.muted }}>
+                    style={on ? { background: 'rgba(255,255,255,.08)', color: RD.text, boxShadow: `inset 0 0 0 1.5px ${RD.green}` } : { background: 'transparent', color: RD.muted }}>
                     {label}
                   </button>
                 );
@@ -207,7 +207,7 @@ export default function SettingsPage() {
               const on = t.id === activeType.id;
               return (
                 <button key={t.id} onClick={() => setThemeType(t.id)} aria-pressed={on} className="rounded-[10px] py-2 text-[13px] font-bold transition-colors"
-                  style={on ? { background: 'rgba(129,182,76,.10)', color: RD.text, boxShadow: `inset 0 0 0 1.5px ${RD.green}` } : { background: 'transparent', color: RD.muted }}>
+                  style={on ? { background: 'rgba(255,255,255,.08)', color: RD.text, boxShadow: `inset 0 0 0 1.5px ${RD.green}` } : { background: 'transparent', color: RD.muted }}>
                   {t.label} <span className="text-[11px] opacity-70">{t.shapes.length}</span>
                 </button>
               );
@@ -240,7 +240,7 @@ export default function SettingsPage() {
                 const count = g.id === 'classic' ? Object.keys(BOARD_THEMES).length + 1 : g.boards.filter((k) => BOARD_TEXTURES[k]).length;
                 return (
                   <button key={g.id} onClick={() => setBoardGroup(g.id)} aria-pressed={on} className="whitespace-nowrap rounded-[10px] px-3 py-2 text-[13px] font-bold transition-colors"
-                    style={on ? { background: 'rgba(129,182,76,.10)', color: RD.text, boxShadow: `inset 0 0 0 1.5px ${RD.green}` } : { background: 'transparent', color: RD.muted }}>
+                    style={on ? { background: 'rgba(255,255,255,.08)', color: RD.text, boxShadow: `inset 0 0 0 1.5px ${RD.green}` } : { background: 'transparent', color: RD.muted }}>
                     {g.label} <span className="text-[11px] opacity-70">{count}</span>
                   </button>
                 );
@@ -459,7 +459,7 @@ export default function SettingsPage() {
                   <button key={k} onClick={() => setCardGlass(k)}
                     className="rounded-xl px-3 py-2.5 text-left"
                     style={{ background: cardGlass === k ? SELECTED_BG : 'rgba(255,255,255,0.05)', border: cardGlass === k ? `1.5px solid ${CHESSCOM_GREEN}` : '1px solid rgba(255,255,255,0.1)' }}>
-                    <span className="block text-[13px] font-bold" style={{ color: cardGlass === k ? CHESSCOM_GREEN : TEXT_LIGHT }}>{CARD_GLASS[k].label}</span>
+                    <span className="block text-[13px] font-bold" style={{ color: TEXT_LIGHT }}>{CARD_GLASS[k].label}</span>
                     <span className="block text-[11px]" style={{ color: TEXT_MUTED }}>{CARD_GLASS[k].sub}</span>
                   </button>
                 ))}
@@ -498,7 +498,7 @@ export default function SettingsPage() {
           <button
             onClick={handleSaveTheme}
             className="px-4 py-2.5 rounded-xl text-sm font-bold flex items-center gap-1.5 shrink-0"
-            style={{ background: savedFlash ? 'rgba(129,182,76,0.2)' : CHESSCOM_GREEN, color: savedFlash ? CHESSCOM_GREEN : '#000' }}
+            style={{ background: savedFlash ? 'rgba(255,255,255,0.08)' : CHESSCOM_GREEN, color: savedFlash ? TEXT_LIGHT : '#000' }}
           >
             {savedFlash ? <Check className="w-4 h-4" /> : <Save className="w-4 h-4" />}
             {savedFlash ? 'Saved' : 'Save Current'}
@@ -532,7 +532,7 @@ export default function SettingsPage() {
             return (
               <SwatchButton key={key} active={boardSize === key} onClick={() => setBoardSize(key)} label={t.label}>
                 <div className="w-full flex items-center justify-center h-8">
-                  <div className="rounded" style={{ width: `${20 + (t.maxWidth / 720) * 24}px`, height: `${20 + (t.maxWidth / 720) * 24}px`, background: 'rgba(129,182,76,0.3)', border: '1px solid rgba(129,182,76,0.5)' }} />
+                  <div className="rounded" style={{ width: `${20 + (t.maxWidth / 720) * 24}px`, height: `${20 + (t.maxWidth / 720) * 24}px`, background: 'rgba(255,255,255,0.14)', border: '1px solid rgba(255,255,255,0.22)' }} />
                 </div>
               </SwatchButton>
             );
@@ -565,7 +565,7 @@ export default function SettingsPage() {
             return (
               <button key={key} onClick={() => { setSoundPack(key); previewSoundPack(key); }} aria-pressed={on}
                 className="rounded-xl px-3 py-2.5 text-left transition-colors"
-                style={{ background: on ? 'rgba(129,182,76,0.12)' : BG_CARD, border: `1px solid ${on ? CHESSCOM_GREEN : 'rgba(255,255,255,0.08)'}` }}>
+                style={{ background: on ? 'rgba(255,255,255,0.08)' : BG_CARD, border: `1px solid ${on ? CHESSCOM_GREEN : 'rgba(255,255,255,0.08)'}` }}>
                 <span className="flex items-center gap-1.5 text-sm font-bold" style={{ color: TEXT_LIGHT }}>
                   <Volume2 className="w-3.5 h-3.5" style={{ color: on ? CHESSCOM_GREEN : TEXT_MUTED }} /> {t.label}
                 </span>
@@ -581,7 +581,7 @@ export default function SettingsPage() {
       <button
         onClick={handleSetDefault}
         className="w-full py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2"
-        style={{ background: defaultFlash ? 'rgba(129,182,76,0.15)' : 'rgba(255,255,255,0.04)', color: defaultFlash ? CHESSCOM_GREEN : TEXT_LIGHT, border: '1px solid rgba(255,255,255,0.08)' }}
+        style={{ background: defaultFlash ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.04)', color: TEXT_LIGHT, border: '1px solid rgba(255,255,255,0.08)' }}
       >
         {defaultFlash ? <Check className="w-4 h-4" /> : <Star className="w-4 h-4" />}
         {defaultFlash ? 'Set as My Default' : 'Set Current Settings as My Default'}

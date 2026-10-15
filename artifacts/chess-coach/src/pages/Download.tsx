@@ -34,7 +34,7 @@ export default function DownloadPage() {
       <section className="max-w-3xl mx-auto px-4 sm:px-8 pt-12 pb-20">
         <div className="text-center mb-10">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full mb-5 text-[11px] font-black tracking-wider"
-            style={{ background: `${G}15`, color: G, border: `1px solid ${G}30` }}>
+            style={{ background: '#81B64C', color: '#FFFFFF' }}>
             <Smartphone className="w-3.5 h-3.5" /> ANDROID APP
           </div>
           <h1 className="text-4xl sm:text-5xl font-black leading-[1.05] tracking-tight mb-4" style={{ color: TEXT }}>

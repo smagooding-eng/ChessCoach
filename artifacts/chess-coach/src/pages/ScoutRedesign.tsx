@@ -4,7 +4,6 @@ import { AlertTriangle, ArrowLeft, ArrowRight, ChevronDown, ChevronRight, Histor
 import { RD } from '@/lib/redesignTheme';
 import { useUser } from '@/hooks/use-user';
 import { ProUpsell } from '@/components/ProUpsell';
-import { useSwipeTabs } from '@/lib/swipeNav';
 import { NEUTRAL_CHIP } from '@/lib/redesignTheme';
 
 // Opponent Scout (redesign): header card with search, profile card, tabs,
@@ -57,7 +56,7 @@ export function ScoutRedesign(props: {
 }) {
   const { inputUsername, setInputUsername, onSubmit, loading, statusMsg, error, isLimitReached, limitNudge, result, topPlayers, history, loadingHistory, onLoadHistory, exploit } = props;
   const [tab, setTab] = useState<'overview' | 'openings' | 'weaknesses' | 'courses'>('overview');
-  useSwipeTabs(['overview', 'openings', 'weaknesses', 'courses'] as const, tab, setTab);
+  // No swiping through this page's own tabs; a swipe here moves to the next/previous page instead.
   const { isPremium, isSubscriptionLoaded } = useUser();
   const [showTop, setShowTop] = useState(false);
   const [open, setOpen] = useState<number | null>(null);
@@ -131,7 +130,7 @@ export function ScoutRedesign(props: {
         </section>
 
         {loading && statusMsg && (
-          <div className="flex items-center gap-3 rounded-[16px] p-4 text-[13.5px]" style={{ background: 'rgba(129,182,76,.07)', border: '1px solid rgba(129,182,76,.28)' }}>
+          <div className="flex items-center gap-3 rounded-[16px] p-4 text-[13.5px]" style={{ background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.10)' }}>
             <Loader2 size={17} className="shrink-0 animate-spin" style={{ color: RD.green }} />{statusMsg}
           </div>
         )}
@@ -157,7 +156,7 @@ export function ScoutRedesign(props: {
                 {p?.avatar ? (
                   <img src={p.avatar} alt={result.username} className="h-[64px] w-[64px] shrink-0 rounded-[16px] object-cover" style={{ border: `1px solid ${RD.border}` }} />
                 ) : (
-                  <span className="grid h-[64px] w-[64px] shrink-0 place-items-center rounded-[16px] text-[26px] font-extrabold" style={{ background: 'rgba(129,182,76,.12)', color: RD.green }}>{result.username[0]?.toUpperCase()}</span>
+                  <span className="grid h-[64px] w-[64px] shrink-0 place-items-center rounded-[16px] text-[26px] font-extrabold" style={{ background: '#81B64C', color: '#FFFFFF' }}>{result.username[0]?.toUpperCase()}</span>
                 )}
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
@@ -182,7 +181,7 @@ export function ScoutRedesign(props: {
                 const active = tab === id;
                 return (
                   <button key={id} onClick={() => setTab(id)} className="rounded-[12px] py-2.5 text-[13px] font-bold transition-colors"
-                    style={active ? { background: 'rgba(129,182,76,.10)', color: RD.text, boxShadow: `inset 0 0 0 1.5px ${RD.green}` } : { background: 'transparent', color: RD.muted }}>
+                    style={active ? { background: 'rgba(255,255,255,.08)', color: RD.text, boxShadow: `inset 0 0 0 1.5px ${RD.green}` } : { background: 'transparent', color: RD.muted }}>
                     {label}
                   </button>
                 );

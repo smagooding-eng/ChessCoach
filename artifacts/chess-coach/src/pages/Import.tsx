@@ -578,7 +578,7 @@ export function Import() {
               </div>
             )}
             {pgnResult && (
-              <div className="mt-3 rounded-[14px] p-4 text-[13px]" style={{ background: 'rgba(129,182,76,.07)', border: '1px solid rgba(129,182,76,.28)' }}>
+              <div className="mt-3 rounded-[14px] p-4 text-[13px]" style={{ background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.10)' }}>
                 <p className="flex items-center gap-2 text-[14px] font-bold" style={{ color: RD.green }}>
                   <CheckCircle2 className="h-4 w-4" />
                   {pgnResult.imported > 0 ? `Added ${pgnResult.imported} game${pgnResult.imported === 1 ? '' : 's'} to your library` : 'No new games added'}

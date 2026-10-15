@@ -168,8 +168,8 @@ export function Subscription() {
         <div className="max-w-md mx-auto">
           <div className="glass-panel rounded-xl p-6 mb-6">
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
-                <Crown className="w-5 h-5 text-primary" />
+              <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center">
+                <Crown className="w-5 h-5 text-white" />
               </div>
               <div>
                 <h3 className="font-bold text-lg">ChessScout.net Pro</h3>

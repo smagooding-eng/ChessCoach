@@ -86,8 +86,8 @@ export default function AffiliatePage() {
         </Link>
 
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-5" style={{ background: 'rgba(129,182,76,0.15)' }}>
-            <DollarSign className="w-8 h-8" style={{ color: G }} />
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-5" style={{ background: '#81B64C' }}>
+            <DollarSign className="w-8 h-8" style={{ color: '#FFFFFF' }} />
           </div>
           <h1 className="text-3xl font-black mb-2" style={{ letterSpacing: '-0.02em' }}>Affiliate Dashboard</h1>
           <p className="text-sm" style={{ color: MUTED }}>Track your referral commission and connect your payout account.</p>

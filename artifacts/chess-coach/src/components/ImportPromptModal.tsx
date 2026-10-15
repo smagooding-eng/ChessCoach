@@ -86,7 +86,7 @@ export function ImportPromptModal() {
       <div className="w-full max-w-md rounded-2xl p-6 space-y-5"
         style={{ background: BG_CARD, border: `1px solid ${BORDER}`, boxShadow: '0 20px 60px rgba(0,0,0,0.55)' }}>
         <div className="flex items-start gap-3">
-          <div className="rounded-xl p-2.5" style={{ background: 'rgba(129,182,76,0.15)', color: CHESSCOM_GREEN }}>
+          <div className="rounded-xl p-2.5" style={{ background: '#81B64C', color: '#FFFFFF' }}>
             <CloudDownload size={22} />
           </div>
           <div className="flex-1">
@@ -105,7 +105,7 @@ export function ImportPromptModal() {
 
         {statusText && (
           <div className="rounded-lg px-3 py-2 text-xs font-bold"
-            style={{ background: 'rgba(129,182,76,0.1)', color: CHESSCOM_GREEN, border: '1px solid rgba(129,182,76,0.25)' }}>
+            style={{ background: '#81B64C', color: '#FFFFFF' }}>
             {statusText}
           </div>
         )}

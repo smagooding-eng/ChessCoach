@@ -426,7 +426,7 @@ function PersonalAnalysisCard() {
       style={{ background: 'linear-gradient(160deg, rgba(14,26,24,0.9), rgba(6,13,12,0.92))', border: '1px solid rgba(129,182,76,0.22)', boxShadow: '0 24px 60px -30px rgba(129,182,76,0.35)' }}>
       <div className="min-w-0 p-2.5 sm:p-5">
         <div className="mb-2 flex items-center gap-2 sm:mb-4">
-          <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full sm:h-9 sm:w-9" style={{ background: 'rgba(129,182,76,0.12)', border: '1px solid rgba(129,182,76,0.35)' }}><Target className="h-3.5 w-3.5 sm:h-4 sm:w-4" style={{ color: G }} /></span>
+          <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full sm:h-9 sm:w-9" style={{ background: '#81B64C' }}><Target className="h-3.5 w-3.5 sm:h-4 sm:w-4" style={{ color: '#FFFFFF' }} /></span>
           <span className="text-[10px] font-black uppercase leading-tight tracking-[0.08em] sm:text-[12px]" style={{ color: G }}>Your personal analysis</span>
         </div>
         <div className="space-y-2 sm:space-y-4">
@@ -549,7 +549,7 @@ export function LandingPage() {
       <main data-track-section="hero" className="relative z-10 mx-auto flex w-full max-w-7xl flex-1 flex-col justify-center gap-3 px-4 pb-3 sm:px-8 lg:grid lg:grid-cols-2 lg:gap-12 lg:pb-6">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }} className="lg:self-center">
           <div className="mb-2.5 inline-flex items-center gap-2 rounded-full px-3 py-1 text-[10.5px] font-black uppercase tracking-[0.12em] sm:text-[11px]"
-            style={{ background: 'rgba(129,182,76,0.08)', color: G, border: '1px solid rgba(129,182,76,0.4)' }}>
+            style={{ background: '#81B64C', color: '#FFFFFF' }}>
             <HeroTrophy className="h-3.5 w-3.5" /> Turn games into progress
           </div>
 

@@ -63,8 +63,8 @@ export default function SolvedPuzzlesPage() {
         </div>
       ) : puzzles.length === 0 ? (
         <div className="text-center py-16">
-          <div className="w-14 h-14 rounded-xl flex items-center justify-center mx-auto mb-3" style={{ background: 'rgba(129,182,76,0.1)' }}>
-            <ArchiveIcon className="w-6 h-6" style={{ color: CHESSCOM_GREEN }} />
+          <div className="w-14 h-14 rounded-xl flex items-center justify-center mx-auto mb-3" style={{ background: '#81B64C' }}>
+            <ArchiveIcon className="w-6 h-6" style={{ color: '#FFFFFF' }} />
           </div>
           <p className="text-sm font-bold mb-1" style={{ color: TEXT_LIGHT }}>No solved puzzles yet</p>
           <p className="text-xs mb-4" style={{ color: TEXT_MUTED }}>Solve a puzzle and it'll show up here automatically</p>

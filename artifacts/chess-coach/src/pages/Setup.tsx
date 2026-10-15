@@ -157,8 +157,8 @@ export function Setup() {
         className="w-full max-w-md glass-panel p-8 md:p-10 rounded-xl relative z-10"
       >
         <div className="text-center mb-6">
-          <div className="mx-auto w-16 h-16 mb-4 bg-primary/20 rounded-full flex items-center justify-center shadow-[0_0_30px_hsl(89_44%_50%_/_0.3)]">
-            <Trophy className="w-8 h-8 text-primary" />
+          <div className="mx-auto w-16 h-16 mb-4 bg-primary rounded-full flex items-center justify-center shadow-[0_0_30px_hsl(89_44%_50%_/_0.3)]">
+            <Trophy className="w-8 h-8 text-white" />
           </div>
           <h1 className="text-3xl font-display font-bold text-white">
             Welcome to <span className="text-gradient">ChessScout.net</span>

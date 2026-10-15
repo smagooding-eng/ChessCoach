@@ -347,7 +347,7 @@ export function AnalysisRedesign() {
     return (
       <Link key={c.id} href={`/courses/${c.id}`} className="flex items-center gap-3 rounded-[14px] px-3 py-3 transition-transform active:scale-[.99]"
         style={{ background: 'rgba(255,255,255,.025)', border: `1px solid ${RD.border}` }}>
-        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px]" style={{ background: 'rgba(129,182,76,.12)', color: RD.green }}>
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px]" style={{ background: '#81B64C', color: '#FFFFFF' }}>
           {p >= 100 ? <CheckCircle2 size={18} /> : <GraduationCap size={18} />}
         </span>
         <span className="min-w-0 flex-1">
@@ -374,7 +374,7 @@ export function AnalysisRedesign() {
             const active = tab === t.id;
             return (
               <button key={t.id} onClick={() => setTab(t.id)} className="min-w-0 truncate rounded-[12px] px-0.5 py-2.5 text-[11.5px] font-bold transition-colors min-[400px]:text-[12.5px] md:px-3 md:text-[13px]"
-                style={active ? { background: 'rgba(129,182,76,.10)', color: RD.text, boxShadow: `inset 0 0 0 1.5px ${RD.green}` } : { background: 'transparent', color: RD.muted }}>
+                style={active ? { background: 'rgba(255,255,255,.08)', color: RD.text, boxShadow: `inset 0 0 0 1.5px ${RD.green}` } : { background: 'transparent', color: RD.muted }}>
                 {t.label}
               </button>
             );
@@ -576,7 +576,7 @@ export function AnalysisRedesign() {
                       <Link key={o.opening} href={`/openings/${encodeURIComponent(o.eco ?? o.opening)}`}
                         className="flex items-center gap-3 rounded-[14px] px-2.5 py-2.5 transition-transform active:scale-[.99]"
                         style={{ background: 'rgba(255,255,255,.025)', border: `1px solid ${RD.border}` }}>
-                        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px] text-[15px] font-extrabold" style={{ background: 'rgba(129,182,76,.12)', color: RD.green }}>{i + 1}</span>
+                        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px] text-[15px] font-extrabold" style={{ background: '#81B64C', color: '#FFFFFF' }}>{i + 1}</span>
                         <span className="min-w-0 flex-1">
                           <b className="block truncate text-[14px] font-bold">{family}</b>
                           {variation && <span className="block truncate text-[13px]" style={{ color: 'rgba(245,247,246,.85)' }}>{variation}</span>}

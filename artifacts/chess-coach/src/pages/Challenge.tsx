@@ -138,7 +138,7 @@ export function Challenge() {
         ) : (
           <div className="space-y-4 p-6" style={cardStyle}>
             <div className="text-center">
-              <span className="mx-auto mb-3 grid h-14 w-14 place-items-center rounded-2xl" style={{ background: PT.greenSoft, color: PT.green }}>
+              <span className="mx-auto mb-3 grid h-14 w-14 place-items-center rounded-2xl" style={{ background: '#81B64C', color: '#FFFFFF' }}>
                 {ch.kind === 'live' ? <Swords size={26} /> : <CalendarDays size={26} />}
               </span>
               <p className="text-[20px] font-black" style={{ color: PT.text }}>

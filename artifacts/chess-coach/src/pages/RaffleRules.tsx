@@ -47,7 +47,7 @@ export default function RaffleRulesPage() {
 
       <main className="max-w-3xl mx-auto px-4 sm:px-8 py-10">
         <div className="flex items-center gap-3 mb-2">
-          <div className="rounded-xl p-2.5" style={{ background: 'rgba(129,182,76,0.15)', color: G }}>
+          <div className="rounded-xl p-2.5" style={{ background: '#81B64C', color: '#FFFFFF' }}>
             <Trophy size={22} />
           </div>
           <h1 className="text-3xl font-black" style={{ color: TEXT, letterSpacing: '-0.02em' }}>

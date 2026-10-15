@@ -132,8 +132,8 @@ export function MobileSetup() {
     <div className="h-[100dvh] flex flex-col items-center justify-center px-5 bg-background overflow-y-auto">
       <div className="w-full max-w-sm">
         <div className="text-center mb-6">
-          <div className="mx-auto w-14 h-14 mb-3 bg-primary/20 rounded-full flex items-center justify-center">
-            <Trophy className="w-7 h-7 text-primary" />
+          <div className="mx-auto w-14 h-14 mb-3 bg-primary rounded-full flex items-center justify-center">
+            <Trophy className="w-7 h-7 text-white" />
           </div>
           <h1 className="text-2xl font-display font-bold text-white">ChessScout.net</h1>
           <p className="text-muted-foreground text-sm mt-1">

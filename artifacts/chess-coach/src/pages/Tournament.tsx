@@ -261,7 +261,7 @@ export function Tournament() {
         <div className="min-w-0">
           <p className="flex flex-wrap items-center gap-x-2 text-[11px] font-black uppercase tracking-[0.16em]" style={{ color: t.status === 'running' ? PT.gold : PT.muted }}>
             <span>{t.status === 'running' ? 'On now' : t.status === 'scheduled' ? 'Upcoming' : 'Finished'} · {isBracket ? 'Knockout' : 'Arena'} · {isLive ? 'Live' : 'Daily'}</span>
-            {t.eligibility === 'pro' && <span className="rounded px-1.5 py-0.5 text-[10px]" style={{ background: PT.greenSoft, color: PT.green, border: `1px solid ${PT.greenLine}` }}>Pro only</span>}
+            {t.eligibility === 'pro' && <span className="rounded px-1.5 py-0.5 text-[10px]" style={{ background: '#81B64C', color: '#FFFFFF' }}>Pro only</span>}
           </p>
           <h1 className="truncate text-2xl font-black md:text-3xl" style={{ color: PT.text, letterSpacing: '-0.02em' }}>{t.name}</h1>
         </div>

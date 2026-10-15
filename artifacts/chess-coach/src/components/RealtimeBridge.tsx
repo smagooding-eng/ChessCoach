@@ -109,7 +109,7 @@ export function RealtimeBridge() {
         className="pointer-events-auto flex w-full max-w-[480px] items-center gap-3 rounded-2xl px-4 py-3 text-left shadow-2xl"
         style={{ background: PT.cardSolid, border: `1px solid ${PT.greenLine}`, boxShadow: '0 18px 40px -12px rgba(0,0,0,.7)' }}
       >
-        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl" style={{ background: PT.greenSoft, color: PT.green }}><Bell size={18} /></span>
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl" style={{ background: '#81B64C', color: '#FFFFFF' }}><Bell size={18} /></span>
         <span className="min-w-0 flex-1">
           <b className="block truncate text-[14px] font-extrabold" style={{ color: PT.text }}>{banner.title}</b>
           <span className="block truncate text-[12.5px]" style={{ color: PT.muted }}>{banner.body}</span>

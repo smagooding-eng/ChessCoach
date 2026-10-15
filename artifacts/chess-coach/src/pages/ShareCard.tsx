@@ -172,7 +172,7 @@ function CardContent({ card }: { card: ShareableCard }) {
         {card.themes.length > 0 && (
           <div className="flex items-center justify-center gap-1.5 flex-wrap mt-2 px-4">
             {card.themes.slice(0, 3).map((theme) => (
-              <span key={theme} className="px-2 py-0.5 rounded-md text-[10px] font-semibold" style={{ background: 'rgba(129,182,76,0.15)', color: CHESSCOM_GREEN }}>
+              <span key={theme} className="px-2 py-0.5 rounded-md text-[10px] font-semibold" style={{ background: '#81B64C', color: '#FFFFFF' }}>
                 {theme}
               </span>
             ))}
@@ -193,7 +193,7 @@ function CardContent({ card }: { card: ShareableCard }) {
         {card.themes.length > 0 && (
           <div className="flex items-center justify-center gap-1.5 flex-wrap mt-3 px-4">
             {card.themes.slice(0, 3).map((theme) => (
-              <span key={theme} className="px-2 py-0.5 rounded-md text-[10px] font-semibold" style={{ background: 'rgba(129,182,76,0.15)', color: CHESSCOM_GREEN }}>
+              <span key={theme} className="px-2 py-0.5 rounded-md text-[10px] font-semibold" style={{ background: '#81B64C', color: '#FFFFFF' }}>
                 {theme}
               </span>
             ))}

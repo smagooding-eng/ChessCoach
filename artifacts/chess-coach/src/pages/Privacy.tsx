@@ -46,7 +46,7 @@ export default function PrivacyPage() {
         <div className="flex items-center gap-3 mb-2">
           <div
             className="rounded-xl p-2.5"
-            style={{ background: 'rgba(129,182,76,0.15)', color: G }}
+            style={{ background: '#81B64C', color: '#FFFFFF' }}
           >
             <ShieldCheck size={22} />
           </div>

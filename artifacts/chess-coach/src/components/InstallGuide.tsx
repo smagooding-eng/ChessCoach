@@ -70,7 +70,7 @@ function Step({ num, children }: { num: number; children: React.ReactNode }) {
   return (
     <div className="flex items-start gap-3">
       <div className="shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-black"
-        style={{ background: 'rgba(129,182,76,0.15)', color: CHESSCOM_GREEN }}>
+        style={{ background: '#81B64C', color: '#FFFFFF' }}>
         {num}
       </div>
       <p className="text-sm leading-relaxed" style={{ color: TEXT_LIGHT }}>{children}</p>

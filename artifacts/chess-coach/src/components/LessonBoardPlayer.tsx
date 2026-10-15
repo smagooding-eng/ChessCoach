@@ -1029,7 +1029,7 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, positionRec
               { id: 'drill' as Tab, label: 'Drill', show: hasDrill, onClick: () => { setIsPlaying(false); setTab('drill'); resetDrill(); } },
             ]).filter((t) => t.show).map((t) => (
               <button key={t.id} onClick={t.onClick} className="rounded-[12px] py-2.5 text-[14px] font-bold transition-colors"
-                style={tab === t.id ? { background: 'rgba(129,182,76,.10)', color: RD.text, boxShadow: `inset 0 0 0 1.5px ${RD.green}` } : { background: 'transparent', color: RD.muted }}>
+                style={tab === t.id ? { background: 'rgba(255,255,255,.08)', color: RD.text, boxShadow: `inset 0 0 0 1.5px ${RD.green}` } : { background: 'transparent', color: RD.muted }}>
                 {t.label}
               </button>
             ))}
@@ -1422,7 +1422,7 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, positionRec
                   navigate(`/practice?fen=${encodeURIComponent(prevFen)}&rating=1200`);
                 }}
                 className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all active:scale-95 border border-primary/30 hover:border-primary/50"
-                style={{ background: 'rgba(129,182,76,0.1)', color: CHESSCOM_GREEN }}
+                style={{ background: '#81B64C', color: '#FFFFFF' }}
               >
                 <Swords className="w-3.5 h-3.5" />
                 Jump in from here

@@ -361,7 +361,7 @@ export function Dashboard() {
             </div>
           </div>
           <div className="flex-1 min-w-0 relative">
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-[0.18em] mb-1.5" style={{ background: 'rgba(129,182,76,0.25)', color: CHESSCOM_GREEN, border: '1px solid rgba(129,182,76,0.4)' }}>
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-[0.18em] mb-1.5" style={{ background: '#81B64C', color: '#FFFFFF' }}>
               <Zap className="w-2.5 h-2.5" /> Coach
             </span>
             <h3 className="font-semibold text-lg md:text-2xl leading-tight" style={{ color: TEXT_LIGHT, letterSpacing: '-0.02em' }}>
@@ -386,8 +386,8 @@ export function Dashboard() {
               border: `1px solid rgba(129,182,76,0.35)`,
               boxShadow: '0 18px 50px -16px rgba(0,0,0,0.6), 0 4px 16px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04)',
             }}>
-            <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: 'rgba(129,182,76,0.15)' }}>
-              <Play className="w-4.5 h-4.5" style={{ color: CHESSCOM_GREEN }} />
+            <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: '#81B64C' }}>
+              <Play className="w-4.5 h-4.5" style={{ color: '#FFFFFF' }} />
             </div>
             <div className="flex-1">
               <h3 className="font-semibold text-sm" style={{ color: TEXT_LIGHT }}>Local Play</h3>
@@ -402,8 +402,8 @@ export function Dashboard() {
               border: `1px solid rgba(129,182,76,0.35)`,
               boxShadow: '0 18px 50px -16px rgba(0,0,0,0.6), 0 4px 16px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04)',
             }}>
-            <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: 'rgba(129,182,76,0.15)' }}>
-              <Puzzle className="w-4.5 h-4.5" style={{ color: CHESSCOM_GREEN }} />
+            <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: '#81B64C' }}>
+              <Puzzle className="w-4.5 h-4.5" style={{ color: '#FFFFFF' }} />
             </div>
             <div className="flex-1">
               <h3 className="font-semibold text-sm" style={{ color: TEXT_LIGHT }}>Puzzles</h3>
@@ -421,8 +421,8 @@ export function Dashboard() {
               border: '1px solid rgba(255,255,255,0.06)',
               boxShadow: '0 18px 50px -16px rgba(0,0,0,0.6), 0 4px 16px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04)',
             }}>
-            <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: 'rgba(129,182,76,0.15)' }}>
-              <Bot className="w-4.5 h-4.5" style={{ color: CHESSCOM_GREEN }} />
+            <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: '#81B64C' }}>
+              <Bot className="w-4.5 h-4.5" style={{ color: '#FFFFFF' }} />
             </div>
             <div className="flex-1">
               <h3 className="font-semibold text-sm" style={{ color: TEXT_LIGHT }}>Practice Bots</h3>
@@ -437,8 +437,8 @@ export function Dashboard() {
               border: '1px solid rgba(255,255,255,0.06)',
               boxShadow: '0 18px 50px -16px rgba(0,0,0,0.6), 0 4px 16px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04)',
             }}>
-            <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: 'rgba(129,182,76,0.15)' }}>
-              <BookOpen className="w-4.5 h-4.5" style={{ color: CHESSCOM_GREEN }} />
+            <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: '#81B64C' }}>
+              <BookOpen className="w-4.5 h-4.5" style={{ color: '#FFFFFF' }} />
             </div>
             <div className="flex-1">
               <h3 className="font-semibold text-sm" style={{ color: TEXT_LIGHT }}>Opening Trainer</h3>
@@ -472,8 +472,8 @@ export function Dashboard() {
               border: '1px solid rgba(255,255,255,0.06)',
               boxShadow: '0 18px 50px -16px rgba(0,0,0,0.6), 0 4px 16px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04)',
             }}>
-            <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ background: 'rgba(129,182,76,0.15)' }}>
-              <ShoppingBag className="w-4.5 h-4.5" style={{ color: CHESSCOM_GREEN }} />
+            <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ background: '#81B64C' }}>
+              <ShoppingBag className="w-4.5 h-4.5" style={{ color: '#FFFFFF' }} />
             </div>
             <div className="flex-1">
               <h3 className="font-semibold text-sm" style={{ color: TEXT_LIGHT }}>Shop</h3>
