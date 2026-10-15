@@ -600,3 +600,13 @@ html.cs-photo .bg-background { background-color: transparent; }
 html.cs-photo body { background: transparent; background-image: none; }
 html.cs-photo .glass-card,
 html.cs-photo .glass-card:hover { background: var(--rd-card); }
+/* Photo look: the backdrop is the picture, so cards drop their own
+   decorative art (both the illustrated and the photo versions). Bot
+   avatars, boards and pieces are untouched; .cs-keep-img opts out
+   (the photo pickers in Settings). */
+html.cs-photo img:not(.cs-keep-img):is([src*="chessscout/"], [src*="assets/openings/"], [src*="assets/courses/"], [src*="hero-bg."]) {
+  visibility: hidden;
+}
+html.cs-photo :not(.cs-photo-backdrop-img):not(.cs-keep-img):is([style*="chessscout/"], [style*="assets/openings/"], [style*="assets/courses/"], [style*="hero-bg."]) {
+  background-image: none !important;
+}

@@ -412,7 +412,7 @@ export default function SettingsPage() {
                 <div className="relative w-full overflow-hidden rounded-lg" style={{ aspectRatio: '16 / 10', background: '#050A0B', border: '1px solid rgba(255,255,255,0.1)' }}>
                   {o.id === 'photo' && (
                     <>
-                      <img src={sample.src} alt="" className="absolute inset-0 h-full w-full object-cover" style={{ filter: 'blur(1.5px)' }} />
+                      <img src={sample.src} alt="" className="cs-keep-img absolute inset-0 h-full w-full object-cover" style={{ filter: 'blur(1.5px)' }} />
                       <div className="absolute inset-0" style={{ background: 'rgba(5,10,11,.45)' }} />
                     </>
                   )}
@@ -435,7 +435,7 @@ export default function SettingsPage() {
                     <button key={p.id} onClick={() => setBgPhoto(p.id)} aria-label={p.label}
                       className="group relative overflow-hidden rounded-xl text-left"
                       style={{ aspectRatio: '4 / 3', border: on ? `2px solid ${CHESSCOM_GREEN}` : '1px solid rgba(255,255,255,0.1)' }}>
-                      <img src={p.src} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover transition-transform group-hover:scale-105" />
+                      <img src={p.src} alt="" loading="lazy" className="cs-keep-img absolute inset-0 h-full w-full object-cover transition-transform group-hover:scale-105" />
                       <span className="absolute inset-x-0 bottom-0 flex items-center gap-1 px-2 pb-1.5 pt-4 text-[11px] font-bold text-white"
                         style={{ background: 'linear-gradient(transparent, rgba(0,0,0,.75))' }}>
                         {on && <Check className="w-3 h-3 shrink-0" style={{ color: CHESSCOM_GREEN }} />} {p.label}

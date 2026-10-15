@@ -236,7 +236,7 @@ export function DashboardRedesign() {
         <section
           className="relative min-h-[340px] overflow-hidden rounded-[20px]"
           style={{
-            backgroundColor: '#050A0B',
+            backgroundColor: 'var(--rd-card-solid, #050A0B)',
             border: `1px solid ${BORDER}`,
             backgroundImage: `url(${siteImg(asset('scout-knight.webp'))})`,
             backgroundSize: 'auto 100%',
@@ -295,7 +295,7 @@ export function DashboardRedesign() {
               href={t.href}
               className="relative block min-h-[128px] overflow-hidden rounded-[18px] transition-transform active:scale-[.98]"
               style={{
-                backgroundColor: '#050A0B',
+                backgroundColor: 'var(--rd-card-solid, #050A0B)',
                 border: `1px solid ${BORDER}`,
                 backgroundImage: `url(${siteImg(asset(t.img))})`,
                 backgroundSize: 'auto 100%',
