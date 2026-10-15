@@ -5,7 +5,7 @@ import React from 'react';
 //   - nothing for the first 120ms (fast loads don't flash anything)
 //   - a thin green progress bar across the top that shoots to ~70% in
 //     0.45s, then creeps until the page is ready
-//   - one small knight that does a single quick hop with a landing ripple
+//   - one small black rook that does a single quick hop with a landing ripple
 //     (~0.35s), then breathes gently if the load runs long
 // Pure CSS/SVG; respects reduced motion.
 const CSS = `
@@ -17,8 +17,8 @@ const CSS = `
   animation: plGrow .45s cubic-bezier(.2,.8,.3,1) .12s both, plCrawl 8s cubic-bezier(.1,.6,.2,1) .57s forwards; }
 @keyframes plGrow { from { transform: scaleX(0); } to { transform: scaleX(.7); } }
 @keyframes plCrawl { from { transform: scaleX(.7); } to { transform: scaleX(.96); } }
-.pl-knight { width: 64px; height: 64px; overflow: visible; }
-.pl-knight * { transform-box: fill-box; }
+.pl-piece { width: 64px; height: 64px; overflow: visible; }
+.pl-piece * { transform-box: fill-box; }
 .pl-hop { transform-origin: 50% 100%; animation: plHop .36s cubic-bezier(.3,.7,.4,1) .12s both, plBreathe 1.8s ease-in-out .7s infinite; }
 @keyframes plHop {
   0% { transform: translate(-14px, 0) scale(1.1,.88); }
@@ -43,20 +43,19 @@ export function PageLoader() {
     <div className="pl-root min-h-screen flex items-center justify-center bg-background" role="status" aria-label="Loading">
       <style>{CSS}</style>
       <div className="pl-top"><div className="pl-top-bar" /></div>
-      <svg className="pl-knight" viewBox="-34 -72 68 82" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <svg className="pl-piece" viewBox="-34 -72 68 82" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
         <defs>
           <linearGradient id="plBlack" x1="0" y1="0" x2="1" y2="1">
             <stop offset="0" stopColor="#3a3a37" /><stop offset=".55" stopColor="#181817" /><stop offset="1" stopColor="#0a0a09" />
           </linearGradient>
         </defs>
-        <ellipse className="pl-shadow" cx="0" cy="2" rx="19" ry="3.5" fill="#000" />
+        <ellipse className="pl-shadow" cx="0" cy="2" rx="23" ry="3.8" fill="#000" />
         <ellipse className="pl-ring" cx="0" cy="2" rx="30" ry="6" fill="none" stroke="#81b64c" strokeWidth="2" />
         <g className="pl-hop">
-          <path d="M-18,0 L20,0 L20,-6 L16,-9 L16,-12 L12,-13 C17,-25 19,-39 13,-49 C9,-56 2,-60 -5,-58 L-8,-65 L-11,-57 C-16,-53 -20,-47 -22,-41 L-26,-31 C-27.5,-26.5 -24,-23 -20,-25 L-14,-29 C-10,-30.5 -6,-32 -4,-34.5 C-8,-27 -12,-19 -12,-13 L-16,-12 L-16,-9 L-18,-6 Z"
+          <path d="M-22,0 L22,0 L22,-7 L18,-10 L18,-14 L13,-17 L12,-44 L17,-47 L17,-64 L10,-64 L10,-57 L4,-57 L4,-64 L-4,-64 L-4,-57 L-10,-57 L-10,-64 L-17,-64 L-17,-47 L-12,-44 L-13,-17 L-18,-14 L-18,-10 L-22,-7 Z"
             fill="url(#plBlack)" stroke="#e5e5e0" strokeWidth="2.2" strokeLinejoin="round" />
-          <circle cx="-11.5" cy="-46" r="1.9" fill="#e5e5e0" />
-          <path d="M11,-48 C15,-38 14,-24 10,-15" fill="none" stroke="#e5e5e0" strokeOpacity=".3" strokeWidth="1.3" strokeLinecap="round" />
-          <path d="M-16,-9 L16,-9" stroke="#e5e5e0" strokeOpacity=".28" strokeWidth="1.2" />
+          <path d="M-12,-44 L12,-44 M-13,-17 L13,-17 M-18,-10 L18,-10" stroke="#e5e5e0" strokeOpacity=".28" strokeWidth="1.2" />
+          <path d="M-8,-40 L-9,-21" stroke="#fff" strokeOpacity=".16" strokeWidth="2.5" strokeLinecap="round" />
         </g>
       </svg>
     </div>
