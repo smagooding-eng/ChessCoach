@@ -1196,17 +1196,6 @@ export function GameReplay() {
                 <FlipVertical2 className="w-5 h-5 md:w-4 md:h-4" />
               </button>
 
-              <button
-                onClick={() => { setPracticeMode(p => !p); setIsPlaying(false); }}
-                className={`p-2.5 md:px-3 md:py-2 rounded-xl text-xs font-bold transition-colors border active:scale-90
-                  ${practiceMode
-                    ? 'bg-violet-500/30 text-violet-300 border-violet-500/60'
-                    : 'bg-secondary border-border hover:border-violet-400/40 hover:text-violet-300'}`}>
-                <span className="flex items-center gap-1">
-                  <Zap className="w-5 h-5 md:w-3.5 md:h-3.5" />
-                  <span className="hidden md:inline">{practiceMode ? 'Practice ON' : 'Practice'}</span>
-                </span>
-              </button>
 
               <button
                 onClick={() => handleReview(false)}
@@ -1268,6 +1257,28 @@ export function GameReplay() {
             {redesign && currentMove === 0 && reviewMoves.length > 0 && (
               <p className="px-1 pt-1 text-[13px] leading-snug" style={{ color: RD.muted }}>Step through the game with the buttons below. The coach explains each move here.</p>
             )}
+            {/* Reviewing: the progress sits here too, above the move buttons, so the
+                sticky controls never cover it. */}
+            {redesign && reviewing && (() => {
+              const pct = reviewProgress && reviewProgress.total > 0 ? Math.round((reviewProgress.done / reviewProgress.total) * 100) : 0;
+              return (
+                <div className="flex h-full flex-col justify-center gap-2.5 rounded-[16px] px-4 py-3" style={{ background: RD.card, border: `1px solid ${RD.border}` }}>
+                  <div className="flex items-center gap-3">
+                    <div className="h-5 w-5 shrink-0 animate-spin rounded-full border-2 border-t-transparent" style={{ borderColor: RD.green, borderTopColor: 'transparent' }} />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[14px] font-extrabold leading-tight" style={{ color: RD.text }}>Reviewing game…</p>
+                      <p className="mt-0.5 truncate text-[12px]" style={{ color: RD.muted }}>
+                        {reviewProgress ? `Analyzing move ${reviewProgress.done} of ${reviewProgress.total}` : 'Starting engine analysis…'}
+                      </p>
+                    </div>
+                    {reviewProgress && <span className="shrink-0 text-[12px] font-bold tabular-nums" style={{ color: RD.text }}>{pct}%</span>}
+                  </div>
+                  <div className="h-1.5 overflow-hidden rounded-full" style={{ background: 'rgba(255,255,255,.08)' }}>
+                    <div className="h-full rounded-full transition-all duration-500" style={{ width: reviewProgress && reviewProgress.total > 0 ? `${pct}%` : '5%', background: RD.green }} />
+                  </div>
+                </div>
+              );
+            })()}
             {/* Not reviewed yet: the call to action sits here, between the board and
                 the move buttons, instead of under the buttons (where they covered it). */}
             {redesign && reviewMoves.length === 0 && !reviewing && (
@@ -1408,7 +1419,7 @@ export function GameReplay() {
 
             return (
               <div className="space-y-3">
-                <div className="glass-card rounded-xl px-4 py-4 border border-primary/30 bg-primary flex flex-col gap-3">
+                {!redesign && <div className="glass-card rounded-xl px-4 py-4 border border-primary/30 bg-primary flex flex-col gap-3">
                   <div className="flex items-center gap-3">
                     <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin shrink-0" />
                     <div className="flex-1 min-w-0">
@@ -1438,7 +1449,7 @@ export function GameReplay() {
                       style={{ width: reviewProgress && reviewProgress.total > 0 ? `${progressPct}%` : '5%' }}
                     />
                   </div>
-                </div>
+                </div>}
 
                 {/* Pre-analysis teaser stats */}
                 {(() => {
