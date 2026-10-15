@@ -1288,7 +1288,6 @@ export function GameReplay() {
           {/* Per-move analysis panel — positioned right below controls for easy follow-along */}
           {currentMove > 0 && reviewMoves.length > 0 && (() => {
             const move = moves[currentMove - 1];
-            const tone = classificationToTone(currentReview?.classification as Classification | undefined);
             const titleNode = (
               <span className="flex items-center gap-1.5">
                 {cfg && <span className={`font-bold ${cfg.color.split(' ')[0]}`}>{cfg.full}</span>}
@@ -1302,7 +1301,9 @@ export function GameReplay() {
               </span>
             );
             return (
-              <AICoachCard tone={tone} name="Coach" badge="Coach" title={titleNode} className="order-[-1] xl:order-none">
+              // Same neutral frame on every move (the move quality is in the title), so
+              // nothing around the board changes colour as you step through the game.
+              <AICoachCard tone="neutral" name="Coach" badge="Coach" title={titleNode} className="order-[-1] xl:order-none">
                 {currentReview ? (
                   <>
                     <div className="flex items-start justify-between gap-2">
