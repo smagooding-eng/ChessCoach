@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'wouter';
-import { Target, Search, ArrowRight, ArrowUpRight, ChevronRight, Play, Puzzle, BookOpen, Crosshair, Crown, Camera, Zap, ShoppingBag, Bot, Swords, Download, BarChart3 } from 'lucide-react';
+import { Target, Search, ArrowRight, ArrowUpRight, ChevronRight, Play, Puzzle, BookOpen, Crosshair, Crown, Camera, Zap, ShoppingBag, Bot, Swords, Download, BarChart3, GraduationCap } from 'lucide-react';
 import { useUser } from '@/hooks/use-user';
 import { useChessPlayer } from '@/hooks/use-chess-player';
 import { useMultiEloProgress } from '@/hooks/use-elo-progress';
@@ -422,12 +422,12 @@ export function DashboardRedesign() {
         {/* ── Everything else from the classic home ── */}
         <div className="grid grid-cols-3 gap-4">
           {[
-            { label: 'Practice Bots', sub: `${BOTS.length} opponents`, href: '/practice', icon: Bot, img: 'quick-bots' },
-            { label: 'Local Play', sub: 'Pass and play', href: '/play/local', icon: Play, img: 'quick-local' },
-            { label: 'Shop', sub: 'Boards & gear', href: '/shop', icon: ShoppingBag, img: 'quick-shop' },
+            { label: 'Practice Bots', sub: `${BOTS.length} opponents`, href: '/practice', icon: Bot, img: scene('quick-bots') },
+            { label: 'Courses', sub: 'Lessons & drills', href: '/courses', icon: GraduationCap, img: `${import.meta.env.BASE_URL}assets/courses/course-library.webp` },
+            { label: 'Shop', sub: 'Boards & gear', href: '/shop', icon: ShoppingBag, img: scene('quick-shop') },
           ].map((q) => (
             <Link key={q.label} href={q.href} className={`relative flex flex-col items-start justify-between gap-2 overflow-hidden rounded-[18px] p-3.5 transition-transform active:scale-[.98] ${photoLook ? 'min-h-[96px]' : 'min-h-[124px]'}`} style={{ background: CARD, border: `1px solid ${BORDER}` }}>
-              {!photoLook && <img src={siteImg(scene(q.img))} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />}
+              {!photoLook && <img src={siteImg(q.img)} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />}
               {!photoLook && <span className="absolute inset-0" style={{ background: 'linear-gradient(0deg, rgba(5,10,11,.92) 0%, rgba(5,10,11,.55) 50%, rgba(5,10,11,.15) 100%)' }} />}
               <span className="relative grid h-9 w-9 place-items-center rounded-[10px]" style={{ background: 'rgba(5,10,11,.6)', color: GREEN, border: '1px solid rgba(129,182,76,.3)' }}><q.icon size={18} /></span>
               <span className="relative min-w-0 max-w-full">
