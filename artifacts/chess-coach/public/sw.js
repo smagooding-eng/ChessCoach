@@ -42,7 +42,7 @@ self.addEventListener('push', (event) => {
     if (lookingAtIt) return;
     await self.registration.showNotification(data.title, {
       body: data.body,
-      icon: data.icon || '/icons/icon-192.png',
+      icon: data.icon || '/icons/icon-192.png?v=4',
       badge: '/icons/icon-192.png',
       data: { url },
       // Same tag = replaces the previous notification for that game, so only
