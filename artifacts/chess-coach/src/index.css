@@ -589,6 +589,8 @@ html.cs-photo {
   --cs-bg-card: rgb(13 21 22 / var(--glass-a));
   --cs-card-gradient: linear-gradient(160deg, rgb(15 24 25 / var(--glass-a)) 0%, rgb(11 18 19 / var(--glass-a)) 100%);
   --cs-panel-solid: #0D1516;
+  /* game review's sticky move controls: see-through like the cards */
+  --review-controls-bg: linear-gradient(180deg, rgb(5 10 11 / 0) 0%, rgb(5 10 11 / calc(var(--glass-a) - .1)) 30%);
   --cs-bg-sidebar: rgb(7 13 14 / .78);
   --cs-sidebar-a95: rgb(7 13 14 / .82);
   --cs-sidebar-a97: rgb(7 13 14 / .86);

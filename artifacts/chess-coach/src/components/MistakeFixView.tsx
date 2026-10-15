@@ -34,6 +34,23 @@ interface MistakeFixViewProps {
   /** Controlled step index into bestLineSan, also lifted to the parent
       for the same reason. */
   engineStep: number;
+  /** A move that isn't a mistake (or the start position): same layout, the
+   *  board shows this position, the "Engine line" tab is dimmed. Game review
+   *  renders every move through this component so the board is never rebuilt
+   *  (rebuilding it flashed an empty board between good moves and mistakes). */
+  plain?: PlainMove | null;
+}
+
+export interface PlainMove {
+  fen: string;
+  lastMove: { from: string; to: string } | null;
+  quality: Classification | null;
+  label: string;
+  san: string | null;
+  evalCp: number | null;
+  practiceMode?: boolean;
+  expectedMoveSan?: string | null;
+  onMovePlayed?: (san: string, isCorrect: boolean) => void;
 }
 
 /** Render a SAN sequence with proper move numbers, e.g. "12. Nxe5 Nxe5 13. d4 Bb4+".
@@ -102,6 +119,7 @@ export function MistakeFixView({
   playedEvalCp,
   engineEvalCp,
   stripClassName = '',
+  plain = null,
 }: MistakeFixViewProps) {
   const better = useMemo(
     () => betterMoveText ? parseBetterMove(betterMoveText, prevFen) : null,
@@ -190,12 +208,25 @@ export function MistakeFixView({
       empty: !better,
     },
   ];
-  const current = slides[slide];
-  const Icon = current.icon;
+  const current = plain
+    ? { ...slides[0], fen: plain.fen, lastMove: plain.lastMove, quality: plain.quality, empty: false }
+    : slides[slide];
 
   return (
     <div className="space-y-1.5 md:space-y-2 max-w-[520px] xl:max-w-[680px] mx-auto">
-      {/* Tab toggle */}
+      {/* Tab toggle (a plain move shows its label and a dimmed Engine line) */}
+      {plain ? (
+        <div aria-label="Move view" className="flex items-stretch gap-1 p-1 rounded-lg bg-white/5 border border-white/10">
+          <span className="flex-1 flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md text-[10px] font-black uppercase tracking-[0.12em] border border-white/10 bg-white/5 text-white/70">
+            <span className="truncate">{plain.label}</span>
+            {plain.san && <span className="hidden sm:inline-block font-mono normal-case tracking-normal text-[10px] font-bold ml-1 text-white/50">{plain.san}</span>}
+          </span>
+          <span aria-disabled="true" title="Shown when the engine had a better move" className="flex-1 flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md text-[10px] font-black uppercase tracking-[0.12em] border border-transparent text-white/25">
+            <CheckCircle2 className="w-3 h-3 shrink-0" />
+            <span className="truncate">Engine line</span>
+          </span>
+        </div>
+      ) : (
       <div role="tablist" aria-label="Compare your move with the engine" className="flex items-stretch gap-1 p-1 rounded-lg bg-white/5 border border-white/10">
         {slides.map((s, idx) => {
           const active = idx === slide;
@@ -223,10 +254,11 @@ export function MistakeFixView({
           );
         })}
       </div>
+      )}
 
       {/* Single board, sliding between the two views */}
       <div className="relative">
-        {/* Switching views is done with the tabs above (no ring or side arrows on the
+      {/* Switching views is done with the tabs above (no ring or side arrows on the
             board, so it looks exactly like every other move). */}
         <div className={stripClassName}><MaterialStrip fen={current.empty ? prevFen : current.fen} color={flipped ? 'w' : 'b'} className="px-1" /></div>
 
@@ -253,6 +285,9 @@ export function MistakeFixView({
                   <ChessBoard
                     fen={current.fen}
                     flipped={flipped}
+                    practiceMode={plain?.practiceMode}
+                    expectedMoveSan={plain ? (plain.expectedMoveSan ?? null) : undefined}
+                    onMovePlayed={plain?.onMovePlayed}
                     lastMove={current.lastMove}
                     moveQuality={current.quality}
                     arrows={(current.key === 'engine' && current.lastMove) ? [{
@@ -269,7 +304,7 @@ export function MistakeFixView({
 
         {/* Same strips and eval bar as every other move, so the board never moves. */}
         <div className={`mt-1.5 md:mt-2 ${stripClassName}`}><MaterialStrip fen={current.empty ? prevFen : current.fen} color={flipped ? 'b' : 'w'} className="px-1" /></div>
-        <div className="mt-1.5 md:mt-2"><EvalBar fen={current.empty ? prevFen : current.fen} cp={current.key === 'engine' ? engineEvalCp : playedEvalCp} /></div>
+        <div className="mt-1.5 md:mt-2"><EvalBar fen={current.empty ? prevFen : current.fen} cp={plain ? plain.evalCp : current.key === 'engine' ? engineEvalCp : playedEvalCp} /></div>
       </div>
     </div>
   );

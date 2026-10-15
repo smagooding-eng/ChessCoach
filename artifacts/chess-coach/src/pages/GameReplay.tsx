@@ -1113,69 +1113,51 @@ export function GameReplay() {
             // formula everywhere, which shrank it to ~220px on laptop screens).
             style={redesign ? { maxWidth: 'min(100%, max(260px, var(--bw)))' } : undefined}
           >
-            {isBad && currentReview && currentMove > 0 && !practiceMode ? (
-              (() => {
-                const prevFen = currentMove <= 1 ? gameStartFen : (moves[currentMove - 2]?.fen ?? gameStartFen);
-                const playedSan = moves[currentMove - 1]?.san ?? null;
-                const playedMove = playedSan && lastMove
-                  ? { san: playedSan, from: lastMove.from, to: lastMove.to }
-                  : null;
-                return (
-                  <MistakeFixView
-                    playedEvalCp={evalAfter(currentMove)}
-                    engineEvalCp={evalAfter(currentMove - 1)}
-                    stripClassName={redesign ? 'hidden md:block' : ''}
-                    prevFen={prevFen}
-                    playedMove={playedMove}
-                    betterMoveText={currentReview.betterMove}
-                    bestLineSan={currentReview.bestLineSan ?? []}
-                    classification={currentReview.classification}
-                    flipped={flipped}
-                    slide={mistakeSlide}
-                    onSlideChange={setMistakeSlide}
-                    engineStep={engineStep}
-                  />
-                );
-              })()
-            ) : (
-              // Exactly the same shape as MistakeFixView (bar, strips, board, eval
-              // bar), so stepping between good moves and mistakes never moves
-              // the board. The "Engine line" tab is dimmed here and lights up
-              // on moves where the engine had something better.
-              <div className="max-w-[520px] xl:max-w-[680px] mx-auto space-y-1.5 md:space-y-2">
-                <div aria-label="Move view" className="flex items-stretch gap-1 p-1 rounded-lg bg-white/5 border border-white/10">
-                  <span className="flex-1 flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md text-[10px] font-black uppercase tracking-[0.12em] border border-white/10 bg-white/5 text-white/70">
-                    <span className="truncate">{currentMove === 0 ? 'Start position' : currentReview ? `${currentReview.classification.replace('_', ' ')}` : 'Your move'}</span>
-                    {currentMove > 0 && moves[currentMove - 1]?.san && (
-                      <span className="hidden sm:inline-block font-mono normal-case tracking-normal text-[10px] font-bold ml-1 text-white/50">{moves[currentMove - 1].san}</span>
-                    )}
-                  </span>
-                  <span aria-disabled="true" title="Shown when the engine had a better move" className="flex-1 flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md text-[10px] font-black uppercase tracking-[0.12em] border border-transparent text-white/25">
-                    <span className="truncate">Engine line</span>
-                  </span>
-                </div>
-                <div className="relative">
-                  <div className={redesign ? 'hidden md:block' : ''}><MaterialStrip fen={currentFen} color={flipped ? 'w' : 'b'} className="px-1" /></div>
-                  <ChessBoard
-                    fen={currentFen}
-                    flipped={flipped}
-                    practiceMode={practiceMode}
-                    expectedMoveSan={practiceMode ? bestMoveSan : null}
-                    onMovePlayed={handleMovePlayed}
-                    lastMove={lastMove}
-                    moveQuality={currentReview?.classification ?? null}
-                  />
-                  <div className={`mt-1.5 md:mt-2 ${redesign ? 'hidden md:block' : ''}`}><MaterialStrip fen={currentFen} color={flipped ? 'b' : 'w'} className="px-1" /></div>
-                  <div className="mt-1.5 md:mt-2"><EvalBar fen={currentFen} cp={practiceMode ? null : evalAfter(currentMove)} /></div>
-                </div>
-              </div>
-            )}
+            {(() => {
+              // Every move goes through MistakeFixView so the board is the same
+              // component instance throughout (switching between two different
+              // layouts rebuilt it, which flashed an empty board). Mistakes get
+              // the "your move / engine line" tabs; other moves are "plain".
+              const bad = isBad && currentReview && currentMove > 0 && !practiceMode;
+              const prevFen = currentMove <= 1 ? gameStartFen : (moves[currentMove - 2]?.fen ?? gameStartFen);
+              const playedSan = moves[currentMove - 1]?.san ?? null;
+              const playedMove = playedSan && lastMove
+                ? { san: playedSan, from: lastMove.from, to: lastMove.to }
+                : null;
+              return (
+                <MistakeFixView
+                  playedEvalCp={evalAfter(currentMove)}
+                  engineEvalCp={evalAfter(currentMove - 1)}
+                  stripClassName={redesign ? 'hidden md:block' : ''}
+                  prevFen={bad ? prevFen : currentFen}
+                  playedMove={bad ? playedMove : null}
+                  betterMoveText={bad ? currentReview!.betterMove : null}
+                  bestLineSan={bad ? (currentReview!.bestLineSan ?? []) : []}
+                  classification={currentReview?.classification ?? 'best'}
+                  flipped={flipped}
+                  slide={bad ? mistakeSlide : 0}
+                  onSlideChange={setMistakeSlide}
+                  engineStep={bad ? engineStep : 0}
+                  plain={bad ? null : {
+                    fen: currentFen,
+                    lastMove,
+                    quality: currentReview?.classification ?? null,
+                    label: currentMove === 0 ? 'Start position' : currentReview ? currentReview.classification.replace('_', ' ') : 'Your move',
+                    san: currentMove > 0 ? (moves[currentMove - 1]?.san ?? null) : null,
+                    evalCp: practiceMode ? null : evalAfter(currentMove),
+                    practiceMode,
+                    expectedMoveSan: practiceMode ? bestMoveSan : null,
+                    onMovePlayed: handleMovePlayed,
+                  }}
+                />
+              );
+            })()}
           </div>
 
           {/* Playback controls */}
           <div
             className={redesign ? 'order-[-1] xl:order-none sticky bottom-0 z-20 flex w-full flex-col-reverse gap-2 pb-[max(0.25rem,env(safe-area-inset-bottom))] pt-2' : 'glass-card rounded-xl px-1.5 py-1.5 md:p-3 flex items-center justify-between order-[-2] xl:order-none'}
-            style={redesign ? { background: 'linear-gradient(180deg, rgba(5,10,11,0) 0%, #050A0B 26%)' } : undefined}
+            style={redesign ? { background: 'var(--review-controls-bg, linear-gradient(180deg, rgba(5,10,11,0) 0%, #050A0B 26%))' } : undefined}
           >
             <MoveNavigationBar
               variant={redesign ? 'redesign' : undefined}
