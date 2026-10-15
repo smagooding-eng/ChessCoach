@@ -3,7 +3,10 @@ import { PageHero } from '@/components/DesignSystem';
 import { useLocation } from 'wouter';
 import { useUser } from '@/hooks/use-user';
 import { apiFetch } from '@/lib/api';
-import { useDashboardRedesignFlag, setDashboardRedesignEnabled, usePhotoImagesFlag, setPhotoImagesEnabled } from '@/hooks/use-app-config';
+import { useDashboardRedesignFlag, setDashboardRedesignEnabled, usePhotoImagesFlag, setPhotoImagesEnabled, useDefaultLook, saveDefaultLook, type DefaultLook } from '@/hooks/use-app-config';
+import { PIECE_SHAPES, PIECE_STYLES, BOARD_THEMES, BOARD_TEXTURES, BG_PHOTOS, CARD_GLASS, isPhotoBoard, type BoardTexture } from '@/context/SettingsContext';
+import { PIECE_THEME_TYPES } from '@/lib/pieceThemes';
+import { BOARD_GROUPS } from '@/lib/boardGroups';
 import { cn } from '@/lib/utils';
 import { Link } from 'wouter';
 import { TournamentsAdminPanel } from '@/components/admin/TournamentsAdminPanel';
@@ -660,8 +663,11 @@ export function Admin() {
             </div>
           )}
 
+          <GamesPlayedPanel />
+
           <DashboardRedesignTogglePanel />
           <PhotoImagesTogglePanel />
+          <DefaultLookPanel />
 
           <PushNotificationPanel />
 
@@ -2145,6 +2151,170 @@ function DashboardRedesignTogglePanel() {
           </div>
         </button>
         {error && <p className="text-xs text-red-400 mt-2">{error}</p>}
+      </div>
+    </motion.div>
+  );
+}
+
+// ── Games played (live and daily) ─────────────────────────────────────────
+type GameWindows = { today: number; yesterday: number; week: number; d30: number; d90: number; all: number };
+function GamesPlayedPanel() {
+  const [data, setData] = useState<{ live: GameWindows; livePeople: GameWindows; daily: GameWindows } | null>(null);
+  const [error, setError] = useState('');
+  const load = useCallback(() => {
+    setError('');
+    apiFetch('/api/admin/game-stats', { credentials: 'include' })
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error('failed'))))
+      .then(setData)
+      .catch(() => setError('Could not load game counts.'));
+  }, []);
+  useEffect(() => { load(); }, [load]);
+  const cols: [keyof GameWindows, string][] = [['today', 'Today'], ['yesterday', 'Yesterday'], ['week', 'This week'], ['d30', '30 days'], ['d90', '90 days'], ['all', 'All time']];
+  const rows: [string, string, GameWindows | undefined][] = [
+    ['Live games', 'All finished live games, including vs bots', data?.live],
+    ['Live vs people', 'Both players were real users', data?.livePeople],
+    ['Daily games', 'Finished daily (correspondence) games', data?.daily],
+  ];
+  return (
+    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="rounded-xl border border-border/40 bg-card overflow-hidden">
+      <div className="px-5 py-3 border-b border-border/30 flex items-center gap-2">
+        <Swords className="w-4 h-4 text-primary" />
+        <h3 className="text-sm font-bold">Games played on ChessScout</h3>
+        <button onClick={load} className="ml-auto p-1 rounded text-muted-foreground hover:text-foreground" aria-label="Refresh"><RefreshCw className="w-3.5 h-3.5" /></button>
+      </div>
+      <div className="p-4 overflow-x-auto">
+        {error ? <p className="text-xs text-red-400">{error}</p> : (
+          <table className="w-full min-w-[520px] text-sm">
+            <thead>
+              <tr className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                <th className="text-left font-bold pb-2"> </th>
+                {cols.map(([k, l]) => <th key={k} className="text-right font-bold pb-2 px-2">{l}</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map(([label, sub, w]) => (
+                <tr key={label} className="border-t border-border/30">
+                  <td className="py-2.5 pr-2"><p className="font-bold">{label}</p><p className="text-[11px] text-muted-foreground">{sub}</p></td>
+                  {cols.map(([k]) => <td key={k} className="py-2.5 px-2 text-right font-mono font-bold tabular-nums">{w ? (w[k] ?? 0).toLocaleString() : '…'}</td>)}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+        <p className="text-[11px] text-muted-foreground mt-2">Days run midnight to midnight US Eastern; the week starts Monday. Counted when the game finished.</p>
+      </div>
+    </motion.div>
+  );
+}
+
+// ── Default look for all users ───────────────────────────────────────────
+// Sets the starting pieces, board and background theme. Each user only gets
+// these for settings they haven't picked themselves; their own picks stay.
+function DefaultLookPanel() {
+  const saved = useDefaultLook();
+  const [look, setLook] = useState<DefaultLook>(saved);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState('');
+  useEffect(() => { setLook(saved); }, [saved]);
+  const set = (patch: DefaultLook) => { setMsg(''); setLook((l) => { const n = { ...l, ...patch }; for (const k of Object.keys(n) as (keyof DefaultLook)[]) if (!n[k]) delete n[k]; return n; }); };
+  const boardValue = look.boardTexture && look.boardTexture !== 'flat' ? `tex:${look.boardTexture}` : look.boardTheme ? `col:${look.boardTheme}` : '';
+  const setBoard = (v: string) => {
+    if (!v) set({ boardTexture: '', boardTheme: '' });
+    else if (v.startsWith('tex:')) set({ boardTexture: v.slice(4) });
+    else set({ boardTheme: v.slice(4), boardTexture: 'flat' });
+  };
+  const save = async () => {
+    setBusy(true); setMsg('');
+    const r = await saveDefaultLook(look);
+    setBusy(false);
+    setMsg(r ? 'Saved. Everyone who hasn’t picked their own now gets this look.' : 'Could not save — try again.');
+  };
+  const sel = 'w-full rounded-lg border border-border/50 bg-background px-3 py-2 text-sm';
+  const label = 'block text-xs font-bold text-muted-foreground mb-1';
+  const textureLabel = (k: string) => BOARD_TEXTURES[k as BoardTexture]?.label ?? k;
+  const surfaceTextures = (Object.keys(BOARD_TEXTURES) as BoardTexture[]).filter((k) => !isPhotoBoard(k) && k !== 'flat');
+  return (
+    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="rounded-xl border border-border/40 bg-card overflow-hidden">
+      <div className="px-5 py-3 border-b border-border/30 flex items-center gap-2">
+        <Palette className="w-4 h-4 text-primary" />
+        <h3 className="text-sm font-bold">Default look for all users</h3>
+      </div>
+      <div className="p-4 space-y-3">
+        <p className="text-xs text-muted-foreground">The pieces, board and background new users start with. Anyone who has already picked their own keeps it — this only fills in what they haven&apos;t chosen. Leave a field on “Built-in default” to keep the app&apos;s usual choice.</p>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div>
+            <span className={label}>Pieces</span>
+            <select className={sel} value={look.pieceShape ?? ''} onChange={(e) => set({ pieceShape: e.target.value })}>
+              <option value="">Built-in default</option>
+              {PIECE_THEME_TYPES.map((t) => (
+                <optgroup key={t.id} label={t.label}>
+                  {t.shapes.filter((k) => PIECE_SHAPES[k] && !PIECE_SHAPES[k].hidden).map((k) => <option key={k} value={k}>{PIECE_SHAPES[k].label}</option>)}
+                </optgroup>
+              ))}
+            </select>
+          </div>
+          <div>
+            <span className={label}>Piece colours (classic sets only)</span>
+            <select className={sel} value={look.pieceStyle ?? ''} onChange={(e) => set({ pieceStyle: e.target.value })}>
+              <option value="">Built-in default</option>
+              {Object.entries(PIECE_STYLES).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+            </select>
+          </div>
+          <div>
+            <span className={label}>Board</span>
+            <select className={sel} value={boardValue} onChange={(e) => setBoard(e.target.value)}>
+              <option value="">Built-in default</option>
+              {BOARD_GROUPS.filter((g) => g.boards.length).map((g) => (
+                <optgroup key={g.id} label={g.label}>
+                  {g.boards.map((k) => <option key={k} value={`tex:${k}`}>{textureLabel(k)}</option>)}
+                </optgroup>
+              ))}
+              <optgroup label="Classic colours">
+                {Object.entries(BOARD_THEMES).map(([k, v]) => <option key={k} value={`col:${k}`}>{v.label}</option>)}
+              </optgroup>
+              {surfaceTextures.length > 0 && (
+                <optgroup label="Surface textures">
+                  {surfaceTextures.map((k) => <option key={k} value={`tex:${k}`}>{textureLabel(k)}</option>)}
+                </optgroup>
+              )}
+            </select>
+          </div>
+          <div>
+            <span className={label}>App look</span>
+            <select className={sel} value={look.uiStyle ?? ''} onChange={(e) => set({ uiStyle: e.target.value })}>
+              <option value="">Built-in default</option>
+              <option value="standard">Standard (solid cards)</option>
+              <option value="photo">Photo backdrop (see-through cards)</option>
+            </select>
+          </div>
+          <div>
+            <span className={label}>Background (photo backdrop look)</span>
+            <select className={sel} value={look.bgPhoto ?? ''} onChange={(e) => set({ bgPhoto: e.target.value })}>
+              <option value="">Built-in default</option>
+              {(['photo', 'colour', 'board'] as const).map((g) => (
+                <optgroup key={g} label={g === 'photo' ? 'Photos' : g === 'colour' ? 'Colours' : 'Chess boards'}>
+                  {BG_PHOTOS.filter((p) => p.group === g).map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
+                </optgroup>
+              ))}
+            </select>
+          </div>
+          <div>
+            <span className={label}>Card transparency (photo backdrop look)</span>
+            <select className={sel} value={look.cardGlass ?? ''} onChange={(e) => set({ cardGlass: e.target.value })}>
+              <option value="">Built-in default</option>
+              {Object.entries(CARD_GLASS).map(([k, v]) => <option key={k} value={k}>{v.label} — {v.sub}</option>)}
+            </select>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 pt-1">
+          <button onClick={save} disabled={busy} className="rounded-lg bg-primary px-4 py-2 text-sm font-bold text-primary-foreground disabled:opacity-50">
+            {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save default look'}
+          </button>
+          <button onClick={() => { setLook({}); setMsg(''); }} disabled={busy} className="rounded-lg border border-border/50 px-4 py-2 text-sm font-bold text-muted-foreground">
+            Reset all to built-in
+          </button>
+        </div>
+        {msg && <p className="text-xs text-muted-foreground">{msg}</p>}
       </div>
     </motion.div>
   );

@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { useUser } from '@/context/UserContext';
-import { useDashboardRedesignFlag } from '@/hooks/use-app-config';
+import { useDashboardRedesignFlag, useDefaultLook, type DefaultLook } from '@/hooks/use-app-config';
 import { playSound, SOUND_PACKS, type SoundPack, type SoundEvent } from '@/lib/sounds';
 import { REDESIGN_ON } from '@/lib/redesignTheme';
 export { SOUND_PACKS, type SoundPack };
@@ -448,6 +448,23 @@ const APP_DEFAULT_SETTINGS: Settings = {
 const STORAGE_KEY = 'chessscout_settings';
 const DEFAULT_KEY = 'chessscout_user_default';
 const THEMES_KEY = 'chessscout_saved_themes';
+// Which look settings this user has picked themselves. The admin's default
+// look (Admin > Default look) fills in only the ones they haven't.
+const PICKED_KEY = 'chessscout_picked';
+type LookKey = keyof DefaultLook;
+const LOOK_KEYS: LookKey[] = ['pieceShape', 'pieceStyle', 'boardTheme', 'boardTexture', 'uiStyle', 'bgPhoto', 'cardGlass', 'appBackground'];
+function lookValueValid(k: LookKey, v: string): boolean {
+  switch (k) {
+    case 'pieceShape': return !!PIECE_SHAPES[v as PieceShape];
+    case 'pieceStyle': return v === 'custom' ? false : !!(PIECE_STYLES as Record<string, unknown>)[v];
+    case 'boardTheme': return !!(BOARD_THEMES as Record<string, unknown>)[v];
+    case 'boardTexture': return !!BOARD_TEXTURES[v as BoardTexture];
+    case 'uiStyle': return v === 'standard' || v === 'photo';
+    case 'bgPhoto': return BG_PHOTOS.some((p) => p.id === v);
+    case 'cardGlass': return !!CARD_GLASS[v as CardGlass];
+    case 'appBackground': return !!APP_BACKGROUNDS[v as AppBackground];
+  }
+}
 
 function scopedKey(base: string, userId: string): string {
   return `${base}_${userId}`;
@@ -516,7 +533,9 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const [userDefault, setUserDefault] = useState<Settings | null>(null);
   const [settings, setSettings] = useState<Settings>(APP_DEFAULT_SETTINGS);
   const [savedThemes, setSavedThemes] = useState<SavedTheme[]>([]);
+  const [picked, setPicked] = useState<LookKey[]>([]);
   const loadedUserIdRef = useRef<string | null>(null);
+  const defaultLook = useDefaultLook();
 
   // (Re)load this specific account's settings whenever the logged-in user
   // changes -- covers both the initial load once auth resolves, and
@@ -531,7 +550,20 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       loadedDefault = raw ? JSON.parse(raw) : null;
     } catch {}
     setUserDefault(loadedDefault ? sanitizeSettings(loadedDefault) : null);
-    setSettings(sanitizeSettings(loadJSON(scopedKey(STORAGE_KEY, userId), loadedDefault ?? APP_DEFAULT_SETTINGS)));
+    const stored = sanitizeSettings(loadJSON(scopedKey(STORAGE_KEY, userId), loadedDefault ?? APP_DEFAULT_SETTINGS));
+    setSettings(stored);
+    // Which look settings were picked by the user. Accounts from before this
+    // was tracked: anything that differs from the built-in default counts as
+    // their own pick (a personal default counts too).
+    let pk: LookKey[] | null = null;
+    try { const raw = localStorage.getItem(scopedKey(PICKED_KEY, userId)); pk = raw ? JSON.parse(raw) : null; } catch {}
+    if (!Array.isArray(pk)) {
+      const hadSaved = (() => { try { return !!localStorage.getItem(scopedKey(STORAGE_KEY, userId)); } catch { return false; } })();
+      pk = loadedDefault ? [...LOOK_KEYS]
+        : hadSaved ? LOOK_KEYS.filter((k) => (stored as unknown as Record<string, unknown>)[k] !== (APP_DEFAULT_SETTINGS as unknown as Record<string, unknown>)[k])
+        : [];
+    }
+    setPicked(pk.filter((k) => LOOK_KEYS.includes(k)));
 
     try {
       const raw = localStorage.getItem(scopedKey(THEMES_KEY, userId));
@@ -549,33 +581,54 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     try { localStorage.setItem(scopedKey(THEMES_KEY, userId), JSON.stringify(savedThemes)); } catch {}
   }, [savedThemes, userId]);
 
+  useEffect(() => {
+    if (loadedUserIdRef.current !== userId) return;
+    try { localStorage.setItem(scopedKey(PICKED_KEY, userId), JSON.stringify(picked)); } catch {}
+  }, [picked, userId]);
+  const pick = (...keys: LookKey[]) => setPicked((p) => Array.from(new Set([...p, ...keys])));
+
+  // What the app actually uses: the user's own picks, and the admin's default
+  // look for anything they haven't picked.
+  const eff: Settings = (() => {
+    let out = settings;
+    for (const k of LOOK_KEYS) {
+      const v = defaultLook[k];
+      if (!picked.includes(k) && typeof v === 'string' && lookValueValid(k, v)) out = { ...out, [k]: v } as Settings;
+    }
+    return out;
+  })();
+
   // Enhanced-only boards render only while the enhanced UI is on. If the flag is off, the
   // board quietly shows the plain board colour instead; the saved choice is kept, so it
   // comes back as soon as the enhanced UI is switched on again.
   const { enabled: enhancedUi } = useDashboardRedesignFlag();
-  const chosenTexture = BOARD_TEXTURES[settings.boardTexture] ?? BOARD_TEXTURES.flat;
+  const chosenTexture = BOARD_TEXTURES[eff.boardTexture] ?? BOARD_TEXTURES.flat;
   const resolvedBoardTexture = chosenTexture.enhancedOnly && !enhancedUi ? BOARD_TEXTURES.flat : chosenTexture;
 
   const resolvedBoardColors: ColorPair =
-    settings.boardTheme === 'custom' ? settings.boardCustomColors : BOARD_THEMES[settings.boardTheme];
+    eff.boardTheme === 'custom' ? eff.boardCustomColors : BOARD_THEMES[eff.boardTheme];
   const resolvedPieceStyle =
-    settings.pieceStyle === 'custom'
-      ? { ...settings.pieceCustomColors, finish: {} as React.CSSProperties, baseLight: settings.pieceCustomColors.light, baseDark: settings.pieceCustomColors.dark }
-      : { ...PIECE_STYLES[settings.pieceStyle] };
+    eff.pieceStyle === 'custom'
+      ? { ...eff.pieceCustomColors, finish: {} as React.CSSProperties, baseLight: eff.pieceCustomColors.light, baseDark: eff.pieceCustomColors.dark }
+      : { ...PIECE_STYLES[eff.pieceStyle] };
 
-  activeSoundPack = settings.soundPack ?? 'classic';
+  activeSoundPack = eff.soundPack ?? 'classic';
 
   const value: SettingsContextValue = {
-    ...settings,
-    setBoardTheme: (t) => setSettings((s) => ({ ...s, boardTheme: t })),
-    setBoardTexture: (t) => setSettings((s) => ({ ...s, boardTexture: t })),
-    setPieceStyle: (t) => setSettings((s) => ({ ...s, pieceStyle: t })),
-    setPieceShape: (t) => setSettings((s) => ({ ...s, pieceShape: t })),
-    setAppBackground: (t) => setSettings((s) => ({ ...s, appBackground: t })),
-    setBoardCustomColor: (which, color) =>
-      setSettings((s) => ({ ...s, boardTheme: 'custom', boardCustomColors: { ...s.boardCustomColors, [which]: color } })),
-    setPieceCustomColor: (which, color) =>
-      setSettings((s) => ({ ...s, pieceStyle: 'custom', pieceCustomColors: { ...s.pieceCustomColors, [which]: color } })),
+    ...eff,
+    setBoardTheme: (t) => { pick('boardTheme'); setSettings((s) => ({ ...s, boardTheme: t })); },
+    setBoardTexture: (t) => { pick('boardTexture'); setSettings((s) => ({ ...s, boardTexture: t })); },
+    setPieceStyle: (t) => { pick('pieceStyle'); setSettings((s) => ({ ...s, pieceStyle: t })); },
+    setPieceShape: (t) => { pick('pieceShape'); setSettings((s) => ({ ...s, pieceShape: t })); },
+    setAppBackground: (t) => { pick('appBackground'); setSettings((s) => ({ ...s, appBackground: t })); },
+    setBoardCustomColor: (which, color) => {
+      pick('boardTheme');
+      setSettings((s) => ({ ...s, boardTheme: 'custom', boardCustomColors: { ...s.boardCustomColors, [which]: color } }));
+    },
+    setPieceCustomColor: (which, color) => {
+      pick('pieceStyle');
+      setSettings((s) => ({ ...s, pieceStyle: 'custom', pieceCustomColors: { ...s.pieceCustomColors, [which]: color } }));
+    },
     setConfirmMoves: (v) => setSettings((s) => ({ ...s, confirmMoves: v })),
     setShowCoordinates: (v) => setSettings((s) => ({ ...s, showCoordinates: v })),
     setShowLegalMoves: (v) => setSettings((s) => ({ ...s, showLegalMoves: v })),
@@ -583,14 +636,14 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     setPromotionChoice: (v) => setSettings((s) => ({ ...s, promotionChoice: v })),
     setSoundPack: (v) => setSettings((s) => ({ ...s, soundPack: v })),
     setBoardSize: (v) => setSettings((s) => ({ ...s, boardSize: v })),
-    setUiStyle: (v) => setSettings((s) => ({ ...s, uiStyle: v })),
-    setBgPhoto: (id) => setSettings((s) => ({ ...s, bgPhoto: id })),
-    setCardGlass: (v) => setSettings((s) => ({ ...s, cardGlass: v })),
+    setUiStyle: (v) => { pick('uiStyle'); setSettings((s) => ({ ...s, uiStyle: v })); },
+    setBgPhoto: (id) => { pick('bgPhoto'); setSettings((s) => ({ ...s, bgPhoto: id })); },
+    setCardGlass: (v) => { pick('cardGlass'); setSettings((s) => ({ ...s, cardGlass: v })); },
     boardColors: resolvedBoardColors,
     boardTextureCss: resolvedBoardTexture,
-    appBackgroundCss: APP_BACKGROUNDS[settings.appBackground].css,
+    appBackgroundCss: APP_BACKGROUNDS[eff.appBackground].css,
     pieceColors: resolvedPieceStyle,
-    boardMaxWidth: BOARD_SIZES[settings.boardSize].maxWidth,
+    boardMaxWidth: BOARD_SIZES[eff.boardSize].maxWidth,
     savedThemes,
     saveCurrentAsTheme: (name) => {
       // A gradient piece style's "color" is a url(#id) SVG fill
@@ -611,6 +664,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       setSavedThemes((prev) => [...prev, theme]);
     },
     applyTheme: (theme) => {
+      pick('boardTheme', 'pieceStyle');
       setSettings((s) => ({
         ...s,
         boardTheme: 'custom',
@@ -621,13 +675,18 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     },
     deleteTheme: (id) => setSavedThemes((prev) => prev.filter((t) => t.id !== id)),
     setAsMyDefault: () => {
-      setUserDefault(settings);
-      try { localStorage.setItem(scopedKey(DEFAULT_KEY, userId), JSON.stringify(settings)); } catch {}
+      setUserDefault(eff);
+      setSettings(eff);
+      pick(...LOOK_KEYS);
+      try { localStorage.setItem(scopedKey(DEFAULT_KEY, userId), JSON.stringify(eff)); } catch {}
     },
     hasCustomDefault: userDefault !== null,
     revertToDefault: () => {
+      // Back to their own default if they set one; otherwise back to the
+      // app's default look (the admin's choice where there is one).
       const target = userDefault ?? APP_DEFAULT_SETTINGS;
       setSettings(target);
+      setPicked(userDefault ? [...LOOK_KEYS] : []);
     },
   };
 

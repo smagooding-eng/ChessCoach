@@ -120,3 +120,50 @@ export async function setPhotoImagesEnabled(enabled: boolean): Promise<{ enabled
   if (d && typeof d.enabled === 'boolean') setPhotoOn(d.enabled);
   return d;
 }
+
+// ── Default look (admin) ────────────────────────────────────────────────────
+// The admin-chosen starting pieces / board / background for everyone. The
+// settings context applies each field only where the user hasn't made their
+// own choice. Shared store + localStorage cache, like the photo flag above.
+export type DefaultLook = Partial<Record<'pieceShape' | 'pieceStyle' | 'boardTheme' | 'boardTexture' | 'uiStyle' | 'bgPhoto' | 'cardGlass' | 'appBackground', string>>;
+const LOOK_CACHE_KEY = 'cs_default_look';
+let lookValue: DefaultLook = (() => { try { return JSON.parse(localStorage.getItem(LOOK_CACHE_KEY) || '{}') || {}; } catch { return {}; } })();
+let lookFetched = false;
+const lookListeners = new Set<() => void>();
+function setLookValue(v: DefaultLook) {
+  lookValue = v || {};
+  try { localStorage.setItem(LOOK_CACHE_KEY, JSON.stringify(lookValue)); } catch { /* storage unavailable */ }
+  lookListeners.forEach((l) => l());
+}
+function fetchDefaultLook() {
+  lookFetched = true;
+  apiFetch('/api/app-config/default-look')
+    .then((r) => (r.ok ? r.json() : null))
+    .then((d) => { if (d && d.look && typeof d.look === 'object') setLookValue(d.look); })
+    .catch(() => { /* keep cached value */ });
+}
+
+export function useDefaultLook(): DefaultLook {
+  const [v, setV] = useState<DefaultLook>(lookValue);
+  useEffect(() => {
+    const l = () => setV(lookValue);
+    lookListeners.add(l);
+    if (!lookFetched) fetchDefaultLook();
+    l();
+    return () => { lookListeners.delete(l); };
+  }, []);
+  return v;
+}
+
+export async function saveDefaultLook(look: DefaultLook): Promise<DefaultLook | null> {
+  const res = await apiFetch('/api/admin/app-config/default-look', {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ look }),
+  });
+  if (!res.ok) return null;
+  const d = await res.json();
+  if (d && d.look) setLookValue(d.look);
+  return d?.look ?? null;
+}

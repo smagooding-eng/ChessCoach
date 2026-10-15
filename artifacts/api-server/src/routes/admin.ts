@@ -97,6 +97,29 @@ function startOfTodayEastern(): Date {
   return new Date(now.getTime() - secondsIntoDay * 1000 - now.getMilliseconds());
 }
 
+// Games played on ChessScout: live games (split into people vs bots) and
+// finished daily games, counted for today, yesterday, this week (from
+// Monday), the last 30 and 90 days, and all time. Days follow US Eastern time.
+router.get("/admin/game-stats", requireAdmin, async (_req: Request, res: Response) => {
+  try {
+    const windows = (col: string) => sql.raw(`
+      count(*) FILTER (WHERE ${col} >= (date_trunc('day', now() AT TIME ZONE 'America/New_York') AT TIME ZONE 'America/New_York'))::int AS today,
+      count(*) FILTER (WHERE ${col} >= (date_trunc('day', now() AT TIME ZONE 'America/New_York') AT TIME ZONE 'America/New_York') - interval '1 day'
+                         AND ${col} <  (date_trunc('day', now() AT TIME ZONE 'America/New_York') AT TIME ZONE 'America/New_York'))::int AS yesterday,
+      count(*) FILTER (WHERE ${col} >= (date_trunc('week', now() AT TIME ZONE 'America/New_York') AT TIME ZONE 'America/New_York'))::int AS week,
+      count(*) FILTER (WHERE ${col} >= now() - interval '30 days')::int AS d30,
+      count(*) FILTER (WHERE ${col} >= now() - interval '90 days')::int AS d90,
+      count(*)::int AS "all"`);
+    const live = await db.execute(sql`SELECT ${windows("finished_at")} FROM live_games`);
+    const people = await db.execute(sql`SELECT ${windows("finished_at")} FROM live_games WHERE white_persona_id IS NULL AND black_persona_id IS NULL`);
+    const daily = await db.execute(sql`SELECT ${windows("finished_at")} FROM correspondence_games WHERE status = 'finished' AND finished_at IS NOT NULL`);
+    const row = (r: { rows: unknown[] }) => (r.rows[0] ?? {}) as Record<string, number>;
+    res.json({ live: row(live), livePeople: row(people), daily: row(daily) });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to load game stats", details: err.cause?.message ?? err.message });
+  }
+});
+
 router.get("/admin/stats", requireAdmin, async (_req: Request, res: Response) => {
   try {
     const todayStart = startOfTodayEastern();

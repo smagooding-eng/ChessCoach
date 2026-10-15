@@ -42,3 +42,33 @@ export async function isPhotoImagesEnabled(): Promise<boolean> {
 export async function setPhotoImagesEnabled(enabled: boolean, adminUserId: string): Promise<void> {
   await setConfigValue(PHOTO_IMAGES_KEY, enabled ? "true" : "false", adminUserId);
 }
+
+const DEFAULT_LOOK_KEY = "default_look";
+
+// Admin-chosen starting look (pieces, board, background theme) for everyone.
+// It only fills in what a user hasn't picked themselves -- the app applies
+// it per field, client side, and never overwrites a user's own choice.
+export type DefaultLook = Partial<Record<"pieceShape" | "pieceStyle" | "boardTheme" | "boardTexture" | "uiStyle" | "bgPhoto" | "cardGlass" | "appBackground", string>>;
+const LOOK_FIELDS = ["pieceShape", "pieceStyle", "boardTheme", "boardTexture", "uiStyle", "bgPhoto", "cardGlass", "appBackground"] as const;
+
+export function cleanDefaultLook(input: unknown): DefaultLook {
+  const out: DefaultLook = {};
+  if (!input || typeof input !== "object") return out;
+  for (const k of LOOK_FIELDS) {
+    const v = (input as Record<string, unknown>)[k];
+    if (typeof v === "string" && v.length > 0 && v.length <= 64 && /^[\w-]+$/.test(v)) out[k] = v;
+  }
+  return out;
+}
+
+export async function getDefaultLook(): Promise<DefaultLook> {
+  const raw = await getConfigValue(DEFAULT_LOOK_KEY);
+  if (!raw) return {};
+  try { return cleanDefaultLook(JSON.parse(raw)); } catch { return {}; }
+}
+
+export async function setDefaultLook(look: DefaultLook, adminUserId: string): Promise<DefaultLook> {
+  const clean = cleanDefaultLook(look);
+  await setConfigValue(DEFAULT_LOOK_KEY, JSON.stringify(clean), adminUserId);
+  return clean;
+}
