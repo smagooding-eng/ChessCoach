@@ -13,6 +13,7 @@ import { AudioAutoplayUnlock } from "@/components/AudioAutoplayUnlock";
 import { Layout } from "@/components/Layout";
 import { useUser } from "@/hooks/use-user";
 import React, { useEffect, Component, Suspense, lazy, type ReactNode } from "react";
+import { PageLoader } from "@/components/PageLoader";
 import { apiFetch } from "@/lib/api";
 
 function ErrorFallback({ error, fallbackNav, onReset }: { error: Error | null; fallbackNav: string; onReset: () => void }) {
@@ -404,15 +405,7 @@ function Router() {
 }
 
 function PageLoadingFallback() {
-  return (
-    <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-background">
-      <div className="text-4xl animate-bounce">&#9820;</div>
-      <div className="w-32 h-1 bg-primary/15 rounded-full overflow-hidden">
-        <div className="h-full w-[30%] bg-primary rounded-full animate-[barSlide_1.4s_ease-in-out_infinite]"
-          style={{ animation: 'barSlide 1.4s ease-in-out infinite' }} />
-      </div>
-    </div>
-  );
+  return <PageLoader />;
 }
 
 function AppBackgroundWrapper({ children }: { children: React.ReactNode }) {
