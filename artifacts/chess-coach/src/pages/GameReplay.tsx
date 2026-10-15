@@ -1107,7 +1107,7 @@ export function GameReplay() {
               doesn't shift up/down when navigating between bad and good moves. */}
           <div
             ref={boardAnchorRef}
-            className={`scroll-mt-16 mx-auto w-full ${redesign ? '[--bw:calc(100dvh-520px)] md:[--bw:calc(100dvh-290px)]' : 'max-w-[min(100%,52dvh)] md:max-w-[min(100%,55dvh)] xl:max-w-none'} order-[-3] xl:order-none`}
+            className={`scroll-mt-16 mx-auto w-full ${redesign ? '[--bw:calc(100dvh-580px)] md:[--bw:calc(100dvh-290px)]' : 'max-w-[min(100%,52dvh)] md:max-w-[min(100%,55dvh)] xl:max-w-none'} order-[-3] xl:order-none`}
             // Phones reserve room under the board for the coach card; on
             // desktop the move list and coach sit beside it, so the board only
             // gives up room for the header and the controls row (was the phone
@@ -1157,8 +1157,8 @@ export function GameReplay() {
 
           {/* Playback controls */}
           <div
-            className={redesign ? 'order-[-1] xl:order-none sticky bottom-0 z-20 flex w-full flex-col-reverse gap-2 pb-[max(0.25rem,env(safe-area-inset-bottom))] pt-2' : 'glass-card rounded-xl px-1.5 py-1.5 md:p-3 flex items-center justify-between order-[-2] xl:order-none'}
-            style={redesign ? { background: 'var(--review-controls-bg, linear-gradient(180deg, rgba(5,10,11,0) 0%, #050A0B 26%))' } : undefined}
+            className={redesign ? 'order-[-1] xl:order-none relative z-20 flex w-full flex-col-reverse gap-2 pb-[max(0.25rem,env(safe-area-inset-bottom))] pt-1' : 'glass-card rounded-xl px-1.5 py-1.5 md:p-3 flex items-center justify-between order-[-2] xl:order-none'}
+            style={undefined}
           >
             <MoveNavigationBar
               variant={redesign ? 'redesign' : undefined}
