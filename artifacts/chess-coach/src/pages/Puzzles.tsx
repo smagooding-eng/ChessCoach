@@ -595,10 +595,10 @@ export function Puzzles() {
 
         {targetTheme && (
           <div className="flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-xl mb-4"
-            style={{ background: 'rgba(129,182,76,0.1)', border: '1px solid rgba(129,182,76,0.25)' }}>
+            style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)' }}>
             <span className="text-sm font-semibold flex items-center gap-2" style={{ color: TEXT_LIGHT }}>
               <Target size={15} style={{ color: CHESSCOM_GREEN }} />
-              Practicing puzzles for: <span style={{ color: CHESSCOM_GREEN }}>{targetTheme}</span>
+              Practicing puzzles for: <span style={{ color: TEXT_LIGHT, fontWeight: 800 }}>{targetTheme}</span>
             </span>
             <button
               onClick={() => navigate('/puzzles')}
@@ -727,7 +727,7 @@ export function Puzzles() {
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-medium px-2 py-0.5 rounded"
-                      style={{ background: 'rgba(129,182,76,0.15)', color: CHESSCOM_GREEN }}>
+                      style={{ background: 'rgba(255,255,255,0.07)', color: '#F5F7F6', border: '1px solid rgba(255,255,255,0.10)' }}>
                       Rating: {puzzle.rating}
                     </span>
                     {puzzle.themes.slice(0, 3).map(theme => (
@@ -980,7 +980,7 @@ export function Puzzles() {
 
         {redesign && stats && (
           <div className="mt-3 flex items-center gap-3.5 rounded-[18px] p-4" style={{ background: 'var(--cs-card-gradient, #0D1516)', border: '1px solid var(--cs-border, rgba(255,255,255,.08))' }}>
-            <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full" style={{ background: 'rgba(129,182,76,.14)', color: 'var(--cs-green, #81B64C)' }}><Target size={22} /></span>
+            <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full" style={{ background: '#81B64C', color: '#FFFFFF' }}><Target size={22} /></span>
             <div className="min-w-0 flex-1">
               <b className="block text-[15px] font-extrabold" style={{ color: TEXT_LIGHT }}>Today&apos;s Progress</b>
               <span className="text-[14px]" style={{ color: TEXT_LIGHT }}><b className="text-[18px]">{Math.min(stats.todayCount, 5)} / 5</b> <span style={{ color: TEXT_MUTED }}>puzzles completed{stats.todayCount > 5 ? ` (${stats.todayCount} total)` : ''}</span></span>
@@ -1012,7 +1012,7 @@ export function Puzzles() {
                         <span className="absolute inset-y-0 left-0 w-[3px]" style={{ background: tint }} />
                       </span>
                     ) : (
-                      <span className="ml-3 grid h-11 w-11 shrink-0 self-center place-items-center rounded-[12px]" style={{ background: 'rgba(129,182,76,.12)', color: tint, border: '1px solid rgba(129,182,76,.28)' }}><ThemeIcon size={20} /></span>
+                      <span className="ml-3 grid h-11 w-11 shrink-0 self-center place-items-center rounded-[12px]" style={{ background: tint, color: '#FFFFFF' }}><ThemeIcon size={20} /></span>
                     )}
                     <span className="min-w-0 flex-1 py-3.5 pl-3.5">
                       <b className="block text-[15px] font-bold" style={{ color: TEXT_LIGHT }}>{o.label}</b>

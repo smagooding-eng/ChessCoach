@@ -233,9 +233,7 @@ export function GamesRedesign() {
               const rs = BADGE[game.result] ?? BADGE.draw;
               return (
                 <Link key={game.id} href={`/games/${game.id}`} className="flex min-w-0 items-center gap-3 transition-opacity active:opacity-80">
-                  <span className="shrink-0 overflow-hidden rounded-[10px]" style={{ border: '2px solid rgba(255,244,225,.9)' }}>
-                    <GameThumb pgn={game.pgn} userColor={isWhite ? 'white' : 'black'} size={60} />
-                  </span>
+                  <GameThumb pgn={game.pgn} userColor={isWhite ? 'white' : 'black'} size={60} />
                   <span className="flex min-w-0 flex-1 items-center gap-3 rounded-[16px] px-3 py-2.5" style={{ background: RD.card, border: `1px solid ${RD.border}` }}>
                     <span className="flex h-[34px] w-[64px] shrink-0 items-center justify-center gap-1.5 rounded-[10px] text-[13px] font-bold" style={{ background: 'rgba(255,255,255,.06)', border: `1px solid ${RD.border}`, color: RD.text }}><span className="h-2 w-2 rounded-full" style={{ background: rs.dot }} />{rs.label}</span>
                     <span className="min-w-0 flex-1">

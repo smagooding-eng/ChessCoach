@@ -473,19 +473,19 @@ html.cs-redesign {
   --card-foreground: 150 12% 96%;
   --popover: 187 26% 8%;
   --popover-foreground: 150 12% 96%;
-  --primary: 95 80% 59%;                  /* #81B64C neon green */
+  --primary: 89 42% 51%;                  /* #81B64C brand green */
   --primary-foreground: 147 52% 4%;       /* dark text on green */
   --secondary: 191 23% 9%;                /* #121B1D */
   --secondary-foreground: 150 12% 96%;
   --muted: 191 23% 9%;
   --muted-foreground: 162 4% 55%;         /* #87918E */
-  --accent: 95 80% 59%;
+  --accent: 89 42% 51%;
   --accent-foreground: 147 52% 4%;
   --destructive: 357 100% 66%;            /* #FF5058 */
   --destructive-foreground: 0 0% 100%;
   --border: 187 12% 14%;                  /* ~rgba(255,255,255,.08) on card */
   --input: 191 23% 9%;
-  --ring: 95 80% 59%;
+  --ring: 89 42% 51%;
   --radius: 1rem;
 
   /* Layout chrome palette (see the CSS-variable constants in Layout.tsx) */

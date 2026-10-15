@@ -369,8 +369,8 @@ export function ScanPosition() {
             onClick={() => fileInputRef.current?.click()}
             className="glass-card rounded-xl p-8 border border-white/10 hover:border-primary/30 transition-all cursor-pointer flex flex-col items-center gap-3 active:scale-[0.98]"
           >
-            <div className="w-14 h-14 rounded-xl flex items-center justify-center" style={{ background: 'rgba(129,182,76,0.12)' }}>
-              <Upload className="w-7 h-7" style={{ color: '#81b64c' }} />
+            <div className="w-14 h-14 rounded-xl flex items-center justify-center" style={{ background: '#81B64C' }}>
+              <Upload className="w-7 h-7" style={{ color: '#ffffff' }} />
             </div>
             <div className="text-center">
               <p className="font-bold text-white">Upload Image</p>
@@ -382,8 +382,8 @@ export function ScanPosition() {
             onClick={() => cameraInputRef.current?.click()}
             className="glass-card rounded-xl p-6 border border-white/10 hover:border-primary/30 transition-all cursor-pointer flex items-center gap-4 active:scale-[0.98]"
           >
-            <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0" style={{ background: 'rgba(129,182,76,0.12)' }}>
-              <Camera className="w-5 h-5" style={{ color: '#81b64c' }} />
+            <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0" style={{ background: '#81B64C' }}>
+              <Camera className="w-5 h-5" style={{ color: '#ffffff' }} />
             </div>
             <div>
               <p className="font-bold text-white text-sm">Take Photo</p>
@@ -401,8 +401,8 @@ export function ScanPosition() {
             }}
             className="glass-card rounded-xl p-6 border border-white/10 hover:border-primary/30 transition-all cursor-pointer flex items-center gap-4 active:scale-[0.98]"
           >
-            <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0" style={{ background: 'rgba(129,182,76,0.12)' }}>
-              <Wand2 className="w-5 h-5" style={{ color: '#81b64c' }} />
+            <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0" style={{ background: '#81B64C' }}>
+              <Wand2 className="w-5 h-5" style={{ color: '#ffffff' }} />
             </div>
             <div>
               <p className="font-bold text-white text-sm">Build Position</p>

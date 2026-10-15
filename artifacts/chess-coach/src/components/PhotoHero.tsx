@@ -1,5 +1,5 @@
 import React from 'react';
-import { RD } from '@/lib/redesignTheme';
+import { RD, GREEN_TILE } from '@/lib/redesignTheme';
 import { useSiteImg } from '@/hooks/use-app-config';
 import { usePhotoLook } from '@/context/SettingsContext';
 
@@ -29,7 +29,7 @@ export function PhotoHero({
       {!photoLook && <div className="absolute inset-0" style={{ background: 'linear-gradient(90deg, rgba(5,10,11,.95) 0%, rgba(5,10,11,.78) 45%, rgba(5,10,11,.15) 100%), linear-gradient(0deg, rgba(5,10,11,.55) 0%, rgba(5,10,11,0) 50%)' }} />}
       <div className={`relative z-10 flex flex-col justify-end p-5 ${photoLook ? '' : 'min-h-[150px]'}`}>
         {icon && (
-          <span className="mb-3 grid h-10 w-10 place-items-center rounded-[12px]" style={{ background: 'rgba(129,182,76,.14)', color: RD.green, border: '1px solid rgba(129,182,76,.25)' }}>{icon}</span>
+          <span className="mb-3 grid h-10 w-10 place-items-center rounded-[12px]" style={GREEN_TILE}>{icon}</span>
         )}
         <h1 className="text-[26px] font-black leading-tight tracking-tight" style={{ color: RD.text, textShadow: '0 2px 14px rgba(0,0,0,.85)' }}>{title}</h1>
         {subtitle && <p className={`mt-1 text-[13.5px] leading-snug ${photoLook ? '' : 'max-w-[70%]'}`} style={{ color: '#C9D1CE', textShadow: '0 2px 10px rgba(0,0,0,.9)' }}>{subtitle}</p>}

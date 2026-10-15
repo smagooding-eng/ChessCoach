@@ -78,7 +78,7 @@ export function CourseOverview({
               const active = tab === id;
               return (
                 <button key={id} onClick={() => setTab(id)} className="py-3 text-[14.5px] font-bold transition-colors"
-                  style={active ? { background: 'rgba(129,182,76,.12)', color: RD.green, boxShadow: `inset 0 -2px 0 ${RD.green}` } : { color: RD.muted }}>
+                  style={active ? { background: 'rgba(255,255,255,.07)', color: RD.text, boxShadow: `inset 0 -2px 0 ${RD.green}` } : { color: RD.muted }}>
                   {label}
                 </button>
               );

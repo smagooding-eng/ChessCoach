@@ -47,10 +47,14 @@ export const GameThumb = React.memo(function GameThumb({
 
   const flipped = userColor === 'black';
 
+  // The frame says which side the user played: a white frame for White, a
+  // black frame for Black. The black frame gets a faint light outline so it
+  // still reads as a frame on the dark pages.
   const borderColor =
     userColor === 'white' ? '#f0f0f0' :
-    userColor === 'black' ? '#1a1a1a' :
+    userColor === 'black' ? '#0c0c0c' :
     'rgba(255,255,255,0.15)';
+  const outline = userColor === 'black' ? '0 0 0 1px rgba(255,255,255,0.28), ' : '';
 
   return (
     <div
@@ -60,7 +64,7 @@ export const GameThumb = React.memo(function GameThumb({
         height: size,
         border: `2.5px solid ${borderColor}`,
         borderRadius: 6,
-        boxShadow: '0 2px 6px rgba(0,0,0,0.4)',
+        boxShadow: `${outline}0 2px 6px rgba(0,0,0,0.4)`,
         boxSizing: 'content-box',
       }}
     >

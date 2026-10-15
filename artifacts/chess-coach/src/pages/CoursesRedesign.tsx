@@ -174,7 +174,7 @@ export function CoursesRedesign({
               const left = g.total - g.done;
               return (
                 <div key={g.name} className="flex items-center gap-3.5 rounded-[20px] p-3.5" style={card}>
-                  <span className="grid h-[68px] w-[68px] shrink-0 place-items-center rounded-[16px]" style={{ background: 'rgba(129,182,76,.12)', border: '1.5px solid rgba(129,182,76,.45)', color: RD.green }}>
+                  <span className="grid h-[68px] w-[68px] shrink-0 place-items-center rounded-[16px]" style={{ background: RD.green, color: '#FFFFFF' }}>
                     <a.icon size={30} />
                   </span>
                   <div className="min-w-0 flex-1">
@@ -221,8 +221,8 @@ export function CoursesRedesign({
               <h2 className="text-[26px] font-extrabold leading-tight">All Courses</h2>
               <p className="text-[14px]" style={{ color: RD.muted }}>Build the skills that matter most.</p>
             </div>
-            <button onClick={onGenerate} disabled={isGenerating} className="flex shrink-0 items-center gap-2 rounded-[12px] px-3.5 py-2.5 text-[12.5px] font-extrabold disabled:opacity-60" style={{ background: 'rgba(129,182,76,.10)', color: RD.green, border: `1px solid ${RD.green}` }}>
-              {isGenerating ? <><span className="h-3.5 w-3.5 animate-spin rounded-full border-2" style={{ borderColor: RD.green, borderTopColor: 'transparent' }} />Building…</> : <><GraduationCap size={15} />New courses</>}
+            <button onClick={onGenerate} disabled={isGenerating} className="flex shrink-0 items-center gap-2 rounded-[12px] px-3.5 py-2.5 text-[12.5px] font-extrabold disabled:opacity-60" style={{ background: RD.green, color: '#05100A' }}>
+              {isGenerating ? <><span className="h-3.5 w-3.5 animate-spin rounded-full border-2" style={{ borderColor: '#05100A', borderTopColor: 'transparent' }} />Building…</> : <><GraduationCap size={15} />New courses</>}
             </button>
           </div>
 
@@ -238,7 +238,7 @@ export function CoursesRedesign({
                 const active = tab === id;
                 return (
                   <button key={id} onClick={() => setTab(id)} className="py-3 text-[14.5px] font-bold transition-colors"
-                    style={active ? { background: 'rgba(129,182,76,.12)', color: RD.green, boxShadow: `inset 0 -2px 0 ${RD.green}` } : { color: RD.muted }}>
+                    style={active ? { background: 'rgba(255,255,255,.07)', color: RD.text, boxShadow: `inset 0 -2px 0 ${RD.green}` } : { color: RD.muted }}>
                     {label}
                   </button>
                 );
@@ -287,7 +287,7 @@ export function CoursesRedesign({
                     </span>
                   </span>
                   <span className="flex shrink-0 flex-col items-center justify-center gap-1.5 pr-2">
-                    <span className="grid h-9 w-9 place-items-center rounded-full" style={{ background: done ? 'rgba(129,182,76,.16)' : RD.green, color: done ? RD.green : '#05100A' }}>
+                    <span className="grid h-9 w-9 place-items-center rounded-full" style={{ background: done ? 'rgba(255,255,255,.08)' : RD.green, color: done ? RD.green : '#05100A' }}>
                       {done ? <CheckCircle2 size={20} aria-label="Completed" /> : <Play size={16} fill="currentColor" aria-label="Open course" />}
                     </span>
                     <b className="text-[13px]" style={{ color: p > 0 ? RD.green : RD.muted }}>{p}%</b>

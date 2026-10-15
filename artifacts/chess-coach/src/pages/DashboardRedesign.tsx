@@ -411,10 +411,10 @@ export function DashboardRedesign() {
           </span>
           <span className="min-w-0 flex-1">
             {!freePlan
-              ? <span className="mb-1 inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-[.16em]" style={{ background: 'rgba(129,182,76,.12)', color: GREEN }}><Zap size={10} /> Coach</span>
+              ? <span className="mb-1 inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-[.16em]" style={NEUTRAL_CHIP}><Zap size={10} style={{ color: GREEN }} /> Coach</span>
               : <span className="mb-1 inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-[.16em]" style={{ background: 'linear-gradient(180deg,#F2C560,#D99A24)', color: '#1A1205' }}><Crown size={10} /> Pro</span>}
             <b className="block text-[17px] font-extrabold leading-tight">Seen a position worth studying?</b>
-            <span className="mt-0.5 block text-[13px] font-bold" style={{ color: GREEN }}>Snap a photo and explore it on the board</span>
+            <span className="mt-0.5 block text-[13px] font-semibold" style={{ color: '#C4CCC9' }}>Snap a photo and explore it on the board</span>
           </span>
           <ArrowUpRight size={20} className="shrink-0" style={{ color: GREEN }} />
         </Link>
