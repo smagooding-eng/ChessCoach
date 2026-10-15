@@ -28,9 +28,9 @@ export function PlayHub() {
 
   // Online first (live and daily games live together there), then local, then bots.
   const rows: { href: string; title: string; sub: string; icon: React.ReactNode; tint: string; show: boolean; img: string }[] = [
-    { href: '/live', title: 'Play Online', sub: 'Live and daily games · challenge a friend', icon: <Swords size={22} />, tint: RD.gold, show: !!authUser, img: 'play-online' },
+    { href: '/live', title: 'Play Online', sub: 'Live and daily games · challenge a friend', icon: <Swords size={22} />, tint: RD.green, show: !!authUser, img: 'play-online' },
     { href: '/play/local', title: 'Play Local', sub: 'Two players, one device', icon: <Play size={22} />, tint: RD.green, show: true, img: 'play-friend' },
-    { href: '/practice', title: 'Play Bots', sub: `${BOTS.length} opponents • ${lowest}–${highest} ELO`, icon: <Bot size={22} />, tint: '#5BA8FF', show: true, img: 'play-bot' },
+    { href: '/practice', title: 'Play Bots', sub: `${BOTS.length} opponents • ${lowest}–${highest} ELO`, icon: <Bot size={22} />, tint: RD.green, show: true, img: 'play-bot' },
   ];
 
   return (
@@ -65,12 +65,13 @@ export function PlayHub() {
             <h2 className="text-[15px] font-extrabold">Meet the bots</h2>
             <Link href="/practice" className="text-[12px] font-extrabold uppercase tracking-wider" style={{ color: RD.green }}>Choose →</Link>
           </div>
-          <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-1">
+          {/* Every bot at once (wraps, no sideways scrolling); tap one to play it. */}
+          <div className="grid grid-cols-5 gap-x-1.5 gap-y-3">
             {BOTS.map((b) => (
-              <Link key={b.name} href="/practice" className="flex w-[78px] shrink-0 flex-col items-center gap-1.5 text-center">
-                <img src={botAvatar(b)} alt={botName(b)} className="h-14 w-14 rounded-full object-cover" style={{ border: `2px solid ${RD.border}`, background: RD.cardLight }} loading="lazy" />
-                <span className="w-full truncate text-[12px] font-bold">{botName(b)}</span>
-                <span className="text-[11px]" style={{ color: RD.muted }}>{b.rating}</span>
+              <Link key={b.name} href={`/practice?bot=${b.rating}`} className="flex min-w-0 flex-col items-center gap-1 text-center transition-transform active:scale-95" aria-label={`Play ${botName(b)} (${b.rating})`}>
+                <img src={botAvatar(b)} alt="" className="h-12 w-12 rounded-full object-cover min-[400px]:h-14 min-[400px]:w-14" style={{ border: `2px solid ${RD.border}`, background: RD.cardLight }} loading="lazy" />
+                <span className="w-full truncate text-[11px] font-bold leading-tight">{botName(b)}</span>
+                <span className="text-[10.5px] leading-none" style={{ color: RD.muted }}>{b.rating}</span>
               </Link>
             ))}
           </div>

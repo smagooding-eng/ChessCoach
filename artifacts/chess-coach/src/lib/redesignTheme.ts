@@ -40,3 +40,7 @@ export const DIFFICULTY_BADGE: Record<string, { bg: string; fg: string }> = {
 export const REDESIGN_ON: boolean = (() => {
   try { return localStorage.getItem('cs_dashboard_redesign') === '1'; } catch { return false; }
 })();
+
+// Status chips (win/loss, severity, difficulty, move quality): one neutral
+// style everywhere; only a small dot carries the colour.
+export const NEUTRAL_CHIP = { background: 'rgba(255,255,255,.07)', color: '#F5F7F6', border: '1px solid rgba(255,255,255,.10)' } as const;

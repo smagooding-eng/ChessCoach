@@ -127,10 +127,11 @@ export function GamesRedesign() {
 
   const filtersActive = resultFilter !== 'all';
 
-  const BADGE: Record<string, { bg: string; fg: string; label: string }> = {
-    win: { bg: 'rgba(46,125,50,.45)', fg: '#95C45A', label: 'WIN' },
-    loss: { bg: 'rgba(150,35,45,.55)', fg: '#FF6B73', label: 'LOSS' },
-    draw: { bg: 'rgba(255,255,255,.12)', fg: '#C9D2CF', label: 'DRAW' },
+  // Neutral chip, white text; only a small dot carries the colour.
+  const BADGE: Record<string, { dot: string; label: string }> = {
+    win: { dot: '#81B64C', label: 'Win' },
+    loss: { dot: '#E5534B', label: 'Loss' },
+    draw: { dot: '#9AA5A1', label: 'Draw' },
   };
 
   return (
@@ -217,7 +218,7 @@ export function GamesRedesign() {
           </div>
         )}
 
-        <div className="mt-3 grid gap-2.5 lg:grid-cols-2 lg:gap-3">
+        <div className="mt-3 grid grid-cols-1 gap-2.5 lg:grid-cols-2 lg:gap-3">
           {data === undefined ? (
             [0, 1, 2, 3, 4].map((i) => (
               <div key={i} className="flex items-center gap-3">
@@ -231,12 +232,12 @@ export function GamesRedesign() {
               const opponent = isWhite ? game.blackUsername : game.whiteUsername;
               const rs = BADGE[game.result] ?? BADGE.draw;
               return (
-                <Link key={game.id} href={`/games/${game.id}`} className="flex items-center gap-3 transition-opacity active:opacity-80">
+                <Link key={game.id} href={`/games/${game.id}`} className="flex min-w-0 items-center gap-3 transition-opacity active:opacity-80">
                   <span className="shrink-0 overflow-hidden rounded-[10px]" style={{ border: '2px solid rgba(255,244,225,.9)' }}>
                     <GameThumb pgn={game.pgn} userColor={isWhite ? 'white' : 'black'} size={60} />
                   </span>
                   <span className="flex min-w-0 flex-1 items-center gap-3 rounded-[16px] px-3 py-2.5" style={{ background: RD.card, border: `1px solid ${RD.border}` }}>
-                    <span className="grid h-[38px] w-[64px] shrink-0 place-items-center rounded-[10px] text-[14px] font-extrabold tracking-wide" style={{ background: rs.bg, color: rs.fg }}>{rs.label}</span>
+                    <span className="flex h-[34px] w-[64px] shrink-0 items-center justify-center gap-1.5 rounded-[10px] text-[13px] font-bold" style={{ background: 'rgba(255,255,255,.06)', border: `1px solid ${RD.border}`, color: RD.text }}><span className="h-2 w-2 rounded-full" style={{ background: rs.dot }} />{rs.label}</span>
                     <span className="min-w-0 flex-1">
                       <b className="block truncate text-[15px] font-bold"><span className="font-semibold" style={{ color: 'rgba(245,247,246,.8)' }}>vs </span>{opponent}</b>
                       <span className="block truncate text-[12.5px]" style={{ color: RD.muted }}>{game.opening || 'Unknown opening'}</span>

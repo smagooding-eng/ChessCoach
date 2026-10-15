@@ -8,6 +8,7 @@ import { Chess } from 'chess.js';
 import { FenThumb } from '@/components/FenThumb';
 import { RedesignHeader } from '@/components/RedesignHeader';
 import { useSwipeTabs } from '@/lib/swipeNav';
+import { NEUTRAL_CHIP } from '@/lib/redesignTheme';
 
 const BG = '#141413';
 const CARD = '#1c1b19';
@@ -154,7 +155,7 @@ function TrapsRedesign({ traps, loading }: { traps: TrapSummary[]; loading: bool
             <b className="block truncate text-[16px] font-extrabold">{trap.name}</b>
             <span className="block truncate text-[13px]" style={{ color: RD.muted }}>{trap.summary}</span>
           </span>
-          <span className="shrink-0 rounded-[8px] px-2.5 py-1.5 text-[12px] font-extrabold capitalize" style={{ background: chip.bg, color: chip.fg, border: `1px solid ${chip.bd}` }}>{trap.difficulty}</span>
+          <span className="shrink-0 rounded-[8px] px-2.5 py-1.5 text-[12px] font-extrabold capitalize" style={NEUTRAL_CHIP}><span className="mr-1.5 inline-block h-1.5 w-1.5 shrink-0 rounded-full align-middle" style={{ background: chip.fg }} />{trap.difficulty}</span>
           <ChevronRight size={16} className="shrink-0" style={{ color: RD.muted }} />
         </span>
       </Link>

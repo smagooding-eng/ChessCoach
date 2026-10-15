@@ -184,6 +184,8 @@ export function Layout({ children, fullscreen }: { children: React.ReactNode; fu
     const onEnd = (e: TouchEvent) => {
       const s0 = start; start = null;
       if (!s0 || !s0.ok || swipeState.current.moreOpen) return;
+      // No swipe navigation on the opponent scout pages (lots of sideways content there).
+      if (/^\/(opponents|scout)(\/|$)/.test(swipeState.current.location)) return;
       const t = e.changedTouches[0];
       const dx = t.clientX - s0.x, dy = t.clientY - s0.y;
       if (Date.now() - s0.t > 700 || Math.abs(dx) < 70 || Math.abs(dx) < Math.abs(dy) * 1.8) return;

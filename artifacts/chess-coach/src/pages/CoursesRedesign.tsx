@@ -174,13 +174,13 @@ export function CoursesRedesign({
               const left = g.total - g.done;
               return (
                 <div key={g.name} className="flex items-center gap-3.5 rounded-[20px] p-3.5" style={card}>
-                  <span className="grid h-[68px] w-[68px] shrink-0 place-items-center rounded-[16px]" style={{ background: `${a.tile}30`, border: `1.5px solid ${a.tile}99`, color: a.tile }}>
+                  <span className="grid h-[68px] w-[68px] shrink-0 place-items-center rounded-[16px]" style={{ background: 'rgba(129,182,76,.12)', border: '1.5px solid rgba(129,182,76,.45)', color: RD.green }}>
                     <a.icon size={30} />
                   </span>
                   <div className="min-w-0 flex-1">
                     <b className="block truncate text-[17px] font-extrabold">{g.name}</b>
-                    <div className="my-2"><Bar value={p} color={a.bar} h={8} /></div>
-                    <span className="text-[12.5px] font-semibold" style={{ color: a.bar }}>{left} lesson{left === 1 ? '' : 's'} ready</span>
+                    <div className="my-2"><Bar value={p} color={RD.green} h={8} /></div>
+                    <span className="text-[12.5px] font-semibold" style={{ color: RD.green }}>{left} lesson{left === 1 ? '' : 's'} ready</span>
                   </div>
                   <b className="shrink-0 text-[20px] font-extrabold">{p}%</b>
                 </div>

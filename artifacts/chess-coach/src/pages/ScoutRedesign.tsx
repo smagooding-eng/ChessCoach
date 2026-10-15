@@ -5,6 +5,7 @@ import { RD } from '@/lib/redesignTheme';
 import { useUser } from '@/hooks/use-user';
 import { ProUpsell } from '@/components/ProUpsell';
 import { useSwipeTabs } from '@/lib/swipeNav';
+import { NEUTRAL_CHIP } from '@/lib/redesignTheme';
 
 // Opponent Scout (redesign): header card with search, profile card, tabs,
 // win-rate / vs-you split card and key weaknesses. All values come from the
@@ -231,7 +232,7 @@ export function ScoutRedesign(props: {
                         const s = SEV[w.severity] ?? SEV.Low;
                         return (
                           <button key={i} onClick={() => { setTab('weaknesses'); setOpen(i); }} className="rounded-[16px] p-3 text-left" style={{ background: 'rgba(255,255,255,.04)', border: `1px solid ${RD.border}` }}>
-                            <span className="inline-block rounded-md px-2 py-0.5 text-[11.5px] font-extrabold" style={{ background: s.bg, color: s.fg }}>{w.severity}</span>
+                            <span className="inline-block rounded-md px-2 py-0.5 text-[11.5px] font-extrabold" style={NEUTRAL_CHIP}><span className="mr-1.5 inline-block h-1.5 w-1.5 shrink-0 rounded-full align-middle" style={{ background: s.fg }} />{w.severity}</span>
                             <b className="mt-2 block text-[14.5px] font-extrabold leading-snug">{w.category}</b>
                             <span className="mt-1 line-clamp-3 block text-[12.5px] leading-snug" style={{ color: RD.muted }}>{w.description}</span>
                           </button>
@@ -268,7 +269,7 @@ export function ScoutRedesign(props: {
                   return (
                     <div key={i} className="rounded-[20px] p-4" style={card}>
                       <button className="flex w-full items-start gap-3 text-left" onClick={() => setOpen(isOpen ? null : i)} aria-expanded={isOpen}>
-                        <span className="mt-0.5 shrink-0 rounded-md px-2 py-0.5 text-[11.5px] font-extrabold" style={{ background: s.bg, color: s.fg }}>{w.severity}</span>
+                        <span className="mt-0.5 shrink-0 rounded-md px-2 py-0.5 text-[11.5px] font-extrabold" style={NEUTRAL_CHIP}><span className="mr-1.5 inline-block h-1.5 w-1.5 shrink-0 rounded-full align-middle" style={{ background: s.fg }} />{w.severity}</span>
                         <span className="min-w-0 flex-1">
                           <b className="block text-[15.5px] font-extrabold">{w.category}</b>
                           <span className="mt-1 block text-[13px] leading-snug" style={{ color: RD.muted }}>{w.description}</span>

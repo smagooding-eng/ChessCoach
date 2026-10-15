@@ -22,6 +22,7 @@ import { BOTS } from '@/lib/chess-bot';
 import { ActiveGamesCard } from '@/components/play/ActiveGamesCard';
 import { PlayAppCard } from '@/components/GooglePlayBadge';
 import { ChallengeInbox } from '@/components/play/OpenChallenges';
+import { NEUTRAL_CHIP } from '@/lib/redesignTheme';
 
 // Dashboard shown when the global "dashboard redesign" flag is ON (see
 // DashboardRouter in App.tsx). The mobile header and bottom nav in the
@@ -370,7 +371,7 @@ export function DashboardRedesign() {
                     style={{ borderColor: BORDER }}
                   >
                     <GameThumb pgn={game.pgn} userColor={isWhite ? 'white' : 'black'} size={44} />
-                    <span className="w-[52px] shrink-0 rounded-md py-1 text-center text-[11px] font-extrabold tracking-wide" style={{ background: rs.bg, color: rs.fg }}>
+                    <span className="w-[52px] shrink-0 rounded-md py-1 text-center text-[11px] font-extrabold tracking-wide" style={NEUTRAL_CHIP}><span className="mr-1.5 inline-block h-1.5 w-1.5 shrink-0 rounded-full align-middle" style={{ background: rs.fg }} />
                       {rs.label}
                     </span>
                     <div className="min-w-0 flex-1">

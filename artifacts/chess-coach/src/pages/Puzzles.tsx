@@ -8,7 +8,7 @@ import { apiFetch } from '@/lib/api';
 import { buildTintedPieceSet } from '@/components/RecoloredPieces';
 import { PieceGradientDefs } from '@/components/PieceGradientDefs';
 import { useUser } from '@/hooks/use-user';
-import { Crown, RotateCcw, ChevronRight, Trophy, Target, Flame, Zap, Lightbulb, Loader2, Lock, Share2 } from 'lucide-react';
+import { Crown, RotateCcw, ChevronRight, Trophy, Target, Flame, Zap, Lightbulb, Loader2, Lock, Share2, Puzzle, GitFork, Pin, ArrowRightToLine, Eye, ShieldOff } from 'lucide-react';
 import { useLocation, useSearch, Link } from 'wouter';
 import { encodeCard } from '@/pages/ShareCard';
 import { UpgradeNudge } from '@/components/UpgradeNudge';
@@ -22,6 +22,17 @@ import { ConfirmPad } from '@/components/ClockPad';
 import { scene } from '@/components/PhotoHero';
 import { useSiteImg } from '@/hooks/use-app-config';
 import { usePhotoLook } from '@/context/SettingsContext';
+
+// Recommended themes: one icon per idea, all in the brand green.
+const THEME_ICON: Record<string, typeof Puzzle> = {
+  mateIn2: Crown,             // the king falls
+  fork: GitFork,              // one piece, two targets
+  pin: Pin,                   // pinned in place
+  skewer: ArrowRightToLine,   // through one piece to the one behind
+  sacrifice: Flame,           // give material for the attack
+  discoveredAttack: Eye,      // a hidden line revealed
+  hangingPiece: ShieldOff,    // an undefended piece
+};
 
 const THEME_SCENE: Record<string, string> = {
   mateIn2: 'theme-mate', fork: 'theme-fork', pin: 'theme-pin', skewer: 'theme-skewer',
@@ -985,7 +996,8 @@ export function Puzzles() {
             <h2 className="mb-2 px-1 text-[17px] font-extrabold" style={{ color: TEXT_LIGHT }}>Recommended Themes</h2>
             <div className="grid gap-2">
               {PUZZLE_TYPE_OPTIONS.filter(o => ['fork', 'pin', 'skewer', 'discoveredAttack', 'sacrifice', 'hangingPiece', 'mateIn2'].includes(o.value)).map((o, i) => {
-                const tint = ['#3B82F6', '#A855F7', '#E8B447', '#81B64C', '#EF4444', '#06B6D4', '#F97316'][i % 7];
+                const tint = '#81B64C';
+                const ThemeIcon = THEME_ICON[o.value] ?? Puzzle;
                 const img = THEME_SCENE[o.value];
                 return (
                   <button
@@ -1000,7 +1012,7 @@ export function Puzzles() {
                         <span className="absolute inset-y-0 left-0 w-[3px]" style={{ background: tint }} />
                       </span>
                     ) : (
-                      <span className="ml-3 grid h-11 w-11 shrink-0 self-center place-items-center rounded-[12px] text-[20px]" style={{ background: `${tint}33`, color: tint }}>♞</span>
+                      <span className="ml-3 grid h-11 w-11 shrink-0 self-center place-items-center rounded-[12px]" style={{ background: 'rgba(129,182,76,.12)', color: tint, border: '1px solid rgba(129,182,76,.28)' }}><ThemeIcon size={20} /></span>
                     )}
                     <span className="min-w-0 flex-1 py-3.5 pl-3.5">
                       <b className="block text-[15px] font-bold" style={{ color: TEXT_LIGHT }}>{o.label}</b>

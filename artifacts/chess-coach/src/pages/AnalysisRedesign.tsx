@@ -12,6 +12,7 @@ import { RD } from '@/lib/redesignTheme';
 import { RedesignHeader } from '@/components/RedesignHeader';
 import type { WeaknessRecord } from '@workspace/api-client-react';
 import { useSwipeTabs } from '@/lib/swipeNav';
+import { NEUTRAL_CHIP } from '@/lib/redesignTheme';
 
 // "My Analytics" (enhanced UI), laid out from the supplied concept. Every
 // number on this page is real data:
@@ -368,11 +369,11 @@ export function AnalysisRedesign() {
       <div className="mx-auto grid grid-cols-1 w-full max-w-[760px] gap-3 lg:max-w-[1200px]">
         <RedesignHeader title="My Analytics" icon={<span className="text-[26px] leading-none">♟</span>} />
 
-        <div className="hide-scrollbar flex gap-1 overflow-x-auto rounded-[16px] p-1 lg:max-w-[720px]" style={{ background: RD.cardSolid, border: `1px solid ${RD.border}` }}>
+        <div className="grid grid-cols-5 gap-0.5 rounded-[16px] p-1 lg:max-w-[720px]" style={{ background: RD.cardSolid, border: `1px solid ${RD.border}` }}>
           {TABS.map((t) => {
             const active = tab === t.id;
             return (
-              <button key={t.id} onClick={() => setTab(t.id)} className="flex-1 shrink-0 whitespace-nowrap rounded-[12px] px-3 py-2.5 text-[13px] font-bold transition-colors"
+              <button key={t.id} onClick={() => setTab(t.id)} className="min-w-0 truncate rounded-[12px] px-0.5 py-2.5 text-[11.5px] font-bold transition-colors min-[400px]:text-[12.5px] md:px-3 md:text-[13px]"
                 style={active ? { background: 'rgba(129,182,76,.10)', color: RD.text, boxShadow: `inset 0 0 0 1.5px ${RD.green}` } : { background: 'transparent', color: RD.muted }}>
                 {t.label}
               </button>
@@ -491,7 +492,7 @@ export function AnalysisRedesign() {
                     const sev = SEV_STYLE[w.severity] ?? SEV_STYLE.Low;
                     return (
                       <Link key={w.id} href={`/analysis/${w.id}`} className="flex items-center gap-3 rounded-[14px] px-3 py-3" style={{ background: 'rgba(255,255,255,.025)', border: `1px solid ${RD.border}` }}>
-                        <span className="shrink-0 rounded-[7px] px-2 py-1 text-[11px] font-extrabold" style={{ background: sev.bg, color: sev.fg, border: `1px solid ${sev.border}` }}>{w.severity}</span>
+                        <span className="shrink-0 rounded-[7px] px-2 py-1 text-[11px] font-extrabold" style={NEUTRAL_CHIP}><span className="mr-1.5 inline-block h-1.5 w-1.5 shrink-0 rounded-full align-middle" style={{ background: sev.fg }} />{w.severity}</span>
                         <span className="min-w-0 flex-1">
                           <b className="block truncate text-[14px] font-bold">{w.category}</b>
                           <span className="line-clamp-1 block text-[12px]" style={{ color: RD.muted }}>{w.description}</span>
@@ -619,7 +620,7 @@ export function AnalysisRedesign() {
                   return (
                     <Card key={w.id} className="!p-0 overflow-hidden">
                       <Link href={`/analysis/${w.id}`} className="flex items-start gap-3 p-3.5">
-                        <span className="shrink-0 rounded-[8px] px-2.5 py-1.5 text-[12px] font-extrabold" style={{ background: sev.bg, color: sev.fg, border: `1px solid ${sev.border}` }}>{w.severity}</span>
+                        <span className="shrink-0 rounded-[8px] px-2.5 py-1.5 text-[12px] font-extrabold" style={NEUTRAL_CHIP}><span className="mr-1.5 inline-block h-1.5 w-1.5 shrink-0 rounded-full align-middle" style={{ background: sev.fg }} />{w.severity}</span>
                         <span className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center" style={{ color: RD.text }}>{v.icon}</span>
                         <span className="min-w-0 flex-1">
                           <b className="block text-[15px] font-extrabold">{w.category}</b>

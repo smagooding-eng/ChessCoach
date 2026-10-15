@@ -1230,6 +1230,15 @@ function readInitialTabParam(): 'bots' | 'openings' {
   return new URLSearchParams(window.location.search).get('tab') === 'openings' ? 'openings' : 'bots';
 }
 
+/** /practice?bot=<rating>: open straight into a game with that bot (e.g. from "Meet the bots"). */
+function readBotParam(): BotConfig | null {
+  try {
+    const v = new URLSearchParams(window.location.search).get('bot');
+    if (!v) return null;
+    return BOTS.find(b => String(b.rating) === v || b.name === v) ?? null;
+  } catch { return null; }
+}
+
 function readInitialOpeningParam(): OpeningLine | null {
   const eco = new URLSearchParams(window.location.search).get('eco');
   if (!eco) return null;
@@ -1249,7 +1258,7 @@ export function PracticeBots() {
   const [jumpIn] = useState(readJumpInParams);
   const [isOnboarding] = useState(readOnboardingParam);
   const [selectedBot, setSelectedBot] = useState<BotConfig | null>(() =>
-    isOnboarding ? (BOTS.find(b => b.rating === 1200) ?? null) : jumpIn ? findBotAboveRating(jumpIn.rating) : null
+    isOnboarding ? (BOTS.find(b => b.rating === 1200) ?? null) : jumpIn ? findBotAboveRating(jumpIn.rating) : readBotParam()
   );
   const [selectedOpening, setSelectedOpening] = useState<OpeningLine | null>(readInitialOpeningParam);
   const [tab, setTab] = useState<'bots' | 'openings'>(() => readInitialOpeningParam() ? 'openings' : readInitialTabParam());

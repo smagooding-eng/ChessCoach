@@ -26,6 +26,7 @@ import { AICoachCard, type AICoachTone } from '@/components/AICoachCard';
 import { ProUpsell } from '@/components/ProUpsell';
 import { MistakeFixView } from '@/components/MistakeFixView';
 import { AnimatePresence, motion } from 'framer-motion';
+import { NEUTRAL_CHIP } from '@/lib/redesignTheme';
 
 type Classification = 'checkmate' | 'brilliant' | 'great' | 'best' | 'excellent' | 'good' | 'book' | 'inaccuracy' | 'mistake' | 'blunder' | 'missed_win';
 
@@ -1037,7 +1038,7 @@ export function GameReplay() {
                   <p className="text-[10.5px]" style={{ color: RD.muted }}>You ({youWhite ? 'White' : 'Black'})</p>
                   <b className="text-[15px] font-extrabold">{me.rating}</b>
                 </div>
-                <span className="rounded-[7px] px-2 py-1 text-[11px] font-extrabold" style={{ background: badge.bg, color: badge.fg }}>{badge.t}</span>
+                <span className="rounded-[7px] px-2 py-1 text-[11px] font-extrabold" style={NEUTRAL_CHIP}><span className="mr-1.5 inline-block h-1.5 w-1.5 shrink-0 rounded-full align-middle" style={{ background: badge.fg }} />{badge.t}</span>
                 <div className="min-w-0 flex-1 text-right leading-tight">
                   <p className="truncate text-[10.5px]" style={{ color: RD.muted }}>{opp.name}</p>
                   <b className="text-[15px] font-extrabold">{opp.rating?.toLocaleString()}</b>
@@ -1266,6 +1267,20 @@ export function GameReplay() {
           >
             {redesign && currentMove === 0 && reviewMoves.length > 0 && (
               <p className="px-1 pt-1 text-[13px] leading-snug" style={{ color: RD.muted }}>Step through the game with the buttons below. The coach explains each move here.</p>
+            )}
+            {/* Not reviewed yet: the call to action sits here, between the board and
+                the move buttons, instead of under the buttons (where they covered it). */}
+            {redesign && reviewMoves.length === 0 && !reviewing && (
+              <div className="flex h-full items-center gap-3 rounded-[16px] px-4 py-3" style={{ background: RD.card, border: `1px solid ${RD.border}` }}>
+                <BrainCircuit className="h-6 w-6 shrink-0" style={{ color: RD.green }} />
+                <div className="min-w-0 flex-1">
+                  <p className="text-[14px] font-extrabold leading-tight" style={{ color: RD.text }}>Review this game with the coach</p>
+                  <p className="mt-0.5 text-[12px] leading-snug" style={{ color: RD.muted }}>Every move graded and explained, with better alternatives.</p>
+                </div>
+                <button onClick={() => handleReview(false)} className="flex shrink-0 items-center gap-1.5 rounded-[12px] px-3.5 py-2.5 text-[13px] font-extrabold" style={{ background: RD.green, color: '#05100A' }}>
+                  <Sparkles className="h-4 w-4" /> Review
+                </button>
+              </div>
             )}
           {/* Per-move analysis panel — positioned right below controls for easy follow-along */}
           {currentMove > 0 && reviewMoves.length > 0 && (() => {
@@ -1554,7 +1569,7 @@ export function GameReplay() {
           )}
 
           {/* Start position prompt / Review Game CTA */}
-          {currentMove === 0 && reviewMoves.length === 0 && !reviewing && (
+          {!redesign && currentMove === 0 && reviewMoves.length === 0 && !reviewing && (
             <div className="glass-card rounded-xl px-4 py-4 border border-primary/20 bg-primary flex flex-col sm:flex-row items-start sm:items-center gap-3 justify-between">
               <div className="flex items-start gap-3">
                 <BrainCircuit className="w-5 h-5 text-primary-foreground shrink-0 mt-0.5" />
@@ -1604,7 +1619,7 @@ export function GameReplay() {
                       className="flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-white/[0.03]"
                       style={{ borderTop: i ? `1px solid ${RD.border}` : undefined }}
                     >
-                      <span className="mt-0.5 w-[74px] shrink-0 rounded-md px-1.5 py-1 text-center text-[10.5px] font-extrabold" style={{ background: tone.bg, color: tone.fg }}>{tone.label}</span>
+                      <span className="mt-0.5 w-[74px] shrink-0 rounded-md px-1.5 py-1 text-center text-[10.5px] font-extrabold" style={NEUTRAL_CHIP}><span className="mr-1.5 inline-block h-1.5 w-1.5 shrink-0 rounded-full align-middle" style={{ background: tone.fg }} />{tone.label}</span>
                       <span className="min-w-0 flex-1">
                         <b className="block text-[14px] font-bold">{num}{m.color === 'white' ? '.' : '...'} {m.san}</b>
                         {m.betterMove && ['blunder', 'mistake', 'missed_win', 'inaccuracy'].includes(m.classification) && (
