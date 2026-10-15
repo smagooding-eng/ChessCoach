@@ -362,7 +362,8 @@ export default function SettingsPage() {
       </>
       )}
 
-      <section className={vis('pieces')}>
+      {/* Recolouring only applies to the classic sets, so it lives under that tab */}
+      <section className={vis('pieces') + (redesign && activeType.id !== 'classic' ? ' hidden' : '')}>
         <h2 className="text-sm font-black uppercase tracking-wide mb-1" style={{ color: TEXT_MUTED }}>Piece Style</h2>
         <p className="text-xs mb-3" style={{ color: TEXT_MUTED }}>
           Color and finish for the pieces themselves{pieceShape !== 'default' ? ' — not used with a non-default shape' : ''}
