@@ -431,7 +431,7 @@ export function AnalysisRedesign() {
               </div>
               <div className="flex items-center gap-4">
                 <div className="grid h-[140px] w-[140px] shrink-0 place-items-center rounded-full" style={{ background: decided > 0 ? donut : RD.cardLight }}>
-                  <div className="grid h-[92px] w-[92px] place-items-center rounded-full text-center" style={{ background: '#0B1213' }}>
+                  <div className="grid h-[92px] w-[92px] place-items-center rounded-full text-center" style={{ background: 'var(--rd-card-solid, #0B1213)' }}>
                     <div>
                       <b className="block text-[24px] font-extrabold leading-none">{decided.toLocaleString()}</b>
                       <span className="text-[11px]" style={{ color: RD.muted }}>Total Games</span>

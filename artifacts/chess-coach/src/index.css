@@ -574,10 +574,10 @@ html.cs-redesign .cs-settings > section > h2 {
     radial-gradient(ellipse at 50% 0%, rgba(5,10,11,0) 0%, rgba(5,10,11,.35) 70%),
     rgba(5,10,11, var(--photo-shade, .5));
 }
-html.cs-photo { background: #050A0B; --glass-a: .62; --photo-shade: .5; --photo-blur: 3px; }
-html.cs-photo[data-glass="light"]  { --glass-a: .42; --photo-shade: .42; --photo-blur: 2px; }
-html.cs-photo[data-glass="medium"] { --glass-a: .62; --photo-shade: .5;  --photo-blur: 3px; }
-html.cs-photo[data-glass="strong"] { --glass-a: .8;  --photo-shade: .58; --photo-blur: 5px; }
+html.cs-photo { background: #050A0B; --glass-a: .7; --photo-shade: .5; --photo-blur: 3px; }
+html.cs-photo[data-glass="light"]  { --glass-a: .5; --photo-shade: .42; --photo-blur: 2px; }
+html.cs-photo[data-glass="medium"] { --glass-a: .7; --photo-shade: .5;  --photo-blur: 3px; }
+html.cs-photo[data-glass="strong"] { --glass-a: .86; --photo-shade: .58; --photo-blur: 5px; }
 html.cs-photo {
   /* redesigned pages (lib/redesignTheme RD.*) */
   --rd-bg: transparent;
@@ -588,6 +588,7 @@ html.cs-photo {
   --cs-bg-dark: transparent;
   --cs-bg-card: rgb(13 21 22 / var(--glass-a));
   --cs-card-gradient: linear-gradient(160deg, rgb(15 24 25 / var(--glass-a)) 0%, rgb(11 18 19 / var(--glass-a)) 100%);
+  --cs-panel-solid: #0D1516;
   --cs-bg-sidebar: rgb(7 13 14 / .78);
   --cs-sidebar-a95: rgb(7 13 14 / .82);
   --cs-sidebar-a97: rgb(7 13 14 / .86);

@@ -33,8 +33,9 @@ import { ChallengeInbox } from '@/components/play/OpenChallenges';
 // cards. Avatars, ratings, stats and game thumbnails all come from the
 // app's existing hooks/components, nothing is mocked.
 
-const BG = '#050A0B';
-const CARD = 'linear-gradient(160deg, #0F1819 0%, #0B1213 100%)';
+// CSS variables (with the usual colours as fallbacks) so the photo backdrop look shows through.
+const BG = 'var(--rd-bg, #050A0B)';
+const CARD = 'var(--rd-card, linear-gradient(160deg, #0F1819 0%, #0B1213 100%))';
 const GREEN = '#81B64C';
 const GREEN_DARK = '#5F8F36';
 const MUTED = '#87918E';
@@ -235,7 +236,7 @@ export function DashboardRedesign() {
         <section
           className="relative min-h-[340px] overflow-hidden rounded-[20px]"
           style={{
-            background: BG,
+            backgroundColor: '#050A0B',
             border: `1px solid ${BORDER}`,
             backgroundImage: `url(${siteImg(asset('scout-knight.webp'))})`,
             backgroundSize: 'auto 100%',
@@ -294,7 +295,7 @@ export function DashboardRedesign() {
               href={t.href}
               className="relative block min-h-[128px] overflow-hidden rounded-[18px] transition-transform active:scale-[.98]"
               style={{
-                background: BG,
+                backgroundColor: '#050A0B',
                 border: `1px solid ${BORDER}`,
                 backgroundImage: `url(${siteImg(asset(t.img))})`,
                 backgroundSize: 'auto 100%',

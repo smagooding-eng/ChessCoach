@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Link } from 'wouter';
 import { ArrowLeft, Check, Save, Trash2, RotateCcw, Star, Volume2 } from 'lucide-react';
-import { playSound } from '@/lib/sounds';
+import { playSound, SOUND_GROUPS } from '@/lib/sounds';
+import { BOARD_GROUPS, boardGroupOf } from '@/lib/boardGroups';
 import { useDashboardRedesignFlag } from '@/hooks/use-app-config';
 import { RedesignHeader } from '@/components/RedesignHeader';
 import { RD, REDESIGN_ON } from '@/lib/redesignTheme';
@@ -69,9 +70,10 @@ function ColorPickerRow({ label, value, onChange }: { label: string; value: stri
 
 // Plays a short sample of a sound pack: a move, a capture, then a check.
 function previewSoundPack(pack: SoundPack) {
+  const gap = SOUND_PACKS[pack]?.group === 'natural' ? 560 : 380;
   playSound('move', pack);
-  setTimeout(() => playSound('capture', pack), 380);
-  setTimeout(() => playSound('check', pack), 800);
+  setTimeout(() => playSound('capture', pack), gap);
+  setTimeout(() => playSound('check', pack), gap * 2.1);
 }
 
 export default function SettingsPage() {
@@ -123,6 +125,8 @@ export default function SettingsPage() {
     if (redesign && isPhotoBoard(boardTexture)) setBoardTexture('flat');
   };
   const [themeType, setThemeType] = useState<string>(() => themeTypeOf(pieceShape));
+  const [boardGroup, setBoardGroup] = useState<string>(() => boardGroupOf(boardTexture));
+  const activeBoardGroup = BOARD_GROUPS.find((g) => g.id === boardGroup) ?? BOARD_GROUPS[0];
   const activeType = PIECE_THEME_TYPES.find((t) => t.id === themeType) ?? PIECE_THEME_TYPES[0];
 
   // One piece-set swatch, shared by the Theme section: the knight of each side, so sets can be told apart
@@ -227,43 +231,40 @@ export default function SettingsPage() {
 
       {redesign && (
         <section className={vis('boards')}>
-          <div className="mb-1 flex items-center gap-2">
-            <h2 className="text-sm font-black uppercase tracking-wide" style={{ color: TEXT_MUTED }}>Signature Boards</h2>
-            <span className="rounded-md px-1.5 py-0.5 text-[10px] font-extrabold" style={{ background: 'rgba(129,182,76,.14)', color: RD.green }}>NEW</span>
+          <h2 className="text-sm font-black uppercase tracking-wide mb-1" style={{ color: TEXT_MUTED }}>Boards</h2>
+          <p className="text-xs mb-4" style={{ color: TEXT_MUTED }}>Choose a material, then a board.</p>
+          <div className="-mx-1 mb-2 overflow-x-auto px-1">
+            <div className="flex min-w-max gap-1 rounded-[14px] p-1" style={{ background: RD.cardSolid, border: `1px solid ${RD.border}` }}>
+              {BOARD_GROUPS.map((g) => {
+                const on = g.id === activeBoardGroup.id;
+                const count = g.id === 'classic' ? Object.keys(BOARD_THEMES).length + 1 : g.boards.filter((k) => BOARD_TEXTURES[k]).length;
+                return (
+                  <button key={g.id} onClick={() => setBoardGroup(g.id)} aria-pressed={on} className="whitespace-nowrap rounded-[10px] px-3 py-2 text-[13px] font-bold transition-colors"
+                    style={on ? { background: 'rgba(129,182,76,.10)', color: RD.text, boxShadow: `inset 0 0 0 1.5px ${RD.green}` } : { background: 'transparent', color: RD.muted }}>
+                    {g.label} <span className="text-[11px] opacity-70">{count}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
-          <p className="text-xs mb-3" style={{ color: TEXT_MUTED }}>Our new photographic collection — woods, marbles, stone, leather, felt and metal.</p>
-          <div className={`grid grid-cols-4 gap-2 ${redesign ? 'lg:grid-cols-8' : ''}`}>
-            {(Object.keys(BOARD_TEXTURES) as BoardTexture[]).filter((key) => key.startsWith('ex-')).map((key) => {
-              const t = BOARD_TEXTURES[key];
-              const img = t.thumb ?? t.boardImage;
-              return (
-                <SwatchButton key={key} active={boardTexture === key} onClick={() => setBoardTexture(key)} label={t.label}>
-                  <div className="w-full aspect-square rounded-lg" style={{ backgroundImage: img ? `url('${img}')` : t.backgroundImage, backgroundSize: '100% 100%', border: '1px solid rgba(255,255,255,0.1)' }} />
-                </SwatchButton>
-              );
-            })}
-          </div>
+          <p className="text-xs mb-3" style={{ color: TEXT_MUTED }}>{activeBoardGroup.blurb}</p>
+          {activeBoardGroup.id !== 'classic' && (
+            <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-8">
+              {activeBoardGroup.boards.filter((k) => BOARD_TEXTURES[k]).map((key) => {
+                const t = BOARD_TEXTURES[key];
+                const img = t.thumb ?? t.boardImage;
+                return (
+                  <SwatchButton key={key} active={boardTexture === key} onClick={() => setBoardTexture(key)} label={t.label}>
+                    <div className="w-full aspect-square rounded-lg" style={{ backgroundImage: img ? `url('${img}')` : t.backgroundImage, backgroundSize: '100% 100%', border: '1px solid rgba(255,255,255,0.1)' }} />
+                  </SwatchButton>
+                );
+              })}
+            </div>
+          )}
         </section>
       )}
 
-      {redesign && (
-        <section className={vis('boards')}>
-          <h2 className="text-sm font-black uppercase tracking-wide mb-1" style={{ color: TEXT_MUTED }}>Premium Boards</h2>
-          <p className="text-xs mb-3" style={{ color: TEXT_MUTED }}>The original photographic set. These replace your board color.</p>
-          <div className={`grid grid-cols-4 gap-2 ${redesign ? 'lg:grid-cols-8' : ''}`}>
-            {(Object.keys(BOARD_TEXTURES) as BoardTexture[]).filter((key) => key.startsWith('cs-')).map((key) => {
-              const t = BOARD_TEXTURES[key];
-              return (
-                <SwatchButton key={key} active={boardTexture === key} onClick={() => setBoardTexture(key)} label={t.label}>
-                  <div className="w-full aspect-square rounded-lg" style={{ backgroundImage: t.boardImage ? `url('${t.boardImage}')` : t.backgroundImage, backgroundSize: '100% 100%', border: '1px solid rgba(255,255,255,0.1)' }} />
-                </SwatchButton>
-              );
-            })}
-          </div>
-        </section>
-      )}
-
-      <section className={vis('boards')}>
+      <section className={vis('boards') + (redesign && activeBoardGroup.id !== 'classic' ? ' hidden' : '')}>
         <h2 className="text-sm font-black uppercase tracking-wide mb-1" style={{ color: TEXT_MUTED }}>{redesign ? 'Classic Boards' : 'Board Color'}</h2>
         {redesign && <p className="text-xs mb-3" style={{ color: TEXT_MUTED }}>Plain two-tone boards, or pick your own colors with Custom.</p>}
         {!redesign && <div className="mb-2" />}
@@ -294,7 +295,7 @@ export default function SettingsPage() {
         )}
       </section>
 
-      <section className={vis('boards')}>
+      <section className={vis('boards') + (redesign && activeBoardGroup.id !== 'classic' ? ' hidden' : '')}>
         <h2 className="text-sm font-black uppercase tracking-wide mb-1" style={{ color: TEXT_MUTED }}>{redesign ? 'Classic Board Texture' : 'Board Texture'}</h2>
         <p className="text-xs mb-3" style={{ color: TEXT_MUTED }}>A subtle surface pattern on top of your board color</p>
         <div className={`grid grid-cols-4 gap-2 ${redesign ? 'lg:grid-cols-8' : ''}`}>
@@ -546,8 +547,12 @@ export default function SettingsPage() {
         <p className="text-xs mb-3" style={{ color: TEXT_MUTED }}>
           {soundEnabled ? 'Moves, captures, checks, castling, promotions and game end each get their own sound. Tap to preview.' : 'Move Sounds is off — turn it on above to hear these during play.'}
         </p>
+        {SOUND_GROUPS.map((grp) => (
+        <div key={grp.id} className="mb-3">
+        <p className="text-[11px] font-black uppercase tracking-[0.14em] mb-1" style={{ color: grp.id === 'natural' ? CHESSCOM_GREEN : TEXT_MUTED }}>{grp.label}</p>
+        <p className="text-[11px] mb-2" style={{ color: TEXT_MUTED }}>{grp.blurb}</p>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-          {(Object.keys(SOUND_PACKS) as SoundPack[]).map((key) => {
+          {(Object.keys(SOUND_PACKS) as SoundPack[]).filter((key) => SOUND_PACKS[key].group === grp.id).map((key) => {
             const t = SOUND_PACKS[key];
             const on = soundPack === key;
             return (
@@ -562,6 +567,8 @@ export default function SettingsPage() {
             );
           })}
         </div>
+        </div>
+        ))}
       </section>
 
       <button

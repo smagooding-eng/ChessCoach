@@ -23,6 +23,8 @@ const CHESSCOM_GREEN = 'var(--cs-green, #81b64c)';
 const BG_DARK = 'var(--cs-bg-dark, #262421)';
 const BG_SIDEBAR = 'var(--cs-bg-sidebar, #1e1c1a)';
 const BG_CARD = 'var(--cs-bg-card, #302e2b)';
+// Pop-up panels (More sheet, profile menu) stay solid even with the see-through photo look.
+const PANEL_SOLID = 'var(--cs-panel-solid, var(--cs-bg-card, #302e2b))';
 const TEXT_LIGHT = 'var(--cs-text-light, #e8e6e3)';
 const TEXT_MUTED = 'var(--cs-text-muted, #9e9b98)';
 const BORDER_COLOR = 'var(--cs-border, rgba(129,182,76,0.06))';
@@ -367,7 +369,7 @@ export function Layout({ children, fullscreen }: { children: React.ReactNode; fu
               exit={{ opacity: 0, height: 0 }}
               transition={{ duration: 0.2 }}
               className="overflow-hidden"
-              style={{ background: BG_CARD, borderBottom: `1px solid ${BORDER_COLOR}` }}
+              style={{ background: PANEL_SOLID, borderBottom: `1px solid ${BORDER_COLOR}` }}
             >
               <div className="px-3 py-2 space-y-0.5">
                 <Link href="/profile" className="block">
@@ -453,7 +455,7 @@ export function Layout({ children, fullscreen }: { children: React.ReactNode; fu
             <motion.div
               key="more-sheet"
               className="md:hidden fixed bottom-0 left-0 right-0 z-[70] rounded-t-2xl"
-              style={{ background: BG_CARD, borderTop: `1px solid ${BORDER_COLOR}` }}
+              style={{ background: PANEL_SOLID, borderTop: `1px solid ${BORDER_COLOR}` }}
               initial={{ y: '100%' }}
               animate={{ y: 0 }}
               exit={{ y: '100%' }}
