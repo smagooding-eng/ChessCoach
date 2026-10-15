@@ -54,18 +54,20 @@ function BellIcon(props: React.SVGProps<SVGSVGElement>) {
 const REDESIGN_NAV_ICON: Record<string, React.ElementType> = {
   '/': HouseIcon,
   '/opponents': Target,
+  '/play': Play,
   '/games': Swords,
   '/analysis': BarChart3,
 };
 
 const PRIMARY_NAV = [
+  // The first four are the bottom bar (and the swipe order): Home, Play, Games, Analysis.
   { href: '/',          label: 'Home',            icon: LayoutDashboard },
-  { href: '/opponents', label: 'Opponent Scout',  icon: Swords },
+  { href: '/play',      label: 'Play',            icon: Play },
   { href: '/games',     label: 'Games',           icon: History },
   { href: '/analysis',  label: 'Analysis',        icon: BrainCircuit },
+  { href: '/opponents', label: 'Opponent Scout',  icon: Swords },
   { href: '/puzzles',   label: 'Puzzles',         icon: Puzzle },
   { href: '/lookup',    label: 'Game Lookup',     icon: Search },
-  { href: '/play',      label: 'Play Local',      icon: Play },
   { href: '/scan',      label: 'Scan Position',   icon: Camera, badge: 'NEW' },
 ];
 
@@ -165,7 +167,7 @@ export function Layout({ children, fullscreen }: { children: React.ReactNode; fu
   const [moreOpen, setMoreOpen] = useState(false);
 
   // Swipe left/right between menus on phones: a page's own tabs first, then
-  // the bottom-nav sections (Home, Scout, Games, Analysis).
+  // the bottom-nav sections (Home, Play, Games, Analysis).
   const mainRef = useRef<HTMLElement | null>(null);
   const swipeState = useRef({ location, moreOpen });
   swipeState.current = { location, moreOpen };
@@ -477,7 +479,7 @@ export function Layout({ children, fullscreen }: { children: React.ReactNode; fu
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bottom-nav-safe" style={{ background: BG_SIDEBAR_97, borderTop: `1px solid ${BORDER_COLOR}`, backdropFilter: 'blur(16px)' }}>
         <div className="flex items-stretch">
           {PRIMARY_NAV.slice(0, 4).map(item => {
-            const isActive = location === item.href;
+            const isActive = location === item.href || (item.href !== '/' && location.startsWith(item.href + '/'));
             const NavIcon: React.ElementType = redesign ? (REDESIGN_NAV_ICON[item.href] ?? item.icon) : item.icon;
             return (
               <Link key={item.href} href={item.href} className="flex-1">

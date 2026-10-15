@@ -5,7 +5,7 @@ import { useEffect } from 'react';
 // Layout listens for horizontal swipes anywhere on the page. A page with its
 // own tab bar registers it with useSwipeTabs(); a swipe first moves through
 // those tabs, and once you're at the first/last tab it moves to the previous/
-// next section in the bottom nav (Home, Scout, Games, Analysis).
+// next section in the bottom nav (Home, Play, Games, Analysis).
 //
 // Swipes are ignored when they start on a chessboard, a text field, a slider,
 // something that scrolls sideways, or anything marked data-no-swipe.

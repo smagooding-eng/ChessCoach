@@ -409,14 +409,14 @@ function PageLoadingFallback() {
   return <PageLoader />;
 }
 
-// The four swipeable sections (Home, Scout, Games, Analysis) are fetched in
+// The four swipeable sections (Home, Play, Games, Analysis) are fetched in
 // the background once the app is idle, so swiping between them never waits
 // on a download (which used to flash the loader mid-swipe).
 function usePrefetchSections() {
   useEffect(() => {
     const go = () => {
       void import("@/pages/DashboardRedesign").catch(() => {});
-      void import("@/pages/OpponentAnalysis").catch(() => {});
+      void import("@/pages/PlayHub").catch(() => {});
       void import("@/pages/GamesRedesign").catch(() => {});
       void import("@/pages/AnalysisRedesign").catch(() => {});
     };
