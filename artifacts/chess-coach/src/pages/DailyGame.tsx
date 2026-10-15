@@ -226,7 +226,7 @@ export function DailyGame() {
               yourColor={mySide}
               subtitle={HOW[game.termination ?? ''] ?? game.termination ?? undefined}
               ratingDelta={myRating != null && after != null ? after - myRating : null}
-              delayMs={game.termination === 'checkmate' ? 1400 : 250}
+              delayMs={game.termination === 'checkmate' ? 500 : 250}
               actions={<>
                 <OverlayButton primary onClick={() => navigate(reviewId ? `/games/${reviewId}` : '/games')}>Review game</OverlayButton>
                 <OverlayButton onClick={() => navigate('/daily')}>Daily games</OverlayButton>

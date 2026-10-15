@@ -406,7 +406,7 @@ export function LocalPlay() {
                 yourColor={result === 'black' ? 'black' : 'white'}
                 title={result === 'draw' ? 'Draw!' : `${result === 'white' ? 'White' : 'Black'} wins!`}
                 subtitle={chess.isCheckmate() ? 'by checkmate' : chess.isStalemate() ? 'by stalemate' : chess.isThreefoldRepetition() ? 'by repetition' : chess.isInsufficientMaterial() ? 'insufficient material' : hasTimer && whiteTime === 0 ? 'White ran out of time' : hasTimer && blackTime === 0 ? 'Black ran out of time' : `${result === 'white' ? 'Black' : 'White'} resigned`}
-                delayMs={chess.isCheckmate() ? 1400 : 250}
+                delayMs={chess.isCheckmate() ? 500 : 250}
                 actions={<>
                   {timeControl && <OverlayButton primary onClick={() => startGame(timeControl)}><RotateCcw className="w-4 h-4" /> Rematch</OverlayButton>}
                   <OverlayButton onClick={resetGame}>New game</OverlayButton>

@@ -600,7 +600,9 @@ export function ChessBoard({
           king, crimson mark on the mated king, and a brief ribbon. */}
       {/* Overlays live in a square box matching the board itself, so they stay
           aligned even when the promotion picker / confirm bar below adds height. */}
-      {checkmateInfo && (
+      {/* Not shown when a game-over card is on the board: the card tells the
+          story (the losing king topples), so the board stays clean. */}
+      {checkmateInfo && !boardOverlay && (
         <div className="absolute inset-x-0 top-0 aspect-square pointer-events-none">
         <CheckmateOverlay
           winningKingSquare={checkmateInfo.winningKingSquare}
