@@ -1072,20 +1072,38 @@ export function GameReplay() {
           })()}
 
           {redesign && (
-            <div className="order-[-4] xl:order-none grid grid-cols-3 gap-1 rounded-[16px] p-1" style={{ background: RD.cardSolid, border: `1px solid ${RD.border}` }}>
-              {([
-                ['analysis', 'Analysis'],
-                ['moments', `Key Moments${keyMoments.length ? ` (${keyMoments.length})` : ''}`],
-                ['report', 'Report'],
-              ] as const).map(([id, label]) => {
-                const active = gtab === id;
-                return (
-                  <button key={id} onClick={() => setGtab(id)} className="rounded-[12px] py-2 text-[13.5px] font-bold transition-colors"
-                    style={active ? { background: 'rgba(255,255,255,.08)', color: RD.text, boxShadow: `inset 0 0 0 1.5px ${RD.green}` } : { background: 'transparent', color: RD.muted }}>
-                    {label}
-                  </button>
-                );
-              })}
+            <div className="order-[-4] xl:order-none flex items-center gap-1 rounded-[16px] p-1" style={{ background: RD.cardSolid, border: `1px solid ${RD.border}` }}>
+              <div className="grid min-w-0 flex-1 grid-cols-3 gap-1">
+                {([
+                  ['analysis', 'Analysis'],
+                  ['moments', `Moments${keyMoments.length ? ` (${keyMoments.length})` : ''}`],
+                  ['report', 'Report'],
+                ] as const).map(([id, label]) => {
+                  const active = gtab === id;
+                  return (
+                    <button key={id} onClick={() => setGtab(id)} className="truncate rounded-[12px] px-1 py-2 text-[13px] font-bold transition-colors"
+                      style={active ? { background: 'rgba(255,255,255,.08)', color: RD.text, boxShadow: `inset 0 0 0 1.5px ${RD.green}` } : { background: 'transparent', color: RD.muted }}>
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+              {/* Flip board and Review / Re-analyze live up here, freeing a row under the board. */}
+              <button onClick={() => setFlipped(f => !f)} title="Flip board" aria-label="Flip board"
+                className="grid h-9 w-9 shrink-0 place-items-center rounded-[11px] transition-transform active:scale-90" style={{ background: 'rgba(255,255,255,.06)', color: RD.text }}>
+                <FlipVertical2 className="h-[18px] w-[18px]" />
+              </button>
+              <button
+                onClick={() => handleReview(reviewMoves.length > 0)}
+                disabled={reviewing}
+                title={reviewing ? 'Reviewing…' : reviewMoves.length > 0 ? (needsContinuationBackfill ? 'Re-analyze to add engine continuation lines' : 'Re-analyze with the latest engine') : 'Review game'}
+                aria-label={reviewMoves.length > 0 ? 'Re-analyze' : 'Review game'}
+                className={`grid h-9 w-9 shrink-0 place-items-center rounded-[11px] transition-transform active:scale-90 disabled:opacity-60 ${needsContinuationBackfill && !reviewing ? 'animate-pulse' : ''}`}
+                style={reviewMoves.length > 0 || reviewing ? { background: 'rgba(255,255,255,.06)', color: RD.text } : { background: RD.green, color: '#FFFFFF' }}>
+                {reviewing
+                  ? <div className="h-4 w-4 animate-spin rounded-full border-2 border-t-transparent" style={{ borderColor: RD.green, borderTopColor: 'transparent' }} />
+                  : reviewMoves.length > 0 ? <RotateCcw className="h-[17px] w-[17px]" /> : <BrainCircuit className="h-[18px] w-[18px]" />}
+              </button>
             </div>
           )}
 
@@ -1130,7 +1148,7 @@ export function GameReplay() {
               doesn't shift up/down when navigating between bad and good moves. */}
           <div
             ref={boardAnchorRef}
-            className={`scroll-mt-16 mx-auto w-full ${redesign ? '[--bw:calc(100dvh-520px)] md:[--bw:calc(100dvh-290px)]' : 'max-w-[min(100%,52dvh)] md:max-w-[min(100%,55dvh)] xl:max-w-none'} order-[-3] xl:order-none`}
+            className={`scroll-mt-16 mx-auto w-full ${redesign ? '[--bw:100vw] md:[--bw:calc(100dvh-290px)]' : 'max-w-[min(100%,52dvh)] md:max-w-[min(100%,55dvh)] xl:max-w-none'} order-[-3] xl:order-none`}
             // Phones reserve room under the board for the coach card; on
             // desktop the move list and coach sit beside it, so the board only
             // gives up room for the header and the controls row (was the phone
@@ -1211,7 +1229,7 @@ export function GameReplay() {
               })()}
             />
 
-            <div className={`flex items-center gap-0.5 md:gap-2 ${redesign ? 'w-full' : ''}`}>
+            <div className={`flex items-center gap-0.5 md:gap-2 ${redesign ? 'hidden' : ''}`}>
               <span className={redesign ? 'mr-auto text-[13px] font-semibold' : 'text-[10px] md:text-xs text-muted-foreground font-mono'} style={redesign ? { color: RD.muted } : undefined}>{redesign ? `Move ${currentMove} / ${maxMoves}` : `${currentMove}/${maxMoves}`}</span>
 
               <button onClick={() => setFlipped(f => !f)} title="Flip board"
