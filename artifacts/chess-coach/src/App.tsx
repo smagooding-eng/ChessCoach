@@ -417,12 +417,19 @@ function AppBackgroundWrapper({ children }: { children: React.ReactNode }) {
     const el = document.documentElement;
     el.classList.toggle('cs-photo', !!photo);
     if (photo) el.dataset.glass = cardGlass; else delete el.dataset.glass;
+    // bright backdrops (white, green) get firmer cards and shadowed text
+    if (photo?.tone === 'light') el.dataset.tone = 'light'; else delete el.dataset.tone;
   }, [photo, cardGlass]);
+  // Per-backdrop blur/shade (plain colours and boards aren't blurred).
+  const backdropVars = photo ? {
+    ...(photo.blur != null ? { '--photo-blur': `${photo.blur}px` } : {}),
+    ...(photo.shade != null ? { '--photo-shade': String(photo.shade) } : {}),
+  } as React.CSSProperties : undefined;
   return (
     <div style={{ minHeight: '100vh', ...(photo ? {} : appBackgroundCss) }}>
       {photo && (
-        <div className="cs-photo-backdrop" aria-hidden="true">
-          <div className="cs-photo-backdrop-img" style={{ backgroundImage: `url("${photo.src}")` }} />
+        <div className="cs-photo-backdrop" aria-hidden="true" style={backdropVars}>
+          <div className="cs-photo-backdrop-img" style={photo.css ? { background: photo.css } : { backgroundImage: `url("${photo.src}")` }} />
           <div className="cs-photo-backdrop-shade" />
         </div>
       )}

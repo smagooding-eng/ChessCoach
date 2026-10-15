@@ -16,19 +16,53 @@ export type AppBackground = 'default' | 'warm-gradient' | 'cool-gradient' | 'noi
 export type UiStyle = 'standard' | 'photo';
 export type CardGlass = 'light' | 'medium' | 'strong';
 
-/** Photos you can put behind the app (UiStyle 'photo'). */
-export const BG_PHOTOS: { id: string; label: string; src: string }[] = [
-  { id: 'library', label: 'Classic set', src: '/photo/assets/courses/course-library.webp' },
-  { id: 'golden-knight', label: 'Golden hour', src: '/photo/assets/courses/course-training-hero.webp' },
-  { id: 'lone-king', label: 'Lone king', src: '/photo/assets/courses/course-endgame.webp' },
-  { id: 'blue-knight', label: 'Blue knight', src: '/photo/assets/courses/course-opening.webp' },
-  { id: 'face-off', label: 'Face-off', src: '/photo/assets/courses/course-tactical.webp' },
-  { id: 'fire', label: 'Fire', src: '/photo/assets/courses/course-discovered.webp' },
-  { id: 'army', label: 'The army', src: '/photo/chessscout/scenes/hero-lookup.webp' },
-  { id: 'sunset', label: 'Sunset', src: '/photo/chessscout/scenes/hero-endgames.webp' },
-  { id: 'wood', label: 'Wooden board', src: '/photo/chessscout/scenes/profile-card.webp' },
-  { id: 'red-board', label: 'Red board', src: '/photo/chessscout/scenes/play-online.webp' },
-  { id: 'silver', label: 'Silver', src: '/photo/chessscout/scenes/play-daily.webp' },
+/** A backdrop behind the app (UiStyle 'photo'): one of our photos, a plain
+ *  colour, or one of our chess boards. `src` is an image; `css` is a CSS
+ *  background used instead (plain colours, square patterns). `blur`/`shade`
+ *  override the card-transparency defaults; `tone: 'light'` is for bright
+ *  backdrops (stronger cards, shadowed text). */
+export type BgBackdrop = {
+  id: string; label: string; group: 'photo' | 'colour' | 'board';
+  src?: string; css?: string; thumb?: string;
+  blur?: number; shade?: number; tone?: 'light' | 'dark';
+};
+const checker = (light: string, dark: string) =>
+  `repeating-conic-gradient(${dark} 0 25%, ${light} 0 50%) 0 0 / min(25vw, 25vh) min(25vw, 25vh)`;
+const boardBg = (id: string, file: string, label: string, thumb = false): BgBackdrop =>
+  ({ id, label, group: 'board', src: `/boards/${file}.webp`, thumb: thumb ? `/boards/${file}-thumb.webp` : undefined, blur: 1 });
+
+/** Backdrops you can put behind the app (UiStyle 'photo'). */
+export const BG_PHOTOS: BgBackdrop[] = [
+  { id: 'library', label: 'Classic set', group: 'photo', src: '/photo/assets/courses/course-library.webp' },
+  { id: 'golden-knight', label: 'Golden hour', group: 'photo', src: '/photo/assets/courses/course-training-hero.webp' },
+  { id: 'lone-king', label: 'Lone king', group: 'photo', src: '/photo/assets/courses/course-endgame.webp' },
+  { id: 'blue-knight', label: 'Blue knight', group: 'photo', src: '/photo/assets/courses/course-opening.webp' },
+  { id: 'face-off', label: 'Face-off', group: 'photo', src: '/photo/assets/courses/course-tactical.webp' },
+  { id: 'fire', label: 'Fire', group: 'photo', src: '/photo/assets/courses/course-discovered.webp' },
+  { id: 'army', label: 'The army', group: 'photo', src: '/photo/chessscout/scenes/hero-lookup.webp' },
+  { id: 'sunset', label: 'Sunset', group: 'photo', src: '/photo/chessscout/scenes/hero-endgames.webp' },
+  { id: 'wood', label: 'Wooden board', group: 'photo', src: '/photo/chessscout/scenes/profile-card.webp' },
+  { id: 'red-board', label: 'Red board', group: 'photo', src: '/photo/chessscout/scenes/play-online.webp' },
+  { id: 'silver', label: 'Silver', group: 'photo', src: '/photo/chessscout/scenes/play-daily.webp' },
+  // plain colours
+  { id: 'solid-black', label: 'Black', group: 'colour', css: '#000000', blur: 0, shade: 0 },
+  { id: 'solid-white', label: 'White', group: 'colour', css: '#F4F5F3', blur: 0, shade: 0, tone: 'light' },
+  { id: 'solid-green', label: 'ChessScout green', group: 'colour', css: '#81B64C', blur: 0, shade: 0.12, tone: 'light' },
+  // our boards: photographic sets
+  boardBg('board-walnut', 'walnut', 'Walnut'),
+  boardBg('board-emerald', 'emerald', 'Emerald Marble'),
+  boardBg('board-obsidian', 'obsidian', 'Obsidian'),
+  boardBg('board-tournament', 'tournament', 'Tournament'),
+  boardBg('board-green-felt', 'green-felt', 'Green Felt', true),
+  boardBg('board-nero-gold', 'nero-gold', 'Nero Gold', true),
+  boardBg('board-grigio', 'grigio-marble', 'Grigio Marble', true),
+  boardBg('board-classic-oak', 'classic-oak', 'Classic Oak', true),
+  // our boards: colour sets as a square pattern
+  { id: 'squares-classic', label: 'Classic Wood squares', group: 'board', css: checker('#f0d9b5', '#b58863'), blur: 0 },
+  { id: 'squares-green', label: 'Green squares', group: 'board', css: checker('#eeeed2', '#769656'), blur: 0 },
+  { id: 'squares-blue', label: 'Ocean Blue squares', group: 'board', css: checker('#dee3e6', '#8ca2ad'), blur: 0 },
+  { id: 'squares-coal', label: 'Coal squares', group: 'board', css: checker('#d6d6d6', '#2b2b2b'), blur: 0 },
+  { id: 'squares-midnight', label: 'Midnight squares', group: 'board', css: checker('#c9ccd6', '#1a1d29'), blur: 0 },
 ];
 export const CARD_GLASS: Record<CardGlass, { label: string; sub: string }> = {
   light: { label: 'See-through', sub: 'Most of the photo' },

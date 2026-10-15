@@ -401,7 +401,7 @@ export default function SettingsPage() {
 
       <section className={vis('themes')}>
         <h2 className="text-sm font-black uppercase tracking-wide mb-1" style={{ color: TEXT_MUTED }}>App Look</h2>
-        <p className="text-xs mb-3" style={{ color: TEXT_MUTED }}>Solid cards, or one of our photos behind every page with see-through cards</p>
+        <p className="text-xs mb-3" style={{ color: TEXT_MUTED }}>Solid cards, or a photo, colour or chess board behind every page with see-through cards</p>
         <div className="grid grid-cols-2 gap-2 md:max-w-[520px]">
           {([
             { id: 'standard' as const, label: 'Standard' },
@@ -413,7 +413,9 @@ export default function SettingsPage() {
                 <div className="relative w-full overflow-hidden rounded-lg" style={{ aspectRatio: '16 / 10', background: '#050A0B', border: '1px solid rgba(255,255,255,0.1)' }}>
                   {o.id === 'photo' && (
                     <>
-                      <img src={sample.src} alt="" className="cs-keep-img absolute inset-0 h-full w-full object-cover" style={{ filter: 'blur(1.5px)' }} />
+                      {sample.css
+                        ? <div className="absolute inset-0" style={{ background: sample.css, backgroundSize: '25% 40%' }} />
+                        : <img src={sample.thumb ?? sample.src} alt="" className="cs-keep-img absolute inset-0 h-full w-full object-cover" style={{ filter: 'blur(1.5px)' }} />}
                       <div className="absolute inset-0" style={{ background: 'rgba(5,10,11,.45)' }} />
                     </>
                   )}
@@ -427,25 +429,29 @@ export default function SettingsPage() {
         </div>
         {uiStyle === 'photo' && (
           <div className="mt-4 space-y-4">
-            <div>
-              <p className="text-xs font-bold mb-2" style={{ color: TEXT_LIGHT }}>Photo</p>
+            {([['photo', 'Photo'], ['colour', 'Colour'], ['board', 'Chess board']] as const).map(([group, title]) => (
+            <div key={group}>
+              <p className="text-xs font-bold mb-2" style={{ color: TEXT_LIGHT }}>{title}</p>
               <div className="grid grid-cols-3 gap-2 md:grid-cols-6">
-                {BG_PHOTOS.map((p) => {
+                {BG_PHOTOS.filter((p) => p.group === group).map((p) => {
                   const on = bgPhoto === p.id;
                   return (
                     <button key={p.id} onClick={() => setBgPhoto(p.id)} aria-label={p.label}
                       className="group relative overflow-hidden rounded-xl text-left"
                       style={{ aspectRatio: '4 / 3', border: on ? `2px solid ${CHESSCOM_GREEN}` : '1px solid rgba(255,255,255,0.1)' }}>
-                      <img src={p.src} alt="" loading="lazy" className="cs-keep-img absolute inset-0 h-full w-full object-cover transition-transform group-hover:scale-105" />
+                      {p.css
+                        ? <span className="absolute inset-0" style={{ background: p.css, backgroundSize: '25% 33.4%' }} />
+                        : <img src={p.thumb ?? p.src} alt="" loading="lazy" className="cs-keep-img absolute inset-0 h-full w-full object-cover transition-transform group-hover:scale-105" />}
                       <span className="absolute inset-x-0 bottom-0 flex items-center gap-1 px-2 pb-1.5 pt-4 text-[11px] font-bold text-white"
                         style={{ background: 'linear-gradient(transparent, rgba(0,0,0,.75))' }}>
-                        {on && <Check className="w-3 h-3 shrink-0" style={{ color: CHESSCOM_GREEN }} />} {p.label}
+                        {on && <Check className="w-3 h-3 shrink-0" style={{ color: CHESSCOM_GREEN }} />} <span className="truncate">{p.label}</span>
                       </span>
                     </button>
                   );
                 })}
               </div>
             </div>
+            ))}
             <div>
               <p className="text-xs font-bold mb-2" style={{ color: TEXT_LIGHT }}>Card transparency</p>
               <div className="grid grid-cols-3 gap-2 md:max-w-[520px]">

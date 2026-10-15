@@ -578,6 +578,11 @@ html.cs-photo { background: #050A0B; --glass-a: .7; --photo-shade: .5; --photo-b
 html.cs-photo[data-glass="light"]  { --glass-a: .5; --photo-shade: .42; --photo-blur: 2px; }
 html.cs-photo[data-glass="medium"] { --glass-a: .7; --photo-shade: .5;  --photo-blur: 3px; }
 html.cs-photo[data-glass="strong"] { --glass-a: .86; --photo-shade: .58; --photo-blur: 5px; }
+/* Bright backdrops (white, our green): cards stay dark enough to read, and
+   text sitting straight on the backdrop gets a soft shadow. */
+html.cs-photo[data-tone="light"] { --glass-a: .88; }
+html.cs-photo[data-tone="light"][data-glass="light"] { --glass-a: .8; }
+html.cs-photo[data-tone="light"] body { text-shadow: 0 0 1px rgba(0,0,0,.95), 0 1px 2px rgba(0,0,0,.85), 0 0 8px rgba(0,0,0,.5); }
 html.cs-photo {
   /* redesigned pages (lib/redesignTheme RD.*) */
   --rd-bg: transparent;
