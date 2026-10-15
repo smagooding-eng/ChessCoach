@@ -2161,6 +2161,7 @@ type GameWindows = { today: number; yesterday: number; week: number; d30: number
 function GamesPlayedPanel() {
   const [data, setData] = useState<{ live: GameWindows; livePeople: GameWindows; daily: GameWindows } | null>(null);
   const [error, setError] = useState('');
+  const [win, setWin] = useState<keyof GameWindows>('week');
   const load = useCallback(() => {
     setError('');
     apiFetch('/api/admin/game-stats', { credentials: 'include' })
@@ -2195,15 +2196,101 @@ function GamesPlayedPanel() {
               {rows.map(([label, sub, w]) => (
                 <tr key={label} className="border-t border-border/30">
                   <td className="py-2.5 pr-2"><p className="font-bold">{label}</p><p className="text-[11px] text-muted-foreground">{sub}</p></td>
-                  {cols.map(([k]) => <td key={k} className="py-2.5 px-2 text-right font-mono font-bold tabular-nums">{w ? (w[k] ?? 0).toLocaleString() : '…'}</td>)}
+                  {cols.map(([k]) => (
+                    <td key={k} className="py-2.5 px-2 text-right font-mono font-bold tabular-nums">
+                      {label === 'Daily games'
+                        ? (w ? (w[k] ?? 0).toLocaleString() : '…')
+                        : <button onClick={() => setWin(k)} className={`underline-offset-2 hover:underline ${win === k ? 'underline' : ''}`}>{w ? (w[k] ?? 0).toLocaleString() : '…'}</button>}
+                    </td>
+                  ))}
                 </tr>
               ))}
             </tbody>
           </table>
         )}
-        <p className="text-[11px] text-muted-foreground mt-2">Days run midnight to midnight US Eastern; the week starts Monday. Counted when the game finished.</p>
+        <p className="text-[11px] text-muted-foreground mt-2">Days run midnight to midnight US Eastern; the week starts Monday. Counted when the game finished. Tap a live-games number to see who played.</p>
+        <LiveGamePlayers windowKey={win} onWindow={setWin} labels={cols} />
       </div>
     </motion.div>
+  );
+}
+
+type LivePlayerRow = { username: string; user_id: string | null; games: number; vs_bots: number; vs_people: number; wins: number; losses: number; draws: number; last_played: string };
+type LiveGameRow = { id: string; mode: string; time_control: string; white_username: string; black_username: string; white_bot: boolean; black_bot: boolean; result: string; termination: string; finished_at: string };
+function LiveGamePlayers({ windowKey, onWindow, labels }: { windowKey: keyof GameWindows; onWindow: (w: keyof GameWindows) => void; labels: [keyof GameWindows, string][] }) {
+  const [data, setData] = useState<{ players: LivePlayerRow[]; games: LiveGameRow[] } | null>(null);
+  const [error, setError] = useState('');
+  const [showGames, setShowGames] = useState(false);
+  useEffect(() => {
+    setData(null); setError('');
+    apiFetch(`/api/admin/live-games?window=${windowKey}`, { credentials: 'include' })
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error('failed'))))
+      .then((d) => setData({ players: d.players ?? [], games: d.games ?? [] }))
+      .catch(() => setError('Could not load who played.'));
+  }, [windowKey]);
+  const when = (iso: string) => new Date(iso).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+  const name = (n: string, bot: boolean) => <span className={bot ? 'text-muted-foreground' : 'font-bold'}>{n}{bot ? ' (bot)' : ''}</span>;
+  return (
+    <div className="mt-4 border-t border-border/30 pt-3">
+      <div className="flex flex-wrap items-center gap-1.5 mb-3">
+        <span className="text-xs font-bold mr-1">Who played live games:</span>
+        {labels.map(([k, l]) => (
+          <button key={k} onClick={() => onWindow(k)} className={`rounded-full px-2.5 py-1 text-[11px] font-bold border ${windowKey === k ? 'border-primary text-foreground bg-white/[0.06]' : 'border-border/40 text-muted-foreground'}`}>{l}</button>
+        ))}
+      </div>
+      {error ? <p className="text-xs text-red-400">{error}</p> : !data ? <p className="text-xs text-muted-foreground">Loading…</p> : data.players.length === 0 ? (
+        <p className="text-xs text-muted-foreground">No live games in this period.</p>
+      ) : (
+        <>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[520px] text-[13px]">
+              <thead>
+                <tr className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                  <th className="text-left font-bold pb-1.5">Player</th>
+                  <th className="text-right font-bold pb-1.5 px-2">Games</th>
+                  <th className="text-right font-bold pb-1.5 px-2">vs people</th>
+                  <th className="text-right font-bold pb-1.5 px-2">vs bots</th>
+                  <th className="text-right font-bold pb-1.5 px-2">W / L / D</th>
+                  <th className="text-right font-bold pb-1.5 pl-2">Last played</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.players.map((p) => (
+                  <tr key={`${p.username}-${p.user_id ?? ''}`} className="border-t border-border/20">
+                    <td className="py-1.5 font-bold">{p.username}{!p.user_id && <span className="ml-1 text-[11px] font-normal text-muted-foreground">(guest)</span>}</td>
+                    <td className="py-1.5 px-2 text-right font-mono font-bold">{p.games}</td>
+                    <td className="py-1.5 px-2 text-right font-mono">{p.vs_people}</td>
+                    <td className="py-1.5 px-2 text-right font-mono">{p.vs_bots}</td>
+                    <td className="py-1.5 px-2 text-right font-mono">{p.wins} / {p.losses} / {p.draws}</td>
+                    <td className="py-1.5 pl-2 text-right text-muted-foreground">{when(p.last_played)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <button onClick={() => setShowGames((v) => !v)} className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-muted-foreground hover:text-foreground">
+            <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showGames ? 'rotate-180' : ''}`} /> {showGames ? 'Hide' : 'Show'} the games ({data.games.length}{data.games.length === 200 ? ', newest 200' : ''})
+          </button>
+          {showGames && (
+            <div className="mt-2 overflow-x-auto">
+              <table className="w-full min-w-[560px] text-[12.5px]">
+                <tbody>
+                  {data.games.map((g) => (
+                    <tr key={g.id} className="border-t border-border/20">
+                      <td className="py-1.5 pr-2 text-muted-foreground whitespace-nowrap">{when(g.finished_at)}</td>
+                      <td className="py-1.5 pr-2">{name(g.white_username, g.white_bot)} <span className="text-muted-foreground">vs</span> {name(g.black_username, g.black_bot)}</td>
+                      <td className="py-1.5 pr-2 font-mono whitespace-nowrap">{g.result === 'white' ? '1-0' : g.result === 'black' ? '0-1' : '½-½'}</td>
+                      <td className="py-1.5 pr-2 text-muted-foreground whitespace-nowrap">{g.time_control} · {g.mode}</td>
+                      <td className="py-1.5 text-muted-foreground whitespace-nowrap">{g.termination.replace(/_/g, ' ')}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
+      )}
+    </div>
   );
 }
 

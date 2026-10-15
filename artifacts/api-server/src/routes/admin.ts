@@ -120,6 +120,55 @@ router.get("/admin/game-stats", requireAdmin, async (_req: Request, res: Respons
   }
 });
 
+// Who played the live games in a period: each player's game count (people vs
+// bots) and the games themselves, newest first. Windows match /admin/game-stats.
+router.get("/admin/live-games", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const w = String(req.query.window ?? "week");
+    const dayStart = `(date_trunc('day', now() AT TIME ZONE 'America/New_York') AT TIME ZONE 'America/New_York')`;
+    const cond: Record<string, string> = {
+      today: `finished_at >= ${dayStart}`,
+      yesterday: `finished_at >= ${dayStart} - interval '1 day' AND finished_at < ${dayStart}`,
+      week: `finished_at >= (date_trunc('week', now() AT TIME ZONE 'America/New_York') AT TIME ZONE 'America/New_York')`,
+      d30: `finished_at >= now() - interval '30 days'`,
+      d90: `finished_at >= now() - interval '90 days'`,
+      all: `true`,
+    };
+    const where = sql.raw(cond[w] ?? cond.week);
+    const players = await db.execute(sql`
+      SELECT username, user_id,
+             count(*)::int AS games,
+             count(*) FILTER (WHERE vs_bot)::int AS vs_bots,
+             count(*) FILTER (WHERE NOT vs_bot)::int AS vs_people,
+             count(*) FILTER (WHERE outcome = 'win')::int AS wins,
+             count(*) FILTER (WHERE outcome = 'loss')::int AS losses,
+             count(*) FILTER (WHERE outcome = 'draw')::int AS draws,
+             max(finished_at) AS last_played
+      FROM (
+        SELECT white_username AS username, white_user_id AS user_id, (black_persona_id IS NOT NULL) AS vs_bot, finished_at,
+               CASE WHEN result = 'white' THEN 'win' WHEN result = 'black' THEN 'loss' ELSE 'draw' END AS outcome
+        FROM live_games WHERE ${where} AND white_persona_id IS NULL
+        UNION ALL
+        SELECT black_username, black_user_id, (white_persona_id IS NOT NULL), finished_at,
+               CASE WHEN result = 'black' THEN 'win' WHEN result = 'white' THEN 'loss' ELSE 'draw' END
+        FROM live_games WHERE ${where} AND black_persona_id IS NULL
+      ) p
+      GROUP BY username, user_id
+      ORDER BY games DESC, last_played DESC
+      LIMIT 200`);
+    const games = await db.execute(sql`
+      SELECT id, mode, time_control, white_username, black_username,
+             (white_persona_id IS NOT NULL) AS white_bot, (black_persona_id IS NOT NULL) AS black_bot,
+             result, termination, finished_at
+      FROM live_games WHERE ${where}
+      ORDER BY finished_at DESC
+      LIMIT 200`);
+    res.json({ window: cond[w] ? w : "week", players: players.rows, games: games.rows });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to load live games", details: err.cause?.message ?? err.message });
+  }
+});
+
 router.get("/admin/stats", requireAdmin, async (_req: Request, res: Response) => {
   try {
     const todayStart = startOfTodayEastern();
