@@ -51,7 +51,8 @@ export function dailyTimeLeft(g: DailyGameRow, serverOffsetMs: number): number {
 
 type QueueRow = { id: string; timeControl: string; mode: string; joinedAt: string };
 
-export function DailyGames() {
+/** embedded: shown as the Daily tab of Play Online (no page title or challenge inbox, which Play Online shows). */
+export function DailyGames({ embedded = false }: { embedded?: boolean } = {}) {
   const { authUser } = useUser();
   const me = authUser?.id;
   const [, navigate] = useLocation();
@@ -175,10 +176,10 @@ export function DailyGames() {
   );
 
   return (
-    <div className="mx-auto max-w-[760px] space-y-4 p-4 md:p-0 pb-24">
+    <div className={embedded ? 'space-y-4' : 'mx-auto max-w-[760px] space-y-4 p-4 md:p-0 pb-24'}>
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl md:text-3xl font-black" style={{ color: PT.text, letterSpacing: '-0.02em' }}>Daily Games</h1>
+          {!embedded && <h1 className="text-2xl md:text-3xl font-black" style={{ color: PT.text, letterSpacing: '-0.02em' }}>Daily Games</h1>}
           <p className="text-sm" style={{ color: PT.muted }}>1, 3 or 7 days per move. We'll notify you when it's your turn.</p>
         </div>
         {rating && (
@@ -191,9 +192,9 @@ export function DailyGames() {
 
       <NotifyPrompt reason="Turn on notifications so you know when it's your move, when an opponent is found and when time is running low." />
 
-      <ChallengeRequestsCard requests={inbox.requests} onChanged={() => { void inbox.reload(); }} />
-      <ChallengeInvitesCard invites={inbox.invites} onChanged={() => { void inbox.reload(); }} />
-      <SentRequestsCard sent={inbox.sent} onChanged={() => { void inbox.reload(); }} />
+      {!embedded && <ChallengeRequestsCard requests={inbox.requests} onChanged={() => { void inbox.reload(); }} />}
+      {!embedded && <ChallengeInvitesCard invites={inbox.invites} onChanged={() => { void inbox.reload(); }} />}
+      {!embedded && <SentRequestsCard sent={inbox.sent} onChanged={() => { void inbox.reload(); }} />}
       <OpenLinksCard links={inbox.links} kind="daily" onChanged={() => { void inbox.reload(); }} />
 
       {/* New game */}

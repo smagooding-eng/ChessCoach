@@ -9,6 +9,7 @@ import { PT, cardStyle, greenBtn, ghostBtn } from '@/lib/playTheme';
 import { ShareLink } from '@/components/play/ShareLink';
 import { NotifyPrompt } from '@/components/play/NotifyPrompt';
 import { TournamentsCard } from '@/components/play/Tournaments';
+import { DailyGames } from '@/pages/DailyGames';
 import { useSocialUnread } from '@/lib/social';
 import { useChallengeInbox, ChallengeRequestsCard, ChallengeInvitesCard, SentRequestsCard, OpenLinksCard, createOpenLink } from '@/components/play/OpenChallenges';
 
@@ -21,7 +22,18 @@ const TC_OPTIONS = [
 
 type Hosted = { code: string; url: string; label: string };
 
-export function LivePlay() {
+type OnlineTab = 'live' | 'daily';
+const readTab = (): OnlineTab | null => {
+  try { const t = new URLSearchParams(window.location.search).get('tab'); return t === 'daily' || t === 'live' ? t : null; } catch { return null; }
+};
+
+/** Play Online: live games and daily games in one place (tabs). /daily opens the Daily tab. */
+export function LivePlay({ initialTab }: { initialTab?: OnlineTab } = {}) {
+  const [tab, setTabState] = useState<OnlineTab>(() => readTab() ?? initialTab ?? 'live');
+  const setTab = (t: OnlineTab) => {
+    setTabState(t);
+    try { const u = new URL(window.location.href); u.searchParams.set('tab', t); window.history.replaceState(null, '', u.pathname + u.search); } catch { /* ignore */ }
+  };
   const live = useLivePlay();
   const { data: ratingsData, refetch } = useLiveRatings();
   const [mode, setMode] = useState<LiveMode>('casual');
@@ -102,8 +114,8 @@ export function LivePlay() {
     <div className="mx-auto max-w-[760px] space-y-4 p-4 md:p-0 pb-24">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl md:text-3xl font-black" style={{ color: PT.text, letterSpacing: '-0.02em' }}>Play Live</h1>
-          <p className="text-sm" style={{ color: PT.muted }}>Real opponents in your rating range, or challenge a friend with a link.</p>
+          <h1 className="text-2xl md:text-3xl font-black" style={{ color: PT.text, letterSpacing: '-0.02em' }}>Play Online</h1>
+          <p className="text-sm" style={{ color: PT.muted }}>Live games against real opponents, daily games at your own pace, or challenge a friend.</p>
         </div>
         <div className="flex shrink-0 flex-col gap-1.5 sm:flex-row">
           <Link href="/friends" className="relative inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-black uppercase tracking-wider"
@@ -186,6 +198,26 @@ export function LivePlay() {
           <ChallengeRequestsCard requests={inbox.requests} onAcceptLive={(code) => live.approveRequest(code)} onChanged={() => { void inbox.reload(); }} />
           <ChallengeInvitesCard invites={inbox.invites} onChanged={() => { void inbox.reload(); }} />
           <SentRequestsCard sent={inbox.sent} onChanged={() => { void inbox.reload(); }} />
+
+          {/* Live | Daily */}
+          <div className="grid grid-cols-2 gap-1 rounded-[14px] p-1" style={{ background: 'rgba(0,0,0,0.3)', border: `1px solid ${PT.border}` }}>
+            {([['live', 'Live', Zap, '5 to 15 minutes'], ['daily', 'Daily', CalendarDays, '1, 3 or 7 days a move']] as const).map(([id, label, Icon, sub]) => {
+              const on = tab === id;
+              return (
+                <button key={id} onClick={() => setTab(id)} aria-pressed={on}
+                  className="flex items-center justify-center gap-2 rounded-[10px] px-3 py-2.5 text-left transition-colors"
+                  style={on ? { background: PT.greenSoft, boxShadow: `inset 0 0 0 1.5px ${PT.green}` } : undefined}>
+                  <Icon size={18} style={{ color: on ? PT.green : PT.muted }} />
+                  <span className="min-w-0">
+                    <b className="block text-[14px] font-extrabold" style={{ color: on ? PT.text : PT.muted }}>{label}</b>
+                    <span className="block truncate text-[11px]" style={{ color: PT.muted }}>{sub}</span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          {tab === 'daily' ? <DailyGames embedded /> : <>
           <OpenLinksCard links={inbox.links} kind="live" onChanged={() => { void inbox.reload(); }} />
           <div className="inline-flex rounded-xl p-1" style={{ background: 'rgba(0,0,0,0.3)', border: `1px solid ${PT.border}` }}>
             {(['casual', 'ranked'] as LiveMode[]).map(m => (
@@ -259,14 +291,7 @@ export function LivePlay() {
             </p>
           </div>
 
-          <Link href="/daily" className="flex items-center gap-3 p-4" style={cardStyle}>
-            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl" style={{ background: PT.greenSoft, color: PT.green }}><CalendarDays size={22} /></span>
-            <span className="min-w-0 flex-1">
-              <b className="block text-[15px] font-extrabold" style={{ color: PT.text }}>Daily games</b>
-              <span className="block text-[12.5px]" style={{ color: PT.muted }}>1, 3 or 7 days per move. Play at your own pace, we notify you when it's your turn.</span>
-            </span>
-            <ChevronRight size={18} style={{ color: PT.muted }} />
-          </Link>
+          </>}
         </>
       )}
 

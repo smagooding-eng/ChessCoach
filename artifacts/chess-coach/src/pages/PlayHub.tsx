@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'wouter';
-import { ChevronRight, Bot, Play, Swords, CalendarDays } from 'lucide-react';
+import { ChevronRight, Bot, Play, Swords } from 'lucide-react';
 import { BOTS } from '@/lib/chess-bot';
 import { useBotAvatar, useBotName } from '@/lib/botAvatars';
 import { useUser } from '@/hooks/use-user';
@@ -26,11 +26,11 @@ export function PlayHub() {
   const lowest = Math.min(...BOTS.map((b) => b.rating));
   const highest = Math.max(...BOTS.map((b) => b.rating));
 
+  // Online first (live and daily games live together there), then local, then bots.
   const rows: { href: string; title: string; sub: string; icon: React.ReactNode; tint: string; show: boolean; img: string }[] = [
-    { href: '/practice', title: 'Play a Bot', sub: `${BOTS.length} opponents • ${lowest}–${highest} ELO`, icon: <Bot size={22} />, tint: '#5BA8FF', show: true, img: 'play-bot' },
-    { href: '/play/local', title: 'Play a Friend', sub: 'Two players, one device', icon: <Play size={22} />, tint: RD.green, show: true, img: 'play-friend' },
-    { href: '/live', title: 'Play Online', sub: 'Live 5–15 min games · challenge a friend', icon: <Swords size={22} />, tint: RD.gold, show: !!authUser, img: 'play-online' },
-    { href: '/daily', title: 'Daily Games', sub: '1, 3 or 7 days per move', icon: <CalendarDays size={22} />, tint: '#A98BFF', show: !!authUser, img: 'play-daily' },
+    { href: '/live', title: 'Play Online', sub: 'Live and daily games · challenge a friend', icon: <Swords size={22} />, tint: RD.gold, show: !!authUser, img: 'play-online' },
+    { href: '/play/local', title: 'Play Local', sub: 'Two players, one device', icon: <Play size={22} />, tint: RD.green, show: true, img: 'play-friend' },
+    { href: '/practice', title: 'Play Bots', sub: `${BOTS.length} opponents • ${lowest}–${highest} ELO`, icon: <Bot size={22} />, tint: '#5BA8FF', show: true, img: 'play-bot' },
   ];
 
   return (

@@ -52,10 +52,10 @@ const RESULT_STYLE: Record<string, { bg: string; fg: string; label: string }> = 
 };
 
 const TILES = [
-  { label: 'Play', sub: 'Friends or bots', href: '/play', img: 'play.webp', pos: '78% center', icon: Play, c1: '#5f8f36', c2: '#81B64C', glow: 'rgba(129,182,76,.28)' },
-  { label: 'Puzzles', sub: 'Smart training', href: '/puzzles', img: 'puzzles.webp', pos: '73% center', icon: Puzzle, c1: '#1e5bff', c2: '#5cc8ff', glow: 'rgba(92,150,255,.30)' },
-  { label: 'Openings', sub: 'Drill and learn', href: '/openings', img: 'openings.webp', pos: '68% center', icon: BookOpen, c1: '#6a3fc7', c2: '#b48cff', glow: 'rgba(168,120,255,.30)' },
-  { label: 'Chess Traps', sub: 'Learn the classics', href: '/traps', img: 'traps.webp', pos: '59% center', icon: Crosshair, c1: '#b9791a', c2: '#ffd27a', glow: 'rgba(232,180,71,.30)' },
+  { label: 'Play', sub: 'Online, local or bots', href: '/play', img: 'play.webp', pos: '78% center', icon: Play, c1: '#5f8f36', c2: '#81B64C', glow: 'rgba(129,182,76,.28)' },
+  { label: 'Puzzles', sub: 'Smart training', href: '/puzzles', img: 'puzzles.webp', pos: '73% center', icon: Puzzle, c1: '#5f8f36', c2: '#81B64C', glow: 'rgba(92,150,255,.30)' },
+  { label: 'Openings', sub: 'Drill and learn', href: '/openings', img: 'openings.webp', pos: '68% center', icon: BookOpen, c1: '#5f8f36', c2: '#81B64C', glow: 'rgba(168,120,255,.30)' },
+  { label: 'Chess Traps', sub: 'Learn the classics', href: '/traps', img: 'traps.webp', pos: '59% center', icon: Crosshair, c1: '#5f8f36', c2: '#81B64C', glow: 'rgba(232,180,71,.30)' },
 ];
 
 function RookIcon({ size = 18, color = GREEN }: { size?: number; color?: string }) {
@@ -310,21 +310,23 @@ export function DashboardRedesign() {
               }}
             >
               {!photoLook && <div className="absolute inset-0" style={{ background: 'linear-gradient(90deg, rgba(5,10,11,.78) 0%, rgba(5,10,11,.25) 62%, rgba(5,10,11,0) 100%), linear-gradient(0deg, rgba(5,10,11,.65) 0%, rgba(5,10,11,0) 55%)' }} />}
-              <div className={`relative z-10 flex h-full flex-col justify-between p-3.5 ${photoLook ? 'min-h-[104px] gap-3' : 'min-h-[128px]'}`}>
+              <div className={`relative z-10 flex h-full ${photoLook ? 'items-center gap-3 p-3' : 'min-h-[128px] flex-col justify-between p-3.5'}`}>
                 <span
-                  className="grid h-10 w-10 place-items-center rounded-[11px]"
+                  className="grid h-10 w-10 shrink-0 place-items-center rounded-[11px]"
                   style={{ background: `linear-gradient(160deg, ${t.c2}, ${t.c1})`, boxShadow: '0 2px 8px rgba(0,0,0,.45)', border: '1px solid rgba(255,255,255,.18)' }}
                 >
                   <t.icon size={21} color="#fff" fill={t.label === 'Play' ? '#fff' : 'none'} />
                 </span>
-                <div className="flex items-end justify-between gap-2">
+                <div className={`flex justify-between gap-2 ${photoLook ? 'min-w-0 flex-1 items-center' : 'items-end'}`}>
                   <div className="min-w-0">
-                    <b className="block truncate text-[19px] font-extrabold leading-tight">{t.label}</b>
+                    <b className={`block truncate font-extrabold leading-tight ${photoLook ? 'text-[16px]' : 'text-[19px]'}`}>{t.label}</b>
                     <span className="block truncate text-[12.5px]" style={{ color: '#C4CCC9' }}>{t.sub}</span>
                   </div>
+                  {!photoLook && (
                   <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full" style={{ border: '1.5px solid rgba(255,255,255,.7)', background: 'rgba(5,10,11,.45)' }}>
                     <ArrowRight size={16} />
                   </span>
+                  )}
                 </div>
               </div>
             </Link>

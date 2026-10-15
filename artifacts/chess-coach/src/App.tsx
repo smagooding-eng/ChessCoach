@@ -180,7 +180,6 @@ const ScanPosition = lazyRetry(() => import("@/pages/ScanPosition").then(m => ({
 const Admin = lazyRetry(() => import("@/pages/Admin").then(m => ({ default: m.Admin })));
 const Welcome = lazyRetry(() => import("@/pages/Welcome").then(m => ({ default: m.Welcome })));
 const NotFound = lazyRetry(() => import("@/pages/not-found"));
-const DailyGames = lazyRetry(() => import("@/pages/DailyGames").then(m => ({ default: m.DailyGames })));
 const DailyGame = lazyRetry(() => import("@/pages/DailyGame").then(m => ({ default: m.DailyGame })));
 const NotificationsPage = lazyRetry(() => import("@/pages/Notifications").then(m => ({ default: m.Notifications })));
 const ChallengePage = lazyRetry(() => import("@/pages/Challenge").then(m => ({ default: m.Challenge })));
@@ -267,7 +266,9 @@ const PLivePlay      = () => <ProtectedRoute component={LivePlay} />;
 const PFriends       = () => <ProtectedRoute component={FriendsPage} />;
 const PMessages      = () => <ProtectedRoute component={MessagesPage} />;
 const PTournament    = () => <ProtectedRoute component={TournamentPage} />;
-const PDailyGames    = () => <ProtectedRoute component={DailyGames} />;
+// Daily games are a tab of Play Online now; /daily (old links, notifications) opens that tab.
+const DailyTab = () => <LivePlay initialTab="daily" />;
+const PDailyGames    = () => <ProtectedRoute component={DailyTab} />;
 const PDailyGame     = () => <ProtectedRoute component={DailyGame} />;
 const PNotifications = () => <ProtectedRoute component={NotificationsPage} />;
 const PTraps         = () => <ProtectedRoute component={TrapsPage} />;
