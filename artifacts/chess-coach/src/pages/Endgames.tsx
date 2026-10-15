@@ -228,7 +228,7 @@ export function Endgames() {
       <div className="mx-auto max-w-[760px] space-y-4 px-3 pt-3 pb-24 md:px-0 md:pt-0">
         <PhotoHero img={scene('hero-endgames')} icon={<Crown size={20} />} title="Endgame Training" subtitle="Master the endgame — the most important phase of chess." />
 
-        <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+        <div data-swipe-tabs className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
           {TABS.map((tab) => {
             const on = activeTab === tab.id;
             return (
@@ -316,7 +316,7 @@ export function Endgames() {
     <div className="space-y-6 pb-20 px-4 pt-4 md:px-0 md:pt-0">
       <PageHero piece="♚" title="Endgame Training" subtitle="Master the endgame — the most important phase of chess." />
 
-      <div className="flex gap-2 overflow-x-auto pb-1">
+      <div data-swipe-tabs className="flex gap-2 overflow-x-auto pb-1">
         {TABS.map(tab => (
           <button
             key={tab.id}

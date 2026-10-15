@@ -1370,7 +1370,7 @@ export function PracticeBots() {
       <div className="min-h-screen px-3 md:px-6 md:pt-6 md:pb-12 pb-[calc(7.5rem+env(safe-area-inset-bottom))]" style={{ background: RD.bg, color: RD.text }}>
         <div className="mx-auto w-full max-w-[640px] lg:max-w-[1200px]">
           <RedesignHeader title="Practice" icon={<Swords size={24} />} />
-          <div className="grid grid-cols-2 gap-1 rounded-[16px] p-1 lg:max-w-[420px]" style={{ background: RD.cardSolid, border: `1px solid ${RD.border}` }}>
+          <div data-swipe-tabs className="grid grid-cols-2 gap-1 rounded-[16px] p-1 lg:max-w-[420px]" style={{ background: RD.cardSolid, border: `1px solid ${RD.border}` }}>
             {([['bots', 'Bots'], ['openings', 'Opening Trainer']] as const).map(([id, label]) => {
               const active = tab === id;
               return (
@@ -1421,7 +1421,7 @@ export function PracticeBots() {
         </div>
       </div>
 
-      <div className="inline-flex p-1 rounded-xl bg-card/60 border border-white/10 gap-1">
+      <div data-swipe-tabs className="inline-flex p-1 rounded-xl bg-card/60 border border-white/10 gap-1">
         <button
           onClick={() => setTab('bots')}
           className={cn(

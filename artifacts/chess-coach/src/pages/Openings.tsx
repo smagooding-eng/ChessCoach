@@ -139,7 +139,7 @@ export function Openings() {
             />
           </div>
 
-          <div className="mt-3 grid grid-cols-3 gap-1 rounded-[16px] p-1" style={{ background: RD.cardSolid, border: `1px solid ${RD.border}` }}>
+          <div data-swipe-tabs className="mt-3 grid grid-cols-3 gap-1 rounded-[16px] p-1" style={{ background: RD.cardSolid, border: `1px solid ${RD.border}` }}>
             {TABS.map((t) => {
               const active = tab === t.id;
               return (

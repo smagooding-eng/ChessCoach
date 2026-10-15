@@ -182,12 +182,25 @@ export function Layout({ children, fullscreen }: { children: React.ReactNode; fu
     let start: Start | null = null;
     let animating = false;
     const W = () => window.innerWidth;
-    const set = (x: number, withTransition: string | null) => {
-      el.style.transition = withTransition ?? 'none';
-      el.style.transform = x === 0 && withTransition === null ? '' : `translate3d(${x}px,0,0)`;
-      el.style.opacity = String(1 - Math.min(Math.abs(x) / W(), 1) * 0.35);
+    // What moves: the whole page when going to another section; only the tab
+    // content (everything after the page's [data-swipe-tabs] bar) when the
+    // swipe changes the page's own tab, so the header and tab bar stay put.
+    let moving: HTMLElement[] = [];
+    const tabContent = (): HTMLElement[] => {
+      const bar = Array.from(el.querySelectorAll<HTMLElement>('[data-swipe-tabs]')).find((b) => b.offsetParent !== null);
+      const out: HTMLElement[] = [];
+      for (let n = bar?.nextElementSibling ?? null; n; n = n.nextElementSibling) if (n instanceof HTMLElement) out.push(n);
+      return out;
     };
-    const clear = () => { el.style.transition = ''; el.style.transform = ''; el.style.opacity = ''; el.style.willChange = ''; };
+    const movingFor = (target: 'tab' | 'page' | 'none') => (target === 'tab' ? tabContent() : [el]);
+    const set = (x: number, transition: string | null, list = moving) => {
+      for (const m of list) {
+        m.style.transition = transition ?? 'none';
+        m.style.transform = `translate3d(${x}px,0,0)`;
+        m.style.opacity = String(1 - Math.min(Math.abs(x) / W(), 1) * 0.35);
+      }
+    };
+    const clear = (list = moving) => { for (const m of list) { m.style.transition = ''; m.style.transform = ''; m.style.opacity = ''; m.style.willChange = ''; } };
     const pageOnlyHere = () => /^\/opponents(\/|$)/.test(swipeState.current.location);
     const targetFor = (dir: 1 | -1): 'tab' | 'page' | 'none' => {
       if (!pageOnlyHere() && pageCanSwipe(dir)) return 'tab';
@@ -213,31 +226,38 @@ export function Layout({ children, fullscreen }: { children: React.ReactNode; fu
         if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
         if (Math.abs(dx) < Math.abs(dy) * 1.4) { s0.mode = 'scroll'; return; }
         s0.mode = 'drag';
-        el.style.willChange = 'transform, opacity';
       }
       const dir: 1 | -1 = dx < 0 ? 1 : -1;
-      if (s0.target === null || dir !== s0.dir) { s0.dir = dir; s0.target = targetFor(dir); }
+      if (s0.target === null || dir !== s0.dir) {
+        s0.dir = dir; s0.target = targetFor(dir);
+        const next = movingFor(s0.target);
+        clear(moving.filter((m) => !next.includes(m)));
+        moving = next;
+        for (const m of moving) m.style.willChange = 'transform, opacity';
+      }
       // Nowhere to go that way: a little rubber-band give only.
       const x = s0.target === 'none' ? dx * 0.18 : dx * 0.92;
       set(x, null);
     };
     const finish = (dir: 1 | -1, target: 'tab' | 'page') => {
       animating = true;
-      const out = -dir * W();
-      set(out, 'transform 170ms cubic-bezier(.4,0,1,1), opacity 170ms linear');
+      const outList = moving;
+      set(-dir * W(), 'transform 160ms cubic-bezier(.4,0,1,1), opacity 160ms linear', outList);
       window.setTimeout(() => {
         if (target === 'tab') runPageSwipe(dir);
-        else {
-          const i = sections.indexOf(swipeState.current.location);
-          navigateTo(sections[i + dir]);
-        }
-        // The new content comes in from the other side.
-        set(dir * W() * 0.35, null);
-        requestAnimationFrame(() => requestAnimationFrame(() => {
-          set(0, 'transform 260ms cubic-bezier(.2,.8,.2,1), opacity 260ms ease-out');
-          window.setTimeout(() => { clear(); animating = false; }, 280);
-        }));
-      }, 170);
+        else navigateTo(sections[sections.indexOf(swipeState.current.location) + dir]);
+        // Wait for the new tab / page to render, then bring it in from the other side.
+        requestAnimationFrame(() => {
+          const inList = target === 'tab' ? tabContent() : [el];
+          clear(outList.filter((m) => !inList.includes(m)));
+          moving = inList;
+          set(dir * W() * 0.35, null, inList);
+          requestAnimationFrame(() => requestAnimationFrame(() => {
+            set(0, 'transform 260ms cubic-bezier(.2,.8,.2,1), opacity 260ms ease-out', inList);
+            window.setTimeout(() => { clear(inList); animating = false; }, 280);
+          }));
+        });
+      }, 160);
     };
     const onEnd = (e: TouchEvent) => {
       const s0 = start; start = null;
@@ -251,10 +271,11 @@ export function Layout({ children, fullscreen }: { children: React.ReactNode; fu
       const target = targetFor(dir);
       if ((flick || far) && target !== 'none' && !swipeState.current.moreOpen) { finish(dir, target); return; }
       // spring back
-      set(0, 'transform 220ms cubic-bezier(.2,.8,.2,1), opacity 220ms ease-out');
-      window.setTimeout(() => { if (!animating) clear(); }, 240);
+      const back = moving;
+      set(0, 'transform 220ms cubic-bezier(.2,.8,.2,1), opacity 220ms ease-out', back);
+      window.setTimeout(() => { if (!animating) clear(back); }, 240);
     };
-    const onCancel = () => { if (start?.mode === 'drag') { set(0, 'transform 200ms ease-out, opacity 200ms ease-out'); window.setTimeout(() => { if (!animating) clear(); }, 220); } start = null; };
+    const onCancel = () => { if (start?.mode === 'drag') { const back = moving; set(0, 'transform 200ms ease-out, opacity 200ms ease-out', back); window.setTimeout(() => { if (!animating) clear(back); }, 220); } start = null; };
     el.addEventListener('touchstart', onStart, { passive: true });
     el.addEventListener('touchmove', onMove, { passive: true });
     el.addEventListener('touchend', onEnd, { passive: true });

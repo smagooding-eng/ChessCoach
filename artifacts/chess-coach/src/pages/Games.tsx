@@ -195,7 +195,7 @@ export function Games() {
     <div className="space-y-5 px-4 pt-4 md:px-0 md:pt-0 pb-10">
       <PageHero piece="♜" title="My Games" subtitle="Import, review, and analyze your chess games — all in one place." />
 
-      <div className="inline-flex p-1 rounded-xl bg-secondary/50 border border-border/40 gap-1">
+      <div data-swipe-tabs className="inline-flex p-1 rounded-xl bg-secondary/50 border border-border/40 gap-1">
         {([
           { key: 'games', label: 'Games' },
           { key: 'import', label: 'Import' },

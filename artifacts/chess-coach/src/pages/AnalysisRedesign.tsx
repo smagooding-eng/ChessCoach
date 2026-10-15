@@ -369,7 +369,7 @@ export function AnalysisRedesign() {
       <div className="mx-auto grid grid-cols-1 w-full max-w-[760px] gap-3 lg:max-w-[1200px]">
         <RedesignHeader title="My Analytics" icon={<span className="text-[26px] leading-none">♟</span>} />
 
-        <div className="grid grid-cols-5 gap-0.5 rounded-[16px] p-1 lg:max-w-[720px]" style={{ background: RD.cardSolid, border: `1px solid ${RD.border}` }}>
+        <div data-swipe-tabs className="grid grid-cols-5 gap-0.5 rounded-[16px] p-1 lg:max-w-[720px]" style={{ background: RD.cardSolid, border: `1px solid ${RD.border}` }}>
           {TABS.map((t) => {
             const active = tab === t.id;
             return (

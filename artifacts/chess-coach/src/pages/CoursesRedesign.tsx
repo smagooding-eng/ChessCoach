@@ -233,7 +233,7 @@ export function CoursesRedesign({
           )}
 
           {courses.length > 0 && (
-            <div className="grid grid-cols-2 overflow-hidden rounded-[14px]" style={{ background: RD.cardSolid, border: `1px solid ${RD.border}` }}>
+            <div data-swipe-tabs className="grid grid-cols-2 overflow-hidden rounded-[14px]" style={{ background: RD.cardSolid, border: `1px solid ${RD.border}` }}>
               {([['all', 'Courses'], ['progress', 'My Progress']] as const).map(([id, label]) => {
                 const active = tab === id;
                 return (

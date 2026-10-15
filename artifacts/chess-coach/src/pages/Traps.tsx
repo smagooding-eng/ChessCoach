@@ -169,7 +169,7 @@ function TrapsRedesign({ traps, loading }: { traps: TrapSummary[]; loading: bool
       <div className="mx-auto w-full max-w-[640px] lg:max-w-[1200px]">
         <RedesignHeader title="Chess Traps" icon={<Crosshair size={24} />} />
 
-        <div className="grid grid-cols-3 gap-1 rounded-[16px] p-1" style={{ background: RD.cardSolid, border: `1px solid ${RD.border}` }}>
+        <div data-swipe-tabs className="grid grid-cols-3 gap-1 rounded-[16px] p-1" style={{ background: RD.cardSolid, border: `1px solid ${RD.border}` }}>
           {([['all', 'All'], ['category', 'By Category'], ['level', 'By Level']] as const).map(([id, label]) => {
             const active = tab === id;
             return (
