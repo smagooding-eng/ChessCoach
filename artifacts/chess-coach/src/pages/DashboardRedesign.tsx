@@ -14,6 +14,7 @@ import { encodeCard } from '@/pages/ShareCard';
 import { ReferralCard } from '@/pages/Profile';
 import { useMyGames } from '@/hooks/use-games';
 import { GameThumb } from '@/components/GameThumb';
+import { playedWhite } from '@/lib/gameSide';
 import { ProUpsell } from '@/components/ProUpsell';
 import { useSiteImg } from '@/hooks/use-app-config';
 import { usePhotoLook } from '@/context/SettingsContext';
@@ -361,7 +362,7 @@ export function DashboardRedesign() {
               <p className="border-t px-4 py-8 text-center text-[13px]" style={{ borderColor: BORDER, color: MUTED }}>No games yet — import some to see them here.</p>
             ) : (
               recent.map((game) => {
-                const isWhite = mine.includes((game.whiteUsername ?? '').toLowerCase());
+                const isWhite = playedWhite(game, mine);
                 const rs = RESULT_STYLE[game.result] ?? RESULT_STYLE.draw;
                 return (
                   <Link

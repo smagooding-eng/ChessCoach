@@ -7,6 +7,7 @@ import { useMyAnalysisSummary } from '@/hooks/use-analysis';
 import { useMyGames } from '@/hooks/use-games';
 import { useUser } from '@/hooks/use-user';
 import { GameThumb } from '@/components/GameThumb';
+import { playedWhite } from '@/lib/gameSide';
 import { RD } from '@/lib/redesignTheme';
 import { RedesignHeader } from '@/components/RedesignHeader';
 
@@ -117,7 +118,7 @@ export function GamesRedesign() {
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return games.filter((g) => {
-      const iAmWhite = mine.includes((g.whiteUsername ?? '').toLowerCase());
+      const iAmWhite = playedWhite(g, mine);
       if (colorTab === 'white' && !iAmWhite) return false;
       if (colorTab === 'black' && iAmWhite) return false;
       if (resultFilter !== 'all' && g.result.toLowerCase() !== resultFilter) return false;
@@ -228,7 +229,7 @@ export function GamesRedesign() {
             ))
           ) : filtered.length ? (
             filtered.map((game) => {
-              const isWhite = mine.includes((game.whiteUsername ?? '').toLowerCase());
+              const isWhite = playedWhite(game, mine);
               const opponent = isWhite ? game.blackUsername : game.whiteUsername;
               const rs = BADGE[game.result] ?? BADGE.draw;
               return (

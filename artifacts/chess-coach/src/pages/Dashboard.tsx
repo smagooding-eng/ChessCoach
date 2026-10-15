@@ -4,6 +4,7 @@ import { useMyAnalysisSummary, useMyWeaknesses } from '@/hooks/use-analysis';
 import { useMyCourses } from '@/hooks/use-courses';
 import { useMyGames } from '@/hooks/use-games';
 import { GameThumb } from '@/components/GameThumb';
+import { playedWhite } from '@/lib/gameSide';
 import { Link } from 'wouter';
 import { Swords, Trophy, Target, AlertTriangle, BookOpen, Clock, GraduationCap, TrendingUp, ChevronRight, Search, Play, Bot, Camera, Lock, Crown, Flame, Zap, Award, Activity, Sparkles, ArrowUpRight, Share2, Puzzle, Crosshair, ShoppingBag } from 'lucide-react';
 import { encodeCard } from '@/pages/ShareCard';
@@ -271,7 +272,7 @@ export function Dashboard() {
           <div className="space-y-0.5">
             {gamesData?.games?.slice(0, 5).map((game, i) => {
               const res = RESULT_COLORS[game.result] ?? RESULT_COLORS.draw;
-              const playedAsWhite = game.whiteUsername?.toLowerCase() === username?.toLowerCase();
+              const playedAsWhite = playedWhite(game, username ? [username.toLowerCase()] : []);
               return (
                 <Link key={game.id} href={`/games/${game.id}`} className="block">
                   <div className="group flex items-center gap-3 p-2.5 rounded-xl transition-colors"
