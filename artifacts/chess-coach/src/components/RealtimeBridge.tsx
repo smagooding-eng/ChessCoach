@@ -72,6 +72,12 @@ export function RealtimeBridge() {
       if (hideTimer.current) clearTimeout(hideTimer.current);
       hideTimer.current = setTimeout(() => setBanner(null), 7000);
     });
+    // Friends & messages: the chat screen and badges listen for these.
+    for (const [evt, name] of [['dm', 'cs:dm'], ['dm_read', 'cs:dm-read'], ['friends_update', 'cs:friends-update']] as const) {
+      es.addEventListener(evt, (e) => {
+        try { window.dispatchEvent(new CustomEvent(name, { detail: JSON.parse((e as MessageEvent).data) })); } catch { /* ignore */ }
+      });
+    }
     es.addEventListener('daily_update', (e) => {
       try { window.dispatchEvent(new CustomEvent('cs:daily-update', { detail: JSON.parse((e as MessageEvent).data) })); } catch { /* ignore */ }
     });

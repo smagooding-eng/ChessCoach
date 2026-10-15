@@ -19,6 +19,12 @@ interface MistakeFixViewProps {
   classification: Classification;
   flipped: boolean;
   onJumpIn?: () => void;
+  /** Stockfish eval (White's side, centipawns) after the played move, and for
+   *  the engine's line (= the position's eval before the mistake). */
+  playedEvalCp?: number | null;
+  engineEvalCp?: number | null;
+  /** Extra classes for the two material strips (e.g. hide them on phones). */
+  stripClassName?: string;
   /** Controlled slide state (0 = played, 1 = engine) -- lifted to the
       parent so the app's existing move-navigation buttons can drive
       stepping through the engine's continuation while this tab is
@@ -93,6 +99,9 @@ export function MistakeFixView({
   slide,
   onSlideChange,
   engineStep,
+  playedEvalCp,
+  engineEvalCp,
+  stripClassName = '',
 }: MistakeFixViewProps) {
   const better = useMemo(
     () => betterMoveText ? parseBetterMove(betterMoveText, prevFen) : null,
@@ -240,24 +249,7 @@ export function MistakeFixView({
           <ChevronRight className="w-4 h-4" />
         </button>
 
-        {/* Slide header */}
-        <div className="hidden md:flex items-center justify-between gap-2 px-1 mb-2">
-          <div className="flex items-center gap-1.5 min-w-0">
-            <Icon className={`w-3.5 h-3.5 shrink-0 ${current.iconClass}`} />
-            <span className="text-[10px] font-black uppercase tracking-[0.12em] text-white/70 truncate">
-              {current.title}
-            </span>
-          </div>
-          {current.moveSan && (
-            <span className={`shrink-0 font-mono text-[11px] font-bold px-1.5 py-0.5 rounded border ${current.chipBg} ${current.chipText} ${current.chipBorder}`}>
-              {current.moveSan}
-            </span>
-          )}
-        </div>
-
-        {!current.empty && (
-          <MaterialStrip fen={current.fen} color={flipped ? 'w' : 'b'} className="px-1" />
-        )}
+        <div className={stripClassName}><MaterialStrip fen={current.empty ? prevFen : current.fen} color={flipped ? 'w' : 'b'} className="px-1" /></div>
 
         <div className="relative overflow-hidden rounded-xl">
           <AnimatePresence mode="wait" initial={false}>
@@ -296,17 +288,9 @@ export function MistakeFixView({
           </AnimatePresence>
         </div>
 
-        {/* Caption — hidden on mobile to save vertical space; the tab toggle already labels the view */}
-        <p className="hidden md:block text-[10px] text-white/40 text-center px-2 leading-snug mt-1.5">
-          {current.caption}
-        </p>
-
-        {!current.empty && (
-          <>
-            <MaterialStrip fen={current.fen} color={flipped ? 'b' : 'w'} className="px-1" />
-            <EvalBar fen={current.fen} />
-          </>
-        )}
+        {/* Same strips and eval bar as every other move, so the board never moves. */}
+        <div className={`mt-1.5 md:mt-2 ${stripClassName}`}><MaterialStrip fen={current.empty ? prevFen : current.fen} color={flipped ? 'b' : 'w'} className="px-1" /></div>
+        <div className="mt-1.5 md:mt-2"><EvalBar fen={current.empty ? prevFen : current.fen} cp={current.key === 'engine' ? engineEvalCp : playedEvalCp} /></div>
       </div>
     </div>
   );

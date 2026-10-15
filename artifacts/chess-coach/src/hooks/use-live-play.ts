@@ -13,6 +13,8 @@ export interface LivePlayer {
   memberSinceYear?: number;
   /** Server-labeled bot opponent (only ever offered, never disguised). */
   isBot?: boolean;
+  /** Real players only: lets you send a friend request after the game. */
+  userId?: string;
 }
 
 export interface LiveGameState {
@@ -39,6 +41,8 @@ export interface LiveGameState {
   serverNow?: number;
   /** After the game: which side has asked for a rematch. */
   rematchFrom?: 'w' | 'b';
+  /** Arena tournament this game is part of. */
+  tournamentId?: string;
 }
 
 export interface OpponentDisconnect { side: 'w' | 'b'; graceMs: number; until: number }
@@ -86,8 +90,15 @@ export function useLivePlay() {
   // serverTime - localTime, so abandonment countdowns match the server.
   const [serverOffset, setServerOffset] = useState(0);
   const [notice, setNotice] = useState<string | null>(null);
+  // Arena tournament: waiting in the pairing pool, or told it has ended.
+  const [tournamentWaiting, setTournamentWaiting] = useState<{ id: string; started: boolean } | null>(null);
+  const [tournamentOver, setTournamentOver] = useState<string | null>(null);
 
   const wsRef = useRef<WebSocket | null>(null);
+  // Socket up right now? A game stays on screen through a brief drop (phones
+  // lose the connection often); the board just waits until it's back.
+  const [connected, setConnected] = useState(false);
+  const unmountedRef = useRef(false);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const gameRef = useRef<LiveGameState | null>(null);
   const colorRef = useRef<'w' | 'b' | null>(null);
@@ -115,6 +126,7 @@ export function useLivePlay() {
     const ws = new WebSocket(buildWsUrl());
     wsRef.current = ws;
     ws.onopen = async () => {
+      setConnected(true);
       setError(null);
       setStatus(s => (s === 'connecting' ? 'idle' : s));
       let g = gameRef.current;
@@ -146,6 +158,9 @@ export function useLivePlay() {
       if (g && g.status === 'active') {
         ws.send(JSON.stringify({ type: 'subscribe', gameId: g.id }));
         ws.send(JSON.stringify({ type: 'presence', gameId: g.id, visible: document.visibilityState === 'visible' }));
+      } else if (g && g.status === 'finished') {
+        // still on the result screen: re-subscribe so rematch offers reach us
+        ws.send(JSON.stringify({ type: 'subscribe', gameId: g.id }));
       }
       else if (queuedTcRef.current && queuedModeRef.current) ws.send(JSON.stringify({ type: 'queue', timeControl: queuedTcRef.current, mode: queuedModeRef.current }));
     };
@@ -174,7 +189,18 @@ export function useLivePlay() {
           pendingApproveRef.current = null;
           setStatus('idle');
           break;
+        case 'tournament_waiting':
+          setTournamentWaiting({ id: msg.tournamentId, started: !!msg.started });
+          break;
+        case 'tournament_paused':
+          setTournamentWaiting(null);
+          break;
+        case 'tournament_over':
+          setTournamentWaiting(null);
+          setTournamentOver(msg.tournamentId);
+          break;
         case 'match_found':
+          setTournamentWaiting(null);
           pendingApproveRef.current = null;
           if (typeof msg.state?.serverNow === 'number') setServerOffset(msg.state.serverNow - Date.now());
           setNotice(null);
@@ -219,6 +245,9 @@ export function useLivePlay() {
           setTimeout(() => setError(null), 2500);
           break;
         case 'error':
+          // A finished game is dropped from the server after a few minutes;
+          // re-subscribing to it then is harmless, so don't show that.
+          if (msg.message === 'Game not found' && gameRef.current?.status === 'finished') break;
           setError(msg.message);
           if (pendingAcceptRef.current || pendingApproveRef.current) {
             // a failed challenge accept must not be re-sent on reconnect
@@ -231,23 +260,31 @@ export function useLivePlay() {
       }
     };
     ws.onclose = () => {
-      wsRef.current = null;
-      if (statusRef.current !== 'finished') {
-        setStatus('disconnected');
-        if (!reconnectTimerRef.current) {
-          reconnectTimerRef.current = setTimeout(() => {
-            reconnectTimerRef.current = null;
-            connect();
-          }, 1500);
-        }
+      if (wsRef.current === ws) wsRef.current = null;
+      setConnected(false);
+      setTournamentWaiting(null); // the server drops you from the pairing pool
+      if (unmountedRef.current) return; // left the page: don't reconnect
+      // Keep an in-progress (or just-finished) game on screen -- switching to
+      // the lobby and back rebuilt the board mid-move. Only the lobby shows
+      // "disconnected".
+      const g = gameRef.current;
+      const inGame = !!g && (statusRef.current === 'in_game' || statusRef.current === 'finished');
+      if (!inGame) setStatus('disconnected');
+      if (!reconnectTimerRef.current) {
+        reconnectTimerRef.current = setTimeout(() => {
+          reconnectTimerRef.current = null;
+          connect();
+        }, 1000);
       }
     };
     ws.onerror = () => { setError("Couldn't connect to live play — retrying…"); };
   }, []);
 
   useEffect(() => {
+    unmountedRef.current = false;
     connect();
     return () => {
+      unmountedRef.current = true;
       if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
       wsRef.current?.close();
       wsRef.current = null;
@@ -310,6 +347,9 @@ export function useLivePlay() {
   const offerRematch = useCallback(() => { if (game) { setNotice(null); send({ type: 'rematch_offer', gameId: game.id }); } }, [game, send]);
   const declineRematch = useCallback(() => { if (game) send({ type: 'rematch_decline', gameId: game.id }); }, [game, send]);
 
+  const tournamentReady = useCallback((tournamentId: string) => { setError(null); send({ type: 'tournament_ready', tournamentId }); }, [send]);
+  const tournamentPause = useCallback((tournamentId: string) => { setTournamentWaiting(null); send({ type: 'tournament_pause', tournamentId }); }, [send]);
+
   const reset = useCallback(() => {
     const g = gameRef.current;
     if (g && g.status === 'finished') send({ type: 'leave_game', gameId: g.id });
@@ -320,8 +360,8 @@ export function useLivePlay() {
 
   return {
     status, error, game, color, queuedTc, queuedMode, opponentDisconnect, premove, setPremove,
-    queuedAt, botOfferMs, waitingFor, waitingKind, serverOffset, notice, approveRequest,
+    queuedAt, botOfferMs, waitingFor, waitingKind, serverOffset, notice, approveRequest, connected,
     enterQueue, offerRematch, declineRematch, cancel, playBot, acceptChallenge, move, resign, offerDraw, acceptDraw, declineDraw,
-    reset,
+    reset, tournamentWaiting, tournamentOver, tournamentReady, tournamentPause,
   };
 }

@@ -165,6 +165,9 @@ function PlayRouter() {
   return enabled ? <PlayHub /> : <LocalPlay />;
 }
 const LivePlay = lazyRetry(() => import("@/pages/LivePlay").then(m => ({ default: m.LivePlay })));
+const FriendsPage = lazyRetry(() => import("@/pages/Friends").then(m => ({ default: m.Friends })));
+const MessagesPage = lazyRetry(() => import("@/pages/Messages").then(m => ({ default: m.Messages })));
+const TournamentPage = lazyRetry(() => import("@/pages/Tournament").then(m => ({ default: m.Tournament })));
 const LiveHistory = lazyRetry(() => import("@/pages/LiveHistory").then(m => ({ default: m.LiveHistory })));
 const GameLookup = lazyRetry(() => import("@/pages/GameLookup").then(m => ({ default: m.GameLookup })));
 const Subscription = lazyRetry(() => import("@/pages/Subscription").then(m => ({ default: m.Subscription })));
@@ -260,6 +263,9 @@ const PPracticeBots  = () => <ProtectedRoute component={PracticeBots} />;
 const PLocalPlay     = () => <ProtectedRoute component={PlayRouter} />;
 const PLocalBoard    = () => <ProtectedRoute component={LocalPlay} />;
 const PLivePlay      = () => <ProtectedRoute component={LivePlay} />;
+const PFriends       = () => <ProtectedRoute component={FriendsPage} />;
+const PMessages      = () => <ProtectedRoute component={MessagesPage} />;
+const PTournament    = () => <ProtectedRoute component={TournamentPage} />;
 const PDailyGames    = () => <ProtectedRoute component={DailyGames} />;
 const PDailyGame     = () => <ProtectedRoute component={DailyGame} />;
 const PNotifications = () => <ProtectedRoute component={NotificationsPage} />;
@@ -370,6 +376,9 @@ function Router() {
       <Route path="/play"            component={PLocalPlay} />
       <Route path="/play/local"      component={PLocalBoard} />
       <Route path="/live"            component={PLivePlay} />
+      <Route path="/friends"         component={PFriends} />
+      <Route path="/messages/:userId" component={PMessages} />
+      <Route path="/tournaments/:id" component={PTournament} />
       <Route path="/daily"           component={PDailyGames} />
       <Route path="/notifications"   component={PNotifications} />
       <Route path="/daily/:id"       component={PDailyGame} />

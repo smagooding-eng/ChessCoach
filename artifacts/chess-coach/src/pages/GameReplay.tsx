@@ -60,6 +60,8 @@ type ReviewMove = {
   cons: string[];
   cpLoss?: number;
   engineAvailable?: boolean;
+  /** Stockfish eval after this move (White's side, centipawns). */
+  evalAfterCp?: number;
   coachStatus?: 'engine-aligned' | 'fallback';
   /** SAN sequence of the engine's recommended continuation. Up to 6 plies. */
   bestLineSan?: string[];
@@ -901,6 +903,14 @@ export function GameReplay() {
     const byMoves = moves.findIndex((m, i) => m.san === san && Math.abs(i - km.moveIndex) <= 2);
     return byMoves >= 0 ? byMoves + 1 : km.moveIndex + 1;
   };
+  // Stockfish's eval (White's side) after `ply` moves, from the review.
+  // Start position: a fixed small White edge. Unknown: null (the bar then
+  // falls back to a quick local estimate).
+  const evalAfter = (ply: number): number | null => {
+    if (ply <= 0) return reviewMoves.length > 0 ? 20 : null;
+    const r = reviewMoves.find(m => m.moveIndex === ply - 1);
+    return typeof r?.evalAfterCp === 'number' ? r.evalAfterCp : null;
+  };
   const currentReview: ReviewMove | null = currentMove > 0
     ? (reviewMoves.find(r => r.moveIndex === currentMove - 1) ?? null)
     : null;
@@ -1112,6 +1122,9 @@ export function GameReplay() {
                   : null;
                 return (
                   <MistakeFixView
+                    playedEvalCp={evalAfter(currentMove)}
+                    engineEvalCp={evalAfter(currentMove - 1)}
+                    stripClassName={redesign ? 'hidden md:block' : ''}
                     prevFen={prevFen}
                     playedMove={playedMove}
                     betterMoveText={currentReview.betterMove}
@@ -1125,23 +1138,36 @@ export function GameReplay() {
                 );
               })()
             ) : (
+              // Exactly the same shape as MistakeFixView (bar, strips, board, eval
+              // bar), so stepping between good moves and mistakes never moves
+              // the board. The "Engine line" tab is dimmed here and lights up
+              // on moves where the engine had something better.
               <div className="max-w-[520px] xl:max-w-[680px] mx-auto space-y-1.5 md:space-y-2">
-                {/* Invisible spacer matching MistakeFixView's tab toggle height
-                    so the board occupies the same vertical position whether or
-                    not the move is classified as bad. */}
-                <div aria-hidden className="h-[34px] invisible" />
-                <div className={redesign ? 'hidden md:block' : ''}><MaterialStrip fen={currentFen} color={flipped ? 'w' : 'b'} className="px-1" /></div>
-                <ChessBoard
-                  fen={currentFen}
-                  flipped={flipped}
-                  practiceMode={practiceMode}
-                  expectedMoveSan={practiceMode ? bestMoveSan : null}
-                  onMovePlayed={handleMovePlayed}
-                  lastMove={lastMove}
-                  moveQuality={currentReview?.classification ?? null}
-                />
-                <div className={redesign ? 'hidden md:block' : ''}><MaterialStrip fen={currentFen} color={flipped ? 'b' : 'w'} className="px-1" /></div>
-                <div className={redesign ? 'hidden md:block' : ''}><EvalBar fen={currentFen} /></div>
+                <div aria-label="Move view" className="flex items-stretch gap-1 p-1 rounded-lg bg-white/5 border border-white/10">
+                  <span className="flex-1 flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md text-[10px] font-black uppercase tracking-[0.12em] border border-white/10 bg-white/5 text-white/70">
+                    <span className="truncate">{currentMove === 0 ? 'Start position' : currentReview ? `${currentReview.classification.replace('_', ' ')}` : 'Your move'}</span>
+                    {currentMove > 0 && moves[currentMove - 1]?.san && (
+                      <span className="hidden sm:inline-block font-mono normal-case tracking-normal text-[10px] font-bold ml-1 text-white/50">{moves[currentMove - 1].san}</span>
+                    )}
+                  </span>
+                  <span aria-disabled="true" title="Shown when the engine had a better move" className="flex-1 flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md text-[10px] font-black uppercase tracking-[0.12em] border border-transparent text-white/25">
+                    <span className="truncate">Engine line</span>
+                  </span>
+                </div>
+                <div className="relative">
+                  <div className={redesign ? 'hidden md:block' : ''}><MaterialStrip fen={currentFen} color={flipped ? 'w' : 'b'} className="px-1" /></div>
+                  <ChessBoard
+                    fen={currentFen}
+                    flipped={flipped}
+                    practiceMode={practiceMode}
+                    expectedMoveSan={practiceMode ? bestMoveSan : null}
+                    onMovePlayed={handleMovePlayed}
+                    lastMove={lastMove}
+                    moveQuality={currentReview?.classification ?? null}
+                  />
+                  <div className={`mt-1.5 md:mt-2 ${redesign ? 'hidden md:block' : ''}`}><MaterialStrip fen={currentFen} color={flipped ? 'b' : 'w'} className="px-1" /></div>
+                  <div className="mt-1.5 md:mt-2"><EvalBar fen={currentFen} cp={practiceMode ? null : evalAfter(currentMove)} /></div>
+                </div>
               </div>
             )}
           </div>

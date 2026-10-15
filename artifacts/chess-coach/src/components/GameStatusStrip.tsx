@@ -5,18 +5,25 @@ import { evaluatePosition } from '@/lib/chess-bot';
 // Reusable eval bar driven directly by a FEN string (via the same
 // evaluatePosition() engine already used for bot move quality), so it
 // works for any game -- bot or live opponent -- not just bot games.
-export function EvalBar({ fen }: { fen: string }) {
+/** Evaluation bar. Pass `cp` (Stockfish centipawns from White's side; mate in
+ *  N = ±(10000 - N)) to show the engine's real evaluation; without it the bar
+ *  falls back to a quick local estimate of the position. */
+export function EvalBar({ fen, cp }: { fen: string; cp?: number | null }) {
   const evalScore = useMemo(() => {
+    if (typeof cp === 'number' && Number.isFinite(cp)) return cp;
     try {
       return evaluatePosition(fen);
     } catch {
       return 0;
     }
-  }, [fen]);
+  }, [fen, cp]);
 
+  const isMate = Math.abs(evalScore) >= 9000;
   const clamped = Math.max(-1500, Math.min(1500, evalScore));
-  const whitePercent = Math.max(4, Math.min(96, 50 + (clamped / 30)));
-  const display = evalScore >= 0 ? `+${(evalScore / 100).toFixed(1)}` : (evalScore / 100).toFixed(1);
+  const whitePercent = isMate ? (evalScore > 0 ? 96 : 4) : Math.max(4, Math.min(96, 50 + (clamped / 30)));
+  const display = isMate
+    ? (10000 - Math.abs(evalScore) <= 0 ? '#' : `${evalScore > 0 ? '' : '-'}M${10000 - Math.abs(evalScore)}`)
+    : evalScore >= 0 ? `+${(evalScore / 100).toFixed(1)}` : (evalScore / 100).toFixed(1);
 
   return (
     <div className="flex items-center gap-2.5">

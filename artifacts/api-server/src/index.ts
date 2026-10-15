@@ -278,6 +278,70 @@ async function runSchemaMigrations() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     )`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, created_at DESC)`);
+    // Friends: one row per pair. requester asked, addressee answers.
+    await db.execute(sql`CREATE TABLE IF NOT EXISTS friendships (
+      id SERIAL PRIMARY KEY,
+      requester_id VARCHAR NOT NULL,
+      addressee_id VARCHAR NOT NULL,
+      status VARCHAR NOT NULL DEFAULT 'pending',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      accepted_at TIMESTAMPTZ,
+      UNIQUE (requester_id, addressee_id)
+    )`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_friendships_addressee ON friendships(addressee_id, status)`);
+    // Direct messages between friends (challenge_code: a challenge sent in the chat).
+    await db.execute(sql`CREATE TABLE IF NOT EXISTS direct_messages (
+      id SERIAL PRIMARY KEY,
+      sender_id VARCHAR NOT NULL,
+      recipient_id VARCHAR NOT NULL,
+      body TEXT NOT NULL,
+      challenge_code VARCHAR,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      read_at TIMESTAMPTZ
+    )`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_dm_pair ON direct_messages(sender_id, recipient_id, created_at DESC)`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_dm_recipient_unread ON direct_messages(recipient_id) WHERE read_at IS NULL`);
+    // Arena tournaments (admin-created). Players are paired continuously while it runs.
+    await db.execute(sql`CREATE TABLE IF NOT EXISTS tournaments (
+      id VARCHAR PRIMARY KEY,
+      name VARCHAR NOT NULL,
+      description TEXT,
+      time_control VARCHAR NOT NULL,
+      mode VARCHAR NOT NULL DEFAULT 'casual',
+      starts_at TIMESTAMPTZ NOT NULL,
+      ends_at TIMESTAMPTZ NOT NULL,
+      status VARCHAR NOT NULL DEFAULT 'scheduled',
+      created_by VARCHAR NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )`);
+    await db.execute(sql`CREATE TABLE IF NOT EXISTS tournament_players (
+      tournament_id VARCHAR NOT NULL,
+      user_id VARCHAR NOT NULL,
+      username VARCHAR NOT NULL,
+      score INTEGER NOT NULL DEFAULT 0,
+      games INTEGER NOT NULL DEFAULT 0,
+      wins INTEGER NOT NULL DEFAULT 0,
+      draws INTEGER NOT NULL DEFAULT 0,
+      losses INTEGER NOT NULL DEFAULT 0,
+      withdrawn BOOLEAN NOT NULL DEFAULT false,
+      joined_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      PRIMARY KEY (tournament_id, user_id)
+    )`);
+    await db.execute(sql`CREATE TABLE IF NOT EXISTS tournament_games (
+      id SERIAL PRIMARY KEY,
+      tournament_id VARCHAR NOT NULL,
+      game_id VARCHAR NOT NULL,
+      white_user_id VARCHAR NOT NULL,
+      black_user_id VARCHAR NOT NULL,
+      white_username VARCHAR NOT NULL,
+      black_username VARCHAR NOT NULL,
+      result VARCHAR,
+      termination VARCHAR,
+      started_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      finished_at TIMESTAMPTZ,
+      UNIQUE (game_id)
+    )`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_tournament_games_t ON tournament_games(tournament_id, started_at DESC)`);
 
     logger.info('Schema migrations complete');
   } catch (err) {

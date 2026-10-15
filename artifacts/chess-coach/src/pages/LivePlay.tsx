@@ -8,6 +8,8 @@ import { apiFetch } from '@/lib/api';
 import { PT, cardStyle, greenBtn, ghostBtn } from '@/lib/playTheme';
 import { ShareLink } from '@/components/play/ShareLink';
 import { NotifyPrompt } from '@/components/play/NotifyPrompt';
+import { TournamentsCard } from '@/components/play/Tournaments';
+import { useSocialUnread } from '@/lib/social';
 import { useChallengeInbox, ChallengeRequestsCard, ChallengeInvitesCard, SentRequestsCard, OpenLinksCard, createOpenLink } from '@/components/play/OpenChallenges';
 
 const TC_OPTIONS = [
@@ -29,6 +31,7 @@ export function LivePlay() {
   const [creating, setCreating] = useState(false);
   const [now, setNow] = useState(Date.now());
   const inbox = useChallengeInbox();
+  const social = useSocialUnread();
   const [creatingOpen, setCreatingOpen] = useState(false);
 
   useEffect(() => { if (live.status === 'finished') void refetch(); }, [live.status, refetch]);
@@ -59,7 +62,9 @@ export function LivePlay() {
     }
   }, [live]);
 
-  if (live.status === 'in_game' || (live.status === 'finished' && live.game)) {
+  // Keep the game on screen through a reconnect (status can briefly read
+  // connecting/disconnected/idle while the socket comes back).
+  if (live.game && (live.status === 'in_game' || live.status === 'finished' || live.game.status === 'active')) {
     return <LiveGame live={live} onLeave={() => live.reset()} />;
   }
 
@@ -100,10 +105,21 @@ export function LivePlay() {
           <h1 className="text-2xl md:text-3xl font-black" style={{ color: PT.text, letterSpacing: '-0.02em' }}>Play Live</h1>
           <p className="text-sm" style={{ color: PT.muted }}>Real opponents in your rating range, or challenge a friend with a link.</p>
         </div>
-        <Link href="/live/history" className="shrink-0 inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-black uppercase tracking-wider"
-          style={{ background: PT.greenSoft, color: PT.green, border: `1px solid ${PT.greenLine}` }}>
-          <History className="w-3.5 h-3.5" /> History
-        </Link>
+        <div className="flex shrink-0 flex-col gap-1.5 sm:flex-row">
+          <Link href="/friends" className="relative inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-black uppercase tracking-wider"
+            style={{ background: PT.greenSoft, color: PT.green, border: `1px solid ${PT.greenLine}` }} aria-label={social.total ? `Friends, ${social.total} new` : 'Friends'}>
+            <Users className="w-3.5 h-3.5" /> Friends
+            {social.total > 0 && (
+              <span className="absolute -right-1.5 -top-1.5 grid h-[18px] min-w-[18px] place-items-center rounded-full px-1 text-[10px] font-black" style={{ background: '#FF5058', color: '#fff' }}>
+                {social.total > 9 ? '9+' : social.total}
+              </span>
+            )}
+          </Link>
+          <Link href="/live/history" className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-black uppercase tracking-wider"
+            style={{ background: PT.greenSoft, color: PT.green, border: `1px solid ${PT.greenLine}` }}>
+            <History className="w-3.5 h-3.5" /> History
+          </Link>
+        </div>
       </div>
 
       {live.status === 'queued' ? (
@@ -208,6 +224,8 @@ export function LivePlay() {
               );
             })}
           </div>
+
+          <TournamentsCard />
 
           {/* Challenge a friend */}
           <div className="p-4 space-y-3" style={cardStyle}>

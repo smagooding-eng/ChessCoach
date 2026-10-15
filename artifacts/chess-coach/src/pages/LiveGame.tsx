@@ -3,7 +3,8 @@ import { ChessBoard } from '@/components/ChessBoard';
 import { EvalBar, MaterialStrip } from '@/components/GameStatusStrip';
 import { Chess } from 'chess.js';
 import type { useLivePlay } from '@/hooks/use-live-play';
-import { Flag, ArrowLeft, Trophy, Clock, Handshake, X, WifiOff, BookOpen, RotateCcw } from 'lucide-react';
+import { Flag, ArrowLeft, Trophy, Clock, Handshake, X, WifiOff, BookOpen, RotateCcw, UserPlus, Check } from 'lucide-react';
+import { apiFetch } from '@/lib/api';
 import { GameOverOverlay, OverlayButton, describeEnding } from '@/components/GameOverOverlay';
 import { useLocation } from 'wouter';
 
@@ -70,9 +71,22 @@ function PlayerStrip({ p, ms, active, isYou, awayMs }: { p: { username: string; 
 }
 
 export function LiveGame({ live, onLeave }: { live: ReturnType<typeof useLivePlay>; onLeave: () => void }) {
-  const { game, color, move, resign, premove, setPremove, offerDraw, acceptDraw, declineDraw, serverOffset, notice, offerRematch, declineRematch } = live;
+  const { game, color, move, resign, premove, setPremove, offerDraw, acceptDraw, declineDraw, serverOffset, notice, offerRematch, declineRematch, connected } = live;
   const [, navigate] = useLocation();
   const [tick, setTick] = useState(0);
+  // "Add as a friend" after a game against a person
+  const [friendState, setFriendState] = useState<'idle' | 'sending' | 'sent'>('idle');
+  useEffect(() => { setFriendState('idle'); }, [game?.id]);
+  const addFriend = async (userId: string) => {
+    setFriendState('sending');
+    try {
+      const r = await apiFetch('/api/friends/request', {
+        method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId }),
+      });
+      setFriendState(r.ok ? 'sent' : 'idle');
+    } catch { setFriendState('idle'); }
+  };
   const reviewId = game?.dbGameIds && color
     ? (color === 'w' ? game.dbGameIds.white : game.dbGameIds.black)
     : undefined;
@@ -127,7 +141,8 @@ export function LiveGame({ live, onLeave }: { live: ReturnType<typeof useLivePla
     return <div className="p-8 text-center" style={{ color: TEXT_MUTED }}>Loading…</div>;
   }
 
-  const isPlayerTurn = game.status === 'active' && game.turn === color;
+  // While reconnecting, moves would go nowhere: hold the board until we're back.
+  const isPlayerTurn = game.status === 'active' && game.turn === color && connected;
   const youAreWhite = color === 'w';
   const top = youAreWhite ? game.black : game.white;
   const bottom = youAreWhite ? game.white : game.black;
@@ -158,7 +173,15 @@ export function LiveGame({ live, onLeave }: { live: ReturnType<typeof useLivePla
   const opponentIsBot = (youAreWhite ? game.black : game.white).isBot;
   const rematchAskedByOpp = finished && !!game.rematchFrom && game.rematchFrom !== color;
   const rematchAskedByMe = finished && game.rematchFrom === color;
-  const rematchButtons = rematchAskedByOpp ? (
+  const inTournament = !!game.tournamentId;
+  const opp = youAreWhite ? game.black : game.white;
+  const nextLabel = inTournament ? 'Next pairing' : 'New opponent';
+  const addFriendButton = finished && !opponentIsBot && opp.userId ? (
+    <OverlayButton onClick={() => { void addFriend(opp.userId!); }} disabled={friendState !== 'idle'}>
+      {friendState === 'sent' ? <><Check className="w-4 h-4" /> Friend request sent</> : <><UserPlus className="w-4 h-4" /> Add {opp.username} as a friend</>}
+    </OverlayButton>
+  ) : null;
+  const rematchButtons = inTournament ? null : rematchAskedByOpp ? (
     <>
       <OverlayButton primary onClick={offerRematch}><RotateCcw className="w-4 h-4" /> Accept rematch</OverlayButton>
       <OverlayButton onClick={declineRematch}>Decline</OverlayButton>
@@ -195,12 +218,12 @@ export function LiveGame({ live, onLeave }: { live: ReturnType<typeof useLivePla
           <p className="text-sm font-bold" style={{ color: TEXT_LIGHT }}>{opponentIsBot ? 'The bot' : 'Your opponent'} wants a rematch!</p>
         )}
         {notice && <p className="text-xs font-bold" style={{ color: '#ec6b6b' }}>{notice}</p>}
-        <div className="mx-auto flex max-w-[320px] flex-col gap-2">{rematchButtons}</div>
+        <div className="mx-auto flex max-w-[320px] flex-col gap-2">{rematchButtons}{addFriendButton}</div>
         <div className="flex justify-center gap-2 pt-2 flex-wrap">
           <button onClick={onLeave}
             className="px-4 py-2 rounded-lg font-black text-xs"
             style={{ background: CHESSCOM_GREEN, color: PT.onGreen }}>
-            New Opponent
+            {inTournament ? 'Next pairing' : 'New Opponent'}
           </button>
           <button onClick={() => navigate(reviewId ? `/games/${reviewId}` : '/games')}
             disabled={!reviewId}
@@ -223,6 +246,12 @@ export function LiveGame({ live, onLeave }: { live: ReturnType<typeof useLivePla
   // under the board as before.
   const messages = (
     <>
+      {!connected && game.status === 'active' && (
+        <div className="rounded-lg px-3 py-2 text-xs flex items-center gap-2"
+          style={{ background: 'rgba(234,151,51,0.3)', color: '#ffffff', border: '1px solid rgba(234,151,51,0.6)' }}>
+          <WifiOff className="w-3.5 h-3.5 shrink-0" /> Reconnecting… your game is safe. Moves resume in a moment.
+        </div>
+      )}
       {oppAwayMs !== null && (
         <div className="rounded-lg px-3 py-2 text-xs flex items-center gap-2"
           style={{ background: 'rgba(229,72,77,0.3)', color: '#ffffff', border: '1px solid rgba(229,72,77,0.6)' }}>
@@ -282,7 +311,7 @@ export function LiveGame({ live, onLeave }: { live: ReturnType<typeof useLivePla
   return (
     <div className="p-4 md:p-0 space-y-3 max-w-2xl lg:max-w-[1120px] mx-auto">
       <button onClick={onLeave} className="inline-flex items-center gap-1.5 text-sm" style={{ color: TEXT_MUTED }}>
-        <ArrowLeft className="w-4 h-4" /> Lobby
+        <ArrowLeft className="w-4 h-4" /> {game.tournamentId ? 'Tournament' : 'Lobby'}
       </button>
 
       <PlayerStrip p={top} ms={topMs} active={topActive} isYou={false} awayMs={oppAwayMs} />
@@ -300,7 +329,7 @@ export function LiveGame({ live, onLeave }: { live: ReturnType<typeof useLivePla
         onMovePlayed={onMovePlayed}
         lastMove={lastMoveSquares}
         moveQuality={null}
-        premoveMode={!isPlayerTurn && game.status === 'active'}
+        premoveMode={!isPlayerTurn && game.status === 'active' && connected}
         premoveColor={color}
         premove={premove}
         onPremoveSet={(p) => setPremove(p)}
@@ -315,8 +344,10 @@ export function LiveGame({ live, onLeave }: { live: ReturnType<typeof useLivePla
               {rematchAskedByOpp && <p className="text-[13px] font-bold" style={{ color: '#EDEDED' }}>{opponentIsBot ? 'The bot' : 'Your opponent'} wants a rematch!</p>}
               {notice && <p className="text-[12px] font-bold" style={{ color: '#ec6b6b' }}>{notice}</p>}
               {rematchButtons}
+              {inTournament && <OverlayButton primary onClick={onLeave}>Next pairing</OverlayButton>}
               {reviewId && <OverlayButton onClick={() => navigate(`/games/${reviewId}`)}><BookOpen className="w-4 h-4" /> Review game</OverlayButton>}
-              <OverlayButton onClick={onLeave}>New opponent</OverlayButton>
+              {addFriendButton}
+              {!inTournament && <OverlayButton onClick={onLeave}>{nextLabel}</OverlayButton>}
             </>}
           />
         ) : null}

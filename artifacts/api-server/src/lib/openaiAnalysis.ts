@@ -819,6 +819,7 @@ function mergeReviewWithEngine(
       moveIndex: idx, san: om.san, color: om.color as "white" | "black",
       classification, explanation, betterMove, pros, cons,
       cpLoss: moveCpLoss, engineAvailable: true,
+      evalAfterCp: Math.round(cpAfter),
       coachStatus,
       bestLineSan,
     });
@@ -843,6 +844,9 @@ export interface MoveReview {
   cons: string[];
   cpLoss?: number;
   engineAvailable?: boolean;
+  /** Stockfish's evaluation of the position AFTER this move, in centipawns
+   *  from White's side (mate in N = ±(10000 - N)). Drives the review eval bar. */
+  evalAfterCp?: number;
   /** Whether the coach text was validated against the engine fact sheet
    *  ("engine-aligned") or had to be replaced with a deterministic template
    *  ("fallback"). Absent when no LLM text was applicable. */

@@ -6,6 +6,7 @@ import { apiFetch } from '@/lib/api';
 import { useDashboardRedesignFlag, setDashboardRedesignEnabled, usePhotoImagesFlag, setPhotoImagesEnabled } from '@/hooks/use-app-config';
 import { cn } from '@/lib/utils';
 import { Link } from 'wouter';
+import { TournamentsAdminPanel } from '@/components/admin/TournamentsAdminPanel';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Activity, AlertCircle, Bold, Brain, Camera, Check, CheckCircle2, ChevronDown, ChevronRight,
@@ -296,7 +297,7 @@ export function Admin() {
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'overview' | 'traffic' | 'ai' | 'users' | 'growth' | 'tools'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'traffic' | 'ai' | 'users' | 'growth' | 'tournaments' | 'tools'>('overview');
   const [showUsers, setShowUsers] = useState(false);
   const [showSubscribers, setShowSubscribers] = useState(false);
   const [showEmailModal, setShowEmailModal] = useState(false);
@@ -443,6 +444,7 @@ export function Admin() {
           ['ai', 'AI Usage & Cost'],
           ['users', 'Users'],
           ['growth', 'Growth & Marketing'],
+          ['tournaments', 'Tournaments'],
           ['tools', 'Admin Tools'],
         ] as const).map(([key, label]) => (
           <button
@@ -703,6 +705,8 @@ export function Admin() {
           <FacebookAutoPostPanel />
         </>
       )}
+
+      {activeTab === 'tournaments' && <TournamentsAdminPanel />}
 
       {activeTab === 'tools' && (
         <>

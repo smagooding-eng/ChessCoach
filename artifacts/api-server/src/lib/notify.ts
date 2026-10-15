@@ -62,6 +62,9 @@ export function isViewing(userId: string, path: string): boolean {
   return false;
 }
 
+/** Has the app open somewhere right now (an event stream is connected). */
+export function hasOpenApp(userId: string): boolean { return streams.has(userId); }
+
 export function emitToUser(userId: string, event: string, data: unknown): void {
   const set = streams.get(userId);
   if (!set) return;
@@ -81,7 +84,7 @@ export async function notifyUser(userId: string, n: NotifyInput): Promise<void> 
   try {
     // One entry per game in the inbox: a newer alert about the same game
     // replaces the older ones ("Your move" after "Your move"...).
-    if (n.url && /^\/(daily|correspondence)\//.test(n.url)) {
+    if (n.url && /^\/(daily|correspondence|messages)\//.test(n.url)) {
       await db.execute(sql`DELETE FROM notifications WHERE user_id = ${userId} AND url = ${n.url}`);
     }
     const rows = await db.execute(sql`
