@@ -7,7 +7,7 @@ import { useMultiEloProgress } from '@/hooks/use-elo-progress';
 import { useDashboardRedesignFlag } from '@/hooks/use-app-config';
 import { GooglePlayBadge, PlayLogo } from '@/components/GooglePlayBadge';
 import { PLAY_STORE_URL, shouldShowPlayBadge } from '@/lib/playApp';
-import { runPageSwipe, swipeAllowedFrom, swipeAllowedLoose } from '@/lib/swipeNav';
+import { runPageSwipe, pageCanSwipe, swipeAllowedFrom, swipeAllowedLoose } from '@/lib/swipeNav';
 import { useLiveRatings, bestLiveRating } from '@/hooks/use-live-ratings';
 import { LayoutDashboard, Import, History, BrainCircuit, GraduationCap, Swords, BookOpen, LogOut, MoreHorizontal, ChevronRight, Bot, Crown, Trophy, Play, Search, Download, Puzzle, User, Settings, CreditCard, Camera, Shield, Target, BarChart3 } from 'lucide-react';
 import { usePwaInstall } from '@/hooks/use-pwa-install';
@@ -169,36 +169,99 @@ export function Layout({ children, fullscreen }: { children: React.ReactNode; fu
   const mainRef = useRef<HTMLElement | null>(null);
   const swipeState = useRef({ location, moreOpen });
   swipeState.current = { location, moreOpen };
+  // The page follows your finger while you swipe; let go past the threshold
+  // (or flick) and it slides off while the next page / tab slides in from the
+  // other side. Not far enough: it springs back.
   useEffect(() => {
     const el = mainRef.current;
     if (!el) return;
     const sections = PRIMARY_NAV.slice(0, 4).map((i) => i.href);
-    let start: { x: number; y: number; t: number; ok: boolean } | null = null;
+    type Start = { x: number; y: number; t: number; ok: boolean; mode: 'unknown' | 'drag' | 'scroll'; target: 'tab' | 'page' | 'none' | null; dir: 1 | -1 };
+    let start: Start | null = null;
+    let animating = false;
+    const W = () => window.innerWidth;
+    const set = (x: number, withTransition: string | null) => {
+      el.style.transition = withTransition ?? 'none';
+      el.style.transform = x === 0 && withTransition === null ? '' : `translate3d(${x}px,0,0)`;
+      el.style.opacity = String(1 - Math.min(Math.abs(x) / W(), 1) * 0.35);
+    };
+    const clear = () => { el.style.transition = ''; el.style.transform = ''; el.style.opacity = ''; el.style.willChange = ''; };
+    const pageOnlyHere = () => /^\/opponents(\/|$)/.test(swipeState.current.location);
+    const targetFor = (dir: 1 | -1): 'tab' | 'page' | 'none' => {
+      if (!pageOnlyHere() && pageCanSwipe(dir)) return 'tab';
+      const i = sections.indexOf(swipeState.current.location);
+      return i >= 0 && i + dir >= 0 && i + dir < sections.length ? 'page' : 'none';
+    };
     const onStart = (e: TouchEvent) => {
-      if (e.touches.length !== 1 || window.innerWidth >= 768) { start = null; return; }
+      if (animating || e.touches.length !== 1 || window.innerWidth >= 768) { start = null; return; }
       const t = e.touches[0];
       // Leave the screen edges to the phone's own back/forward gestures.
       const edge = t.clientX < 24 || t.clientX > window.innerWidth - 24;
       // Opponent Scout swipes straight to the next/previous page (it has no
       // swipeable tabs), so sideways-scrolling rows there don't block it.
-      const pageOnly = /^\/opponents(\/|$)/.test(swipeState.current.location);
-      start = { x: t.clientX, y: t.clientY, t: Date.now(), ok: !edge && (pageOnly ? swipeAllowedLoose(e.target) : swipeAllowedFrom(e.target)) };
+      const ok = !edge && !swipeState.current.moreOpen && (pageOnlyHere() ? swipeAllowedLoose(e.target) : swipeAllowedFrom(e.target));
+      start = { x: t.clientX, y: t.clientY, t: Date.now(), ok, mode: 'unknown', target: null, dir: 1 };
+    };
+    const onMove = (e: TouchEvent) => {
+      const s0 = start;
+      if (!s0 || !s0.ok || s0.mode === 'scroll') return;
+      const t = e.touches[0];
+      const dx = t.clientX - s0.x, dy = t.clientY - s0.y;
+      if (s0.mode === 'unknown') {
+        if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
+        if (Math.abs(dx) < Math.abs(dy) * 1.4) { s0.mode = 'scroll'; return; }
+        s0.mode = 'drag';
+        el.style.willChange = 'transform, opacity';
+      }
+      const dir: 1 | -1 = dx < 0 ? 1 : -1;
+      if (s0.target === null || dir !== s0.dir) { s0.dir = dir; s0.target = targetFor(dir); }
+      // Nowhere to go that way: a little rubber-band give only.
+      const x = s0.target === 'none' ? dx * 0.18 : dx * 0.92;
+      set(x, null);
+    };
+    const finish = (dir: 1 | -1, target: 'tab' | 'page') => {
+      animating = true;
+      const out = -dir * W();
+      set(out, 'transform 170ms cubic-bezier(.4,0,1,1), opacity 170ms linear');
+      window.setTimeout(() => {
+        if (target === 'tab') runPageSwipe(dir);
+        else {
+          const i = sections.indexOf(swipeState.current.location);
+          navigateTo(sections[i + dir]);
+        }
+        // The new content comes in from the other side.
+        set(dir * W() * 0.35, null);
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+          set(0, 'transform 260ms cubic-bezier(.2,.8,.2,1), opacity 260ms ease-out');
+          window.setTimeout(() => { clear(); animating = false; }, 280);
+        }));
+      }, 170);
     };
     const onEnd = (e: TouchEvent) => {
       const s0 = start; start = null;
-      if (!s0 || !s0.ok || swipeState.current.moreOpen) return;
+      if (!s0 || !s0.ok || s0.mode !== 'drag') return;
       const t = e.changedTouches[0];
-      const dx = t.clientX - s0.x, dy = t.clientY - s0.y;
-      if (Date.now() - s0.t > 700 || Math.abs(dx) < 70 || Math.abs(dx) < Math.abs(dy) * 1.8) return;
-      const dir: 1 | -1 = dx < 0 ? 1 : -1; // swipe left = next
-      if (!/^\/opponents(\/|$)/.test(swipeState.current.location) && runPageSwipe(dir)) return;
-      const i = sections.indexOf(swipeState.current.location);
-      const next = i + dir;
-      if (i >= 0 && next >= 0 && next < sections.length) navigateTo(sections[next]);
+      const dx = t.clientX - s0.x;
+      const dt = Math.max(1, Date.now() - s0.t);
+      const flick = Math.abs(dx) / dt > 0.5 && Math.abs(dx) > 40;
+      const far = Math.abs(dx) > W() * 0.28;
+      const dir: 1 | -1 = dx < 0 ? 1 : -1;
+      const target = targetFor(dir);
+      if ((flick || far) && target !== 'none' && !swipeState.current.moreOpen) { finish(dir, target); return; }
+      // spring back
+      set(0, 'transform 220ms cubic-bezier(.2,.8,.2,1), opacity 220ms ease-out');
+      window.setTimeout(() => { if (!animating) clear(); }, 240);
     };
+    const onCancel = () => { if (start?.mode === 'drag') { set(0, 'transform 200ms ease-out, opacity 200ms ease-out'); window.setTimeout(() => { if (!animating) clear(); }, 220); } start = null; };
     el.addEventListener('touchstart', onStart, { passive: true });
+    el.addEventListener('touchmove', onMove, { passive: true });
     el.addEventListener('touchend', onEnd, { passive: true });
-    return () => { el.removeEventListener('touchstart', onStart); el.removeEventListener('touchend', onEnd); };
+    el.addEventListener('touchcancel', onCancel, { passive: true });
+    return () => {
+      el.removeEventListener('touchstart', onStart); el.removeEventListener('touchmove', onMove);
+      el.removeEventListener('touchend', onEnd); el.removeEventListener('touchcancel', onCancel);
+      clear();
+    };
   }, [navigateTo]);
   const [profileOpen, setProfileOpen] = useState(false);
   const handleLogout = isAuthenticated ? authLogout : logout;

@@ -409,7 +409,25 @@ function PageLoadingFallback() {
   return <PageLoader />;
 }
 
+// The four swipeable sections (Home, Scout, Games, Analysis) are fetched in
+// the background once the app is idle, so swiping between them never waits
+// on a download (which used to flash the loader mid-swipe).
+function usePrefetchSections() {
+  useEffect(() => {
+    const go = () => {
+      void import("@/pages/DashboardRedesign").catch(() => {});
+      void import("@/pages/OpponentAnalysis").catch(() => {});
+      void import("@/pages/GamesRedesign").catch(() => {});
+      void import("@/pages/AnalysisRedesign").catch(() => {});
+    };
+    const w = window as Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number };
+    if (w.requestIdleCallback) w.requestIdleCallback(go, { timeout: 4000 });
+    else window.setTimeout(go, 2500);
+  }, []);
+}
+
 function AppBackgroundWrapper({ children }: { children: React.ReactNode }) {
+  usePrefetchSections();
   const { appBackgroundCss, uiStyle, bgPhoto, cardGlass } = useSettings();
   const photo = uiStyle === 'photo' ? BG_PHOTOS.find((p) => p.id === bgPhoto) ?? BG_PHOTOS[0] : null;
   // Photo look: the html class switches every card to see-through (index.css).

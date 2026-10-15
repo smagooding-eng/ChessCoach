@@ -10,7 +10,7 @@ import { useEffect } from 'react';
 // Swipes are ignored when they start on a chessboard, a text field, a slider,
 // something that scrolls sideways, or anything marked data-no-swipe.
 
-type Handler = (dir: 1 | -1) => boolean;
+type Handler = ((dir: 1 | -1) => boolean) & { can?: (dir: 1 | -1) => boolean };
 let pageHandler: Handler | null = null;
 
 // setTab is typed loosely on purpose: a React state setter for a union of
@@ -18,13 +18,15 @@ let pageHandler: Handler | null = null;
 export function useSwipeTabs<T extends string>(ids: readonly T[], current: T, setTab: (t: never) => void, enabled = true): void {
   useEffect(() => {
     if (!enabled) return;
-    const h: Handler = (dir) => {
+    const can = (dir: 1 | -1) => {
       const i = ids.indexOf(current);
-      const next = i + dir;
-      if (i < 0 || next < 0 || next >= ids.length) return false;
-      (setTab as (t: T) => void)(ids[next]);
-      return true;
+      return i >= 0 && i + dir >= 0 && i + dir < ids.length;
     };
+    const h: Handler = Object.assign((dir: 1 | -1) => {
+      if (!can(dir)) return false;
+      (setTab as (t: T) => void)(ids[ids.indexOf(current) + dir]);
+      return true;
+    }, { can });
     pageHandler = h;
     return () => { if (pageHandler === h) pageHandler = null; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -33,6 +35,11 @@ export function useSwipeTabs<T extends string>(ids: readonly T[], current: T, se
 
 export function runPageSwipe(dir: 1 | -1): boolean {
   return pageHandler ? pageHandler(dir) : false;
+}
+
+/** Would a swipe in this direction move the current page's tabs? (no side effects) */
+export function pageCanSwipe(dir: 1 | -1): boolean {
+  return !!pageHandler?.can?.(dir);
 }
 
 const BLOCKERS = '[data-no-swipe],[data-square],[data-piece],input,textarea,select,[contenteditable="true"],[role="slider"],[draggable="true"]';
