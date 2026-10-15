@@ -7,7 +7,7 @@ import { useMultiEloProgress } from '@/hooks/use-elo-progress';
 import { useDashboardRedesignFlag } from '@/hooks/use-app-config';
 import { GooglePlayBadge, PlayLogo } from '@/components/GooglePlayBadge';
 import { PLAY_STORE_URL, shouldShowPlayBadge } from '@/lib/playApp';
-import { runPageSwipe, swipeAllowedFrom } from '@/lib/swipeNav';
+import { runPageSwipe, swipeAllowedFrom, swipeAllowedLoose } from '@/lib/swipeNav';
 import { useLiveRatings, bestLiveRating } from '@/hooks/use-live-ratings';
 import { LayoutDashboard, Import, History, BrainCircuit, GraduationCap, Swords, BookOpen, LogOut, MoreHorizontal, ChevronRight, Bot, Crown, Trophy, Play, Search, Download, Puzzle, User, Settings, CreditCard, Camera, Shield, Target, BarChart3 } from 'lucide-react';
 import { usePwaInstall } from '@/hooks/use-pwa-install';
@@ -179,18 +179,19 @@ export function Layout({ children, fullscreen }: { children: React.ReactNode; fu
       const t = e.touches[0];
       // Leave the screen edges to the phone's own back/forward gestures.
       const edge = t.clientX < 24 || t.clientX > window.innerWidth - 24;
-      start = { x: t.clientX, y: t.clientY, t: Date.now(), ok: !edge && swipeAllowedFrom(e.target) };
+      // Opponent Scout swipes straight to the next/previous page (it has no
+      // swipeable tabs), so sideways-scrolling rows there don't block it.
+      const pageOnly = /^\/opponents(\/|$)/.test(swipeState.current.location);
+      start = { x: t.clientX, y: t.clientY, t: Date.now(), ok: !edge && (pageOnly ? swipeAllowedLoose(e.target) : swipeAllowedFrom(e.target)) };
     };
     const onEnd = (e: TouchEvent) => {
       const s0 = start; start = null;
       if (!s0 || !s0.ok || swipeState.current.moreOpen) return;
-      // No swipe navigation on the opponent scout pages (lots of sideways content there).
-      if (/^\/(opponents|scout)(\/|$)/.test(swipeState.current.location)) return;
       const t = e.changedTouches[0];
       const dx = t.clientX - s0.x, dy = t.clientY - s0.y;
       if (Date.now() - s0.t > 700 || Math.abs(dx) < 70 || Math.abs(dx) < Math.abs(dy) * 1.8) return;
       const dir: 1 | -1 = dx < 0 ? 1 : -1; // swipe left = next
-      if (runPageSwipe(dir)) return;
+      if (!/^\/opponents(\/|$)/.test(swipeState.current.location) && runPageSwipe(dir)) return;
       const i = sections.indexOf(swipeState.current.location);
       const next = i + dir;
       if (i >= 0 && next >= 0 && next < sections.length) navigateTo(sections[next]);

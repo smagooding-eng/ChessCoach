@@ -37,6 +37,13 @@ export function runPageSwipe(dir: 1 | -1): boolean {
 
 const BLOCKERS = '[data-no-swipe],[data-square],[data-piece],input,textarea,select,[contenteditable="true"],[role="slider"],[draggable="true"]';
 
+/** Like swipeAllowedFrom, but only boards, fields and data-no-swipe block it (not
+ *  sideways-scrolling rows). Used on pages that swipe straight to the next page. */
+export function swipeAllowedLoose(el: EventTarget | null): boolean {
+  if (!(el instanceof Element)) return true;
+  return !el.closest(BLOCKERS);
+}
+
 /** Should a touch that started on `el` be allowed to become a menu swipe? */
 export function swipeAllowedFrom(el: EventTarget | null): boolean {
   if (!(el instanceof Element)) return true;
