@@ -71,7 +71,7 @@ export function LessonQuizScreen({ quiz, onContinue }: { quiz: QuizMoves; onCont
   const correct = picked === quiz.best;
 
   return (
-    <div className="fixed inset-0 z-40 overflow-y-auto" style={{ background: RD.bg, color: RD.text }}>
+    <div className="fixed inset-0 z-40 overflow-y-auto" style={{ background: '#050A0B', color: RD.text }}>
       <div className="mx-auto w-full max-w-[560px] px-4 pb-10 pt-[max(0.5rem,env(safe-area-inset-top))]">
         <div className="relative flex items-center justify-center py-2.5">
           <button onClick={onContinue} aria-label="Skip the quick check" className="absolute left-0 grid h-10 w-10 place-items-center rounded-full" style={{ color: RD.text }}><ArrowLeft size={22} /></button>
@@ -151,7 +151,7 @@ export function LessonCompleteScreen({
   const siteImg = useSiteImg();
   const pct = lessonsTotal > 0 ? Math.round((lessonsDone / lessonsTotal) * 100) : 0;
   return (
-    <div className="fixed inset-0 z-40 overflow-y-auto" style={{ background: RD.bg, color: RD.text }}>
+    <div className="fixed inset-0 z-40 overflow-y-auto" style={{ background: '#050A0B', color: RD.text }}>
       <div className="relative">
         <img src={siteImg(`${import.meta.env.BASE_URL}assets/courses/course-tactical.webp`)} alt="" className="absolute inset-0 h-[300px] w-full object-cover" />
         <div className="absolute inset-0 h-[300px]" style={{ background: 'linear-gradient(180deg, rgba(5,10,11,.55) 0%, #050A0B 100%)' }} />
@@ -226,7 +226,7 @@ export function LessonIntroScreen({
     : k === 'drill' ? <Swords size={16} style={{ color: RD.green }} />
     : <CheckCircle2 size={16} style={{ color: RD.green }} />;
   return (
-    <div className="fixed inset-0 z-40 overflow-y-auto" style={{ background: RD.bg, color: RD.text }}>
+    <div className="fixed inset-0 z-40 overflow-y-auto" style={{ background: '#050A0B', color: RD.text }}>
       <div className="mx-auto w-full max-w-[560px] px-4 pb-10 pt-[max(0.5rem,env(safe-area-inset-top))]">
         <div className="relative flex items-center justify-center py-2.5">
           <button onClick={onBack} aria-label="Back to course overview" className="absolute left-0 grid h-10 w-10 place-items-center rounded-full" style={{ color: RD.text }}><ArrowLeft size={22} /></button>

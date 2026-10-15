@@ -18,6 +18,7 @@ import { RD } from '@/lib/redesignTheme';
 import { PhotoHero, scene } from '@/components/PhotoHero';
 import { ART_BASE, distinctArtImgs } from './CoursesRedesign';
 import { useSwipeTabs } from '@/lib/swipeNav';
+import { usePhotoLook } from '@/context/SettingsContext';
 
 type EndgameTab = 'checkmate' | 'essential' | 'personal';
 
@@ -57,6 +58,7 @@ export function Endgames() {
   const { data, isLoading, refetch } = useMyCourses();
   const { enabled: redesign } = useDashboardRedesignFlag();
   const siteImg = useSiteImg();
+  const photoLook = usePhotoLook();
 
   const [activeTab, setActiveTab] = useState<EndgameTab>('checkmate');
   useSwipeTabs(TABS.map((t) => t.id), activeTab, setActiveTab);
@@ -271,9 +273,13 @@ export function Endgames() {
               const done = progress === 100;
               return (
                 <Link key={course.id} href={`/courses/${course.id}`} className="flex items-stretch overflow-hidden rounded-[18px] transition-transform active:scale-[.99]" style={{ background: RD.card, border: `1px solid ${RD.border}` }}>
+                  {photoLook ? (
+                    <span className="ml-3.5 grid h-11 w-11 shrink-0 self-center place-items-center rounded-[12px]" style={{ background: 'rgba(129,182,76,.12)', color: RD.green, border: '1px solid rgba(129,182,76,.25)' }}><Crown size={20} /></span>
+                  ) : (
                   <span className="relative w-[96px] shrink-0 overflow-hidden">
                     <img src={siteImg(`${ART_BASE}${imgs[i]}.webp`)} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
                   </span>
+                  )}
                   <span className="min-w-0 flex-1 px-3.5 py-3">
                     <b className="block truncate text-[15.5px] font-extrabold" style={{ color: RD.text }}>{course.title}</b>
                     <span className="mt-0.5 flex items-center gap-1 text-[12px]" style={{ color: done ? RD.green : RD.muted }}>

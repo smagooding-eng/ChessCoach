@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ChessBoard } from './ChessBoard';
 import { MaterialStrip, EvalBar } from './GameStatusStrip';
 import { normalizeFen, cn } from '@/lib/utils';
-import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { AlertTriangle, CheckCircle2 } from 'lucide-react';
 
 type Classification =
   | 'checkmate' | 'brilliant' | 'great' | 'best' | 'excellent' | 'good' | 'book'
@@ -192,8 +192,6 @@ export function MistakeFixView({
   ];
   const current = slides[slide];
   const Icon = current.icon;
-  const goPrev = () => onSlideChange(0);
-  const goNext = () => onSlideChange(1);
 
   return (
     <div className="space-y-1.5 md:space-y-2 max-w-[520px] xl:max-w-[680px] mx-auto">
@@ -228,27 +226,8 @@ export function MistakeFixView({
 
       {/* Single board, sliding between the two views */}
       <div className="relative">
-        {/* Prev arrow */}
-        <button
-          type="button"
-          onClick={goPrev}
-          disabled={slide === 0}
-          aria-label="Show what you played"
-          className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1/2 z-10 w-8 h-8 rounded-full bg-black/60 border border-white/10 backdrop-blur flex items-center justify-center text-white/70 hover:text-white hover:bg-black/80 disabled:opacity-30 disabled:cursor-not-allowed transition"
-        >
-          <ChevronLeft className="w-4 h-4" />
-        </button>
-        {/* Next arrow */}
-        <button
-          type="button"
-          onClick={goNext}
-          disabled={slide === 1}
-          aria-label="Show engine's recommended move"
-          className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 z-10 w-8 h-8 rounded-full bg-black/60 border border-white/10 backdrop-blur flex items-center justify-center text-white/70 hover:text-white hover:bg-black/80 disabled:opacity-30 disabled:cursor-not-allowed transition"
-        >
-          <ChevronRight className="w-4 h-4" />
-        </button>
-
+        {/* Switching views is done with the tabs above (no ring or side arrows on the
+            board, so it looks exactly like every other move). */}
         <div className={stripClassName}><MaterialStrip fen={current.empty ? prevFen : current.fen} color={flipped ? 'w' : 'b'} className="px-1" /></div>
 
         <div className="relative overflow-hidden rounded-xl">
@@ -270,7 +249,7 @@ export function MistakeFixView({
                   </p>
                 </div>
               ) : (
-                <div className={`rounded-xl ring-1 ${current.ring} overflow-hidden`}>
+                <div className="rounded-xl overflow-hidden">
                   <ChessBoard
                     fen={current.fen}
                     flipped={flipped}

@@ -612,3 +612,8 @@ let activeSoundPack: SoundPack = 'classic';
 export function playMoveSound(kind: SoundEvent = 'move') {
   playSound(kind, activeSoundPack);
 }
+
+/** The photo backdrop look is on: cards drop their own pictures and use a compact layout. */
+export function usePhotoLook(): boolean {
+  return useSettings().uiStyle === 'photo';
+}

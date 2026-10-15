@@ -5,6 +5,7 @@ import { useCourseDetail } from '@/hooks/use-courses';
 import { RD } from '@/lib/redesignTheme';
 import { useSiteImg } from '@/hooks/use-app-config';
 import { useSwipeTabs } from '@/lib/swipeNav';
+import { usePhotoLook } from '@/context/SettingsContext';
 
 // Courses (redesign): "Your Training Plan" -- next-move hero, flat stat
 // columns, priority rows, a recommended-course card and compact course rows,
@@ -85,6 +86,7 @@ export function CoursesRedesign({
   onArchive: (id: number) => void;
 }) {
   const siteImg = useSiteImg();
+  const photoLook = usePhotoLook();
   const [tab, setTab] = useState<'all' | 'progress'>('all');
   useSwipeTabs(['all', 'progress'] as const, tab, setTab);
 
@@ -131,12 +133,12 @@ export function CoursesRedesign({
         {/* YOUR NEXT MOVE */}
         {nextCourse && (
           <section className="relative overflow-hidden rounded-[22px]" style={{ border: `1.5px solid ${RD.green}`, boxShadow: '0 0 0 1px rgba(129,182,76,.18), 0 18px 50px -22px rgba(129,182,76,.5)' }}>
-            <img src={siteImg(`${ART_BASE}course-training-hero.webp`)} alt="" className="absolute inset-0 h-full w-full object-cover" style={{ objectPosition: '82% center' }} />
-            <div className="absolute inset-0" style={{ background: 'linear-gradient(90deg, rgba(5,10,11,.94) 0%, rgba(5,10,11,.78) 48%, rgba(5,10,11,.05) 100%)' }} />
+            {!photoLook && <img src={siteImg(`${ART_BASE}course-training-hero.webp`)} alt="" className="absolute inset-0 h-full w-full object-cover" style={{ objectPosition: '82% center' }} />}
+            {!photoLook && <div className="absolute inset-0" style={{ background: 'linear-gradient(90deg, rgba(5,10,11,.94) 0%, rgba(5,10,11,.78) 48%, rgba(5,10,11,.05) 100%)' }} />}
             <div className="relative z-10 p-5">
               <p className="text-[12px] font-extrabold uppercase tracking-[.18em]" style={{ color: '#D9C46A' }}>Your next move</p>
-              <h2 className="mt-2 max-w-[68%] text-[26px] font-extrabold leading-tight">{nextCourse.title}</h2>
-              <p className="mt-1.5 max-w-[68%] text-[14px] leading-snug" style={{ color: 'rgba(245,247,246,.85)' }}>
+              <h2 className={`mt-2 text-[26px] font-extrabold leading-tight ${photoLook ? '' : 'max-w-[68%]'}`}>{nextCourse.title}</h2>
+              <p className={`mt-1.5 text-[14px] leading-snug ${photoLook ? '' : 'max-w-[68%]'}`} style={{ color: 'rgba(245,247,246,.85)' }}>
                 Lesson {Math.min(nextCourse.completedLessons + 1, nextCourse.totalLessons)} of {nextCourse.totalLessons}
                 {currentLesson ? <><br />{currentLesson.title}</> : null}
               </p>
@@ -192,11 +194,11 @@ export function CoursesRedesign({
           <section className="grid gap-2.5">
             <h2 className="px-1 text-[20px] font-extrabold">Recommended for you</h2>
             <Link href={`/courses/${recommended.id}`} className="relative block overflow-hidden rounded-[22px]" style={{ border: `1px solid ${RD.border}` }}>
-              <img src={siteImg(`${ART_BASE}${artFor(recommended).img}.webp`)} alt="" className="absolute inset-0 h-full w-full object-cover" style={{ objectPosition: '75% center' }} />
-              <div className="absolute inset-0" style={{ background: 'linear-gradient(90deg, rgba(5,10,11,.92) 0%, rgba(5,10,11,.7) 55%, rgba(5,10,11,.1) 100%)' }} />
-              <div className="relative z-10 flex min-h-[210px] flex-col p-5">
-                <h3 className="max-w-[75%] text-[26px] font-extrabold leading-tight">{recommended.title}</h3>
-                <p className="mt-1.5 line-clamp-2 max-w-[70%] text-[14.5px] leading-snug" style={{ color: 'rgba(245,247,246,.9)' }}>{recommended.description}</p>
+              {!photoLook && <img src={siteImg(`${ART_BASE}${artFor(recommended).img}.webp`)} alt="" className="absolute inset-0 h-full w-full object-cover" style={{ objectPosition: '75% center' }} />}
+              {!photoLook && <div className="absolute inset-0" style={{ background: 'linear-gradient(90deg, rgba(5,10,11,.92) 0%, rgba(5,10,11,.7) 55%, rgba(5,10,11,.1) 100%)' }} />}
+              <div className={`relative z-10 flex flex-col p-5 ${photoLook ? '' : 'min-h-[210px]'}`}>
+                <h3 className={`text-[26px] font-extrabold leading-tight ${photoLook ? '' : 'max-w-[75%]'}`}>{recommended.title}</h3>
+                <p className={`mt-1.5 line-clamp-2 text-[14.5px] leading-snug ${photoLook ? '' : 'max-w-[70%]'}`} style={{ color: 'rgba(245,247,246,.9)' }}>{recommended.description}</p>
                 <div className="mt-auto pt-4">
                   <p className="mb-1.5 text-[13px] font-bold">{pctOf(recommended)}% complete</p>
                   <div className="max-w-[78%]"><Bar value={pctOf(recommended)} h={7} /></div>
@@ -272,9 +274,11 @@ export function CoursesRedesign({
             return (
               <div key={c.id} className="flex items-stretch overflow-hidden rounded-[20px]" style={card}>
                 <Link href={`/courses/${c.id}`} className="flex min-w-0 flex-1 items-stretch">
+                  {!photoLook && (
                   <span className="relative w-[96px] shrink-0 overflow-hidden">
                     <img src={siteImg(`${ART_BASE}${visibleImgs[ci]}.webp`)} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
                   </span>
+                  )}
                   <span className="min-w-0 flex-1 px-3.5 py-3.5">
                     <b className="block truncate text-[16.5px] font-extrabold">{c.title}</b>
                     <span className="mt-0.5 line-clamp-1 block text-[13px]" style={{ color: RD.muted }}>{c.description}</span>

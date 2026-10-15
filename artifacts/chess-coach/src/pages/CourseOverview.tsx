@@ -4,6 +4,7 @@ import { ArrowLeft, ArrowRight, CheckCircle2, Layers, Play } from 'lucide-react'
 import { RD } from '@/lib/redesignTheme';
 import { artFor, ART_BASE, lessonThumbSrc, type CourseLike } from './CoursesRedesign';
 import { useSiteImg, usePhotoImagesFlag } from '@/hooks/use-app-config';
+import { usePhotoLook } from '@/context/SettingsContext';
 
 // Course Overview (redesign), per the course mockup: top bar, full-bleed art,
 // title / description / meta, progress, one primary action, and a Lessons /
@@ -19,6 +20,7 @@ export function CourseOverview({
 }) {
   const siteImg = useSiteImg();
   const photoImgs = usePhotoImagesFlag();
+  const photoLook = usePhotoLook();
   const [tab, setTab] = useState<'lessons' | 'about'>('lessons');
   const art = artFor(course);
   const total = course.totalLessons || lessons.length;
@@ -36,12 +38,14 @@ export function CourseOverview({
           <b className="text-[16px]">Course</b>
         </div>
 
+        {!photoLook && (
         <div className="relative h-[210px] overflow-hidden">
           <img src={siteImg(`${ART_BASE}${art.img}.webp`)} alt="" className="absolute inset-0 h-full w-full object-cover" />
           <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, rgba(5,10,11,0) 40%, #050A0B 100%)' }} />
         </div>
+        )}
 
-        <div className="-mt-6 relative z-10 px-4">
+        <div className={`relative z-10 px-4 ${photoLook ? 'mt-2' : '-mt-6'}`}>
           <h1 className="text-[32px] font-extrabold leading-tight tracking-tight">{course.title}</h1>
           <p className="mt-1.5 text-[15px] leading-snug" style={{ color: 'rgba(245,247,246,.85)' }}>{course.description}</p>
 
@@ -93,9 +97,11 @@ export function CourseOverview({
                     className="flex w-full items-center gap-3 rounded-[14px] px-2.5 py-2 text-left"
                     style={{ background: isCurrent ? 'rgba(129,182,76,.08)' : 'transparent', boxShadow: isCurrent ? `inset 0 0 0 1.5px ${RD.green}` : undefined }}
                   >
+                    {!photoLook && (
                     <span className="relative h-11 w-11 shrink-0 overflow-hidden rounded-[9px]" style={{ border: `1px solid ${RD.border}` }}>
                       <img src={siteImg(lessonThumbSrc(i, art.img, photoImgs))} alt="" loading="lazy" className="h-full w-full object-cover" />
                     </span>
+                    )}
                     <span className="w-5 shrink-0 text-center text-[13px]" style={{ color: RD.muted }}>{i + 1}</span>
                     <span className="min-w-0 flex-1 text-[15px] font-semibold leading-snug" style={{ color: l.completed || isCurrent ? RD.text : 'rgba(245,247,246,.75)' }}>{l.title}</span>
                     {l.completed ? (

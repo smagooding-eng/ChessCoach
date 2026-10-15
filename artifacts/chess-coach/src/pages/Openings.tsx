@@ -13,6 +13,7 @@ import { RD } from '@/lib/redesignTheme';
 import { RedesignHeader } from '@/components/RedesignHeader';
 import { openingThumbList } from '@/lib/openingThumb';
 import { useSwipeTabs } from '@/lib/swipeNav';
+import { usePhotoLook } from '@/context/SettingsContext';
 
 type SortKey = 'totalGames' | 'winRate' | 'opening' | 'whiteWinRate' | 'blackWinRate';
 type ColorFilter = 'all' | 'white' | 'black';
@@ -48,6 +49,7 @@ export function Openings() {
   const [colorFilter, setColorFilter] = useState<ColorFilter>('all');
   const { enabled: redesign } = useDashboardRedesignFlag();
   const photoImgs = usePhotoImagesFlag();
+  const photoLook = usePhotoLook();
   const [tab, setTab] = useState<'foryou' | 'popular' | 'repertoire'>('foryou');
   useSwipeTabs(['foryou', 'popular', 'repertoire'] as const, tab, setTab);
 
@@ -164,9 +166,11 @@ export function Openings() {
               const linkParam = encodeURIComponent(o.eco ?? o.opening);
               return (
                 <Link key={o.opening} href={`/openings/${linkParam}`} className="flex items-stretch overflow-hidden rounded-[18px] transition-transform active:scale-[.99]" style={{ background: RD.card, border: `1px solid ${RD.border}` }}>
+                  {!photoLook && (
                   <span className="relative w-[104px] shrink-0 overflow-hidden">
                     <img src={thumbs[oi]} alt="" loading="lazy" className="absolute inset-0 h-full w-full scale-[1.08] object-cover" />
                   </span>
+                  )}
                   <span className="min-w-0 flex-1 px-4 py-3.5">
                     <b className="block truncate text-[16px] font-extrabold">{o.opening}</b>
                     <span className="block truncate text-[13px]" style={{ color: RD.muted }}>{o.wins}W {o.draws}D {o.losses}L · {o.totalGames} game{o.totalGames === 1 ? '' : 's'}</span>

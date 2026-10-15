@@ -22,6 +22,7 @@ import { RD } from '@/lib/redesignTheme';
 import { RedesignHeader } from '@/components/RedesignHeader';
 import { openingThumbList, openingFamily } from '@/lib/openingThumb';
 import { useSwipeTabs } from '@/lib/swipeNav';
+import { usePhotoLook } from '@/context/SettingsContext';
 
 const QUALITY_TO_TONE: Record<string, AICoachTone> = {
   checkmate: 'gold',
@@ -1147,6 +1148,7 @@ const TRAINER_THUMBS_PHOTO = openingThumbList(OPENINGS.map((o) => openingFamily(
 
 function OpeningTileRD({ opening, index, onSelect }: { opening: OpeningLine; index: number; onSelect: (o: OpeningLine) => void }) {
   const photoImgs = usePhotoImagesFlag();
+  const photoLook = usePhotoLook();
   const thumb = (photoImgs ? TRAINER_THUMBS_PHOTO : TRAINER_THUMBS_AI)[index];
   return (
     <button
@@ -1154,9 +1156,11 @@ function OpeningTileRD({ opening, index, onSelect }: { opening: OpeningLine; ind
       className="flex w-full items-stretch overflow-hidden rounded-[18px] text-left transition-transform active:scale-[.99]"
       style={{ background: RD.card, border: `1px solid ${RD.border}` }}
     >
+      {!photoLook && (
       <span className="relative w-[104px] shrink-0 overflow-hidden">
         <img src={thumb} alt="" loading="lazy" className="absolute inset-0 h-full w-full scale-[1.08] object-cover" />
       </span>
+      )}
       <span className="min-w-0 flex-1 px-4 py-3.5">
         <span className="flex items-center gap-2">
           <b className="truncate text-[16px] font-extrabold" style={{ color: RD.text }}>{opening.name}</b>

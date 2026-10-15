@@ -21,6 +21,7 @@ import { EvalBar, MaterialStrip } from '@/components/GameStatusStrip';
 import { ConfirmPad } from '@/components/ClockPad';
 import { scene } from '@/components/PhotoHero';
 import { useSiteImg } from '@/hooks/use-app-config';
+import { usePhotoLook } from '@/context/SettingsContext';
 
 const THEME_SCENE: Record<string, string> = {
   mateIn2: 'theme-mate', fork: 'theme-fork', pin: 'theme-pin', skewer: 'theme-skewer',
@@ -130,6 +131,7 @@ export function Puzzles() {
   // Redesign only: Daily (no filters) / Themes (theme chips) / Custom (theme + rating).
   const { enabled: redesign } = useDashboardRedesignFlag();
   const siteImg = useSiteImg();
+  const photoLook = usePhotoLook();
   const [ptab, setPtab] = useState<'daily' | 'themes' | 'custom'>('daily');
   const feedbackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [explanation, setExplanation] = useState<string | null>(null);
@@ -992,7 +994,7 @@ export function Puzzles() {
                     className="flex items-stretch overflow-hidden rounded-[16px] text-left transition-transform active:scale-[.99]"
                     style={{ background: 'var(--cs-card-gradient, #0D1516)', border: '1px solid var(--cs-border, rgba(255,255,255,.08))' }}
                   >
-                    {img ? (
+                    {img && !photoLook ? (
                       <span className="relative w-[96px] shrink-0 overflow-hidden">
                         <img src={siteImg(scene(img))} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
                         <span className="absolute inset-y-0 left-0 w-[3px]" style={{ background: tint }} />

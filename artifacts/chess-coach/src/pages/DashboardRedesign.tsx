@@ -16,6 +16,7 @@ import { useMyGames } from '@/hooks/use-games';
 import { GameThumb } from '@/components/GameThumb';
 import { ProUpsell } from '@/components/ProUpsell';
 import { useSiteImg } from '@/hooks/use-app-config';
+import { usePhotoLook } from '@/context/SettingsContext';
 import { scene } from '@/components/PhotoHero';
 import { BOTS } from '@/lib/chess-bot';
 import { ActiveGamesCard } from '@/components/play/ActiveGamesCard';
@@ -71,6 +72,8 @@ function Skeleton({ className = '' }: { className?: string }) {
 
 export function DashboardRedesign() {
   const siteImg = useSiteImg();
+  // Photo backdrop look: no pictures on the cards, so they tighten up.
+  const photoLook = usePhotoLook();
   const { username, isPremium, authUser, isSubscriptionLoaded } = useUser();
   // Only once the plan is known, so Pro members never see an upsell flash.
   const freePlan = isSubscriptionLoaded && !!authUser && !isPremium;
@@ -164,8 +167,8 @@ export function DashboardRedesign() {
         {/* ── Player summary ── */}
         <section className="relative overflow-hidden rounded-[20px] p-5 lg:col-span-2" style={{ background: CARD, border: `1px solid ${BORDER}` }}>
           {/* faint background picture behind the name card */}
-          <img src={siteImg(scene('profile-card'))} alt="" className="pointer-events-none absolute inset-0 h-full w-full object-cover" style={{ opacity: 0.6 }} />
-          <div className="pointer-events-none absolute inset-0" style={{ background: 'linear-gradient(90deg, rgba(11,18,19,.82) 0%, rgba(11,18,19,.5) 50%, rgba(11,18,19,.22) 100%), linear-gradient(0deg, rgba(11,18,19,.55) 0%, rgba(11,18,19,0) 45%)' }} />
+          {!photoLook && <img src={siteImg(scene('profile-card'))} alt="" className="pointer-events-none absolute inset-0 h-full w-full object-cover" style={{ opacity: 0.6 }} />}
+          {!photoLook && <div className="pointer-events-none absolute inset-0" style={{ background: 'linear-gradient(90deg, rgba(11,18,19,.82) 0%, rgba(11,18,19,.5) 50%, rgba(11,18,19,.22) 100%), linear-gradient(0deg, rgba(11,18,19,.55) 0%, rgba(11,18,19,0) 45%)' }} />}
           <div className="relative">
           <div className="flex items-center gap-3">
             <div className="relative shrink-0">
@@ -234,8 +237,8 @@ export function DashboardRedesign() {
 
         {/* ── Scout hero ── */}
         <section
-          className="relative min-h-[340px] overflow-hidden rounded-[20px]"
-          style={{
+          className={`relative overflow-hidden rounded-[20px] ${photoLook ? '' : 'min-h-[340px]'}`}
+          style={photoLook ? { background: CARD, border: `1px solid ${BORDER}` } : {
             backgroundColor: 'var(--rd-card-solid, #050A0B)',
             border: `1px solid ${BORDER}`,
             backgroundImage: `url(${siteImg(asset('scout-knight.webp'))})`,
@@ -244,8 +247,8 @@ export function DashboardRedesign() {
             backgroundRepeat: 'no-repeat',
           }}
         >
-          <div className="absolute inset-0" style={{ background: 'linear-gradient(90deg, rgba(5,10,11,.94) 0%, rgba(5,10,11,.72) 46%, rgba(5,10,11,0) 78%)' }} />
-          <div className="relative z-10 flex min-h-[340px] flex-col p-5">
+          {!photoLook && <div className="absolute inset-0" style={{ background: 'linear-gradient(90deg, rgba(5,10,11,.94) 0%, rgba(5,10,11,.72) 46%, rgba(5,10,11,0) 78%)' }} />}
+          <div className={`relative z-10 flex flex-col p-5 ${photoLook ? '' : 'min-h-[340px]'}`}>
             <p className="flex items-center gap-2 text-[11px] font-extrabold uppercase tracking-[.22em]" style={{ color: GREEN }}>
               <Target size={18} /> Know your opponent.
             </p>
@@ -253,13 +256,13 @@ export function DashboardRedesign() {
               Scout Any<br />
               <span style={{ color: GREEN, textShadow: '0 0 26px rgba(129,182,76,.35), 0 2px 14px rgba(0,0,0,.85)' }}>Chess.com Player</span>
             </h2>
-            <p className="mt-2.5 max-w-[58%] text-[14px] leading-snug sm:max-w-[48%]" style={{ color: '#C9D1CE', textShadow: '0 2px 10px rgba(0,0,0,.9)' }}>
+            <p className={`mt-2.5 text-[14px] leading-snug ${photoLook ? '' : 'max-w-[58%] sm:max-w-[48%]'}`} style={{ color: '#C9D1CE', textShadow: '0 2px 10px rgba(0,0,0,.9)' }}>
               Get instant analysis, weaknesses, tendencies, and custom prep lines.
             </p>
 
             <form
               onSubmit={submitScout}
-              className="mt-auto flex items-center overflow-hidden rounded-[16px]"
+              className={`${photoLook ? 'mt-5' : 'mt-auto'} flex items-center overflow-hidden rounded-[16px]`}
               style={{ background: 'rgba(8,14,15,.82)', border: `1px solid rgba(255,255,255,.12)`, boxShadow: '0 0 28px rgba(129,182,76,.16)' }}
             >
               <Search size={20} className="ml-4 shrink-0" style={{ color: '#C9D1CE' }} />
@@ -293,8 +296,8 @@ export function DashboardRedesign() {
             <Link
               key={t.label}
               href={t.href}
-              className="relative block min-h-[128px] overflow-hidden rounded-[18px] transition-transform active:scale-[.98]"
-              style={{
+              className={`relative block overflow-hidden rounded-[18px] transition-transform active:scale-[.98] ${photoLook ? '' : 'min-h-[128px]'}`}
+              style={photoLook ? { background: CARD, border: `1px solid ${BORDER}` } : {
                 backgroundColor: 'var(--rd-card-solid, #050A0B)',
                 border: `1px solid ${BORDER}`,
                 backgroundImage: `url(${siteImg(asset(t.img))})`,
@@ -306,8 +309,8 @@ export function DashboardRedesign() {
                 boxShadow: 'none',
               }}
             >
-              <div className="absolute inset-0" style={{ background: 'linear-gradient(90deg, rgba(5,10,11,.78) 0%, rgba(5,10,11,.25) 62%, rgba(5,10,11,0) 100%), linear-gradient(0deg, rgba(5,10,11,.65) 0%, rgba(5,10,11,0) 55%)' }} />
-              <div className="relative z-10 flex h-full min-h-[128px] flex-col justify-between p-3.5">
+              {!photoLook && <div className="absolute inset-0" style={{ background: 'linear-gradient(90deg, rgba(5,10,11,.78) 0%, rgba(5,10,11,.25) 62%, rgba(5,10,11,0) 100%), linear-gradient(0deg, rgba(5,10,11,.65) 0%, rgba(5,10,11,0) 55%)' }} />}
+              <div className={`relative z-10 flex h-full flex-col justify-between p-3.5 ${photoLook ? 'min-h-[104px] gap-3' : 'min-h-[128px]'}`}>
                 <span
                   className="grid h-10 w-10 place-items-center rounded-[11px]"
                   style={{ background: `linear-gradient(160deg, ${t.c2}, ${t.c1})`, boxShadow: '0 2px 8px rgba(0,0,0,.45)', border: '1px solid rgba(255,255,255,.18)' }}
@@ -420,9 +423,9 @@ export function DashboardRedesign() {
             { label: 'Local Play', sub: 'Pass and play', href: '/play/local', icon: Play, img: 'quick-local' },
             { label: 'Shop', sub: 'Boards & gear', href: '/shop', icon: ShoppingBag, img: 'quick-shop' },
           ].map((q) => (
-            <Link key={q.label} href={q.href} className="relative flex min-h-[124px] flex-col items-start justify-between gap-2 overflow-hidden rounded-[18px] p-3.5 transition-transform active:scale-[.98]" style={{ background: CARD, border: `1px solid ${BORDER}` }}>
-              <img src={siteImg(scene(q.img))} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
-              <span className="absolute inset-0" style={{ background: 'linear-gradient(0deg, rgba(5,10,11,.92) 0%, rgba(5,10,11,.55) 50%, rgba(5,10,11,.15) 100%)' }} />
+            <Link key={q.label} href={q.href} className={`relative flex flex-col items-start justify-between gap-2 overflow-hidden rounded-[18px] p-3.5 transition-transform active:scale-[.98] ${photoLook ? 'min-h-[96px]' : 'min-h-[124px]'}`} style={{ background: CARD, border: `1px solid ${BORDER}` }}>
+              {!photoLook && <img src={siteImg(scene(q.img))} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />}
+              {!photoLook && <span className="absolute inset-0" style={{ background: 'linear-gradient(0deg, rgba(5,10,11,.92) 0%, rgba(5,10,11,.55) 50%, rgba(5,10,11,.15) 100%)' }} />}
               <span className="relative grid h-9 w-9 place-items-center rounded-[10px]" style={{ background: 'rgba(5,10,11,.6)', color: GREEN, border: '1px solid rgba(129,182,76,.3)' }}><q.icon size={18} /></span>
               <span className="relative min-w-0 max-w-full">
                 <b className="block truncate text-[13.5px] font-extrabold">{q.label}</b>

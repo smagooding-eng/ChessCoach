@@ -10,6 +10,7 @@ import { scene } from '@/components/PhotoHero';
 import { useSiteImg } from '@/hooks/use-app-config';
 import { ChallengeInbox } from '@/components/play/OpenChallenges';
 import { ActiveGamesCard } from '@/components/play/ActiveGamesCard';
+import { usePhotoLook } from '@/context/SettingsContext';
 
 // "Play Chess" hub (redesign). Only offers what the app can actually do:
 //  - Play a Bot: the real roster (count and rating range read from BOTS).
@@ -21,6 +22,7 @@ export function PlayHub() {
   const botAvatar = useBotAvatar();
   const botName = useBotName();
   const siteImg = useSiteImg();
+  const photoLook = usePhotoLook();
   const lowest = Math.min(...BOTS.map((b) => b.rating));
   const highest = Math.max(...BOTS.map((b) => b.rating));
 
@@ -43,11 +45,11 @@ export function PlayHub() {
             <Link
               key={r.href}
               href={r.href}
-              className="relative flex min-h-[104px] items-center gap-3.5 overflow-hidden rounded-[20px] p-4 transition-transform active:scale-[.99]"
+              className={`relative flex items-center gap-3.5 overflow-hidden rounded-[20px] p-4 transition-transform active:scale-[.99] ${photoLook ? '' : 'min-h-[104px]'}`}
               style={{ background: RD.card, border: `1px solid ${RD.border}` }}
             >
-              <img src={siteImg(scene(r.img))} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" style={{ objectPosition: '75% center' }} />
-              <span className="absolute inset-0" style={{ background: 'linear-gradient(90deg, rgba(5,10,11,.95) 0%, rgba(5,10,11,.8) 42%, rgba(5,10,11,.1) 100%)' }} />
+              {!photoLook && <img src={siteImg(scene(r.img))} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" style={{ objectPosition: '75% center' }} />}
+              {!photoLook && <span className="absolute inset-0" style={{ background: 'linear-gradient(90deg, rgba(5,10,11,.95) 0%, rgba(5,10,11,.8) 42%, rgba(5,10,11,.1) 100%)' }} />}
               <span className="relative grid h-12 w-12 shrink-0 place-items-center rounded-[14px]" style={{ background: 'rgba(5,10,11,.55)', color: r.tint, border: `1px solid ${r.tint}55` }}>{r.icon}</span>
               <span className="relative min-w-0 flex-1">
                 <b className="block text-[16px] font-bold">{r.title}</b>
