@@ -42,6 +42,36 @@ const QUALITY_TO_TONE: Record<string, AICoachTone> = {
 type GameResult = 'playing' | 'win' | 'loss' | 'draw';
 type MoveRecord = { san: string; fen: string; fenBefore: string; color: 'w' | 'b'; analysis: MoveAnalysisResult | null };
 
+// ── Saved bot games ──────────────────────────────────────────────────────
+// Each bot keeps its unfinished game on this device, so closing the app or
+// opening another page doesn't lose it: picking the bot again carries on
+// from the same position. Finished games and "New game" clear the save.
+type SavedBotGame = { v: 1; startFen: string; playerColor: 'w' | 'b'; moves: MoveRecord[]; elapsedSec: number; gameKey: string; savedAt: number };
+const savedGameKey = (botName: string) => `cs-botgame:${botName}`;
+function loadBotGame(botName: string): SavedBotGame | null {
+  try {
+    const raw = localStorage.getItem(savedGameKey(botName));
+    if (!raw) return null;
+    const g = JSON.parse(raw) as SavedBotGame;
+    if (g?.v !== 1 || !Array.isArray(g.moves) || g.moves.length === 0 || (g.playerColor !== 'w' && g.playerColor !== 'b')) return null;
+    return g;
+  } catch { return null; }
+}
+function storeBotGame(botName: string, g: SavedBotGame | null) {
+  try {
+    if (g) localStorage.setItem(savedGameKey(botName), JSON.stringify(g));
+    else localStorage.removeItem(savedGameKey(botName));
+  } catch { /* storage full or blocked: the game just isn't kept */ }
+}
+/** Rebuilds the board from a save; null if any move no longer replays. */
+function replaySaved(g: SavedBotGame): Chess | null {
+  try {
+    const c = new Chess(g.startFen);
+    for (const m of g.moves) { if (!c.move(m.san)) return null; }
+    return c.isGameOver() ? null : c;
+  } catch { return null; }
+}
+
 const TIER_COLORS: Record<string, string> = {
   Beginner: 'from-stone-700 to-stone-900 border-stone-600/50',
   Casual: 'from-emerald-900 to-emerald-950 border-emerald-600/40',
@@ -209,7 +239,7 @@ function BotCard({ bot, onSelect }: { bot: BotConfig; onSelect: (b: BotConfig) =
         {record ?? 'Not played yet'}{beaten > 0 ? ` · beaten by ${beaten} player${beaten === 1 ? '' : 's'}` : ' · unbeaten so far'}
       </p>
       <div className="flex items-center gap-1.5 text-xs font-bold text-white/40 group-hover:text-white/70 transition-colors mt-auto pt-2">
-        Challenge <ChevronRight className="w-3.5 h-3.5" />
+        {loadBotGame(bot.name) ? 'Resume game' : 'Challenge'} <ChevronRight className="w-3.5 h-3.5" />
       </div>
     </motion.button>
   );
@@ -244,7 +274,19 @@ function GameView({ bot, onBack, startFen, startColor, isOnboarding }: { bot: Bo
   }, []);
   // Viewing only: turns the board around without touching the game.
   const [boardTurned, setBoardTurned] = useState(false);
+  // An unfinished game against this bot, if one was saved (normal games only;
+  // "play from this position" and onboarding games aren't kept).
+  const keepsSave = !startFen && !isOnboarding;
+  const [restored] = useState(() => {
+    if (!keepsSave) return null;
+    const g = loadBotGame(bot.name);
+    if (!g) return null;
+    const c = replaySaved(g);
+    if (!c) { storeBotGame(bot.name, null); return null; }
+    return { game: g, chess: c };
+  });
   const [playerColor, setPlayerColor] = useState<'w' | 'b'>(() => {
+    if (restored) return restored.game.playerColor;
     if (startColor) return startColor;
     if (startFen) {
       const turn = startFen.split(' ')[1];
@@ -252,14 +294,14 @@ function GameView({ bot, onBack, startFen, startColor, isOnboarding }: { bot: Bo
     }
     return 'w';
   });
-  const [chess] = useState(() => startFen ? new Chess(startFen) : new Chess());
+  const [chess] = useState(() => restored ? restored.chess : startFen ? new Chess(startFen) : new Chess());
   const [fen, setFen] = useState(chess.fen());
   const [result, setResult] = useState<GameResult>('playing');
-  const [moves, setMoves] = useState<MoveRecord[]>([]);
+  const [moves, setMoves] = useState<MoveRecord[]>(() => restored?.game.moves ?? []);
   const [thinking, setThinking] = useState(false);
   const { isAuthenticated: signedIn } = useUser();
   // One key per game, so a result is saved exactly once.
-  const gameKeyRef = useRef(`${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`);
+  const gameKeyRef = useRef(restored?.game.gameKey ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`);
   const reportedRef = useRef<string | null>(null);
   // Save the result for the bot cards' records (games from the normal start
   // position only -- "play from this position" practice doesn't count).
@@ -328,7 +370,7 @@ function GameView({ bot, onBack, startFen, startColor, isOnboarding }: { bot: Bo
       .then(data => { if (data?.rating) setSeededRating(data.rating); })
       .catch(() => {});
   }, [isOnboarding, result]);
-  const [elapsedSec, setElapsedSec] = useState(0);
+  const [elapsedSec, setElapsedSec] = useState(() => restored?.game.elapsedSec ?? 0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const botTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const gameIdRef = useRef(0);
@@ -431,6 +473,38 @@ function GameView({ bot, onBack, startFen, startColor, isOnboarding }: { bot: Bo
       makeBotMove();
     }
   }, [playerColor, moves.length, result, makeBotMove, chess]);
+
+  // A restored game where the app was closed while the bot was thinking:
+  // the bot plays its move now.
+  const resumedRef = useRef(false);
+  useEffect(() => {
+    if (resumedRef.current || !restored) return;
+    resumedRef.current = true;
+    if (result === 'playing' && chess.turn() !== playerColor) makeBotMove();
+  }, [restored, result, chess, playerColor, makeBotMove]);
+
+  // Keep the unfinished game saved for this bot after every move; clear it
+  // when the game ends or a new one starts.
+  const elapsedRef = useRef(elapsedSec);
+  elapsedRef.current = elapsedSec;
+  const saveNowRef = useRef<() => void>(() => {});
+  saveNowRef.current = () => {
+    if (!keepsSave) return;
+    if (result !== 'playing' || moves.length === 0) { storeBotGame(bot.name, null); return; }
+    storeBotGame(bot.name, {
+      v: 1, startFen: moves[0].fenBefore, playerColor, moves,
+      elapsedSec: elapsedRef.current, gameKey: gameKeyRef.current, savedAt: Date.now(),
+    });
+  };
+  useEffect(() => { saveNowRef.current(); }, [moves, result, playerColor]);
+  // ...and once more on the way out, so the clock is current.
+  useEffect(() => {
+    const flush = () => saveNowRef.current();
+    const onVis = () => { if (document.visibilityState === 'hidden') flush(); };
+    window.addEventListener('pagehide', flush);
+    document.addEventListener('visibilitychange', onVis);
+    return () => { window.removeEventListener('pagehide', flush); document.removeEventListener('visibilitychange', onVis); flush(); };
+  }, []);
 
   useEffect(() => {
     if (moveListRef.current) {
@@ -1153,7 +1227,7 @@ function BotTileRD({ bot, onSelect }: { bot: BotConfig; onSelect: (b: BotConfig)
       </span>
       <span className="flex shrink-0 flex-col items-end gap-1">
         <b className="text-[15px] font-extrabold" style={{ color: RD.text }}>{bot.rating}</b>
-        <span className="flex items-center text-[11px] font-bold" style={{ color: RD.green }}>Play <ChevronRight className="h-3.5 w-3.5" /></span>
+        <span className="flex items-center text-[11px] font-bold" style={{ color: RD.green }}>{loadBotGame(bot.name) ? 'Resume' : 'Play'} <ChevronRight className="h-3.5 w-3.5" /></span>
       </span>
     </button>
   );
