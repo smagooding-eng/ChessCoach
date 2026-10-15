@@ -11,8 +11,14 @@ export interface TournamentSummary {
   timeControl: string;
   timeControlLabel: string;
   mode: 'casual' | 'ranked';
+  format: 'arena' | 'bracket';
+  kind: 'live' | 'daily';
+  eligibility: 'all' | 'pro';
+  maxPlayers: number | null;
+  totalRounds: number | null;
   startsAt: string;
-  endsAt: string;
+  /** null: a bracket, which ends when the final is played */
+  endsAt: string | null;
   status: 'scheduled' | 'running' | 'finished' | 'cancelled';
   players: number;
   joined: boolean;
@@ -32,7 +38,7 @@ export function fmtCountdown(ms: number): string {
 }
 
 export function whenLabel(t: TournamentSummary, now = Date.now()): string {
-  if (t.status === 'running') return `Ends in ${fmtCountdown(new Date(t.endsAt).getTime() - now)}`;
+  if (t.status === 'running') return t.endsAt ? `Ends in ${fmtCountdown(new Date(t.endsAt).getTime() - now)}` : 'In progress';
   if (t.status === 'scheduled') {
     const start = new Date(t.startsAt);
     const ms = start.getTime() - now;
@@ -73,10 +79,11 @@ export function TournamentsCard() {
           <span className="min-w-0 flex-1">
             <span className="flex items-center gap-2">
               <b className="truncate text-[14.5px] font-extrabold" style={{ color: PT.text }}>{t.name}</b>
-              {t.status === 'running' && <span className="shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-black uppercase tracking-wider" style={{ background: PT.gold, color: '#1a1405' }}>Live</span>}
+              {t.status === 'running' && <span className="shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-black uppercase tracking-wider" style={{ background: PT.gold, color: '#1a1405' }}>On now</span>}
+              {t.eligibility === 'pro' && <span className="shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-black uppercase tracking-wider" style={{ background: PT.greenSoft, color: PT.green, border: `1px solid ${PT.greenLine}` }}>Pro</span>}
             </span>
             <span className="flex flex-wrap items-center gap-x-2.5 text-[12px]" style={{ color: PT.muted }}>
-              <span className="inline-flex items-center gap-1"><Clock size={11} /> {t.timeControlLabel} · {t.mode === 'ranked' ? 'Ranked' : 'Casual'}</span>
+              <span className="inline-flex items-center gap-1"><Clock size={11} /> {t.format === 'bracket' ? 'Knockout' : 'Arena'} · {t.timeControlLabel} · {t.mode === 'ranked' ? 'Ranked' : 'Casual'}</span>
               <span className="inline-flex items-center gap-1"><Users size={11} /> {t.players}</span>
               <span>{whenLabel(t, now)}</span>
             </span>

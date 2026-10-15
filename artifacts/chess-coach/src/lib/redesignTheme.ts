@@ -3,11 +3,14 @@
 // hardcode their colors import from here so they all stay identical;
 // pages that use the app's theme tokens are themed by the
 // `html.cs-redesign` block in index.css instead.
+// Surfaces are CSS variables with the normal colours as fallbacks, so the
+// "photo backdrop" look (html.cs-photo in index.css) can make every card
+// see-through at once.
 export const RD = {
-  bg: '#050A0B',
-  card: 'linear-gradient(160deg, #0F1819 0%, #0B1213 100%)',
-  cardSolid: '#0D1516',
-  cardLight: '#121B1D',
+  bg: 'var(--rd-bg, #050A0B)',
+  card: 'var(--rd-card, linear-gradient(160deg, #0F1819 0%, #0B1213 100%))',
+  cardSolid: 'var(--rd-card-solid, #0D1516)',
+  cardLight: 'var(--rd-card-light, #121B1D)',
   border: 'rgba(255,255,255,.08)',
   green: '#81B64C',
   greenDark: '#5F8F36',

@@ -7,7 +7,7 @@ import { RedesignHeader } from '@/components/RedesignHeader';
 import { RD, REDESIGN_ON } from '@/lib/redesignTheme';
 import { PIECE_THEME_TYPES, themeTypeOf } from '@/lib/pieceThemes';
 import {
-  useSettings, BOARD_THEMES, BOARD_TEXTURES, isPhotoBoard, SOUND_PACKS, type SoundPack, PIECE_STYLES, PIECE_SHAPES, BOARD_SIZES, APP_BACKGROUNDS,
+  useSettings, BOARD_THEMES, BOARD_TEXTURES, isPhotoBoard, SOUND_PACKS, type SoundPack, PIECE_STYLES, PIECE_SHAPES, BOARD_SIZES, APP_BACKGROUNDS, BG_PHOTOS, CARD_GLASS, type CardGlass,
   type BoardTheme, type BoardTexture, type PieceStyle, type PieceShape, type BoardSize, type AppBackground, type SavedTheme,
 } from '@/context/SettingsContext';
 
@@ -81,6 +81,7 @@ export default function SettingsPage() {
     pieceStyle, setPieceStyle,
     pieceShape, setPieceShape,
     appBackground, setAppBackground,
+    uiStyle, setUiStyle, bgPhoto, setBgPhoto, cardGlass, setCardGlass,
     boardCustomColors, setBoardCustomColor,
     pieceCustomColors, setPieceCustomColor,
     confirmMoves, setConfirmMoves,
@@ -397,8 +398,72 @@ export default function SettingsPage() {
       </section>
 
       <section className={vis('themes')}>
+        <h2 className="text-sm font-black uppercase tracking-wide mb-1" style={{ color: TEXT_MUTED }}>App Look</h2>
+        <p className="text-xs mb-3" style={{ color: TEXT_MUTED }}>Solid cards, or one of our photos behind every page with see-through cards</p>
+        <div className="grid grid-cols-2 gap-2 md:max-w-[520px]">
+          {([
+            { id: 'standard' as const, label: 'Standard' },
+            { id: 'photo' as const, label: 'Photo backdrop' },
+          ]).map((o) => {
+            const sample = BG_PHOTOS.find((p) => p.id === bgPhoto) ?? BG_PHOTOS[0];
+            return (
+              <SwatchButton key={o.id} active={uiStyle === o.id} onClick={() => setUiStyle(o.id)} label={o.label}>
+                <div className="relative w-full overflow-hidden rounded-lg" style={{ aspectRatio: '16 / 10', background: '#050A0B', border: '1px solid rgba(255,255,255,0.1)' }}>
+                  {o.id === 'photo' && (
+                    <>
+                      <img src={sample.src} alt="" className="absolute inset-0 h-full w-full object-cover" style={{ filter: 'blur(1.5px)' }} />
+                      <div className="absolute inset-0" style={{ background: 'rgba(5,10,11,.45)' }} />
+                    </>
+                  )}
+                  <div className="absolute left-[10%] right-[10%] top-[14%] h-[30%] rounded-md" style={{ background: o.id === 'photo' ? 'rgba(13,21,22,.6)' : '#0D1516', border: '1px solid rgba(255,255,255,.08)' }} />
+                  <div className="absolute left-[10%] right-[40%] top-[52%] h-[30%] rounded-md" style={{ background: o.id === 'photo' ? 'rgba(13,21,22,.6)' : '#0D1516', border: '1px solid rgba(255,255,255,.08)' }} />
+                  <div className="absolute left-[64%] right-[10%] top-[52%] h-[30%] rounded-md" style={{ background: o.id === 'photo' ? 'rgba(129,182,76,.55)' : '#81B64C' }} />
+                </div>
+              </SwatchButton>
+            );
+          })}
+        </div>
+        {uiStyle === 'photo' && (
+          <div className="mt-4 space-y-4">
+            <div>
+              <p className="text-xs font-bold mb-2" style={{ color: TEXT_LIGHT }}>Photo</p>
+              <div className="grid grid-cols-3 gap-2 md:grid-cols-6">
+                {BG_PHOTOS.map((p) => {
+                  const on = bgPhoto === p.id;
+                  return (
+                    <button key={p.id} onClick={() => setBgPhoto(p.id)} aria-label={p.label}
+                      className="group relative overflow-hidden rounded-xl text-left"
+                      style={{ aspectRatio: '4 / 3', border: on ? `2px solid ${CHESSCOM_GREEN}` : '1px solid rgba(255,255,255,0.1)' }}>
+                      <img src={p.src} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover transition-transform group-hover:scale-105" />
+                      <span className="absolute inset-x-0 bottom-0 flex items-center gap-1 px-2 pb-1.5 pt-4 text-[11px] font-bold text-white"
+                        style={{ background: 'linear-gradient(transparent, rgba(0,0,0,.75))' }}>
+                        {on && <Check className="w-3 h-3 shrink-0" style={{ color: CHESSCOM_GREEN }} />} {p.label}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <div>
+              <p className="text-xs font-bold mb-2" style={{ color: TEXT_LIGHT }}>Card transparency</p>
+              <div className="grid grid-cols-3 gap-2 md:max-w-[520px]">
+                {(Object.keys(CARD_GLASS) as CardGlass[]).map((k) => (
+                  <button key={k} onClick={() => setCardGlass(k)}
+                    className="rounded-xl px-3 py-2.5 text-left"
+                    style={{ background: cardGlass === k ? SELECTED_BG : 'rgba(255,255,255,0.05)', border: cardGlass === k ? `1.5px solid ${CHESSCOM_GREEN}` : '1px solid rgba(255,255,255,0.1)' }}>
+                    <span className="block text-[13px] font-bold" style={{ color: cardGlass === k ? CHESSCOM_GREEN : TEXT_LIGHT }}>{CARD_GLASS[k].label}</span>
+                    <span className="block text-[11px]" style={{ color: TEXT_MUTED }}>{CARD_GLASS[k].sub}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+      </section>
+
+      <section className={vis('themes') + (uiStyle === 'photo' ? ' opacity-50' : '')}>
         <h2 className="text-sm font-black uppercase tracking-wide mb-1" style={{ color: TEXT_MUTED }}>App Background</h2>
-        <p className="text-xs mb-3" style={{ color: TEXT_MUTED }}>A subtle tint behind the whole app, not just the board</p>
+        <p className="text-xs mb-3" style={{ color: TEXT_MUTED }}>{uiStyle === 'photo' ? 'Only used with the Standard look' : 'A subtle tint behind the whole app, not just the board'}</p>
         <div className={`grid grid-cols-4 gap-2 ${redesign ? 'lg:grid-cols-8' : ''}`}>
           {(Object.keys(APP_BACKGROUNDS) as AppBackground[]).map((key) => {
             const t = APP_BACKGROUNDS[key];

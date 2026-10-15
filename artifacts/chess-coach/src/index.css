@@ -554,3 +554,48 @@ html.cs-redesign .cs-settings > section > h2 {
   color: #F5F7F6 !important;
   margin-bottom: 12px !important;
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   Photo backdrop look (Settings > Themes > App look). AppBackgroundWrapper
+   adds `cs-photo` to <html> and a fixed photo layer behind everything;
+   these overrides make page backgrounds clear and every card see-through.
+   data-glass picks how see-through (light / medium / strong).
+   ═══════════════════════════════════════════════════════════════════ */
+.cs-photo-backdrop { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; background: #050A0B; }
+.cs-photo-backdrop-img {
+  position: absolute; inset: -24px;
+  background-size: cover; background-position: center;
+  filter: blur(var(--photo-blur, 3px)) saturate(1.05);
+  transform: scale(1.04);
+}
+.cs-photo-backdrop-shade {
+  position: absolute; inset: 0;
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(5,10,11,0) 0%, rgba(5,10,11,.35) 70%),
+    rgba(5,10,11, var(--photo-shade, .5));
+}
+html.cs-photo { background: #050A0B; --glass-a: .62; --photo-shade: .5; --photo-blur: 3px; }
+html.cs-photo[data-glass="light"]  { --glass-a: .42; --photo-shade: .42; --photo-blur: 2px; }
+html.cs-photo[data-glass="medium"] { --glass-a: .62; --photo-shade: .5;  --photo-blur: 3px; }
+html.cs-photo[data-glass="strong"] { --glass-a: .8;  --photo-shade: .58; --photo-blur: 5px; }
+html.cs-photo {
+  /* redesigned pages (lib/redesignTheme RD.*) */
+  --rd-bg: transparent;
+  --rd-card: linear-gradient(160deg, rgb(15 24 25 / var(--glass-a)) 0%, rgb(11 18 19 / var(--glass-a)) 100%);
+  --rd-card-solid: rgb(13 21 22 / var(--glass-a));
+  --rd-card-light: rgb(18 27 29 / calc(var(--glass-a) + .08));
+  /* layout chrome (components/Layout.tsx) */
+  --cs-bg-dark: transparent;
+  --cs-bg-card: rgb(13 21 22 / var(--glass-a));
+  --cs-card-gradient: linear-gradient(160deg, rgb(15 24 25 / var(--glass-a)) 0%, rgb(11 18 19 / var(--glass-a)) 100%);
+  --cs-bg-sidebar: rgb(7 13 14 / .78);
+  --cs-sidebar-a95: rgb(7 13 14 / .82);
+  --cs-sidebar-a97: rgb(7 13 14 / .86);
+  /* theme token behind bg-card (hsl triplet + alpha) */
+  --card: 187 26% 7% / var(--glass-a);
+}
+/* pages that paint bg-background let the photo through */
+html.cs-photo .bg-background { background-color: transparent; }
+html.cs-photo body { background: transparent; background-image: none; }
+html.cs-photo .glass-card,
+html.cs-photo .glass-card:hover { background: var(--rd-card); }

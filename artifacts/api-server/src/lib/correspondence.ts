@@ -237,6 +237,10 @@ export async function getGame(gameId: string, userId: string): Promise<Correspon
 
 type Result = "white" | "black" | "draw";
 
+// Set by the tournament engine (avoids an import cycle).
+let dailyFinishHook: ((g: CorrespondenceGame) => Promise<void>) | null = null;
+export function setDailyFinishHook(fn: (g: CorrespondenceGame) => Promise<void>): void { dailyFinishHook = fn; }
+
 async function finishGame(game: CorrespondenceGame, result: Result, termination: string, pgn: string, fen: string): Promise<CorrespondenceGame> {
   // Only the first caller finishes it (guards against a timeout sweep and a
   // move landing at the same moment).
@@ -331,6 +335,8 @@ async function finishGame(game: CorrespondenceGame, result: Result, termination:
     if (u) final = u;
   }
   touched(final);
+  // Tournament games (bracket / arena) score and advance from here.
+  if (dailyFinishHook) void dailyFinishHook(final).catch((err) => logger.warn({ err, gameId: final.id }, "[daily] tournament hook failed"));
 
   // Tell both players.
   const how: Record<string, string> = {

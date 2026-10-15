@@ -4,7 +4,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { RealtimeBridge } from "@/components/RealtimeBridge";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { UserProvider } from "@/context/UserContext";
-import { SettingsProvider, useSettings } from "@/context/SettingsContext";
+import { SettingsProvider, useSettings, BG_PHOTOS } from "@/context/SettingsContext";
 import { ImportStatusWatcher } from "@/components/ImportStatusWatcher";
 import { AutoPushPrompt } from "@/components/AutoPushPrompt";
 import { useDashboardRedesignFlag } from "@/hooks/use-app-config";
@@ -409,9 +409,22 @@ function PageLoadingFallback() {
 }
 
 function AppBackgroundWrapper({ children }: { children: React.ReactNode }) {
-  const { appBackgroundCss } = useSettings();
+  const { appBackgroundCss, uiStyle, bgPhoto, cardGlass } = useSettings();
+  const photo = uiStyle === 'photo' ? BG_PHOTOS.find((p) => p.id === bgPhoto) ?? BG_PHOTOS[0] : null;
+  // Photo look: the html class switches every card to see-through (index.css).
+  useEffect(() => {
+    const el = document.documentElement;
+    el.classList.toggle('cs-photo', !!photo);
+    if (photo) el.dataset.glass = cardGlass; else delete el.dataset.glass;
+  }, [photo, cardGlass]);
   return (
-    <div style={{ minHeight: '100vh', ...appBackgroundCss }}>
+    <div style={{ minHeight: '100vh', ...(photo ? {} : appBackgroundCss) }}>
+      {photo && (
+        <div className="cs-photo-backdrop" aria-hidden="true">
+          <div className="cs-photo-backdrop-img" style={{ backgroundImage: `url("${photo.src}")` }} />
+          <div className="cs-photo-backdrop-shade" />
+        </div>
+      )}
       {children}
     </div>
   );

@@ -12,6 +12,29 @@ export type BoardTexture = 'flat' | 'wood' | 'marble' | 'felt' | 'granite' | 'le
   // Enhanced-UI-only photographic boards (see ENHANCED_BOARD_KEYS below)
   | 'ex-rosewood-blue-marble' | 'ex-green-felt' | 'ex-brushed-aluminum' | 'ex-oak-walnut' | 'ex-sahara-noir' | 'ex-granite' | 'ex-nero-gold' | 'ex-copper-patina' | 'ex-burl-rosewood' | 'ex-travertine' | 'ex-saddle-leather' | 'ex-grigio-marble' | 'ex-maple-ebony' | 'ex-soapstone' | 'ex-crema-marfil' | 'ex-jade-marble' | 'ex-verde-alpi' | 'ex-classic-oak' | 'ex-birch-rosewood';
 export type AppBackground = 'default' | 'warm-gradient' | 'cool-gradient' | 'noise';
+/** standard: solid cards. photo: one of our photos behind the whole app, with see-through cards. */
+export type UiStyle = 'standard' | 'photo';
+export type CardGlass = 'light' | 'medium' | 'strong';
+
+/** Photos you can put behind the app (UiStyle 'photo'). */
+export const BG_PHOTOS: { id: string; label: string; src: string }[] = [
+  { id: 'library', label: 'Classic set', src: '/photo/assets/courses/course-library.webp' },
+  { id: 'golden-knight', label: 'Golden hour', src: '/photo/assets/courses/course-training-hero.webp' },
+  { id: 'lone-king', label: 'Lone king', src: '/photo/assets/courses/course-endgame.webp' },
+  { id: 'blue-knight', label: 'Blue knight', src: '/photo/assets/courses/course-opening.webp' },
+  { id: 'face-off', label: 'Face-off', src: '/photo/assets/courses/course-tactical.webp' },
+  { id: 'fire', label: 'Fire', src: '/photo/assets/courses/course-discovered.webp' },
+  { id: 'army', label: 'The army', src: '/photo/chessscout/scenes/hero-lookup.webp' },
+  { id: 'sunset', label: 'Sunset', src: '/photo/chessscout/scenes/hero-endgames.webp' },
+  { id: 'wood', label: 'Wooden board', src: '/photo/chessscout/scenes/profile-card.webp' },
+  { id: 'red-board', label: 'Red board', src: '/photo/chessscout/scenes/play-online.webp' },
+  { id: 'silver', label: 'Silver', src: '/photo/chessscout/scenes/play-daily.webp' },
+];
+export const CARD_GLASS: Record<CardGlass, { label: string; sub: string }> = {
+  light: { label: 'See-through', sub: 'Most of the photo' },
+  medium: { label: 'Balanced', sub: 'Recommended' },
+  strong: { label: 'Subtle', sub: 'Easiest to read' },
+};
 export type PieceStyle = 'classic' | 'glossy' | 'outlined' | 'ocean' | 'crimson' | 'emerald' | 'royal' | 'flat' | 'depth' | 'shaded' | 'wood3d' | 'marble3d' | 'chrome' | 'gold' | 'copper' | 'obsidian' | 'ivory' | 'custom';
 export type PieceShape = 'default' | 'cburnett' | 'celtic' | 'chessnut' | 'fantasy' | 'spatial' | 'rhosgfx' | 'kiwen-suwi' | 'firi' | 'totoy' | 'papercut' | 'ink-cream' | 'frost-mosaic' | 'walnut-maple' | 'carved-jade' | 'brushed-steel' | 'futuristic-ceramic' | 'crystal-ice' | 'marble-gold' | 'glossy-vinyl' | 'ruby-sapphire' | 'pixel-art' | 'stained-glass' | 'minimal-rounded' | 'pixel-art-2' | 'chunky-cartoon' | 'steampunk-brass' | 'gothic-spires' | 'bronze-silver' | 'celtic-stone';
 export type PromotionChoice = 'queen' | 'ask';
@@ -352,6 +375,9 @@ interface Settings {
   soundPack: SoundPack;
   promotionChoice: PromotionChoice;
   boardSize: BoardSize;
+  uiStyle: UiStyle;
+  bgPhoto: string;
+  cardGlass: CardGlass;
 }
 
 // Out-of-the-box look. In the enhanced UI that's the Tournament board with
@@ -374,6 +400,9 @@ const APP_DEFAULT_SETTINGS: Settings = {
   soundPack: 'classic',
   promotionChoice: 'queen',
   boardSize: 'standard',
+  uiStyle: 'standard',
+  bgPhoto: 'library',
+  cardGlass: 'medium',
 };
 
 // Base key names -- actual storage keys are these suffixed with the
@@ -405,6 +434,9 @@ interface SettingsContextValue extends Settings {
   setPromotionChoice: (v: PromotionChoice) => void;
   setSoundPack: (v: SoundPack) => void;
   setBoardSize: (v: BoardSize) => void;
+  setUiStyle: (v: UiStyle) => void;
+  setBgPhoto: (id: string) => void;
+  setCardGlass: (v: CardGlass) => void;
   boardColors: ColorPair;
   boardTextureCss: { backgroundImage: string; backgroundImageDark?: string; backgroundSize?: string; boardImage?: string };
   appBackgroundCss: React.CSSProperties;
@@ -426,6 +458,9 @@ const SettingsContext = createContext<SettingsContextValue | null>(null);
 function sanitizeSettings(st: Settings): Settings {
   let out = PIECE_SHAPES[st.pieceShape as PieceShape] ? st : { ...st, pieceShape: 'default' as PieceShape };
   if (!SOUND_PACKS[out.soundPack as SoundPack]) out = { ...out, soundPack: 'classic' };
+  if (out.uiStyle !== 'photo' && out.uiStyle !== 'standard') out = { ...out, uiStyle: 'standard' };
+  if (!BG_PHOTOS.some((p) => p.id === out.bgPhoto)) out = { ...out, bgPhoto: 'library' };
+  if (!CARD_GLASS[out.cardGlass as CardGlass]) out = { ...out, cardGlass: 'medium' };
   return out;
 }
 
@@ -514,6 +549,9 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     setPromotionChoice: (v) => setSettings((s) => ({ ...s, promotionChoice: v })),
     setSoundPack: (v) => setSettings((s) => ({ ...s, soundPack: v })),
     setBoardSize: (v) => setSettings((s) => ({ ...s, boardSize: v })),
+    setUiStyle: (v) => setSettings((s) => ({ ...s, uiStyle: v })),
+    setBgPhoto: (id) => setSettings((s) => ({ ...s, bgPhoto: id })),
+    setCardGlass: (v) => setSettings((s) => ({ ...s, cardGlass: v })),
     boardColors: resolvedBoardColors,
     boardTextureCss: resolvedBoardTexture,
     appBackgroundCss: APP_BACKGROUNDS[settings.appBackground].css,

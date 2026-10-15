@@ -7,6 +7,7 @@ import { sql } from "drizzle-orm";
 import { createServer } from "http";
 import { attachLiveServer, seedBotPersonas } from "./lib/liveServer";
 import { startDailySweep } from "./lib/correspondence";
+import { startTournamentEngine } from "./lib/tournamentEngine";
 
 async function initStripe() {
   const databaseUrl = process.env.DATABASE_URL;
@@ -342,6 +343,35 @@ async function runSchemaMigrations() {
       UNIQUE (game_id)
     )`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_tournament_games_t ON tournament_games(tournament_id, started_at DESC)`);
+    // Tournament formats: arena (continuous pairing) or bracket (knockout);
+    // live or daily games; open to everyone or Pro only; brackets have no
+    // fixed end (they finish with the final).
+    await db.execute(sql`ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS format VARCHAR NOT NULL DEFAULT 'arena'`);
+    await db.execute(sql`ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS kind VARCHAR NOT NULL DEFAULT 'live'`);
+    await db.execute(sql`ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS eligibility VARCHAR NOT NULL DEFAULT 'all'`);
+    await db.execute(sql`ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS max_players INTEGER`);
+    await db.execute(sql`ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS total_rounds INTEGER`);
+    await db.execute(sql`ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS winner_user_id VARCHAR`);
+    await db.execute(sql`ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS winner_username VARCHAR`);
+    await db.execute(sql`ALTER TABLE tournaments ALTER COLUMN ends_at DROP NOT NULL`);
+    await db.execute(sql`ALTER TABLE tournament_games ADD COLUMN IF NOT EXISTS kind VARCHAR NOT NULL DEFAULT 'live'`);
+    await db.execute(sql`ALTER TABLE tournament_games ADD COLUMN IF NOT EXISTS match_id INTEGER`);
+    await db.execute(sql`CREATE TABLE IF NOT EXISTS tournament_matches (
+      id SERIAL PRIMARY KEY,
+      tournament_id VARCHAR NOT NULL,
+      round INTEGER NOT NULL,
+      slot INTEGER NOT NULL,
+      a_id VARCHAR, a_name VARCHAR, a_seed INTEGER,
+      b_id VARCHAR, b_name VARCHAR, b_seed INTEGER,
+      status VARCHAR NOT NULL DEFAULT 'waiting',
+      winner_id VARCHAR, winner_name VARCHAR,
+      note VARCHAR,
+      game_id VARCHAR,
+      games_played INTEGER NOT NULL DEFAULT 0,
+      deadline TIMESTAMPTZ,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      UNIQUE (tournament_id, round, slot)
+    )`);
 
     logger.info('Schema migrations complete');
   } catch (err) {
@@ -353,6 +383,7 @@ async function runSchemaMigrations() {
 const httpServer = createServer(app);
 attachLiveServer(httpServer);
 startDailySweep();
+startTournamentEngine();
 httpServer.listen(port, (err?: Error) => {
   if (err) {
     logger.error({ err }, "Error listening on port");

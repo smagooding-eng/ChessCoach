@@ -1501,7 +1501,7 @@ const tLast = new Map<string, { opp: string; color: 'w' | 'b' }>();      // `${t
 const T_STOP_PAIRING_MS = 60 * 1000;   // no new pairings in the last minute
 const T_REPEAT_OK_MS = 20 * 1000;      // allow a repeat opponent after waiting this long
 
-interface TRow { id: string; name: string; time_control: string; mode: string; status: string; starts_at: string | Date; ends_at: string | Date }
+interface TRow { id: string; name: string; time_control: string; mode: string; status: string; starts_at: string | Date; ends_at: string | Date | null; format?: string; kind?: string }
 
 async function loadTournament(id: string): Promise<TRow | null> {
   if (!id) return null;
@@ -1513,11 +1513,9 @@ async function tournamentReady(ws: WebSocket, userId: string, username: string, 
   if (!t || t.status === 'cancelled') return send(ws, { type: 'error', message: 'Tournament not found' });
   if (t.status === 'finished') return send(ws, { type: 'tournament_over', tournamentId: tid });
   if (userActiveGame.has(userId)) return send(ws, { type: 'error', message: 'Finish your current game first' });
-  // Being on the tournament screen and pressing play means you're in.
-  await db.execute(sql`
-    INSERT INTO tournament_players (tournament_id, user_id, username) VALUES (${tid}, ${userId}, ${username})
-    ON CONFLICT (tournament_id, user_id) DO UPDATE SET withdrawn = false
-  `);
+  const joined = rowsOf<{ withdrawn: boolean }>(await db.execute(sql`
+    SELECT withdrawn FROM tournament_players WHERE tournament_id = ${tid} AND user_id = ${userId}`))[0];
+  if (!joined || joined.withdrawn) return send(ws, { type: 'error', message: 'Join the tournament first' });
   cancelQueue(userId);
   let pool = tWaiting.get(tid);
   if (!pool) { pool = new Map(); tWaiting.set(tid, pool); }
@@ -1602,11 +1600,11 @@ async function pairTournament(t: TRow) {
   }
 }
 
-async function startTournamentGame(t: TRow, tc: TimeControlSpec, a: TWaiter, b: TWaiter) {
+async function startTournamentGame(t: TRow, tc: TimeControlSpec, a: TWaiter, b: TWaiter, opts: { aWhite?: boolean; matchId?: number } = {}): Promise<string> {
   const lastA = tLast.get(`${t.id}:${a.userId}`);
   const lastB = tLast.get(`${t.id}:${b.userId}`);
-  // Alternate colours: whoever had white last time gets black.
-  const aWhite = lastA?.color === 'w' ? false : lastB?.color === 'w' ? true : lastA?.color === 'b' ? true : Math.random() < 0.5;
+  // Alternate colours: whoever had white last time gets black (brackets set it).
+  const aWhite = opts.aWhite ?? (lastA?.color === 'w' ? false : lastB?.color === 'w' ? true : lastA?.color === 'b' ? true : Math.random() < 0.5);
   const mode: Mode = t.mode === 'ranked' ? 'ranked' : 'casual';
   const [ar, br] = await Promise.all([seedRatingFromImports(a.userId, tc.id), seedRatingFromImports(b.userId, tc.id)]);
   const [ap, bp] = await Promise.all([resolveHumanProfile(a.userId, a.username), resolveHumanProfile(b.userId, b.username)]);
@@ -1620,14 +1618,15 @@ async function startTournamentGame(t: TRow, tc: TimeControlSpec, a: TWaiter, b: 
   tLast.set(`${t.id}:${a.userId}`, { opp: b.userId, color: aWhite ? 'w' : 'b' });
   tLast.set(`${t.id}:${b.userId}`, { opp: a.userId, color: aWhite ? 'b' : 'w' });
   await db.execute(sql`
-    INSERT INTO tournament_games (tournament_id, game_id, white_user_id, black_user_id, white_username, black_username)
-    VALUES (${t.id}, ${game.id}, ${white.userId!}, ${black.userId!}, ${white.username}, ${black.username})
+    INSERT INTO tournament_games (tournament_id, game_id, white_user_id, black_user_id, white_username, black_username, kind, match_id)
+    VALUES (${t.id}, ${game.id}, ${white.userId!}, ${black.userId!}, ${white.username}, ${black.username}, 'live', ${opts.matchId ?? null})
     ON CONFLICT (game_id) DO NOTHING
   `).catch(err => logger.warn({ err }, 'tournament game insert failed'));
   subscribeWs(a.ws, game.id);
   subscribeWs(b.ws, game.id);
   send(a.ws, { type: 'match_found', state: gamePublicState(game), color: aWhite ? 'w' : 'b' });
   send(b.ws, { type: 'match_found', state: gamePublicState(game), color: aWhite ? 'b' : 'w' });
+  return game.id;
 }
 
 async function recordTournamentResult(g: LiveGame) {
@@ -1638,6 +1637,11 @@ async function recordTournamentResult(g: LiveGame) {
     WHERE game_id = ${g.id} AND result IS NULL RETURNING id
   `));
   if (done.length === 0) return; // already scored
+  const fmt = rowsOf<{ format: string }>(await db.execute(sql`SELECT format FROM tournaments WHERE id = ${tid}`))[0]?.format;
+  if (fmt === 'bracket') {
+    if (tournamentGameHook) await tournamentGameHook(tid, g.id, g.result ?? 'draw');
+    return;
+  }
   const sides: { userId: string; pts: number; w: number; d: number; l: number }[] = [
     { userId: g.white.userId, pts: g.result === 'white' ? 2 : g.result === 'draw' ? 1 : 0, w: g.result === 'white' ? 1 : 0, d: g.result === 'draw' ? 1 : 0, l: g.result === 'black' ? 1 : 0 },
     { userId: g.black.userId, pts: g.result === 'black' ? 2 : g.result === 'draw' ? 1 : 0, w: g.result === 'black' ? 1 : 0, d: g.result === 'draw' ? 1 : 0, l: g.result === 'white' ? 1 : 0 },
@@ -1651,35 +1655,18 @@ async function recordTournamentResult(g: LiveGame) {
   }
 }
 
-async function notifyTournamentPlayers(tid: string, title: string, body: string) {
-  const rows = rowsOf<{ user_id: string }>(await db.execute(sql`SELECT user_id FROM tournament_players WHERE tournament_id = ${tid} AND withdrawn = false`));
-  for (const r of rows) {
-    notifyUser(r.user_id, { kind: 'tournament', title, body, url: `/tournaments/${tid}` }).catch(() => {});
-  }
-}
-
 let tTickRunning = false;
 async function tournamentTick() {
-  if (tTickRunning) return;
+  if (tTickRunning || tWaiting.size === 0) return;
   tTickRunning = true;
   try {
-    const started = rowsOf<{ id: string; name: string }>(await db.execute(sql`
-      UPDATE tournaments SET status = 'running' WHERE status = 'scheduled' AND starts_at <= now() RETURNING id, name`));
-    for (const t of started) {
-      await notifyTournamentPlayers(t.id, `${t.name} has started`, 'Tap to get your first pairing.');
-      for (const w of tWaiting.get(t.id)?.values() ?? []) send(w.ws, { type: 'tournament_waiting', tournamentId: t.id, started: true });
-    }
-    const ended = rowsOf<{ id: string; name: string }>(await db.execute(sql`
-      UPDATE tournaments SET status = 'finished' WHERE status = 'running' AND ends_at <= now() RETURNING id, name`));
-    for (const t of ended) {
-      closeTournamentPool(t.id);
-      await notifyTournamentPlayers(t.id, `${t.name} is over`, 'See the final standings.');
-    }
-    if (tWaiting.size === 0) return;
+    // Status changes (start / end) are handled by tournamentEngine; this only
+    // pairs players in running live arenas.
     const running = rowsOf<TRow>(await db.execute(sql`
-      SELECT id, name, time_control, mode, status, starts_at, ends_at FROM tournaments WHERE status = 'running'`));
+      SELECT id, name, time_control, mode, status, starts_at, ends_at, format, kind FROM tournaments
+      WHERE status = 'running' AND format = 'arena' AND kind = 'live'`));
     for (const t of running) {
-      if (new Date(t.ends_at).getTime() - Date.now() < T_STOP_PAIRING_MS) continue;
+      if (t.ends_at && new Date(t.ends_at).getTime() - Date.now() < T_STOP_PAIRING_MS) continue;
       await pairTournament(t);
     }
   } catch (err) {
@@ -1688,4 +1675,39 @@ async function tournamentTick() {
     tTickRunning = false;
   }
 }
+
+/** A tournament just started: tell everyone waiting on its page. */
+export function notifyPoolStarted(tid: string) {
+  for (const w of tWaiting.get(tid)?.values() ?? []) send(w.ws, { type: 'tournament_waiting', tournamentId: tid, started: true });
+}
+
+/** Is this player on the tournament screen, ready to play? */
+export function isInTournamentPool(tid: string, userId: string): boolean {
+  const w = tWaiting.get(tid)?.get(userId);
+  return !!w && w.ws.readyState === WebSocket.OPEN && !userActiveGame.has(userId);
+}
+
+/** Bracket match: start the game if both players are ready. Returns the game id. */
+export async function tryStartBracketGame(tid: string, matchId: number, aId: string, bId: string, aWhite: boolean): Promise<string | null> {
+  const pool = tWaiting.get(tid);
+  const a = pool?.get(aId);
+  const b = pool?.get(bId);
+  if (!pool || !a || !b || !isInTournamentPool(tid, aId) || !isInTournamentPool(tid, bId)) return null;
+  const t = await loadTournament(tid);
+  const tc = t ? TIME_CONTROLS[t.time_control as TimeControlId] : undefined;
+  if (!t || !tc) return null;
+  pool.delete(aId); pool.delete(bId);
+  try {
+    return await startTournamentGame(t, tc, a, b, { aWhite, matchId });
+  } catch (err) {
+    logger.warn({ err, tid }, 'bracket game start failed');
+    if (a.ws.readyState === WebSocket.OPEN) pool.set(aId, a);
+    if (b.ws.readyState === WebSocket.OPEN) pool.set(bId, b);
+    return null;
+  }
+}
+
+// Set by the tournament engine: a bracket game finished (avoids an import cycle).
+let tournamentGameHook: ((tid: string, gameId: string, result: 'white' | 'black' | 'draw') => Promise<void>) | null = null;
+export function setTournamentGameHook(fn: (tid: string, gameId: string, result: 'white' | 'black' | 'draw') => Promise<void>) { tournamentGameHook = fn; }
 setInterval(() => { void tournamentTick(); }, 3000).unref();
