@@ -1107,7 +1107,7 @@ export function GameReplay() {
               doesn't shift up/down when navigating between bad and good moves. */}
           <div
             ref={boardAnchorRef}
-            className={`scroll-mt-16 mx-auto w-full ${redesign ? '[--bw:calc(100dvh-580px)] md:[--bw:calc(100dvh-290px)]' : 'max-w-[min(100%,52dvh)] md:max-w-[min(100%,55dvh)] xl:max-w-none'} order-[-3] xl:order-none`}
+            className={`scroll-mt-16 mx-auto w-full ${redesign ? '[--bw:calc(100dvh-520px)] md:[--bw:calc(100dvh-290px)]' : 'max-w-[min(100%,52dvh)] md:max-w-[min(100%,55dvh)] xl:max-w-none'} order-[-3] xl:order-none`}
             // Phones reserve room under the board for the coach card; on
             // desktop the move list and coach sit beside it, so the board only
             // gives up room for the header and the controls row (was the phone
