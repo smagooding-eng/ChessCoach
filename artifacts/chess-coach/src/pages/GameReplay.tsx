@@ -661,6 +661,25 @@ export function GameReplay() {
   const [isPlaying, setIsPlaying]     = useState(false);
   const [flipped, setFlipped]         = useState(false);
   const [practiceMode, setPracticeMode] = useState(false);
+  // Phones: the coach card under the move buttons stretches down to the bottom
+  // bar, using the space that used to hold the opening name and a back link.
+  const gridRef = useRef<HTMLDivElement | null>(null);
+  const coachSlotRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const fit = () => {
+      const grid = gridRef.current, slot = coachSlotRef.current;
+      if (!grid || !slot) return;
+      if (window.innerWidth >= 1280 || slot.offsetParent === null) { slot.style.height = ''; return; }
+      const room = grid.getBoundingClientRect().bottom - slot.getBoundingClientRect().top + grid.scrollTop - 6;
+      slot.style.height = `${Math.max(116, Math.floor(room))}px`;
+    };
+    fit();
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(fit) : null;
+    if (ro && gridRef.current) ro.observe(gridRef.current);
+    if (ro && boardAnchorRef.current) ro.observe(boardAnchorRef.current);
+    window.addEventListener('resize', fit);
+    return () => { ro?.disconnect(); window.removeEventListener('resize', fit); };
+  });
 
   // Review Game state
   const [reviewing, setReviewing]       = useState(false);
@@ -1003,11 +1022,15 @@ export function GameReplay() {
           />
         </div>
       )}
-      <Link href="/games" className={`inline-flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors text-sm shrink-0 order-3 xl:order-none ${redesign ? 'hidden' : ''}`}>
+      {/* The redesign has its back arrow in the header, and the opening lives in
+          the Report tab, so the bottom of the screen goes to the board and coach. */}
+      {!redesign && (
+      <Link href="/games" className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors text-sm shrink-0 order-3 xl:order-none">
         <ArrowLeft className="w-4 h-4" /> Back to Games
       </Link>
+      )}
 
-      {game.opening && (
+      {game.opening && !redesign && (
         <div className="flex glass-card rounded-xl px-4 py-2 md:px-5 md:py-2.5 items-center gap-2 md:gap-3 border border-primary/20 bg-primary shrink-0 order-2 xl:order-none">
           <BookOpen className="w-4 h-4 text-primary-foreground shrink-0" />
           <span className="text-xs font-bold text-primary-foreground/70">{game.eco}</span>
@@ -1015,7 +1038,7 @@ export function GameReplay() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px] gap-4 xl:gap-6 flex-1 min-h-0 overflow-y-auto overscroll-contain xl:overflow-hidden hide-scrollbar order-1 xl:order-none">
+      <div ref={gridRef} className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px] gap-4 xl:gap-6 flex-1 min-h-0 overflow-y-auto overscroll-contain xl:overflow-hidden hide-scrollbar order-1 xl:order-none">
 
         {/* ── Left col: board + controls ── */}
         <div className="flex flex-col gap-2 md:gap-4 xl:min-h-0 xl:overflow-y-auto xl:pr-2 hide-scrollbar">
@@ -1157,7 +1180,7 @@ export function GameReplay() {
 
           {/* Playback controls */}
           <div
-            className={redesign ? 'order-[-1] xl:order-none relative z-20 flex w-full flex-col-reverse gap-2 pb-[max(0.25rem,env(safe-area-inset-bottom))] pt-1' : 'glass-card rounded-xl px-1.5 py-1.5 md:p-3 flex items-center justify-between order-[-2] xl:order-none'}
+            className={redesign ? 'order-[-2] xl:order-none relative z-20 flex w-full flex-col-reverse gap-2 pt-0.5' : 'glass-card rounded-xl px-1.5 py-1.5 md:p-3 flex items-center justify-between order-[-2] xl:order-none'}
             style={undefined}
           >
             <MoveNavigationBar
@@ -1252,7 +1275,8 @@ export function GameReplay() {
           )}
 
           <div
-            className={redesign ? (gtab !== 'analysis' ? 'hidden' : 'order-[-2] xl:order-none h-[116px] shrink-0 overflow-y-auto rounded-[16px] xl:h-auto xl:overflow-visible') : 'contents'}
+            ref={coachSlotRef}
+            className={redesign ? (gtab !== 'analysis' ? 'hidden' : 'order-[-2] xl:order-none min-h-[116px] shrink-0 overflow-y-auto rounded-[16px] xl:h-auto xl:overflow-visible') : 'contents'}
           >
             {redesign && currentMove === 0 && reviewMoves.length > 0 && (
               <p className="px-1 pt-1 text-[13px] leading-snug" style={{ color: RD.muted }}>Step through the game with the buttons below. The coach explains each move here.</p>
@@ -1657,6 +1681,13 @@ export function GameReplay() {
           )}
 
           <div className={redesign && gtab !== 'report' ? 'hidden' : 'contents'}>
+          {redesign && game.opening && (
+            <div className="order-[-1] xl:order-none flex items-center gap-2.5 rounded-[14px] px-4 py-2.5" style={{ background: RD.card, border: `1px solid ${RD.border}` }}>
+              <BookOpen className="h-4 w-4 shrink-0" style={{ color: RD.green }} />
+              {game.eco && <span className="text-[12px] font-bold" style={{ color: RD.muted }}>{game.eco}</span>}
+              <span className="truncate text-[13.5px] font-bold" style={{ color: RD.text }}>{game.opening}</span>
+            </div>
+          )}
           {/* Game Rating Panel — shown after review completes */}
           {reviewMoves.length > 0 && (
             <GameRatingPanel

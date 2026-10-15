@@ -39,7 +39,7 @@ export function MoveNavigationBar({
     // Five wide rounded buttons across the row (redesign mockup)
     const wide = (onClick: () => void, disabled: boolean, icon: React.ReactNode, label: string) => (
       <button onClick={onClick} disabled={disabled} aria-label={label}
-        className="flex h-[58px] items-center justify-center rounded-[14px] transition-transform active:scale-95 disabled:opacity-30"
+        className="flex h-[46px] items-center justify-center rounded-[13px] transition-transform active:scale-95 disabled:opacity-30"
         style={{ background: 'var(--cs-bg-card, #0D1516)', border: '1px solid var(--cs-border, rgba(255,255,255,.08))', color: TEXT_LIGHT }}>
         {icon}
       </button>
