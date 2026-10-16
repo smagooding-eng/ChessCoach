@@ -62,6 +62,8 @@ function requireAdmin(req: Request, res: Response, next: Function) {
   next();
 }
 
+const BOT_UA = /bot\b|bot\/|crawl|spider|slurp|headless|lighthouse|pagespeed|facebookexternalhit|embedly|bingpreview|semrush|ahrefs|mj12|google-inspectiontool|phantomjs|puppeteer|playwright|selenium|python-requests|curl\/|wget|go-http-client|node-fetch/i;
+
 const SECTION_IDS = ["hero", "how_it_works", "differentiators", "features", "faq", "pricing", "final_cta"] as const;
 
 const VALID_EVENTS = new Set([
@@ -88,6 +90,11 @@ router.post("/landing-funnel/track", async (req: Request, res: Response) => {
     // Unrecognized/missing platform falls back to 'web' rather than
     // rejecting the event outright -- an older cached client bundle
     // without the platform field shouldn't start dropping events.
+    // Search-engine crawlers and other bots run the page's JavaScript too, so
+    // they used to show up as "landing page views" that never scroll or leave.
+    // They're acknowledged but not counted.
+    const ua = String(req.headers["user-agent"] ?? "");
+    if (!ua || BOT_UA.test(ua)) { res.json({ success: true, ignored: true }); return; }
     const safePlatform: Platform = platform === "app" ? "app" : "web";
     const safeElapsedMs = typeof elapsedMs === "number" && Number.isFinite(elapsedMs) && elapsedMs >= 0
       ? Math.round(elapsedMs)
@@ -183,14 +190,21 @@ async function getFunnelStatsForPlatform(since: Date, until: Date, platform: Pla
   // "Left without doing anything" = viewed the landing page but never
   // triggered any other funnel event at all (not even Mia or signup click).
   const distinctActiveVisitors = await db
-    .select({ visitorId: landingFunnelEventsTable.visitorId })
+    .select({ visitorId: landingFunnelEventsTable.visitorId, eventType: landingFunnelEventsTable.eventType })
     .from(landingFunnelEventsTable)
     .where(and(platformFilter, gte(landingFunnelEventsTable.createdAt, since), lte(landingFunnelEventsTable.createdAt, until)));
-  const visitorEventCounts: Record<string, number> = {};
+  // Seeing the page (the view, the hero coming into view, leaving from the
+  // hero) isn't an action. This used to count visitors with exactly one
+  // event, but every visit logs at least two (page view + hero view), so it
+  // always read 0.
+  const PASSIVE = /^(landing_view|viewed_hero|exit_.+)$/;
+  const viewed = new Set<string>();
+  const acted = new Set<string>();
   for (const row of distinctActiveVisitors) {
-    visitorEventCounts[row.visitorId] = (visitorEventCounts[row.visitorId] ?? 0) + 1;
+    if (row.eventType === "landing_view") viewed.add(row.visitorId);
+    if (!PASSIVE.test(row.eventType)) acted.add(row.visitorId);
   }
-  const leftWithoutAction = Object.values(visitorEventCounts).filter((c) => c === 1).length;
+  const leftWithoutAction = [...viewed].filter((v) => !acted.has(v)).length;
 
   const visitorBreakdown = await getLandingVisitorBreakdown(since, until, platform);
 

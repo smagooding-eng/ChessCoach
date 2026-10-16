@@ -27,9 +27,14 @@ export function parseDateRangeParams(req: Request, defaultDays = 30): { since: D
   const startDateStr = req.query.startDate as string | undefined;
   const endDateStr = req.query.endDate as string | undefined;
   if (startDateStr && endDateStr) {
+    // tz = the admin's getTimezoneOffset() in minutes (e.g. 240 for US
+    // Eastern summer time), so "today" is the admin's local day, not UTC's.
+    const tzRaw = parseInt(String(req.query.tz ?? "0"), 10);
+    const tz = Number.isFinite(tzRaw) ? Math.max(-840, Math.min(840, tzRaw)) : 0;
+    const shift = tz * 60 * 1000;
     return {
-      since: new Date(`${startDateStr}T00:00:00.000Z`),
-      until: new Date(`${endDateStr}T23:59:59.999Z`),
+      since: new Date(new Date(`${startDateStr}T00:00:00.000Z`).getTime() + shift),
+      until: new Date(new Date(`${endDateStr}T23:59:59.999Z`).getTime() + shift),
     };
   }
   const days = Math.min(90, Math.max(1, parseInt(req.query.days as string) || defaultDays));

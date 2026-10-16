@@ -94,9 +94,14 @@ const DATE_RANGE_LABELS: Record<DateRangePreset, string> = {
   custom: 'Custom range...',
 };
 
+// Local calendar date (not UTC): "Today" means today where the admin is, not
+// the UTC day, which in the evening US time has already rolled over.
 function fmtDate(d: Date): string {
-  return d.toISOString().slice(0, 10);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
+// Minutes between local time and UTC, so the server can turn these local
+// dates into the right instants.
+const TZ_Q = `&tz=${new Date().getTimezoneOffset()}`;
 
 function computeDateRange(preset: DateRangePreset, customStart: string, customEnd: string): DateRange {
   const today = new Date();
@@ -2894,7 +2899,7 @@ function LandingFunnelPanel() {
     if (!range.startDate || !range.endDate) return;
     setLoading(true);
     setFunnelError('');
-    apiFetch(`/api/admin/landing-funnel?startDate=${range.startDate}&endDate=${range.endDate}`, { credentials: 'include' })
+    apiFetch(`/api/admin/landing-funnel?startDate=${range.startDate}&endDate=${range.endDate}${TZ_Q}`, { credentials: 'include' })
       .then(async r => {
         const d = await r.json().catch(() => null);
         if (!r.ok) { setFunnelError(d?.details || d?.error || `HTTP ${r.status}`); return null; }
@@ -2946,7 +2951,7 @@ function AiUsagePanel() {
   useEffect(() => {
     if (!range.startDate || !range.endDate) return;
     setLoading(true);
-    apiFetch(`/api/admin/ai-usage?startDate=${range.startDate}&endDate=${range.endDate}`, { credentials: 'include' })
+    apiFetch(`/api/admin/ai-usage?startDate=${range.startDate}&endDate=${range.endDate}${TZ_Q}`, { credentials: 'include' })
       .then(r => r.ok ? r.json() : null)
       .then(d => setData(d))
       .finally(() => setLoading(false));
@@ -3050,7 +3055,7 @@ function UserActivityPanel() {
   useEffect(() => {
     if (!range.startDate || !range.endDate) return;
     setLoading(true);
-    apiFetch(`/api/admin/user-activity?startDate=${range.startDate}&endDate=${range.endDate}`, { credentials: 'include' })
+    apiFetch(`/api/admin/user-activity?startDate=${range.startDate}&endDate=${range.endDate}${TZ_Q}`, { credentials: 'include' })
       .then(r => r.ok ? r.json() : null)
       .then(d => setData(d))
       .finally(() => setLoading(false));

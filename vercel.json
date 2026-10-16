@@ -34,6 +34,10 @@
       "destination": "/api/og?kind=share&data=:data"
     },
     {
+      "source": "/sitemap.xml",
+      "destination": "https://chesscoach-api-kbf8.onrender.com/sitemap.xml"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
