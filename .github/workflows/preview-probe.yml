@@ -8,12 +8,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: |
-          exec > >(while IFS= read -r l; do echo "::notice::$l"; done) 2>&1
           UA='facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)'
-          for u in https://chessscout.net/players https://chessscout.net/ https://chessscout.net/tournaments; do
-            echo "== $u"; curl -sS -A "$UA" -D - -o page.html "$u" | head -5
-            grep -oE '<meta[^>]+(og:image|og:title|twitter:image)[^>]*>' page.html
+          {
+          for u in https://chessscout.net/ https://chessscout.net/tournaments; do
+            echo "== $u"; curl -sS -A "$UA" -o page.html -w "%{http_code}\n" "$u"
+            grep -oE '<meta[^>]+(og:image"|og:title)[^>]*>' page.html
           done
-          for i in shots/players.jpg shots/home.jpg; do
-            echo "== $i"; curl -sS -A "$UA" -D - -o img "https://chessscout.net/$i" | head -8; file img; ls -la img
+          for i in shots/players.jpg shots/home.jpg og-players.jpg; do
+            echo "== $i"; curl -sS -A "$UA" -D hdr -o img "https://chessscout.net/$i"; grep -iE "^HTTP|content-type|content-length|x-vercel-cache" hdr; file img | cut -c1-120
           done
+          } > out.txt 2>&1
+          echo "::notice::$(sed ':a;N;$!ba;s/\n/%0A/g' out.txt)"
