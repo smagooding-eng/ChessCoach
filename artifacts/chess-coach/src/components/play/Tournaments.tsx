@@ -16,8 +16,6 @@ export interface TournamentSummary {
   format: 'arena' | 'bracket';
   kind: 'live' | 'daily';
   eligibility: 'all' | 'pro';
-  /** ChessScout bots fill in when no one's free (live tournaments). */
-  bots?: boolean;
   maxPlayers: number | null;
   totalRounds: number | null;
   startsAt: string;

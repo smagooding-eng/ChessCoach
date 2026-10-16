@@ -83,7 +83,6 @@ export function CreateTournament() {
   const [club, setClub] = useState('');
   const [logo, setLogo] = useState<string | null>(null);
   const [listed, setListed] = useState(true);
-  const [bots, setBots] = useState(true);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [created, setCreated] = useState<{ id: string; name: string; when: Date } | null>(null);
@@ -123,7 +122,7 @@ export function CreateTournament() {
           name: name.trim() || suggested, description: note.trim() || undefined, timeControl: tc, mode,
           startsAt: when.toISOString(), durationMinutes: format === 'arena' ? length : undefined,
           format, kind, maxPlayers: proT ? (maxPlayers ?? PRO_MAX) : maxPlayers, join, clubName: club.trim() || undefined, logo: logo ?? undefined, listed,
-          eligibility: proT ? 'pro' : 'all', acceptOrganizerTerms: proT ? terms : undefined, bots: kind === 'live' ? bots : false,
+          eligibility: proT ? 'pro' : 'all', acceptOrganizerTerms: proT ? terms : undefined,
         }),
       });
       const d = await r.json().catch(() => ({}));
@@ -337,18 +336,6 @@ export function CreateTournament() {
           <input type="checkbox" checked={listed} onChange={(e) => setListed(e.target.checked)} className="h-4 w-4 accent-[#81B64C]" />
           <span className="text-[13.5px] font-bold" style={{ color: PT.text }}>Show on the public tournaments list</span>
         </label>
-
-        {kind === 'live' && (
-          <label className="flex cursor-pointer items-start gap-3 rounded-[12px] px-3 py-2.5" style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${PT.border}` }}>
-            <input type="checkbox" checked={bots} onChange={(e) => setBots(e.target.checked)} className="mt-0.5 h-4 w-4 accent-[#81B64C]" />
-            <span>
-              <span className="block text-[13.5px] font-bold" style={{ color: PT.text }}>Bots fill in when no one's free</span>
-              <span className="block text-[12px]" style={{ color: PT.muted }}>
-                {format === 'bracket' ? 'Empty places in the bracket get a ChessScout bot, so it runs even with a few players.' : 'Players never sit waiting, and the arena keeps going.'} Bots are labeled, aren't counted as players, and never change ratings.
-              </span>
-            </span>
-          </label>
-        )}
 
         <label className="flex cursor-pointer items-center gap-3 rounded-[12px] px-3 py-2.5" style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${PT.border}` }}>
           <input type="checkbox" checked={join} onChange={(e) => setJoin(e.target.checked)} className="h-4 w-4 accent-[#81B64C]" />

@@ -54,7 +54,7 @@ interface TRow {
   winner_username: string | null;
   visibility?: string; created_by?: string; created_by_name?: string | null;
   club_name?: string | null; logo_version?: number | null; entry_fee_cents?: number | null;
-  players?: number | string; joined?: boolean; bots_enabled?: boolean;
+  players?: number | string; joined?: boolean;
 }
 
 const liveTcs = () => listTimeControls().map((t) => ({ id: t.id, label: t.label }));
@@ -84,8 +84,6 @@ function publicT(t: TRow, uid?: string | null) {
     createdByName: t.created_by_name ?? null,
     isCreator: !!uid && t.created_by === uid,
     clubName: t.club_name ?? null,
-    // Bots step in when no one's free (live tournaments only).
-    bots: !!t.bots_enabled && t.kind !== "daily",
     // Entry fees are switched off for now (Pro membership is the only way in).
     entryFeeCents: ENTRY_FEES_ENABLED && t.eligibility === "pro" ? (t.entry_fee_cents ?? ENTRY_FEE_CENTS) : null,
     logoUrl: t.logo_version ? `/api/tournaments/${t.id}/logo?v=${t.logo_version}` : null,
@@ -96,7 +94,7 @@ const uidOf = (req: Request): string | null => (req.isAuthenticated?.() && req.u
 
 const SELECT_T = (uid: string) => sql`
   SELECT t.*,
-    (SELECT COUNT(*) FROM tournament_players p WHERE p.tournament_id = t.id AND NOT p.withdrawn AND p.user_id NOT LIKE 'bot:%') AS players,
+    (SELECT COUNT(*) FROM tournament_players p WHERE p.tournament_id = t.id AND NOT p.withdrawn) AS players,
     EXISTS (SELECT 1 FROM tournament_players p WHERE p.tournament_id = t.id AND p.user_id = ${uid} AND NOT p.withdrawn) AS joined
   FROM tournaments t`;
 
@@ -126,13 +124,13 @@ router.get("/tournaments", async (req: Request, res: Response) => {
 
 interface CreateBody {
   name?: string; description?: string; timeControl?: string; mode?: string; startsAt?: string;
-  durationMinutes?: number; format?: string; kind?: string; eligibility?: string; maxPlayers?: number | null; bots?: boolean;
+  durationMinutes?: number; format?: string; kind?: string; eligibility?: string; maxPlayers?: number | null;
 }
 
 /** Validates a create request; returns the row values or an error message. */
 function parseCreate(b: CreateBody, opts: { admin: boolean }): { error: string } | {
   name: string; description: string | null; timeControl: string; mode: string; starts: Date; ends: Date | null;
-  format: string; kind: string; eligibility: string; maxPlayers: number | null; bots: boolean;
+  format: string; kind: string; eligibility: string; maxPlayers: number | null;
 } {
   const name = String(b.name ?? "").trim().slice(0, 80);
   if (!name) return { error: "Give it a name" };
@@ -162,8 +160,6 @@ function parseCreate(b: CreateBody, opts: { admin: boolean }): { error: string }
     eligibility: b.eligibility === "pro" ? "pro" : "all",
     // A Pro tournament always has a cap (500 at most).
     maxPlayers: b.eligibility === "pro" && !opts.admin ? (maxPlayers ?? PRO_MAX_PLAYERS) : maxPlayers,
-    // Bots fill in for live tournaments unless the organizer turns them off.
-    bots: kind === "live" && b.bots !== false,
   };
 }
 
@@ -256,9 +252,9 @@ router.post("/tournaments", requireAuth, async (req: Request, res: Response) => 
     const name = displayName(req);
     const visibility = extra.listed === false ? "link" : "public";
     await db.execute(sql`
-      INSERT INTO tournaments (id, name, description, time_control, mode, starts_at, ends_at, status, created_by, format, kind, eligibility, max_players, visibility, created_by_name, club_name, bots_enabled)
+      INSERT INTO tournaments (id, name, description, time_control, mode, starts_at, ends_at, status, created_by, format, kind, eligibility, max_players, visibility, created_by_name, club_name)
       VALUES (${id}, ${v.name}, ${v.description}, ${v.timeControl}, ${v.mode}, ${v.starts.toISOString()}, ${v.ends ? v.ends.toISOString() : null},
-        'scheduled', ${uid}, ${v.format}, ${v.kind}, ${v.eligibility}, ${v.maxPlayers}, ${visibility}, ${name}, ${String(extra.clubName ?? "").trim().slice(0, 80) || null}, ${v.bots})`);
+        'scheduled', ${uid}, ${v.format}, ${v.kind}, ${v.eligibility}, ${v.maxPlayers}, ${visibility}, ${name}, ${String(extra.clubName ?? "").trim().slice(0, 80) || null})`);
     if (v.eligibility === "pro") {
       await db.execute(sql`UPDATE tournaments SET entry_fee_cents = ${ENTRY_FEES_ENABLED ? ENTRY_FEE_CENTS : null}, organizer_terms_at = now() WHERE id = ${id}`);
     }
@@ -408,7 +404,6 @@ router.get("/tournaments/:id", async (req: Request, res: Response) => {
         state: live.playing[p.user_id] || activeDaily.has(p.user_id) ? "playing" : waiting.has(p.user_id) ? "waiting" : "away",
         playingAgainst: live.playing[p.user_id] ?? activeDaily.get(p.user_id)?.opp ?? null,
         isMe: p.user_id === uid,
-        isBot: p.user_id.startsWith("bot:"),
       })),
       games: recentGames.map((g) => ({
         gameId: g.game_id, kind: g.kind, white: g.white_username, black: g.black_username, result: g.result, termination: g.termination, startedAt: g.started_at,
@@ -481,7 +476,7 @@ router.post("/tournaments/:id/withdraw", requireAuth, async (req: Request, res: 
 router.get("/admin/tournaments", requireAdmin, async (_req: Request, res: Response) => {
   try {
     const rows = rowsOf<TRow>(await db.execute(sql`
-      SELECT t.*, (SELECT COUNT(*) FROM tournament_players p WHERE p.tournament_id = t.id AND NOT p.withdrawn AND p.user_id NOT LIKE 'bot:%') AS players
+      SELECT t.*, (SELECT COUNT(*) FROM tournament_players p WHERE p.tournament_id = t.id AND NOT p.withdrawn) AS players
       FROM tournaments t ORDER BY t.starts_at DESC LIMIT 50`));
     res.json({ tournaments: rows.map((r) => publicT(r)), timeControls: liveTcs(), liveTimeControls: liveTcs(), dailyTimeControls: dailyTcs() });
   } catch (err) {
@@ -496,9 +491,9 @@ router.post("/admin/tournaments", requireAdmin, async (req: Request, res: Respon
     if ("error" in v) { res.status(400).json({ error: v.error }); return; }
     const id = crypto.randomBytes(5).toString("hex");
     await db.execute(sql`
-      INSERT INTO tournaments (id, name, description, time_control, mode, starts_at, ends_at, status, created_by, format, kind, eligibility, max_players, visibility, created_by_name, bots_enabled)
+      INSERT INTO tournaments (id, name, description, time_control, mode, starts_at, ends_at, status, created_by, format, kind, eligibility, max_players, visibility, created_by_name)
       VALUES (${id}, ${v.name}, ${v.description}, ${v.timeControl}, ${v.mode}, ${v.starts.toISOString()}, ${v.ends ? v.ends.toISOString() : null},
-        'scheduled', ${req.user!.id}, ${v.format}, ${v.kind}, ${v.eligibility}, ${v.maxPlayers}, 'public', 'ChessScout.net', ${v.bots})`);
+        'scheduled', ${req.user!.id}, ${v.format}, ${v.kind}, ${v.eligibility}, ${v.maxPlayers}, 'public', 'ChessScout.net')`);
     res.json({ id });
   } catch (err) {
     logger.error({ err }, "[tournaments] create failed");

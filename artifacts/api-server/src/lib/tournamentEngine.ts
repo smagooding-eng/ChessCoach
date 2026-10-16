@@ -22,7 +22,6 @@ import {
   closeTournamentPool, notifyPoolStarted, tryStartBracketGame, isInTournamentPool,
   setTournamentGameHook, loadUserRating,
 } from "./liveServer";
-import { isBotId, getTournamentBot, seatBots, spreadBots, BOT_VS_BOT_MAX_RATING } from "./tournamentBots";
 import { startGame as startDailyGame, setDailyFinishHook, isValidTimeControl as isDailyTc, DAILY_RATING_KEY } from "./correspondence";
 
 const SHOW_UP_MS = 10 * 60 * 1000;            // live bracket: time to turn up for a match
@@ -36,7 +35,7 @@ function rowsOf<T>(res: unknown): T[] {
 export interface TRow {
   id: string; name: string; time_control: string; mode: string; status: string;
   starts_at: string; ends_at: string | null; format: string; kind: string;
-  eligibility: string; max_players: number | null; total_rounds: number | null; bots_enabled?: boolean;
+  eligibility: string; max_players: number | null; total_rounds: number | null;
 }
 interface MRow {
   id: number; tournament_id: string; round: number; slot: number;
@@ -47,7 +46,7 @@ interface MRow {
 
 const url = (tid: string) => `/tournaments/${tid}`;
 const notify = (userId: string, title: string, body: string, link: string) =>
-  isBotId(userId) ? Promise.resolve() : notifyUser(userId, { kind: "tournament", title, body, url: link }).catch(() => {});
+  notifyUser(userId, { kind: "tournament", title, body, url: link }).catch(() => {});
 
 export function roundLabel(round: number, total: number): string {
   const left = total - round;
@@ -71,14 +70,10 @@ async function loadT(tid: string): Promise<TRow | null> {
   return rowsOf<TRow>(await db.execute(sql`SELECT * FROM tournaments WHERE id = ${tid}`))[0] ?? null;
 }
 
-/** People in a tournament (not bots). */
 async function players(tid: string): Promise<{ user_id: string; username: string }[]> {
   return rowsOf<{ user_id: string; username: string }>(await db.execute(sql`
-    SELECT user_id, username FROM tournament_players WHERE tournament_id = ${tid} AND NOT withdrawn AND user_id NOT LIKE 'bot:%' ORDER BY joined_at`));
+    SELECT user_id, username FROM tournament_players WHERE tournament_id = ${tid} AND NOT withdrawn ORDER BY joined_at`));
 }
-
-/** Smallest live knockout we'll run with bots filling the empty places. */
-const MIN_BOT_BRACKET = 8;
 
 async function notifyAll(tid: string, title: string, body: string) {
   for (const p of await players(tid)) void notify(p.user_id, title, body, url(tid));
@@ -97,16 +92,7 @@ function seedPositions(n: number): number[] {
 // ── Brackets ───────────────────────────────────────────────────────────────
 
 async function buildBracket(t: TRow) {
-  let list = await players(t.id);
-  // Bots fill the bracket up to a full power of two (at least 8), so it runs
-  // with no byes, and runs even if fewer than two people signed up.
-  if (t.bots_enabled && t.kind === "live") {
-    let size = MIN_BOT_BRACKET;
-    while (size < list.length) size *= 2;
-    const bots = spreadBots(size - list.length, new Set(), BOT_VS_BOT_MAX_RATING);
-    await seatBots(t.id, bots);
-    list = [...list, ...bots.map((b) => ({ user_id: b.id, username: b.name }))];
-  }
+  const list = await players(t.id);
   if (list.length < 2) {
     await db.execute(sql`UPDATE tournaments SET status = 'cancelled' WHERE id = ${t.id}`);
     for (const p of list) void notify(p.user_id, `${t.name} was cancelled`, "Not enough players signed up.", url(t.id));
@@ -114,7 +100,7 @@ async function buildBracket(t: TRow) {
     return;
   }
   const ratingKey = t.kind === "daily" ? DAILY_RATING_KEY : t.time_control;
-  const rated = await Promise.all(list.map(async (p) => ({ ...p, rating: getTournamentBot(p.user_id)?.rating ?? (await loadUserRating(p.user_id, ratingKey)).rating })));
+  const rated = await Promise.all(list.map(async (p) => ({ ...p, rating: (await loadUserRating(p.user_id, ratingKey)).rating })));
   rated.sort((a, b) => b.rating - a.rating);
   const seedOf = new Map(rated.map((p, i) => [p.user_id, i + 1]));
   let size = 2;
