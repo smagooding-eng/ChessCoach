@@ -29,8 +29,8 @@ async function getJson<T>(path: string): Promise<T | null> {
   return (await r.json().catch(() => null)) as T | null;
 }
 
-// image: designed fallback picture (public/); the preview itself is a live
-// screenshot of the page from /api/shot, which falls back to that image.
+// image: designed picture (public/og-*.jpg); the preview uses the section's
+// real screenshot from public/shots/, re-taken daily by a GitHub workflow.
 interface Page { title: string; description: string; path: string; body: string; jsonLd?: unknown; status?: number; image?: string }
 
 // ── Players ──────────────────────────────────────────────────────────────
@@ -140,7 +140,7 @@ function apply(html: string, p: Page): string {
   out = setTag(out, 'name', 'twitter:title', t);
   out = setTag(out, 'name', 'twitter:description', d);
   {
-    const img = esc(`${SITE}/api/shot?path=${encodeURIComponent(p.path)}`);
+    const img = esc(`${SITE}/shots/${p.path.startsWith('/learn') ? 'learn' : 'players'}.jpg`);
     out = setTag(out, 'property', 'og:image', img);
     out = setTag(out, 'name', 'twitter:image', img);
   }
