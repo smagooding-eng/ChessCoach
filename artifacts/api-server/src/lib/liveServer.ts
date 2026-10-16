@@ -596,6 +596,7 @@ async function persistFinishedGame(g: LiveGame) {
     const resultStr = won ? 'win' : lost ? 'loss' : 'draw';
     try {
       const inserted = await db.insert(gamesTable).values({
+        userId: p.userId,
         username: p.username.toLowerCase(),
         pgn,
         whiteUsername: g.white.username,
@@ -608,7 +609,8 @@ async function persistFinishedGame(g: LiveGame) {
         eco: null,
         playedAt: playedAtIso,
         url: null,
-        platform: 'chessscout',
+        // A game against a bot is listed under Bots, not ChessScout games.
+        platform: (side === 'white' ? g.black : g.white).kind === 'bot' ? 'bot' : 'chessscout',
       }).returning({ id: gamesTable.id });
       const insertedId = inserted[0]?.id;
       if (typeof insertedId === 'number') g.dbGameIds[side] = insertedId;
@@ -1440,7 +1442,7 @@ export async function getUserLiveHistory(userId: string, limit: number) {
       lg.started_at, lg.finished_at,
       g.id AS games_id
     FROM live_games lg
-    LEFT JOIN games g ON g.platform = 'chessscout'
+    LEFT JOIN games g ON g.platform IN ('chessscout', 'bot')
       AND g.played_at = lg.started_at
       AND (
         (lg.white_user_id = ${userId} AND LOWER(g.username) = LOWER(lg.white_username))

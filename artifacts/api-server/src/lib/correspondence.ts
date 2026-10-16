@@ -306,6 +306,7 @@ async function finishGame(game: CorrespondenceGame, result: Result, termination:
     const lost = (result === "black" && isWhite) || (result === "white" && !isWhite);
     try {
       const inserted = await db.insert(gamesTable).values({
+        userId: isWhite ? claimed.whiteUserId : claimed.blackUserId,
         username: username.toLowerCase(),
         pgn: fullPgn,
         whiteUsername: claimed.whiteUsername,

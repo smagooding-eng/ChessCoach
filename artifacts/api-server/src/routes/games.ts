@@ -342,6 +342,9 @@ router.get("/games/elo-progress", async (req, res): Promise<void> => {
     const conditions = [inArray(gamesTable.username, ownerNames)];
     if (platformFilter && (platformFilter === "chesscom" || platformFilter === "lichess" || platformFilter === "chessscout")) {
       conditions.push(eq(gamesTable.platform, platformFilter));
+    } else {
+      // Games against bots don't belong in a rating history.
+      conditions.push(sql`${gamesTable.platform} <> 'bot'`);
     }
 
     const allRatings = await db
@@ -424,8 +427,18 @@ router.get("/games", requireAuth, async (req, res): Promise<void> => {
   // frontend code that reads them keeps working unchanged.
 
   const conditions = [eq(gamesTable.userId, req.user!.id)];
-  if (platform && (platform === "chesscom" || platform === "lichess" || platform === "chessscout")) {
+  // source (Games tab): chessscout | chesscom | lichess | bots | all.
+  // Read straight from the query since it isn't in the generated schema.
+  // Without one, games against bots stay out (they have their own tab).
+  const source = typeof req.query.source === "string" ? req.query.source : "";
+  if (source === "bots") {
+    conditions.push(eq(gamesTable.platform, "bot"));
+  } else if (source === "chesscom" || source === "lichess" || source === "chessscout") {
+    conditions.push(eq(gamesTable.platform, source));
+  } else if (platform && (platform === "chesscom" || platform === "lichess" || platform === "chessscout")) {
     conditions.push(eq(gamesTable.platform, platform));
+  } else {
+    conditions.push(sql`${gamesTable.platform} <> 'bot'`);
   }
   if (opponent) {
     conditions.push(

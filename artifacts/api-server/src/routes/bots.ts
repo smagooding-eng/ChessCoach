@@ -3,7 +3,7 @@ import { Chess } from "chess.js";
 import { requireAuth } from "../middlewares/authMiddleware";
 import { stockfishBotMove } from "../lib/engineAnalysis";
 import { logger } from "../lib/logger";
-import { db } from "@workspace/db";
+import { db, gamesTable } from "@workspace/db";
 import { sql } from "drizzle-orm";
 
 const router: IRouter = Router();
@@ -49,8 +49,31 @@ router.post("/bots/move", requireAuth, async (req: Request, res: Response) => {
 // may retry). Only real games count: from the starting position, at least a
 // couple of moves in.
 const BOT_RESULTS = new Set(["win", "loss", "draw"]);
+/** A finished practice-bot game, stored like any other game (platform 'bot'). */
+async function saveBotGame(req: Request, g: { bot: string; result: string; pgn: string; color: "w" | "b"; botRating: number }) {
+  const chess = new Chess();
+  chess.loadPgn(g.pgn); // throws on a bad PGN
+  if (chess.history().length < 2) return;
+  const u = req.user!;
+  const me = u.scoutUsername || u.chesscomUsername || u.lichessUsername || u.firstName || u.email?.split("@")[0] || "You";
+  const botName = `${g.bot} (Bot)`;
+  const [white, black] = g.color === "w" ? [me, botName] : [botName, me];
+  const tag = g.result === "draw" ? "1/2-1/2" : (g.result === "win") === (g.color === "w") ? "1-0" : "0-1";
+  const now = new Date();
+  chess.header("Event", "ChessScout practice bot", "Site", "ChessScout.net", "Date", now.toISOString().slice(0, 10).replace(/-/g, "."),
+    "White", white, "Black", black, "Result", tag);
+  await db.insert(gamesTable).values({
+    userId: u.id, username: me.toLowerCase(), pgn: chess.pgn(),
+    whiteUsername: white, blackUsername: black,
+    whiteRating: g.color === "w" ? 0 : Math.round(g.botRating), blackRating: g.color === "b" ? 0 : Math.round(g.botRating),
+    result: g.result, timeControl: "untimed", opening: null, eco: null, playedAt: now, url: null, platform: "bot",
+  });
+}
+
 router.post("/bots/result", requireAuth, async (req: Request, res: Response) => {
-  const { bot, result, moves, gameKey } = (req.body ?? {}) as { bot?: unknown; result?: unknown; moves?: unknown; gameKey?: unknown };
+  const { bot, result, moves, gameKey, pgn, color, botRating } = (req.body ?? {}) as {
+    bot?: unknown; result?: unknown; moves?: unknown; gameKey?: unknown; pgn?: unknown; color?: unknown; botRating?: unknown;
+  };
   if (typeof bot !== "string" || !bot || bot.length > 60 || typeof result !== "string" || !BOT_RESULTS.has(result)
     || typeof gameKey !== "string" || !gameKey || gameKey.length > 80) {
     res.status(400).json({ error: "bot, result and gameKey are required" });
@@ -59,11 +82,17 @@ router.post("/bots/result", requireAuth, async (req: Request, res: Response) => 
   const n = typeof moves === "number" && Number.isFinite(moves) ? Math.max(0, Math.min(1000, Math.round(moves))) : 0;
   if (n < 2) { res.json({ saved: false }); return; }
   try {
-    await db.execute(sql`
+    const ins = await db.execute(sql`
       INSERT INTO bot_results (user_id, bot, result, moves, game_key)
       VALUES (${req.user!.id}, ${bot}, ${result}, ${n}, ${gameKey})
-      ON CONFLICT (user_id, game_key) DO NOTHING
+      ON CONFLICT (user_id, game_key) DO NOTHING RETURNING id
     `);
+    const fresh = (Array.isArray(ins) ? ins : ((ins as { rows?: unknown[] })?.rows ?? [])).length > 0;
+    // Keep the game itself too (Games tab > Bots), once per game.
+    if (fresh && typeof pgn === "string" && pgn.length < 20_000 && (color === "w" || color === "b")) {
+      await saveBotGame(req, { bot, result, pgn, color, botRating: typeof botRating === "number" ? botRating : 0 })
+        .catch((err) => logger.warn({ err }, "save bot game failed"));
+    }
     res.json({ saved: true });
   } catch (err) {
     logger.warn({ err }, "save bot result failed");

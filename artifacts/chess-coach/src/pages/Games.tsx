@@ -21,7 +21,7 @@ export function Games() {
   useSwipeTabs(['games', 'import', 'analysis'] as const, tab, setTab);
   const [pageSize, setPageSize] = useState(100);
   const [filter, setFilter] = useState('all');
-  const [platformFilter, setPlatformFilter] = useState<'all' | 'chesscom' | 'lichess' | 'chessscout'>('all');
+  const [platformFilter, setPlatformFilter] = useState<'all' | 'chesscom' | 'lichess' | 'chessscout' | 'bots'>('all');
   const [search, setSearch] = useState('');
   const [h2hMode, setH2hMode] = useState(false);
   const [h2hOpponent, setH2hOpponent] = useState('');
@@ -41,7 +41,7 @@ export function Games() {
   // "3 games" if only 3 of those happened to be within the most recently
   // loaded batch.
   const { data, isLoading, isError, error } = useMyGames(pageSize, {
-    platform: platformFilter === 'all' ? undefined : platformFilter,
+    source: platformFilter === 'all' ? undefined : platformFilter,
     opponent: h2hMode && debouncedH2hOpponent ? debouncedH2hOpponent : undefined,
   });
   const { username } = useUser();
@@ -281,13 +281,14 @@ export function Games() {
         </button>
         <select
           value={platformFilter}
-          onChange={(e) => setPlatformFilter(e.target.value as 'all' | 'chesscom' | 'lichess' | 'chessscout')}
+          onChange={(e) => setPlatformFilter(e.target.value as 'all' | 'chesscom' | 'lichess' | 'chessscout' | 'bots')}
           className="px-4 py-2.5 bg-secondary/50 border border-border rounded-xl outline-none focus:border-primary appearance-none cursor-pointer text-sm"
         >
           <option value="all">All Platforms</option>
           <option value="chesscom">Chess.com</option>
           <option value="lichess">Lichess</option>
-          <option value="chessscout">ChessScout.net Live</option>
+          <option value="chessscout">ChessScout.net</option>
+          <option value="bots">Bot games</option>
         </select>
         <select
           value={filter}
@@ -384,17 +385,18 @@ export function Games() {
                         </div>
                         <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
                           {(() => {
-                            const plat = (game.platform || 'chesscom') as 'lichess' | 'chesscom' | 'chessscout';
+                            const plat = (game.platform || 'chesscom') as 'lichess' | 'chesscom' | 'chessscout' | 'bot';
                             const cls =
                               plat === 'lichess' ? 'bg-white/20 text-white'
                               : plat === 'chessscout' ? 'bg-primary text-primary-foreground'
+                              : plat === 'bot' ? 'bg-white/10 text-white'
                               : 'bg-emerald-500 text-white';
-                            const label = plat === 'lichess' ? 'LC' : plat === 'chessscout' ? 'CS' : 'CC';
+                            const label = plat === 'lichess' ? 'LC' : plat === 'chessscout' ? 'CS' : plat === 'bot' ? 'BOT' : 'CC';
                             return (
                               <span className={cn(
                                 'inline-flex items-center gap-0.5 px-1 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider',
                                 cls,
-                              )} title={plat === 'chessscout' ? 'ChessScout.net Live' : plat === 'lichess' ? 'Lichess' : 'Chess.com'}>
+                              )} title={plat === 'chessscout' ? 'ChessScout.net' : plat === 'bot' ? 'Bot game' : plat === 'lichess' ? 'Lichess' : 'Chess.com'}>
                                 {label}
                               </span>
                             );

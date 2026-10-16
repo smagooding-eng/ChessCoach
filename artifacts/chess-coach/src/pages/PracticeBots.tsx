@@ -318,8 +318,10 @@ function GameView({ bot, onBack, startFen, startColor, isOnboarding }: { bot: Bo
     if (result === 'playing' || !signedIn || startFen) return;
     if (reportedRef.current === gameKeyRef.current) return;
     reportedRef.current = gameKeyRef.current;
-    reportBotResult(bot.name, result, moves.length, gameKeyRef.current);
-  }, [result, signedIn, startFen, bot.name, moves.length]);
+    let pgn = '';
+    try { pgn = chess.pgn(); } catch { /* result is still saved */ }
+    reportBotResult(bot.name, result, moves.length, gameKeyRef.current, pgn ? { pgn, color: playerColor, botRating: bot.rating } : undefined);
+  }, [result, signedIn, startFen, bot.name, moves.length, chess, playerColor, bot.rating]);
   const [, navigate] = useLocation();
   const [seededRating, setSeededRating] = useState<number | null>(null);
   const seedRequestedRef = useRef(false);

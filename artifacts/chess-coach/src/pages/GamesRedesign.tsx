@@ -4,7 +4,7 @@ import { Search, ChevronRight, RefreshCw, Users } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from '@/lib/api';
 import { useMyAnalysisSummary } from '@/hooks/use-analysis';
-import { useMyGames } from '@/hooks/use-games';
+import { useMyGames, type GameSource } from '@/hooks/use-games';
 import { useUser } from '@/hooks/use-user';
 import { GameThumb } from '@/components/GameThumb';
 import { playedWhite } from '@/lib/gameSide';
@@ -26,6 +26,17 @@ const COLOR_TABS = [
   { id: 'black', label: 'Black' },
 ] as const;
 
+// Where the games come from. "All" is every real game (ChessScout, Chess.com,
+// Lichess); games against bots have their own tab.
+const SOURCES: { id: GameSource; label: string }[] = [
+  { id: 'all', label: 'All' },
+  { id: 'chessscout', label: 'ChessScout' },
+  { id: 'chesscom', label: 'Chess.com' },
+  { id: 'lichess', label: 'Lichess' },
+  { id: 'bots', label: 'Bots' },
+];
+const SOURCE_LABEL: Record<string, string> = { chessscout: 'ChessScout', chesscom: 'Chess.com', lichess: 'Lichess', bot: 'Bot' };
+
 const RESULT_FILTERS = [
   { id: 'all', label: 'All results' },
   { id: 'win', label: 'Wins' },
@@ -46,6 +57,10 @@ export function GamesRedesign() {
   const [search, setSearch] = useState('');
   const [colorTab, setColorTab] = useState<(typeof COLOR_TABS)[number]['id']>('all');
   const [resultFilter, setResultFilter] = useState('all');
+  const [source, setSource] = useState<GameSource>(() => {
+    try { const v = localStorage.getItem('cs_games_source') as GameSource | null; return v && SOURCES.some((s) => s.id === v) ? v : 'all'; } catch { return 'all'; }
+  });
+  const pickSource = (s: GameSource) => { setSource(s); try { localStorage.setItem('cs_games_source', s); } catch { /* ignore */ } };
   const [showFilters, setShowFilters] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [pageSize, setPageSize] = useState(100);
@@ -57,7 +72,7 @@ export function GamesRedesign() {
   }, [h2hOpponent]);
   // Opponent filtering happens server-side across the whole history, so an
   // H2H record is never silently limited to whatever page happens to be loaded.
-  const { data } = useMyGames(pageSize, { opponent: debouncedH2h || undefined });
+  const { data } = useMyGames(pageSize, { opponent: debouncedH2h || undefined, source });
   const games = data?.games ?? [];
   const total = data?.total ?? 0;
   const { data: summary } = useMyAnalysisSummary();
@@ -111,8 +126,8 @@ export function GamesRedesign() {
   };
 
   const mine = useMemo(
-    () => [username, authUser?.chesscomUsername, authUser?.lichessUsername].filter((n): n is string => !!n).map((n) => n.toLowerCase()),
-    [username, authUser?.chesscomUsername, authUser?.lichessUsername],
+    () => [username, authUser?.chesscomUsername, authUser?.lichessUsername, (authUser as { scoutUsername?: string | null } | null)?.scoutUsername].filter((n): n is string => !!n).map((n) => n.toLowerCase()),
+    [username, authUser],
   );
 
   const filtered = useMemo(() => {
@@ -147,6 +162,19 @@ export function GamesRedesign() {
             </button>
           }
         />
+
+        <div className="-mx-1 mb-2.5 flex gap-1.5 overflow-x-auto px-1 pb-0.5 [scrollbar-width:none]" role="tablist" aria-label="Game source">
+          {SOURCES.map((s) => {
+            const on = source === s.id;
+            return (
+              <button key={s.id} role="tab" aria-selected={on} onClick={() => pickSource(s.id)}
+                className="shrink-0 rounded-full px-3.5 py-1.5 text-[13px] font-bold transition-colors"
+                style={on ? { background: RD.green, color: '#FFFFFF', border: `1px solid ${RD.green}` } : { background: 'rgba(255,255,255,.04)', color: RD.muted, border: `1px solid ${RD.border}` }}>
+                {s.label}
+              </button>
+            );
+          })}
+        </div>
 
         <div className="flex items-center gap-2.5">
           <div className="grid flex-1 grid-cols-3 gap-1 rounded-[16px] p-1" style={{ background: RD.cardSolid, border: `1px solid ${RD.border}` }}>
@@ -203,7 +231,7 @@ export function GamesRedesign() {
           </div>
         )}
 
-        {unreviewedCount > 0 && (
+        {source === 'all' && unreviewedCount > 0 && (
           <div className="mt-3 flex items-center gap-3 rounded-[16px] px-4 py-3" style={{ background: 'rgba(129,182,76,.07)', border: '1px solid rgba(129,182,76,.28)' }}>
             <div className="min-w-0 flex-1 text-[13px]">
               {bulkJobId && bulkProgress ? (
@@ -239,7 +267,9 @@ export function GamesRedesign() {
                     <span className="flex h-[34px] w-[64px] shrink-0 items-center justify-center gap-1.5 rounded-[10px] text-[13px] font-bold" style={{ background: 'rgba(255,255,255,.06)', border: `1px solid ${RD.border}`, color: RD.text }}><span className="h-2 w-2 rounded-full" style={{ background: rs.dot }} />{rs.label}</span>
                     <span className="min-w-0 flex-1">
                       <b className="block truncate text-[15px] font-bold"><span className="font-semibold" style={{ color: 'rgba(245,247,246,.8)' }}>vs </span>{opponent}</b>
-                      <span className="block truncate text-[12.5px]" style={{ color: RD.muted }}>{game.opening || 'Unknown opening'}</span>
+                      <span className="block truncate text-[12.5px]" style={{ color: RD.muted }}>
+                        {source === 'all' && (game as { platform?: string }).platform ? `${SOURCE_LABEL[(game as { platform?: string }).platform!] ?? ''} · ` : ''}{game.opening || 'Unknown opening'}
+                      </span>
                     </span>
                     <span className="shrink-0 text-[13px]" style={{ color: 'rgba(245,247,246,.85)' }}>{new Date(game.playedAt).toLocaleDateString()}</span>
                   </span>
@@ -248,8 +278,24 @@ export function GamesRedesign() {
             })
           ) : (
             <div className="rounded-[18px] px-4 py-12 text-center" style={{ background: RD.card, border: `1px solid ${RD.border}`, color: RD.muted }}>
-              <p className="text-[14px]">No games match.</p>
-              <p className="mt-1 text-[12px]">Try a different search or filter.</p>
+              {source === 'bots' && !search && resultFilter === 'all' && !debouncedH2h ? (
+                <>
+                  <p className="text-[14px]">No bot games yet.</p>
+                  <p className="mt-1 text-[12px]">Games you finish against practice bots show up here.</p>
+                  <Link href="/practice" className="mt-3 inline-block rounded-[12px] px-4 py-2 text-[13px] font-extrabold" style={{ background: RD.green, color: '#FFFFFF' }}>Play a bot</Link>
+                </>
+              ) : source === 'chessscout' && !search && resultFilter === 'all' && !debouncedH2h ? (
+                <>
+                  <p className="text-[14px]">No ChessScout games yet.</p>
+                  <p className="mt-1 text-[12px]">Live and daily games you play here show up in this tab.</p>
+                  <Link href="/play" className="mt-3 inline-block rounded-[12px] px-4 py-2 text-[13px] font-extrabold" style={{ background: RD.green, color: '#FFFFFF' }}>Play a game</Link>
+                </>
+              ) : (
+                <>
+                  <p className="text-[14px]">No games match.</p>
+                  <p className="mt-1 text-[12px]">Try a different search or filter.</p>
+                </>
+              )}
             </div>
           )}
         </div>

@@ -411,6 +411,28 @@ async function runSchemaMigrations() {
       UNIQUE (tournament_id, round, slot)
     )`);
 
+    // Games played on ChessScout used to be saved without their owner, so
+    // they never showed in the Games tab. Link them to their players, and
+    // file games against a bot under 'bot'. Safe to re-run (only touches
+    // rows still missing an owner / still 'chessscout').
+    try {
+      for (const side of ['white', 'black'] as const) {
+        const uid = sql.raw(`lg.${side}_user_id`), uname = sql.raw(`lg.${side}_username`);
+        await db.execute(sql`UPDATE games g SET user_id = ${uid} FROM live_games lg
+          WHERE g.platform = 'chessscout' AND g.user_id IS NULL AND ${uid} IS NOT NULL
+            AND g.played_at = lg.started_at AND LOWER(g.username) = LOWER(${uname})`);
+        const cgUid = sql.raw(`cg.${side}_user_id`), cgGid = sql.raw(`cg.${side}_games_id`);
+        await db.execute(sql`UPDATE games g SET user_id = ${cgUid} FROM correspondence_games cg
+          WHERE g.id = ${cgGid} AND g.user_id IS NULL`);
+      }
+      await db.execute(sql`UPDATE games g SET platform = 'bot' FROM live_games lg
+        WHERE g.platform = 'chessscout' AND g.played_at = lg.started_at
+          AND (lg.white_persona_id IS NOT NULL OR lg.black_persona_id IS NOT NULL)
+          AND (LOWER(g.username) = LOWER(lg.white_username) OR LOWER(g.username) = LOWER(lg.black_username))`);
+    } catch (err) {
+      logger.warn({ err }, 'ChessScout games owner backfill failed');
+    }
+
     logger.info('Schema migrations complete');
   } catch (err) {
     logger.error({ err }, 'Schema migration failed');
