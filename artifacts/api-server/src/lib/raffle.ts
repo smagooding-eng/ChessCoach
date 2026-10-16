@@ -6,7 +6,6 @@ export const RAFFLE = {
   drawingDateLabel: 'November 17, 2026',
   prize: 'ChessNut Air electronic chessboard',
   minSubs: 500,
-  referralCode: 'CHESSEDITZ',
   contactEmail: 'chessscout.net@gmail.com',
 } as const;
 

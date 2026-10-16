@@ -736,7 +736,6 @@ export function raffleCountdownHtml(name: string | null, daysLeft: number, unsub
       emailP('How to enter:', { mb: 6 }),
       emailFeatures([
         { glyph: '&#9819;', title: 'Go Pro', text: 'Subscribe to Pro for $5/month and you\'re entered automatically. Cancel anytime.' },
-        { glyph: '&#9820;', title: 'Double your entry', text: `Use referral code <strong style="color:${EMAIL.text};">${RAFFLE.referralCode}</strong> when you subscribe for 2 entries.` },
         { glyph: '&#9821;', title: 'Free entry', text: `No purchase necessary: email <a href="mailto:${RAFFLE.contactEmail}?subject=Sweepstakes%20Entry" style="color:${EMAIL.green};text-decoration:none;">${RAFFLE.contactEmail}</a> with the subject "Sweepstakes Entry" and your full name and email address.` },
       ]),
       emailP(`The prize is only awarded if we reach ${RAFFLE.minSubs} qualifying subscriptions by the drawing date, and a subscription entry needs to still be active at the drawing. 18+, void where prohibited. <a href="${EMAIL.site}/raffle-rules" style="color:${EMAIL.green};text-decoration:none;font-weight:700;">Official rules &rarr;</a>`, { size: 12, mb: 22 }),

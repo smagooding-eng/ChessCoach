@@ -9,9 +9,8 @@ const CARD = '#302e2b';
 const TEXT = '#e8e6e3';
 const MUTED = '#9e9b98';
 
-const LAST_UPDATED = 'August 27, 2026';
+const LAST_UPDATED = 'October 15, 2026';
 const CONTACT_EMAIL = 'chessscout.net@gmail.com';
-const REFERRAL_CODE = 'CHESSEDITZ';
 const DRAWING_DATE = 'November 17, 2026';
 const MIN_SUBS = 500;
 
@@ -85,21 +84,18 @@ export default function RaffleRulesPage() {
             <p className="font-bold mt-4 mb-1" style={{ color: TEXT }}>Method 1 — Subscribe to ChessScout.net Pro (1 entry)</p>
             <p>Any individual who purchases and maintains an active ChessScout.net Pro subscription at any point during the Entry Period receives one (1) entry into the Sweepstakes.</p>
 
-            <p className="font-bold mt-4 mb-1" style={{ color: TEXT }}>Method 1B — Subscribe using referral code {REFERRAL_CODE} (2 entries total)</p>
-            <p>Any individual who purchases and maintains an active ChessScout.net Pro subscription during the Entry Period and applies referral code <strong style={{ color: G }}>{REFERRAL_CODE}</strong> at checkout receives two (2) entries into the Sweepstakes in place of the single entry described in Method 1. The referral code must be applied at the time of subscribing; it cannot be applied retroactively to an existing subscription.</p>
-
-            <p className="font-bold mt-4 mb-1" style={{ color: TEXT }}>Method 1C — Subscribe and engage on Instagram (+1 entry)</p>
-            <p>Any individual who purchases and maintains an active ChessScout.net Pro subscription during the Entry Period and also likes and/or shares at least one (1) ChessScout.net Reel on Instagram during the Entry Period receives one (1) additional entry into the Sweepstakes, on top of the entry or entries already earned under Method 1 or Method 1B. To receive this additional entry, the entrant must email <a href={`mailto:${CONTACT_EMAIL}`} style={{ color: G }}>{CONTACT_EMAIL}</a> with the subject line "Instagram Entry," including their Instagram handle and the full name and email address associated with their subscription, during the Entry Period. Sponsor may verify the like or share before crediting the entry; an entrant whose Instagram account is private or who cannot otherwise be verified may be asked to provide a screenshot as proof.</p>
+            <p className="font-bold mt-4 mb-1" style={{ color: TEXT }}>Method 1B — Subscribe and engage on Instagram (+1 entry)</p>
+            <p>Any individual who purchases and maintains an active ChessScout.net Pro subscription during the Entry Period and also likes and/or shares at least one (1) ChessScout.net Reel on Instagram during the Entry Period receives one (1) additional entry into the Sweepstakes, on top of the entry already earned under Method 1. To receive this additional entry, the entrant must email <a href={`mailto:${CONTACT_EMAIL}`} style={{ color: G }}>{CONTACT_EMAIL}</a> with the subject line "Instagram Entry," including their Instagram handle and the full name and email address associated with their subscription, during the Entry Period. Sponsor may verify the like or share before crediting the entry; an entrant whose Instagram account is private or who cannot otherwise be verified may be asked to provide a screenshot as proof.</p>
 
             <p className="font-bold mt-4 mb-1" style={{ color: TEXT }}>Method 2 — Free entry, no purchase necessary (1 entry)</p>
             <p>If you do not wish to purchase a subscription, you may still receive one (1) free entry by emailing <a href={`mailto:${CONTACT_EMAIL}`} style={{ color: G }}>{CONTACT_EMAIL}</a> with the subject line "Sweepstakes Entry," and including your full name and email address, during the Entry Period. Limit one (1) free entry per person regardless of the number of emails sent. Free entries are weighted identically to paid entries described in Method 1 — a free entry and a Method 1 paid-subscription entry each represent one (1) chance to win.</p>
 
-            <p className="mt-3" style={{ color: MUTED }}>Limit: each individual may receive a maximum of three (3) total entries (achieved only by combining Method 1B and Method 1C), regardless of how many subscriptions, referral applications, Instagram actions, or free-entry emails are submitted. Multiple accounts, subscriptions, or entries by the same individual will be treated as a single entrant at their highest qualifying entry count. Sponsor reserves the right to disqualify duplicate or fraudulent entries.</p>
+            <p className="mt-3" style={{ color: MUTED }}>Limit: each individual may receive a maximum of two (2) total entries (achieved only by combining Method 1 and Method 1B), regardless of how many subscriptions, Instagram actions, or free-entry emails are submitted. Multiple accounts, subscriptions, or entries by the same individual will be treated as a single entrant at their highest qualifying entry count. Sponsor reserves the right to disqualify duplicate or fraudulent entries.</p>
           </section>
 
           <section>
             <h2 className="text-lg font-bold mb-2" style={{ color: G }}>5. Minimum Participation Requirement</h2>
-            <p>The Prize will be awarded only if Sponsor records at least {MIN_SUBS} qualifying Pro subscriptions (as described in Method 1 or Method 1B) during the Entry Period (the "Threshold"). If the Threshold is not met by the end of the Entry Period, the Sweepstakes will be cancelled and no Prize will be awarded, regardless of the number of free entries received under Method 2. Sponsor will announce whether the Threshold was met on or before the Drawing Date via the ChessScout.net website and/or email to entrants.</p>
+            <p>The Prize will be awarded only if Sponsor records at least {MIN_SUBS} qualifying Pro subscriptions (as described in Method 1) during the Entry Period (the "Threshold"). If the Threshold is not met by the end of the Entry Period, the Sweepstakes will be cancelled and no Prize will be awarded, regardless of the number of free entries received under Method 2. Sponsor will announce whether the Threshold was met on or before the Drawing Date via the ChessScout.net website and/or email to entrants.</p>
           </section>
 
           <section>

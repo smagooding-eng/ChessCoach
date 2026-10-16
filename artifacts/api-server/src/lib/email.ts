@@ -136,8 +136,7 @@ function raffleRules(): string {
   return emailP(`The prize is only awarded if we reach ${RAFFLE_MIN_SUBS} qualifying subscriptions by the drawing date. Your subscription needs to still be active at the time of the drawing to win. No purchase necessary — a free entry method is available. <a href="${EMAIL.site}/raffle-rules" style="color:${EMAIL.green};text-decoration:none;font-weight:700;">Read the full official rules &rarr;</a>`, { size: 12, mb: 22 });
 }
 
-// Sent when someone subscribes to Pro during the raffle entry period
-// WITHOUT a referral code applied -- one entry.
+// Sent when someone subscribes to Pro during the raffle entry period -- one entry.
 export function raffleEntryEmailHtml(firstName: string | null): string {
   const name = firstName ? escapeHtml(firstName) : 'there';
   return emailLayout({
@@ -148,27 +147,6 @@ export function raffleEntryEmailHtml(firstName: string | null): string {
     body: [
       emailPanel(`<div style="color:${EMAIL.text};font-size:16px;font-weight:800;margin:0 0 4px;">1 raffle entry — ChessNut Air electronic chessboard</div><div style="color:${EMAIL.muted};font-size:13px;">Drawing on ${RAFFLE_DRAWING_DATE}</div>`),
       emailP("Thanks for subscribing to ChessScout.net Pro. You've been automatically entered into our raffle for a chance to win a ChessNut Air.", { size: 14 }),
-      `<div style="color:${EMAIL.text};font-size:14px;font-weight:800;margin:0 0 6px;font-family:${EMAIL_FONT};">Want a second entry?</div>`,
-      emailP(`Refer a friend and use referral code <strong style="color:${EMAIL.text};">CHESSEDITZ</strong> the next time you resubscribe, or share it with someone who hasn't joined yet — anyone who subscribes using that code gets 2 entries instead of 1.`, { size: 14 }),
-      emailDivider(),
-      raffleRules(),
-    ].join(''),
-    cta: { label: 'View raffle details &rarr;', href: `${EMAIL.site}/raffle` },
-  });
-}
-
-// Sent when someone subscribes to Pro during the raffle entry period
-// WITH referral code CHESSEDITZ applied at checkout -- two entries.
-export function raffleReferralEntryEmailHtml(firstName: string | null): string {
-  const name = firstName ? escapeHtml(firstName) : 'there';
-  return emailLayout({
-    preheader: 'Your referral code doubled your raffle entries.',
-    badge: 'Double entry unlocked',
-    title: `Nice move, ${name}: 2 entries!`,
-    subtitle: 'Your referral code doubled your odds',
-    body: [
-      emailPanel(`<div style="color:${EMAIL.text};font-size:16px;font-weight:800;margin:0 0 4px;">2 raffle entries — ChessNut Air electronic chessboard</div><div style="color:${EMAIL.muted};font-size:13px;">Drawing on ${RAFFLE_DRAWING_DATE}</div>`),
-      emailP(`You subscribed to ChessScout.net Pro using referral code <strong style="color:${EMAIL.text};">CHESSEDITZ</strong>, so instead of the usual single entry, you've been entered <strong style="color:${EMAIL.text};">twice</strong> into our raffle for a chance to win a ChessNut Air.`, { size: 14 }),
       emailDivider(),
       raffleRules(),
     ].join(''),

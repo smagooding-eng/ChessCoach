@@ -9,7 +9,6 @@ const BG = '#141413';
 const TEXT = '#e8e6e3';
 const MUTED = '#9e9b98';
 const CARD = '#1c1b19';
-const REFERRAL_CODE = 'CHESSEDITZ';
 const DRAWING_DATE = 'November 17, 2026';
 const MIN_SUBS = 500;
 
@@ -19,7 +18,7 @@ export default function RafflePage() {
   useEffect(() => {
     setPageMeta(
       'Win a ChessNut Air — ChessScout.net Pro Raffle',
-      `Subscribe to ChessScout.net Pro and get entered to win a ChessNut Air electronic chessboard. Use referral code ${REFERRAL_CODE} for 2 entries. Drawing on ${DRAWING_DATE}.`,
+      `Subscribe to ChessScout.net Pro and get entered to win a ChessNut Air electronic chessboard. Drawing on ${DRAWING_DATE}.`,
       '/raffle',
     );
   }, []);
@@ -57,15 +56,6 @@ export default function RafflePage() {
               <div>
                 <p className="font-bold text-sm mb-0.5">Subscribe to Pro</p>
                 <p className="text-sm" style={{ color: MUTED }}>Any active ChessScout.net Pro subscription during the entry period gets you 1 entry.</p>
-              </div>
-            </div>
-            <div className="flex gap-3">
-              <div className="shrink-0 w-7 h-7 rounded-full flex items-center justify-center font-black text-sm" style={{ background: G, color: '#000' }}>2</div>
-              <div>
-                <p className="font-bold text-sm mb-0.5">Use referral code {REFERRAL_CODE} for a second entry</p>
-                <p className="text-sm" style={{ color: MUTED }}>
-                  Enter code <span className="font-mono font-bold" style={{ color: G }}>{REFERRAL_CODE}</span> at checkout and you'll get 2 entries instead of 1 — double your odds.
-                </p>
               </div>
             </div>
           </div>
