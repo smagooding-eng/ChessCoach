@@ -90,8 +90,8 @@ function shareMeta(data: string): Meta | null {
 
 // Plain app pages (no server-side content): just their own title and picture.
 const PAGES: Record<string, Omit<Meta, 'url'> & { path: string }> = {
-  pricing: { path: '/pricing', title: 'Pricing — ChessScout.net', description: 'Free forever, or $5/month for everything: AI coach on every game, personalized courses, scouting reports and Pro tournaments.', image: `${SITE}/og-pricing.jpg` },
-  tournaments: { path: '/tournaments', title: 'Online Chess Tournaments | ChessScout.net', description: 'Free online chess tournaments: an arena every hour, knockouts on weekends, live or daily. Join one, or create one for your club.', image: `${SITE}/og-tournaments.jpg` },
+  pricing: { path: '/pricing', title: 'Pricing — ChessScout.net', description: 'Free forever, or $5/month for everything: AI coach on every game, personalized courses, scouting reports and Pro tournaments.', image: `${SITE}/api/shot?path=%2Fpricing` },
+  tournaments: { path: '/tournaments', title: 'Online Chess Tournaments | ChessScout.net', description: 'Free online chess tournaments: nightly arenas, weekend knockouts, live or daily. Join one, or create one for your club.', image: `${SITE}/api/shot?path=%2Ftournaments` },
 };
 
 function pageMeta(key: string): Meta | null {
@@ -118,7 +118,7 @@ async function tournamentMeta(id: string): Promise<Meta | null> {
   return {
     title: `${t.name} | Chess tournament on ChessScout.net`,
     description: `${what}. Hosted by ${host}. ${state}`,
-    image: `${SITE}/og-tournaments.jpg`,
+    image: `${SITE}/api/shot?path=${encodeURIComponent(`/tournaments/${id}`)}`,
     url: `${SITE}/tournaments/${id}`,
   };
 }

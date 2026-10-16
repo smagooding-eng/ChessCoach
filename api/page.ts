@@ -29,7 +29,8 @@ async function getJson<T>(path: string): Promise<T | null> {
   return (await r.json().catch(() => null)) as T | null;
 }
 
-// image: the link-preview picture (Facebook, iMessage, X...), 1200x630 in public/.
+// image: designed fallback picture (public/); the preview itself is a live
+// screenshot of the page from /api/shot, which falls back to that image.
 interface Page { title: string; description: string; path: string; body: string; jsonLd?: unknown; status?: number; image?: string }
 
 // ── Players ──────────────────────────────────────────────────────────────
@@ -138,8 +139,8 @@ function apply(html: string, p: Page): string {
   out = setTag(out, 'property', 'og:url', u);
   out = setTag(out, 'name', 'twitter:title', t);
   out = setTag(out, 'name', 'twitter:description', d);
-  if (p.image) {
-    const img = esc(`${SITE}/${p.image}`);
+  {
+    const img = esc(`${SITE}/api/shot?path=${encodeURIComponent(p.path)}`);
     out = setTag(out, 'property', 'og:image', img);
     out = setTag(out, 'name', 'twitter:image', img);
   }
