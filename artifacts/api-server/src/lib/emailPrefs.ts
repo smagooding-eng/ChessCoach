@@ -26,6 +26,15 @@ export function unsubscribeUrl(userId: string): string {
   return `${API_BASE}/api/email/unsubscribe?u=${encodeURIComponent(userId)}&t=${unsubToken(userId)}`;
 }
 
+/** Signed opt-out link for an outreach contact (not a ChessScout user). */
+export function clubUnsubscribeUrl(email: string): string {
+  const e = email.trim().toLowerCase();
+  return `${API_BASE}/api/email/club-unsubscribe?e=${encodeURIComponent(e)}&t=${unsubToken(`club:${e}`)}`;
+}
+export function verifyClubUnsubscribe(email: string, token: string): boolean {
+  return verifyUnsubToken(`club:${email.trim().toLowerCase()}`, token);
+}
+
 /** List-Unsubscribe headers so Gmail/Apple Mail show their own one-click unsubscribe. */
 export function unsubscribeHeaders(userId: string): Record<string, string> {
   return {

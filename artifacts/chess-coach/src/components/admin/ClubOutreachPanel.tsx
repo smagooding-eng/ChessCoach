@@ -557,6 +557,38 @@ export function ClubOutreachPanel() {
   };
   const [opened, setOpened] = useState(false);
   useEffect(() => { setOpened(false); }, [qi, queue]);
+  // ── Resend ──
+  const [quota, setQuota] = useState<{ limit: number; used: number; remaining: number } | null>(null);
+  const [resendBusy, setResendBusy] = useState(false);
+  const loadQuota = useCallback(async () => {
+    try { const r = await apiFetch('/api/admin/club-outreach/resend-quota', { credentials: 'include' }); if (r.ok) setQuota(await r.json()); } catch { /* ignore */ }
+  }, []);
+  useEffect(() => { void loadQuota(); }, [loadQuota]);
+  /** Sends each contact its own styled email (template filled for that club) through Resend. */
+  const sendViaResend = async (list: Contact[]): Promise<boolean> => {
+    if (!list.length) return false;
+    if (!settings.address.trim()) { setMsg('Add your mailing address in Sender details first. Marketing emails must include one.'); setEditing(true); return false; }
+    const n = quota ? Math.min(list.length, quota.remaining) : list.length;
+    if (quota && quota.remaining <= 0) { setMsg(`Resend's daily outreach limit is used up (${quota.limit} a day). Use Gmail or try tomorrow.`); return false; }
+    if (!confirm(`Send ${n} styled email${n === 1 ? '' : 's'} through Resend now?${quota && list.length > quota.remaining ? ` (${list.length - quota.remaining} will wait for tomorrow's limit.)` : ''}`)) return false;
+    setResendBusy(true); setMsg(`Sending ${n} through Resend…`);
+    const items = list.map((c) => {
+      const text = fill(template.body, c, settings);
+      return { id: c.id, subject: fill(template.subject, c, settings), text, html: styledEmailHtml(text) };
+    });
+    try {
+      const r = await apiFetch('/api/admin/club-outreach/send', {
+        method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items, replyTo: settings.gmail || undefined, template: template.id }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) { setMsg(d.error || 'Could not send'); return false; }
+      setMsg(`Sent ${d.sent} through Resend${d.failed?.length ? `, ${d.failed.length} failed` : ''}${d.skippedForLimit ? `, ${d.skippedForLimit} left for tomorrow (daily limit)` : ''}. Replies go to ${settings.gmail || 'your Resend sender address'}.`);
+      return true;
+    } catch { setMsg('Could not send'); return false; }
+    finally { setResendBusy(false); void loadQuota(); void loadData(); }
+  };
+
   const markSentAndNext = async () => {
     if (!current) return;
     await setStatus([current.id], 'contacted', template.id);
@@ -666,6 +698,10 @@ export function ClubOutreachPanel() {
           <button onClick={startQueue} disabled={!selected.size} className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold disabled:opacity-50" style={{ background: GREEN, color: '#fff' }}>
             <Mail size={13} /> Email one by one
           </button>
+          <button onClick={async () => { if (await sendViaResend(contacts.filter((c) => selected.has(c.id)))) setSelected(new Set()); }} disabled={!selected.size || resendBusy}
+            className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold disabled:opacity-50" style={{ background: GREEN, color: '#fff' }}>
+            {resendBusy ? <Loader2 size={13} className="animate-spin" /> : <Mail size={13} />} Send with Resend
+          </button>
           <button onClick={startBatches} disabled={!selected.size} className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold disabled:opacity-50" style={{ background: 'rgba(255,255,255,.1)', color: '#fff' }}>
             <Copy size={13} /> BCC batches
           </button>
@@ -688,7 +724,8 @@ export function ClubOutreachPanel() {
         </div>
       </div>
       <p className="text-[11px]" style={{ color: MUTED }}>
-        Tip: keep it to a few dozen a day from a personal Gmail so your emails keep landing in inboxes. Anyone who replies "no thanks" goes on the never-contact list (the ⊘ button).
+        Resend sends each club its own styled email (replies go to your Gmail, with an unsubscribe link){quota ? ` · ${quota.remaining} of ${quota.limit} left today` : ''}.
+        Tip: keep Gmail to a few dozen a day so your emails keep landing in inboxes. Anyone who replies "no thanks" goes on the never-contact list (the ⊘ button).
       </p>
 
       {/* List */}
@@ -745,6 +782,14 @@ export function ClubOutreachPanel() {
             </div>
             <p className="text-sm font-bold text-white">{bulkSubject}</p>
             <DraftActions draft={{ to: settings.gmail, bcc: batch.map((c) => c.email), subject: bulkSubject, body: bulkBody }} styled={settings.styled} account={settings.gmail} onOpened={() => {}} />
+            <button onClick={async () => {
+                if (await sendViaResend(batch)) {
+                  if (bi + 1 >= (batches?.length ?? 0)) { setBatches(null); setSelected(new Set()); } else { setBi(bi + 1); setCopied(''); }
+                }
+              }} disabled={resendBusy || (quota?.remaining ?? 1) <= 0}
+              className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl py-3 text-sm font-bold disabled:opacity-50" style={{ background: 'rgba(129,182,76,.18)', color: '#fff', border: '1px solid rgba(129,182,76,.5)' }}>
+              {resendBusy ? <Loader2 size={15} className="animate-spin" /> : <Mail size={15} />} Send this batch with Resend, one email each{quota ? ` (${quota.remaining} left today)` : ''}
+            </button>
             <button onClick={finishBatch} className="w-full rounded-xl py-2.5 text-xs font-bold text-white" style={{ background: 'rgba(255,255,255,.08)' }}>
               {bi + 1 >= batches.length ? 'Sent — mark contacted and finish' : 'Sent — mark contacted, next batch'}
             </button>
@@ -768,6 +813,10 @@ export function ClubOutreachPanel() {
             <p className="text-xs" style={{ color: MUTED }}>To: <span className="text-white">{current.email}</span></p>
             <p className="text-sm font-bold text-white">{subject}</p>
             <DraftActions draft={{ to: current.email, subject, body }} styled={settings.styled} account={settings.gmail} onOpened={() => setOpened(true)} />
+            <button onClick={async () => { if (await sendViaResend([current])) advance(); }} disabled={resendBusy || (quota?.remaining ?? 1) <= 0}
+              className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl py-3 text-sm font-bold disabled:opacity-50" style={{ background: 'rgba(129,182,76,.18)', color: '#fff', border: '1px solid rgba(129,182,76,.5)' }}>
+              {resendBusy ? <Loader2 size={15} className="animate-spin" /> : <Mail size={15} />} Send styled with Resend instead{quota ? ` (${quota.remaining} left today)` : ''}
+            </button>
             <button onClick={markSentAndNext} className="w-full rounded-xl py-2.5 text-xs font-bold" style={opened ? { background: GREEN, color: '#fff' } : { background: 'rgba(255,255,255,.08)', color: '#fff' }}>
               {qi + 1 >= queue.length ? 'Sent — mark contacted and finish' : 'Sent — mark contacted, next'}
             </button>

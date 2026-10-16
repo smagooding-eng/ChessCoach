@@ -56,6 +56,15 @@ export async function ensureClubOutreachTables(): Promise<void> {
     trigger VARCHAR NOT NULL DEFAULT 'manual'
   )`);
   await db.execute(sql`CREATE TABLE IF NOT EXISTS club_outreach_state (id VARCHAR PRIMARY KEY, cursor INTEGER NOT NULL DEFAULT 0)`);
+  // Outreach sent through Resend (counted against the daily limit).
+  await db.execute(sql`CREATE TABLE IF NOT EXISTS club_outreach_sends (
+    id SERIAL PRIMARY KEY,
+    contact_id INTEGER,
+    email VARCHAR NOT NULL,
+    template VARCHAR,
+    resend_id VARCHAR,
+    sent_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  )`);
 }
 
 // ── What to search for ──────────────────────────────────────────────────────

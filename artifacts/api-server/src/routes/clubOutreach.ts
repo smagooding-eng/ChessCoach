@@ -3,6 +3,9 @@ import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { logger } from "../lib/logger";
 import { ensureClubOutreachTables, startDiscovery, isDiscoveryRunning } from "../lib/clubOutreach";
+import { sendEmail } from "../lib/email";
+import { unsubscribeFooterHtml } from "../lib/emailTheme";
+import { clubUnsubscribeUrl } from "../lib/emailPrefs";
 
 // Admin: club & organizer contacts for one-by-one outreach from Gmail.
 //   GET    /admin/club-outreach               contacts (+ counts, latest runs)
@@ -65,6 +68,71 @@ router.post("/admin/club-outreach/discover", requireAdmin, async (req: Request, 
   } catch (err) {
     logger.error({ err }, "[club-outreach] discover failed");
     res.status(500).json({ error: "Could not start the search" });
+  }
+});
+
+// ── Sending through Resend ──
+// Each email goes to one organization (no Bcc), with replies to your Gmail,
+// a one-click unsubscribe link, and a daily cap that leaves room for the
+// site's own emails on the same Resend plan.
+const OUTREACH_DAILY_LIMIT = Math.max(1, Number(process.env.OUTREACH_RESEND_DAILY_LIMIT) || 80);
+
+async function sentToday(): Promise<number> {
+  const [r] = rowsOf<{ n: string }>(await db.execute(sql`SELECT COUNT(*) AS n FROM club_outreach_sends WHERE sent_at > now() - interval '24 hours'`));
+  return Number(r?.n ?? 0);
+}
+
+router.get("/admin/club-outreach/resend-quota", requireAdmin, async (_req: Request, res: Response) => {
+  try {
+    await ready();
+    const used = await sentToday();
+    res.json({ limit: OUTREACH_DAILY_LIMIT, used, remaining: Math.max(0, OUTREACH_DAILY_LIMIT - used) });
+  } catch { res.status(500).json({ error: "Could not load" }); }
+});
+
+router.post("/admin/club-outreach/send", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    await ready();
+    const items = (Array.isArray(req.body?.items) ? req.body.items : []) as { id: number; subject: string; html: string; text: string }[];
+    const replyTo = typeof req.body?.replyTo === "string" && EMAIL_RE.test(req.body.replyTo) ? req.body.replyTo : undefined;
+    const template = typeof req.body?.template === "string" ? req.body.template.slice(0, 40) : null;
+    if (!items.length) { res.status(400).json({ error: "Nothing to send" }); return; }
+    const remaining = Math.max(0, OUTREACH_DAILY_LIMIT - (await sentToday()));
+    if (remaining <= 0) { res.status(429).json({ error: `Daily Resend limit reached (${OUTREACH_DAILY_LIMIT} in 24 hours). Try again tomorrow or use Gmail.` }); return; }
+    const batch = items.slice(0, Math.min(remaining, 100));
+    const ids = batch.map((i) => Number(i.id)).filter(Number.isInteger);
+    if (!ids.length) { res.status(400).json({ error: "Nothing to send" }); return; }
+    const contacts = rowsOf<{ id: number; email: string }>(await db.execute(sql`
+      SELECT c.id, c.email FROM club_contacts c
+      WHERE c.id IN (${sql.join(ids.map((id) => sql`${id}`), sql`, `)})
+        AND NOT EXISTS (SELECT 1 FROM club_contact_dnc d WHERE LOWER(d.email) = LOWER(c.email))`));
+    const byId = new Map(contacts.map((c) => [Number(c.id), c.email]));
+    let sent = 0;
+    const failed: { id: number; error: string }[] = [];
+    for (const it of batch) {
+      const to = byId.get(Number(it.id));
+      if (!to) { failed.push({ id: it.id, error: "on the do-not-contact list or missing" }); continue; }
+      const unsub = clubUnsubscribeUrl(to);
+      const html = `${String(it.html ?? "")}${unsubscribeFooterHtml(unsub)}`;
+      const text = `${String(it.text ?? "")}\n\nUnsubscribe: ${unsub}`;
+      try {
+        const data = await sendEmail({
+          to, subject: String(it.subject ?? "").slice(0, 200), html, text, replyTo,
+          headers: { "List-Unsubscribe": `<${unsub}>`, "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" },
+        });
+        await db.execute(sql`INSERT INTO club_outreach_sends (contact_id, email, template, resend_id) VALUES (${it.id}, ${to}, ${template}, ${data?.id ?? null})`);
+        await db.execute(sql`UPDATE club_contacts SET status = 'contacted', contacted_at = now(), contacted_template = COALESCE(${template}, contacted_template) WHERE id = ${it.id}`);
+        sent++;
+      } catch (err) {
+        failed.push({ id: it.id, error: err instanceof Error ? err.message : "send failed" });
+        if (/rate|429|limit/i.test(String((err as Error)?.message))) break;
+      }
+      await new Promise((r) => setTimeout(r, 600));
+    }
+    res.json({ sent, failed, skippedForLimit: items.length - batch.length, remaining: Math.max(0, OUTREACH_DAILY_LIMIT - (await sentToday())) });
+  } catch (err) {
+    logger.error({ err }, "[club-outreach] resend send failed");
+    res.status(500).json({ error: "Could not send" });
   }
 });
 
