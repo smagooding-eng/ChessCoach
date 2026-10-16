@@ -237,6 +237,49 @@ export function DashboardRedesign() {
         <ActiveGamesCard />
         <PlayAppCard className="lg:col-span-2" />
 
+        {/* ── Feature tiles ── */}
+        <div className="grid grid-cols-2 gap-4 lg:self-stretch lg:auto-rows-fr">
+          {TILES.map((t) => (
+            <Link
+              key={t.label}
+              href={t.href}
+              className={`relative block overflow-hidden rounded-[18px] transition-transform active:scale-[.98] ${photoLook ? '' : 'min-h-[128px]'}`}
+              style={photoLook ? { background: CARD, border: `1px solid ${BORDER}` } : {
+                backgroundColor: 'var(--rd-card-solid, #050A0B)',
+                border: `1px solid ${BORDER}`,
+                backgroundImage: `url(${siteImg(asset(t.img))})`,
+                backgroundSize: 'auto 100%',
+                backgroundPosition: t.pos,
+                backgroundRepeat: 'no-repeat',
+                // No coloured glow on these tiles: it read as a bright rim down the
+                // left side of Play and Openings.
+                boxShadow: 'none',
+              }}
+            >
+              {!photoLook && <div className="absolute inset-0" style={{ background: 'linear-gradient(90deg, rgba(5,10,11,.78) 0%, rgba(5,10,11,.25) 62%, rgba(5,10,11,0) 100%), linear-gradient(0deg, rgba(5,10,11,.65) 0%, rgba(5,10,11,0) 55%)' }} />}
+              <div className={`relative z-10 flex h-full ${photoLook ? 'items-center gap-3 p-3' : 'min-h-[128px] flex-col justify-between p-3.5'}`}>
+                <span
+                  className="grid h-10 w-10 shrink-0 place-items-center rounded-[11px]"
+                  style={{ background: `linear-gradient(160deg, ${t.c2}, ${t.c1})`, boxShadow: '0 2px 8px rgba(0,0,0,.45)', border: '1px solid rgba(255,255,255,.18)' }}
+                >
+                  <t.icon size={21} color="#fff" fill={t.label === 'Play' ? '#fff' : 'none'} />
+                </span>
+                <div className={`flex justify-between gap-2 ${photoLook ? 'min-w-0 flex-1 items-center' : 'items-end'}`}>
+                  <div className="min-w-0">
+                    <b className={`block truncate font-extrabold leading-tight ${photoLook ? 'text-[16px]' : 'text-[19px]'}`}>{t.label}</b>
+                    <span className="block truncate text-[12.5px]" style={{ color: '#C4CCC9' }}>{t.sub}</span>
+                  </div>
+                  {!photoLook && (
+                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full" style={{ border: '1.5px solid rgba(255,255,255,.7)', background: 'rgba(5,10,11,.45)' }}>
+                    <ArrowRight size={16} />
+                  </span>
+                  )}
+                </div>
+              </div>
+            </Link>
+          ))}
+        </div>
+
         {/* ── Scout hero ── */}
         <section
           className={`relative overflow-hidden rounded-[20px] ${photoLook ? '' : 'min-h-[340px]'}`}
@@ -291,49 +334,6 @@ export function DashboardRedesign() {
             </form>
           </div>
         </section>
-
-        {/* ── Feature tiles ── */}
-        <div className="grid grid-cols-2 gap-4 lg:self-stretch lg:auto-rows-fr">
-          {TILES.map((t) => (
-            <Link
-              key={t.label}
-              href={t.href}
-              className={`relative block overflow-hidden rounded-[18px] transition-transform active:scale-[.98] ${photoLook ? '' : 'min-h-[128px]'}`}
-              style={photoLook ? { background: CARD, border: `1px solid ${BORDER}` } : {
-                backgroundColor: 'var(--rd-card-solid, #050A0B)',
-                border: `1px solid ${BORDER}`,
-                backgroundImage: `url(${siteImg(asset(t.img))})`,
-                backgroundSize: 'auto 100%',
-                backgroundPosition: t.pos,
-                backgroundRepeat: 'no-repeat',
-                // No coloured glow on these tiles: it read as a bright rim down the
-                // left side of Play and Openings.
-                boxShadow: 'none',
-              }}
-            >
-              {!photoLook && <div className="absolute inset-0" style={{ background: 'linear-gradient(90deg, rgba(5,10,11,.78) 0%, rgba(5,10,11,.25) 62%, rgba(5,10,11,0) 100%), linear-gradient(0deg, rgba(5,10,11,.65) 0%, rgba(5,10,11,0) 55%)' }} />}
-              <div className={`relative z-10 flex h-full ${photoLook ? 'items-center gap-3 p-3' : 'min-h-[128px] flex-col justify-between p-3.5'}`}>
-                <span
-                  className="grid h-10 w-10 shrink-0 place-items-center rounded-[11px]"
-                  style={{ background: `linear-gradient(160deg, ${t.c2}, ${t.c1})`, boxShadow: '0 2px 8px rgba(0,0,0,.45)', border: '1px solid rgba(255,255,255,.18)' }}
-                >
-                  <t.icon size={21} color="#fff" fill={t.label === 'Play' ? '#fff' : 'none'} />
-                </span>
-                <div className={`flex justify-between gap-2 ${photoLook ? 'min-w-0 flex-1 items-center' : 'items-end'}`}>
-                  <div className="min-w-0">
-                    <b className={`block truncate font-extrabold leading-tight ${photoLook ? 'text-[16px]' : 'text-[19px]'}`}>{t.label}</b>
-                    <span className="block truncate text-[12.5px]" style={{ color: '#C4CCC9' }}>{t.sub}</span>
-                  </div>
-                  {!photoLook && (
-                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full" style={{ border: '1.5px solid rgba(255,255,255,.7)', background: 'rgba(5,10,11,.45)' }}>
-                    <ArrowRight size={16} />
-                  </span>
-                  )}
-                </div>
-              </div>
-            </Link>
-          ))}
-        </div>
 
         {/* ── Recent games ── */}
         <section className="rounded-[20px]" style={{ background: CARD, border: `1px solid ${BORDER}` }}>
