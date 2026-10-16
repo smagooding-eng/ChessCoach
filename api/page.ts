@@ -29,7 +29,8 @@ async function getJson<T>(path: string): Promise<T | null> {
   return (await r.json().catch(() => null)) as T | null;
 }
 
-interface Page { title: string; description: string; path: string; body: string; jsonLd?: unknown; status?: number }
+// image: the link-preview picture (Facebook, iMessage, X...), 1200x630 in public/.
+interface Page { title: string; description: string; path: string; body: string; jsonLd?: unknown; status?: number; image?: string }
 
 // ── Players ──────────────────────────────────────────────────────────────
 type Res = { games: number; wins: number; draws: number; losses: number };
@@ -70,7 +71,7 @@ async function playerPage(slug: string): Promise<Page | null> {
 <p><a href="/setup">Scout any Chess.com or Lichess player free on ChessScout</a></p>
 </main>`;
   return {
-    title: `${who} — Openings & Repertoire | ChessScout`, description, path: `/players/${p.username}`, body,
+    title: `${who} — Openings & Repertoire | ChessScout`, description, path: `/players/${p.username}`, body, image: 'og-players.jpg',
     jsonLd: { '@context': 'https://schema.org', '@type': 'ProfilePage', name: `${who}'s chess openings`, url: `${SITE}/players/${p.username}`, description,
       mainEntity: { '@type': 'Person', name: p.name || p.username, alternateName: p.username } },
   };
@@ -84,7 +85,7 @@ async function playersIndex(): Promise<Page> {
 <p>Openings, first moves and recent results for top Chess.com players and streamers, from their real games.</p>
 <ul>${players.map((p) => `<li><a href="/players/${esc(p.slug)}">${esc(`${p.title ? `${p.title} ` : ''}${p.name || p.slug}`)}</a></li>`).join('')}</ul>
 </main>`;
-  return { title: 'Top Chess Players’ Openings & Repertoires | ChessScout', description: 'See what the world’s top Chess.com players and streamers actually play: first moves, favorite openings as White and Black, and recent results.', path: '/players', body };
+  return { title: 'Top Chess Players’ Openings & Repertoires | ChessScout', description: 'See what the world’s top Chess.com players and streamers actually play: first moves, favorite openings as White and Black, and recent results.', path: '/players', body, image: 'og-players.jpg' };
 }
 
 // ── Articles ─────────────────────────────────────────────────────────────
@@ -107,7 +108,7 @@ async function articlePage(slug: string): Promise<Page | null> {
   const a = d?.article;
   if (!a) return null;
   return {
-    title: `${a.title} — ChessScout.net`, description: a.metaDescription, path: `/learn/${a.slug}`,
+    title: `${a.title} — ChessScout.net`, description: a.metaDescription, path: `/learn/${a.slug}`, image: 'og-learn.jpg',
     body: `<main style="max-width:720px;margin:0 auto;padding:16px;color:#F5F7F6;font-family:system-ui,sans-serif"><p><a href="/learn">Articles</a></p><h1>${esc(a.title)}</h1>\n${markdown(a.content || '')}</main>`,
     jsonLd: { '@context': 'https://schema.org', '@type': 'Article', headline: a.title, description: a.metaDescription, datePublished: a.createdAt,
       mainEntityOfPage: { '@type': 'WebPage', '@id': `${SITE}/learn/${a.slug}` }, author: { '@type': 'Organization', name: 'ChessScout.net' }, publisher: { '@type': 'Organization', name: 'ChessScout.net' } },
@@ -118,7 +119,7 @@ async function articlesIndex(): Promise<Page> {
   const d = await getJson<{ articles: { slug: string; title: string; metaDescription: string }[] }>('/api/articles');
   const articles = d?.articles ?? [];
   return {
-    title: 'Chess Improvement Articles — ChessScout.net', description: 'Practical chess improvement articles on blunders, time trouble, and opening mistakes.', path: '/learn',
+    title: 'Chess Improvement Articles — ChessScout.net', description: 'Practical chess improvement articles on blunders, time trouble, and opening mistakes.', path: '/learn', image: 'og-learn.jpg',
     body: `<main style="max-width:720px;margin:0 auto;padding:16px;color:#F5F7F6;font-family:system-ui,sans-serif"><h1>Chess improvement articles</h1><ul>${articles.map((a) => `<li><a href="/learn/${esc(a.slug)}">${esc(a.title)}</a> — ${esc(a.metaDescription)}</li>`).join('')}</ul></main>`,
   };
 }
@@ -137,6 +138,11 @@ function apply(html: string, p: Page): string {
   out = setTag(out, 'property', 'og:url', u);
   out = setTag(out, 'name', 'twitter:title', t);
   out = setTag(out, 'name', 'twitter:description', d);
+  if (p.image) {
+    const img = esc(`${SITE}/${p.image}`);
+    out = setTag(out, 'property', 'og:image', img);
+    out = setTag(out, 'name', 'twitter:image', img);
+  }
   out = /<link\s+rel="canonical"[^>]*>/i.test(out)
     ? out.replace(/<link\s+rel="canonical"[^>]*>/i, `<link rel="canonical" href="${u}" />`)
     : out.replace('</head>', `<link rel="canonical" href="${u}" />\n</head>`);

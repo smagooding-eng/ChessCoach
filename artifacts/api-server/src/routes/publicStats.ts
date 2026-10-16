@@ -19,7 +19,7 @@ router.get("/public/site-stats", async (_req: Request, res: Response) => {
           (SELECT COUNT(*) FROM games) AS games_imported,
           (SELECT COUNT(*) FROM games WHERE review_data IS NOT NULL) AS games_reviewed,
           (SELECT COUNT(*) FROM puzzle_attempts WHERE solved) AS puzzles_solved,
-          (SELECT COUNT(*) FROM live_games) + (SELECT COUNT(*) FROM correspondence_games WHERE status <> 'active') + (SELECT COUNT(*) FROM bot_results) AS games_played,
+          (SELECT COUNT(*) FROM live_games WHERE white_user_id IS NOT NULL OR black_user_id IS NOT NULL) + (SELECT COUNT(*) FROM correspondence_games WHERE status <> 'active') + (SELECT COUNT(*) FROM bot_results) AS games_played,
           (SELECT COUNT(*) FROM users) AS players`));
       const all = [
         { key: "games_reviewed", label: "games reviewed", value: Number(r?.games_reviewed ?? 0) },

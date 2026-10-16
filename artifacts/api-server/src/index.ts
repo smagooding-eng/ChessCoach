@@ -372,6 +372,8 @@ async function runSchemaMigrations() {
     // Organizer branding: club name + logo (logo bytes live in their own table).
     await db.execute(sql`ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS club_name VARCHAR`);
     await db.execute(sql`ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS logo_version INTEGER`);
+    // Bots fill in when no one's free (live tournaments); official ones always.
+    await db.execute(sql`ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS bots_enabled BOOLEAN NOT NULL DEFAULT false`);
     await import("./lib/tournamentEntries").then((m) => m.ensureTournamentEntryTables());
     await db.execute(sql`CREATE TABLE IF NOT EXISTS tournament_logos (
       tournament_id VARCHAR PRIMARY KEY,

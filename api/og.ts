@@ -88,6 +88,41 @@ function shareMeta(data: string): Meta | null {
   }
 }
 
+// Plain app pages (no server-side content): just their own title and picture.
+const PAGES: Record<string, Omit<Meta, 'url'> & { path: string }> = {
+  pricing: { path: '/pricing', title: 'Pricing — ChessScout.net', description: 'Free forever, or $5/month for everything: AI coach on every game, personalized courses, scouting reports and Pro tournaments.', image: `${SITE}/og-pricing.jpg` },
+  tournaments: { path: '/tournaments', title: 'Online Chess Tournaments | ChessScout.net', description: 'Free online chess tournaments: an arena every hour, knockouts on weekends, live or daily. Join one, or create one for your club.', image: `${SITE}/og-tournaments.jpg` },
+};
+
+function pageMeta(key: string): Meta | null {
+  const p = PAGES[key];
+  return p ? { title: p.title, description: p.description, image: p.image, url: `${SITE}${p.path}` } : null;
+}
+
+interface TournamentInfo {
+  name: string; format: string; kind: string; mode: string; timeControlLabel: string; status: string;
+  startsAt: string; players: number; clubName: string | null; createdByName: string | null; winner: string | null;
+}
+
+async function tournamentMeta(id: string): Promise<Meta | null> {
+  const r = await fetchWithTimeout(`${API}/api/tournaments/${encodeURIComponent(id)}`, 3500);
+  if (!r || !r.ok) return null;
+  const d = await r.json().catch(() => null) as { tournament?: TournamentInfo } | null;
+  const t = d?.tournament;
+  if (!t) return null;
+  const what = `${t.format === 'bracket' ? 'Knockout' : 'Arena'} · ${t.kind === 'daily' ? `${t.timeControlLabel} per move` : t.timeControlLabel} · ${t.mode === 'ranked' ? 'Ranked' : 'Casual'}`;
+  const host = t.clubName || t.createdByName || 'ChessScout.net';
+  const state = t.status === 'finished'
+    ? (t.winner ? `Won by ${t.winner}. See the final standings.` : 'See the final standings.')
+    : t.status === 'running' ? 'Live now. Tap to join and play.' : 'Free to join. Tap to sign up.';
+  return {
+    title: `${t.name} | Chess tournament on ChessScout.net`,
+    description: `${what}. Hosted by ${host}. ${state}`,
+    image: `${SITE}/og-tournaments.jpg`,
+    url: `${SITE}/tournaments/${id}`,
+  };
+}
+
 function setMeta(html: string, m: Meta): string {
   const t = esc(m.title), d = esc(m.description), i = esc(m.image), u = esc(m.url);
   const tag = (attr: string, key: string, value: string) => {
@@ -111,6 +146,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     if (kind === 'challenge' && key) meta = await challengeMeta(key);
     else if (kind === 'share' && key) meta = shareMeta(key);
+    else if (kind === 'page') meta = pageMeta(String(req.query.p ?? ''));
+    else if (kind === 'tournament' && /^[a-z0-9]{4,40}$/i.test(String(req.query.id ?? ''))) meta = await tournamentMeta(String(req.query.id));
   } catch { meta = null; }
 
   const pageRes = await fetchWithTimeout(`${SITE}/index.html`, 3500);

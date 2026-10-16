@@ -17,6 +17,7 @@ import { fetchLichessProfile } from './lichess';
 import { usersTable, gameChallengesTable } from '@workspace/db';
 import { eq, and } from 'drizzle-orm';
 import { notifyUser } from './notify';
+import { type TBot, isBotId, getTournamentBot, seatedBots, seatBots, spreadBots, nearestFreeBot, ARENA_START_BOTS, TOURNAMENT_BOT_WAIT_MS, BOT_VS_BOT_MAX_RATING, MAX_BOT_VS_BOT_GAMES } from './tournamentBots';
 
 export type TimeControlId = 'blitz_5_0' | 'blitz_5_3' | 'rapid_10_0' | 'rapid_15_0';
 export type Mode = 'casual' | 'ranked';
@@ -157,6 +158,8 @@ interface Player {
   avatar: string;
   memberSinceYear: number;
   personaId?: string;
+  /** Tournament bot ("bot:..."): plays in tournaments, never rated. */
+  botId?: string;
 }
 
 interface LiveGame {
@@ -508,7 +511,11 @@ function finishGame(g: LiveGame, result: 'white' | 'black' | 'draw', termination
 
   if (g.white.kind === 'human' && g.white.userId) userActiveGame.delete(g.white.userId);
   if (g.black.kind === 'human' && g.black.userId) userActiveGame.delete(g.black.userId);
-  if (g.tournamentId) void recordTournamentResult(g).catch(err => logger.warn({ err, gameId: g.id }, 'tournament result failed'));
+  if (g.tournamentId) {
+    for (const p of [g.white, g.black]) if (p.botId) tBotBusy.delete(`${g.tournamentId}:${p.botId}`);
+    if (g.white.botId && g.black.botId) tBotGames.set(g.tournamentId, Math.max(0, (tBotGames.get(g.tournamentId) ?? 1) - 1));
+    void recordTournamentResult(g).catch(err => logger.warn({ err, gameId: g.id }, 'tournament result failed'));
+  }
   for (const p of [g.white, g.black]) {
     if (p.kind === 'human' && p.userId) void startPendingForCreator(p.userId).catch(() => {});
   }
@@ -1501,11 +1508,11 @@ const tLast = new Map<string, { opp: string; color: 'w' | 'b' }>();      // `${t
 const T_STOP_PAIRING_MS = 60 * 1000;   // no new pairings in the last minute
 const T_REPEAT_OK_MS = 20 * 1000;      // allow a repeat opponent after waiting this long
 
-interface TRow { id: string; name: string; time_control: string; mode: string; status: string; starts_at: string | Date; ends_at: string | Date | null; format?: string; kind?: string }
+interface TRow { id: string; name: string; time_control: string; mode: string; status: string; starts_at: string | Date; ends_at: string | Date | null; format?: string; kind?: string; bots_enabled?: boolean }
 
 async function loadTournament(id: string): Promise<TRow | null> {
   if (!id) return null;
-  return rowsOf<TRow>(await db.execute(sql`SELECT id, name, time_control, mode, status, starts_at, ends_at FROM tournaments WHERE id = ${id}`))[0] ?? null;
+  return rowsOf<TRow>(await db.execute(sql`SELECT id, name, time_control, mode, status, starts_at, ends_at, format, kind, bots_enabled FROM tournaments WHERE id = ${id}`))[0] ?? null;
 }
 
 async function tournamentReady(ws: WebSocket, userId: string, username: string, tid: string) {
@@ -1541,8 +1548,9 @@ export function tournamentLiveStatus(tid: string): { waiting: string[]; playing:
   const playing: Record<string, string> = {};
   for (const g of games.values()) {
     if (g.tournamentId !== tid || g.status !== 'active') continue;
-    if (g.white.userId) playing[g.white.userId] = g.black.username;
-    if (g.black.userId) playing[g.black.userId] = g.white.username;
+    const w = g.white.userId ?? g.white.botId, b = g.black.userId ?? g.black.botId;
+    if (w) playing[w] = g.black.username;
+    if (b) playing[b] = g.white.username;
   }
   return { waiting, playing };
 }
@@ -1555,16 +1563,97 @@ export function closeTournamentPool(tid: string) {
   tWaiting.delete(tid);
 }
 
-async function pairTournament(t: TRow) {
-  const pool = tWaiting.get(t.id);
-  if (!pool) return;
-  for (const [uid, w] of pool) {
-    if (w.ws.readyState !== WebSocket.OPEN) pool.delete(uid);
+// ── Tournament bots (see tournamentBots.ts) ────────────────────────────────
+const tBotBusy = new Set<string>();                    // `${tid}:${botId}` in a game
+const tBotSeats = new Map<string, TBot[]>();           // tid -> seated bots (cache)
+const tBotGames = new Map<string, number>();           // tid -> bot-vs-bot games in progress
+const isWaiter = (x: TWaiter | TBot): x is TWaiter => 'ws' in x;
+const seatId = (x: TWaiter | TBot) => (isWaiter(x) ? x.userId : x.id);
+
+function botPlayer(b: TBot): Player {
+  return {
+    kind: 'bot', username: b.name, rating: b.rating, country: '', title: null,
+    avatar: `https://api.dicebear.com/7.x/bottts-neutral/svg?seed=${encodeURIComponent(b.id)}`,
+    // personaId marks the game as vs-bot in live_games (admin stats, history).
+    memberSinceYear: new Date().getFullYear(), botId: b.id, personaId: b.id,
+  };
+}
+
+async function botsFor(t: TRow): Promise<TBot[]> {
+  let seats = tBotSeats.get(t.id);
+  if (!seats) {
+    seats = await seatedBots(t.id);
+    if (seats.length === 0) {
+      const add = spreadBots(ARENA_START_BOTS, new Set(), BOT_VS_BOT_MAX_RATING);
+      await seatBots(t.id, add);
+      seats = add;
+    }
+    tBotSeats.set(t.id, seats);
   }
-  const free = [...pool.values()].filter(w => !userActiveGame.has(w.userId));
-  if (free.length < 2) return;
+  return seats;
+}
+
+/** Live arena with bots: humans who've waited get a bot; spare bots play each other. */
+async function pairArenaBots(t: TRow, tc: TimeControlSpec, waitingHumans: TWaiter[]) {
+  const pool = tWaiting.get(t.id);
+  const seats = await botsFor(t);
+  const free = seats.filter((b) => !tBotBusy.has(`${t.id}:${b.id}`));
+  const now = Date.now();
+  for (const h of waitingHumans) {
+    if (now - h.since < TOURNAMENT_BOT_WAIT_MS || userActiveGame.has(h.userId)) continue;
+    const rating = (await loadUserRating(h.userId, t.time_control)).rating;
+    free.sort((a, b) => Math.abs(a.rating - rating) - Math.abs(b.rating - rating));
+    let bot = free.shift();
+    if (!bot) {
+      // Every seated bot is mid-game: seat another one near this player's rating.
+      const extra = nearestFreeBot(rating, new Set(seats.map((b) => b.id)));
+      if (!extra) continue;
+      await seatBots(t.id, [extra]);
+      seats.push(extra);
+      bot = extra;
+    }
+    pool?.delete(h.userId);
+    tBotBusy.add(`${t.id}:${bot.id}`);
+    void startTournamentGame(t, tc, h, bot).catch(err => {
+      logger.warn({ err, tid: t.id }, 'tournament bot game failed');
+      tBotBusy.delete(`${t.id}:${bot!.id}`);
+      if (h.ws.readyState === WebSocket.OPEN) pool?.set(h.userId, h);
+    });
+  }
+  // The rest play each other, so the arena keeps going with or without people
+  // (only the lighter bots, a couple of games at a time: see tournamentBots.ts).
+  const spare = free.filter((b) => b.rating <= BOT_VS_BOT_MAX_RATING);
+  free.length = 0; free.push(...spare);
+  if (t.mode === 'ranked') free.sort((a, b) => b.rating - a.rating);
+  else for (let i = free.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [free[i], free[j]] = [free[j], free[i]]; }
+  while (free.length >= 2 && (tBotGames.get(t.id) ?? 0) < MAX_BOT_VS_BOT_GAMES) {
+    const a = free.shift()!;
+    const last = tLast.get(`${t.id}:${a.id}`)?.opp;
+    let k = free.findIndex((b) => b.id !== last);
+    if (k < 0) k = 0;
+    const b = free.splice(k, 1)[0];
+    tBotBusy.add(`${t.id}:${a.id}`); tBotBusy.add(`${t.id}:${b.id}`);
+    tBotGames.set(t.id, (tBotGames.get(t.id) ?? 0) + 1);
+    void startTournamentGame(t, tc, a, b).catch(err => {
+      logger.warn({ err, tid: t.id }, 'tournament bot game failed');
+      tBotBusy.delete(`${t.id}:${a.id}`); tBotBusy.delete(`${t.id}:${b.id}`);
+      tBotGames.set(t.id, Math.max(0, (tBotGames.get(t.id) ?? 1) - 1));
+    });
+  }
+}
+
+async function pairTournament(t: TRow) {
   const tc = TIME_CONTROLS[t.time_control as TimeControlId];
   if (!tc) return;
+  const pool = tWaiting.get(t.id);
+  for (const [uid, w] of pool ?? []) {
+    if (w.ws.readyState !== WebSocket.OPEN) pool!.delete(uid);
+  }
+  const free = [...(pool?.values() ?? [])].filter(w => !userActiveGame.has(w.userId));
+  if (!pool || free.length < 2) {
+    if (t.bots_enabled) await pairArenaBots(t, tc, free);
+    return;
+  }
   // Ranked: line players up by rating so neighbours (similar ratings) meet.
   // Casual: a random draw each time.
   if (t.mode === 'ranked') {
@@ -1602,40 +1691,46 @@ async function pairTournament(t: TRow) {
       if (b.ws.readyState === WebSocket.OPEN) pool.set(b.userId, b);
     });
   }
+  if (t.bots_enabled) await pairArenaBots(t, tc, free.filter((w) => !used.has(w.userId)));
 }
 
-async function startTournamentGame(t: TRow, tc: TimeControlSpec, a: TWaiter, b: TWaiter, opts: { aWhite?: boolean; matchId?: number } = {}): Promise<string> {
-  const lastA = tLast.get(`${t.id}:${a.userId}`);
-  const lastB = tLast.get(`${t.id}:${b.userId}`);
+async function startTournamentGame(t: TRow, tc: TimeControlSpec, a: TWaiter | TBot, b: TWaiter | TBot, opts: { aWhite?: boolean; matchId?: number } = {}): Promise<string> {
+  const aId = seatId(a), bId = seatId(b);
+  const lastA = tLast.get(`${t.id}:${aId}`);
+  const lastB = tLast.get(`${t.id}:${bId}`);
   // Alternate colours: whoever had white last time gets black (brackets set it).
   const aWhite = opts.aWhite ?? (lastA?.color === 'w' ? false : lastB?.color === 'w' ? true : lastA?.color === 'b' ? true : Math.random() < 0.5);
-  const mode: Mode = t.mode === 'ranked' ? 'ranked' : 'casual';
-  const [ar, br] = await Promise.all([seedRatingFromImports(a.userId, tc.id), seedRatingFromImports(b.userId, tc.id)]);
-  const [ap, bp] = await Promise.all([resolveHumanProfile(a.userId, a.username), resolveHumanProfile(b.userId, b.username)]);
-  if (userActiveGame.has(a.userId) || userActiveGame.has(b.userId)) throw new Error('player already in a game');
-  const aPlayer: Player = { kind: 'human', userId: a.userId, username: a.username, rating: ar.rating, ...ap };
-  const bPlayer: Player = { kind: 'human', userId: b.userId, username: b.username, rating: br.rating, ...bp };
+  // A game with a bot in it never changes ratings.
+  const withBot = !isWaiter(a) || !isWaiter(b);
+  const mode: Mode = t.mode === 'ranked' && !withBot ? 'ranked' : 'casual';
+  const toPlayer = async (x: TWaiter | TBot): Promise<Player> => {
+    if (!isWaiter(x)) return botPlayer(x);
+    const [r, prof] = await Promise.all([seedRatingFromImports(x.userId, tc.id), resolveHumanProfile(x.userId, x.username)]);
+    return { kind: 'human', userId: x.userId, username: x.username, rating: r.rating, ...prof };
+  };
+  const [aPlayer, bPlayer] = await Promise.all([toPlayer(a), toPlayer(b)]);
+  if ((isWaiter(a) && userActiveGame.has(a.userId)) || (isWaiter(b) && userActiveGame.has(b.userId))) throw new Error('player already in a game');
   const white = aWhite ? aPlayer : bPlayer;
   const black = aWhite ? bPlayer : aPlayer;
   const game = await createGame(white, black, tc, mode);
   game.tournamentId = t.id;
-  tLast.set(`${t.id}:${a.userId}`, { opp: b.userId, color: aWhite ? 'w' : 'b' });
-  tLast.set(`${t.id}:${b.userId}`, { opp: a.userId, color: aWhite ? 'b' : 'w' });
+  tLast.set(`${t.id}:${aId}`, { opp: bId, color: aWhite ? 'w' : 'b' });
+  tLast.set(`${t.id}:${bId}`, { opp: aId, color: aWhite ? 'b' : 'w' });
+  const wId = white.userId ?? white.botId!, bkId = black.userId ?? black.botId!;
   await db.execute(sql`
     INSERT INTO tournament_games (tournament_id, game_id, white_user_id, black_user_id, white_username, black_username, kind, match_id)
-    VALUES (${t.id}, ${game.id}, ${white.userId!}, ${black.userId!}, ${white.username}, ${black.username}, 'live', ${opts.matchId ?? null})
+    VALUES (${t.id}, ${game.id}, ${wId}, ${bkId}, ${white.username}, ${black.username}, 'live', ${opts.matchId ?? null})
     ON CONFLICT (game_id) DO NOTHING
   `).catch(err => logger.warn({ err }, 'tournament game insert failed'));
-  subscribeWs(a.ws, game.id);
-  subscribeWs(b.ws, game.id);
-  send(a.ws, { type: 'match_found', state: gamePublicState(game), color: aWhite ? 'w' : 'b' });
-  send(b.ws, { type: 'match_found', state: gamePublicState(game), color: aWhite ? 'b' : 'w' });
+  if (isWaiter(a)) { subscribeWs(a.ws, game.id); send(a.ws, { type: 'match_found', state: gamePublicState(game), color: aWhite ? 'w' : 'b' }); }
+  if (isWaiter(b)) { subscribeWs(b.ws, game.id); send(b.ws, { type: 'match_found', state: gamePublicState(game), color: aWhite ? 'b' : 'w' }); }
   return game.id;
 }
 
 async function recordTournamentResult(g: LiveGame) {
   const tid = g.tournamentId;
-  if (!tid || !g.white.userId || !g.black.userId) return;
+  const whiteId = g.white.userId ?? g.white.botId, blackId = g.black.userId ?? g.black.botId;
+  if (!tid || !whiteId || !blackId) return;
   const done = rowsOf<{ id: number }>(await db.execute(sql`
     UPDATE tournament_games SET result = ${g.result ?? 'draw'}, termination = ${g.termination ?? null}, finished_at = now()
     WHERE game_id = ${g.id} AND result IS NULL RETURNING id
@@ -1647,8 +1742,8 @@ async function recordTournamentResult(g: LiveGame) {
     return;
   }
   const sides: { userId: string; pts: number; w: number; d: number; l: number }[] = [
-    { userId: g.white.userId, pts: g.result === 'white' ? 2 : g.result === 'draw' ? 1 : 0, w: g.result === 'white' ? 1 : 0, d: g.result === 'draw' ? 1 : 0, l: g.result === 'black' ? 1 : 0 },
-    { userId: g.black.userId, pts: g.result === 'black' ? 2 : g.result === 'draw' ? 1 : 0, w: g.result === 'black' ? 1 : 0, d: g.result === 'draw' ? 1 : 0, l: g.result === 'white' ? 1 : 0 },
+    { userId: whiteId, pts: g.result === 'white' ? 2 : g.result === 'draw' ? 1 : 0, w: g.result === 'white' ? 1 : 0, d: g.result === 'draw' ? 1 : 0, l: g.result === 'black' ? 1 : 0 },
+    { userId: blackId, pts: g.result === 'black' ? 2 : g.result === 'draw' ? 1 : 0, w: g.result === 'black' ? 1 : 0, d: g.result === 'draw' ? 1 : 0, l: g.result === 'white' ? 1 : 0 },
   ];
   for (const s of sides) {
     await db.execute(sql`
@@ -1661,16 +1756,19 @@ async function recordTournamentResult(g: LiveGame) {
 
 let tTickRunning = false;
 async function tournamentTick() {
-  if (tTickRunning || tWaiting.size === 0) return;
+  if (tTickRunning) return;
   tTickRunning = true;
   try {
     // Status changes (start / end) are handled by tournamentEngine; this only
     // pairs players in running live arenas.
     const running = rowsOf<TRow>(await db.execute(sql`
-      SELECT id, name, time_control, mode, status, starts_at, ends_at, format, kind FROM tournaments
+      SELECT id, name, time_control, mode, status, starts_at, ends_at, format, kind, bots_enabled FROM tournaments
       WHERE status = 'running' AND format = 'arena' AND kind = 'live'`));
+    const runningIds = new Set(running.map((t) => t.id));
+    for (const tid of tBotSeats.keys()) if (!runningIds.has(tid)) tBotSeats.delete(tid);
     for (const t of running) {
       if (t.ends_at && new Date(t.ends_at).getTime() - Date.now() < T_STOP_PAIRING_MS) continue;
+      if (!t.bots_enabled && !tWaiting.has(t.id)) continue;
       await pairTournament(t);
     }
   } catch (err) {
@@ -1687,6 +1785,7 @@ export function notifyPoolStarted(tid: string) {
 
 /** Is this player on the tournament screen, ready to play? */
 export function isInTournamentPool(tid: string, userId: string): boolean {
+  if (isBotId(userId)) return !tBotBusy.has(`${tid}:${userId}`);
   const w = tWaiting.get(tid)?.get(userId);
   return !!w && w.ws.readyState === WebSocket.OPEN && !userActiveGame.has(userId);
 }
@@ -1694,19 +1793,23 @@ export function isInTournamentPool(tid: string, userId: string): boolean {
 /** Bracket match: start the game if both players are ready. Returns the game id. */
 export async function tryStartBracketGame(tid: string, matchId: number, aId: string, bId: string, aWhite: boolean): Promise<string | null> {
   const pool = tWaiting.get(tid);
-  const a = pool?.get(aId);
-  const b = pool?.get(bId);
-  if (!pool || !a || !b || !isInTournamentPool(tid, aId) || !isInTournamentPool(tid, bId)) return null;
+  // A bot side is always ready; a human has to be on the tournament screen.
+  const seat = (id: string): TWaiter | TBot | undefined => (isBotId(id) ? getTournamentBot(id) : pool?.get(id));
+  const a = seat(aId);
+  const b = seat(bId);
+  if (!a || !b || !isInTournamentPool(tid, aId) || !isInTournamentPool(tid, bId)) return null;
   const t = await loadTournament(tid);
   const tc = t ? TIME_CONTROLS[t.time_control as TimeControlId] : undefined;
   if (!t || !tc) return null;
-  pool.delete(aId); pool.delete(bId);
+  for (const x of [a, b]) { if (isWaiter(x)) pool?.delete(x.userId); else tBotBusy.add(`${tid}:${x.id}`); }
   try {
     return await startTournamentGame(t, tc, a, b, { aWhite, matchId });
   } catch (err) {
     logger.warn({ err, tid }, 'bracket game start failed');
-    if (a.ws.readyState === WebSocket.OPEN) pool.set(aId, a);
-    if (b.ws.readyState === WebSocket.OPEN) pool.set(bId, b);
+    for (const x of [a, b]) {
+      if (isWaiter(x)) { if (x.ws.readyState === WebSocket.OPEN) pool?.set(x.userId, x); }
+      else tBotBusy.delete(`${tid}:${x.id}`);
+    }
     return null;
   }
 }

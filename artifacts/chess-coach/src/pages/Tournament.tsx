@@ -14,6 +14,8 @@ interface Standing {
   rank: number; userId: string; username: string;
   score: number; games: number; wins: number; draws: number; losses: number;
   withdrawn: boolean; state: 'playing' | 'waiting' | 'away'; playingAgainst: string | null; isMe: boolean;
+  /** A ChessScout bot (fills in when no one's free; never rated). */
+  isBot?: boolean;
 }
 interface TGame { gameId: string; kind: string; white: string; black: string; result: string | null; termination: string | null; startedAt: string; mine: boolean }
 interface Side { name: string | null; seed: number | null; isMe: boolean }
@@ -33,7 +35,12 @@ function rulesText(t: TournamentSummary): string {
   const draw = t.mode === 'ranked'
     ? 'Ranked: players are paired with opponents of similar rating, and results count toward ChessScout ratings.'
     : 'Casual: opponents are drawn at random and ratings don\'t change.';
-  return `${draw} ${rulesBody(t)}`;
+  const bots = t.bots
+    ? (t.format === 'bracket'
+      ? ' Empty places in the bracket are filled by ChessScout bots, labeled Bot. Games against a bot never change your rating.'
+      : ' When no one is free, a ChessScout bot (labeled Bot) plays you, and bots play each other so the arena keeps going. Bot games score points but never change your rating, and bots aren\'t counted as players.')
+    : '';
+  return `${draw} ${rulesBody(t)}${bots}`;
 }
 
 function rulesBody(t: TournamentSummary): string {
@@ -489,10 +496,10 @@ function StandingsList({ standings, finished }: { standings: Standing[]; finishe
             <div key={s.userId} className="flex items-center gap-3 px-4 py-2.5" style={{ background: s.isMe ? PT.greenSoft : undefined, borderTop: `1px solid ${PT.border}` }}>
               <span className="w-6 text-center text-[13px] font-black tabular-nums" style={{ color: s.rank <= 3 ? MEDAL[s.rank - 1] : PT.muted }}>{s.rank}</span>
               <span className="min-w-0 flex-1">
-                <b className="block truncate text-[14px] font-extrabold" style={{ color: PT.text }}>{s.username}{s.isMe ? ' (you)' : ''}</b>
+                <b className="block truncate text-[14px] font-extrabold" style={{ color: PT.text }}>{s.username}{s.isMe ? ' (you)' : ''}{s.isBot && <span className="ml-1.5 inline-flex items-center rounded px-1.5 py-px align-middle text-[9.5px] font-black uppercase tracking-wider" style={{ background: 'rgba(255,255,255,.08)', border: `1px solid ${PT.border}`, color: PT.muted }}>Bot</span>}</b>
                 {!finished && (
                   <span className="text-[11.5px]" style={{ color: s.state === 'playing' ? PT.gold : s.state === 'waiting' ? PT.green : PT.muted }}>
-                    {s.withdrawn ? 'Left' : s.state === 'playing' ? `Playing ${s.playingAgainst ?? ''}` : s.state === 'waiting' ? 'Waiting for a pairing' : 'Not playing right now'}
+                    {s.withdrawn ? 'Left' : s.state === 'playing' ? `Playing ${s.playingAgainst ?? ''}` : s.state === 'waiting' ? 'Waiting for a pairing' : s.isBot ? 'Ready to play' : 'Not playing right now'}
                   </span>
                 )}
               </span>
@@ -515,7 +522,7 @@ function PlayerList({ standings, title }: { standings: Standing[]; title: string
       ) : (
         <div className="flex flex-wrap gap-1.5 p-4">
           {standings.map((s) => (
-            <span key={s.userId} className="rounded-lg px-2.5 py-1 text-[12.5px] font-bold" style={{ background: s.isMe ? PT.greenSoft : 'rgba(0,0,0,.25)', color: PT.text }}>{s.username}</span>
+            <span key={s.userId} className="rounded-lg px-2.5 py-1 text-[12.5px] font-bold" style={{ background: s.isMe ? PT.greenSoft : 'rgba(0,0,0,.25)', color: s.isBot ? PT.muted : PT.text }}>{s.username}</span>
           ))}
         </div>
       )}

@@ -58,6 +58,39 @@
       "destination": "/api/sitemap"
     },
     {
+      "source": "/tournaments/:id",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": ".*(bot|Bot|BOT|crawler|spider|facebookexternalhit|Facebot|WhatsApp|Slack|Discord|Telegram|Twitter|LinkedIn|Pinterest|Embedly|Iframely|Quora|Skype|redditbot|Applebot|vkShare|Google-PageRenderer|Snapchat|Viber|Line/|KakaoTalk|Mastodon|preview|Preview).*"
+        }
+      ],
+      "destination": "/api/og?kind=tournament&id=:id"
+    },
+    {
+      "source": "/tournaments",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": ".*(bot|Bot|BOT|crawler|spider|facebookexternalhit|Facebot|WhatsApp|Slack|Discord|Telegram|Twitter|LinkedIn|Pinterest|Embedly|Iframely|Quora|Skype|redditbot|Applebot|vkShare|Google-PageRenderer|Snapchat|Viber|Line/|KakaoTalk|Mastodon|preview|Preview).*"
+        }
+      ],
+      "destination": "/api/og?kind=page&p=tournaments"
+    },
+    {
+      "source": "/pricing",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": ".*(bot|Bot|BOT|crawler|spider|facebookexternalhit|Facebot|WhatsApp|Slack|Discord|Telegram|Twitter|LinkedIn|Pinterest|Embedly|Iframely|Quora|Skype|redditbot|Applebot|vkShare|Google-PageRenderer|Snapchat|Viber|Line/|KakaoTalk|Mastodon|preview|Preview).*"
+        }
+      ],
+      "destination": "/api/og?kind=page&p=pricing"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
