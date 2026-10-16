@@ -45,6 +45,7 @@ export function LivePlay({ initialTab }: { initialTab?: OnlineTab } = {}) {
   const inbox = useChallengeInbox();
   const social = useSocialUnread();
   const [creatingOpen, setCreatingOpen] = useState(false);
+  const [friendOpen, setFriendOpen] = useState(false);
 
   useEffect(() => { if (live.status === 'finished') void refetch(); }, [live.status, refetch]);
   useEffect(() => { if (live.status === 'in_game') setHosted(null); }, [live.status]);
@@ -112,24 +113,23 @@ export function LivePlay({ initialTab }: { initialTab?: OnlineTab } = {}) {
 
   return (
     <div className="mx-auto max-w-[760px] space-y-4 p-4 md:p-0 pb-24">
-      <div className="flex items-start justify-between gap-3">
-        <div>
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
           <h1 className="text-2xl md:text-3xl font-black" style={{ color: PT.text, letterSpacing: '-0.02em' }}>Play Online</h1>
-          <p className="text-sm" style={{ color: PT.muted }}>Live games against real opponents, daily games at your own pace, or challenge a friend.</p>
+          <p className="text-[13px]" style={{ color: PT.muted }}>Real opponents, live or at your own pace.</p>
         </div>
-        <div className="flex shrink-0 flex-col gap-1.5 sm:flex-row">
-          <Link href="/friends" className="relative inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-black uppercase tracking-wider"
-            style={{ background: '#81B64C', color: '#FFFFFF' }} aria-label={social.total ? `Friends, ${social.total} new` : 'Friends'}>
-            <Users className="w-3.5 h-3.5" /> Friends
+        <div className="flex shrink-0 gap-2">
+          <Link href="/friends" className="relative grid h-10 w-10 place-items-center rounded-full" style={ghostBtn}
+            aria-label={social.total ? `Friends, ${social.total} new` : 'Friends'} title="Friends">
+            <Users size={18} />
             {social.total > 0 && (
-              <span className="absolute -right-1.5 -top-1.5 grid h-[18px] min-w-[18px] place-items-center rounded-full px-1 text-[10px] font-black" style={{ background: '#FF5058', color: '#fff' }}>
+              <span className="absolute -right-1 -top-1 grid h-[18px] min-w-[18px] place-items-center rounded-full px-1 text-[10px] font-black" style={{ background: '#FF5058', color: '#fff' }}>
                 {social.total > 9 ? '9+' : social.total}
               </span>
             )}
           </Link>
-          <Link href="/live/history" className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-black uppercase tracking-wider"
-            style={{ background: '#81B64C', color: '#FFFFFF' }}>
-            <History className="w-3.5 h-3.5" /> History
+          <Link href="/live/history" className="grid h-10 w-10 place-items-center rounded-full" style={ghostBtn} aria-label="Game history" title="History">
+            <History size={18} />
           </Link>
         </div>
       </div>
@@ -218,79 +218,94 @@ export function LivePlay({ initialTab }: { initialTab?: OnlineTab } = {}) {
           </div>
 
           {tab === 'daily' ? <DailyGames embedded /> : <>
-          <OpenLinksCard links={inbox.links} kind="live" onChanged={() => { void inbox.reload(); }} />
-          <div className="inline-flex rounded-xl p-1" style={{ background: 'rgba(0,0,0,0.3)', border: `1px solid ${PT.border}` }}>
-            {(['casual', 'ranked'] as LiveMode[]).map(m => (
-              <button key={m} onClick={() => setMode(m)}
-                className="px-4 py-2 rounded-lg text-xs font-black uppercase tracking-[0.14em] inline-flex items-center gap-1.5"
-                style={{ background: mode === m ? PT.green : 'transparent', color: mode === m ? PT.onGreen : PT.muted }}>
-                {m === 'casual' ? <Sparkles className="w-3.5 h-3.5" /> : <Award className="w-3.5 h-3.5" />}
-                {m}
-              </button>
-            ))}
-          </div>
-          <p className="text-xs -mt-2" style={{ color: PT.muted }}>
-            {mode === 'casual' ? 'Casual games do not change your rating.' : 'Ranked games update your rating for that time control.'}
-          </p>
+          {/* Quick play: pick a clock, get matched. */}
+          <section className="p-4" style={cardStyle}>
+            <div className="mb-1 flex items-center justify-between gap-3">
+              <h2 className="text-[16px] font-extrabold" style={{ color: PT.text }}>Quick play</h2>
+              <div className="inline-flex rounded-[10px] p-0.5" style={{ background: 'rgba(0,0,0,0.3)', border: `1px solid ${PT.border}` }}>
+                {(['casual', 'ranked'] as LiveMode[]).map(m => (
+                  <button key={m} onClick={() => setMode(m)} aria-pressed={mode === m}
+                    className="inline-flex items-center gap-1 rounded-[8px] px-2.5 py-1.5 text-[11.5px] font-extrabold capitalize"
+                    style={mode === m ? greenBtn : { color: PT.muted }}>
+                    {m === 'casual' ? <Sparkles className="w-3 h-3" /> : <Award className="w-3 h-3" />}{m}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <p className="mb-3 text-[12px]" style={{ color: PT.muted }}>
+              {mode === 'casual' ? 'Casual: no rating change.' : 'Ranked: your rating for that clock goes up or down.'} Tap a clock to find an opponent.
+            </p>
+            <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+              {TC_OPTIONS.map(opt => {
+                const r = ratingsData?.ratings[opt.id];
+                return (
+                  <button key={opt.id}
+                    disabled={live.status === 'connecting' || live.status === 'disconnected'}
+                    onClick={() => live.enterQueue(opt.id, mode)}
+                    className="flex items-center gap-3 rounded-[14px] p-3 text-left transition-transform active:scale-[0.98] disabled:opacity-50"
+                    style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${PT.border}` }}>
+                    <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[11px]" style={{ background: '#81B64C', color: '#FFFFFF' }}>
+                      <opt.icon className="w-5 h-5" />
+                    </span>
+                    <span className="min-w-0">
+                      <b className="block text-[17px] font-black leading-tight" style={{ color: PT.text }}>{opt.label}</b>
+                      <span className="block text-[11.5px]" style={{ color: PT.muted }}>
+                        {opt.sub} · {r && r.gamesPlayed > 0 ? `${r.rating}${r.isProvisional ? '?' : ''}` : 'unrated'}
+                      </span>
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </section>
 
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-            {TC_OPTIONS.map(opt => {
-              const r = ratingsData?.ratings[opt.id];
-              return (
-                <button key={opt.id}
-                  disabled={live.status === 'connecting' || live.status === 'disconnected'}
-                  onClick={() => live.enterQueue(opt.id, mode)}
-                  className="text-left p-4 transition-transform active:scale-[0.98] disabled:opacity-50" style={cardStyle}>
-                  <div className="flex items-center gap-1.5 mb-2">
-                    <opt.icon className="w-4 h-4" style={{ color: PT.green }} />
-                    <span className="text-[10.5px] font-black uppercase tracking-[0.16em]" style={{ color: PT.green }}>{opt.sub}</span>
+          {/* Play a friend: closed until you want it. */}
+          <section className="overflow-hidden" style={cardStyle}>
+            <button onClick={() => setFriendOpen(o => !o)} aria-expanded={friendOpen} className="flex w-full items-center gap-3 p-4 text-left">
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[11px]" style={{ background: '#81B64C', color: '#FFFFFF' }}><Users size={19} /></span>
+              <span className="min-w-0 flex-1">
+                <b className="block text-[15px] font-extrabold" style={{ color: PT.text }}>Play a friend</b>
+                <span className="block text-[12px]" style={{ color: PT.muted }}>Send a link; the game starts when they accept</span>
+              </span>
+              <ChevronRight size={18} style={{ color: PT.muted, transform: friendOpen ? 'rotate(90deg)' : undefined, transition: 'transform .15s' }} />
+            </button>
+            {friendOpen && (
+              <div className="space-y-3 px-4 pb-4" style={{ borderTop: `1px solid ${PT.border}` }}>
+                <div className="pt-3">
+                  <p className="mb-1.5 text-[11px] font-black uppercase tracking-[0.14em]" style={{ color: PT.muted }}>Clock</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {TC_OPTIONS.map(o => (
+                      <button key={o.id} onClick={() => setFriendTc(o.id)} className="rounded-lg px-3 py-1.5 text-[12.5px] font-bold"
+                        style={friendTc === o.id ? greenBtn : ghostBtn}>{o.label}</button>
+                    ))}
                   </div>
-                  <div className="text-2xl font-black" style={{ color: PT.text }}>{opt.label}</div>
-                  <div className="mt-1 text-[11.5px]" style={{ color: PT.muted }}>
-                    {r && r.gamesPlayed > 0 ? `Rating ${r.rating}${r.isProvisional ? '?' : ''}` : 'Unrated'}
+                </div>
+                <div>
+                  <p className="mb-1.5 text-[11px] font-black uppercase tracking-[0.14em]" style={{ color: PT.muted }}>Your colour</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {(['random', 'white', 'black'] as const).map(c => (
+                      <button key={c} onClick={() => setFriendColor(c)} className="rounded-lg px-3 py-1.5 text-[12.5px] font-bold capitalize"
+                        style={friendColor === c ? greenBtn : ghostBtn}>{c === 'random' ? 'Random' : c}</button>
+                    ))}
                   </div>
-                  <div className="mt-3 inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11.5px] font-black" style={greenBtn}>
-                    <Swords className="w-3.5 h-3.5" /> Play
-                  </div>
-                </button>
-              );
-            })}
-          </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <button onClick={createChallenge} disabled={creating} className="rounded-xl py-3 text-[13.5px] font-extrabold disabled:opacity-60" style={greenBtn}>
+                    {creating ? 'Creating…' : 'Link for one friend'}
+                  </button>
+                  <button onClick={makeOpenLink} disabled={creatingOpen} className="rounded-xl py-3 text-[13.5px] font-extrabold disabled:opacity-60" style={ghostBtn}>
+                    {creatingOpen ? 'Creating…' : 'Open link'}
+                  </button>
+                </div>
+                <p className="text-[11.5px]" style={{ color: PT.muted }}>
+                  {mode === 'ranked' ? 'Ranked' : 'Casual'} game. <b style={{ color: PT.text }}>Open link:</b> post it anywhere; anyone can challenge you and you choose who to play.
+                </p>
+              </div>
+            )}
+          </section>
+          <OpenLinksCard links={inbox.links} kind="live" onChanged={() => { void inbox.reload(); }} />
 
           <TournamentsCard />
-
-          {/* Challenge a friend */}
-          <div className="p-4 space-y-3" style={cardStyle}>
-            <div className="flex items-center gap-2">
-              <Users className="w-4.5 h-4.5" style={{ color: PT.green }} size={18} />
-              <h2 className="text-[15px] font-extrabold" style={{ color: PT.text }}>Challenge a friend</h2>
-            </div>
-            <p className="text-[12.5px] -mt-1" style={{ color: PT.muted }}>Get a link to send. When they open it and accept, the game starts ({mode}).</p>
-            <div className="flex flex-wrap gap-1.5">
-              {TC_OPTIONS.map(o => (
-                <button key={o.id} onClick={() => setFriendTc(o.id)} className="rounded-lg px-3 py-1.5 text-[12.5px] font-bold"
-                  style={friendTc === o.id ? greenBtn : ghostBtn}>{o.label}</button>
-              ))}
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              {(['random', 'white', 'black'] as const).map(c => (
-                <button key={c} onClick={() => setFriendColor(c)} className="rounded-lg px-3 py-1.5 text-[12.5px] font-bold capitalize"
-                  style={friendColor === c ? greenBtn : ghostBtn}>{c === 'random' ? 'Random colour' : `I play ${c}`}</button>
-              ))}
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <button onClick={createChallenge} disabled={creating} className="rounded-xl py-3 text-[13.5px] font-extrabold disabled:opacity-60" style={greenBtn}>
-                {creating ? 'Creating…' : 'One-time link'}
-              </button>
-              <button onClick={makeOpenLink} disabled={creatingOpen} className="rounded-xl py-3 text-[13.5px] font-extrabold disabled:opacity-60" style={ghostBtn}>
-                {creatingOpen ? 'Creating…' : 'Open link (anyone)'}
-              </button>
-            </div>
-            <p className="text-[11.5px]" style={{ color: PT.muted }}>
-              <b style={{ color: PT.text }}>One-time:</b> for one friend, starts when they accept. <b style={{ color: PT.text }}>Open:</b> post it anywhere; anyone can challenge you and you pick who to play.
-            </p>
-          </div>
-
           </>}
         </>
       )}
@@ -303,26 +318,21 @@ export function LivePlay({ initialTab }: { initialTab?: OnlineTab } = {}) {
       {live.status === 'connecting' && <p className="text-xs" style={{ color: PT.muted }}>Connecting…</p>}
       {live.status === 'disconnected' && <p className="text-xs" style={{ color: '#ea9733' }}>Reconnecting…</p>}
 
-      <div className="p-4" style={cardStyle}>
-        <div className="flex items-center gap-2 mb-3">
-          <Trophy className="w-4 h-4" style={{ color: PT.green }} />
-          <h2 className="text-sm font-black uppercase tracking-[0.14em]" style={{ color: PT.text }}>Your ChessScout ratings</h2>
-        </div>
-        <div className="grid grid-cols-3 gap-2 md:grid-cols-5">
-          {[...TC_OPTIONS.map(o => ({ id: o.id, label: o.label })), { id: 'daily', label: 'Daily' }].map(opt => {
-            const r = opt.id === 'daily' ? dailyR : ratingsData?.ratings[opt.id];
-            return (
-              <div key={opt.id} className="text-center p-2.5 rounded-xl" style={{ background: 'rgba(0,0,0,0.2)' }}>
-                <div className="text-[10px] font-black uppercase tracking-[0.16em]" style={{ color: PT.muted }}>{opt.label}</div>
-                <div className="text-xl font-black mt-0.5" style={{ color: PT.text }}>
-                  {r && r.gamesPlayed > 0 ? `${r.rating}${r.isProvisional ? '?' : ''}` : '—'}
-                </div>
-                <div className="text-[10px]" style={{ color: PT.muted }}>{r?.gamesPlayed ?? 0} games</div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
+      {/* Your ratings, one compact row */}
+      <section className="flex items-center gap-3 overflow-x-auto px-4 py-3" style={cardStyle}>
+        <span className="inline-flex shrink-0 items-center gap-1.5 text-[11px] font-black uppercase tracking-[0.14em]" style={{ color: PT.muted }}>
+          <Trophy className="w-3.5 h-3.5" style={{ color: PT.gold }} /> Ratings
+        </span>
+        {[...TC_OPTIONS.map(o => ({ id: o.id, label: o.label })), { id: 'daily', label: 'Daily' }].map(opt => {
+          const r = opt.id === 'daily' ? dailyR : ratingsData?.ratings[opt.id];
+          return (
+            <span key={opt.id} className="shrink-0 rounded-[10px] px-2.5 py-1.5 text-center" style={{ background: 'rgba(0,0,0,0.2)' }} title={`${r?.gamesPlayed ?? 0} games`}>
+              <span className="block text-[10px] font-bold" style={{ color: PT.muted }}>{opt.label}</span>
+              <b className="block text-[14px] font-black leading-tight" style={{ color: PT.text }}>{r && r.gamesPlayed > 0 ? `${r.rating}${r.isProvisional ? '?' : ''}` : '—'}</b>
+            </span>
+          );
+        })}
+      </section>
     </div>
   );
 }

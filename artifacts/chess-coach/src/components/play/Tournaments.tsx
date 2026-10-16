@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'wouter';
-import { Trophy, ChevronRight, Users, Clock } from 'lucide-react';
+import { Trophy, ChevronRight, Users, Clock, Plus } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
-import { PT, cardStyle } from '@/lib/playTheme';
+import { PT, cardStyle, greenBtn } from '@/lib/playTheme';
 
 export interface TournamentSummary {
   id: string;
@@ -23,6 +23,10 @@ export interface TournamentSummary {
   players: number;
   joined: boolean;
   winner?: string | null;
+  /** 'link': a player-made tournament, only reachable by its share link */
+  visibility?: 'public' | 'link';
+  createdByName?: string | null;
+  isCreator?: boolean;
 }
 
 export function fmtCountdown(ms: number): string {
@@ -63,14 +67,21 @@ export function TournamentsCard() {
     const c = setInterval(() => setNow(Date.now()), 1000);
     return () => { alive = false; clearInterval(t); clearInterval(c); };
   }, []);
-  const items = [...(list?.running ?? []), ...(list?.upcoming ?? [])].slice(0, 4);
-  if (items.length === 0) return null;
+  const items = [...(list?.running ?? []), ...(list?.upcoming ?? [])].slice(0, 5);
   return (
     <div className="overflow-hidden" style={cardStyle}>
       <div className="flex items-center gap-2 px-4 pt-4">
         <Trophy size={18} style={{ color: PT.gold }} />
-        <h2 className="text-[15px] font-extrabold" style={{ color: PT.text }}>Tournaments</h2>
+        <h2 className="flex-1 text-[15px] font-extrabold" style={{ color: PT.text }}>Tournaments</h2>
+        <Link href="/tournaments/new" className="inline-flex items-center gap-1 rounded-[10px] px-3 py-1.5 text-[12.5px] font-extrabold" style={greenBtn}>
+          <Plus size={14} /> Create
+        </Link>
       </div>
+      {items.length === 0 && (
+        <p className="px-4 pb-4 pt-2 text-[12.5px]" style={{ color: PT.muted }}>
+          No tournaments right now. Create one for your friends or club and share the link.
+        </p>
+      )}
       {items.map((t) => (
         <Link key={t.id} href={`/tournaments/${t.id}`} className="flex items-center gap-3 px-4 py-3" style={{ borderTop: `1px solid ${PT.border}`, marginTop: 10 }}>
           <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl" style={{ background: t.status === 'running' ? 'rgba(232,180,71,.15)' : PT.greenSoft, color: t.status === 'running' ? PT.gold : PT.green }}>
@@ -80,6 +91,7 @@ export function TournamentsCard() {
             <span className="flex items-center gap-2">
               <b className="truncate text-[14.5px] font-extrabold" style={{ color: PT.text }}>{t.name}</b>
               {t.status === 'running' && <span className="shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-black uppercase tracking-wider" style={{ background: PT.gold, color: '#1a1405' }}>On now</span>}
+              {t.isCreator && <span className="shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-black uppercase tracking-wider" style={{ background: 'rgba(255,255,255,.08)', color: PT.text }}>Yours</span>}
               {t.eligibility === 'pro' && <span className="shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-black uppercase tracking-wider" style={{ background: '#81B64C', color: '#FFFFFF' }}>Pro</span>}
             </span>
             <span className="flex flex-wrap items-center gap-x-2.5 text-[12px]" style={{ color: PT.muted }}>

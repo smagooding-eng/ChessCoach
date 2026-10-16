@@ -140,12 +140,19 @@ export function Layout({ children, fullscreen }: { children: React.ReactNode; fu
   // (and past onboarding, which needs a linked chess account), go back to it.
   useEffect(() => {
     if (location === '/welcome' || location === '/setup') return;
-    if (!layoutAuthUser || (!layoutAuthUser.chesscomUsername && !layoutAuthUser.lichessUsername)) return;
+    if (!layoutAuthUser || (!layoutAuthUser.chesscomUsername && !layoutAuthUser.lichessUsername && !layoutAuthUser.scoutUsername)) return;
     let code: string | null = null;
-    try { code = localStorage.getItem('cs_pending_challenge'); } catch { /* ignore */ }
-    if (!code) return;
-    try { localStorage.removeItem('cs_pending_challenge'); } catch { /* ignore */ }
-    navigateTo(`/challenge/${code}`);
+    let tournament: string | null = null;
+    try { code = localStorage.getItem('cs_pending_challenge'); tournament = localStorage.getItem('cs_pending_tournament'); } catch { /* ignore */ }
+    if (code) {
+      try { localStorage.removeItem('cs_pending_challenge'); } catch { /* ignore */ }
+      navigateTo(`/challenge/${code}`);
+      return;
+    }
+    if (tournament) {
+      try { localStorage.removeItem('cs_pending_tournament'); } catch { /* ignore */ }
+      navigateTo(`/tournaments/${tournament}`);
+    }
   }, [location, navigateTo, layoutAuthUser]);
   const { enabled: redesign } = useDashboardRedesignFlag();
   // The redesigned inner screens (games list + game analysis, analysis, puzzles,

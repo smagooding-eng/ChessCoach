@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils';
 import { Link } from 'wouter';
 import { TournamentsAdminPanel } from '@/components/admin/TournamentsAdminPanel';
 import { motion, AnimatePresence } from 'framer-motion';
+import { ClubOutreachPanel } from '@/components/admin/ClubOutreachPanel';
 import {
   Activity, AlertCircle, Bold, Brain, Camera, Check, CheckCircle2, ChevronDown, ChevronRight,
   Copy, CreditCard, Crown, DollarSign, Edit3, Eye, FileText, Gamepad2, Gift, GraduationCap, Heading1, Heading2,
@@ -711,6 +712,7 @@ export function Admin() {
           <ReferralCodesPanel />
           <ReferralSignupsPanel />
           <AffiliatesPanel />
+          <ClubOutreachPanel />
           <OutreachStudio />
           <SeoArticlesPanel />
           <FacebookAutoPostPanel />
@@ -2970,6 +2972,7 @@ function AiUsagePanel() {
     seo_article: 'SEO Article',
     admin_marketing: 'Admin Marketing Copy',
     outreach_draft: 'Outreach Draft',
+    outreach_discovery: 'Club Outreach Search',
   };
   const fmtUsd = (n: number) => n < 0.01 && n > 0 ? '<$0.01' : `$${n.toFixed(2)}`;
 

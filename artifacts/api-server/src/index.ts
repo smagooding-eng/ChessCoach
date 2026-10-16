@@ -365,6 +365,10 @@ async function runSchemaMigrations() {
     await db.execute(sql`ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS total_rounds INTEGER`);
     await db.execute(sql`ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS winner_user_id VARCHAR`);
     await db.execute(sql`ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS winner_username VARCHAR`);
+    // Player-created tournaments: unlisted (reached by their share link) and
+    // credited to their creator.
+    await db.execute(sql`ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS visibility VARCHAR NOT NULL DEFAULT 'public'`);
+    await db.execute(sql`ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS created_by_name VARCHAR`);
     await db.execute(sql`ALTER TABLE tournaments ALTER COLUMN ends_at DROP NOT NULL`);
     await db.execute(sql`ALTER TABLE tournament_games ADD COLUMN IF NOT EXISTS kind VARCHAR NOT NULL DEFAULT 'live'`);
     await db.execute(sql`ALTER TABLE tournament_games ADD COLUMN IF NOT EXISTS match_id INTEGER`);
@@ -409,6 +413,8 @@ runSchemaMigrations().then(() => {
   ensurePublicPlayersTable().then(() => startPublicPlayersRefresher()).catch((err) => logger.warn({ err }, 'public players setup failed'));
   // IndexNow: full submission of public pages at most once a week.
   import("./lib/indexNow").then(({ startIndexNow }) => startIndexNow()).catch((err) => logger.warn({ err }, 'indexnow start failed'));
+  // Club outreach: weekly search for new club / organizer contacts.
+  import("./lib/clubOutreach").then(({ startClubOutreachSchedule }) => startClubOutreachSchedule()).catch((err) => logger.warn({ err }, 'club outreach start failed'));
   void seedBotPersonas().catch((err) => logger.warn({ err }, 'seedBotPersonas failed'));
   import("./lib/growthScheduler").then(({ startGrowthScheduler }) => {
     startGrowthScheduler();

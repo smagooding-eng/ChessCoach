@@ -16,6 +16,7 @@ export const AI_FEATURES = {
   SEO_ARTICLE: "seo_article",               // generateArticle
   ADMIN_MARKETING: "admin_marketing",       // /admin/marketing/generate
   OUTREACH_DRAFT: "outreach_draft",         // outreach lead draft generation
+  OUTREACH_DISCOVERY: "outreach_discovery", // club outreach web search
 } as const;
 
 export type AiFeature = (typeof AI_FEATURES)[keyof typeof AI_FEATURES];

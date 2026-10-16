@@ -174,6 +174,7 @@ const LivePlay = lazyRetry(() => import("@/pages/LivePlay").then(m => ({ default
 const FriendsPage = lazyRetry(() => import("@/pages/Friends").then(m => ({ default: m.Friends })));
 const MessagesPage = lazyRetry(() => import("@/pages/Messages").then(m => ({ default: m.Messages })));
 const TournamentPage = lazyRetry(() => import("@/pages/Tournament").then(m => ({ default: m.Tournament })));
+const CreateTournamentPage = lazyRetry(() => import("@/pages/CreateTournament").then(m => ({ default: m.CreateTournament })));
 const LiveHistory = lazyRetry(() => import("@/pages/LiveHistory").then(m => ({ default: m.LiveHistory })));
 const GameLookup = lazyRetry(() => import("@/pages/GameLookup").then(m => ({ default: m.GameLookup })));
 const Subscription = lazyRetry(() => import("@/pages/Subscription").then(m => ({ default: m.Subscription })));
@@ -209,6 +210,9 @@ function ProtectedRoute({ component: Component, fallbackNav, requireAdmin, skipW
 
   useEffect(() => {
     if (isLoaded && !isAuthLoading && !username && !isAuthenticated) {
+      // Signed out on a tournament link: come back to it after signing up.
+      const m = location.match(/^\/tournaments\/([a-z0-9]+)$/i);
+      if (m && m[1] !== 'new') { try { localStorage.setItem('cs_pending_tournament', m[1]); } catch { /* ignore */ } }
       navigate('/setup', { replace: true } as never);
       return;
     }
@@ -272,6 +276,7 @@ const PLivePlay      = () => <ProtectedRoute component={LivePlay} />;
 const PFriends       = () => <ProtectedRoute component={FriendsPage} />;
 const PMessages      = () => <ProtectedRoute component={MessagesPage} />;
 const PTournament    = () => <ProtectedRoute component={TournamentPage} />;
+const PCreateTournament = () => <ProtectedRoute component={CreateTournamentPage} />;
 // Daily games are a tab of Play Online now; /daily (old links, notifications) opens that tab.
 const DailyTab = () => <LivePlay initialTab="daily" />;
 const PDailyGames    = () => <ProtectedRoute component={DailyTab} />;
@@ -388,6 +393,7 @@ function Router() {
       <Route path="/live"            component={PLivePlay} />
       <Route path="/friends"         component={PFriends} />
       <Route path="/messages/:userId" component={PMessages} />
+      <Route path="/tournaments/new" component={PCreateTournament} />
       <Route path="/tournaments/:id" component={PTournament} />
       <Route path="/daily"           component={PDailyGames} />
       <Route path="/notifications"   component={PNotifications} />

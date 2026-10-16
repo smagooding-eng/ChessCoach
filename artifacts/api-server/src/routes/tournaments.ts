@@ -7,13 +7,19 @@ import { listTimeControls, tournamentLiveStatus, closeTournamentPool } from "../
 import { listCorrespondenceTimeControls } from "../lib/correspondence";
 import { withdrawFromBracket, roundLabel } from "../lib/tournamentEngine";
 import { logger } from "../lib/logger";
+import { notifyUser } from "../lib/notify";
 
-// Tournaments. Admins create them; the engine (lib/tournamentEngine) starts,
-// pairs and finishes them.
+// Tournaments. Admins create public ones; any player can create one and
+// share its link (unlisted: it only shows to people with the link, its
+// players and its creator). The engine (lib/tournamentEngine) starts, pairs
+// and finishes them.
 //   GET  /tournaments                 running, upcoming and recent
+//   GET  /tournament-options          time controls for the create form
+//   POST /tournaments                 create (any signed-in player)
 //   GET  /tournaments/:id             details, standings or bracket, your game
 //   POST /tournaments/:id/join
 //   POST /tournaments/:id/withdraw
+//   POST /tournaments/:id/cancel      (creator or admin)
 //   GET  /admin/tournaments           (admin) all + option lists
 //   POST /admin/tournaments           (admin) create
 //   POST /admin/tournaments/:id/cancel (admin)
@@ -34,6 +40,7 @@ interface TRow {
   starts_at: string; ends_at: string | null; status: string; created_at: string;
   format: string; kind: string; eligibility: string; max_players: number | null; total_rounds: number | null;
   winner_username: string | null;
+  visibility?: string; created_by?: string; created_by_name?: string | null;
   players?: number | string; joined?: boolean;
 }
 
@@ -41,7 +48,7 @@ const liveTcs = () => listTimeControls().map((t) => ({ id: t.id, label: t.label 
 const dailyTcs = () => listCorrespondenceTimeControls().map((t) => ({ id: t.id, label: `${t.label} per move` }));
 const tcLabel = (id: string) => [...liveTcs(), ...dailyTcs()].find((t) => t.id === id)?.label ?? id;
 
-function publicT(t: TRow) {
+function publicT(t: TRow, uid?: string | null) {
   return {
     id: t.id,
     name: t.name,
@@ -60,6 +67,9 @@ function publicT(t: TRow) {
     players: Number(t.players ?? 0),
     joined: !!t.joined,
     winner: t.winner_username,
+    visibility: t.visibility === "link" ? "link" : "public",
+    createdByName: t.created_by_name ?? null,
+    isCreator: !!uid && t.created_by === uid,
   };
 }
 
@@ -76,18 +86,113 @@ router.get("/tournaments", async (req: Request, res: Response) => {
     const uid = uidOf(req) ?? "";
     const rows = rowsOf<TRow>(await db.execute(sql`
       ${SELECT_T(uid)}
-      WHERE t.status IN ('scheduled', 'running')
-         OR (t.status = 'finished' AND COALESCE(t.ends_at, t.starts_at) > now() - interval '14 days')
+      WHERE (t.status IN ('scheduled', 'running')
+         OR (t.status = 'finished' AND COALESCE(t.ends_at, t.starts_at) > now() - interval '14 days'))
+        AND (t.visibility = 'public' OR t.created_by = ${uid}
+          OR EXISTS (SELECT 1 FROM tournament_players p WHERE p.tournament_id = t.id AND p.user_id = ${uid} AND NOT p.withdrawn))
       ORDER BY t.starts_at ASC
       LIMIT 60`));
+    const pub = (r: TRow) => publicT(r, uid);
     res.json({
-      running: rows.filter((r) => r.status === "running").map(publicT),
-      upcoming: rows.filter((r) => r.status === "scheduled").map(publicT),
-      recent: rows.filter((r) => r.status === "finished").reverse().slice(0, 10).map(publicT),
+      running: rows.filter((r) => r.status === "running").map(pub),
+      upcoming: rows.filter((r) => r.status === "scheduled").map(pub),
+      recent: rows.filter((r) => r.status === "finished").reverse().slice(0, 10).map(pub),
     });
   } catch (err) {
     logger.error({ err }, "[tournaments] list failed");
     res.status(500).json({ error: "Could not load tournaments" });
+  }
+});
+
+interface CreateBody {
+  name?: string; description?: string; timeControl?: string; mode?: string; startsAt?: string;
+  durationMinutes?: number; format?: string; kind?: string; eligibility?: string; maxPlayers?: number | null;
+}
+
+/** Validates a create request; returns the row values or an error message. */
+function parseCreate(b: CreateBody, opts: { admin: boolean }): { error: string } | {
+  name: string; description: string | null; timeControl: string; mode: string; starts: Date; ends: Date | null;
+  format: string; kind: string; eligibility: string; maxPlayers: number | null;
+} {
+  const name = String(b.name ?? "").trim().slice(0, 80);
+  if (!name) return { error: "Give it a name" };
+  const format = b.format === "bracket" ? "bracket" : "arena";
+  const kind = b.kind === "daily" ? "daily" : "live";
+  const tcs = kind === "daily" ? dailyTcs() : liveTcs();
+  if (!b.timeControl || !tcs.some((t) => t.id === b.timeControl)) return { error: "Pick a time control" };
+  const starts = b.startsAt ? new Date(b.startsAt) : new Date();
+  if (Number.isNaN(starts.getTime())) return { error: "Invalid start time" };
+  const maxAhead = opts.admin ? 366 : 60;
+  if (starts.getTime() > Date.now() + maxAhead * 24 * 3600_000) return { error: opts.admin ? "Start within the next year" : "Start within the next 60 days" };
+  let ends: Date | null = null;
+  if (format === "arena") {
+    const minutes = Math.round(Number(b.durationMinutes));
+    const maxMinutes = opts.admin ? 60 * 24 * 60 : 30 * 24 * 60;
+    if (!Number.isFinite(minutes) || minutes < 10 || minutes > maxMinutes) return { error: opts.admin ? "Arena length must be 10 minutes to 60 days" : "Arena length must be 10 minutes to 30 days" };
+    if (kind === "daily" && minutes < 24 * 60) return { error: "A daily arena needs at least a day" };
+    ends = new Date(Math.max(starts.getTime(), Date.now()) + minutes * 60_000);
+    if (ends.getTime() <= Date.now()) return { error: "That would already be over" };
+  }
+  const cap = opts.admin ? 1024 : 256;
+  const maxPlayers = b.maxPlayers && Number(b.maxPlayers) >= 2 ? Math.min(cap, Math.round(Number(b.maxPlayers))) : null;
+  return {
+    name, description: String(b.description ?? "").trim().slice(0, 500) || null, timeControl: b.timeControl,
+    mode: b.mode === "ranked" ? "ranked" : "casual", starts, ends, format, kind,
+    eligibility: opts.admin && b.eligibility === "pro" ? "pro" : "all", maxPlayers,
+  };
+}
+
+const displayName = (req: Request) =>
+  req.user!.scoutUsername || req.user!.chesscomUsername || req.user!.lichessUsername || req.user!.firstName || req.user!.email?.split("@")[0] || "Player";
+
+router.get("/tournament-options", (_req: Request, res: Response) => {
+  res.json({ liveTimeControls: liveTcs(), dailyTimeControls: dailyTcs() });
+});
+
+const MAX_OPEN_PER_CREATOR = 5;
+
+router.post("/tournaments", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const uid = req.user!.id;
+    const v = parseCreate((req.body ?? {}) as CreateBody, { admin: false });
+    if ("error" in v) { res.status(400).json({ error: v.error }); return; }
+    const [{ open }] = rowsOf<{ open: string }>(await db.execute(sql`
+      SELECT COUNT(*) AS open FROM tournaments WHERE created_by = ${uid} AND status IN ('scheduled', 'running')`));
+    if (Number(open) >= MAX_OPEN_PER_CREATOR && !req.user!.isAdmin) {
+      res.status(400).json({ error: `You can run up to ${MAX_OPEN_PER_CREATOR} tournaments at a time. Finish or cancel one first.` });
+      return;
+    }
+    const id = crypto.randomBytes(5).toString("hex");
+    const name = displayName(req);
+    await db.execute(sql`
+      INSERT INTO tournaments (id, name, description, time_control, mode, starts_at, ends_at, status, created_by, format, kind, eligibility, max_players, visibility, created_by_name)
+      VALUES (${id}, ${v.name}, ${v.description}, ${v.timeControl}, ${v.mode}, ${v.starts.toISOString()}, ${v.ends ? v.ends.toISOString() : null},
+        'scheduled', ${uid}, ${v.format}, ${v.kind}, 'all', ${v.maxPlayers}, 'link', ${name})`);
+    // The creator plays too unless they say otherwise.
+    if ((req.body as { join?: boolean })?.join !== false) {
+      await db.execute(sql`INSERT INTO tournament_players (tournament_id, user_id, username) VALUES (${id}, ${uid}, ${name}) ON CONFLICT DO NOTHING`);
+    }
+    res.json({ id });
+  } catch (err) {
+    logger.error({ err }, "[tournaments] user create failed");
+    res.status(500).json({ error: "Could not create the tournament" });
+  }
+});
+
+router.post("/tournaments/:id/cancel", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const id = String(req.params.id);
+    const [t] = rowsOf<{ created_by: string; name: string }>(await db.execute(sql`SELECT created_by, name FROM tournaments WHERE id = ${id}`));
+    if (!t) { res.status(404).json({ error: "Tournament not found" }); return; }
+    if (t.created_by !== req.user!.id && !req.user!.isAdmin) { res.status(403).json({ error: "Only the organizer can cancel this tournament" }); return; }
+    await db.execute(sql`UPDATE tournaments SET status = 'cancelled' WHERE id = ${id} AND status IN ('scheduled', 'running')`);
+    closeTournamentPool(id);
+    const players = rowsOf<{ user_id: string }>(await db.execute(sql`SELECT user_id FROM tournament_players WHERE tournament_id = ${id} AND NOT withdrawn AND user_id <> ${req.user!.id}`));
+    for (const p of players) void notifyUser(p.user_id, { title: `${t.name} was cancelled`, body: "The organizer cancelled this tournament.", kind: "tournament" }).catch(() => {});
+    res.json({ ok: true });
+  } catch (err) {
+    logger.error({ err }, "[tournaments] user cancel failed");
+    res.status(500).json({ error: "Could not cancel" });
   }
 });
 
@@ -145,7 +250,7 @@ router.get("/tournaments/:id", async (req: Request, res: Response) => {
     const knockedOut = t.format === "bracket" && !!uid && !mine && matchRows.some((m) => (m.a_id === uid || m.b_id === uid) && m.status === "done" && m.winner_id !== uid);
 
     res.json({
-      tournament: publicT(t),
+      tournament: publicT(t, uid),
       serverNow: Date.now(),
       standings: players.map((p, i) => ({
         rank: i + 1,
@@ -184,10 +289,19 @@ router.post("/tournaments/:id/join", requireAuth, async (req: Request, res: Resp
       return;
     }
     if (!t.joined && t.max_players && Number(t.players ?? 0) >= t.max_players) { res.status(400).json({ error: "This tournament is full" }); return; }
-    const name = req.user!.scoutUsername || req.user!.chesscomUsername || req.user!.lichessUsername || req.user!.firstName || req.user!.email?.split("@")[0] || "Player";
+    const name = displayName(req);
     await db.execute(sql`
       INSERT INTO tournament_players (tournament_id, user_id, username) VALUES (${id}, ${uid}, ${name})
       ON CONFLICT (tournament_id, user_id) DO UPDATE SET withdrawn = false`);
+    // Let the organizer of a player-made tournament know someone joined.
+    if (!t.joined && t.visibility === "link" && t.created_by && t.created_by !== uid) {
+      const count = Number(t.players ?? 0) + 1;
+      void notifyUser(t.created_by, {
+        title: `${name} joined ${t.name}`,
+        body: t.max_players ? `${count} of ${t.max_players} players` : `${count} player${count === 1 ? "" : "s"} so far`,
+        url: `/tournaments/${id}`, kind: "tournament",
+      }).catch(() => {});
+    }
     res.json({ ok: true });
   } catch (err) {
     logger.error({ err }, "[tournaments] join failed");
@@ -213,7 +327,7 @@ router.get("/admin/tournaments", requireAdmin, async (_req: Request, res: Respon
     const rows = rowsOf<TRow>(await db.execute(sql`
       SELECT t.*, (SELECT COUNT(*) FROM tournament_players p WHERE p.tournament_id = t.id AND NOT p.withdrawn) AS players
       FROM tournaments t ORDER BY t.starts_at DESC LIMIT 50`));
-    res.json({ tournaments: rows.map(publicT), timeControls: liveTcs(), liveTimeControls: liveTcs(), dailyTimeControls: dailyTcs() });
+    res.json({ tournaments: rows.map((r) => publicT(r)), timeControls: liveTcs(), liveTimeControls: liveTcs(), dailyTimeControls: dailyTcs() });
   } catch (err) {
     logger.error({ err }, "[tournaments] admin list failed");
     res.status(500).json({ error: "Could not load tournaments" });
@@ -222,34 +336,13 @@ router.get("/admin/tournaments", requireAdmin, async (_req: Request, res: Respon
 
 router.post("/admin/tournaments", requireAdmin, async (req: Request, res: Response) => {
   try {
-    const b = (req.body ?? {}) as {
-      name?: string; description?: string; timeControl?: string; mode?: string; startsAt?: string;
-      durationMinutes?: number; format?: string; kind?: string; eligibility?: string; maxPlayers?: number | null;
-    };
-    const name = String(b.name ?? "").trim().slice(0, 80);
-    if (!name) { res.status(400).json({ error: "Give it a name" }); return; }
-    const format = b.format === "bracket" ? "bracket" : "arena";
-    const kind = b.kind === "daily" ? "daily" : "live";
-    const tcs = kind === "daily" ? dailyTcs() : liveTcs();
-    if (!b.timeControl || !tcs.some((t) => t.id === b.timeControl)) { res.status(400).json({ error: "Pick a time control" }); return; }
-    const starts = b.startsAt ? new Date(b.startsAt) : new Date();
-    if (Number.isNaN(starts.getTime())) { res.status(400).json({ error: "Invalid start time" }); return; }
-    if (starts.getTime() > Date.now() + 366 * 24 * 3600_000) { res.status(400).json({ error: "Start within the next year" }); return; }
-    let ends: Date | null = null;
-    if (format === "arena") {
-      const minutes = Math.round(Number(b.durationMinutes));
-      if (!Number.isFinite(minutes) || minutes < 10 || minutes > 60 * 24 * 60) { res.status(400).json({ error: "Arena length must be 10 minutes to 60 days" }); return; }
-      if (kind === "daily" && minutes < 24 * 60) { res.status(400).json({ error: "A daily arena needs at least a day" }); return; }
-      ends = new Date(starts.getTime() + minutes * 60_000);
-      if (ends.getTime() <= Date.now()) { res.status(400).json({ error: "That would already be over" }); return; }
-    }
-    const maxPlayers = b.maxPlayers && Number(b.maxPlayers) >= 2 ? Math.min(1024, Math.round(Number(b.maxPlayers))) : null;
+    const v = parseCreate((req.body ?? {}) as CreateBody, { admin: true });
+    if ("error" in v) { res.status(400).json({ error: v.error }); return; }
     const id = crypto.randomBytes(5).toString("hex");
     await db.execute(sql`
-      INSERT INTO tournaments (id, name, description, time_control, mode, starts_at, ends_at, status, created_by, format, kind, eligibility, max_players)
-      VALUES (${id}, ${name}, ${String(b.description ?? "").trim().slice(0, 500) || null}, ${b.timeControl},
-        ${b.mode === "ranked" ? "ranked" : "casual"}, ${starts.toISOString()}, ${ends ? ends.toISOString() : null}, 'scheduled', ${req.user!.id},
-        ${format}, ${kind}, ${b.eligibility === "pro" ? "pro" : "all"}, ${maxPlayers})`);
+      INSERT INTO tournaments (id, name, description, time_control, mode, starts_at, ends_at, status, created_by, format, kind, eligibility, max_players, visibility, created_by_name)
+      VALUES (${id}, ${v.name}, ${v.description}, ${v.timeControl}, ${v.mode}, ${v.starts.toISOString()}, ${v.ends ? v.ends.toISOString() : null},
+        'scheduled', ${req.user!.id}, ${v.format}, ${v.kind}, ${v.eligibility}, ${v.maxPlayers}, 'public', 'ChessScout.net')`);
     res.json({ id });
   } catch (err) {
     logger.error({ err }, "[tournaments] create failed");

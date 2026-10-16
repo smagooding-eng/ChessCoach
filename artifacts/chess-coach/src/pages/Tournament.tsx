@@ -6,6 +6,7 @@ import { useLivePlay } from '@/hooks/use-live-play';
 import { LiveGame } from '@/pages/LiveGame';
 import { PT, cardStyle, greenBtn, ghostBtn } from '@/lib/playTheme';
 import { fmtCountdown, type TournamentSummary } from '@/components/play/Tournaments';
+import { ShareLink } from '@/components/play/ShareLink';
 
 interface Standing {
   rank: number; userId: string; username: string;
@@ -108,6 +109,13 @@ export function Tournament() {
     setPlaying(false);
     await apiFetch(`/api/tournaments/${id}/withdraw`, { method: 'POST', credentials: 'include' }).catch(() => {});
     void load();
+  };
+
+  const cancelTournament = async () => {
+    if (!confirm('Cancel this tournament? Players who joined will be told it was cancelled.')) return;
+    const r = await apiFetch(`/api/tournaments/${id}/cancel`, { method: 'POST', credentials: 'include' }).catch(() => null);
+    if (r && r.ok) window.location.href = '/live';
+    else setErr('Could not cancel the tournament');
   };
 
   // In a live game: the board takes over; "Next pairing" brings you back here.
@@ -264,8 +272,28 @@ export function Tournament() {
             {t.eligibility === 'pro' && <span className="rounded px-1.5 py-0.5 text-[10px]" style={{ background: '#81B64C', color: '#FFFFFF' }}>Pro only</span>}
           </p>
           <h1 className="truncate text-2xl font-black md:text-3xl" style={{ color: PT.text, letterSpacing: '-0.02em' }}>{t.name}</h1>
+          {t.visibility === 'link' && t.createdByName && (
+            <p className="text-[12.5px]" style={{ color: PT.muted }}>Organized by {t.isCreator ? 'you' : t.createdByName}</p>
+          )}
         </div>
       </div>
+
+      {/* Anyone can pass the link on while it's open; the organizer also gets Cancel. */}
+      {open && (t.isCreator || t.visibility === 'link') && (
+        <div className="space-y-3 p-4" style={cardStyle}>
+          <div className="flex items-center gap-2">
+            <Users size={17} style={{ color: PT.green }} />
+            <h2 className="flex-1 text-[15px] font-extrabold" style={{ color: PT.text }}>{t.isCreator ? 'Invite players' : 'Invite friends'}</h2>
+            {t.maxPlayers ? <span className="text-[12px] font-bold" style={{ color: PT.muted }}>{Math.max(0, t.maxPlayers - t.players)} spots left</span> : null}
+          </div>
+          <ShareLink url={`${window.location.origin}/tournaments/${t.id}`} text={`Join "${t.name}" on ChessScout (${t.timeControlLabel})`} />
+          {t.isCreator && (
+            <button onClick={cancelTournament} className="w-full rounded-xl py-2 text-[12.5px] font-bold" style={{ ...ghostBtn, color: PT.red }}>
+              Cancel tournament
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Summary + action */}
       <div className="space-y-4 p-5" style={cardStyle}>

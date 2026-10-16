@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'wouter';
-import { ChevronRight, Bot, Play, Swords } from 'lucide-react';
+import { ChevronRight, Bot, Play, Swords, Trophy } from 'lucide-react';
 import { BOTS } from '@/lib/chess-bot';
 import { useBotAvatar, useBotName } from '@/lib/botAvatars';
 import { useUser } from '@/hooks/use-user';
@@ -17,6 +17,7 @@ import { usePhotoLook } from '@/context/SettingsContext';
 //  - Play a Friend: two players on this device (the existing Local Play).
 //  - Play Online: live games with matchmaking and challenge links.
 //  - Daily Games: 1 / 3 / 7 days per move, with push notifications.
+//  - Tournaments: create one (arena or knockout) and share its link.
 export function PlayHub() {
   const { authUser } = useUser();
   const botAvatar = useBotAvatar();
@@ -29,6 +30,7 @@ export function PlayHub() {
   // Online first (live and daily games live together there), then local, then bots.
   const rows: { href: string; title: string; sub: string; icon: React.ReactNode; tint: string; show: boolean; img: string }[] = [
     { href: '/live', title: 'Play Online', sub: 'Live and daily games · challenge a friend', icon: <Swords size={22} />, tint: RD.green, show: !!authUser, img: 'play-online' },
+    { href: '/tournaments/new', title: 'Tournaments', sub: 'Create one for friends or your club · share the link', icon: <Trophy size={22} />, tint: RD.green, show: !!authUser, img: 'play-daily' },
     { href: '/play/local', title: 'Play Local', sub: 'Two players, one device', icon: <Play size={22} />, tint: RD.green, show: true, img: 'play-friend' },
     { href: '/practice', title: 'Play Bots', sub: `${BOTS.length} opponents • ${lowest}–${highest} ELO`, icon: <Bot size={22} />, tint: RD.green, show: true, img: 'play-bot' },
   ];
