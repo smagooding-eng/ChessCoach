@@ -71,6 +71,12 @@ async function runSchemaMigrations() {
     await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_active_at TIMESTAMPTZ`);
     await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS email_opt_out BOOLEAN NOT NULL DEFAULT false`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_page_views_user_time ON page_views(user_id, created_at DESC)`);
+    // One row per player per day they opened the app (for "active every week" checks).
+    await db.execute(sql`CREATE TABLE IF NOT EXISTS user_activity_days (
+      user_id VARCHAR NOT NULL,
+      day DATE NOT NULL,
+      PRIMARY KEY (user_id, day)
+    )`);
     await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS users_scout_username_lower_idx ON users (LOWER(scout_username))`);
     await db.execute(sql`UPDATE users SET is_premium_override = true WHERE email = 'lukakhvedelidze97@gmail.com' AND is_premium_override = false`);
 

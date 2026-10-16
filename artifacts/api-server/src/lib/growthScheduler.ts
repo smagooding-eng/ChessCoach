@@ -4,6 +4,7 @@ import { eq, and, lte, isNotNull, isNull, sql, count } from "drizzle-orm";
 import { sendEmail } from "./email";
 import { emailLayout, emailP, emailFeatures, emailPanel, escapeHtml, EMAIL, EMAIL_FONT } from "./emailTheme";
 import { unsubscribeHeaders, unsubscribeUrl } from "./emailPrefs";
+import { sendPushToUser, isPushConfigured } from "./pushNotifications";
 import { logger } from "./logger";
 import { randomUUID } from "crypto";
 import { runBulkReviewJob } from "../routes/games";
@@ -18,6 +19,13 @@ export function startGrowthScheduler() {
   cron.schedule('0 */6 * * *', async () => {
     logger.info('[growth] Email drip check');
     await runEmailDrips();
+  });
+
+  // Push reminders once a day at 18:00 UTC (2pm New York, 11am California,
+  // 7pm London) so nobody's phone buzzes in the middle of the night.
+  cron.schedule('0 18 * * *', async () => {
+    logger.info('[growth] Push drip check');
+    await runPushDrips();
   });
 
   // DISABLED: this was silently burning real OpenAI cost with zero user
@@ -112,6 +120,7 @@ async function runEmailDrips() {
     await sendTrialExpiryReminders();
     await sendWinBackEmails();
     await sendUnreviewedGamesReminder();
+    await sendEngagedUpgradeEmails();
   } catch (err: unknown) {
     logger.error({ error: err instanceof Error ? err.message : 'Unknown' }, '[growth] Drip error');
   }
@@ -469,4 +478,226 @@ function trialExpiryHtml(name: string | null, unsubUrl: string): string {
     cta: { label: 'See Pro &rarr;', href: `${EMAIL.site}/subscription` },
     unsubscribeUrl: unsubUrl,
   });
+}
+
+// ── Upgrade call for engaged free players ──────────────────────────────────
+// Free players who used ChessScout.net in every one of the last 4 weeks
+// (and have had their account at least that long) get one email asking
+// them to go Pro, with their own numbers from the last 4 weeks.
+
+// Every signal of real use in the last 28 days: app opens, page views,
+// live games and bot games.
+const RECENT_ACTIVITY = sql`(
+  SELECT user_id, day::timestamptz AS t FROM user_activity_days WHERE day > (now() - interval '28 days')::date
+  UNION ALL SELECT user_id, created_at FROM page_views WHERE user_id IS NOT NULL AND created_at > now() - interval '28 days'
+  UNION ALL SELECT white_user_id, finished_at FROM live_games WHERE white_user_id IS NOT NULL AND finished_at > now() - interval '28 days'
+  UNION ALL SELECT black_user_id, finished_at FROM live_games WHERE black_user_id IS NOT NULL AND finished_at > now() - interval '28 days'
+  UNION ALL SELECT user_id, created_at FROM bot_results WHERE created_at > now() - interval '28 days'
+)`;
+
+type EngagedCandidate = { id: string; email: string | null; first_name: string | null; days_active: number };
+
+async function engagedFreePlayers(channel: 'email' | 'push', dripType: string): Promise<EngagedCandidate[]> {
+  const channelCond = channel === 'email'
+    ? sql`u.email IS NOT NULL AND u.email_opt_out = false`
+    : sql`EXISTS (SELECT 1 FROM push_subscriptions ps WHERE ps.user_id = u.id)
+          AND (u.email IS NULL OR u.email_opt_out = true OR EXISTS (
+            SELECT 1 FROM email_drip_log e WHERE e.user_id = u.id AND e.drip_type = 'pro_upgrade_engaged' AND e.sent_at < now() - interval '3 days'))`;
+  return rowsOf<EngagedCandidate>(await db.execute(sql`
+    WITH act AS ${RECENT_ACTIVITY},
+    weeks AS (
+      SELECT user_id,
+        COUNT(DISTINCT FLOOR(EXTRACT(EPOCH FROM (now() - t)) / 604800)) AS w,
+        COUNT(DISTINCT (t AT TIME ZONE 'UTC')::date) AS days_active
+      FROM act GROUP BY user_id
+    )
+    SELECT u.id, u.email, u.first_name, weeks.days_active::int AS days_active
+    FROM users u JOIN weeks ON weeks.user_id = u.id
+    WHERE weeks.w >= 4
+      AND u.created_at < now() - interval '28 days'
+      AND u.stripe_subscription_id IS NULL
+      AND u.is_premium_override = false
+      AND ${channelCond}
+      AND NOT EXISTS (SELECT 1 FROM email_drip_log d WHERE d.user_id = u.id AND d.drip_type = ${dripType})
+    ORDER BY weeks.days_active DESC
+    LIMIT ${DRIP_BATCH_LIMIT}`));
+}
+
+interface MonthStats { daysActive: number; liveGames: number; dailyGames: number; botGames: number; rating: { label: string; value: number } | null }
+
+async function loadMonthStats(userId: string, daysActive: number): Promise<MonthStats> {
+  const [r] = rowsOf<{ live: string; daily: string; bots: string; tc: string | null; rating: number | null }>(await db.execute(sql`
+    SELECT
+      (SELECT COUNT(*) FROM live_games WHERE (white_user_id = ${userId} OR black_user_id = ${userId}) AND finished_at > now() - interval '28 days') AS live,
+      (SELECT COUNT(*) FROM correspondence_games WHERE (white_user_id = ${userId} OR black_user_id = ${userId}) AND finished_at > now() - interval '28 days') AS daily,
+      (SELECT COUNT(*) FROM bot_results WHERE user_id = ${userId} AND created_at > now() - interval '28 days') AS bots,
+      r.time_control AS tc, r.rating AS rating
+    FROM (SELECT 1) one
+    LEFT JOIN LATERAL (
+      SELECT time_control, rating FROM user_live_ratings
+      WHERE user_id = ${userId} AND games_played > 0
+      ORDER BY games_played DESC LIMIT 1
+    ) r ON true`));
+  return {
+    daysActive,
+    liveGames: Number(r?.live) || 0,
+    dailyGames: Number(r?.daily) || 0,
+    botGames: Number(r?.bots) || 0,
+    rating: r?.tc && r.rating != null ? { label: timeControlLabel(r.tc), value: Math.round(Number(r.rating)) } : null,
+  };
+}
+
+function statsPanel(s: MonthStats): string {
+  const games = s.liveGames + s.dailyGames + s.botGames;
+  const cells: { n: string; label: string }[] = [{ n: String(s.daysActive), label: s.daysActive === 1 ? 'day active' : 'days active' }];
+  if (games > 0) cells.push({ n: String(games), label: games === 1 ? 'game played' : 'games played' });
+  if (s.rating) cells.push({ n: String(s.rating.value), label: `${s.rating.label} rating` });
+  const width = Math.floor(100 / cells.length);
+  const tds = cells.map(c => `<td width="${width}%" align="center" valign="top" style="padding:6px 4px;font-family:${EMAIL_FONT};">
+    <div style="font-size:28px;font-weight:900;color:${EMAIL.text};line-height:1.1;">${c.n}</div>
+    <div style="font-size:12px;color:${EMAIL.muted};margin-top:4px;">${c.label}</div></td>`).join('');
+  const breakdown = [
+    s.liveGames ? plural(s.liveGames, 'live game') : '',
+    s.dailyGames ? plural(s.dailyGames, 'daily game') : '',
+    s.botGames ? plural(s.botGames, 'bot game') : '',
+  ].filter(Boolean).join(' · ');
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 22px;"><tr>
+<td bgcolor="${EMAIL.cardInner}" style="background:${EMAIL.cardInner};border:1px solid ${EMAIL.border};border-radius:14px;padding:14px 12px;">
+  <div style="font-family:${EMAIL_FONT};font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${EMAIL.muted};text-align:center;margin:0 0 8px;">Your last 4 weeks</div>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>${tds}</tr></table>
+  ${breakdown ? `<div style="font-family:${EMAIL_FONT};font-size:12px;color:${EMAIL.faint};text-align:center;margin-top:8px;">${breakdown}</div>` : ''}
+</td></tr></table>`;
+}
+
+export function engagedUpgradeHtml(name: string | null, s: MonthStats, unsubUrl: string): string {
+  const safeName = name ? escapeHtml(name) : null;
+  return emailLayout({
+    preheader: "You've been on ChessScout.net every week this month. Here's what Pro adds, for $5/month.",
+    badge: 'Every week this month',
+    title: safeName ? `You're putting in the work, ${safeName}` : "You're putting in the work",
+    subtitle: "You've used ChessScout.net every week for the last month. Pro gets more out of that time.",
+    body: [
+      statsPanel(s),
+      emailP('With Pro you also get:', { mb: 6 }),
+      emailFeatures([
+        { glyph: '&#9819;', title: 'Unlimited game analysis', text: 'Every game you play reviewed move by move, with the key moments and what to play instead.' },
+        { glyph: '&#9820;', title: 'Full opponent scouting reports', text: 'Unlimited reports on any Chess.com or Lichess player: openings, habits and weak spots.' },
+        { glyph: '&#9822;', title: 'Courses built from your games', text: 'Lessons aimed at the mistakes you actually make, not generic theory.' },
+        { glyph: '&#9821;', title: 'Unlimited puzzles', text: 'No daily cap.' },
+      ]),
+      emailP(`Pro is <strong style="color:${EMAIL.text};">$5/month</strong>. Cancel anytime.`, { center: true, mb: 22 }),
+    ].join(''),
+    cta: { label: 'Upgrade to Pro &rarr;', href: `${EMAIL.site}/subscription` },
+    footerNote: "You're getting this because you've been active on ChessScout.net every week this month. We only send this once.",
+    unsubscribeUrl: unsubUrl,
+  });
+}
+
+async function sendEngagedUpgradeEmails() {
+  try {
+    const candidates = await engagedFreePlayers('email', 'pro_upgrade_engaged');
+    for (const user of candidates) {
+      if (!user.email) continue;
+      try {
+        const stats = await loadMonthStats(user.id, Number(user.days_active) || 0);
+        const name = firstNameOf(user.first_name);
+        await sendOptionalEmail({ id: user.id, email: user.email },
+          name ? `${name}, you've played every week this month` : "You've played every week this month",
+          engagedUpgradeHtml(name, stats, unsubscribeUrl(user.id)));
+        await logDrip(user.id, 'pro_upgrade_engaged');
+        logger.info({ userId: user.id, daysActive: stats.daysActive }, '[drip] Engaged upgrade email sent');
+      } catch (err: unknown) {
+        logger.error({ userId: user.id, error: err instanceof Error ? err.message : 'Unknown' }, '[drip] Engaged upgrade email failed');
+      }
+      await pause(DRIP_SEND_GAP_MS);
+    }
+  } catch (err: unknown) {
+    logger.error({ error: err instanceof Error ? err.message : 'Unknown' }, '[drip] Engaged upgrade check failed');
+  }
+}
+
+// ── Push reminders ──────────────────────────────────────────────────────────
+// The push versions of the email drips, each sent once, only to players who
+// allowed notifications on a device (turning them off in Profile stops
+// these too). They go out a little before the matching email so the two
+// don't land together:
+//   push_win_back      5+ days away: the most urgent real thing waiting
+//   push_win_back_30   30+ days away, 14+ days after the first push, no visit since
+//   push_pro_upgrade   engaged free players, 3+ days after the upgrade email
+
+async function pushDrip(userId: string, dripType: string, payload: { title: string; body: string; url: string }): Promise<boolean> {
+  const r = await sendPushToUser(userId, { ...payload, tag: `cs:drip:${dripType}` });
+  if (r.sent > 0) { await logDrip(userId, dripType); return true; }
+  return false;
+}
+
+function winBackPush(c: WinBackContext): { title: string; body: string; url: string } {
+  if (c.yourMove > 0) return { title: "It's your move ♟", body: `${plural(c.yourMove, 'daily game')} ${c.yourMove === 1 ? 'is' : 'are'} waiting on your move.`, url: '/daily' };
+  if (c.friendRequests > 0) return { title: 'New friend request', body: `You have ${plural(c.friendRequests, 'friend request')} waiting on ChessScout.net.`, url: '/friends' };
+  if (c.unreadMessages > 0) return { title: 'You have messages', body: `${plural(c.unreadMessages, 'unread message')} waiting for you.`, url: '/friends' };
+  if (c.unreviewedGames >= 3) return { title: 'Your games are ready for review', body: `Your coach has ${c.unreviewedGames} games to go through with you.`, url: '/games' };
+  return { title: 'Your board is set up ♟', body: "Quick game? Live opponents and today's puzzles are waiting.", url: '/play' };
+}
+
+async function runPushDrips() {
+  if (!isPushConfigured()) return;
+  try {
+    const hasPush = sql`EXISTS (SELECT 1 FROM push_subscriptions ps WHERE ps.user_id = u.id)`;
+
+    const first = rowsOf<WinBackCandidate>(await db.execute(sql`
+      SELECT * FROM (
+        SELECT u.id, u.email, u.first_name, u.chesscom_username, u.lichess_username,
+          (u.stripe_subscription_id IS NOT NULL OR u.is_premium_override) AS is_pro,
+          ${LAST_ACTIVITY} AS last_activity
+        FROM users u
+        WHERE ${hasPush}
+          AND NOT EXISTS (SELECT 1 FROM email_drip_log d WHERE d.user_id = u.id AND d.drip_type = 'push_win_back')
+      ) x
+      WHERE x.last_activity > 'epoch'::timestamptz AND x.last_activity < now() - interval '5 days'
+      ORDER BY x.last_activity DESC
+      LIMIT ${DRIP_BATCH_LIMIT}`));
+    for (const user of first) {
+      try {
+        const c = await loadWinBackContext(user);
+        if (await pushDrip(user.id, 'push_win_back', winBackPush(c))) logger.info({ userId: user.id }, '[push-drip] Win-back push sent');
+      } catch (err: unknown) {
+        logger.error({ userId: user.id, error: err instanceof Error ? err.message : 'Unknown' }, '[push-drip] Win-back push failed');
+      }
+    }
+
+    const second = rowsOf<{ id: string }>(await db.execute(sql`
+      SELECT * FROM (
+        SELECT u.id, ${LAST_ACTIVITY} AS last_activity,
+          (SELECT d.sent_at FROM email_drip_log d WHERE d.user_id = u.id AND d.drip_type = 'push_win_back') AS first_sent
+        FROM users u
+        WHERE ${hasPush}
+          AND NOT EXISTS (SELECT 1 FROM email_drip_log d WHERE d.user_id = u.id AND d.drip_type = 'push_win_back_30')
+      ) x
+      WHERE x.first_sent IS NOT NULL AND x.first_sent < now() - interval '14 days'
+        AND x.last_activity > 'epoch'::timestamptz AND x.last_activity < x.first_sent
+        AND x.last_activity < now() - interval '30 days'
+      LIMIT ${DRIP_BATCH_LIMIT}`));
+    for (const user of second) {
+      try {
+        await pushDrip(user.id, 'push_win_back_30', { title: "What's new on ChessScout.net", body: 'Live and daily games, coach reviews, friends and tournaments. Come take a look.', url: '/play' });
+      } catch (err: unknown) {
+        logger.error({ userId: user.id, error: err instanceof Error ? err.message : 'Unknown' }, '[push-drip] 30-day push failed');
+      }
+    }
+
+    const engaged = await engagedFreePlayers('push', 'push_pro_upgrade');
+    for (const user of engaged) {
+      try {
+        await pushDrip(user.id, 'push_pro_upgrade', {
+          title: "You've played every week this month",
+          body: 'Get unlimited game reviews, scouting reports and courses with Pro. $5/month, cancel anytime.',
+          url: '/subscription',
+        });
+      } catch (err: unknown) {
+        logger.error({ userId: user.id, error: err instanceof Error ? err.message : 'Unknown' }, '[push-drip] Upgrade push failed');
+      }
+    }
+  } catch (err: unknown) {
+    logger.error({ error: err instanceof Error ? err.message : 'Unknown' }, '[push-drip] Push drip check failed');
+  }
 }

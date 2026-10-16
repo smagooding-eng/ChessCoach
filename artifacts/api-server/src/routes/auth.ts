@@ -101,6 +101,7 @@ router.get("/auth/user", async (req: Request, res: Response) => {
 /** Record that the player opened the app (at most once per 10 minutes). */
 export function touchLastActive(userId: string): void {
   db.execute(sql`UPDATE users SET last_active_at = now() WHERE id = ${userId} AND (last_active_at IS NULL OR last_active_at < now() - interval '10 minutes')`).catch(() => {});
+  db.execute(sql`INSERT INTO user_activity_days (user_id, day) VALUES (${userId}, (now() AT TIME ZONE 'UTC')::date) ON CONFLICT DO NOTHING`).catch(() => {});
 }
 
 const RESERVED_SCOUT_NAMES = new Set([
