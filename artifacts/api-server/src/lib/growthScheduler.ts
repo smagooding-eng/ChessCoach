@@ -5,6 +5,7 @@ import { sendEmail } from "./email";
 import { emailLayout, emailP, emailFeatures, emailPanel, escapeHtml, EMAIL, EMAIL_FONT } from "./emailTheme";
 import { unsubscribeHeaders, unsubscribeUrl } from "./emailPrefs";
 import { sendPushToUser, isPushConfigured } from "./pushNotifications";
+import { RAFFLE, raffleDaysLeft, dueStage } from "./raffle";
 import { logger } from "./logger";
 import { randomUUID } from "crypto";
 import { runBulkReviewJob } from "../routes/games";
@@ -121,6 +122,7 @@ async function runEmailDrips() {
     await sendWinBackEmails();
     await sendUnreviewedGamesReminder();
     await sendEngagedUpgradeEmails();
+    await sendRaffleCountdownEmails();
   } catch (err: unknown) {
     logger.error({ error: err instanceof Error ? err.message : 'Unknown' }, '[growth] Drip error');
   }
@@ -685,6 +687,8 @@ async function runPushDrips() {
       }
     }
 
+    await sendRaffleCountdownPushes();
+
     const engaged = await engagedFreePlayers('push', 'push_pro_upgrade');
     for (const user of engaged) {
       try {
@@ -699,5 +703,101 @@ async function runPushDrips() {
     }
   } catch (err: unknown) {
     logger.error({ error: err instanceof Error ? err.message : 'Unknown' }, '[push-drip] Push drip check failed');
+  }
+}
+
+// ── Sweepstakes countdown ───────────────────────────────────────────────────
+// Free players get a countdown to the Pro sweepstakes drawing: emails at 30,
+// 14, 7 and 1 day left, push at 21, 10, 3 days left and on the last day.
+// Each stage is sent once; only the stage that's current goes out, and
+// nothing is sent after the drawing. Every message says there's a free way
+// to enter and links the official rules.
+
+const RAFFLE_EMAIL_STAGES = [30, 14, 7, 1];
+const RAFFLE_PUSH_STAGES = [21, 10, 3, 0];
+
+function daysLeftText(n: number): string {
+  return n === 0 ? 'Today is the last day' : n === 1 ? '1 day left' : `${n} days left`;
+}
+
+export function raffleCountdownHtml(name: string | null, daysLeft: number, unsubUrl: string): string {
+  const safeName = name ? escapeHtml(name) : null;
+  const when = daysLeft === 0 ? 'tonight' : 'tomorrow';
+  const title = daysLeft <= 1
+    ? (safeName ? `${safeName}, the sweepstakes closes ${when}` : `The sweepstakes closes ${when}`)
+    : `${daysLeft} days until the sweepstakes drawing`;
+  return emailLayout({
+    preheader: `${daysLeftText(daysLeft)} to enter for a ${RAFFLE.prize}. Drawing on ${RAFFLE.drawingDateLabel}.`,
+    badge: daysLeftText(daysLeft),
+    title,
+    subtitle: `Win a ${RAFFLE.prize}.`,
+    body: [
+      emailPanel(`<div style="color:${EMAIL.text};font-size:44px;font-weight:900;line-height:1;margin:0 0 6px;">${daysLeft}</div><div style="color:${EMAIL.muted};font-size:13px;">${daysLeft === 1 ? 'day' : 'days'} left${daysLeft === 0 ? ' (entries close 11:59 PM Eastern)' : ''} · drawing on ${RAFFLE.drawingDateLabel}</div>`),
+      emailP('How to enter:', { mb: 6 }),
+      emailFeatures([
+        { glyph: '&#9819;', title: 'Go Pro', text: 'Subscribe to Pro for $5/month and you\'re entered automatically. Cancel anytime.' },
+        { glyph: '&#9820;', title: 'Double your entry', text: `Use referral code <strong style="color:${EMAIL.text};">${RAFFLE.referralCode}</strong> when you subscribe for 2 entries.` },
+        { glyph: '&#9821;', title: 'Free entry', text: `No purchase necessary: email <a href="mailto:${RAFFLE.contactEmail}?subject=Sweepstakes%20Entry" style="color:${EMAIL.green};text-decoration:none;">${RAFFLE.contactEmail}</a> with the subject "Sweepstakes Entry" and your full name and email address.` },
+      ]),
+      emailP(`The prize is only awarded if we reach ${RAFFLE.minSubs} qualifying subscriptions by the drawing date, and a subscription entry needs to still be active at the drawing. 18+, void where prohibited. <a href="${EMAIL.site}/raffle-rules" style="color:${EMAIL.green};text-decoration:none;font-weight:700;">Official rules &rarr;</a>`, { size: 12, mb: 22 }),
+    ].join(''),
+    cta: { label: 'Go Pro and enter &rarr;', href: `${EMAIL.site}/subscription` },
+    afterCta: `<p style="margin:14px 0 0;text-align:center;font-family:${EMAIL_FONT};font-size:13px;"><a href="${EMAIL.site}/raffle" style="color:${EMAIL.green};text-decoration:none;font-weight:700;">Sweepstakes details</a></p>`,
+    footerNote: "You're getting this because you have a free ChessScout.net account.",
+    unsubscribeUrl: unsubUrl,
+  });
+}
+
+async function sendRaffleCountdownEmails() {
+  const daysLeft = raffleDaysLeft();
+  const stage = dueStage(RAFFLE_EMAIL_STAGES, daysLeft);
+  if (stage === null) return;
+  const dripType = `raffle_email_${stage}`;
+  try {
+    const candidates = rowsOf<{ id: string; email: string; first_name: string | null }>(await db.execute(sql`
+      SELECT u.id, u.email, u.first_name FROM users u
+      WHERE u.email IS NOT NULL AND u.email_opt_out = false
+        AND u.stripe_subscription_id IS NULL AND u.is_premium_override = false
+        AND NOT EXISTS (SELECT 1 FROM email_drip_log d WHERE d.user_id = u.id AND d.drip_type = ${dripType})
+      LIMIT ${DRIP_BATCH_LIMIT * 3}`));
+    for (const user of candidates) {
+      try {
+        const name = firstNameOf(user.first_name);
+        const subject = daysLeft <= 1
+          ? `Last chance: the sweepstakes closes ${daysLeft === 0 ? 'tonight' : 'tomorrow'} 🏆`
+          : `${daysLeft} days until the ChessScout.net sweepstakes drawing 🏆`;
+        await sendOptionalEmail(user, subject, raffleCountdownHtml(name, daysLeft, unsubscribeUrl(user.id)));
+        await logDrip(user.id, dripType);
+      } catch (err: unknown) {
+        logger.error({ userId: user.id, error: err instanceof Error ? err.message : 'Unknown' }, '[drip] Sweepstakes countdown email failed');
+      }
+      await pause(DRIP_SEND_GAP_MS);
+    }
+    if (candidates.length) logger.info({ stage, daysLeft, count: candidates.length }, '[drip] Sweepstakes countdown emails sent');
+  } catch (err: unknown) {
+    logger.error({ error: err instanceof Error ? err.message : 'Unknown' }, '[drip] Sweepstakes countdown check failed');
+  }
+}
+
+async function sendRaffleCountdownPushes() {
+  const daysLeft = raffleDaysLeft();
+  const stage = dueStage(RAFFLE_PUSH_STAGES, daysLeft);
+  if (stage === null) return;
+  const dripType = `raffle_push_${stage}`;
+  const candidates = rowsOf<{ id: string }>(await db.execute(sql`
+    SELECT u.id FROM users u
+    WHERE EXISTS (SELECT 1 FROM push_subscriptions ps WHERE ps.user_id = u.id)
+      AND u.stripe_subscription_id IS NULL AND u.is_premium_override = false
+      AND NOT EXISTS (SELECT 1 FROM email_drip_log d WHERE d.user_id = u.id AND d.drip_type = ${dripType})
+    LIMIT 500`));
+  const payload = daysLeft === 0
+    ? { title: '🏆 Last day to enter the sweepstakes', body: `Go Pro today to enter for a ${RAFFLE.prize}. Free entry also available, see the rules.`, url: '/raffle' }
+    : { title: `🏆 ${daysLeftText(daysLeft)} until the drawing`, body: `Go Pro to enter for a ${RAFFLE.prize}. Free entry also available, see the rules.`, url: '/raffle' };
+  for (const user of candidates) {
+    try {
+      await pushDrip(user.id, dripType, payload);
+    } catch (err: unknown) {
+      logger.error({ userId: user.id, error: err instanceof Error ? err.message : 'Unknown' }, '[push-drip] Sweepstakes push failed');
+    }
   }
 }

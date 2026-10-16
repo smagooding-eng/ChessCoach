@@ -1,4 +1,5 @@
 import { Resend } from 'resend';
+import { RAFFLE } from './raffle';
 import { emailLayout, emailP, emailFeatures, emailPanel, emailDivider, escapeHtml, EMAIL, EMAIL_FONT } from './emailTheme';
 
 let _resend: Resend | null = null;
@@ -128,8 +129,8 @@ export function welcomeEmailHtml(firstName: string | null): string {
   });
 }
 
-const RAFFLE_DRAWING_DATE = 'November 17, 2026';
-const RAFFLE_MIN_SUBS = 500;
+const RAFFLE_DRAWING_DATE = RAFFLE.drawingDateLabel;
+const RAFFLE_MIN_SUBS = RAFFLE.minSubs;
 
 function raffleRules(): string {
   return emailP(`The prize is only awarded if we reach ${RAFFLE_MIN_SUBS} qualifying subscriptions by the drawing date. Your subscription needs to still be active at the time of the drawing to win. No purchase necessary — a free entry method is available. <a href="${EMAIL.site}/raffle-rules" style="color:${EMAIL.green};text-decoration:none;font-weight:700;">Read the full official rules &rarr;</a>`, { size: 12, mb: 22 });
