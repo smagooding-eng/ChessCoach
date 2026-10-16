@@ -33,6 +33,10 @@
       ],
       "destination": "/api/og?kind=share&data=:data"
     },
+    { "source": "/players", "destination": "/api/page?kind=players" },
+    { "source": "/players/:slug", "destination": "/api/page?kind=player&slug=:slug" },
+    { "source": "/learn", "destination": "/api/page?kind=learn" },
+    { "source": "/learn/:slug", "destination": "/api/page?kind=article&slug=:slug" },
     {
       "source": "/sitemap.xml",
       "destination": "/api/sitemap"

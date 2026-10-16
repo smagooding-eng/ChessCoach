@@ -104,6 +104,8 @@ const LandingPage = lazyRetry(() => import("@/pages/LandingPage").then(m => ({ d
 const MobileSetup = lazyRetry(() => import("@/pages/MobileSetup").then(m => ({ default: m.MobileSetup })));
 const ScoutShare = lazyRetry(() => import("@/pages/ScoutShare").then(m => ({ default: m.ScoutShare })));
 const ArticlesIndex = lazyRetry(() => import("@/pages/Articles").then(m => ({ default: m.ArticlesIndex })));
+const PublicPlayersIndex = lazyRetry(() => import("@/pages/PublicPlayers").then(m => ({ default: m.PublicPlayersIndex })));
+const PublicPlayerPage = lazyRetry(() => import("@/pages/PublicPlayers").then(m => ({ default: m.PublicPlayerPage })));
 const ArticlePage = lazyRetry(() => import("@/pages/Articles").then(m => ({ default: m.ArticlePage })));
 const ShareCard = lazyRetry(() => import("@/pages/ShareCard").then(m => ({ default: m.ShareCard })));
 const DownloadPage = lazyRetry(() => import("@/pages/Download"));
@@ -345,6 +347,8 @@ function Router() {
     <><ScrollToTop /><PageTracker /><Switch>
       <Route path="/setup" component={SetupRouter} />
       <Route path="/scout/:data" component={ScoutShare} />
+      <Route path="/players" component={PublicPlayersIndex} />
+      <Route path="/players/:slug" component={PublicPlayerPage} />
       <Route path="/learn" component={ArticlesIndex} />
       <Route path="/learn/:slug" component={ArticlePage} />
       <Route path="/share/:data" component={ShareCard} />

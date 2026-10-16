@@ -8,6 +8,7 @@ import { createServer } from "http";
 import { attachLiveServer, seedBotPersonas } from "./lib/liveServer";
 import { startDailySweep } from "./lib/correspondence";
 import { startTournamentEngine } from "./lib/tournamentEngine";
+import { ensurePublicPlayersTable, startPublicPlayersRefresher } from "./lib/publicPlayers";
 
 async function initStripe() {
   const databaseUrl = process.env.DATABASE_URL;
@@ -393,6 +394,8 @@ httpServer.listen(port, (err?: Error) => {
 });
 
 runSchemaMigrations().then(() => {
+  // Public player pages: table + slow weekly refresh from Chess.com.
+  ensurePublicPlayersTable().then(() => startPublicPlayersRefresher()).catch((err) => logger.warn({ err }, 'public players setup failed'));
   void seedBotPersonas().catch((err) => logger.warn({ err }, 'seedBotPersonas failed'));
   import("./lib/growthScheduler").then(({ startGrowthScheduler }) => {
     startGrowthScheduler();

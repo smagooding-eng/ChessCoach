@@ -1,6 +1,6 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { db, seoArticlesTable } from "@workspace/db";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, sql } from "drizzle-orm";
 import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
@@ -50,7 +50,20 @@ router.get("/sitemap.xml", async (_req: Request, res: Response) => {
     logger.error({ err }, "[sitemap] Failed to load articles, serving static entries only");
   }
 
-  const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${[...staticXml, ...articleXml].join("\n")}\n</urlset>\n`;
+  // Public player pages (/players and /players/<username>).
+  let playerXml: string[] = [];
+  try {
+    const rows = await db.execute(sql`SELECT slug, updated_at FROM public_players WHERE data IS NOT NULL ORDER BY games DESC`);
+    const list = rows.rows as { slug: string; updated_at: string }[];
+    if (list.length) {
+      playerXml = [urlEntry(`${SITE}/players`, "weekly", "0.7"),
+        ...list.map((p) => urlEntry(`${SITE}/players/${encodeURIComponent(p.slug)}`, "weekly", "0.6", new Date(p.updated_at).toISOString().split("T")[0]))];
+    }
+  } catch (err) {
+    logger.warn({ err }, "[sitemap] Failed to load players");
+  }
+
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${[...staticXml, ...articleXml, ...playerXml].join("\n")}\n</urlset>\n`;
 
   res.set("Content-Type", "application/xml");
   res.send(xml);
