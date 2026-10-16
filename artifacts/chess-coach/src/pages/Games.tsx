@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { useReviewAll } from '@/components/ReviewAllDialog';
 import { PageHero } from '@/components/DesignSystem';
 import { useMyGames } from '@/hooks/use-games';
 import { useMyAnalysisSummary } from '@/hooks/use-analysis';
@@ -105,18 +106,10 @@ export function Games() {
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, [bulkJobId, queryClient]);
 
-  const startBulkReview = async () => {
-    setBulkError(null);
-    setBulkProgress(null);
-    try {
-      const res = await apiFetch('/api/games/review-all', { method: 'POST', credentials: 'include' });
-      if (!res.ok) { setBulkError('Failed to start review'); return; }
-      const { jobId } = await res.json() as { jobId: string };
-      setBulkJobId(jobId);
-    } catch {
-      setBulkError('Failed to start review');
-    }
-  };
+  // "Review all" asks first (free or Coach, and notifications), then runs
+  // on the server; we just follow the job. See ReviewAllDialog.
+  const reviewAll = useReviewAll((jobId) => { setBulkError(null); setBulkProgress(null); setBulkJobId(jobId); });
+  const startBulkReview = reviewAll.start;
 
   // Result and free-text search still filter only the currently-loaded page
   // — a full-text search across the entire history would need a dedicated
@@ -219,7 +212,8 @@ export function Games() {
 
       {tab === 'games' && (
       <>
-      {unreviewedCount > 0 && (
+      {reviewAll.dialog}
+      {(unreviewedCount > 0 || !!bulkJobId) && (
         <div className="glass-card rounded-xl p-3.5 flex flex-col sm:flex-row items-start sm:items-center gap-3 border border-primary/20">
           <Sparkles className="w-4 h-4 text-primary shrink-0 hidden sm:block" />
           <div className="flex-1 min-w-0 text-sm">

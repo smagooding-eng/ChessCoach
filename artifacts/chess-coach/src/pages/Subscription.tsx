@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { PieceTile } from '@/components/DesignSystem';
 import { useUser } from '@/hooks/use-user';
 import { useLocation } from 'wouter';
-import { Crown, Check, Zap, BrainCircuit, GraduationCap, Swords, Volume2, Loader2, ExternalLink, Clock, CreditCard } from 'lucide-react';
+import { Crown, Check, Zap, BrainCircuit, GraduationCap, Swords, Volume2, Loader2, ExternalLink, Clock, CreditCard, Sparkles } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { apiFetch, apiFetchLocal } from '@/lib/api';
 import { EmbeddedCheckoutForm } from '@/components/EmbeddedCheckoutForm';
@@ -41,6 +41,7 @@ interface ProductInfo {
 export function Subscription() {
   const { isAuthenticated, subscription, refreshSubscription, isPremium } = useUser();
   const [, setLocation] = useLocation();
+  const afterReview = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('after') === 'review';
   const [products, setProducts] = useState<ProductInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedPriceId, setSelectedPriceId] = useState<string | null>(null);
@@ -163,6 +164,16 @@ export function Subscription() {
             ? 'You have access to all Pro features.'
             : "You're on the Free plan. Subscribe to ChessScout.net Pro to unlock unlimited opponent scouting and courses."}
         </p>
+        {/* Came from "Review with Coach" on the Games page: the server starts the
+            Coach review as soon as the subscription is active. */}
+        {afterReview && (
+          <div className="mt-4 flex max-w-lg items-center gap-3 rounded-xl px-4 py-3 text-left text-sm" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(129,182,76,0.4)' }}>
+            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg" style={{ background: '#81B64C' }}><Sparkles className="h-4 w-4 text-white" /></span>
+            <span>{isPremium
+              ? <>You're Pro. Your coach is reviewing all your games now. <a href="/games" className="font-bold underline">See progress</a></>
+              : "As soon as you upgrade, your coach reviews all your games, and we'll let you know when they're done."}</span>
+          </div>
+        )}
       </div>
 
       {isPremium ? (
@@ -264,6 +275,13 @@ export function Subscription() {
                       setSelectedPriceId(null);
                       setShowManualCard(false);
                       refreshSubscription();
+                      // Upgraded to get a Coach review: start it now (the server
+                      // would also pick it up within a minute) and show progress.
+                      if (afterReview) {
+                        apiFetch('/api/games/review-after-upgrade', { method: 'POST', credentials: 'include' })
+                          .catch(() => {})
+                          .finally(() => setLocation('/games'));
+                      }
                     }}
                     onCancel={() => setShowManualCard(false)}
                   />

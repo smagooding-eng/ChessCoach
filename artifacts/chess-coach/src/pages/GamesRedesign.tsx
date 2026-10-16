@@ -10,6 +10,7 @@ import { GameThumb } from '@/components/GameThumb';
 import { playedWhite } from '@/lib/gameSide';
 import { RD } from '@/lib/redesignTheme';
 import { RedesignHeader } from '@/components/RedesignHeader';
+import { useReviewAll } from '@/components/ReviewAllDialog';
 
 // Game History (redesign). Matches the mockup: All Games / White / Black
 // tabs with a filter button that reveals the result filter, a search
@@ -114,16 +115,10 @@ export function GamesRedesign() {
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, [bulkJobId, queryClient]);
 
-  const startBulkReview = async () => {
-    setBulkError(null);
-    setBulkProgress(null);
-    try {
-      const res = await apiFetch('/api/games/review-all', { method: 'POST', credentials: 'include' });
-      if (!res.ok) { setBulkError('Failed to start review'); return; }
-      const { jobId } = await res.json() as { jobId: string };
-      setBulkJobId(jobId);
-    } catch { setBulkError('Failed to start review'); }
-  };
+  // "Review all" asks first (free or Coach, and notifications), then runs
+  // on the server; we just follow the job. See ReviewAllDialog.
+  const reviewAll = useReviewAll((jobId) => { setBulkError(null); setBulkProgress(null); setBulkJobId(jobId); });
+  const startBulkReview = reviewAll.start;
 
   const mine = useMemo(
     () => [username, authUser?.chesscomUsername, authUser?.lichessUsername, (authUser as { scoutUsername?: string | null } | null)?.scoutUsername].filter((n): n is string => !!n).map((n) => n.toLowerCase()),
@@ -231,7 +226,7 @@ export function GamesRedesign() {
           </div>
         )}
 
-        {source === 'all' && unreviewedCount > 0 && (
+        {source === 'all' && (unreviewedCount > 0 || !!bulkJobId) && (
           <div className="mt-3 flex items-center gap-3 rounded-[16px] px-4 py-3" style={{ background: 'rgba(129,182,76,.07)', border: '1px solid rgba(129,182,76,.28)' }}>
             <div className="min-w-0 flex-1 text-[13px]">
               {bulkJobId && bulkProgress ? (
@@ -266,7 +261,15 @@ export function GamesRedesign() {
                   <span className="flex min-w-0 flex-1 items-center gap-3 rounded-[16px] px-3 py-2.5" style={{ background: RD.card, border: `1px solid ${RD.border}` }}>
                     <span className="flex h-[34px] w-[64px] shrink-0 items-center justify-center gap-1.5 rounded-[10px] text-[13px] font-bold" style={{ background: 'rgba(255,255,255,.06)', border: `1px solid ${RD.border}`, color: RD.text }}><span className="h-2 w-2 rounded-full" style={{ background: rs.dot }} />{rs.label}</span>
                     <span className="min-w-0 flex-1">
-                      <b className="block truncate text-[15px] font-bold"><span className="font-semibold" style={{ color: 'rgba(245,247,246,.8)' }}>vs </span>{opponent}</b>
+                      <b className="flex min-w-0 items-center gap-2 text-[15px] font-bold">
+                        <span className="truncate"><span className="font-semibold" style={{ color: 'rgba(245,247,246,.8)' }}>vs </span>{opponent}</span>
+                        {(game as { reviewed?: boolean }).reviewed && (
+                          <span className="inline-flex shrink-0 items-center gap-1 rounded-full px-1.5 py-px text-[10px] font-black uppercase tracking-wider" title="Reviewed"
+                            style={{ background: 'rgba(255,255,255,.06)', border: `1px solid ${RD.border}`, color: RD.text }}>
+                            <span className="h-1.5 w-1.5 rounded-full" style={{ background: RD.green }} />Reviewed
+                          </span>
+                        )}
+                      </b>
                       <span className="block truncate text-[12.5px]" style={{ color: RD.muted }}>
                         {source === 'all' && (game as { platform?: string }).platform ? `${SOURCE_LABEL[(game as { platform?: string }).platform!] ?? ''} · ` : ''}{game.opening || 'Unknown opening'}
                       </span>
@@ -299,6 +302,8 @@ export function GamesRedesign() {
             </div>
           )}
         </div>
+
+        {reviewAll.dialog}
 
         {games.length < total && (
           <button onClick={() => setPageSize((n) => n + 100)} className="mt-3 w-full rounded-[14px] py-3 text-[13.5px] font-extrabold" style={{ background: RD.cardSolid, border: `1px solid ${RD.border}`, color: RD.green }}>

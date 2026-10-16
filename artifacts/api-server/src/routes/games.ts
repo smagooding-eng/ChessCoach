@@ -1,4 +1,6 @@
 import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
+import { notifyUser } from "../lib/notify";
+import { logger as appLogger } from "../lib/logger";
 import { db, gamesTable, backgroundJobsTable, usersTable } from "@workspace/db";
 import { requireAuth, requirePremium, isUserPremium } from "../middlewares/authMiddleware";
 import { eq, desc, count, isNull, and, or, ilike, asc, sql, gte, inArray } from "drizzle-orm";
@@ -1238,35 +1240,57 @@ async function reviewOneGame(
 // once. `maxGames` caps how many this specific invocation processes —
 // the auto/background trigger uses a small cap; the manual "Review All"
 // button uses a much larger one.
+//
+// Manual jobs ("Review all") run entirely on the server, so they keep going
+// when the app is closed; if the server restarts mid-way they're resumed on
+// boot (resumeBulkReviews). They push "your games are reviewed" at the end.
+// coachCatchUp (after upgrading to Pro from the review prompt) also redoes
+// games that were reviewed without the Coach.
+export interface BulkReviewOpts { notify?: boolean; coachCatchUp?: boolean; manual?: boolean; offset?: number }
+
 export async function runBulkReviewJob(
   userId: string,
   jobId: string,
   log: Logger,
   maxGames: number,
+  opts: BulkReviewOpts = {},
 ): Promise<void> {
+  const base = { manual: !!opts.manual, coachCatchUp: !!opts.coachCatchUp };
+  const offset = opts.offset ?? 0;
   try {
-    const unreviewed = await db
-      .select()
-      .from(gamesTable)
-      .where(and(eq(gamesTable.userId, userId), isNull(gamesTable.reviewData)))
-      .orderBy(desc(gamesTable.playedAt))
-      .limit(maxGames);
-
-    const total = unreviewed.length;
-    let reviewedSoFar = 0;
     // Same owner for every game in a bulk job, so look the plan up once.
     const aiCoach = await aiCoachForOwner(userId);
+    const catchUp = !!opts.coachCatchUp && aiCoach;
+    const todo = await db
+      .select()
+      .from(gamesTable)
+      .where(and(
+        eq(gamesTable.userId, userId),
+        catchUp
+          ? or(isNull(gamesTable.reviewData), sql`${gamesTable.reviewData}->>'aiCoach' = 'false'`)
+          : isNull(gamesTable.reviewData),
+      ))
+      .orderBy(sql`(${gamesTable.reviewData} IS NULL) DESC`, desc(gamesTable.playedAt))
+      .limit(maxGames);
 
-    if (total === 0) {
+    const total = offset + todo.length;
+    let reviewedSoFar = offset;
+
+    if (todo.length === 0) {
       await db.update(backgroundJobsTable).set({
         status: "done",
-        result: { reviewedSoFar: 0, total: 0 } as unknown as Record<string, unknown>,
+        result: { ...base, reviewedSoFar, total, heartbeat: Date.now() } as unknown as Record<string, unknown>,
         completedAt: new Date(),
       }).where(eq(backgroundJobsTable.id, jobId));
+      if (opts.notify && reviewedSoFar > 0) await notifyReviewed(userId, reviewedSoFar, aiCoach);
       return;
     }
 
-    for (const game of unreviewed) {
+    await db.update(backgroundJobsTable).set({
+      result: { ...base, reviewedSoFar, total, heartbeat: Date.now() } as unknown as Record<string, unknown>,
+    }).where(eq(backgroundJobsTable.id, jobId));
+
+    for (const game of todo) {
       try {
         await reviewOneGame(game, undefined, userId, aiCoach);
         reviewedSoFar++;
@@ -1274,7 +1298,7 @@ export async function runBulkReviewJob(
         log.warn({ err, gameId: game.id }, "Bulk review: one game failed, continuing with the rest");
       }
       await db.update(backgroundJobsTable).set({
-        result: { reviewedSoFar, total, currentGameId: game.id } as unknown as Record<string, unknown>,
+        result: { ...base, reviewedSoFar, total, currentGameId: game.id, heartbeat: Date.now() } as unknown as Record<string, unknown>,
       }).where(eq(backgroundJobsTable.id, jobId));
     }
 
@@ -1283,6 +1307,7 @@ export async function runBulkReviewJob(
       completedAt: new Date(),
     }).where(eq(backgroundJobsTable.id, jobId));
 
+    if (opts.notify && reviewedSoFar > 0) await notifyReviewed(userId, reviewedSoFar, aiCoach);
     log.info({ jobId, userId, reviewedSoFar, total }, "Bulk review job complete");
   } catch (err) {
     log.error({ err, jobId, userId }, "Bulk review job failed");
@@ -1295,8 +1320,58 @@ export async function runBulkReviewJob(
   }
 }
 
+async function notifyReviewed(userId: string, n: number, coach: boolean) {
+  await notifyUser(userId, {
+    kind: "review",
+    title: n === 1 ? "Your game is reviewed" : `All ${n} games reviewed`,
+    body: coach ? "Your coach has gone through every game. See what to work on." : "Every move checked by Stockfish. See your mistakes and best moves.",
+    url: "/games",
+  }).catch(() => {});
+}
+
 const MANUAL_BULK_REVIEW_MAX = 100;
-const BULK_REVIEW_STALE_MS = 60 * 60 * 1000; // generous — 100 sequential game reviews can legitimately take a long time
+// A job counts as running while it's made progress recently (each game
+// updates the heartbeat); one that's gone quiet this long was cut off.
+const BULK_REVIEW_STALE_MS = 15 * 60 * 1000;
+
+type JobRow = typeof backgroundJobsTable.$inferSelect;
+const jobResult = (j: JobRow) => (j.result ?? {}) as { manual?: boolean; coachCatchUp?: boolean; reviewedSoFar?: number; heartbeat?: number };
+const lastActivity = (j: JobRow) => Math.max(new Date(j.createdAt!).getTime(), Number(jobResult(j).heartbeat ?? 0));
+
+/** The player's pending "Review all" job, if one is still running. */
+async function activeManualReview(userId: string): Promise<JobRow | null> {
+  const pending = await db.select().from(backgroundJobsTable).where(and(
+    eq(backgroundJobsTable.userId, userId),
+    eq(backgroundJobsTable.type, "bulk_review"),
+    eq(backgroundJobsTable.status, "pending"),
+  ));
+  let live: JobRow | null = null;
+  for (const j of pending) {
+    if (!jobResult(j).manual) continue;
+    if (Date.now() - lastActivity(j) <= BULK_REVIEW_STALE_MS) { live = j; continue; }
+    await db.update(backgroundJobsTable).set({ status: "error", error: "Timed out (server restart or crash)", completedAt: new Date() })
+      .where(eq(backgroundJobsTable.id, j.id));
+  }
+  return live;
+}
+
+/** Start (or join) a player's "Review all". Runs on the server; notifies when done. */
+export async function startManualBulkReview(userId: string, log: Logger, opts: { coachCatchUp?: boolean } = {}): Promise<string> {
+  const live = await activeManualReview(userId);
+  if (live) return live.id;
+  const jobId = randomUUID();
+  await db.insert(backgroundJobsTable).values({
+    id: jobId, userId, type: "bulk_review", status: "pending",
+    result: { manual: true, coachCatchUp: !!opts.coachCatchUp, reviewedSoFar: 0, total: 0, heartbeat: Date.now() } as unknown as Record<string, unknown>,
+  });
+  runBulkReviewJob(userId, jobId, log, MANUAL_BULK_REVIEW_MAX, { notify: true, manual: true, coachCatchUp: opts.coachCatchUp }).catch(() => {});
+  return jobId;
+}
+
+/** Is a manual "Review all" running for this player? (Used to skip the auto reviewer.) */
+export async function hasActiveManualReview(userId: string): Promise<boolean> {
+  return !!(await activeManualReview(userId));
+}
 
 // Read-only check for an already-running bulk review, so any page that
 // shows a "review your games" prompt can find out first whether one's
@@ -1304,55 +1379,78 @@ const BULK_REVIEW_STALE_MS = 60 * 60 * 1000; // generous — 100 sequential game
 // offering to start a second one or showing a stale "not reviewed yet"
 // count while one's already working through the list.
 router.get("/games/review-all-active", requireAuth, async (req, res): Promise<void> => {
-  const userId = req.user!.id;
-  const [pending] = await db.select().from(backgroundJobsTable).where(
-    and(
-      eq(backgroundJobsTable.userId, userId),
-      eq(backgroundJobsTable.type, "bulk_review"),
-      eq(backgroundJobsTable.status, "pending"),
-    )
-  );
-  if (pending && Date.now() - new Date(pending.createdAt!).getTime() <= BULK_REVIEW_STALE_MS) {
-    res.json({ jobId: pending.id });
-  } else {
-    res.json({ jobId: null });
-  }
+  const live = await activeManualReview(req.user!.id);
+  res.json({ jobId: live?.id ?? null });
 });
 
 router.post("/games/review-all", requireAuth, async (req, res): Promise<void> => {
-  const userId = req.user!.id;
+  const jobId = await startManualBulkReview(req.user!.id, req.log);
+  res.json({ jobId });
+});
 
-  const [pending] = await db.select().from(backgroundJobsTable).where(
-    and(
-      eq(backgroundJobsTable.userId, userId),
-      eq(backgroundJobsTable.type, "bulk_review"),
-      eq(backgroundJobsTable.status, "pending"),
-    )
-  );
-  if (pending) {
-    const age = Date.now() - new Date(pending.createdAt!).getTime();
-    if (age <= BULK_REVIEW_STALE_MS) {
-      res.json({ jobId: pending.id });
-      return;
+// "Review with Coach" for a free player: they're sent to upgrade, and the
+// moment they're Pro (whichever way checkout finishes, even if they never
+// come back to the app) every game is reviewed with the Coach. See
+// startReviewServices.
+router.post("/games/review-after-upgrade", requireAuth, async (req, res): Promise<void> => {
+  const userId = req.user!.id;
+  if (await isUserPremium(userId)) {
+    const jobId = await startManualBulkReview(userId, req.log, { coachCatchUp: true });
+    res.json({ jobId, started: true });
+    return;
+  }
+  await db.execute(sql`INSERT INTO review_after_upgrade (user_id) VALUES (${userId})
+    ON CONFLICT (user_id) DO UPDATE SET created_at = now()`);
+  res.json({ queued: true });
+});
+
+let reviewServicesStarted = false;
+/** Boot: resume interrupted "Review all" jobs; watch for upgrades that asked for a Coach review. */
+export async function startReviewServices(): Promise<void> {
+  if (reviewServicesStarted) return;
+  reviewServicesStarted = true;
+  await db.execute(sql`CREATE TABLE IF NOT EXISTS review_after_upgrade (
+    user_id VARCHAR PRIMARY KEY,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  )`);
+
+  // Nothing is running yet at boot, so every pending job was cut off by the
+  // restart: pick manual ones back up where they left off; drop the rest.
+  const pending = await db.select().from(backgroundJobsTable).where(and(
+    eq(backgroundJobsTable.type, "bulk_review"), eq(backgroundJobsTable.status, "pending")));
+  for (const j of pending) {
+    const r = jobResult(j);
+    if (r.manual && j.userId && Date.now() - lastActivity(j) < 6 * 3600_000) {
+      await db.update(backgroundJobsTable).set({ result: { ...r, heartbeat: Date.now() } as unknown as Record<string, unknown> })
+        .where(eq(backgroundJobsTable.id, j.id));
+      appLogger.info({ jobId: j.id, userId: j.userId }, "Resuming bulk review after restart");
+      runBulkReviewJob(j.userId, j.id, appLogger, MANUAL_BULK_REVIEW_MAX, {
+        notify: true, manual: true, coachCatchUp: r.coachCatchUp, offset: r.reviewedSoFar ?? 0,
+      }).catch(() => {});
+    } else {
+      await db.update(backgroundJobsTable).set({ status: "error", error: "Interrupted by a server restart", completedAt: new Date() })
+        .where(eq(backgroundJobsTable.id, j.id));
     }
-    await db.update(backgroundJobsTable).set({
-      status: "error",
-      error: "Timed out (server restart or crash)",
-      completedAt: new Date(),
-    }).where(eq(backgroundJobsTable.id, pending.id));
   }
 
-  const jobId = randomUUID();
-  await db.insert(backgroundJobsTable).values({
-    id: jobId,
-    userId,
-    type: "bulk_review",
-    status: "pending",
-  });
-
-  res.json({ jobId });
-  runBulkReviewJob(userId, jobId, req.log, MANUAL_BULK_REVIEW_MAX).catch(() => {});
-});
+  const sweep = async () => {
+    try {
+      await db.execute(sql`DELETE FROM review_after_upgrade WHERE created_at < now() - interval '3 days'`);
+      const rows = await db.execute(sql`SELECT user_id FROM review_after_upgrade`);
+      const list = (Array.isArray(rows) ? rows : ((rows as unknown as { rows?: unknown[] }).rows ?? [])) as { user_id: string }[];
+      for (const { user_id } of list) {
+        if (!(await isUserPremium(user_id).catch(() => false))) continue;
+        await db.execute(sql`DELETE FROM review_after_upgrade WHERE user_id = ${user_id}`);
+        appLogger.info({ userId: user_id }, "Upgraded from the review prompt: starting Coach review");
+        await startManualBulkReview(user_id, appLogger, { coachCatchUp: true });
+      }
+    } catch (err) {
+      appLogger.warn({ err }, "review-after-upgrade sweep failed");
+    }
+  };
+  setInterval(() => { void sweep(); }, 30_000).unref();
+  void sweep();
+}
 
 router.get("/games/review-all-status/:jobId", requireAuth, async (req, res): Promise<void> => {
   const [job] = await db.select().from(backgroundJobsTable).where(

@@ -462,6 +462,8 @@ runSchemaMigrations().then(() => {
   // Club outreach: weekly search for new club / organizer contacts.
   import("./lib/clubOutreach").then(({ startClubOutreachSchedule }) => startClubOutreachSchedule()).catch((err) => logger.warn({ err }, 'club outreach start failed'));
   void seedBotPersonas().catch((err) => logger.warn({ err }, 'seedBotPersonas failed'));
+  // "Review all": resume jobs cut off by a restart; Coach review after upgrading.
+  import("./routes/games").then(({ startReviewServices }) => startReviewServices()).catch((err) => logger.warn({ err }, 'review services start failed'));
   import("./lib/growthScheduler").then(({ startGrowthScheduler }) => {
     startGrowthScheduler();
   }).catch((err) => {

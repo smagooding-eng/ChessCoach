@@ -9,7 +9,7 @@ import { sendPushToUser, isPushConfigured } from "./pushNotifications";
 import { RAFFLE, raffleDaysLeft, dueStage } from "./raffle";
 import { logger } from "./logger";
 import { randomUUID } from "crypto";
-import { runBulkReviewJob } from "../routes/games";
+import { runBulkReviewJob, hasActiveManualReview } from "../routes/games";
 import { generateNextSeoArticle } from "./seoContentEngine";
 
 let schedulerStarted = false;
@@ -100,6 +100,8 @@ async function runAutoReviewTick() {
     for (const { userId } of candidates) {
       if (!userId) continue;
       try {
+        // The player's own "Review all" is already working through them.
+        if (await hasActiveManualReview(userId)) continue;
         const jobId = randomUUID();
         await db.insert(backgroundJobsTable).values({
           id: jobId,
