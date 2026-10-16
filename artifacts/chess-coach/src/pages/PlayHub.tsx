@@ -11,6 +11,7 @@ import { useSiteImg } from '@/hooks/use-app-config';
 import { ChallengeInbox } from '@/components/play/OpenChallenges';
 import { ActiveGamesCard } from '@/components/play/ActiveGamesCard';
 import { usePhotoLook } from '@/context/SettingsContext';
+import { SiteStatsLine, HappeningNow } from '@/components/SiteStats';
 
 // "Play Chess" hub (redesign). Only offers what the app can actually do:
 //  - Play a Bot: the real roster (count and rating range read from BOTS).
@@ -39,6 +40,10 @@ export function PlayHub() {
     <div className="min-h-screen px-3 md:px-6 md:pt-6 md:pb-12 pb-[calc(7.5rem+env(safe-area-inset-bottom))]" style={{ background: RD.bg, color: RD.text }}>
       <div className="mx-auto grid grid-cols-1 w-full max-w-[560px] gap-3 lg:max-w-[1000px]">
         <RedesignHeader title="Play Chess" backHref="/" />
+        <div className="flex flex-col gap-1.5">
+          <HappeningNow />
+          <SiteStatsLine className="px-1 text-[12px]" style={{ color: RD.muted }} max={2} />
+        </div>
         {authUser && <ChallengeInbox />}
         {authUser && <div><ActiveGamesCard /></div>}
 

@@ -410,6 +410,8 @@ const httpServer = createServer(app);
 attachLiveServer(httpServer);
 startDailySweep();
 startTournamentEngine();
+// Official scheduled tournaments (nightly blitz, weekend knockout, weekly daily).
+import("./lib/officialTournaments").then(({ startOfficialTournaments }) => startOfficialTournaments()).catch((err) => logger.warn({ err }, "official tournaments start failed"));
 httpServer.listen(port, (err?: Error) => {
   if (err) {
     logger.error({ err }, "Error listening on port");

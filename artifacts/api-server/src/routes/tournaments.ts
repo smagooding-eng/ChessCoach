@@ -113,7 +113,8 @@ router.get("/tournaments", async (req: Request, res: Response) => {
     res.json({
       running: rows.filter((r) => r.status === "running").map(pub),
       upcoming: rows.filter((r) => r.status === "scheduled").map(pub),
-      recent: rows.filter((r) => r.status === "finished").reverse().slice(0, 60).map(pub),
+      // Finished events nobody played (e.g. an empty scheduled arena) aren't listed.
+      recent: rows.filter((r) => r.status === "finished" && Number(r.players ?? 0) >= 2).reverse().slice(0, 60).map(pub),
     });
   } catch (err) {
     logger.error({ err }, "[tournaments] list failed");

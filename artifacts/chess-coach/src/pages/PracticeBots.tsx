@@ -190,7 +190,16 @@ function botRecordText(stats: BotStats | null, bot: BotConfig): string | null {
   if (!r || r.wins + r.losses + r.draws === 0) return null;
   return `You ${r.wins}W · ${r.losses}L${r.draws ? ` · ${r.draws}D` : ''}`;
 }
+// Beaten-by counts are only shown from 1,000 up; below that we just say
+// whether the bot has been beaten.
+const SHOW_COUNT_FROM = 1000;
+function beatenText(n: number, long: boolean): string {
+  if (n <= 0) return long ? ' · unbeaten so far' : ' · unbeaten';
+  if (n >= SHOW_COUNT_FROM) return long ? ` · beaten by ${n.toLocaleString()} players` : ` · beaten by ${n.toLocaleString()}`;
+  return ' · has been beaten';
+}
 function BeatenBadge({ count }: { count: number }) {
+  if (count < SHOW_COUNT_FROM) return null;
   return (
     <span className="absolute -bottom-1.5 -right-1.5 flex items-center gap-0.5 rounded-full px-1.5 py-[2px] text-[10px] font-black leading-none"
       title={`${count} player${count === 1 ? ' has' : 's have'} beaten this bot`}
@@ -236,7 +245,7 @@ function BotCard({ bot, onSelect }: { bot: BotConfig; onSelect: (b: BotConfig) =
       </div>
       <p className="text-xs text-white/60 leading-relaxed">{botBlurb(bot)}</p>
       <p className="text-[11px] font-bold text-white/70">
-        {record ?? 'Not played yet'}{beaten > 0 ? ` · beaten by ${beaten} player${beaten === 1 ? '' : 's'}` : ' · unbeaten so far'}
+        {record ?? 'Not played yet'}{beatenText(beaten, true)}
       </p>
       <div className="flex items-center gap-1.5 text-xs font-bold text-white/40 group-hover:text-white/70 transition-colors mt-auto pt-2">
         {loadBotGame(bot.name) ? 'Resume game' : 'Challenge'} <ChevronRight className="w-3.5 h-3.5" />
@@ -1223,7 +1232,7 @@ function BotTileRD({ bot, onSelect }: { bot: BotConfig; onSelect: (b: BotConfig)
         <span className="mt-0.5 block text-[12.5px] leading-snug line-clamp-2" style={{ color: RD.muted }}>{botBlurb(bot)}</span>
         <span className="mt-1 block text-[11.5px] font-bold" style={{ color: record ? RD.text : RD.muted }}>
           {record ?? 'Not played yet'}
-          <span className="font-semibold" style={{ color: RD.muted }}>{beaten > 0 ? ` · beaten by ${beaten}` : ' · unbeaten'}</span>
+          <span className="font-semibold" style={{ color: RD.muted }}>{beatenText(beaten, false)}</span>
         </span>
       </span>
       <span className="flex shrink-0 flex-col items-end gap-1">

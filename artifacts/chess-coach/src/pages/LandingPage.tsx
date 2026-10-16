@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { apiFetch, apiUrl, setAuthToken } from '@/lib/api';
 import { useSiteImg } from '@/hooks/use-app-config';
 import { GooglePlayBadge } from '@/components/GooglePlayBadge';
+import { SiteStatsLine, HappeningNow } from '@/components/SiteStats';
 
 const G = '#81B64C';
 const G_HOVER = '#6FA23E';
@@ -591,6 +592,8 @@ export function LandingPage() {
             <span className="flex items-center gap-1.5"><Check className="h-3.5 w-3.5" style={{ color: G }} /> No credit card required</span>
             <span className="flex items-center gap-1.5"><Check className="h-3.5 w-3.5" style={{ color: G }} /> Cancel anytime</span>
           </div>
+          <SiteStatsLine className="mt-2 text-[12px] sm:text-[13px]" style={{ color: 'rgba(245,247,246,0.72)' }} />
+          <HappeningNow className="mt-2" />
           <GooglePlayBadge height={44} className="mt-3" />
         </motion.div>
 
