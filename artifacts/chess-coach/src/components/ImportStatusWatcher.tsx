@@ -6,15 +6,18 @@ import { apiFetch } from '@/lib/api';
 import { invalidateEloCache } from '@/hooks/use-elo-progress';
 import { useQueryClient } from '@tanstack/react-query';
 import { PickGameToReviewModal } from '@/components/PickGameToReviewModal';
+import { RD } from '@/lib/redesignTheme';
 
 const STORAGE_KEY_PREFIX = 'pendingImportJobs:';
 const POLL_INTERVAL_MS = 4000;
 
-const CHESSCOM_GREEN = '#81b64c';
-const BG_CARD = '#302e2b';
-const TEXT_LIGHT = '#e8e6e3';
-const TEXT_MUTED = '#9e9b98';
-const BORDER = 'rgba(255,255,255,0.08)';
+const CHESSCOM_GREEN = '#81B64C';
+// Current app theme (redesign palette; CSS-variable surfaces follow the
+// chosen backdrop).
+const BG_CARD = RD.cardSolid;
+const TEXT_LIGHT = RD.text;
+const TEXT_MUTED = RD.muted;
+const BORDER = RD.border;
 
 // silent: true marks a job kicked off automatically in the background
 // (the dashboard's auto-fetch-on-load check) rather than a manual click
@@ -79,7 +82,7 @@ export function trackImportJob(jobId: string, platform: 'chesscom' | 'lichess', 
 
 export function ImportStatusWatcher() {
   const { authUser } = useUser();
-  const [, navigate] = useLocation();
+  const [location, navigate] = useLocation();
   const queryClient = useQueryClient();
   const [completed, setCompleted] = useState<Job[]>([]);
   const [pendingCount, setPendingCount] = useState(0);
@@ -203,6 +206,8 @@ export function ImportStatusWatcher() {
   };
 
   if (!authUser) return null;
+  // Onboarding shows its own "you're all set" card for this import.
+  if (location === '/welcome') return <>{showPickModal && <PickGameToReviewModal onClose={() => setShowPickModal(false)} />}</>;
 
   const platformsDone = Array.from(new Set(completed.map(c => c.platform)));
   const labels = platformsDone.map(p => p === 'chesscom' ? 'Chess.com' : 'Lichess').join(' and ');
@@ -210,11 +215,11 @@ export function ImportStatusWatcher() {
   return (
     <>
       {pendingCount > 0 && !bannerVisible && !pendingBannerDismissed && (
-        <div className="fixed bottom-5 right-5 z-50 max-w-sm rounded-2xl p-4 shadow-2xl"
-          style={{ background: BG_CARD, border: `1px solid ${BORDER}`, boxShadow: '0 18px 50px rgba(0,0,0,0.55)' }}>
+        <div className="fixed left-3 right-3 bottom-[calc(5.75rem+env(safe-area-inset-bottom))] md:left-auto md:right-5 md:bottom-5 z-50 md:max-w-sm rounded-[20px] p-4 shadow-2xl"
+          style={{ background: BG_CARD, border: `1px solid ${BORDER}`, boxShadow: '0 18px 50px rgba(0,0,0,0.6)', backdropFilter: 'blur(14px)' }}>
           <div className="flex items-start gap-3">
-            <div className="rounded-xl p-2 shrink-0" style={{ background: '#81B64C', color: '#FFFFFF' }}>
-              <div className="w-5 h-5 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: `${CHESSCOM_GREEN} transparent ${CHESSCOM_GREEN} ${CHESSCOM_GREEN}` }} />
+            <div className="grid h-10 w-10 place-items-center rounded-[12px] shrink-0" style={{ background: '#81B64C', color: '#FFFFFF' }}>
+              <div className="w-5 h-5 rounded-full border-2 animate-spin" style={{ borderColor: '#FFFFFF transparent #FFFFFF #FFFFFF' }} />
             </div>
             <div className="flex-1 min-w-0">
               <h3 className="text-sm font-black" style={{ color: TEXT_LIGHT }}>
@@ -231,10 +236,10 @@ export function ImportStatusWatcher() {
         </div>
       )}
       {bannerVisible && completed.length > 0 && (
-        <div className="fixed bottom-5 right-5 z-50 max-w-sm rounded-2xl p-4 shadow-2xl"
-          style={{ background: BG_CARD, border: `1px solid ${BORDER}`, boxShadow: '0 18px 50px rgba(0,0,0,0.55)' }}>
+        <div className="fixed left-3 right-3 bottom-[calc(5.75rem+env(safe-area-inset-bottom))] md:left-auto md:right-5 md:bottom-5 z-50 md:max-w-sm rounded-[20px] p-4 shadow-2xl"
+          style={{ background: BG_CARD, border: `1px solid ${BORDER}`, boxShadow: '0 18px 50px rgba(0,0,0,0.6)', backdropFilter: 'blur(14px)' }}>
           <div className="flex items-start gap-3">
-            <div className="rounded-xl p-2" style={{ background: '#81B64C', color: '#FFFFFF' }}>
+            <div className="grid h-10 w-10 place-items-center rounded-[12px] shrink-0" style={{ background: '#81B64C', color: '#FFFFFF' }}>
               <CheckCircle2 size={20} />
             </div>
             <div className="flex-1 min-w-0">
@@ -246,13 +251,13 @@ export function ImportStatusWatcher() {
               </p>
               <div className="mt-3 flex gap-2">
                 <button onClick={goToAnalysis}
-                  className="flex-1 px-3 py-1.5 rounded-lg text-xs font-black"
-                  style={{ background: CHESSCOM_GREEN, color: 'white' }}>
+                  className="flex-1 px-3 py-2 rounded-[10px] text-xs font-extrabold"
+                  style={{ background: CHESSCOM_GREEN, color: '#FFFFFF' }}>
                   Run Analysis
                 </button>
                 <button onClick={goToGames}
-                  className="flex-1 px-3 py-1.5 rounded-lg text-xs font-bold"
-                  style={{ background: 'rgba(255,255,255,0.08)', color: TEXT_LIGHT }}>
+                  className="flex-1 px-3 py-2 rounded-[10px] text-xs font-bold"
+                  style={{ background: 'rgba(255,255,255,0.06)', color: TEXT_LIGHT, border: `1px solid ${BORDER}` }}>
                   Browse Games
                 </button>
               </div>

@@ -34,7 +34,7 @@ export async function saveScoutUsername(name: string): Promise<string | null> {
 }
 
 export function ScoutUsernameInput({
-  value, onChange, onStatus, current, autoFocus, placeholder = 'e.g. KnightRider', inputStyle, textColor = '#e8e6e3', mutedColor = '#9e9b98',
+  value, onChange, onStatus, current, autoFocus, placeholder = 'e.g. KnightRider', inputStyle, textColor = '#F5F7F6', mutedColor = '#87918E',
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -86,24 +86,24 @@ export function ScoutUsernameInput({
           autoCapitalize="off"
           autoCorrect="off"
           spellCheck={false}
-          className="w-full rounded-lg py-2.5 pl-3 pr-9 text-sm font-bold outline-none"
-          style={{ background: 'rgba(0,0,0,0.3)', color: textColor, border: '1px solid rgba(255,255,255,0.08)', ...inputStyle }}
+          className="w-full rounded-[10px] py-2.5 pl-3 pr-9 text-sm font-bold outline-none"
+          style={{ background: 'rgba(255,255,255,0.05)', color: textColor, border: '1px solid rgba(255,255,255,0.08)', ...inputStyle }}
         />
         <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2">
           {status === 'checking' && <Loader2 className="h-4 w-4 animate-spin" style={{ color: mutedColor }} />}
           {status === 'ok' && <Check className="h-4 w-4" style={{ color: '#81B64C' }} />}
-          {status === 'bad' && <X className="h-4 w-4" style={{ color: '#E06A5F' }} />}
+          {status === 'bad' && <X className="h-4 w-4" style={{ color: '#FF5058' }} />}
         </span>
       </div>
       {msg && (
-        <p className="text-[11px] font-semibold" style={{ color: status === 'bad' ? '#E06A5F' : mutedColor }}>{msg}</p>
+        <p className="text-[11px] font-semibold" style={{ color: status === 'bad' ? '#FF5058' : mutedColor }}>{msg}</p>
       )}
     </div>
   );
 }
 
 /** Profile card: shows the ChessScout.net username and lets any user create or change it. */
-export function ScoutUsernameCard({ current, onSaved, text = '#e8e6e3', muted = '#9e9b98', border = 'rgba(255,255,255,0.08)' }: {
+export function ScoutUsernameCard({ current, onSaved, text = '#F5F7F6', muted = '#87918E', border = 'rgba(255,255,255,0.08)' }: {
   current: string | null | undefined;
   onSaved: () => void | Promise<void>;
   text?: string;
@@ -134,7 +134,7 @@ export function ScoutUsernameCard({ current, onSaved, text = '#e8e6e3', muted = 
       {editing ? (
         <div className="mt-1.5 space-y-2">
           <ScoutUsernameInput value={value} onChange={setValue} onStatus={setStatus} current={current} autoFocus textColor={text} mutedColor={muted} />
-          {error && <p className="text-[11px] font-semibold" style={{ color: '#E06A5F' }}>{error}</p>}
+          {error && <p className="text-[11px] font-semibold" style={{ color: '#FF5058' }}>{error}</p>}
           <div className="flex gap-2">
             <button onClick={save} disabled={saving || status === 'bad' || status === 'checking'} className="rounded-lg px-3 py-1.5 text-[12.5px] font-extrabold disabled:opacity-50" style={{ background: '#81B64C', color: '#FFFFFF' }}>
               {saving ? 'Saving…' : 'Save'}

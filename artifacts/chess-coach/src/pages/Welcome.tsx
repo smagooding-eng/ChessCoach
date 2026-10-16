@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { RD } from '@/lib/redesignTheme';
 import { useLocation } from 'wouter';
 import { Swords } from 'lucide-react';
 import { useUser } from '@/hooks/use-user';
@@ -13,12 +14,14 @@ function readPendingChallenge(): string | null {
   try { return localStorage.getItem(PENDING_CHALLENGE_KEY); } catch { return null; }
 }
 
-const CHESSCOM_GREEN = '#81b64c';
-const BG_DARK = '#262421';
-const BG_CARD = '#302e2b';
-const TEXT_LIGHT = '#e8e6e3';
-const TEXT_MUTED = '#9e9b98';
-const BORDER = 'rgba(255,255,255,0.08)';
+const CHESSCOM_GREEN = '#81B64C';
+// Current app theme (redesign palette; surfaces follow the chosen backdrop).
+const BG_DARK = RD.bg;
+const BG_CARD = RD.card;
+const TEXT_LIGHT = RD.text;
+const TEXT_MUTED = RD.muted;
+const BORDER = RD.border;
+const INPUT: React.CSSProperties = { background: 'rgba(255,255,255,0.05)', color: RD.text, border: `1px solid ${RD.border}` };
 
 export function Welcome() {
   const { authUser, refreshAuth, login } = useUser();
@@ -105,10 +108,10 @@ export function Welcome() {
 
   return (
     <div className="min-h-screen flex items-center justify-center px-4 py-10" style={{ background: BG_DARK }}>
-      <div className="w-full max-w-md rounded-2xl p-6 md:p-8 space-y-5"
-        style={{ background: BG_CARD, border: `1px solid ${BORDER}`, boxShadow: '0 18px 50px rgba(0,0,0,0.45)' }}>
+      <div className="w-full max-w-md rounded-[22px] p-6 md:p-8 space-y-5"
+        style={{ background: BG_CARD, border: `1px solid ${BORDER}`, boxShadow: '0 24px 60px rgba(0,0,0,0.5)' }}>
         <div className="space-y-2 text-center">
-          <div className="text-4xl">♚</div>
+          <img src={`${import.meta.env.BASE_URL}images/logo.svg`} alt="" className="mx-auto h-14 w-14" />
           <h1 className="text-xl font-black" style={{ color: TEXT_LIGHT }}>
             Welcome{authUser?.firstName ? `, ${authUser.firstName}` : ''}!
           </h1>
@@ -131,7 +134,7 @@ export function Welcome() {
             <label className="text-[11px] font-black uppercase tracking-widest" style={{ color: TEXT_MUTED }}>
               ChessScout.net username
             </label>
-            <ScoutUsernameInput value={scoutName} onChange={setScoutName} onStatus={setScoutStatus} current={authUser?.scoutUsername} autoFocus />
+            <ScoutUsernameInput value={scoutName} onChange={setScoutName} onStatus={setScoutStatus} current={authUser?.scoutUsername} autoFocus inputStyle={INPUT} textColor={RD.text} mutedColor={RD.muted} />
             <p className="text-[11px]" style={{ color: TEXT_MUTED }}>
               {chesscom.trim() || lichess.trim()
                 ? 'Optional when you link an account. You can set it later from Profile.'
@@ -154,8 +157,8 @@ export function Welcome() {
               value={chesscom}
               onChange={(e) => setChesscom(e.target.value)}
               placeholder="e.g. Hikaru"
-              className="w-full px-3 py-2.5 rounded-lg text-sm font-bold outline-none"
-              style={{ background: 'rgba(0,0,0,0.3)', color: TEXT_LIGHT, border: `1px solid ${BORDER}` }}
+              className="w-full px-3 py-2.5 rounded-[10px] text-sm font-bold outline-none"
+              style={INPUT}
             />
           </div>
 
@@ -168,8 +171,8 @@ export function Welcome() {
               value={lichess}
               onChange={(e) => setLichess(e.target.value)}
               placeholder="e.g. DrNykterstein"
-              className="w-full px-3 py-2.5 rounded-lg text-sm font-bold outline-none"
-              style={{ background: 'rgba(0,0,0,0.3)', color: TEXT_LIGHT, border: `1px solid ${BORDER}` }}
+              className="w-full px-3 py-2.5 rounded-[10px] text-sm font-bold outline-none"
+              style={INPUT}
             />
           </div>
 
@@ -178,7 +181,7 @@ export function Welcome() {
           </p>
 
           {error && (
-            <div className="rounded-lg p-2.5 text-xs" style={{ background: 'rgba(220,67,67,0.35)', color: '#ffffff', border: '1px solid rgba(220,67,67,0.6)' }}>
+            <div className="rounded-lg p-2.5 text-xs" style={{ background: 'rgba(255,80,88,0.14)', color: '#FFFFFF', border: '1px solid rgba(255,80,88,0.4)' }}>
               {error}
             </div>
           )}
@@ -186,8 +189,8 @@ export function Welcome() {
           <button
             type="submit"
             disabled={saving}
-            className="w-full py-3 rounded-xl font-black text-sm disabled:opacity-50"
-            style={{ background: `linear-gradient(180deg, #95c45a 0%, ${CHESSCOM_GREEN} 100%)`, color: 'white' }}
+            className="w-full py-3.5 rounded-[14px] font-extrabold text-[15px] disabled:opacity-50"
+            style={{ background: CHESSCOM_GREEN, color: '#FFFFFF' }}
           >
             {saving ? 'Saving…' : pendingCode ? 'Continue to the challenge' : 'Continue'}
           </button>

@@ -3,12 +3,19 @@ import { useLocation } from 'wouter';
 import { apiFetch } from '@/lib/api';
 import { startOnboardingImport } from '@/lib/onboardingImport';
 import { trackFunnelEvent } from '@/lib/funnelTracking';
+import { Check } from 'lucide-react';
+import { RD } from '@/lib/redesignTheme';
 
-const CHESSCOM_GREEN = '#81b64c';
-const BG_CARD = '#302e2b';
-const TEXT_LIGHT = '#e8e6e3';
-const TEXT_MUTED = '#9e9b98';
-const BORDER = 'rgba(255,255,255,0.08)';
+const LOGO = `${import.meta.env.BASE_URL}images/logo.svg`;
+const BTN: React.CSSProperties = { background: '#81B64C', color: '#FFFFFF' };
+
+const CHESSCOM_GREEN = '#81B64C';
+// Current app theme (redesign palette; CSS-variable surfaces follow the
+// chosen backdrop).
+const BG_CARD = RD.cardSolid;
+const TEXT_LIGHT = RD.text;
+const TEXT_MUTED = RD.muted;
+const BORDER = RD.border;
 
 interface OnboardingStartModalProps {
   username: string | null;
@@ -90,10 +97,10 @@ export function OnboardingStartModal({ username: initialUsername, platform: init
 
   if (status === 'need-username') {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center px-4" style={{ background: 'rgba(0,0,0,0.7)' }}>
-        <div className="w-full max-w-md rounded-2xl p-6 md:p-8 space-y-5 text-center"
-          style={{ background: BG_CARD, border: `1px solid ${BORDER}`, boxShadow: '0 18px 50px rgba(0,0,0,0.45)' }}>
-          <div className="text-4xl">♟</div>
+      <div className="fixed inset-0 z-50 flex items-center justify-center px-4" style={{ background: 'rgba(0,0,0,0.72)', backdropFilter: 'blur(6px)' }}>
+        <div className="w-full max-w-md rounded-[22px] p-6 md:p-8 space-y-5 text-center"
+          style={{ background: BG_CARD, border: `1px solid ${BORDER}`, boxShadow: '0 24px 60px rgba(0,0,0,0.6)' }}>
+          <img src={LOGO} alt="" className="mx-auto h-14 w-14" />
           <div>
             <h2 className="text-xl font-black mb-2" style={{ color: TEXT_LIGHT }}>
               {importErrorMessage ? "Let's try that again" : 'One quick thing'}
@@ -111,7 +118,7 @@ export function OnboardingStartModal({ username: initialUsername, platform: init
                 key={p}
                 onClick={() => setPlatform(p)}
                 className="px-4 py-1.5 rounded-md text-xs font-bold transition-colors"
-                style={platform === p ? { background: CHESSCOM_GREEN, color: '#000' } : { color: TEXT_MUTED }}
+                style={platform === p ? { background: CHESSCOM_GREEN, color: '#FFFFFF' } : { color: TEXT_MUTED }}
               >
                 {p === 'chesscom' ? 'Chess.com' : 'Lichess'}
               </button>
@@ -126,18 +133,18 @@ export function OnboardingStartModal({ username: initialUsername, platform: init
             placeholder={platform === 'chesscom' ? 'e.g. Hikaru' : 'e.g. DrNykterstein'}
             autoFocus
             className="w-full px-3 py-2.5 rounded-lg text-sm font-bold outline-none text-center"
-            style={{ background: 'rgba(0,0,0,0.3)', color: TEXT_LIGHT, border: `1px solid ${BORDER}` }}
+            style={{ background: 'rgba(255,255,255,0.05)', color: TEXT_LIGHT, border: `1px solid ${BORDER}` }}
           />
 
           {linkError && (
-            <p className="text-xs" style={{ color: '#dc4343' }}>{linkError}</p>
+            <p className="text-xs" style={{ color: RD.red }}>{linkError}</p>
           )}
 
           <button
             onClick={submitUsername}
             disabled={linking}
-            className="w-full py-3 rounded-xl font-black text-sm disabled:opacity-50"
-            style={{ background: `linear-gradient(180deg, #95c45a 0%, ${CHESSCOM_GREEN} 100%)`, color: 'white' }}
+            className="w-full py-3.5 rounded-[14px] font-extrabold text-[15px] disabled:opacity-50"
+            style={BTN}
           >
             {linking ? 'Saving…' : 'Continue'}
           </button>
@@ -147,10 +154,16 @@ export function OnboardingStartModal({ username: initialUsername, platform: init
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center px-4" style={{ background: 'rgba(0,0,0,0.7)' }}>
-      <div className="w-full max-w-md rounded-2xl p-6 md:p-8 space-y-5 text-center"
-        style={{ background: BG_CARD, border: `1px solid ${BORDER}`, boxShadow: '0 18px 50px rgba(0,0,0,0.45)' }}>
-        <div className="text-4xl">{status === 'ready' ? '✅' : '♟'}</div>
+    <div className="fixed inset-0 z-50 flex items-center justify-center px-4" style={{ background: 'rgba(0,0,0,0.72)', backdropFilter: 'blur(6px)' }}>
+      <div className="w-full max-w-md rounded-[22px] p-6 md:p-8 space-y-5 text-center"
+        style={{ background: BG_CARD, border: `1px solid ${BORDER}`, boxShadow: '0 24px 60px rgba(0,0,0,0.6)' }}>
+        {status === 'ready' ? (
+          <div className="mx-auto grid h-14 w-14 place-items-center rounded-[16px]" style={{ background: '#81B64C', color: '#FFFFFF' }}><Check size={30} strokeWidth={3} /></div>
+        ) : (
+          <div className="mx-auto grid h-14 w-14 place-items-center rounded-[16px]" style={{ background: '#81B64C' }}>
+            <div className="h-7 w-7 rounded-full border-[3px] animate-spin" style={{ borderColor: '#FFFFFF transparent #FFFFFF #FFFFFF' }} />
+          </div>
+        )}
         <div>
           <h2 className="text-xl font-black mb-2" style={{ color: TEXT_LIGHT }}>
             {status === 'ready' ? "You're all set!" : 'Setting up your account'}
@@ -164,8 +177,8 @@ export function OnboardingStartModal({ username: initialUsername, platform: init
 
         <button
           onClick={finish}
-          className="w-full py-3 rounded-xl font-black text-sm"
-          style={{ background: `linear-gradient(180deg, #95c45a 0%, ${CHESSCOM_GREEN} 100%)`, color: 'white' }}
+          className="w-full py-3.5 rounded-[14px] font-extrabold text-[15px]"
+          style={BTN}
         >
           Go to my dashboard
         </button>
