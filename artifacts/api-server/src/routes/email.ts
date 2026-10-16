@@ -2,6 +2,7 @@ import { Router, type IRouter, type Request, type Response } from "express";
 import { db, usersTable } from "@workspace/db";
 import { isNotNull, inArray, eq } from "drizzle-orm";
 import { sendEmail, sendBulkEmail } from "../lib/email";
+import { emailLayout, emailP } from "../lib/emailTheme";
 import { ADMIN_EMAILS } from "../lib/auth";
 import { ObjectStorageService } from "../lib/objectStorage";
 
@@ -98,7 +99,7 @@ router.post("/admin/email/test", requireAdmin, async (req: Request, res: Respons
     const result = await sendEmail({
       to: adminEmail,
       subject: subject || "Test Email from ChessScout",
-      html: html || `<div style="padding:20px;background:#262421;color:#e8e6e3;font-family:sans-serif;"><h2 style="color:#81b64c;">♜ ChessScout Test Email</h2><p>This is a test email from your ChessScout admin panel.</p><p style="color:#9e9b98;">If you received this, your email integration is working correctly!</p></div>`,
+      html: html || emailLayout({ preheader: "Test email from your ChessScout.net admin panel.", badge: "Test", title: "ChessScout.net test email", body: emailP("This is a test email from your ChessScout.net admin panel. If you received this, your email integration is working.", { center: true, mb: 0 }) }),
       text: text || "This is a test email from ChessScout.",
       replyTo: adminEmail,
     });

@@ -2,6 +2,7 @@ import cron from 'node-cron';
 import { db, usersTable, emailDripLogTable, gamesTable, backgroundJobsTable } from "@workspace/db";
 import { eq, and, lte, isNotNull, isNull, sql, count } from "drizzle-orm";
 import { sendEmail } from "./email";
+import { emailLayout, emailP, emailFeatures, emailPanel, escapeHtml, EMAIL } from "./emailTheme";
 import { logger } from "./logger";
 import { randomUUID } from "crypto";
 import { runBulkReviewJob } from "../routes/games";
@@ -266,84 +267,55 @@ async function sendUnreviewedGamesReminder() {
 }
 
 function unreviewedGamesHtml(name: string | null, gameCount: number): string {
-  const greeting = name ? `Hey ${name}` : 'Hey there';
-  return `<!DOCTYPE html><html><head><meta charset="utf-8"></head>
-<body style="margin:0;padding:0;background:#262421;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
-<div style="max-width:600px;margin:0 auto;padding:40px 20px;">
-  <div style="text-align:center;margin-bottom:24px;"><h1 style="color:#81b64c;font-size:24px;margin:0;">♜ ChessScout.net</h1></div>
-  <div style="background:#302e2b;border-radius:12px;padding:32px;margin-bottom:24px;">
-    <div style="text-align:center;margin-bottom:16px;"><span style="display:inline-block;background:#81b64c;color:#fff;padding:4px 14px;border-radius:14px;font-size:11px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;">Waiting for review</span></div>
-    <h2 style="color:#e8e6e3;font-size:20px;margin:0 0 16px;text-align:center;">${greeting}, ${gameCount} of your games haven't been reviewed yet</h2>
-    <div style="background:#262421;border-radius:8px;padding:20px;margin:0 0 20px;text-align:center;">
-      <p style="color:#e8e6e3;font-size:32px;font-weight:800;margin:0 0 4px;">${gameCount}</p>
-      <p style="color:#9e9b98;font-size:13px;margin:0;">unreviewed game${gameCount === 1 ? '' : 's'} sitting there with mistakes we haven't broken down yet</p>
-    </div>
-    <p style="color:#9e9b98;font-size:15px;line-height:1.6;margin:0 0 24px;text-align:center;">
-      That's real patterns you might be repeating without knowing it — get the breakdown before your next game.
-    </p>
-    <div style="text-align:center;">
-      <a href="https://chessscout.net/games" style="display:inline-block;background:linear-gradient(180deg,#a8d876 0%,#81b64c 55%,#5f8f36 100%);color:#fff;font-weight:700;font-size:15px;padding:14px 32px;border-radius:10px;text-decoration:none;box-shadow:0 3px 0 #4a7028;">Review My Games →</a>
-    </div>
-  </div>
-  <p style="color:#666;font-size:12px;text-align:center;margin:0;">
-    You're getting this because it's been a few days since your last visit. We only send this once.<br/>ChessScout.net — Know your opponent's weaknesses.
-  </p>
-</div>
-</body></html>`;
+  const greeting = name ? `Hey ${escapeHtml(name)}` : 'Hey there';
+  return emailLayout({
+    preheader: `${gameCount} of your games are waiting for your coach's review.`,
+    badge: 'Waiting for review',
+    title: `${greeting}, ${gameCount} of your games haven't been reviewed yet`,
+    body: [
+      emailPanel(`<div style="color:${EMAIL.text};font-size:34px;font-weight:900;margin:0 0 2px;">${gameCount}</div><div style="color:${EMAIL.muted};font-size:13px;">unreviewed game${gameCount === 1 ? '' : 's'} with mistakes we haven't broken down yet</div>`),
+      emailP("That's real patterns you might be repeating without knowing it. Get the breakdown before your next game.", { center: true, mb: 22 }),
+    ].join(''),
+    cta: { label: 'Review my games &rarr;', href: `${EMAIL.site}/games` },
+    footerNote: "You're getting this because it's been a few days since your last visit. We only send this once.",
+  });
 }
 
 function trialExpiryHtml(name: string | null): string {
-  const greeting = name ? `Hey ${name}` : 'Hey there';
-  return `<!DOCTYPE html><html><head><meta charset="utf-8"></head>
-<body style="margin:0;padding:0;background:#262421;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
-<div style="max-width:600px;margin:0 auto;padding:40px 20px;">
-  <div style="text-align:center;margin-bottom:24px;"><h1 style="color:#81b64c;font-size:24px;margin:0;">♜ ChessScout.net</h1></div>
-  <div style="background:#302e2b;border-radius:12px;padding:32px;margin-bottom:24px;">
-    <div style="text-align:center;margin-bottom:16px;"><span style="display:inline-block;background:#81b64c;color:#fff;padding:4px 14px;border-radius:14px;font-size:11px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;">Upgrade available</span></div>
-    <h2 style="color:#e8e6e3;font-size:20px;margin:0 0 16px;text-align:center;">${greeting}, here's what you're missing on the free plan</h2>
-    <p style="color:#9e9b98;font-size:15px;line-height:1.6;margin:0 0 20px;">
-      You joined ChessScout.net a few days ago — here's the full picture of what Pro unlocks beyond the free tier:
-    </p>
-    <table style="width:100%;border-collapse:collapse;margin:0 0 20px;">
-      <tr><td style="padding:8px 0;vertical-align:top;width:28px;color:#81b64c;font-size:16px;">🔍</td><td style="padding:8px 0;"><strong style="color:#e8e6e3;font-size:14px;">Deep opponent scouting reports</strong><br/><span style="color:#9e9b98;font-size:12px;">Free plan includes 1 basic scout — Pro is unlimited with full weakness analysis</span></td></tr>
-      <tr><td style="padding:8px 0;vertical-align:top;width:28px;color:#81b64c;font-size:16px;">♟️</td><td style="padding:8px 0;"><strong style="color:#e8e6e3;font-size:14px;">Unlimited game analysis</strong><br/><span style="color:#9e9b98;font-size:12px;">Deep AI analysis of every move, not just what your reviewed games already show</span></td></tr>
-      <tr><td style="padding:8px 0;vertical-align:top;width:28px;color:#81b64c;font-size:16px;">🎓</td><td style="padding:8px 0;"><strong style="color:#e8e6e3;font-size:14px;">Personalized training courses</strong><br/><span style="color:#9e9b98;font-size:12px;">Built around your actual weaknesses, not generic lessons</span></td></tr>
-      <tr><td style="padding:8px 0;vertical-align:top;width:28px;color:#81b64c;font-size:16px;">🧩</td><td style="padding:8px 0;"><strong style="color:#e8e6e3;font-size:14px;">Unlimited puzzles</strong><br/><span style="color:#9e9b98;font-size:12px;">Free plan is 5/day — Pro removes the cap</span></td></tr>
-    </table>
-    <p style="color:#9e9b98;font-size:15px;line-height:1.6;margin:0 0 24px;text-align:center;">
-      Lock in your edge for just <strong style="color:#81b64c;">$5/month</strong> or <strong style="color:#81b64c;">$55/year</strong>. Cancel anytime.
-    </p>
-    <div style="text-align:center;">
-      <a href="https://chessscout.net/subscription" style="display:inline-block;background:linear-gradient(180deg,#a8d876 0%,#81b64c 55%,#5f8f36 100%);color:#fff;text-decoration:none;padding:14px 32px;border-radius:10px;font-size:16px;font-weight:700;box-shadow:0 3px 0 #4a7028;">Upgrade to Pro →</a>
-    </div>
-  </div>
-  <p style="color:#666;font-size:12px;text-align:center;margin:0;">ChessScout.net — Know your opponent's weaknesses.</p>
-</div></body></html>`;
+  const greeting = name ? `Hey ${escapeHtml(name)}` : 'Hey there';
+  return emailLayout({
+    preheader: "Here's what Pro unlocks beyond the free plan.",
+    badge: 'Upgrade available',
+    title: `${greeting}, here's what you're missing on the free plan`,
+    body: [
+      emailP("You joined ChessScout.net a few days ago. Here's the full picture of what Pro unlocks beyond the free tier:", { mb: 6 }),
+      emailFeatures([
+        { glyph: '&#9820;', title: 'Deep opponent scouting reports', text: 'Free plan includes 1 basic scout. Pro is unlimited with full weakness analysis.' },
+        { glyph: '&#9819;', title: 'Unlimited game analysis', text: 'Deep analysis of every move, not just what your reviewed games already show.' },
+        { glyph: '&#9822;', title: 'Personalized training courses', text: 'Built around your actual weaknesses, not generic lessons.' },
+        { glyph: '&#9821;', title: 'Unlimited puzzles', text: 'Free plan is 5 a day. Pro removes the cap.' },
+      ]),
+      emailP(`Pro is <strong style="color:${EMAIL.text};">$5/month</strong> or <strong style="color:${EMAIL.text};">$55/year</strong>. Cancel anytime.`, { center: true, mb: 22 }),
+    ].join(''),
+    cta: { label: 'Upgrade to Pro &rarr;', href: `${EMAIL.site}/subscription` },
+  });
 }
 
 function winBackHtml(name: string | null): string {
-  const greeting = name ? `We miss you, ${name}!` : 'We miss you!';
-  return `<!DOCTYPE html><html><head><meta charset="utf-8"></head>
-<body style="margin:0;padding:0;background:#262421;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
-<div style="max-width:600px;margin:0 auto;padding:40px 20px;">
-  <div style="text-align:center;margin-bottom:24px;"><h1 style="color:#81b64c;font-size:24px;margin:0;">♜ ChessScout.net</h1></div>
-  <div style="background:#302e2b;border-radius:12px;padding:32px;margin-bottom:24px;">
-    <div style="text-align:center;margin-bottom:16px;"><span style="display:inline-block;background:#81b64c;color:#fff;padding:4px 14px;border-radius:14px;font-size:11px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;">It's been a week</span></div>
-    <h2 style="color:#e8e6e3;font-size:20px;margin:0 0 16px;text-align:center;">${greeting}</h2>
-    <p style="color:#9e9b98;font-size:15px;line-height:1.6;margin:0 0 20px;">
-      It's been a week since your last visit to ChessScout.net. While you've been away, other players have been scouting their opponents and climbing the ranks.
-    </p>
-    <div style="border-top:1px solid rgba(129,182,76,0.15);margin:0 0 20px;"></div>
-    <p style="color:#e8e6e3;font-size:14px;font-weight:700;margin:0 0 12px;">Here's what you're missing:</p>
-    <table style="width:100%;border-collapse:collapse;margin:0 0 24px;">
-      <tr><td style="padding:6px 0;vertical-align:top;width:26px;color:#81b64c;">🔍</td><td style="padding:6px 0;color:#e8e6e3;font-size:14px;">New analysis features for deeper insights</td></tr>
-      <tr><td style="padding:6px 0;vertical-align:top;width:26px;color:#81b64c;">🧩</td><td style="padding:6px 0;color:#e8e6e3;font-size:14px;">Fresh daily puzzles to sharpen your tactics</td></tr>
-      <tr><td style="padding:6px 0;vertical-align:top;width:26px;color:#81b64c;">📋</td><td style="padding:6px 0;color:#e8e6e3;font-size:14px;">Updated scouting reports for your opponents</td></tr>
-    </table>
-    <div style="text-align:center;">
-      <a href="https://chessscout.net" style="display:inline-block;background:linear-gradient(180deg,#a8d876 0%,#81b64c 55%,#5f8f36 100%);color:#fff;text-decoration:none;padding:14px 32px;border-radius:10px;font-size:16px;font-weight:700;box-shadow:0 3px 0 #4a7028;">Get Back in the Game →</a>
-    </div>
-  </div>
-  <p style="color:#666;font-size:12px;text-align:center;margin:0;">ChessScout.net — Know your opponent's weaknesses.</p>
-</div></body></html>`;
+  const greeting = name ? `We miss you, ${escapeHtml(name)}!` : 'We miss you!';
+  return emailLayout({
+    preheader: 'Your next game, your next opponent and your next review are waiting.',
+    badge: "It's been a week",
+    title: greeting,
+    body: [
+      emailP("It's been a week since your last visit to ChessScout.net. Here's what's waiting for you:", { mb: 6 }),
+      emailFeatures([
+        { glyph: '&#9822;', title: 'Play', text: 'Jump into a live or daily game, or pick up a bot game where you left it.' },
+        { glyph: '&#9820;', title: 'Scout', text: 'Check your next opponent\'s openings and habits before you sit down.' },
+        { glyph: '&#9819;', title: 'Improve', text: 'Get your recent games reviewed and see what to play instead.' },
+        { glyph: '&#9821;', title: 'Train', text: 'A new set of daily puzzles to sharpen your tactics.' },
+      ]),
+    ].join(''),
+    cta: { label: 'Get back in the game &rarr;', href: EMAIL.site },
+  });
 }

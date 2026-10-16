@@ -4,6 +4,7 @@ import { db, usersTable, referralConversionsTable, emailDripLogTable } from "@wo
 import { eq, sql } from "drizzle-orm";
 import { storage } from "../lib/storage";
 import { sendEmail, welcomeEmailHtml } from "../lib/email";
+import { emailLayout, emailP, escapeHtml, EMAIL, EMAIL_FONT } from "../lib/emailTheme";
 import crypto from "crypto";
 import {
   clearSession,
@@ -70,20 +71,15 @@ function validatePassword(password: string): string | null {
 }
 
 function verificationEmailHtml(name: string | null, verifyUrl: string): string {
-  const greeting = name || "there";
-  return `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#262421;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
-  <div style="max-width:560px;margin:0 auto;padding:40px 20px;">
-    <div style="text-align:center;margin-bottom:24px;"><h1 style="color:#81b64c;margin:0;font-size:26px;">♜ ChessScout.net</h1></div>
-    <div style="background:#302e2b;border-radius:12px;padding:30px;color:#e8e6e3;">
-      <h2 style="color:#e8e6e3;margin:0 0 12px;font-size:20px;">Confirm your email, ${greeting}</h2>
-      <p style="color:#9e9b98;font-size:14px;line-height:1.6;margin:0 0 20px;">Click the button below to confirm this is your email address. The link expires in 24 hours.</p>
-      <div style="text-align:center;margin:24px 0;">
-        <a href="${verifyUrl}" style="display:inline-block;background:#81b64c;color:#fff;text-decoration:none;padding:13px 30px;border-radius:8px;font-weight:700;font-size:15px;">Verify my email</a>
-      </div>
-      <p style="color:#9e9b98;font-size:12px;line-height:1.5;margin:0;">If the button doesn't work, paste this URL into your browser:<br/><span style="color:#81b64c;word-break:break-all;">${verifyUrl}</span></p>
-      <p style="color:#666;font-size:12px;margin-top:18px;">If you didn't sign up for ChessScout, you can ignore this email.</p>
-    </div>
-  </div></body></html>`;
+  const greeting = name ? escapeHtml(name) : "there";
+  return emailLayout({
+    preheader: "Confirm your email to finish setting up ChessScout.net.",
+    title: `Confirm your email, ${greeting}`,
+    body: emailP("Tap the button below to confirm this is your email address. The link expires in 24 hours.", { center: true, mb: 22 }),
+    cta: { label: "Verify my email", href: verifyUrl },
+    afterCta: `<p style="margin:22px 0 0;font-size:12px;line-height:1.5;color:${EMAIL.muted};font-family:${EMAIL_FONT};">If the button doesn't work, paste this link into your browser:<br><span style="color:${EMAIL.green};word-break:break-all;">${verifyUrl}</span></p>`,
+    footerNote: "If you didn't sign up for ChessScout.net, you can ignore this email.",
+  });
 }
 
 router.get("/auth/user", async (req: Request, res: Response) => {
@@ -249,7 +245,7 @@ router.post("/auth/register", async (req: Request, res: Response) => {
 
       sendEmail({
         to: user.email,
-        subject: "Welcome to ChessScout.net — Your Edge Starts Now! ♜",
+        subject: "Welcome to ChessScout.net: Play. Scout. Improve. ♜",
         html: welcomeEmailHtml(user.firstName),
       }).then(() => {
         db.insert(emailDripLogTable).values({ userId: user.id, dripType: 'welcome' }).catch(() => {});
@@ -516,7 +512,7 @@ router.get("/auth/google/callback", async (req: Request, res: Response) => {
         if (user.email) {
           sendEmail({
             to: user.email,
-            subject: "Welcome to ChessScout.net — Your Edge Starts Now! ♜",
+            subject: "Welcome to ChessScout.net: Play. Scout. Improve. ♜",
             html: welcomeEmailHtml(user.firstName),
           }).then(() => {
             db.insert(emailDripLogTable).values({ userId: user.id, dripType: 'welcome' }).catch(() => {});
