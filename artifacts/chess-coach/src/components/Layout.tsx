@@ -360,7 +360,7 @@ export function Layout({ children, fullscreen }: { children: React.ReactNode; fu
             <Link href="/subscription" className="mb-2 flex items-center gap-2 rounded-xl px-3 py-2.5 text-[12.5px] font-extrabold transition-transform active:scale-[.98]"
               style={{ background: 'linear-gradient(180deg,#F2C560,#D99A24)', color: '#1A1205' }}>
               <Crown className="w-4 h-4" /> Go Pro
-              <span className="ml-auto text-[10.5px] font-bold opacity-80">from $5/mo</span>
+              <span className="ml-auto text-[10.5px] font-bold opacity-80">$5/mo</span>
             </Link>
           )}
           <div className="flex items-center gap-1.5 px-2 py-2 rounded-xl" style={{ background: BG_CARD }}>
@@ -558,7 +558,7 @@ export function Layout({ children, fullscreen }: { children: React.ReactNode; fu
                       <Crown className="w-5 h-5" style={{ color: '#E8B447' }} />
                       <span className="min-w-0 flex-1">
                         <span className="block text-sm font-extrabold" style={{ color: TEXT_LIGHT }}>Go Pro</span>
-                        <span className="block text-[11.5px]" style={{ color: TEXT_MUTED }}>AI coach, courses and scouting reports · from $5/mo</span>
+                        <span className="block text-[11.5px]" style={{ color: TEXT_MUTED }}>AI coach, courses and scouting reports · $5/mo</span>
                       </span>
                       <ChevronRight className="w-4 h-4" style={{ color: '#E8B447' }} />
                     </div>

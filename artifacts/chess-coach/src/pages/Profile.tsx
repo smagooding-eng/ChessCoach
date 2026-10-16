@@ -479,7 +479,7 @@ ${featureRow('&#9821;', 'Train', 'Puzzles, the opening trainer, chess traps and 
 <div style="text-align:center;background:linear-gradient(135deg,rgba(129,182,76,0.1),rgba(129,182,76,0.05));border:1px solid rgba(129,182,76,0.2);border-radius:8px;padding:20px;margin-bottom:20px;">
 <p style="color:#F5F7F6;font-size:14px;margin:0 0 4px;">Plans start at just</p>
 <p style="color:#81b64c;font-size:28px;font-weight:700;margin:0;">$5<span style="font-size:14px;font-weight:400;color:#87918E;">/month</span></p>
-<p style="color:#87918E;font-size:12px;margin:4px 0 0;">Or $55/year. Less than a coffee. Cancel anytime.</p>
+<p style="color:#87918E;font-size:12px;margin:4px 0 0;">Less than a coffee. Cancel anytime.</p>
 </div>
 <p style="text-align:center;"><a href="https://chessscout.net/subscription" style="${btnStyle}">Upgrade to Pro →</a></p>`,
   },

@@ -7,7 +7,7 @@ ChessScout imports your games from Chess.com or Lichess and finds recurring patt
 ## Pricing
 
 - Free: unlimited daily puzzles, 3 opponent scouts, 5 personalized courses, unlimited practice bots, first 20 games imported
-- Pro: $5/month or $55/year — unlimited everything, full cross-game pattern analysis
+- Pro: $5/month (cancel anytime) — unlimited everything, full cross-game pattern analysis
 - No free trial, no credit card required for the free tier, cancel anytime
 
 ## Key features

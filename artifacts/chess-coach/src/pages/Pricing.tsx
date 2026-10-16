@@ -23,7 +23,7 @@ const ROWS: { feature: string; free: boolean | string; pro: boolean | string; ch
   { feature: 'Puzzles', free: 'Unlimited', pro: '+ AI explanations', chesscomFree: true } as any,
   { feature: 'Lesson read-aloud', free: 'Device voice', pro: 'Natural coach voice', chesscomFree: false } as any,
   { feature: 'Games viewable', free: 'Unlimited', pro: 'Unlimited', chesscomFree: '—' } as any,
-  { feature: 'Price', free: '$0', pro: '$5/mo or $55/yr', chesscomFree: '$0' } as any,
+  { feature: 'Price', free: '$0', pro: '$5/mo', chesscomFree: '$0' } as any,
 ];
 
 function Cell({ value }: { value: boolean | string }) {
@@ -39,7 +39,7 @@ export default function PricingPage() {
   useEffect(() => {
     setPageMeta(
       'Pricing — ChessScout.net',
-      'ChessScout.net pricing: free tier and $5/month or $55/year Pro plan. See exactly what\'s included at each tier.',
+      'ChessScout.net pricing: free tier and a $5/month Pro plan. See exactly what\'s included at each tier.',
       '/pricing',
     );
   }, []);
@@ -83,7 +83,7 @@ export default function PricingPage() {
               <Crown className="w-4 h-4" style={{ color: G }} /> Pro
             </h2>
             <p className="text-3xl font-black mb-1" style={{ color: TEXT }}>$5<span className="text-sm font-normal" style={{ color: MUTED }}>/mo</span></p>
-            <p className="text-xs mb-4" style={{ color: MUTED }}>or $55/year</p>
+            <p className="text-xs mb-4" style={{ color: MUTED }}>Cancel anytime</p>
             <ul className="space-y-2 text-sm mb-6" style={{ color: TEXT }}>
               <li>AI coach on every game you review</li>
               <li>Personalized courses from your mistakes</li>

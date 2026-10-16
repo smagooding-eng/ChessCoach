@@ -9,7 +9,7 @@ export default function VsImproveMyChessPage() {
       canonicalPath="/vs/improve-my-chess"
       intro="Improve My Chess uses Stockfish plus an AI (Claude) to explain your blunders in plain English, and offers opponent scouting and personalized drills through a credit-based system — every feature spends from the same credit pool. Here's how it compares to ChessScout.net, honestly."
       rows={[
-        { feature: 'Price', us: '$5/mo or $55/yr', them: '£4.99/mo or £39/yr, credit-based' },
+        { feature: 'Price', us: '$5/mo, cancel anytime', them: '£4.99/mo or £39/yr, credit-based' },
         { feature: 'Free tier', us: 'Unlimited puzzles + limits elsewhere', them: '"Try the core experience" tier' },
         { feature: 'Plain-English blunder explanations', us: true, them: true },
         { feature: 'Opponent scouting', us: true, them: true },

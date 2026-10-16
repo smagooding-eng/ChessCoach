@@ -9,9 +9,9 @@ import { RD } from '@/lib/redesignTheme';
 // AI result would have been, next to the free (Stockfish) version they already
 // have. Matches whichever UI is active.
 //
-// Pricing comes from the real plans ($5/month, $55/year) -- keep in sync with
-// the Subscription page if those change.
-export const PRO_PRICE_LINE = 'From $5/month · cancel anytime';
+// Pricing comes from the real plan ($5/month, no yearly plan) -- keep in
+// sync with the Subscription page if that changes.
+export const PRO_PRICE_LINE = '$5/month · cancel anytime';
 
 export function ProUpsell({
   title,

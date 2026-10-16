@@ -9,7 +9,7 @@ export default function VsAimchessPage() {
       canonicalPath="/vs/aimchess"
       intro="Aimchess is a well-established chess analytics tool that diagnoses weaknesses across six dimensions (opening accuracy, time management, resourcefulness, endgame conversion, advantage capitalization, and blunder prevention) and builds training around them. Here's how it compares to ChessScout.net, honestly."
       rows={[
-        { feature: 'Price', us: '$5/mo or $55/yr', them: '~$8–14/mo (varies by billing)' },
+        { feature: 'Price', us: '$5/mo, cancel anytime', them: '~$8–14/mo (varies by billing)' },
         { feature: 'Free tier', us: true, them: 'Limited free reports' },
         { feature: 'Imports Chess.com & Lichess', us: true, them: true },
         { feature: 'Opponent scouting', us: true, them: true },
