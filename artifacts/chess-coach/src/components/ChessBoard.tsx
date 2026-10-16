@@ -9,6 +9,7 @@ import { useSettings, playMoveSound, boardSkin } from '@/context/SettingsContext
 import { eventForMove, detectSingleMove } from '@/lib/sounds';
 import { SquareBadge } from './SquareBadge';
 import { CheckmateOverlay } from './CheckmateOverlay';
+import { useBoardStyleTip } from './BoardStyleTip';
 
 class BoardErrorBoundary extends Component<
   { children: ReactNode; position: string; renderKey: number },
@@ -166,6 +167,7 @@ export function ChessBoard({
 }: ChessBoardProps) {
   const { confirmMoves, boardColors, boardTextureCss, showCoordinates, showLegalMoves, pieceColors, pieceShape, pieceStyle, soundEnabled, promotionChoice, boardMaxWidth: settingsMaxWidth } = useSettings();
   const boardMaxWidth = maxWidthOverride ?? settingsMaxWidth;
+  useBoardStyleTip();
   const confirmMovesRef = useRef(confirmMoves);
   confirmMovesRef.current = confirmMoves;
   const suppressConfirmMovesRef = useRef(suppressConfirmMoves);

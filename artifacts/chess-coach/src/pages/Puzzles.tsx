@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
+import { useBoardStyleTip } from '@/components/BoardStyleTip';
 import { useDashboardRedesignFlag } from '@/hooks/use-app-config';
 import { RedesignHeader } from '@/components/RedesignHeader';
 import { PieceTile } from '@/components/DesignSystem';
@@ -113,6 +114,7 @@ interface PuzzleStats {
 type PuzzleState = 'loading' | 'ready' | 'solving' | 'correct' | 'wrong' | 'showing_solution' | 'no_puzzles';
 
 export function Puzzles() {
+  useBoardStyleTip();
   const { authUser } = useUser();
   const { boardColors, boardTextureCss, pieceColors, pieceShape, pieceStyle, showCoordinates, soundEnabled, boardMaxWidth, showLegalMoves, confirmMoves } = useSettings();
   const [, navigate] = useLocation();

@@ -1,4 +1,5 @@
 import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
+import { BoardStyleTipHost } from '@/components/BoardStyleTip';
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { RealtimeBridge } from "@/components/RealtimeBridge";
@@ -370,7 +371,7 @@ function SetupRouter() {
 
 function Router() {
   return (
-    <><ScrollToTop /><PageTracker /><Switch>
+    <><ScrollToTop /><PageTracker /><BoardStyleTipHost /><Switch>
       <Route path="/setup" component={SetupRouter} />
       <Route path="/scout/:data" component={ScoutShare} />
       <Route path="/players" component={PublicPlayersIndex} />
