@@ -4,6 +4,7 @@ import { isNotNull, inArray, eq } from "drizzle-orm";
 import { sendEmail, sendBulkEmail } from "../lib/email";
 import { emailLayout, emailP, unsubscribeFooterHtml } from "../lib/emailTheme";
 import { optedInUsersByEmail, unsubscribeHeaders, unsubscribeUrl } from "../lib/emailPrefs";
+import { trackHtml } from "../lib/emailTracking";
 import { ADMIN_EMAILS } from "../lib/auth";
 import { ObjectStorageService } from "../lib/objectStorage";
 
@@ -79,11 +80,12 @@ router.post("/admin/email/broadcast", requireAdmin, async (req: Request, res: Re
       res.status(400).json({ error: "Everyone selected has unsubscribed from emails", skippedOptOut });
       return;
     }
-    const personalize = (to: string) => {
+    const personalize = async (to: string) => {
       const userId = allowed.get(to.toLowerCase());
-      if (!userId) return { html };
+      const tracked = await trackHtml(html, { kind: "broadcast", template: String(subject).slice(0, 40), email: to, userId: userId ?? null, subject });
+      if (!userId) return { html: tracked };
       const footer = unsubscribeFooterHtml(unsubscribeUrl(userId));
-      const withFooter = html.includes("</body>") ? html.replace("</body>", `${footer}</body>`) : html + footer;
+      const withFooter = tracked.includes("</body>") ? tracked.replace("</body>", `${footer}</body>`) : tracked + footer;
       return { html: withFooter, headers: unsubscribeHeaders(userId) };
     };
 

@@ -6,6 +6,7 @@ import { ensureClubOutreachTables, startDiscovery, isDiscoveryRunning } from "..
 import { sendEmail } from "../lib/email";
 import { unsubscribeFooterHtml } from "../lib/emailTheme";
 import { clubUnsubscribeUrl } from "../lib/emailPrefs";
+import { trackHtml, ensureEmailTracking } from "../lib/emailTracking";
 
 // Admin: club & organizer contacts for one-by-one outreach from Gmail.
 //   GET    /admin/club-outreach               contacts (+ counts, latest runs)
@@ -31,13 +32,19 @@ const ready = () => (tablesReady ??= ensureClubOutreachTables());
 router.get("/admin/club-outreach", requireAdmin, async (req: Request, res: Response) => {
   try {
     await ready();
+    await ensureEmailTracking();
     const status = String(req.query.status ?? "new");
     const where = status === "all" ? sql`TRUE` : sql`c.status = ${status}`;
     const contacts = rowsOf(await db.execute(sql`
       SELECT c.id, c.email, c.org_name AS "orgName", c.org_type AS "orgType", c.city, c.region, c.country, c.website,
         c.source_url AS "sourceUrl", c.status, c.notes, c.found_at AS "foundAt", c.contacted_at AS "contactedAt",
-        c.contacted_template AS "contactedTemplate", c.run_id AS "runId"
+        c.contacted_template AS "contactedTemplate", c.run_id AS "runId",
+        tr.opened_at AS "openedAt", tr.open_count AS "openCount", tr.clicked_at AS "clickedAt", tr.click_count AS "clickCount"
       FROM club_contacts c
+      LEFT JOIN LATERAL (
+        SELECT opened_at, open_count, clicked_at, click_count FROM email_tracking t
+        WHERE t.contact_id = c.id ORDER BY t.sent_at DESC LIMIT 1
+      ) tr ON true
       WHERE ${where} AND NOT EXISTS (SELECT 1 FROM club_contact_dnc d WHERE LOWER(d.email) = LOWER(c.email))
       ORDER BY c.found_at DESC LIMIT 1000`));
     const counts = rowsOf<{ status: string; n: string }>(await db.execute(sql`SELECT status, COUNT(*) AS n FROM club_contacts GROUP BY status`));
@@ -113,7 +120,9 @@ router.post("/admin/club-outreach/send", requireAdmin, async (req: Request, res:
       const to = byId.get(Number(it.id));
       if (!to) { failed.push({ id: it.id, error: "on the do-not-contact list or missing" }); continue; }
       const unsub = clubUnsubscribeUrl(to);
-      const html = `${String(it.html ?? "")}${unsubscribeFooterHtml(unsub)}`;
+      const html = await trackHtml(`${String(it.html ?? "")}${unsubscribeFooterHtml(unsub)}`, {
+        kind: "outreach", template, email: to, contactId: Number(it.id), subject: String(it.subject ?? ""),
+      });
       const text = `${String(it.text ?? "")}\n\nUnsubscribe: ${unsub}`;
       try {
         const data = await sendEmail({

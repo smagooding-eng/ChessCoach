@@ -4,6 +4,7 @@ import { eq, and, lte, isNotNull, isNull, sql, count } from "drizzle-orm";
 import { sendEmail } from "./email";
 import { emailLayout, emailP, emailFeatures, emailPanel, escapeHtml, EMAIL, EMAIL_FONT } from "./emailTheme";
 import { unsubscribeHeaders, unsubscribeUrl } from "./emailPrefs";
+import { trackHtml } from "./emailTracking";
 import { sendPushToUser, isPushConfigured } from "./pushNotifications";
 import { RAFFLE, raffleDaysLeft, dueStage } from "./raffle";
 import { logger } from "./logger";
@@ -149,8 +150,9 @@ async function logDrip(userId: string, dripType: string): Promise<void> {
   await db.insert(emailDripLogTable).values({ userId, dripType }).onConflictDoNothing();
 }
 
-async function sendOptionalEmail(user: { id: string; email: string }, subject: string, html: string): Promise<void> {
-  await sendEmail({ to: user.email, subject, html, headers: unsubscribeHeaders(user.id) });
+async function sendOptionalEmail(user: { id: string; email: string }, subject: string, html: string, template = 'drip'): Promise<void> {
+  const tracked = await trackHtml(html, { kind: 'drip', template, email: user.email, userId: user.id, subject });
+  await sendEmail({ to: user.email, subject, html: tracked, headers: unsubscribeHeaders(user.id) });
 }
 
 function firstNameOf(name: string | null): string | null {
@@ -175,7 +177,7 @@ async function sendTrialExpiryReminders() {
 
     for (const user of candidates) {
       try {
-        await sendOptionalEmail(user, "Here's what Pro adds to your ChessScout.net account", trialExpiryHtml(user.first_name, unsubscribeUrl(user.id)));
+        await sendOptionalEmail(user, "Here's what Pro adds to your ChessScout.net account", trialExpiryHtml(user.first_name, unsubscribeUrl(user.id)), 'trial_expiry');
         await logDrip(user.id, 'trial_expiry');
         logger.info({ userId: user.id }, '[drip] Free-plan nudge sent');
       } catch (err: unknown) {
@@ -359,7 +361,7 @@ async function sendWinBackEmails() {
       try {
         const c = await loadWinBackContext(user);
         const name = firstNameOf(user.first_name);
-        await sendOptionalEmail(user, winBackSubject(name, c), winBackHtml(name, c, unsubscribeUrl(user.id)));
+        await sendOptionalEmail(user, winBackSubject(name, c), winBackHtml(name, c, unsubscribeUrl(user.id)), 'win_back');
         await logDrip(user.id, 'win_back');
         logger.info({ userId: user.id, daysAway: c.daysAway }, '[drip] Win-back sent');
       } catch (err: unknown) {
@@ -392,7 +394,7 @@ async function sendWinBackEmails() {
       try {
         const c = await loadWinBackContext(user);
         const name = firstNameOf(user.first_name);
-        await sendOptionalEmail(user, name ? `What's new on ChessScout.net, ${name}` : "What's new on ChessScout.net", winBack30Html(name, c, unsubscribeUrl(user.id)));
+        await sendOptionalEmail(user, name ? `What's new on ChessScout.net, ${name}` : "What's new on ChessScout.net", winBack30Html(name, c, unsubscribeUrl(user.id)), 'win_back_30');
         await logDrip(user.id, 'win_back_30');
         logger.info({ userId: user.id, daysAway: c.daysAway }, '[drip] Win-back (30 days) sent');
       } catch (err: unknown) {
@@ -432,7 +434,7 @@ async function sendUnreviewedGamesReminder() {
       if (unreviewedCount < MIN_UNREVIEWED_GAMES_FOR_REMINDER) continue;
 
       try {
-        await sendOptionalEmail(user, `♟️ You have ${unreviewedCount} unreviewed games waiting`, unreviewedGamesHtml(firstNameOf(user.first_name), unreviewedCount, unsubscribeUrl(user.id)));
+        await sendOptionalEmail(user, `♟️ You have ${unreviewedCount} unreviewed games waiting`, unreviewedGamesHtml(firstNameOf(user.first_name), unreviewedCount, unsubscribeUrl(user.id)), 'unreviewed_games');
         await logDrip(user.id, 'unreviewed_games');
         logger.info({ userId: user.id, unreviewedCount }, '[drip] Unreviewed games reminder sent');
       } catch (err: unknown) {
@@ -605,7 +607,7 @@ async function sendEngagedUpgradeEmails() {
         const name = firstNameOf(user.first_name);
         await sendOptionalEmail({ id: user.id, email: user.email },
           name ? `${name}, you've played every week this month` : "You've played every week this month",
-          engagedUpgradeHtml(name, stats, unsubscribeUrl(user.id)));
+          engagedUpgradeHtml(name, stats, unsubscribeUrl(user.id)), 'pro_upgrade_engaged');
         await logDrip(user.id, 'pro_upgrade_engaged');
         logger.info({ userId: user.id, daysActive: stats.daysActive }, '[drip] Engaged upgrade email sent');
       } catch (err: unknown) {
@@ -765,7 +767,7 @@ async function sendRaffleCountdownEmails() {
         const subject = daysLeft <= 1
           ? `Last chance: the sweepstakes closes ${daysLeft === 0 ? 'tonight' : 'tomorrow'} 🏆`
           : `${daysLeft} days until the ChessScout.net sweepstakes drawing 🏆`;
-        await sendOptionalEmail(user, subject, raffleCountdownHtml(name, daysLeft, unsubscribeUrl(user.id)));
+        await sendOptionalEmail(user, subject, raffleCountdownHtml(name, daysLeft, unsubscribeUrl(user.id)), dripType);
         await logDrip(user.id, dripType);
       } catch (err: unknown) {
         logger.error({ userId: user.id, error: err instanceof Error ? err.message : 'Unknown' }, '[drip] Sweepstakes countdown email failed');

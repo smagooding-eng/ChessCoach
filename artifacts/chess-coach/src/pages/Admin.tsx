@@ -13,6 +13,7 @@ import { TournamentsAdminPanel } from '@/components/admin/TournamentsAdminPanel'
 import { motion, AnimatePresence } from 'framer-motion';
 import { ClubOutreachPanel } from '@/components/admin/ClubOutreachPanel';
 import { ShareKitPanel } from '@/components/admin/ShareKitPanel';
+import { EmailTrackingPanel } from '@/components/admin/EmailTrackingPanel';
 import {
   Activity, AlertCircle, Bold, Brain, Camera, Check, CheckCircle2, ChevronDown, ChevronRight,
   Copy, CreditCard, Crown, DollarSign, Edit3, Eye, FileText, Gamepad2, Gift, GraduationCap, Heading1, Heading2,
@@ -714,6 +715,7 @@ export function Admin() {
           <ReferralSignupsPanel />
           <AffiliatesPanel />
           <ShareKitPanel />
+          <EmailTrackingPanel />
           <ClubOutreachPanel />
           <OutreachStudio />
           <SeoArticlesPanel />

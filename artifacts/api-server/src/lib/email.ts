@@ -64,7 +64,7 @@ export async function sendEmail(options: SendEmailOptions) {
 const delay = (ms: number) => new Promise(r => setTimeout(r, ms));
 
 /** Per-recipient tweaks for a bulk send (e.g. that person's unsubscribe link). */
-export type BulkPersonalize = (to: string) => { html: string; headers?: Record<string, string> };
+export type BulkPersonalize = (to: string) => { html: string; headers?: Record<string, string> } | Promise<{ html: string; headers?: Record<string, string> }>;
 
 export async function sendBulkEmail(recipients: string[], subject: string, html: string, text?: string, personalize?: BulkPersonalize) {
   const results = {
@@ -77,7 +77,7 @@ export async function sendBulkEmail(recipients: string[], subject: string, html:
 
   for (const to of recipients) {
     try {
-      const p = personalize ? personalize(to) : { html };
+      const p = personalize ? await personalize(to) : { html };
       const data = await sendEmail({ to, subject, html: p.html, text, headers: p.headers });
       results.sent++;
       console.log(`[email] Sent to ${to}, id: ${data?.id}`);
@@ -90,7 +90,7 @@ export async function sendBulkEmail(recipients: string[], subject: string, html:
         console.log('[email] Rate limited, waiting 5s...');
         await delay(5000);
         try {
-          const p = personalize ? personalize(to) : { html };
+          const p = personalize ? await personalize(to) : { html };
           await sendEmail({ to, subject, html: p.html, text, headers: p.headers });
           results.failed--;
           results.sent++;

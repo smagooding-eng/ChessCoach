@@ -18,6 +18,7 @@ const MUTED = '#9e9b98';
 interface Contact {
   id: number; email: string; orgName: string; orgType: string | null; city: string | null; region: string | null; country: string | null;
   website: string | null; sourceUrl: string | null; status: string; notes: string | null; foundAt: string; contactedAt: string | null; contactedTemplate: string | null;
+  openedAt?: string | null; openCount?: number | null; clickedAt?: string | null; clickCount?: number | null;
 }
 interface Run { id: number; startedAt: string; finishedAt: string | null; candidates: number; added: number; error: string | null; trigger: string; searches: string | null }
 
@@ -377,9 +378,27 @@ async function copyRich(html: string, plain: string): Promise<boolean> {
 }
 
 /** Preview + the buttons that open a draft (Gmail web, Gmail app, mail app). */
-function DraftActions({ draft, styled, account, onOpened }: { draft: Draft; styled: boolean; account: string; onOpened: () => void }) {
+function DraftActions({ draft, styled, account, onOpened, track }: {
+  draft: Draft; styled: boolean; account: string; onOpened: () => void;
+  /** Contacts this copy goes to, so opens and clicks can be tracked. */
+  track?: { contacts: { id: number; email: string }[]; template: string };
+}) {
   const [copiedStyled, setCopiedStyled] = useState(false);
-  const html = useMemo(() => styledEmailHtml(draft.body), [draft.body]);
+  const plainHtml = useMemo(() => styledEmailHtml(draft.body), [draft.body]);
+  // Fetch a tracked copy ahead of time so Copy stays instant (clipboard needs the tap).
+  const [trackedHtml, setTrackedHtml] = useState<string | null>(null);
+  const trackKey = track ? `${track.template}:${track.contacts.map((c) => c.id).join(',')}:${draft.body.length}` : '';
+  useEffect(() => {
+    setTrackedHtml(null);
+    if (!styled || !track || !track.contacts.length) return;
+    let alive = true;
+    apiFetch('/api/admin/club-outreach/tracked-html', {
+      method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ html: plainHtml, contacts: track.contacts, template: track.template, subject: draft.subject }),
+    }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (alive && d?.html) setTrackedHtml(d.html); }).catch(() => {});
+    return () => { alive = false; };
+  }, [trackKey, styled, plainHtml]);  // eslint-disable-line react-hooks/exhaustive-deps
+  const html = trackedHtml ?? plainHtml;
   // Styled: open the draft without a body and paste the copied email into it.
   const open: Draft = styled ? { ...draft, body: '' } : draft;
   const copyStyled = () => { void copyRich(html, draft.body).then((ok) => { if (ok) { setCopiedStyled(true); setTimeout(() => setCopiedStyled(false), 2500); } }); };
@@ -748,6 +767,8 @@ export function ClubOutreachPanel() {
                   {c.website && <a href={c.website} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-0.5 underline">Website <ExternalLink size={10} /></a>}
                   {c.sourceUrl && c.sourceUrl.startsWith('http') && <a href={c.sourceUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-0.5 underline">Where the email is listed <ExternalLink size={10} /></a>}
                   {c.contactedAt && <span>Contacted {new Date(c.contactedAt).toLocaleDateString()}{c.contactedTemplate ? ` (${templates.find((t) => t.id === c.contactedTemplate)?.name ?? c.contactedTemplate})` : ''}</span>}
+                  {c.openedAt && <span className="font-bold text-white">Opened{(c.openCount ?? 0) > 1 ? ` ×${c.openCount}` : ''}</span>}
+                  {c.clickedAt && <span className="font-bold" style={{ color: GREEN }}>Clicked a link{(c.clickCount ?? 0) > 1 ? ` ×${c.clickCount}` : ''}</span>}
                 </p>
               </div>
               <button onClick={() => neverContact(c)} title="Never contact" aria-label="Never contact" className="shrink-0 rounded-md p-1.5 hover:bg-white/5" style={{ color: MUTED }}><Ban size={14} /></button>
@@ -781,7 +802,8 @@ export function ClubOutreachPanel() {
               </button>
             </div>
             <p className="text-sm font-bold text-white">{bulkSubject}</p>
-            <DraftActions draft={{ to: settings.gmail, bcc: batch.map((c) => c.email), subject: bulkSubject, body: bulkBody }} styled={settings.styled} account={settings.gmail} onOpened={() => {}} />
+            <DraftActions draft={{ to: settings.gmail, bcc: batch.map((c) => c.email), subject: bulkSubject, body: bulkBody }} styled={settings.styled} account={settings.gmail} onOpened={() => {}}
+              track={{ contacts: batch.map((c) => ({ id: c.id, email: c.email })), template: template.id }} />
             <button onClick={async () => {
                 if (await sendViaResend(batch)) {
                   if (bi + 1 >= (batches?.length ?? 0)) { setBatches(null); setSelected(new Set()); } else { setBi(bi + 1); setCopied(''); }
@@ -812,7 +834,8 @@ export function ClubOutreachPanel() {
             <TemplatePicker templates={templates} value={templateId} onChange={setTemplateId} compact />
             <p className="text-xs" style={{ color: MUTED }}>To: <span className="text-white">{current.email}</span></p>
             <p className="text-sm font-bold text-white">{subject}</p>
-            <DraftActions draft={{ to: current.email, subject, body }} styled={settings.styled} account={settings.gmail} onOpened={() => setOpened(true)} />
+            <DraftActions draft={{ to: current.email, subject, body }} styled={settings.styled} account={settings.gmail} onOpened={() => setOpened(true)}
+              track={{ contacts: [{ id: current.id, email: current.email }], template: template.id }} />
             <button onClick={async () => { if (await sendViaResend([current])) advance(); }} disabled={resendBusy || (quota?.remaining ?? 1) <= 0}
               className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl py-3 text-sm font-bold disabled:opacity-50" style={{ background: 'rgba(129,182,76,.18)', color: '#fff', border: '1px solid rgba(129,182,76,.5)' }}>
               {resendBusy ? <Loader2 size={15} className="animate-spin" /> : <Mail size={15} />} Send styled with Resend instead{quota ? ` (${quota.remaining} left today)` : ''}

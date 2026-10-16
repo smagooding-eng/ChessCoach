@@ -12,6 +12,10 @@
   ],
   "rewrites": [
     {
+      "source": "/t/:path*",
+      "destination": "https://chesscoach-api-kbf8.onrender.com/api/t/:path*"
+    },
+    {
       "source": "/challenge/:code",
       "has": [
         {
@@ -33,10 +37,22 @@
       ],
       "destination": "/api/og?kind=share&data=:data"
     },
-    { "source": "/players", "destination": "/api/page?kind=players" },
-    { "source": "/players/:slug", "destination": "/api/page?kind=player&slug=:slug" },
-    { "source": "/learn", "destination": "/api/page?kind=learn" },
-    { "source": "/learn/:slug", "destination": "/api/page?kind=article&slug=:slug" },
+    {
+      "source": "/players",
+      "destination": "/api/page?kind=players"
+    },
+    {
+      "source": "/players/:slug",
+      "destination": "/api/page?kind=player&slug=:slug"
+    },
+    {
+      "source": "/learn",
+      "destination": "/api/page?kind=learn"
+    },
+    {
+      "source": "/learn/:slug",
+      "destination": "/api/page?kind=article&slug=:slug"
+    },
     {
       "source": "/sitemap.xml",
       "destination": "/api/sitemap"
