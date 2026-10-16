@@ -1565,10 +1565,14 @@ async function pairTournament(t: TRow) {
   if (free.length < 2) return;
   const tc = TIME_CONTROLS[t.time_control as TimeControlId];
   if (!tc) return;
-  const scoreRows = rowsOf<{ user_id: string; score: number | string }>(
-    await db.execute(sql`SELECT user_id, score FROM tournament_players WHERE tournament_id = ${t.id}`));
-  const score = new Map(scoreRows.map(r => [r.user_id, Number(r.score) || 0]));
-  free.sort((a, b) => (score.get(b.userId) ?? 0) - (score.get(a.userId) ?? 0) || a.since - b.since);
+  // Ranked: line players up by rating so neighbours (similar ratings) meet.
+  // Casual: a random draw each time.
+  if (t.mode === 'ranked') {
+    const ratings = new Map(await Promise.all(free.map(async (w) => [w.userId, (await loadUserRating(w.userId, t.time_control)).rating] as const)));
+    free.sort((a, b) => (ratings.get(b.userId) ?? DEFAULT_RATING.rating) - (ratings.get(a.userId) ?? DEFAULT_RATING.rating) || a.since - b.since);
+  } else {
+    for (let i = free.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [free[i], free[j]] = [free[j], free[i]]; }
+  }
   const now = Date.now();
   const used = new Set<string>();
   const pairs: [TWaiter, TWaiter][] = [];

@@ -3,6 +3,7 @@ import { Link } from 'wouter';
 import { Trophy, ChevronRight, Users, Clock, Plus } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { PT, cardStyle, greenBtn } from '@/lib/playTheme';
+import { TournamentLogo } from '@/components/play/TournamentBranding';
 
 export interface TournamentSummary {
   id: string;
@@ -27,6 +28,9 @@ export interface TournamentSummary {
   visibility?: 'public' | 'link';
   createdByName?: string | null;
   isCreator?: boolean;
+  /** Organizer branding */
+  clubName?: string | null;
+  logoUrl?: string | null;
 }
 
 export function fmtCountdown(ms: number): string {
@@ -73,6 +77,7 @@ export function TournamentsCard() {
       <div className="flex items-center gap-2 px-4 pt-4">
         <Trophy size={18} style={{ color: PT.gold }} />
         <h2 className="flex-1 text-[15px] font-extrabold" style={{ color: PT.text }}>Tournaments</h2>
+        <Link href="/tournaments" className="text-[12px] font-extrabold uppercase tracking-wider" style={{ color: PT.green }}>See all</Link>
         <Link href="/tournaments/new" className="inline-flex items-center gap-1 rounded-[10px] px-3 py-1.5 text-[12.5px] font-extrabold" style={greenBtn}>
           <Plus size={14} /> Create
         </Link>
@@ -84,9 +89,7 @@ export function TournamentsCard() {
       )}
       {items.map((t) => (
         <Link key={t.id} href={`/tournaments/${t.id}`} className="flex items-center gap-3 px-4 py-3" style={{ borderTop: `1px solid ${PT.border}`, marginTop: 10 }}>
-          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl" style={{ background: t.status === 'running' ? 'rgba(232,180,71,.15)' : PT.greenSoft, color: t.status === 'running' ? PT.gold : PT.green }}>
-            <Trophy size={20} />
-          </span>
+          <TournamentLogo t={t} size={44} />
           <span className="min-w-0 flex-1">
             <span className="flex items-center gap-2">
               <b className="truncate text-[14.5px] font-extrabold" style={{ color: PT.text }}>{t.name}</b>

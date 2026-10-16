@@ -101,6 +101,7 @@ async function buildBracket(t: TRow) {
   const ratingKey = t.kind === "daily" ? DAILY_RATING_KEY : t.time_control;
   const rated = await Promise.all(list.map(async (p) => ({ ...p, rating: (await loadUserRating(p.user_id, ratingKey)).rating })));
   rated.sort((a, b) => b.rating - a.rating);
+  const seedOf = new Map(rated.map((p, i) => [p.user_id, i + 1]));
   let size = 2;
   while (size < rated.length) size *= 2;
   const total = Math.log2(size);
@@ -110,13 +111,20 @@ async function buildBracket(t: TRow) {
       await db.execute(sql`INSERT INTO tournament_matches (tournament_id, round, slot) VALUES (${t.id}, ${r}, ${slot}) ON CONFLICT DO NOTHING`);
     }
   }
-  const order = seedPositions(size);
-  for (let slot = 0; slot < size / 2; slot++) {
-    const sa = order[slot * 2], sb = order[slot * 2 + 1];
-    const a = rated[sa - 1], b = rated[sb - 1];
+  // Ranked: first-round opponents have similar ratings (1 v 2, 3 v 4...).
+  // Casual: a random draw. Byes (when the field isn't a power of two) are
+  // spread across the bracket; in ranked they go to the highest rated.
+  const order = t.mode === "ranked" ? [...rated] : [...rated].sort(() => Math.random() - 0.5);
+  const slots = size / 2;
+  const byes = size - order.length;
+  const byeSlots = new Set(Array.from({ length: byes }, (_, i) => Math.floor((i * slots) / Math.max(1, byes))));
+  let next = 0;
+  for (let slot = 0; slot < slots; slot++) {
+    const a = order[next++];
+    const b = byeSlots.has(slot) ? undefined : order[next++];
     await db.execute(sql`
-      UPDATE tournament_matches SET a_id = ${a?.user_id ?? null}, a_name = ${a?.username ?? null}, a_seed = ${a ? sa : null},
-        b_id = ${b?.user_id ?? null}, b_name = ${b?.username ?? null}, b_seed = ${b ? sb : null}, updated_at = now()
+      UPDATE tournament_matches SET a_id = ${a?.user_id ?? null}, a_name = ${a?.username ?? null}, a_seed = ${a ? seedOf.get(a.user_id) ?? null : null},
+        b_id = ${b?.user_id ?? null}, b_name = ${b?.username ?? null}, b_seed = ${b ? seedOf.get(b.user_id) ?? null : null}, updated_at = now()
       WHERE tournament_id = ${t.id} AND round = 1 AND slot = ${slot}`);
   }
   const t2 = { ...t, total_rounds: total };
@@ -299,6 +307,13 @@ async function pairDailyArena(t: TRow) {
     SELECT user_id, username, score FROM tournament_players WHERE tournament_id = ${t.id} AND NOT withdrawn
     ORDER BY score DESC, joined_at`)).filter((p) => !busy.has(p.user_id));
   if (free.length < 2) return;
+  // Ranked: neighbours by daily rating; casual: random.
+  if (t.mode === "ranked") {
+    const r = new Map(await Promise.all(free.map(async (p) => [p.user_id, (await loadUserRating(p.user_id, DAILY_RATING_KEY)).rating] as const)));
+    free.sort((a, b) => (r.get(b.user_id) ?? 0) - (r.get(a.user_id) ?? 0));
+  } else {
+    free.sort(() => Math.random() - 0.5);
+  }
   const lastRows = rowsOf<{ u: string; white_user_id: string; black_user_id: string }>(await db.execute(sql`
     SELECT DISTINCT ON (u) u, white_user_id, black_user_id FROM (
       SELECT white_user_id AS u, white_user_id, black_user_id, started_at FROM tournament_games WHERE tournament_id = ${t.id}

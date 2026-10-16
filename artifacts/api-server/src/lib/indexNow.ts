@@ -12,7 +12,7 @@ const SITE = `https://${HOST}`;
 const ENDPOINT = "https://api.indexnow.org/indexnow";
 
 // Public pages (same list as the sitemap's static entries).
-const STATIC_PATHS = ["/", "/pricing", "/learn", "/players", "/vs/aimchess", "/vs/improve-my-chess", "/vs/free-chess-analysis", "/privacy", "/terms"];
+const STATIC_PATHS = ["/", "/pricing", "/learn", "/players", "/tournaments", "/vs/aimchess", "/vs/improve-my-chess", "/vs/free-chess-analysis", "/privacy", "/terms"];
 
 function enabled(): boolean {
   if (process.env.INDEXNOW_ENABLED === "false") return false;

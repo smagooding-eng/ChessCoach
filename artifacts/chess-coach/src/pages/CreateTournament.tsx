@@ -5,6 +5,7 @@ import { apiFetch } from '@/lib/api';
 import { useUser } from '@/hooks/use-user';
 import { PT, cardStyle, greenBtn, ghostBtn } from '@/lib/playTheme';
 import { ShareLink } from '@/components/play/ShareLink';
+import { LogoPicker } from '@/components/play/TournamentBranding';
 
 // Create a tournament in one screen: pick a format, the time control, how
 // many players and when it starts, then share the link. Player-made
@@ -72,6 +73,9 @@ export function CreateTournament() {
   const [note, setNote] = useState('');
   const [showNote, setShowNote] = useState(false);
   const [join, setJoin] = useState(true);
+  const [club, setClub] = useState('');
+  const [logo, setLogo] = useState<string | null>(null);
+  const [listed, setListed] = useState(true);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [created, setCreated] = useState<{ id: string; name: string; when: Date } | null>(null);
@@ -110,7 +114,7 @@ export function CreateTournament() {
         body: JSON.stringify({
           name: name.trim() || suggested, description: note.trim() || undefined, timeControl: tc, mode,
           startsAt: when.toISOString(), durationMinutes: format === 'arena' ? length : undefined,
-          format, kind, maxPlayers, join,
+          format, kind, maxPlayers, join, clubName: club.trim() || undefined, logo: logo ?? undefined, listed,
         }),
       });
       const d = await r.json().catch(() => ({}));
@@ -131,7 +135,7 @@ export function CreateTournament() {
           <div>
             <h1 className="text-[22px] font-black" style={{ color: PT.text }}>{created.name} is set</h1>
             <p className="mt-1 text-[13.5px]" style={{ color: PT.muted }}>
-              Starts {created.when.toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}. Send the link to the players you want; they can join from it.
+              Starts {created.when.toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}. Share the link with your players; they can join from it{listed ? ' or find it on the tournaments list' : ''}.
             </p>
           </div>
           <div className="text-left">
@@ -149,7 +153,7 @@ export function CreateTournament() {
   return (
     <div className="mx-auto max-w-[560px] space-y-4 p-4 pb-28 md:p-0">
       <div className="flex items-center gap-3">
-        <Link href="/live" className="grid h-9 w-9 shrink-0 place-items-center rounded-full" style={{ color: PT.muted, background: 'rgba(255,255,255,.05)' }} aria-label="Back"><ArrowLeft size={18} /></Link>
+        <Link href="/tournaments" className="grid h-9 w-9 shrink-0 place-items-center rounded-full" style={{ color: PT.muted, background: 'rgba(255,255,255,.05)' }} aria-label="Back"><ArrowLeft size={18} /></Link>
         <div>
           <h1 className="text-2xl font-black" style={{ color: PT.text, letterSpacing: '-0.02em' }}>Create a tournament</h1>
           <p className="text-[13px]" style={{ color: PT.muted }}>Set it up, then share the link with your players.</p>
@@ -247,16 +251,19 @@ export function CreateTournament() {
 
         {/* Rated */}
         <div>
-          <Label>Rating</Label>
+          <Label>Ranked or casual</Label>
           <div className="grid grid-cols-2 gap-1.5">
             <Chip on={mode === 'casual'} onClick={() => setMode('casual')}><span className="inline-flex items-center gap-1.5"><Sparkles size={14} /> Casual</span></Chip>
             <Chip on={mode === 'ranked'} onClick={() => setMode('ranked')}><span className="inline-flex items-center gap-1.5"><Award size={14} /> Ranked</span></Chip>
           </div>
+          <p className="mt-1.5 text-[12px]" style={{ color: PT.muted }}>
+            {mode === 'ranked' ? 'Players face opponents of similar rating, and games count toward ChessScout ratings.' : 'Opponents are drawn at random and ratings don’t change.'}
+          </p>
         </div>
 
-        {/* Name */}
+        {/* Name + branding */}
         <div>
-          <Label>Name</Label>
+          <Label>Title</Label>
           <input value={name} onChange={(e) => { setName(e.target.value); setNameTouched(true); }} maxLength={80}
             className="w-full rounded-[10px] px-3 py-2.5 text-[14px] font-bold outline-none"
             style={{ background: 'rgba(255,255,255,0.05)', color: PT.text, border: `1px solid ${PT.border}` }} />
@@ -272,6 +279,20 @@ export function CreateTournament() {
           )}
         </div>
 
+        <div>
+          <Label>Your club (optional)</Label>
+          <input value={club} onChange={(e) => setClub(e.target.value)} maxLength={80} placeholder="e.g. Riverside Chess Club"
+            className="mb-2.5 w-full rounded-[10px] px-3 py-2.5 text-[14px] font-bold outline-none"
+            style={{ background: 'rgba(255,255,255,0.05)', color: PT.text, border: `1px solid ${PT.border}` }} />
+          <LogoPicker value={logo} onChange={setLogo} />
+          <p className="mt-1.5 text-[12px]" style={{ color: PT.muted }}>Players see your club name and logo on the tournament page and the tournaments list.</p>
+        </div>
+
+        <label className="flex cursor-pointer items-center gap-3 rounded-[12px] px-3 py-2.5" style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${PT.border}` }}>
+          <input type="checkbox" checked={listed} onChange={(e) => setListed(e.target.checked)} className="h-4 w-4 accent-[#81B64C]" />
+          <span className="text-[13.5px] font-bold" style={{ color: PT.text }}>Show on the public tournaments list</span>
+        </label>
+
         <label className="flex cursor-pointer items-center gap-3 rounded-[12px] px-3 py-2.5" style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${PT.border}` }}>
           <input type="checkbox" checked={join} onChange={(e) => setJoin(e.target.checked)} className="h-4 w-4 accent-[#81B64C]" />
           <span className="text-[13.5px] font-bold" style={{ color: PT.text }}>I'm playing in it too</span>
@@ -283,7 +304,7 @@ export function CreateTournament() {
           {busy ? <Loader2 size={18} className="animate-spin" /> : <Trophy size={18} />} Create and get link
         </button>
         <p className="flex items-center justify-center gap-1.5 text-center text-[12px]" style={{ color: PT.muted }}>
-          <Users size={13} /> Only people with the link can see and join it.
+          <Users size={13} /> {listed ? 'Anyone can find it on the tournaments list, or join from your link.' : 'Only people with the link can find and join it.'}
         </p>
       </div>
     </div>

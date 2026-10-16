@@ -21,6 +21,7 @@ import { Layout } from "@/components/Layout";
 import { useUser } from "@/hooks/use-user";
 import React, { useEffect, Component, Suspense, lazy, type ReactNode } from "react";
 import { PageLoader } from "@/components/PageLoader";
+import { PublicShell } from "@/components/PublicShell";
 import { apiFetch } from "@/lib/api";
 
 function ErrorFallback({ error, fallbackNav, onReset }: { error: Error | null; fallbackNav: string; onReset: () => void }) {
@@ -175,6 +176,7 @@ const FriendsPage = lazyRetry(() => import("@/pages/Friends").then(m => ({ defau
 const MessagesPage = lazyRetry(() => import("@/pages/Messages").then(m => ({ default: m.Messages })));
 const TournamentPage = lazyRetry(() => import("@/pages/Tournament").then(m => ({ default: m.Tournament })));
 const CreateTournamentPage = lazyRetry(() => import("@/pages/CreateTournament").then(m => ({ default: m.CreateTournament })));
+const TournamentsIndexPage = lazyRetry(() => import("@/pages/TournamentsIndex").then(m => ({ default: m.TournamentsIndex })));
 const LiveHistory = lazyRetry(() => import("@/pages/LiveHistory").then(m => ({ default: m.LiveHistory })));
 const GameLookup = lazyRetry(() => import("@/pages/GameLookup").then(m => ({ default: m.GameLookup })));
 const Subscription = lazyRetry(() => import("@/pages/Subscription").then(m => ({ default: m.Subscription })));
@@ -275,7 +277,16 @@ const PLocalBoard    = () => <ProtectedRoute component={LocalPlay} />;
 const PLivePlay      = () => <ProtectedRoute component={LivePlay} />;
 const PFriends       = () => <ProtectedRoute component={FriendsPage} />;
 const PMessages      = () => <ProtectedRoute component={MessagesPage} />;
-const PTournament    = () => <ProtectedRoute component={TournamentPage} />;
+// Tournaments are public: signed-out visitors get them in a light frame,
+// signed-in players inside the app as usual.
+function PublicOrApp({ component: Component }: { component: React.ComponentType }) {
+  const { isAuthenticated, isAuthLoading } = useUser();
+  if (isAuthLoading) return <PageLoader />;
+  if (!isAuthenticated) return <PublicShell><Suspense fallback={<PageLoader />}><Component /></Suspense></PublicShell>;
+  return <ProtectedRoute component={Component} />;
+}
+const PTournament    = () => <PublicOrApp component={TournamentPage} />;
+const PTournaments   = () => <PublicOrApp component={TournamentsIndexPage} />;
 const PCreateTournament = () => <ProtectedRoute component={CreateTournamentPage} />;
 // Daily games are a tab of Play Online now; /daily (old links, notifications) opens that tab.
 const DailyTab = () => <LivePlay initialTab="daily" />;
@@ -393,6 +404,7 @@ function Router() {
       <Route path="/live"            component={PLivePlay} />
       <Route path="/friends"         component={PFriends} />
       <Route path="/messages/:userId" component={PMessages} />
+      <Route path="/tournaments" component={PTournaments} />
       <Route path="/tournaments/new" component={PCreateTournament} />
       <Route path="/tournaments/:id" component={PTournament} />
       <Route path="/daily"           component={PDailyGames} />

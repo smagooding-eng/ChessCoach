@@ -9,9 +9,9 @@ import { withdrawFromBracket, roundLabel } from "../lib/tournamentEngine";
 import { logger } from "../lib/logger";
 import { notifyUser } from "../lib/notify";
 
-// Tournaments. Admins create public ones; any player can create one and
-// share its link (unlisted: it only shows to people with the link, its
-// players and its creator). The engine (lib/tournamentEngine) starts, pairs
+// Tournaments. Admins and players create them; they're listed publicly
+// unless the organizer chose link-only. Anyone (signed in or not) can view
+// the list and a tournament's standings, bracket and games. The engine (lib/tournamentEngine) starts, pairs
 // and finishes them.
 //   GET  /tournaments                 running, upcoming and recent
 //   GET  /tournament-options          time controls for the create form
@@ -20,6 +20,8 @@ import { notifyUser } from "../lib/notify";
 //   POST /tournaments/:id/join
 //   POST /tournaments/:id/withdraw
 //   POST /tournaments/:id/cancel      (creator or admin)
+//   PATCH /tournaments/:id            (creator or admin) name, club, note, logo, listed
+//   GET  /tournaments/:id/logo        organizer's logo image
 //   GET  /admin/tournaments           (admin) all + option lists
 //   POST /admin/tournaments           (admin) create
 //   POST /admin/tournaments/:id/cancel (admin)
@@ -41,6 +43,7 @@ interface TRow {
   format: string; kind: string; eligibility: string; max_players: number | null; total_rounds: number | null;
   winner_username: string | null;
   visibility?: string; created_by?: string; created_by_name?: string | null;
+  club_name?: string | null; logo_version?: number | null;
   players?: number | string; joined?: boolean;
 }
 
@@ -70,6 +73,8 @@ function publicT(t: TRow, uid?: string | null) {
     visibility: t.visibility === "link" ? "link" : "public",
     createdByName: t.created_by_name ?? null,
     isCreator: !!uid && t.created_by === uid,
+    clubName: t.club_name ?? null,
+    logoUrl: t.logo_version ? `/api/tournaments/${t.id}/logo?v=${t.logo_version}` : null,
   };
 }
 
@@ -87,16 +92,16 @@ router.get("/tournaments", async (req: Request, res: Response) => {
     const rows = rowsOf<TRow>(await db.execute(sql`
       ${SELECT_T(uid)}
       WHERE (t.status IN ('scheduled', 'running')
-         OR (t.status = 'finished' AND COALESCE(t.ends_at, t.starts_at) > now() - interval '14 days'))
+         OR (t.status = 'finished' AND COALESCE(t.ends_at, t.starts_at) > now() - interval '90 days'))
         AND (t.visibility = 'public' OR t.created_by = ${uid}
           OR EXISTS (SELECT 1 FROM tournament_players p WHERE p.tournament_id = t.id AND p.user_id = ${uid} AND NOT p.withdrawn))
       ORDER BY t.starts_at ASC
-      LIMIT 60`));
+      LIMIT 300`));
     const pub = (r: TRow) => publicT(r, uid);
     res.json({
       running: rows.filter((r) => r.status === "running").map(pub),
       upcoming: rows.filter((r) => r.status === "scheduled").map(pub),
-      recent: rows.filter((r) => r.status === "finished").reverse().slice(0, 10).map(pub),
+      recent: rows.filter((r) => r.status === "finished").reverse().slice(0, 60).map(pub),
     });
   } catch (err) {
     logger.error({ err }, "[tournaments] list failed");
@@ -145,6 +150,66 @@ function parseCreate(b: CreateBody, opts: { admin: boolean }): { error: string }
 const displayName = (req: Request) =>
   req.user!.scoutUsername || req.user!.chesscomUsername || req.user!.lichessUsername || req.user!.firstName || req.user!.email?.split("@")[0] || "Player";
 
+// Logos arrive as data URLs (resized to ~256px in the browser).
+const LOGO_RE = /^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=]+)$/;
+const MAX_LOGO_BYTES = 350_000;
+
+async function saveLogo(id: string, dataUrl: unknown): Promise<string | null> {
+  if (dataUrl === null || dataUrl === "") {
+    await db.execute(sql`DELETE FROM tournament_logos WHERE tournament_id = ${id}`);
+    await db.execute(sql`UPDATE tournaments SET logo_version = NULL WHERE id = ${id}`);
+    return null;
+  }
+  if (typeof dataUrl !== "string") return null;
+  const m = dataUrl.match(LOGO_RE);
+  if (!m) return "The logo must be a PNG, JPG or WebP image";
+  if (m[2].length * 0.75 > MAX_LOGO_BYTES) return "That logo is too large";
+  await db.execute(sql`
+    INSERT INTO tournament_logos (tournament_id, mime, data) VALUES (${id}, ${m[1]}, ${m[2]})
+    ON CONFLICT (tournament_id) DO UPDATE SET mime = ${m[1]}, data = ${m[2]}, updated_at = now()`);
+  await db.execute(sql`UPDATE tournaments SET logo_version = COALESCE(logo_version, 0) + 1 WHERE id = ${id}`);
+  return null;
+}
+
+router.get("/tournaments/:id/logo", async (req: Request, res: Response) => {
+  try {
+    const [row] = rowsOf<{ mime: string; data: string }>(await db.execute(sql`SELECT mime, data FROM tournament_logos WHERE tournament_id = ${String(req.params.id)}`));
+    if (!row) { res.status(404).end(); return; }
+    res.set("Content-Type", row.mime);
+    res.set("Cache-Control", "public, max-age=31536000, immutable");
+    res.send(Buffer.from(row.data, "base64"));
+  } catch {
+    res.status(500).end();
+  }
+});
+
+// Organizer edits: name, club name, note, logo, listed or link-only.
+router.patch("/tournaments/:id", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const id = String(req.params.id);
+    const [t] = rowsOf<{ created_by: string; status: string }>(await db.execute(sql`SELECT created_by, status FROM tournaments WHERE id = ${id}`));
+    if (!t) { res.status(404).json({ error: "Tournament not found" }); return; }
+    if (t.created_by !== req.user!.id && !req.user!.isAdmin) { res.status(403).json({ error: "Only the organizer can edit this tournament" }); return; }
+    const b = (req.body ?? {}) as { name?: string; clubName?: string | null; description?: string | null; logo?: string | null; listed?: boolean };
+    if (b.name !== undefined) {
+      const name = String(b.name).trim().slice(0, 80);
+      if (!name) { res.status(400).json({ error: "Give it a name" }); return; }
+      await db.execute(sql`UPDATE tournaments SET name = ${name} WHERE id = ${id}`);
+    }
+    if (b.clubName !== undefined) await db.execute(sql`UPDATE tournaments SET club_name = ${String(b.clubName ?? "").trim().slice(0, 80) || null} WHERE id = ${id}`);
+    if (b.description !== undefined) await db.execute(sql`UPDATE tournaments SET description = ${String(b.description ?? "").trim().slice(0, 500) || null} WHERE id = ${id}`);
+    if (typeof b.listed === "boolean") await db.execute(sql`UPDATE tournaments SET visibility = ${b.listed ? "public" : "link"} WHERE id = ${id}`);
+    if (b.logo !== undefined) {
+      const err = await saveLogo(id, b.logo);
+      if (err) { res.status(400).json({ error: err }); return; }
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    logger.error({ err }, "[tournaments] edit failed");
+    res.status(500).json({ error: "Could not save" });
+  }
+});
+
 router.get("/tournament-options", (_req: Request, res: Response) => {
   res.json({ liveTimeControls: liveTcs(), dailyTimeControls: dailyTcs() });
 });
@@ -164,10 +229,16 @@ router.post("/tournaments", requireAuth, async (req: Request, res: Response) => 
     }
     const id = crypto.randomBytes(5).toString("hex");
     const name = displayName(req);
+    const extra = (req.body ?? {}) as { clubName?: string; logo?: string; listed?: boolean };
+    const visibility = extra.listed === false ? "link" : "public";
     await db.execute(sql`
-      INSERT INTO tournaments (id, name, description, time_control, mode, starts_at, ends_at, status, created_by, format, kind, eligibility, max_players, visibility, created_by_name)
+      INSERT INTO tournaments (id, name, description, time_control, mode, starts_at, ends_at, status, created_by, format, kind, eligibility, max_players, visibility, created_by_name, club_name)
       VALUES (${id}, ${v.name}, ${v.description}, ${v.timeControl}, ${v.mode}, ${v.starts.toISOString()}, ${v.ends ? v.ends.toISOString() : null},
-        'scheduled', ${uid}, ${v.format}, ${v.kind}, 'all', ${v.maxPlayers}, 'link', ${name})`);
+        'scheduled', ${uid}, ${v.format}, ${v.kind}, 'all', ${v.maxPlayers}, ${visibility}, ${name}, ${String(extra.clubName ?? "").trim().slice(0, 80) || null})`);
+    if (extra.logo) {
+      const err = await saveLogo(id, extra.logo);
+      if (err) logger.warn({ id, err }, "[tournaments] logo rejected at create");
+    }
     // The creator plays too unless they say otherwise.
     if ((req.body as { join?: boolean })?.join !== false) {
       await db.execute(sql`INSERT INTO tournament_players (tournament_id, user_id, username) VALUES (${id}, ${uid}, ${name}) ON CONFLICT DO NOTHING`);
@@ -294,7 +365,7 @@ router.post("/tournaments/:id/join", requireAuth, async (req: Request, res: Resp
       INSERT INTO tournament_players (tournament_id, user_id, username) VALUES (${id}, ${uid}, ${name})
       ON CONFLICT (tournament_id, user_id) DO UPDATE SET withdrawn = false`);
     // Let the organizer of a player-made tournament know someone joined.
-    if (!t.joined && t.visibility === "link" && t.created_by && t.created_by !== uid) {
+    if (!t.joined && t.created_by_name !== "ChessScout.net" && t.created_by && t.created_by !== uid) {
       const count = Number(t.players ?? 0) + 1;
       void notifyUser(t.created_by, {
         title: `${name} joined ${t.name}`,

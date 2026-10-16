@@ -369,6 +369,15 @@ async function runSchemaMigrations() {
     // credited to their creator.
     await db.execute(sql`ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS visibility VARCHAR NOT NULL DEFAULT 'public'`);
     await db.execute(sql`ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS created_by_name VARCHAR`);
+    // Organizer branding: club name + logo (logo bytes live in their own table).
+    await db.execute(sql`ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS club_name VARCHAR`);
+    await db.execute(sql`ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS logo_version INTEGER`);
+    await db.execute(sql`CREATE TABLE IF NOT EXISTS tournament_logos (
+      tournament_id VARCHAR PRIMARY KEY,
+      mime VARCHAR NOT NULL,
+      data TEXT NOT NULL,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )`);
     await db.execute(sql`ALTER TABLE tournaments ALTER COLUMN ends_at DROP NOT NULL`);
     await db.execute(sql`ALTER TABLE tournament_games ADD COLUMN IF NOT EXISTS kind VARCHAR NOT NULL DEFAULT 'live'`);
     await db.execute(sql`ALTER TABLE tournament_games ADD COLUMN IF NOT EXISTS match_id INTEGER`);

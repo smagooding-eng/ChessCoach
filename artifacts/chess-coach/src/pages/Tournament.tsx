@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Link, useParams } from 'wouter';
+import { Link, useParams, useLocation } from 'wouter';
+import { useUser } from '@/hooks/use-user';
+import { TournamentLogo, TournamentEditCard } from '@/components/play/TournamentBranding';
 import { ArrowLeft, Trophy, Users, Clock, Loader2, Play, Pause, Swords, Medal, Award, Sparkles, Crown, CalendarDays, Check } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { useLivePlay } from '@/hooks/use-live-play';
@@ -25,8 +27,15 @@ interface Detail {
 const MEDAL = ['#E8B447', '#C9D1D6', '#C98A4B'];
 
 function rulesText(t: TournamentSummary): string {
+  const draw = t.mode === 'ranked'
+    ? 'Ranked: players are paired with opponents of similar rating, and results count toward ChessScout ratings.'
+    : 'Casual: opponents are drawn at random and ratings don\'t change.';
+  return `${draw} ${rulesBody(t)}`;
+}
+
+function rulesBody(t: TournamentSummary): string {
   if (t.format === 'bracket') {
-    return `Knockout bracket, seeded by rating. One game per match; a draw is replayed with colours reversed, and if that's drawn too the higher seed goes through. ${
+    return `Knockout bracket. One game per match; a draw is replayed with colours reversed, and if that's drawn too the higher seed goes through. ${
       t.kind === 'live' ? 'When your match is ready you have 10 minutes to open this page or it\'s a forfeit.' : 'Each game starts automatically and we notify you when it\'s your move.'
     } It ends when the final is played.`;
   }
@@ -35,11 +44,31 @@ function rulesText(t: TournamentSummary): string {
     : "Daily arena: whenever you don't have a game going, you're paired with another free player automatically. Win 2 points, draw 1, loss 0. Most points at the end wins.";
 }
 
+type Live = ReturnType<typeof useLivePlay>;
+
+// Signed-out visitors can follow a tournament (standings, bracket, games)
+// without a live connection; joining sends them to sign up first.
+const PUBLIC_LIVE = {
+  game: null, status: 'idle', connected: false, tournamentWaiting: null, tournamentOver: null,
+  tournamentReady: () => {}, tournamentPause: () => {}, reset: () => {},
+} as unknown as Live;
+
 // A tournament: arena standings or a knockout bracket, plus what you need to
 // do next. Live games are played right here.
 export function Tournament() {
-  const { id } = useParams<{ id: string }>();
+  const { isAuthenticated } = useUser();
+  return isAuthenticated ? <TournamentSignedIn /> : <TournamentView live={PUBLIC_LIVE} signedIn={false} />;
+}
+
+function TournamentSignedIn() {
   const live = useLivePlay();
+  return <TournamentView live={live} signedIn />;
+}
+
+function TournamentView({ live, signedIn }: { live: Live; signedIn: boolean }) {
+  const { id } = useParams<{ id: string }>();
+  const [, navigate] = useLocation();
+  const [editing, setEditing] = useState(false);
   const [data, setData] = useState<Detail | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [needsPro, setNeedsPro] = useState(false);
@@ -91,6 +120,11 @@ export function Tournament() {
   }, [tournamentOver, id, load]);
 
   const join = async () => {
+    if (!signedIn) {
+      try { localStorage.setItem('cs_pending_tournament', String(id)); } catch { /* ignore */ }
+      navigate('/setup');
+      return;
+    }
     setBusy(true); setErr(null); setNeedsPro(false);
     try {
       const r = await apiFetch(`/api/tournaments/${id}/join`, { method: 'POST', credentials: 'include' });
@@ -114,7 +148,7 @@ export function Tournament() {
   const cancelTournament = async () => {
     if (!confirm('Cancel this tournament? Players who joined will be told it was cancelled.')) return;
     const r = await apiFetch(`/api/tournaments/${id}/cancel`, { method: 'POST', credentials: 'include' }).catch(() => null);
-    if (r && r.ok) window.location.href = '/live';
+    if (r && r.ok) window.location.href = '/tournaments';
     else setErr('Could not cancel the tournament');
   };
 
@@ -129,7 +163,7 @@ export function Tournament() {
         {err ? (
           <div className="space-y-3">
             <p className="text-[15px] font-bold" style={{ color: PT.text }}>{err}</p>
-            <Link href="/live" className="inline-block rounded-xl px-4 py-2 text-[13px] font-bold" style={ghostBtn}>Back to Live play</Link>
+            <Link href="/tournaments" className="inline-block rounded-xl px-4 py-2 text-[13px] font-bold" style={ghostBtn}>All tournaments</Link>
           </div>
         ) : <Loader2 className="mx-auto animate-spin" style={{ color: PT.green }} />}
       </div>
@@ -169,7 +203,7 @@ export function Tournament() {
       return (
         <div className="space-y-2">
           <button onClick={join} disabled={busy || full} className="inline-flex w-full items-center justify-center gap-2 rounded-xl py-3.5 text-[15px] font-extrabold disabled:opacity-60" style={greenBtn}>
-            {busy ? <Loader2 size={18} className="animate-spin" /> : <Swords size={18} />} {full ? 'Tournament full' : 'Join tournament'}
+            {busy ? <Loader2 size={18} className="animate-spin" /> : <Swords size={18} />} {full ? 'Tournament full' : signedIn ? 'Join tournament' : 'Sign up free to join'}
           </button>
           {needsPro && (
             <p className="text-center text-[12.5px]" style={{ color: PT.muted }}>
@@ -265,21 +299,26 @@ export function Tournament() {
   return (
     <div className="mx-auto max-w-[760px] space-y-4 p-4 pb-24 md:p-0">
       <div className="flex items-center gap-3">
-        <Link href="/live" className="grid h-9 w-9 shrink-0 place-items-center rounded-full" style={{ color: PT.muted, background: 'rgba(255,255,255,.05)' }} aria-label="Back to Live play"><ArrowLeft size={18} /></Link>
+        <Link href="/tournaments" className="grid h-9 w-9 shrink-0 place-items-center rounded-full" style={{ color: PT.muted, background: 'rgba(255,255,255,.05)' }} aria-label="All tournaments"><ArrowLeft size={18} /></Link>
+        <TournamentLogo t={t} size={56} />
         <div className="min-w-0">
           <p className="flex flex-wrap items-center gap-x-2 text-[11px] font-black uppercase tracking-[0.16em]" style={{ color: t.status === 'running' ? PT.gold : PT.muted }}>
             <span>{t.status === 'running' ? 'On now' : t.status === 'scheduled' ? 'Upcoming' : 'Finished'} · {isBracket ? 'Knockout' : 'Arena'} · {isLive ? 'Live' : 'Daily'}</span>
             {t.eligibility === 'pro' && <span className="rounded px-1.5 py-0.5 text-[10px]" style={{ background: '#81B64C', color: '#FFFFFF' }}>Pro only</span>}
           </p>
           <h1 className="truncate text-2xl font-black md:text-3xl" style={{ color: PT.text, letterSpacing: '-0.02em' }}>{t.name}</h1>
-          {t.visibility === 'link' && t.createdByName && (
-            <p className="text-[12.5px]" style={{ color: PT.muted }}>Organized by {t.isCreator ? 'you' : t.createdByName}</p>
+          {(t.clubName || (t.createdByName && t.createdByName !== 'ChessScout.net')) && (
+            <p className="truncate text-[12.5px]" style={{ color: PT.muted }}>
+              {t.clubName ? <>Hosted by <b style={{ color: PT.text }}>{t.clubName}</b>{t.createdByName && t.createdByName !== 'ChessScout.net' ? ` · organized by ${t.isCreator ? 'you' : t.createdByName}` : ''}</> : <>Organized by {t.isCreator ? 'you' : t.createdByName}</>}
+            </p>
           )}
         </div>
       </div>
 
       {/* Anyone can pass the link on while it's open; the organizer also gets Cancel. */}
-      {open && (t.isCreator || t.visibility === 'link') && (
+      {t.isCreator && editing && <TournamentEditCard t={t} onClose={() => setEditing(false)} onSaved={() => { setEditing(false); void load(); }} />}
+
+      {open && (t.isCreator || t.visibility === 'link' || signedIn) && (
         <div className="space-y-3 p-4" style={cardStyle}>
           <div className="flex items-center gap-2">
             <Users size={17} style={{ color: PT.green }} />
@@ -287,6 +326,11 @@ export function Tournament() {
             {t.maxPlayers ? <span className="text-[12px] font-bold" style={{ color: PT.muted }}>{Math.max(0, t.maxPlayers - t.players)} spots left</span> : null}
           </div>
           <ShareLink url={`${window.location.origin}/tournaments/${t.id}`} text={`Join "${t.name}" on ChessScout (${t.timeControlLabel})`} />
+          {t.isCreator && !editing && (
+            <button onClick={() => setEditing(true)} className="w-full rounded-xl py-2 text-[12.5px] font-bold" style={ghostBtn}>
+              Edit name, club or logo
+            </button>
+          )}
           {t.isCreator && (
             <button onClick={cancelTournament} className="w-full rounded-xl py-2 text-[12.5px] font-bold" style={{ ...ghostBtn, color: PT.red }}>
               Cancel tournament

@@ -30,7 +30,7 @@ export function PlayHub() {
   // Online first (live and daily games live together there), then local, then bots.
   const rows: { href: string; title: string; sub: string; icon: React.ReactNode; tint: string; show: boolean; img: string }[] = [
     { href: '/live', title: 'Play Online', sub: 'Live and daily games · challenge a friend', icon: <Swords size={22} />, tint: RD.green, show: !!authUser, img: 'play-online' },
-    { href: '/tournaments/new', title: 'Tournaments', sub: 'Create one for friends or your club · share the link', icon: <Trophy size={22} />, tint: RD.green, show: !!authUser, img: 'play-daily' },
+    { href: '/tournaments', title: 'Tournaments', sub: 'Join one, follow standings, or create one for your club', icon: <Trophy size={22} />, tint: RD.green, show: !!authUser, img: 'play-daily' },
     { href: '/play/local', title: 'Play Local', sub: 'Two players, one device', icon: <Play size={22} />, tint: RD.green, show: true, img: 'play-friend' },
     { href: '/practice', title: 'Play Bots', sub: `${BOTS.length} opponents • ${lowest}–${highest} ELO`, icon: <Bot size={22} />, tint: RD.green, show: true, img: 'play-bot' },
   ];
