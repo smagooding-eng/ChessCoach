@@ -3,9 +3,8 @@ import { useUser } from '@/hooks/use-user';
 import { useLocation, Link } from 'wouter';
 import { trackFunnelEvent } from '@/lib/funnelTracking';
 import { useLandingFunnelTracking } from '@/hooks/use-landing-funnel-tracking';
-import { ArrowRight, Mail, Eye, EyeOff, UserPlus, LogIn, Search, BarChart3, Brain, Check, X, Target, Crosshair, BookOpen, Gamepad2, Flame, Puzzle, Users, Skull, History, GraduationCap, Download as DownloadIcon, Smartphone } from 'lucide-react';
+import { Play as PlayIcon, ArrowRight, Mail, Eye, EyeOff, UserPlus, LogIn, Search, BarChart3, Brain, Check, X, Target, Crosshair, BookOpen, Gamepad2, Flame, Puzzle, Users, Skull, History, GraduationCap, Download as DownloadIcon, Smartphone } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Trophy as HeroTrophy } from 'lucide-react';
 import { apiFetch, apiUrl, setAuthToken } from '@/lib/api';
 import { useSiteImg } from '@/hooks/use-app-config';
 import { GooglePlayBadge } from '@/components/GooglePlayBadge';
@@ -171,7 +170,7 @@ function AuthModal({ open, onClose, initialMode, externalError, context = 'defau
 
           <div className="text-center mb-6">
             <h2 className="text-2xl font-black" style={{ color: TEXT }}>
-              {mode === 'login' ? 'Welcome Back' : context === 'opponent_scout' ? 'Scout Any Opponent Free' : 'Analyze My Games Free'}
+              {mode === 'login' ? 'Welcome Back' : context === 'opponent_scout' ? 'Scout Any Opponent Free' : 'Create Your Free Account'}
             </h2>
             <p className="text-sm mt-1" style={{ color: MUTED }}>
               {mode === 'login' ? 'Sign in to your account' : 'Free to start — upgrade to Pro anytime'}
@@ -258,7 +257,7 @@ function AuthModal({ open, onClose, initialMode, externalError, context = 'defau
               {loading ? (
                 <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
               ) : mode === 'register' ? (
-                <><UserPlus className="w-4 h-4" />{context === 'opponent_scout' ? 'Scout Any Opponent Free' : 'Analyze My Games Free'}</>
+                <><UserPlus className="w-4 h-4" />{context === 'opponent_scout' ? 'Scout Any Opponent Free' : 'Create Free Account'}</>
               ) : (
                 <><LogIn className="w-4 h-4" />Sign In</>
               )}
@@ -509,11 +508,13 @@ export function LandingPage() {
   const openOpponentScout = () => { trackFunnelEvent('opponent_scout_clicked'); setAuthMode('register'); setAuthContext('opponent_scout'); setAuthOpen(true); };
   const openLogin = () => { setAuthMode('login'); setAuthOpen(true); };
 
-  const features = [
-    { icon: BarChart3, title: 'Deep Analysis', onClick: openSignup },
-    { icon: GraduationCap, title: 'Personalized Courses', onClick: openSignup },
-    { icon: Crosshair, title: 'Opponent Scout', onClick: openOpponentScout },
-    { icon: Gamepad2, title: 'Practice Bots', onClick: openSignup },
+  // The motto's three words, as the strip under the hero: each opens the
+  // matching part of ChessScout (Scout goes to the public player pages, so a
+  // visitor can try it without signing up).
+  const pillars = [
+    { icon: PlayIcon, title: 'Play', sub: 'Live · Daily · Bots', onClick: openSignup },
+    { icon: Crosshair, title: 'Scout', sub: 'See what anyone plays', onClick: () => setLocation('/players') },
+    { icon: BarChart3, title: 'Improve', sub: 'Every game reviewed', onClick: openSignup },
   ];
 
   return (
@@ -535,12 +536,13 @@ export function LandingPage() {
             <span className="ml-0.5 text-sm font-bold" style={{ color: MUTED }}>.net</span>
           </div>
           <div className="flex items-center gap-4 sm:gap-6">
+            <Link href="/players" className="hidden text-sm font-medium transition-colors hover:text-white sm:inline" style={{ color: MUTED }}>Top players</Link>
             <Link href="/pricing" className="hidden text-sm font-medium transition-colors hover:text-white sm:inline" style={{ color: MUTED }}>Pricing</Link>
             <button onClick={openLogin} className="text-sm font-medium transition-colors hover:text-white" style={{ color: MUTED }}>Sign In</button>
             <button onClick={openSignup} className="rounded-xl px-4 py-2 text-sm font-extrabold transition-all sm:px-5 sm:py-2.5"
               style={{ background: G, color: ON_G, boxShadow: `0 6px 22px ${G}40` }}
               onMouseEnter={e => (e.currentTarget.style.background = G_HOVER)} onMouseLeave={e => (e.currentTarget.style.background = G)}>
-              Try Free
+              Join Free
             </button>
           </div>
         </div>
@@ -549,32 +551,40 @@ export function LandingPage() {
       <main data-track-section="hero" className="relative z-10 mx-auto flex w-full max-w-7xl flex-1 flex-col justify-center gap-3 px-4 pb-3 sm:px-8 lg:grid lg:grid-cols-2 lg:gap-12 lg:pb-6">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }} className="lg:self-center">
           <div className="mb-2.5 inline-flex items-center gap-2 rounded-full px-3 py-1 text-[10.5px] font-black uppercase tracking-[0.12em] sm:text-[11px]"
-            style={{ background: '#81B64C', color: '#FFFFFF' }}>
-            <HeroTrophy className="h-3.5 w-3.5" /> Turn games into progress
+            style={{ background: 'rgba(255,255,255,.07)', color: TEXT, border: '1px solid rgba(255,255,255,.12)' }}>
+            <span className="h-1.5 w-1.5 rounded-full" style={{ background: G }} /> Play smarter. Win more.
           </div>
 
-          <h1 className="font-black leading-[1.04] tracking-tight text-[clamp(1.65rem,8.4vw,2.75rem)] sm:text-[3.4rem] lg:text-[4.6rem]" style={{ color: TEXT, fontFamily: "Georgia, 'Times New Roman', serif" }}>
-            Stop Guessing.<br />
-            Find What&rsquo;s<br />
+          <h1 className="font-black leading-[1.04] tracking-tight text-[clamp(2.1rem,11vw,3.2rem)] sm:text-[3.8rem] lg:text-[5rem]" style={{ color: TEXT, fontFamily: "Georgia, 'Times New Roman', serif" }}>
+            Play.<br />
+            Scout.<br />
             <span className="relative inline-block">
-              <span style={{ color: G }}>Holding You Back.</span>
+              <span style={{ color: G }}>Improve.</span>
               <motion.span aria-hidden initial={{ scaleX: 0 }} animate={{ scaleX: 1 }} transition={{ delay: 0.5, duration: 0.7, ease: 'easeOut' }}
                 className="absolute -bottom-1.5 left-0 right-0 h-1 origin-left rounded-full" style={{ background: `linear-gradient(90deg, ${G}, ${G}00)` }} />
             </span>
           </h1>
 
-          <p className="mt-3 max-w-[34rem] text-[14px] leading-snug [@media(max-height:760px)]:hidden sm:text-base sm:leading-relaxed lg:text-lg" style={{ color: 'rgba(245,247,246,0.78)' }}>
-            ChessScout analyzes your Chess.com or Lichess games to find the <span className="whitespace-nowrap">2&ndash;3</span> biggest mistakes and patterns keeping you from your next rating level.
+          <p className="mt-3 max-w-[34rem] text-[14px] leading-snug [@media(max-height:700px)]:hidden sm:text-base sm:leading-relaxed lg:text-lg" style={{ color: 'rgba(245,247,246,0.78)' }}>
+            Play live, daily or against bots right here on ChessScout. Your coach reviews every game and shows exactly why you won or lost &mdash; and before a big game, scout what your opponent plays.
           </p>
 
-          <button onClick={openSignup}
-            className="group mt-3 inline-flex items-center justify-center gap-2.5 rounded-2xl px-7 py-3 text-[15px] font-extrabold transition-all sm:px-9 sm:py-3.5 sm:text-base"
-            style={{ background: `linear-gradient(180deg, #A8D876, ${G_HOVER})`, color: ON_G, boxShadow: `0 14px 36px -12px ${G}90` }}
-            onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; }} onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; }}>
-            <BarChart3 className="h-5 w-5" />
-            Analyze My Games Free
-            <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
-          </button>
+          <div className="mt-3.5 flex flex-wrap items-center gap-2.5">
+            <button onClick={openSignup}
+              className="group inline-flex items-center justify-center gap-2.5 rounded-2xl px-7 py-3 text-[15px] font-extrabold transition-all sm:px-9 sm:py-3.5 sm:text-base"
+              style={{ background: `linear-gradient(180deg, #A8D876, ${G_HOVER})`, color: ON_G, boxShadow: `0 14px 36px -12px ${G}90` }}
+              onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; }} onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; }}>
+              <PlayIcon className="h-5 w-5" fill="currentColor" />
+              Play Free
+              <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
+            </button>
+            <button onClick={openOpponentScout}
+              className="inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3 text-[14px] font-extrabold transition-colors sm:py-3.5 sm:text-[15px]"
+              style={{ background: 'rgba(255,255,255,.06)', color: TEXT, border: '1px solid rgba(255,255,255,.14)' }}>
+              <Search className="h-4 w-4" style={{ color: G }} />
+              Scout an Opponent
+            </button>
+          </div>
 
           <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11.5px] font-semibold sm:gap-x-5 sm:text-[13px]" style={{ color: 'rgba(245,247,246,0.82)' }}>
             <span className="flex items-center gap-1.5"><Check className="h-3.5 w-3.5" style={{ color: G }} /> Free to start</span>
@@ -590,12 +600,13 @@ export function LandingPage() {
       </main>
 
       <div className="relative z-10 mx-auto w-full max-w-7xl shrink-0 px-4 sm:px-8">
-        <div className="grid grid-cols-4 rounded-2xl py-2 sm:py-3 lg:py-4" style={{ background: 'rgba(13,21,22,0.72)', border: '1px solid rgba(255,255,255,0.07)' }}>
-          {features.map((f, i) => (
+        <div className="grid grid-cols-3 rounded-2xl py-2 sm:py-3 lg:py-4" style={{ background: 'rgba(13,21,22,0.72)', border: '1px solid rgba(255,255,255,0.07)' }}>
+          {pillars.map((f, i) => (
             <button key={f.title} onClick={f.onClick} className="flex flex-col items-center px-1.5 text-center transition-colors hover:bg-white/[0.03] sm:px-4"
               style={{ borderLeft: i ? '1px solid rgba(255,255,255,0.08)' : undefined }}>
               <f.icon className="mb-1 h-5 w-5 sm:mb-1.5 sm:h-7 sm:w-7" style={{ color: G }} />
-              <span className="text-[11px] font-bold leading-tight sm:text-[15px]" style={{ color: TEXT }}>{f.title}</span>
+              <span className="text-[13px] font-extrabold leading-tight sm:text-[16px]" style={{ color: TEXT }}>{f.title}</span>
+              <span className="mt-0.5 text-[10.5px] leading-tight sm:text-[12.5px]" style={{ color: MUTED }}>{f.sub}</span>
             </button>
           ))}
         </div>
@@ -604,6 +615,7 @@ export function LandingPage() {
       <footer className="relative z-10 shrink-0 px-4 pb-[max(0.4rem,env(safe-area-inset-bottom))] pt-2 text-center text-[11px]" style={{ color: MUTED }}>
         <span className="mr-3 hidden sm:inline">For club players 400&ndash;2000 ELO.</span>
         <Link href="/pricing" className="mx-1.5 hover:underline">Pricing</Link>
+        <Link href="/players" className="mx-1.5 hover:underline">Top players</Link>
         <Link href="/learn" className="mx-1.5 hover:underline">Learn</Link>
         <a href={`${import.meta.env.BASE_URL}download`} className="mx-1.5 hover:underline">Get the app</a>
         <Link href="/privacy" className="mx-1.5 hover:underline">Privacy</Link>
