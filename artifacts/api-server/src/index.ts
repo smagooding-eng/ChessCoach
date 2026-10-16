@@ -407,6 +407,8 @@ httpServer.listen(port, (err?: Error) => {
 runSchemaMigrations().then(() => {
   // Public player pages: table + slow weekly refresh from Chess.com.
   ensurePublicPlayersTable().then(() => startPublicPlayersRefresher()).catch((err) => logger.warn({ err }, 'public players setup failed'));
+  // IndexNow: full submission of public pages at most once a week.
+  import("./lib/indexNow").then(({ startIndexNow }) => startIndexNow()).catch((err) => logger.warn({ err }, 'indexnow start failed'));
   void seedBotPersonas().catch((err) => logger.warn({ err }, 'seedBotPersonas failed'));
   import("./lib/growthScheduler").then(({ startGrowthScheduler }) => {
     startGrowthScheduler();

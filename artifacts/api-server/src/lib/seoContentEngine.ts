@@ -2,6 +2,7 @@ import OpenAI from "openai";
 import { db, seoArticlesTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { logger } from "./logger";
+import { pingIndexNow } from "./indexNow";
 import { trackAiUsage, AI_FEATURES } from "./aiUsageTracker";
 
 // Long-tail keywords targeting real, specific frustration a chess player
@@ -180,5 +181,6 @@ export async function generateNextSeoArticle(): Promise<{ published: boolean; sl
   });
 
   logger.info({ slug, keyword: nextKeyword }, "[seo] Published new article");
+  pingIndexNow([`/learn/${slug}`, "/learn"]);
   return { published: true, slug };
 }

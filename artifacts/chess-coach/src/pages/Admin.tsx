@@ -5040,6 +5040,32 @@ function SeoArticlesPanel() {
 
   useEffect(() => { loadArticles(); }, [loadArticles]);
 
+  // IndexNow (Bing and others): last full submission + a manual "submit now".
+  const [indexNow, setIndexNow] = useState<{ lastFullAt: string | null; lastCount: number | null } | null>(null);
+  const [indexNowBusy, setIndexNowBusy] = useState(false);
+  const [indexNowMsg, setIndexNowMsg] = useState('');
+  const loadIndexNow = useCallback(async () => {
+    try {
+      const res = await apiFetch('/api/admin/indexnow/status', { credentials: 'include' });
+      if (res.ok) setIndexNow(await res.json());
+    } catch { /* ignore */ }
+  }, []);
+  useEffect(() => { loadIndexNow(); }, [loadIndexNow]);
+  const submitIndexNow = async () => {
+    setIndexNowBusy(true);
+    setIndexNowMsg('');
+    try {
+      const res = await apiFetch('/api/admin/indexnow/submit-all', { method: 'POST', credentials: 'include' });
+      const d = await res.json();
+      if (res.ok && d.submitted) setIndexNowMsg(`Submitted ${d.submitted} pages to Bing (IndexNow)${d.status === 202 ? ', key check pending' : ''}.`);
+      else setIndexNowMsg(d.skipped ? `Not sent: ${d.skipped}` : `IndexNow rejected the request${d.status ? ` (HTTP ${d.status})` : ''}.`);
+      loadIndexNow();
+    } catch {
+      setIndexNowMsg('Submission failed — network error');
+    }
+    setIndexNowBusy(false);
+  };
+
   const generateNow = async () => {
     setGenerating(true);
     setGenerateMsg('');
@@ -5105,6 +5131,26 @@ function SeoArticlesPanel() {
       {generateMsg && (
         <p className="text-xs mb-3 px-3 py-2 rounded-lg" style={{ background: 'rgba(129,182,76,0.08)', color: CHESSCOM_GREEN }}>{generateMsg}</p>
       )}
+
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl px-3.5 py-3" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+        <div className="min-w-0">
+          <p className="text-sm font-semibold" style={{ color: TEXT_LIGHT }}>Bing IndexNow</p>
+          <p className="text-[11px]" style={{ color: TEXT_MUTED }}>
+            New articles and refreshed player pages are sent automatically; every public page is re-sent weekly.
+            {indexNow?.lastFullAt ? ` Last full submission: ${new Date(indexNow.lastFullAt).toLocaleString()} (${indexNow.lastCount ?? 0} pages).` : ' No full submission yet.'}
+          </p>
+          {indexNowMsg && <p className="text-[11px] mt-1 font-semibold" style={{ color: TEXT_LIGHT }}>{indexNowMsg}</p>}
+        </div>
+        <button
+          onClick={submitIndexNow}
+          disabled={indexNowBusy}
+          className="px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 disabled:opacity-50"
+          style={{ background: 'rgba(255,255,255,0.08)', color: TEXT_LIGHT, border: '1px solid rgba(255,255,255,0.12)' }}
+        >
+          {indexNowBusy ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+          Submit all now
+        </button>
+      </div>
 
       {loading ? (
         <div className="py-8 text-center"><Loader2 className="w-5 h-5 animate-spin mx-auto" style={{ color: TEXT_MUTED }} /></div>

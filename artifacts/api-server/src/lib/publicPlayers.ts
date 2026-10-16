@@ -1,6 +1,7 @@
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { logger } from "./logger";
+import { pingIndexNow } from "./indexNow";
 import { fetchChessComProfile, fetchChessComArchiveList, fetchChessComGamesForArchive, extractOpeningFromPgn, type ChessComGame } from "./chesscom";
 
 // Public player pages (chessscout.net/players/<username>): what well-known
@@ -151,6 +152,7 @@ let running = false;
 async function refreshPass(limit: number) {
   if (running) return;
   running = true;
+  const updated: string[] = [];
   try {
     await seedList();
     const due = await db.execute(sql`SELECT slug FROM public_players
@@ -161,6 +163,7 @@ async function refreshPass(limit: number) {
         const data = await buildPlayer(row.slug);
         if (data) {
           await db.execute(sql`UPDATE public_players SET data = ${JSON.stringify(data)}::jsonb, games = ${data.period.games}, updated_at = now() WHERE slug = ${row.slug}`);
+          updated.push(`/players/${encodeURIComponent(row.slug)}`);
         } else {
           // Not found or not enough games: try again next week rather than every pass.
           await db.execute(sql`UPDATE public_players SET updated_at = now() WHERE slug = ${row.slug}`);
@@ -168,7 +171,11 @@ async function refreshPass(limit: number) {
       } catch (err) { logger.warn({ err, slug: row.slug }, "[players] build failed"); }
       await sleep(DELAY_MS);
     }
-  } finally { running = false; }
+  } finally {
+    running = false;
+    // Tell Bing & co. about the refreshed pages (and the index that lists them).
+    if (updated.length) pingIndexNow(["/players", ...updated]);
+  }
 }
 
 /** Starts the slow background refresher: a first pass shortly after boot, then every 6 hours. */

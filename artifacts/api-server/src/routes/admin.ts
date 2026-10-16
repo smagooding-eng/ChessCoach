@@ -12,6 +12,7 @@ import { aiUsageEventsTable, bulkCrawlQueueTable } from "@workspace/db";
 import { runBulkCrawlJob } from "../lib/bulkGameCrawler";
 import { randomUUID } from "crypto";
 import OpenAI from "openai";
+import { pingIndexNow, submitToIndexNow, allPublicPaths } from "../lib/indexNow";
 
 const router: IRouter = Router();
 
@@ -738,17 +739,46 @@ router.patch("/admin/seo-articles/:id", requireAdmin, async (req: Request, res: 
       res.status(400).json({ error: "published (boolean) is required" });
       return;
     }
-    await db.update(seoArticlesTable).set({ published }).where(eq(seoArticlesTable.id, id));
+    const [art] = await db.update(seoArticlesTable).set({ published }).where(eq(seoArticlesTable.id, id)).returning({ slug: seoArticlesTable.slug });
+    // Published: let engines index it. Unpublished: let them recrawl and drop it.
+    if (art?.slug) pingIndexNow([`/learn/${art.slug}`, "/learn"]);
     res.json({ success: true });
   } catch (err: any) {
     res.status(500).json({ error: "Failed to update article", details: err.message });
   }
 });
 
+// IndexNow: submit every public page now (Bing, Yandex and others).
+router.post("/admin/indexnow/submit-all", requireAdmin, async (_req: Request, res: Response) => {
+  try {
+    const paths = await allPublicPaths();
+    const result = await submitToIndexNow(paths, { force: true });
+    if (result.submitted) {
+      await db.execute(sql`INSERT INTO indexnow_state (id, last_full_at, last_count) VALUES ('main', now(), ${result.submitted})
+        ON CONFLICT (id) DO UPDATE SET last_full_at = now(), last_count = ${result.submitted}`).catch(() => {});
+    }
+    res.json({ ...result, total: paths.length });
+  } catch (err: any) {
+    res.status(500).json({ error: "IndexNow submission failed", details: err.message });
+  }
+});
+
+router.get("/admin/indexnow/status", requireAdmin, async (_req: Request, res: Response) => {
+  try {
+    await db.execute(sql`CREATE TABLE IF NOT EXISTS indexnow_state (id VARCHAR PRIMARY KEY, last_full_at TIMESTAMPTZ, last_count INTEGER)`);
+    const r: any = await db.execute(sql`SELECT last_full_at, last_count FROM indexnow_state WHERE id = 'main'`);
+    const rows = Array.isArray(r) ? r : r?.rows ?? [];
+    res.json({ lastFullAt: rows[0]?.last_full_at ?? null, lastCount: rows[0]?.last_count ?? null });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to load IndexNow status" });
+  }
+});
+
 router.delete("/admin/seo-articles/:id", requireAdmin, async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
-    await db.delete(seoArticlesTable).where(eq(seoArticlesTable.id, id));
+    const [art] = await db.delete(seoArticlesTable).where(eq(seoArticlesTable.id, id)).returning({ slug: seoArticlesTable.slug });
+    if (art?.slug) pingIndexNow([`/learn/${art.slug}`, "/learn"]);
     res.json({ success: true });
   } catch (err: any) {
     res.status(500).json({ error: "Failed to delete article", details: err.message });
