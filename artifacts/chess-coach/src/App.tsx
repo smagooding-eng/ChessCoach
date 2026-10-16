@@ -334,7 +334,8 @@ function PageTracker() {
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
       // automated: the browser says it's driven by a script (headless/test tools)
-      body: JSON.stringify({ path: location, visitorId: getVisitorId(), automated: navigator.webdriver === true }),
+      // ownTool: our own screenshot tools add ?cs_shot=1 (Share Kit, store and link-preview shots)
+      body: JSON.stringify({ path: location, visitorId: getVisitorId(), automated: navigator.webdriver === true, ownTool: new URLSearchParams(window.location.search).has('cs_shot') }),
     }).catch(() => {});
   }, [location]);
   return null;

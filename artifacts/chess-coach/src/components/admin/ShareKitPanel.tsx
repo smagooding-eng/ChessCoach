@@ -58,7 +58,8 @@ function Card({ item, url, view, live }: { item: Item; url: string; view: View; 
   const [copied, setCopied] = useState(false);
   const [bust, setBust] = useState(0);
   const [failed, setFailed] = useState(false);
-  const shot = shotUrl(`${SITE}${item.path}`, view, bust);
+  // ?cs_shot=1 marks the screenshot service's visit as ours in the bot stats.
+  const shot = shotUrl(`${SITE}${item.path}${item.path.includes('?') ? '&' : '?'}cs_shot=1`, view, bust);
   const canShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function';
   const copy = async () => {
     try { await navigator.clipboard.writeText(url); } catch {

@@ -75,12 +75,12 @@ router.use(tournamentsRouter);
 
 router.post("/track", async (req: Request, res: Response) => {
   try {
-    const { path, visitorId, automated } = req.body;
+    const { path, visitorId, automated, ownTool } = req.body;
     if (!path) { res.status(400).json({ error: "path required" }); return; }
     const ip = req.headers["x-forwarded-for"]?.toString().split(",")[0]?.trim() || req.ip || "unknown";
     // Bots go to their own table, so page views and visitors are people only.
     const ua = String(req.headers["user-agent"] ?? "").slice(0, 400);
-    const kind = req.user?.id ? null : botKind(ua, automated === true);
+    const kind = req.user?.id ? null : ownTool === true ? "ChessScout's own tools" : botKind(ua, automated === true);
     if (kind) {
       await db.execute(sql`INSERT INTO bot_visits (path, kind, user_agent, ip_address, source) VALUES (${String(path).slice(0, 300)}, ${kind}, ${ua}, ${ip}, 'browser')`);
       res.json({ ok: true });

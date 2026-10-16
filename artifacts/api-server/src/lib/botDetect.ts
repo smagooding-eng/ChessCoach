@@ -4,6 +4,9 @@
 // number in Admin (views, visitors, funnel) leaves them out.
 
 const KINDS: [RegExp, string][] = [
+  // Our own tools: store/link-preview screenshot jobs, and the Share Kit's
+  // screenshot service (Microlink, which renders pages in headless Chrome).
+  [/chessscoutstoreshots|chessscout-shots|microlink/i, "ChessScout's own tools"],
   [/facebookexternalhit|facebot|meta-externalagent|meta-externalfetcher/i, "Facebook"],
   [/googlebot|google-inspectiontool|googleother|adsbot-google|mediapartners-google|google-read-aloud|storebot-google|google-pagerenderer/i, "Google"],
   [/bingbot|bingpreview|msnbot|adidxbot/i, "Bing"],

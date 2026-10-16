@@ -14,6 +14,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ClubOutreachPanel } from '@/components/admin/ClubOutreachPanel';
 import { ShareKitPanel } from '@/components/admin/ShareKitPanel';
 import { EmailTrackingPanel } from '@/components/admin/EmailTrackingPanel';
+import { BotVisitsPanel } from '@/components/admin/BotVisitsPanel';
 import {
   Activity, AlertCircle, Bold, Brain, Camera, Check, CheckCircle2, ChevronDown, ChevronRight,
   Copy, CreditCard, Crown, DollarSign, Edit3, Eye, FileText, Gamepad2, Gift, GraduationCap, Heading1, Heading2,
@@ -312,6 +313,7 @@ export function Admin() {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'traffic' | 'ai' | 'users' | 'growth' | 'tournaments' | 'tools'>('overview');
   const [showUsers, setShowUsers] = useState(false);
+  const [showBots, setShowBots] = useState(false);
   const [showSubscribers, setShowSubscribers] = useState(false);
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [emailRecipients, setEmailRecipients] = useState<string[]>([]);
@@ -528,7 +530,8 @@ export function Admin() {
               secondary={stats.bots.today}
               secondaryLabel="Today"
               accent="#9e9b98"
-              footnote={`Not counted in page views or visitors above. ${stats.bots.todayKinds.length
+              onClick={() => setShowBots(true)}
+              footnote={`Tap to see who they are. Not counted in page views or visitors above. ${stats.bots.todayKinds.length
                 ? `Today: ${stats.bots.todayKinds.map((k) => `${k.kind} ${fmt(k.views)}`).join(' · ')}.`
                 : stats.bots.weekKinds.length ? `Last 7 days: ${stats.bots.weekKinds.map((k) => `${k.kind} ${fmt(k.views)}`).join(' · ')}.` : 'None recorded yet.'} Counting started Oct 16, 2026; earlier views may include some bots.`}
             />
@@ -583,6 +586,7 @@ export function Admin() {
 
       <AnimatePresence>
         {showUsers && <UserListPanel onClose={() => setShowUsers(false)} onEmailUsers={handleEmailUsers} />}
+        {showBots && <BotVisitsPanel onClose={() => setShowBots(false)} />}
         {showSubscribers && <SubscribersPanel onClose={() => setShowSubscribers(false)} />}
       </AnimatePresence>
 

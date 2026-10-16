@@ -106,6 +106,23 @@ function startOfTodayEastern(): Date {
 // Games played on ChessScout: live games (split into people vs bots) and
 // finished daily games, counted for today, yesterday, this week (from
 // Monday), the last 30 and 90 days, and all time. Days follow US Eastern time.
+// Recent bot visits with who they were (user agent, IP, page), so the admin
+// can see where bot traffic actually comes from.
+router.get("/admin/bot-visits", requireAdmin, async (_req: Request, res: Response) => {
+  try {
+    const recent = (await db.execute(sql`
+      SELECT kind, path, user_agent, ip_address, source, created_at FROM bot_visits
+      ORDER BY created_at DESC LIMIT 150`)).rows;
+    const byIp = (await db.execute(sql`
+      SELECT ip_address, kind, COUNT(*) AS visits, MIN(user_agent) AS user_agent, MAX(created_at) AS last_seen
+      FROM bot_visits WHERE created_at > now() - interval '7 days'
+      GROUP BY ip_address, kind ORDER BY visits DESC LIMIT 30`)).rows;
+    res.json({ recent, byIp });
+  } catch {
+    res.json({ recent: [], byIp: [] });
+  }
+});
+
 router.get("/admin/game-stats", requireAdmin, async (_req: Request, res: Response) => {
   try {
     const windows = (col: string) => sql.raw(`

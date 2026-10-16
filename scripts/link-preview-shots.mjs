@@ -23,7 +23,7 @@ const compose = await browser.newPage({ viewport: { width: 1200, height: 630 }, 
 let failed = 0;
 for (const [name, path] of PAGES) {
   try {
-    await page.goto(`${SITE}${path}`, { waitUntil: 'networkidle', timeout: 45_000 });
+    await page.goto(`${SITE}${path}?cs_shot=1`, { waitUntil: 'networkidle', timeout: 45_000 });
     await page.waitForTimeout(3500); // splash + fade-ins
     const shot = (await page.screenshot({ type: 'jpeg', quality: 88 })).toString('base64');
     const src = `data:image/jpeg;base64,${shot}`;

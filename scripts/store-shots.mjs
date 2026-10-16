@@ -36,7 +36,7 @@ for (const d of DEVICES) {
   const page = await ctx.newPage();
   for (const [name, path] of PAGES) {
     try {
-      await page.goto(`${SITE}${path}`, { waitUntil: 'networkidle', timeout: 60_000 });
+      await page.goto(`${SITE}${path}?cs_shot=1`, { waitUntil: 'networkidle', timeout: 60_000 });
       await page.waitForTimeout(4000);
       await page.screenshot({ path: `${OUT}/${d.id}/${name}.png` });
       console.log('ok', d.id, name);
