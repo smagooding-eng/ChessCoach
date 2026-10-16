@@ -550,11 +550,6 @@ export function LandingPage() {
 
       <main data-track-section="hero" className="relative z-10 mx-auto flex w-full max-w-7xl flex-1 flex-col justify-center gap-3 px-4 pb-3 sm:px-8 lg:grid lg:grid-cols-2 lg:gap-12 lg:pb-6">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }} className="lg:self-center">
-          <div className="mb-2.5 inline-flex items-center gap-2 rounded-full px-3 py-1 text-[10.5px] font-black uppercase tracking-[0.12em] sm:text-[11px]"
-            style={{ background: 'rgba(255,255,255,.07)', color: TEXT, border: '1px solid rgba(255,255,255,.12)' }}>
-            <span className="h-1.5 w-1.5 rounded-full" style={{ background: G }} /> Play smarter. Win more.
-          </div>
-
           <h1 className="font-black leading-[1.04] tracking-tight text-[clamp(2.1rem,11vw,3.2rem)] sm:text-[3.8rem] lg:text-[5rem]" style={{ color: TEXT, fontFamily: "Georgia, 'Times New Roman', serif" }}>
             Play.<br />
             Scout.<br />
@@ -565,7 +560,12 @@ export function LandingPage() {
             </span>
           </h1>
 
-          <p className="mt-3 max-w-[34rem] text-[14px] leading-snug [@media(max-height:700px)]:hidden sm:text-base sm:leading-relaxed lg:text-lg" style={{ color: 'rgba(245,247,246,0.78)' }}>
+          {/* The second half of the motto: a full line under the headline, not a small tag. */}
+          <p className="mt-3 text-[clamp(1.15rem,5.6vw,1.6rem)] font-extrabold leading-tight tracking-tight sm:text-[1.9rem] lg:text-[2.2rem]" style={{ color: TEXT }}>
+            Play smarter. <span style={{ color: G }}>Win more.</span>
+          </p>
+
+          <p className="mt-2 max-w-[34rem] text-[14px] leading-snug [@media(max-height:700px)]:hidden sm:text-base sm:leading-relaxed lg:text-lg" style={{ color: 'rgba(245,247,246,0.78)' }}>
             Play live, daily or against bots right here on ChessScout. Your coach reviews every game and shows exactly why you won or lost &mdash; and before a big game, scout what your opponent plays.
           </p>
 
