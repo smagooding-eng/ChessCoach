@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Building2, Loader2, Search, Mail, ExternalLink, X, Check, Plus, RotateCcw, ChevronRight, Ban } from 'lucide-react';
+import { Building2, Loader2, Search, Mail, ExternalLink, X, Check, Plus, RotateCcw, ChevronRight, Ban, Copy } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 
 // Club Outreach (Admin > Growth & Marketing).
@@ -35,7 +35,7 @@ const DEFAULT_TEMPLATES: Template[] = [
   {
     id: 'intro',
     name: 'Introduce ChessScout.net',
-    subject: 'A free chess tool for {{org}} players',
+    subject: "A free chess tool for {{org}}'s players",
     body: `Hi {{org}} team,
 
 I'm {{sender}}, and I build ChessScout.net, a chess site made for club players. I thought it might be useful for your members{{inCity}}.
@@ -59,7 +59,7 @@ If you'd rather not hear from me again, just reply "no thanks" and I won't email
   {
     id: 'tournament',
     name: 'Advertise a tournament',
-    subject: 'Run your next {{org}} tournament online, free',
+    subject: "Run {{org}}'s next tournament online, free",
     body: `Hi {{org}} team,
 
 I'm {{sender}} from ChessScout.net. We've just made it easy for clubs to run online tournaments for their members, and I wanted to offer it to you.
@@ -108,7 +108,7 @@ If you'd rather not hear from me again, just reply "no thanks" and I won't email
   },
 ];
 
-interface Settings { sender: string; gmail: string; address: string; tournamentLink: string }
+interface Settings { sender: string; gmail: string; address: string; tournamentLink: string; batchSize: number }
 const SETTINGS_KEY = 'cs_club_outreach_settings';
 const TEMPLATES_KEY = 'cs_club_outreach_templates';
 
@@ -117,10 +117,12 @@ function load<T>(key: string, fallback: T): T {
 }
 function save(key: string, value: unknown) { try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* ignore */ } }
 
-function fill(text: string, c: Contact, s: Settings): string {
-  const place = c.city || c.region || '';
+/** Fills a template for one organization, or (c = null) generically for a BCC batch. */
+function fill(text: string, c: Contact | null, s: Settings): string {
+  const place = c ? (c.city || c.region || '') : '';
   return text
-    .replace(/\{\{org\}\}/g, c.orgName)
+    .replace(/Hi \{\{org\}\} team,/g, c ? `Hi ${c.orgName} team,` : 'Hi there,')
+    .replace(/\{\{org\}\}/g, c ? c.orgName : 'your club')
     .replace(/\{\{city\}\}/g, place)
     .replace(/\{\{inCity\}\}/g, place ? ` in ${place}` : '')
     .replace(/\{\{sender\}\}/g, s.sender || 'Shann')
@@ -146,7 +148,7 @@ export function ClubOutreachPanel() {
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState('');
   const [selected, setSelected] = useState<Set<number>>(new Set());
-  const [settings, setSettings] = useState<Settings>(() => load(SETTINGS_KEY, { sender: 'Shann', gmail: '', address: '', tournamentLink: '' }));
+  const [settings, setSettings] = useState<Settings>(() => load(SETTINGS_KEY, { sender: 'Shann', gmail: '', address: '', tournamentLink: '', batchSize: 40 }));
   const [overrides, setOverrides] = useState<Record<string, { subject: string; body: string }>>(() => load(TEMPLATES_KEY, {}));
   const [templateId, setTemplateId] = useState('intro');
   const [editing, setEditing] = useState(false);
@@ -211,6 +213,42 @@ export function ClubOutreachPanel() {
   const toggleAll = () => setSelected(allSelected ? new Set() : new Set(contacts.map((c) => c.id)));
   const toggle = (id: number) => setSelected((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
 
+  // BCC batches: copy/paste addresses or open one Gmail draft per batch.
+  const [batches, setBatches] = useState<Contact[][] | null>(null);
+  const [bi, setBi] = useState(0);
+  const [copied, setCopied] = useState('');
+  const batchSize = Math.max(5, Math.min(100, Number(settings.batchSize) || 40));
+  const startBatches = () => {
+    const list = contacts.filter((c) => selected.has(c.id));
+    if (!list.length) return;
+    if (!settings.address.trim()) { setMsg('Add your mailing address in Sender details first. Marketing emails must include one.'); setEditing(true); return; }
+    const out: Contact[][] = [];
+    for (let i = 0; i < list.length; i += batchSize) out.push(list.slice(i, i + batchSize));
+    setBatches(out); setBi(0); setCopied('');
+  };
+  const copyText = async (text: string, what: string) => {
+    try { await navigator.clipboard.writeText(text); } catch {
+      const t = document.createElement('textarea'); t.value = text; document.body.appendChild(t); t.select();
+      try { document.execCommand('copy'); } catch { /* ignore */ } t.remove();
+    }
+    setCopied(what); setTimeout(() => setCopied(''), 1800);
+  };
+  const batch = batches?.[bi] ?? null;
+  const bulkSubject = fill(template.subject, null, settings);
+  const bulkBody = fill(template.body, null, settings);
+  const finishBatch = async () => {
+    if (!batch || !batches) return;
+    await setStatus(batch.map((c) => c.id), 'contacted', template.id);
+    if (bi + 1 >= batches.length) { setBatches(null); setSelected(new Set()); void loadData(); }
+    else { setBi(bi + 1); setCopied(''); }
+  };
+  const openBccDraft = () => {
+    if (!batch) return;
+    const p = new URLSearchParams({ view: 'cm', fs: '1', to: settings.gmail || '', bcc: batch.map((c) => c.email).join(','), su: bulkSubject, body: bulkBody });
+    if (settings.gmail) p.set('authuser', settings.gmail);
+    window.open(`https://mail.google.com/mail/?${p.toString()}`, '_blank', 'noopener');
+  };
+
   const startQueue = () => {
     const list = contacts.filter((c) => selected.has(c.id));
     if (!list.length) return;
@@ -246,7 +284,7 @@ export function ClubOutreachPanel() {
           </h2>
           <p className="mt-1 text-xs" style={{ color: MUTED }}>
             Chess clubs, school and college clubs, leagues, associations, organizers and coaches that list a contact email on their own website.
-            New ones are found every Monday; use the button for more. Each email goes out from your Gmail, one at a time.
+            New ones are found every Monday; use the button for more. Send from your Gmail one at a time, or copy addresses into Bcc batches.
           </p>
         </div>
         <button onClick={discover} disabled={running} className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold disabled:opacity-60" style={{ background: GREEN, color: '#fff' }}>
@@ -275,6 +313,7 @@ export function ClubOutreachPanel() {
               <div><p className={LABEL}>Gmail to send from</p><input className={INPUT} placeholder="you@gmail.com" value={settings.gmail} onChange={(e) => updateSettings({ gmail: e.target.value.trim() })} /></div>
               <div><p className={LABEL}>Mailing address (required by anti-spam law)</p><input className={INPUT} placeholder="Street, City, State ZIP (a PO box is fine)" value={settings.address} onChange={(e) => updateSettings({ address: e.target.value })} /></div>
               <div><p className={LABEL}>Tournament link to promote (optional)</p><input className={INPUT} placeholder="https://chessscout.net/tournaments/…" value={settings.tournamentLink} onChange={(e) => updateSettings({ tournamentLink: e.target.value.trim() })} /></div>
+              <div><p className={LABEL}>Addresses per BCC batch</p><input className={INPUT} type="number" min={5} max={100} value={settings.batchSize} onChange={(e) => updateSettings({ batchSize: Number(e.target.value) || 40 })} /></div>
               <p className="text-[11px]" style={{ color: MUTED }}>Saved on this device.</p>
             </div>
           ) : (
@@ -301,7 +340,7 @@ export function ClubOutreachPanel() {
       {/* Status tabs */}
       <div className="flex flex-wrap items-center gap-1.5">
         {STATUS_TABS.map((s) => {
-          const n = s.id === 'all' ? Object.values(counts).reduce((a: number, b: number) => a + b, 0) : counts[s.id] ?? 0;
+          const n = s.id === 'all' ? (Object.values(counts) as number[]).reduce((a, b) => a + b, 0) : counts[s.id] ?? 0;
           return (
             <button key={s.id} onClick={() => setTab(s.id)} className="rounded-lg px-2.5 py-1.5 text-xs font-bold"
               style={tab === s.id ? { background: 'rgba(255,255,255,.12)', color: '#fff' } : { color: MUTED }}>
@@ -332,7 +371,14 @@ export function ClubOutreachPanel() {
         <span className="text-xs" style={{ color: MUTED }}>{selected.size} selected · {contactedToday} contacted today</span>
         <div className="ml-auto flex flex-wrap gap-1.5">
           <button onClick={startQueue} disabled={!selected.size} className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold disabled:opacity-50" style={{ background: GREEN, color: '#fff' }}>
-            <Mail size={13} /> Email selected
+            <Mail size={13} /> Email one by one
+          </button>
+          <button onClick={startBatches} disabled={!selected.size} className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold disabled:opacity-50" style={{ background: 'rgba(255,255,255,.1)', color: '#fff' }}>
+            <Copy size={13} /> BCC batches
+          </button>
+          <button onClick={() => copyText(contacts.filter((c) => selected.has(c.id)).map((c) => c.email).join(', '), 'list')} disabled={!selected.size}
+            className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-bold disabled:opacity-50" style={{ background: 'rgba(255,255,255,.06)', color: '#fff' }}>
+            {copied === 'list' ? <Check size={13} /> : <Copy size={13} />} {copied === 'list' ? 'Copied' : 'Copy emails'}
           </button>
           {tab !== 'replied' && (
             <button onClick={async () => { await setStatus([...selected], 'replied'); setSelected(new Set()); void loadData(); }} disabled={!selected.size}
@@ -377,6 +423,44 @@ export function ClubOutreachPanel() {
               <button onClick={() => neverContact(c)} title="Never contact" aria-label="Never contact" className="shrink-0 rounded-md p-1.5 hover:bg-white/5" style={{ color: MUTED }}><Ban size={14} /></button>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* BCC batches */}
+      {batches && batch && (
+        <div className="fixed inset-0 z-[95] flex items-end justify-center p-0 sm:items-center sm:p-4" style={{ background: 'rgba(0,0,0,.6)' }}>
+          <div className="max-h-[92vh] w-full max-w-[640px] space-y-3 overflow-y-auto rounded-t-2xl p-5 sm:rounded-2xl" style={{ background: '#262421', border: '1px solid rgba(255,255,255,.1)' }}>
+            <div className="flex items-center gap-2">
+              <p className="flex-1 text-sm font-bold text-white">Batch {bi + 1} of {batches.length} · {batch.length} addresses</p>
+              <button onClick={() => { setBatches(null); void loadData(); }} aria-label="Close" className="p-1" style={{ color: MUTED }}><X size={18} /></button>
+            </div>
+            <div className="h-1.5 overflow-hidden rounded-full bg-white/10"><div className="h-full" style={{ width: `${(bi / batches.length) * 100}%`, background: GREEN }} /></div>
+            <p className="text-[12px]" style={{ color: MUTED }}>
+              Put these in <b className="text-white">Bcc</b> (never To or Cc) so organizations can't see each other's addresses. The message uses a general greeting since it goes to several clubs.
+            </p>
+            <div className="max-h-[110px] overflow-y-auto rounded-lg p-2.5 font-mono text-[11.5px] text-white/80" style={{ background: 'rgba(0,0,0,.3)' }}>
+              {batch.map((c) => c.email).join(', ')}
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <button onClick={() => copyText(batch.map((c) => c.email).join(', '), 'bcc')} className="inline-flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-xs font-bold text-white" style={{ background: 'rgba(255,255,255,.08)' }}>
+                {copied === 'bcc' ? <Check size={14} /> : <Copy size={14} />} {copied === 'bcc' ? 'Copied' : 'Copy addresses'}
+              </button>
+              <button onClick={() => copyText(`${bulkSubject}\n\n${bulkBody}`, 'msg')} className="inline-flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-xs font-bold text-white" style={{ background: 'rgba(255,255,255,.08)' }}>
+                {copied === 'msg' ? <Check size={14} /> : <Copy size={14} />} {copied === 'msg' ? 'Copied' : 'Copy subject + message'}
+              </button>
+            </div>
+            <p className="text-sm font-bold text-white">{bulkSubject}</p>
+            <pre className="max-h-[240px] overflow-y-auto whitespace-pre-wrap rounded-lg p-3 text-[12.5px] text-white/85" style={{ background: 'rgba(0,0,0,.3)', fontFamily: 'inherit' }}>{bulkBody}</pre>
+            <button onClick={openBccDraft} className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl py-3 text-sm font-bold" style={{ background: GREEN, color: '#fff' }}>
+              <Mail size={15} /> Open Gmail draft with these in Bcc
+            </button>
+            <button onClick={finishBatch} className="w-full rounded-xl py-2.5 text-xs font-bold text-white" style={{ background: 'rgba(255,255,255,.08)' }}>
+              {bi + 1 >= batches.length ? 'Sent — mark contacted and finish' : 'Sent — mark contacted, next batch'}
+            </button>
+            <p className="text-[11px]" style={{ color: MUTED }}>
+              Gmail allows about 500 recipients a day on a regular account. Spreading batches across the day and keeping replies flowing helps the account stay in good standing.
+            </p>
+          </div>
         </div>
       )}
 
