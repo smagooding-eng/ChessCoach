@@ -185,6 +185,15 @@
         0% { opacity: 0; transform: translateY(8px); }
         100% { opacity: 1; transform: translateY(0); }
       }
+      /* tagline under the name (replaced the loading bar) */
+      .splash-tag {
+        margin-top: 10px;
+        font-size: 15px; font-weight: 800; letter-spacing: -0.2px;
+        color: rgba(229,229,224,0.78);
+        opacity: 0;
+        animation: fadeUp 0.5s ease 1.05s forwards;
+      }
+      .splash-tag span { color: #81b64c; }
       .splash-bar-wrap {
         margin-top: 20px;
         width: 160px; height: 3px;
@@ -205,11 +214,11 @@
       }
       /* Reduced motion: just the result -- the rook standing on the pawn's square. */
       @media (prefers-reduced-motion: reduce) {
-        .sp-stage *, .splash-title, .splash-bar-wrap { animation: none !important; }
+        .sp-stage *, .splash-title, .splash-bar-wrap, .splash-tag { animation: none !important; }
         .sp-rook-pos { transform: translate(180px,110px); }
         .sp-shadow { transform: translateX(120px); opacity: .55; }
         .sp-pawn, .sp-ring, .sp-spark, .sp-pop { display: none; }
-        .sp-board, .splash-title, .splash-bar-wrap { opacity: 1; }
+        .sp-board, .splash-title, .splash-bar-wrap, .splash-tag { opacity: 1; }
         .sp-flash { opacity: .16; }
         .sp-glow { opacity: .4; }
       }
@@ -287,7 +296,7 @@
         </g>
       </svg>
       <div class="splash-title">Chess<span>Scout</span>.net</div>
-      <div class="splash-bar-wrap"><div class="splash-bar"></div></div>
+      <div class="splash-tag">Play smarter. <span>Win more.</span></div>
     </div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
