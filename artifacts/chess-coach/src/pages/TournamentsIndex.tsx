@@ -7,6 +7,7 @@ import { setPageMeta } from '@/lib/pageMeta';
 import { PT, cardStyle, greenBtn, ghostBtn } from '@/lib/playTheme';
 import { whenLabel, type TournamentSummary } from '@/components/play/Tournaments';
 import { TournamentLogo } from '@/components/play/TournamentBranding';
+import { t as tr, noGT } from '@/lib/i18n';
 
 // Public list of tournaments (signed in or not): open to join, in progress,
 // and finished, each opening its page with standings, bracket and games.
@@ -21,11 +22,11 @@ function isOpen(t: TournamentSummary) {
 
 function StatusChip({ t }: { t: TournamentSummary }) {
   const [label, dot] = t.status === 'finished'
-    ? ['Finished', PT.muted]
-    : isFull(t) ? ['Full', PT.gold]
-    : t.status === 'running' && t.format === 'bracket' ? ['Registration closed', PT.muted]
-    : t.status === 'running' ? ['Live now · open', '#FF5058']
-    : ['Open', PT.green];
+    ? [tr('Finished'), PT.muted]
+    : isFull(t) ? [tr('Full'), PT.gold]
+    : t.status === 'running' && t.format === 'bracket' ? [tr('Registration closed'), PT.muted]
+    : t.status === 'running' ? [tr('Live now · open'), '#FF5058']
+    : [tr('Open'), PT.green];
   return (
     <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full px-2 py-0.5 text-[10.5px] font-black uppercase tracking-wider"
       style={{ background: 'rgba(255,255,255,.06)', border: `1px solid ${PT.border}`, color: PT.text }}>
@@ -41,15 +42,15 @@ function Row({ t, now }: { t: TournamentSummary; now: number }) {
       <TournamentLogo t={t} size={48} />
       <span className="min-w-0 flex-1">
         <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-          <b className="truncate text-[15px] font-extrabold" style={{ color: PT.text }}>{t.name}</b>
+          <b translate="no" className="truncate text-[15px] font-extrabold" style={{ color: PT.text }}>{t.name}</b>
           <StatusChip t={t} />
-          {t.eligibility === 'pro' && <span className="rounded px-1.5 py-0.5 text-[10px] font-black uppercase tracking-wider" style={{ background: '#81B64C', color: '#FFFFFF' }}>Pro</span>}
-          {t.joined && <span className="text-[10.5px] font-black uppercase tracking-wider" style={{ color: PT.green }}>Joined</span>}
-          {t.isCreator && <span className="text-[10.5px] font-black uppercase tracking-wider" style={{ color: PT.muted }}>Yours</span>}
+          {t.eligibility === 'pro' && <span className="rounded px-1.5 py-0.5 text-[10px] font-black uppercase tracking-wider" style={{ background: '#81B64C', color: '#FFFFFF' }}>{tr('Pro')}</span>}
+          {t.joined && <span className="text-[10.5px] font-black uppercase tracking-wider" style={{ color: PT.green }}>{tr('Joined')}</span>}
+          {t.isCreator && <span className="text-[10.5px] font-black uppercase tracking-wider" style={{ color: PT.muted }}>{tr('Yours')}</span>}
         </span>
-        <span className="block truncate text-[12px]" style={{ color: PT.muted }}>{host}</span>
+        <span translate="no" className="block truncate text-[12px]" style={{ color: PT.muted }}>{host}</span>
         <span className="mt-0.5 flex flex-wrap items-center gap-x-3 text-[12px]" style={{ color: PT.muted }}>
-          <span className="inline-flex items-center gap-1"><Clock size={11} /> {t.format === 'bracket' ? 'Knockout' : 'Arena'} · {t.timeControlLabel} · {t.mode === 'ranked' ? 'Ranked' : 'Casual'}</span>
+          <span className="inline-flex items-center gap-1"><Clock size={11} /> {t.format === 'bracket' ? tr('Knockout') : tr('Arena')} · {t.timeControlLabel} · {t.mode === 'ranked' ? tr('Ranked') : tr('Casual')}</span>
           <span className="inline-flex items-center gap-1"><Users size={11} /> {t.players}{t.maxPlayers ? ` / ${t.maxPlayers}` : ''}</span>
           <span>{whenLabel(t, now)}</span>
         </span>
@@ -90,22 +91,22 @@ export function TournamentsIndex() {
   const fullUpcoming = tab === 'open' ? (data?.upcoming ?? []).filter(isFull) : [];
 
   const tabs: { id: Tab; label: string; n: number }[] = [
-    { id: 'open', label: 'Open to join', n: lists.open.length },
-    { id: 'live', label: 'In progress', n: lists.live.length },
-    { id: 'finished', label: 'Finished', n: lists.finished.length },
+    { id: 'open', label: tr('Open to join'), n: lists.open.length },
+    { id: 'live', label: tr('In progress'), n: lists.live.length },
+    { id: 'finished', label: tr('Finished'), n: lists.finished.length },
   ];
 
   return (
-    <div className="mx-auto max-w-[760px] space-y-4 p-4 pb-28 md:p-0">
+    <div {...noGT()} className="mx-auto max-w-[760px] space-y-4 p-4 pb-28 md:p-0">
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
           <h1 className="flex items-center gap-2 text-2xl font-black md:text-3xl" style={{ color: PT.text, letterSpacing: '-0.02em' }}>
-            <Trophy size={24} style={{ color: PT.gold }} /> Tournaments
+            <Trophy size={24} style={{ color: PT.gold }} /> {tr('Tournaments')}
           </h1>
-          <p className="text-[13px]" style={{ color: PT.muted }}>Arenas and knockouts, live or daily. Tap one for standings, bracket and games.</p>
+          <p className="text-[13px]" style={{ color: PT.muted }}>{tr('Arenas and knockouts, live or daily. Tap one for standings, bracket and games.')}</p>
         </div>
         <Link href={isAuthenticated ? '/tournaments/new' : '/setup'} className="inline-flex shrink-0 items-center gap-1.5 rounded-xl px-3.5 py-2.5 text-[13px] font-extrabold" style={greenBtn}>
-          <Plus size={15} /> Create
+          <Plus size={15} /> {tr('Create')}
         </Link>
       </div>
 
@@ -121,7 +122,7 @@ export function TournamentsIndex() {
 
       <label className="flex items-center gap-2 rounded-[14px] px-3.5 py-2.5" style={{ background: PT.cardSolid, border: `1px solid ${PT.border}` }}>
         <Search size={16} style={{ color: PT.muted }} />
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search by name or club" className="w-full bg-transparent text-[14px] outline-none" style={{ color: PT.text }} />
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={tr('Search by name or club')} className="w-full bg-transparent text-[14px] outline-none" style={{ color: PT.text }} />
       </label>
 
       <div className="overflow-hidden" style={cardStyle}>
@@ -130,10 +131,10 @@ export function TournamentsIndex() {
         ) : shown.length === 0 && fullUpcoming.length === 0 ? (
           <div className="space-y-3 px-4 py-10 text-center">
             <p className="text-[14px] font-bold" style={{ color: PT.text }}>
-              {tab === 'open' ? 'No tournaments open right now.' : tab === 'live' ? 'Nothing in progress right now.' : 'No finished tournaments yet.'}
+              {tab === 'open' ? tr('No tournaments open right now.') : tab === 'live' ? tr('Nothing in progress right now.') : tr('No finished tournaments yet.')}
             </p>
             <Link href={isAuthenticated ? '/tournaments/new' : '/setup'} className="inline-flex items-center gap-1.5 rounded-xl px-4 py-2.5 text-[13px] font-extrabold" style={ghostBtn}>
-              <Plus size={14} /> Create one for your friends or club
+              <Plus size={14} /> {tr('Create one for your friends or club')}
             </Link>
           </div>
         ) : (

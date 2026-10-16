@@ -11,7 +11,7 @@ let cache: { at: number; metrics: { key: string; label: string; value: number }[
 
 function rowsOf<T>(r: unknown): T[] { return Array.isArray(r) ? (r as T[]) : ((r as { rows?: T[] })?.rows ?? []); }
 
-router.get("/public/stats", async (_req: Request, res: Response) => {
+router.get("/public/site-stats", async (_req: Request, res: Response) => {
   try {
     if (!cache || Date.now() - cache.at > 10 * 60_000) {
       const [r] = rowsOf<Record<string, string>>(await db.execute(sql`

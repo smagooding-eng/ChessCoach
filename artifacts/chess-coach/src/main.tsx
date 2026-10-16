@@ -5,6 +5,7 @@ import { getApiBase, getAuthToken } from "./lib/api";
 import App from "./App";
 import "./index.css";
 import { rememberPlayAppLaunch } from "./lib/playApp";
+import { initI18n } from "./lib/i18n";
 
 // Note if we were opened by the Google Play app (hides the Play badges).
 rememberPlayAppLaunch();
@@ -72,7 +73,11 @@ window.addEventListener("unhandledrejection", (e) => {
   }
 });
 
-createRoot(document.getElementById("root")!).render(<App />);
+// Language first (loads that language's dictionary, and Google's translator for
+// non-English); never blocks for long and never throws.
+initI18n().finally(() => {
+  createRoot(document.getElementById("root")!).render(<App />);
+});
 
 // public/sw.js existed in this project already (PWA offline caching, now
 // also push notification handling -- see PieceGradientDefs... no, see

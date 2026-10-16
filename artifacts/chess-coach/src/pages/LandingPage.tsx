@@ -9,6 +9,8 @@ import { apiFetch, apiUrl, setAuthToken } from '@/lib/api';
 import { useSiteImg } from '@/hooks/use-app-config';
 import { GooglePlayBadge } from '@/components/GooglePlayBadge';
 import { SiteStatsLine, HappeningNow } from '@/components/SiteStats';
+import { t, tn, noGT } from '@/lib/i18n';
+import { LanguageSelect } from '@/components/LanguagePicker';
 
 const G = '#81B64C';
 const G_HOVER = '#6FA23E';
@@ -33,9 +35,9 @@ function clientValidEmail(email: string): boolean {
 type PwdCheck = { ok: boolean; label: string };
 function passwordChecks(pwd: string): PwdCheck[] {
   return [
-    { ok: pwd.length >= 8, label: 'At least 8 characters' },
-    { ok: /[A-Za-z]/.test(pwd), label: 'Contains a letter' },
-    { ok: /[0-9]/.test(pwd), label: 'Contains a number' },
+    { ok: pwd.length >= 8, label: t('At least 8 characters') },
+    { ok: /[A-Za-z]/.test(pwd), label: t('Contains a letter') },
+    { ok: /[0-9]/.test(pwd), label: t('Contains a number') },
   ];
 }
 
@@ -84,7 +86,7 @@ function AuthModal({ open, onClose, initialMode, externalError, context = 'defau
     if (mode === 'register') {
       trackFunnelEvent('signup_form_submitted');
       if (!clientValidEmail(email)) {
-        setError('Please enter a valid email address');
+        setError(t('Please enter a valid email address'));
         trackFunnelEvent('signup_error');
         return;
       }
@@ -111,7 +113,7 @@ function AuthModal({ open, onClose, initialMode, externalError, context = 'defau
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error || 'Something went wrong');
+        setError(data.error || t('Something went wrong'));
         if (mode === 'register') trackFunnelEvent('signup_error');
         return;
       }
@@ -122,7 +124,7 @@ function AuthModal({ open, onClose, initialMode, externalError, context = 'defau
       await refreshAuth();
       setLocation('/');
     } catch {
-      setError('Connection error. Please try again.');
+      setError(t('Connection error. Please try again.'));
       if (mode === 'register') trackFunnelEvent('signup_error');
     } finally {
       setLoading(false);
@@ -165,20 +167,20 @@ function AuthModal({ open, onClose, initialMode, externalError, context = 'defau
           style={{ background: CARD, border: `1px solid rgba(255,255,255,0.06)` }}
           onClick={(e) => e.stopPropagation()}
         >
-          <button onClick={onClose} aria-label="Close" className="absolute top-4 right-4 hover:opacity-70 transition-opacity" style={{ color: MUTED }}>
+          <button onClick={onClose} aria-label={t('Close')} className="absolute top-4 right-4 hover:opacity-70 transition-opacity" style={{ color: MUTED }}>
             <X className="w-5 h-5" />
           </button>
 
           <div className="text-center mb-6">
             <h2 className="text-2xl font-black" style={{ color: TEXT }}>
-              {mode === 'login' ? 'Welcome Back' : context === 'opponent_scout' ? 'Scout Any Opponent Free' : 'Create Your Free Account'}
+              {mode === 'login' ? t('Welcome Back') : context === 'opponent_scout' ? t('Scout Any Opponent Free') : t('Create Your Free Account')}
             </h2>
             <p className="text-sm mt-1" style={{ color: MUTED }}>
-              {mode === 'login' ? 'Sign in to your account' : 'Free to start — upgrade to Pro anytime'}
+              {mode === 'login' ? t('Sign in to your account') : t('Free to start — upgrade to Pro anytime')}
             </p>
             {mode === 'register' && (
               <p className="text-xs font-bold mt-1.5 flex items-center justify-center gap-1" style={{ color: G }}>
-                <Check className="w-3.5 h-3.5" /> No credit card required
+                <Check className="w-3.5 h-3.5" /> {t('No credit card required')}
               </p>
             )}
           </div>
@@ -198,11 +200,11 @@ function AuthModal({ open, onClose, initialMode, externalError, context = 'defau
                   <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
                   <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
                 </svg>
-                Continue with Google
+                {t('Continue with Google')}
               </button>
               <div className="flex items-center gap-3 mb-4">
                 <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.08)' }} />
-                <span className="text-xs uppercase" style={{ color: MUTED }}>or</span>
+                <span className="text-xs uppercase" style={{ color: MUTED }}>{t('or')}</span>
                 <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.08)' }} />
               </div>
             </>
@@ -214,7 +216,7 @@ function AuthModal({ open, onClose, initialMode, externalError, context = 'defau
 
           <form onSubmit={handleSubmit} className="space-y-3">
             <div>
-              <label className="block text-xs font-medium mb-1 ml-1" style={{ color: TEXT }}>Email</label>
+              <label className="block text-xs font-medium mb-1 ml-1" style={{ color: TEXT }}>{t('Email')}</label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: MUTED }} />
                 <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} onBlur={() => setEmailTouched(true)} placeholder="you@example.com" required
@@ -223,14 +225,14 @@ function AuthModal({ open, onClose, initialMode, externalError, context = 'defau
                   onFocus={e => (e.target.style.borderColor = G)} />
               </div>
               {mode === 'register' && emailTouched && email && !clientValidEmail(email) && (
-                <p className="text-[11px] mt-1 ml-1" style={{ color: '#ef6b6b' }}>That doesn't look like a valid email address.</p>
+                <p className="text-[11px] mt-1 ml-1" style={{ color: '#ef6b6b' }}>{t("That doesn't look like a valid email address.")}</p>
               )}
             </div>
             <div>
-              <label className="block text-xs font-medium mb-1 ml-1" style={{ color: TEXT }}>Password</label>
+              <label className="block text-xs font-medium mb-1 ml-1" style={{ color: TEXT }}>{t('Password')}</label>
               <div className="relative">
                 <input type={showPassword ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)}
-                  placeholder={mode === 'register' ? 'At least 8 chars, with letters & numbers' : 'Your password'} required minLength={mode === 'register' ? 8 : undefined}
+                  placeholder={mode === 'register' ? t('At least 8 chars, with letters & numbers') : t('Your password')} required minLength={mode === 'register' ? 8 : undefined}
                   className="w-full px-4 py-3 pr-10 rounded-xl text-sm outline-none transition-all"
                   style={{ background: 'rgba(255,255,255,0.05)', border: '2px solid rgba(255,255,255,0.08)', color: TEXT }}
                   onFocus={e => (e.target.style.borderColor = G)}
@@ -258,9 +260,9 @@ function AuthModal({ open, onClose, initialMode, externalError, context = 'defau
               {loading ? (
                 <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
               ) : mode === 'register' ? (
-                <><UserPlus className="w-4 h-4" />{context === 'opponent_scout' ? 'Scout Any Opponent Free' : 'Create Free Account'}</>
+                <><UserPlus className="w-4 h-4" />{context === 'opponent_scout' ? t('Scout Any Opponent Free') : t('Create Free Account')}</>
               ) : (
-                <><LogIn className="w-4 h-4" />Sign In</>
+                <><LogIn className="w-4 h-4" />{t('Sign In')}</>
               )}
               {!loading && <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />}
             </button>
@@ -268,9 +270,9 @@ function AuthModal({ open, onClose, initialMode, externalError, context = 'defau
 
           <div className="mt-5 text-center text-sm" style={{ color: MUTED }}>
             {mode === 'login' ? (
-              <>Don't have an account?{' '}<button onClick={() => { setMode('register'); setError(''); }} className="font-medium hover:underline" style={{ color: G }}>Sign up</button></>
+              <>{t("Don't have an account?")}{' '}<button onClick={() => { setMode('register'); setError(''); }} className="font-medium hover:underline" style={{ color: G }}>{t('Sign up')}</button></>
             ) : (
-              <>Already have an account?{' '}<button onClick={() => { setMode('login'); setError(''); }} className="font-medium hover:underline" style={{ color: G }}>Sign in</button></>
+              <>{t('Already have an account?')}{' '}<button onClick={() => { setMode('login'); setError(''); }} className="font-medium hover:underline" style={{ color: G }}>{t('Sign in')}</button></>
             )}
           </div>
         </motion.div>
@@ -394,7 +396,7 @@ function ExampleBoard() {
   // the same exact grid. Light squares are a single background rect, so there are no
   // light/light edges at all, and dark squares use crispEdges to avoid hairline gaps.
   return (
-    <div className="relative aspect-square w-full overflow-hidden rounded-lg" style={{ border: '1px solid rgba(255,255,255,0.12)' }} role="img" aria-label="Example position with a missed winning tactic">
+    <div className="relative aspect-square w-full overflow-hidden rounded-lg" style={{ border: '1px solid rgba(255,255,255,0.12)' }} role="img" aria-label={t('Example position with a missed winning tactic')}>
       <svg viewBox="0 0 8 8" className="block h-full w-full" preserveAspectRatio="none">
         <rect x="0" y="0" width="8" height="8" fill="#C9D3B6" />
         {Array.from({ length: 64 }, (_, i) => {
@@ -417,9 +419,9 @@ function ExampleBoard() {
 
 function PersonalAnalysisCard() {
   const rows = [
-    { icon: Crosshair, name: 'Tactical Awareness', level: 'HIGH', pct: 72, color: '#FF5058', note: 'You missed tactical opportunities in 7 of your last 20 games.' },
-    { icon: BookOpen, name: 'Opening Preparation', level: 'MEDIUM', pct: 38, color: '#F2A93B', note: '' },
-    { icon: Brain, name: 'Positional Play', level: 'LOW', pct: 22, color: G, note: '' },
+    { icon: Crosshair, name: t('Tactical Awareness'), level: t('HIGH'), pct: 72, color: '#FF5058', note: t('You missed tactical opportunities in 7 of your last 20 games.') },
+    { icon: BookOpen, name: t('Opening Preparation'), level: t('MEDIUM'), pct: 38, color: '#F2A93B', note: '' },
+    { icon: Brain, name: t('Positional Play'), level: t('LOW'), pct: 22, color: G, note: '' },
   ];
   return (
     <div className="grid grid-cols-[1.45fr_1fr] overflow-hidden rounded-[20px]"
@@ -427,7 +429,7 @@ function PersonalAnalysisCard() {
       <div className="min-w-0 p-2.5 sm:p-5">
         <div className="mb-2 flex items-center gap-2 sm:mb-4">
           <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full sm:h-9 sm:w-9" style={{ background: '#81B64C' }}><Target className="h-3.5 w-3.5 sm:h-4 sm:w-4" style={{ color: '#FFFFFF' }} /></span>
-          <span className="text-[10px] font-black uppercase leading-tight tracking-[0.08em] sm:text-[12px]" style={{ color: G }}>Your personal analysis</span>
+          <span className="text-[10px] font-black uppercase leading-tight tracking-[0.08em] sm:text-[12px]" style={{ color: G }}>{t('Your personal analysis')}</span>
         </div>
         <div className="space-y-2 sm:space-y-4">
           {rows.map((r) => (
@@ -449,10 +451,10 @@ function PersonalAnalysisCard() {
         </div>
       </div>
       <div className="min-w-0 p-2.5 sm:p-5" style={{ borderLeft: '1px solid rgba(255,255,255,0.08)' }}>
-        <p className="mb-1.5 text-[9px] font-black uppercase leading-tight tracking-[0.06em] sm:mb-2 sm:text-[11px]" style={{ color: MUTED }}>A real example from your game</p>
+        <p className="mb-1.5 text-[9px] font-black uppercase leading-tight tracking-[0.06em] sm:mb-2 sm:text-[11px]" style={{ color: MUTED }}>{t('A real example from your game')}</p>
         <ExampleBoard />
-        <p className="mt-1.5 text-[12px] font-bold sm:mt-2 sm:text-[14px]" style={{ color: TEXT }}>You played <span style={{ color: '#FF5058' }}>18. Qe2?</span></p>
-        <p className="mt-0.5 text-[10px] leading-snug [@media(max-height:780px)]:hidden sm:text-[12px]" style={{ color: MUTED }}>You missed a winning combination. ChessScout shows you exactly what to look for and how to fix it.</p>
+        <p className="mt-1.5 text-[12px] font-bold sm:mt-2 sm:text-[14px]" style={{ color: TEXT }}>{tn('You played {move}', { move: <span translate="no" style={{ color: '#FF5058' }}>18. Qe2?</span> })}</p>
+        <p className="mt-0.5 text-[10px] leading-snug [@media(max-height:780px)]:hidden sm:text-[12px]" style={{ color: MUTED }}>{t('You missed a winning combination. ChessScout shows you exactly what to look for and how to fix it.')}</p>
       </div>
     </div>
   );
@@ -480,11 +482,11 @@ export function LandingPage() {
     const urlError = params.get('error');
     if (urlError === 'google_not_configured') {
       trackFunnelEvent('google_signup_error');
-      setOauthError('Google sign-in is not available yet. Please use email and password.');
+      setOauthError(t('Google sign-in is not available yet. Please use email and password.'));
       setAuthOpen(true);
     } else if (urlError === 'google_auth_failed') {
       trackFunnelEvent('google_signup_error');
-      setOauthError('Google sign-in failed. Please try again or use email and password.');
+      setOauthError(t('Google sign-in failed. Please try again or use email and password.'));
       setAuthOpen(true);
     }
     if (urlError || ref) {
@@ -513,13 +515,13 @@ export function LandingPage() {
   // matching part of ChessScout (Scout goes to the public player pages, so a
   // visitor can try it without signing up).
   const pillars = [
-    { icon: PlayIcon, title: 'Play', sub: 'Live · Daily · Bots', onClick: openSignup },
-    { icon: Crosshair, title: 'Scout', sub: 'See what anyone plays', onClick: () => setLocation('/players') },
-    { icon: BarChart3, title: 'Improve', sub: 'Every game reviewed', onClick: openSignup },
+    { icon: PlayIcon, title: t('Play'), sub: t('Live · Daily · Bots'), onClick: openSignup },
+    { icon: Crosshair, title: t('Scout'), sub: t('See what anyone plays'), onClick: () => setLocation('/players') },
+    { icon: BarChart3, title: t('Improve'), sub: t('Every game reviewed'), onClick: openSignup },
   ];
 
   return (
-    <div className="relative flex min-h-[100dvh] flex-col overflow-x-hidden" style={{ background: `radial-gradient(ellipse at 75% 0%, #0F2B1D 0%, #07130F 34%, ${BG} 68%)` }}>
+    <div {...noGT()} className="relative flex min-h-[100dvh] flex-col overflow-x-hidden" style={{ background: `radial-gradient(ellipse at 75% 0%, #0F2B1D 0%, #07130F 34%, ${BG} 68%)` }}>
       {/* knight art: bleeds off the right edge on phones (as in the mockup), sits fully in view on desktop */}
       <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
         <img src={siteImg(`${import.meta.env.BASE_URL}chessscout/scout-knight.webp`)} alt=""
@@ -531,19 +533,20 @@ export function LandingPage() {
 
       <nav className="relative z-20 shrink-0">
         <div className="mx-auto flex h-12 max-w-7xl items-center justify-between px-4 sm:h-16 sm:px-8">
-          <div className="flex items-baseline gap-0.5">
+          <div translate="no" className="flex items-baseline gap-0.5">
             <span className="text-[1.3rem] font-black tracking-tight" style={{ color: TEXT }}>Chess</span>
             <span className="text-[1.3rem] font-black tracking-tight" style={{ color: G }}>Scout</span>
             <span className="ml-0.5 text-sm font-bold" style={{ color: MUTED }}>.net</span>
           </div>
           <div className="flex items-center gap-4 sm:gap-6">
-            <Link href="/players" className="hidden text-sm font-medium transition-colors hover:text-white sm:inline" style={{ color: MUTED }}>Top players</Link>
-            <Link href="/pricing" className="hidden text-sm font-medium transition-colors hover:text-white sm:inline" style={{ color: MUTED }}>Pricing</Link>
-            <button onClick={openLogin} className="text-sm font-medium transition-colors hover:text-white" style={{ color: MUTED }}>Sign In</button>
+            <Link href="/players" className="hidden text-sm font-medium transition-colors hover:text-white sm:inline" style={{ color: MUTED }}>{t('Top players')}</Link>
+            <Link href="/pricing" className="hidden text-sm font-medium transition-colors hover:text-white sm:inline" style={{ color: MUTED }}>{t('Pricing')}</Link>
+            <LanguageSelect compact className="hidden text-sm font-medium sm:inline-flex" style={{ color: MUTED }} />
+            <button onClick={openLogin} className="text-sm font-medium transition-colors hover:text-white" style={{ color: MUTED }}>{t('Sign In')}</button>
             <button onClick={openSignup} className="rounded-xl px-4 py-2 text-sm font-extrabold transition-all sm:px-5 sm:py-2.5"
               style={{ background: G, color: ON_G, boxShadow: `0 6px 22px ${G}40` }}
               onMouseEnter={e => (e.currentTarget.style.background = G_HOVER)} onMouseLeave={e => (e.currentTarget.style.background = G)}>
-              Join Free
+              {t('Join Free')}
             </button>
           </div>
         </div>
@@ -552,10 +555,10 @@ export function LandingPage() {
       <main data-track-section="hero" className="relative z-10 mx-auto flex w-full max-w-7xl flex-1 flex-col justify-center gap-3 px-4 pb-3 sm:px-8 lg:grid lg:grid-cols-2 lg:gap-12 lg:pb-6">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }} className="lg:self-center">
           <h1 className="font-black leading-[1.04] tracking-tight text-[clamp(2.1rem,11vw,3.2rem)] sm:text-[3.8rem] lg:text-[5rem]" style={{ color: TEXT, fontFamily: "Georgia, 'Times New Roman', serif" }}>
-            Play.<br />
-            Scout.<br />
+            {t('Play.')}<br />
+            {t('Scout.')}<br />
             <span className="relative inline-block">
-              <span style={{ color: G }}>Improve.</span>
+              <span style={{ color: G }}>{t('Improve.')}</span>
               <motion.span aria-hidden initial={{ scaleX: 0 }} animate={{ scaleX: 1 }} transition={{ delay: 0.5, duration: 0.7, ease: 'easeOut' }}
                 className="absolute -bottom-1.5 left-0 right-0 h-1 origin-left rounded-full" style={{ background: `linear-gradient(90deg, ${G}, ${G}00)` }} />
             </span>
@@ -563,11 +566,11 @@ export function LandingPage() {
 
           {/* The second half of the motto: a full line under the headline, not a small tag. */}
           <p className="mt-3 text-[clamp(1.15rem,5.6vw,1.6rem)] font-extrabold leading-tight tracking-tight sm:text-[1.9rem] lg:text-[2.2rem]" style={{ color: TEXT }}>
-            Play smarter. <span style={{ color: G }}>Win more.</span>
+            {t('Play smarter.')} <span style={{ color: G }}>{t('Win more.')}</span>
           </p>
 
           <p className="mt-2 max-w-[34rem] text-[14px] leading-snug [@media(max-height:700px)]:hidden sm:text-base sm:leading-relaxed lg:text-lg" style={{ color: 'rgba(245,247,246,0.78)' }}>
-            Play live, daily or against bots right here on ChessScout. Your coach reviews every game and shows exactly why you won or lost &mdash; and before a big game, scout what your opponent plays.
+            {t('Play live, daily or against bots right here on ChessScout. Your coach reviews every game and shows exactly why you won or lost — and before a big game, scout what your opponent plays.')}
           </p>
 
           <div className="mt-3.5 flex flex-wrap items-center gap-2.5">
@@ -576,21 +579,21 @@ export function LandingPage() {
               style={{ background: `linear-gradient(180deg, #A8D876, ${G_HOVER})`, color: ON_G, boxShadow: `0 14px 36px -12px ${G}90` }}
               onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; }} onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; }}>
               <PlayIcon className="h-5 w-5" fill="currentColor" />
-              Play Free
+              {t('Play Free')}
               <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
             </button>
             <button onClick={openOpponentScout}
               className="inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3 text-[14px] font-extrabold transition-colors sm:py-3.5 sm:text-[15px]"
               style={{ background: 'rgba(255,255,255,.06)', color: TEXT, border: '1px solid rgba(255,255,255,.14)' }}>
               <Search className="h-4 w-4" style={{ color: G }} />
-              Scout an Opponent
+              {t('Scout an Opponent')}
             </button>
           </div>
 
           <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11.5px] font-semibold sm:gap-x-5 sm:text-[13px]" style={{ color: 'rgba(245,247,246,0.82)' }}>
-            <span className="flex items-center gap-1.5"><Check className="h-3.5 w-3.5" style={{ color: G }} /> Free to start</span>
-            <span className="flex items-center gap-1.5"><Check className="h-3.5 w-3.5" style={{ color: G }} /> No credit card required</span>
-            <span className="flex items-center gap-1.5"><Check className="h-3.5 w-3.5" style={{ color: G }} /> Cancel anytime</span>
+            <span className="flex items-center gap-1.5"><Check className="h-3.5 w-3.5" style={{ color: G }} /> {t('Free to start')}</span>
+            <span className="flex items-center gap-1.5"><Check className="h-3.5 w-3.5" style={{ color: G }} /> {t('No credit card required')}</span>
+            <span className="flex items-center gap-1.5"><Check className="h-3.5 w-3.5" style={{ color: G }} /> {t('Cancel anytime')}</span>
           </div>
           <SiteStatsLine className="mt-2 text-[12px] sm:text-[13px]" style={{ color: 'rgba(245,247,246,0.72)' }} />
           <HappeningNow className="mt-2" />
@@ -616,14 +619,15 @@ export function LandingPage() {
       </div>
 
       <footer className="relative z-10 shrink-0 px-4 pb-[max(0.4rem,env(safe-area-inset-bottom))] pt-2 text-center text-[11px]" style={{ color: MUTED }}>
-        <span className="mr-3 hidden sm:inline">For club players 400&ndash;2000 ELO.</span>
-        <Link href="/pricing" className="mx-1.5 hover:underline">Pricing</Link>
-        <Link href="/players" className="mx-1.5 hover:underline">Top players</Link>
-        <Link href="/learn" className="mx-1.5 hover:underline">Learn</Link>
-        <a href={`${import.meta.env.BASE_URL}download`} className="mx-1.5 hover:underline">Get the app</a>
-        <Link href="/privacy" className="mx-1.5 hover:underline">Privacy</Link>
-        <Link href="/terms" className="mx-1.5 hover:underline">Terms</Link>
-        <Link href="/credits" className="mx-1.5 hover:underline">Photo credits</Link>
+        <span className="mr-3 hidden sm:inline">{t('For club players 400–2000 ELO.')}</span>
+        <LanguageSelect compact className="mx-1.5 align-middle sm:hidden" />
+        <Link href="/pricing" className="mx-1.5 hover:underline">{t('Pricing')}</Link>
+        <Link href="/players" className="mx-1.5 hover:underline">{t('Top players')}</Link>
+        <Link href="/learn" className="mx-1.5 hover:underline">{t('Learn')}</Link>
+        <a href={`${import.meta.env.BASE_URL}download`} className="mx-1.5 hover:underline">{t('Get the app')}</a>
+        <Link href="/privacy" className="mx-1.5 hover:underline">{t('Privacy')}</Link>
+        <Link href="/terms" className="mx-1.5 hover:underline">{t('Terms')}</Link>
+        <Link href="/credits" className="mx-1.5 hover:underline">{t('Photo credits')}</Link>
       </footer>
 
       <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} initialMode={authMode} externalError={oauthError} context={authContext} />

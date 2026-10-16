@@ -5,6 +5,7 @@ import { playSound, SOUND_GROUPS } from '@/lib/sounds';
 import { BOARD_GROUPS, boardGroupOf } from '@/lib/boardGroups';
 import { useDashboardRedesignFlag } from '@/hooks/use-app-config';
 import { RedesignHeader } from '@/components/RedesignHeader';
+import { LanguageSettings } from '@/components/LanguagePicker';
 import { RD, REDESIGN_ON } from '@/lib/redesignTheme';
 import { PIECE_THEME_TYPES, themeTypeOf } from '@/lib/pieceThemes';
 import {
@@ -195,6 +196,8 @@ export default function SettingsPage() {
       </div>
       </>
       )}
+
+      <LanguageSettings text={TEXT_LIGHT} muted={TEXT_MUTED} card={BG_CARD} border="rgba(255,255,255,0.1)" />
 
       {redesign && (
         <section className={vis('pieces')}>

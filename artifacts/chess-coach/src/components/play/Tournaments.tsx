@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { t as tr, dateLocale } from '@/lib/i18n';
 import { Link } from 'wouter';
 import { Trophy, ChevronRight, Users, Clock, Plus } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
@@ -48,14 +49,14 @@ export function fmtCountdown(ms: number): string {
 }
 
 export function whenLabel(t: TournamentSummary, now = Date.now()): string {
-  if (t.status === 'running') return t.endsAt ? `Ends in ${fmtCountdown(new Date(t.endsAt).getTime() - now)}` : 'In progress';
+  if (t.status === 'running') return t.endsAt ? tr('Ends in {time}', { time: fmtCountdown(new Date(t.endsAt).getTime() - now) }) : tr('In progress');
   if (t.status === 'scheduled') {
     const start = new Date(t.startsAt);
     const ms = start.getTime() - now;
-    if (ms < 6 * 3600_000) return `Starts in ${fmtCountdown(ms)}`;
-    return `Starts ${start.toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}`;
+    if (ms < 6 * 3600_000) return tr('Starts in {time}', { time: fmtCountdown(ms) });
+    return tr('Starts {date}', { date: start.toLocaleString(dateLocale(), { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) });
   }
-  return t.winner ? `Won by ${t.winner}` : 'Finished';
+  return t.winner ? tr('Won by {name}', { name: t.winner }) : tr('Finished');
 }
 
 /** Running and upcoming tournaments, for the Live play lobby. Hidden when there are none. */
