@@ -17,6 +17,7 @@ const CORE: [string, string, string][] = [
   ['/pricing', 'monthly', '0.8'],
   ['/learn', 'weekly', '0.7'],
   ['/tournaments', 'daily', '0.7'],
+  ['/players', 'weekly', '0.8'],
   ['/vs/aimchess', 'monthly', '0.6'],
   ['/vs/improve-my-chess', 'monthly', '0.6'],
   ['/vs/free-chess-analysis', 'monthly', '0.6'],
