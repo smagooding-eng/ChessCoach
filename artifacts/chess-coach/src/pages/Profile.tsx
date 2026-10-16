@@ -15,6 +15,7 @@ import { useMultiEloProgress } from '@/hooks/use-elo-progress';
 import { RD } from '@/lib/redesignTheme';
 import { RedesignHeader } from '@/components/RedesignHeader';
 import { ProUpsell } from '@/components/ProUpsell';
+import { ScoutUsernameCard } from '@/components/ScoutUsernameInput';
 import {
   User, Mail, Crown, LogOut, ChevronRight, Trophy, Swords, Target, DollarSign,
   GraduationCap, Settings, Shield, Edit3, Check, X, Eye, Users, CreditCard,
@@ -1679,7 +1680,7 @@ export function Profile() {
 }
 
 function ProfileClassic() {
-  const { username, authUser, isPremium, subscription, authLogout, login, logout } = useUser();
+  const { username, authUser, isPremium, subscription, authLogout, login, logout, refreshAuth } = useUser();
   const { player } = useChessPlayer(username ?? undefined);
   const { data: summary } = useMyAnalysisSummary();
   const { data: liveRatings } = useLiveRatings();
@@ -1794,7 +1795,7 @@ function ProfileClassic() {
               </div>
             ) : (
               <div className="flex items-center gap-2">
-                <h1 className="text-xl md:text-2xl font-black tracking-tight truncate" style={{ color: TEXT }}>{player?.name || username}</h1>
+                <h1 className="text-xl md:text-2xl font-black tracking-tight truncate" style={{ color: TEXT }}>{player?.name || username || authUser?.scoutUsername || 'Player'}</h1>
                 <button onClick={() => setEditingUsername(true)} className="p-1 rounded transition-colors" style={{ color: MUTED }} onMouseEnter={e => { e.currentTarget.style.color = G; e.currentTarget.style.background = `${G}1a`; }} onMouseLeave={e => { e.currentTarget.style.color = MUTED; e.currentTarget.style.background = 'transparent'; }}>
                   <Edit3 className="w-3.5 h-3.5" />
                 </button>
@@ -1811,6 +1812,11 @@ function ProfileClassic() {
             )}
           </div>
         </div>
+        {authUser && (
+          <div className="relative mt-4">
+            <ScoutUsernameCard current={authUser.scoutUsername} onSaved={refreshAuth} text={TEXT} muted={MUTED} />
+          </div>
+        )}
       </motion.div>
 
       {authUser?.isAdmin && <AdminTicker />}
@@ -1956,7 +1962,7 @@ function ProfileClassic() {
 // referral, subscription, notifications, sign out, admin tools), in the
 // enhanced theme. Two columns on desktop.
 function ProfileRedesign() {
-  const { username, authUser, isPremium, authLogout, login, logout, isSubscriptionLoaded } = useUser();
+  const { username, authUser, isPremium, authLogout, login, logout, isSubscriptionLoaded, refreshAuth } = useUser();
   const { player } = useChessPlayer(username ?? undefined);
   const { data: summary } = useMyAnalysisSummary();
   const { data: liveRatings } = useLiveRatings();
@@ -2061,7 +2067,7 @@ function ProfileRedesign() {
                 </div>
               ) : (
                 <div className="flex items-center gap-2">
-                  <h1 className="truncate text-[24px] font-extrabold tracking-tight">{player?.name || username || 'Player'}</h1>
+                  <h1 className="truncate text-[24px] font-extrabold tracking-tight">{player?.name || username || authUser?.scoutUsername || 'Player'}</h1>
                   <button onClick={() => setEditingUsername(true)} aria-label="Edit Chess.com username" className="grid h-8 w-8 shrink-0 place-items-center rounded-full" style={{ color: RD.muted, background: 'rgba(255,255,255,.04)' }}><Edit3 size={14} /></button>
                 </div>
               )}
@@ -2070,8 +2076,14 @@ function ProfileRedesign() {
             </div>
           </div>
 
+          {authUser && (
+            <div className="relative mt-4">
+              <ScoutUsernameCard current={authUser.scoutUsername} onSaved={refreshAuth} text={RD.text} muted={RD.muted} border={RD.border} />
+            </div>
+          )}
+
           {/* Linked accounts */}
-          <div className="relative mt-4 grid grid-cols-2 gap-2">
+          <div className="relative mt-2 grid grid-cols-2 gap-2">
             {accounts.map(a => (
               <div key={a.label} className="rounded-[14px] px-3 py-2.5" style={{ background: 'rgba(255,255,255,.035)', border: `1px solid ${RD.border}` }}>
                 <p className="text-[11px] font-bold uppercase tracking-wider" style={{ color: RD.muted }}>{a.label}</p>

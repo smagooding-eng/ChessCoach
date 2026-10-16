@@ -35,6 +35,7 @@ function toSessionUser(dbUser: any): SessionUser {
     profileImageUrl: dbUser.profileImageUrl,
     chesscomUsername: dbUser.chesscomUsername,
     lichessUsername: dbUser.lichessUsername || null,
+    scoutUsername: dbUser.scoutUsername || null,
     isAdmin: dbUser.isAdmin || ADMIN_EMAILS.includes(dbUser.email?.toLowerCase?.() ?? ""),
     inviteCode: dbUser.inviteCode || null,
     emailVerified: !!dbUser.emailVerified || dbUser.authProvider === "google" || dbUser.authProvider === "local+google",
@@ -85,10 +86,76 @@ function verificationEmailHtml(name: string | null, verifyUrl: string): string {
   </div></body></html>`;
 }
 
-router.get("/auth/user", (req: Request, res: Response) => {
-  res.json({
-    user: req.isAuthenticated() ? req.user : null,
-  });
+router.get("/auth/user", async (req: Request, res: Response) => {
+  if (!req.isAuthenticated()) { res.json({ user: null }); return; }
+  // The ChessScout username can be set from another device, so read it
+  // fresh rather than trusting the copy stored in this session.
+  try {
+    const [row] = await db.select({ scoutUsername: usersTable.scoutUsername }).from(usersTable).where(eq(usersTable.id, req.user!.id)).limit(1);
+    if (row) (req.user as any).scoutUsername = row.scoutUsername ?? null;
+  } catch { /* fall back to the session copy */ }
+  res.json({ user: req.user });
+});
+
+const RESERVED_SCOUT_NAMES = new Set([
+  "admin", "administrator", "root", "support", "help", "chessscout", "chessscoutnet", "chess-scout",
+  "scout", "coach", "moderator", "mod", "staff", "system", "official", "team", "api", "www",
+  "null", "undefined", "anonymous", "guest", "player", "bot", "stockfish",
+]);
+
+function validateScoutUsername(raw: unknown): { name?: string; error?: string } {
+  const name = typeof raw === "string" ? raw.trim() : "";
+  if (name.length < 3 || name.length > 20) return { error: "Use 3 to 20 characters." };
+  if (!/^[A-Za-z0-9_-]+$/.test(name)) return { error: "Letters, numbers, - and _ only." };
+  if (!/[A-Za-z0-9]/.test(name[0])) return { error: "Start with a letter or number." };
+  if (RESERVED_SCOUT_NAMES.has(name.toLowerCase())) return { error: "That name is reserved." };
+  return { name };
+}
+
+async function scoutUsernameTaken(name: string, exceptUserId?: string): Promise<boolean> {
+  const rows = await db.select({ id: usersTable.id }).from(usersTable)
+    .where(sql`LOWER(${usersTable.scoutUsername}) = LOWER(${name})`).limit(1);
+  return rows.length > 0 && rows[0].id !== exceptUserId;
+}
+
+router.get("/auth/scout-username/check", async (req: Request, res: Response) => {
+  const v = validateScoutUsername(req.query.name);
+  if (v.error) { res.json({ available: false, error: v.error }); return; }
+  try {
+    const taken = await scoutUsernameTaken(v.name!, req.isAuthenticated() ? req.user!.id : undefined);
+    res.json(taken ? { available: false, error: "That username is taken." } : { available: true });
+  } catch {
+    res.status(500).json({ available: false, error: "Couldn't check right now." });
+  }
+});
+
+router.post("/auth/scout-username", async (req: Request, res: Response) => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Not authenticated" }); return; }
+  const v = validateScoutUsername(req.body?.username);
+  if (v.error) { res.status(400).json({ error: v.error }); return; }
+  try {
+    if (await scoutUsernameTaken(v.name!, req.user!.id)) {
+      res.status(409).json({ error: "That username is taken." });
+      return;
+    }
+    const [updated] = await db.update(usersTable).set({ scoutUsername: v.name! })
+      .where(eq(usersTable.id, req.user!.id)).returning();
+    const sessionUser = toSessionUser(updated);
+    const sid = getSessionId(req);
+    if (sid) {
+      const { updateSession } = await import("../lib/auth");
+      await updateSession(sid, { user: sessionUser });
+    }
+    req.user = sessionUser as any;
+    res.json({ user: sessionUser });
+  } catch (err: any) {
+    // Unique index race: someone else grabbed it between check and write.
+    if (String(err?.code) === "23505" || /unique/i.test(String(err?.message))) {
+      res.status(409).json({ error: "That username is taken." });
+      return;
+    }
+    res.status(500).json({ error: "Failed to save username" });
+  }
 });
 
 function generateInviteCode(): string {

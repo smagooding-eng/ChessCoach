@@ -5,6 +5,7 @@ import { useUser } from '@/hooks/use-user';
 import { apiFetch } from '@/lib/api';
 import { OnboardingStartModal } from '@/components/OnboardingStartModal';
 import { startOnboardingImport } from '@/lib/onboardingImport';
+import { ScoutUsernameInput, saveScoutUsername, type ScoutNameStatus } from '@/components/ScoutUsernameInput';
 
 const PENDING_CHALLENGE_KEY = 'cs_pending_challenge';
 
@@ -23,6 +24,8 @@ export function Welcome() {
   const { authUser, refreshAuth, login } = useUser();
   const [chesscom, setChesscom] = useState('');
   const [lichess, setLichess] = useState('');
+  const [scoutName, setScoutName] = useState(() => authUser?.scoutUsername ?? '');
+  const [scoutStatus, setScoutStatus] = useState<ScoutNameStatus>('empty');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [onboarding, setOnboarding] = useState<{ username: string; platform: 'chesscom' | 'lichess' } | null>(null);
@@ -45,13 +48,33 @@ export function Welcome() {
     e.preventDefault();
     const cc = chesscom.trim();
     const lc = lichess.trim();
-    if (!cc && !lc) {
-      setError('Enter at least one username so we can pull your games.');
+    const sn = scoutName.trim();
+    if (!cc && !lc && !sn) {
+      setError('Link Chess.com or Lichess, or pick a ChessScout.net username.');
+      return;
+    }
+    if (sn && scoutStatus === 'bad') {
+      setError('Pick a different ChessScout.net username.');
       return;
     }
     setSaving(true);
     setError(null);
     try {
+      if (sn && sn !== authUser?.scoutUsername) {
+        const err = await saveScoutUsername(sn);
+        if (err) throw new Error(err);
+      }
+      if (!cc && !lc) {
+        // No games to import: straight into the app (or the waiting challenge).
+        await refreshAuth();
+        if (pendingCode) {
+          try { localStorage.removeItem(PENDING_CHALLENGE_KEY); } catch { /* ignore */ }
+          navigate(`/challenge/${pendingCode}`, { replace: true } as never);
+        } else {
+          navigate('/', { replace: true } as never);
+        }
+        return;
+      }
       const body: Record<string, string> = {};
       if (cc) body.chesscomUsername = cc;
       if (lc) body.lichessUsername = lc;
@@ -90,7 +113,7 @@ export function Welcome() {
             Welcome{authUser?.firstName ? `, ${authUser.firstName}` : ''}!
           </h1>
           <p className="text-sm" style={{ color: TEXT_MUTED }}>
-            Tell us where you play. We'll import your games so we can analyze your style and coach you.
+            Pick your ChessScout.net username. Play on Chess.com or Lichess too? Add those and we'll import your games to coach you.
           </p>
         </div>
 
@@ -98,12 +121,30 @@ export function Welcome() {
           <div className="flex items-center gap-3 rounded-xl p-3" style={{ background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.10)' }}>
             <Swords className="h-5 w-5 shrink-0" style={{ color: CHESSCOM_GREEN }} />
             <p className="text-[13px]" style={{ color: TEXT_LIGHT }}>
-              {challenger ? <><b>{challenger.name}</b> challenged you to a {challenger.what}.</> : 'You have a challenge waiting.'} Enter your username and we'll take you straight to it.
+              {challenger ? <><b>{challenger.name}</b> challenged you to a {challenger.what}.</> : 'You have a challenge waiting.'} Pick a username and we'll take you straight to it.
             </p>
           </div>
         )}
 
         <form onSubmit={submit} className="space-y-4">
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-black uppercase tracking-widest" style={{ color: TEXT_MUTED }}>
+              ChessScout.net username
+            </label>
+            <ScoutUsernameInput value={scoutName} onChange={setScoutName} onStatus={setScoutStatus} current={authUser?.scoutUsername} autoFocus />
+            <p className="text-[11px]" style={{ color: TEXT_MUTED }}>
+              {chesscom.trim() || lichess.trim()
+                ? 'Optional when you link an account. You can set it later from Profile.'
+                : 'Required if you skip Chess.com and Lichess. This is your name on ChessScout.net.'}
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3 pt-1">
+            <div className="h-px flex-1" style={{ background: BORDER }} />
+            <span className="text-[10.5px] font-black uppercase tracking-widest" style={{ color: TEXT_MUTED }}>Import your games (optional)</span>
+            <div className="h-px flex-1" style={{ background: BORDER }} />
+          </div>
+
           <div className="space-y-1.5">
             <label className="text-[11px] font-black uppercase tracking-widest" style={{ color: TEXT_MUTED }}>
               Chess.com username
@@ -113,7 +154,6 @@ export function Welcome() {
               value={chesscom}
               onChange={(e) => setChesscom(e.target.value)}
               placeholder="e.g. Hikaru"
-              autoFocus
               className="w-full px-3 py-2.5 rounded-lg text-sm font-bold outline-none"
               style={{ background: 'rgba(0,0,0,0.3)', color: TEXT_LIGHT, border: `1px solid ${BORDER}` }}
             />
@@ -134,7 +174,7 @@ export function Welcome() {
           </div>
 
           <p className="text-[11px]" style={{ color: TEXT_MUTED }}>
-            You only need one. You can change or add the other later from Profile.
+            Link one, both or neither. You can add them later from Profile.
           </p>
 
           {error && (

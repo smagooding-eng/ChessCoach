@@ -11,6 +11,7 @@ interface AuthUser {
   profileImageUrl: string | null;
   chesscomUsername: string | null;
   lichessUsername: string | null;
+  scoutUsername?: string | null;
   isAdmin: boolean;
   emailVerified?: boolean;
 }

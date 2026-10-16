@@ -38,7 +38,7 @@ function newCode(): string {
 }
 
 const displayName = (req: Request) =>
-  req.user!.chesscomUsername ?? req.user!.lichessUsername ?? req.user!.firstName ?? "Player";
+  req.user!.scoutUsername || req.user!.chesscomUsername || req.user!.lichessUsername || req.user!.firstName || "Player";
 
 function liveLabel(id: string): string | null {
   return listTimeControls().find((t) => t.id === id)?.label ?? null;

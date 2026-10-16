@@ -1265,7 +1265,7 @@ export function attachLiveServer(server: HttpServer) {
     }
     const userInfo: { userId: string; username: string } = {
       userId: session.user.id,
-      username: session.user.chesscomUsername || session.user.lichessUsername || (session.user.firstName || session.user.email?.split('@')[0] || 'Player'),
+      username: session.user.scoutUsername || session.user.chesscomUsername || session.user.lichessUsername || (session.user.firstName || session.user.email?.split('@')[0] || 'Player'),
     };
     wss.handleUpgrade(req, socket, head, ws => {
       wsUser.set(ws, userInfo);

@@ -24,6 +24,9 @@ export const usersTable = pgTable("users", {
   stripeSubscriptionId: varchar("stripe_subscription_id"),
   chesscomUsername: varchar("chesscom_username"),
   lichessUsername: varchar("lichess_username"),
+  // ChessScout.net username: the player's own name on the site. Required
+  // only when no Chess.com / Lichess account is linked; anyone may set one.
+  scoutUsername: varchar("scout_username"),
   isAdmin: boolean("is_admin").notNull().default(false),
   isPremiumOverride: boolean("is_premium_override").notNull().default(false),
   emailVerified: boolean("email_verified").notNull().default(false),

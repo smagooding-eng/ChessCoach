@@ -18,15 +18,15 @@ import { logger } from "../lib/logger";
 //   GET    /social/unread               { messages, requests } for badges
 const router: IRouter = Router();
 
-interface UserRow { id: string; chesscom_username: string | null; lichess_username: string | null; first_name: string | null; profile_image_url: string | null }
+interface UserRow { id: string; scout_username?: string | null; chesscom_username: string | null; lichess_username: string | null; first_name: string | null; profile_image_url: string | null }
 
 function rowsOf<T>(res: unknown): T[] {
   if (Array.isArray(res)) return res as T[];
   return ((res as { rows?: T[] })?.rows) ?? [];
 }
 
-function nameOf(u: Pick<UserRow, "chesscom_username" | "lichess_username" | "first_name">): string {
-  return u.chesscom_username || u.lichess_username || u.first_name || "Player";
+function nameOf(u: Pick<UserRow, "scout_username" | "chesscom_username" | "lichess_username" | "first_name">): string {
+  return u.scout_username || u.chesscom_username || u.lichess_username || u.first_name || "Player";
 }
 
 function avatarOf(u: UserRow): string {
@@ -44,11 +44,11 @@ function person(u: UserRow) {
 }
 
 const me = (req: Request) => req.user!.id;
-const myName = (req: Request) => req.user!.chesscomUsername ?? req.user!.lichessUsername ?? req.user!.firstName ?? "Player";
+const myName = (req: Request) => req.user!.scoutUsername || req.user!.chesscomUsername || req.user!.lichessUsername || req.user!.firstName || "Player";
 
 async function loadUser(id: string): Promise<UserRow | null> {
   const r = rowsOf<UserRow>(await db.execute(sql`
-    SELECT id, chesscom_username, lichess_username, first_name, profile_image_url FROM users WHERE id = ${id}`));
+    SELECT id, scout_username, chesscom_username, lichess_username, first_name, profile_image_url FROM users WHERE id = ${id}`));
   return r[0] ?? null;
 }
 
@@ -64,7 +64,7 @@ router.get("/friends", requireAuth, async (req: Request, res: Response) => {
     const uid = me(req);
     interface FRow extends UserRow { requester_id: string; status: string; created_at: string }
     const rows = rowsOf<FRow>(await db.execute(sql`
-      SELECT f.requester_id, f.status, f.created_at, u.id, u.chesscom_username, u.lichess_username, u.first_name, u.profile_image_url
+      SELECT f.requester_id, f.status, f.created_at, u.id, u.scout_username, u.chesscom_username, u.lichess_username, u.first_name, u.profile_image_url
       FROM friendships f
       JOIN users u ON u.id = CASE WHEN f.requester_id = ${uid} THEN f.addressee_id ELSE f.requester_id END
       WHERE f.requester_id = ${uid} OR f.addressee_id = ${uid}`));
@@ -107,14 +107,14 @@ router.get("/friends/search", requireAuth, async (req: Request, res: Response) =
     if (q.length < 2) { res.json({ results: [] }); return; }
     const like = q.replace(/[\\%_]/g, (c) => `\\${c}`) + "%";
     const rows = rowsOf<UserRow & { rel_status: string | null; rel_requester: string | null }>(await db.execute(sql`
-      SELECT u.id, u.chesscom_username, u.lichess_username, u.first_name, u.profile_image_url,
+      SELECT u.id, u.scout_username, u.chesscom_username, u.lichess_username, u.first_name, u.profile_image_url,
         f.status AS rel_status, f.requester_id AS rel_requester
       FROM users u
       LEFT JOIN friendships f ON (f.requester_id = ${uid} AND f.addressee_id = u.id) OR (f.addressee_id = ${uid} AND f.requester_id = u.id)
       WHERE u.id <> ${uid} AND (
-        u.chesscom_username ILIKE ${like} OR u.lichess_username ILIKE ${like} OR u.first_name ILIKE ${like}
+        u.scout_username ILIKE ${like} OR u.chesscom_username ILIKE ${like} OR u.lichess_username ILIKE ${like} OR u.first_name ILIKE ${like}
       )
-      ORDER BY (LOWER(COALESCE(u.chesscom_username, u.lichess_username, u.first_name, '')) = LOWER(${q})) DESC, u.created_at DESC
+      ORDER BY (LOWER(COALESCE(u.scout_username, u.chesscom_username, u.lichess_username, u.first_name, '')) = LOWER(${q})) DESC, u.created_at DESC
       LIMIT 15`));
     res.json({
       results: rows.map((r) => ({

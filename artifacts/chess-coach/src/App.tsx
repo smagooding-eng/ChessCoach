@@ -223,6 +223,7 @@ function ProtectedRoute({ component: Component, fallbackNav, requireAdmin, skipW
       authUser &&
       !authUser.chesscomUsername &&
       !authUser.lichessUsername &&
+      !authUser.scoutUsername &&
       location !== '/welcome'
     ) {
       navigate('/welcome', { replace: true } as never);

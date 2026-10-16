@@ -184,7 +184,7 @@ router.post("/tournaments/:id/join", requireAuth, async (req: Request, res: Resp
       return;
     }
     if (!t.joined && t.max_players && Number(t.players ?? 0) >= t.max_players) { res.status(400).json({ error: "This tournament is full" }); return; }
-    const name = req.user!.chesscomUsername || req.user!.lichessUsername || req.user!.firstName || req.user!.email?.split("@")[0] || "Player";
+    const name = req.user!.scoutUsername || req.user!.chesscomUsername || req.user!.lichessUsername || req.user!.firstName || req.user!.email?.split("@")[0] || "Player";
     await db.execute(sql`
       INSERT INTO tournament_players (tournament_id, user_id, username) VALUES (${id}, ${uid}, ${name})
       ON CONFLICT (tournament_id, user_id) DO UPDATE SET withdrawn = false`);

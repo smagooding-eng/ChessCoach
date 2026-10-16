@@ -10,7 +10,7 @@ import {
 const router: IRouter = Router();
 
 const displayName = (req: Request) =>
-  req.user!.chesscomUsername ?? req.user!.lichessUsername ?? req.user!.firstName ?? "Player";
+  req.user!.scoutUsername || req.user!.chesscomUsername || req.user!.lichessUsername || req.user!.firstName || "Player";
 
 router.get("/correspondence/time-controls", (_req: Request, res: Response) => {
   res.json({ timeControls: listCorrespondenceTimeControls() });
