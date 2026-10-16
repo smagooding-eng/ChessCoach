@@ -60,15 +60,17 @@ export async function ensureClubOutreachTables(): Promise<void> {
 
 // ── What to search for ──────────────────────────────────────────────────────
 
+// Public, community chess: clubs anyone can join. Schools, colleges and
+// scholastic-only programs are left out (see isSchool below).
 const ORG_TYPES = [
-  "chess club",
-  "scholastic (school) chess club or program",
-  "college or university chess club",
-  "chess league",
-  "state or regional chess association",
-  "chess tournament organizer",
-  "chess coach or chess academy",
-  "library or community center chess club",
+  "public chess club open to adults and all ages",
+  "community chess club that meets at a cafe, bar, library or community center",
+  "chess club affiliated with US Chess, the English Chess Federation, Chess Canada or a national federation",
+  "local or regional chess league for adult club teams",
+  "state, county or regional chess association",
+  "chess tournament organizer or director who runs open tournaments",
+  "chess meetup group with its own website",
+  "chess coach or private chess academy for adults and juniors",
 ];
 
 const PLACES = [
@@ -111,6 +113,7 @@ async function searchOrganizations(type: string, place: string): Promise<Candida
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   const prompt = `Search the web for active ${type} organizations in ${place}.
 Find up to 10 real ones that have their own official website (not a Facebook, Instagram, Reddit or Meetup page) where they publish a way to contact them.
+Only public or community organizations that adults can join or play in. Do NOT include schools, school districts, school chess teams, colleges, universities, PTAs, or programs only for students.
 Return ONLY JSON in this shape, using websites you actually found in search results:
 {"results":[{"name":"...","type":"${type}","city":"...","region":"...","country":"...","website":"https://...","contactPage":"https://... (their contact or about page if you found it)"}]}
 Do not include email addresses. Do not invent websites.`;
@@ -133,6 +136,13 @@ Do not include email addresses. Do not invent websites.`;
     }
   }
   throw lastErr instanceof Error ? lastErr : new Error("Web search failed");
+}
+
+// Schools, colleges and student-only programs (we want public clubs).
+const SCHOOL_NAME = /\b(school|schools|elementary|middle school|high school|junior high|isd|usd|district|k-?12|university|college|campus|students?|scholastic|pta|pto)\b/i;
+const SCHOOL_HOST = /(\.edu(\.[a-z]{2})?$|\.k12\.|\.sch\.|\.ac\.(uk|nz|za)$|\.edu\.au$|schools?\b|isd\.|usd\d)/i;
+function isSchool(c: { name: string; type?: string; website: string }, host: string): boolean {
+  return SCHOOL_NAME.test(c.name) || SCHOOL_HOST.test(host) || /scholastic|school|college|university/i.test(c.type ?? '');
 }
 
 // ── Reading the organization's own site ────────────────────────────────────
@@ -214,7 +224,7 @@ async function findContactEmail(c: Candidate): Promise<{ email: string; sourceUr
     seen.add(page);
     const html = await fetchText(page);
     if (!html) continue;
-    const email = pickEmail(extractEmails(html), host);
+    const email = pickEmail(extractEmails(html).filter((e) => !SCHOOL_HOST.test(e.split("@")[1])), host);
     if (email && await acceptsMail(email.split("@")[1])) return { email, sourceUrl: page };
   }
   return null;
@@ -248,7 +258,7 @@ export async function startDiscovery(opts: { searches: number; trigger: "manual"
         candidates += list.length;
         for (const c of list) {
           const host = hostOf(c.website);
-          if (!host) continue;
+          if (!host || isSchool(c, host)) continue;
           const [dup] = rowsOf<{ id: number }>(await db.execute(sql`SELECT id FROM club_contacts WHERE website ILIKE ${`%${host}%`} LIMIT 1`));
           if (dup) continue;
           const found = await findContactEmail(c);

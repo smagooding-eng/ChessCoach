@@ -189,7 +189,7 @@ If you'd rather not hear from me again, just reply "no thanks" and I won't email
   },
 ];
 
-interface Settings { sender: string; gmail: string; address: string; tournamentLink: string; batchSize: number }
+interface Settings { sender: string; gmail: string; address: string; tournamentLink: string; batchSize: number; styled: boolean }
 const SETTINGS_KEY = 'cs_club_outreach_settings';
 const TEMPLATES_KEY = 'cs_club_outreach_templates';
 
@@ -212,13 +212,153 @@ function fill(text: string, c: Contact | null, s: Settings): string {
     .replace(/\n{3,}/g, '\n\n');
 }
 
-function gmailUrl(to: string, subject: string, body: string, account: string): string {
-  const p = new URLSearchParams({ view: 'cm', fs: '1', to, su: subject, body });
-  if (account) p.set('authuser', account);
-  return `https://mail.google.com/mail/?${p.toString()}`;
+// ── Opening a draft ─────────────────────────────────────────────────────────
+// Gmail's web compose (desktop), the Gmail app (iPhone/iPad) or the phone's
+// default mail app (mailto, which Android hands to Gmail). Links are real
+// <a> elements so browsers never treat them as blocked pop-ups.
+
+const enc = encodeURIComponent;
+const IS_IOS = typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent);
+const IS_MOBILE = typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+
+interface Draft { to?: string; bcc?: string[]; subject: string; body: string }
+
+function gmailWebUrl(d: Draft, account: string): string {
+  const q = [`view=cm`, `fs=1`, `tf=1`, `to=${enc(d.to ?? '')}`];
+  if (d.bcc?.length) q.push(`bcc=${enc(d.bcc.join(','))}`);
+  q.push(`su=${enc(d.subject)}`);
+  if (d.body) q.push(`body=${enc(d.body)}`);
+  return `https://mail.google.com/mail/u/${account ? enc(account) : '0'}/?${q.join('&')}`;
 }
-const mailtoUrl = (to: string, subject: string, body: string) =>
-  `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+function gmailAppUrl(d: Draft): string {
+  const q = [`to=${enc(d.to ?? '')}`];
+  if (d.bcc?.length) q.push(`bcc=${enc(d.bcc.join(','))}`);
+  q.push(`subject=${enc(d.subject)}`);
+  if (d.body) q.push(`body=${enc(d.body)}`);
+  return `googlegmail://co?${q.join('&')}`;
+}
+function mailtoUrl(d: Draft): string {
+  const q: string[] = [];
+  if (d.bcc?.length) q.push(`bcc=${d.bcc.map(enc).join(',')}`);
+  q.push(`subject=${enc(d.subject)}`);
+  if (d.body) q.push(`body=${enc(d.body)}`);
+  return `mailto:${d.to ? enc(d.to) : ''}?${q.join('&')}`;
+}
+
+// ── Styled emails ───────────────────────────────────────────────────────────
+// The same look as ChessScout's own emails. Gmail compose can't take HTML in
+// a link, so the styled version is copied to the clipboard and pasted into
+// the draft (it keeps its formatting).
+
+const T = { bg: '#050A0B', card: '#0D1516', inner: '#121B1D', border: '#1E2829', green: '#81B64C', text: '#F5F7F6', muted: '#87918E', faint: '#5C6664' };
+const FONT = `-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif`;
+const esc = (x: string) => x.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const linkify = (x: string) => esc(x).replace(/(https?:\/\/[^\s<)]+)/g, (u) => `<a href="${u}" style="color:${T.green};text-decoration:none;font-weight:700;">${u.replace(/^https?:\/\//, '').replace(/\?utm_[^\s]*$/, '')}</a>`);
+
+function ctaLabel(url: string): string {
+  if (/\/tournaments\/new/.test(url)) return 'Create a tournament &rarr;';
+  if (/\/tournaments\//.test(url)) return 'Join the tournament &rarr;';
+  return 'Visit ChessScout.net &rarr;';
+}
+
+export function styledEmailHtml(text: string): string {
+  const blocks = text.replace(/\r/g, '').split(/\n{2,}/).map((b) => b.trim()).filter(Boolean);
+  const optOutIdx = blocks.findIndex((b) => /rather not hear from me/i.test(b));
+  const optOut = optOutIdx >= 0 ? blocks.splice(optOutIdx, 1)[0] : '';
+  const sigIdx = blocks.findIndex((b) => /^(thanks|cheers|best),?/i.test(b));
+  const sig = sigIdx >= 0 ? blocks.splice(sigIdx).join('\n') : '';
+  const parts = blocks.map((b) => {
+    const lines = b.split('\n');
+    const firstBullet = lines.findIndex((l) => /^\s*[-•]\s+/.test(l));
+    if (firstBullet >= 0 && lines.slice(firstBullet).every((l) => /^\s*[-•]\s+/.test(l))) {
+      const lead = lines.slice(0, firstBullet);
+      const items = lines.slice(firstBullet);
+      return `${lead.length ? `<p style="margin:0 0 8px;font-family:${FONT};font-size:15px;line-height:1.6;color:${T.muted};">${lead.map(linkify).join('<br>')}</p>` : ''}<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 16px;">${items.map((l) => `<tr><td valign="top" style="padding:9px 10px 3px 0;"><span style="display:inline-block;width:7px;height:7px;border-radius:7px;background:${T.green};"></span></td><td style="padding:2px 0;font-family:${FONT};font-size:15px;line-height:1.55;color:${T.text};">${linkify(l.replace(/^\s*[-•]\s+/, ''))}</td></tr>`).join('')}</table>`;
+    }
+    // A line ending in a ChessScout link becomes text + a green button.
+    const m = b.match(/^([\s\S]*?)(https:\/\/chessscout\.net\S*)\s*$/);
+    if (m && lines.length <= 2) {
+      const lead = m[1].trim().replace(/[:\-–]\s*$/, '');
+      return `${lead ? `<p style="margin:0 0 12px;font-family:${FONT};font-size:15px;line-height:1.6;color:${T.muted};">${esc(lead)}</p>` : ''}
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 18px;"><tr><td bgcolor="${T.green}" style="border-radius:12px;background:${T.green};"><a href="${m[2]}" style="display:inline-block;padding:13px 26px;font-family:${FONT};font-size:15px;font-weight:800;color:#FFFFFF;text-decoration:none;">${ctaLabel(m[2])}</a></td></tr></table>`;
+    }
+    const isGreeting = /^(hi|hello|dear)\b/i.test(b) && lines.length === 1;
+    return `<p style="margin:0 0 16px;font-family:${FONT};font-size:${isGreeting ? 17 : 15}px;line-height:1.6;color:${isGreeting ? T.text : T.muted};${isGreeting ? 'font-weight:800;' : ''}">${lines.map(linkify).join('<br>')}</p>`;
+  });
+  const sigHtml = sig ? `<p style="margin:6px 0 0;font-family:${FONT};font-size:14px;line-height:1.55;color:${T.text};">${sig.split('\n').map((l, i) => i === 0 ? esc(l) : `<span style="color:${i === 1 ? T.text : T.muted};${i === 1 ? 'font-weight:800;' : ''}">${linkify(l)}</span>`).join('<br>')}</p>` : '';
+  return `<div style="background:${T.bg};padding:28px 12px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:580px;margin:0 auto;">
+<tr><td align="center" style="padding:0 0 18px;"><a href="${SITE}" style="text-decoration:none;font-family:${FONT};font-size:22px;font-weight:900;color:${T.text};"><img src="${SITE}/icons/icon-192.png" width="36" height="36" alt="" style="vertical-align:middle;border:0;border-radius:9px;margin-right:8px;">ChessScout<span style="color:${T.green};">.net</span></a></td></tr>
+<tr><td bgcolor="${T.card}" style="background:${T.card};border:1px solid ${T.border};border-radius:20px;padding:28px 24px;">${parts.join('\n')}${sigHtml}</td></tr>
+<tr><td align="center" style="padding:18px 10px 0;font-family:${FONT};">
+<div style="font-size:13px;font-weight:800;color:${T.text};margin:0 0 6px;">Play smarter. <span style="color:${T.green};">Win more.</span></div>
+${optOut ? `<div style="font-size:12px;line-height:1.5;color:${T.faint};">${esc(optOut)}</div>` : ''}
+</td></tr></table></div>`;
+}
+
+/** Copies rich HTML (with a plain-text fallback) so it pastes formatted into Gmail. */
+async function copyRich(html: string, plain: string): Promise<boolean> {
+  try {
+    const Item = (window as unknown as { ClipboardItem?: new (d: Record<string, Blob>) => unknown }).ClipboardItem;
+    if (Item && navigator.clipboard && 'write' in navigator.clipboard) {
+      await (navigator.clipboard as unknown as { write: (items: unknown[]) => Promise<void> }).write([
+        new Item({ 'text/html': new Blob([html], { type: 'text/html' }), 'text/plain': new Blob([plain], { type: 'text/plain' }) }),
+      ]);
+      return true;
+    }
+  } catch { /* fall through */ }
+  try {
+    const div = document.createElement('div');
+    div.innerHTML = html;
+    div.style.position = 'fixed'; div.style.left = '-9999px';
+    document.body.appendChild(div);
+    const range = document.createRange(); range.selectNodeContents(div);
+    const sel = window.getSelection(); sel?.removeAllRanges(); sel?.addRange(range);
+    const ok = document.execCommand('copy');
+    sel?.removeAllRanges(); div.remove();
+    return ok;
+  } catch { return false; }
+}
+
+/** Preview + the buttons that open a draft (Gmail web, Gmail app, mail app). */
+function DraftActions({ draft, styled, account, onOpened }: { draft: Draft; styled: boolean; account: string; onOpened: () => void }) {
+  const [copiedStyled, setCopiedStyled] = useState(false);
+  const html = useMemo(() => styledEmailHtml(draft.body), [draft.body]);
+  // Styled: open the draft without a body and paste the copied email into it.
+  const open: Draft = styled ? { ...draft, body: '' } : draft;
+  const copyStyled = () => { void copyRich(html, draft.body).then((ok) => { if (ok) { setCopiedStyled(true); setTimeout(() => setCopiedStyled(false), 2500); } }); };
+  const onLink = () => { if (styled) copyStyled(); onOpened(); };
+  const btn = 'inline-flex items-center justify-center gap-1.5 rounded-xl py-3 text-sm font-bold';
+  const links = [
+    !IS_MOBILE && { href: gmailWebUrl(open, account), label: 'Open in Gmail', primary: true, target: '_blank' },
+    IS_IOS && { href: gmailAppUrl(open), label: 'Open Gmail app', primary: true, target: undefined },
+    { href: mailtoUrl(open), label: IS_MOBILE && !IS_IOS ? 'Open in Gmail / mail app' : 'Mail app', primary: IS_MOBILE && !IS_IOS, target: undefined },
+    IS_MOBILE && { href: gmailWebUrl(open, account), label: 'Gmail website', primary: false, target: '_blank' },
+  ].filter(Boolean) as { href: string; label: string; primary: boolean; target?: string }[];
+  return (
+    <div className="space-y-2">
+      {styled ? (
+        <iframe title="Email preview" srcDoc={`<!doctype html><html><body style="margin:0;background:${T.bg}">${html}</body></html>`} className="h-[340px] w-full rounded-lg border-0" />
+      ) : (
+        <pre className="max-h-[320px] overflow-y-auto whitespace-pre-wrap rounded-lg p-3 text-[12.5px] text-white/85" style={{ background: 'rgba(0,0,0,.3)', fontFamily: 'inherit' }}>{draft.body}</pre>
+      )}
+      {styled && (
+        <button type="button" onClick={copyStyled} className={`${btn} w-full text-white`} style={{ background: 'rgba(255,255,255,.08)' }}>
+          {copiedStyled ? <Check size={15} /> : <Copy size={15} />} {copiedStyled ? 'Styled email copied: paste it into the draft' : 'Copy styled email'}
+        </button>
+      )}
+      <div className="grid grid-cols-2 gap-2">
+        {links.map((l) => (
+          <a key={l.label} href={l.href} target={l.target} rel="noopener noreferrer" onClick={onLink}
+            className={btn} style={l.primary ? { background: GREEN, color: '#fff' } : { background: 'rgba(255,255,255,.08)', color: '#fff' }}>
+            {l.primary && <Mail size={15} />} {l.label}
+          </a>
+        ))}
+      </div>
+      {styled && <p className="text-[11px]" style={{ color: MUTED }}>Opening a draft also copies the styled email. In the draft, tap the message area and paste (Ctrl/⌘+V or long-press → Paste).</p>}
+    </div>
+  );
+}
 
 /** Two rows of template buttons: personal (filled in per club) and general (for Bcc batches). */
 function TemplatePicker({ templates, value, onChange, compact }: { templates: Template[]; value: string; onChange: (id: string) => void; compact?: boolean }) {
@@ -250,7 +390,7 @@ export function ClubOutreachPanel() {
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState('');
   const [selected, setSelected] = useState<Set<number>>(new Set());
-  const [settings, setSettings] = useState<Settings>(() => load(SETTINGS_KEY, { sender: 'Shann', gmail: '', address: '', tournamentLink: '', batchSize: 40 }));
+  const [settings, setSettings] = useState<Settings>(() => load(SETTINGS_KEY, { sender: 'Shann', gmail: '', address: '', tournamentLink: '', batchSize: 40, styled: true }));
   const [overrides, setOverrides] = useState<Record<string, { subject: string; body: string }>>(() => load(TEMPLATES_KEY, {}));
   const [templateId, setTemplateId] = useState('intro');
   const [editing, setEditing] = useState(false);
@@ -344,12 +484,6 @@ export function ClubOutreachPanel() {
     if (bi + 1 >= batches.length) { setBatches(null); setSelected(new Set()); void loadData(); }
     else { setBi(bi + 1); setCopied(''); }
   };
-  const openBccDraft = () => {
-    if (!batch) return;
-    const p = new URLSearchParams({ view: 'cm', fs: '1', to: settings.gmail || '', bcc: batch.map((c) => c.email).join(','), su: bulkSubject, body: bulkBody });
-    if (settings.gmail) p.set('authuser', settings.gmail);
-    window.open(`https://mail.google.com/mail/?${p.toString()}`, '_blank', 'noopener');
-  };
 
   const startQueue = () => {
     const list = contacts.filter((c) => selected.has(c.id));
@@ -365,10 +499,10 @@ export function ClubOutreachPanel() {
     if (qi + 1 >= queue.length) { setQueue(null); setSelected(new Set()); void loadData(); }
     else setQi(qi + 1);
   };
-  const sendWith = async (kind: 'gmail' | 'mailto') => {
+  const [opened, setOpened] = useState(false);
+  useEffect(() => { setOpened(false); }, [qi, queue]);
+  const markSentAndNext = async () => {
     if (!current) return;
-    if (kind === 'gmail') window.open(gmailUrl(current.email, subject, body, settings.gmail), '_blank', 'noopener');
-    else window.location.href = mailtoUrl(current.email, subject, body);
     await setStatus([current.id], 'contacted', template.id);
     advance();
   };
@@ -415,6 +549,10 @@ export function ClubOutreachPanel() {
               <div><p className={LABEL}>Gmail to send from</p><input className={INPUT} placeholder="you@gmail.com" value={settings.gmail} onChange={(e) => updateSettings({ gmail: e.target.value.trim() })} /></div>
               <div><p className={LABEL}>Mailing address (required by anti-spam law)</p><input className={INPUT} placeholder="Street, City, State ZIP (a PO box is fine)" value={settings.address} onChange={(e) => updateSettings({ address: e.target.value })} /></div>
               <div><p className={LABEL}>Tournament link to promote (optional)</p><input className={INPUT} placeholder="https://chessscout.net/tournaments/…" value={settings.tournamentLink} onChange={(e) => updateSettings({ tournamentLink: e.target.value.trim() })} /></div>
+              <label className="flex items-center gap-2 text-xs font-bold text-white">
+                <input type="checkbox" checked={settings.styled} onChange={(e) => updateSettings({ styled: e.target.checked })} className="h-4 w-4 accent-[#81B64C]" />
+                Styled emails (ChessScout look, copied and pasted into the draft)
+              </label>
               <div><p className={LABEL}>Addresses per BCC batch</p><input className={INPUT} type="number" min={5} max={100} value={settings.batchSize} onChange={(e) => updateSettings({ batchSize: Number(e.target.value) || 40 })} /></div>
               <p className="text-[11px]" style={{ color: MUTED }}>Saved on this device.</p>
             </div>
@@ -550,10 +688,7 @@ export function ClubOutreachPanel() {
               </button>
             </div>
             <p className="text-sm font-bold text-white">{bulkSubject}</p>
-            <pre className="max-h-[240px] overflow-y-auto whitespace-pre-wrap rounded-lg p-3 text-[12.5px] text-white/85" style={{ background: 'rgba(0,0,0,.3)', fontFamily: 'inherit' }}>{bulkBody}</pre>
-            <button onClick={openBccDraft} className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl py-3 text-sm font-bold" style={{ background: GREEN, color: '#fff' }}>
-              <Mail size={15} /> Open Gmail draft with these in Bcc
-            </button>
+            <DraftActions draft={{ to: settings.gmail, bcc: batch.map((c) => c.email), subject: bulkSubject, body: bulkBody }} styled={settings.styled} account={settings.gmail} onOpened={() => {}} />
             <button onClick={finishBatch} className="w-full rounded-xl py-2.5 text-xs font-bold text-white" style={{ background: 'rgba(255,255,255,.08)' }}>
               {bi + 1 >= batches.length ? 'Sent — mark contacted and finish' : 'Sent — mark contacted, next batch'}
             </button>
@@ -576,18 +711,15 @@ export function ClubOutreachPanel() {
             <TemplatePicker templates={templates} value={templateId} onChange={setTemplateId} compact />
             <p className="text-xs" style={{ color: MUTED }}>To: <span className="text-white">{current.email}</span></p>
             <p className="text-sm font-bold text-white">{subject}</p>
-            <pre className="max-h-[320px] overflow-y-auto whitespace-pre-wrap rounded-lg p-3 text-[12.5px] text-white/85" style={{ background: 'rgba(0,0,0,.3)', fontFamily: 'inherit' }}>{body}</pre>
-            <div className="grid grid-cols-2 gap-2">
-              <button onClick={() => sendWith('gmail')} className="inline-flex items-center justify-center gap-1.5 rounded-xl py-3 text-sm font-bold" style={{ background: GREEN, color: '#fff' }}>
-                <Mail size={15} /> Open in Gmail
-              </button>
-              <button onClick={() => sendWith('mailto')} className="rounded-xl py-3 text-sm font-bold text-white" style={{ background: 'rgba(255,255,255,.08)' }}>Mail app</button>
-            </div>
+            <DraftActions draft={{ to: current.email, subject, body }} styled={settings.styled} account={settings.gmail} onOpened={() => setOpened(true)} />
+            <button onClick={markSentAndNext} className="w-full rounded-xl py-2.5 text-xs font-bold" style={opened ? { background: GREEN, color: '#fff' } : { background: 'rgba(255,255,255,.08)', color: '#fff' }}>
+              {qi + 1 >= queue.length ? 'Sent — mark contacted and finish' : 'Sent — mark contacted, next'}
+            </button>
             <div className="flex gap-2">
               <button onClick={advance} className="flex-1 rounded-xl py-2 text-xs font-bold" style={{ background: 'rgba(255,255,255,.05)', color: MUTED }}>Skip</button>
               <button onClick={async () => { await setStatus([current.id], 'not_interested'); advance(); }} className="flex-1 rounded-xl py-2 text-xs font-bold" style={{ background: 'rgba(255,255,255,.05)', color: MUTED }}>Not a fit</button>
             </div>
-            <p className="flex items-center gap-1.5 text-[11px]" style={{ color: MUTED }}><Check size={12} /> Opening the draft marks it contacted. Review it and press Send in Gmail.</p>
+            <p className="flex items-center gap-1.5 text-[11px]" style={{ color: MUTED }}><Check size={12} /> Send it in Gmail, then come back and tap Sent.</p>
           </div>
         </div>
       )}
