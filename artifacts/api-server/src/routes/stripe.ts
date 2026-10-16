@@ -2,7 +2,7 @@ import { Router, type IRouter, type Request, type Response } from 'express';
 import { storage } from '../lib/storage';
 import { stripeService } from '../lib/stripeService';
 import { getUncachableStripeClient, getStripeSync } from '../lib/stripeClient';
-import { db, referralConversionsTable, usersTable } from '@workspace/db';
+import { db, referralConversionsTable, usersTable, affiliateAdjustmentsTable } from '@workspace/db';
 import { eq, and, sql } from 'drizzle-orm';
 import crypto from 'crypto';
 
@@ -529,6 +529,14 @@ router.get('/affiliate/status', async (req: Request, res: Response) => {
       if (c.commissionPaidAt) paidCents += cents;
       else owedUnpaidCents += cents;
     }
+    // Adjustments: manual ones plus Pro tournament entry earnings.
+    const adjustments = await db.select().from(affiliateAdjustmentsTable).where(eq(affiliateAdjustmentsTable.affiliateUserId, user.id));
+    let tournamentCents = 0;
+    for (const a of adjustments) {
+      if (a.paidAt) paidCents += a.cents;
+      else owedUnpaidCents += a.cents;
+      if ((a.reason ?? '').startsWith('Tournament entry') || (a.reason ?? '').startsWith('Refunded entry')) tournamentCents += a.cents;
+    }
 
     res.json({
       isAffiliate: true,
@@ -538,6 +546,7 @@ router.get('/affiliate/status', async (req: Request, res: Response) => {
       affiliateProgramEndsAt: user.affiliateProgramEndsAt,
       owedUnpaidCents,
       paidCents,
+      tournamentCents,
     });
   } catch (err: any) {
     res.status(500).json({ error: 'Failed to load affiliate status' });

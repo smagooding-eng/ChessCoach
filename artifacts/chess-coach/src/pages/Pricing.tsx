@@ -23,6 +23,8 @@ const ROWS: { feature: string; free: boolean | string; pro: boolean | string; ch
   { feature: 'Puzzles', free: 'Unlimited', pro: '+ AI explanations', chesscomFree: true } as any,
   { feature: 'Lesson read-aloud', free: 'Device voice', pro: 'Natural coach voice', chesscomFree: false } as any,
   { feature: 'Games viewable', free: 'Unlimited', pro: 'Unlimited', chesscomFree: '—' } as any,
+  { feature: 'Create tournaments', free: true, pro: true, chesscomFree: false },
+  { feature: 'Pro tournaments', free: '$5 entry each', pro: 'Join free + host & earn $1/entry', chesscomFree: false } as any,
   { feature: 'Price', free: '$0', pro: '$5/mo', chesscomFree: '$0' } as any,
 ];
 
@@ -91,6 +93,8 @@ export default function PricingPage() {
               <li>Full AI weakness analysis</li>
               <li>Scan a board from a photo</li>
               <li>AI puzzle explanations & natural-voice lessons</li>
+              <li>Join every Pro tournament free</li>
+              <li>Host Pro tournaments and earn $1 per new entry</li>
             </ul>
             <Link href="/#pricing" className="block text-center py-2.5 rounded-xl text-sm font-black"
               style={{ background: G, color: '#fff' }}>

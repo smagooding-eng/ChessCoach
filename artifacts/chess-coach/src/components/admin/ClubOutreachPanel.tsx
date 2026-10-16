@@ -187,6 +187,62 @@ ChessScout.net
 
 If you'd rather not hear from me again, just reply "no thanks" and I won't email you again.`,
   },
+  {
+    id: 'protournament',
+    name: 'Pro tournaments (earn per entry)',
+    kind: 'personal',
+    subject: "Host {{org}}'s tournaments on ChessScout.net and earn per entry",
+    body: `Hi {{org}} team,
+
+I'm {{sender}} from ChessScout.net. Clubs can now run their own tournaments on our site, including Pro tournaments that help fund the club.
+
+Here's how a Pro tournament works:
+- you create it with a ChessScout Pro membership ($5/month) and pick arena or knockout, live or daily, the time control and up to 500 players
+- players who are already Pro join free; everyone else goes Pro or pays a one-time $5 entry
+- for every player who pays the entry or goes Pro to join, your club earns $1, paid out to you
+- the money is yours to use however you like: club costs, prizes, snacks for club night
+
+You can also run free tournaments for everyone, with your club's name and logo on the page.
+
+Create one here: ${utm('/tournaments/new', 'club_protournament')}
+{{tournamentLine}}
+Happy to help set up your first one; just reply with what you have in mind.
+
+Thanks,
+{{sender}}
+ChessScout.net
+{{address}}
+
+If you'd rather not hear from me again, just reply "no thanks" and I won't email you again.`,
+  },
+  {
+    id: 'protournament_general',
+    name: 'Pro tournaments (earn per entry)',
+    kind: 'general',
+    subject: 'Run club tournaments on ChessScout.net and earn per entry',
+    body: `Hi there,
+
+I'm {{sender}} from ChessScout.net. Chess clubs can now run their own tournaments on our site, including Pro tournaments that help fund the club.
+
+Here's how a Pro tournament works:
+- you create it with a ChessScout Pro membership ($5/month) and pick arena or knockout, live or daily, the time control and up to 500 players
+- players who are already Pro join free; everyone else goes Pro or pays a one-time $5 entry
+- for every player who pays the entry or goes Pro to join, your club earns $1, paid out to you
+- the money is yours to use however you like: club costs, prizes, snacks for club night
+
+You can also run free tournaments for everyone, with your club's name and logo on the page.
+
+Create one here: ${utm('/tournaments/new', 'club_protournament_bcc')}
+{{tournamentLine}}
+Happy to help set up your first one; just reply with what you have in mind.
+
+Thanks,
+{{sender}}
+ChessScout.net
+{{address}}
+
+If you'd rather not hear from me again, just reply "no thanks" and I won't email you again.`,
+  },
 ];
 
 interface Settings { sender: string; gmail: string; address: string; tournamentLink: string; batchSize: number; styled: boolean }

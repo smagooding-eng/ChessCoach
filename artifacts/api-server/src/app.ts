@@ -33,6 +33,17 @@ async function trackSubscriptionEventBestEffort(payload: Buffer, signature: stri
     const stripe = new Stripe(secretKey, { apiVersion: "2025-08-27.basil" as any });
     const event = stripe.webhooks.constructEvent(payload, signature, webhookSecret);
 
+    // Pro tournament entry fees (the return page also confirms; this covers
+    // people who close the tab before it loads).
+    if (event.type === "checkout.session.completed") {
+      const session = event.data.object as any;
+      if (session?.metadata?.kind === "tournament_entry" && session.id) {
+        const { recordPaidEntry } = await import("./lib/tournamentEntries");
+        await recordPaidEntry(session.id).catch((err) => console.error("Tournament entry webhook failed:", err?.message));
+      }
+      return;
+    }
+
     if (event.type === "customer.subscription.created") {
       const sub = event.data.object as any;
       const customerId = typeof sub.customer === "string" ? sub.customer : sub.customer?.id;

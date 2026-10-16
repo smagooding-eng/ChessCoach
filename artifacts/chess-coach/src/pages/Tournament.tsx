@@ -22,7 +22,10 @@ interface MyMatch { id: number; roundLabel: string; opponent: string | null; sta
 interface Detail {
   tournament: TournamentSummary; serverNow: number; standings: Standing[]; games: TGame[];
   bracket: BMatch[]; myMatch: MyMatch | null; knockedOut: boolean; myDailyGame: string | null;
+  organizer?: { proEntries: number; feeEntries: number; earnedCents: number } | null;
 }
+
+const money = (cents: number) => `$${(cents / 100).toFixed(cents % 100 === 0 ? 0 : 2)}`;
 
 const MEDAL = ['#E8B447', '#C9D1D6', '#C98A4B'];
 
@@ -69,6 +72,7 @@ function TournamentView({ live, signedIn }: { live: Live; signedIn: boolean }) {
   const { id } = useParams<{ id: string }>();
   const [, navigate] = useLocation();
   const [editing, setEditing] = useState(false);
+  const { isPremium } = useUser();
   const [data, setData] = useState<Detail | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [needsPro, setNeedsPro] = useState(false);
@@ -87,6 +91,35 @@ function TournamentView({ live, signedIn }: { live: Live; signedIn: boolean }) {
       setOffset(d.serverNow - Date.now());
     } catch (e) { setErr(e instanceof Error ? e.message : 'Could not load'); }
   }, [id]);
+
+  // Back from paying the entry fee (?entry=<checkout session>): confirm it.
+  const [entryMsg, setEntryMsg] = useState<string | null>(null);
+  useEffect(() => {
+    if (!signedIn) return;
+    const sid = new URLSearchParams(window.location.search).get('entry');
+    if (!sid) return;
+    try { window.history.replaceState(null, '', window.location.pathname); } catch { /* ignore */ }
+    setEntryMsg('Confirming your entry…');
+    apiFetch(`/api/tournaments/${id}/entry/confirm`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: sid }) })
+      .then((r) => r.json())
+      .then((d) => { setEntryMsg(d.confirmed ? "Payment received. You're in!" : 'Payment is still processing; you will be added as soon as it clears.'); void load(); })
+      .catch(() => setEntryMsg('Could not confirm the payment yet. If you were charged, you will be added shortly.'));
+  }, [id, signedIn]);  // eslint-disable-line react-hooks/exhaustive-deps
+
+  const goPro = async () => {
+    await apiFetch(`/api/tournaments/${id}/pro-intent`, { method: 'POST', credentials: 'include' }).catch(() => {});
+    try { localStorage.setItem('cs_pending_tournament', String(id)); } catch { /* ignore */ }
+    navigate('/subscription');
+  };
+  const payEntry = async () => {
+    setBusy(true); setErr(null);
+    try {
+      const r = await apiFetch(`/api/tournaments/${id}/entry/checkout`, { method: 'POST', credentials: 'include' });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok || !d.url) throw new Error(d.error || 'Could not start checkout');
+      window.location.href = d.url;
+    } catch (e) { setErr(e instanceof Error ? e.message : 'Could not start checkout'); setBusy(false); }
+  };
 
   useEffect(() => {
     void load();
@@ -202,13 +235,23 @@ function TournamentView({ live, signedIn }: { live: Live; signedIn: boolean }) {
       const full = !!t.maxPlayers && t.players >= t.maxPlayers;
       return (
         <div className="space-y-2">
-          <button onClick={join} disabled={busy || full} className="inline-flex w-full items-center justify-center gap-2 rounded-xl py-3.5 text-[15px] font-extrabold disabled:opacity-60" style={greenBtn}>
-            {busy ? <Loader2 size={18} className="animate-spin" /> : <Swords size={18} />} {full ? 'Tournament full' : signedIn ? 'Join tournament' : 'Sign up free to join'}
-          </button>
-          {needsPro && (
-            <p className="text-center text-[12.5px]" style={{ color: PT.muted }}>
-              Pro members can join. <Link href="/pricing" className="font-bold underline" style={{ color: PT.green }}>See ChessScout Pro</Link>
-            </p>
+          {!(t.eligibility === 'pro' && signedIn && !isPremium && !full) && (
+            <button onClick={join} disabled={busy || full} className="inline-flex w-full items-center justify-center gap-2 rounded-xl py-3.5 text-[15px] font-extrabold disabled:opacity-60" style={greenBtn}>
+              {busy ? <Loader2 size={18} className="animate-spin" /> : <Swords size={18} />} {full ? 'Tournament full' : signedIn ? 'Join tournament' : 'Sign up free to join'}
+            </button>
+          )}
+          {(needsPro || (signedIn && !isPremium)) && t.eligibility === 'pro' && !full && (
+            <div className="space-y-2 rounded-xl p-3.5" style={{ background: 'rgba(255,255,255,.04)', border: `1px solid ${PT.border}` }}>
+              <p className="text-center text-[13px] font-bold" style={{ color: PT.text }}>This is a Pro tournament. Two ways in:</p>
+              <div className="grid grid-cols-2 gap-2">
+                <button onClick={goPro} className="rounded-xl px-2 py-3 text-[13px] font-extrabold" style={greenBtn}>
+                  Go Pro<span className="block text-[11px] font-bold opacity-80">$5/month · join every Pro tournament</span>
+                </button>
+                <button onClick={payEntry} disabled={busy} className="rounded-xl px-2 py-3 text-[13px] font-extrabold disabled:opacity-60" style={ghostBtn}>
+                  Pay {money(t.entryFeeCents ?? 500)} entry<span className="block text-[11px] font-bold" style={{ color: PT.muted }}>this tournament only</span>
+                </button>
+              </div>
+            </div>
           )}
         </div>
       );
@@ -304,7 +347,7 @@ function TournamentView({ live, signedIn }: { live: Live; signedIn: boolean }) {
         <div className="min-w-0">
           <p className="flex flex-wrap items-center gap-x-2 text-[11px] font-black uppercase tracking-[0.16em]" style={{ color: t.status === 'running' ? PT.gold : PT.muted }}>
             <span>{t.status === 'running' ? 'On now' : t.status === 'scheduled' ? 'Upcoming' : 'Finished'} · {isBracket ? 'Knockout' : 'Arena'} · {isLive ? 'Live' : 'Daily'}</span>
-            {t.eligibility === 'pro' && <span className="rounded px-1.5 py-0.5 text-[10px]" style={{ background: '#81B64C', color: '#FFFFFF' }}>Pro only</span>}
+            {t.eligibility === 'pro' && <span className="rounded px-1.5 py-0.5 text-[10px]" style={{ background: '#81B64C', color: '#FFFFFF' }}>Pro tournament{t.entryFeeCents ? ` · ${money(t.entryFeeCents)} entry` : ''}</span>}
           </p>
           <h1 className="truncate text-2xl font-black md:text-3xl" style={{ color: PT.text, letterSpacing: '-0.02em' }}>{t.name}</h1>
           {(t.clubName || (t.createdByName && t.createdByName !== 'ChessScout.net')) && (
@@ -316,6 +359,21 @@ function TournamentView({ live, signedIn }: { live: Live; signedIn: boolean }) {
       </div>
 
       {/* Anyone can pass the link on while it's open; the organizer also gets Cancel. */}
+      {t.isCreator && t.eligibility === 'pro' && data.organizer && (
+        <div className="space-y-2 p-4" style={cardStyle}>
+          <div className="flex items-center gap-2">
+            <Crown size={17} style={{ color: PT.gold }} />
+            <h2 className="flex-1 text-[15px] font-extrabold" style={{ color: PT.text }}>Your Pro tournament earnings</h2>
+            <b className="text-[18px] font-black" style={{ color: PT.text }}>{money(data.organizer.earnedCents)}</b>
+          </div>
+          <p className="text-[12.5px]" style={{ color: PT.muted }}>
+            {data.organizer.feeEntries} paid entr{data.organizer.feeEntries === 1 ? 'y' : 'ies'} · {data.organizer.proEntries} new Pro member{data.organizer.proEntries === 1 ? '' : 's'}.
+            You earn $1 for each player who joins with an entry fee or goes Pro from your tournament (players who were already Pro join free).
+          </p>
+          <Link href="/affiliate" className="inline-block rounded-xl px-3.5 py-2 text-[12.5px] font-extrabold" style={ghostBtn}>Payouts and earnings →</Link>
+        </div>
+      )}
+
       {t.isCreator && editing && <TournamentEditCard t={t} onClose={() => setEditing(false)} onSaved={() => { setEditing(false); void load(); }} />}
 
       {open && (t.isCreator || t.visibility === 'link' || signedIn) && (
@@ -365,6 +423,7 @@ function TournamentView({ live, signedIn }: { live: Live; signedIn: boolean }) {
         </p>
 
         {err && <p className="text-[12.5px] font-bold" style={{ color: PT.red }}>{err}</p>}
+        {entryMsg && <p className="rounded-xl p-2.5 text-center text-[13px] font-bold" style={{ background: PT.greenSoft, color: PT.text, border: `1px solid ${PT.greenLine}` }}>{entryMsg}</p>}
         {action}
         {me && !isBracket && (
           <p className="text-center text-[13px]" style={{ color: PT.text }}>

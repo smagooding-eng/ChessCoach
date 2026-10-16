@@ -8,6 +8,12 @@ import { listCorrespondenceTimeControls } from "../lib/correspondence";
 import { withdrawFromBracket, roundLabel } from "../lib/tournamentEngine";
 import { logger } from "../lib/logger";
 import { notifyUser } from "../lib/notify";
+import {
+  ENTRY_FEE_CENTS, hasPaidEntry, creditProSignupIfAny, recordProIntent, createEntryCheckout, recordPaidEntry,
+  refundTournamentEntries, organizerSummary, loadTournamentInfo,
+} from "../lib/tournamentEntries";
+
+const PRO_MAX_PLAYERS = 500;
 
 // Tournaments. Admins and players create them; they're listed publicly
 // unless the organizer chose link-only. Anyone (signed in or not) can view
@@ -43,7 +49,7 @@ interface TRow {
   format: string; kind: string; eligibility: string; max_players: number | null; total_rounds: number | null;
   winner_username: string | null;
   visibility?: string; created_by?: string; created_by_name?: string | null;
-  club_name?: string | null; logo_version?: number | null;
+  club_name?: string | null; logo_version?: number | null; entry_fee_cents?: number | null;
   players?: number | string; joined?: boolean;
 }
 
@@ -74,6 +80,7 @@ function publicT(t: TRow, uid?: string | null) {
     createdByName: t.created_by_name ?? null,
     isCreator: !!uid && t.created_by === uid,
     clubName: t.club_name ?? null,
+    entryFeeCents: t.eligibility === "pro" ? (t.entry_fee_cents ?? ENTRY_FEE_CENTS) : null,
     logoUrl: t.logo_version ? `/api/tournaments/${t.id}/logo?v=${t.logo_version}` : null,
   };
 }
@@ -138,12 +145,15 @@ function parseCreate(b: CreateBody, opts: { admin: boolean }): { error: string }
     ends = new Date(Math.max(starts.getTime(), Date.now()) + minutes * 60_000);
     if (ends.getTime() <= Date.now()) return { error: "That would already be over" };
   }
-  const cap = opts.admin ? 1024 : 256;
+  // Free player tournaments up to 256 players; Pro tournaments up to 500.
+  const cap = opts.admin ? 1024 : b.eligibility === "pro" ? PRO_MAX_PLAYERS : 256;
   const maxPlayers = b.maxPlayers && Number(b.maxPlayers) >= 2 ? Math.min(cap, Math.round(Number(b.maxPlayers))) : null;
   return {
     name, description: String(b.description ?? "").trim().slice(0, 500) || null, timeControl: b.timeControl,
     mode: b.mode === "ranked" ? "ranked" : "casual", starts, ends, format, kind,
-    eligibility: opts.admin && b.eligibility === "pro" ? "pro" : "all", maxPlayers,
+    eligibility: b.eligibility === "pro" ? "pro" : "all",
+    // A Pro tournament always has a cap (500 at most).
+    maxPlayers: b.eligibility === "pro" && !opts.admin ? (maxPlayers ?? PRO_MAX_PLAYERS) : maxPlayers,
   };
 }
 
@@ -227,14 +237,21 @@ router.post("/tournaments", requireAuth, async (req: Request, res: Response) => 
       res.status(400).json({ error: `You can run up to ${MAX_OPEN_PER_CREATOR} tournaments at a time. Finish or cancel one first.` });
       return;
     }
+    const extra = (req.body ?? {}) as { clubName?: string; logo?: string; listed?: boolean; acceptOrganizerTerms?: boolean };
+    if (v.eligibility === "pro") {
+      if (!(await isUserPremium(uid))) { res.status(403).json({ error: "Pro tournaments can be created by ChessScout Pro members.", needsPro: true }); return; }
+      if (extra.acceptOrganizerTerms !== true) { res.status(400).json({ error: "Please accept the organizer terms for a Pro tournament" }); return; }
+    }
     const id = crypto.randomBytes(5).toString("hex");
     const name = displayName(req);
-    const extra = (req.body ?? {}) as { clubName?: string; logo?: string; listed?: boolean };
     const visibility = extra.listed === false ? "link" : "public";
     await db.execute(sql`
       INSERT INTO tournaments (id, name, description, time_control, mode, starts_at, ends_at, status, created_by, format, kind, eligibility, max_players, visibility, created_by_name, club_name)
       VALUES (${id}, ${v.name}, ${v.description}, ${v.timeControl}, ${v.mode}, ${v.starts.toISOString()}, ${v.ends ? v.ends.toISOString() : null},
-        'scheduled', ${uid}, ${v.format}, ${v.kind}, 'all', ${v.maxPlayers}, ${visibility}, ${name}, ${String(extra.clubName ?? "").trim().slice(0, 80) || null})`);
+        'scheduled', ${uid}, ${v.format}, ${v.kind}, ${v.eligibility}, ${v.maxPlayers}, ${visibility}, ${name}, ${String(extra.clubName ?? "").trim().slice(0, 80) || null})`);
+    if (v.eligibility === "pro") {
+      await db.execute(sql`UPDATE tournaments SET entry_fee_cents = ${ENTRY_FEE_CENTS}, organizer_terms_at = now() WHERE id = ${id}`);
+    }
     if (extra.logo) {
       const err = await saveLogo(id, extra.logo);
       if (err) logger.warn({ id, err }, "[tournaments] logo rejected at create");
@@ -258,12 +275,60 @@ router.post("/tournaments/:id/cancel", requireAuth, async (req: Request, res: Re
     if (t.created_by !== req.user!.id && !req.user!.isAdmin) { res.status(403).json({ error: "Only the organizer can cancel this tournament" }); return; }
     await db.execute(sql`UPDATE tournaments SET status = 'cancelled' WHERE id = ${id} AND status IN ('scheduled', 'running')`);
     closeTournamentPool(id);
+    void refundTournamentEntries(id);
     const players = rowsOf<{ user_id: string }>(await db.execute(sql`SELECT user_id FROM tournament_players WHERE tournament_id = ${id} AND NOT withdrawn AND user_id <> ${req.user!.id}`));
     for (const p of players) void notifyUser(p.user_id, { title: `${t.name} was cancelled`, body: "The organizer cancelled this tournament.", kind: "tournament" }).catch(() => {});
     res.json({ ok: true });
   } catch (err) {
     logger.error({ err }, "[tournaments] user cancel failed");
     res.status(500).json({ error: "Could not cancel" });
+  }
+});
+
+// Pro tournaments: the two ways in for someone who isn't Pro yet.
+router.post("/tournaments/:id/pro-intent", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const id = String(req.params.id);
+    const t = await loadTournamentInfo(id);
+    if (!t || t.eligibility !== "pro") { res.status(400).json({ error: "Not a Pro tournament" }); return; }
+    if (!(await isUserPremium(req.user!.id))) await recordProIntent(id, req.user!.id);
+    res.json({ ok: true });
+  } catch (err) {
+    logger.error({ err }, "[tournaments] pro intent failed");
+    res.status(500).json({ error: "Could not continue" });
+  }
+});
+
+router.post("/tournaments/:id/entry/checkout", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const id = String(req.params.id);
+    const uid = req.user!.id;
+    const [t] = rowsOf<TRow>(await db.execute(sql`${SELECT_T(uid)} WHERE t.id = ${id}`));
+    if (!t || t.eligibility !== "pro") { res.status(400).json({ error: "This tournament doesn't take entry fees" }); return; }
+    if (t.status !== "scheduled" && t.status !== "running") { res.status(400).json({ error: "This tournament isn't open" }); return; }
+    if (t.format === "bracket" && t.status !== "scheduled") { res.status(400).json({ error: "Registration closed when the bracket started" }); return; }
+    if (t.max_players && Number(t.players ?? 0) >= t.max_players) { res.status(400).json({ error: "This tournament is full" }); return; }
+    if (await isUserPremium(uid)) { res.status(400).json({ error: "You're Pro, so you can join for free" }); return; }
+    if (await hasPaidEntry(id, uid)) { res.status(400).json({ error: "You've already paid your entry" }); return; }
+    const origin = (process.env.CORS_ORIGIN || "https://chessscout.net").replace(/\/$/, "");
+    const url = await createEntryCheckout({ tid: id, userId: uid, email: req.user!.email ?? null, frontendOrigin: origin });
+    res.json({ url });
+  } catch (err) {
+    logger.error({ err }, "[tournaments] entry checkout failed");
+    res.status(500).json({ error: err instanceof Error ? err.message : "Could not start checkout" });
+  }
+});
+
+router.post("/tournaments/:id/entry/confirm", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const sessionId = String(req.body?.sessionId ?? "");
+    if (!sessionId.startsWith("cs_")) { res.status(400).json({ error: "Invalid payment reference" }); return; }
+    const r = await recordPaidEntry(sessionId, req.user!.id);
+    if (!r || r.tournamentId !== String(req.params.id)) { res.json({ confirmed: false }); return; }
+    res.json({ confirmed: true });
+  } catch (err) {
+    logger.error({ err }, "[tournaments] entry confirm failed");
+    res.status(500).json({ error: err instanceof Error ? err.message : "Could not confirm the payment" });
   }
 });
 
@@ -341,6 +406,7 @@ router.get("/tournaments/:id", async (req: Request, res: Response) => {
       myMatch,
       knockedOut,
       myDailyGame: uid ? activeDaily.get(uid)?.gameId ?? null : null,
+      organizer: uid && t.created_by === uid && t.eligibility === "pro" ? await organizerSummary(id) : null,
     });
   } catch (err) {
     logger.error({ err }, "[tournaments] detail failed");
@@ -355,12 +421,19 @@ router.post("/tournaments/:id/join", requireAuth, async (req: Request, res: Resp
     const [t] = rowsOf<TRow>(await db.execute(sql`${SELECT_T(uid)} WHERE t.id = ${id}`));
     if (!t || (t.status !== "scheduled" && t.status !== "running")) { res.status(400).json({ error: "This tournament isn't open" }); return; }
     if (t.format === "bracket" && t.status !== "scheduled") { res.status(400).json({ error: "Registration closed when the bracket started" }); return; }
-    if (t.eligibility === "pro" && !(await isUserPremium(uid))) {
-      res.status(403).json({ error: "This tournament is for ChessScout Pro members.", needsPro: true });
-      return;
+    const name = displayName(req);
+    if (t.eligibility === "pro") {
+      const premium = await isUserPremium(uid);
+      if (!premium && !(await hasPaidEntry(id, uid))) {
+        res.status(403).json({
+          error: "This is a Pro tournament. Join ChessScout Pro, or pay the one-time entry fee.",
+          needsPro: true, entryFeeCents: t.entry_fee_cents ?? ENTRY_FEE_CENTS,
+        });
+        return;
+      }
+      if (premium) await creditProSignupIfAny(id, uid, name);
     }
     if (!t.joined && t.max_players && Number(t.players ?? 0) >= t.max_players) { res.status(400).json({ error: "This tournament is full" }); return; }
-    const name = displayName(req);
     await db.execute(sql`
       INSERT INTO tournament_players (tournament_id, user_id, username) VALUES (${id}, ${uid}, ${name})
       ON CONFLICT (tournament_id, user_id) DO UPDATE SET withdrawn = false`);
@@ -426,6 +499,7 @@ router.post("/admin/tournaments/:id/cancel", requireAdmin, async (req: Request, 
     const id = String(req.params.id);
     await db.execute(sql`UPDATE tournaments SET status = 'cancelled' WHERE id = ${id} AND status IN ('scheduled', 'running')`);
     closeTournamentPool(id);
+    void refundTournamentEntries(id);
     res.json({ ok: true });
   } catch (err) {
     logger.error({ err }, "[tournaments] cancel failed");

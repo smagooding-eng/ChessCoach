@@ -43,6 +43,7 @@ function Row({ t, now }: { t: TournamentSummary; now: number }) {
         <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
           <b className="truncate text-[15px] font-extrabold" style={{ color: PT.text }}>{t.name}</b>
           <StatusChip t={t} />
+          {t.eligibility === 'pro' && <span className="rounded px-1.5 py-0.5 text-[10px] font-black uppercase tracking-wider" style={{ background: '#81B64C', color: '#FFFFFF' }}>Pro</span>}
           {t.joined && <span className="text-[10.5px] font-black uppercase tracking-wider" style={{ color: PT.green }}>Joined</span>}
           {t.isCreator && <span className="text-[10.5px] font-black uppercase tracking-wider" style={{ color: PT.muted }}>Yours</span>}
         </span>

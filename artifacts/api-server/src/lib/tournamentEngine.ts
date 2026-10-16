@@ -96,6 +96,7 @@ async function buildBracket(t: TRow) {
   if (list.length < 2) {
     await db.execute(sql`UPDATE tournaments SET status = 'cancelled' WHERE id = ${t.id}`);
     for (const p of list) void notify(p.user_id, `${t.name} was cancelled`, "Not enough players signed up.", url(t.id));
+    void import("./tournamentEntries").then((m) => m.refundTournamentEntries(t.id)).catch(() => {});
     return;
   }
   const ratingKey = t.kind === "daily" ? DAILY_RATING_KEY : t.time_control;

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation } from 'wouter';
-import { ArrowLeft, Trophy, Zap, CalendarDays, Users, Clock, Swords, GitBranch, Loader2, Check, Sparkles, Award, ChevronDown } from 'lucide-react';
+import { ArrowLeft, Trophy, Zap, CalendarDays, Users, Clock, Swords, GitBranch, Loader2, Check, Sparkles, Award, ChevronDown, Crown } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { useUser } from '@/hooks/use-user';
 import { PT, cardStyle, greenBtn, ghostBtn } from '@/lib/playTheme';
@@ -18,6 +18,11 @@ interface Tc { id: string; label: string }
 const PLAYER_PRESETS: { value: number | null; label: string }[] = [
   { value: 4, label: '4' }, { value: 8, label: '8' }, { value: 16, label: '16' }, { value: 32, label: '32' }, { value: null, label: 'No limit' },
 ];
+// Pro tournaments always have a cap, 500 at most.
+const PRO_PLAYER_PRESETS: { value: number | null; label: string }[] = [
+  { value: 16, label: '16' }, { value: 32, label: '32' }, { value: 64, label: '64' }, { value: 128, label: '128' }, { value: 256, label: '256' }, { value: 500, label: '500 (max)' },
+];
+const PRO_MAX = 500;
 const LIVE_LENGTHS = [{ m: 30, label: '30 min' }, { m: 60, label: '1 hour' }, { m: 90, label: '90 min' }, { m: 120, label: '2 hours' }];
 const DAILY_LENGTHS = [{ m: 3 * 1440, label: '3 days' }, { m: 7 * 1440, label: '1 week' }, { m: 14 * 1440, label: '2 weeks' }, { m: 30 * 1440, label: '30 days' }];
 
@@ -55,7 +60,9 @@ function Chip({ on, onClick, children }: { on: boolean; onClick: () => void; chi
 }
 
 export function CreateTournament() {
-  const { authUser } = useUser();
+  const { authUser, isPremium } = useUser();
+  const [proT, setProT] = useState(false);
+  const [terms, setTerms] = useState(false);
   const [, navigate] = useLocation();
   const host = authUser?.scoutUsername || authUser?.chesscomUsername || authUser?.lichessUsername || authUser?.firstName || 'My';
 
@@ -114,7 +121,8 @@ export function CreateTournament() {
         body: JSON.stringify({
           name: name.trim() || suggested, description: note.trim() || undefined, timeControl: tc, mode,
           startsAt: when.toISOString(), durationMinutes: format === 'arena' ? length : undefined,
-          format, kind, maxPlayers, join, clubName: club.trim() || undefined, logo: logo ?? undefined, listed,
+          format, kind, maxPlayers: proT ? (maxPlayers ?? PRO_MAX) : maxPlayers, join, clubName: club.trim() || undefined, logo: logo ?? undefined, listed,
+          eligibility: proT ? 'pro' : 'all', acceptOrganizerTerms: proT ? terms : undefined,
         }),
       });
       const d = await r.json().catch(() => ({}));
@@ -201,15 +209,51 @@ export function CreateTournament() {
           </div>
         </div>
 
+        {/* Who can join */}
+        <div>
+          <Label>Who can join</Label>
+          <div className="grid grid-cols-2 gap-2">
+            <button type="button" onClick={() => setProT(false)} aria-pressed={!proT} className="rounded-[14px] p-3 text-left"
+              style={{ background: !proT ? PT.greenSoft : 'rgba(255,255,255,0.04)', border: `1.5px solid ${!proT ? PT.green : PT.border}` }}>
+              <b className="block text-[14.5px] font-extrabold" style={{ color: PT.text }}>Everyone</b>
+              <span className="block text-[12px] leading-snug" style={{ color: PT.muted }}>Free for all players.</span>
+            </button>
+            <button type="button" onClick={() => { if (isPremium) { setProT(true); if (maxPlayers === null) setMaxPlayers(PRO_MAX); } }} aria-pressed={proT} disabled={!isPremium}
+              className="rounded-[14px] p-3 text-left disabled:opacity-70"
+              style={{ background: proT ? PT.greenSoft : 'rgba(255,255,255,0.04)', border: `1.5px solid ${proT ? PT.green : PT.border}` }}>
+              <b className="flex items-center gap-1.5 text-[14.5px] font-extrabold" style={{ color: PT.text }}><Crown size={14} style={{ color: PT.gold }} /> Pro tournament</b>
+              <span className="block text-[12px] leading-snug" style={{ color: PT.muted }}>Pro members, or a $5 entry. You earn $1 per new entry.</span>
+            </button>
+          </div>
+          {!isPremium && (
+            <p className="mt-1.5 text-[12px]" style={{ color: PT.muted }}>
+              Pro tournaments are for Pro members to host. <Link href="/pricing" className="font-bold underline" style={{ color: PT.green }}>See ChessScout Pro</Link>
+            </p>
+          )}
+          {proT && (
+            <div className="mt-2 space-y-2 rounded-[12px] p-3" style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${PT.border}` }}>
+              <p className="text-[12.5px] leading-snug" style={{ color: PT.muted }}>
+                Pro members join free. Everyone else can go Pro ($5/month) or pay a one-time <b style={{ color: PT.text }}>$5 entry</b>.
+                For each player who joins with an entry fee or goes Pro from your tournament, you earn <b style={{ color: PT.text }}>$1</b>, paid out through
+                your <Link href="/affiliate" className="font-bold underline" style={{ color: PT.green }}>Affiliate page</Link>. Players who were already Pro don't earn a payout. Up to 500 players.
+              </p>
+              <label className="flex cursor-pointer items-start gap-2.5 text-[12.5px]" style={{ color: PT.text }}>
+                <input type="checkbox" checked={terms} onChange={(e) => setTerms(e.target.checked)} className="mt-0.5 h-4 w-4 shrink-0 accent-[#81B64C]" />
+                <span>I'm the organizer. Any prizes or rewards are mine to offer and deliver, and I'll follow the rules where I and my players live. ChessScout.net doesn't hold, offer or award prizes.</span>
+              </label>
+            </div>
+          )}
+        </div>
+
         {/* Players */}
         <div>
           <Label>Number of players</Label>
           <div className="flex flex-wrap gap-1.5">
-            {PLAYER_PRESETS.map((p) => <Chip key={p.label} on={maxPlayers === p.value} onClick={() => setMaxPlayers(p.value)}>{p.label}</Chip>)}
+            {(proT ? PRO_PLAYER_PRESETS : PLAYER_PRESETS).map((p) => <Chip key={p.label} on={maxPlayers === p.value} onClick={() => setMaxPlayers(p.value)}>{p.label}</Chip>)}
             <input
-              type="number" min={2} max={256} inputMode="numeric"
-              value={maxPlayers !== null && !PLAYER_PRESETS.some((p) => p.value === maxPlayers) ? maxPlayers : ''}
-              onChange={(e) => { const n = Number(e.target.value); setMaxPlayers(Number.isFinite(n) && n >= 2 ? Math.min(256, Math.round(n)) : 16); }}
+              type="number" min={2} max={proT ? PRO_MAX : 256} inputMode="numeric"
+              value={maxPlayers !== null && !(proT ? PRO_PLAYER_PRESETS : PLAYER_PRESETS).some((p) => p.value === maxPlayers) ? maxPlayers : ''}
+              onChange={(e) => { const n = Number(e.target.value); setMaxPlayers(Number.isFinite(n) && n >= 2 ? Math.min(proT ? PRO_MAX : 256, Math.round(n)) : 16); }}
               placeholder="Other"
               className="w-[84px] rounded-[10px] px-3 py-2 text-[13px] font-bold outline-none"
               style={{ ...ghostBtn }}
@@ -300,7 +344,7 @@ export function CreateTournament() {
 
         {err && <p className="text-[13px] font-bold" style={{ color: PT.red }}>{err}</p>}
 
-        <button onClick={submit} disabled={busy || !tc} className="inline-flex w-full items-center justify-center gap-2 rounded-[14px] py-3.5 text-[15px] font-extrabold disabled:opacity-60" style={greenBtn}>
+        <button onClick={submit} disabled={busy || !tc || (proT && !terms)} className="inline-flex w-full items-center justify-center gap-2 rounded-[14px] py-3.5 text-[15px] font-extrabold disabled:opacity-60" style={greenBtn}>
           {busy ? <Loader2 size={18} className="animate-spin" /> : <Trophy size={18} />} Create and get link
         </button>
         <p className="flex items-center justify-center gap-1.5 text-center text-[12px]" style={{ color: PT.muted }}>

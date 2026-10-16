@@ -31,6 +31,8 @@ export interface TournamentSummary {
   /** Organizer branding */
   clubName?: string | null;
   logoUrl?: string | null;
+  /** Pro tournaments: one-off entry fee for players who aren't Pro */
+  entryFeeCents?: number | null;
 }
 
 export function fmtCountdown(ms: number): string {
