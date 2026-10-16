@@ -15,6 +15,20 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 const SITE = 'https://chessscout.net';
 const API = (process.env.VITE_API_URL || process.env.API_URL || 'https://chesscoach-api-kbf8.onrender.com').replace(/\/+$/, '');
 
+// Crawlers never run the page's JavaScript, so they're reported to the API
+// here (Admin > Bots & Crawlers). Short timeout; never holds up the reply long.
+const BOT_UA = /bot|crawl|spider|slurp|preview|facebookexternalhit|facebot|meta-external|whatsapp|telegram|discord|slack|embedly|iframely|quora|skype|vkshare|google-pagerenderer|snapchat|viber|line\/|kakaotalk|mastodon|headless|lighthouse|curl|wget|python|go-http|okhttp|axios|node-fetch|scrapy/i;
+async function reportBot(req: VercelRequest, path: string): Promise<void> {
+  const ua = String(req.headers['user-agent'] ?? '');
+  if (ua && !BOT_UA.test(ua)) return;
+  const ip = String(req.headers['x-forwarded-for'] ?? '').split(',')[0].trim();
+  const c = new AbortController();
+  const t = setTimeout(() => c.abort(), 800);
+  try {
+    await fetch(`${API}/api/track-bot`, { method: 'POST', signal: c.signal, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path, ua, ip }) });
+  } catch { /* stats only */ } finally { clearTimeout(t); }
+}
+
 const esc = (s: string) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
 interface FetchRes { ok: boolean; status: number; json(): Promise<unknown>; text(): Promise<string> }
@@ -163,7 +177,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     else if (kind === 'article' && /^[a-z0-9-]{1,120}$/.test(slug)) page = await articlePage(slug);
   } catch { page = null; }
 
-  const pageRes = await fetchWithTimeout(`${SITE}/index.html`, 3500);
+  const [pageRes] = await Promise.all([
+    fetchWithTimeout(`${SITE}/index.html`, 3500),
+    reportBot(req, page?.path ?? `/${kind}`),
+  ]);
   let html = pageRes && pageRes.ok ? await pageRes.text() : '';
   if (!html) html = `<!doctype html><html><head><meta charset="utf-8" /><title>ChessScout.net</title></head><body><div id="root"></div></body></html>`;
   if (page) html = apply(html, page);

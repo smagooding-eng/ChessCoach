@@ -71,6 +71,18 @@ async function runSchemaMigrations() {
     await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_active_at TIMESTAMPTZ`);
     await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS email_opt_out BOOLEAN NOT NULL DEFAULT false`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_page_views_user_time ON page_views(user_id, created_at DESC)`);
+    // Crawlers, link-preview fetchers, scripts and automated browsers (see
+    // lib/botDetect): kept apart from page_views so people stats exclude them.
+    await db.execute(sql`CREATE TABLE IF NOT EXISTS bot_visits (
+      id SERIAL PRIMARY KEY,
+      path VARCHAR NOT NULL,
+      kind VARCHAR NOT NULL,
+      user_agent TEXT,
+      ip_address VARCHAR,
+      source VARCHAR NOT NULL DEFAULT 'browser',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_bot_visits_time ON bot_visits(created_at DESC)`);
     // One row per player per day they opened the app (for "active every week" checks).
     await db.execute(sql`CREATE TABLE IF NOT EXISTS user_activity_days (
       user_id VARCHAR NOT NULL,

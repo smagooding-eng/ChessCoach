@@ -2,6 +2,7 @@ import { Router, type IRouter, type Request, type Response } from "express";
 import { db, landingFunnelEventsTable } from "@workspace/db";
 import { sql, gte, lte, and, eq } from "drizzle-orm";
 import { parseDateRangeParams } from "./admin";
+import { botKind } from "../lib/botDetect";
 
 // Same shape returned by /api/admin/stats -- kept identical so the admin
 // UI can render both with one component.
@@ -85,6 +86,11 @@ router.post("/landing-funnel/track", async (req: Request, res: Response) => {
     };
     if (!visitorId || !eventType || !VALID_EVENTS.has(eventType)) {
       res.status(400).json({ error: "Invalid visitorId or eventType" });
+      return;
+    }
+    // Bots aren't part of the funnel (they're counted in bot_visits instead).
+    if (botKind(String(req.headers["user-agent"] ?? ""), (req.body as { automated?: boolean }).automated === true)) {
+      res.json({ ok: true });
       return;
     }
     // Unrecognized/missing platform falls back to 'web' rather than

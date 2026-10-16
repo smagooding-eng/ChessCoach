@@ -32,7 +32,7 @@ export function trackFunnelEvent(eventType: LandingFunnelEvent, elapsedMs?: numb
   apiFetch('/api/landing-funnel/track', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ visitorId: getVisitorId(), eventType, platform: PLATFORM, elapsedMs }),
+    body: JSON.stringify({ visitorId: getVisitorId(), eventType, platform: PLATFORM, elapsedMs, automated: typeof navigator !== "undefined" && navigator.webdriver === true }),
   }).catch(() => {});
 }
 
@@ -44,7 +44,7 @@ export function trackFunnelEvent(eventType: LandingFunnelEvent, elapsedMs?: numb
 export function trackFunnelEventBeacon(eventType: LandingFunnelEvent, elapsedMs?: number) {
   try {
     const blob = new Blob(
-      [JSON.stringify({ visitorId: getVisitorId(), eventType, platform: PLATFORM, elapsedMs })],
+      [JSON.stringify({ visitorId: getVisitorId(), eventType, platform: PLATFORM, elapsedMs, automated: typeof navigator !== "undefined" && navigator.webdriver === true })],
       { type: 'application/json' }
     );
     const sent = navigator.sendBeacon(apiUrl('/api/landing-funnel/track'), blob);

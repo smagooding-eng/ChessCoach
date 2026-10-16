@@ -286,6 +286,22 @@ router.get("/admin/stats", requireAdmin, async (_req: Request, res: Response) =>
       activeMembers: Number(tw.active_members ?? 0),
     };
 
+    // Bots (crawlers, link-preview fetchers, scripts, headless browsers):
+    // stored apart from page_views, so every number above is people only.
+    let bots = { total: 0, today: 0, todayKinds: [] as { kind: string; views: number }[], weekKinds: [] as { kind: string; views: number }[] };
+    try {
+      const [b] = (await db.execute(sql`
+        SELECT COUNT(*) AS total, COUNT(*) FILTER (WHERE created_at >= ${todayStart}) AS today FROM bot_visits`)).rows as { total: string; today: string }[];
+      const kinds = async (since: Date) => ((await db.execute(sql`
+        SELECT kind, COUNT(*) AS views FROM bot_visits WHERE created_at >= ${since}
+        GROUP BY kind ORDER BY views DESC LIMIT 12`)).rows as { kind: string; views: string }[]).map((r) => ({ kind: r.kind, views: Number(r.views) }));
+      bots = {
+        total: Number(b?.total ?? 0), today: Number(b?.today ?? 0),
+        todayKinds: await kinds(todayStart),
+        weekKinds: await kinds(new Date(Date.now() - 7 * 86_400_000)),
+      };
+    } catch { /* table not created yet */ }
+
     let subBreakdown = { active: 0, trialing: 0, canceled: 0, pastDue: 0, total: 0 };
     try {
       const stripe = await getUncachableStripeClient();
@@ -340,6 +356,7 @@ router.get("/admin/stats", requireAdmin, async (_req: Request, res: Response) =>
       },
       visitorBreakdown,
       todayWho,
+      bots,
       users: { total: totalUsersResult.count, today: todayUsersResult.count },
       subscriptions: subBreakdown,
       games: {

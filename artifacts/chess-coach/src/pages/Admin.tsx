@@ -20,6 +20,7 @@ import {
   History, Image, Italic, Link as LinkIcon, List, ListOrdered, Loader2, LogOut, Mail, Megaphone,
   Bell, Minus, Palette, Play, Redo2, RefreshCw, Search, Send, Settings, Shield, Sparkles, Swords, Target, Trash2,
   Trophy, Type, Undo2, User, UserCheck, UserPlus, Users, Wrench, X, Zap, TrendingUp, Plus, ShoppingBag,
+  Bot as BotIcon,
 } from 'lucide-react';
 
 interface VisitorBreakdown { new: number; returning: number; bounced: number }
@@ -27,6 +28,7 @@ interface VisitorBreakdown { new: number; returning: number; bounced: number }
 interface AdminStats {
   pageViews: { total: number; today: number };
   todayWho?: { anonViews: number; memberViews: number; adminViews: number; anonVisitors: number; activeMembers: number };
+  bots?: { total: number; today: number; todayKinds: { kind: string; views: number }[]; weekKinds: { kind: string; views: number }[] };
   uniqueVisitors: { total: number; today: number; totalByIp: number; todayByIp: number };
   visitorBreakdown: VisitorBreakdown;
   funnel: { landingPageUniqueIps: number; signups: number; paying: number };
@@ -517,6 +519,20 @@ export function Admin() {
             secondaryLabel="Today"
             footnote={`${stats.todayWho ? `Today: ${fmt(stats.todayWho.anonVisitors)} not signed in (could sign up) · ${fmt(stats.todayWho.activeMembers)} existing members. ` : ''}By IP address: ${fmt(stats.uniqueVisitors.totalByIp)} total, ${fmt(stats.uniqueVisitors.todayByIp)} today — often more accurate, since the number above double-counts anyone using multiple browsers or the installed app.`}
           />
+          {stats.bots && (
+            <StatCard
+              icon={BotIcon}
+              label="Bots & Crawlers"
+              primary={stats.bots.total}
+              primaryLabel="Total"
+              secondary={stats.bots.today}
+              secondaryLabel="Today"
+              accent="#9e9b98"
+              footnote={`Not counted in page views or visitors above. ${stats.bots.todayKinds.length
+                ? `Today: ${stats.bots.todayKinds.map((k) => `${k.kind} ${fmt(k.views)}`).join(' · ')}.`
+                : stats.bots.weekKinds.length ? `Last 7 days: ${stats.bots.weekKinds.map((k) => `${k.kind} ${fmt(k.views)}`).join(' · ')}.` : 'None recorded yet.'} Counting started Oct 16, 2026; earlier views may include some bots.`}
+            />
+          )}
           <StatCard
             icon={CreditCard}
             label="Subscriptions"

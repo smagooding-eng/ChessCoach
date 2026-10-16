@@ -333,7 +333,8 @@ function PageTracker() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({ path: location, visitorId: getVisitorId() }),
+      // automated: the browser says it's driven by a script (headless/test tools)
+      body: JSON.stringify({ path: location, visitorId: getVisitorId(), automated: navigator.webdriver === true }),
     }).catch(() => {});
   }, [location]);
   return null;

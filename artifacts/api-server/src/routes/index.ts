@@ -36,6 +36,8 @@ import socialRouter from "./social";
 import tournamentsRouter from "./tournaments";
 import { requirePremium } from "../middlewares/authMiddleware";
 import { db, pageViewsTable } from "@workspace/db";
+import { botKind } from "../lib/botDetect";
+import { sql } from "drizzle-orm";
 
 const router: IRouter = Router();
 
@@ -73,9 +75,17 @@ router.use(tournamentsRouter);
 
 router.post("/track", async (req: Request, res: Response) => {
   try {
-    const { path, visitorId } = req.body;
+    const { path, visitorId, automated } = req.body;
     if (!path) { res.status(400).json({ error: "path required" }); return; }
     const ip = req.headers["x-forwarded-for"]?.toString().split(",")[0]?.trim() || req.ip || "unknown";
+    // Bots go to their own table, so page views and visitors are people only.
+    const ua = String(req.headers["user-agent"] ?? "").slice(0, 400);
+    const kind = req.user?.id ? null : botKind(ua, automated === true);
+    if (kind) {
+      await db.execute(sql`INSERT INTO bot_visits (path, kind, user_agent, ip_address, source) VALUES (${String(path).slice(0, 300)}, ${kind}, ${ua}, ${ip}, 'browser')`);
+      res.json({ ok: true });
+      return;
+    }
     if (req.user?.id) touchLastActive(req.user.id);
     await db.insert(pageViewsTable).values({
       path,
@@ -86,6 +96,23 @@ router.post("/track", async (req: Request, res: Response) => {
     res.json({ ok: true });
   } catch {
     res.status(500).json({ error: "Failed to track" });
+  }
+});
+
+// Crawlers that never run the page's JavaScript (link previews, search
+// engines) are reported by the Vercel functions that answer them (api/og.ts,
+// api/page.ts). Only bot user agents are stored.
+router.post("/track-bot", async (req: Request, res: Response) => {
+  try {
+    const { path, ua, ip } = (req.body ?? {}) as { path?: string; ua?: string; ip?: string };
+    const kind = botKind(ua);
+    if (path && kind) {
+      await db.execute(sql`INSERT INTO bot_visits (path, kind, user_agent, ip_address, source)
+        VALUES (${String(path).slice(0, 300)}, ${kind}, ${String(ua ?? "").slice(0, 400)}, ${String(ip ?? "").slice(0, 64) || null}, 'crawler')`);
+    }
+    res.json({ ok: true });
+  } catch {
+    res.json({ ok: false });
   }
 });
 
