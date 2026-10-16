@@ -56,7 +56,7 @@ async function challengeMeta(code: string): Promise<Meta | null> {
   const daily = c.kind === 'daily';
   const what = daily ? `daily game (${c.timeControlLabel ?? ''} per move)` : `${c.timeControlLabel ?? ''} live game`;
   const mode = c.mode === 'ranked' ? 'Ranked' : 'Casual';
-  const image = `${SITE}/${daily ? 'og-challenge-daily.jpg' : 'og-challenge.jpg'}`;
+  const image = `${SITE}/${daily ? 'og-challenge-daily-v2.jpg' : 'og-challenge-v2.jpg'}`;
   const url = `${SITE}/challenge/${code}`;
   if (c.isRequest) {
     return { title: `Chess challenge for ${name}`, description: 'A challenge request on ChessScout.net.', image, url };
@@ -91,13 +91,13 @@ function shareMeta(data: string): Meta | null {
     card = JSON.parse(decodeURIComponent(escape(Buffer.from(decodeURIComponent(data), 'base64').toString('binary'))));
   } catch { return null; }
   const url = `${SITE}/share/${data}`;
-  const ach = `${SITE}/og-achievement.jpg`;
+  const ach = `${SITE}/og-achievement-v2.jpg`;
   switch (card?.type) {
     case 'milestone': return { title: `${card.username} reached a ${card.newRating} Scout rating`, description: 'Tracking real progress on ChessScout.net. See how they did it.', image: ach, url };
     case 'streak': return { title: `${card.username} is on a ${card.streakDays}-day chess streak`, description: 'Training every day on ChessScout.net.', image: ach, url };
     case 'course': return { title: `${card.username} completed "${card.courseName}"`, description: 'A course built from their own games on ChessScout.net.', image: ach, url };
-    case 'puzzle': return { title: `${card.username} is solving chess puzzles at ${card.rating}`, description: 'Can you beat their puzzle rating? Try on ChessScout.net.', image: `${SITE}/og-puzzle.jpg`, url };
-    case 'puzzle_position': return { title: `Can you solve this ${card.rating}-rated chess puzzle?`, description: 'Find the best move on ChessScout.net.', image: `${SITE}/og-puzzle.jpg`, url };
+    case 'puzzle': return { title: `${card.username} is solving chess puzzles at ${card.rating}`, description: 'Can you beat their puzzle rating? Try on ChessScout.net.', image: `${SITE}/og-puzzle-v2.jpg`, url };
+    case 'puzzle_position': return { title: `Can you solve this ${card.rating}-rated chess puzzle?`, description: 'Find the best move on ChessScout.net.', image: `${SITE}/og-puzzle-v2.jpg`, url };
     default: return null;
   }
 }
