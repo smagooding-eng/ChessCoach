@@ -1,0 +1,38 @@
+name: Store screenshots (raw)
+
+# Phone screenshots of the public pages for the Play Store listing, committed
+# to store-assets/raw/. Run on demand from the Actions tab.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['scripts/store-shots.mjs', '.github/workflows/store-shots.yml']
+
+permissions:
+  contents: write
+
+jobs:
+  shots:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install Playwright
+        run: |
+          mkdir -p /tmp/pw && cd /tmp/pw && npm init -y >/dev/null && npm i playwright@1.47.2 >/dev/null
+          npx playwright install --with-deps chromium
+      - name: Take screenshots
+        run: |
+          cp scripts/store-shots.mjs /tmp/pw/store-shots.mjs
+          OUT="$GITHUB_WORKSPACE/store-assets/raw" node /tmp/pw/store-shots.mjs
+      - name: Commit
+        run: |
+          git config user.name "store-shots-bot"
+          git config user.email "store-shots-bot@users.noreply.github.com"
+          git add store-assets/raw
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "Store screenshots (raw)"
+          git pull --rebase origin main
+          git push origin HEAD:main
