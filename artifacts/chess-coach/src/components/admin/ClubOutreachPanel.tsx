@@ -29,12 +29,14 @@ const STATUS_TABS: { id: string; label: string }[] = [
 const SITE = 'https://chessscout.net';
 const utm = (path: string, campaign: string) => `${SITE}${path}${path.includes('?') ? '&' : '?'}utm_source=outreach&utm_medium=email&utm_campaign=${campaign}`;
 
-interface Template { id: string; name: string; subject: string; body: string }
+/** personal: filled in per club (one-by-one drafts). general: written for a Bcc batch. */
+interface Template { id: string; name: string; kind: 'personal' | 'general'; subject: string; body: string }
 
 const DEFAULT_TEMPLATES: Template[] = [
   {
     id: 'intro',
     name: 'Introduce ChessScout.net',
+    kind: 'personal',
     subject: "A free chess tool for {{org}}'s players",
     body: `Hi {{org}} team,
 
@@ -59,6 +61,7 @@ If you'd rather not hear from me again, just reply "no thanks" and I won't email
   {
     id: 'tournament',
     name: 'Advertise a tournament',
+    kind: 'personal',
     subject: "Run {{org}}'s next tournament online, free",
     body: `Hi {{org}} team,
 
@@ -85,6 +88,7 @@ If you'd rather not hear from me again, just reply "no thanks" and I won't email
   {
     id: 'partner',
     name: 'Club partnership',
+    kind: 'personal',
     subject: 'Partnering with {{org}}',
     body: `Hi {{org}} team,
 
@@ -92,6 +96,83 @@ I'm {{sender}}, the developer of ChessScout.net. I'm looking for a few clubs to 
 
 What I can offer your club:
 - free online tournaments for your members, set up and run on ChessScout.net (${utm('/tournaments/new', 'club_partner')})
+- a coach-style review of every game your players play there
+- a direct line to me for features your club needs
+
+In return I'd love honest feedback, and for you to mention ChessScout.net to your members if they find it useful.
+
+Would you be open to a quick chat?
+
+Thanks,
+{{sender}}
+ChessScout.net
+{{address}}
+
+If you'd rather not hear from me again, just reply "no thanks" and I won't email you again.`,
+  },
+  {
+    id: 'intro_general',
+    name: 'Introduce ChessScout.net',
+    kind: 'general',
+    subject: 'A free chess tool for your club players',
+    body: `Hi there,
+
+I'm {{sender}}, and I build ChessScout.net, a chess site made for club players. I'm reaching out to a few chess clubs and organizers because I think it could be useful for your members.
+
+On ChessScout.net players can:
+- play live and daily games against real opponents, or bots at their level
+- get every game reviewed move by move, with the key moments and what to play instead
+- scout an opponent's openings and habits before a match (works with Chess.com and Lichess accounts)
+
+It's free to start: ${utm('/', 'club_intro_bcc')}
+
+If it sounds useful, I'd be grateful if you shared it with your players, and I'd love to hear what your club would want from a site like this.
+
+Thanks,
+{{sender}}
+ChessScout.net
+{{address}}
+
+If you'd rather not hear from me again, just reply "no thanks" and I won't email you again.`,
+  },
+  {
+    id: 'tournament_general',
+    name: 'Advertise a tournament',
+    kind: 'general',
+    subject: 'Run your next club tournament online, free',
+    body: `Hi there,
+
+I'm {{sender}} from ChessScout.net. We've just made it easy for chess clubs to run online tournaments for their members, and I wanted to offer it to you.
+
+It takes about a minute:
+- choose arena (most points wins) or knockout
+- pick live or daily games and the time control
+- set the number of players, then share one link
+
+Players join from the link, and pairings, clocks and standings are handled for you. It's free.
+
+Create one here: ${utm('/tournaments/new', 'club_tournament_bcc')}
+{{tournamentLine}}
+Happy to help set up your first one; just reply with the format and time you have in mind.
+
+Thanks,
+{{sender}}
+ChessScout.net
+{{address}}
+
+If you'd rather not hear from me again, just reply "no thanks" and I won't email you again.`,
+  },
+  {
+    id: 'partner_general',
+    name: 'Club partnership',
+    kind: 'general',
+    subject: 'Looking for a few chess clubs to partner with',
+    body: `Hi there,
+
+I'm {{sender}}, the developer of ChessScout.net. I'm looking for a few chess clubs to work with closely as we grow.
+
+What I can offer your club:
+- free online tournaments for your members, set up and run on ChessScout.net (${utm('/tournaments/new', 'club_partner_bcc')})
 - a coach-style review of every game your players play there
 - a direct line to me for features your club needs
 
@@ -138,6 +219,27 @@ function gmailUrl(to: string, subject: string, body: string, account: string): s
 }
 const mailtoUrl = (to: string, subject: string, body: string) =>
   `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+
+/** Two rows of template buttons: personal (filled in per club) and general (for Bcc batches). */
+function TemplatePicker({ templates, value, onChange, compact }: { templates: Template[]; value: string; onChange: (id: string) => void; compact?: boolean }) {
+  const group = (kind: Template['kind'], label: string) => (
+    <div>
+      <p className="mb-1 text-[10.5px] font-bold uppercase tracking-wider" style={{ color: MUTED }}>{label}</p>
+      <div className="flex flex-wrap gap-1.5">
+        {templates.filter((t) => t.kind === kind).map((t) => (
+          <button key={t.id} type="button" onClick={() => onChange(t.id)} className={`rounded-lg font-bold ${compact ? 'px-2 py-1 text-[11px]' : 'px-2.5 py-1.5 text-xs'}`}
+            style={value === t.id ? { background: GREEN, color: '#fff' } : { background: 'rgba(0,0,0,.3)', color: '#fff', border: '1px solid rgba(255,255,255,.1)' }}>{t.name}</button>
+        ))}
+      </div>
+    </div>
+  );
+  return (
+    <div className="space-y-2">
+      {group('personal', 'Personal · fills in each club (one by one)')}
+      {group('general', 'General · for Bcc batches')}
+    </div>
+  );
+}
 
 export function ClubOutreachPanel() {
   const [tab, setTab] = useState('new');
@@ -322,16 +424,13 @@ export function ClubOutreachPanel() {
         </div>
         <div className="space-y-2 rounded-xl p-3.5" style={INNER}>
           <p className="text-sm font-bold text-white">Template</p>
-          <div className="flex flex-wrap gap-1.5">
-            {templates.map((t) => (
-              <button key={t.id} onClick={() => setTemplateId(t.id)} className="rounded-lg px-2.5 py-1.5 text-xs font-bold"
-                style={templateId === t.id ? { background: GREEN, color: '#fff' } : { background: 'rgba(0,0,0,.3)', color: '#fff', border: '1px solid rgba(255,255,255,.1)' }}>{t.name}</button>
-            ))}
-          </div>
+          <TemplatePicker templates={templates} value={templateId} onChange={setTemplateId} />
           <input className={INPUT} value={template.subject} onChange={(e) => updateTemplate({ subject: e.target.value })} />
           <textarea className={`${INPUT} min-h-[150px] font-mono text-[12px]`} value={template.body} onChange={(e) => updateTemplate({ body: e.target.value })} />
           <div className="flex items-center justify-between">
-            <p className="text-[11px]" style={{ color: MUTED }}>Fills in: {'{{org}} {{city}} {{sender}} {{address}} {{tournamentLine}}'}</p>
+            <p className="text-[11px]" style={{ color: MUTED }}>
+              {template.kind === 'personal' ? 'Fills in: {{org}} {{city}} {{sender}} {{address}} {{tournamentLine}}' : 'Fills in: {{sender}} {{address}} {{tournamentLine}}'}
+            </p>
             {overrides[template.id] && <button onClick={resetTemplate} className="inline-flex items-center gap-1 text-[11px] font-bold" style={{ color: GREEN }}><RotateCcw size={11} /> Reset</button>}
           </div>
         </div>
@@ -435,8 +534,9 @@ export function ClubOutreachPanel() {
               <button onClick={() => { setBatches(null); void loadData(); }} aria-label="Close" className="p-1" style={{ color: MUTED }}><X size={18} /></button>
             </div>
             <div className="h-1.5 overflow-hidden rounded-full bg-white/10"><div className="h-full" style={{ width: `${(bi / batches.length) * 100}%`, background: GREEN }} /></div>
+            <TemplatePicker templates={templates} value={templateId} onChange={setTemplateId} compact />
             <p className="text-[12px]" style={{ color: MUTED }}>
-              Put these in <b className="text-white">Bcc</b> (never To or Cc) so organizations can't see each other's addresses. The message uses a general greeting since it goes to several clubs.
+              Put these in <b className="text-white">Bcc</b> (never To or Cc) so organizations can't see each other's addresses. Personal templates use "your club" here, since one email goes to several clubs.
             </p>
             <div className="max-h-[110px] overflow-y-auto rounded-lg p-2.5 font-mono text-[11.5px] text-white/80" style={{ background: 'rgba(0,0,0,.3)' }}>
               {batch.map((c) => c.email).join(', ')}
@@ -473,6 +573,7 @@ export function ClubOutreachPanel() {
               <button onClick={() => { setQueue(null); void loadData(); }} aria-label="Close" className="p-1" style={{ color: MUTED }}><X size={18} /></button>
             </div>
             <div className="h-1.5 overflow-hidden rounded-full bg-white/10"><div className="h-full" style={{ width: `${(qi / queue.length) * 100}%`, background: GREEN }} /></div>
+            <TemplatePicker templates={templates} value={templateId} onChange={setTemplateId} compact />
             <p className="text-xs" style={{ color: MUTED }}>To: <span className="text-white">{current.email}</span></p>
             <p className="text-sm font-bold text-white">{subject}</p>
             <pre className="max-h-[320px] overflow-y-auto whitespace-pre-wrap rounded-lg p-3 text-[12.5px] text-white/85" style={{ background: 'rgba(0,0,0,.3)', fontFamily: 'inherit' }}>{body}</pre>
