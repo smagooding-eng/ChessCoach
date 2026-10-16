@@ -10,12 +10,12 @@ jobs:
       - run: |
           UA='facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)'
           {
-          for u in https://chessscout.net/ https://chessscout.net/tournaments; do
+          for u in; do
             echo "== $u"; curl -sS -A "$UA" -o page.html -w "%{http_code}\n" "$u"
             grep -oE '<meta[^>]+(og:image"|og:title)[^>]*>' page.html
           done
           for i in shots/players.jpg shots/home.jpg og-players.jpg; do
             echo "== $i"; curl -sS -A "$UA" -D hdr -o img "https://chessscout.net/$i"; grep -iE "^HTTP|content-type|content-length|x-vercel-cache" hdr; file img | cut -c1-120
           done
-          } > out.txt 2>&1
+          } 2>&1 | tr -d "\r" > out.txt
           echo "::notice::$(sed ':a;N;$!ba;s/\n/%0A/g' out.txt)"
