@@ -321,6 +321,13 @@ function getVisitorId(): string {
 
 function PageTracker() {
   const [location] = useLocation();
+  // A referral code on any shared link (?ref=CODE) is kept for signup.
+  useEffect(() => {
+    try {
+      const ref = new URLSearchParams(window.location.search).get('ref');
+      if (ref && /^[A-Za-z0-9_-]{3,40}$/.test(ref)) localStorage.setItem('chessscout_ref', ref.toUpperCase());
+    } catch { /* ignore */ }
+  }, [location]);
   useEffect(() => {
     apiFetch('/api/track', {
       method: 'POST',
