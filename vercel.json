@@ -35,7 +35,7 @@
     },
     {
       "source": "/sitemap.xml",
-      "destination": "https://chesscoach-api-kbf8.onrender.com/sitemap.xml"
+      "destination": "/api/sitemap"
     },
     {
       "source": "/(.*)",
