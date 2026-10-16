@@ -6,6 +6,7 @@ import { useUser } from '@/hooks/use-user';
 import { apiFetch } from '@/lib/api';
 import { OnboardingStartModal } from '@/components/OnboardingStartModal';
 import { startOnboardingImport } from '@/lib/onboardingImport';
+import { startBackgroundImport } from '@/lib/autoImport';
 import { ScoutUsernameInput, saveScoutUsername, type ScoutNameStatus } from '@/components/ScoutUsernameInput';
 
 const PENDING_CHALLENGE_KEY = 'cs_pending_challenge';
@@ -89,6 +90,9 @@ export function Welcome() {
       });
       if (!res.ok) throw new Error('Failed to save');
       if (cc) login(cc);
+      // Both accounts linked: the setup below imports Chess.com, so bring in
+      // the Lichess games alongside it.
+      if (cc && lc) void startBackgroundImport('lichess', lc, 3);
       if (pendingCode) {
         // Import in the background and go straight to the challenge.
         await startOnboardingImport(cc || lc, cc ? 'chesscom' : 'lichess');

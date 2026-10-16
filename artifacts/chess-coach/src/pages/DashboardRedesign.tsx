@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { autoImportLinkedAccounts } from '@/lib/autoImport';
 import { Link, useLocation } from 'wouter';
 import { Target, Search, ArrowRight, ArrowUpRight, ChevronRight, Play, Puzzle, BookOpen, Crosshair, Crown, Camera, Zap, ShoppingBag, Bot, Swords, Download, BarChart3, GraduationCap } from 'lucide-react';
 import { useUser } from '@/hooks/use-user';
@@ -6,8 +7,6 @@ import { useChessPlayer } from '@/hooks/use-chess-player';
 import { useMultiEloProgress } from '@/hooks/use-elo-progress';
 import { useMyAnalysisSummary, useMyWeaknesses } from '@/hooks/use-analysis';
 import { useLiveRatings, bestLiveRating } from '@/hooks/use-live-ratings';
-import { apiFetch } from '@/lib/api';
-import { trackImportJob } from '@/components/ImportStatusWatcher';
 import { EmailVerifyBanner } from '@/components/EmailVerifyBanner';
 import { FenThumb } from '@/components/FenThumb';
 import { encodeCard } from '@/pages/ShareCard';
@@ -95,24 +94,12 @@ export function DashboardRedesign() {
   const autoImportedRef = useRef(false);
   useEffect(() => {
     if (autoImportedRef.current) return;
-    const platform: 'chesscom' | 'lichess' | null = username ? 'chesscom' : authUser?.lichessUsername ? 'lichess' : null;
-    const autoUsername = platform === 'chesscom' ? username : authUser?.lichessUsername;
-    if (!platform || !autoUsername) return;
+    const chesscom = authUser?.chesscomUsername || username;
+    const lichess = authUser?.lichessUsername;
+    if (!chesscom && !lichess) return;
     autoImportedRef.current = true;
-    (async () => {
-      try {
-        const r = await apiFetch('/api/games/import-bg', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ username: autoUsername, months: 1, forceUpdate: false, platform, ownerUsername: username || autoUsername }),
-        });
-        if (!r.ok) return;
-        const { jobId } = await r.json() as { jobId: string };
-        if (jobId) trackImportJob(jobId, platform, autoUsername, true);
-      } catch { /* silent by design */ }
-    })();
-  }, [username, authUser?.lichessUsername]);
+    autoImportLinkedAccounts({ chesscom, lichess });
+  }, [username, authUser?.chesscomUsername, authUser?.lichessUsername]);
 
   const displayName = username ?? authUser?.chesscomUsername ?? authUser?.lichessUsername ?? 'Player';
   const mine = [username, authUser?.chesscomUsername, authUser?.lichessUsername]
