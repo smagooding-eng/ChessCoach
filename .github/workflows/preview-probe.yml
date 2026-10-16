@@ -1,0 +1,18 @@
+name: Preview probe (temporary)
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/preview-probe.yml']
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          UA='facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)'
+          for u in https://chessscout.net/players https://chessscout.net/ https://chessscout.net/tournaments; do
+            echo "== $u"; curl -sS -A "$UA" -D - -o page.html "$u" | head -5
+            grep -oE '<meta[^>]+(og:image|og:title|twitter:image)[^>]*>' page.html
+          done
+          for i in shots/players.jpg shots/home.jpg; do
+            echo "== $i"; curl -sS -A "$UA" -D - -o img "https://chessscout.net/$i" | head -8; file img; ls -la img
+          done
