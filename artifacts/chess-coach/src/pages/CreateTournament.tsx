@@ -222,7 +222,7 @@ export function CreateTournament() {
               className="rounded-[14px] p-3 text-left disabled:opacity-70"
               style={{ background: proT ? PT.greenSoft : 'rgba(255,255,255,0.04)', border: `1.5px solid ${proT ? PT.green : PT.border}` }}>
               <b className="flex items-center gap-1.5 text-[14.5px] font-extrabold" style={{ color: PT.text }}><Crown size={14} style={{ color: PT.gold }} /> Pro tournament</b>
-              <span className="block text-[12px] leading-snug" style={{ color: PT.muted }}>Pro members, or a $5 entry. You earn $1 per new entry.</span>
+              <span className="block text-[12px] leading-snug" style={{ color: PT.muted }}>For Pro members. You earn $1 per new Pro signup.</span>
             </button>
           </div>
           {!isPremium && (
@@ -233,8 +233,8 @@ export function CreateTournament() {
           {proT && (
             <div className="mt-2 space-y-2 rounded-[12px] p-3" style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${PT.border}` }}>
               <p className="text-[12.5px] leading-snug" style={{ color: PT.muted }}>
-                Pro members join free. Everyone else can go Pro ($5/month) or pay a one-time <b style={{ color: PT.text }}>$5 entry</b>.
-                For each player who joins with an entry fee or goes Pro from your tournament, you earn <b style={{ color: PT.text }}>$1</b>, paid out through
+                Pro members join free. Everyone else joins by going Pro ($5/month).
+                For each player who goes Pro from your tournament and joins, you earn <b style={{ color: PT.text }}>$1</b>, paid out through
                 your <Link href="/affiliate" className="font-bold underline" style={{ color: PT.green }}>Affiliate page</Link>. Players who were already Pro don't earn a payout. Up to 500 players.
               </p>
               <label className="flex cursor-pointer items-start gap-2.5 text-[12.5px]" style={{ color: PT.text }}>

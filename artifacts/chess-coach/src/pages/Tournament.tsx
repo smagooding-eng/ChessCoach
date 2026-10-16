@@ -111,15 +111,6 @@ function TournamentView({ live, signedIn }: { live: Live; signedIn: boolean }) {
     try { localStorage.setItem('cs_pending_tournament', String(id)); } catch { /* ignore */ }
     navigate('/subscription');
   };
-  const payEntry = async () => {
-    setBusy(true); setErr(null);
-    try {
-      const r = await apiFetch(`/api/tournaments/${id}/entry/checkout`, { method: 'POST', credentials: 'include' });
-      const d = await r.json().catch(() => ({}));
-      if (!r.ok || !d.url) throw new Error(d.error || 'Could not start checkout');
-      window.location.href = d.url;
-    } catch (e) { setErr(e instanceof Error ? e.message : 'Could not start checkout'); setBusy(false); }
-  };
 
   useEffect(() => {
     void load();
@@ -242,15 +233,10 @@ function TournamentView({ live, signedIn }: { live: Live; signedIn: boolean }) {
           )}
           {(needsPro || (signedIn && !isPremium)) && t.eligibility === 'pro' && !full && (
             <div className="space-y-2 rounded-xl p-3.5" style={{ background: 'rgba(255,255,255,.04)', border: `1px solid ${PT.border}` }}>
-              <p className="text-center text-[13px] font-bold" style={{ color: PT.text }}>This is a Pro tournament. Two ways in:</p>
-              <div className="grid grid-cols-2 gap-2">
-                <button onClick={goPro} className="rounded-xl px-2 py-3 text-[13px] font-extrabold" style={greenBtn}>
-                  Go Pro<span className="block text-[11px] font-bold opacity-80">$5/month · join every Pro tournament</span>
-                </button>
-                <button onClick={payEntry} disabled={busy} className="rounded-xl px-2 py-3 text-[13px] font-extrabold disabled:opacity-60" style={ghostBtn}>
-                  Pay {money(t.entryFeeCents ?? 500)} entry<span className="block text-[11px] font-bold" style={{ color: PT.muted }}>this tournament only</span>
-                </button>
-              </div>
+              <p className="text-center text-[13px] font-bold" style={{ color: PT.text }}>This is a Pro tournament for ChessScout Pro members.</p>
+              <button onClick={goPro} className="w-full rounded-xl px-2 py-3 text-[14px] font-extrabold" style={greenBtn}>
+                Go Pro and join<span className="block text-[11px] font-bold opacity-80">$5/month · cancel anytime · join every Pro tournament</span>
+              </button>
             </div>
           )}
         </div>
@@ -347,7 +333,7 @@ function TournamentView({ live, signedIn }: { live: Live; signedIn: boolean }) {
         <div className="min-w-0">
           <p className="flex flex-wrap items-center gap-x-2 text-[11px] font-black uppercase tracking-[0.16em]" style={{ color: t.status === 'running' ? PT.gold : PT.muted }}>
             <span>{t.status === 'running' ? 'On now' : t.status === 'scheduled' ? 'Upcoming' : 'Finished'} · {isBracket ? 'Knockout' : 'Arena'} · {isLive ? 'Live' : 'Daily'}</span>
-            {t.eligibility === 'pro' && <span className="rounded px-1.5 py-0.5 text-[10px]" style={{ background: '#81B64C', color: '#FFFFFF' }}>Pro tournament{t.entryFeeCents ? ` · ${money(t.entryFeeCents)} entry` : ''}</span>}
+            {t.eligibility === 'pro' && <span className="rounded px-1.5 py-0.5 text-[10px]" style={{ background: '#81B64C', color: '#FFFFFF' }}>Pro tournament</span>}
           </p>
           <h1 className="truncate text-2xl font-black md:text-3xl" style={{ color: PT.text, letterSpacing: '-0.02em' }}>{t.name}</h1>
           {(t.clubName || (t.createdByName && t.createdByName !== 'ChessScout.net')) && (
@@ -367,8 +353,8 @@ function TournamentView({ live, signedIn }: { live: Live; signedIn: boolean }) {
             <b className="text-[18px] font-black" style={{ color: PT.text }}>{money(data.organizer.earnedCents)}</b>
           </div>
           <p className="text-[12.5px]" style={{ color: PT.muted }}>
-            {data.organizer.feeEntries} paid entr{data.organizer.feeEntries === 1 ? 'y' : 'ies'} · {data.organizer.proEntries} new Pro member{data.organizer.proEntries === 1 ? '' : 's'}.
-            You earn $1 for each player who joins with an entry fee or goes Pro from your tournament (players who were already Pro join free).
+            {data.organizer.proEntries} new Pro member{data.organizer.proEntries === 1 ? '' : 's'} joined through your tournament.
+            You earn $1 for each player who goes Pro from your tournament and joins (players who were already Pro join free).
           </p>
           <Link href="/affiliate" className="inline-block rounded-xl px-3.5 py-2 text-[12.5px] font-extrabold" style={ghostBtn}>Payouts and earnings →</Link>
         </div>

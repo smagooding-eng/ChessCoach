@@ -12,7 +12,7 @@ const PREMIUM_FEATURES = [
   { icon: GraduationCap, label: 'Personalized Courses', desc: 'Lessons built from the real mistakes in your own games' },
   { icon: Swords, label: 'AI Scouting Reports', desc: 'Your opponent\'s weaknesses and how to exploit them' },
   { icon: Volume2, label: 'Natural Coach Voice', desc: 'Lessons read aloud in a natural voice, plus AI puzzle explanations and board scanning from a photo' },
-  { icon: Crown, label: 'Pro Tournaments', desc: 'Join every Pro tournament free, and host your own: earn $1 for each player who pays the $5 entry or goes Pro to join' },
+  { icon: Crown, label: 'Pro Tournaments', desc: 'Join every Pro tournament, and host your own: earn $1 for each player who goes Pro to join' },
 ];
 
 const FREE_FEATURES = [

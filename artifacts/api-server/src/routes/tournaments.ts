@@ -14,6 +14,10 @@ import {
 } from "../lib/tournamentEntries";
 
 const PRO_MAX_PLAYERS = 500;
+// One-off $5 entries are built but switched off for now: Pro membership is
+// the only way into a Pro tournament. Set ENTRY_FEES_ENABLED=true to bring
+// them back (the UI follows entryFeeCents).
+const ENTRY_FEES_ENABLED = process.env.ENTRY_FEES_ENABLED === "true";
 
 // Tournaments. Admins and players create them; they're listed publicly
 // unless the organizer chose link-only. Anyone (signed in or not) can view
@@ -80,7 +84,8 @@ function publicT(t: TRow, uid?: string | null) {
     createdByName: t.created_by_name ?? null,
     isCreator: !!uid && t.created_by === uid,
     clubName: t.club_name ?? null,
-    entryFeeCents: t.eligibility === "pro" ? (t.entry_fee_cents ?? ENTRY_FEE_CENTS) : null,
+    // Entry fees are switched off for now (Pro membership is the only way in).
+    entryFeeCents: ENTRY_FEES_ENABLED && t.eligibility === "pro" ? (t.entry_fee_cents ?? ENTRY_FEE_CENTS) : null,
     logoUrl: t.logo_version ? `/api/tournaments/${t.id}/logo?v=${t.logo_version}` : null,
   };
 }
@@ -250,7 +255,7 @@ router.post("/tournaments", requireAuth, async (req: Request, res: Response) => 
       VALUES (${id}, ${v.name}, ${v.description}, ${v.timeControl}, ${v.mode}, ${v.starts.toISOString()}, ${v.ends ? v.ends.toISOString() : null},
         'scheduled', ${uid}, ${v.format}, ${v.kind}, ${v.eligibility}, ${v.maxPlayers}, ${visibility}, ${name}, ${String(extra.clubName ?? "").trim().slice(0, 80) || null})`);
     if (v.eligibility === "pro") {
-      await db.execute(sql`UPDATE tournaments SET entry_fee_cents = ${ENTRY_FEE_CENTS}, organizer_terms_at = now() WHERE id = ${id}`);
+      await db.execute(sql`UPDATE tournaments SET entry_fee_cents = ${ENTRY_FEES_ENABLED ? ENTRY_FEE_CENTS : null}, organizer_terms_at = now() WHERE id = ${id}`);
     }
     if (extra.logo) {
       const err = await saveLogo(id, extra.logo);
@@ -301,6 +306,7 @@ router.post("/tournaments/:id/pro-intent", requireAuth, async (req: Request, res
 
 router.post("/tournaments/:id/entry/checkout", requireAuth, async (req: Request, res: Response) => {
   try {
+    if (!ENTRY_FEES_ENABLED) { res.status(400).json({ error: "Entry fees aren't available. Join ChessScout Pro to play in Pro tournaments." }); return; }
     const id = String(req.params.id);
     const uid = req.user!.id;
     const [t] = rowsOf<TRow>(await db.execute(sql`${SELECT_T(uid)} WHERE t.id = ${id}`));
@@ -426,8 +432,8 @@ router.post("/tournaments/:id/join", requireAuth, async (req: Request, res: Resp
       const premium = await isUserPremium(uid);
       if (!premium && !(await hasPaidEntry(id, uid))) {
         res.status(403).json({
-          error: "This is a Pro tournament. Join ChessScout Pro, or pay the one-time entry fee.",
-          needsPro: true, entryFeeCents: t.entry_fee_cents ?? ENTRY_FEE_CENTS,
+          error: ENTRY_FEES_ENABLED ? "This is a Pro tournament. Join ChessScout Pro, or pay the one-time entry fee." : "This is a Pro tournament for ChessScout Pro members.",
+          needsPro: true, entryFeeCents: ENTRY_FEES_ENABLED ? (t.entry_fee_cents ?? ENTRY_FEE_CENTS) : null,
         });
         return;
       }

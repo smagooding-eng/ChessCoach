@@ -589,14 +589,14 @@ ${divider}
   },
   {
     name: '🏆 Host a Pro Tournament',
-    subject: 'Host a Pro tournament and earn $1 per entry',
+    subject: 'Host a Pro tournament and earn $1 per new Pro member',
     html: `<div style="text-align:center;margin-bottom:18px;">${badge('New for Pro members')}</div>
 <h2 style="color:#F5F7F6;text-align:center;margin:0 0 6px;font-size:24px;font-weight:900;">Host your own Pro tournament</h2>
-<p style="color:#87918E;text-align:center;font-size:14px;margin:0 0 22px;">Run tournaments for your friends or club, and earn from every new entry.</p>
+<p style="color:#87918E;text-align:center;font-size:14px;margin:0 0 22px;">Run tournaments for your friends or club, and earn from every new Pro member they bring.</p>
 <table style="width:100%;border-collapse:collapse;margin:0 0 22px;">
 ${featureRow('&#9819;', 'Create it in a minute', 'Arena or knockout, live or daily, your time control, up to 500 players, with your club name and logo.')}
-${featureRow('&#9820;', 'Two ways in', 'Pro members join free. Everyone else goes Pro or pays a one-time $5 entry.')}
-${featureRow('&#9822;', 'You earn $1 per new entry', 'For every player who pays the entry or goes Pro to join, you earn $1, paid out to you.')}
+${featureRow('&#9820;', 'For Pro members', 'Pro members join free. Everyone else joins by going Pro ($5/month).')}
+${featureRow('&#9822;', 'You earn $1 per new Pro', 'For every player who goes Pro to join your tournament, you earn $1, paid out to you.')}
 ${featureRow('&#9821;', 'Yours to use', 'Spend it however you like: club costs, prizes or the next event.')}
 </table>
 <p style="text-align:center;"><a href="https://chessscout.net/tournaments/new" style="${btnStyle}">Create a tournament →</a></p>
