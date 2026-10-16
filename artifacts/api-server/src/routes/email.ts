@@ -2,7 +2,8 @@ import { Router, type IRouter, type Request, type Response } from "express";
 import { db, usersTable } from "@workspace/db";
 import { isNotNull, inArray, eq } from "drizzle-orm";
 import { sendEmail, sendBulkEmail } from "../lib/email";
-import { emailLayout, emailP } from "../lib/emailTheme";
+import { emailLayout, emailP, unsubscribeFooterHtml } from "../lib/emailTheme";
+import { optedInUsersByEmail, unsubscribeHeaders, unsubscribeUrl } from "../lib/emailPrefs";
 import { ADMIN_EMAILS } from "../lib/auth";
 import { ObjectStorageService } from "../lib/objectStorage";
 
@@ -70,13 +71,30 @@ router.post("/admin/email/broadcast", requireAdmin, async (req: Request, res: Re
       return;
     }
 
-    req.log.info({ recipientCount: recipients.length, recipientFilter }, "Starting email broadcast");
-    const results = await sendBulkEmail(recipients, subject, html, text);
+    // Respect unsubscribes, and give every recipient their own unsubscribe link.
+    const { allowed, optedOut } = await optedInUsersByEmail(recipients);
+    const skippedOptOut = recipients.filter(e => optedOut.has(e.toLowerCase())).length;
+    recipients = recipients.filter(e => !optedOut.has(e.toLowerCase()));
+    if (recipients.length === 0) {
+      res.status(400).json({ error: "Everyone selected has unsubscribed from emails", skippedOptOut });
+      return;
+    }
+    const personalize = (to: string) => {
+      const userId = allowed.get(to.toLowerCase());
+      if (!userId) return { html };
+      const footer = unsubscribeFooterHtml(unsubscribeUrl(userId));
+      const withFooter = html.includes("</body>") ? html.replace("</body>", `${footer}</body>`) : html + footer;
+      return { html: withFooter, headers: unsubscribeHeaders(userId) };
+    };
+
+    req.log.info({ recipientCount: recipients.length, skippedOptOut, recipientFilter }, "Starting email broadcast");
+    const results = await sendBulkEmail(recipients, subject, html, text, personalize);
     req.log.info({ sent: results.sent, failed: results.failed, errors: results.errors }, "Email broadcast complete");
 
     res.json({
       success: true,
       totalRecipients: recipients.length,
+      skippedOptOut,
       ...results,
       failedEmails: results.errors.length > 0 ? results.errors : undefined,
     });

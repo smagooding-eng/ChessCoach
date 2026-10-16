@@ -1147,7 +1147,7 @@ router.post("/admin/fix-chess960", requireAdmin, async (req: Request, res: Respo
 });
 
 const CAMPAIGN_THEMES: Record<string, string> = {
-  "Free Trial": "Emphasize the free 3-day trial with no credit card required. Urgency: try it risk-free today.",
+  "Free Trial": "Emphasize that playing is free, no credit card needed, and Pro is $5/month with cancel anytime. Invite them to try it today.",
   "Opponent Scouting": "Focus on the killer feature: smart scouting reports that expose any opponent's weaknesses before you play them.",
   "Game Analysis": "Highlight move-by-move game analysis with Stockfish 17 engine + coaching explanations for every move.",
   "New Feature": "Announce exciting new features. Be enthusiastic and specific about what's new.",
@@ -1176,7 +1176,7 @@ PRODUCT INFO:
 - Personalized training courses generated from your actual mistakes
 - 10 practice bots from 400 to 3000 ELO
 - ELO tracking across Chess.com and Lichess
-- 3-day free trial, $4/month or $1/week, no credit card required
+- Free to play; Pro is $5/month (cancel anytime) for unlimited analysis, full scouting reports and courses
 - Website: https://chessscout.net
 
 CAMPAIGN THEME: ${theme}

@@ -53,6 +53,11 @@ export const usersTable = pgTable("users", {
   // onboarding, used as the destination for actual payout transfers.
   stripeConnectAccountId: varchar("stripe_connect_account_id"),
   lastLoginAt: timestamp("last_login_at", { withTimezone: true }),
+  // Last time the app was opened (sessions last weeks, so lastLoginAt alone
+  // makes active players look inactive to the reminder emails).
+  lastActiveAt: timestamp("last_active_at", { withTimezone: true }),
+  // Opted out of optional emails (win-back, reminders, broadcasts).
+  emailOptOut: boolean("email_opt_out").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });

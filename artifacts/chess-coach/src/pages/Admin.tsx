@@ -3655,10 +3655,10 @@ ${featureRow('&#9821;', 'Train', 'Puzzles, the opening trainer, chess traps and 
 </table>
 </div>
 <div style="text-align:center;background:linear-gradient(135deg,rgba(129,182,76,0.1),rgba(129,182,76,0.05));border:1px solid rgba(129,182,76,0.2);border-radius:8px;padding:20px;margin-bottom:20px;">
-<p style="color:#F5F7F6;font-size:22px;font-weight:700;margin:0;">$1<span style="font-size:14px;font-weight:400;color:#87918E;">/week</span> &nbsp;or&nbsp; $4<span style="font-size:14px;font-weight:400;color:#87918E;">/month</span></p>
-<p style="color:#81b64c;font-size:13px;margin:4px 0 0;">Includes 3-day free trial</p>
+<p style="color:#F5F7F6;font-size:22px;font-weight:700;margin:0;">$5<span style="font-size:14px;font-weight:400;color:#87918E;">/month</span></p>
+<p style="color:#87918E;font-size:13px;margin:4px 0 0;">Cancel anytime.</p>
 </div>
-<p style="text-align:center;"><a href="https://chessscout.net/subscription" style="${btnStyle}">Analyze My Games Free →</a></p>`,
+<p style="text-align:center;"><a href="https://chessscout.net/subscription" style="${btnStyle}">See Pro →</a></p>`,
   },
   {
     name: '🚀 New Feature',
@@ -3773,7 +3773,7 @@ ${divider}
 </div>
 <div style="text-align:center;background:linear-gradient(135deg,rgba(129,182,76,0.1),rgba(129,182,76,0.05));border:1px solid rgba(129,182,76,0.2);border-radius:8px;padding:20px;margin-bottom:20px;">
 <p style="color:#F5F7F6;font-size:14px;margin:0 0 4px;">Plans start at just</p>
-<p style="color:#81b64c;font-size:28px;font-weight:700;margin:0;">$1<span style="font-size:14px;font-weight:400;color:#87918E;">/week</span></p>
+<p style="color:#F5F7F6;font-size:28px;font-weight:700;margin:0;">$5<span style="font-size:14px;font-weight:400;color:#87918E;">/month</span></p>
 <p style="color:#87918E;font-size:12px;margin:4px 0 0;">Less than a coffee. Cancel anytime.</p>
 </div>
 <p style="text-align:center;"><a href="https://chessscout.net/subscription" style="${btnStyle}">Keep Pro Access →</a></p>`,
@@ -3799,21 +3799,19 @@ ${divider}
   },
   {
     name: '🎯 Re-engagement',
-    subject: 'We Miss You — Your Chess Is Waiting',
-    html: `<img src="${CHESS_IMAGES.board}" alt="Chess board" style="${imgStyle}" />
-<h2 style="color:#81b64c;margin:0 0 8px;">It's Been a While ♜</h2>
-<p style="color:#87918E;font-size:13px;margin:0 0 20px;">Your chess improvement doesn't have to stop</p>
-<p>We noticed you haven't been on ChessScout.net recently. Even a few minutes of daily puzzle practice can make a noticeable difference in your games.</p>
-<div style="background:#121B1D;border-radius:8px;padding:20px;margin:20px 0;">
-<h3 style="color:#F5F7F6;font-size:15px;margin:0 0 16px;">Quick ways to jump back in:</h3>
-<table style="width:100%;border-collapse:collapse;">
-<tr><td style="padding:8px 0;vertical-align:top;width:30px;font-size:16px;">⚡</td><td style="padding:8px 0;"><strong style="color:#F5F7F6;">2 minutes</strong> — Solve a daily puzzle</td></tr>
-<tr><td style="padding:8px 0;vertical-align:top;width:30px;font-size:16px;">🎯</td><td style="padding:8px 0;"><strong style="color:#F5F7F6;">5 minutes</strong> — Scout your next opponent</td></tr>
-<tr><td style="padding:8px 0;vertical-align:top;width:30px;font-size:16px;">📖</td><td style="padding:8px 0;"><strong style="color:#F5F7F6;">10 minutes</strong> — Review a recent game with the coach</td></tr>
-<tr><td style="padding:8px 0;vertical-align:top;width:30px;font-size:16px;">🤖</td><td style="padding:8px 0;"><strong style="color:#F5F7F6;">15 minutes</strong> — Play a practice bot match</td></tr>
+    subject: 'Your board is set up ♟',
+    html: `<div style="text-align:center;margin-bottom:18px;">${badge("It's been a while")}</div>
+<h2 style="color:#F5F7F6;text-align:center;margin:0 0 6px;font-size:24px;font-weight:900;">Your board is set up</h2>
+<p style="color:#87918E;text-align:center;font-size:14px;margin:0 0 22px;">Here's what's waiting for you on ChessScout.net.</p>
+<p style="color:#87918E;margin:0 0 6px;">Pick up where you left off:</p>
+<table style="width:100%;border-collapse:collapse;margin:0 0 22px;">
+${featureRow('&#9822;', 'Play', 'Start a live game in seconds, or warm up against a bot at your level.')}
+${featureRow('&#9820;', 'Scout', "See your next opponent's openings and habits before you sit down.")}
+${featureRow('&#9819;', 'Improve', 'Get your recent games reviewed: the key moments and what to play instead.')}
+${featureRow('&#9821;', 'Train', "Today's puzzles are ready.")}
 </table>
-</div>
-<p style="text-align:center;"><a href="https://chessscout.net" style="${btnStyle}">Get Back to Chess →</a></p>`,
+<p style="text-align:center;"><a href="https://chessscout.net/play" style="${btnStyle}">Play a game →</a></p>
+<p style="text-align:center;margin-top:12px;font-size:13px;"><a href="https://chessscout.net/opponents" style="color:#81B64C;font-weight:700;text-decoration:none;">Scout an opponent</a> &nbsp;·&nbsp; <a href="https://chessscout.net/puzzles" style="color:#81B64C;font-weight:700;text-decoration:none;">Puzzles</a> &nbsp;·&nbsp; <a href="https://chessscout.net/games" style="color:#81B64C;font-weight:700;text-decoration:none;">My games</a></p>`,
   },
   {
     name: '📚 Opening Guide',

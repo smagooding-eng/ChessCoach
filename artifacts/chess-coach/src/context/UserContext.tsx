@@ -12,6 +12,7 @@ interface AuthUser {
   chesscomUsername: string | null;
   lichessUsername: string | null;
   scoutUsername?: string | null;
+  emailOptOut?: boolean;
   isAdmin: boolean;
   emailVerified?: boolean;
 }

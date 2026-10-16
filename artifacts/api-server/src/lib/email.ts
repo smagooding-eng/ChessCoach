@@ -37,6 +37,7 @@ export interface SendEmailOptions {
   html: string;
   text?: string;
   replyTo?: string;
+  headers?: Record<string, string>;
 }
 
 export async function sendEmail(options: SendEmailOptions) {
@@ -49,6 +50,7 @@ export async function sendEmail(options: SendEmailOptions) {
     html: options.html,
     text: options.text,
     replyTo: options.replyTo,
+    ...(options.headers ? { headers: options.headers } : {}),
   });
 
   if (error) {
@@ -60,7 +62,10 @@ export async function sendEmail(options: SendEmailOptions) {
 
 const delay = (ms: number) => new Promise(r => setTimeout(r, ms));
 
-export async function sendBulkEmail(recipients: string[], subject: string, html: string, text?: string) {
+/** Per-recipient tweaks for a bulk send (e.g. that person's unsubscribe link). */
+export type BulkPersonalize = (to: string) => { html: string; headers?: Record<string, string> };
+
+export async function sendBulkEmail(recipients: string[], subject: string, html: string, text?: string, personalize?: BulkPersonalize) {
   const results = {
     sent: 0,
     failed: 0,
@@ -71,7 +76,8 @@ export async function sendBulkEmail(recipients: string[], subject: string, html:
 
   for (const to of recipients) {
     try {
-      const data = await sendEmail({ to, subject, html, text });
+      const p = personalize ? personalize(to) : { html };
+      const data = await sendEmail({ to, subject, html: p.html, text, headers: p.headers });
       results.sent++;
       console.log(`[email] Sent to ${to}, id: ${data?.id}`);
       await delay(600);
@@ -83,7 +89,8 @@ export async function sendBulkEmail(recipients: string[], subject: string, html:
         console.log('[email] Rate limited, waiting 5s...');
         await delay(5000);
         try {
-          await sendEmail({ to, subject, html, text });
+          const p = personalize ? personalize(to) : { html };
+          await sendEmail({ to, subject, html: p.html, text, headers: p.headers });
           results.failed--;
           results.sent++;
           results.errors.pop();

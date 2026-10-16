@@ -21,6 +21,11 @@ const FONT = `-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial
 
 export const EMAIL_FONT = FONT;
 
+/** Footer line injected into admin broadcasts (their HTML is built in the browser). */
+export function unsubscribeFooterHtml(url: string): string {
+  return `<div style="text-align:center;padding:0 10px 28px;font-family:${FONT};font-size:12px;color:${EMAIL.faint};">Don't want these emails? <a href="${url}" style="color:${EMAIL.faint};text-decoration:underline;">Unsubscribe</a></div>`;
+}
+
 export function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
@@ -77,6 +82,8 @@ export function emailLayout(o: {
   cta?: { label: string; href: string };
   afterCta?: string;
   footerNote?: string;
+  /** Optional emails only: adds an unsubscribe link to the footer. */
+  unsubscribeUrl?: string;
   center?: boolean;
 }): string {
   const align = o.center === false ? 'left' : 'center';
@@ -113,7 +120,7 @@ export function emailLayout(o: {
     <tr><td align="center" style="padding:22px 10px 0;font-family:${FONT};">
       <div style="font-size:13px;font-weight:800;color:${EMAIL.text};margin:0 0 6px;">Play smarter. <span style="color:${EMAIL.green};">Win more.</span></div>
       ${o.footerNote ? `<div style="font-size:12px;line-height:1.5;color:${EMAIL.faint};margin:0 0 6px;">${o.footerNote}</div>` : ''}
-      <div style="font-size:12px;color:${EMAIL.faint};"><a href="${EMAIL.site}" style="color:${EMAIL.faint};text-decoration:underline;">chessscout.net</a></div>
+      <div style="font-size:12px;color:${EMAIL.faint};"><a href="${EMAIL.site}" style="color:${EMAIL.faint};text-decoration:underline;">chessscout.net</a>${o.unsubscribeUrl ? ` &nbsp;·&nbsp; <a href="${o.unsubscribeUrl}" style="color:${EMAIL.faint};text-decoration:underline;">Unsubscribe</a>` : ''}</div>
     </td></tr>
   </table>
 </td></tr>

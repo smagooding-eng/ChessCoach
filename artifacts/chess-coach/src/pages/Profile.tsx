@@ -548,12 +548,18 @@ ${divider}
   {
     name: '🎯 Re-engagement',
     subject: "It's Been a While — Your Chess Progress Is Waiting",
-    html: `<img src="${CHESS_IMAGES.opening}" alt="Chess opening" style="${imgStyle}" />
-<h2 style="color:#81b64c;margin:0 0 8px;">We Miss You at the Board ♞</h2>
-<p style="color:#87918E;font-size:13px;margin:0 0 20px;">Pick up right where you left off</p>
-<p>It's been a bit since your last visit. Your stats, puzzles, and weakness reports are all still here — ready whenever you are.</p>
-${divider}
-<p style="text-align:center;"><a href="https://chessscout.net" style="${btnStyle}">Jump Back In →</a></p>`,
+    html: `<div style="text-align:center;margin-bottom:18px;">${badge("It's been a while")}</div>
+<h2 style="color:#F5F7F6;text-align:center;margin:0 0 6px;font-size:24px;font-weight:900;">Your board is set up</h2>
+<p style="color:#87918E;text-align:center;font-size:14px;margin:0 0 22px;">Here's what's waiting for you on ChessScout.net.</p>
+<p style="color:#87918E;margin:0 0 6px;">Pick up where you left off:</p>
+<table style="width:100%;border-collapse:collapse;margin:0 0 22px;">
+${featureRow('&#9822;', 'Play', 'Start a live game in seconds, or warm up against a bot at your level.')}
+${featureRow('&#9820;', 'Scout', "See your next opponent's openings and habits before you sit down.")}
+${featureRow('&#9819;', 'Improve', 'Get your recent games reviewed: the key moments and what to play instead.')}
+${featureRow('&#9821;', 'Train', "Today's puzzles are ready.")}
+</table>
+<p style="text-align:center;"><a href="https://chessscout.net/play" style="${btnStyle}">Play a game →</a></p>
+<p style="text-align:center;margin-top:12px;font-size:13px;"><a href="https://chessscout.net/opponents" style="color:#81B64C;font-weight:700;text-decoration:none;">Scout an opponent</a> &nbsp;·&nbsp; <a href="https://chessscout.net/puzzles" style="color:#81B64C;font-weight:700;text-decoration:none;">Puzzles</a> &nbsp;·&nbsp; <a href="https://chessscout.net/games" style="color:#81B64C;font-weight:700;text-decoration:none;">My games</a></p>`,
   },
   {
     name: '📚 Opening Guide',
@@ -1972,6 +1978,7 @@ function ProfileRedesign() {
   const { data: coursesData } = useMyCourses();
   const { data: multiElo } = useMultiEloProgress(username ?? undefined);
   const push = usePushNotifications();
+  const [emailPrefSaving, setEmailPrefSaving] = useState(false);
 
   const [editingUsername, setEditingUsername] = useState(false);
   const [newUsername, setNewUsername] = useState(username ?? '');
@@ -2186,6 +2193,37 @@ function ProfileRedesign() {
             </span>
           </button>
           {push.error && <p className="px-4 pb-3 text-[12px]" style={{ color: RD.red }}>{push.error}</p>}
+          {authUser?.email && (() => {
+            const emailsOn = !authUser.emailOptOut;
+            return (
+              <button
+                onClick={async () => {
+                  setEmailPrefSaving(true);
+                  try {
+                    await apiFetch('/api/auth/update-profile', {
+                      method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+                      body: JSON.stringify({ emailOptOut: emailsOn }),
+                    });
+                    await refreshAuth();
+                  } finally { setEmailPrefSaving(false); }
+                }}
+                disabled={emailPrefSaving}
+                className="flex w-full items-center gap-3 px-4 py-3 text-left disabled:opacity-50"
+                style={{ borderTop: `1px solid ${RD.border}` }}
+              >
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[12px]" style={{ background: 'rgba(255,255,255,.06)', border: `1px solid ${RD.border}`, color: RD.text }}><Mail size={18} /></span>
+                <span className="min-w-0 flex-1">
+                  <b className="block text-[14.5px] font-bold">Email reminders</b>
+                  <span className="block truncate text-[12px]" style={{ color: RD.muted }}>
+                    {emailPrefSaving ? 'Saving…' : emailsOn ? 'On — reminders and updates' : 'Off — account emails only'}
+                  </span>
+                </span>
+                <span className="flex h-6 w-11 shrink-0 items-center rounded-full px-0.5 transition-colors" style={{ background: emailsOn ? RD.green : 'rgba(255,255,255,.15)', justifyContent: emailsOn ? 'flex-end' : 'flex-start' }}>
+                  <span className="h-5 w-5 rounded-full bg-white" />
+                </span>
+              </button>
+            );
+          })()}
           <button onClick={handleLogout} className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-[rgba(255,80,88,.06)]" style={{ borderTop: `1px solid ${RD.border}` }}>
             <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[12px]" style={{ background: 'rgba(255,80,88,.14)', border: '1px solid rgba(255,80,88,.35)', color: RD.red }}><LogOut size={18} /></span>
             <b className="text-[14.5px] font-bold" style={{ color: RD.red }}>Sign Out</b>

@@ -37,6 +37,7 @@ function toSessionUser(dbUser: any): SessionUser {
     chesscomUsername: dbUser.chesscomUsername,
     lichessUsername: dbUser.lichessUsername || null,
     scoutUsername: dbUser.scoutUsername || null,
+    emailOptOut: !!dbUser.emailOptOut,
     isAdmin: dbUser.isAdmin || ADMIN_EMAILS.includes(dbUser.email?.toLowerCase?.() ?? ""),
     inviteCode: dbUser.inviteCode || null,
     emailVerified: !!dbUser.emailVerified || dbUser.authProvider === "google" || dbUser.authProvider === "local+google",
@@ -87,11 +88,20 @@ router.get("/auth/user", async (req: Request, res: Response) => {
   // The ChessScout username can be set from another device, so read it
   // fresh rather than trusting the copy stored in this session.
   try {
-    const [row] = await db.select({ scoutUsername: usersTable.scoutUsername }).from(usersTable).where(eq(usersTable.id, req.user!.id)).limit(1);
-    if (row) (req.user as any).scoutUsername = row.scoutUsername ?? null;
+    const [row] = await db.select({ scoutUsername: usersTable.scoutUsername, emailOptOut: usersTable.emailOptOut }).from(usersTable).where(eq(usersTable.id, req.user!.id)).limit(1);
+    if (row) {
+      (req.user as any).scoutUsername = row.scoutUsername ?? null;
+      (req.user as any).emailOptOut = !!row.emailOptOut;
+    }
   } catch { /* fall back to the session copy */ }
+  touchLastActive(req.user!.id);
   res.json({ user: req.user });
 });
+
+/** Record that the player opened the app (at most once per 10 minutes). */
+export function touchLastActive(userId: string): void {
+  db.execute(sql`UPDATE users SET last_active_at = now() WHERE id = ${userId} AND (last_active_at IS NULL OR last_active_at < now() - interval '10 minutes')`).catch(() => {});
+}
 
 const RESERVED_SCOUT_NAMES = new Set([
   "admin", "administrator", "root", "support", "help", "chessscout", "chessscoutnet", "chess-scout",
@@ -547,13 +557,14 @@ router.post("/auth/update-profile", async (req: Request, res: Response) => {
     return;
   }
 
-  const { chesscomUsername, firstName, lichessUsername } = req.body;
+  const { chesscomUsername, firstName, lichessUsername, emailOptOut } = req.body;
 
   try {
     const updates: Record<string, any> = {};
     if (chesscomUsername !== undefined) updates.chesscomUsername = chesscomUsername;
     if (lichessUsername !== undefined) updates.lichessUsername = lichessUsername;
     if (firstName !== undefined) updates.firstName = firstName;
+    if (typeof emailOptOut === "boolean") updates.emailOptOut = emailOptOut;
 
     if (Object.keys(updates).length === 0) {
       res.json({ user: req.user });

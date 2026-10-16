@@ -5,7 +5,8 @@ import analysisRouter from "./analysis";
 import coursesRouter from "./courses";
 import opponentsRouter from "./opponents";
 import ttsRouter from "./tts";
-import authRouter from "./auth";
+import authRouter, { touchLastActive } from "./auth";
+import emailPrefsRouter from "./emailPrefs";
 import stripeRouter from "./stripe";
 import adminRouter from "./admin";
 import emailRouter from "./email";
@@ -41,6 +42,7 @@ router.use(gamesRouter);
 router.use(stripeRouter);
 router.use(adminRouter);
 router.use(emailRouter);
+router.use(emailPrefsRouter);
 router.use("/storage", storageRouter);
 router.use(puzzlesRouter);
 router.use(liveRouter);
@@ -68,6 +70,7 @@ router.post("/track", async (req: Request, res: Response) => {
     const { path, visitorId } = req.body;
     if (!path) { res.status(400).json({ error: "path required" }); return; }
     const ip = req.headers["x-forwarded-for"]?.toString().split(",")[0]?.trim() || req.ip || "unknown";
+    if (req.user?.id) touchLastActive(req.user.id);
     await db.insert(pageViewsTable).values({
       path,
       userId: req.user?.id ?? null,

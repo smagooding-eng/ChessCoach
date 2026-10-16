@@ -75,7 +75,7 @@ const PRODUCT_INFO = `PRODUCT INFO — ChessScout.net:
 - Personalized training courses and puzzles generated from your actual mistakes
 - 10 practice bots from 400 to 3000 ELO
 - ELO tracking across Chess.com and Lichess
-- 3-day free trial, $4/month or $1/week, no credit card required
+- Free to play; Pro is $5/month (cancel anytime) for unlimited analysis, full scouting reports and courses
 - A free, no-signup live demo on the homepage that scouts your last 5 games and your last opponent's
 - Website: https://chessscout.net`;
 

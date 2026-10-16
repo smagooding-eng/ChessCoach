@@ -68,6 +68,9 @@ async function runSchemaMigrations() {
   try {
     await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_premium_override BOOLEAN NOT NULL DEFAULT false`);
     await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS scout_username VARCHAR`);
+    await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_active_at TIMESTAMPTZ`);
+    await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS email_opt_out BOOLEAN NOT NULL DEFAULT false`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_page_views_user_time ON page_views(user_id, created_at DESC)`);
     await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS users_scout_username_lower_idx ON users (LOWER(scout_username))`);
     await db.execute(sql`UPDATE users SET is_premium_override = true WHERE email = 'lukakhvedelidze97@gmail.com' AND is_premium_override = false`);
 
