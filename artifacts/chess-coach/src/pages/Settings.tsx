@@ -9,7 +9,7 @@ import { LanguageSettings } from '@/components/LanguagePicker';
 import { RD, REDESIGN_ON } from '@/lib/redesignTheme';
 import { PIECE_THEME_TYPES, themeTypeOf } from '@/lib/pieceThemes';
 import {
-  useSettings, BOARD_THEMES, BOARD_TEXTURES, isPhotoBoard, SOUND_PACKS, type SoundPack, PIECE_STYLES, PIECE_SHAPES, BOARD_SIZES, APP_BACKGROUNDS, BG_PHOTOS, CARD_GLASS, type CardGlass,
+  useSettings, hapticsSupported, BOARD_THEMES, BOARD_TEXTURES, isPhotoBoard, SOUND_PACKS, type SoundPack, PIECE_STYLES, PIECE_SHAPES, BOARD_SIZES, APP_BACKGROUNDS, BG_PHOTOS, CARD_GLASS, type CardGlass,
   type BoardTheme, type BoardTexture, type PieceStyle, type PieceShape, type BoardSize, type AppBackground, type SavedTheme,
 } from '@/context/SettingsContext';
 
@@ -90,7 +90,7 @@ export default function SettingsPage() {
     confirmMoves, setConfirmMoves,
     showCoordinates, setShowCoordinates,
     showLegalMoves, setShowLegalMoves,
-    soundEnabled, setSoundEnabled, soundPack, setSoundPack,
+    soundEnabled, setSoundEnabled, hapticsEnabled, setHapticsEnabled, soundPack, setSoundPack,
     promotionChoice, setPromotionChoice,
     boardSize, setBoardSize,
     savedThemes, saveCurrentAsTheme, applyTheme, deleteTheme,
@@ -550,6 +550,10 @@ export default function SettingsPage() {
         <ToggleRow label="Legal Move Dots" description="Highlight where a selected piece can move — turn off if you'd rather not see them" checked={showLegalMoves} onChange={setShowLegalMoves} />
         <ToggleRow label="Ask on Promotion" description="Choose which piece to promote to, instead of always auto-queening" checked={promotionChoice === 'ask'} onChange={(v) => setPromotionChoice(v ? 'ask' : 'queen')} />
         <ToggleRow label="Move Sounds" description="Play a short sound when a move or capture is made" checked={soundEnabled} onChange={setSoundEnabled} />
+        <ToggleRow label="Haptics" description={hapticsSupported()
+            ? 'A short vibration on each move, a stronger one for captures and checks'
+            : "Your device or browser doesn't support vibration (iPhone browsers don't)"}
+          checked={hapticsEnabled} onChange={(v) => { setHapticsEnabled(v); if (v && hapticsSupported()) { try { navigator.vibrate([28, 60, 22, 50, 22]); } catch { /* ignore */ } } }} />
       </section>
 
       <section className={vis('play')}>

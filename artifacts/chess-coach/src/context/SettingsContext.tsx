@@ -406,6 +406,8 @@ interface Settings {
   showCoordinates: boolean;
   showLegalMoves: boolean;
   soundEnabled: boolean;
+  /** Vibrate on moves, captures, checks and game end (phones that support it). */
+  hapticsEnabled: boolean;
   soundPack: SoundPack;
   promotionChoice: PromotionChoice;
   boardSize: BoardSize;
@@ -431,6 +433,7 @@ const APP_DEFAULT_SETTINGS: Settings = {
   showCoordinates: true,
   showLegalMoves: true,
   soundEnabled: true,
+  hapticsEnabled: true,
   soundPack: 'classic',
   promotionChoice: 'queen',
   boardSize: 'standard',
@@ -482,6 +485,7 @@ interface SettingsContextValue extends Settings {
   setShowCoordinates: (v: boolean) => void;
   setShowLegalMoves: (v: boolean) => void;
   setSoundEnabled: (v: boolean) => void;
+  setHapticsEnabled: (v: boolean) => void;
   setPromotionChoice: (v: PromotionChoice) => void;
   setSoundPack: (v: SoundPack) => void;
   setBoardSize: (v: BoardSize) => void;
@@ -613,6 +617,8 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       : { ...PIECE_STYLES[eff.pieceStyle] };
 
   activeSoundPack = eff.soundPack ?? 'classic';
+  activeSoundEnabled = eff.soundEnabled !== false;
+  activeHaptics = eff.hapticsEnabled !== false;
 
   const value: SettingsContextValue = {
     ...eff,
@@ -633,6 +639,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     setShowCoordinates: (v) => setSettings((s) => ({ ...s, showCoordinates: v })),
     setShowLegalMoves: (v) => setSettings((s) => ({ ...s, showLegalMoves: v })),
     setSoundEnabled: (v) => setSettings((s) => ({ ...s, soundEnabled: v })),
+    setHapticsEnabled: (v) => setSettings((s) => ({ ...s, hapticsEnabled: v })),
     setPromotionChoice: (v) => setSettings((s) => ({ ...s, promotionChoice: v })),
     setSoundPack: (v) => setSettings((s) => ({ ...s, soundPack: v })),
     setBoardSize: (v) => setSettings((s) => ({ ...s, boardSize: v })),
@@ -702,8 +709,29 @@ export function useSettings() {
 // The selected sound pack, mirrored here by SettingsProvider so the plain
 // playMoveSound() function (called from boards and the puzzle page) always uses it.
 let activeSoundPack: SoundPack = 'classic';
+let activeSoundEnabled = true;
+let activeHaptics = true;
 export function playMoveSound(kind: SoundEvent = 'move') {
   playSound(kind, activeSoundPack);
+}
+
+/** Can this device vibrate? (Android browsers and the Play app; not iPhone Safari.) */
+export const hapticsSupported = (): boolean => typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function';
+
+// Short, distinct buzzes: a tap for a move, firmer for a capture, a double
+// pulse for check, a longer pattern at the end of the game.
+const HAPTIC: Record<SoundEvent, number | number[]> = {
+  move: 12, castle: [12, 40, 12], capture: 28, check: [22, 50, 22], promote: [15, 40, 30], gameEnd: [40, 70, 60, 70, 90], illegal: [8, 30, 8],
+};
+export function vibrateFor(kind: SoundEvent = 'move') {
+  if (!activeHaptics || !hapticsSupported()) return;
+  try { navigator.vibrate(HAPTIC[kind] ?? 12); } catch { /* not allowed right now */ }
+}
+
+/** A move happened on a board: sound and/or haptics, per the player's settings. */
+export function moveFeedback(kind: SoundEvent = 'move') {
+  if (activeSoundEnabled) playSound(kind, activeSoundPack);
+  vibrateFor(kind);
 }
 
 /** The photo backdrop look is on: cards drop their own pictures and use a compact layout. */

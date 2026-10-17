@@ -5,7 +5,7 @@ import { Chess } from 'chess.js';
 import { normalizeFen, getPieceColorScheme } from '@/lib/utils';
 import { buildTintedPieceSet } from './RecoloredPieces';
 import { PieceGradientDefs } from './PieceGradientDefs';
-import { useSettings, playMoveSound, boardSkin } from '@/context/SettingsContext';
+import { useSettings, playMoveSound, moveFeedback, boardSkin } from '@/context/SettingsContext';
 import { eventForMove, detectSingleMove } from '@/lib/sounds';
 import { SquareBadge } from './SquareBadge';
 import { CheckmateOverlay } from './CheckmateOverlay';
@@ -242,9 +242,8 @@ export function ChessBoard({
     if (prev === position) return;
     const placed = position.split(' ')[0];
     if (userMoveFenRef.current === placed) { userMoveFenRef.current = null; return; }
-    if (!soundEnabledRef.current) return;
     const hit = detectSingleMove(prev, position);
-    if (hit) playMoveSound(eventForMove(hit.move, hit.after));
+    if (hit) moveFeedback(eventForMove(hit.move, hit.after));
   }, [position]);
   const expectedMoveSanRef = useRef(expectedMoveSan);
   expectedMoveSanRef.current = expectedMoveSan;
@@ -331,7 +330,7 @@ export function ChessBoard({
       const chess = new Chess(positionRef.current);
       const move = chess.move({ from, to, promotion });
       if (!move) return false;
-      if (soundEnabledRef.current) playMoveSound(eventForMove(move, chess));
+      moveFeedback(eventForMove(move, chess));
       userMoveFenRef.current = chess.fen().split(' ')[0];
       const san = move.san;
       const expected = expectedMoveSanRef.current;

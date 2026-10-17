@@ -15,7 +15,7 @@ import { encodeCard } from '@/pages/ShareCard';
 import { UpgradeNudge } from '@/components/UpgradeNudge';
 import { ProUpsell } from '@/components/ProUpsell';
 import { AnimatePresence, motion } from 'framer-motion';
-import { useSettings, playMoveSound, boardSkin } from '@/context/SettingsContext';
+import { useSettings, playMoveSound, moveFeedback, boardSkin } from '@/context/SettingsContext';
 import { eventForMove } from '@/lib/sounds';
 import { CheckmateOverlay, checkmateSquares } from '@/components/CheckmateOverlay';
 import { EvalBar, MaterialStrip } from '@/components/GameStatusStrip';
@@ -248,7 +248,7 @@ export function Puzzles() {
       const gameCopy = new Chess(game.fen());
       const move = gameCopy.move({ from, to, promotion: 'q' });
       if (!move) return false;
-      if (soundEnabled) playMoveSound(eventForMove(move, gameCopy));
+      moveFeedback(eventForMove(move, gameCopy));
 
       const uciMove = from + to + (move.flags.includes('p') ? 'q' : '');
 
@@ -297,7 +297,7 @@ export function Puzzles() {
                 const promo = om.length > 4 ? om[4] : undefined;
                 const nextGame = new Chess(gameCopy.fen());
                 const omMove = nextGame.move({ from: omFrom, to: omTo, promotion: promo });
-                if (soundEnabled && omMove) playMoveSound(eventForMove(omMove, nextGame));
+                if (omMove) moveFeedback(eventForMove(omMove, nextGame));
                 setGame(nextGame);
                 setLastMove({ from: omFrom, to: omTo });
                 setCurrentMoveIndex(data.nextMoveIndex);
