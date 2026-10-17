@@ -1,4 +1,5 @@
 import { SquareBadge } from './SquareBadge';
+import { useMoveHaptics } from '@/lib/moveHaptics';
 import { useDashboardRedesignFlag } from '@/hooks/use-app-config';
 import { RD, REDESIGN_ON } from '@/lib/redesignTheme';
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
@@ -607,6 +608,9 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, positionRec
   const [scenarioComplete, setScenarioComplete] = useState(false);
 
   const step = steps?.[currentStep];
+  // Settings > Haptics: buzz as the lesson steps forward and on drill moves.
+  useMoveHaptics(step?.fen);
+  useMoveHaptics(drillPosition || null);
   const totalSteps = steps?.length ?? 1;
   const isFirst = currentStep === 0;
   const isLast = currentStep === totalSteps - 1;
