@@ -105,6 +105,8 @@ function shareMeta(data: string): Meta | null {
 // Plain app pages (no server-side content): just their own title and picture.
 const PAGES: Record<string, Omit<Meta, 'url'> & { path: string }> = {
   pricing: { path: '/pricing', title: 'Pricing — ChessScout.net', description: 'Free forever, or $5/month for everything: AI coach on every game, personalized courses, scouting reports and Pro tournaments.', image: `${SITE}/shots/pricing.jpg` },
+  beginner: { path: '/beginner', title: 'Beginner Path: learn chess from zero | ChessScout.net', description: 'Learn how every piece moves, check and checkmate, castling and your first tactics, with arrows that show why. Then play a coached first game. Free.', image: `${SITE}/shots/beginner.jpg` },
+  kids: { path: '/kids', title: 'Chess for Kids: a chess adventure for ages 5–8 | ChessScout.net', description: '9 playful worlds, friendly talking pieces, and a real game with Benny the Bear. No ads, no chat, and Kid Mode for parents.', image: `${SITE}/shots/kids.jpg` },
   tournaments: { path: '/tournaments', title: 'Online Chess Tournaments | ChessScout.net', description: 'Free online chess tournaments: nightly arenas, weekend knockouts, live or daily. Join one, or create one for your club.', image: `${SITE}/shots/tournaments.jpg` },
 };
 

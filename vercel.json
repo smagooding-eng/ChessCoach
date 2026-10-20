@@ -91,6 +91,61 @@
       "destination": "/api/og?kind=page&p=pricing"
     },
     {
+      "source": "/beginner",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": ".*(bot|Bot|BOT|crawler|spider|facebookexternalhit|Facebot|WhatsApp|Slack|Discord|Telegram|Twitter|LinkedIn|Pinterest|Embedly|Iframely|Quora|Skype|redditbot|Applebot|vkShare|Google-PageRenderer|Snapchat|Viber|Line/|KakaoTalk|Mastodon|preview|Preview).*"
+        }
+      ],
+      "destination": "/api/og?kind=page&p=beginner"
+    },
+    {
+      "source": "/beginner/:unit/:lesson",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": ".*(bot|Bot|BOT|crawler|spider|facebookexternalhit|Facebot|WhatsApp|Slack|Discord|Telegram|Twitter|LinkedIn|Pinterest|Embedly|Iframely|Quora|Skype|redditbot|Applebot|vkShare|Google-PageRenderer|Snapchat|Viber|Line/|KakaoTalk|Mastodon|preview|Preview).*"
+        }
+      ],
+      "destination": "/api/og?kind=page&p=beginner"
+    },
+    {
+      "source": "/kids",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": ".*(bot|Bot|BOT|crawler|spider|facebookexternalhit|Facebot|WhatsApp|Slack|Discord|Telegram|Twitter|LinkedIn|Pinterest|Embedly|Iframely|Quora|Skype|redditbot|Applebot|vkShare|Google-PageRenderer|Snapchat|Viber|Line/|KakaoTalk|Mastodon|preview|Preview).*"
+        }
+      ],
+      "destination": "/api/og?kind=page&p=kids"
+    },
+    {
+      "source": "/kids/:world",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": ".*(bot|Bot|BOT|crawler|spider|facebookexternalhit|Facebot|WhatsApp|Slack|Discord|Telegram|Twitter|LinkedIn|Pinterest|Embedly|Iframely|Quora|Skype|redditbot|Applebot|vkShare|Google-PageRenderer|Snapchat|Viber|Line/|KakaoTalk|Mastodon|preview|Preview).*"
+        }
+      ],
+      "destination": "/api/og?kind=page&p=kids"
+    },
+    {
+      "source": "/kids/:world/:level",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": ".*(bot|Bot|BOT|crawler|spider|facebookexternalhit|Facebot|WhatsApp|Slack|Discord|Telegram|Twitter|LinkedIn|Pinterest|Embedly|Iframely|Quora|Skype|redditbot|Applebot|vkShare|Google-PageRenderer|Snapchat|Viber|Line/|KakaoTalk|Mastodon|preview|Preview).*"
+        }
+      ],
+      "destination": "/api/og?kind=page&p=kids"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

@@ -17,7 +17,7 @@ const INNER: React.CSSProperties = { background: 'rgba(255,255,255,0.03)', borde
 const GREEN = '#81B64C';
 const MUTED = '#9e9b98';
 
-interface Item { title: string; path: string; note?: string; group: string; signIn?: boolean }
+interface Item { title: string; path: string; note?: string; group: string; signIn?: boolean; /** The page's own link-preview picture (what Facebook, iMessage, etc. show). */ preview?: string }
 
 const STATIC: Item[] = [
   { group: 'Main pages', title: 'Home', path: '/', note: 'Play. Scout. Improve. The landing page with sign-up.' },
@@ -28,10 +28,10 @@ const STATIC: Item[] = [
   { group: 'Main pages', title: 'Learn (articles)', path: '/learn', note: 'Chess guides and articles.' },
   { group: 'Main pages', title: 'Sweepstakes', path: '/raffle', note: 'Win a ChessNut Air.' },
   { group: 'Main pages', title: 'Get the app', path: '/download', note: 'Install on phone or desktop.' },
-  { group: 'Learn chess (new)', title: 'Beginner Path', path: '/beginner', note: 'Learn chess from zero: every piece, check and checkmate, castling, first tactics, then a coached game. Open to visitors.' },
-  { group: 'Learn chess (new)', title: 'Beginner lesson: the Knight', path: '/beginner/knight/knight-1?preview=1', note: 'A sample lesson (opens directly, even for new visitors): short explanation, then hands-on exercises with arrows.' },
-  { group: 'Learn chess (new)', title: 'Chess for Kids', path: '/kids', note: 'Chess Adventure for ages 5–8: 9 worlds, friendly pieces, and Benny the Bear. No sign-in needed; Kid Mode for parents.' },
-  { group: 'Learn chess (new)', title: 'Kids: Knight Forest', path: '/kids/knight', note: 'One of the 9 worlds: tap-every-target games for the Knight.' },
+  { group: 'Learn chess (new)', title: 'Beginner Path', path: '/beginner', preview: '/shots/beginner.jpg', note: 'Learn chess from zero: every piece, check and checkmate, castling, first tactics, then a coached game. Open to visitors.' },
+  { group: 'Learn chess (new)', title: 'Beginner lesson: the Knight', path: '/beginner/knight/knight-1?preview=1', preview: '/shots/beginner.jpg', note: 'A sample lesson (opens directly, even for new visitors): short explanation, then hands-on exercises with arrows.' },
+  { group: 'Learn chess (new)', title: 'Chess for Kids', path: '/kids', preview: '/shots/kids.jpg', note: 'Chess Adventure for ages 5–8: 9 worlds, friendly pieces, and Benny the Bear. No sign-in needed; Kid Mode for parents.' },
+  { group: 'Learn chess (new)', title: 'Kids: Knight Forest', path: '/kids/knight', preview: '/shots/kids.jpg', note: 'One of the 9 worlds: tap-every-target games for the Knight.' },
   { group: 'Comparisons', title: 'ChessScout vs Aimchess', path: '/vs/aimchess' },
   { group: 'Comparisons', title: 'ChessScout vs ImproveMyChess', path: '/vs/improve-my-chess' },
   { group: 'Comparisons', title: 'ChessScout vs free analysis', path: '/vs/free-chess-analysis' },
@@ -85,6 +85,8 @@ function Card({ item, url, view, live }: { item: Item; url: string; view: View; 
               const w = el.parentElement.clientWidth;
               el.style.setProperty('--s', String(w / (view === 'phone' ? 390 : 1280)));
             }} />
+        ) : item.preview ? (
+          <img src={item.preview} alt={`${item.title} link preview`} loading="lazy" className="h-full w-full object-cover" />
         ) : failed ? (
           <div className="grid h-full place-items-center p-4 text-center text-[11.5px]" style={{ color: MUTED }}>
             Screenshot unavailable right now (the free screenshot service allows about 50 a day). Use Live, or try Refresh later.
