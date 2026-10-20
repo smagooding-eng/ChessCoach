@@ -21,10 +21,22 @@ export interface KidsState {
 const KEY = 'cs_kids_v1';
 const DEFAULT: KidsState = { avatar: null, stars: {}, sound: true, voice: true, unlockAll: false };
 const listeners = new Set<() => void>();
+const maxMap = (a: Record<string, number> | undefined, b: Record<string, number> | undefined) => {
+  const out: Record<string, number> = { ...(a ?? {}) };
+  for (const [k, v] of Object.entries(b ?? {})) out[k] = Math.max(out[k] ?? 0, v);
+  return out;
+};
+
+// Progress is kept per account: signed in, it lives under a key for that
+// account (and on the server, see lib/learnSync.ts); signed out, under the
+// device key. So two accounts on one device never see each other's progress.
+let scope: string | null = null;
+const storageKey = () => (scope ? `${KEY}:${scope}` : KEY);
+const changeHooks = new Set<() => void>();
 
 function read(): KidsState {
   try {
-    const raw = localStorage.getItem(KEY);
+    const raw = localStorage.getItem(storageKey());
     if (raw) return { ...DEFAULT, ...JSON.parse(raw) };
   } catch { /* private mode etc. */ }
   return { ...DEFAULT };
@@ -32,11 +44,27 @@ function read(): KidsState {
 
 let current: KidsState = typeof window === 'undefined' ? { ...DEFAULT } : read();
 
-function write(next: KidsState) {
+function write(next: KidsState, quiet = false) {
   current = next;
-  try { localStorage.setItem(KEY, JSON.stringify(next)); } catch { /* ignore */ }
+  try { localStorage.setItem(storageKey(), JSON.stringify(next)); } catch { /* ignore */ }
+  listeners.forEach((l) => l());
+  if (!quiet) changeHooks.forEach((h) => h());
+}
+
+/** Switch to another account's progress (null = signed out, this device). */
+export function scopeKids(id: string | null) {
+  if (id === scope) return;
+  scope = id;
+  current = read();
   listeners.forEach((l) => l());
 }
+/** Fold in what the server has for this account (best stars win). */
+export function mergeKids(remote: Partial<KidsState> | null | undefined) {
+  if (!remote || typeof remote !== 'object') return;
+  write({ ...DEFAULT, ...current, ...remote, avatar: remote.avatar ?? current.avatar ?? null, stars: maxMap(remote.stars, current.stars), bennyWins: Math.max(remote.bennyWins ?? 0, current.bennyWins ?? 0) }, true);
+}
+export function kidsSnapshot() { return current; }
+export function onKidsChange(h: () => void) { changeHooks.add(h); return () => { changeHooks.delete(h); }; }
 
 export function useKids() {
   const [state, setState] = useState(current);

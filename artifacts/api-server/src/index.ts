@@ -89,6 +89,14 @@ async function runSchemaMigrations() {
       day DATE NOT NULL,
       PRIMARY KEY (user_id, day)
     )`);
+    // Beginner Path + Chess for Kids progress and the account's Kid Mode flag (routes/learnProgress.ts).
+    await db.execute(sql`CREATE TABLE IF NOT EXISTS learn_progress (
+      user_id VARCHAR PRIMARY KEY,
+      beginner JSONB,
+      kids JSONB,
+      kid_mode BOOLEAN NOT NULL DEFAULT false,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )`);
     await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS users_scout_username_lower_idx ON users (LOWER(scout_username))`);
     await db.execute(sql`UPDATE users SET is_premium_override = true WHERE email = 'lukakhvedelidze97@gmail.com' AND is_premium_override = false`);
 

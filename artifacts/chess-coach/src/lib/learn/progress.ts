@@ -14,20 +14,50 @@ export interface LearnState {
 const KEY = 'cs_beginner_v1';
 const DEFAULT: LearnState = { lessons: {}, sound: true, unlockAll: false };
 const listeners = new Set<() => void>();
+const maxMap = (a: Record<string, number> | undefined, b: Record<string, number> | undefined) => {
+  const out: Record<string, number> = { ...(a ?? {}) };
+  for (const [k, v] of Object.entries(b ?? {})) out[k] = Math.max(out[k] ?? 0, v);
+  return out;
+};
+
+// Progress is kept per account: signed in, it lives under a key for that
+// account (and on the server, see lib/learnSync.ts); signed out, under the
+// device key. So two accounts on one device never see each other's progress.
+let scope: string | null = null;
+const storageKey = () => (scope ? `${KEY}:${scope}` : KEY);
+const changeHooks = new Set<() => void>();
 
 function read(): LearnState {
   try {
-    const raw = localStorage.getItem(KEY);
+    const raw = localStorage.getItem(storageKey());
     if (raw) return { ...DEFAULT, ...JSON.parse(raw) };
-  } catch { /* ignore */ }
+  } catch { /* private mode etc. */ }
   return { ...DEFAULT };
 }
+
 let current: LearnState = typeof window === 'undefined' ? { ...DEFAULT } : read();
-function write(next: LearnState) {
+
+function write(next: LearnState, quiet = false) {
   current = next;
-  try { localStorage.setItem(KEY, JSON.stringify(next)); } catch { /* ignore */ }
+  try { localStorage.setItem(storageKey(), JSON.stringify(next)); } catch { /* ignore */ }
+  listeners.forEach((l) => l());
+  if (!quiet) changeHooks.forEach((h) => h());
+}
+
+/** Switch to another account's progress (null = signed out, this device). */
+export function scopeLearn(id: string | null) {
+  if (id === scope) return;
+  scope = id;
+  current = read();
   listeners.forEach((l) => l());
 }
+/** Fold in what the server has for this account (best stars win). */
+export function mergeLearn(remote: Partial<LearnState> | null | undefined) {
+  if (!remote || typeof remote !== 'object') return;
+  write({ ...DEFAULT, ...current, ...remote, lessons: maxMap(remote.lessons, current.lessons) }, true);
+}
+export function learnSnapshot() { return current; }
+export function onLearnChange(h: () => void) { changeHooks.add(h); return () => { changeHooks.delete(h); }; }
 
 export function learnState() { return current; }
 

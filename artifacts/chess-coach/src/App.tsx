@@ -11,6 +11,7 @@ import { SettingsProvider, useSettings, BG_PHOTOS } from "@/context/SettingsCont
 // page straight away, never a loading screen first.
 import { DashboardRedesign } from "@/pages/DashboardRedesign";
 import { useKidMode, isKidsPath } from "@/lib/kids/kidMode";
+import { LearnSync } from "@/lib/learnSync";
 import { PlayHub } from "@/pages/PlayHub";
 import { GamesRedesign } from "@/pages/GamesRedesign";
 import { AnalysisRedesign } from "@/pages/AnalysisRedesign";
@@ -545,6 +546,7 @@ function App() {
                     <RealtimeBridge />
                   </NotInKidMode>
                   <AudioAutoplayUnlock />
+                  <LearnSync />
                 </WouterRouter>
                 <Toaster />
               </TooltipProvider>
