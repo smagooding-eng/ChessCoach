@@ -113,7 +113,10 @@ function coachMove(fenBefore: string, m: Move): Coach {
   const notes: Coach['notes'] = [];
 
   if (m.captured) notes.push({ tone: 'good', text: `You captured a ${NAME[m.captured]} (worth ${VALUE[m.captured]}).` });
-  if (after.inCheck() && !after.isCheckmate()) notes.push({ tone: 'good', text: 'Check! Black has to deal with it before doing anything else.' });
+  if (after.inCheck() && !after.isCheckmate()) {
+    arrows.push(...checkArrows(after).arrows);
+    notes.push({ tone: 'good', text: `Check! Red arrow: your ${NAME[m.piece]} attacks the black King. Black has to get out of check before doing anything else.` });
+  }
   if (m.san.startsWith('O-O')) notes.push({ tone: 'good', text: 'Castling tucked your King away safely.' });
 
   // What the moved piece now attacks.
@@ -176,6 +179,8 @@ function botNote(g: Chess, m: Move, bot: string): BotNote {
   const marks: Mark[] = [];
   const warn: string[] = [];
   let text = `${bot} played ${m.san} (orange arrow).`;
+  const before = new Chess(m.before);
+  if (before.inCheck()) text = `${bot} got out of check with ${m.san} (orange arrow).`;
   if (m.captured) text = `${bot} took your ${NAME[m.captured]} with ${m.san} (orange arrow).`;
   if (g.inCheck()) {
     const c = checkArrows(g);
@@ -284,7 +289,7 @@ export function FirstGame({ onFinish }: { onFinish: (stars: number) => void }) {
       }
       setThinking(false);
       endCheck();
-    }, 900);
+    }, g.current.inCheck() ? 1800 : 900);
   };
 
   const play = (from: string, to: string, promotion?: 'q' | 'r' | 'b' | 'n') => {
@@ -327,7 +332,10 @@ export function FirstGame({ onFinish }: { onFinish: (stars: number) => void }) {
   const tip: Arrow[] = firstMove ? [{ from: 'e2', to: 'e4', color: 'good', dashed: true }] : [];
   const secondMove = history.current.length === 1 && myTurn && !over;
   const goal = secondMove ? goalFor(g.current, bot.name) : null;
-  const boardArrows = mateViz ? mateViz.arrows : [...tip, ...(note?.arrows ?? [])];
+  // Whoever is in check right now: red line to the King, and the King square glows.
+  const checkNow = !mateViz && g.current.inCheck();
+  const checkLine = checkNow && g.current.turn() === 'b' ? checkArrows(g.current).arrows : [];
+  const boardArrows = mateViz ? mateViz.arrows : [...tip, ...(note?.arrows ?? []), ...checkLine];
   const boardMarks = mateViz ? mateViz.marks : note?.marks ?? [];
   const fen = g.current.fen();
   const mateIn = useMemo(() => (myTurn ? findMate(fen) : null), [fen, myTurn]);
@@ -346,7 +354,7 @@ export function FirstGame({ onFinish }: { onFinish: (stars: number) => void }) {
       </div>
 
       <div className="relative shrink-0 mx-auto w-full" style={{ maxWidth: 'max(240px, min(520px, calc(100dvh - 430px)))' }}>
-        <LearnBoard items={items} danger={mateViz?.king ?? null} selected={selected} dots={dots} highlight={new Set(last)} hint={firstMove && !selected ? new Set(['e2']) : undefined} accent="#d9c25a"
+        <LearnBoard items={items} danger={mateViz?.king ?? (checkNow ? kingSquare(g.current, g.current.turn()) : null)} selected={selected} dots={dots} highlight={new Set(last)} hint={firstMove && !selected ? new Set(['e2']) : undefined} accent="#d9c25a"
           arrows={boardArrows} marks={boardMarks} onTap={onTap}
           canDrag={(sq) => myTurn && g.current.get(sq as Square)?.color === 'w'}
           onDrop={(from, to) => { if (myTurn && !play(from, to)) setSelected(null); }} />
