@@ -106,6 +106,11 @@ export type Sfx = 'tap' | 'move' | 'pop' | 'oops' | 'win' | 'check';
 
 export function playSfx(kind: Sfx) {
   if (!current.sound) return;
+  playSfxAlways(kind);
+}
+
+/** The same effects without the kids sound setting (other sections gate them themselves). */
+export function playSfxAlways(kind: Sfx) {
   switch (kind) {
     case 'tap': tone(520, 0, 0.08, 'triangle', 0.08); break;
     case 'move': tone(330, 0, 0.12, 'triangle', 0.14, 440); break;

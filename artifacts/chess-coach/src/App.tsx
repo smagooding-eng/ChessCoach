@@ -120,6 +120,8 @@ const AffiliatePage = lazyRetry(() => import("@/pages/Affiliate"));
 const TrapsPage = lazyRetry(() => import("@/pages/Traps"));
 const BeginnerCoursesPage = lazyRetry(() => import("@/pages/BeginnerCourses"));
 const KidsHomePage = lazyRetry(() => import("@/pages/kids/KidsHome"));
+const BeginnerPathPage = lazyRetry(() => import("@/pages/learn/BeginnerPath"));
+const BeginnerLessonPlayPage = lazyRetry(() => import("@/pages/learn/BeginnerLessonPlay"));
 const KidsWorldPage = lazyRetry(() => import("@/pages/kids/KidsWorld"));
 const KidsPlayPage = lazyRetry(() => import("@/pages/kids/KidsPlay"));
 const BeginnerCourseDetailPage = lazyRetry(() => import("@/pages/BeginnerCourseDetail"));
@@ -301,6 +303,8 @@ const PTraps         = () => <ProtectedRoute component={TrapsPage} />;
 const PTrapTraining  = () => <ProtectedRoute component={TrapTrainingPage} />;
 const PBeginnerCourses = () => <ProtectedRoute component={BeginnerCoursesPage} requireAdmin />;
 const PKidsHome = () => <ProtectedRoute component={KidsHomePage} requireAdmin fullscreen />;
+const PBeginnerPath = () => <ProtectedRoute component={BeginnerPathPage} requireAdmin />;
+const PBeginnerLessonPlay = () => <ProtectedRoute component={BeginnerLessonPlayPage} requireAdmin fullscreen />;
 const PKidsWorld = () => <ProtectedRoute component={KidsWorldPage} requireAdmin fullscreen />;
 const PKidsPlay = () => <ProtectedRoute component={KidsPlayPage} requireAdmin fullscreen />;
 const PBeginnerCourseDetail = () => <ProtectedRoute component={BeginnerCourseDetailPage} requireAdmin />;
@@ -430,6 +434,8 @@ function Router() {
       <Route path="/traps/:id" component={PTrapTraining} />
 <Route path="/admin/beginner-courses/:id" component={PBeginnerCourseDetail} />
 <Route path="/admin/beginner-courses" component={PBeginnerCourses} />
+      <Route path="/admin/beginner/:unit/:lesson" component={PBeginnerLessonPlay} />
+      <Route path="/admin/beginner" component={PBeginnerPath} />
       <Route path="/admin/kids/:world/:level" component={PKidsPlay} />
       <Route path="/admin/kids/:world" component={PKidsWorld} />
       <Route path="/admin/kids" component={PKidsHome} />

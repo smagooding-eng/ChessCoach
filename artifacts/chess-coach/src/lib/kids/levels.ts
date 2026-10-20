@@ -15,7 +15,13 @@ export type LevelKind =
   | 'collect'   // move your piece and catch every star (or plum piece)
   | 'tapAll'    // tap every shape your piece could capture in one move
   | 'check'     // make one move that puts the plum king in check
-  | 'mate';     // make one move that is checkmate (chess.js decides)
+  | 'mate'      // make one move that is checkmate (chess.js decides)
+  // Used by the Beginner path (older students):
+  | 'best'      // find the right move in a real position (answers, SAN)
+  | 'escape'    // get the King out of check in a particular way (goal)
+  | 'tapLegal'  // tap every square the piece on `from` can legally move to
+  | 'tapSquare' // tap the named squares (board coordinates)
+  | 'quiz';     // multiple choice, with an explanation
 
 export interface Level {
   id: string;
@@ -25,7 +31,16 @@ export interface Level {
   pieces?: BoardPiece[];       // our piece(s) first, then plum pieces
   shapes?: { sq: string; kind: ShapeKind }[];
   bushes?: string[];
-  fen?: string;                // mate levels only
+  fen?: string;                // mate / best / escape / tapLegal / quiz (diagram)
+  answers?: string[];          // best: accepted moves in SAN, without +/#
+  wrong?: Record<string, string>; // best: what to say for a tempting wrong move
+  goal?: 'king' | 'block' | 'capture' | 'any'; // escape
+  from?: string;               // tapLegal
+  squares?: string[];          // tapSquare
+  question?: string;           // quiz
+  options?: string[];          // quiz
+  correct?: number;            // quiz
+  explain?: string;            // quiz + best: shown after the right answer
 }
 
 export interface World {
@@ -146,7 +161,8 @@ export function attacks(type: PieceType, side: Side, from: string, at: (sq: stri
 }
 
 /** Why a tapped shape can't be captured -- the friendly explanation shown to the child. */
-export function whyNot(type: PieceType, side: Side, from: string, target: string, at: (sq: string) => Occupant): string {
+export function whyNot(type: PieceType, side: Side, from: string, target: string, at: (sq: string) => Occupant, tone: 'kids' | 'plain' = 'kids'): string {
+  if (tone === 'plain') return whyNotPlain(type, side, from, target, at);
   const [fx, fy] = sqToXY(from);
   const [tx, ty] = sqToXY(target);
   const dx = tx - fx, dy = ty - fy;
@@ -178,6 +194,37 @@ export function whyNot(type: PieceType, side: Side, from: string, target: string
   if (type === 'b') return 'The Bishop only moves on diagonals.';
   if (type === 'q') return 'The Queen moves in straight lines and diagonals, but not like that!';
   return `The ${name} can't reach that one.`;
+}
+
+function whyNotPlain(type: PieceType, side: Side, from: string, target: string, at: (sq: string) => Occupant): string {
+  const [fx, fy] = sqToXY(from);
+  const [tx, ty] = sqToXY(target);
+  const dx = tx - fx, dy = ty - fy;
+  if (type === 'p') {
+    const fwd = side === 'w' ? 1 : -1;
+    if (dx === 0 && dy * fwd > 0) return 'Pawns move straight ahead but capture only diagonally, so a piece directly in front blocks them.';
+    if (dy * fwd < 0) return 'Pawns never move backwards.';
+    return 'A pawn captures one square diagonally forward, nowhere else.';
+  }
+  if (type === 'n') return 'Not a knight move. The Knight goes two squares in one direction, then one square sideways (an L).';
+  const straight = dx === 0 || dy === 0;
+  const diag = Math.abs(dx) === Math.abs(dy);
+  if (type === 'k' && (straight || diag)) return 'The King moves only one square at a time.';
+  const lineOk = (type === 'r' && straight) || (type === 'b' && diag) || (type === 'q' && (straight || diag));
+  if (lineOk) {
+    const sx = Math.sign(dx), sy = Math.sign(dy);
+    for (let i = 1; ; i++) {
+      const sq = xyToSq(fx + sx * i, fy + sy * i);
+      if (!sq || sq === target) break;
+      const o = at(sq);
+      if (o === 'friend' || o === 'bush') return `Blocked: your own piece on ${sq} is in the way, and pieces can't jump over it.`;
+      if (o !== 'empty') return `Blocked: the ${PIECE_NAMES[type]} would have to stop at ${sq} first.`;
+    }
+  }
+  if (type === 'r') return 'The Rook moves only along ranks and files (straight lines).';
+  if (type === 'b') return 'The Bishop moves only along diagonals.';
+  if (type === 'q') return 'The Queen moves along ranks, files and diagonals, but this square is on none of them.';
+  return `The ${PIECE_NAMES[type]} can't reach that square in one move.`;
 }
 
 export const PIECE_NAMES: Record<PieceType, string> = {
