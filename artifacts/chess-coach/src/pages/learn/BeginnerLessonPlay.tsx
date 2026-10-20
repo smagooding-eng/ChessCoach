@@ -31,10 +31,10 @@ export default function BeginnerLessonPlay() {
   return <LessonFlow key={lesson.id} unit={unit} lesson={lesson} />;
 }
 
-function Shell({ children, back, title }: { children: ReactNode; back: string; title?: string }) {
+function Shell({ children, back, title, tight }: { children: ReactNode; back: string; title?: string; tight?: boolean }) {
   return (
     <div className="min-h-screen" style={{ background: L.bg, color: L.text }}>
-      <div className="max-w-xl mx-auto px-4 pb-12" style={{ paddingTop: 'max(12px, env(safe-area-inset-top))' }}>
+      <div className={`max-w-xl mx-auto px-4 ${tight ? 'pb-0' : 'pb-12'}`} style={{ paddingTop: 'max(12px, env(safe-area-inset-top))' }}>
         <div className="flex items-center gap-3 py-2">
           <Link href={back} aria-label="Back" className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: L.card }}>
             <ArrowLeft className="w-5 h-5" />
@@ -136,7 +136,7 @@ function LessonFlow({ unit, lesson }: { unit: Unit; lesson: Lesson }) {
 
   if (lesson.game) {
     return (
-      <Shell back="/admin/beginner" title={title}>
+      <Shell back="/admin/beginner" title={title} tight>
         <FirstGame onFinish={(stars) => { award(lesson.id, stars); results.current = [stars]; playSfxAlways('win'); setStage({ kind: 'done' }); }} />
       </Shell>
     );

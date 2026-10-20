@@ -55,9 +55,23 @@ function hanging(g: Chess, side: 'w' | 'b') {
   return out;
 }
 
+/** Material a move wins (captures, mate) minus what it leaves Black to take next. Simple and honest. */
+function moveScore(m: Move): number {
+  const after = new Chess(m.after);
+  if (after.isCheckmate()) return 1000;
+  let loss = 0;
+  for (const x of hanging(after, 'w')) {
+    const defended = attackersOf(after, x.sq, 'w').length > 0;
+    const atk = VALUE[after.get(x.from as Square)?.type ?? 'p'];
+    loss = Math.max(loss, defended ? VALUE[x.type] - atk : VALUE[x.type]);
+  }
+  return (m.captured ? VALUE[m.captured] : 0) - loss + (m.promotion ? VALUE[m.promotion] - 1 : 0) + (after.inCheck() ? 0.2 : 0);
+}
+
 const arrowFor = (m: Move, color: Arrow['color'], dashed = false): Arrow => ({ from: m.from, to: m.to, color, dashed, knight: m.piece === 'n' });
 
 interface Coach {
+  better?: { san: string; why: string };
   san: string; q: Quality; fen: string; arrows: Arrow[]; marks: Mark[];
   checks: { label: string; state: 'ok' | 'bad' | 'none' }[];
   notes: { tone: 'good' | 'bad' | 'info'; text: string }[];
@@ -108,16 +122,28 @@ function coachMove(fenBefore: string, m: Move): Coach {
   const others = h.filter((x) => x.sq !== m.to);
   if (others.length) notes.push({ tone: 'bad', text: `Red ${others.length > 1 ? 'arrows' : 'arrow'}: your ${others.map((x) => `${NAME[x.type]} on ${x.sq}`).join(' and ')} can be taken.` });
 
-  // The better move, when it mattered.
-  if (res.bestMoveSan && !GOOD_Q.includes(q)) {
-    const bm = before.moves({ verbose: true }).find((x) => x.san === res.bestMoveSan);
-    if (bm) {
+  // The better move, whenever this one wasn't good. The engine's pick is
+  // used unless it drops material itself; otherwise the move that wins the
+  // most (or loses the least) material.
+  let better: Coach['better'];
+  if (!GOOD_Q.includes(q)) {
+    const legal = before.moves({ verbose: true }).filter((x) => x.san !== m.san);
+    const scored = legal.map((x) => ({ x, s: moveScore(x) })).sort((a, b) => b.s - a.s);
+    const engine = scored.find((e) => e.x.san === res.bestMoveSan);
+    const top = scored[0];
+    const pick = engine && top && engine.s >= top.s - 0.5 ? engine : top;
+    if (pick) {
+      const bm = pick.x;
+      const mine = moveScore(m);
+      const why = new Chess(bm.after).isCheckmate() ? 'it\'s checkmate'
+        : bm.captured && pick.s > mine ? `it wins a ${NAME[bm.captured]}`
+        : movedHangs && !hanging(new Chess(bm.after), 'w').length ? 'it doesn\'t leave anything for Black to take'
+        : bm.san.includes('+') ? 'it gives check and keeps your pieces safe'
+        : 'it keeps all your pieces protected';
+      better = { san: bm.san, why };
       arrows.push(arrowFor(bm, 'good', true));
-      const why = bm.san.includes('#') ? 'it was checkmate' : bm.captured ? `it wins a ${NAME[bm.captured]}` : bm.san.includes('+') ? 'it gives check' : 'it keeps your pieces safer';
-      notes.push({ tone: 'good', text: `Dotted green arrow: ${bm.san} was better, because ${why}.` });
+      notes.push({ tone: 'good', text: `Better was ${bm.san} (dotted green arrow), because ${why}.` });
     }
-  } else if (movedHangs && !GOOD_Q.includes(q)) {
-    notes.push({ tone: 'good', text: `Before you move a piece, check: can anything take it on its new square?` });
   }
   if (!notes.length) notes.push({ tone: 'info', text: res.pros[0] ? `${res.pros[0]}.` : 'A quiet move. Nothing was left unprotected.' });
 
@@ -126,7 +152,7 @@ function coachMove(fenBefore: string, m: Move): Coach {
     { label: 'Others protected', state: others.length ? 'bad' : 'ok' },
     { label: 'Made a threat', state: targets.length || after.inCheck() ? 'ok' : 'none' },
   ];
-  return { san: m.san, q, fen: m.after, arrows, marks, checks, notes, matBefore: material(before), matAfter: material(after) };
+  return { better, san: m.san, q, fen: m.after, arrows, marks, checks, notes, matBefore: material(before), matAfter: material(after) };
 }
 
 function botNote(g: Chess, m: Move, bot: string): BotNote {
@@ -244,13 +270,18 @@ export function FirstGame({ onFinish }: { onFinish: (stars: number) => void }) {
   };
 
   const mat = material(g.current);
-  const boardArrows = note?.arrows ?? [];
+  // Before the very first move, suggest one: 1.e4.
+  const firstMove = !history.current.length && !coach;
+  const tip: Arrow[] = firstMove ? [{ from: 'e2', to: 'e4', color: 'good', dashed: true }] : [];
+  const boardArrows = [...tip, ...(note?.arrows ?? [])];
   const boardMarks = note?.marks ?? [];
 
   return (
-    <div>
-      <div className="flex items-center gap-3 mb-3">
-        <img src={bot.avatar} alt="" className="w-11 h-11 rounded-xl" style={{ background: L.card }} />
+    // Everything sits in one screen: the board shrinks on short phones and
+    // the coach panel below scrolls on its own if it runs long.
+    <div className="flex flex-col" style={{ height: 'calc(100dvh - 72px - env(safe-area-inset-top) - env(safe-area-inset-bottom))', minHeight: 520 }}>
+      <div className="flex items-center gap-3 mb-2 shrink-0">
+        <img src={`${import.meta.env.BASE_URL ?? '/'}assets/bots/tommy.webp`} alt="" className="w-10 h-10 rounded-full object-cover" style={{ background: L.card, border: `2px solid ${L.line}` }} />
         <div className="flex-1 min-w-0">
           <p className="font-black leading-tight">{bot.name} <span className="text-xs font-bold" style={{ color: L.muted }}>· {bot.rating}</span></p>
           <p className="text-xs" style={{ color: L.muted }}>{thinking ? 'Thinking…' : over ? 'Game over' : g.current.turn() === 'w' ? 'Your move (White)' : ''}</p>
@@ -258,18 +289,8 @@ export function FirstGame({ onFinish }: { onFinish: (stars: number) => void }) {
         <Balance mat={mat} />
       </div>
 
-      <AnimatePresence mode="wait">
-        {note && (
-          <motion.div key={note.text} className="rounded-xl px-4 py-2.5 mb-3 text-[14px] leading-snug"
-            style={{ background: `${L.warn}14`, borderLeft: `4px solid ${L.warn}` }} initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
-            <p className="font-semibold">{note.text}</p>
-            {note.warn.map((w) => <p key={w} className="mt-1 font-bold" style={{ color: w.startsWith('Look closely') ? L.good : '#f08a8a' }}>{w}</p>)}
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      <div className="relative">
-        <LearnBoard items={items} selected={selected} dots={dots} highlight={new Set(last)} accent="#d9c25a"
+      <div className="relative shrink-0 mx-auto w-full" style={{ maxWidth: 'max(240px, min(520px, calc(100dvh - 430px)))' }}>
+        <LearnBoard items={items} selected={selected} dots={dots} highlight={new Set(last)} hint={firstMove && !selected ? new Set(['e2']) : undefined} accent="#d9c25a"
           arrows={boardArrows} marks={boardMarks} onTap={onTap}
           canDrag={(sq) => myTurn && g.current.get(sq as Square)?.color === 'w'}
           onDrop={(from, to) => { if (myTurn && !play(from, to)) setSelected(null); }} />
@@ -278,35 +299,42 @@ export function FirstGame({ onFinish }: { onFinish: (stars: number) => void }) {
         </AnimatePresence>
       </div>
 
-      <div className="mt-3 flex gap-2">
+      <div className="mt-2 flex gap-2 shrink-0">
         <button type="button" onClick={takeBack} disabled={!history.current.length || thinking}
-          className="flex-1 h-10 rounded-xl flex items-center justify-center gap-1.5 text-sm font-bold disabled:opacity-40" style={{ background: L.card }}>
+          className="flex-1 h-9 rounded-xl flex items-center justify-center gap-1.5 text-sm font-bold disabled:opacity-40" style={{ background: L.card }}>
           <RotateCcw className="w-4 h-4" /> Take back
         </button>
         {!over && history.current.length > 0 && (
           <button type="button" onClick={() => setOver({ stars: 1, text: 'You stopped the game. Come back and finish one any time.' })}
-            className="flex-1 h-10 rounded-xl flex items-center justify-center gap-1.5 text-sm font-bold" style={{ background: L.card, color: L.muted }}>
+            className="flex-1 h-9 rounded-xl flex items-center justify-center gap-1.5 text-sm font-bold" style={{ background: L.card, color: L.muted }}>
             <Flag className="w-4 h-4" /> End game
           </button>
         )}
       </div>
 
-      <AnimatePresence mode="wait">
-        {coach && !over && <CoachCard key={coach.fen} c={coach} />}
-      </AnimatePresence>
-
-      <AnimatePresence>
+      <div className="mt-2 flex-1 min-h-0 overflow-y-auto space-y-2 pb-2" style={{ overscrollBehavior: 'contain' }}>
+        {firstMove && (
+          <div className="rounded-xl px-3 py-2.5 text-[13px] leading-snug" style={{ background: `${L.good}14`, borderLeft: `4px solid ${L.good}` }}>
+            <p className="font-black mb-0.5" style={{ color: L.good }}>Suggested first move: e4</p>
+            <p>Move the Pawn in front of your King two squares forward (dotted green arrow). It grabs the center and opens a path for your Queen and Bishop.</p>
+          </div>
+        )}
         {over && (
-          <motion.div className="mt-4 rounded-2xl p-5 text-center" style={{ background: L.card, border: `1px solid ${L.line}` }}
-            initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
-            <p className="font-black text-lg mb-4">{over.text}</p>
-            {coach && <div className="text-left mb-4"><CoachCard c={coach} /></div>}
-            <button type="button" onClick={() => onFinish(over.stars)} className="w-full rounded-xl py-3.5 font-black text-white" style={{ background: L.good }}>
+          <div className="rounded-xl p-3 text-center" style={{ background: L.card, border: `1px solid ${L.line}` }}>
+            <p className="font-black mb-2">{over.text}</p>
+            <button type="button" onClick={() => onFinish(over.stars)} className="w-full rounded-xl py-3 font-black text-white" style={{ background: L.good }}>
               Finish lesson
             </button>
-          </motion.div>
+          </div>
         )}
-      </AnimatePresence>
+        {coach && <CoachCard key={coach.fen} c={coach} />}
+        {note && (
+          <div className="rounded-xl px-3 py-2 text-[13px] leading-snug" style={{ background: `${L.warn}14`, borderLeft: `4px solid ${L.warn}` }}>
+            <p className="font-semibold">{note.text}</p>
+            {note.warn.map((w) => <p key={w} className="mt-0.5 font-bold" style={{ color: w.startsWith('Look closely') ? L.good : '#f08a8a' }}>{w}</p>)}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -316,7 +344,7 @@ function Balance({ mat }: { mat: number }) {
   return (
     <div className="w-[128px] shrink-0" aria-label="Material balance">
       <div className="flex justify-between text-[10px] font-bold uppercase tracking-wider mb-1" style={{ color: L.muted }}>
-        <span>Material</span><span className="ml-2" style={{ color: mat > 0 ? L.good : mat < 0 ? L.bad : L.muted }}>{mat === 0 ? 'Even' : mat > 0 ? `+${mat}` : mat}</span>
+        <span>Material</span><span style={{ marginLeft: 8, color: mat > 0 ? L.good : mat < 0 ? L.bad : L.muted }}>{mat === 0 ? 'Even' : mat > 0 ? `+${mat}` : mat}</span>
       </div>
       <div className="h-2.5 rounded-full overflow-hidden" style={{ background: '#3a3835' }}>
         <motion.div className="h-full" style={{ background: '#f2efe9' }} animate={{ width: `${pct}%` }} transition={{ type: 'spring', stiffness: 120, damping: 20 }} />
@@ -329,10 +357,10 @@ function CoachCard({ c }: { c: Coach }) {
   const meta = QUALITY[c.q];
   const delta = c.matAfter - c.matBefore;
   return (
-    <motion.div className="mt-4 rounded-2xl p-3" style={{ background: L.card, border: `1px solid ${meta.color}55` }}
+    <motion.div className="rounded-2xl p-3" style={{ background: L.card, border: `1px solid ${meta.color}55` }}
       initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
       <div className="flex gap-3">
-        <div className="shrink-0" style={{ width: 132 }}>
+        <div className="shrink-0" style={{ width: 112 }}>
           <LearnBoard items={fenItems(c.fen)} coords={false} arrows={c.arrows} marks={c.marks} />
         </div>
         <div className="min-w-0 flex-1">
@@ -342,6 +370,11 @@ function CoachCard({ c }: { c: Coach }) {
             <span className="font-black text-lg leading-tight" style={{ color: meta.color }}>{meta.label}</span>
           </div>
           <p className="text-xs mt-1 leading-snug" style={{ color: '#cfccc8' }}>{meta.line}</p>
+          {c.better && (
+            <p className="mt-1.5 inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-[13px] font-black" style={{ background: `${L.good}22`, color: L.good, border: `1px dashed ${L.good}` }}>
+              Better: {c.better.san}
+            </p>
+          )}
           <div className="flex flex-wrap gap-1 mt-2">
             {c.checks.map((k) => (
               <span key={k.label} className="px-1.5 py-0.5 rounded-md text-[11px] font-bold flex items-center gap-1"
@@ -352,7 +385,7 @@ function CoachCard({ c }: { c: Coach }) {
           </div>
         </div>
       </div>
-      <div className="mt-3 space-y-1.5">
+      <div className="mt-2.5 space-y-1">
         {c.notes.map((n) => (
           <p key={n.text} className="text-[13px] leading-snug pl-2.5 py-0.5" style={{ borderLeft: `3px solid ${n.tone === 'good' ? L.good : n.tone === 'bad' ? L.bad : L.accent}` }}>{n.text}</p>
         ))}
