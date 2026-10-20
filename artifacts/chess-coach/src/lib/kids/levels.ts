@@ -41,6 +41,8 @@ export interface Level {
   options?: string[];          // quiz
   correct?: number;            // quiz
   explain?: string;            // quiz + best: shown after the right answer
+  /** Arrows/marks drawn from the start to show what matters (e.g. an attacked square). */
+  guide?: { arrows: { from: string; to: string; color: 'good' | 'bad' | 'info' | 'warn'; dashed?: boolean }[]; marks?: { sq: string; kind: 'x' | 'ring' }[] };
 }
 
 export interface World {

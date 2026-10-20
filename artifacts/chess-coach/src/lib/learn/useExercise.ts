@@ -497,8 +497,9 @@ export function useExercise(level: Level, onSolved: (mistakes: number) => void, 
   const guideArrows = guides && me && !game.current && !solved && !busy && (level.kind === 'collect' || level.kind === 'tapAll' || level.kind === 'check')
     ? moveArrows(me.type, 'w', me.sq, occ) : [];
   const idle = !viz.arrows.length && !viz.marks.length;
-  const arrows = !idle ? viz.arrows : (startCheck && !solved && !busy ? startCheck.arrows : dangerZone ? dangerZone.arrows : guideArrows);
-  const marks = !idle ? viz.marks : dangerZone ? dangerZone.marks : [];
+  const levelGuide = level.guide && !solved && !busy ? level.guide : null;
+  const arrows = !idle ? viz.arrows : (startCheck && !solved && !busy ? startCheck.arrows : dangerZone ? dangerZone.arrows : levelGuide ? levelGuide.arrows : guideArrows);
+  const marks = !idle ? viz.marks : dangerZone ? dangerZone.marks : levelGuide?.marks ?? [];
 
   // the rule reminder for whatever piece is in play
   const selPiece = game.current && selected ? game.current.get(selected as Square) : null;
