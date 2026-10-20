@@ -6,6 +6,7 @@
 // are the avatars a child picks. All drawn here as SVG so they stay crisp at
 // any size and need no image downloads.
 
+import type { ReactElement } from 'react';
 import type { PieceType, Side, ShapeKind } from '@/lib/kids/levels';
 
 const TEAM = {
@@ -42,7 +43,7 @@ export function KidPiece({ type, side, size = 56, mood }: { type: PieceType; sid
   const c = TEAM[side];
   const stroke = { stroke: c.line, strokeWidth: 3, strokeLinejoin: 'round' as const };
   const base = <rect x="22" y="83" width="56" height="11" rx="5.5" fill={c.shade} {...stroke} />;
-  let art: JSX.Element;
+  let art: ReactElement;
   switch (type) {
     case 'p':
       art = (
@@ -140,7 +141,7 @@ export function KidPiece({ type, side, size = 56, mood }: { type: PieceType; sid
 
 /** Things to catch on the board. */
 export function KidShape({ kind, size = 48 }: { kind: ShapeKind; size?: number | string }) {
-  let art: JSX.Element;
+  let art: ReactElement;
   const eyes = (x: number, y: number, col: string) => (
     <g>
       <circle cx={x - 6} cy={y} r="2.6" fill={col} />
@@ -262,7 +263,7 @@ export function KidAvatar({ id, size = 56 }: { id: string; size?: number }) {
     </g>
   );
   const smile = (y: number) => <path d={`M43 ${y} Q50 ${y + 6} 57 ${y}`} stroke={line} strokeWidth="3" fill="none" strokeLinecap="round" />;
-  let art: JSX.Element;
+  let art: ReactElement;
   switch (a.id) {
     case 'fox':
       art = (

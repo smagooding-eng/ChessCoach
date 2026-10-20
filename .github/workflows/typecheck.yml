@@ -1,0 +1,24 @@
+name: Typecheck
+
+# Same typecheck Vercel runs before building, so a type error shows up here
+# (with the exact lines as annotations) instead of only as a failed deploy.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Typecheck
+        run: |
+          set -o pipefail
+          pnpm run typecheck 2>&1 | tee tc.log || { grep -E "error TS" tc.log | head -40 | sed "s/^/::error::/"; exit 1; }
