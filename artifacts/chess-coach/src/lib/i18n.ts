@@ -40,10 +40,10 @@ export const LANGUAGES: Language[] = [
   { code: 'vi', name: 'Tiếng Việt', native: true },
   { code: 'th', name: 'ไทย' },
   { code: 'tl', name: 'Filipino', native: true },
-  { code: 'zh-CN', name: '简体中文' },
-  { code: 'zh-TW', name: '繁體中文' },
-  { code: 'ja', name: '日本語' },
-  { code: 'ko', name: '한국어' },
+  { code: 'zh-CN', name: '简体中文', native: true },
+  { code: 'zh-TW', name: '繁體中文', native: true },
+  { code: 'ja', name: '日本語', native: true },
+  { code: 'ko', name: '한국어', native: true },
 ];
 
 const STORE = 'cs_lang';
@@ -193,6 +193,10 @@ const APP_LOADERS: Record<string, () => Promise<{ default: Record<string, string
   pl: () => import('@/locales/app-pl.json'),
   id: () => import('@/locales/app-id.json'),
   uk: () => import('@/locales/app-uk.json'),
+  'zh-TW': () => import('@/locales/app-zh-TW.json'),
+  'zh-CN': () => import('@/locales/app-zh-CN.json'),
+  ko: () => import('@/locales/app-ko.json'),
+  ja: () => import('@/locales/app-ja.json'),
   tl: () => import('@/locales/app-tl.json'),
   vi: () => import('@/locales/app-vi.json'),
   sv: () => import('@/locales/app-sv.json'),
