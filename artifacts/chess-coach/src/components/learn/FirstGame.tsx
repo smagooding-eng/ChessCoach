@@ -71,7 +71,7 @@ function moveScore(m: Move): number {
 const arrowFor = (m: Move, color: Arrow['color'], dashed = false): Arrow => ({ from: m.from, to: m.to, color, dashed, knight: m.piece === 'n' });
 
 interface Coach {
-  better?: { san: string; why: string };
+  better?: { san: string; why: string; fen: string; arrows: Arrow[]; marks: Mark[] };
   san: string; q: Quality; fen: string; arrows: Arrow[]; marks: Mark[];
   checks: { label: string; state: 'ok' | 'bad' | 'none' }[];
   notes: { tone: 'good' | 'bad' | 'info'; text: string }[];
@@ -96,7 +96,7 @@ function coachMove(fenBefore: string, m: Move): Coach {
     if (net >= 3) q = 'blunder';
     else if (net >= 1 && GOOD_Q.includes(q)) q = 'mistake';
   }
-  const arrows: Arrow[] = [arrowFor(m, GOOD_Q.includes(q) ? 'good' : q === 'inaccuracy' ? 'warn' : 'bad')];
+  const arrows: Arrow[] = [arrowFor(m, GOOD_Q.includes(q) ? 'good' : 'warn')];
   const marks: Mark[] = [];
   const notes: Coach['notes'] = [];
 
@@ -135,14 +135,18 @@ function coachMove(fenBefore: string, m: Move): Coach {
     if (pick) {
       const bm = pick.x;
       const mine = moveScore(m);
+      const attacked = targets.some((a) => a.to === bm.to);
       const why = new Chess(bm.after).isCheckmate() ? 'it\'s checkmate'
         : bm.captured && pick.s > mine ? `it wins a ${NAME[bm.captured]}`
+        : bm.captured && attacked ? `it takes the ${NAME[bm.captured]} right away, instead of only attacking it`
+        : bm.captured ? `it captures the ${NAME[bm.captured]}`
         : movedHangs && !hanging(new Chess(bm.after), 'w').length ? 'it doesn\'t leave anything for Black to take'
         : bm.san.includes('+') ? 'it gives check and keeps your pieces safe'
         : 'it keeps all your pieces protected';
-      better = { san: bm.san, why };
-      arrows.push(arrowFor(bm, 'good', true));
-      notes.push({ tone: 'good', text: `Better was ${bm.san} (dotted green arrow), because ${why}.` });
+      // Drawn on its own view of the position BEFORE your move (where that
+      // move was actually available), so it never overlaps your own arrows.
+      better = { san: bm.san, why, fen: fenBefore, arrows: [arrowFor(bm, 'good')], marks: bm.captured ? [{ sq: bm.to, kind: 'ring' }] : [] };
+      notes.push({ tone: 'good', text: `Better was ${bm.san}, because ${why}. Tap "Better" above the small board to see it.` });
     }
   }
   if (!notes.length) notes.push({ tone: 'info', text: res.pros[0] ? `${res.pros[0]}.` : 'A quiet move. Nothing was left unprotected.' });
@@ -372,14 +376,27 @@ function Balance({ mat }: { mat: number }) {
 }
 
 function CoachCard({ c }: { c: Coach }) {
+  const [view, setView] = useState<'mine' | 'better'>('mine');
   const meta = QUALITY[c.q];
+  const showBetter = view === 'better' && !!c.better;
   const delta = c.matAfter - c.matBefore;
   return (
     <motion.div className="rounded-2xl p-3" style={{ background: L.card, border: `1px solid ${meta.color}55` }}
       initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
       <div className="flex gap-3">
         <div className="shrink-0" style={{ width: 112 }}>
-          <LearnBoard items={fenItems(c.fen)} coords={false} arrows={c.arrows} marks={c.marks} />
+          {c.better && (
+            <div className="flex mb-1 rounded-lg overflow-hidden text-[11px] font-black" role="tablist">
+              {(['mine', 'better'] as const).map((v) => (
+                <button key={v} type="button" role="tab" aria-selected={view === v} onClick={() => setView(v)} className="flex-1 py-1"
+                  style={{ background: view === v ? (v === 'better' ? L.good : L.card2) : 'rgba(255,255,255,0.04)', color: view === v ? '#fff' : L.muted }}>
+                  {v === 'mine' ? 'Yours' : 'Better'}
+                </button>
+              ))}
+            </div>
+          )}
+          <LearnBoard items={fenItems(showBetter ? c.better!.fen : c.fen)} coords={false}
+            arrows={showBetter ? c.better!.arrows : c.arrows} marks={showBetter ? c.better!.marks : c.marks} />
         </div>
         <div className="min-w-0 flex-1">
           <p className="text-[11px] font-bold" style={{ color: L.muted }}><span className="uppercase tracking-wider text-[10px]">Your move</span> · <span style={{ color: L.text }}>{c.san}</span></p>
@@ -389,9 +406,10 @@ function CoachCard({ c }: { c: Coach }) {
           </div>
           <p className="text-xs mt-1 leading-snug" style={{ color: '#cfccc8' }}>{meta.line}</p>
           {c.better && (
-            <p className="mt-1.5 inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-[13px] font-black" style={{ background: `${L.good}22`, color: L.good, border: `1px dashed ${L.good}` }}>
+            <button type="button" onClick={() => setView(view === 'better' ? 'mine' : 'better')}
+              className="mt-1.5 inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-[13px] font-black" style={{ background: view === 'better' ? L.good : `${L.good}22`, color: view === 'better' ? '#fff' : L.good, border: `1px dashed ${L.good}` }}>
               Better: {c.better.san}
-            </p>
+            </button>
           )}
           <div className="flex flex-wrap gap-1 mt-2">
             {c.checks.map((k) => (
