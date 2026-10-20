@@ -307,11 +307,12 @@ export function useExercise(level: Level, onSolved: (mistakes: number) => void, 
         if (found.has(sq)) return;
         const next = new Set(found); next.add(sq); setFound(next); sfx('pop');
         const rest = [...answers].filter((a) => !next.has(a));
-        if (!rest.length) win(`Correct! That's ${sq}.`, 400);
-        else say(`Yes, that's ${sq}. Now find ${rest.join(' and ')}.`, 'good');
+        if (!rest.length) win(level.explain ? `Correct! ${level.explain}` : `Correct! That's ${sq}.`, 400);
+        else say(rest.length > 3 ? `Yes, that's ${sq}. ${rest.length} more to find.` : `Yes, that's ${sq}. Now find ${rest.join(' and ')}.`, 'good');
       } else {
         const rest = [...answers].filter((a) => !found.has(a));
         const t = rest[0];
+        if (level.explain) { miss(null, `That's ${sq}. ${level.explain}`, [], [{ sq, kind: 'ring' }]); return; }
         miss(null, `That square is ${sq}: column (file) "${sq[0]}", row (rank) ${sq[1]}. You're looking for ${rest.join(' and ')}. For ${t}, find the letter "${t[0]}" along the bottom edge, then go up to row ${t[1]} (numbers on the left edge).`, [], [{ sq, kind: 'ring' }]);
       }
       return;

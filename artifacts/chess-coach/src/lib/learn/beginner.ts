@@ -87,6 +87,8 @@ export const UNITS: Unit[] = [
         ],
         diagram: { fen: '8/8/8/8/3R4/8/8/8 w - - 0 1', moves: 'd4' },
         exercises: [
+          { id: 'find-rook', kind: 'tapSquare', title: 'Find the Rooks', say: 'Tap all four Rooks where they start: the corners.', squares: ['a1', 'h1', 'a8', 'h8'],
+            fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1', explain: 'The Rooks start in the four corners: a1 and h1 for White, a8 and h8 for Black.' },
           { id: 'rk1', kind: 'collect', title: 'Reach the targets', say: 'Move the Rook onto every target. Take as many moves as you need.',
             pieces: [me('r', 'd4')], shapes: targets(['d8', 'h8', 'h2']) },
           { id: 'rk2', kind: 'tapAll', title: 'What can it reach?', say: 'Tap every target the Rook could capture in ONE move. Your own pawns block the way.',
@@ -111,6 +113,8 @@ export const UNITS: Unit[] = [
         ],
         diagram: { fen: '8/8/8/8/3B4/8/8/8 w - - 0 1', moves: 'd4' },
         exercises: [
+          { id: 'find-bishop', kind: 'tapSquare', title: 'Find the Bishops', say: 'Tap all four Bishops where they start.', squares: ['c1', 'f1', 'c8', 'f8'],
+            fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1', explain: 'The Bishops start next to the Knights: c1 and f1 for White, c8 and f8 for Black. One on a light square, one on a dark square.' },
           { id: 'bp1', kind: 'collect', title: 'Reach the targets', say: 'Move the Bishop onto every target.',
             pieces: [me('b', 'f1')], shapes: targets(['b5', 'e8', 'h3']) },
           { id: 'bp2', kind: 'tapAll', title: 'What can it reach?', say: 'Tap every target the Bishop could capture in one move.',
@@ -134,6 +138,8 @@ export const UNITS: Unit[] = [
         ],
         diagram: { fen: '8/8/8/3Q4/8/8/8/8 w - - 0 1', moves: 'd5' },
         exercises: [
+          { id: 'find-queen', kind: 'tapSquare', title: 'Find the Queens', say: 'Tap both Queens where they start.', squares: ['d1', 'd8'],
+            fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1', explain: 'The Queens start on d1 and d8. "Queen on her own color": the White Queen on a light square, the Black Queen on a dark one.' },
           { id: 'qn1', kind: 'collect', title: 'Reach the targets', say: 'Move the Queen onto every target.',
             pieces: [me('q', 'd1')], shapes: targets(['h5', 'a5', 'a8', 'e8']) },
           { id: 'qn2', kind: 'tapAll', title: 'Eight directions', say: 'Tap every target the Queen could capture in one move.',
@@ -158,6 +164,8 @@ export const UNITS: Unit[] = [
         ],
         diagram: { fen: '8/8/8/8/3N4/8/8/8 w - - 0 1', moves: 'd4' },
         exercises: [
+          { id: 'find-knight', kind: 'tapSquare', title: 'Find the Knights', say: 'Tap all four Knights where they start.', squares: ['b1', 'g1', 'b8', 'g8'],
+            fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1', explain: 'The Knights start next to the Rooks: b1 and g1 for White, b8 and g8 for Black.' },
           { id: 'kn1', kind: 'collect', title: 'Two jumps', say: 'Move the Knight onto the target. It takes two moves.',
             pieces: [me('n', 'g1')], shapes: targets(['g5']) },
           { id: 'kn2', kind: 'tapAll', title: 'Where can it land?', say: 'Tap every target the Knight could capture in one move.',
@@ -183,6 +191,8 @@ export const UNITS: Unit[] = [
         ],
         diagram: { fen: '8/8/8/8/4K3/8/8/8 w - - 0 1', moves: 'e4' },
         exercises: [
+          { id: 'find-king', kind: 'tapSquare', title: 'Find the Kings', say: 'Tap both Kings where they start.', squares: ['e1', 'e8'],
+            fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1', explain: 'The Kings start on e1 and e8, right next to their Queens.' },
           { id: 'kg1', kind: 'collect', title: 'A short walk', say: 'Walk the King to the target, one square at a time.',
             pieces: [me('k', 'c8')], shapes: targets(['g6']) },
           { id: 'kg2', kind: 'tapAll', title: 'One step', say: 'Tap every target the King could capture in one move.',
@@ -208,6 +218,8 @@ export const UNITS: Unit[] = [
         ],
         diagram: { fen: '8/8/8/3p1p2/4P3/8/8/8 w - - 0 1', moves: 'e4' },
         exercises: [
+          { id: 'find-pawn', kind: 'tapSquare', title: 'Find the Pawns', say: 'Tap all sixteen Pawns where they start.', squares: ['a2', 'b2', 'c2', 'd2', 'e2', 'f2', 'g2', 'h2', 'a7', 'b7', 'c7', 'd7', 'e7', 'f7', 'g7', 'h7'],
+            fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1', explain: 'Every Pawn starts on the second row from its side: rank 2 for White, rank 7 for Black.' },
           { id: 'pw1', kind: 'collect', title: 'Two squares', say: 'From its starting square a Pawn can move two. Reach the target in one move.',
             pieces: [me('p', 'd2')], shapes: targets(['d4']) },
           { id: 'pw2', kind: 'tapAll', title: 'Diagonal captures', say: 'Tap every target the Pawn could capture in one move.',

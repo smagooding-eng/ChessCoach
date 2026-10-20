@@ -147,6 +147,7 @@ function LessonFlow({ unit, lesson }: { unit: Unit; lesson: Lesson }) {
     <Shell back="/admin/beginner" title={title}>
       {bar}
       <Exercise key={`${ex.id}-${round}`} level={ex} index={stage.i} total={n}
+        guides={stage.i - (lesson.exercises[0]?.id.startsWith('find-') ? 1 : 0) < 2}
         onSolved={(m) => finishExercise(stage.i, m)} onNext={() => advance(stage.i)} onRestart={() => setRound((r) => r + 1)} />
     </Shell>
   );
@@ -168,9 +169,9 @@ export function Diagram({ fen, highlight, moves, arrows }: { fen: string; highli
   return <LearnBoard items={items} highlight={new Set(highlight ?? [])} arrows={all} />;
 }
 
-export function Exercise({ level, index, total, onSolved, onNext, onRestart }:
-  { level: Level; index: number; total: number; onSolved: (mistakes: number) => void; onNext: () => void; onRestart: () => void }) {
-  const ex = useExercise(level, onSolved, index < 2);
+export function Exercise({ level, index, total, onSolved, onNext, onRestart, guides }:
+  { level: Level; index: number; total: number; onSolved: (mistakes: number) => void; onNext: () => void; onRestart: () => void; guides?: boolean }) {
+  const ex = useExercise(level, onSolved, guides ?? index < 2);
   const toneColor = ex.msg.tone === 'good' ? L.good : ex.msg.tone === 'oops' ? L.warn : L.accent;
 
   return (
