@@ -86,6 +86,8 @@ export function useExercise(level: Level, onSolved: (mistakes: number) => void, 
   const [solved, setSolved] = useState(false);
   const [moves, setMoves] = useState(0);
   const [picked, setPicked] = useState<number | null>(null);
+  /** A pawn reached the last rank: waiting for the student to choose the new piece. */
+  const [promo, setPromo] = useState<{ from: string; to: string } | null>(null);
   const hintSquares = useRef<string[]>([]);
 
   const say = useCallback((text: string, tone: Tone = 'normal') => setMsg({ text, tone }), []);
@@ -169,11 +171,19 @@ export function useExercise(level: Level, onSolved: (mistakes: number) => void, 
     return goal === 'any' || (goal === 'king' && m.piece === 'k') || (goal === 'capture' && !!m.captured) || (goal === 'block' && m.piece !== 'k' && !m.captured);
   };
 
-  const tapGame = (sq: string, fromOverride?: string) => {
+  const tapGame = (sq: string, fromOverride?: string, promoteTo?: string) => {
     const g = game.current!;
     const selected = fromOverride ?? selectedState;
     const legal = selected ? g.moves({ square: selected as Square, verbose: true }) : [];
-    const m = legal.find((x) => x.to === sq && (!x.promotion || x.promotion === 'q'));
+    const m = legal.find((x) => x.to === sq && (!x.promotion || x.promotion === (promoteTo ?? 'q')));
+    if (selected && m && m.promotion && !promoteTo) {
+      // let the student pick the piece, like a real game
+      sfx('tap');
+      setSelected(selected);
+      setPromo({ from: selected, to: sq });
+      say('Promotion! Your Pawn reached the last rank. Choose what it becomes: Queen, Rook, Bishop or Knight.');
+      return;
+    }
     if (selected && m) {
       sfx('move');
       setMoves((n) => n + 1);
@@ -265,7 +275,7 @@ export function useExercise(level: Level, onSolved: (mistakes: number) => void, 
 
   // ---------------------------------------------------------- taps
   const onTap = (sq: string) => {
-    if (busy || solved) return;
+    if (busy || solved || promo) return;
     show(startCheck?.arrows ?? []);
 
     if (level.kind === 'tapSquare') {
@@ -396,10 +406,18 @@ export function useExercise(level: Level, onSolved: (mistakes: number) => void, 
     return !!me && sq === me.sq;
   };
   const onDrop = (from: string, to: string) => {
-    if (busy || solved) return;
+    if (busy || solved || promo) return;
     show(startCheck?.arrows ?? []);
     if (game.current) { setSelected(from); tapGame(to, from); return; }
     if (me && from === me.sq) { setSelected(me.sq); movePiece(to); }
+  };
+
+  const choosePromotion = (piece: 'q' | 'r' | 'b' | 'n' | null) => {
+    const p = promo;
+    setPromo(null);
+    if (!p) return;
+    if (!piece) { say(level.say); return; }
+    tapGame(p.to, p.from, piece);
   };
 
   const answerQuiz = (i: number) => {
@@ -490,6 +508,7 @@ export function useExercise(level: Level, onSolved: (mistakes: number) => void, 
       highlight: level.kind === 'tapSquare' || level.kind === 'tapLegal' ? found : undefined, arrows, marks,
       canDrag: movesPieces ? canDrag : undefined, onDrop: movesPieces ? onDrop : undefined },
     msg, mistakes, solved, moves, picked, answerQuiz, hint,
+    promo, choosePromotion,
     checklist: level.kind === 'tapSquare' ? (level.squares ?? []).map((sq) => ({ sq, done: found.has(sq) })) : null,
     rule: ruleType && level.kind !== 'quiz' && level.kind !== 'tapSquare' ? RULE[ruleType] : null,
     progress: { found: found.size, total: answers.size, left: targetsLeft.length + pieces.filter((p) => p.side === 'b' && p.type !== 'k').length },
