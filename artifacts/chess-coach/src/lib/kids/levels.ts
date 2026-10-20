@@ -404,3 +404,24 @@ export const WORLDS: World[] = [
 export function findWorld(id: string): World | undefined {
   return WORLDS.find((w) => w.id === id);
 }
+
+/** Goals (targets or black pieces) a piece can no longer reach in any number of moves, from `from`. */
+export function unreachableGoals(type: PieceType, from: string, others: { side: string; sq: string; type: PieceType }[], targets: { sq: string }[], bushes?: Set<string>) {
+  const goals = [...targets.map((t) => ({ sq: t.sq, name: 'star' })), ...others.filter((p) => p.side === 'b').map((p) => ({ sq: p.sq, name: PIECE_NAMES[p.type] }))];
+  const at = (x: string): Occupant => {
+    if (targets.some((t) => t.sq === x)) return type === 'p' ? 'empty' : 'shape';
+    if (bushes?.has(x)) return 'friend';
+    const p = others.find((o) => o.sq === x);
+    return !p ? 'empty' : p.side === 'w' ? 'friend' : 'enemy';
+  };
+  const seen = new Set([from]); const queue = [from]; const hit = new Set<string>();
+  while (queue.length) {
+    const cur = queue.shift()!;
+    const rr = reach(type, 'w', cur, at);
+    for (const x of [...rr.moves, ...rr.captures]) {
+      hit.add(x);
+      if (!seen.has(x)) { seen.add(x); queue.push(x); }
+    }
+  }
+  return goals.filter((g) => !hit.has(g.sq));
+}

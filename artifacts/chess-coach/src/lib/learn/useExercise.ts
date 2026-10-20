@@ -6,7 +6,7 @@
 
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { Chess, type Square, type Move } from 'chess.js';
-import { reach, attacks, PIECE_NAMES, type Level, type Occupant, type BoardPiece, type PieceType } from '@/lib/kids/levels';
+import { reach, attacks, unreachableGoals, PIECE_NAMES, type Level, type Occupant, type BoardPiece, type PieceType } from '@/lib/kids/levels';
 import { playSfxAlways, type Sfx } from '@/lib/kids/progress';
 import { learnState } from './progress';
 import {
@@ -398,6 +398,27 @@ export function useExercise(level: Level, onSolved: (mistakes: number) => void, 
 
     if (level.kind === 'collect') {
       const remaining = targetsLeft.length - (tHere ? 1 : 0) + pieces.filter((p) => p.side === 'b').length - (eHere ? 1 : 0);
+      if (remaining > 0) {
+        // A legal move can still leave a goal out of reach for good (a Pawn
+        // never moves backward or sideways). Explain it and start over.
+        const lost = unreachableGoals(me.type, sq, pieces.filter((p) => p !== eHere && p.id !== me.id), targetsLeft.filter((t) => t !== tHere));
+        if (lost.length) {
+          sfx('oops');
+          setMistakes((n) => n + 1);
+          const names = lost.map((x) => `the ${x.name} on ${x.sq}`).join(' and ');
+          say(me.type === 'p'
+            ? `Uh-oh: from ${sq} the Pawn can never reach ${names}. Pawns only move forward and capture diagonally forward, so a piece beside or behind it is out of reach. Let's start again.`
+            : `Uh-oh: from ${sq} the ${NAME[me.type]} can't reach ${names} any more. Let's start again.`, 'oops');
+          show([], lost.map((x) => ({ sq: x.sq, kind: 'x' as const })));
+          setBusy(true);
+          window.setTimeout(() => {
+            setPieces((level.pieces ?? []).map((p, i) => ({ ...p, id: `p${i}` })));
+            setTargets((level.shapes ?? []).map((t, i) => ({ sq: t.sq, id: `t${i}` })));
+            setMoves(0); show(); setBusy(false); say(level.say);
+          }, 4000);
+          return;
+        }
+      }
       if (tHere || eHere) {
         sfx('pop');
         if (remaining === 0) win('Done!', 400); else say(`${eHere ? 'Captured' : 'Got it'}! ${remaining} to go.`, 'good');

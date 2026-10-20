@@ -9,7 +9,7 @@ import { KidsShell, TopBar, Bubble, ChunkyButton, Confetti, KID_FONT } from '@/c
 import { KidsBoard, type BoardItem } from '@/components/kids/KidsBoard';
 import { KidPiece, KidShape, KidAvatar, StarRow } from '@/components/kids/KidsArt';
 import {
-  findWorld, reach, attacks, whyNot, PIECE_NAMES,
+  findWorld, reach, attacks, whyNot, unreachableGoals, PIECE_NAMES,
   type Level, type World, type Occupant, type BoardPiece, type PieceType, type ShapeKind,
 } from '@/lib/kids/levels';
 import { useKids, levelUnlocked, starsFor, playSfx, speak, stopSpeaking, worldDone } from '@/lib/kids/progress';
@@ -190,6 +190,23 @@ function LevelRunner({ world, level, index, onRestart }: { world: World; level: 
 
     if (level.kind === 'collect') {
       const remaining = shapes.length - (shapeHere ? 1 : 0) + pieces.filter((p) => p.side === 'b').length - (enemyHere ? 1 : 0);
+      if (remaining > 0) {
+        const lost = unreachableGoals(me.type, sq, pieces.filter((p) => p !== enemyHere && p.id !== me.id), shapes.filter((s) => s !== shapeHere), bushes);
+        if (lost.length) {
+          playSfx('oops');
+          setMistakes((m) => m + 1);
+          say(me.type === 'p'
+            ? `Oh no! From ${sq} I can't reach the ${lost[0].name === 'star' ? 'star' : `plum ${lost[0].name}`} anymore. Pawns only walk forward! Let's try again.`
+            : `Oh no! I can't reach the ${lost[0].name === 'star' ? 'star' : `plum ${lost[0].name}`} from here anymore. Let's try again.`, 'oops');
+          setBusy(true);
+          window.setTimeout(() => {
+            setPieces((level.pieces ?? []).map((p, i) => ({ ...p, id: `p${i}` })));
+            setShapes((level.shapes ?? []).map((s, i) => ({ ...s, id: `s${i}` })));
+            setMoves(0); setBusy(false); say(level.say);
+          }, 3500);
+          return;
+        }
+      }
       if (shapeHere || enemyHere) {
         playSfx('pop');
         if (remaining === 0) { say(enemyHere ? 'You captured them all!' : 'You caught every star!', 'good'); finish(300); }
