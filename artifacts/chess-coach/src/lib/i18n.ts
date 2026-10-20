@@ -1,8 +1,9 @@
 import React from 'react';
 
 // Site language, two layers:
-//  1. Hand-written dictionaries (src/locales/*.ts) for the main public pages in
-//     the "native" languages. t('English text') returns the translation, or the
+//  1. Our own dictionaries for the "native" languages: src/locales/*.ts for
+//     the main public pages (t()), and src/locales/app-*.json for every other
+//     page, applied by domTranslate as pages render. t('English text') returns the translation, or the
 //     English when a string has none yet. Those regions carry translate="no" so
 //     Google leaves them alone.
 //  2. Google's website translator for everything else (the signed-in app, and
@@ -20,12 +21,12 @@ export const LANGUAGES: Language[] = [
   { code: 'pt', name: 'Português', native: true },
   { code: 'fr', name: 'Français', native: true },
   { code: 'de', name: 'Deutsch', native: true },
-  { code: 'it', name: 'Italiano' },
+  { code: 'it', name: 'Italiano', native: true },
   { code: 'nl', name: 'Nederlands' },
-  { code: 'pl', name: 'Polski' },
-  { code: 'ru', name: 'Русский' },
-  { code: 'uk', name: 'Українська' },
-  { code: 'tr', name: 'Türkçe' },
+  { code: 'pl', name: 'Polski', native: true },
+  { code: 'ru', name: 'Русский', native: true },
+  { code: 'uk', name: 'Українська', native: true },
+  { code: 'tr', name: 'Türkçe', native: true },
   { code: 'ro', name: 'Română' },
   { code: 'cs', name: 'Čeština' },
   { code: 'hu', name: 'Magyar' },
@@ -35,7 +36,7 @@ export const LANGUAGES: Language[] = [
   { code: 'fa', name: 'فارسی' },
   { code: 'hi', name: 'हिन्दी' },
   { code: 'bn', name: 'বাংলা' },
-  { code: 'id', name: 'Bahasa Indonesia' },
+  { code: 'id', name: 'Bahasa Indonesia', native: true },
   { code: 'vi', name: 'Tiếng Việt' },
   { code: 'th', name: 'ไทย' },
   { code: 'tl', name: 'Filipino' },
@@ -186,6 +187,12 @@ const APP_LOADERS: Record<string, () => Promise<{ default: Record<string, string
   pt: () => import('@/locales/app-pt.json'),
   fr: () => import('@/locales/app-fr.json'),
   de: () => import('@/locales/app-de.json'),
+  it: () => import('@/locales/app-it.json'),
+  ru: () => import('@/locales/app-ru.json'),
+  tr: () => import('@/locales/app-tr.json'),
+  pl: () => import('@/locales/app-pl.json'),
+  id: () => import('@/locales/app-id.json'),
+  uk: () => import('@/locales/app-uk.json'),
 };
 
 /** Call once before the first render. Never throws; at worst the site stays English. */
@@ -194,13 +201,14 @@ export async function initI18n(): Promise<void> {
   document.documentElement.lang = current;
   if (current === 'en') { writeGoogCookie(null); return; }
   const loader = LOADERS[current];
-  if (loader) {
+  const appLoader = APP_LOADERS[current];
+  if (loader || appLoader) {
     // Our own translations: the pages built with t(), plus every other page
     // through domTranslate. No Google here, so nothing double-translates.
     try {
       const [page, app] = await Promise.all([
-        loader().then((m) => m.default).catch(() => ({} as Record<string, string>)),
-        (APP_LOADERS[current]?.() ?? Promise.resolve({ default: {} })).then((m) => m.default).catch(() => ({} as Record<string, string>)),
+        (loader?.() ?? Promise.resolve({ default: {} })).then((m) => m.default).catch(() => ({} as Record<string, string>)),
+        (appLoader?.() ?? Promise.resolve({ default: {} })).then((m) => m.default).catch(() => ({} as Record<string, string>)),
       ]);
       dict = { ...app, ...page };
     } catch { dict = {}; }
