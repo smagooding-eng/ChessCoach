@@ -18,36 +18,81 @@ const VALUE: Record<string, number> = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
 const NAME = (t: string) => PIECE_NAMES[t as PieceType];
 const CHEERS = ['Nice move!', 'Ooh, good one!', 'Hmm, let me think…', 'You\'re getting good at this!', 'My turn!'];
 
-/** A piece of `side` the other side could win right now. */
-function hanging(g: Chess, side: 'w' | 'b'): { sq: string; type: string; by: string } | null {
-  const opp = side === 'w' ? 'b' : 'w';
-  let worst: { sq: string; type: string; by: string } | null = null;
-  for (const row of g.board()) for (const c of row) {
-    if (!c || c.color !== side || c.type === 'k') continue;
-    const atk = g.attackers(c.square, opp);
-    if (!atk.length) continue;
-    const cheapest = atk.reduce((a, s) => (VALUE[g.get(s)!.type] < VALUE[g.get(a)!.type] ? s : a));
-    const defended = g.attackers(c.square, side).length > 0;
-    if (!defended || VALUE[g.get(cheapest)!.type] < VALUE[c.type]) {
-      if (!worst || VALUE[c.type] > VALUE[worst.type]) worst = { sq: c.square, type: c.type, by: g.get(cheapest)!.type };
-    }
-  }
-  return worst;
+// ------------------------------------------------------------- analytics
+//
+// Everything Benny says is worked out on the real position, looking one
+// exchange deep: a capture counts what it takes MINUS the piece lost if it
+// gets taken straight back, and a "danger" only counts if the child couldn't
+// win something bigger in return. So he never warns about a Knight when the
+// child is really attacking his Queen.
+
+const PTS = (t: string) => `${NAME(t)} (${VALUE[t]} point${VALUE[t] === 1 ? '' : 's'})`;
+type Arrow = { from: string; to: string; color: 'good' | 'bad' | 'info' | 'warn'; dashed?: boolean; knight?: boolean };
+
+/** What a capture really wins: the piece taken, minus ours if it's taken back. */
+function captureNet(g: Chess, m: Move): number {
+  if (!m.captured) return 0;
+  g.move(m);
+  const mate = g.isCheckmate();
+  const back = g.moves({ verbose: true }).some((x) => x.to === m.to);
+  g.undo();
+  if (mate) return 100;
+  return VALUE[m.captured] - (back ? VALUE[m.piece] : 0);
 }
 
-/** Simple, honest score for a move: what it wins minus what it leaves hanging. */
+/** The side to move's best capture, by what it really wins. */
+function bestCapture(g: Chess, skipTo?: string): { m: Move; net: number } | null {
+  let best: { m: Move; net: number } | null = null;
+  for (const m of g.moves({ verbose: true })) {
+    if (!m.captured || m.to === skipTo) continue;
+    const net = captureNet(g, m);
+    if (!best || net > best.net) best = { m, net };
+  }
+  return best;
+}
+
+/** The same position with the other side to move (to ask "what could they take?"). */
+function flipped(g: Chess): Chess | null {
+  if (g.inCheck()) return null;
+  const f = g.fen().split(' ');
+  f[1] = f[1] === 'w' ? 'b' : 'w'; f[3] = '-';
+  try { return new Chess(f.join(' ')); } catch { return null; }
+}
+
+const arrowOf = (m: Move, color: Arrow['color']): Arrow => ({ from: m.from, to: m.to, color, knight: m.piece === 'n' });
+
+/** After the child's move (Benny to move): what can Benny win, and what does the child win back? */
+function afterKidMove(g: Chess) {
+  const risk = bestCapture(g);
+  let back: { m: Move; net: number } | null = null;
+  if (risk && risk.net > 0) { g.move(risk.m); back = bestCapture(g, risk.m.to); g.undo(); }
+  const lose = risk && risk.net > 0 ? risk.net - Math.max(0, back?.net ?? 0) : 0;
+  const f = flipped(g);
+  const threat = f ? bestCapture(f) : null; // what the child is now attacking
+  return { risk: risk && risk.net > 0 ? risk : null, back: back && back.net > 0 ? back : null, lose, threat: threat && threat.net > 0 ? threat : null };
+}
+
+/** After Benny's move (child to move): what is attacked, and what can the child win? */
+function afterBennyMove(g: Chess) {
+  const chance = bestCapture(g);
+  const f = flipped(g);
+  const danger = f ? bestCapture(f) : null;
+  return { chance: chance && chance.net > 0 ? chance : null, danger: danger && danger.net > 0 ? danger : null };
+}
+
+/** Score for "Help me!": what a move wins, minus what Benny could then win. */
 function score(g: Chess, m: Move): number {
+  let s = m.captured ? captureNet(g, m) : 0;
   g.move(m);
-  let s = 0;
   if (g.isCheckmate()) s = 1000;
   else {
-    s = (m.captured ? VALUE[m.captured] : 0) + (m.promotion ? 8 : 0) + (g.inCheck() ? 0.3 : 0);
-    const h = hanging(g, m.color);
-    if (h) s -= VALUE[h.type];
-    if (['d4', 'e4', 'd5', 'e5'].includes(m.to)) s += 0.2;
+    const r = bestCapture(g);
+    if (r && r.net > 0) s -= r.net;
+    if (g.inCheck()) s += 0.3;
+    if (['d4', 'e4', 'd5', 'e5', 'c3', 'f3', 'c4', 'f4'].includes(m.to) && m.piece !== 'q' && m.piece !== 'k') s += 0.2;
   }
   g.undo();
-  return s + Math.random() * 0.1;
+  return s + Math.random() * 0.05;
 }
 
 /** Benny's move: mostly random, sometimes grabs a free piece, rarely spots mate. */
@@ -111,6 +156,7 @@ function Game({ wins, onWin }: { wins: number; onWin: () => void }) {
   const [selected, setSelected] = useState<string | null>(null);
   const [hint, setHint] = useState<Set<string> | undefined>();
   const [danger, setDanger] = useState<string | null>(null);
+  const [arrows, setArrows] = useState<Arrow[]>([]);
   const [talk, setTalk] = useState<{ text: string; tone: 'normal' | 'good' | 'oops'; mood: BearMood }>({
     text: 'Hi! I\'m Benny the Bear. Let\'s play a real game! You are the white pieces, so you go first. Try moving a Pawn in the middle!',
     tone: 'normal', mood: 'happy',
@@ -158,13 +204,35 @@ function Game({ wins, onWin }: { wins: number; onWin: () => void }) {
       playSfx(g.current.inCheck() ? 'check' : m.captured ? 'pop' : 'move');
       if (finish()) return;
       setPhase('you');
-      const kingSq = g.current.inCheck() ? g.current.board().flat().find((x) => x && x.type === 'k' && x.color === 'w')?.square ?? null : null;
-      const h = hanging(g.current, 'w');
-      setDanger(kingSq ?? h?.sq ?? null);
-      if (kingSq) say('Check! My piece is attacking your King. Move your King, or block me, or catch my piece!', 'oops', 'wow');
-      else if (m.captured) say(`Gotcha! I caught your ${NAME(m.captured)}.${h ? ` And watch out, I'm looking at your ${NAME(h.type)} too!` : ''}`, 'oops', 'happy');
-      else if (h) say(`Watch out! My ${NAME(h.by)} is looking at your ${NAME(h.type)} (it's glowing). Can you keep it safe?`, 'oops', 'think');
-      else say(CHEERS[Math.floor(Math.random() * CHEERS.length)] + ' Your turn!', 'normal', 'happy');
+      const c = g.current;
+      const kingSq = c.inCheck() ? c.board().flat().find((x) => x && x.type === 'k' && x.color === 'w')?.square ?? null : null;
+      const moveArrow = arrowOf(m, 'warn');
+      if (kingSq) {
+        const checkers = c.attackers(kingSq as Square, 'b');
+        setDanger(kingSq);
+        setArrows([moveArrow, ...checkers.map((sq) => ({ from: sq, to: kingSq, color: 'bad' as const, knight: c.get(sq)?.type === 'n' }))]);
+        say(`Check! My ${NAME(c.get(checkers[0])!.type)} is attacking your King (red arrow). You can move your King, put a piece in the way, or catch my ${NAME(c.get(checkers[0])!.type)}!`, 'oops', 'wow');
+        return;
+      }
+      const { chance, danger: d } = afterBennyMove(c);
+      const lines: string[] = [];
+      const show: Arrow[] = [moveArrow];
+      if (m.captured) lines.push(`Gotcha! I caught your ${NAME(m.captured)}.`);
+      if (d) {
+        show.push(arrowOf(d.m, 'bad'));
+        setDanger(d.m.to);
+        lines.push(`Watch out! My ${NAME(d.m.piece)} is attacking your ${PTS(d.m.captured!)} (red arrow).`);
+      } else setDanger(null);
+      if (chance && (!d || chance.net >= d.net)) {
+        lines.push(chance.net >= 3
+          ? `But look closely… one of MY pieces can be caught${d ? ', and it\'s worth more!' : '!'} Can you find it? Tap "Help me!" if you need a clue.`
+          : `Psst… I left something you could catch. Can you spot it?`);
+      } else if (d) {
+        lines.push(`Move it to a safe square, or protect it with another piece.`);
+      }
+      if (!lines.length) lines.push(CHEERS[Math.floor(Math.random() * CHEERS.length)] + ' Your turn!');
+      setArrows(show);
+      say(lines.join(' '), d ? 'oops' : 'normal', d ? 'think' : 'happy');
     }, 1100);
   };
 
@@ -175,22 +243,46 @@ function Game({ wins, onWin }: { wins: number; onWin: () => void }) {
     history.current.push({ fen: g.current.fen(), items, caught });
     const m = g.current.move({ from, to, promotion: 'q' });
     setItems((it) => applyMove(it, m));
-    setSelected(null); setHint(undefined); setDanger(null);
+    setSelected(null); setHint(undefined); setDanger(null); setArrows([]);
     if (m.captured) setCaught((c) => ({ ...c, mine: [...c.mine, m.captured!] }));
     playSfx(g.current.inCheck() ? 'check' : m.captured ? 'pop' : 'move');
     if (finish()) return true;
 
-    // Did the child just leave something where Benny can catch it? Then wait.
-    const h = hanging(g.current, 'w');
-    if (h && h.sq === m.to) {
-      setPhase('warn'); setDanger(h.sq);
-      say(`Uh-oh! My ${NAME(h.by)} could catch your ${NAME(h.type)} there (it's glowing). Do you want to take it back?`, 'oops', 'think');
+    // Look one exchange deep before saying anything.
+    const c = g.current;
+    const moveArrow = arrowOf(m, 'good');
+    if (m.promotion) { setArrows([moveArrow]); say('WOW! Your Pawn reached the end and became a QUEEN (9 points)!', 'good', 'wow'); bennyTurn(); return true; }
+    if (c.inCheck()) {
+      const k = c.board().flat().find((x) => x && x.type === 'k' && x.color === 'b')!.square;
+      setDanger(k); setArrows([moveArrow, { from: m.to, to: k, color: 'good', knight: m.piece === 'n' }]);
+      say(`Check! Your ${NAME(m.piece)} is attacking my King (green arrow). I have to save him!`, 'good', 'wow');
+      bennyTurn(); return true;
+    }
+    const a = afterKidMove(c);
+    if (a.risk && a.lose >= 3) {
+      // A real loss: pause and let the child decide.
+      setPhase('warn'); setDanger(a.risk.m.to);
+      setArrows([moveArrow, arrowOf(a.risk.m, 'bad')]);
+      const yours = NAME(a.risk.m.captured!);
+      say(`Uh-oh! My ${NAME(a.risk.m.piece)} could catch your ${PTS(a.risk.m.captured!)} (red arrow)${a.risk.net < VALUE[a.risk.m.captured!] ? ` — you'd catch my ${NAME(a.risk.m.piece)} back, but your ${yours} is worth more` : ' and nothing protects it'}. Do you want to take it back?`, 'oops', 'think');
       return true;
     }
-    if (m.promotion) say('WOW! Your Pawn reached the end and became a QUEEN!', 'good', 'wow');
-    else if (g.current.inCheck()) say('Check! Oh no, my King is in danger! I have to save him.', 'good', 'wow');
-    else if (m.captured) say(`Yum! You caught my ${NAME(m.captured)}!`, 'good', 'wow');
-    else say('Hmm… let me think…', 'normal', 'think');
+    const show: Arrow[] = [moveArrow];
+    const lines: string[] = [];
+    if (m.captured) lines.push(`Yum! You caught my ${PTS(m.captured)}!`);
+    if (a.risk && a.back) {
+      show.push(arrowOf(a.risk.m, 'bad'), arrowOf(a.back.m, 'good'));
+      lines.push(`Ooh, tricky! My ${NAME(a.risk.m.piece)} could catch your ${NAME(a.risk.m.captured!)} (red arrow), but then you'd catch my ${PTS(a.back.m.captured!)} (green arrow). Hmm…`);
+    } else if (a.risk && a.lose > 0) {
+      show.push(arrowOf(a.risk.m, 'bad'));
+      lines.push(`Careful: my ${NAME(a.risk.m.piece)} could catch your ${NAME(a.risk.m.captured!)} (red arrow).`);
+    } else if (a.threat) {
+      show.push(arrowOf(a.threat.m, 'good'));
+      lines.push(`Uh-oh, your ${NAME(a.threat.m.piece)} is attacking my ${PTS(a.threat.m.captured!)} (green arrow)! I'd better do something.`);
+    }
+    if (!lines.length) lines.push('Hmm… let me think…');
+    setArrows(show);
+    say(lines.join(' '), m.captured || a.threat ? 'good' : 'normal', m.captured || a.threat ? 'wow' : 'think');
     bennyTurn();
     return true;
   };
@@ -209,26 +301,35 @@ function Game({ wins, onWin }: { wins: number; onWin: () => void }) {
     if (!h) return;
     window.clearTimeout(timer.current);
     g.current.load(h.fen);
-    setItems(h.items); setCaught(h.caught); setSelected(null); setHint(undefined); setDanger(null); setResult(null); setPhase('you');
+    setItems(h.items); setCaught(h.caught); setSelected(null); setHint(undefined); setDanger(null); setArrows([]); setResult(null); setPhase('you');
     say('Okay, try again! Pick a safe square this time.', 'normal', 'happy');
   };
 
-  const keepIt = () => { setDanger(null); say('Brave! Let\'s see what I do…', 'normal', 'think'); bennyTurn(); };
+  const keepIt = () => { setDanger(null); setArrows([]); say('Brave! Let\'s see what I do…', 'normal', 'think'); bennyTurn(); };
 
   const help = () => {
     if (phase !== 'you') return;
     const moves = g.current.moves({ verbose: true });
     const best = moves.map((m) => ({ m, s: score(g.current, m) })).sort((a, b) => b.s - a.s)[0]?.m;
     if (!best) return;
-    setSelected(null); setHint(new Set([best.from, best.to]));
-    say(best.captured ? `Psst… your ${NAME(best.piece)} can catch my ${NAME(best.captured)}! Look at the glowing squares.`
-      : `Try moving your ${NAME(best.piece)} to the glowing square.`, 'normal', 'think');
+    setSelected(null); setHint(new Set([best.from, best.to])); setArrows([arrowOf(best, 'good')]);
+    const f = flipped(g.current);
+    const was = f ? bestCapture(f) : null; // was this piece in danger?
+    const net = best.captured ? captureNet(g.current, best) : 0;
+    let why: string;
+    if (best.captured && net >= VALUE[best.captured]) why = `Your ${NAME(best.piece)} can catch my ${PTS(best.captured)}, and I can't catch it back!`;
+    else if (best.captured && net > 0) why = `Your ${NAME(best.piece)} can catch my ${PTS(best.captured)}. I can take back, but you still win more.`;
+    else if (best.captured) why = `Your ${NAME(best.piece)} can catch my ${NAME(best.captured)}. It's a fair trade.`;
+    else if (was && was.m.to === best.from) why = `My ${NAME(was.m.piece)} is attacking your ${NAME(best.piece)}. Move it here to keep it safe!`;
+    else if (score(g.current, best) >= 0.3 && !best.captured) why = `Try this: it's safe, and it helps your ${NAME(best.piece)} join the game.`;
+    else why = `Try moving your ${NAME(best.piece)} along the green arrow. It's a safe square.`;
+    say(why, 'normal', 'think');
   };
 
   const newGame = () => {
     window.clearTimeout(timer.current);
     g.current = new Chess(); history.current = [];
-    setItems(startItems(g.current)); setCaught({ mine: [], his: [] }); setSelected(null); setHint(undefined); setDanger(null); setResult(null); setPhase('you');
+    setItems(startItems(g.current)); setCaught({ mine: [], his: [] }); setSelected(null); setHint(undefined); setDanger(null); setArrows([]); setResult(null); setPhase('you');
     say('New game! You go first.', 'normal', 'happy');
   };
 
@@ -241,7 +342,7 @@ function Game({ wins, onWin }: { wins: number; onWin: () => void }) {
       </div>
 
       <Tray label="Benny caught" pieces={caught.his} side="w" />
-      <KidsBoard items={items} frame="#E8A86B" dots={dots} selected={selected} hint={hint} danger={danger}
+      <KidsBoard items={items} frame="#E8A86B" dots={dots} selected={selected} hint={hint} danger={danger} arrows={arrows}
         bounce={selected} onTap={onTap}
         canDrag={(sq) => phase === 'you' && g.current.get(sq as Square)?.color === 'w'}
         onDrop={(from, to) => { if (!play(from, to)) { setSelected(null); } }} />
@@ -264,9 +365,9 @@ function Game({ wins, onWin }: { wins: number; onWin: () => void }) {
         </motion.div>
       ) : (
         <div className="mt-4 grid grid-cols-3 gap-3">
-          <ChunkyButton onClick={help} disabled={phase !== 'you'} color="#FFC93C" shade="#E08A00" className="!px-1 !text-base whitespace-nowrap">Help me!</ChunkyButton>
-          <ChunkyButton onClick={undo} disabled={phase === 'benny' || !history.current.length} color="#45B7F7" shade="#2187C4" className="!px-1 !text-base whitespace-nowrap">Undo</ChunkyButton>
-          <ChunkyButton onClick={newGame} color="#9479E0" shade="#6C51C2" className="!px-1 !text-base whitespace-nowrap">New game</ChunkyButton>
+          <ChunkyButton onClick={help} disabled={phase !== 'you'} color="#FFC93C" shade="#E08A00" className="!px-2"><span style={{ fontSize: 16, whiteSpace: 'nowrap' }}>Help me!</span></ChunkyButton>
+          <ChunkyButton onClick={undo} disabled={phase === 'benny' || !history.current.length} color="#45B7F7" shade="#2187C4" className="!px-2"><span style={{ fontSize: 16, whiteSpace: 'nowrap' }}>Undo</span></ChunkyButton>
+          <ChunkyButton onClick={newGame} color="#9479E0" shade="#6C51C2" className="!px-2"><span style={{ fontSize: 16, whiteSpace: 'nowrap' }}>New game</span></ChunkyButton>
         </div>
       )}
       <Confetti run={party} />

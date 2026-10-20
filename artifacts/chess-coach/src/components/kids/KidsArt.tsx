@@ -10,49 +10,60 @@ import type { ReactElement } from 'react';
 import type { PieceType, Side, ShapeKind } from '@/lib/kids/levels';
 
 const TEAM = {
-  w: { body: '#FFD45C', shade: '#F7A928', line: '#8A4F00', cheek: '#FF8DA1', shine: '#FFF3C4' },
-  b: { body: '#9479E0', shade: '#6C51C2', line: '#33236E', cheek: '#F7A6D6', shine: '#D9CCFF' },
+  w: { body: '#FFD45C', shade: '#F29E1F', line: '#7A4300', cheek: '#FF8DA1', shine: '#FFF6CF', deep: '#E08A00' },
+  b: { body: '#A08AEB', shade: '#6747C7', line: '#2C1D63', cheek: '#F7A6D6', shine: '#E4DAFF', deep: '#5235AE' },
 };
 
 function Face({ x, y, side, mood = 'happy', s = 1 }: { x: number; y: number; side: Side; mood?: 'happy' | 'wow' | 'sad'; s?: number }) {
   const c = TEAM[side];
-  const eyeDx = 7 * s;
+  const eyeDx = 7.5 * s;
   return (
     <g>
       {[-1, 1].map((d) => (
         <g key={d}>
-          <ellipse cx={x + d * eyeDx} cy={y} rx={3.3 * s} ry={4.2 * s} fill={c.line} />
-          <circle cx={x + d * eyeDx + 1.1 * s} cy={y - 1.5 * s} r={1.3 * s} fill="#fff" />
+          <ellipse cx={x + d * eyeDx} cy={y} rx={3.9 * s} ry={4.9 * s} fill={c.line} />
+          <circle cx={x + d * eyeDx + 1.3 * s} cy={y - 1.8 * s} r={1.6 * s} fill="#fff" />
+          <circle cx={x + d * eyeDx - 1.2 * s} cy={y + 1.9 * s} r={0.7 * s} fill="#fff" opacity="0.8" />
         </g>
       ))}
-      <ellipse cx={x - 12 * s} cy={y + 6 * s} rx={3.6 * s} ry={2.4 * s} fill={c.cheek} opacity={0.75} />
-      <ellipse cx={x + 12 * s} cy={y + 6 * s} rx={3.6 * s} ry={2.4 * s} fill={c.cheek} opacity={0.75} />
+      <ellipse cx={x - 13 * s} cy={y + 6.5 * s} rx={4 * s} ry={2.6 * s} fill={c.cheek} opacity={0.8} />
+      <ellipse cx={x + 13 * s} cy={y + 6.5 * s} rx={4 * s} ry={2.6 * s} fill={c.cheek} opacity={0.8} />
       {mood === 'wow' ? (
-        <ellipse cx={x} cy={y + 8 * s} rx={3 * s} ry={3.6 * s} fill={c.line} />
+        <ellipse cx={x} cy={y + 9 * s} rx={3.2 * s} ry={3.8 * s} fill={c.line} />
       ) : mood === 'sad' ? (
-        <path d={`M${x - 5 * s} ${y + 10 * s} Q${x} ${y + 6 * s} ${x + 5 * s} ${y + 10 * s}`} stroke={c.line} strokeWidth={2.4 * s} fill="none" strokeLinecap="round" />
+        <path d={`M${x - 5 * s} ${y + 11 * s} Q${x} ${y + 7 * s} ${x + 5 * s} ${y + 11 * s}`} stroke={c.line} strokeWidth={2.6 * s} fill="none" strokeLinecap="round" />
       ) : (
-        <path d={`M${x - 6 * s} ${y + 6 * s} Q${x} ${y + 12 * s} ${x + 6 * s} ${y + 6 * s}`} stroke={c.line} strokeWidth={2.4 * s} fill="none" strokeLinecap="round" />
+        <path d={`M${x - 5.5 * s} ${y + 7 * s} Q${x} ${y + 12.5 * s} ${x + 5.5 * s} ${y + 7 * s} Z`} fill={c.line} stroke={c.line} strokeWidth={1.6 * s} strokeLinejoin="round" />
       )}
     </g>
   );
 }
 
-/** A friendly chess piece character. */
+/** A friendly chess piece character: soft gradient body, bold outline, big shiny eyes. */
 export function KidPiece({ type, side, size = 56, mood }: { type: PieceType; side: Side; size?: number | string; mood?: 'happy' | 'wow' | 'sad' }) {
   const c = TEAM[side];
-  const stroke = { stroke: c.line, strokeWidth: 3, strokeLinejoin: 'round' as const };
-  const base = <rect x="22" y="83" width="56" height="11" rx="5.5" fill={c.shade} {...stroke} />;
+  const fill = `url(#kp-${side}-body)`;
+  const dark = `url(#kp-${side}-dark)`;
+  const stroke = { stroke: c.line, strokeWidth: 3.2, strokeLinejoin: 'round' as const };
+  const base = (
+    <>
+      <path d="M22 93 Q22 82 33 81 H67 Q78 82 78 93 Z" fill={dark} {...stroke} />
+      <path d="M30 85 H70" stroke={c.shine} strokeWidth="2" strokeLinecap="round" opacity="0.6" />
+    </>
+  );
+  const shine = (cx: number, cy: number, rx: number, ry: number, rot = -20) => (
+    <ellipse cx={cx} cy={cy} rx={rx} ry={ry} fill="#fff" opacity="0.55" transform={`rotate(${rot} ${cx} ${cy})`} />
+  );
   let art: ReactElement;
   switch (type) {
     case 'p':
       art = (
         <>
-          <path d="M34 85 Q36 62 43 52 L57 52 Q64 62 66 85 Z" fill={c.body} {...stroke} />
-          <ellipse cx="50" cy="52" rx="15" ry="4.5" fill={c.shade} {...stroke} />
-          <circle cx="50" cy="33" r="18" fill={c.body} {...stroke} />
-          <ellipse cx="43" cy="24" rx="6" ry="3.5" fill={c.shine} opacity="0.8" />
-          <Face x={50} y={32} side={side} mood={mood} s={0.9} />
+          <path d="M35 83 Q36 66 44 57 H56 Q64 66 65 83 Z" fill={fill} {...stroke} />
+          <ellipse cx="50" cy="57" rx="15" ry="5" fill={dark} {...stroke} />
+          <circle cx="50" cy="35" r="21" fill={fill} {...stroke} />
+          {shine(41, 24, 6, 3.5)}
+          <Face x={50} y={36} side={side} mood={mood} s={1} />
           {base}
         </>
       );
@@ -60,11 +71,12 @@ export function KidPiece({ type, side, size = 56, mood }: { type: PieceType; sid
     case 'r':
       art = (
         <>
-          <path d="M30 38 L70 38 L67 85 L33 85 Z" fill={c.body} {...stroke} />
-          <path d="M24 16 h11 v8 h8.5 v-8 h13 v8 h8.5 v-8 h11 v24 h-52 Z" fill={c.body} {...stroke} />
-          <rect x="26" y="36" width="48" height="6" rx="3" fill={c.shade} {...stroke} />
-          <rect x="29" y="20" width="4" height="12" rx="2" fill={c.shine} opacity="0.8" />
-          <Face x={50} y={57} side={side} mood={mood} s={0.95} />
+          <path d="M31 83 L34 44 H66 L69 83 Z" fill={fill} {...stroke} />
+          <path d="M38 76 H46 M54 76 H62 M42 70 H50" stroke={c.deep} strokeWidth="2.4" strokeLinecap="round" opacity="0.55" />
+          <path d="M25 17 H36 V25 H44.5 V17 H55.5 V25 H64 V17 H75 V39 Q75 45 69 45 H31 Q25 45 25 39 Z" fill={fill} {...stroke} />
+          <path d="M28 41 H72" stroke={c.deep} strokeWidth="2.4" strokeLinecap="round" opacity="0.5" />
+          {shine(31, 26, 2.5, 6, 0)}
+          <Face x={50} y={58} side={side} mood={mood} s={0.95} />
           {base}
         </>
       );
@@ -72,13 +84,13 @@ export function KidPiece({ type, side, size = 56, mood }: { type: PieceType; sid
     case 'b':
       art = (
         <>
-          <path d="M37 85 Q39 66 42 56 L58 56 Q61 66 63 85 Z" fill={c.body} {...stroke} />
-          <path d="M50 12 C70 24 74 44 62 56 L38 56 C26 44 30 24 50 12 Z" fill={c.body} {...stroke} />
-          <path d="M57 22 L50 34" stroke={c.line} strokeWidth="3" strokeLinecap="round" />
-          <circle cx="50" cy="10" r="5" fill={c.shade} {...stroke} />
-          <ellipse cx="50" cy="56" rx="14" ry="4" fill={c.shade} {...stroke} />
-          <ellipse cx="40" cy="28" rx="3.5" ry="7" fill={c.shine} opacity="0.75" transform="rotate(25 40 28)" />
-          <Face x={50} y={41} side={side} mood={mood} s={0.85} />
+          <path d="M37 83 Q38 69 42 60 H58 Q62 69 63 83 Z" fill={fill} {...stroke} />
+          <path d="M50 12 C69 23 74 43 62 59 H38 C26 43 31 23 50 12 Z" fill={fill} {...stroke} />
+          <path d="M59 22 L49 37" stroke={c.line} strokeWidth="3.2" strokeLinecap="round" />
+          <circle cx="50" cy="9" r="5.5" fill={dark} {...stroke} />
+          <ellipse cx="50" cy="60" rx="14" ry="4.5" fill={dark} {...stroke} />
+          {shine(40, 27, 3.5, 7.5, 25)}
+          <Face x={50} y={44} side={side} mood={mood} s={0.88} />
           {base}
         </>
       );
@@ -86,19 +98,18 @@ export function KidPiece({ type, side, size = 56, mood }: { type: PieceType; sid
     case 'n':
       art = (
         <>
-          <path d="M66 85 L32 85 Q30 70 40 60 Q30 61 23 55 Q18 49 23 42 L40 28 Q42 16 52 13 L55 5 L60 14 Q78 22 76 46 Q74 66 66 85 Z" fill={c.body} {...stroke} />
-          <path d="M60 14 Q78 22 76 46 Q74 66 66 85 L60 85 Q68 62 68 44 Q68 26 56 17 Z" fill={c.shade} />
-          <path d="M66 85 L32 85 Q30 70 40 60 Q30 61 23 55 Q18 49 23 42 L40 28 Q42 16 52 13 L55 5 L60 14 Q78 22 76 46 Q74 66 66 85 Z" fill="none" {...stroke} />
-          <circle cx="25" cy="47" r="2" fill={c.line} />
-          <ellipse cx="47" cy="22" rx="5" ry="3" fill={c.shine} opacity="0.8" transform="rotate(-30 47 22)" />
-          <g>
-            <ellipse cx="47" cy="33" rx="3.4" ry="4.3" fill={c.line} />
-            <circle cx="48.3" cy="31.4" r="1.3" fill="#fff" />
-            <ellipse cx="39" cy="45" rx="3.6" ry="2.4" fill={c.cheek} opacity="0.75" />
-            {mood === 'wow'
-              ? <ellipse cx="31" cy="53" rx="2.6" ry="3" fill={c.line} />
-              : <path d="M27 52 Q32 57 37 53" stroke={c.line} strokeWidth="2.4" fill="none" strokeLinecap="round" />}
-          </g>
+          <path d="M67 83 L32 83 Q29 70 40 60 Q29 61 22 55 Q16 48 22 41 L39 27 Q41 15 52 12 L55 4 L61 13 Q79 21 77 46 Q75 66 67 83 Z" fill={fill} {...stroke} />
+          <path d="M61 13 Q79 21 77 46 Q75 66 67 83 L61 83 Q69 63 69 45 Q69 28 57 17 Z" fill={dark} opacity="0.85" />
+          <path d="M57 15 Q66 18 70 27 L64 28 L68 35 L62 36 L66 43 L60 43" fill="none" stroke={c.deep} strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M67 83 L32 83 Q29 70 40 60 Q29 61 22 55 Q16 48 22 41 L39 27 Q41 15 52 12 L55 4 L61 13 Q79 21 77 46 Q75 66 67 83 Z" fill="none" {...stroke} />
+          <ellipse cx="24.5" cy="47" rx="2" ry="1.6" fill={c.line} />
+          {shine(46, 21, 5, 3)}
+          <ellipse cx="47" cy="33" rx="4.2" ry="5.2" fill={c.line} />
+          <circle cx="48.6" cy="31" r="1.7" fill="#fff" />
+          <ellipse cx="39" cy="46" rx="4" ry="2.6" fill={c.cheek} opacity="0.8" />
+          {mood === 'wow'
+            ? <ellipse cx="31" cy="54" rx="2.8" ry="3.2" fill={c.line} />
+            : <path d="M26 52 Q32 58 38 53" stroke={c.line} strokeWidth="2.6" fill="none" strokeLinecap="round" />}
           {base}
         </>
       );
@@ -106,12 +117,13 @@ export function KidPiece({ type, side, size = 56, mood }: { type: PieceType; sid
     case 'q':
       art = (
         <>
-          <path d="M32 85 Q35 70 40 64 L60 64 Q65 70 68 85 Z" fill={c.body} {...stroke} />
-          <circle cx="50" cy="48" r="19" fill={c.body} {...stroke} />
-          <path d="M30 30 L37 14 L44 26 L50 10 L56 26 L63 14 L70 30 Z" fill={c.shade} {...stroke} />
-          {[[37, 13], [50, 9], [63, 13]].map(([x, y]) => <circle key={x} cx={x} cy={y} r="3.6" fill="#FF7AB6" stroke={c.line} strokeWidth="2" />)}
-          <ellipse cx="42" cy="39" rx="5" ry="3" fill={c.shine} opacity="0.8" />
-          <Face x={50} y={49} side={side} mood={mood} s={0.9} />
+          <path d="M30 83 Q34 67 40 62 H60 Q66 67 70 83 Z" fill={fill} {...stroke} />
+          <circle cx="50" cy="47" r="20" fill={fill} {...stroke} />
+          <path d="M29 31 L33 13 L42 25 L50 8 L58 25 L67 13 L71 31 Q50 37 29 31 Z" fill="#FFC93C" {...stroke} />
+          {[[33, 12], [50, 7], [67, 12]].map(([x, y]) => <circle key={x} cx={x} cy={y} r="3.8" fill="#FF6FAE" stroke={c.line} strokeWidth="2" />)}
+          <circle cx="50" cy="27" r="2.6" fill="#45D9F7" stroke={c.line} strokeWidth="1.5" />
+          {shine(41, 39, 5, 3)}
+          <Face x={50} y={49} side={side} mood={mood} s={0.92} />
           {base}
         </>
       );
@@ -120,20 +132,33 @@ export function KidPiece({ type, side, size = 56, mood }: { type: PieceType; sid
     default:
       art = (
         <>
-          <path d="M32 85 Q35 70 40 64 L60 64 Q65 70 68 85 Z" fill={c.body} {...stroke} />
-          <circle cx="50" cy="48" r="19" fill={c.body} {...stroke} />
-          <path d="M31 31 L33 20 L41 26 L50 18 L59 26 L67 20 L69 31 Z" fill={c.shade} {...stroke} />
-          <path d="M50 4 V16 M44 9 H56" stroke={c.line} strokeWidth="7" strokeLinecap="round" />
-          <path d="M50 4 V16 M44 9 H56" stroke={c.shade} strokeWidth="3" strokeLinecap="round" />
-          <ellipse cx="42" cy="39" rx="5" ry="3" fill={c.shine} opacity="0.8" />
-          <Face x={50} y={49} side={side} mood={mood} s={0.9} />
+          <path d="M30 83 Q34 67 40 62 H60 Q66 67 70 83 Z" fill={fill} {...stroke} />
+          <circle cx="50" cy="47" r="20" fill={fill} {...stroke} />
+          <path d="M30 31 L32 16 L41 23 L50 15 L59 23 L68 16 L70 31 Q50 37 30 31 Z" fill="#FFC93C" {...stroke} />
+          <path d="M50 2 V14 M44 7 H56" stroke={c.line} strokeWidth="7.5" strokeLinecap="round" />
+          <path d="M50 2 V14 M44 7 H56" stroke="#FFC93C" strokeWidth="3.5" strokeLinecap="round" />
+          <circle cx="40" cy="27" r="2.2" fill="#FF6FAE" stroke={c.line} strokeWidth="1.4" />
+          <circle cx="60" cy="27" r="2.2" fill="#45D9F7" stroke={c.line} strokeWidth="1.4" />
+          {shine(41, 39, 5, 3)}
+          <Face x={50} y={49} side={side} mood={mood} s={0.92} />
           {base}
         </>
       );
   }
   return (
     <svg viewBox="0 0 100 100" width={size} height={size} aria-hidden="true" style={{ overflow: 'visible', display: 'block' }}>
-      <ellipse cx="50" cy="96" rx="30" ry="3.5" fill="#000" opacity="0.12" />
+      <defs>
+        <linearGradient id={`kp-${side}-body`} x1="0" y1="0" x2="0.35" y2="1">
+          <stop offset="0" stopColor={c.shine} />
+          <stop offset="0.38" stopColor={c.body} />
+          <stop offset="1" stopColor={c.shade} />
+        </linearGradient>
+        <linearGradient id={`kp-${side}-dark`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor={c.body} />
+          <stop offset="1" stopColor={c.deep} />
+        </linearGradient>
+      </defs>
+      <ellipse cx="50" cy="96" rx="31" ry="3.8" fill="#000" opacity="0.14" />
       {art}
     </svg>
   );

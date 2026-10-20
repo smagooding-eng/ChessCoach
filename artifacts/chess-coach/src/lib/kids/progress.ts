@@ -6,6 +6,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { WORLDS, type World } from './levels';
+import { apiFetch } from '@/lib/api';
 
 export interface KidsState {
   avatar: string | null;
@@ -127,24 +128,81 @@ export function playSfxAlways(kind: Sfx) {
 }
 
 // ------------------------------------------------------------- voice
+//
+// A real, natural voice: the app's speech service, asked to read like a kind
+// teacher talking to a young child. Clips are cached, so a line heard once
+// plays instantly after. If the service can't be reached, the device's own
+// voice is used (the most natural one it has).
+//
+// Tapping the same thing again never restarts the sentence: a line that is
+// already playing just keeps playing.
 
-export function speak(text: string, force = false) {
+const KID_VOICE = 'coral';
+const clips = new Map<string, Promise<string>>();
+let player: HTMLAudioElement | null = null;
+let nowText = '';
+let gen = 0;
+
+function clip(text: string): Promise<string> {
+  const hit = clips.get(text);
+  if (hit) return hit;
+  const p = apiFetch('/api/tts/speak', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text, voice: KID_VOICE, style: 'kids' }),
+  }).then(async (res) => {
+    if (!res.ok) throw new Error('tts');
+    return URL.createObjectURL(await res.blob());
+  });
+  clips.set(text, p);
+  p.catch(() => clips.delete(text));
+  if (clips.size > 80) { const k = clips.keys().next().value as string; clips.get(k)?.then((u) => URL.revokeObjectURL(u)).catch(() => {}); clips.delete(k); }
+  return p;
+}
+
+function deviceVoice(text: string) {
   if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
-  if (!force && !current.voice) return;
   try {
     window.speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(text);
-    u.rate = 0.92;
-    u.pitch = 1.15;
+    u.rate = 0.95;
+    u.pitch = 1.05;
     u.lang = 'en-US';
-    const voices = window.speechSynthesis.getVoices();
-    const nice = voices.find((v) => /en[-_]/i.test(v.lang) && /(female|samantha|google us english|aria|jenny|zira)/i.test(v.name))
-      ?? voices.find((v) => /^en/i.test(v.lang));
-    if (nice) u.voice = nice;
+    const voices = window.speechSynthesis.getVoices().filter((v) => /^en/i.test(v.lang));
+    const rank = (v: SpeechSynthesisVoice) =>
+      (/natural|neural|enhanced|premium/i.test(v.name) ? 4 : 0)
+      + (/google us english|samantha|ava|aria|jenny|allison|zoe/i.test(v.name) ? 2 : 0)
+      + (/en[-_]us/i.test(v.lang) ? 1 : 0);
+    const best = voices.sort((a, b) => rank(b) - rank(a))[0];
+    if (best) u.voice = best;
+    u.onend = () => { if (nowText === text) nowText = ''; };
     window.speechSynthesis.speak(u);
   } catch { /* ignore */ }
 }
 
+function isPlaying() {
+  return (player && !player.paused && !player.ended) || (typeof window !== 'undefined' && window.speechSynthesis?.speaking);
+}
+
+export function speak(text: string, force = false) {
+  if (typeof window === 'undefined') return;
+  if (!force && !current.voice) return;
+  if (text === nowText && isPlaying()) return; // same line, already talking: let it finish
+  stopSpeaking();
+  nowText = text;
+  const my = ++gen;
+  clip(text).then((url) => {
+    if (my !== gen) return;
+    player = new Audio(url);
+    player.onended = () => { if (my === gen) nowText = ''; };
+    return player.play();
+  }).catch(() => { if (my === gen) deviceVoice(text); });
+}
+
 export function stopSpeaking() {
+  gen++;
+  nowText = '';
+  try { player?.pause(); } catch { /* ignore */ }
+  player = null;
   try { window.speechSynthesis?.cancel(); } catch { /* ignore */ }
 }

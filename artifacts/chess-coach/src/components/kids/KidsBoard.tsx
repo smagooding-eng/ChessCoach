@@ -4,6 +4,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { KidPiece, KidShape, KidBush } from './KidsArt';
 import { FILES, sqToXY, type BoardPiece, type ShapeKind } from '@/lib/kids/levels';
 import { useBoardPointer } from '@/components/learn/useBoardPointer';
+import { ArrowLayer } from '@/components/learn/LearnBoard';
+import type { Arrow } from '@/lib/learn/explain';
 
 export interface BoardItem {
   id: string;
@@ -26,6 +28,8 @@ export interface KidsBoardProps {
   onTap: (sq: string) => void;
   canDrag?: (sq: string) => boolean;
   onDrop?: (from: string, to: string) => void;
+  /** Arrows over the board (attacks, threats, the last move). */
+  arrows?: Arrow[];
 }
 
 const LIGHT = '#FFF7E3';
@@ -36,7 +40,7 @@ function pos(sq: string) {
   return { left: `${x * 12.5}%`, top: `${(7 - y) * 12.5}%` };
 }
 
-export function KidsBoard({ items, frame, dots, selected, found, shake, hint, danger, bounce, onTap, canDrag, onDrop }: KidsBoardProps) {
+export function KidsBoard({ items, frame, dots, selected, found, shake, hint, danger, bounce, onTap, canDrag, onDrop, arrows }: KidsBoardProps) {
   const squares: string[] = [];
   for (let y = 7; y >= 0; y--) for (let x = 0; x < 8; x++) squares.push(FILES[x] + (y + 1));
   const at = new Map(items.map((i) => [i.sq, i]));
@@ -125,6 +129,7 @@ export function KidsBoard({ items, frame, dots, selected, found, shake, hint, da
               })}
             </AnimatePresence>
           </div>
+          {arrows && arrows.length > 0 && <ArrowLayer arrows={arrows} marks={[]} />}
           {dragItem?.piece && ptr.drag && (
             <div className="absolute pointer-events-none z-10" style={{ left: ptr.drag.x, top: ptr.drag.y, width: '12.5%', height: '12.5%', transform: 'translate(-50%, -60%) scale(1.2)' }}>
               <KidPiece type={dragItem.piece.type} side={dragItem.piece.side} size="100%" />

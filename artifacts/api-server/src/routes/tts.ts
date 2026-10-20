@@ -18,6 +18,11 @@ const openai = new OpenAI({
 const NARRATION_STYLE =
   "You are a warm, knowledgeable chess coach narrating a lesson. Natural, conversational tone with slight emphasis on chess terms and key concepts.";
 
+// Chess for Kids: the same speech endpoint, read the way a kind teacher talks
+// to a young child -- warm, smiling, unhurried.
+const KIDS_STYLE =
+  "You are a warm, gentle, playful friend talking to a child aged 5 to 8. Speak a little slowly and very clearly, with a smile in your voice. Sound natural and human: friendly and encouraging, lively on exciting words like 'Wow' or 'Checkmate', soft and kind when something goes wrong. Never sound robotic or rushed.";
+
 const CACHE_MAX_ENTRIES = 400;
 const CACHE_MAX_BYTES = 80 * 1024 * 1024;
 const audioCache = new Map<string, Buffer>();
@@ -40,12 +45,12 @@ function cachePut(key: string, buf: Buffer) {
   }
 }
 
-async function speakFast(text: string, voice: string): Promise<Buffer> {
+async function speakFast(text: string, voice: string, style = NARRATION_STYLE): Promise<Buffer> {
   const r = await openai.audio.speech.create({
     model: "gpt-4o-mini-tts",
     voice: voice as any,
     input: text,
-    instructions: NARRATION_STYLE,
+    instructions: style,
     response_format: "mp3",
   });
   return Buffer.from(await r.arrayBuffer());
@@ -71,7 +76,8 @@ async function speakLegacy(text: string, voice: string): Promise<Buffer> {
 
 router.post("/tts/speak", async (req, res): Promise<void> => {
   try {
-    const { text, voice } = req.body as { text?: string; voice?: string };
+    const { text, voice, style } = req.body as { text?: string; voice?: string; style?: string };
+    const kids = style === "kids";
 
     if (!text || text.trim().length === 0) {
       res.status(400).json({ error: "text is required" });
@@ -79,15 +85,15 @@ router.post("/tts/speak", async (req, res): Promise<void> => {
     }
 
     const trimmed = text.slice(0, 4096);
-    const validVoices = ["alloy", "echo", "fable", "nova", "onyx", "shimmer"] as const;
+    const validVoices = ["alloy", "echo", "fable", "nova", "onyx", "shimmer", "coral", "sage"] as const;
     type Voice = typeof validVoices[number];
     const selectedVoice: Voice = validVoices.includes(voice as Voice) ? (voice as Voice) : "nova";
 
-    const key = createHash("sha1").update(`${selectedVoice}\u0000${trimmed}`).digest("hex");
+    const key = createHash("sha1").update(`${selectedVoice}\u0000${kids ? "kids" : ""}\u0000${trimmed}`).digest("hex");
     let buffer = cacheGet(key);
     if (!buffer) {
       try {
-        buffer = await speakFast(trimmed, selectedVoice);
+        buffer = await speakFast(trimmed, selectedVoice, kids ? KIDS_STYLE : NARRATION_STYLE);
       } catch (err) {
         logger.warn({ err }, "Fast TTS failed, falling back to gpt-audio");
         buffer = await speakLegacy(trimmed, selectedVoice);
