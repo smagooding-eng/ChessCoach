@@ -21,7 +21,9 @@ export default function BeginnerLessonPlay() {
   const { unit, lesson } = findLesson(uid ?? '', lid ?? '');
   const { state } = useLearn();
 
-  if (!unit || !lesson || !lessonUnlocked(state, lesson.id)) {
+  // Shared links (?preview=1) open a lesson directly, so a visitor can try it.
+  const preview = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('preview');
+  if (!unit || !lesson || (!preview && !lessonUnlocked(state, lesson.id))) {
     return (
       <Shell back="/beginner">
         <p className="text-center mt-16 font-bold">This lesson is locked. Finish the one before it first.</p>

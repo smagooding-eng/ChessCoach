@@ -288,11 +288,11 @@ const PFriends       = () => <ProtectedRoute component={FriendsPage} />;
 const PMessages      = () => <ProtectedRoute component={MessagesPage} />;
 // Tournaments are public: signed-out visitors get them in a light frame,
 // signed-in players inside the app as usual.
-function PublicOrApp({ component: Component }: { component: React.ComponentType }) {
+function PublicOrApp({ component: Component, skipWelcomeRedirect, fullscreen }: { component: React.ComponentType; skipWelcomeRedirect?: boolean; fullscreen?: boolean }) {
   const { isAuthenticated, isAuthLoading } = useUser();
   if (isAuthLoading) return <PageLoader />;
   if (!isAuthenticated) return <PublicShell><Suspense fallback={<PageLoader />}><Component /></Suspense></PublicShell>;
-  return <ProtectedRoute component={Component} />;
+  return <ProtectedRoute component={Component} skipWelcomeRedirect={skipWelcomeRedirect} fullscreen={fullscreen} />;
 }
 const PTournament    = () => <PublicOrApp component={TournamentPage} />;
 const PTournaments   = () => <PublicOrApp component={TournamentsIndexPage} />;
@@ -312,10 +312,11 @@ const PKidsHome = kidsPage(KidsHomePage);
 const PKidsWorld = kidsPage(KidsWorldPage);
 const PKidsPlay = kidsPage(KidsPlayPage);
 const PKidsGame = kidsPage(KidsGamePage);
-// The Beginner Path is for brand-new players, who may not have a chess.com /
-// Lichess account to link yet, so it skips the link-your-account redirect.
-const PBeginnerPath = () => <ProtectedRoute component={BeginnerPathPage} skipWelcomeRedirect />;
-const PBeginnerLessonPlay = () => <ProtectedRoute component={BeginnerLessonPlayPage} skipWelcomeRedirect fullscreen />;
+// The Beginner Path is open to visitors too (a shareable way in: try a lesson
+// before signing up). Signed in, it skips the link-your-account redirect,
+// since brand-new players may not have a chess.com / Lichess account yet.
+const PBeginnerPath = () => <PublicOrApp component={BeginnerPathPage} skipWelcomeRedirect />;
+const PBeginnerLessonPlay = () => <PublicOrApp component={BeginnerLessonPlayPage} skipWelcomeRedirect fullscreen />;
 const PBeginnerCourseDetail = () => <ProtectedRoute component={BeginnerCourseDetailPage} requireAdmin />;
 const PBeginnerLesson = () => <ProtectedRoute component={BeginnerLessonPage} requireAdmin />;
 const PLiveHistory   = () => <ProtectedRoute component={LiveHistory} fallbackNav="/live" />;

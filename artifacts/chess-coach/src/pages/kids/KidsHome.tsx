@@ -19,7 +19,11 @@ export default function KidsHome() {
   const [, navigate] = useLocation();
   const [gate, setGate] = useState<null | 'corner'>(null);
   const [grownUp, setGrownUp] = useState(false);
-  useEffect(() => { if (!state.avatar) setPicker(true); }, [state.avatar]);
+  // First visit: pick a buddy (not for the share-kit screenshot service, so the map shows).
+  useEffect(() => {
+    const shot = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('cs_shot');
+    if (!state.avatar && !shot) setPicker(true);
+  }, [state.avatar]);
 
   const buddy = AVATARS.find((a) => a.id === state.avatar);
   const nextIndex = WORLDS.findIndex((w, i) => worldUnlocked(state, i) && !worldDone(state, w));
