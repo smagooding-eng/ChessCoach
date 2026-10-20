@@ -1501,7 +1501,10 @@ interface TWaiter { userId: string; username: string; ws: WebSocket; since: numb
 const tWaiting = new Map<string, Map<string, TWaiter>>();               // tournamentId -> userId -> waiter
 const tLast = new Map<string, { opp: string; color: 'w' | 'b' }>();      // `${tid}:${userId}` -> last pairing
 const T_STOP_PAIRING_MS = 60 * 1000;   // no new pairings in the last minute
-const T_REPEAT_OK_MS = 20 * 1000;      // allow a repeat opponent after waiting this long
+// Rematching the opponent you just played is a last resort: only when no one
+// else in the arena is mid-game (so nobody else is about to be free), or after
+// both have waited this long.
+const T_REPEAT_OK_MS = 60 * 1000;
 
 interface TRow { id: string; name: string; time_control: string; mode: string; status: string; starts_at: string | Date; ends_at: string | Date | null; format?: string; kind?: string }
 
@@ -1576,19 +1579,44 @@ async function pairTournament(t: TRow) {
     for (let i = free.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [free[i], free[j]] = [free[j], free[i]]; }
   }
   const now = Date.now();
+  // How often each pair has already met in this arena: the fewest wins, so
+  // everyone gets spread across the field instead of the same two meeting
+  // over and over.
+  const met = new Map<string, number>();
+  const pairKey = (x: string, y: string) => (x < y ? `${x}|${y}` : `${y}|${x}`);
+  for (const r of rowsOf<{ white_user_id: string; black_user_id: string }>(await db.execute(sql`
+    SELECT white_user_id, black_user_id FROM tournament_games WHERE tournament_id = ${t.id}`))) {
+    const k = pairKey(r.white_user_id, r.black_user_id);
+    met.set(k, (met.get(k) ?? 0) + 1);
+  }
+  // Others still mid-game here will be free soon: worth waiting for them
+  // rather than rematching straight away.
+  let othersPlaying = 0;
+  for (const g of games.values()) if (g.tournamentId === t.id && g.status === 'active') othersPlaying++;
+  const lastOpp = (id: string) => tLast.get(`${t.id}:${id}`)?.opp;
+  const ratingOf = new Map<string, number>();
+  if (t.mode === 'ranked') {
+    for (const w of free) ratingOf.set(w.userId, (await loadUserRating(w.userId, t.time_control)).rating);
+  }
+
   const used = new Set<string>();
   const pairs: [TWaiter, TWaiter][] = [];
   for (let i = 0; i < free.length; i++) {
     const a = free[i];
     if (used.has(a.userId)) continue;
-    const lastA = tLast.get(`${t.id}:${a.userId}`);
     let pick: TWaiter | null = null;
-    for (let j = i + 1; j < free.length; j++) {
+    let best = Infinity;
+    for (let j = 0; j < free.length; j++) {
       const b = free[j];
-      if (used.has(b.userId)) continue;
-      const repeat = lastA?.opp === b.userId;
-      if (repeat && now - a.since < T_REPEAT_OK_MS && now - b.since < T_REPEAT_OK_MS) continue;
-      pick = b; break;
+      if (b === a || used.has(b.userId)) continue;
+      const rematch = lastOpp(a.userId) === b.userId || lastOpp(b.userId) === a.userId;
+      if (rematch && othersPlaying > 0 && (now - a.since < T_REPEAT_OK_MS || now - b.since < T_REPEAT_OK_MS)) continue;
+      // Fewest previous meetings first; then (ranked) closest rating; a
+      // rematch only beats nothing.
+      const times = met.get(pairKey(a.userId, b.userId)) ?? 0;
+      const gap = t.mode === 'ranked' ? Math.abs((ratingOf.get(a.userId) ?? 1500) - (ratingOf.get(b.userId) ?? 1500)) : 0;
+      const score = (rematch ? 1_000_000 : 0) + times * 10_000 + Math.min(gap, 9_999);
+      if (score < best) { best = score; pick = b; }
     }
     if (!pick) continue;
     used.add(a.userId); used.add(pick.userId);
