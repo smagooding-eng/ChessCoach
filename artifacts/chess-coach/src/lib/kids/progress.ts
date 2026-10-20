@@ -13,6 +13,8 @@ export interface KidsState {
   sound: boolean;
   voice: boolean;
   unlockAll: boolean;
+  /** Games won against Benny the Bear (the free-play game). */
+  bennyWins?: number;
 }
 
 const KEY = 'cs_kids_v1';

@@ -379,3 +379,43 @@ export function StarRow({ n, size = 18, gap = 2 }: { n: number; size?: number; g
     </div>
   );
 }
+
+// ------------------------------------------------------------- Benny the Bear (the kids' game buddy)
+
+export type BearMood = 'happy' | 'wow' | 'think' | 'oops';
+
+export function KidBear({ mood = 'happy', size = 64 }: { mood?: BearMood; size?: number }) {
+  const line = '#3A2A1E';
+  const fur = '#C68A57';
+  const eyes = mood === 'think'
+    ? (<g><circle cx="41" cy="50" r="4" fill={line} /><circle cx="61" cy="50" r="4" fill={line} /><circle cx="42.5" cy="48" r="1.5" fill="#fff" /><circle cx="62.5" cy="48" r="1.5" fill="#fff" /></g>)
+    : mood === 'wow'
+      ? (<g><circle cx="40" cy="52" r="5.5" fill={line} /><circle cx="60" cy="52" r="5.5" fill={line} /><circle cx="42" cy="50" r="2" fill="#fff" /><circle cx="62" cy="50" r="2" fill="#fff" /></g>)
+      : (<g><circle cx="40" cy="53" r="4.2" fill={line} /><circle cx="60" cy="53" r="4.2" fill={line} /><circle cx="41.5" cy="51.4" r="1.6" fill="#fff" /><circle cx="61.5" cy="51.4" r="1.6" fill="#fff" /></g>);
+  const mouth = mood === 'wow'
+    ? <ellipse cx="50" cy="72" rx="4" ry="5" fill={line} />
+    : mood === 'oops'
+      ? <path d="M44 74 Q50 70 56 74" stroke={line} strokeWidth="3" fill="none" strokeLinecap="round" />
+      : mood === 'think'
+        ? <path d="M45 72 L55 71" stroke={line} strokeWidth="3" strokeLinecap="round" />
+        : <path d="M43 70 Q50 77 57 70" stroke={line} strokeWidth="3" fill="none" strokeLinecap="round" />;
+  return (
+    <svg viewBox="0 0 100 100" width={size} height={size} role="img" aria-label="Benny the Bear">
+      <circle cx="50" cy="50" r="48" fill="#FFE6C7" />
+      <circle cx="25" cy="27" r="12" fill={fur} stroke={line} strokeWidth="3" />
+      <circle cx="75" cy="27" r="12" fill={fur} stroke={line} strokeWidth="3" />
+      <circle cx="25" cy="27" r="6" fill="#F3B7A0" />
+      <circle cx="75" cy="27" r="6" fill="#F3B7A0" />
+      <path d="M18 56 Q18 26 50 26 Q82 26 82 56 Q82 84 50 86 Q18 84 18 56 Z" fill={fur} stroke={line} strokeWidth="3" />
+      <ellipse cx="50" cy="68" rx="15" ry="12" fill="#F6DDBF" />
+      <ellipse cx="50" cy="62" rx="5.5" ry="4" fill={line} />
+      {mood === 'think' && <path d="M34 42 L45 40 M56 40 L67 42" stroke={line} strokeWidth="2.5" strokeLinecap="round" />}
+      {eyes}
+      {mouth}
+      <circle cx="30" cy="66" r="4.5" fill="#FF9AA2" opacity="0.6" />
+      <circle cx="70" cy="66" r="4.5" fill="#FF9AA2" opacity="0.6" />
+      <path d="M40 88 L50 83 L60 88 L50 93 Z" fill="#FF6B6B" stroke={line} strokeWidth="2" strokeLinejoin="round" />
+      <circle cx="50" cy="88" r="2.6" fill="#fff" />
+    </svg>
+  );
+}

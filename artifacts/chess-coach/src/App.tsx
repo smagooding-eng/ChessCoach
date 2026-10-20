@@ -124,6 +124,7 @@ const BeginnerPathPage = lazyRetry(() => import("@/pages/learn/BeginnerPath"));
 const BeginnerLessonPlayPage = lazyRetry(() => import("@/pages/learn/BeginnerLessonPlay"));
 const KidsWorldPage = lazyRetry(() => import("@/pages/kids/KidsWorld"));
 const KidsPlayPage = lazyRetry(() => import("@/pages/kids/KidsPlay"));
+const KidsGamePage = lazyRetry(() => import("@/pages/kids/KidsGame"));
 const BeginnerCourseDetailPage = lazyRetry(() => import("@/pages/BeginnerCourseDetail"));
 const BeginnerLessonPage = lazyRetry(() => import("@/pages/BeginnerLesson"));
 const TrapTrainingPage = lazyRetry(() => import("@/pages/TrapTraining"));
@@ -307,6 +308,7 @@ const PBeginnerPath = () => <ProtectedRoute component={BeginnerPathPage} require
 const PBeginnerLessonPlay = () => <ProtectedRoute component={BeginnerLessonPlayPage} requireAdmin fullscreen />;
 const PKidsWorld = () => <ProtectedRoute component={KidsWorldPage} requireAdmin fullscreen />;
 const PKidsPlay = () => <ProtectedRoute component={KidsPlayPage} requireAdmin fullscreen />;
+const PKidsGame = () => <ProtectedRoute component={KidsGamePage} requireAdmin fullscreen />;
 const PBeginnerCourseDetail = () => <ProtectedRoute component={BeginnerCourseDetailPage} requireAdmin />;
 const PBeginnerLesson = () => <ProtectedRoute component={BeginnerLessonPage} requireAdmin />;
 const PLiveHistory   = () => <ProtectedRoute component={LiveHistory} fallbackNav="/live" />;
@@ -436,6 +438,7 @@ function Router() {
 <Route path="/admin/beginner-courses" component={PBeginnerCourses} />
       <Route path="/admin/beginner/:unit/:lesson" component={PBeginnerLessonPlay} />
       <Route path="/admin/beginner" component={PBeginnerPath} />
+      <Route path="/admin/kids/benny" component={PKidsGame} />
       <Route path="/admin/kids/:world/:level" component={PKidsPlay} />
       <Route path="/admin/kids/:world" component={PKidsWorld} />
       <Route path="/admin/kids" component={PKidsHome} />

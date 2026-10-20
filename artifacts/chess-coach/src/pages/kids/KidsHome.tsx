@@ -5,7 +5,7 @@ import { Link } from 'wouter';
 import { motion } from 'framer-motion';
 import { Lock } from 'lucide-react';
 import { KidsShell, TopBar, BuddyPicker, Bubble, KID_FONT } from '@/components/kids/KidsChrome';
-import { KidPiece, KidAvatar, StarRow, AVATARS } from '@/components/kids/KidsArt';
+import { KidPiece, KidAvatar, KidBear, StarRow, AVATARS } from '@/components/kids/KidsArt';
 import { WORLDS } from '@/lib/kids/levels';
 import { useKids, worldDone, worldStars, worldUnlocked } from '@/lib/kids/progress';
 
@@ -34,7 +34,7 @@ export default function KidsHome() {
       {buddy && (
         <div className="mb-6">
           <Bubble who={<KidAvatar id={buddy.id} size={64} />}
-            text={nextIndex === -1 ? 'WOW! You finished every world. You are a chess champion!'
+            text={nextIndex === -1 ? 'WOW! You finished every world. Now you can play a real game with Benny the Bear!'
               : `Let's go to ${WORLDS[nextIndex].name}! Tap it to start.`} />
         </div>
       )}
@@ -100,6 +100,25 @@ export default function KidsHome() {
           })}
         </div>
       </div>
+
+      {/* the reward: a real game with Benny the Bear */}
+      {(() => {
+        const ready = state.unlockAll || nextIndex === -1;
+        const card = (
+          <motion.div className="mt-6 rounded-[28px] p-4 flex items-center gap-3"
+            style={{ background: ready ? '#fff' : 'rgba(255,255,255,0.55)', border: `3px solid ${ready ? '#E8A86B' : 'transparent'}`, boxShadow: ready ? '0 6px 0 #E8A86B' : '0 6px 0 rgba(47,34,87,0.12)' }}
+            animate={ready ? { scale: [1, 1.02, 1] } : {}} transition={{ duration: 1.6, repeat: Infinity }}>
+            <div className="shrink-0" style={{ filter: ready ? 'none' : 'grayscale(1)' }}><KidBear size={76} mood={ready ? 'happy' : 'think'} /></div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[22px] font-extrabold leading-tight">Play Benny the Bear</p>
+              {ready
+                ? <p className="text-base font-bold opacity-70">A real game of chess! {state.bennyWins ? `You've beaten him ${state.bennyWins} time${state.bennyWins === 1 ? '' : 's'}.` : 'Can you beat him?'}</p>
+                : <p className="text-sm font-bold opacity-60 flex items-center gap-1"><Lock className="w-4 h-4" /> Finish every world to play</p>}
+            </div>
+          </motion.div>
+        );
+        return ready ? <Link className="block" href="/admin/kids/benny" aria-label="Play a game with Benny the Bear">{card}</Link> : <div aria-label="Benny the Bear game, locked">{card}</div>;
+      })()}
 
       {/* sticker book */}
       <div className="mt-8 rounded-[28px] bg-white/80 p-4" style={{ boxShadow: '0 6px 0 rgba(47,34,87,0.12)' }}>
