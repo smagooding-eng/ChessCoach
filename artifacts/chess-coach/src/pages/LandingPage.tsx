@@ -1,3 +1,4 @@
+import { axonTrack } from '@/lib/axon';
 import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { useUser } from '@/hooks/use-user';
 import { useLocation, Link } from 'wouter';
@@ -118,6 +119,7 @@ function AuthModal({ open, onClose, initialMode, externalError, context = 'defau
         return;
       }
       if (mode === 'register') trackFunnelEvent('signup_completed');
+      else axonTrack('login');
       if (data.token) setAuthToken(data.token);
       localStorage.removeItem('chessscout_ref');
       if (data.user?.chesscomUsername) login(data.user.chesscomUsername);

@@ -83,6 +83,18 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <!-- AppLovin Axon pixel. Skipped on Chess for Kids pages and in Kid Mode:
+         nothing is tracked for children. Page views and events are sent from the app (lib/axon.ts). -->
+    <script>
+      (function () {
+        var kid = false;
+        try { kid = localStorage.getItem('cs_kid_mode') === '1'; } catch (e) {}
+        if (kid || /^\/kids(\/|$)/.test(location.pathname)) return;
+        var AXON_EVENT_KEY = "a4d5a1e5-d427-4d21-9fe4-b63f339db158";
+        !function(e,r){var t=["https://s.axon.ai/pixel.js","https://res4.applovin.com/p/l/loader.iife.js"];if(!e.axon){var a=e.axon=function(){a.performOperation?a.performOperation.apply(a,arguments):a.operationQueue.push(arguments)};a.operationQueue=[],a.ts=Date.now(),a.eventKey=AXON_EVENT_KEY;for(var n=r.getElementsByTagName("script")[0],o=0;o<t.length;o++){var i=r.createElement("script");i.async=!0,i.src=t[o],n.parentNode.insertBefore(i,n)}}}(window,document);
+        axon("init");
+      })();
+    </script>
     <style>
       body { margin: 0; background: #141413; }
       #splash {

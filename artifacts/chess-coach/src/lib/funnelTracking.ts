@@ -1,5 +1,6 @@
 import { apiFetch, apiUrl } from '@/lib/api';
 import { isRunningStandalone } from '@/hooks/use-pwa-install';
+import { axonTrack } from '@/lib/axon';
 
 function getVisitorId(): string {
   const key = 'chess_coach_visitor_id';
@@ -29,6 +30,7 @@ export type LandingFunnelEvent =
   | `exit_${LandingSectionId}`;
 
 export function trackFunnelEvent(eventType: LandingFunnelEvent, elapsedMs?: number) {
+  if (eventType === 'signup_completed' || eventType === 'google_signup_completed') axonTrack('sign_up');
   apiFetch('/api/landing-funnel/track', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

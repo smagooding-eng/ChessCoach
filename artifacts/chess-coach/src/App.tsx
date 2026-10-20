@@ -12,6 +12,7 @@ import { SettingsProvider, useSettings, BG_PHOTOS } from "@/context/SettingsCont
 import { DashboardRedesign } from "@/pages/DashboardRedesign";
 import { useKidMode, isKidsPath } from "@/lib/kids/kidMode";
 import { LearnSync } from "@/lib/learnSync";
+import { axonTrack } from "@/lib/axon";
 import { PlayHub } from "@/pages/PlayHub";
 import { GamesRedesign } from "@/pages/GamesRedesign";
 import { AnalysisRedesign } from "@/pages/AnalysisRedesign";
@@ -342,6 +343,8 @@ function getVisitorId(): string {
 
 function PageTracker() {
   const [location] = useLocation();
+  // AppLovin Axon: a page view on every screen change (never for kids pages).
+  useEffect(() => { if (!isKidsPath(location)) axonTrack('page_view'); }, [location]);
   // A referral code on any shared link (?ref=CODE) is kept for signup.
   useEffect(() => {
     try {

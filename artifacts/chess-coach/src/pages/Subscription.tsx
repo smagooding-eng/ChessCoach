@@ -5,6 +5,7 @@ import { useLocation } from 'wouter';
 import { Crown, Check, Zap, BrainCircuit, GraduationCap, Swords, Volume2, Loader2, ExternalLink, Clock, CreditCard, Sparkles } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { apiFetch, apiFetchLocal } from '@/lib/api';
+import { axonTrack } from '@/lib/axon';
 import { EmbeddedCheckoutForm } from '@/components/EmbeddedCheckoutForm';
 
 const PREMIUM_FEATURES = [
@@ -51,6 +52,19 @@ export function Subscription() {
   const searchParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
   const isSuccess = searchParams?.get('success') === 'true';
   const isCanceled = searchParams?.get('canceled') === 'true';
+  // AppLovin Axon: one purchase event per completed checkout (not again on reload).
+  useEffect(() => {
+    if (!isSuccess) return;
+    const key = `cs_axon_purchase_${window.location.search}`;
+    let plan: Record<string, unknown> | null = null;
+    try {
+      if (sessionStorage.getItem(key)) return;
+      sessionStorage.setItem(key, '1');
+      plan = JSON.parse(sessionStorage.getItem('cs_axon_plan') || 'null');
+    } catch { /* ignore */ }
+    // The plan chosen at checkout (monthly or yearly); monthly Pro if it wasn't recorded.
+    axonTrack('purchase', plan ?? { currency: 'USD', value: 5, items: [{ item_id: 'pro_monthly', item_name: 'ChessScout.net Pro (monthly)', price: 5, quantity: 1 }] });
+  }, [isSuccess]);
 
   useEffect(() => {
     if (isSuccess) {
@@ -76,11 +90,35 @@ export function Subscription() {
   const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
   const [checkoutError, setCheckoutError] = useState('');
 
+  // AppLovin Axon: the Pro plan as an "item" (view_item, add_to_cart, begin_checkout, purchase).
+  const axonPlan = (p: PriceInfo) => {
+    const price = p.unit_amount / 100;
+    const yearly = p.recurring?.interval === 'year';
+    return { currency: p.currency.toUpperCase(), value: price, items: [{ item_id: p.id, item_name: `ChessScout.net Pro (${yearly ? 'yearly' : 'monthly'})`, price, quantity: 1 }] };
+  };
+  const axonBeginCheckout = (priceId: string) => {
+    const p = products[0]?.prices?.find((x: PriceInfo) => x.id === priceId);
+    if (!p) return;
+    const data = axonPlan(p);
+    try { sessionStorage.setItem('cs_axon_plan', JSON.stringify(data)); } catch { /* ignore */ }
+    axonTrack('add_to_cart', data);
+    axonTrack('begin_checkout', data);
+  };
+  useEffect(() => {
+    if (isSuccess || isPremium) return;
+    const p = products[0]?.prices?.find((x: PriceInfo) => x.recurring?.interval === 'month') ?? products[0]?.prices?.[0];
+    if (p) axonTrack('view_item', axonPlan(p));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [products]);
+  useEffect(() => { if (selectedPriceId) axonBeginCheckout(selectedPriceId); // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedPriceId]);
+
   const handleCheckout = async (priceId: string) => {
     if (!isAuthenticated) {
       setLocation('/setup');
       return;
     }
+    axonBeginCheckout(priceId);
     setCheckoutLoading(priceId);
     setCheckoutError('');
     try {
