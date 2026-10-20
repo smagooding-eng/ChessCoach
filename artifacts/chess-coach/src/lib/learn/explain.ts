@@ -259,12 +259,7 @@ export function recapture(g: Chess, m: Move): Explained | null {
 export function escapes(g: Chess): Explained {
   const k = kingSquare(g, 'b');
   const ms = g.moves({ verbose: true });
-  if (g.isStalemate() && k) {
-    return {
-      text: `Stalemate. Black isn't in check, but has no legal move at all: every square around the King on ${k} is covered. That is a DRAW, not a win. Checkmate needs check AND no escape.`,
-      arrows: [], marks: [{ sq: k, kind: 'ring' }],
-    };
-  }
+  if (g.isStalemate() && k) return whyStalemate(g, k);
   if (!g.inCheck()) {
     return { text: 'That isn\'t check: nothing attacks the black King, so Black can just play on. Checkmate always starts with check.', arrows: [], marks: k ? [{ sq: k, kind: 'ring' }] : [] };
   }
@@ -273,6 +268,49 @@ export function escapes(g: Chess): Explained {
   return {
     text: `Check, but not checkmate: Black can escape with ${how} (orange arrow${ms.length > 1 ? 's' : ''}). Checkmate means the King has no way out at all.`,
     arrows, marks: [],
+  };
+}
+
+/** Stalemate: the King isn't attacked, yet every square around it is covered or blocked. */
+function whyStalemate(g: Chess, k: string): Explained {
+  const marks: Mark[] = [{ sq: k, kind: 'ring' }];
+  const arrows: Arrow[] = [];
+  const own: string[] = [];
+  const covered = new Map<string, string[]>();
+  const [kx, ky] = sqToXY(k);
+  for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) {
+    if (!dx && !dy) continue;
+    const sq = xyToSq(kx + dx, ky + dy);
+    if (!sq) continue;
+    const p = g.get(sq as Square);
+    if (p && p.color === 'b') { own.push(sq); continue; }
+    const att = attackersOf(g, sq, 'w', k);
+    if (att.length) {
+      marks.push({ sq, kind: 'x' });
+      for (const a of att) covered.set(a, [...(covered.get(a) ?? []), sq]);
+    }
+  }
+  const dist = (a: string, b: string) => Math.max(Math.abs(a.charCodeAt(0) - b.charCodeAt(0)), Math.abs(Number(a[1]) - Number(b[1])));
+  // One dotted arrow per attacker per direction, to the farthest square it covers that way.
+  for (const [a, sqs] of covered) {
+    const isN = g.get(a as Square)?.type === 'n';
+    const far = new Map<string, string>();
+    for (const q of sqs) {
+      const key = isN ? q : `${Math.sign(q.charCodeAt(0) - a.charCodeAt(0))},${Math.sign(Number(q[1]) - Number(a[1]))}`;
+      const cur = far.get(key);
+      if (!cur || dist(a, q) > dist(a, cur)) far.set(key, q);
+    }
+    for (const q of far.values()) arrows.push({ from: a, to: q, color: 'warn', dashed: true, knight: isN });
+  }
+  const lines = [`Not in check: nothing attacks the King on ${k} (circled), so it isn't checkmate.`];
+  for (const [a, sqs] of covered) lines.push(`${sqs.join(', ')}: covered by your ${NAME[g.get(a as Square)!.type as PieceType]} on ${a} (dotted arrow, X), so the King can't step there.`);
+  if (own.length) lines.push(`${own.join(', ')}: blocked by Black's own pieces.`);
+  if (kx === 0 || kx === 7 || ky === 0 || ky === 7) lines.push('The edge of the board takes away the rest.');
+  const others = g.board().flat().some((c) => c && c.color === 'b' && c.type !== 'k');
+  if (others) lines.push('And none of Black\'s other pieces has a legal move either.');
+  return {
+    text: `Stalemate: that's a DRAW, not a win.\n• ${lines.join('\n• ')}\nCheckmate needs both: the King in check AND no way out. Find a move that gives check.`,
+    arrows, marks,
   };
 }
 
@@ -310,8 +348,14 @@ export function whyMate(g: Chess): Explained {
   }
   const dist = (a: string, b: string) => Math.max(Math.abs(a.charCodeAt(0) - b.charCodeAt(0)), Math.abs(Number(a[1]) - Number(b[1])));
   for (const [a, sqs] of covered) {
-    const far = sqs.reduce((m, q) => (dist(a, q) > dist(a, m) ? q : m), sqs[0]);
-    arrows.push({ from: a, to: far, color: 'warn', dashed: true, knight: g.get(a as Square)?.type === 'n' });
+    const isN = g.get(a as Square)?.type === 'n';
+    const far = new Map<string, string>();
+    for (const q of sqs) {
+      const key = isN ? q : `${Math.sign(q.charCodeAt(0) - a.charCodeAt(0))},${Math.sign(Number(q[1]) - Number(a[1]))}`;
+      const cur = far.get(key);
+      if (!cur || dist(a, q) > dist(a, cur)) far.set(key, q);
+    }
+    for (const q of far.values()) arrows.push({ from: a, to: q, color: 'warn', dashed: true, knight: isN });
   }
 
   const lines: string[] = [];

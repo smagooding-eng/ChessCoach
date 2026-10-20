@@ -202,7 +202,7 @@ export function useExercise(level: Level, onSolved: (mistakes: number) => void, 
         if (g.inCheck()) { sfx('check'); setDanger(kingSquare(g, 'b')); } else sfx('oops');
         const e = escapes(g);
         say(e.text, 'oops'); show([...checkArrows(g).arrows, ...e.arrows], e.marks);
-        retryAfter(undo, 4200);
+        retryAfter(undo, g.isStalemate() ? 8000 : 4200);
         return;
       }
 
