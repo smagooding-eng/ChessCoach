@@ -41,6 +41,10 @@ export interface Level {
   options?: string[];          // quiz
   correct?: number;            // quiz
   explain?: string;            // quiz + best: shown after the right answer
+  /** best: after the right move, play these replies on the board, one by one, narrated. */
+  followUp?: { san: string; say: string }[];
+  /** best: arrows/marks drawn once solved, to show the idea. */
+  successViz?: { arrows: { from: string; to: string; color: 'good' | 'bad' | 'info' | 'warn'; dashed?: boolean }[]; marks?: { sq: string; kind: 'x' | 'ring' }[] };
   /** Arrows/marks drawn from the start to show what matters (e.g. an attacked square). */
   guide?: { arrows: { from: string; to: string; color: 'good' | 'bad' | 'info' | 'warn'; dashed?: boolean }[]; marks?: { sq: string; kind: 'x' | 'ring' }[] };
 }

@@ -16,6 +16,8 @@ export interface Lesson {
   /** Optional diagram for the intro: a FEN, with squares to highlight. */
   diagram?: { fen: string; highlight?: string[]; moves?: string; arrows?: { from: string; to: string; color?: 'good' | 'bad' | 'info' | 'warn' }[] };
   exercises: Level[];
+  /** A real game against the easiest bot, with a coach after every move (no exercises). */
+  game?: boolean;
 }
 
 export interface Unit {
@@ -388,14 +390,29 @@ export const UNITS: Unit[] = [
         ],
         exercises: [
           { id: 'tc1', kind: 'best', title: 'Knight fork', say: 'Find a Knight move that attacks the King and the Rook at the same time.',
-            fen: 'r3k3/8/8/1N6/8/8/8/4K3 w - - 0 1', answers: ['Nc7'], explain: 'Nc7+ forks King and Rook. After the King moves, Nxa8.' },
+            fen: 'r3k3/8/8/1N6/8/8/8/4K3 w - - 0 1', answers: ['Nc7'], explain: 'That\'s a fork: one piece attacking two at once.',
+            followUp: [
+              { san: 'Ke7', say: 'Black is in check, so the King MUST move. Black has no time to save the Rook.' },
+              { san: 'Nxa8', say: 'Nxa8: the Knight takes the Rook. A fork wins material because the opponent can only deal with one threat per move.' },
+            ] },
           { id: 'tc2', kind: 'best', title: 'Queen fork', say: 'Find a Queen move that checks the King and attacks the Rook.',
-            fen: 'r5k1/8/8/8/8/8/8/3QK3 w - - 0 1', answers: ['Qd5'], explain: 'Qd5+ hits g8 and a8 along two diagonals. Next move Qxa8.' },
+            fen: 'r5k1/8/8/8/8/8/8/3QK3 w - - 0 1', answers: ['Qd5'], explain: 'Qd5+ attacks the King on g8 and the Rook on a8 along two different diagonals.',
+            followUp: [
+              { san: 'Kh8', say: 'Black has to get out of check first, so the King moves.' },
+              { san: 'Qxa8', say: 'Qxa8+: the Queen takes the Rook (with check). Checks are the best forks, because the opponent never gets a free move to rescue the other piece.' },
+            ] },
           { id: 'tc3', kind: 'best', title: 'Pin', say: 'Pin the black Knight to its King.',
-            fen: '4k3/8/2n5/8/8/8/8/4KB2 w - - 0 1', answers: ['Bb5'], explain: 'Bb5: the Knight can\'t move, because that would expose its King.' },
+            fen: '4k3/8/2n5/8/8/8/8/4KB2 w - - 0 1', answers: ['Bb5'],
+            explain: 'Bb5 pins the Knight: the Bishop\'s diagonal runs through the Knight on c6 straight to the King on e8 (dotted line). If the Knight moved, the Bishop would be attacking the King, and you\'re never allowed to expose your own King. So the Knight is frozen to the spot (circled).',
+            successViz: { arrows: [{ from: 'b5', to: 'c6', color: 'good' }, { from: 'c6', to: 'e8', color: 'bad', dashed: true }], marks: [{ sq: 'c6', kind: 'ring' }] } },
           { id: 'tc4', kind: 'best', title: 'Skewer', say: 'Check the King so that the Queen behind it falls.',
             fen: '8/8/2k4q/8/8/8/8/R3K3 w - - 0 1', answers: ['Ra6'],
-            explain: 'Ra6+: the King has to step off the 6th rank, then Rxh6.' },
+            explain: 'Ra6+ checks the King, and the Queen is hiding right behind it on the same rank (dotted line).',
+            successViz: { arrows: [{ from: 'a6', to: 'c6', color: 'bad' }, { from: 'c6', to: 'h6', color: 'warn', dashed: true }], marks: [{ sq: 'h6', kind: 'ring' }] },
+            followUp: [
+              { san: 'Kb7', say: 'The King is in check and has to step off the 6th rank. That opens the line.' },
+              { san: 'Rxh6', say: 'Rxh6: the Rook goes straight through to the Queen. That\'s a skewer: attack the big piece in front, win the one behind it.' },
+            ] },
         ],
       },
     ],
@@ -424,6 +441,21 @@ export const UNITS: Unit[] = [
           { id: 'op4', kind: 'quiz', title: 'Principles', say: 'Quick check.', question: 'Which is usually the WORST idea in the first few moves?',
             options: ['Moving the Queen out early', 'Developing a Knight', 'Castling'], correct: 0, explain: 'An early Queen gets chased, and you lose time while your opponent develops.' },
         ],
+      },
+    ],
+  },
+  {
+    id: 'first-game', title: 'Your First Game', blurb: 'Play a whole game, with a coach on every move.', icon: 'k',
+    lessons: [
+      {
+        id: 'first-game-1', title: 'Play Tommy',
+        intro: [
+          'Time to put it all together. You\'ll play a full game as White against Tommy, the friendliest bot on ChessScout.',
+          'After every move, a coach card shows a small board with arrows: blue for what your piece now attacks, red for anything Black can take, and a dotted green arrow when there was a better move.',
+          'The bar at the top shows material: who has more points of pieces on the board. Use Take back as often as you like. Checkmate Tommy to earn three stars.',
+        ],
+        exercises: [],
+        game: true,
       },
     ],
   },

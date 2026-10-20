@@ -84,11 +84,11 @@ export default function BeginnerPath() {
                     <div className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-white/[0.03]">
                       <span className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 text-xs font-black"
                         style={{ background: stars ? `${L.good}25` : isNext ? `${L.accent}25` : 'rgba(255,255,255,0.05)', color: stars ? L.good : isNext ? L.accent : L.muted }}>
-                        {!open ? <Lock className="w-3.5 h-3.5" /> : stars ? <Check className="w-4 h-4" /> : l.exercises.length}
+                        {!open ? <Lock className="w-3.5 h-3.5" /> : stars ? <Check className="w-4 h-4" /> : l.game ? '♟' : l.exercises.length}
                       </span>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-bold truncate">{l.title}</p>
-                        <p className="text-[11px]" style={{ color: L.muted }}>{l.exercises.length} exercises</p>
+                        <p className="text-[11px]" style={{ color: L.muted }}>{l.game ? 'A full game with a coach' : `${l.exercises.length} exercises`}</p>
                       </div>
                       {stars > 0 && <StarRow n={stars} size={14} gap={1} />}
                       {open && <ChevronRight className="w-4 h-4 shrink-0" style={{ color: L.muted }} />}

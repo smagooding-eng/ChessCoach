@@ -211,7 +211,29 @@ export function useExercise(level: Level, onSolved: (mistakes: number) => void, 
           sfx('pop');
           const t = attackedTargets(g, m.to);
           const extra = t.names.length >= 2 ? ` Now it attacks ${t.names.join(' and ')} at the same time.` : '';
-          win(`Correct!${extra}`, 600, [moveArrow, ...(t.names.length >= 2 ? t.arrows : [])]);
+          const vizArrows = level.successViz?.arrows ?? (t.names.length >= 2 ? t.arrows : []);
+          if (level.followUp?.length) {
+            // show the idea, then play it out so the student sees why it works
+            setBusy(true);
+            say(`Correct!${extra}${level.explain ? ` ${level.explain}` : ''}`, 'good');
+            show([moveArrow, ...vizArrows], level.successViz?.marks ?? []);
+            const steps = level.followUp;
+            steps.forEach((step, i) => {
+              window.setTimeout(() => {
+                const mv = g.moves({ verbose: true }).find((x) => strip(x.san) === strip(step.san));
+                if (!mv) return;
+                playGameMove(mv);
+                sfx(mv.captured ? 'pop' : 'move');
+                const last = i === steps.length - 1;
+                say(step.say, 'good');
+                show([{ from: mv.from, to: mv.to, color: mv.color === 'w' ? 'good' : 'warn', knight: mv.piece === 'n' }]);
+                if (last) window.setTimeout(() => { setSolved(true); onSolved(mistakesRef.current); }, 700);
+              }, 2600 + i * 2400);
+            });
+            return;
+          }
+          win(`Correct!${extra}`, 600, [moveArrow, ...vizArrows]);
+          if (level.successViz?.marks) setViz({ arrows: [moveArrow, ...vizArrows], marks: level.successViz.marks });
           return;
         }
         setMistakes((n) => n + 1);
