@@ -25,7 +25,7 @@ export default function KidsWorld() {
   if (!world || !worldUnlocked(state, index)) {
     return (
       <KidsShell>
-        <TopBar back="/admin/kids" />
+        <TopBar back="/kids" />
         <p className="text-2xl font-extrabold text-center mt-10">This world is still locked!</p>
       </KidsShell>
     );
@@ -36,7 +36,7 @@ export default function KidsWorld() {
 
   return (
     <KidsShell tint={`${world.color}88`}>
-      <TopBar back="/admin/kids" />
+      <TopBar back="/kids" />
 
       <div className="flex flex-col items-center mt-1">
         <motion.div animate={{ y: [0, -10, 0] }} transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}>
@@ -81,14 +81,14 @@ export default function KidsWorld() {
             </motion.div>
           );
           return open
-            ? <Link key={l.id} href={`/admin/kids/${world.id}/${l.id}`} aria-label={`Level ${i + 1}: ${l.title}, ${stars} stars`}>{coin}</Link>
+            ? <Link key={l.id} href={`/kids/${world.id}/${l.id}`} aria-label={`Level ${i + 1}: ${l.title}, ${stars} stars`}>{coin}</Link>
             : <div key={l.id} aria-label={`Level ${i + 1}, locked`}>{coin}</div>;
         })}
       </div>
 
       <div className="mt-8 flex justify-center">
         <ChunkyButton className="min-w-[220px] text-2xl" color="#5CCB86" shade="#35A060"
-          onClick={() => navigate(`/admin/kids/${world.id}/${world.levels[playIndex].id}`)}>
+          onClick={() => navigate(`/kids/${world.id}/${world.levels[playIndex].id}`)}>
           {next === -1 ? 'Play again' : next === 0 ? "Let's play!" : 'Keep going!'}
         </ChunkyButton>
       </div>

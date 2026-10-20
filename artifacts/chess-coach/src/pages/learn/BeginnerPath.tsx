@@ -1,4 +1,4 @@
-// Beginner path -- the course map. Admin preview for now (/admin/beginner).
+// Beginner path -- the course map (/beginner).
 
 import { Link } from 'wouter';
 import { motion } from 'framer-motion';
@@ -7,11 +7,14 @@ import { L, usePieceIcon } from '@/components/learn/theme';
 import { PieceGradientDefs } from '@/components/PieceGradientDefs';
 import { StarRow } from '@/components/kids/KidsArt';
 import { UNITS } from '@/lib/learn/beginner';
+import { useUser } from '@/hooks/use-user';
 import { useLearn, lessonUnlocked, nextLesson, unitProgress, totalLessons } from '@/lib/learn/progress';
 
 export default function BeginnerPath() {
   const { state, update, reset } = useLearn();
   const icon = usePieceIcon();
+  const { authUser } = useUser();
+  const admin = !!authUser?.isAdmin;
   const next = nextLesson(state);
   const doneCount = Object.values(state.lessons).filter((n) => n > 0).length;
   const total = totalLessons();
@@ -20,10 +23,7 @@ export default function BeginnerPath() {
     <div className="min-h-screen" style={{ background: L.bg, color: L.text }}>
       <PieceGradientDefs />
       <div className="max-w-2xl mx-auto px-4 sm:px-8 py-8">
-        <span className="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full" style={{ background: `${L.accent}25`, color: L.accent }}>
-          Admin preview
-        </span>
-        <div className="flex items-center gap-3 mt-3 mb-1">
+        <div className="flex items-center gap-3 mb-1">
           <div className="rounded-xl p-2.5" style={{ background: `${L.accent}18`, color: L.accent }}><GraduationCap className="w-6 h-6" /></div>
           <h1 className="text-3xl font-black" style={{ letterSpacing: '-0.02em' }}>Beginner Path</h1>
         </div>
@@ -41,7 +41,7 @@ export default function BeginnerPath() {
             <motion.div className="h-full rounded-full" style={{ background: L.accent }} initial={{ width: 0 }} animate={{ width: `${(doneCount / total) * 100}%` }} />
           </div>
           {next ? (
-            <Link href={`/admin/beginner/${next.unit.id}/${next.lesson.id}`}
+            <Link href={`/beginner/${next.unit.id}/${next.lesson.id}`}
               className="flex items-center gap-3 rounded-xl px-4 py-3 font-bold text-white" style={{ background: L.accent }}>
               <Play className="w-5 h-5" />
               <div className="flex-1 min-w-0">
@@ -95,7 +95,7 @@ export default function BeginnerPath() {
                     </div>
                   );
                   return open
-                    ? <Link key={l.id} href={`/admin/beginner/${u.id}/${l.id}`} className="block">{row}</Link>
+                    ? <Link key={l.id} href={`/beginner/${u.id}/${l.id}`} className="block">{row}</Link>
                     : <div key={l.id}>{row}</div>;
                 })}
               </motion.div>
@@ -105,21 +105,25 @@ export default function BeginnerPath() {
 
         {/* preview tools */}
         <div className="mt-8 rounded-2xl p-4 text-sm" style={{ background: L.card, border: `1px solid ${L.line}`, color: L.muted }}>
-          <p className="font-bold mb-2" style={{ color: L.text }}>Preview tools</p>
-          <p className="mb-3">Progress is saved on this device for now.</p>
+          <p className="font-bold mb-2" style={{ color: L.text }}>Settings</p>
+          <p className="mb-3">Your progress is saved on this device.</p>
           <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={() => update({ unlockAll: !state.unlockAll })} className="rounded-lg px-3 py-2 font-bold" style={{ background: L.card2, color: L.text }}>
-              {state.unlockAll ? 'Lock lessons in order' : 'Unlock all lessons'}
-            </button>
+            {admin && (
+              <button type="button" onClick={() => update({ unlockAll: !state.unlockAll })} className="rounded-lg px-3 py-2 font-bold" style={{ background: L.card2, color: L.text }}>
+                {state.unlockAll ? 'Lock lessons in order' : 'Unlock all lessons'}
+              </button>
+            )}
             <button type="button" onClick={() => update({ sound: !state.sound })} className="rounded-lg px-3 py-2 font-bold flex items-center gap-1.5" style={{ background: L.card2, color: L.text }}>
               {state.sound ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />} Sounds {state.sound ? 'on' : 'off'}
             </button>
             <button type="button" onClick={() => { if (window.confirm('Clear all Beginner Path progress?')) reset(); }} className="rounded-lg px-3 py-2 font-bold" style={{ background: L.card2, color: L.text }}>
               Reset progress
             </button>
-            <Link href="/admin/beginner-courses" className="rounded-lg px-3 py-2 font-bold" style={{ background: L.card2, color: L.text }}>
-              Server-built courses (old)
-            </Link>
+            {admin && (
+              <Link href="/admin/beginner-courses" className="rounded-lg px-3 py-2 font-bold" style={{ background: L.card2, color: L.text }}>
+                Server-built courses (old, admin)
+              </Link>
+            )}
           </div>
         </div>
       </div>

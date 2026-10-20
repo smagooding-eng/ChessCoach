@@ -135,12 +135,12 @@ export default function KidsGame() {
   if (!open) {
     return (
       <KidsShell>
-        <TopBar back="/admin/kids" />
+        <TopBar back="/kids" />
         <div className="mt-10 text-center">
           <div className="flex justify-center"><KidBear size={120} mood="think" /></div>
           <p className="text-2xl font-extrabold mt-4">Benny is waiting for you!</p>
           <p className="text-lg font-semibold mt-1 opacity-80">Finish every world on the map, then come back and play a real game with him.</p>
-          <div className="mt-6 flex justify-center"><ChunkyButton onClick={() => navigate('/admin/kids')}>Back to the map</ChunkyButton></div>
+          <div className="mt-6 flex justify-center"><ChunkyButton onClick={() => navigate('/kids')}>Back to the map</ChunkyButton></div>
         </div>
       </KidsShell>
     );
@@ -335,7 +335,7 @@ function Game({ wins, onWin }: { wins: number; onWin: () => void }) {
 
   return (
     <KidsShell tint="#FFD9A8">
-      <TopBar back="/admin/kids" />
+      <TopBar back="/kids" />
       <div className="mb-3">
         <Bubble who={<motion.div animate={phase === 'benny' ? { rotate: [0, -6, 6, 0] } : {}} transition={{ duration: 0.8, repeat: Infinity }}><KidBear size={64} mood={talk.mood} /></motion.div>}
           text={talk.text} tone={talk.tone} />
@@ -360,7 +360,7 @@ function Game({ wins, onWin }: { wins: number; onWin: () => void }) {
           {result === 'win' && <p className="text-lg font-bold opacity-70 mt-1">Wins against Benny: {wins}</p>}
           <div className="mt-4 grid grid-cols-2 gap-3">
             <ChunkyButton onClick={newGame}>Play again</ChunkyButton>
-            <ChunkyButton onClick={() => navigate('/admin/kids')} color="#9479E0" shade="#6C51C2">Map</ChunkyButton>
+            <ChunkyButton onClick={() => navigate('/kids')} color="#9479E0" shade="#6C51C2">Map</ChunkyButton>
           </div>
         </motion.div>
       ) : (

@@ -23,7 +23,7 @@ export default function BeginnerLessonPlay() {
 
   if (!unit || !lesson || !lessonUnlocked(state, lesson.id)) {
     return (
-      <Shell back="/admin/beginner">
+      <Shell back="/beginner">
         <p className="text-center mt-16 font-bold">This lesson is locked. Finish the one before it first.</p>
       </Shell>
     );
@@ -82,7 +82,7 @@ function LessonFlow({ unit, lesson }: { unit: Unit; lesson: Lesson }) {
 
   if (stage.kind === 'intro') {
     return (
-      <Shell back="/admin/beginner" title={unit.title}>
+      <Shell back="/beginner" title={unit.title}>
         {bar}
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
           <h1 className="text-[28px] font-black leading-tight mb-3" style={{ letterSpacing: '-0.02em' }}>{lesson.title}</h1>
@@ -104,7 +104,7 @@ function LessonFlow({ unit, lesson }: { unit: Unit; lesson: Lesson }) {
     const stars = Math.max(1, Math.round(avg));
     const next = lessonAfter(lesson.id);
     return (
-      <Shell back="/admin/beginner" title={unit.title}>
+      <Shell back="/beginner" title={unit.title}>
         {bar}
         <motion.div className="rounded-2xl p-6 text-center mt-6" style={{ background: L.card, border: `1px solid ${L.line}` }}
           initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
@@ -116,18 +116,18 @@ function LessonFlow({ unit, lesson }: { unit: Unit; lesson: Lesson }) {
           </p>
           <div className="flex flex-col gap-2">
             {next ? (
-              <button type="button" onClick={() => navigate(`/admin/beginner/${next.unit.id}/${next.lesson.id}`)}
+              <button type="button" onClick={() => navigate(`/beginner/${next.unit.id}/${next.lesson.id}`)}
                 className="rounded-xl py-3 font-black text-white" style={{ background: L.accent }}>
                 Next: {next.lesson.title}
               </button>
             ) : (
-              <button type="button" onClick={() => navigate('/admin/beginner')} className="rounded-xl py-3 font-black text-white" style={{ background: L.good }}>
+              <button type="button" onClick={() => navigate('/beginner')} className="rounded-xl py-3 font-black text-white" style={{ background: L.good }}>
                 Path complete: back to the map
               </button>
             )}
             <button type="button" onClick={() => { results.current = []; setStage({ kind: 'intro' }); }}
               className="rounded-xl py-3 font-bold" style={{ background: L.card2 }}>Review this lesson</button>
-            <Link href="/admin/beginner" className="rounded-xl py-3 font-bold" style={{ color: L.muted }}>Back to the path</Link>
+            <Link href="/beginner" className="rounded-xl py-3 font-bold" style={{ color: L.muted }}>Back to the path</Link>
           </div>
         </motion.div>
       </Shell>
@@ -136,7 +136,7 @@ function LessonFlow({ unit, lesson }: { unit: Unit; lesson: Lesson }) {
 
   if (lesson.game) {
     return (
-      <Shell back="/admin/beginner" title={title} tight>
+      <Shell back="/beginner" title={title} tight>
         <FirstGame onFinish={(stars) => { award(lesson.id, stars); results.current = [stars]; playSfxAlways('win'); setStage({ kind: 'done' }); }} />
       </Shell>
     );
@@ -144,7 +144,7 @@ function LessonFlow({ unit, lesson }: { unit: Unit; lesson: Lesson }) {
 
   const ex = lesson.exercises[stage.i];
   return (
-    <Shell back="/admin/beginner" title={title}>
+    <Shell back="/beginner" title={title}>
       {bar}
       <Exercise key={`${ex.id}-${round}`} level={ex} index={stage.i} total={n}
         guides={stage.i - (lesson.exercises[0]?.id.startsWith('find-') ? 1 : 0) < 2}

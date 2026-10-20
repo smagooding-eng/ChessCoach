@@ -1,3 +1,4 @@
+import { StartHereCards } from '@/components/StartHereCards';
 import React, { useEffect, useRef, useState } from 'react';
 import { autoImportLinkedAccounts } from '@/lib/autoImport';
 import { Link, useLocation } from 'wouter';
@@ -218,6 +219,9 @@ export function DashboardRedesign() {
           </div>
           </div>
         </section>
+
+        {/* ── New to chess: Beginner Path + Chess for Kids ── */}
+        <StartHereCards variant="redesign" />
 
         {/* ── Your live / daily games (hidden when none) ── */}
         <ChallengeInbox className="lg:col-span-2" />

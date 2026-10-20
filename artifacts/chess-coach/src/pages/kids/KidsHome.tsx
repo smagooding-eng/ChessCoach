@@ -1,6 +1,9 @@
-// Chess for Kids -- the adventure map. Admin preview for now (/admin/kids).
+// Chess for Kids -- the adventure map (/kids).
 
 import { useEffect, useState } from 'react';
+import { useLocation } from 'wouter';
+import { ParentGate } from '@/components/kids/ParentGate';
+import { useKidMode, setKidMode } from '@/lib/kids/kidMode';
 import { Link } from 'wouter';
 import { motion } from 'framer-motion';
 import { Lock } from 'lucide-react';
@@ -12,6 +15,10 @@ import { useKids, worldDone, worldStars, worldUnlocked } from '@/lib/kids/progre
 export default function KidsHome() {
   const { state, update, reset } = useKids();
   const [picker, setPicker] = useState(false);
+  const kidMode = useKidMode();
+  const [, navigate] = useLocation();
+  const [gate, setGate] = useState<null | 'corner'>(null);
+  const [grownUp, setGrownUp] = useState(false);
   useEffect(() => { if (!state.avatar) setPicker(true); }, [state.avatar]);
 
   const buddy = AVATARS.find((a) => a.id === state.avatar);
@@ -20,7 +27,7 @@ export default function KidsHome() {
 
   return (
     <KidsShell>
-      <TopBar back="/admin" onAvatar={() => setPicker(true)} />
+      <TopBar back={kidMode ? undefined : '/'} onAvatar={() => setPicker(true)} />
 
       <div className="text-center mt-2 mb-4">
         <motion.h1 className="text-[44px] leading-none font-extrabold text-white"
@@ -95,7 +102,7 @@ export default function KidsHome() {
               </div>
             );
             return open
-              ? <div key={w.id}><Link className="block" href={`/admin/kids/${w.id}`} aria-label={`${w.name}${done ? ', finished' : ''}`}>{card}</Link>{dotsRow}</div>
+              ? <div key={w.id}><Link className="block" href={`/kids/${w.id}`} aria-label={`${w.name}${done ? ', finished' : ''}`}>{card}</Link>{dotsRow}</div>
               : <div key={w.id}><div aria-label={`${w.name}, locked`}>{card}</div>{dotsRow}</div>;
           })}
         </div>
@@ -117,7 +124,7 @@ export default function KidsHome() {
             </div>
           </motion.div>
         );
-        return ready ? <Link className="block" href="/admin/kids/benny" aria-label="Play a game with Benny the Bear">{card}</Link> : <div aria-label="Benny the Bear game, locked">{card}</div>;
+        return ready ? <Link className="block" href="/kids/benny" aria-label="Play a game with Benny the Bear">{card}</Link> : <div aria-label="Benny the Bear game, locked">{card}</div>;
       })()}
 
       {/* sticker book */}
@@ -140,22 +147,45 @@ export default function KidsHome() {
         </div>
       </div>
 
-      {/* grown-up corner */}
+      {/* grown-up corner: behind the grown-up question, so a child can't change settings or leave Kid Mode */}
       <div className="mt-6 rounded-3xl bg-white/60 p-4 text-sm font-semibold" style={{ color: '#4A3A86' }}>
         <p className="font-extrabold text-base mb-1">For grown-ups</p>
-        <p className="opacity-80 mb-3">No chat, no ads, no names. Progress stays on this device.</p>
-        <div className="flex flex-wrap gap-2">
-          <button type="button" onClick={() => update({ unlockAll: !state.unlockAll })}
-            className="rounded-xl px-3 py-2 bg-white font-bold" style={{ boxShadow: '0 3px 0 rgba(47,34,87,0.15)' }}>
-            {state.unlockAll ? 'Lock levels in order' : 'Unlock all levels'}
+        <p className="opacity-80 mb-3">
+          No chat, no ads, no names. Progress stays on this device.
+          {kidMode ? ' Kid Mode is ON: this device stays in Chess for Kids, even after closing the app.' : ''}
+        </p>
+        {!grownUp ? (
+          <button type="button" onClick={() => setGate('corner')} className="rounded-xl px-3 py-2 bg-white font-bold" style={{ boxShadow: '0 3px 0 rgba(47,34,87,0.15)' }}>
+            Grown-up settings
           </button>
-          <button type="button" onClick={() => { if (window.confirm('Start the adventure over? Stars will be cleared.')) reset(); }}
-            className="rounded-xl px-3 py-2 bg-white font-bold" style={{ boxShadow: '0 3px 0 rgba(47,34,87,0.15)' }}>
-            Start over
-          </button>
-        </div>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {kidMode ? (
+              <button type="button" onClick={() => { setKidMode(false); navigate('/'); }}
+                className="rounded-xl px-3 py-2 font-bold text-white" style={{ background: '#6C51C2', boxShadow: '0 3px 0 #4A3591' }}>
+                Exit Kid Mode
+              </button>
+            ) : (
+              <button type="button" onClick={() => { setKidMode(true); setGrownUp(false); }}
+                className="rounded-xl px-3 py-2 font-bold text-white" style={{ background: '#2FBF71', boxShadow: '0 3px 0 #1E8E50' }}>
+                Turn on Kid Mode
+              </button>
+            )}
+            <button type="button" onClick={() => update({ unlockAll: !state.unlockAll })}
+              className="rounded-xl px-3 py-2 bg-white font-bold" style={{ boxShadow: '0 3px 0 rgba(47,34,87,0.15)' }}>
+              {state.unlockAll ? 'Lock levels in order' : 'Unlock all levels'}
+            </button>
+            <button type="button" onClick={() => { if (window.confirm('Start the adventure over? Stars will be cleared.')) reset(); }}
+              className="rounded-xl px-3 py-2 bg-white font-bold" style={{ boxShadow: '0 3px 0 rgba(47,34,87,0.15)' }}>
+              Start over
+            </button>
+            <button type="button" onClick={() => setGrownUp(false)} className="rounded-xl px-3 py-2 font-bold opacity-70">Done</button>
+          </div>
+        )}
       </div>
 
+      <ParentGate open={gate === 'corner'} onClose={() => setGate(null)} onPass={() => { setGate(null); setGrownUp(true); }}
+        note={kidMode ? 'Answer to change settings or leave Kid Mode.' : 'Answer to open the grown-up settings.'} />
       <BuddyPicker open={picker} onClose={() => setPicker(false)} />
     </KidsShell>
   );

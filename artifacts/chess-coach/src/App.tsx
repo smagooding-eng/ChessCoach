@@ -10,6 +10,7 @@ import { SettingsProvider, useSettings, BG_PHOTOS } from "@/context/SettingsCont
 // front rather than code-split: swiping between them must show the next
 // page straight away, never a loading screen first.
 import { DashboardRedesign } from "@/pages/DashboardRedesign";
+import { useKidMode, isKidsPath } from "@/lib/kids/kidMode";
 import { PlayHub } from "@/pages/PlayHub";
 import { GamesRedesign } from "@/pages/GamesRedesign";
 import { AnalysisRedesign } from "@/pages/AnalysisRedesign";
@@ -303,12 +304,17 @@ const PNotifications = () => <ProtectedRoute component={NotificationsPage} />;
 const PTraps         = () => <ProtectedRoute component={TrapsPage} />;
 const PTrapTraining  = () => <ProtectedRoute component={TrapTrainingPage} />;
 const PBeginnerCourses = () => <ProtectedRoute component={BeginnerCoursesPage} requireAdmin />;
-const PKidsHome = () => <ProtectedRoute component={KidsHomePage} requireAdmin fullscreen />;
-const PBeginnerPath = () => <ProtectedRoute component={BeginnerPathPage} requireAdmin />;
-const PBeginnerLessonPlay = () => <ProtectedRoute component={BeginnerLessonPlayPage} requireAdmin fullscreen />;
-const PKidsWorld = () => <ProtectedRoute component={KidsWorldPage} requireAdmin fullscreen />;
-const PKidsPlay = () => <ProtectedRoute component={KidsPlayPage} requireAdmin fullscreen />;
-const PKidsGame = () => <ProtectedRoute component={KidsGamePage} requireAdmin fullscreen />;
+// Chess for Kids works without signing in (progress stays on the device), so
+// a child locked in Kid Mode is never bounced to a login screen.
+const kidsPage = (C: React.ComponentType) => () => <ErrorBoundary fallbackNav="/kids"><C /></ErrorBoundary>;
+const PKidsHome = kidsPage(KidsHomePage);
+const PKidsWorld = kidsPage(KidsWorldPage);
+const PKidsPlay = kidsPage(KidsPlayPage);
+const PKidsGame = kidsPage(KidsGamePage);
+// The Beginner Path is for brand-new players, who may not have a chess.com /
+// Lichess account to link yet, so it skips the link-your-account redirect.
+const PBeginnerPath = () => <ProtectedRoute component={BeginnerPathPage} skipWelcomeRedirect />;
+const PBeginnerLessonPlay = () => <ProtectedRoute component={BeginnerLessonPlayPage} skipWelcomeRedirect fullscreen />;
 const PBeginnerCourseDetail = () => <ProtectedRoute component={BeginnerCourseDetailPage} requireAdmin />;
 const PBeginnerLesson = () => <ProtectedRoute component={BeginnerLessonPage} requireAdmin />;
 const PLiveHistory   = () => <ProtectedRoute component={LiveHistory} fallbackNav="/live" />;
@@ -381,7 +387,24 @@ function SetupRouter() {
   return quick ? <MobileSetup /> : <LandingPage />;
 }
 
+function RedirectTo({ to }: { to: string }) {
+  const [, navigate] = useLocation();
+  useEffect(() => { navigate(to, { replace: true } as never); }, [to, navigate]);
+  return null;
+}
+
+// Kid Mode: while it's on, the only pages are the kids ones. Anything else
+// (a bookmark, the back button, a notification link) goes back to /kids.
+function KidModeLock() {
+  const [location, navigate] = useLocation();
+  useEffect(() => { navigate('/kids', { replace: true } as never); }, [location, navigate]);
+  return null;
+}
+
 function Router() {
+  const kidMode = useKidMode();
+  const [where] = useLocation();
+  if (kidMode && !isKidsPath(where)) return <KidModeLock />;
   return (
     <><ScrollToTop /><PageTracker /><BoardStyleTipHost /><Switch>
       <Route path="/setup" component={SetupRouter} />
@@ -436,12 +459,18 @@ function Router() {
       <Route path="/traps/:id" component={PTrapTraining} />
 <Route path="/admin/beginner-courses/:id" component={PBeginnerCourseDetail} />
 <Route path="/admin/beginner-courses" component={PBeginnerCourses} />
-      <Route path="/admin/beginner/:unit/:lesson" component={PBeginnerLessonPlay} />
-      <Route path="/admin/beginner" component={PBeginnerPath} />
-      <Route path="/admin/kids/benny" component={PKidsGame} />
-      <Route path="/admin/kids/:world/:level" component={PKidsPlay} />
-      <Route path="/admin/kids/:world" component={PKidsWorld} />
-      <Route path="/admin/kids" component={PKidsHome} />
+      <Route path="/beginner/:unit/:lesson" component={PBeginnerLessonPlay} />
+      <Route path="/beginner" component={PBeginnerPath} />
+      <Route path="/kids/benny" component={PKidsGame} />
+      <Route path="/kids/:world/:level" component={PKidsPlay} />
+      <Route path="/kids/:world" component={PKidsWorld} />
+      <Route path="/kids" component={PKidsHome} />
+      {/* old admin-preview addresses keep working */}
+      <Route path="/admin/beginner/:unit/:lesson">{(p) => <RedirectTo to={`/beginner/${p.unit}/${p.lesson}`} />}</Route>
+      <Route path="/admin/beginner"><RedirectTo to="/beginner" /></Route>
+      <Route path="/admin/kids/:a/:b">{(p) => <RedirectTo to={`/kids/${p.a}/${p.b}`} />}</Route>
+      <Route path="/admin/kids/:a">{(p) => <RedirectTo to={`/kids/${p.a}`} />}</Route>
+      <Route path="/admin/kids"><RedirectTo to="/kids" /></Route>
 <Route path="/admin/beginner-lessons/:id" component={PBeginnerLesson} />
       <Route path="/traps"     component={PTraps} />
       <Route path="/live/history"    component={PLiveHistory} />
@@ -492,6 +521,11 @@ function AppBackgroundWrapper({ children }: { children: React.ReactNode }) {
   );
 }
 
+/** Grown-up pop-ups (notification prompts, live challenges, import toasts) stay out of Kid Mode. */
+function NotInKidMode({ children }: { children: ReactNode }) {
+  return useKidMode() ? null : <>{children}</>;
+}
+
 function App() {
   return (
     <ErrorBoundary>
@@ -504,10 +538,12 @@ function App() {
                   <Suspense fallback={<PageLoadingFallback />}>
                     <Router />
                   </Suspense>
-                  <ImportStatusWatcher />
-                  <BackgroundJobsWatcher />
-                  <AutoPushPrompt />
-                  <RealtimeBridge />
+                  <NotInKidMode>
+                    <ImportStatusWatcher />
+                    <BackgroundJobsWatcher />
+                    <AutoPushPrompt />
+                    <RealtimeBridge />
+                  </NotInKidMode>
                   <AudioAutoplayUnlock />
                 </WouterRouter>
                 <Toaster />

@@ -827,19 +827,19 @@ export function Admin() {
                 </div>
                 <ChevronRight className="w-4 h-4 text-muted-foreground" />
               </Link>
-              <Link href="/admin/beginner" className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all hover:bg-white/5 text-left border border-white/10">
+              <Link href="/beginner" className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all hover:bg-white/5 text-left border border-white/10">
                 <span className="text-lg">📖</span>
                 <div className="flex-1">
                   <p className="text-foreground font-bold">Beginner Courses</p>
-                  <p className="text-xs text-muted-foreground">Beginner Path: 13 units from the board to first tactics &mdash; in progress</p>
+                  <p className="text-xs text-muted-foreground">Beginner Path: live for everyone at /beginner</p>
                 </div>
                 <ChevronRight className="w-4 h-4 text-muted-foreground" />
               </Link>
-              <Link href="/admin/kids" className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all hover:bg-white/5 text-left border border-white/10">
+              <Link href="/kids" className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all hover:bg-white/5 text-left border border-white/10">
                 <span className="text-lg">🧸</span>
                 <div className="flex-1">
                   <p className="text-foreground font-bold">Chess for Kids</p>
-                  <p className="text-xs text-muted-foreground">Chess Adventure: 9 worlds, piece games, check &amp; checkmate &mdash; in progress</p>
+                  <p className="text-xs text-muted-foreground">Chess Adventure + Benny the Bear: live for everyone at /kids</p>
                 </div>
                 <ChevronRight className="w-4 h-4 text-muted-foreground" />
               </Link>

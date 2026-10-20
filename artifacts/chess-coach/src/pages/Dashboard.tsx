@@ -1,3 +1,4 @@
+import { StartHereCards } from '@/components/StartHereCards';
 import React, { useEffect, useRef, useState } from 'react';
 import { autoImportLinkedAccounts } from '@/lib/autoImport';
 import { useMyAnalysisSummary, useMyWeaknesses } from '@/hooks/use-analysis';
@@ -96,6 +97,7 @@ export function Dashboard() {
       <ChallengeInbox />
       <ActiveGamesCard />
       <PlayAppCard />
+      <StartHereCards />
 
       <div
         className="relative overflow-hidden p-4 md:p-5 rounded-2xl"

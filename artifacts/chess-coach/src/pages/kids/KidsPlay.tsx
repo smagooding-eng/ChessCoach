@@ -30,7 +30,7 @@ export default function KidsPlay() {
   if (!world || index < 0 || !levelUnlocked(state, world, index)) {
     return (
       <KidsShell>
-        <TopBar back={world ? `/admin/kids/${world.id}` : '/admin/kids'} />
+        <TopBar back={world ? `/kids/${world.id}` : '/kids'} />
         <p className="text-2xl font-extrabold text-center mt-10">This level is still locked!</p>
       </KidsShell>
     );
@@ -38,7 +38,7 @@ export default function KidsPlay() {
   const level = world.levels[index];
   return (
     <KidsShell tint={`${world.color}77`}>
-      <TopBar back={`/admin/kids/${world.id}`} />
+      <TopBar back={`/kids/${world.id}`} />
       <LevelRunner key={`${level.id}-${round}`} world={world} level={level} index={index} onRestart={() => setRound((r) => r + 1)} />
     </KidsShell>
   );
@@ -438,9 +438,9 @@ function LevelRunner({ world, level, index, onRestart }: { world: World; level: 
               <div className="flex flex-col gap-3">
                 {nextLevel ? (
                   <ChunkyButton color="#5CCB86" shade="#35A060" className="text-2xl"
-                    onClick={() => navigate(`/admin/kids/${world.id}/${nextLevel.id}`)}>Next level</ChunkyButton>
+                    onClick={() => navigate(`/kids/${world.id}/${nextLevel.id}`)}>Next level</ChunkyButton>
                 ) : (
-                  <ChunkyButton color="#5CCB86" shade="#35A060" className="text-2xl" onClick={() => navigate('/admin/kids')}>Back to the map</ChunkyButton>
+                  <ChunkyButton color="#5CCB86" shade="#35A060" className="text-2xl" onClick={() => navigate('/kids')}>Back to the map</ChunkyButton>
                 )}
                 <ChunkyButton color="#9479E0" shade="#6C51C2" onClick={onRestart}>Play again</ChunkyButton>
               </div>

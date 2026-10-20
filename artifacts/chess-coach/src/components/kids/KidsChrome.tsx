@@ -54,15 +54,17 @@ export function KidsShell({ children, tint = '#C9B6FF' }: { children: ReactNode;
   );
 }
 
-export function TopBar({ back, onAvatar }: { back: string; onAvatar?: () => void }) {
+export function TopBar({ back, onAvatar }: { back?: string; onAvatar?: () => void }) {
   const { state, update } = useKids();
   const round: CSSProperties = { boxShadow: '0 4px 0 rgba(47,34,87,0.18)' };
   return (
     <div className="flex items-center gap-2 py-2">
-      <Link href={back} aria-label="Back"
-        className="w-11 h-11 rounded-2xl bg-white flex items-center justify-center active:translate-y-0.5" style={round}>
-        <ArrowLeft className="w-6 h-6" style={{ color: INK }} />
-      </Link>
+      {back && (
+        <Link href={back} aria-label="Back"
+          className="w-11 h-11 rounded-2xl bg-white flex items-center justify-center active:translate-y-0.5" style={round}>
+          <ArrowLeft className="w-6 h-6" style={{ color: INK }} />
+        </Link>
+      )}
       <div className="flex-1" />
       <div className="h-11 px-3 rounded-2xl bg-white flex items-center gap-1.5 font-extrabold text-lg" style={round} aria-label={`${totalStars(state)} stars`}>
         <svg viewBox="0 0 100 100" width="24" height="24" aria-hidden="true">
