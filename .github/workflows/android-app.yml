@@ -91,8 +91,26 @@ jobs:
       - name: Generate the Android project
         run: cd android && bubblewrap update --skipVersionUpgrade --manifest=./twa-manifest.json
 
+      # Gradle builds the project Bubblewrap generated, then the SDK's own
+      # zipalign/apksigner and the JDK's jarsigner sign it. (bubblewrap build
+      # stops on interactive checks on a CI runner.)
       - name: Build and sign
-        run: cd android && bubblewrap build --skipPwaValidation
+        env:
+          KS_ALIAS: ${{ steps.key.outputs.alias }}
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew --no-daemon bundleRelease assembleRelease
+          BT="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)"
+          UNSIGNED="$(ls app/build/outputs/apk/release/*.apk | head -1)"
+          "$BT/zipalign" -f -p 4 "$UNSIGNED" aligned.apk
+          "$BT/apksigner" sign --ks android.keystore --ks-key-alias "$KS_ALIAS" \
+            --ks-pass env:BUBBLEWRAP_KEYSTORE_PASSWORD --key-pass env:BUBBLEWRAP_KEY_PASSWORD \
+            --out app-release-signed.apk aligned.apk
+          cp app/build/outputs/bundle/release/app-release.aab app-release-bundle.aab
+          jarsigner -keystore android.keystore -storepass "$BUBBLEWRAP_KEYSTORE_PASSWORD" \
+            -keypass "$BUBBLEWRAP_KEY_PASSWORD" -sigalg SHA256withRSA -digestalg SHA-256 \
+            app-release-bundle.aab "$KS_ALIAS"
 
       - uses: actions/upload-artifact@v4
         with:
