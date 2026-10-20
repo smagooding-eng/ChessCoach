@@ -3,7 +3,7 @@
 // did, what it left unprotected and (when there was one) the better move,
 // plus a material balance bar and quick safety checks.
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Chess, type Move, type Square } from 'chess.js';
 import { RotateCcw, Flag, Check, X, Minus } from 'lucide-react';
@@ -11,7 +11,7 @@ import { L } from './theme';
 import { LearnBoard, fenItems, type LearnItem } from './LearnBoard';
 import { PromotionPicker } from './PromotionPicker';
 import { BOTS, getBotMove, analyzeMoveQuality, type MoveAnalysisResult } from '@/lib/chess-bot';
-import { attackersOf, attackedTargets, checkArrows, type Arrow, type Mark } from '@/lib/learn/explain';
+import { attackersOf, attackedTargets, checkArrows, whyMate, kingSquare, type Arrow, type Mark } from '@/lib/learn/explain';
 import { playSfxAlways } from '@/lib/kids/progress';
 import type { PieceType } from '@/lib/kids/levels';
 
@@ -80,6 +80,18 @@ interface Coach {
 interface BotNote { text: string; warn: string[]; arrows: Arrow[]; marks: Mark[] }
 
 function coachMove(fenBefore: string, m: Move): Coach {
+  const mated = new Chess(m.after);
+  if (mated.isCheckmate()) {
+    const why = whyMate(mated);
+    const lines = why.text.split('\n• ').slice(1);
+    return {
+      san: m.san, q: 'checkmate', fen: m.after,
+      arrows: [arrowFor(m, 'good'), ...why.arrows], marks: why.marks,
+      checks: [{ label: 'Check', state: 'ok' }, { label: 'No escape square', state: 'ok' }, { label: 'No block or capture', state: 'ok' }],
+      notes: lines.map((text) => ({ tone: 'good' as const, text })),
+      matBefore: material(new Chess(fenBefore)), matAfter: material(mated),
+    };
+  }
   const res = analyzeMoveQuality(fenBefore, m.san);
   const before = new Chess(fenBefore);
   const after = new Chess(m.after);
@@ -180,6 +192,28 @@ function botNote(g: Chess, m: Move, bot: string): BotNote {
   return { text, warn, arrows, marks };
 }
 
+/** Is there a forced mate for White? Mate in 1 from any move; mate in 2 from checking first moves. */
+function findMate(fen: string): 1 | 2 | null {
+  const g = new Chess(fen);
+  if (g.turn() !== 'w' || g.isGameOver()) return null;
+  const mates = (c: Chess) => c.moves({ verbose: true }).some((m) => { c.move(m); const r = c.isCheckmate(); c.undo(); return r; });
+  if (mates(g)) return 1;
+  for (const m of g.moves({ verbose: true }).filter((x) => x.san.includes('+'))) {
+    g.move(m);
+    const replies = g.moves({ verbose: true });
+    let forced = replies.length > 0;
+    for (const r of replies) {
+      g.move(r);
+      const ok = mates(g);
+      g.undo();
+      if (!ok) { forced = false; break; }
+    }
+    g.undo();
+    if (forced) return 2;
+  }
+  return null;
+}
+
 /** Second-move coaching: what to aim for this turn, in words only (nothing drawn). */
 function goalFor(g: Chess, bot: string): { title: string; text: string } {
   if (g.inCheck()) return { title: 'Your goal: get out of check', text: 'Your King is attacked. Move it, block the line, or capture the piece giving check.' };
@@ -213,6 +247,7 @@ export function FirstGame({ onFinish }: { onFinish: (stars: number) => void }) {
   const [thinking, setThinking] = useState(false);
   const [promo, setPromo] = useState<{ from: string; to: string } | null>(null);
   const [over, setOver] = useState<{ stars: number; text: string } | null>(null);
+  const [mateViz, setMateViz] = useState<{ arrows: Arrow[]; marks: Mark[]; king: string | null } | null>(null);
   const history = useRef<{ fen: string; items: LearnItem[]; last: string[] }[]>([]);
   const timer = useRef<number | undefined>(undefined);
   useEffect(() => () => window.clearTimeout(timer.current), []);
@@ -226,7 +261,10 @@ export function FirstGame({ onFinish }: { onFinish: (stars: number) => void }) {
     if (c.isCheckmate()) {
       const won = c.turn() === 'b';
       playSfxAlways(won ? 'win' : 'oops');
-      setOver(won ? { stars: 3, text: `Checkmate! You beat ${bot.name} in your first game.` } : { stars: 1, text: `${bot.name} checkmated you. Every strong player lost their first games. Try again!` });
+      const king = kingSquare(c, c.turn());
+      if (won) { const w = whyMate(c); setMateViz({ arrows: w.arrows, marks: w.marks, king }); }
+      else setMateViz({ arrows: checkArrows(c).arrows, marks: [], king });
+      setOver(won ? { stars: 3, text: `Checkmate! ${bot.name}'s King is in check and has no way out. You won your first game!` } : { stars: 1, text: `Checkmate: ${bot.name} won this one. Your King is in check with no way out (red arrow). Every strong player lost their first games. Try again!` });
     } else {
       setOver({ stars: 2, text: c.isStalemate() ? 'Stalemate: it\'s a draw. The King had no legal move but wasn\'t in check.' : 'The game is a draw.' });
     }
@@ -280,7 +318,7 @@ export function FirstGame({ onFinish }: { onFinish: (stars: number) => void }) {
     if (!h) return;
     window.clearTimeout(timer.current);
     g.current.load(h.fen);
-    setItems(h.items); setLast(h.last); setSelected(null); setCoach(null); setNote(null); setThinking(false); setOver(null);
+    setItems(h.items); setLast(h.last); setSelected(null); setCoach(null); setNote(null); setThinking(false); setOver(null); setMateViz(null);
   };
 
   const mat = material(g.current);
@@ -289,8 +327,10 @@ export function FirstGame({ onFinish }: { onFinish: (stars: number) => void }) {
   const tip: Arrow[] = firstMove ? [{ from: 'e2', to: 'e4', color: 'good', dashed: true }] : [];
   const secondMove = history.current.length === 1 && myTurn && !over;
   const goal = secondMove ? goalFor(g.current, bot.name) : null;
-  const boardArrows = [...tip, ...(note?.arrows ?? [])];
-  const boardMarks = note?.marks ?? [];
+  const boardArrows = mateViz ? mateViz.arrows : [...tip, ...(note?.arrows ?? [])];
+  const boardMarks = mateViz ? mateViz.marks : note?.marks ?? [];
+  const fen = g.current.fen();
+  const mateIn = useMemo(() => (myTurn ? findMate(fen) : null), [fen, myTurn]);
 
   return (
     // Everything sits in one screen: the board shrinks on short phones and
@@ -306,7 +346,7 @@ export function FirstGame({ onFinish }: { onFinish: (stars: number) => void }) {
       </div>
 
       <div className="relative shrink-0 mx-auto w-full" style={{ maxWidth: 'max(240px, min(520px, calc(100dvh - 430px)))' }}>
-        <LearnBoard items={items} selected={selected} dots={dots} highlight={new Set(last)} hint={firstMove && !selected ? new Set(['e2']) : undefined} accent="#d9c25a"
+        <LearnBoard items={items} danger={mateViz?.king ?? null} selected={selected} dots={dots} highlight={new Set(last)} hint={firstMove && !selected ? new Set(['e2']) : undefined} accent="#d9c25a"
           arrows={boardArrows} marks={boardMarks} onTap={onTap}
           canDrag={(sq) => myTurn && g.current.get(sq as Square)?.color === 'w'}
           onDrop={(from, to) => { if (myTurn && !play(from, to)) setSelected(null); }} />
@@ -333,6 +373,14 @@ export function FirstGame({ onFinish }: { onFinish: (stars: number) => void }) {
           <div className="rounded-xl px-3 py-2.5 text-[13px] leading-snug" style={{ background: `${L.good}14`, borderLeft: `4px solid ${L.good}` }}>
             <p className="font-black mb-0.5" style={{ color: L.good }}>Suggested first move: e4</p>
             <p>Move the Pawn in front of your King two squares forward (dotted green arrow). It grabs the center and opens a path for your Queen and Bishop.</p>
+          </div>
+        )}
+        {mateIn && (
+          <div className="rounded-xl px-3 py-2.5 text-[13px] leading-snug" style={{ background: `${L.good}1c`, borderLeft: `4px solid ${L.good}` }}>
+            <p className="font-black text-[15px] mb-0.5" style={{ color: L.good }}>{mateIn === 1 ? 'Can you find the mate in 1?' : 'Can you find the mate in 2?'}</p>
+            <p>{mateIn === 1
+              ? `One of your moves checkmates ${bot.name} right now. Look for a check that leaves the King with no square to run to.`
+              : `Start with a check. Whatever ${bot.name} answers, you'll have a checkmate on your next move.`}</p>
           </div>
         )}
         {goal && (
