@@ -97,7 +97,6 @@ export function Dashboard() {
       <ChallengeInbox />
       <ActiveGamesCard />
       <PlayAppCard />
-      <StartHereCards />
 
       <div
         className="relative overflow-hidden p-4 md:p-5 rounded-2xl"
@@ -353,6 +352,8 @@ export function Dashboard() {
           </div>
         </div>
       </Link>
+
+      <StartHereCards />
 
       <div className="grid grid-cols-2 gap-3 px-3 md:px-0">
         <Link href="/play" className="block">

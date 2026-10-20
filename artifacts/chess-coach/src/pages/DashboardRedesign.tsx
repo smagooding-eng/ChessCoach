@@ -220,9 +220,6 @@ export function DashboardRedesign() {
           </div>
         </section>
 
-        {/* ── New to chess: Beginner Path + Chess for Kids ── */}
-        <StartHereCards variant="redesign" />
-
         {/* ── Your live / daily games (hidden when none) ── */}
         <ChallengeInbox className="lg:col-span-2" />
         <ActiveGamesCard />
@@ -270,6 +267,9 @@ export function DashboardRedesign() {
             </Link>
           ))}
         </div>
+
+        {/* ── New to chess: a slim row to the Beginner Path + Chess for Kids ── */}
+        <StartHereCards variant="redesign" />
 
         {/* ── Scout hero ── */}
         <section
