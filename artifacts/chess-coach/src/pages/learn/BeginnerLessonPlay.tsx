@@ -160,7 +160,7 @@ export function Diagram({ fen, highlight, moves, arrows }: { fen: string; highli
 
 export function Exercise({ level, index, total, onSolved, onNext, onRestart }:
   { level: Level; index: number; total: number; onSolved: (mistakes: number) => void; onNext: () => void; onRestart: () => void }) {
-  const ex = useExercise(level, onSolved);
+  const ex = useExercise(level, onSolved, index < 2);
   const toneColor = ex.msg.tone === 'good' ? L.good : ex.msg.tone === 'oops' ? L.warn : L.accent;
 
   return (

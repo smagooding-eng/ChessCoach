@@ -68,7 +68,9 @@ function onPieceLine(type: PieceType, from: string, to: string) {
  * `what` names the thing on the target square ("target", "black Rook").
  */
 export function explainReach(type: PieceType, from: string, target: string, at: (sq: string) => Occupant,
-  opts: { ok: boolean; what: string; whatAt?: (sq: string) => string; isKing?: boolean }): Explained {
+  opts: { ok: boolean; what: string; whatAt?: (sq: string) => string; isKing?: boolean; guides?: boolean }): Explained {
+  const guides = opts.guides !== false;
+  const g = (t: string) => (guides ? t : '');
   const n = NAME[type];
   if (opts.isKing) {
     return {
@@ -87,23 +89,23 @@ export function explainReach(type: PieceType, from: string, target: string, at: 
     return { text: `Yes. ${target} is ${how}.`, arrows: [{ from, to: target, color: 'good', knight: type === 'n' }], marks: [] };
   }
 
-  const all = moveArrows(type, 'w', from, at);
+  const all = guides ? moveArrows(type, 'w', from, at) : [];
   const wrongArrow: Arrow = { from, to: target, color: 'bad', dashed: true, knight: false };
 
   if (type === 'p') {
     if (dx === 0 && dy > 0) {
       return {
-        text: `Pawns are unusual: they MOVE straight forward but CAPTURE diagonally. Something standing directly in front (${target}) just blocks the Pawn; it can't take it. The green diagonal arrows show where this Pawn can capture.`,
+        text: `Pawns are unusual: they MOVE straight forward but CAPTURE diagonally. Something standing directly in front (${target}) just blocks the Pawn; it can't take it.${g(' The green diagonal arrows show where this Pawn can capture.')}`,
         arrows: all, marks: [{ sq: target, kind: 'x' }],
       };
     }
-    if (dy <= 0) return { text: 'Pawns can never move backwards or sideways. They only go forward, and capture one square diagonally forward (the diagonal arrows).', arrows: all, marks: [{ sq: target, kind: 'x' }] };
-    return { text: `A Pawn captures only one square diagonally forward, never further. ${target} is too far away. The diagonal arrows show its two capture squares.`, arrows: all, marks: [{ sq: target, kind: 'x' }] };
+    if (dy <= 0) return { text: `Pawns can never move backwards or sideways. They only go forward, and capture one square diagonally forward${g(' (the diagonal arrows)')}.`, arrows: all, marks: [{ sq: target, kind: 'x' }] };
+    return { text: `A Pawn captures only one square diagonally forward, never further. ${target} is too far away.${g(' The diagonal arrows show its two capture squares.')}`, arrows: all, marks: [{ sq: target, kind: 'x' }] };
   }
 
   if (type === 'n') {
     return {
-      text: `A Knight jumps in an L: 2 squares in a straight line, then 1 square to the side. The arrows show all of its landing squares from ${from}. ${target} isn't one of them.`,
+      text: `A Knight jumps in an L: 2 squares in a straight line, then 1 square to the side.${g(` The arrows show all of its landing squares from ${from}.`)} ${target} isn't one of them.`,
       arrows: all, marks: [{ sq: target, kind: 'x' }],
     };
   }
@@ -111,7 +113,7 @@ export function explainReach(type: PieceType, from: string, target: string, at: 
   if (type === 'k') {
     const dist = Math.max(Math.abs(dx), Math.abs(dy));
     return {
-      text: `The King moves only ONE square at a time, in any direction (arrows). ${target} is ${dist} squares away.`,
+      text: `The King moves only ONE square at a time, in any direction${g(' (arrows)')}. ${target} is ${dist} squares away.`,
       arrows: all, marks: [{ sq: target, kind: 'x' }],
     };
   }
@@ -143,8 +145,8 @@ export function explainReach(type: PieceType, from: string, target: string, at: 
   }
   const lines = type === 'r' ? 'straight up, down, left or right' : type === 'b' ? 'along diagonals' : 'along straight lines and diagonals';
   return {
-    text: `${target} isn't on any of the ${n}'s lines. A ${n} only travels ${lines}. The arrows show every direction it can go from ${from}.`,
-    arrows: [...all, wrongArrow], marks: [{ sq: target, kind: 'x' }],
+    text: `${target} isn't on any of the ${n}'s lines. A ${n} only travels ${lines}.${g(` The arrows show every direction it can go from ${from}.`)}`,
+    arrows: guides ? [...all, wrongArrow] : [], marks: [{ sq: target, kind: 'x' }],
   };
 }
 
