@@ -15,10 +15,17 @@ export function useBoardPointer(opts: {
   const box = useRef<HTMLDivElement | null>(null);
   const [drag, setDrag] = useState<DragState | null>(null);
   const start = useRef<{ x: number; y: number; sq: string } | null>(null);
+  const lastPointer = useRef(0);
 
   const squareAt = (clientX: number, clientY: number): string | null => {
     const el = box.current;
     if (!el) return null;
+    // Prefer the square element actually under the finger, so what you touch
+    // is exactly what registers; fall back to the board geometry.
+    try {
+      const hit = document.elementFromPoint(clientX, clientY)?.closest('[data-sq]') as HTMLElement | null;
+      if (hit && el.contains(hit) && hit.dataset.sq) return hit.dataset.sq;
+    } catch { /* ignore */ }
     const r = el.getBoundingClientRect();
     const fx = Math.floor(((clientX - r.left) / r.width) * 8);
     const fy = Math.floor(((clientY - r.top) / r.height) * 8);
@@ -48,10 +55,11 @@ export function useBoardPointer(opts: {
   const onPointerUp = (e: RPointerEvent<HTMLDivElement>) => {
     const s = start.current;
     start.current = null;
+    lastPointer.current = Date.now();
     const d = drag;
     setDrag(null);
     if (!s) return;
-    const sq = squareAt(e.clientX, e.clientY);
+    const sq = d?.moved ? squareAt(e.clientX, e.clientY) : s.sq; // a tap counts where it started
     if (d?.moved) {
       if (sq && sq !== d.from) opts.onDrop?.(d.from, sq);
       else if (sq === d.from) opts.onTap?.(sq); // dropped back where it started: just select it
@@ -65,6 +73,6 @@ export function useBoardPointer(opts: {
     box, drag,
     handlers: { onPointerDown, onPointerMove, onPointerUp, onPointerCancel },
     /** Keyboard activation of a square button (pointer taps are handled above). */
-    keyTap: (sq: string, detail: number) => { if (detail === 0) opts.onTap?.(sq); },
+    keyTap: (sq: string, detail: number) => { if (detail === 0 && Date.now() - lastPointer.current > 700) opts.onTap?.(sq); },
   };
 }

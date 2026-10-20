@@ -239,10 +239,13 @@ export function useExercise(level: Level, onSolved: (mistakes: number) => void) 
       if (answers.has(sq)) {
         if (found.has(sq)) return;
         const next = new Set(found); next.add(sq); setFound(next); sfx('pop');
-        const left = answers.size - next.size;
-        if (left === 0) win('Correct!', 400); else say(`Yes, that's ${sq}. ${left} more.`, 'good');
+        const rest = [...answers].filter((a) => !next.has(a));
+        if (!rest.length) win(`Correct! That's ${sq}.`, 400);
+        else say(`Yes, that's ${sq}. Now find ${rest.join(' and ')}.`, 'good');
       } else {
-        miss(null, `That square is ${sq}: column (file) "${sq[0]}", row (rank) ${sq[1]}. Read the letter along the bottom edge, then the number up the left edge.`, [], [{ sq, kind: 'ring' }]);
+        const rest = [...answers].filter((a) => !found.has(a));
+        const t = rest[0];
+        miss(null, `That square is ${sq}: column (file) "${sq[0]}", row (rank) ${sq[1]}. You're looking for ${rest.join(' and ')}. For ${t}, find the letter "${t[0]}" along the bottom edge, then go up to row ${t[1]} (numbers on the left edge).`, [], [{ sq, kind: 'ring' }]);
       }
       return;
     }
@@ -447,6 +450,7 @@ export function useExercise(level: Level, onSolved: (mistakes: number) => void) 
       highlight: level.kind === 'tapSquare' || level.kind === 'tapLegal' ? found : undefined, arrows, marks: viz.marks,
       canDrag: movesPieces ? canDrag : undefined, onDrop: movesPieces ? onDrop : undefined },
     msg, mistakes, solved, moves, picked, answerQuiz, hint,
+    checklist: level.kind === 'tapSquare' ? (level.squares ?? []).map((sq) => ({ sq, done: found.has(sq) })) : null,
     rule: ruleType && level.kind !== 'quiz' && level.kind !== 'tapSquare' ? RULE[ruleType] : null,
     progress: { found: found.size, total: answers.size, left: targetsLeft.length + pieces.filter((p) => p.side === 'b' && p.type !== 'k').length },
   };

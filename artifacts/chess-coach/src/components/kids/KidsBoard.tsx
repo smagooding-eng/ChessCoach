@@ -56,7 +56,7 @@ export function KidsBoard({ items, frame, dots, selected, found, shake, hint, da
               const label = item?.piece ? `${sq}, ${item.piece.side === 'w' ? 'your' : 'plum'} piece`
                 : item?.shape ? `${sq}, ${item.shape}` : item?.bush ? `${sq}, bush` : sq;
               return (
-                <button key={sq} type="button" aria-label={label} onClick={(e) => ptr.keyTap(sq, e.detail)}
+                <button key={sq} type="button" data-sq={sq} aria-label={label} onClick={(e) => ptr.keyTap(sq, e.detail)}
                   className="relative outline-none focus-visible:ring-4 focus-visible:ring-white/80"
                   style={{ background: dark ? DARK : LIGHT, WebkitTapHighlightColor: 'transparent' }}>
                   {selected === sq && <span className="absolute inset-0" style={{ background: 'rgba(255,214,92,0.65)' }} />}

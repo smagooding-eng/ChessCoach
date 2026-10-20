@@ -176,6 +176,18 @@ export function Exercise({ level, index, total, onSolved, onNext, onRestart }:
         </motion.div>
       </AnimatePresence>
 
+      {ex.checklist && (
+        <div className="flex flex-wrap items-center gap-2 mb-3" aria-label="Squares to find">
+          <span className="text-xs font-bold uppercase tracking-wider" style={{ color: L.muted }}>Find</span>
+          {ex.checklist.map((c) => (
+            <span key={c.sq} className="px-3 py-1 rounded-lg text-sm font-black flex items-center gap-1"
+              style={{ background: c.done ? `${L.good}22` : L.card, color: c.done ? L.good : L.text, border: `1px solid ${c.done ? L.good : L.line}` }}>
+              {c.done && <Check className="w-3.5 h-3.5" />}{c.sq}
+            </span>
+          ))}
+        </div>
+      )}
+
       {ex.rule && (
         <p className="text-xs font-semibold mb-3 -mt-1 px-1" style={{ color: L.muted }}>{ex.rule}</p>
       )}

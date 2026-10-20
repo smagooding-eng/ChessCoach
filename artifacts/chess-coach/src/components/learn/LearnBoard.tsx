@@ -69,7 +69,7 @@ export function LearnBoard({ items, dots, selected, found, shake, hint, highligh
             const item = at.get(sq);
             const label = item?.piece ? `${sq}, ${item.piece.side === 'w' ? 'white' : 'black'} ${item.piece.type}` : item?.target ? `${sq}, target` : sq;
             return (
-              <button key={sq} type="button" aria-label={label} onClick={(e) => ptr.keyTap(sq, e.detail)} disabled={!onTap}
+              <button key={sq} type="button" data-sq={sq} aria-label={label} onClick={(e) => ptr.keyTap(sq, e.detail)} disabled={!onTap}
                 className="relative outline-none focus-visible:ring-2 focus-visible:ring-white/70"
                 style={{ ...(dark ? skin.darkSquareStyle : skin.lightSquareStyle), WebkitTapHighlightColor: 'transparent', cursor: onTap ? 'pointer' : 'default' }}>
                 {highlight?.has(sq) && <span className="absolute inset-0" style={{ background: `${accent}55` }} />}
@@ -83,10 +83,10 @@ export function LearnBoard({ items, dots, selected, found, shake, hint, highligh
                     animate={{ opacity: [0.65, 1, 0.65] }} transition={{ duration: 0.9, repeat: Infinity }} />
                 )}
                 {coords && x === 0 && (
-                  <span className="absolute top-0.5 left-1 text-[10px] font-bold leading-none" style={{ color: dark ? boardColors.light : boardColors.dark }}>{y + 1}</span>
+                  <span className="absolute top-0.5 left-1 text-[11px] font-black leading-none" style={{ color: '#fff', textShadow: '0 0 3px rgba(0,0,0,0.9), 0 1px 2px rgba(0,0,0,0.9)' }}>{y + 1}</span>
                 )}
                 {coords && y === 0 && (
-                  <span className="absolute bottom-0.5 right-1 text-[10px] font-bold leading-none" style={{ color: dark ? boardColors.light : boardColors.dark }}>{FILES[x]}</span>
+                  <span className="absolute bottom-0.5 right-1 text-[11px] font-black leading-none" style={{ color: '#fff', textShadow: '0 0 3px rgba(0,0,0,0.9), 0 1px 2px rgba(0,0,0,0.9)' }}>{FILES[x]}</span>
                 )}
               </button>
             );
