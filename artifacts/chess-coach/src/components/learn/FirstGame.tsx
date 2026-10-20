@@ -176,6 +176,16 @@ function botNote(g: Chess, m: Move, bot: string): BotNote {
   return { text, warn, arrows, marks };
 }
 
+/** Second-move coaching: what to aim for this turn, in words only (nothing drawn). */
+function goalFor(g: Chess, bot: string): { title: string; text: string } {
+  if (g.inCheck()) return { title: 'Your goal: get out of check', text: 'Your King is attacked. Move it, block the line, or capture the piece giving check.' };
+  const mine = hanging(g, 'w');
+  if (mine.length) return { title: `Your goal: save your ${NAME[mine[0].type]}`, text: `${bot} is attacking it. Move it to a safe square or protect it with another piece.` };
+  const theirs = hanging(g, 'b');
+  if (theirs.length) return { title: 'Your goal: look for a free piece', text: `One of ${bot}'s pieces isn't protected properly. Find it and see if you can capture it safely.` };
+  return { title: 'Your goal: develop a piece', text: 'Bring a Knight or a Bishop off the back row, toward the center. Pieces in the middle control more squares, and getting them out early lets you castle soon. Before you move, check that nothing can capture it on its new square.' };
+}
+
 function applyMove(items: LearnItem[], m: Move): LearnItem[] {
   let out = items.filter((i) => i.sq !== m.to);
   if (m.flags.includes('e')) out = out.filter((i) => i.sq !== m.to[0] + m.from[1]);
@@ -273,6 +283,8 @@ export function FirstGame({ onFinish }: { onFinish: (stars: number) => void }) {
   // Before the very first move, suggest one: 1.e4.
   const firstMove = !history.current.length && !coach;
   const tip: Arrow[] = firstMove ? [{ from: 'e2', to: 'e4', color: 'good', dashed: true }] : [];
+  const secondMove = history.current.length === 1 && myTurn && !over;
+  const goal = secondMove ? goalFor(g.current, bot.name) : null;
   const boardArrows = [...tip, ...(note?.arrows ?? [])];
   const boardMarks = note?.marks ?? [];
 
@@ -317,6 +329,12 @@ export function FirstGame({ onFinish }: { onFinish: (stars: number) => void }) {
           <div className="rounded-xl px-3 py-2.5 text-[13px] leading-snug" style={{ background: `${L.good}14`, borderLeft: `4px solid ${L.good}` }}>
             <p className="font-black mb-0.5" style={{ color: L.good }}>Suggested first move: e4</p>
             <p>Move the Pawn in front of your King two squares forward (dotted green arrow). It grabs the center and opens a path for your Queen and Bishop.</p>
+          </div>
+        )}
+        {goal && (
+          <div className="rounded-xl px-3 py-2.5 text-[13px] leading-snug" style={{ background: `${L.accent}14`, borderLeft: `4px solid ${L.accent}` }}>
+            <p className="font-black mb-0.5" style={{ color: L.accent }}>{goal.title}</p>
+            <p>{goal.text}</p>
           </div>
         )}
         {over && (
