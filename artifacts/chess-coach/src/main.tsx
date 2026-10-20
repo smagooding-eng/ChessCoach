@@ -7,6 +7,9 @@ import "./index.css";
 import { rememberPlayAppLaunch } from "./lib/playApp";
 import { initI18n } from "./lib/i18n";
 
+// The app's code is running (index.html shows an 'update your browser' note if it never does).
+(window as unknown as { __csBoot?: boolean }).__csBoot = true;
+
 // Note if we were opened by the Google Play app (hides the Play badges).
 rememberPlayAppLaunch();
 

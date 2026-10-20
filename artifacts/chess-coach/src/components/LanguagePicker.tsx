@@ -9,7 +9,9 @@ import { LANGUAGES, getLang, setLang, t } from '@/lib/i18n';
 export function LanguageSelect({ className, style, compact }: { className?: string; style?: React.CSSProperties; compact?: boolean }) {
   const lang = getLang();
   return (
-    <label translate="no" className={`notranslate relative inline-flex items-center gap-1.5 ${className ?? ''}`} style={style}>
+    // A caller that hides it on phones ("hidden sm:inline-flex") sets the display itself;
+    // adding inline-flex here too would override "hidden" and show it anyway.
+    <label translate="no" className={`notranslate relative items-center gap-1.5 ${/(^|\s)hidden(\s|$)/.test(className ?? '') ? '' : 'inline-flex'} ${className ?? ''}`} style={style}>
       <Globe size={compact ? 13 : 15} className="pointer-events-none shrink-0 opacity-80" aria-hidden />
       <span className="sr-only">{t('Language')}</span>
       <select

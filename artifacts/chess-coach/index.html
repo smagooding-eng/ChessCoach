@@ -86,7 +86,7 @@
     <style>
       body { margin: 0; background: #141413; }
       #splash {
-        position: fixed; inset: 0; z-index: 9999;
+        position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 9999;
         display: flex; flex-direction: column; align-items: center; justify-content: center;
         background: #141413;
         font-family: Inter, system-ui, sans-serif;
@@ -293,6 +293,36 @@
       <div class="splash-tag">Play smarter. <span>Win more.</span></div>
     </div>
     <div id="root"></div>
+    <script>
+      // Older iPads / Safari: small stand-ins for newer built-ins some code expects.
+      (function () {
+        function def(o, k, v) { if (o && !o[k]) try { Object.defineProperty(o, k, { value: v, writable: true, configurable: true }); } catch (e) { o[k] = v; } }
+        var at = function (i) { i = Math.trunc(i) || 0; if (i < 0) i += this.length; return i < 0 || i >= this.length ? undefined : this[i]; };
+        def(Array.prototype, 'at', at); def(String.prototype, 'at', at);
+        def(Array.prototype, 'findLast', function (f, t) { for (var i = this.length - 1; i >= 0; i--) if (f.call(t, this[i], i, this)) return this[i]; });
+        def(Array.prototype, 'findLastIndex', function (f, t) { for (var i = this.length - 1; i >= 0; i--) if (f.call(t, this[i], i, this)) return i; return -1; });
+        def(Object, 'hasOwn', function (o, k) { return Object.prototype.hasOwnProperty.call(o, k); });
+        if (typeof window.structuredClone !== 'function') window.structuredClone = function (v) { return v === undefined ? v : JSON.parse(JSON.stringify(v)); };
+        if (window.crypto && !window.crypto.randomUUID) window.crypto.randomUUID = function () {
+          var b = new Uint8Array(16); window.crypto.getRandomValues(b); b[6] = (b[6] & 15) | 64; b[8] = (b[8] & 63) | 128;
+          var h = []; for (var i = 0; i < 16; i++) h.push((b[i] + 256).toString(16).slice(1));
+          return h.slice(0, 4).join('') + '-' + h.slice(4, 6).join('') + '-' + h.slice(6, 8).join('') + '-' + h.slice(8, 10).join('') + '-' + h.slice(10).join('');
+        };
+      })();
+      // If the app's code can't run at all (a browser too old for it), say so
+      // instead of a blank screen. main.tsx sets __csBoot as its first line;
+      // the page's load event only fires once that script has run or failed.
+      window.addEventListener('load', function () { setTimeout(function () {
+        if (window.__csBoot) return;
+        var sp = document.getElementById('splash'); if (sp) sp.style.display = 'none';
+        var d = document.createElement('div');
+        d.setAttribute('style', 'max-width:420px;margin:15vh auto 0;padding:0 24px;font-family:-apple-system,system-ui,sans-serif;color:#e8e6e3;text-align:center;line-height:1.5');
+        d.innerHTML = '<p style="font-size:22px;font-weight:800;margin:0 0 10px">ChessScout.net needs a newer browser</p>' +
+          '<p style="color:#9e9b98;margin:0 0 18px">This browser is too old to run the app. On an iPhone or iPad, update it in Settings &rsaquo; General &rsaquo; Software Update. On a computer, update your browser or try Chrome, Edge, Firefox or Safari.</p>' +
+          '<a href="" style="display:inline-block;background:#81b64c;color:#fff;font-weight:700;text-decoration:none;padding:12px 22px;border-radius:12px">Try again</a>';
+        document.body.appendChild(d);
+      }, 1500); });
+    </script>
     <script type="module" src="/src/main.tsx"></script>
     <script>
       if ('serviceWorker' in navigator) {

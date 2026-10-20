@@ -532,18 +532,18 @@ export function LandingPage() {
       </div>
 
       <nav className="relative z-20 shrink-0">
-        <div className="mx-auto flex h-12 max-w-7xl items-center justify-between px-4 sm:h-16 sm:px-8">
-          <div translate="no" className="flex items-baseline gap-0.5">
+        <div className="mx-auto flex h-12 max-w-7xl items-center justify-between gap-2 px-4 sm:h-16 sm:px-8">
+          <div translate="no" className="flex min-w-0 shrink items-baseline gap-0.5 whitespace-nowrap">
             <span className="text-[1.3rem] font-black tracking-tight" style={{ color: TEXT }}>Chess</span>
             <span className="text-[1.3rem] font-black tracking-tight" style={{ color: G }}>Scout</span>
             <span className="ml-0.5 text-sm font-bold" style={{ color: MUTED }}>.net</span>
           </div>
-          <div className="flex items-center gap-4 sm:gap-6">
+          <div className="flex shrink-0 items-center gap-3 sm:gap-6">
             <Link href="/players" className="hidden text-sm font-medium transition-colors hover:text-white sm:inline" style={{ color: MUTED }}>{t('Top players')}</Link>
             <Link href="/pricing" className="hidden text-sm font-medium transition-colors hover:text-white sm:inline" style={{ color: MUTED }}>{t('Pricing')}</Link>
             <LanguageSelect compact className="hidden text-sm font-medium sm:inline-flex" style={{ color: MUTED }} />
-            <button onClick={openLogin} className="text-sm font-medium transition-colors hover:text-white" style={{ color: MUTED }}>{t('Sign In')}</button>
-            <button onClick={openSignup} className="rounded-xl px-4 py-2 text-sm font-extrabold transition-all sm:px-5 sm:py-2.5"
+            <button onClick={openLogin} className="whitespace-nowrap text-sm font-medium transition-colors hover:text-white" style={{ color: MUTED }}>{t('Sign In')}</button>
+            <button onClick={openSignup} className="whitespace-nowrap rounded-xl px-3.5 py-2 text-sm font-extrabold transition-all sm:px-5 sm:py-2.5"
               style={{ background: G, color: ON_G, boxShadow: `0 6px 22px ${G}40` }}
               onMouseEnter={e => (e.currentTarget.style.background = G_HOVER)} onMouseLeave={e => (e.currentTarget.style.background = G)}>
               {t('Join Free')}
