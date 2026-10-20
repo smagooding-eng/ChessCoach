@@ -37,7 +37,7 @@ export function LanguageSettings({ text, muted, card, border }: { text: string; 
           {lang === 'en'
             ? 'English is the original. Other languages translate the whole site.'
             : native
-              ? t('The main pages are translated by us; the rest of the app is translated automatically by Google.')
+              ? t('Translated by ChessScout. Anything we haven’t translated yet stays in English.')
               : 'This language is translated automatically by Google, so some wording may be off.'}
         </p>
       </div>

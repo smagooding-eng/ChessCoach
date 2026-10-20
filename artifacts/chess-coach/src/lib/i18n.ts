@@ -179,6 +179,14 @@ const LOADERS: Record<string, () => Promise<{ default: Record<string, string> }>
   fr: () => import('@/locales/fr'),
   de: () => import('@/locales/de'),
 };
+// The rest of the app (every page, by its English text), applied by
+// domTranslate as the page renders.
+const APP_LOADERS: Record<string, () => Promise<{ default: Record<string, string> }>> = {
+  es: () => import('@/locales/app-es.json'),
+  pt: () => import('@/locales/app-pt.json'),
+  fr: () => import('@/locales/app-fr.json'),
+  de: () => import('@/locales/app-de.json'),
+};
 
 /** Call once before the first render. Never throws; at worst the site stays English. */
 export async function initI18n(): Promise<void> {
@@ -187,9 +195,20 @@ export async function initI18n(): Promise<void> {
   if (current === 'en') { writeGoogCookie(null); return; }
   const loader = LOADERS[current];
   if (loader) {
-    try { dict = (await loader()).default; } catch { dict = {}; }
+    // Our own translations: the pages built with t(), plus every other page
+    // through domTranslate. No Google here, so nothing double-translates.
+    try {
+      const [page, app] = await Promise.all([
+        loader().then((m) => m.default).catch(() => ({} as Record<string, string>)),
+        (APP_LOADERS[current]?.() ?? Promise.resolve({ default: {} })).then((m) => m.default).catch(() => ({} as Record<string, string>)),
+      ]);
+      dict = { ...app, ...page };
+    } catch { dict = {}; }
+    writeGoogCookie(null);
+    try { const { startDomTranslate } = await import('./domTranslate'); startDomTranslate(dict); } catch { /* stays English */ }
+    return;
   }
-  // Google covers whatever our dictionary doesn't (the app pages), in every language.
+  // Other languages: Google's translator.
   try { loadGoogleTranslate(current); } catch { /* ignore */ }
 }
 
