@@ -146,7 +146,7 @@ function coachMove(fenBefore: string, m: Move): Coach {
       // Drawn on its own view of the position BEFORE your move (where that
       // move was actually available), so it never overlaps your own arrows.
       better = { san: bm.san, why, fen: fenBefore, arrows: [arrowFor(bm, 'good')], marks: bm.captured ? [{ sq: bm.to, kind: 'ring' }] : [] };
-      notes.push({ tone: 'good', text: `Better was ${bm.san}, because ${why}. Tap "Better" above the small board to see it.` });
+      notes.push({ tone: 'good', text: `Better was ${bm.san}, because ${why}. ${marks.length ? 'Tap "Better" above the small board to see it.' : 'The small board shows it; tap "Yours" to compare with your move.'}` });
     }
   }
   if (!notes.length) notes.push({ tone: 'info', text: res.pros[0] ? `${res.pros[0]}.` : 'A quiet move. Nothing was left unprotected.' });
@@ -376,7 +376,9 @@ function Balance({ mat }: { mat: number }) {
 }
 
 function CoachCard({ c }: { c: Coach }) {
-  const [view, setView] = useState<'mine' | 'better'>('mine');
+  // Open on the better move, unless your move left something hanging: then
+  // the red arrows on your own move are the first thing to see.
+  const [view, setView] = useState<'mine' | 'better'>(c.better && !c.marks.length ? 'better' : 'mine');
   const meta = QUALITY[c.q];
   const showBetter = view === 'better' && !!c.better;
   const delta = c.matAfter - c.matBefore;
