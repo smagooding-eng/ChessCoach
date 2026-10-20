@@ -98,7 +98,13 @@ jobs:
         env:
           KS_ALIAS: ${{ steps.key.outputs.alias }}
         run: |
+          set -o pipefail
           cd android
+          # On failure, surface the tail of the output as annotations so the
+          # reason shows on the run page without opening the raw log.
+          trap 'tail -25 build.log | sed "s/^/::error::/"' ERR
+          exec > >(tee build.log) 2>&1
+          ls
           chmod +x gradlew
           ./gradlew --no-daemon bundleRelease assembleRelease
           BT="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)"
