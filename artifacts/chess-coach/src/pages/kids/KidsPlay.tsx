@@ -107,8 +107,9 @@ function LevelRunner({ world, level, index, onRestart }: { world: World; level: 
   // tap-all answers are fixed by the starting position
   const answers = useMemo(() => {
     if (level.kind !== 'tapAll' || !r) return new Set<string>();
-    return new Set([...r.captures]);
-  }, [level.kind, r]);
+    // the King is never captured, so he is never an answer
+    return new Set([...r.captures].filter((s) => s !== plumKing?.sq));
+  }, [level.kind, r, plumKing?.sq]);
 
   const finish = (extraDelay = 0) => {
     setBusy(true);
@@ -138,6 +139,12 @@ function LevelRunner({ world, level, index, onRestart }: { world: World; level: 
         say(`Tap the ${level.shapes?.length ? 'shapes' : 'plum pieces'} the ${PIECE_NAMES[me.type]} can capture!`, 'normal');
         return;
       }
+      if (plumKing && sq === plumKing.sq) {
+        playSfx('oops');
+        setShake({ sq, n: Date.now() });
+        say('We never capture the King! Attacking the King is called check.', 'oops');
+        return;
+      }
       if (answers.has(sq)) {
         if (found.has(sq)) return;
         const next = new Set(found); next.add(sq);
@@ -153,8 +160,19 @@ function LevelRunner({ world, level, index, onRestart }: { world: World; level: 
       return;
     }
 
-    // collect + check: move the piece
-    if (sq === me.sq) { playSfx('tap'); say(level.say); return; }
+    // collect + check: pick the piece up first (tap or drag), then move it
+    if (sq === me.sq) { playSfx('tap'); setSelected(selected === me.sq ? null : me.sq); return; }
+    if (selected !== me.sq) {
+      playSfx('tap');
+      setShake({ sq: me.sq, n: Date.now() });
+      say(`Tap your ${PIECE_NAMES[me.type]} first, then tap where it should go! Or drag it.`, 'normal');
+      return;
+    }
+    movePiece(sq);
+  };
+
+  const movePiece = (sq: string) => {
+    if (!me || !r) return;
     const legal = r.moves.has(sq) && !(plumKing && sq === plumKing.sq);
     if (!legal) {
       if (plumKing && sq === plumKing.sq) { oops(me.sq, "We don't capture the King. Just attack him!"); return; }
@@ -166,6 +184,7 @@ function LevelRunner({ world, level, index, onRestart }: { world: World; level: 
     const enemyHere = pieces.find((p) => p.side === 'b' && p.sq === sq);
     const from = me.sq;
     setMoves((m) => m + 1);
+    setSelected(null);
     setPieces((ps) => ps.filter((p) => p !== enemyHere).map((p) => (p.id === me.id ? { ...p, sq } : p)));
     if (shapeHere) setShapes((ss) => ss.filter((s) => s !== shapeHere));
 
@@ -207,11 +226,13 @@ function LevelRunner({ world, level, index, onRestart }: { world: World; level: 
     return new Set(g.moves({ square: selected as Square, verbose: true }).map((m) => m.to));
   }, [selected, busy]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const tapMate = (sq: string) => {
+  const tapMate = (sq: string, fromOverride?: string) => {
     const g = game.current;
     if (!g) return;
-    if (selected && mateDots.has(sq)) {
-      const from = selected;
+    const sel = fromOverride ?? selected;
+    const legalTo = sel ? new Set(g.moves({ square: sel as Square, verbose: true }).map((m) => m.to as string)) : mateDots;
+    if (sel && legalTo.has(sq)) {
+      const from = sel;
       const mv = g.move({ from: from as Square, to: sq as Square, promotion: 'q' });
       const id = ids.current.get(from);
       const capturedId = ids.current.get(sq);
@@ -242,7 +263,19 @@ function LevelRunner({ world, level, index, onRestart }: { world: World; level: 
     }
     const p = g.get(sq as Square);
     if (p && p.color === 'w') { playSfx('tap'); setSelected(sq); return; }
+    if (!sel) { playSfx('tap'); say('Tap one of your pieces first, then tap where it should go! Or drag it.', 'normal'); return; }
     setSelected(null);
+  };
+
+  const canDrag = (sq: string) => {
+    if (busy || done) return false;
+    if (game.current) return game.current.get(sq as Square)?.color === 'w';
+    return (level.kind === 'collect' || level.kind === 'check') && !!me && sq === me.sq;
+  };
+  const onDrop = (from: string, to: string) => {
+    if (busy || done) return;
+    if (game.current) { setSelected(from); tapMate(to, from); return; }
+    if (me && from === me.sq) { setSelected(me.sq); movePiece(to); }
   };
 
   const showMeMate = () => {
@@ -272,7 +305,7 @@ function LevelRunner({ world, level, index, onRestart }: { world: World; level: 
     ];
     if (level.kind === 'tapAll') {
       hint = showHint && r ? new Set([...r.moves]) : undefined;
-    } else if (r && !busy) {
+    } else if (r && !busy && selected === me?.sq) {
       dots = new Set([...r.moves].filter((s) => s !== plumKing?.sq));
     }
   }
@@ -302,7 +335,8 @@ function LevelRunner({ world, level, index, onRestart }: { world: World; level: 
 
       <KidsBoard items={items} frame={world.color} dots={dots} selected={selected}
         found={found} shake={shake} hint={hint} danger={danger}
-        bounce={level.kind === 'mate' ? selected : me?.sq ?? null} onTap={onTap} />
+        bounce={level.kind === 'mate' ? selected : me?.sq ?? null} onTap={onTap}
+        canDrag={level.kind === 'tapAll' ? undefined : canDrag} onDrop={level.kind === 'tapAll' ? undefined : onDrop} />
 
       {/* status + helpers */}
       <div className="mt-5 flex items-center gap-3">

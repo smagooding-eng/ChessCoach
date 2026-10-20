@@ -11,7 +11,8 @@ import { findLesson, type Lesson, type Unit } from '@/lib/learn/beginner';
 import { useLearn, lessonUnlocked, lessonAfter } from '@/lib/learn/progress';
 import { useExercise } from '@/lib/learn/useExercise';
 import { starsFor, playSfxAlways } from '@/lib/kids/progress';
-import type { Level } from '@/lib/kids/levels';
+import type { Level, Occupant } from '@/lib/kids/levels';
+import { moveArrows, type Arrow, type ArrowColor } from '@/lib/learn/explain';
 
 export default function BeginnerLessonPlay() {
   const { unit: uid, lesson: lid } = useParams<{ unit: string; lesson: string }>();
@@ -86,7 +87,7 @@ function LessonFlow({ unit, lesson }: { unit: Unit; lesson: Lesson }) {
           <div className="space-y-3 mb-5">
             {lesson.intro.map((p, i) => <p key={i} className="text-[15px] leading-relaxed" style={{ color: '#cfccc8' }}>{p}</p>)}
           </div>
-          {lesson.diagram && <Diagram fen={lesson.diagram.fen} highlight={lesson.diagram.highlight} />}
+          {lesson.diagram && <Diagram {...lesson.diagram} />}
           <button type="button" onClick={() => setStage({ kind: 'ex', i: 0 })}
             className="mt-6 w-full rounded-xl py-3.5 font-black text-white flex items-center justify-center gap-2" style={{ background: L.accent }}>
             Start practice ({n} exercises) <ChevronRight className="w-5 h-5" />
@@ -141,11 +142,23 @@ function LessonFlow({ unit, lesson }: { unit: Unit; lesson: Lesson }) {
   );
 }
 
-function Diagram({ fen, highlight }: { fen: string; highlight?: string[] }) {
-  return <LearnBoard items={fenItems(fen)} highlight={new Set(highlight ?? [])} />;
+export function Diagram({ fen, highlight, moves, arrows }: { fen: string; highlight?: string[]; moves?: string; arrows?: { from: string; to: string; color?: ArrowColor }[] }) {
+  const items = fenItems(fen);
+  let all: Arrow[] = (arrows ?? []).map((a) => ({ from: a.from, to: a.to, color: a.color ?? 'info' }));
+  if (moves) {
+    const p = items.find((i) => i.sq === moves)?.piece;
+    if (p) {
+      const at = (sq: string): Occupant => {
+        const o = items.find((i) => i.sq === sq)?.piece;
+        return !o ? 'empty' : o.side === p.side ? 'friend' : 'enemy';
+      };
+      all = [...all, ...moveArrows(p.type, p.side, moves, at, 'info')];
+    }
+  }
+  return <LearnBoard items={items} highlight={new Set(highlight ?? [])} arrows={all} />;
 }
 
-function Exercise({ level, index, total, onSolved, onNext, onRestart }:
+export function Exercise({ level, index, total, onSolved, onNext, onRestart }:
   { level: Level; index: number; total: number; onSolved: (mistakes: number) => void; onNext: () => void; onRestart: () => void }) {
   const ex = useExercise(level, onSolved);
   const toneColor = ex.msg.tone === 'good' ? L.good : ex.msg.tone === 'oops' ? L.warn : L.accent;
@@ -162,6 +175,10 @@ function Exercise({ level, index, total, onSolved, onNext, onRestart }:
           {ex.msg.text}
         </motion.div>
       </AnimatePresence>
+
+      {ex.rule && (
+        <p className="text-xs font-semibold mb-3 -mt-1 px-1" style={{ color: L.muted }}>{ex.rule}</p>
+      )}
 
       {level.kind === 'quiz' ? (
         <div>

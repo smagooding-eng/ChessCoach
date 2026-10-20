@@ -14,7 +14,7 @@ export interface Lesson {
   /** Short paragraphs shown before the exercises. */
   intro: string[];
   /** Optional diagram for the intro: a FEN, with squares to highlight. */
-  diagram?: { fen: string; highlight?: string[] };
+  diagram?: { fen: string; highlight?: string[]; moves?: string; arrows?: { from: string; to: string; color?: 'good' | 'bad' | 'info' | 'warn' }[] };
   exercises: Level[];
 }
 
@@ -39,9 +39,9 @@ export const UNITS: Unit[] = [
         intro: [
           'A chessboard has 64 squares in an 8 × 8 grid.',
           'Columns are called files and are lettered a to h from White\'s left. Rows are called ranks and are numbered 1 to 8 from White\'s side.',
-          'A square\'s name is its file then its rank, so the square where file e meets rank 4 is "e4".',
+          'A square\'s name is its file then its rank, so the square where file e (blue arrow) meets rank 4 (orange arrow) is "e4".',
         ],
-        diagram: { fen: '8/8/8/8/8/8/8/8 w - - 0 1', highlight: ['e4'] },
+        diagram: { fen: '8/8/8/8/8/8/8/8 w - - 0 1', highlight: ['e4'], arrows: [{ from: 'e1', to: 'e4', color: 'info' }, { from: 'a4', to: 'e4', color: 'warn' }] },
         exercises: [
           { id: 'bd1', kind: 'tapSquare', title: 'Find e4', say: 'Tap the square e4.', squares: ['e4'] },
           { id: 'bd2', kind: 'tapSquare', title: 'Two corners', say: 'Tap the two corner squares a8 and h1.', squares: ['a8', 'h1'] },
@@ -83,7 +83,7 @@ export const UNITS: Unit[] = [
           'It can\'t jump. Any piece in the way stops it. It can capture the first enemy piece it runs into by landing on its square, but never goes past it.',
           'A Rook is worth about 5 points.',
         ],
-        diagram: { fen: '8/8/8/8/3R4/8/8/8 w - - 0 1', highlight: ['d1', 'd2', 'd3', 'd5', 'd6', 'd7', 'd8', 'a4', 'b4', 'c4', 'e4', 'f4', 'g4', 'h4'] },
+        diagram: { fen: '8/8/8/8/3R4/8/8/8 w - - 0 1', moves: 'd4' },
         exercises: [
           { id: 'rk1', kind: 'collect', title: 'Reach the targets', say: 'Move the Rook onto every target. Take as many moves as you need.',
             pieces: [me('r', 'd4')], shapes: targets(['d8', 'h8', 'h2']) },
@@ -107,7 +107,7 @@ export const UNITS: Unit[] = [
           'Because it only moves diagonally, a Bishop stays on the color it starts on for the whole game. Each side has one light-squared and one dark-squared Bishop.',
           'A Bishop is worth about 3 points.',
         ],
-        diagram: { fen: '8/8/8/8/3B4/8/8/8 w - - 0 1', highlight: ['a1', 'b2', 'c3', 'e5', 'f6', 'g7', 'h8', 'a7', 'b6', 'c5', 'e3', 'f2', 'g1'] },
+        diagram: { fen: '8/8/8/8/3B4/8/8/8 w - - 0 1', moves: 'd4' },
         exercises: [
           { id: 'bp1', kind: 'collect', title: 'Reach the targets', say: 'Move the Bishop onto every target.',
             pieces: [me('b', 'f1')], shapes: targets(['b5', 'e8', 'h3']) },
@@ -130,7 +130,7 @@ export const UNITS: Unit[] = [
           'The Queen combines the Rook and the Bishop: any number of squares along a rank, file or diagonal.',
           'She is the most powerful piece, worth about 9 points, so losing her for less is usually a disaster.',
         ],
-        diagram: { fen: '8/8/8/3Q4/8/8/8/8 w - - 0 1', highlight: ['d8', 'd1', 'a5', 'h5', 'a8', 'h1', 'a2', 'g8'] },
+        diagram: { fen: '8/8/8/3Q4/8/8/8/8 w - - 0 1', moves: 'd5' },
         exercises: [
           { id: 'qn1', kind: 'collect', title: 'Reach the targets', say: 'Move the Queen onto every target.',
             pieces: [me('q', 'd1')], shapes: targets(['h5', 'a5', 'a8', 'e8']) },
@@ -154,7 +154,7 @@ export const UNITS: Unit[] = [
           'It is the only piece that jumps. Pieces in between don\'t matter; only the landing square does.',
           'A Knight always lands on the opposite color to where it started. It is worth about 3 points.',
         ],
-        diagram: { fen: '8/8/8/8/3N4/8/8/8 w - - 0 1', highlight: ['c6', 'e6', 'f5', 'f3', 'e2', 'c2', 'b3', 'b5'] },
+        diagram: { fen: '8/8/8/8/3N4/8/8/8 w - - 0 1', moves: 'd4' },
         exercises: [
           { id: 'kn1', kind: 'collect', title: 'Two jumps', say: 'Move the Knight onto the target. It takes two moves.',
             pieces: [me('n', 'g1')], shapes: targets(['g5']) },
@@ -179,7 +179,7 @@ export const UNITS: Unit[] = [
           'The King may never move to a square the opponent attacks. That would put him in check, which is against the rules.',
           'The whole game is about the King. You can\'t afford to lose him, so he has no point value.',
         ],
-        diagram: { fen: '8/8/8/8/4K3/8/8/8 w - - 0 1', highlight: ['d3', 'd4', 'd5', 'e3', 'e5', 'f3', 'f4', 'f5'] },
+        diagram: { fen: '8/8/8/8/4K3/8/8/8 w - - 0 1', moves: 'e4' },
         exercises: [
           { id: 'kg1', kind: 'collect', title: 'A short walk', say: 'Walk the King to the target, one square at a time.',
             pieces: [me('k', 'c8')], shapes: targets(['g6']) },
@@ -200,10 +200,11 @@ export const UNITS: Unit[] = [
         id: 'pawn-1', title: 'How the Pawn moves',
         intro: [
           'A Pawn moves straight forward one square. On its very first move it may go two squares instead.',
+          'In the diagram the Pawn on e4 can step to e5 (blue arrow), or capture either black Pawn diagonally (green arrows).',
           'Unlike every other piece, it captures differently from how it moves: one square diagonally forward.',
           'A piece directly in front blocks a Pawn completely. Pawns never move backwards. Each Pawn is worth 1 point.',
         ],
-        diagram: { fen: '8/8/8/8/8/8/4P3/8 w - - 0 1', highlight: ['e3', 'e4'] },
+        diagram: { fen: '8/8/8/3p1p2/4P3/8/8/8 w - - 0 1', moves: 'e4' },
         exercises: [
           { id: 'pw1', kind: 'collect', title: 'Two squares', say: 'From its starting square a Pawn can move two. Reach the target in one move.',
             pieces: [me('p', 'd2')], shapes: targets(['d4']) },
@@ -220,8 +221,9 @@ export const UNITS: Unit[] = [
         intro: [
           'Promotion: a Pawn that reaches the far rank must turn into a Queen, Rook, Bishop or Knight. Almost always you choose a Queen.',
           'En passant: if an enemy Pawn moves two squares and lands right beside your Pawn, you may capture it as if it had moved only one. You must do it immediately or the chance is gone.',
+          'In the diagram, Black\'s Pawn just jumped d7→d5 (orange arrow) to land beside yours. White captures en passant by moving e5→d6 (green arrow), and the Pawn on d5 is removed.',
         ],
-        diagram: { fen: 'k7/8/8/3pP3/8/8/8/4K3 w - d6 0 2', highlight: ['d5', 'd6', 'e5'] },
+        diagram: { fen: 'k7/8/8/3pP3/8/8/8/4K3 w - d6 0 2', highlight: ['d6'], arrows: [{ from: 'd7', to: 'd5', color: 'warn' }, { from: 'e5', to: 'd6', color: 'good' }] },
         exercises: [
           { id: 'pw5', kind: 'best', title: 'Promote', say: 'Push the Pawn to the last rank and promote it.',
             fen: '8/4P3/8/8/8/2k5/8/4K3 w - - 0 1', answers: ['e8=Q'], explain: 'e8=Q: a brand new Queen.' },
@@ -341,9 +343,10 @@ export const UNITS: Unit[] = [
         intro: [
           'Castling moves the King two squares toward a Rook, and that Rook jumps to the square on the King\'s other side. It tucks the King away and brings the Rook into play.',
           'You can castle only if: neither piece has moved yet, the squares between them are empty, and the King is not in check, doesn\'t pass through an attacked square, and doesn\'t land in check.',
+          'In the diagram: kingside castling moves the King e1→g1 and the Rook h1→f1; queenside moves the King e1→c1 and the Rook a1→d1.',
           'To castle here, tap your King, then tap the square two steps to the side.',
         ],
-        diagram: { fen: 'r3k2r/pppppppp/8/8/8/8/PPPPPPPP/R4RK1 b kq - 0 1', highlight: ['f1', 'g1'] },
+        diagram: { fen: 'r3k2r/pppppppp/8/8/8/8/PPPPPPPP/R3K2R w KQkq - 0 1', arrows: [{ from: 'e1', to: 'g1', color: 'good' }, { from: 'h1', to: 'f1', color: 'info' }, { from: 'e1', to: 'c1', color: 'good' }, { from: 'a1', to: 'd1', color: 'info' }] },
         exercises: [
           { id: 'sp1', kind: 'best', title: 'Castle kingside', say: 'Castle on the kingside (toward the h-file Rook).',
             fen: 'r3k2r/pppppppp/8/8/8/8/PPPPPPPP/R3K2R w KQkq - 0 1', answers: ['O-O'],

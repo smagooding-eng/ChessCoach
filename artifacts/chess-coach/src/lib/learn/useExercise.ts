@@ -1,11 +1,18 @@
 // Beginner path -- the rules for one exercise. Same flow as the kids
 // levels, worded for older students, plus real-position exercise kinds.
+// Every wrong answer is explained in plain words AND drawn on the board
+// (arrows for the lines a piece travels, what blocks it, what attacks a
+// square), because new players can't yet "see" why a move is illegal.
 
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { Chess, type Square, type Move } from 'chess.js';
-import { reach, attacks, whyNot, PIECE_NAMES, type Level, type Occupant, type BoardPiece, type PieceType } from '@/lib/kids/levels';
+import { reach, attacks, PIECE_NAMES, type Level, type Occupant, type BoardPiece, type PieceType } from '@/lib/kids/levels';
 import { playSfxAlways, type Sfx } from '@/lib/kids/progress';
 import { learnState } from './progress';
+import {
+  explainReach, moveArrows, checkArrows, explainKingSquare, explainNoCastle, attackedTargets, recapture, escapes,
+  attackersOf, kingSquare, RULE, type Arrow, type Mark,
+} from './explain';
 import type { LearnItem } from '@/components/learn/LearnBoard';
 
 export type Tone = 'normal' | 'good' | 'oops';
@@ -16,6 +23,7 @@ interface Target { id: string; sq: string }
 
 const sfx = (k: Sfx) => { if (learnState().sound) playSfxAlways(k); };
 const strip = (san: string) => san.replace(/[+#]/g, '');
+const NAME = PIECE_NAMES;
 
 export function useExercise(level: Level, onSolved: (mistakes: number) => void) {
   const usesGame = ['mate', 'best', 'escape', 'tapLegal'].includes(level.kind) || (level.kind === 'tapSquare' && !!level.fen) || (level.kind === 'quiz' && !!level.fen);
@@ -26,17 +34,21 @@ export function useExercise(level: Level, onSolved: (mistakes: number) => void) 
   }
   const [, force] = useState(0);
 
+  const startCheck = level.kind === 'escape' && game.current ? checkArrows(game.current) : null;
+
   const [pieces, setPieces] = useState<Piece[]>(() => (level.pieces ?? []).map((p, i) => ({ ...p, id: `p${i}` })));
   const [targetsLeft, setTargets] = useState<Target[]>(() => (level.shapes ?? []).map((s, i) => ({ sq: s.sq, id: `t${i}` })));
   const [found, setFound] = useState<Set<string>>(new Set());
   const [mistakes, setMistakes] = useState(0);
   const mistakesRef = useRef(0);
   mistakesRef.current = mistakes;
-  const [msg, setMsg] = useState<Msg>({ text: level.say, tone: 'normal' });
+  const [msg, setMsg] = useState<Msg>({ text: startCheck?.text ? `${level.say} ${startCheck.text}` : level.say, tone: 'normal' });
+  const [viz, setViz] = useState<{ arrows: Arrow[]; marks: Mark[] }>({ arrows: [], marks: [] });
   const [shake, setShake] = useState<{ sq: string; n: number } | null>(null);
   const [showHint, setShowHint] = useState(false);
   const [danger, setDanger] = useState<string | null>(null);
-  const [selected, setSelected] = useState<string | null>(level.kind === 'tapLegal' ? level.from ?? null : null);
+  const [selectedState, setSelected] = useState<string | null>(level.kind === 'tapLegal' ? level.from ?? null : null);
+  const selected = selectedState;
   const [busy, setBusy] = useState(false);
   const [solved, setSolved] = useState(false);
   const [moves, setMoves] = useState(0);
@@ -44,15 +56,18 @@ export function useExercise(level: Level, onSolved: (mistakes: number) => void) 
   const hintSquares = useRef<string[]>([]);
 
   const say = useCallback((text: string, tone: Tone = 'normal') => setMsg({ text, tone }), []);
-  const miss = (sq: string | null, text: string) => {
+  const show = (arrows: Arrow[] = [], marks: Mark[] = []) => setViz({ arrows, marks });
+  const miss = (sq: string | null, text: string, arrows: Arrow[] = [], marks: Mark[] = []) => {
     sfx('oops');
     setMistakes((m) => m + 1);
     if (sq) setShake({ sq, n: Date.now() });
     say(text, 'oops');
+    show(arrows, marks);
   };
-  const win = (text: string, delay = 500) => {
+  const win = (text: string, delay = 500, arrows: Arrow[] = []) => {
     setBusy(true);
     say(level.explain ? `${text} ${level.explain}` : text, 'good');
+    show(arrows);
     window.setTimeout(() => { setSolved(true); onSolved(mistakesRef.current); }, delay);
   };
 
@@ -65,15 +80,20 @@ export function useExercise(level: Level, onSolved: (mistakes: number) => void) 
     if (!p) return 'empty';
     return p.side === 'w' ? 'friend' : 'enemy';
   }, [targetsLeft, pieces, me?.type, level.kind]);
+  const whatAt = (sq: string) => {
+    if (targetsLeft.some((t) => t.sq === sq)) return 'target';
+    const p = pieces.find((x) => x.sq === sq);
+    return p ? `${p.side === 'w' ? 'white' : 'black'} ${NAME[p.type]}` : 'piece';
+  };
   const r = useMemo(() => (me && !game.current ? reach(me.type, 'w', me.sq, occ) : null), [me, occ]);
   const answers = useMemo(() => {
-    if (level.kind === 'tapAll' && r) return new Set([...r.captures]);
+    if (level.kind === 'tapAll' && r) return new Set([...r.captures].filter((s) => s !== enemyKing?.sq)); // Kings are never captured
     if (level.kind === 'tapSquare') return new Set(level.squares ?? []);
     if (level.kind === 'tapLegal' && game.current && level.from) {
       return new Set(game.current.moves({ square: level.from as Square, verbose: true }).map((m) => m.to as string));
     }
     return new Set<string>();
-  }, [level, r]);
+  }, [level, r, enemyKing?.sq]);
 
   // ---------------------------------------------------------- real-position kinds
   const legalFrom = useMemo(() => {
@@ -82,18 +102,12 @@ export function useExercise(level: Level, onSolved: (mistakes: number) => void) 
     return g.moves({ square: selected as Square, verbose: true });
   }, [selected, busy, level.kind]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const kingSq = (g: Chess, color: 'w' | 'b') => {
-    for (const row of g.board()) for (const c of row) if (c && c.type === 'k' && c.color === color) return c.square as string;
-    return null;
-  };
-
   const playGameMove = (m: Move) => {
     const g = game.current!;
     const capturedId = ids.current.get(m.to);
     const id = ids.current.get(m.from);
     g.move(m);
     if (id) { ids.current.delete(m.from); ids.current.set(m.to, id); }
-    // castling moves the rook too
     if (m.flags.includes('k') || m.flags.includes('q')) {
       const rank = m.color === 'w' ? '1' : '8';
       const [rf, rt] = m.flags.includes('k') ? ['h' + rank, 'f' + rank] : ['a' + rank, 'd' + rank];
@@ -111,56 +125,115 @@ export function useExercise(level: Level, onSolved: (mistakes: number) => void) 
     };
   };
 
-  const retryAfter = (undo: () => void, ms = 1300) => {
+  /** Leave the wrong move (and its explanation) on the board long enough to read, then take it back. */
+  const retryAfter = (undo: () => void, ms = 3200) => {
     setBusy(true);
-    window.setTimeout(() => { undo(); setDanger(null); setBusy(false); }, ms);
+    window.setTimeout(() => { undo(); setDanger(null); show(); setBusy(false); }, ms);
   };
 
-  const tapGame = (sq: string) => {
+  const isGoal = (m: Move) => {
+    const goal = level.goal ?? 'any';
+    return goal === 'any' || (goal === 'king' && m.piece === 'k') || (goal === 'capture' && !!m.captured) || (goal === 'block' && m.piece !== 'k' && !m.captured);
+  };
+
+  const tapGame = (sq: string, fromOverride?: string) => {
     const g = game.current!;
-    const m = legalFrom.find((x) => x.to === sq && (!x.promotion || x.promotion === 'q'));
+    const selected = fromOverride ?? selectedState;
+    const legal = selected ? g.moves({ square: selected as Square, verbose: true }) : [];
+    const m = legal.find((x) => x.to === sq && (!x.promotion || x.promotion === 'q'));
     if (selected && m) {
       sfx('move');
       setMoves((n) => n + 1);
+      const moveArrow: Arrow = { from: m.from, to: m.to, color: 'good', knight: m.piece === 'n' };
       const undo = playGameMove(m);
+
       if (level.kind === 'mate') {
-        if (g.isCheckmate()) { sfx('check'); setDanger(kingSq(g, 'b')); win('Checkmate!', 900); return; }
+        if (g.isCheckmate()) {
+          sfx('check'); setDanger(kingSquare(g, 'b'));
+          win('Checkmate! The King is attacked (red arrow) and has no square to go to, no way to block, and no way to capture the attacker.', 900, checkArrows(g).arrows);
+          return;
+        }
         setMistakes((n) => n + 1);
-        if (g.isStalemate()) { sfx('oops'); say('Stalemate! Black has no legal move but isn\'t in check, so the game is a draw. Try again.', 'oops'); }
-        else if (g.inCheck()) { sfx('check'); setDanger(kingSq(g, 'b')); say('Check, but the King can still escape. Try another move.', 'oops'); }
-        else { sfx('oops'); say('Not checkmate. Look for a move that attacks the King and covers every escape.', 'oops'); }
-        retryAfter(undo);
+        if (g.inCheck()) { sfx('check'); setDanger(kingSquare(g, 'b')); } else sfx('oops');
+        const e = escapes(g);
+        say(e.text, 'oops'); show([...checkArrows(g).arrows, ...e.arrows], e.marks);
+        retryAfter(undo, 4200);
         return;
       }
+
       if (level.kind === 'best') {
-        if ((level.answers ?? []).includes(strip(m.san))) { sfx('pop'); win('Correct!'); return; }
+        if ((level.answers ?? []).includes(strip(m.san))) {
+          sfx('pop');
+          const t = attackedTargets(g, m.to);
+          const extra = t.names.length >= 2 ? ` Now it attacks ${t.names.join(' and ')} at the same time.` : '';
+          win(`Correct!${extra}`, 600, [moveArrow, ...(t.names.length >= 2 ? t.arrows : [])]);
+          return;
+        }
         setMistakes((n) => n + 1);
         sfx('oops');
-        say(level.wrong?.[strip(m.san)] ?? 'That\'s legal, but not the move we\'re looking for. Try again.', 'oops');
-        retryAfter(undo, 1600);
+        const rc = recapture(g, m);
+        const base = level.wrong?.[strip(m.san)] ?? 'That move is legal, but it\'s not the one this exercise is looking for.';
+        say(`${base}${rc && !level.wrong?.[strip(m.san)] ? ` ${rc.text}` : ''} Try again.`, 'oops');
+        show([{ ...moveArrow, color: 'warn' }, ...(rc?.arrows ?? [])]);
+        retryAfter(undo, 4200);
         return;
       }
+
       if (level.kind === 'escape') {
-        const goal = level.goal ?? 'any';
-        const ok = goal === 'any' || (goal === 'king' && m.piece === 'k') || (goal === 'capture' && !!m.captured) || (goal === 'block' && m.piece !== 'k' && !m.captured);
-        if (ok) { sfx('pop'); win('Out of check!'); return; }
+        if (isGoal(m)) {
+          sfx('pop');
+          const how = m.piece === 'k' ? 'The King stepped to a square nothing attacks.' : m.captured ? 'The attacker is gone, so nothing attacks your King.' : 'Your piece now stands between the attacker and the King, so the line is cut.';
+          win(`Out of check! ${how}`, 600, [moveArrow]);
+          return;
+        }
         setMistakes((n) => n + 1);
         sfx('oops');
         const how = m.piece === 'k' ? 'by moving the King' : m.captured ? 'by capturing' : 'by blocking';
-        say(`That does get you out of check ${how}, but this exercise asks you to ${goal === 'king' ? 'move the King' : goal === 'block' ? 'block the attack' : 'capture the attacker'}.`, 'oops');
-        retryAfter(undo, 1800);
+        const want = level.goal === 'king' ? 'move the King' : level.goal === 'block' ? 'block the attack' : 'capture the attacker';
+        say(`That does get you out of check (${how}), but this exercise asks you to ${want}. Try again.`, 'oops');
+        show([{ ...moveArrow, color: 'warn' }]);
+        retryAfter(undo, 3600);
         return;
       }
     }
+
     const p = g.get(sq as Square);
-    if (p && p.color === 'w') { sfx('tap'); setSelected(sq); return; }
-    if (selected && level.kind === 'escape') { miss(null, 'That move would leave your King in check, so it isn\'t allowed.'); setSelected(null); return; }
-    setSelected(null);
+    if (p && p.color === 'w') { sfx('tap'); setSelected(sq); show(startCheck?.arrows ?? []); return; }
+
+    if (selected) {
+      const sp = g.get(selected as Square);
+      // tapped a square the selected piece can't go to: explain why
+      if (sp?.type === 'k') {
+        const backRank = selected === 'e1' && (sq === 'g1' || sq === 'c1');
+        if (backRank) {
+          const e = explainNoCastle(g, sq === 'g1' ? 'k' : 'q');
+          if (e) { miss(null, e.text, e.arrows, e.marks); setSelected(selected); return; }
+        }
+        const e = explainKingSquare(g, selected, sq);
+        miss(null, e.text, [...e.arrows, ...(startCheck?.arrows ?? [])], e.marks);
+        setSelected(selected);
+        return;
+      }
+      if (level.kind === 'escape' && sp) {
+        const c = checkArrows(g);
+        miss(null, `Moving the ${NAME[sp.type as PieceType]} there wouldn't stop the check. ${c.text} When you're in check, your move MUST get the King out of check: move the King, block the line, or capture the attacker.`, c.arrows, [{ sq, kind: 'x' }]);
+        setSelected(selected);
+        return;
+      }
+      if (sp) {
+        setSelected(selected);
+        say(`The ${NAME[sp.type as PieceType]} on ${selected} can't move to ${sq}. The green dots show every square it can legally move to.`, 'normal');
+        return;
+      }
+    }
+    sfx('tap');
+    say('First pick up one of your (white) pieces: tap it, then tap where it should go. You can also drag it.', 'normal');
   };
 
   // ---------------------------------------------------------- taps
   const onTap = (sq: string) => {
     if (busy || solved) return;
+    show(startCheck?.arrows ?? []);
 
     if (level.kind === 'tapSquare') {
       if (answers.has(sq)) {
@@ -169,7 +242,7 @@ export function useExercise(level: Level, onSolved: (mistakes: number) => void) 
         const left = answers.size - next.size;
         if (left === 0) win('Correct!', 400); else say(`Yes, that's ${sq}. ${left} more.`, 'good');
       } else {
-        miss(null, `That's ${sq}. Find the file letter along the bottom, then the rank number up the side.`);
+        miss(null, `That square is ${sq}: column (file) "${sq[0]}", row (rank) ${sq[1]}. Read the letter along the bottom edge, then the number up the left edge.`, [], [{ sq, kind: 'ring' }]);
       }
       return;
     }
@@ -180,16 +253,12 @@ export function useExercise(level: Level, onSolved: (mistakes: number) => void) 
         if (found.has(sq)) return;
         const next = new Set(found); next.add(sq); setFound(next); sfx('pop');
         const left = answers.size - next.size;
-        if (left === 0) win('All of them!', 400); else say(`Yes. ${left} more.`, 'good');
+        const yes = `Yes, ${sq} is safe: no black piece attacks it.`;
+        if (left === 0) win(`${yes} That's every legal move.`, 400, [{ from: level.from!, to: sq, color: 'good' }]);
+        else { say(`${yes} ${left} more.`, 'good'); show([{ from: level.from!, to: sq, color: 'good' }]); }
       } else {
-        const g = game.current!;
-        const piece = level.from ? g.get(level.from as Square) : null;
-        const [fx, fy] = [sq.charCodeAt(0) - 97, Number(sq[1]) - 1];
-        const [kx, ky] = level.from ? [level.from.charCodeAt(0) - 97, Number(level.from[1]) - 1] : [0, 0];
-        const adjacent = Math.max(Math.abs(fx - kx), Math.abs(fy - ky)) === 1;
-        miss(sq, piece?.type === 'k' && adjacent
-          ? `${sq} is attacked by a black piece. The King can never move into check.`
-          : `The ${PIECE_NAMES[(piece?.type ?? 'k') as PieceType]} can't move to ${sq}.`);
+        const e = explainKingSquare(game.current!, level.from!, sq);
+        miss(sq, e.text, e.arrows, e.marks);
         if (mistakesRef.current + 1 >= 2) setShowHint(true);
       }
       return;
@@ -199,32 +268,59 @@ export function useExercise(level: Level, onSolved: (mistakes: number) => void) 
     if (!me || !r) return;
 
     if (level.kind === 'tapAll') {
+      const isKing = enemyKing?.sq === sq;
       const isTarget = targetsLeft.some((t) => t.sq === sq) || pieces.some((p) => p.side === 'b' && p.sq === sq);
-      if (!isTarget) { sfx('tap'); say(`Tap the ${level.shapes?.length ? 'targets' : 'black pieces'} the ${PIECE_NAMES[me.type]} could capture.`); return; }
-      if (answers.has(sq)) {
+      if (!isTarget) {
+        sfx('tap');
+        say(`Tap the ${level.shapes?.length ? 'targets' : 'black pieces'}. For each one, ask: can the ${NAME[me.type]} reach it in one move, with nothing in the way?`);
+        show(moveArrows(me.type, 'w', me.sq, occ));
+        return;
+      }
+      const ok = answers.has(sq);
+      const e = explainReach(me.type, me.sq, sq, occ, { ok, what: whatAt(sq), whatAt, isKing });
+      if (isKing) { sfx('oops'); say(e.text, 'oops'); show(e.arrows, e.marks); setShake({ sq, n: Date.now() }); return; }
+      if (ok) {
         if (found.has(sq)) return;
         const next = new Set(found); next.add(sq); setFound(next); sfx('pop');
         const left = answers.size - next.size;
-        if (left === 0) win('You found all of them!', 400); else say(`Yes. ${left} more.`, 'good');
+        if (left === 0) win(`${e.text} You found all of them!`, 600, e.arrows);
+        else { say(`${e.text} ${left} more.`, 'good'); show(e.arrows, e.marks); }
         return;
       }
-      miss(sq, whyNot(me.type, 'w', me.sq, sq, occ, 'plain'));
+      miss(sq, e.text, e.arrows, e.marks);
       if (mistakesRef.current + 1 >= 2) setShowHint(true);
       return;
     }
 
-    if (sq === me.sq) { sfx('tap'); return; }
+    // collect + check: pick the piece up first (tap or drag), then move it
+    if (sq === me.sq) { sfx('tap'); setSelected(selected === me.sq ? null : me.sq); return; }
+    if (selected !== me.sq) {
+      sfx('tap');
+      setShake({ sq: me.sq, n: Date.now() });
+      say(`First pick up your ${NAME[me.type]}: tap it, then tap the square you want it to go to. You can also drag it there.`);
+      return;
+    }
+    movePiece(sq);
+  };
+
+  const movePiece = (sq: string) => {
+    if (!me || !r) return;
     const legal = r.moves.has(sq) && sq !== enemyKing?.sq;
     if (!legal) {
-      if (enemyKing && sq === enemyKing.sq) { miss(me.sq, 'Kings are never captured. Attack it instead: that\'s check.'); return; }
-      const o = occ(sq);
-      miss(me.sq, o === 'friend' ? 'You can\'t capture your own piece.' : whyNot(me.type, 'w', me.sq, sq, occ, 'plain'));
+      if (enemyKing && sq === enemyKing.sq) {
+        miss(me.sq, 'Kings are never captured. Instead, you attack the King. That\'s called "check". Find a square where your piece attacks it.', [], [{ sq, kind: 'ring' }]);
+        return;
+      }
+      if (occ(sq) === 'friend') { miss(me.sq, 'That\'s your own piece. You can never capture (or land on) your own pieces.', [], [{ sq, kind: 'x' }]); return; }
+      const e = explainReach(me.type, me.sq, sq, occ, { ok: false, what: whatAt(sq), whatAt });
+      miss(me.sq, e.text, e.arrows, e.marks);
       return;
     }
     const tHere = targetsLeft.find((t) => t.sq === sq);
     const eHere = pieces.find((p) => p.side === 'b' && p.sq === sq);
     const from = me.sq;
     setMoves((n) => n + 1);
+    setSelected(null);
     setPieces((ps) => ps.filter((p) => p !== eHere).map((p) => (p.id === me.id ? { ...p, sq } : p)));
     if (tHere) setTargets((ts) => ts.filter((t) => t !== tHere));
 
@@ -232,7 +328,7 @@ export function useExercise(level: Level, onSolved: (mistakes: number) => void) 
       const remaining = targetsLeft.length - (tHere ? 1 : 0) + pieces.filter((p) => p.side === 'b').length - (eHere ? 1 : 0);
       if (tHere || eHere) {
         sfx('pop');
-        if (remaining === 0) win('Done!', 400); else say(`${remaining} to go.`, 'good');
+        if (remaining === 0) win('Done!', 400); else say(`${eHere ? 'Captured' : 'Got it'}! ${remaining} to go.`, 'good');
       } else sfx('move');
       return;
     }
@@ -241,13 +337,30 @@ export function useExercise(level: Level, onSolved: (mistakes: number) => void) 
     sfx('move');
     const after = (x: string): Occupant => (x === enemyKing?.sq ? 'enemy' : x === sq ? 'friend' : occ(x) === 'friend' ? 'empty' : occ(x));
     if (enemyKing && attacks(me.type, 'w', sq, after).has(enemyKing.sq)) {
-      setDanger(enemyKing.sq); sfx('check'); win('Check!', 800);
+      setDanger(enemyKing.sq); sfx('check');
+      win(`Check! From ${sq} the ${NAME[me.type]} attacks the King on ${enemyKing.sq} (red arrow). Black must now get the King out of check.`, 900,
+        [{ from: sq, to: enemyKing.sq, color: 'bad', knight: me.type === 'n' }]);
     } else {
       setMistakes((n) => n + 1);
-      say('That doesn\'t attack the King. Try another square.', 'oops');
+      const at2 = (x: string): Occupant => (x === sq ? 'friend' : x === from ? 'empty' : occ(x));
+      say(`From ${sq} the ${NAME[me.type]} attacks the squares along the arrows, but the King on ${enemyKing?.sq} isn't on any of them, so it's not check. Try another square.`, 'oops');
+      show(me.type === 'p' ? moveArrows('p', 'w', sq, at2).filter((a) => a.dashed || a.color === 'good') : moveArrows(me.type, 'w', sq, at2), enemyKing ? [{ sq: enemyKing.sq, kind: 'ring' }] : []);
       setBusy(true);
-      window.setTimeout(() => { setPieces((ps) => ps.map((p) => (p.id === me.id ? { ...p, sq: from } : p))); setBusy(false); }, 1000);
+      window.setTimeout(() => { setPieces((ps) => ps.map((p) => (p.id === me.id ? { ...p, sq: from } : p))); show(); setBusy(false); }, 3000);
     }
+  };
+
+  const movesPieces = level.kind === 'collect' || level.kind === 'check' || level.kind === 'mate' || level.kind === 'best' || level.kind === 'escape';
+  const canDrag = (sq: string) => {
+    if (!movesPieces || busy || solved) return false;
+    if (game.current) return game.current.get(sq as Square)?.color === 'w';
+    return !!me && sq === me.sq;
+  };
+  const onDrop = (from: string, to: string) => {
+    if (busy || solved) return;
+    show(startCheck?.arrows ?? []);
+    if (game.current) { setSelected(from); tapGame(to, from); return; }
+    if (me && from === me.sq) { setSelected(me.sq); movePiece(to); }
   };
 
   const answerQuiz = (i: number) => {
@@ -265,18 +378,34 @@ export function useExercise(level: Level, onSolved: (mistakes: number) => void) 
       const all = g.moves({ verbose: true });
       const good = all.find((m) => {
         if (level.kind === 'best') return (level.answers ?? []).includes(strip(m.san));
-        if (level.kind === 'escape') {
-          const goal = level.goal ?? 'any';
-          return goal === 'any' || (goal === 'king' && m.piece === 'k') || (goal === 'capture' && !!m.captured) || (goal === 'block' && m.piece !== 'k' && !m.captured);
-        }
+        if (level.kind === 'escape') return isGoal(m);
         g.move(m); const ok = g.isCheckmate(); g.undo(); return ok;
       });
-      if (good) { setSelected(good.from); hintSquares.current = [good.to]; say(`Try the piece on ${good.from}.`); }
-    } else if (level.kind === 'tapAll' || level.kind === 'tapLegal') {
-      say('The outlined squares show everywhere the piece can go.');
+      if (good) {
+        setSelected(good.from); hintSquares.current = [good.to];
+        say(`Try moving the ${NAME[good.piece as PieceType]} on ${good.from} (arrow).`);
+        show([...(startCheck?.arrows ?? []), { from: good.from, to: good.to, color: 'info', dashed: true, knight: good.piece === 'n' }]);
+      }
+    } else if (level.kind === 'tapLegal' && g && level.from) {
+      const legal = [...answers];
+      const [kx, ky] = [level.from.charCodeAt(0) - 97, Number(level.from[1]) - 1];
+      const red: Arrow[] = [];
+      for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) {
+        if (!dx && !dy) continue;
+        const x = kx + dx, y = ky + dy;
+        if (x < 0 || x > 7 || y < 0 || y > 7) continue;
+        const s = String.fromCharCode(97 + x) + (y + 1);
+        if (legal.includes(s)) continue;
+        for (const a of attackersOf(g, s, 'b', level.from)) red.push({ from: a, to: s, color: 'bad', knight: g.get(a as Square)?.type === 'n' });
+      }
+      say('Outlined squares are safe. The red arrows show which black piece attacks each of the other squares around the King.');
+      show(red);
+    } else if (level.kind === 'tapAll' && me) {
+      say(`The arrows show every line the ${NAME[me.type]} can travel this move. It captures the FIRST target or black piece it meets on each line.`);
+      show(moveArrows(me.type, 'w', me.sq, occ));
     } else if (level.kind === 'tapSquare') {
       hintSquares.current = [...answers].filter((s) => !found.has(s));
-      say('Outlined.');
+      say('Outlined. Letters along the bottom are files (columns), numbers up the side are ranks (rows).');
     }
     force((n) => n + 1);
   };
@@ -300,16 +429,25 @@ export function useExercise(level: Level, onSolved: (mistakes: number) => void) 
       ...targetsLeft.map((t) => ({ id: t.id, sq: t.sq, target: true })),
       ...pieces.map((p) => ({ id: p.id, sq: p.sq, piece: p as BoardPiece })),
     ];
-    if (level.kind === 'tapAll') hintSet = showHint && r ? new Set([...r.moves]) : undefined;
+    if (level.kind === 'tapAll') hintSet = showHint && r ? new Set([...r.moves].filter((s) => s !== enemyKing?.sq)) : undefined;
     else if (level.kind === 'tapSquare') hintSet = showHint ? new Set(hintSquares.current) : undefined;
-    else if (r && !busy && (level.kind === 'collect' || level.kind === 'check')) dots = new Set([...r.moves].filter((s) => s !== enemyKing?.sq));
+    else if (r && !busy && selected === me?.sq && (level.kind === 'collect' || level.kind === 'check')) dots = new Set([...r.moves].filter((s) => s !== enemyKing?.sq));
   }
+
+  // escape: keep the check visible until the student does something else
+  const arrows = viz.arrows.length || viz.marks.length ? viz.arrows : (startCheck && !solved && !busy ? startCheck.arrows : []);
+
+  // the rule reminder for whatever piece is in play
+  const selPiece = game.current && selected ? game.current.get(selected as Square) : null;
+  const ruleType: PieceType | null = me && !game.current ? me.type : selPiece ? (selPiece.type as PieceType) : null;
 
   const bounce = level.kind === 'tapLegal' ? level.from : undefined;
   return {
     board: { items, dots, selected: selected ?? bounce ?? null, found, shake, hint: hintSet, danger, onTap,
-      highlight: level.kind === 'tapSquare' || level.kind === 'tapLegal' ? found : undefined },
+      highlight: level.kind === 'tapSquare' || level.kind === 'tapLegal' ? found : undefined, arrows, marks: viz.marks,
+      canDrag: movesPieces ? canDrag : undefined, onDrop: movesPieces ? onDrop : undefined },
     msg, mistakes, solved, moves, picked, answerQuiz, hint,
-    progress: { found: found.size, total: answers.size, left: targetsLeft.length + pieces.filter((p) => p.side === 'b').length },
+    rule: ruleType && level.kind !== 'quiz' && level.kind !== 'tapSquare' ? RULE[ruleType] : null,
+    progress: { found: found.size, total: answers.size, left: targetsLeft.length + pieces.filter((p) => p.side === 'b' && p.type !== 'k').length },
   };
 }

@@ -3,6 +3,7 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { KidPiece, KidShape, KidBush } from './KidsArt';
 import { FILES, sqToXY, type BoardPiece, type ShapeKind } from '@/lib/kids/levels';
+import { useBoardPointer } from '@/components/learn/useBoardPointer';
 
 export interface BoardItem {
   id: string;
@@ -23,6 +24,8 @@ export interface KidsBoardProps {
   danger?: string | null;     // a king in check
   bounce?: string | null;     // the piece that's "alive" (gently bobs)
   onTap: (sq: string) => void;
+  canDrag?: (sq: string) => boolean;
+  onDrop?: (from: string, to: string) => void;
 }
 
 const LIGHT = '#FFF7E3';
@@ -33,15 +36,17 @@ function pos(sq: string) {
   return { left: `${x * 12.5}%`, top: `${(7 - y) * 12.5}%` };
 }
 
-export function KidsBoard({ items, frame, dots, selected, found, shake, hint, danger, bounce, onTap }: KidsBoardProps) {
+export function KidsBoard({ items, frame, dots, selected, found, shake, hint, danger, bounce, onTap, canDrag, onDrop }: KidsBoardProps) {
   const squares: string[] = [];
   for (let y = 7; y >= 0; y--) for (let x = 0; x < 8; x++) squares.push(FILES[x] + (y + 1));
   const at = new Map(items.map((i) => [i.sq, i]));
+  const ptr = useBoardPointer({ canDrag, onTap, onDrop });
+  const dragItem = ptr.drag?.moved ? at.get(ptr.drag.from) : undefined;
 
   return (
     <div className="w-full mx-auto select-none" style={{ maxWidth: 520 }}>
       <div className="rounded-[26px] p-2" style={{ background: frame, boxShadow: '0 8px 0 rgba(47,34,87,0.22), inset 0 3px 0 rgba(255,255,255,0.35)' }}>
-        <div className="relative w-full rounded-[18px] overflow-hidden" style={{ aspectRatio: '1 / 1' }}>
+        <div ref={ptr.box} {...ptr.handlers} className="relative w-full rounded-[18px] overflow-hidden" style={{ aspectRatio: '1 / 1', touchAction: 'none' }}>
           {/* squares */}
           <div className="absolute inset-0 grid grid-cols-8 grid-rows-8">
             {squares.map((sq) => {
@@ -51,7 +56,7 @@ export function KidsBoard({ items, frame, dots, selected, found, shake, hint, da
               const label = item?.piece ? `${sq}, ${item.piece.side === 'w' ? 'your' : 'plum'} piece`
                 : item?.shape ? `${sq}, ${item.shape}` : item?.bush ? `${sq}, bush` : sq;
               return (
-                <button key={sq} type="button" aria-label={label} onClick={() => onTap(sq)}
+                <button key={sq} type="button" aria-label={label} onClick={(e) => ptr.keyTap(sq, e.detail)}
                   className="relative outline-none focus-visible:ring-4 focus-visible:ring-white/80"
                   style={{ background: dark ? DARK : LIGHT, WebkitTapHighlightColor: 'transparent' }}>
                   {selected === sq && <span className="absolute inset-0" style={{ background: 'rgba(255,214,92,0.65)' }} />}
@@ -101,7 +106,7 @@ export function KidsBoard({ items, frame, dots, selected, found, shake, hint, da
                       key={shaking ? `s${shake?.n}` : 'still'}
                       animate={shaking ? { x: [0, -7, 7, -5, 5, 0] } : bounce === it.sq ? { y: [0, -4, 0] } : { y: 0 }}
                       transition={shaking ? { duration: 0.45 } : { duration: 1.6, repeat: bounce === it.sq ? Infinity : 0, ease: 'easeInOut' }}>
-                      <div className="w-full h-full" style={{ opacity: isFound ? 0.35 : 1, transition: 'opacity .3s' }}>
+                      <div className="w-full h-full" style={{ opacity: isFound ? 0.35 : dragItem === it ? 0.3 : 1, transition: 'opacity .3s' }}>
                         {it.piece && <KidPiece type={it.piece.type} side={it.piece.side} size="100%"
                           mood={danger === it.sq ? 'wow' : undefined} />}
                         {it.shape && <KidShape kind={it.shape} size="100%" />}
@@ -120,6 +125,11 @@ export function KidsBoard({ items, frame, dots, selected, found, shake, hint, da
               })}
             </AnimatePresence>
           </div>
+          {dragItem?.piece && ptr.drag && (
+            <div className="absolute pointer-events-none z-10" style={{ left: ptr.drag.x, top: ptr.drag.y, width: '12.5%', height: '12.5%', transform: 'translate(-50%, -60%) scale(1.2)' }}>
+              <KidPiece type={dragItem.piece.type} side={dragItem.piece.side} size="100%" />
+            </div>
+          )}
         </div>
       </div>
     </div>
