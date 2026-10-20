@@ -169,7 +169,7 @@ export function Exercise({ level, index, total, onSolved, onNext, onRestart }:
       <h2 className="text-xl font-black mb-3">{level.title}</h2>
 
       <AnimatePresence mode="wait">
-        <motion.div key={ex.msg.text} className="rounded-xl px-4 py-3 mb-4 text-[15px] leading-snug font-medium"
+        <motion.div key={ex.msg.text} className="rounded-xl px-4 py-3 mb-4 text-[15px] leading-snug font-medium whitespace-pre-line"
           style={{ background: `${toneColor}14`, borderLeft: `4px solid ${toneColor}` }}
           initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
           {ex.msg.text}

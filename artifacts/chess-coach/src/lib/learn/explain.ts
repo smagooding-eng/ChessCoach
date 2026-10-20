@@ -277,3 +277,73 @@ export function escapes(g: Chess): Explained {
 }
 
 export { lower, pieceName };
+
+/**
+ * After checkmate: why the King can't get out. Covers all three escapes:
+ * every square around the King (own piece in the way, or attacked, with
+ * the attacker drawn), blocking the check, and capturing the checker.
+ */
+export function whyMate(g: Chess): Explained {
+  const color = g.turn();               // the side that is mated
+  const by = color === 'w' ? 'b' : 'w';
+  const k = kingSquare(g, color);
+  if (!k) return { text: '', arrows: [], marks: [] };
+  const checkers = attackersOf(g, k, by);
+  const checkArrowsList: Arrow[] = checkers.map((a) => ({ from: a, to: k, color: 'bad' as ArrowColor, knight: g.get(a as Square)?.type === 'n' }));
+  const arrows: Arrow[] = [];
+  const marks: Mark[] = [];
+
+  const own: string[] = [];
+  const covered = new Map<string, string[]>(); // attacker -> squares
+  const [kx, ky] = sqToXY(k);
+  for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) {
+    if (!dx && !dy) continue;
+    const sq = xyToSq(kx + dx, ky + dy);
+    if (!sq) continue;
+    const p = g.get(sq as Square);
+    if (p && p.color === color) { own.push(sq); marks.push({ sq, kind: 'ring' }); continue; }
+    const att = attackersOf(g, sq, by, k);
+    if (att.length) {
+      marks.push({ sq, kind: 'x' });
+      for (const a of att) covered.set(a, [...(covered.get(a) ?? []), sq]);
+    }
+  }
+  const dist = (a: string, b: string) => Math.max(Math.abs(a.charCodeAt(0) - b.charCodeAt(0)), Math.abs(Number(a[1]) - Number(b[1])));
+  for (const [a, sqs] of covered) {
+    const far = sqs.reduce((m, q) => (dist(a, q) > dist(a, m) ? q : m), sqs[0]);
+    arrows.push({ from: a, to: far, color: 'warn', dashed: true, knight: g.get(a as Square)?.type === 'n' });
+  }
+
+  const lines: string[] = [];
+  if (own.length) lines.push(`${own.join(', ')}: blocked by Black's own pieces (circled).`);
+  for (const [a, sqs] of covered) lines.push(`${sqs.join(', ')}: covered by your ${NAME[g.get(a as Square)!.type as PieceType]} on ${a} (dotted arrow).`);
+  if (kx === 0 || kx === 7 || ky === 0 || ky === 7) lines.push('The edge of the board takes away the rest.');
+
+  if (checkers.length === 1) {
+    const c = checkers[0];
+    const cp = g.get(c as Square)!;
+    const [cx, cy] = sqToXY(c);
+    const adjacent = Math.max(Math.abs(cx - kx), Math.abs(cy - ky)) === 1;
+    if (cp.type === 'n') lines.push('Block? A Knight\'s check jumps, so it can\'t be blocked.');
+    else if (adjacent) lines.push(`Block? The ${NAME[cp.type as PieceType]} is right next to the King, so there's no gap to block.`);
+    else {
+      const between: string[] = [];
+      const sx = Math.sign(kx - cx), sy = Math.sign(ky - cy);
+      for (let i = 1; ; i++) { const s = xyToSq(cx + sx * i, cy + sy * i); if (!s || s === k) break; between.push(s); }
+      lines.push(`Block? No black piece can move onto ${between.join(' or ')}.`);
+    }
+    const takers = attackersOf(g, c, color);
+    if (!takers.length) lines.push(`Capture? Nothing black can reach the ${NAME[cp.type as PieceType]} on ${c}.`);
+    else {
+      const guard = attackersOf(g, c, by);
+      lines.push(guard.length
+        ? `Capture? The King could take the ${NAME[cp.type as PieceType]}, but it's protected by your ${NAME[g.get(guard[0] as Square)!.type as PieceType]} on ${guard[0]}, so that would be moving into check.`
+        : `Capture? It can't be captured legally.`);
+      for (const gd of guard) arrows.push({ from: gd, to: c, color: 'good', knight: g.get(gd as Square)?.type === 'n' });
+    }
+  } else if (checkers.length > 1) {
+    lines.push('Double check: two pieces attack at once, so blocking or capturing one still leaves the other. Only a King move could help, and there isn\'t one.');
+  }
+  // the check line goes on top so it stays visible
+  return { text: `Why it's checkmate:\n• ${lines.join('\n• ')}`, arrows: [...arrows, ...checkArrowsList], marks };
+}

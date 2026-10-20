@@ -11,7 +11,7 @@ import { playSfxAlways, type Sfx } from '@/lib/kids/progress';
 import { learnState } from './progress';
 import {
   explainReach, moveArrows, checkArrows, explainKingSquare, explainNoCastle, attackedTargets, recapture, escapes,
-  attackersOf, kingSquare, RULE, type Arrow, type Mark,
+  attackersOf, kingSquare, RULE, whyMate, type Arrow, type Mark,
 } from './explain';
 import type { LearnItem } from '@/components/learn/LearnBoard';
 
@@ -193,7 +193,9 @@ export function useExercise(level: Level, onSolved: (mistakes: number) => void, 
       if (level.kind === 'mate') {
         if (g.isCheckmate()) {
           sfx('check'); setDanger(kingSquare(g, 'b'));
-          win('Checkmate! The King is attacked (red arrow) and has no square to go to, no way to block, and no way to capture the attacker.', 900, checkArrows(g).arrows);
+          const why = whyMate(g);
+          win(`Checkmate! The King is in check (red arrow) and has no way out.\n${why.text}`, 900, why.arrows);
+          setViz({ arrows: why.arrows, marks: why.marks });
           return;
         }
         setMistakes((n) => n + 1);
