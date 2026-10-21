@@ -2,6 +2,7 @@ import { Router, type IRouter, type Request, type Response } from "express";
 import { db, outreachLeadsTable } from "@workspace/db";
 import { eq, desc } from "drizzle-orm";
 import OpenAI from "openai";
+import { askClaude, claudeAvailable } from "../lib/claude";
 import { logger } from "../lib/logger";
 import { trackAiUsage, AI_FEATURES } from "../lib/aiUsageTracker";
 
@@ -155,7 +156,6 @@ router.post("/admin/outreach/leads/:id/generate-draft", requireAdmin, async (req
     }
 
     const guidance = PLATFORM_GUIDANCE[lead.platform] ?? PLATFORM_GUIDANCE.other;
-    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
     const prompt = `${PRODUCT_INFO}
 
@@ -173,14 +173,22 @@ Write a single, specific, genuine-sounding reply to this exact situation. It mus
 
 Return plain text only — just the reply itself, no preamble, no markdown formatting, no quotes around it.`;
 
-    const response = await openai.chat.completions.create({
-      model: "gpt-5.6-luna",
-      max_completion_tokens: 500,
-      messages: [{ role: "user", content: prompt }],
-    });
-    void trackAiUsage({ userId: req.user?.id, feature: AI_FEATURES.OUTREACH_DRAFT, model: "gpt-5.6-luna", usage: response.usage });
-
-    const draft = response.choices[0]?.message?.content?.trim() ?? "";
+    // Claude when ANTHROPIC_API_KEY is set; OpenAI only as the fallback.
+    let draft = "";
+    if (claudeAvailable()) {
+      const r = await askClaude(prompt, { maxTokens: 800 });
+      void trackAiUsage({ userId: req.user?.id, feature: AI_FEATURES.OUTREACH_DRAFT, model: r.model, usage: { prompt_tokens: r.inputTokens, completion_tokens: r.outputTokens, total_tokens: r.inputTokens + r.outputTokens } });
+      draft = r.text.trim();
+    } else {
+      const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+      const response = await openai.chat.completions.create({
+        model: "gpt-5.6-luna",
+        max_completion_tokens: 500,
+        messages: [{ role: "user", content: prompt }],
+      });
+      void trackAiUsage({ userId: req.user?.id, feature: AI_FEATURES.OUTREACH_DRAFT, model: "gpt-5.6-luna", usage: response.usage });
+      draft = response.choices[0]?.message?.content?.trim() ?? "";
+    }
     if (!draft) {
       res.status(502).json({ error: "Draft generation returned nothing — try again" });
       return;

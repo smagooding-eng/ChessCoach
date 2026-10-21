@@ -22,6 +22,7 @@ import OpenAI from "openai";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { logger } from "./logger";
+import { askClaude, claudeAvailable } from "./claude";
 import { trackAiUsage, AI_FEATURES } from "./aiUsageTracker";
 
 function rowsOf<T>(r: unknown): T[] { return Array.isArray(r) ? (r as T[]) : ((r as { rows?: T[] })?.rows ?? []); }
@@ -241,13 +242,31 @@ Do not include email addresses. Do not invent websites. Do not list Chess.com or
 
 const LINK_IN_BIO = /(^|\.)(linktr\.ee|beacons\.ai|carrd\.co|stan\.store|bio\.link|linkin\.bio|campsite\.bio|lnk\.bio|tap\.bio|komi\.io|snipfeed\.co|hoo\.be|solo\.to)$/i;
 
+const validCandidates = (text: string): Candidate[] => {
+  const parsed = parseJsonLoose(text) as { results?: Candidate[] } | null;
+  const list = Array.isArray(parsed?.results) ? parsed!.results : [];
+  return list.filter((c) => c && typeof c.website === "string" && /^https?:\/\//i.test(c.website) && typeof c.name === "string");
+};
+
 async function searchOrganizations(type: string, place: string, audience: Audience = "club"): Promise<Candidate[]> {
-  if (!process.env.OPENAI_API_KEY) throw new Error("OPENAI_API_KEY is not set");
-  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   const prompt = audience === "influencer" ? creatorPrompt(type, place)
     : audience === "library" ? libraryPrompt(type, place)
     : audience === "press" ? pressPrompt(type, place)
     : clubPrompt(type, place);
+  // Claude with web search when ANTHROPIC_API_KEY is set; OpenAI only as the
+  // fallback for when it isn't.
+  if (claudeAvailable()) {
+    const r = await askClaude(`${prompt}
+
+Use web search to find them. Your final message must be only the JSON object, with no other text.`, { webSearch: true, maxSearches: 6, maxTokens: 4000 });
+    void trackAiUsage({
+      feature: AI_FEATURES.OUTREACH_DISCOVERY, model: r.model,
+      usage: { prompt_tokens: r.inputTokens, completion_tokens: r.outputTokens, total_tokens: r.inputTokens + r.outputTokens },
+    });
+    return validCandidates(r.text);
+  }
+  if (!process.env.OPENAI_API_KEY) throw new Error("Set ANTHROPIC_API_KEY on the server to search with Claude");
+  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   let lastErr: unknown = null;
   for (const model of SEARCH_MODELS) {
     try {
@@ -258,9 +277,7 @@ async function searchOrganizations(type: string, place: string, audience: Audien
         feature: AI_FEATURES.OUTREACH_DISCOVERY, model,
         usage: { prompt_tokens: resp.usage?.input_tokens, completion_tokens: resp.usage?.output_tokens, total_tokens: resp.usage?.total_tokens },
       });
-      const parsed = parseJsonLoose(resp.output_text ?? "") as { results?: Candidate[] } | null;
-      const list = Array.isArray(parsed?.results) ? parsed!.results : [];
-      return list.filter((c) => c && typeof c.website === "string" && /^https?:\/\//i.test(c.website) && typeof c.name === "string");
+      return validCandidates(resp.output_text ?? "");
     } catch (err) {
       lastErr = err;
       logger.warn({ err: err instanceof Error ? err.message : err, model }, "[club-outreach] web search failed, trying next model");
