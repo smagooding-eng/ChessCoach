@@ -475,6 +475,45 @@ function PersonalAnalysisCard() {
   );
 }
 
+// Below the first screen: everything ChessScout.net does, with links to the
+// page for each. Gives people who scroll (and search engines) the full picture.
+function LandingExplore({ onSignup }: { onSignup: () => void }) {
+  const items = [
+    { href: '/play-chess-online', title: t('Play chess online'), text: t('Live games against real people, daily games, challenges with friends, and ten practice bots from 400 to 3000.') },
+    { href: '/chess-tournaments', title: t('Tournaments'), text: t('Arena and knockout tournaments, live or daily. Create your own for a club, class or friends.') },
+    { href: '/chess-game-analysis', title: t('Game analysis'), text: t('Free Stockfish review of every game, including your Chess.com and Lichess games.') },
+    { href: '/scout-chess-opponent', title: t('Scout any opponent'), text: t('See what any Chess.com or Lichess player plays as White and Black before you face them.') },
+    { href: '/chess-for-kids', title: t('Chess for kids'), text: t('Nine colorful worlds that teach one piece at a time. Teacher Approved on Google Play.') },
+    { href: '/learn-chess', title: t('Learn chess'), text: t('The Beginner Path takes you from the rules to your first real games.') },
+    { href: '/chess-puzzles', title: t('Unlimited puzzles'), text: t('Mates, forks, pins, skewers and endgames, with a puzzle rating that grows with you.') },
+    { href: '/chess-openings', title: t('Openings & traps'), text: t('What top players play, how they score, and the traps to set and avoid.') },
+  ];
+  return (
+    <section className="relative z-10 mx-auto w-full max-w-7xl px-4 pb-16 pt-10 sm:px-8">
+      <h2 className="text-[clamp(1.5rem,6vw,2.2rem)] font-black leading-tight" style={{ color: TEXT }}>{t('Everything you need to play and get better')}</h2>
+      <p className="mt-2 max-w-2xl text-[14.5px] leading-relaxed" style={{ color: MUTED }}>{t('Free to play, free to learn, in 28 languages, in your browser or on Android.')}</p>
+      <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {items.map((it) => (
+          <Link key={it.href} href={it.href} className="group rounded-[18px] p-4 transition-colors hover:bg-white/[0.03]"
+            style={{ background: 'rgba(13,21,22,0.72)', border: '1px solid rgba(255,255,255,0.07)' }}>
+            <span className="flex items-center justify-between gap-2 text-[15px] font-extrabold" style={{ color: TEXT }}>
+              {it.title} <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" style={{ color: G }} />
+            </span>
+            <span className="mt-1 block text-[13px] leading-snug" style={{ color: MUTED }}>{it.text}</span>
+          </Link>
+        ))}
+      </div>
+      <div className="mt-6 flex flex-wrap items-center gap-3">
+        <button onClick={onSignup} className="inline-flex items-center gap-2 rounded-2xl px-6 py-3 text-[15px] font-extrabold"
+          style={{ background: G, color: ON_G }}>
+          <PlayIcon className="h-4 w-4" fill="currentColor" /> {t('Play Free')}
+        </button>
+        <Link href="/learn" className="text-[14px] font-bold hover:underline" style={{ color: MUTED }}>{t('Chess improvement articles')}</Link>
+      </div>
+    </section>
+  );
+}
+
 export function LandingPage() {
   const siteImg = useSiteImg();
   const [authOpen, setAuthOpen] = useState(false);
@@ -545,7 +584,9 @@ export function LandingPage() {
   ];
 
   return (
-    <div {...noGT()} className="relative flex min-h-[100dvh] flex-col overflow-x-hidden" style={{ background: `radial-gradient(ellipse at 75% 0%, #0F2B1D 0%, #07130F 34%, ${BG} 68%)` }}>
+    <div {...noGT()} className="relative overflow-x-hidden" style={{ background: `radial-gradient(ellipse at 75% 0%, #0F2B1D 0%, #07130F 34%, ${BG} 68%)`, backgroundColor: BG }}>
+      {/* First screen: exactly as before. The explore section sits below it. */}
+      <div className="relative flex min-h-[100dvh] flex-col">
       {/* knight art: bleeds off the right edge on phones (as in the mockup), sits fully in view on desktop */}
       <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
         <img src={siteImg(`${import.meta.env.BASE_URL}chessscout/scout-knight.webp`)} alt=""
@@ -654,6 +695,9 @@ export function LandingPage() {
         <Link href="/credits" className="mx-1.5 hover:underline">{t('Photo credits')}</Link>
         <SocialLinks size={14} className="mx-1" />
       </footer>
+      </div>
+
+      <LandingExplore onSignup={openSignup} />
 
       <AuthModal open={authOpen} onClose={() => { setAuthOpen(false); setAuthEmail(false); }} initialMode={authMode} externalError={oauthError} context={authContext} startWithEmail={authEmail} />
     </div>

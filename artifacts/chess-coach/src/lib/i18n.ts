@@ -63,7 +63,22 @@ function match(locale: string): string | null {
   return byCode.get(base)?.code ?? null;
 }
 
+/** "/es/chess-for-kids" -> { lang: "es", rest: "/chess-for-kids" }; null for addresses without a language. */
+export function pathLang(path: string): { lang: string; rest: string } | null {
+  const m = /^\/([a-z]{2}(?:-[a-z]{2})?)(\/.*)?$/i.exec(path);
+  if (!m) return null;
+  const l = byCode.get(m[1].toLowerCase());
+  if (!l || l.code === 'en') return null;
+  return { lang: l.code, rest: m[2] || '/' };
+}
+
 function detect(): string {
+  // The address can carry the language (/es, /pt/chess-for-kids): those pages
+  // are written in it, so the app around them follows.
+  try {
+    const pl = pathLang(window.location.pathname.replace(import.meta.env.BASE_URL.replace(/\/$/, ''), '') || '/');
+    if (pl) return pl.lang;
+  } catch { /* ignore */ }
   // A link can pick the language (?lang=es), e.g. from a translated outreach email.
   try {
     const q = new URLSearchParams(window.location.search).get('lang');

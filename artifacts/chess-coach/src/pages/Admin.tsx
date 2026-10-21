@@ -14,6 +14,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ClubOutreachPanel } from '@/components/admin/ClubOutreachPanel';
 import { TrafficExportPanel } from '@/components/admin/TrafficExportPanel';
 import { ShareKitPanel } from '@/components/admin/ShareKitPanel';
+import { DirectoryKitPanel } from '@/components/admin/DirectoryKitPanel';
 import { EmailTrackingPanel } from '@/components/admin/EmailTrackingPanel';
 import { BotVisitsPanel } from '@/components/admin/BotVisitsPanel';
 import {
@@ -751,6 +752,7 @@ export function Admin() {
           <ShareKitPanel />
           <EmailTrackingPanel />
           <ClubOutreachPanel />
+          <DirectoryKitPanel />
           <OutreachStudio />
           <SeoArticlesPanel />
           <FacebookAutoPostPanel />

@@ -90,17 +90,6 @@
       "destination": "/api/og?kind=page&p=tournaments"
     },
     {
-      "source": "/pricing",
-      "has": [
-        {
-          "type": "header",
-          "key": "user-agent",
-          "value": ".*(bot|Bot|BOT|crawler|spider|facebookexternalhit|Facebot|WhatsApp|Slack|Discord|Telegram|Twitter|LinkedIn|Pinterest|Embedly|Iframely|Quora|Skype|redditbot|Applebot|vkShare|Google-PageRenderer|Snapchat|Viber|Line/|KakaoTalk|Mastodon|preview|Preview).*"
-        }
-      ],
-      "destination": "/api/og?kind=page&p=pricing"
-    },
-    {
       "source": "/beginner",
       "has": [
         {
@@ -154,6 +143,42 @@
         }
       ],
       "destination": "/api/og?kind=page&p=kids"
+    },
+    {
+      "source": "/pricing",
+      "destination": "/api/page?kind=seo&key=pricing"
+    },
+    {
+      "source": "/:key(play-chess-online|chess-for-kids|learn-chess|chess-puzzles|chess-tournaments|chess-game-analysis|scout-chess-opponent)",
+      "destination": "/api/page?kind=seo&key=:key"
+    },
+    {
+      "source": "/:lang(es|pt|fr|de|it|nl|pl|ru|uk|tr|ro|cs|hu|el|sv|ar|fa|hi|bn|id|vi|th|tl|zh-cn|zh-tw|ja|ko)",
+      "destination": "/api/page?kind=seo&key=home&lang=:lang"
+    },
+    {
+      "source": "/:lang(es|pt|fr|de|it|nl|pl|ru|uk|tr|ro|cs|hu|el|sv|ar|fa|hi|bn|id|vi|th|tl|zh-cn|zh-tw|ja|ko)/:key(play-chess-online|chess-for-kids|learn-chess|chess-puzzles|chess-tournaments|chess-game-analysis|scout-chess-opponent|pricing)",
+      "destination": "/api/page?kind=seo&key=:key&lang=:lang"
+    },
+    {
+      "source": "/vs/:name",
+      "destination": "/api/page?kind=vs&path=/vs/:name"
+    },
+    {
+      "source": "/chess-openings",
+      "destination": "/api/page?kind=openings"
+    },
+    {
+      "source": "/chess-openings/:slug",
+      "destination": "/api/page?kind=opening&slug=:slug"
+    },
+    {
+      "source": "/chess-traps",
+      "destination": "/api/page?kind=traps"
+    },
+    {
+      "source": "/chess-traps/:slug",
+      "destination": "/api/page?kind=trap&slug=:slug"
     },
     {
       "source": "/(.*)",

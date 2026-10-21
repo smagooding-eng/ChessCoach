@@ -45,7 +45,7 @@ async function getJson<T>(path: string): Promise<T | null> {
 
 // image: designed picture (public/og-*.jpg); the preview uses the section's
 // real screenshot from public/shots/, re-taken daily by a GitHub workflow.
-interface Page { title: string; description: string; path: string; body: string; jsonLd?: unknown; status?: number; image?: string }
+interface Page { title: string; description: string; path: string; body: string; jsonLd?: unknown; status?: number; image?: string; lang?: string; alternates?: { lang: string; path: string }[] }
 
 // ── Players ──────────────────────────────────────────────────────────────
 type Res = { games: number; wins: number; draws: number; losses: number };
@@ -139,6 +139,135 @@ async function articlesIndex(): Promise<Page> {
   };
 }
 
+// ── Search-friendly pages (/play-chess-online, /es/..., /pricing, /vs/...) ─
+const MAIN = '<main style="max-width:760px;margin:0 auto;padding:16px;color:#F5F7F6;font-family:system-ui,sans-serif">';
+const LANG_NAMES: Record<string, string> = { en: 'English', es: 'Español', pt: 'Português', fr: 'Français', de: 'Deutsch', it: 'Italiano', nl: 'Nederlands', pl: 'Polski', ru: 'Русский', uk: 'Українська', tr: 'Türkçe', ro: 'Română', cs: 'Čeština', hu: 'Magyar', el: 'Ελληνικά', sv: 'Svenska', ar: 'العربية', fa: 'فارسی', hi: 'हिन्दी', bn: 'বাংলা', id: 'Bahasa Indonesia', vi: 'Tiếng Việt', th: 'ไทย', tl: 'Filipino', 'zh-CN': '简体中文', 'zh-TW': '繁體中文', ja: '日本語', ko: '한국어' };
+interface SeoLink { label: string; href: string }
+interface SeoData {
+  key: string; lang: string; path: string; image?: string; title: string; description: string; h1: string; intro: string;
+  sections: { h: string; p: string; links?: SeoLink[] }[]; faq: { q: string; a: string }[]; cta: SeoLink;
+  alternates: { lang: string; path: string }[]; related: SeoLink[];
+}
+const link = (l: SeoLink) => `<a href="${esc(l.href)}">${esc(l.label)}</a>`;
+
+async function seoPage(key: string, lang: string): Promise<Page | null> {
+  const d = await getJson<{ page: SeoData }>(`/api/public/seo/page/${encodeURIComponent(key)}?lang=${encodeURIComponent(lang)}`);
+  const p = d?.page;
+  if (!p) return null;
+  // Asked for a language the page isn't translated into yet: don't serve English at that address.
+  if (lang !== 'en' && p.lang !== lang) return null;
+  const dir = p.lang === 'ar' || p.lang === 'fa' ? ' dir="rtl"' : '';
+  const others = p.alternates.filter((a) => a.lang !== p.lang);
+  const body = `<main lang="${esc(p.lang)}"${dir} style="max-width:760px;margin:0 auto;padding:16px;color:#F5F7F6;font-family:system-ui,sans-serif">
+<p><a href="${p.lang === 'en' ? '/' : `/${p.lang.toLowerCase()}`}">ChessScout.net</a></p>
+<h1>${esc(p.h1)}</h1>
+<p>${esc(p.intro)}</p>
+<p>${link(p.cta)}</p>
+${p.sections.map((x) => `<h2>${esc(x.h)}</h2>\n<p>${esc(x.p)}</p>${x.links?.length ? `\n<p>${x.links.map(link).join(' · ')}</p>` : ''}`).join('\n')}
+${p.faq.length ? `${p.faq.map((f) => `<h3>${esc(f.q)}</h3>\n<p>${esc(f.a)}</p>`).join('\n')}` : ''}
+${p.related.length ? `<nav><p>${p.related.map(link).join(' · ')}</p></nav>` : ''}
+${others.length ? `<nav><p>${others.map((a) => `<a href="${esc(a.path)}" hreflang="${esc(a.lang)}">${esc(LANG_NAMES[a.lang] ?? a.lang)}</a>`).join(' · ')}</p></nav>` : ''}
+</main>`;
+  const jsonLd = p.faq.length ? { '@context': 'https://schema.org', '@type': 'FAQPage', inLanguage: p.lang, mainEntity: p.faq.map((f) => ({ '@type': 'Question', name: f.q, acceptedAnswer: { '@type': 'Answer', text: f.a } })) } : undefined;
+  return { title: p.title, description: p.description, path: p.path, body, image: p.image, lang: p.lang, alternates: p.alternates, jsonLd };
+}
+
+interface VsData { path: string; title: string; description: string; competitor: string; intro: string; rows: { feature: string; us: string; them: string }[]; note: string }
+async function vsPage(path: string): Promise<Page | null> {
+  const d = await getJson<{ page: VsData }>(`/api/public/seo/vs?path=${encodeURIComponent(path)}`);
+  const v = d?.page;
+  if (!v) return null;
+  const body = `${MAIN}
+<p><a href="/">ChessScout.net</a></p>
+<h1>${esc(v.title)}</h1>
+<p>${esc(v.intro)}</p>
+<table><thead><tr><th>Feature</th><th>ChessScout.net</th><th>${esc(v.competitor)}</th></tr></thead><tbody>
+${v.rows.map((r) => `<tr><td>${esc(r.feature)}</td><td>${esc(r.us)}</td><td>${esc(r.them)}</td></tr>`).join('\n')}
+</tbody></table>
+<h2>The honest take</h2>
+<p>${esc(v.note)}</p>
+<p><a href="/setup?signup=1">Try ChessScout.net free</a> · <a href="/pricing">Pricing</a></p>
+</main>`;
+  return { title: v.title, description: v.description, path: v.path, body, image: 'og-pricing.jpg' };
+}
+
+// ── Openings and traps ───────────────────────────────────────────────────
+type Tally = { games: number; wins: number; draws: number; losses: number };
+interface OpeningSummary { slug: string; name: string; games: number; players: number; asWhite: Tally; asBlack: Tally; moves: string | null }
+interface OpeningDetail extends OpeningSummary { note: string | null; topPlayers: { slug: string; name: string; title: string | null; color: 'white' | 'black'; games: number; score: number }[] }
+
+async function openingsIndex(): Promise<Page> {
+  const d = await getJson<{ openings: OpeningSummary[] }>('/api/public/openings');
+  const list = d?.openings ?? [];
+  return {
+    title: 'Chess Openings: What Top Players Play & How They Score | ChessScout', path: '/chess-openings', image: 'og-players.jpg',
+    description: 'The chess openings top Chess.com players and grandmasters choose most, and how they score with each as White and Black, from their real games.',
+    body: `${MAIN}<p><a href="/">ChessScout.net</a></p><h1>Chess openings top players actually play</h1>
+<p>Built from the real recent games of top Chess.com players and grandmasters: how often each opening is chosen, and how they score with it as White and as Black. Score means wins plus half the draws.</p>
+<ul>${list.map((o) => `<li><a href="/chess-openings/${esc(o.slug)}">${esc(o.name)}</a>${o.moves ? ` (${esc(o.moves)})` : ''}: ${o.games} games by ${o.players} players; White scores ${score(o.asWhite)}%, Black scores ${score(o.asBlack)}%</li>`).join('')}</ul>
+<p><a href="/setup?signup=1">Train your openings free on ChessScout.net</a></p></main>`,
+  };
+}
+
+async function openingPage(slug: string): Promise<Page | null> {
+  const d = await getJson<{ opening: OpeningDetail }>(`/api/public/openings/${encodeURIComponent(slug)}`);
+  const o = d?.opening;
+  if (!o) return null;
+  const side = (label: string, t: Tally) => t.games ? `<p><strong>${label}:</strong> ${score(t)}% score in ${t.games} games (${t.wins} wins, ${t.draws} draws, ${t.losses} losses).</p>` : '';
+  const description = `${o.name}${o.moves ? ` (${o.moves})` : ''}: how top Chess.com players and grandmasters score with it as White and Black, and who plays it most, from ${o.games} real games.`;
+  return {
+    title: `${o.name}: How Top Players Score With It | ChessScout`, description, path: `/chess-openings/${o.slug}`, image: 'og-players.jpg',
+    body: `${MAIN}<p><a href="/chess-openings">Chess openings</a></p><h1>${esc(o.name)}</h1>
+${o.moves ? `<p><strong>${esc(o.moves)}</strong></p>` : ''}${o.note ? `<p>${esc(o.note)}</p>` : ''}
+${side('As White', o.asWhite)}${side('As Black', o.asBlack)}
+<h2>Who plays it most</h2>
+<ul>${o.topPlayers.map((p) => `<li><a href="/players/${esc(p.slug)}">${esc(`${p.title ? `${p.title} ` : ''}${p.name}`)}</a>: ${p.games} games as ${p.color === 'white' ? 'White' : 'Black'}, scores ${p.score}%</li>`).join('')}</ul>
+<p>From the recent public Chess.com games of ${o.players} players on the <a href="/players">top players list</a>, updated about once a week. Score = wins plus half the draws.</p>
+<p><a href="/scout-chess-opponent">Scout your opponent</a> · <a href="/setup?signup=1">Drill your openings free</a></p></main>`,
+    jsonLd: { '@context': 'https://schema.org', '@type': 'Article', headline: `${o.name}: how top players score with it`, description, mainEntityOfPage: `${SITE}/chess-openings/${o.slug}`, publisher: { '@type': 'Organization', name: 'ChessScout.net' } },
+  };
+}
+
+interface PublicTrap { id?: number; slug: string; name: string; category: string; difficulty: string; trapSide: string; summary: string; explanation?: string; startingFen?: string; moves?: string[]; moveNotes?: string[]; criticalMoveIndex?: number; safeMoves?: string[] }
+
+async function trapsIndex(): Promise<Page> {
+  const d = await getJson<{ traps: PublicTrap[] }>('/api/public/traps');
+  const list = d?.traps ?? [];
+  return {
+    title: 'Chess Opening Traps: Learn, Set & Avoid Them | ChessScout', path: '/chess-traps', image: 'og-learn.jpg',
+    description: 'Classic chess opening traps explained move by move: how each one works, the move that falls for it, and the safe reply. Practice them free.',
+    body: `${MAIN}<p><a href="/">ChessScout.net</a></p><h1>Chess opening traps</h1>
+<p>The traps players fall into most, explained move by move: how each one works, the move that falls for it, and the safe reply.</p>
+<ul>${list.map((t) => `<li><a href="/chess-traps/${esc(t.slug)}">${esc(t.name)}</a> (${esc(t.category)}, ${esc(t.difficulty)}): ${esc(t.summary)}</li>`).join('')}</ul></main>`,
+  };
+}
+
+function numbered(fen: string, moves: string[]): string[] {
+  const parts = fen.split(' ');
+  let n = parseInt(parts[5] || '1', 10) || 1;
+  let white = (parts[1] || 'w') === 'w';
+  return moves.map((san) => { const label = white ? `${n}.` : `${n}...`; if (!white) n++; white = !white; return `${label} ${san}`; });
+}
+
+async function trapPage(slug: string): Promise<Page | null> {
+  const d = await getJson<{ trap: PublicTrap }>(`/api/public/traps/${encodeURIComponent(slug)}`);
+  const t = d?.trap;
+  if (!t) return null;
+  const moves = numbered(t.startingFen ?? '', t.moves ?? []);
+  const description = `${t.summary} How the ${t.name} works, the move that falls for it, and how to avoid it.`.slice(0, 300);
+  return {
+    title: `${t.name}: Chess Trap Explained Move by Move | ChessScout`, description, path: `/chess-traps/${t.slug}`, image: 'og-learn.jpg',
+    body: `${MAIN}<p><a href="/chess-traps">Chess traps</a></p><h1>${esc(t.name)}</h1>
+<p>${esc(t.category)} · ${esc(t.difficulty)} · set by ${t.trapSide === 'white' ? 'White' : 'Black'}</p>
+<p>${esc(t.summary)}</p>${t.explanation ? `<p>${esc(t.explanation)}</p>` : ''}
+<h2>Move by move</h2>
+<ol>${moves.map((m, i) => `<li><strong>${esc(m)}</strong>${i === t.criticalMoveIndex ? ' (the mistake)' : ''}${t.moveNotes?.[i] ? `: ${esc(t.moveNotes[i])}` : ''}</li>`).join('')}</ol>
+${t.safeMoves?.length ? `<p><strong>Safe instead:</strong> ${esc(t.safeMoves.join(', '))}</p>` : ''}
+<p><a href="/setup?signup=1">Practice the ${esc(t.name)} free on ChessScout.net</a></p></main>`,
+    jsonLd: { '@context': 'https://schema.org', '@type': 'Article', headline: `${t.name}: chess trap explained`, description, mainEntityOfPage: `${SITE}/chess-traps/${t.slug}`, publisher: { '@type': 'Organization', name: 'ChessScout.net' } },
+  };
+}
+
 // ── HTML assembly ────────────────────────────────────────────────────────
 function apply(html: string, p: Page): string {
   const t = esc(p.title), d = esc(p.description), u = esc(`${SITE}${p.path}`);
@@ -154,15 +283,28 @@ function apply(html: string, p: Page): string {
   out = setTag(out, 'name', 'twitter:title', t);
   out = setTag(out, 'name', 'twitter:description', d);
   {
-    const img = esc(`${SITE}/shots/${p.path.startsWith('/learn') ? 'learn' : 'players'}.jpg`);
+    const img = esc(p.image ? `${SITE}/${p.image}` : `${SITE}/shots/${p.path.startsWith('/learn') ? 'learn' : 'players'}.jpg`);
     out = setTag(out, 'property', 'og:image', img);
     out = setTag(out, 'name', 'twitter:image', img);
   }
   out = /<link\s+rel="canonical"[^>]*>/i.test(out)
     ? out.replace(/<link\s+rel="canonical"[^>]*>/i, `<link rel="canonical" href="${u}" />`)
     : out.replace('</head>', `<link rel="canonical" href="${u}" />\n</head>`);
+  if (p.lang) {
+    out = out.replace(/<html lang="[^"]*"/i, `<html lang="${esc(p.lang)}"`);
+    out = setTag(out, 'property', 'og:locale', esc(p.lang.replace('-', '_')));
+  }
+  if (p.alternates && p.alternates.length > 1) {
+    const tags = [...p.alternates.map((a) => `<link rel="alternate" hreflang="${esc(a.lang)}" href="${esc(`${SITE}${a.path}`)}" />`),
+      `<link rel="alternate" hreflang="x-default" href="${esc(`${SITE}${p.alternates.find((a) => a.lang === 'en')?.path ?? p.path}`)}" />`];
+    out = out.replace('</head>', `${tags.join('\n')}\n</head>`);
+  }
   if (p.jsonLd) out = out.replace('</head>', `<script type="application/ld+json">${JSON.stringify(p.jsonLd).replace(/</g, '\\u003c')}</script>\n</head>`);
-  out = out.replace(/<div id="root">\s*<\/div>/i, `<div id="root">${p.body}</div>`);
+  // index.html carries the home page's text inside #root between these
+  // markers; other pages replace it with their own.
+  out = /<!--seo-->[\s\S]*<!--\/seo-->/.test(out)
+    ? out.replace(/<!--seo-->[\s\S]*<!--\/seo-->/, () => `<!--seo-->${p.body}<!--/seo-->`)
+    : out.replace(/<div id="root">\s*<\/div>/i, () => `<div id="root">${p.body}</div>`);
   return out;
 }
 
@@ -175,7 +317,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     else if (kind === 'player' && /^[a-z0-9_-]{2,40}$/.test(slug)) page = await playerPage(slug);
     else if (kind === 'learn') page = await articlesIndex();
     else if (kind === 'article' && /^[a-z0-9-]{1,120}$/.test(slug)) page = await articlePage(slug);
+    else if (kind === 'seo' && /^[a-z-]{2,40}$/.test(String(req.query.key ?? ''))) {
+      const lang = String(req.query.lang ?? 'en');
+      page = await seoPage(String(req.query.key), /^[a-z]{2}(-[a-z]{2})?$/i.test(lang) ? lang : 'en');
+    }
+    else if (kind === 'vs' && /^\/vs\/[a-z-]{2,40}$/.test(String(req.query.path ?? ''))) page = await vsPage(String(req.query.path));
+    else if (kind === 'openings') page = await openingsIndex();
+    else if (kind === 'opening' && /^[a-z0-9-]{1,80}$/.test(slug)) page = await openingPage(slug);
+    else if (kind === 'traps') page = await trapsIndex();
+    else if (kind === 'trap' && /^[a-z0-9-]{1,80}$/.test(slug)) page = await trapPage(slug);
   } catch { page = null; }
+
+  // A language this page isn't translated into yet: send people (and crawlers)
+  // to the English page rather than show English at a translated address.
+  if (!page && kind === 'seo' && String(req.query.lang ?? 'en') !== 'en' && /^[a-z-]{2,40}$/.test(String(req.query.key ?? ''))) {
+    const key = String(req.query.key);
+    res.setHeader('Cache-Control', 'public, s-maxage=300');
+    res.redirect(302, key === 'home' ? '/' : `/${key}`);
+    return;
+  }
 
   const [pageRes] = await Promise.all([
     fetchWithTimeout(`${SITE}/index.html`, 3500),

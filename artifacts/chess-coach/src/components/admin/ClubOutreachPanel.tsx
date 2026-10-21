@@ -578,6 +578,21 @@ ${PRESS_CLOSE}
 ${CLUB_SIGN_OFF}`,
   },
   {
+    id: 'press_add_to_list', audience: 'press', kind: 'personal', name: 'Add us to your list (ready-to-paste entry)',
+    subject: 'A free chess app for your list of chess apps',
+    body: `Hi {{name}},
+
+I'm {{sender}}, the developer of ChessScout.net. I read your list of chess apps{{articleLine}} and wondered if you'd consider ChessScout for the next update. To make it easy, here's an entry you can paste or edit:
+
+ChessScout.net (web and Android, free; Pro $5/month)
+Play live and daily games, join tournaments, practice against bots from 400 to 3000, and solve unlimited puzzles. It also imports your Chess.com and Lichess games for free Stockfish review, and lets you scout any opponent's openings before a game. Chess for Kids teaches young beginners one piece at a time, and the app is Teacher Approved on Google Play. Available in 28 languages.
+Best for: players who want to play and improve in one place, families, and clubs running their own tournaments.
+
+${PRESS_CLOSE}
+
+${CLUB_SIGN_OFF}`,
+  },
+  {
     id: 'press_pitch_general', audience: 'press', kind: 'general', name: 'Pitch for app lists & reviews',
     subject: 'For your chess app coverage: ChessScout.net',
     body: `Hi there,

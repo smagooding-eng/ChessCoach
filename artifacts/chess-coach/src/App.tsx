@@ -1,4 +1,5 @@
 import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
+import { pathLang } from "@/lib/i18n";
 import { rememberReturnTo } from '@/components/QuickSignup';
 import { BoardStyleTipHost } from '@/components/BoardStyleTip';
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -110,6 +111,12 @@ const LandingPage = lazyRetry(() => import("@/pages/LandingPage").then(m => ({ d
 const MobileSetup = lazyRetry(() => import("@/pages/MobileSetup").then(m => ({ default: m.MobileSetup })));
 const ScoutShare = lazyRetry(() => import("@/pages/ScoutShare").then(m => ({ default: m.ScoutShare })));
 const ArticlesIndex = lazyRetry(() => import("@/pages/Articles").then(m => ({ default: m.ArticlesIndex })));
+const SeoLanding = lazyRetry(() => import("@/pages/SeoPages").then(m => ({ default: m.SeoLanding })));
+const ChessOpeningsIndex = lazyRetry(() => import("@/pages/SeoPages").then(m => ({ default: m.ChessOpeningsIndex })));
+const ChessOpeningPage = lazyRetry(() => import("@/pages/SeoPages").then(m => ({ default: m.ChessOpeningPage })));
+const ChessTrapsIndex = lazyRetry(() => import("@/pages/SeoPages").then(m => ({ default: m.ChessTrapsIndex })));
+const ChessTrapPage = lazyRetry(() => import("@/pages/SeoPages").then(m => ({ default: m.ChessTrapPage })));
+const LangHome = lazyRetry(() => import("@/pages/SeoPages").then(m => ({ default: m.LangHome })));
 const PublicPlayersIndex = lazyRetry(() => import("@/pages/PublicPlayers").then(m => ({ default: m.PublicPlayersIndex })));
 const PublicPlayerPage = lazyRetry(() => import("@/pages/PublicPlayers").then(m => ({ default: m.PublicPlayerPage })));
 const ArticlePage = lazyRetry(() => import("@/pages/Articles").then(m => ({ default: m.ArticlePage })));
@@ -436,13 +443,31 @@ function KidModeLock() {
   return null;
 }
 
+// Search-friendly public pages (English addresses; /xx/... for other languages).
+const SEO_PATHS = ['play-chess-online', 'chess-for-kids', 'learn-chess', 'chess-puzzles', 'chess-tournaments', 'chess-game-analysis', 'scout-chess-opponent'];
+
+/** /es, /pt/chess-for-kids, ...: a public page in another language. */
+function LangRoutes({ lang, rest }: { lang: string; rest: string }) {
+  const key = rest.replace(/^\/|\/$/g, '');
+  if (!key) return <LangHome Landing={SetupRouter} />;
+  if (SEO_PATHS.includes(key) || key === 'pricing') return <SeoLanding pageKey={key} lang={lang} />;
+  return <RedirectTo to={rest} />;
+}
+
 function Router() {
   const kidMode = useKidMode();
   const [where] = useLocation();
   if (kidMode && !isKidsPath(where)) return <KidModeLock />;
+  const pl = pathLang(where);
+  if (pl) return <><ScrollToTop /><PageTracker /><LangRoutes lang={pl.lang} rest={pl.rest} /></>;
   return (
     <><ScrollToTop /><PageTracker /><BoardStyleTipHost /><Switch>
       <Route path="/setup" component={SetupRouter} />
+      {SEO_PATHS.map((k) => <Route key={k} path={`/${k}`}>{() => <SeoLanding pageKey={k} />}</Route>)}
+      <Route path="/chess-openings" component={ChessOpeningsIndex} />
+      <Route path="/chess-openings/:slug" component={ChessOpeningPage} />
+      <Route path="/chess-traps" component={ChessTrapsIndex} />
+      <Route path="/chess-traps/:slug" component={ChessTrapPage} />
       <Route path="/scout/:data" component={ScoutShare} />
       <Route path="/players" component={PublicPlayersIndex} />
       <Route path="/players/:slug" component={PublicPlayerPage} />

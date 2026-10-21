@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
+import { RatePlayCard } from '@/components/RatePlayCard';
 import { useBoardStyleTip } from '@/components/BoardStyleTip';
 import { useDashboardRedesignFlag } from '@/hooks/use-app-config';
 import { RedesignHeader } from '@/components/RedesignHeader';
@@ -977,6 +978,7 @@ export function Puzzles() {
                 <Flame size={15} /> Share your {stats.streak}-day streak
               </button>
             )}
+            {stats && stats.streak >= 3 && <div className="mt-3"><RatePlayCard moment={`${stats.streak}-day streak!`} /></div>}
           </div>
         )}
 

@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { RatePlayCard } from '@/components/RatePlayCard';
 import { ChessBoard } from '@/components/ChessBoard';
 import { EvalBar, MaterialStrip } from '@/components/GameStatusStrip';
 import { Chess } from 'chess.js';
@@ -225,6 +226,7 @@ export function LiveGame({ live, onLeave }: { live: ReturnType<typeof useLivePla
         )}
         {notice && <p className="text-xs font-bold" style={{ color: '#ec6b6b' }}>{notice}</p>}
         <div className="mx-auto flex max-w-[320px] flex-col gap-2">{rematchButtons}{addFriendButton}</div>
+        {youWon && !opponentIsBot && <RatePlayCard moment="Great win!" />}
         <div className="flex justify-center gap-2 pt-2 flex-wrap">
           <button onClick={onLeave}
             className="px-4 py-2 rounded-lg font-black text-xs"

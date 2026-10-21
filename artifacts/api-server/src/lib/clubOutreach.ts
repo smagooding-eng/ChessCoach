@@ -165,11 +165,15 @@ const PRESS_KINDS = [
   "parenting or education website that recommends chess apps or learning apps for kids",
   "technology or Android app website that reviews learning, puzzle or board game apps",
   "chess news site, chess magazine or chess blog that covers new chess tools",
+  "writer of a 'Chess.com alternatives', 'apps like Lichess' or 'best free chess sites to play online' article",
+  "teacher, homeschool or school-library blog that lists chess resources or chess apps for students",
+  "writer of a 'best chess apps for kids' or 'how to teach kids chess' guide",
 ];
 const PRESS_MARKETS = [
   "the United States", "the United Kingdom", "Canada and Australia", "India", "Spanish-language media", "Portuguese-language media (Brazil and Portugal)",
   "French-language media", "German-language media", "Italian-language media", "Dutch and Polish media", "Turkish media",
   "Indonesian and Vietnamese media", "Japanese media", "Korean media",
+  "Arabic-language media", "Russian and Ukrainian media", "Hindi-language media", "the Philippines",
 ];
 
 export type Audience = "club" | "influencer" | "library" | "press";

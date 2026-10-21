@@ -131,6 +131,7 @@ async function buildPlayer(username: string): Promise<PlayerData | null> {
   return computePlayerData(username, profile, games);
 }
 
+let lastTitledFetch = 0;
 async function seedList() {
   const names = new Map<string, string>();
   for (const s of STREAMERS) names.set(s, "streamer");
@@ -138,11 +139,27 @@ async function seedList() {
     const r = await fetch("https://api.chess.com/pub/leaderboards", UA);
     if (r.ok) {
       const d = (await r.json()) as Record<string, { username?: string }[]>;
-      for (const cat of ["live_blitz", "live_bullet", "live_rapid"]) {
+      for (const cat of ["live_blitz", "live_bullet", "live_rapid", "daily", "live_blitz960"]) {
         for (const p of (d[cat] ?? []).slice(0, 50)) if (p.username) names.set(p.username.toLowerCase(), names.get(p.username.toLowerCase()) ?? "leaderboard");
       }
     }
   } catch (err) { logger.warn({ err }, "[players] leaderboard fetch failed"); }
+  // Every titled grandmaster on Chess.com (refreshed once a day). Players
+  // without enough recent games never get a page, so inactive accounts cost
+  // one look a week and nothing else.
+  if (Date.now() - lastTitledFetch > 24 * 60 * 60 * 1000) {
+    for (const title of ["GM", "WGM"]) {
+      try {
+        const r = await fetch(`https://api.chess.com/pub/titled/${title}`, UA);
+        if (r.ok) {
+          const d = (await r.json()) as { players?: string[] };
+          for (const u of d.players ?? []) if (u && !names.has(u.toLowerCase())) names.set(u.toLowerCase(), `titled_${title.toLowerCase()}`);
+        }
+      } catch (err) { logger.warn({ err, title }, "[players] titled list fetch failed"); }
+      await sleep(1500);
+    }
+    lastTitledFetch = Date.now();
+  }
   for (const [slug, source] of names) {
     await db.execute(sql`INSERT INTO public_players (slug, username, source) VALUES (${slug}, ${slug}, ${source}) ON CONFLICT (slug) DO NOTHING`);
   }
@@ -178,10 +195,10 @@ async function refreshPass(limit: number) {
   }
 }
 
-/** Starts the slow background refresher: a first pass shortly after boot, then every 6 hours. */
+/** Starts the slow background refresher: a first pass shortly after boot, then every 6 hours (about 360 players a day, enough to refresh the full list weekly). */
 export function startPublicPlayersRefresher() {
   setTimeout(() => { void refreshPass(80).catch((err) => logger.warn({ err }, "[players] pass failed")); }, 90_000);
-  setInterval(() => { void refreshPass(40).catch((err) => logger.warn({ err }, "[players] pass failed")); }, 6 * 60 * 60 * 1000);
+  setInterval(() => { void refreshPass(90).catch((err) => logger.warn({ err }, "[players] pass failed")); }, 6 * 60 * 60 * 1000);
 }
 
 export interface PlayerSummary { slug: string; name: string | null; title: string | null; avatar: string | null; ratings: PlayerData["ratings"]; games: number }

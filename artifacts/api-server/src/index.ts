@@ -10,6 +10,7 @@ import { attachLiveServer, seedBotPersonas } from "./lib/liveServer";
 import { startDailySweep } from "./lib/correspondence";
 import { startTournamentEngine } from "./lib/tournamentEngine";
 import { ensurePublicPlayersTable, startPublicPlayersRefresher } from "./lib/publicPlayers";
+import { ensureSeoTranslationsTable, startSeoTranslator } from "./lib/seoPages";
 
 async function initStripe() {
   const databaseUrl = process.env.DATABASE_URL;
@@ -472,6 +473,7 @@ httpServer.listen(port, (err?: Error) => {
 runSchemaMigrations().then(() => {
   // Public player pages: table + slow weekly refresh from Chess.com.
   ensurePublicPlayersTable().then(() => startPublicPlayersRefresher()).catch((err) => logger.warn({ err }, 'public players setup failed'));
+  ensureSeoTranslationsTable().then(() => startSeoTranslator()).catch((err) => logger.warn({ err }, 'seo translations setup failed'));
   // IndexNow: full submission of public pages at most once a week.
   import("./lib/indexNow").then(({ startIndexNow }) => startIndexNow()).catch((err) => logger.warn({ err }, 'indexnow start failed'));
   // Club outreach: weekly search for new club / organizer contacts.

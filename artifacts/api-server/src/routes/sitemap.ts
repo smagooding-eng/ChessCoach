@@ -2,6 +2,8 @@ import { Router, type IRouter, type Request, type Response } from "express";
 import { db, seoArticlesTable } from "@workspace/db";
 import { eq, desc, sql } from "drizzle-orm";
 import { logger } from "../lib/logger";
+import { SEO_PAGES, availableLangs, localizedPath } from "../lib/seoPages";
+import { listOpenings, listTraps } from "../lib/publicChessPages";
 
 const router: IRouter = Router();
 
@@ -12,8 +14,6 @@ const SITE = "https://chessscout.net";
 // a crawler can't reach real content behind the login wall, so listing
 // those would just waste crawl budget and could look like cloaking.
 const STATIC_URLS: { path: string; changefreq: string; priority: string }[] = [
-  { path: "/", changefreq: "weekly", priority: "1.0" },
-  { path: "/pricing", changefreq: "monthly", priority: "0.8" },
   { path: "/learn", changefreq: "weekly", priority: "0.7" },
   { path: "/tournaments", changefreq: "daily", priority: "0.7" },
   { path: "/vs/aimchess", changefreq: "monthly", priority: "0.6" },
@@ -64,7 +64,34 @@ router.get("/sitemap.xml", async (_req: Request, res: Response) => {
     logger.warn({ err }, "[sitemap] Failed to load players");
   }
 
-  const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${[...staticXml, ...articleXml, ...playerXml].join("\n")}\n</urlset>\n`;
+  // Search-friendly pages, each with every language it's translated into.
+  let seoXml: string[] = [];
+  try {
+    const langs = await availableLangs();
+    for (const p of SEO_PAGES) {
+      const ls = langs[p.key] ?? ["en"];
+      const alt = ls.length > 1
+        ? [...ls.map((l) => `\n    <xhtml:link rel="alternate" hreflang="${l}" href="${SITE}${localizedPath(p, l)}" />`), `\n    <xhtml:link rel="alternate" hreflang="x-default" href="${SITE}${p.path}" />`].join("")
+        : "";
+      for (const l of ls) {
+        seoXml.push(`  <url>\n    <loc>${SITE}${localizedPath(p, l)}</loc>${alt}\n    <changefreq>weekly</changefreq>\n    <priority>${p.path === "/" ? "1.0" : "0.8"}</priority>\n  </url>`);
+      }
+    }
+  } catch (err) { logger.warn({ err }, "[sitemap] Failed to load SEO pages"); }
+
+  // Opening and trap pages.
+  let chessXml: string[] = [];
+  try {
+    const [openings, traps] = await Promise.all([listOpenings(), listTraps()]);
+    chessXml = [
+      urlEntry(`${SITE}/chess-openings`, "weekly", "0.7"),
+      ...openings.map((o) => urlEntry(`${SITE}/chess-openings/${o.slug}`, "weekly", "0.6")),
+      urlEntry(`${SITE}/chess-traps`, "monthly", "0.7"),
+      ...traps.map((t) => urlEntry(`${SITE}/chess-traps/${t.slug}`, "monthly", "0.6")),
+    ];
+  } catch (err) { logger.warn({ err }, "[sitemap] Failed to load openings/traps"); }
+
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">\n${[...seoXml, ...staticXml, ...chessXml, ...articleXml, ...playerXml].join("\n")}\n</urlset>\n`;
 
   res.set("Content-Type", "application/xml");
   res.send(xml);

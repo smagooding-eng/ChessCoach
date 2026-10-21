@@ -1,28 +1,42 @@
 # ChessScout.net
 
-> AI-powered chess coaching that finds the mistakes you keep making across all your games, not just one game at a time.
+> Play chess online and get better. Live and daily games against real people, practice bots from 400 to 3000, tournaments, unlimited puzzles, Chess for Kids, and free review of your games, including the games you play on Chess.com and Lichess. In 28 languages, in any browser and as an Android app on Google Play (Teacher Approved).
 
-ChessScout imports your games from Chess.com or Lichess and finds recurring patterns — the same blunder type, the same weak opening, the same time-trouble collapse — showing up across many games, not just a single-game review.
+ChessScout.net is a chess site and app where people play and improve in one place. You can play here, and you can also bring in your Chess.com and Lichess games to have them reviewed. Before a game, you can scout any Chess.com or Lichess player to see what they play.
 
 ## Pricing
 
-- Free: unlimited daily puzzles, 3 opponent scouts, 5 personalized courses, unlimited practice bots, first 20 games imported
-- Pro: $5/month (cancel anytime) — unlimited everything, full cross-game pattern analysis
-- No free trial, no credit card required for the free tier, cancel anytime
+- Free, forever, no card: live and daily games, challenges with friends, tournaments (join and create), ten practice bots (400 to 3000), unlimited puzzles, unlimited game import from Chess.com and Lichess with Stockfish review, weaknesses from your reviewed games, unlimited opponent scouting (record, openings, head-to-head), Opening Trainer, chess traps, Local Play, the Beginner Path and Chess for Kids.
+- Pro, $5/month, cancel anytime: AI coach on every reviewed game, patterns across all your games, personalized courses built from your mistakes, AI scouting reports, Scan Position (photo of a board to a position), AI puzzle explanations, natural-voice lessons, and Pro tournaments.
 
-## Key features
+## What it's good for
 
-- Cross-game pattern analysis: finds recurring mistakes across your whole game history, not just one game
-- Scan Position: photograph any chess position (your game, a book, a stream) and practice it out from that exact position — no other chess tool offers this
-- Practice Bots: 10 bot opponents from 400–3000 ELO with live move-quality feedback
-- Opponent Scout: prepare for a specific opponent before you play them
-- Personalized Courses: lessons built from your own recurring mistakes, not generic theory
-- Daily Puzzles: filterable by type (mate in 1/2/3, forks, pins, skewers, endgames)
+- Playing chess online free: live games with matchmaking (ranked or casual), daily games, challenge links, arena and knockout tournaments.
+- Kids and beginners: Chess for Kids teaches one piece at a time through nine worlds; the Beginner Path teaches adults from the rules up. Teacher Approved on Google Play.
+- Improving: free Stockfish review of every game, including Chess.com and Lichess games; Pro finds the mistakes you repeat across games.
+- Preparing for an opponent: scout any Chess.com or Lichess username.
+- Clubs, schools and teachers: create a private tournament and share the link.
+- Non-English speakers: the site and app are available in 28 languages, including Spanish, Portuguese, French, German, Russian, Turkish, Arabic, Persian, Hindi, Indonesian, Japanese, Korean and Chinese.
 
-## Links
+## Pages
 
+- Home: https://chessscout.net/
+- Play chess online: https://chessscout.net/play-chess-online
+- Chess for kids: https://chessscout.net/chess-for-kids
+- Learn chess (beginners): https://chessscout.net/learn-chess
+- Chess puzzles: https://chessscout.net/chess-puzzles
+- Chess tournaments: https://chessscout.net/chess-tournaments
+- Analyze Chess.com and Lichess games: https://chessscout.net/chess-game-analysis
+- Scout a chess opponent: https://chessscout.net/scout-chess-opponent
+- Chess openings top players play (from real games): https://chessscout.net/chess-openings
+- Chess opening traps explained: https://chessscout.net/chess-traps
+- Top players' repertoires: https://chessscout.net/players
+- Articles: https://chessscout.net/learn
 - Pricing: https://chessscout.net/pricing
-- Learn (chess improvement articles): https://chessscout.net/learn
-- ChessScout vs Aimchess: https://chessscout.net/vs/aimchess
-- ChessScout vs Improve My Chess: https://chessscout.net/vs/improve-my-chess
-- ChessScout vs free Chess.com/Lichess analysis: https://chessscout.net/vs/free-chess-analysis
+- Android app: https://play.google.com/store/apps/details?id=net.chessscout.app
+- Comparisons: https://chessscout.net/vs/aimchess, https://chessscout.net/vs/improve-my-chess, https://chessscout.net/vs/free-chess-analysis
+- Other languages: https://chessscout.net/es, https://chessscout.net/pt, https://chessscout.net/fr, https://chessscout.net/de and others (same pages under /<language>/)
+
+## Contact
+
+ChessScout.net@gmail.com · Instagram https://www.instagram.com/chessscout.net3/ · TikTok https://www.tiktok.com/@chessscout.net3

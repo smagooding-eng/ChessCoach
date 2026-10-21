@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
+import { RatePlayCard } from '@/components/RatePlayCard';
 import { PieceTile } from '@/components/DesignSystem';
 import { useSettings } from '@/context/SettingsContext';
 import { MaterialStrip } from '@/components/GameStatusStrip';
@@ -831,6 +832,7 @@ function GameView({ bot, onBack, startFen, startColor, isOnboarding }: { bot: Bo
                 )}>
                   {result === 'win' ? 'You Win!' : result === 'loss' ? 'You Lost' : 'Draw'}
                 </h3>
+                {result === 'win' && !isOnboarding && <RatePlayCard moment="You beat the bot!" />}
                 <p className="text-xs text-muted-foreground">
                   vs {botName(bot)} ({bot.rating}) · {moves.length} moves · {formatTime(elapsedSec)}
                 </p>

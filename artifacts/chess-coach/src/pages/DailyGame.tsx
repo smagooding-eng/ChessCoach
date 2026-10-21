@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { RatePlayCard } from '@/components/RatePlayCard';
 import { Link, useLocation, useParams } from 'wouter';
 import { Chess } from 'chess.js';
 import { ArrowLeft, Flag, Handshake, Loader2, BookOpen, Clock } from 'lucide-react';
@@ -157,6 +158,7 @@ export function DailyGame() {
           </button>
           <Link href="/daily" className="rounded-xl px-4 py-2.5 text-[13px] font-bold" style={ghostBtn}>Daily games</Link>
         </div>
+        {won && game.result !== 'draw' && game.termination !== 'aborted' && <RatePlayCard moment="Great win!" />}
       </div>
     );
   })();
