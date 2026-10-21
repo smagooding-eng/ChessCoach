@@ -1,4 +1,3 @@
-import { StartHereCards } from '@/components/StartHereCards';
 import { SocialLinks } from '@/components/SocialLinks';
 import React, { useEffect, useRef, useState } from 'react';
 import { autoImportLinkedAccounts } from '@/lib/autoImport';
@@ -354,7 +353,6 @@ export function Dashboard() {
         </div>
       </Link>
 
-      <StartHereCards />
 
       <div className="grid grid-cols-2 gap-3 px-3 md:px-0">
         <Link href="/play" className="block">

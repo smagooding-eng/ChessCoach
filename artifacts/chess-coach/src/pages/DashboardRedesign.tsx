@@ -1,9 +1,8 @@
-import { StartHereCards } from '@/components/StartHereCards';
 import { SocialLinks } from '@/components/SocialLinks';
 import React, { useEffect, useRef, useState } from 'react';
 import { autoImportLinkedAccounts } from '@/lib/autoImport';
 import { Link, useLocation } from 'wouter';
-import { Target, Search, ArrowRight, ArrowUpRight, ChevronRight, Play, Puzzle, BookOpen, Crosshair, Crown, Camera, Zap, ShoppingBag, Bot, BarChart3, GraduationCap } from 'lucide-react';
+import { Trophy, Target, Search, ArrowRight, ArrowUpRight, ChevronRight, Play, Puzzle, BookOpen, Crosshair, Crown, Camera, Zap, ShoppingBag, Bot, BarChart3, GraduationCap } from 'lucide-react';
 import { useUser } from '@/hooks/use-user';
 import { useChessPlayer } from '@/hooks/use-chess-player';
 import { useMultiEloProgress } from '@/hooks/use-elo-progress';
@@ -55,7 +54,8 @@ const RESULT_STYLE: Record<string, { bg: string; fg: string; label: string }> = 
 };
 
 const TILES = [
-  { label: 'Play', sub: 'Online, local or bots', href: '/play', img: 'play.webp', pos: '78% center', icon: Play, c1: '#5f8f36', c2: '#81B64C', glow: 'rgba(129,182,76,.28)' },
+  // Play now lives on the name card, so this slot shows Tournaments.
+  { label: 'Tournaments', sub: 'Join or host events', href: '/tournaments', img: 'scenes/play-online.webp', pos: '70% center', icon: Trophy, c1: '#5f8f36', c2: '#81B64C', glow: 'rgba(129,182,76,.28)' },
   { label: 'Puzzles', sub: 'Smart training', href: '/puzzles', img: 'puzzles.webp', pos: '73% center', icon: Puzzle, c1: '#5f8f36', c2: '#81B64C', glow: 'rgba(92,150,255,.30)' },
   { label: 'Openings', sub: 'Drill and learn', href: '/openings', img: 'openings.webp', pos: '68% center', icon: BookOpen, c1: '#5f8f36', c2: '#81B64C', glow: 'rgba(168,120,255,.30)' },
   { label: 'Chess Traps', sub: 'Learn the classics', href: '/traps', img: 'traps.webp', pos: '59% center', icon: Crosshair, c1: '#5f8f36', c2: '#81B64C', glow: 'rgba(232,180,71,.30)' },
@@ -269,8 +269,6 @@ export function DashboardRedesign() {
           ))}
         </div>
 
-        {/* ── New to chess: a slim row to the Beginner Path + Chess for Kids ── */}
-        <StartHereCards variant="redesign" />
 
         {/* ── Scout hero ── */}
         <section
