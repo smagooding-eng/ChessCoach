@@ -15,6 +15,7 @@ import { ClubOutreachPanel } from '@/components/admin/ClubOutreachPanel';
 import { TrafficExportPanel } from '@/components/admin/TrafficExportPanel';
 import { ShareKitPanel } from '@/components/admin/ShareKitPanel';
 import { DirectoryKitPanel } from '@/components/admin/DirectoryKitPanel';
+import { OnlineNowPanel, ChallengeUserButton } from '@/components/admin/OnlineNowPanel';
 import { EmailTrackingPanel } from '@/components/admin/EmailTrackingPanel';
 import { BotVisitsPanel } from '@/components/admin/BotVisitsPanel';
 import {
@@ -740,6 +741,7 @@ export function Admin() {
             </button>
             {showUsers && <UserListPanel onClose={() => setShowUsers(false)} onEmailUsers={handleEmailUsers} />}
           </div>
+          <OnlineNowPanel labelForPath={labelForPath} />
           <UserActivityPanel />
         </>
       )}
@@ -3183,6 +3185,7 @@ function UserActivityPanel() {
                   <span>{u.totalPageViews} page views</span>
                   {u.aiCalls > 0 && <span className="text-foreground font-bold">{u.aiCalls} AI calls (${u.aiCostUsd.toFixed(2)})</span>}
                 </div>
+                <div className="mb-1.5"><ChallengeUserButton userId={u.id} name={u.label} /></div>
                 {(u.activities?.length ?? 0) > 0 && (
                   <div className="mb-1 flex flex-wrap gap-1">
                     {u.activities!.map((a) => (

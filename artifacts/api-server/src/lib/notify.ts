@@ -62,6 +62,23 @@ export function isViewing(userId: string, path: string): boolean {
   return false;
 }
 
+/** Everyone with the app open right now, with the page they're on (most recent tab). */
+export function listOpenApps(): { userId: string; path: string | null; visible: boolean; seenAt: number | null }[] {
+  const now = Date.now();
+  const ids = new Set<string>([...streams.keys(), ...views.keys()]);
+  const out: { userId: string; path: string | null; visible: boolean; seenAt: number | null }[] = [];
+  for (const userId of ids) {
+    let best: View | null = null;
+    for (const v of views.get(userId)?.values() ?? []) {
+      if (now - v.at > VIEW_TTL_MS) continue;
+      if (!best || (v.visible && !best.visible) || v.at > best.at) best = v;
+    }
+    if (!streams.has(userId) && !best) continue;
+    out.push({ userId, path: best?.path ?? null, visible: !!best?.visible, seenAt: best?.at ?? null });
+  }
+  return out;
+}
+
 /** Has the app open somewhere right now (an event stream is connected). */
 export function hasOpenApp(userId: string): boolean { return streams.has(userId); }
 
