@@ -14,8 +14,7 @@ import { FenThumb } from '@/components/FenThumb';
 
 const BASE = import.meta.env.BASE_URL;
 
-// Every tile shares the Beginner Path look: a deep green card with the art on the right.
-const GREEN_BG = 'linear-gradient(135deg, #102618 0%, #1A3824 55%, #264F30 100%)';
+// Every tile uses the app's card color (it follows the theme setting), with the art on the right.
 const board = (fen: string) => <span className="absolute -right-3 top-3 rotate-[8deg] opacity-80"><FenThumb fen={fen} size={124} /></span>;
 
 interface Tile {
@@ -69,13 +68,13 @@ export function LearnHub() {
           {tiles.map((t) => (
             <Link key={t.title} href={t.href}
               className="relative flex min-h-[132px] flex-col justify-end overflow-hidden rounded-[20px] p-4 transition-transform active:scale-[.98]"
-              style={{ background: t.bg ?? GREEN_BG, border: `1px solid ${RD.border}` }}>
+              style={{ background: t.bg ?? RD.card, border: `1px solid ${RD.border}` }}>
               {t.img && <img src={t.photo ? siteImg(t.img) : t.img} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />}
               {t.art}
               <span className="absolute inset-0" style={{ background: t.art
                 ? 'linear-gradient(0deg, rgba(5,10,11,.82) 0%, rgba(5,10,11,.3) 55%, rgba(5,10,11,0) 100%)'
                 : 'linear-gradient(0deg, rgba(5,10,11,.94) 0%, rgba(5,10,11,.62) 55%, rgba(5,10,11,.2) 100%)' }} />
-              <span className={`absolute ${t.art ? 'left-4 top-4' : 'right-3 top-3'} grid h-9 w-9 place-items-center rounded-[10px]`} style={{ background: 'rgba(5,10,11,.6)', color: RD.green, border: '1px solid rgba(129,182,76,.3)' }}>
+              <span className={`absolute ${t.art ? 'left-4 top-4' : 'right-3 top-3'} grid h-9 w-9 place-items-center rounded-[10px]`} style={{ background: 'rgba(129,182,76,.14)', color: RD.green, border: '1px solid rgba(129,182,76,.3)' }}>
                 <t.icon size={18} />
               </span>
               <span className={`relative min-w-0 ${t.art ? 'pr-24' : ''}`}>
