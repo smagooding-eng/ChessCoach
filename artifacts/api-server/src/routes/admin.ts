@@ -1704,7 +1704,8 @@ router.get("/admin/user-activity", requireAdmin, async (req: Request, res: Respo
     todayStart.setUTCHours(0, 0, 0, 0);
 
     const [allUsers, windowPageViews, activeTodayRows, windowAiUsage] = await Promise.all([
-      db.select({ id: usersTable.id, email: usersTable.email, chesscomUsername: usersTable.chesscomUsername, createdAt: usersTable.createdAt })
+      db.select({ id: usersTable.id, email: usersTable.email, chesscomUsername: usersTable.chesscomUsername, lichessUsername: usersTable.lichessUsername,
+          scoutUsername: usersTable.scoutUsername, firstName: usersTable.firstName, lastName: usersTable.lastName, authProvider: usersTable.authProvider, createdAt: usersTable.createdAt })
         .from(usersTable).where(sql`${usersTable.id} NOT IN (SELECT id FROM analytics_excluded_users)`),
       db.select({ userId: pageViewsTable.userId, path: pageViewsTable.path, createdAt: pageViewsTable.createdAt })
         .from(pageViewsTable)
@@ -1718,6 +1719,32 @@ router.get("/admin/user-activity", requireAdmin, async (req: Request, res: Respo
         .where(and(isNotNull(aiUsageEventsTable.userId), gte(aiUsageEventsTable.createdAt, since), lte(aiUsageEventsTable.createdAt, until))),
     ]);
 
+    // What each member actually did in the range (besides viewing pages).
+    const rowsOf = (r: unknown) => ((r as unknown as { rows?: Record<string, unknown>[] }).rows ?? []);
+    const actRows = await Promise.all([
+      db.execute(sql`SELECT user_id, platform AS k, COUNT(*)::int AS n FROM games WHERE user_id IS NOT NULL AND created_at >= ${since} AND created_at <= ${until} GROUP BY 1, 2`),
+      db.execute(sql`SELECT u AS user_id, 'live' AS k, COUNT(*)::int AS n FROM (
+          SELECT white_user_id AS u FROM live_games WHERE finished_at >= ${since} AND finished_at <= ${until}
+          UNION ALL SELECT black_user_id FROM live_games WHERE finished_at >= ${since} AND finished_at <= ${until}) x WHERE u IS NOT NULL GROUP BY 1`),
+      db.execute(sql`SELECT u AS user_id, 'daily' AS k, COUNT(*)::int AS n FROM (
+          SELECT white_user_id AS u FROM correspondence_games WHERE started_at >= ${since} AND started_at <= ${until}
+          UNION ALL SELECT black_user_id FROM correspondence_games WHERE started_at >= ${since} AND started_at <= ${until}) x GROUP BY 1`),
+      db.execute(sql`SELECT user_id, CASE WHEN solved THEN 'puzzles_solved' ELSE 'puzzles_missed' END AS k, COUNT(*)::int AS n FROM puzzle_attempts WHERE attempted_at >= ${since} AND attempted_at <= ${until} GROUP BY 1, 2`),
+      db.execute(sql`SELECT user_id, 'scans' AS k, COUNT(*)::int AS n FROM scan_attempts WHERE created_at >= ${since} AND created_at <= ${until} GROUP BY 1`),
+    ].map((q) => q.then(rowsOf).catch(() => [] as Record<string, unknown>[])));
+    const ACT_LABEL: Record<string, string> = {
+      chesscom: 'Chess.com games imported', lichess: 'Lichess games imported', chessscout: 'Games played on ChessScout',
+      live: 'Live games', daily: 'Daily games started', puzzles_solved: 'Puzzles solved', puzzles_missed: 'Puzzles missed', scans: 'Positions scanned',
+    };
+    const activitiesByUser = new Map<string, { label: string; count: number }[]>();
+    for (const r of actRows.flat()) {
+      const uid = String(r.user_id ?? ''); const k = String(r.k ?? ''); const n = Number(r.n ?? 0);
+      if (!uid || !n) continue;
+      const list = activitiesByUser.get(uid) ?? [];
+      list.push({ label: ACT_LABEL[k] ?? k, count: n });
+      activitiesByUser.set(uid, list);
+    }
+
     // All aggregation happens here in JS rather than in SQL -- at this
     // app's scale (tens of thousands of page views, not millions) that's
     // simpler to read and change than an equivalent set of window
@@ -1725,6 +1752,7 @@ router.get("/admin/user-activity", requireAdmin, async (req: Request, res: Respo
     // maintain.
     type UserAgg = {
       pageViewsByPath: Record<string, number>;
+      views: { path: string; at: Date }[];
       totalPageViews: number;
       daysActiveSet: Set<string>;
       lastActiveAt: Date | null;
@@ -1735,7 +1763,7 @@ router.get("/admin/user-activity", requireAdmin, async (req: Request, res: Respo
     const getAgg = (userId: string): UserAgg => {
       let agg = byUser.get(userId);
       if (!agg) {
-        agg = { pageViewsByPath: {}, totalPageViews: 0, daysActiveSet: new Set(), lastActiveAt: null, aiCostUsd: 0, aiCalls: 0 };
+        agg = { pageViewsByPath: {}, views: [], totalPageViews: 0, daysActiveSet: new Set(), lastActiveAt: null, aiCostUsd: 0, aiCalls: 0 };
         byUser.set(userId, agg);
       }
       return agg;
@@ -1745,6 +1773,7 @@ router.get("/admin/user-activity", requireAdmin, async (req: Request, res: Respo
       if (!pv.userId) continue;
       const agg = getAgg(pv.userId);
       agg.pageViewsByPath[pv.path] = (agg.pageViewsByPath[pv.path] ?? 0) + 1;
+      agg.views.push({ path: pv.path, at: pv.createdAt });
       agg.totalPageViews++;
       agg.daysActiveSet.add(pv.createdAt.toISOString().slice(0, 10));
       if (!agg.lastActiveAt || pv.createdAt > agg.lastActiveAt) agg.lastActiveAt = pv.createdAt;
@@ -1770,10 +1799,22 @@ router.get("/admin/user-activity", requireAdmin, async (req: Request, res: Respo
         const topFeatures = agg
           ? Object.entries(agg.pageViewsByPath).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([path, count]) => ({ path, count }))
           : [];
+        const allFeatures = agg
+          ? Object.entries(agg.pageViewsByPath).sort((a, b) => b[1] - a[1]).map(([path, count]) => ({ path, count }))
+          : [];
         return {
           id: u.id,
-          label: u.chesscomUsername || u.email || u.id,
+          label: u.scoutUsername || u.chesscomUsername || u.lichessUsername || u.email || u.id,
           email: u.email,
+          name: [u.firstName, u.lastName].filter(Boolean).join(' ') || null,
+          scoutUsername: u.scoutUsername ?? null,
+          chesscomUsername: u.chesscomUsername ?? null,
+          lichessUsername: u.lichessUsername ?? null,
+          authProvider: u.authProvider,
+          allFeatures,
+          // Every page view in the range, newest first.
+          pageViewLog: agg ? agg.views.sort((a, b) => b.at.getTime() - a.at.getTime()).slice(0, 500).map((v) => ({ path: v.path, at: v.at.toISOString() })) : [],
+          activities: (activitiesByUser.get(u.id) ?? []).sort((a, b) => b.count - a.count),
           signedUpAt: u.createdAt.toISOString(),
           isNew: u.createdAt >= todayStart,
           activeToday: activeTodayIds.has(u.id),

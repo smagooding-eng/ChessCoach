@@ -3096,8 +3096,12 @@ function UserActivityPanel() {
       id: string; label: string; email: string | null; signedUpAt: string; isNew: boolean; activeToday: boolean;
       lastActiveAt: string | null; totalPageViews: number; daysActive: number;
       topFeatures: { path: string; count: number }[]; aiCostUsd: number; aiCalls: number;
+      name?: string | null; scoutUsername?: string | null; chesscomUsername?: string | null; lichessUsername?: string | null; authProvider?: string;
+      allFeatures?: { path: string; count: number }[]; pageViewLog?: { path: string; at: string }[]; activities?: { label: string; count: number }[];
     }[];
   } | null>(null);
+  const [q, setQ] = useState('');
+  const [openLog, setOpenLog] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
   const [range, setRange] = useState<DateRange>({ startDate: '', endDate: '' });
   const [expanded, setExpanded] = useState(false);
@@ -3118,7 +3122,9 @@ function UserActivityPanel() {
     if (d.toDateString() === today.toDateString()) return 'today';
     return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
   };
-  const visibleUsers = expanded ? data?.users ?? [] : (data?.users ?? []).slice(0, 15);
+  const matching = (data?.users ?? []).filter((u) => !q || [u.label, u.email, u.name, u.scoutUsername, u.chesscomUsername, u.lichessUsername].some((v) => v && v.toLowerCase().includes(q.toLowerCase())));
+  const visibleUsers = expanded || q ? matching : matching.slice(0, 15);
+  const fmtTime = (iso: string) => new Date(iso).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="rounded-2xl border border-border/40 bg-card/60 p-5">
@@ -3147,6 +3153,8 @@ function UserActivityPanel() {
           </div>
 
           <p className="text-xs font-bold text-muted-foreground mb-2">Per user, sorted by last active — {data.users.length} total accounts</p>
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Find by email, name or username"
+            className="mb-2 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs outline-none" />
           <div className="space-y-2">
             {visibleUsers.map((u) => (
               <div key={u.id} className="p-3 rounded-lg bg-white/5 border border-white/5">
@@ -3157,6 +3165,17 @@ function UserActivityPanel() {
                     {u.isNew ? 'New today' : u.activeToday ? 'Active today' : 'Not active today'}
                   </span>
                 </div>
+                <div className="mb-1.5 space-y-0.5 text-[10.5px]">
+                  {u.email && <p className="truncate"><span className="text-muted-foreground">Email: </span><span className="font-semibold select-all">{u.email}</span>{u.authProvider ? <span className="text-muted-foreground"> · {u.authProvider.includes('google') ? 'Google' : 'email/password'}</span> : null}</p>}
+                  {u.name && <p className="truncate"><span className="text-muted-foreground">Name: </span>{u.name}</p>}
+                  {(u.scoutUsername || u.chesscomUsername || u.lichessUsername) && (
+                    <p className="flex flex-wrap gap-x-3">
+                      {u.scoutUsername && <span><span className="text-muted-foreground">ChessScout: </span>{u.scoutUsername}</span>}
+                      {u.chesscomUsername && <span><span className="text-muted-foreground">Chess.com: </span>{u.chesscomUsername}</span>}
+                      {u.lichessUsername && <span><span className="text-muted-foreground">Lichess: </span>{u.lichessUsername}</span>}
+                    </p>
+                  )}
+                </div>
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[10px] text-muted-foreground mb-1.5">
                   <span>Signed up {fmtDate(u.signedUpAt)}</span>
                   <span>Last active {fmtDate(u.lastActiveAt)}</span>
@@ -3164,20 +3183,44 @@ function UserActivityPanel() {
                   <span>{u.totalPageViews} page views</span>
                   {u.aiCalls > 0 && <span className="text-foreground font-bold">{u.aiCalls} AI calls (${u.aiCostUsd.toFixed(2)})</span>}
                 </div>
-                {u.topFeatures.length > 0 && (
+                {(u.activities?.length ?? 0) > 0 && (
+                  <div className="mb-1 flex flex-wrap gap-1">
+                    {u.activities!.map((a) => (
+                      <span key={a.label} className="text-[9px] px-1.5 py-0.5 rounded bg-primary/15 text-primary font-semibold">{a.label} · {a.count}</span>
+                    ))}
+                  </div>
+                )}
+                {(u.allFeatures ?? u.topFeatures).length > 0 && (
                   <div className="flex flex-wrap gap-1">
-                    {u.topFeatures.map((f) => (
+                    {(u.allFeatures ?? u.topFeatures).map((f) => (
                       <span key={f.path} className="text-[9px] px-1.5 py-0.5 rounded bg-white/5 text-muted-foreground">
                         {labelForPath(f.path)} · {f.count}
                       </span>
                     ))}
                   </div>
                 )}
+                {(u.pageViewLog?.length ?? 0) > 0 && (
+                  <>
+                    <button onClick={() => setOpenLog((o) => ({ ...o, [u.id]: !o[u.id] }))} className="mt-1.5 text-[10px] font-bold text-primary">
+                      {openLog[u.id] ? 'Hide page views' : `Show all ${u.pageViewLog!.length} page views`}
+                    </button>
+                    {openLog[u.id] && (
+                      <div className="mt-1 max-h-72 overflow-y-auto rounded border border-white/5">
+                        {u.pageViewLog!.map((v, i) => (
+                          <div key={i} className="flex justify-between gap-3 border-b border-white/5 px-2 py-1 text-[10px] last:border-0">
+                            <span className="truncate">{labelForPath(v.path)} <span className="text-muted-foreground">{v.path}</span></span>
+                            <span className="shrink-0 text-muted-foreground">{fmtTime(v.at)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
             ))}
           </div>
 
-          {data.users.length > 15 && (
+          {!q && data.users.length > 15 && (
             <button onClick={() => setExpanded((v) => !v)} className="w-full mt-3 text-xs font-bold text-primary py-2">
               {expanded ? 'Show fewer' : `Show all ${data.users.length} users`}
             </button>
