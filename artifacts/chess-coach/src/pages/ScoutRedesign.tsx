@@ -94,7 +94,7 @@ export function ScoutRedesign(props: {
               className="min-w-0 flex-1 bg-transparent px-3.5 py-4 text-[16px] outline-none placeholder:text-[#87918E]"
               style={{ color: RD.text }}
             />
-            <button type="submit" disabled={loading || !inputUsername.trim()} aria-label="Scout this player" className="grid w-[64px] place-items-center disabled:opacity-50" style={{ background: `linear-gradient(180deg, ${RD.green}, ${RD.greenDark})`, color: '#05100A' }}>
+            <button type="submit" disabled={loading || !inputUsername.trim()} aria-label="Scout this player" className="grid w-[64px] place-items-center disabled:opacity-50" style={{ background: `linear-gradient(180deg, ${RD.green}, ${RD.greenDark})`, color: '#FFFFFF' }}>
               {loading ? <Loader2 size={22} className="animate-spin" /> : <ArrowRight size={24} />}
             </button>
           </form>
