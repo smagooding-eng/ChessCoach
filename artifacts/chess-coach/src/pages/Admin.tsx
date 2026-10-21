@@ -12,6 +12,7 @@ import { Link } from 'wouter';
 import { TournamentsAdminPanel } from '@/components/admin/TournamentsAdminPanel';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ClubOutreachPanel } from '@/components/admin/ClubOutreachPanel';
+import { TrafficExportPanel } from '@/components/admin/TrafficExportPanel';
 import { ShareKitPanel } from '@/components/admin/ShareKitPanel';
 import { EmailTrackingPanel } from '@/components/admin/EmailTrackingPanel';
 import { BotVisitsPanel } from '@/components/admin/BotVisitsPanel';
@@ -644,6 +645,8 @@ export function Admin() {
 
       {activeTab === 'traffic' && (
         <>
+          <TrafficExportPanel />
+
           {stats && stats.visitorBreakdown && (
             <VisitorBreakdownPanel
               title="Visitors, Site-Wide"
