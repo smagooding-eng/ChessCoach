@@ -599,7 +599,50 @@ const DEFAULT_TEMPLATES: Template[] = [
   ...LIBRARY_TEMPLATES,
   ...PRESS_TEMPLATES,
 ];
-const EMAIL_LANGS: { code: string; label: string }[] = [{ code: 'en', label: 'English' }, ...Object.entries(LOCAL_INTROS).map(([code, L]) => ({ code, label: L.label }))];
+const EMAIL_LANGS: { code: string; label: string }[] = [
+  { code: 'auto', label: "Auto: each club's language" },
+  { code: 'en', label: 'English' },
+  ...Object.entries(LOCAL_INTROS).map(([code, L]) => ({ code, label: L.label })),
+];
+const langLabel = (code: string) => (code === 'en' ? 'English' : LOCAL_INTROS[code]?.label ?? code);
+
+// Which email language a club gets in Auto mode, from the country/region the
+// search saved. Countries that mostly do business in English (India, the
+// Philippines, Nigeria...) get English; anything unknown gets English.
+const PLACE_LANG: [RegExp, string][] = [
+  [/quebec|québec/i, 'fr'],
+  [/spain|españa|mexico|méxico|argentina|colombia|chile|peru|perú|venezuela|ecuador|uruguay|paraguay|bolivia|guatemala|costa rica|panama|panamá|cuba|dominican|honduras|el salvador|nicaragua|puerto rico/i, 'es'],
+  [/brazil|brasil|portugal/i, 'pt'],
+  [/france|belgium|belgique|luxembourg|monaco|senegal|côte d'ivoire|ivory coast/i, 'fr'],
+  [/germany|deutschland|austria|österreich|switzerland|schweiz|liechtenstein/i, 'de'],
+  [/italy|italia|san marino/i, 'it'],
+  [/netherlands|nederland|holland/i, 'nl'],
+  [/poland|polska/i, 'pl'],
+  [/ukraine|україна/i, 'uk'],
+  [/turkey|türkiye|turkiye/i, 'tr'],
+  [/romania|moldova/i, 'ro'],
+  [/czech|česk/i, 'cs'],
+  [/hungary|magyar/i, 'hu'],
+  [/greece|cyprus|ελλάδα/i, 'el'],
+  [/sweden|sverige/i, 'sv'],
+  [/emirates|uae|qatar|saudi|egypt|morocco|algeria|tunisia|jordan|lebanon|kuwait|bahrain|oman|iraq|libya/i, 'ar'],
+  [/afghanistan|tajikistan/i, 'fa'],
+  [/bangladesh/i, 'bn'],
+  [/indonesia/i, 'id'],
+  [/vietnam|viet nam/i, 'vi'],
+  [/thailand/i, 'th'],
+  [/taiwan|hong kong/i, 'zh-TW'],
+  [/china|singapore/i, 'zh-CN'],
+  [/japan/i, 'ja'],
+  [/korea/i, 'ko'],
+];
+function langForContact(c: Contact | null): string {
+  if (!c) return 'en';
+  const where = [c.region, c.country, c.city].filter(Boolean).join(' · ');
+  if (/united states|usa|\bus\b|united kingdom|\buk\b|england|scotland|wales|ireland|canada|australia|new zealand/i.test(c.country ?? '') && !/quebec|québec/i.test(where)) return 'en';
+  for (const [re, l] of PLACE_LANG) if (re.test(where) && LOCAL_INTROS[l]) return l;
+  return 'en';
+}
 
 interface Settings { sender: string; gmail: string; address: string; tournamentLink: string; batchSize: number; styled: boolean }
 const SETTINGS_KEY = 'cs_club_outreach_settings';
@@ -825,7 +868,7 @@ function TemplatePicker({ templates: all, value, onChange, compact, audience = '
 
 export function ClubOutreachPanel() {
   const [audience, setAudienceState] = useState<Audience>(() => { try { const a = localStorage.getItem(AUDIENCE_KEY) as Audience | null; return a && a in AUDIENCE_META ? a : 'club'; } catch { return 'club'; } });
-  const [lang, setLangState] = useState('en');
+  const [lang, setLangState] = useState(() => (audience === 'club' ? 'auto' : 'en'));
   const [tab, setTab] = useState('new');
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [counts, setCounts] = useState<Record<string, number>>({});
@@ -837,9 +880,9 @@ export function ClubOutreachPanel() {
   const [settings, setSettings] = useState<Settings>(() => load(SETTINGS_KEY, { sender: 'Shann', gmail: '', address: '', tournamentLink: '', batchSize: 40, styled: true }));
   const [overrides, setOverrides] = useState<Record<string, { subject: string; body: string }>>(() => load(TEMPLATES_KEY, {}));
   const [templateId, setTemplateId] = useState(() => AUDIENCE_META[audience].defaultTemplate);
-  const setLang = (l: string) => { setLangState(l); setTemplateId(l === 'en' ? 'intro' : `intro_${l}`); };
+  const setLang = (l: string) => { setLangState(l); setTemplateId(l === 'en' || l === 'auto' ? 'intro' : `intro_${l}`); };
   const setAudience = (a: Audience) => {
-    setAudienceState(a); setTab('new'); setSelected(new Set()); setMsg(''); setLangState('en');
+    setAudienceState(a); setTab('new'); setSelected(new Set()); setMsg(''); setLangState(a === 'club' ? 'auto' : 'en');
     setTemplateId(AUDIENCE_META[a].defaultTemplate);
     try { localStorage.setItem(AUDIENCE_KEY, a); } catch { /* ignore */ }
   };
@@ -851,6 +894,14 @@ export function ClubOutreachPanel() {
 
   const templates = useMemo(() => DEFAULT_TEMPLATES.map((t) => ({ ...t, ...(overrides[t.id] ?? {}) })), [overrides]);
   const template = templates.find((t) => t.id === templateId) ?? templates[0];
+  // Auto language: the Introduce email in the club's own language. Other club
+  // templates are English only, so they're sent as they are.
+  const autoLang = audience === 'club' && lang === 'auto' && (template.id === 'intro' || template.id === 'intro_general');
+  const langOf = (c: Contact | null) => (autoLang ? langForContact(c) : (template.lang ?? 'en'));
+  const tplFor = (l: string): Template => {
+    if (!autoLang || l === 'en') return template;
+    return templates.find((t) => t.id === (template.kind === 'personal' ? `intro_${l}` : `intro_general_${l}`)) ?? template;
+  };
 
   const loadData = useCallback(async () => {
     try {
@@ -907,6 +958,7 @@ export function ClubOutreachPanel() {
 
   // BCC batches: copy/paste addresses or open one Gmail draft per batch.
   const [batches, setBatches] = useState<Contact[][] | null>(null);
+  const [batchLangs, setBatchLangs] = useState<string[]>([]);
   const [bi, setBi] = useState(0);
   const [copied, setCopied] = useState('');
   const batchSize = Math.max(5, Math.min(100, Number(settings.batchSize) || 40));
@@ -914,9 +966,13 @@ export function ClubOutreachPanel() {
     const list = contacts.filter((c) => selected.has(c.id));
     if (!list.length) return;
     if (!settings.address.trim()) { setMsg('Add your mailing address in Sender details first. Marketing emails must include one.'); setEditing(true); return; }
+    // In Auto, each batch holds clubs that share a language, so one email fits all of them.
+    const byLang = new Map<string, Contact[]>();
+    for (const c of list) { const l = langOf(c); byLang.set(l, [...(byLang.get(l) ?? []), c]); }
     const out: Contact[][] = [];
-    for (let i = 0; i < list.length; i += batchSize) out.push(list.slice(i, i + batchSize));
-    setBatches(out); setBi(0); setCopied('');
+    const langs: string[] = [];
+    for (const [l, group] of byLang) for (let i = 0; i < group.length; i += batchSize) { out.push(group.slice(i, i + batchSize)); langs.push(l); }
+    setBatches(out); setBatchLangs(langs); setBi(0); setCopied('');
   };
   const copyText = async (text: string, what: string) => {
     try { await navigator.clipboard.writeText(text); } catch {
@@ -926,8 +982,10 @@ export function ClubOutreachPanel() {
     setCopied(what); setTimeout(() => setCopied(''), 1800);
   };
   const batch = batches?.[bi] ?? null;
-  const bulkSubject = fill(template.subject, null, settings);
-  const bulkBody = fill(template.body, null, settings);
+  const batchLang = batchLangs[bi] ?? 'en';
+  const batchTpl = tplFor(batchLang);
+  const bulkSubject = fill(batchTpl.subject, null, settings);
+  const bulkBody = fill(batchTpl.body, null, settings);
   const finishBatch = async () => {
     if (!batch || !batches) return;
     await setStatus(batch.map((c) => c.id), 'contacted', template.id);
@@ -942,8 +1000,10 @@ export function ClubOutreachPanel() {
     setQueue(list); setQi(0);
   };
   const current = queue?.[qi] ?? null;
-  const subject = current ? fill(template.subject, current, settings) : '';
-  const body = current ? fill(template.body, current, settings) : '';
+  const currentLang = langOf(current);
+  const currentTpl = tplFor(currentLang);
+  const subject = current ? fill(currentTpl.subject, current, settings) : '';
+  const body = current ? fill(currentTpl.body, current, settings) : '';
   const advance = () => {
     if (!queue) return;
     if (qi + 1 >= queue.length) { setQueue(null); setSelected(new Set()); void loadData(); }
@@ -967,8 +1027,9 @@ export function ClubOutreachPanel() {
     if (!confirm(`Send ${n} styled email${n === 1 ? '' : 's'} through Resend now?${quota && list.length > quota.remaining ? ` (${list.length - quota.remaining} will wait for tomorrow's limit.)` : ''}`)) return false;
     setResendBusy(true); setMsg(`Sending ${n} through Resend…`);
     const items = list.map((c) => {
-      const text = fill(template.body, c, settings);
-      return { id: c.id, subject: fill(template.subject, c, settings), text, html: styledEmailHtml(text) };
+      const tpl = tplFor(langOf(c));
+      const text = fill(tpl.body, c, settings);
+      return { id: c.id, subject: fill(tpl.subject, c, settings), text, html: styledEmailHtml(text) };
     });
     try {
       const r = await apiFetch('/api/admin/club-outreach/send', {
@@ -1059,7 +1120,14 @@ export function ClubOutreachPanel() {
               </label>
             )}
           </div>
-          <TemplatePicker templates={templates} value={templateId} onChange={setTemplateId} audience={audience} lang={lang} />
+          <TemplatePicker templates={templates} value={templateId} onChange={setTemplateId} audience={audience} lang={lang === 'auto' ? 'en' : lang} />
+          {audience === 'club' && lang === 'auto' && (
+            <p className="text-[11px]" style={{ color: MUTED }}>
+              {autoLang
+                ? "Auto: each club gets the Introduce email in its country's language (English when the country is English-speaking or unknown). Bcc batches are grouped by language."
+                : 'Auto only translates the Introduce email; this template goes out in English.'}
+            </p>
+          )}
           <input className={INPUT} value={template.subject} onChange={(e) => updateTemplate({ subject: e.target.value })} />
           <textarea className={`${INPUT} min-h-[150px] font-mono text-[12px]`} value={template.body} onChange={(e) => updateTemplate({ body: e.target.value })} />
           <div className="flex items-center justify-between">
@@ -1165,7 +1233,7 @@ export function ClubOutreachPanel() {
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-semibold text-white">{c.orgName}</p>
                 <p className="truncate text-[11.5px]" style={{ color: MUTED }}>
-                  {[c.platform, c.orgType, [c.city, c.region, c.country].filter(Boolean).join(', ')].filter(Boolean).join(' · ')}
+                  {[c.platform, c.orgType, [c.city, c.region, c.country].filter(Boolean).join(', '), audience === 'club' && langForContact(c) !== 'en' ? `emails in ${langLabel(langForContact(c))}` : ''].filter(Boolean).join(' · ')}
                 </p>
                 <p className="truncate text-[12px] text-white/80">{c.email}</p>
                 <p className="flex flex-wrap gap-x-3 text-[11px]" style={{ color: MUTED }}>
@@ -1188,11 +1256,11 @@ export function ClubOutreachPanel() {
         <div className="fixed inset-0 z-[95] flex items-end justify-center p-0 sm:items-center sm:p-4" style={{ background: 'rgba(0,0,0,.6)' }}>
           <div className="max-h-[92vh] w-full max-w-[640px] space-y-3 overflow-y-auto rounded-t-2xl p-5 sm:rounded-2xl" style={{ background: '#262421', border: '1px solid rgba(255,255,255,.1)' }}>
             <div className="flex items-center gap-2">
-              <p className="flex-1 text-sm font-bold text-white">Batch {bi + 1} of {batches.length} · {batch.length} addresses</p>
+              <p className="flex-1 text-sm font-bold text-white">Batch {bi + 1} of {batches.length} · {batch.length} addresses{audience === 'club' && autoLang ? ` · ${langLabel(batchLang)}` : ''}</p>
               <button onClick={() => { setBatches(null); void loadData(); }} aria-label="Close" className="p-1" style={{ color: MUTED }}><X size={18} /></button>
             </div>
             <div className="h-1.5 overflow-hidden rounded-full bg-white/10"><div className="h-full" style={{ width: `${(bi / batches.length) * 100}%`, background: GREEN }} /></div>
-            <TemplatePicker templates={templates} value={templateId} onChange={setTemplateId} compact audience={audience} lang={lang} />
+            <TemplatePicker templates={templates} value={templateId} onChange={setTemplateId} compact audience={audience} lang={lang === 'auto' ? 'en' : lang} />
             <p className="text-[12px]" style={{ color: MUTED }}>
               Put these in <b className="text-white">Bcc</b> (never To or Cc) so organizations can't see each other's addresses. Personal templates use "your club" here, since one email goes to several clubs.
             </p>
@@ -1237,8 +1305,8 @@ export function ClubOutreachPanel() {
               <button onClick={() => { setQueue(null); void loadData(); }} aria-label="Close" className="p-1" style={{ color: MUTED }}><X size={18} /></button>
             </div>
             <div className="h-1.5 overflow-hidden rounded-full bg-white/10"><div className="h-full" style={{ width: `${(qi / queue.length) * 100}%`, background: GREEN }} /></div>
-            <TemplatePicker templates={templates} value={templateId} onChange={setTemplateId} compact audience={audience} lang={lang} />
-            <p className="text-xs" style={{ color: MUTED }}>To: <span className="text-white">{current.email}</span></p>
+            <TemplatePicker templates={templates} value={templateId} onChange={setTemplateId} compact audience={audience} lang={lang === 'auto' ? 'en' : lang} />
+            <p className="text-xs" style={{ color: MUTED }}>To: <span className="text-white">{current.email}</span>{audience === 'club' && <> · Language: <span className="text-white">{langLabel(currentLang)}</span></>}</p>
             <p className="text-sm font-bold text-white">{subject}</p>
             <DraftActions draft={{ to: current.email, subject, body }} styled={settings.styled} account={settings.gmail} onOpened={() => setOpened(true)}
               track={{ contacts: [{ id: current.id, email: current.email }], template: template.id }} />
