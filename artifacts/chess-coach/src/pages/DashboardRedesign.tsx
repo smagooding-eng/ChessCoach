@@ -316,7 +316,7 @@ export function DashboardRedesign() {
               <button
                 type="submit"
                 className="grid h-[54px] w-[62px] shrink-0 place-items-center transition-transform active:scale-95"
-                style={{ background: `linear-gradient(180deg, ${GREEN} 0%, ${GREEN_DARK} 100%)`, color: '#05100A', boxShadow: '0 0 22px rgba(129,182,76,.45)' }}
+                style={{ background: `linear-gradient(180deg, ${GREEN} 0%, ${GREEN_DARK} 100%)`, color: '#FFFFFF', boxShadow: '0 0 22px rgba(129,182,76,.45)' }}
                 aria-label="Scout this player"
               >
                 <ArrowRight size={26} strokeWidth={2.6} />
