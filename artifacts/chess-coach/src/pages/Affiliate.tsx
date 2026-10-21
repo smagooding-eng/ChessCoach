@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'wouter';
 import { ArrowLeft, DollarSign, CheckCircle2, ExternalLink, Loader2, AlertCircle } from 'lucide-react';
+import { ReferralCodeEditor } from '@/components/ReferralCodeEditor';
 import { apiFetch } from '@/lib/api';
 import { useUser } from '@/hooks/use-user';
 
@@ -146,6 +147,8 @@ export default function AffiliatePage() {
               <div className="rounded-xl p-4 text-center" style={{ background: CARD, border: '1px solid rgba(255,255,255,0.06)' }}>
                 <p className="text-xs mb-1" style={{ color: MUTED }}>Your referral code</p>
                 <p className="font-mono font-black text-lg" style={{ color: G }}>{status.inviteCode}</p>
+                <p className="mt-1 break-all font-mono text-[11px]" style={{ color: MUTED }}>{window.location.origin}/?ref={status.inviteCode}</p>
+                <ReferralCodeEditor tone="dark" code={status.inviteCode} onChange={(next) => setStatus((st) => (st ? { ...st, inviteCode: next } : st))} />
               </div>
             )}
           </>

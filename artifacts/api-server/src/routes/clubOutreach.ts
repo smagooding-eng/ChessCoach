@@ -9,7 +9,7 @@ import { clubUnsubscribeUrl } from "../lib/emailPrefs";
 import { trackHtml, ensureEmailTracking } from "../lib/emailTracking";
 
 // Admin: club & organizer contacts for one-by-one outreach from Gmail.
-//   GET    /admin/club-outreach               contacts (+ counts, latest runs)
+//   GET    /admin/club-outreach               contacts (+ counts, latest runs); ?audience=club|influencer
 //   POST   /admin/club-outreach/discover      find new contacts now
 //   POST   /admin/club-outreach/status        { ids, status, template? }
 //   POST   /admin/club-outreach/contacts      add one by hand
@@ -34,11 +34,12 @@ router.get("/admin/club-outreach", requireAdmin, async (req: Request, res: Respo
     await ready();
     await ensureEmailTracking();
     const status = String(req.query.status ?? "new");
-    const where = status === "all" ? sql`TRUE` : sql`c.status = ${status}`;
+    const audience = req.query.audience === "influencer" ? "influencer" : "club";
+    const where = status === "all" ? sql`c.audience = ${audience}` : sql`c.status = ${status} AND c.audience = ${audience}`;
     const contacts = rowsOf(await db.execute(sql`
       SELECT c.id, c.email, c.org_name AS "orgName", c.org_type AS "orgType", c.city, c.region, c.country, c.website,
         c.source_url AS "sourceUrl", c.status, c.notes, c.found_at AS "foundAt", c.contacted_at AS "contactedAt",
-        c.contacted_template AS "contactedTemplate", c.run_id AS "runId",
+        c.contacted_template AS "contactedTemplate", c.run_id AS "runId", c.audience, c.platform, c.profile_url AS "profileUrl",
         tr.opened_at AS "openedAt", tr.open_count AS "openCount", tr.clicked_at AS "clickedAt", tr.click_count AS "clickCount"
       FROM club_contacts c
       LEFT JOIN LATERAL (
@@ -47,10 +48,10 @@ router.get("/admin/club-outreach", requireAdmin, async (req: Request, res: Respo
       ) tr ON true
       WHERE ${where} AND NOT EXISTS (SELECT 1 FROM club_contact_dnc d WHERE LOWER(d.email) = LOWER(c.email))
       ORDER BY c.found_at DESC LIMIT 1000`));
-    const counts = rowsOf<{ status: string; n: string }>(await db.execute(sql`SELECT status, COUNT(*) AS n FROM club_contacts GROUP BY status`));
+    const counts = rowsOf<{ status: string; n: string }>(await db.execute(sql`SELECT status, COUNT(*) AS n FROM club_contacts WHERE audience = ${audience} GROUP BY status`));
     const runs = rowsOf(await db.execute(sql`
       SELECT id, started_at AS "startedAt", finished_at AS "finishedAt", candidates, added, error, trigger, searches
-      FROM club_outreach_runs ORDER BY started_at DESC LIMIT 6`));
+      FROM club_outreach_runs WHERE audience = ${audience} ORDER BY started_at DESC LIMIT 6`));
     const [{ n: dnc }] = rowsOf<{ n: string }>(await db.execute(sql`SELECT COUNT(*) AS n FROM club_contact_dnc`));
     res.json({
       contacts,
@@ -69,7 +70,8 @@ router.post("/admin/club-outreach/discover", requireAdmin, async (req: Request, 
   try {
     await ready();
     const searches = Math.max(1, Math.min(20, Math.round(Number(req.body?.searches ?? 8))));
-    const runId = await startDiscovery({ searches, trigger: "manual" });
+    const audience = req.body?.audience === "influencer" ? "influencer" : "club";
+    const runId = await startDiscovery({ searches, trigger: "manual", audience });
     if (runId === null) { res.status(409).json({ error: "A search is already running" }); return; }
     res.json({ runId });
   } catch (err) {
@@ -174,9 +176,10 @@ router.post("/admin/club-outreach/contacts", requireAdmin, async (req: Request, 
     const [dnc] = rowsOf(await db.execute(sql`SELECT email FROM club_contact_dnc WHERE LOWER(email) = ${email}`));
     if (dnc) { res.status(400).json({ error: "That address is on the do-not-contact list" }); return; }
     const ins = rowsOf(await db.execute(sql`
-      INSERT INTO club_contacts (email, org_name, org_type, city, website, source_url)
+      INSERT INTO club_contacts (email, org_name, org_type, city, website, source_url, audience, platform, profile_url)
       VALUES (${email}, ${orgName}, ${String(req.body?.orgType ?? "").slice(0, 120) || null}, ${String(req.body?.city ?? "").slice(0, 120) || null},
-        ${String(req.body?.website ?? "").slice(0, 500) || null}, 'added by hand')
+        ${String(req.body?.website ?? "").slice(0, 500) || null}, 'added by hand', ${req.body?.audience === "influencer" ? "influencer" : "club"},
+        ${String(req.body?.platform ?? "").slice(0, 60) || null}, ${String(req.body?.profileUrl ?? "").slice(0, 500) || null})
       ON CONFLICT DO NOTHING RETURNING id`));
     if (!ins.length) { res.status(409).json({ error: "That email is already in the list" }); return; }
     res.json({ ok: true });

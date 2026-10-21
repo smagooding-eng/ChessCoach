@@ -680,6 +680,39 @@ router.get("/auth/referrals", async (req: Request, res: Response) => {
   }
 });
 
+// Let a member with a referral code (Pro members and affiliates) change it to
+// something that fits them, like their channel or club name. Earlier
+// referrals stay credited (they're stored by user, not by code); only links
+// with the old code stop working.
+const RESERVED_CODES = new Set(["ADMIN", "CHESSSCOUT", "CHESSSCOUTNET", "SUPPORT", "STAFF", "OFFICIAL", "HELP", "PRO", "FREE", "TEST", "NULL", "UNDEFINED"]);
+router.post("/auth/referrals/code", async (req: Request, res: Response) => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Not authenticated" }); return; }
+  try {
+    const userId = req.user.id;
+    const raw = typeof req.body?.code === "string" ? req.body.code : "";
+    const code = raw.trim().toUpperCase().replace(/[\s-]+/g, "");
+    if (!/^[A-Z0-9_]{3,20}$/.test(code)) {
+      res.status(400).json({ error: "Use 3 to 20 letters, numbers or underscores (no spaces)." }); return;
+    }
+    if (RESERVED_CODES.has(code)) { res.status(400).json({ error: "That code is reserved. Try another." }); return; }
+    const [user] = await db.select({ inviteCode: usersTable.inviteCode, isAffiliate: usersTable.isAffiliate }).from(usersTable).where(eq(usersTable.id, userId));
+    if (!user?.inviteCode && !user?.isAffiliate) {
+      res.status(403).json({ error: "Referral codes come with Pro or the affiliate program." }); return;
+    }
+    if (user.inviteCode === code) { res.json({ inviteCode: code }); return; }
+    const [taken] = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.inviteCode, code));
+    if (taken && taken.id !== userId) { res.status(409).json({ error: `"${code}" is already taken. Try another.` }); return; }
+    try {
+      await db.update(usersTable).set({ inviteCode: code }).where(eq(usersTable.id, userId));
+    } catch {
+      res.status(409).json({ error: `"${code}" is already taken. Try another.` }); return;
+    }
+    res.json({ inviteCode: code });
+  } catch {
+    res.status(500).json({ error: "Could not update your referral code" });
+  }
+});
+
 router.get("/logout", async (req: Request, res: Response) => {
   const sid = getSessionId(req);
   await clearSession(res, sid);

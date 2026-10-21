@@ -15,6 +15,7 @@ import { useMultiEloProgress } from '@/hooks/use-elo-progress';
 import { RD } from '@/lib/redesignTheme';
 import { RedesignHeader } from '@/components/RedesignHeader';
 import { ProUpsell } from '@/components/ProUpsell';
+import { ReferralCodeEditor } from '@/components/ReferralCodeEditor';
 import { ScoutUsernameCard } from '@/components/ScoutUsernameInput';
 import {
   User, Mail, Crown, LogOut, ChevronRight, Trophy, Swords, Target, DollarSign,
@@ -1604,6 +1605,7 @@ export function ReferralCard({ isPremium, compact = false }: { isPremium: boolea
                 <p className="text-[11px] text-muted-foreground mt-1.5">
                   Friends enter this at signup, or use your link below.
                 </p>
+                <ReferralCodeEditor code={data.inviteCode} onChange={(next) => setData((d) => (d ? { ...d, inviteCode: next } : d))} />
               </div>
             )}
 

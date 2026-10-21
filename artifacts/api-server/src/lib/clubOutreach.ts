@@ -12,6 +12,11 @@
 //   3. Check the domain accepts mail (MX record) and skip anything already
 //      saved or on the do-not-contact list.
 // Personal social profiles and member lists are never scraped.
+//
+// Creators (audience 'influencer'): chess YouTubers, streamers, TikTokers,
+// coaches, bloggers and podcasters to invite to the affiliate program. Same
+// rule: only a business/contact email the creator publishes on their own
+// website or link-in-bio page. Social platforms themselves are never scraped.
 import dns from "dns";
 import OpenAI from "openai";
 import { db } from "@workspace/db";
@@ -40,6 +45,10 @@ export async function ensureClubOutreachTables(): Promise<void> {
     found_at TIMESTAMPTZ NOT NULL DEFAULT now()
   )`);
   await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS idx_club_contacts_email ON club_contacts (LOWER(email))`);
+  // Clubs and creators share the table; 'club' for everything found before creators existed.
+  await db.execute(sql`ALTER TABLE club_contacts ADD COLUMN IF NOT EXISTS audience VARCHAR NOT NULL DEFAULT 'club'`);
+  await db.execute(sql`ALTER TABLE club_contacts ADD COLUMN IF NOT EXISTS platform VARCHAR`);
+  await db.execute(sql`ALTER TABLE club_contacts ADD COLUMN IF NOT EXISTS profile_url VARCHAR`);
   await db.execute(sql`CREATE TABLE IF NOT EXISTS club_contact_dnc (
     email VARCHAR PRIMARY KEY,
     reason VARCHAR,
@@ -55,6 +64,7 @@ export async function ensureClubOutreachTables(): Promise<void> {
     error TEXT,
     trigger VARCHAR NOT NULL DEFAULT 'manual'
   )`);
+  await db.execute(sql`ALTER TABLE club_outreach_runs ADD COLUMN IF NOT EXISTS audience VARCHAR NOT NULL DEFAULT 'club'`);
   await db.execute(sql`CREATE TABLE IF NOT EXISTS club_outreach_state (id VARCHAR PRIMARY KEY, cursor INTEGER NOT NULL DEFAULT 0)`);
   // Outreach sent through Resend (counted against the daily limit).
   await db.execute(sql`CREATE TABLE IF NOT EXISTS club_outreach_sends (
@@ -103,9 +113,36 @@ function searchAt(index: number): { type: string; place: string } {
   return { place: PLACES[Math.floor(i / ORG_TYPES.length)], type: ORG_TYPES[i % ORG_TYPES.length] };
 }
 
+// Creators: kinds of chess creator × markets (the app speaks 28 languages).
+const CREATOR_KINDS = [
+  "chess YouTuber who posts lessons, game analysis or opening videos",
+  "chess streamer on Twitch, Kick or YouTube Live",
+  "chess creator on TikTok, Instagram Reels or YouTube Shorts",
+  "online chess coach who posts free chess content",
+  "chess content creator for beginners or kids, or a chess teacher who posts for parents",
+  "chess blogger, Substack or newsletter writer",
+  "chess podcast host",
+  "titled chess player (GM, IM, FM, WGM, WIM, WFM) who makes content",
+];
+const CREATOR_MARKETS = [
+  "the United States", "the United Kingdom and Ireland", "Canada", "Australia and New Zealand", "India (English or Hindi)",
+  "the Philippines", "Nigeria, Kenya and South Africa", "Spain (Spanish language)", "Mexico, Argentina, Colombia and Latin America (Spanish language)",
+  "Brazil and Portugal (Portuguese language)", "France (French language)", "Germany, Austria and Switzerland (German language)",
+  "Italy (Italian language)", "the Netherlands and Belgium", "Poland", "Ukraine and Russian-speaking countries", "Turkey",
+  "Greece", "Romania, Czechia and Hungary", "Sweden and the Nordics", "the Arab world (Arabic language)", "Iran (Persian language)",
+  "Bangladesh (Bengali language)", "Indonesia", "Vietnam", "Thailand", "China and Taiwan (Chinese language)", "Japan", "South Korea",
+];
+function creatorSearchAt(index: number): { type: string; place: string } {
+  const total = CREATOR_KINDS.length * CREATOR_MARKETS.length;
+  const i = ((index % total) + total) % total;
+  return { place: CREATOR_MARKETS[Math.floor(i / CREATOR_KINDS.length)], type: CREATOR_KINDS[i % CREATOR_KINDS.length] };
+}
+
+export type Audience = "club" | "influencer";
+
 // ── Web search (names + websites only) ─────────────────────────────────────
 
-interface Candidate { name: string; type?: string; city?: string; region?: string; country?: string; website: string; contactPage?: string }
+interface Candidate { name: string; type?: string; city?: string; region?: string; country?: string; website: string; contactPage?: string; platform?: string; profileUrl?: string }
 
 const SEARCH_MODELS = [process.env.OUTREACH_SEARCH_MODEL, "gpt-5.6-luna", "gpt-4.1-mini"].filter(Boolean) as string[];
 
@@ -117,15 +154,30 @@ function parseJsonLoose(text: string): unknown {
   try { return JSON.parse(cleaned.slice(start, end + 1)); } catch { return null; }
 }
 
-async function searchOrganizations(type: string, place: string): Promise<Candidate[]> {
-  if (!process.env.OPENAI_API_KEY) throw new Error("OPENAI_API_KEY is not set");
-  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-  const prompt = `Search the web for active ${type} organizations in ${place}.
+function clubPrompt(type: string, place: string): string {
+  return `Search the web for active ${type} organizations in ${place}.
 Find up to 10 real ones that have their own official website (not a Facebook, Instagram, Reddit or Meetup page) where they publish a way to contact them.
 Only public or community organizations that adults can join or play in. Do NOT include schools, school districts, school chess teams, colleges, universities, PTAs, or programs only for students.
 Return ONLY JSON in this shape, using websites you actually found in search results:
 {"results":[{"name":"...","type":"${type}","city":"...","region":"...","country":"...","website":"https://...","contactPage":"https://... (their contact or about page if you found it)"}]}
 Do not include email addresses. Do not invent websites.`;
+}
+
+function creatorPrompt(type: string, place: string): string {
+  return `Search the web for active chess content creators: ${type}, in or creating for ${place}.
+Find up to 10 real people or channels that posted in the last few months. Prefer small and mid-size creators (roughly 1,000 to 300,000 followers), who are more likely to answer.
+Each must have a page OUTSIDE the social platforms where they list a business or contact email: their own website, or a link-in-bio page (Linktree, Beacons, Carrd, Stan, bio.link and similar).
+Return ONLY JSON in this shape, using pages you actually found in search results:
+{"results":[{"name":"their creator or channel name","type":"${type}","platform":"YouTube | Twitch | TikTok | Instagram | Blog | Podcast | Kick","profileUrl":"https://... their main channel or profile","country":"...","website":"https://... their own website or link-in-bio page","contactPage":"https://... the page that shows their business email, if different"}]}
+Do not include email addresses. Do not invent websites. Do not list Chess.com or Lichess staff accounts, federations or companies.`;
+}
+
+const LINK_IN_BIO = /(^|\.)(linktr\.ee|beacons\.ai|carrd\.co|stan\.store|bio\.link|linkin\.bio|campsite\.bio|lnk\.bio|tap\.bio|komi\.io|snipfeed\.co|hoo\.be|solo\.to)$/i;
+
+async function searchOrganizations(type: string, place: string, audience: Audience = "club"): Promise<Candidate[]> {
+  if (!process.env.OPENAI_API_KEY) throw new Error("OPENAI_API_KEY is not set");
+  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  const prompt = audience === "influencer" ? creatorPrompt(type, place) : clubPrompt(type, place);
   let lastErr: unknown = null;
   for (const model of SEARCH_MODELS) {
     try {
@@ -225,7 +277,9 @@ async function findContactEmail(c: Candidate): Promise<{ email: string; sourceUr
   const host = hostOf(c.website);
   if (!host) return null;
   const base = new URL(c.website);
-  const pages = [c.contactPage, c.website, `${base.origin}/contact`, `${base.origin}/contact-us`, `${base.origin}/about`]
+  // A link-in-bio page is one page per creator; don't guess /contact on the shared host.
+  const linkPage = LINK_IN_BIO.test(host);
+  const pages = (linkPage ? [c.contactPage, c.website] : [c.contactPage, c.website, `${base.origin}/contact`, `${base.origin}/contact-us`, `${base.origin}/about`, `${base.origin}/business`, `${base.origin}/sponsor`])
     .filter((u): u is string => !!u && /^https?:\/\//i.test(u) && !SOCIAL.test(u));
   const seen = new Set<string>();
   for (const page of pages) {
@@ -245,43 +299,51 @@ let running = false;
 export function isDiscoveryRunning(): boolean { return running; }
 
 /** Runs `searches` (type, place) searches from where the last run stopped. Returns the run id. */
-export async function startDiscovery(opts: { searches: number; trigger: "manual" | "weekly" }): Promise<number | null> {
+export async function startDiscovery(opts: { searches: number; trigger: "manual" | "weekly"; audience?: Audience }): Promise<number | null> {
   if (running) return null;
   running = true;
-  await ensureClubOutreachTables();
-  const [run] = rowsOf<{ id: number }>(await db.execute(sql`INSERT INTO club_outreach_runs (trigger) VALUES (${opts.trigger}) RETURNING id`));
+  const audience: Audience = opts.audience === "influencer" ? "influencer" : "club";
+  const stateId = audience === "influencer" ? "influencer" : "main";
+  const at = audience === "influencer" ? creatorSearchAt : searchAt;
+  try { await ensureClubOutreachTables(); } catch (err) { running = false; throw err; }
+  const [run] = rowsOf<{ id: number }>(await db.execute(sql`INSERT INTO club_outreach_runs (trigger, audience) VALUES (${opts.trigger}, ${audience}) RETURNING id`));
   void (async () => {
     let candidates = 0;
     let added = 0;
     const done: string[] = [];
     let error: string | null = null;
     try {
-      const [st] = rowsOf<{ cursor: number }>(await db.execute(sql`SELECT cursor FROM club_outreach_state WHERE id = 'main'`));
+      const [st] = rowsOf<{ cursor: number }>(await db.execute(sql`SELECT cursor FROM club_outreach_state WHERE id = ${stateId}`));
       let cursor = Number(st?.cursor ?? 0);
       for (let n = 0; n < opts.searches; n++, cursor++) {
-        const { type, place } = searchAt(cursor);
+        const { type, place } = at(cursor);
         done.push(`${type} · ${place}`);
         let list: Candidate[] = [];
-        try { list = await searchOrganizations(type, place); }
+        try { list = await searchOrganizations(type, place, audience); }
         catch (err) { error = err instanceof Error ? err.message : "Web search failed"; break; }
         candidates += list.length;
         for (const c of list) {
           const host = hostOf(c.website);
-          if (!host || isSchool(c, host)) continue;
-          const [dup] = rowsOf<{ id: number }>(await db.execute(sql`SELECT id FROM club_contacts WHERE website ILIKE ${`%${host}%`} LIMIT 1`));
+          if (!host || (audience === "club" && isSchool(c, host))) continue;
+          // Link-in-bio hosts are shared by many creators, so match the whole page there.
+          const [dup] = rowsOf<{ id: number }>(await db.execute(LINK_IN_BIO.test(host)
+            ? sql`SELECT id FROM club_contacts WHERE LOWER(website) = ${c.website.toLowerCase().replace(/\/$/, "")} OR LOWER(website) = ${c.website.toLowerCase()} LIMIT 1`
+            : sql`SELECT id FROM club_contacts WHERE website ILIKE ${`%${host}%`} LIMIT 1`));
           if (dup) continue;
           const found = await findContactEmail(c);
           if (!found) continue;
           const [dnc] = rowsOf<{ email: string }>(await db.execute(sql`SELECT email FROM club_contact_dnc WHERE LOWER(email) = ${found.email}`));
           if (dnc) continue;
           const ins = rowsOf<{ id: number }>(await db.execute(sql`
-            INSERT INTO club_contacts (email, org_name, org_type, city, region, country, website, source_url, run_id)
+            INSERT INTO club_contacts (email, org_name, org_type, city, region, country, website, source_url, run_id, audience, platform, profile_url)
             VALUES (${found.email}, ${c.name.slice(0, 200)}, ${(c.type || type).slice(0, 120)}, ${c.city?.slice(0, 120) ?? null},
-              ${c.region?.slice(0, 120) ?? null}, ${c.country?.slice(0, 120) ?? null}, ${c.website.slice(0, 500)}, ${found.sourceUrl.slice(0, 500)}, ${run.id})
+              ${c.region?.slice(0, 120) ?? null}, ${c.country?.slice(0, 120) ?? null}, ${c.website.slice(0, 500)}, ${found.sourceUrl.slice(0, 500)}, ${run.id},
+              ${audience}, ${typeof c.platform === "string" ? c.platform.slice(0, 60) : null},
+              ${typeof c.profileUrl === "string" && /^https?:\/\//i.test(c.profileUrl) ? c.profileUrl.slice(0, 500) : null})
             ON CONFLICT DO NOTHING RETURNING id`));
           if (ins.length) added++;
         }
-        await db.execute(sql`INSERT INTO club_outreach_state (id, cursor) VALUES ('main', ${cursor + 1}) ON CONFLICT (id) DO UPDATE SET cursor = ${cursor + 1}`);
+        await db.execute(sql`INSERT INTO club_outreach_state (id, cursor) VALUES (${stateId}, ${cursor + 1}) ON CONFLICT (id) DO UPDATE SET cursor = ${cursor + 1}`);
       }
     } catch (err) {
       error = err instanceof Error ? err.message : "Run failed";
@@ -296,17 +358,19 @@ export async function startDiscovery(opts: { searches: number; trigger: "manual"
   return run.id;
 }
 
-/** Weekly run (Mondays): a bigger batch than the manual button. */
+/** Weekly runs: clubs on Mondays, creators on Thursdays (bigger batches than the manual button). */
 export function startClubOutreachSchedule(): void {
   ensureClubOutreachTables().catch((err) => logger.warn({ err }, "[club-outreach] table setup failed"));
   setInterval(async () => {
     const d = new Date();
-    if (d.getUTCDay() !== 1 || d.getUTCHours() !== 14) return;
+    if (d.getUTCHours() !== 14) return;
+    const audience: Audience | null = d.getUTCDay() === 1 ? "club" : d.getUTCDay() === 4 ? "influencer" : null;
+    if (!audience) return;
     try {
       const [last] = rowsOf<{ started_at: string }>(await db.execute(sql`
-        SELECT started_at FROM club_outreach_runs WHERE trigger = 'weekly' ORDER BY started_at DESC LIMIT 1`));
+        SELECT started_at FROM club_outreach_runs WHERE trigger = 'weekly' AND audience = ${audience} ORDER BY started_at DESC LIMIT 1`));
       if (last && Date.now() - new Date(last.started_at).getTime() < 6 * 86_400_000) return;
-      await startDiscovery({ searches: 16, trigger: "weekly" });
+      await startDiscovery({ searches: audience === "club" ? 16 : 12, trigger: "weekly", audience });
     } catch (err) { logger.warn({ err }, "[club-outreach] weekly check failed"); }
   }, 15 * 60_000).unref();
 }

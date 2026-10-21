@@ -1655,7 +1655,12 @@ function AffiliatesPanel() {
                   <button onClick={() => removeTierRow(i)} className="text-xs text-destructive px-1">✕</button>
                 </div>
               ))}
-              <button onClick={addTierRow} className="text-[11px] font-bold text-primary">+ Add tier</button>
+              <div className="flex flex-wrap gap-3">
+                <button onClick={addTierRow} className="text-[11px] font-bold text-primary">+ Add tier</button>
+                <button onClick={() => setTiers([{ maxDaysSinceSignup: '3650', dollars: '1.00' }])} className="text-[11px] font-bold text-primary">
+                  Creator preset: $1 for every member who goes Pro (no time limit)
+                </button>
+              </div>
             </div>
           </div>
 
