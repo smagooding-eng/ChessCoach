@@ -15,7 +15,7 @@ import { FenThumb } from '@/components/FenThumb';
 const BASE = import.meta.env.BASE_URL;
 
 // Every tile shares the Beginner Path look: a deep green card with the art on the right.
-const GREEN_BG = 'linear-gradient(135deg, #10301A 0%, #1E4A2A 55%, #2E6B3A 100%)';
+const GREEN_BG = 'linear-gradient(135deg, #102618 0%, #1A3824 55%, #264F30 100%)';
 const board = (fen: string) => <span className="absolute -right-3 top-3 rotate-[8deg] opacity-80"><FenThumb fen={fen} size={124} /></span>;
 
 interface Tile {
