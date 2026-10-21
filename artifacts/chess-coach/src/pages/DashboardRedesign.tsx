@@ -212,10 +212,10 @@ export function DashboardRedesign() {
 
           <div className="mt-5 grid grid-cols-2 gap-3">
             <Link href="/play" className="flex items-center justify-center gap-2 rounded-[13px] py-3 text-[14px] font-extrabold" style={{ background: `linear-gradient(180deg, ${GREEN}, ${GREEN_DARK})`, color: '#05100A' }}>
-              <Play size={16} /> Play
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style={{ marginLeft: 1 }}><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12.5-7.5a1 1 0 0 0 0-1.72L8.5 3.64A1 1 0 0 0 7 4.5z" /></svg> Play
             </Link>
             <Link href="/learning" className="flex items-center justify-center gap-2 rounded-[13px] py-3 text-[14px] font-bold" style={{ background: 'rgba(255,255,255,.06)', border: `1px solid ${BORDER}` }}>
-              <GraduationCap size={16} style={{ color: GREEN }} /> Learn
+              <GraduationCap size={17} strokeWidth={2.25} style={{ color: GREEN }} /> Learn
             </Link>
           </div>
           </div>
