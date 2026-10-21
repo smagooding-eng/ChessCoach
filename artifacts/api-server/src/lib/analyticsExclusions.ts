@@ -66,7 +66,7 @@ export async function ensureAnalyticsViews(): Promise<void> {
 export async function excludedUserIds(): Promise<string[]> {
   try {
     const r = await db.execute(sql`SELECT id FROM analytics_excluded_users`);
-    const rows = Array.isArray(r) ? r : (r as { rows?: { id: string }[] }).rows ?? [];
+    const rows = (r as unknown as { rows?: { id: string }[] }).rows ?? [];
     return (rows as { id: string }[]).map((x) => String(x.id));
   } catch { return []; }
 }
@@ -78,7 +78,7 @@ export async function exclusionSummary(): Promise<{ accounts: number; browsers: 
       (SELECT COUNT(*) FROM analytics_excluded_users) AS accounts,
       (SELECT COUNT(*) FROM analytics_excluded_visitors) AS browsers,
       (SELECT COUNT(*) FROM analytics_bot_visitors) AS bots`);
-    const row = ((Array.isArray(r) ? r : (r as { rows?: unknown[] }).rows ?? [])[0] ?? {}) as Record<string, unknown>;
+    const row = (((r as unknown as { rows?: unknown[] }).rows ?? [])[0] ?? {}) as Record<string, unknown>;
     return { accounts: Number(row.accounts ?? 0), browsers: Number(row.browsers ?? 0), suspectedBotBrowsers: Number(row.bots ?? 0), emails: EXCLUDED_EMAILS };
   } catch { return { accounts: 0, browsers: 0, suspectedBotBrowsers: 0, emails: EXCLUDED_EMAILS }; }
 }
