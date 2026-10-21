@@ -9,6 +9,7 @@ import { LiveGame } from '@/pages/LiveGame';
 import { PT, cardStyle, greenBtn, ghostBtn } from '@/lib/playTheme';
 import { fmtCountdown, type TournamentSummary } from '@/components/play/Tournaments';
 import { ShareLink } from '@/components/play/ShareLink';
+import { QuickSignup } from '@/components/QuickSignup';
 
 interface Standing {
   rank: number; userId: string; username: string;
@@ -78,6 +79,7 @@ function TournamentView({ live, signedIn }: { live: Live; signedIn: boolean }) {
   const [needsPro, setNeedsPro] = useState(false);
   const [playing, setPlaying] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [signupOpen, setSignupOpen] = useState(false);
   const [offset, setOffset] = useState(0);
   const [now, setNow] = useState(Date.now());
   const [visible, setVisible] = useState(document.visibilityState === 'visible');
@@ -146,7 +148,7 @@ function TournamentView({ live, signedIn }: { live: Live; signedIn: boolean }) {
   const join = async () => {
     if (!signedIn) {
       try { localStorage.setItem('cs_pending_tournament', String(id)); } catch { /* ignore */ }
-      navigate('/setup');
+      setSignupOpen(true);
       return;
     }
     setBusy(true); setErr(null); setNeedsPro(false);
@@ -455,6 +457,9 @@ function TournamentView({ live, signedIn }: { live: Live; signedIn: boolean }) {
         {t.mode === 'ranked' ? <Award size={12} /> : <Sparkles size={12} />}
         {t.mode === 'ranked' ? 'Ranked: games update your ChessScout rating.' : 'Casual: games don\'t change your rating.'}
       </p>
+      <QuickSignup open={signupOpen} onClose={() => setSignupOpen(false)} returnTo={null}
+        title={`Join ${t.name || 'this tournament'}`}
+        subtitle="Free, no credit card. Sign up and you'll come straight back to the tournament." />
     </div>
   );
 }

@@ -120,7 +120,7 @@ export function Welcome() {
             Welcome{authUser?.firstName ? `, ${authUser.firstName}` : ''}!
           </h1>
           <p className="text-sm" style={{ color: TEXT_MUTED }}>
-            Pick your ChessScout.net username. Play on Chess.com or Lichess too? Add those and we'll import your games to coach you.
+            Link your Chess.com or Lichess account so your coach can start on your real games. You can also pick a ChessScout.net username.
           </p>
         </div>
 
@@ -134,22 +134,9 @@ export function Welcome() {
         )}
 
         <form onSubmit={submit} className="space-y-4">
-          <div className="space-y-1.5">
-            <label className="text-[11px] font-black uppercase tracking-widest" style={{ color: TEXT_MUTED }}>
-              ChessScout.net username
-            </label>
-            <ScoutUsernameInput value={scoutName} onChange={setScoutName} onStatus={setScoutStatus} current={authUser?.scoutUsername} autoFocus inputStyle={INPUT} textColor={RD.text} mutedColor={RD.muted} />
-            <p className="text-[11px]" style={{ color: TEXT_MUTED }}>
-              {chesscom.trim() || lichess.trim()
-                ? 'Optional when you link an account. You can set it later from Profile.'
-                : 'Required if you skip Chess.com and Lichess. This is your name on ChessScout.net.'}
-            </p>
-          </div>
-
-          <div className="flex items-center gap-3 pt-1">
-            <div className="h-px flex-1" style={{ background: BORDER }} />
-            <span className="text-[10.5px] font-black uppercase tracking-widest" style={{ color: TEXT_MUTED }}>Import your games (optional)</span>
-            <div className="h-px flex-1" style={{ background: BORDER }} />
+          <div className="rounded-xl p-3" style={{ background: 'rgba(129,182,76,0.10)', border: '1px solid rgba(129,182,76,0.35)' }}>
+            <p className="text-[13.5px] font-extrabold" style={{ color: TEXT_LIGHT }}>Where do you play?</p>
+            <p className="mt-0.5 text-[12px]" style={{ color: TEXT_MUTED }}>Add your Chess.com or Lichess name and we'll import your games and start reviewing them right away.</p>
           </div>
 
           <div className="space-y-1.5">
@@ -159,6 +146,7 @@ export function Welcome() {
             <input
               type="text"
               value={chesscom}
+              autoFocus
               onChange={(e) => setChesscom(e.target.value)}
               placeholder="e.g. Hikaru"
               className="w-full px-3 py-2.5 rounded-[10px] text-sm font-bold outline-none"
@@ -180,8 +168,27 @@ export function Welcome() {
             />
           </div>
 
+
+          <div className="flex items-center gap-3 pt-1">
+            <div className="h-px flex-1" style={{ background: BORDER }} />
+            <span className="text-[10.5px] font-black uppercase tracking-widest" style={{ color: TEXT_MUTED }}>Your name on ChessScout.net</span>
+            <div className="h-px flex-1" style={{ background: BORDER }} />
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-black uppercase tracking-widest" style={{ color: TEXT_MUTED }}>
+              ChessScout.net username
+            </label>
+            <ScoutUsernameInput value={scoutName} onChange={setScoutName} onStatus={setScoutStatus} current={authUser?.scoutUsername} inputStyle={INPUT} textColor={RD.text} mutedColor={RD.muted} />
+            <p className="text-[11px]" style={{ color: TEXT_MUTED }}>
+              {chesscom.trim() || lichess.trim()
+                ? 'Optional when you link an account. You can set it later from Profile.'
+                : 'Required if you skip Chess.com and Lichess. This is your name on ChessScout.net.'}
+            </p>
+          </div>
+
           <p className="text-[11px]" style={{ color: TEXT_MUTED }}>
-            Link one, both or neither. You can add them later from Profile.
+            No Chess.com or Lichess? Just pick a username. You can link accounts later from Profile.
           </p>
 
           {error && (

@@ -5,6 +5,16 @@
   "framework": null,
   "redirects": [
     {
+      "source": "/blog/:slug",
+      "destination": "/learn/:slug",
+      "permanent": true
+    },
+    {
+      "source": "/blog",
+      "destination": "/learn",
+      "permanent": true
+    },
+    {
       "source": "/:l([a-z0-9])",
       "destination": "/?utm_source=heycatch&utm_campaign=:l",
       "permanent": false

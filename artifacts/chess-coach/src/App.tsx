@@ -1,4 +1,5 @@
 import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
+import { rememberReturnTo } from '@/components/QuickSignup';
 import { BoardStyleTipHost } from '@/components/BoardStyleTip';
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -226,6 +227,14 @@ function ProtectedRoute({ component: Component, fallbackNav, requireAdmin, skipW
       // Signed out on a tournament link: come back to it after signing up.
       const m = location.match(/^\/tournaments\/([a-z0-9]+)$/i);
       if (m && m[1] !== 'new') { try { localStorage.setItem('cs_pending_tournament', m[1]); } catch { /* ignore */ } }
+      // Anything else (a tournament to create, a profile, a feature from a
+      // shared link): come back to it after signing up, and open the sign-up
+      // box right away instead of the plain landing page.
+      if (location !== '/' && !(m && m[1] !== 'new')) {
+        rememberReturnTo(location + window.location.search);
+        navigate('/setup?signup=1', { replace: true } as never);
+        return;
+      }
       navigate('/setup', { replace: true } as never);
       return;
     }
@@ -343,6 +352,25 @@ function getVisitorId(): string {
   return id;
 }
 
+// Where this visit came from: utm tags on the link, or the site that linked
+// here. Sent once, with the first page of the visit.
+let sourceSent = false;
+function visitSource(): { utmSource?: string; utmCampaign?: string; referrerHost?: string } {
+  if (sourceSent) return {};
+  sourceSent = true;
+  try {
+    const q = new URLSearchParams(window.location.search);
+    const out: { utmSource?: string; utmCampaign?: string; referrerHost?: string } = {};
+    if (q.get('utm_source')) out.utmSource = q.get('utm_source')!;
+    if (q.get('utm_campaign')) out.utmCampaign = q.get('utm_campaign')!;
+    if (document.referrer) {
+      const h = new URL(document.referrer).hostname.replace(/^www\./, '');
+      if (h && h !== window.location.hostname.replace(/^www\./, '')) out.referrerHost = h;
+    }
+    return out;
+  } catch { return {}; }
+}
+
 function PageTracker() {
   const [location] = useLocation();
   // AppLovin Axon: a page view on every screen change (never for kids pages).
@@ -361,7 +389,7 @@ function PageTracker() {
       credentials: 'include',
       // automated: the browser says it's driven by a script (headless/test tools)
       // ownTool: our own screenshot tools add ?cs_shot=1 (Share Kit, store and link-preview shots)
-      body: JSON.stringify({ path: location, visitorId: getVisitorId(), automated: navigator.webdriver === true, ownTool: new URLSearchParams(window.location.search).has('cs_shot') }),
+      body: JSON.stringify({ path: location, visitorId: getVisitorId(), automated: navigator.webdriver === true, ownTool: new URLSearchParams(window.location.search).has('cs_shot'), ...visitSource() }),
     }).catch(() => {});
   }, [location]);
   return null;
@@ -420,6 +448,8 @@ function Router() {
       <Route path="/players/:slug" component={PublicPlayerPage} />
       <Route path="/learn" component={ArticlesIndex} />
       <Route path="/learn/:slug" component={ArticlePage} />
+      <Route path="/blog/:slug">{(p: { slug: string }) => <RedirectTo to={`/learn/${p.slug}`} />}</Route>
+      <Route path="/blog"><RedirectTo to="/learn" /></Route>
       <Route path="/share/:data" component={ShareCard} />
       <Route path="/download" component={DownloadPage} />
       <Route path="/settings" component={SettingsPage} />

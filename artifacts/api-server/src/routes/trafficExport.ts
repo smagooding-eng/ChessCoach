@@ -30,7 +30,7 @@ router.get("/admin/traffic-export", requireAdmin, async (req: Request, res: Resp
     const DAY = (col: string) => sql.raw(`to_char((${col} - interval '${tz} minutes'), 'YYYY-MM-DD')`);
     const HOUR = (col: string) => sql.raw(`extract(hour from (${col} - interval '${tz} minutes'))::int`);
 
-    const [daily, signupsDaily, funnelDaily, funnelTotals, paths, entries, signupEntries, hours, convDaily, totals, exits] = await Promise.all([
+    const [daily, signupsDaily, funnelDaily, funnelTotals, paths, entries, signupEntries, hours, convDaily, totals, exits, sources, activation] = await Promise.all([
       db.execute(sql`
         SELECT ${DAY("created_at")} AS day, COUNT(*) AS views, COUNT(DISTINCT visitor_id) AS visitors,
           COUNT(DISTINCT ip_address) AS unique_ips, COUNT(*) FILTER (WHERE user_id IS NOT NULL) AS signed_in_views,
@@ -103,7 +103,34 @@ router.get("/admin/traffic-export", requireAdmin, async (req: Request, res: Resp
           ORDER BY visitor_id, ${DAY("created_at")}, created_at DESC
         )
         SELECT path, COUNT(*) AS exits FROM lasts GROUP BY 1 ORDER BY exits DESC LIMIT 40`),
+      // Where visitors came from: utm_source on our links, else the referring
+      // site, else "direct / untagged". Recorded from Oct 2026 on.
+      db.execute(sql`
+        WITH src AS (
+          SELECT DISTINCT ON (visitor_id) visitor_id,
+            COALESCE(utm_source, referrer_host, 'direct / untagged') AS source, utm_campaign AS campaign
+          FROM pv_people WHERE visitor_id IS NOT NULL AND created_at >= ${since} AND created_at <= ${until}
+          ORDER BY visitor_id, (utm_source IS NULL AND referrer_host IS NULL), created_at
+        ), signed AS (SELECT DISTINCT visitor_id FROM pv_people WHERE visitor_id IS NOT NULL AND user_id IS NOT NULL),
+        newu AS (
+          SELECT DISTINCT pv.visitor_id FROM pv_people pv JOIN users u ON u.id = pv.user_id
+          WHERE u.created_at >= ${since} AND u.created_at <= ${until} AND pv.visitor_id IS NOT NULL
+        )
+        SELECT s.source, s.campaign, COUNT(*) AS visitors, COUNT(g.visitor_id) AS ever_signed_in, COUNT(n.visitor_id) AS new_member_browsers
+        FROM src s LEFT JOIN signed g ON g.visitor_id = s.visitor_id LEFT JOIN newu n ON n.visitor_id = s.visitor_id
+        GROUP BY 1, 2 ORDER BY visitors DESC LIMIT 60`),
+      // New members who got going: linked Chess.com/Lichess or have games.
+      db.execute(sql`
+        WITH u AS (SELECT id, chesscom_username, lichess_username FROM users
+          WHERE created_at >= ${since} AND created_at <= ${until} AND id NOT IN (SELECT id FROM analytics_excluded_users))
+        SELECT COUNT(*) AS signups,
+          COUNT(*) FILTER (WHERE COALESCE(chesscom_username, '') <> '' OR COALESCE(lichess_username, '') <> '') AS linked_chess_account,
+          COUNT(*) FILTER (WHERE EXISTS (SELECT 1 FROM games g WHERE g.user_id = u.id)) AS have_games,
+          COUNT(*) FILTER (WHERE COALESCE(chesscom_username, '') <> '' OR COALESCE(lichess_username, '') <> ''
+            OR EXISTS (SELECT 1 FROM games g WHERE g.user_id = u.id)) AS activated
+        FROM u`),
     ]);
+    const act = rowsOf<Record<string, unknown>>(activation)[0] ?? {};
 
     const t = rowsOf<Record<string, unknown>>(totals)[0] ?? {};
     res.json({
@@ -133,6 +160,13 @@ router.get("/admin/traffic-export", requireAdmin, async (req: Request, res: Resp
       entryPages: rowsOf<Record<string, unknown>>(entries).map((r) => ({ path: r.path, visitors: num(r.visitors), everSignedIn: num(r.became_or_were_signed_in) })),
       signupEntryPages: rowsOf<Record<string, unknown>>(signupEntries).map((r) => ({ path: r.path, signups: num(r.signups) })),
       exitPages: rowsOf<Record<string, unknown>>(exits).map((r) => ({ path: r.path, exits: num(r.exits) })),
+      visitSources: rowsOf<Record<string, unknown>>(sources).map((r) => ({
+        source: r.source, campaign: r.campaign ?? null, visitors: num(r.visitors), everSignedIn: num(r.ever_signed_in), newMemberBrowsers: num(r.new_member_browsers),
+      })),
+      newMemberActivation: {
+        signups: num(act.signups), linkedChessAccount: num(act.linked_chess_account), haveGames: num(act.have_games), activated: num(act.activated),
+        note: "Activated = linked Chess.com or Lichess, or has games in their account (games load on the Welcome screen, so /import views undercount this).",
+      },
       hourOfDay: rowsOf<Record<string, unknown>>(hours).map((r) => ({ hour: num(r.hour), views: num(r.views), visitors: num(r.visitors) })),
     });
   } catch (err) {

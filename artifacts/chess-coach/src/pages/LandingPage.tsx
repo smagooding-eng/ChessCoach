@@ -43,7 +43,7 @@ function passwordChecks(pwd: string): PwdCheck[] {
   ];
 }
 
-function AuthModal({ open, onClose, initialMode, externalError, context = 'default' }: { open: boolean; onClose: () => void; initialMode: 'login' | 'register'; externalError?: string; context?: 'default' | 'opponent_scout' }) {
+function AuthModal({ open, onClose, initialMode, externalError, context = 'default', startWithEmail = false }: { open: boolean; onClose: () => void; initialMode: 'login' | 'register'; externalError?: string; context?: 'default' | 'opponent_scout'; startWithEmail?: boolean }) {
   const [mode, setMode] = useState<'login' | 'register'>(initialMode);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -58,6 +58,10 @@ function AuthModal({ open, onClose, initialMode, externalError, context = 'defau
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState(externalError || '');
   const [emailTouched, setEmailTouched] = useState(false);
+  // Google is the main way in (it's where almost every signup comes from);
+  // the email form stays one tap away.
+  const [showEmail, setShowEmail] = useState(startWithEmail);
+  useEffect(() => { if (open) setShowEmail(startWithEmail); }, [open, startWithEmail]);
 
   useEffect(() => { setMode(initialMode); }, [initialMode]);
   useEffect(() => { if (externalError) setError(externalError); }, [externalError]);
@@ -192,10 +196,8 @@ function AuthModal({ open, onClose, initialMode, externalError, context = 'defau
             <>
               <button
                 onClick={handleGoogleLogin}
-                className="w-full flex items-center justify-center gap-3 px-4 py-3 rounded-xl border transition-colors font-medium mb-4"
-                style={{ background: 'rgba(255,255,255,0.04)', borderColor: 'rgba(255,255,255,0.1)', color: TEXT }}
-                onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.08)')}
-                onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.04)')}
+                className="w-full flex items-center justify-center gap-3 px-4 py-3.5 rounded-xl transition-transform active:scale-[.98] text-[15px] font-extrabold mb-4"
+                style={{ background: '#FFFFFF', color: '#1F1F1F', boxShadow: '0 10px 26px -12px rgba(0,0,0,.6)' }}
               >
                 <svg className="w-5 h-5" viewBox="0 0 24 24">
                   <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/>
@@ -205,11 +207,19 @@ function AuthModal({ open, onClose, initialMode, externalError, context = 'defau
                 </svg>
                 {t('Continue with Google')}
               </button>
-              <div className="flex items-center gap-3 mb-4">
-                <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.08)' }} />
-                <span className="text-xs uppercase" style={{ color: MUTED }}>{t('or')}</span>
-                <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.08)' }} />
-              </div>
+              {(showEmail || mode === 'login') ? (
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.08)' }} />
+                  <span className="text-xs uppercase" style={{ color: MUTED }}>{t('or')}</span>
+                  <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.08)' }} />
+                </div>
+              ) : (
+                <button type="button" onClick={() => setShowEmail(true)}
+                  className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold"
+                  style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: TEXT }}>
+                  <Mail className="w-4 h-4" style={{ color: MUTED }} /> {t('Sign up with email')}
+                </button>
+              )}
             </>
           )}
 
@@ -217,6 +227,7 @@ function AuthModal({ open, onClose, initialMode, externalError, context = 'defau
             <div className="mb-4 p-3 rounded-xl text-sm" style={{ background: 'rgba(220,67,67,0.35)', border: '1px solid rgba(220,67,67,0.6)', color: '#ffffff' }}>{error}</div>
           )}
 
+          {(showEmail || mode === 'login' || !googleAvailable) && (
           <form onSubmit={handleSubmit} className="space-y-3">
             <div>
               <label className="block text-xs font-medium mb-1 ml-1" style={{ color: TEXT }}>{t('Email')}</label>
@@ -270,6 +281,7 @@ function AuthModal({ open, onClose, initialMode, externalError, context = 'defau
               {!loading && <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />}
             </button>
           </form>
+          )}
 
           <div className="mt-5 text-center text-sm" style={{ color: MUTED }}>
             {mode === 'login' ? (
@@ -469,6 +481,7 @@ export function LandingPage() {
   const [authMode, setAuthMode] = useState<'login' | 'register'>('register');
   const [authContext, setAuthContext] = useState<'default' | 'opponent_scout'>('default');
   const [oauthError, setOauthError] = useState('');
+  const [authEmail, setAuthEmail] = useState(false);
   const { isAuthenticated, isAuthLoading } = useUser();
   const [, setLocation] = useLocation();
 
@@ -483,6 +496,14 @@ export function LandingPage() {
     const ref = params.get('ref');
     if (ref) localStorage.setItem('chessscout_ref', ref);
     const urlError = params.get('error');
+    // ?signup=1|email|login: open the sign-up (or sign-in) box straight away,
+    // e.g. coming from a shared link's "Continue" or a signed-out redirect.
+    const su = params.get('signup');
+    if (su) {
+      if (su === 'login') { setAuthMode('login'); } else { trackFunnelEvent('signup_clicked'); setAuthMode('register'); }
+      setAuthEmail(su === 'email');
+      setAuthOpen(true);
+    }
     if (urlError === 'google_not_configured') {
       trackFunnelEvent('google_signup_error');
       setOauthError(t('Google sign-in is not available yet. Please use email and password.'));
@@ -492,7 +513,7 @@ export function LandingPage() {
       setOauthError(t('Google sign-in failed. Please try again or use email and password.'));
       setAuthOpen(true);
     }
-    if (urlError || ref) {
+    if (urlError || ref || su) {
       window.history.replaceState({}, '', window.location.pathname);
     }
   }, []);
@@ -634,7 +655,7 @@ export function LandingPage() {
         <SocialLinks size={14} className="mx-1" />
       </footer>
 
-      <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} initialMode={authMode} externalError={oauthError} context={authContext} />
+      <AuthModal open={authOpen} onClose={() => { setAuthOpen(false); setAuthEmail(false); }} initialMode={authMode} externalError={oauthError} context={authContext} startWithEmail={authEmail} />
     </div>
   );
 }

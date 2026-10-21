@@ -91,12 +91,21 @@ router.post("/track", async (req: Request, res: Response) => {
       return;
     }
     if (req.user?.id) touchLastActive(req.user.id);
-    await db.insert(pageViewsTable).values({
-      path,
-      userId: req.user?.id ?? null,
-      visitorId: visitorId || `ip_${ip}`,
-      ipAddress: ip,
-    });
+    const clean = (v: unknown, n = 80) => (typeof v === "string" && v.trim() ? v.trim().toLowerCase().replace(/[^a-z0-9_.\-]/g, "").slice(0, n) || null : null);
+    const { utmSource, utmCampaign, referrerHost } = req.body ?? {};
+    const src = clean(utmSource), camp = clean(utmCampaign, 120), refHost = clean(referrerHost, 120);
+    if (src || camp || refHost) {
+      // Only the first page of a visit from a link carries these.
+      await db.execute(sql`INSERT INTO page_views (path, user_id, visitor_id, ip_address, utm_source, utm_campaign, referrer_host)
+        VALUES (${path}, ${req.user?.id ?? null}, ${visitorId || `ip_${ip}`}, ${ip}, ${src}, ${camp}, ${refHost})`);
+    } else {
+      await db.insert(pageViewsTable).values({
+        path,
+        userId: req.user?.id ?? null,
+        visitorId: visitorId || `ip_${ip}`,
+        ipAddress: ip,
+      });
+    }
     res.json({ ok: true });
   } catch {
     res.status(500).json({ error: "Failed to track" });

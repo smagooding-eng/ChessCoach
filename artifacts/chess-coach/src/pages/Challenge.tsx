@@ -5,6 +5,7 @@ import { apiFetch } from '@/lib/api';
 import { useUser } from '@/hooks/use-user';
 import { PT, cardStyle, greenBtn, ghostBtn } from '@/lib/playTheme';
 import { ShareLink } from '@/components/play/ShareLink';
+import { QuickSignup } from '@/components/QuickSignup';
 
 export const PENDING_CHALLENGE_KEY = 'cs_pending_challenge';
 
@@ -35,6 +36,7 @@ export function Challenge() {
   const [missing, setMissing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [signupOpen, setSignupOpen] = useState(false);
 
   const load = React.useCallback(() => {
     apiFetch(`/api/challenges/${code}`, { credentials: 'include' })
@@ -78,7 +80,7 @@ export function Challenge() {
     if (!ch) return;
     if (!isAuthenticated) {
       try { localStorage.setItem(PENDING_CHALLENGE_KEY, ch.code); } catch { /* ignore */ }
-      navigate('/setup');
+      setSignupOpen(true);
       return;
     }
     const d = await post('request');
@@ -101,7 +103,7 @@ export function Challenge() {
     if (!ch) return;
     if (!isAuthenticated) {
       try { localStorage.setItem(PENDING_CHALLENGE_KEY, ch.code); } catch { /* ignore */ }
-      navigate('/setup');
+      setSignupOpen(true);
       return;
     }
     if (ch.kind === 'live') { navigate(`/live?challenge=${ch.code}`); return; }
@@ -157,7 +159,7 @@ export function Challenge() {
 
             {ch.isRequest ? (
               <RequestView ch={ch} isCreator={isCreator} isRequester={isRequester} busy={busy} signedIn={isAuthenticated}
-                onSignIn={() => { try { localStorage.setItem(PENDING_CHALLENGE_KEY, ch.code); } catch { /* ignore */ } navigate('/setup'); }}
+                onSignIn={() => { try { localStorage.setItem(PENDING_CHALLENGE_KEY, ch.code); } catch { /* ignore */ } setSignupOpen(true); }}
                 onApprove={approve} onDecline={decline} onWithdraw={withdraw}
                 onGoLive={() => navigate(`/live?challenge=${ch.code}`)}
                 onOpenGame={() => ch.gameId && navigate(`/daily/${ch.gameId}`)} />
@@ -209,6 +211,9 @@ export function Challenge() {
           )}
         </div>
       </div>
+      <QuickSignup open={signupOpen} onClose={() => setSignupOpen(false)} returnTo={null}
+        title={ch?.creatorUsername ? `Play ${ch.creatorUsername} on ChessScout.net` : 'Answer this challenge'}
+        subtitle="Free, no credit card. Sign up and you'll go straight to this challenge." />
     </div>
   );
 }

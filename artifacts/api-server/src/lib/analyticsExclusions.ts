@@ -3,7 +3,9 @@
 //      in (including that browser's signed-out visits), and
 //   2. suspected bots that got past the user-agent check: a browser that
 //      never signed in, seen on an IP that produced 5+ such browsers in one
-//      day (headless scrapers and ad-network checkers rotate their ids).
+//      day (headless scrapers and ad-network checkers rotate their ids), or
+//      one that only loaded the home/landing page once and never ran the
+//      landing page's tracking script.
 // Imported games and other per-account records are untouched; this only
 // changes what the reporting queries count.
 //
@@ -44,7 +46,16 @@ export async function ensureAnalyticsViews(): Promise<void> {
       SELECT DISTINCT pv.visitor_id
       FROM page_views pv
       JOIN anon a ON a.visitor_id = pv.visitor_id
-      JOIN ip_day i ON i.ip_address = pv.ip_address AND i.d = date_trunc('day', pv.created_at)`));
+      JOIN ip_day i ON i.ip_address = pv.ip_address AND i.d = date_trunc('day', pv.created_at)
+      UNION
+      -- One look at the home/landing page and nothing else, never signed in,
+      -- and the landing page's own script never reported in: link checkers
+      -- and ad-network crawlers (the daily ~4am burst), not people.
+      SELECT pv.visitor_id
+      FROM page_views pv JOIN anon a ON a.visitor_id = pv.visitor_id
+      GROUP BY pv.visitor_id
+      HAVING COUNT(*) = 1 AND BOOL_AND(pv.path IN ('/', '/setup'))
+        AND pv.visitor_id NOT IN (SELECT visitor_id FROM landing_funnel_events)`));
     await db.execute(sql.raw(`CREATE OR REPLACE VIEW analytics_excluded_visitors AS
       SELECT DISTINCT visitor_id FROM page_views
         WHERE visitor_id IS NOT NULL AND user_id IN (SELECT id FROM analytics_excluded_users)

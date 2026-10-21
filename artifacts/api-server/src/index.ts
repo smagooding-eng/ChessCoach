@@ -280,6 +280,10 @@ async function runSchemaMigrations() {
     await db.execute(sql`ALTER TABLE landing_funnel_events ADD COLUMN IF NOT EXISTS platform VARCHAR NOT NULL DEFAULT 'web'`);
     await db.execute(sql`ALTER TABLE landing_funnel_events ADD COLUMN IF NOT EXISTS elapsed_ms INTEGER`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_landing_funnel_created ON landing_funnel_events(created_at, platform)`);
+    // Where a visit came from (utm tags on our links, or the referring site).
+    await db.execute(sql`ALTER TABLE page_views ADD COLUMN IF NOT EXISTS utm_source VARCHAR`);
+    await db.execute(sql`ALTER TABLE page_views ADD COLUMN IF NOT EXISTS utm_campaign VARCHAR`);
+    await db.execute(sql`ALTER TABLE page_views ADD COLUMN IF NOT EXISTS referrer_host VARCHAR`);
     // Reporting views that leave the owner's accounts and suspected bots out of the admin numbers.
     await ensureAnalyticsViews();
     // Practice-bot results: each player's record against each bot, and how

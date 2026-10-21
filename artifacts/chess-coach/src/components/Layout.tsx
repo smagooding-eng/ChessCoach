@@ -152,6 +152,14 @@ export function Layout({ children, fullscreen }: { children: React.ReactNode; fu
     if (tournament) {
       try { localStorage.removeItem('cs_pending_tournament'); } catch { /* ignore */ }
       navigateTo(`/tournaments/${tournament}`);
+      return;
+    }
+    // Any other page they were on when they signed up (shared links, articles…).
+    let back: string | null = null;
+    try { back = localStorage.getItem('cs_return_to'); } catch { /* ignore */ }
+    if (back) {
+      try { localStorage.removeItem('cs_return_to'); } catch { /* ignore */ }
+      if (back !== location) navigateTo(back);
     }
   }, [location, navigateTo, layoutAuthUser]);
   const { enabled: redesign } = useDashboardRedesignFlag();

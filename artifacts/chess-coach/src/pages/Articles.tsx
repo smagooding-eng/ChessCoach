@@ -4,6 +4,8 @@ import { PageHero, CHESSCOM_GREEN, TEXT_LIGHT, TEXT_MUTED } from '@/components/D
 import { apiFetch } from '@/lib/api';
 import { setPageMeta, setArticleStructuredData } from '@/lib/pageMeta';
 import { Loader2, ArrowRight, ArrowLeft } from 'lucide-react';
+import { useUser } from '@/hooks/use-user';
+import { QuickSignup, GoogleMark } from '@/components/QuickSignup';
 
 interface ArticleSummary {
   slug: string;
@@ -81,6 +83,8 @@ export function ArticlePage() {
   const [article, setArticle] = useState<Article | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const { isAuthenticated } = useUser();
+  const [signupOpen, setSignupOpen] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -128,15 +132,35 @@ export function ArticlePage() {
       <p className="text-xs mt-2" style={{ color: CHESSCOM_GREEN }}>
         Published {new Date(article.createdAt).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })}
       </p>
+      {!isAuthenticated && (
+        <button type="button" onClick={() => setSignupOpen(true)}
+          className="mt-4 flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left"
+          style={{ background: 'rgba(129,182,76,0.10)', border: '1px solid rgba(129,182,76,0.35)' }}>
+          <span className="min-w-0 flex-1 text-[13px] font-semibold" style={{ color: TEXT_LIGHT }}>
+            Play, analyze your games and solve puzzles on ChessScout.net. Free.
+          </span>
+          <span className="shrink-0 inline-flex items-center gap-1 text-[13px] font-black" style={{ color: CHESSCOM_GREEN }}>Join free <ArrowRight className="w-4 h-4" /></span>
+        </button>
+      )}
       <div className="mt-6">{renderMarkdown(article.content)}</div>
 
       <div className="mt-10 p-5 rounded-2xl text-center" style={{ background: 'linear-gradient(180deg, #383532 0%, #2a2825 100%)', border: '1px solid rgba(255,255,255,0.06)' }}>
         <p className="text-sm mb-3" style={{ color: TEXT_MUTED }}>See these patterns show up in your own games.</p>
-        <Link href="/" className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-black"
-          style={{ background: `linear-gradient(180deg, #95c45a 0%, ${CHESSCOM_GREEN} 100%)`, color: 'white' }}>
-          Try the free scouting demo <ArrowRight className="w-4 h-4" />
-        </Link>
+        {isAuthenticated ? (
+          <Link href="/" className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-black"
+            style={{ background: `linear-gradient(180deg, #95c45a 0%, ${CHESSCOM_GREEN} 100%)`, color: 'white' }}>
+            Try the free scouting demo <ArrowRight className="w-4 h-4" />
+          </Link>
+        ) : (
+          <button type="button" onClick={() => setSignupOpen(true)} className="inline-flex items-center gap-2.5 px-5 py-3 rounded-xl text-sm font-black"
+            style={{ background: '#FFFFFF', color: '#1F1F1F' }}>
+            <GoogleMark /> Analyze my games free
+          </button>
+        )}
       </div>
+      <QuickSignup open={signupOpen} onClose={() => setSignupOpen(false)} returnTo="/"
+        title="Analyze your own games, free"
+        subtitle="Sign up, link Chess.com or Lichess, and get your first game review in about a minute." />
     </div>
   );
 }
