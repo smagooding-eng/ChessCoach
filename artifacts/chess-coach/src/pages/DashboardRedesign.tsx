@@ -3,7 +3,7 @@ import { SocialLinks } from '@/components/SocialLinks';
 import React, { useEffect, useRef, useState } from 'react';
 import { autoImportLinkedAccounts } from '@/lib/autoImport';
 import { Link, useLocation } from 'wouter';
-import { Target, Search, ArrowRight, ArrowUpRight, ChevronRight, Play, Puzzle, BookOpen, Crosshair, Crown, Camera, Zap, ShoppingBag, Bot, Swords, Download, BarChart3, GraduationCap } from 'lucide-react';
+import { Target, Search, ArrowRight, ArrowUpRight, ChevronRight, Play, Puzzle, BookOpen, Crosshair, Crown, Camera, Zap, ShoppingBag, Bot, BarChart3, GraduationCap } from 'lucide-react';
 import { useUser } from '@/hooks/use-user';
 import { useChessPlayer } from '@/hooks/use-chess-player';
 import { useMultiEloProgress } from '@/hooks/use-elo-progress';
@@ -211,11 +211,11 @@ export function DashboardRedesign() {
           </div>
 
           <div className="mt-5 grid grid-cols-2 gap-3">
-            <Link href="/import" className="flex items-center justify-center gap-2 rounded-[13px] py-3 text-[14px] font-extrabold" style={{ background: `linear-gradient(180deg, ${GREEN}, ${GREEN_DARK})`, color: '#05100A' }}>
-              <Download size={16} /> Import
+            <Link href="/play" className="flex items-center justify-center gap-2 rounded-[13px] py-3 text-[14px] font-extrabold" style={{ background: `linear-gradient(180deg, ${GREEN}, ${GREEN_DARK})`, color: '#05100A' }}>
+              <Play size={16} /> Play
             </Link>
-            <Link href="/opponents" className="flex items-center justify-center gap-2 rounded-[13px] py-3 text-[14px] font-bold" style={{ background: 'rgba(255,255,255,.06)', border: `1px solid ${BORDER}` }}>
-              <Swords size={16} style={{ color: GREEN }} /> Scout
+            <Link href="/learning" className="flex items-center justify-center gap-2 rounded-[13px] py-3 text-[14px] font-bold" style={{ background: 'rgba(255,255,255,.06)', border: `1px solid ${BORDER}` }}>
+              <GraduationCap size={16} style={{ color: GREEN }} /> Learn
             </Link>
           </div>
           </div>

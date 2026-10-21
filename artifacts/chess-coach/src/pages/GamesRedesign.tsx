@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Link } from 'wouter';
-import { Search, ChevronRight, RefreshCw, Users } from 'lucide-react';
+import { Search, ChevronRight, RefreshCw, Users, Download } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from '@/lib/api';
 import { useMyAnalysisSummary } from '@/hooks/use-analysis';
@@ -152,9 +152,14 @@ export function GamesRedesign() {
           title="My Games"
           icon={<span className="text-[26px] leading-none">♟</span>}
           right={
+            <>
+            <Link href="/import" className="mr-1 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] font-extrabold" style={{ background: RD.green, color: '#05100A' }}>
+              <Download size={15} /> Import
+            </Link>
             <button onClick={() => setShowSearch((v) => !v)} aria-label="Search games" aria-expanded={showSearch} className="grid h-9 w-9 place-items-center rounded-full" style={{ color: showSearch ? RD.green : RD.text }}>
               <Search size={21} />
             </button>
+            </>
           }
         />
 

@@ -167,6 +167,7 @@ function AnalysisRouter() {
   return enabled ? <AnalysisRedesign /> : <Analysis />;
 }
 const Courses = lazyRetry(() => import("@/pages/Courses").then(m => ({ default: m.Courses })));
+const LearnHub = lazyRetry(() => import("@/pages/LearnHub").then(m => ({ default: m.LearnHub })));
 const CourseDetail = lazyRetry(() => import("@/pages/CourseDetail").then(m => ({ default: m.CourseDetail })));
 const Endgames = lazyRetry(() => import("@/pages/Endgames").then(m => ({ default: m.Endgames })));
 const WeaknessDetail = lazyRetry(() => import("@/pages/WeaknessDetail").then(m => ({ default: m.WeaknessDetail })));
@@ -276,6 +277,7 @@ const PGameReplay    = () => <ProtectedRoute component={GameReplay} fallbackNav=
 const PAnalysis      = () => <ProtectedRoute component={AnalysisRouter} />;
 const PWeakness      = () => <ProtectedRoute component={WeaknessDetail} fallbackNav="/analysis" />;
 const PCourses       = () => <ProtectedRoute component={Courses} />;
+const PLearnHub      = () => <ProtectedRoute component={LearnHub} />;
 const PCourseDetail  = () => <ProtectedRoute component={CourseDetail} fallbackNav="/courses" fullscreen />;
 const PEndgames      = () => <ProtectedRoute component={Endgames} />;
 const POpenings      = () => <ProtectedRoute component={Openings} />;
@@ -443,6 +445,7 @@ function Router() {
       <Route path="/analysis"    component={PAnalysis} />
       <Route path="/analysis/:id" component={PWeakness} />
       <Route path="/courses"     component={PCourses} />
+      <Route path="/learning"    component={PLearnHub} />
       <Route path="/courses/:id" component={PCourseDetail} />
       <Route path="/endgames"    component={PEndgames} />
       <Route path="/openings"        component={POpenings} />

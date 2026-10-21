@@ -202,11 +202,11 @@ export function Dashboard() {
         )}
 
         <div className="relative flex gap-2 mt-3.5">
-          <Link href="/import" className="flex-1 px-3 py-2 rounded-lg font-semibold text-sm text-white flex items-center justify-center gap-2 transition-all hover:scale-[1.02] active:scale-[0.98]" style={{ background: `linear-gradient(180deg, #95c45a 0%, ${CHESSCOM_GREEN} 100%)`, boxShadow: `0 4px 12px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.2)` }}>
-            <ImportIcon /> Import
+          <Link href="/play" className="flex-1 px-3 py-2 rounded-lg font-semibold text-sm text-white flex items-center justify-center gap-2 transition-all hover:scale-[1.02] active:scale-[0.98]" style={{ background: `linear-gradient(180deg, #95c45a 0%, ${CHESSCOM_GREEN} 100%)`, boxShadow: `0 4px 12px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.2)` }}>
+            <Play className="w-4 h-4" /> Play
           </Link>
-          <Link href="/opponents" className="flex-1 px-3 py-2 rounded-lg font-semibold text-sm flex items-center justify-center gap-2 transition-all hover:scale-[1.02] active:scale-[0.98]" style={{ background: 'rgba(255,255,255,0.07)', color: TEXT_LIGHT, border: '1px solid rgba(255,255,255,0.1)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)' }}>
-            <Swords className="w-4 h-4" style={{ color: CHESSCOM_GREEN }} /> Scout
+          <Link href="/learning" className="flex-1 px-3 py-2 rounded-lg font-semibold text-sm flex items-center justify-center gap-2 transition-all hover:scale-[1.02] active:scale-[0.98]" style={{ background: 'rgba(255,255,255,0.07)', color: TEXT_LIGHT, border: '1px solid rgba(255,255,255,0.1)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)' }}>
+            <GraduationCap className="w-4 h-4" style={{ color: CHESSCOM_GREEN }} /> Learn
           </Link>
         </div>
       </div>
