@@ -211,41 +211,12 @@ export function DashboardRedesign() {
           </div>
 
           <div className="mt-5 grid grid-cols-2 gap-3">
-            {/* Play + Learn, in the same look as the feature tiles below. */}
-            {([
-              { label: 'Play', href: '/play', img: 'play.webp', pos: '78% center', icon: Play },
-              { label: 'Learn', href: '/learning', img: 'openings.webp', pos: '68% center', icon: GraduationCap },
-            ] as const).map((t) => (
-              <Link key={t.label} href={t.href}
-                className={`relative block overflow-hidden rounded-[16px] transition-transform active:scale-[.98] ${photoLook ? '' : 'min-h-[96px]'}`}
-                style={t.label === 'Play' ? { background: `linear-gradient(180deg, ${GREEN}, ${GREEN_DARK})`, border: '1px solid rgba(255,255,255,.14)' }
-                  : photoLook ? { background: CARD, border: `1px solid ${BORDER}` } : {
-                  backgroundColor: 'var(--rd-card-solid, #050A0B)',
-                  border: `1px solid ${BORDER}`,
-                  backgroundImage: `url(${siteImg(asset(t.img))})`,
-                  backgroundSize: 'auto 100%',
-                  backgroundPosition: t.pos,
-                  backgroundRepeat: 'no-repeat',
-                }}>
-                {!photoLook && t.label !== 'Play' && <div className="absolute inset-0" style={{ background: 'linear-gradient(90deg, rgba(5,10,11,.78) 0%, rgba(5,10,11,.25) 62%, rgba(5,10,11,0) 100%), linear-gradient(0deg, rgba(5,10,11,.65) 0%, rgba(5,10,11,0) 55%)' }} />}
-                <div className={`relative z-10 flex h-full ${photoLook ? 'items-center gap-3 p-3' : 'min-h-[96px] flex-col justify-between p-3'}`}>
-                  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px]"
-                    style={t.label === 'Play'
-                      ? { background: 'rgba(5,10,11,.22)', border: '1px solid rgba(255,255,255,.28)' }
-                      : { background: `linear-gradient(160deg, ${GREEN}, ${GREEN_DARK})`, boxShadow: '0 2px 8px rgba(0,0,0,.45)', border: '1px solid rgba(255,255,255,.18)' }}>
-                    <t.icon size={19} color="#fff" fill={t.label === 'Play' ? '#fff' : 'none'} />
-                  </span>
-                  <div className={`flex justify-between gap-2 ${photoLook ? 'min-w-0 flex-1 items-center' : 'items-end'}`}>
-                    <b className={`block font-extrabold leading-tight ${photoLook ? 'text-[16px]' : 'text-[18px]'}`}>{t.label}</b>
-                    {!photoLook && (
-                      <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full" style={{ border: '1.5px solid rgba(255,255,255,.7)', background: t.label === 'Play' ? 'rgba(5,10,11,.18)' : 'rgba(5,10,11,.45)' }}>
-                        <ArrowRight size={14} />
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </Link>
-            ))}
+            <Link href="/play" className="flex items-center justify-center gap-2 rounded-[13px] py-3 text-[14px] font-extrabold" style={{ background: `linear-gradient(180deg, ${GREEN}, ${GREEN_DARK})`, color: '#FFFFFF' }}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style={{ marginLeft: 1 }}><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12.5-7.5a1 1 0 0 0 0-1.72L8.5 3.64A1 1 0 0 0 7 4.5z" /></svg> Play
+            </Link>
+            <Link href="/learning" className="flex items-center justify-center gap-2 rounded-[13px] py-3 text-[14px] font-bold" style={{ background: 'rgba(255,255,255,.06)', border: `1px solid ${BORDER}` }}>
+              <GraduationCap size={17} strokeWidth={2.25} style={{ color: GREEN }} /> Learn
+            </Link>
           </div>
           </div>
         </section>
