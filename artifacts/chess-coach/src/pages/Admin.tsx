@@ -3728,7 +3728,7 @@ ${divider}
 </table>
 ${divider}
 <p style="text-align:center;"><a href="https://chessscout.net/puzzles" style="${btnStyle}">Solve Today's Puzzles →</a></p>
-<p style="text-align:center;margin-top:8px;color:#87918E;font-size:12px;">Free users: 5 puzzles/day &nbsp;|&nbsp; Pro: Unlimited</p>`,
+<p style="text-align:center;margin-top:8px;color:#87918E;font-size:12px;">Unlimited puzzles for everyone &nbsp;|&nbsp; Pro adds AI explanations</p>`,
   },
   {
     name: '📊 Your Weekly Stats',

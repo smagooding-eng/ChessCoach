@@ -1,4 +1,5 @@
 import { StartHereCards } from '@/components/StartHereCards';
+import { SocialLinks } from '@/components/SocialLinks';
 import React, { useEffect, useRef, useState } from 'react';
 import { autoImportLinkedAccounts } from '@/lib/autoImport';
 import { useMyAnalysisSummary, useMyWeaknesses } from '@/hooks/use-analysis';
@@ -533,6 +534,9 @@ export function Dashboard() {
         </div>
 
         {authUser && <ReferralCard isPremium={isPremium} compact />}
+        <footer className="flex items-center justify-center pb-2 pt-1 text-xs" style={{ color: '#9e9b98' }}>
+          <SocialLinks size={18} label="Follow ChessScout" />
+        </footer>
       </div>
     </div>
   );

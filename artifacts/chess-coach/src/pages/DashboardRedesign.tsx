@@ -1,4 +1,5 @@
 import { StartHereCards } from '@/components/StartHereCards';
+import { SocialLinks } from '@/components/SocialLinks';
 import React, { useEffect, useRef, useState } from 'react';
 import { autoImportLinkedAccounts } from '@/lib/autoImport';
 import { Link, useLocation } from 'wouter';
@@ -431,6 +432,9 @@ export function DashboardRedesign() {
         </div>
 
         {authUser && <div className="lg:col-span-2"><ReferralCard isPremium={isPremium} compact /></div>}
+        <footer className="flex items-center justify-center pb-2 pt-1 text-xs lg:col-span-2" style={{ color: '#87918E' }}>
+          <SocialLinks size={18} label="Follow ChessScout" />
+        </footer>
 
       </div>
     </div>
