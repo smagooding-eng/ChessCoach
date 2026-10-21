@@ -42,7 +42,7 @@ interface Template { id: string; name: string; kind: 'personal' | 'general'; sub
 // "Creator preset" so the "no time limit" line below stays true.
 const AFF_SETUP = `Getting set up takes two minutes:
 - create a free account: ${utm('/', 'creator_signup')}
-- reply with the email you signed up with and I'll switch on your affiliate dashboard
+- email chessscout.net@gmail.com to say you're in, with the email you signed up with, and I'll switch on your affiliate dashboard
 - on the dashboard, change your code to fit your channel (chessscout.net/?ref=YOURNAME) and connect Stripe for payouts`;
 
 const AFF_TERMS = `How the affiliate program works:
@@ -57,12 +57,14 @@ const AFF_PRODUCT = `What your audience gets:
 - opponent scouting and tournaments, and Scan Position to turn a photo of a board into a position
 - a Beginner Path and Chess for Kids (Teacher Approved on Google Play), in 28 languages`;
 
-const SIGN_OFF = `Thanks,
+const SIGN_OFF = `Questions or ready to start? Email chessscout.net@gmail.com.
+
+Thanks,
 {{sender}}
 ChessScout.net
 {{address}}
 
-If you'd rather not hear from me again, just reply "no thanks" and I won't email you again.`;
+If you'd rather not hear from me again, email chessscout.net@gmail.com with "no thanks" and I won't email you again.`;
 
 const CREATOR_TEMPLATES: Template[] = [
   {
@@ -136,7 +138,7 @@ I'm {{sender}}, the developer of ChessScout.net. I watch a lot of chess content,
 - "Can I beat every bot?": coaching bots from first-timer to grandmaster, with live analysis as you play
 - "Turning a photo into a position": Scan Position from a real board
 
-If you'd like to try everything first, reply and I'll set your account up with Pro so you can test it on camera.
+If you'd like to try everything first, email chessscout.net@gmail.com and I'll set your account up with Pro so you can test it on camera.
 
 ${AFF_TERMS}
 
@@ -154,7 +156,7 @@ Just following up on my note about the ChessScout.net affiliate program, in case
 
 The short version: you get your own referral code (you can edit it to match your channel), and you earn $1 for every member who goes Pro with it, paid through Stripe.
 
-If you're interested, create a free account at ${utm('/', 'creator_followup')} and reply with the email you used. If it's not for you, no problem at all.
+If you're interested, create a free account at ${utm('/', 'creator_followup')}, then email chessscout.net@gmail.com to confirm, with the email you used. If it's not for you, no problem at all.
 
 ${SIGN_OFF}`,
   },
@@ -501,7 +503,8 @@ function mailtoUrl(d: Draft): string {
 const T = { bg: '#050A0B', card: '#0D1516', inner: '#121B1D', border: '#1E2829', green: '#81B64C', text: '#F5F7F6', muted: '#87918E', faint: '#5C6664' };
 const FONT = `-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif`;
 const esc = (x: string) => x.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-const linkify = (x: string) => esc(x).replace(/(https?:\/\/[^\s<)]+)/g, (u) => `<a href="${u}" style="color:${T.green};text-decoration:none;font-weight:700;">${u.replace(/^https?:\/\//, '').replace(/\?utm_[^\s]*$/, '')}</a>`);
+const linkify = (x: string) => esc(x).replace(/(https?:\/\/[^\s<)]+)/g, (u) => `<a href="${u}" style="color:${T.green};text-decoration:none;font-weight:700;">${u.replace(/^https?:\/\//, '').replace(/\?utm_[^\s]*$/, '')}</a>`)
+  .replace(/(^|[\s(])([a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,24})(?=$|[\s).,])/gi, (_m, pre, e) => `${pre}<a href="mailto:${e}" style="color:${T.green};text-decoration:none;font-weight:700;">${e}</a>`);
 
 function ctaLabel(url: string): string {
   if (/\/tournaments\/new/.test(url)) return 'Create a tournament &rarr;';
