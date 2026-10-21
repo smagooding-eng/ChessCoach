@@ -617,3 +617,11 @@ html.cs-photo img:not(.cs-keep-img):is([src*="chessscout/"], [src*="assets/openi
 html.cs-photo :not(.cs-photo-backdrop-img):not(.cs-keep-img):is([style*="chessscout/"], [style*="assets/openings/"], [style*="assets/courses/"], [style*="hero-bg."]) {
   background-image: none !important;
 }
+
+/* Arabic / Persian: let each piece of text run in its own direction, so RTL
+   sentences read correctly and mixed English (names, moves like Nf3) stays in
+   order, without mirroring the page layout or the chessboard. */
+.cs-rtl :is(p, h1, h2, h3, h4, h5, h6, li, label, span, a, button, td, th, dd, dt, figcaption, blockquote) {
+  unicode-bidi: plaintext;
+}
+.cs-rtl :is(input, textarea) { unicode-bidi: plaintext; }

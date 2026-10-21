@@ -32,8 +32,8 @@ export const LANGUAGES: Language[] = [
   { code: 'hu', name: 'Magyar', native: true },
   { code: 'el', name: 'Ελληνικά', native: true },
   { code: 'sv', name: 'Svenska', native: true },
-  { code: 'ar', name: 'العربية' },
-  { code: 'fa', name: 'فارسی' },
+  { code: 'ar', name: 'العربية', native: true },
+  { code: 'fa', name: 'فارسی', native: true },
   { code: 'hi', name: 'हिन्दी', native: true },
   { code: 'bn', name: 'বাংলা', native: true },
   { code: 'id', name: 'Bahasa Indonesia', native: true },
@@ -193,6 +193,8 @@ const APP_LOADERS: Record<string, () => Promise<{ default: Record<string, string
   pl: () => import('@/locales/app-pl.json'),
   id: () => import('@/locales/app-id.json'),
   uk: () => import('@/locales/app-uk.json'),
+  fa: () => import('@/locales/app-fa.json'),
+  ar: () => import('@/locales/app-ar.json'),
   th: () => import('@/locales/app-th.json'),
   bn: () => import('@/locales/app-bn.json'),
   hi: () => import('@/locales/app-hi.json'),
@@ -214,6 +216,9 @@ const APP_LOADERS: Record<string, () => Promise<{ default: Record<string, string
 export async function initI18n(): Promise<void> {
   if (typeof document === 'undefined') return;
   document.documentElement.lang = current;
+  // Arabic and Persian read right-to-left. Each block of text picks its own
+  // direction (see .cs-rtl in index.css) while the layout and the board stay put.
+  document.documentElement.classList.toggle('cs-rtl', current === 'ar' || current === 'fa');
   if (current === 'en') { writeGoogCookie(null); return; }
   const loader = LOADERS[current];
   const appLoader = APP_LOADERS[current];
