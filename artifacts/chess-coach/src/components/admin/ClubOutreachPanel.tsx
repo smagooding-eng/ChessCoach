@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Building2, Users, Loader2, Search, Mail, ExternalLink, X, Check, Plus, RotateCcw, ChevronRight, Ban, Copy } from 'lucide-react';
+import { Building2, Users, Library, Newspaper, Loader2, Search, Mail, ExternalLink, X, Check, Plus, RotateCcw, ChevronRight, Ban, Copy } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
+import { LOCAL_INTROS } from './outreachLocal';
 
 // Club Outreach (Admin > Growth & Marketing).
 // Finds chess clubs, school/college clubs, leagues, associations, organizers
@@ -22,7 +23,25 @@ interface Contact {
   audience?: Audience; platform?: string | null; profileUrl?: string | null;
 }
 /** Who the outreach is for: chess clubs/organizers, or creators for the affiliate program. */
-type Audience = 'club' | 'influencer';
+type Audience = 'club' | 'influencer' | 'library' | 'press';
+const AUDIENCE_META: Record<Audience, { tab: string; title: string; icon: typeof Users; find: string; noun: string; who: string; defaultTemplate: string; day: string; blurb: string }> = {
+  club: {
+    tab: 'Clubs', title: 'Club Outreach', icon: Building2, find: 'Find new contacts', noun: 'organizations', who: 'club', defaultTemplate: 'intro', day: 'Monday',
+    blurb: 'Chess clubs, leagues, associations, organizers and coaches that list a contact email on their own website, in English-speaking countries and, now, in the other countries the app speaks. Pick the email language below to write to a club in its own language.',
+  },
+  influencer: {
+    tab: 'Creators', title: 'Creator Outreach', icon: Users, find: 'Find new creators', noun: 'creators', who: 'creator', defaultTemplate: 'aff_invite', day: 'Thursday',
+    blurb: 'Chess YouTubers, streamers, TikTokers, coaches, bloggers and podcasters, in every market the app speaks, who list a business email on their own website or link-in-bio page. Invite them to the affiliate program: $1 for every member who goes Pro with their code, and they can edit the code to fit their channel. When someone says yes, add them in Affiliates with the Creator preset.',
+  },
+  library: {
+    tab: 'Libraries', title: 'Library Outreach', icon: Library, find: 'Find new libraries', noun: 'libraries', who: 'library', defaultTemplate: 'lib_programs', day: 'Tuesday',
+    blurb: "Public libraries that run chess clubs or kids' and teen chess programs and list an email on their own website. The pitch: the Beginner Path, Chess for Kids with Kid Mode, free tournaments for their chess club and face-to-face play on one device.",
+  },
+  press: {
+    tab: 'Press', title: 'Press & Reviewers', icon: Newspaper, find: 'Find writers', noun: 'writers', who: 'writer', defaultTemplate: 'press_pitch', day: 'Wednesday',
+    blurb: "Writers of \"best chess apps\" lists, app reviewers, and parenting, education and chess sites that recommend apps, with an email on their own author, contact or tips page. One mention in a list article can matter more than many cold emails, so keep these personal.",
+  },
+};
 const AUDIENCE_KEY = 'cs_outreach_audience';
 interface Run { id: number; startedAt: string; finishedAt: string | null; candidates: number; added: number; error: string | null; trigger: string; searches: string | null }
 
@@ -35,7 +54,7 @@ const SITE = 'https://chessscout.net';
 const utm = (path: string, campaign: string) => `${SITE}${path}${path.includes('?') ? '&' : '?'}utm_source=outreach&utm_medium=email&utm_campaign=${campaign}`;
 
 /** personal: filled in per club (one-by-one drafts). general: written for a Bcc batch. */
-interface Template { id: string; name: string; kind: 'personal' | 'general'; subject: string; body: string; audience?: Audience }
+interface Template { id: string; name: string; kind: 'personal' | 'general'; subject: string; body: string; audience?: Audience; lang?: string }
 
 // Creators: invites to the affiliate program ($1 for every member who goes
 // Pro with their code). Set new creators up in Affiliates with the
@@ -431,10 +450,156 @@ If you'd rather not hear from me again, just reply "no thanks" and I won't email
   },
 ];
 
+// Clubs abroad: the intro email in each language the app speaks.
+const LOCAL_CLUB_TEMPLATES: Template[] = Object.entries(LOCAL_INTROS).flatMap(([lang, L]) => {
+  const link = `${utm('/', `club_intro_${lang}`)}&lang=${lang}`;
+  const body = (greet: string) => `${greet}
+
+${L.body.replace('LINK', link)}
+
+${L.thanks}
+{{sender}}
+ChessScout.net
+{{address}}
+
+${L.optout}`;
+  return [
+    { id: `intro_${lang}`, audience: 'club' as Audience, lang, kind: 'personal' as const, name: `Introduce ChessScout.net (${L.label})`, subject: L.subject, body: body(L.greet) },
+    { id: `intro_general_${lang}`, audience: 'club' as Audience, lang, kind: 'general' as const, name: `Introduce ChessScout.net (${L.label})`, subject: L.subjectAll, body: body(L.greetAll) },
+  ];
+});
+
+const CLUB_SIGN_OFF = `Thanks,
+{{sender}}
+ChessScout.net
+{{address}}
+
+If you'd rather not hear from me again, just reply "no thanks" and I won't email you again.`;
+
+const LIBRARY_OFFER = `What it offers your library, free:
+- a Beginner Path that teaches every piece step by step and ends with a coached first game against a friendly bot
+- Chess for Kids, with read-aloud lessons and Kid Mode, which keeps children in the kids area until a grown-up answers a math question
+- free online tournaments for your chess club, set up in about a minute and shared with one link
+- face-to-face play on one device, so two patrons can share a library tablet or computer
+- 28 languages, for patrons who read more easily in another language`;
+
+const LIBRARY_TEMPLATES: Template[] = [
+  {
+    id: 'lib_programs', audience: 'library', kind: 'personal', name: 'Chess for library programs',
+    subject: 'Free chess for {{org}}: beginners, kids and tournaments',
+    body: `Hi {{org}} team,
+
+I'm {{sender}}, and I build ChessScout.net, a chess app made for beginners and families as well as club players. I saw that {{org}} offers chess{{inCity}}, and I thought it could help with your programs.
+
+${LIBRARY_OFFER}
+
+ChessScout is Teacher Approved on Google Play. Take a look: ${utm('/', 'library_programs')}
+
+If it fits, I'd be grateful if you mentioned it to your chess group or added it to your online resources. And if anything would make it more useful for your programs, I'd love to hear it.
+
+${CLUB_SIGN_OFF}`,
+  },
+  {
+    id: 'lib_tournament', audience: 'library', kind: 'personal', name: 'Library chess tournament',
+    subject: 'Run a free chess tournament for {{org}} patrons',
+    body: `Hi {{org}} team,
+
+I'm {{sender}} from ChessScout.net. If your chess group ever wants a tournament, we've made it easy to run one online for free, and I wanted to offer it to {{org}}.
+
+- choose arena (most points wins) or knockout, live or daily games, and the time control
+- share one link; players join from home or from library computers
+- pairings, clocks and standings are handled for you
+- beginners can warm up first with the Beginner Path and practice bots
+
+Create one here: ${utm('/tournaments/new', 'library_tournament')}
+{{tournamentLine}}
+Happy to help set up the first one; just reply with the date and format you have in mind.
+
+${CLUB_SIGN_OFF}`,
+  },
+  {
+    id: 'lib_programs_general', audience: 'library', kind: 'general', name: 'Chess for library programs',
+    subject: 'Free chess for your library: beginners, kids and tournaments',
+    body: `Hi there,
+
+I'm {{sender}}, and I build ChessScout.net, a chess app made for beginners and families as well as club players. I'm writing to a few libraries that offer chess, because I think it could help with your programs.
+
+${LIBRARY_OFFER}
+
+ChessScout is Teacher Approved on Google Play. Take a look: ${utm('/', 'library_programs_bcc')}
+
+If it fits, I'd be grateful if you mentioned it to your chess group or added it to your online resources. And if anything would make it more useful for your programs, I'd love to hear it.
+
+${CLUB_SIGN_OFF}`,
+  },
+];
+
+const PRESS_DIFFERENT = `What's different about it:
+- it reviews your Chess.com and Lichess games, not only games played on the site, and finds the mistakes you repeat
+- opponent scouting: a player's openings, results and your head-to-head record before a match
+- Scan Position turns a photo of a real board into a position to analyze
+- a Beginner Path, and Chess for Kids with a Kid Mode parents can lock; it's Teacher Approved on Google Play
+- live play, coaching bots with live analysis, unlimited puzzles and tournaments, in 28 languages`;
+
+const PRESS_CLOSE = `It's free to start, with an optional Pro plan at $5/month: ${utm('/', 'press')}
+Android: https://play.google.com/store/apps/details?id=net.chessscout.app
+
+I'm happy to set up a Pro account so you can test everything, answer questions, or send screenshots.`;
+
+const PRESS_TEMPLATES: Template[] = [
+  {
+    id: 'press_pitch', audience: 'press', kind: 'personal', name: 'Pitch for app lists & reviews',
+    subject: 'For your chess app coverage: ChessScout.net',
+    body: `Hi {{name}},
+
+I'm {{sender}}, the developer of ChessScout.net. I came across your coverage of chess apps{{articleLine}}, and I wanted to put ChessScout on your radar for the next update or review.
+
+${PRESS_DIFFERENT}
+
+${PRESS_CLOSE}
+
+${CLUB_SIGN_OFF}`,
+  },
+  {
+    id: 'press_kids', audience: 'press', kind: 'personal', name: 'Kids & education angle',
+    subject: 'A kids and beginner chess app for your readers',
+    body: `Hi {{name}},
+
+I'm {{sender}}, the developer of ChessScout.net. I saw your recommendations for kids and learning apps{{articleLine}}, and I think ChessScout could be a good fit for your readers.
+
+- Chess for Kids: colorful worlds, read-aloud lessons and Benny the Bear, a gentle bot for young players
+- Kid Mode keeps children in the kids area; leaving it takes a grown-up math question, and it stays on across sign-ins
+- the Beginner Path teaches each piece step by step and ends with a coached first game
+- it's Teacher Approved on Google Play and works in 28 languages
+- when they're ready, there's live play, puzzles and tournaments for the whole family
+
+${PRESS_CLOSE}
+
+${CLUB_SIGN_OFF}`,
+  },
+  {
+    id: 'press_pitch_general', audience: 'press', kind: 'general', name: 'Pitch for app lists & reviews',
+    subject: 'For your chess app coverage: ChessScout.net',
+    body: `Hi there,
+
+I'm {{sender}}, the developer of ChessScout.net. I'm writing to a few people who cover chess and learning apps, to put ChessScout on your radar for a future list or review.
+
+${PRESS_DIFFERENT}
+
+${PRESS_CLOSE}
+
+${CLUB_SIGN_OFF}`,
+  },
+];
+
 const DEFAULT_TEMPLATES: Template[] = [
   ...CLUB_TEMPLATES.map((t) => ({ ...t, audience: 'club' as Audience })),
+  ...LOCAL_CLUB_TEMPLATES,
   ...CREATOR_TEMPLATES,
+  ...LIBRARY_TEMPLATES,
+  ...PRESS_TEMPLATES,
 ];
+const EMAIL_LANGS: { code: string; label: string }[] = [{ code: 'en', label: 'English' }, ...Object.entries(LOCAL_INTROS).map(([code, L]) => ({ code, label: L.label }))];
 
 interface Settings { sender: string; gmail: string; address: string; tournamentLink: string; batchSize: number; styled: boolean }
 const SETTINGS_KEY = 'cs_club_outreach_settings';
@@ -454,6 +619,7 @@ function fill(text: string, c: Contact | null, s: Settings): string {
     .replace(/\{\{name\}\}/g, c ? c.orgName : 'there')
     .replace(/\{\{platform\}\}/g, c?.platform || '')
     .replace(/\{\{onPlatform\}\}/g, c?.platform ? ` on ${c.platform}` : '')
+    .replace(/\{\{articleLine\}\}/g, c?.profileUrl ? ` (${c.profileUrl})` : '')
     .replace(/\{\{city\}\}/g, place)
     .replace(/\{\{inCity\}\}/g, place ? ` in ${place}` : '')
     .replace(/\{\{sender\}\}/g, s.sender || 'Shann')
@@ -514,9 +680,14 @@ function ctaLabel(url: string): string {
 
 export function styledEmailHtml(text: string): string {
   const blocks = text.replace(/\r/g, '').split(/\n{2,}/).map((b) => b.trim()).filter(Boolean);
-  const optOutIdx = blocks.findIndex((b) => /rather not hear from me/i.test(b));
+  // The signature is the block with the "ChessScout.net" line; whatever follows it is the opt-out
+  // (works for the translated templates too).
+  const sigAt = blocks.findIndex((b) => b.split('\n').some((l) => l.trim() === 'ChessScout.net'));
+  let optOutIdx = blocks.findIndex((b) => /rather not hear from me/i.test(b));
+  if (optOutIdx < 0 && sigAt >= 0 && sigAt < blocks.length - 1) optOutIdx = blocks.length - 1;
   const optOut = optOutIdx >= 0 ? blocks.splice(optOutIdx, 1)[0] : '';
-  const sigIdx = blocks.findIndex((b) => /^(thanks|cheers|best),?/i.test(b));
+  let sigIdx = blocks.findIndex((b) => /^(thanks|cheers|best),?/i.test(b));
+  if (sigIdx < 0) sigIdx = blocks.findIndex((b) => b.split('\n').some((l) => l.trim() === 'ChessScout.net'));
   const sig = sigIdx >= 0 ? blocks.splice(sigIdx).join('\n') : '';
   const parts = blocks.map((b) => {
     const lines = b.split('\n');
@@ -630,9 +801,9 @@ function DraftActions({ draft, styled, account, onOpened, track }: {
 }
 
 /** Two rows of template buttons: personal (filled in per club) and general (for Bcc batches). */
-function TemplatePicker({ templates: all, value, onChange, compact, audience = 'club' }: { templates: Template[]; value: string; onChange: (id: string) => void; compact?: boolean; audience?: Audience }) {
-  const templates = all.filter((t) => (t.audience ?? 'club') === audience);
-  const who = audience === 'influencer' ? 'creator' : 'club';
+function TemplatePicker({ templates: all, value, onChange, compact, audience = 'club', lang = 'en' }: { templates: Template[]; value: string; onChange: (id: string) => void; compact?: boolean; audience?: Audience; lang?: string }) {
+  const templates = all.filter((t) => (t.audience ?? 'club') === audience && (t.lang ?? 'en') === lang);
+  const who = AUDIENCE_META[audience].who;
   const group = (kind: Template['kind'], label: string) => (
     <div>
       <p className="mb-1 text-[10.5px] font-bold uppercase tracking-wider" style={{ color: MUTED }}>{label}</p>
@@ -653,7 +824,8 @@ function TemplatePicker({ templates: all, value, onChange, compact, audience = '
 }
 
 export function ClubOutreachPanel() {
-  const [audience, setAudienceState] = useState<Audience>(() => { try { return localStorage.getItem(AUDIENCE_KEY) === 'influencer' ? 'influencer' : 'club'; } catch { return 'club'; } });
+  const [audience, setAudienceState] = useState<Audience>(() => { try { const a = localStorage.getItem(AUDIENCE_KEY) as Audience | null; return a && a in AUDIENCE_META ? a : 'club'; } catch { return 'club'; } });
+  const [lang, setLangState] = useState('en');
   const [tab, setTab] = useState('new');
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [counts, setCounts] = useState<Record<string, number>>({});
@@ -664,10 +836,11 @@ export function ClubOutreachPanel() {
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [settings, setSettings] = useState<Settings>(() => load(SETTINGS_KEY, { sender: 'Shann', gmail: '', address: '', tournamentLink: '', batchSize: 40, styled: true }));
   const [overrides, setOverrides] = useState<Record<string, { subject: string; body: string }>>(() => load(TEMPLATES_KEY, {}));
-  const [templateId, setTemplateId] = useState(() => (audience === 'influencer' ? 'aff_invite' : 'intro'));
+  const [templateId, setTemplateId] = useState(() => AUDIENCE_META[audience].defaultTemplate);
+  const setLang = (l: string) => { setLangState(l); setTemplateId(l === 'en' ? 'intro' : `intro_${l}`); };
   const setAudience = (a: Audience) => {
-    setAudienceState(a); setTab('new'); setSelected(new Set()); setMsg('');
-    setTemplateId(a === 'influencer' ? 'aff_invite' : 'intro');
+    setAudienceState(a); setTab('new'); setSelected(new Set()); setMsg(''); setLangState('en');
+    setTemplateId(AUDIENCE_META[a].defaultTemplate);
     try { localStorage.setItem(AUDIENCE_KEY, a); } catch { /* ignore */ }
   };
   const [editing, setEditing] = useState(false);
@@ -824,36 +997,27 @@ export function ClubOutreachPanel() {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <h2 className="flex items-center gap-2 text-lg font-bold text-white">
-            <span className="grid h-8 w-8 place-items-center rounded-lg" style={{ background: GREEN, color: '#fff' }}>{audience === 'influencer' ? <Users size={17} /> : <Building2 size={17} />}</span>
-            {audience === 'influencer' ? 'Creator Outreach' : 'Club Outreach'}
+            <span className="grid h-8 w-8 place-items-center rounded-lg" style={{ background: GREEN, color: '#fff' }}>{React.createElement(AUDIENCE_META[audience].icon, { size: 17 })}</span>
+            {AUDIENCE_META[audience].title}
           </h2>
-          <div className="mt-2 inline-flex rounded-lg p-0.5" style={{ background: 'rgba(0,0,0,.3)' }}>
-            {([['club', 'Clubs & organizers'], ['influencer', 'Creators & influencers']] as [Audience, string][]).map(([a, label]) => (
+          <div className="mt-2 inline-flex flex-wrap rounded-lg p-0.5" style={{ background: 'rgba(0,0,0,.3)' }}>
+            {(Object.keys(AUDIENCE_META) as Audience[]).map((a) => (
               <button key={a} type="button" onClick={() => setAudience(a)} className="rounded-md px-2.5 py-1 text-xs font-bold"
-                style={audience === a ? { background: GREEN, color: '#fff' } : { color: MUTED }}>{label}</button>
+                style={audience === a ? { background: GREEN, color: '#fff' } : { color: MUTED }}>{AUDIENCE_META[a].tab}</button>
             ))}
           </div>
-          {audience === 'influencer' ? (
-            <p className="mt-2 text-xs" style={{ color: MUTED }}>
-              Chess YouTubers, streamers, TikTokers, coaches, bloggers and podcasters, in every market the app speaks, who list a business email on their own website or link-in-bio page.
-              Invite them to the affiliate program: $1 for every member who goes Pro with their code, and they can edit the code to fit their channel.
-              New ones are found every Thursday; use the button for more. When someone says yes, add them in Affiliates with the Creator preset.
-            </p>
-          ) : (
-            <p className="mt-2 text-xs" style={{ color: MUTED }}>
-              Chess clubs, school and college clubs, leagues, associations, organizers and coaches that list a contact email on their own website.
-              New ones are found every Monday; use the button for more. Send from your Gmail one at a time, or copy addresses into Bcc batches.
-            </p>
-          )}
+          <p className="mt-2 text-xs" style={{ color: MUTED }}>
+            {AUDIENCE_META[audience].blurb} New ones are found every {AUDIENCE_META[audience].day}; use the button for more.
+          </p>
         </div>
         <button onClick={discover} disabled={running} className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold disabled:opacity-60" style={{ background: GREEN, color: '#fff' }}>
-          {running ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />} {running ? 'Searching…' : audience === 'influencer' ? 'Find new creators' : 'Find new contacts'}
+          {running ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />} {running ? 'Searching…' : AUDIENCE_META[audience].find}
         </button>
       </div>
 
       {lastRun && (
         <p className="text-[11.5px]" style={{ color: MUTED }}>
-          Last search {new Date(lastRun.startedAt).toLocaleString()} ({lastRun.trigger}): {lastRun.finishedAt ? `${lastRun.added} new contact${lastRun.added === 1 ? '' : 's'} from ${lastRun.candidates} ${audience === 'influencer' ? 'creators' : 'organizations'} checked` : 'running…'}
+          Last search {new Date(lastRun.startedAt).toLocaleString()} ({lastRun.trigger}): {lastRun.finishedAt ? `${lastRun.added} new contact${lastRun.added === 1 ? '' : 's'} from ${lastRun.candidates} ${AUDIENCE_META[audience].noun} checked` : 'running…'}
           {lastRun.error ? ` · stopped: ${lastRun.error}` : ''}
         </p>
       )}
@@ -884,14 +1048,26 @@ export function ClubOutreachPanel() {
           )}
         </div>
         <div className="space-y-2 rounded-xl p-3.5" style={INNER}>
-          <p className="text-sm font-bold text-white">Template</p>
-          <TemplatePicker templates={templates} value={templateId} onChange={setTemplateId} audience={audience} />
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-sm font-bold text-white">Template</p>
+            {audience === 'club' && (
+              <label className="flex items-center gap-1.5 text-[11px] font-bold" style={{ color: MUTED }}>
+                Email language
+                <select value={lang} onChange={(e) => setLang(e.target.value)} className="rounded-md border border-white/10 bg-black/30 px-2 py-1 text-xs text-white outline-none">
+                  {EMAIL_LANGS.map((l) => <option key={l.code} value={l.code}>{l.label}</option>)}
+                </select>
+              </label>
+            )}
+          </div>
+          <TemplatePicker templates={templates} value={templateId} onChange={setTemplateId} audience={audience} lang={lang} />
           <input className={INPUT} value={template.subject} onChange={(e) => updateTemplate({ subject: e.target.value })} />
           <textarea className={`${INPUT} min-h-[150px] font-mono text-[12px]`} value={template.body} onChange={(e) => updateTemplate({ body: e.target.value })} />
           <div className="flex items-center justify-between">
             <p className="text-[11px]" style={{ color: MUTED }}>
               {template.kind === 'personal'
-                ? (audience === 'influencer' ? 'Fills in: {{name}} {{onPlatform}} {{platform}} {{sender}} {{address}}' : 'Fills in: {{org}} {{city}} {{sender}} {{address}} {{tournamentLine}}')
+                ? (audience === 'influencer' ? 'Fills in: {{name}} {{onPlatform}} {{platform}} {{sender}} {{address}}'
+                  : audience === 'press' ? 'Fills in: {{name}} {{articleLine}} {{sender}} {{address}}'
+                  : 'Fills in: {{org}} {{city}} {{sender}} {{address}} {{tournamentLine}}')
                 : 'Fills in: {{sender}} {{address}} {{tournamentLine}}'}
             </p>
             {overrides[template.id] && <button onClick={resetTemplate} className="inline-flex items-center gap-1 text-[11px] font-bold" style={{ color: GREEN }}><RotateCcw size={11} /> Reset</button>}
@@ -916,13 +1092,13 @@ export function ClubOutreachPanel() {
       </div>
 
       {adding && (
-        audience === 'influencer' ? (
+        audience === 'influencer' || audience === 'press' ? (
         <div className="grid gap-2 rounded-xl p-3 sm:grid-cols-6" style={INNER}>
-          <input className={INPUT} placeholder="Creator / channel name" value={newContact.orgName} onChange={(e) => setNewContact({ ...newContact, orgName: e.target.value })} />
-          <input className={INPUT} placeholder="Business email" value={newContact.email} onChange={(e) => setNewContact({ ...newContact, email: e.target.value })} />
-          <input className={INPUT} placeholder="Platform (YouTube, Twitch…)" value={newContact.platform} onChange={(e) => setNewContact({ ...newContact, platform: e.target.value })} />
-          <input className={INPUT} placeholder="Channel link" value={newContact.profileUrl} onChange={(e) => setNewContact({ ...newContact, profileUrl: e.target.value })} />
-          <input className={INPUT} placeholder="Website or link-in-bio" value={newContact.website} onChange={(e) => setNewContact({ ...newContact, website: e.target.value })} />
+          <input className={INPUT} placeholder={audience === 'press' ? 'Writer or publication' : 'Creator / channel name'} value={newContact.orgName} onChange={(e) => setNewContact({ ...newContact, orgName: e.target.value })} />
+          <input className={INPUT} placeholder={audience === 'press' ? 'Email' : 'Business email'} value={newContact.email} onChange={(e) => setNewContact({ ...newContact, email: e.target.value })} />
+          <input className={INPUT} placeholder={audience === 'press' ? 'Publication' : 'Platform (YouTube, Twitch…)'} value={newContact.platform} onChange={(e) => setNewContact({ ...newContact, platform: e.target.value })} />
+          <input className={INPUT} placeholder={audience === 'press' ? 'Article about chess apps' : 'Channel link'} value={newContact.profileUrl} onChange={(e) => setNewContact({ ...newContact, profileUrl: e.target.value })} />
+          <input className={INPUT} placeholder={audience === 'press' ? 'Author or contact page' : 'Website or link-in-bio'} value={newContact.website} onChange={(e) => setNewContact({ ...newContact, website: e.target.value })} />
           <button onClick={addContact} className="rounded-lg px-3 py-2 text-xs font-bold" style={{ background: GREEN, color: '#fff' }}>Add</button>
         </div>
         ) : (
@@ -980,7 +1156,7 @@ export function ClubOutreachPanel() {
       {loading ? (
         <div className="py-8 text-center"><Loader2 className="mx-auto h-5 w-5 animate-spin" style={{ color: MUTED }} /></div>
       ) : contacts.length === 0 ? (
-        <p className="py-6 text-center text-sm" style={{ color: MUTED }}>{tab === 'new' ? (audience === 'influencer' ? 'No new creators. Click "Find new creators" to search.' : 'No new contacts. Click "Find new contacts" to search.') : 'Nothing here yet.'}</p>
+        <p className="py-6 text-center text-sm" style={{ color: MUTED }}>{tab === 'new' ? `Nothing new yet. Click "${AUDIENCE_META[audience].find}" to search.` : 'Nothing here yet.'}</p>
       ) : (
         <div className="max-h-[560px] space-y-1.5 overflow-y-auto pr-1">
           {contacts.map((c) => (
@@ -993,7 +1169,7 @@ export function ClubOutreachPanel() {
                 </p>
                 <p className="truncate text-[12px] text-white/80">{c.email}</p>
                 <p className="flex flex-wrap gap-x-3 text-[11px]" style={{ color: MUTED }}>
-                  {c.profileUrl && <a href={c.profileUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-0.5 underline">{c.platform || 'Channel'} <ExternalLink size={10} /></a>}
+                  {c.profileUrl && <a href={c.profileUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-0.5 underline">{audience === 'press' ? 'Article' : c.platform || 'Channel'} <ExternalLink size={10} /></a>}
                   {c.website && <a href={c.website} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-0.5 underline">Website <ExternalLink size={10} /></a>}
                   {c.sourceUrl && c.sourceUrl.startsWith('http') && <a href={c.sourceUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-0.5 underline">Where the email is listed <ExternalLink size={10} /></a>}
                   {c.contactedAt && <span>Contacted {new Date(c.contactedAt).toLocaleDateString()}{c.contactedTemplate ? ` (${templates.find((t) => t.id === c.contactedTemplate)?.name ?? c.contactedTemplate})` : ''}</span>}
@@ -1016,7 +1192,7 @@ export function ClubOutreachPanel() {
               <button onClick={() => { setBatches(null); void loadData(); }} aria-label="Close" className="p-1" style={{ color: MUTED }}><X size={18} /></button>
             </div>
             <div className="h-1.5 overflow-hidden rounded-full bg-white/10"><div className="h-full" style={{ width: `${(bi / batches.length) * 100}%`, background: GREEN }} /></div>
-            <TemplatePicker templates={templates} value={templateId} onChange={setTemplateId} compact audience={audience} />
+            <TemplatePicker templates={templates} value={templateId} onChange={setTemplateId} compact audience={audience} lang={lang} />
             <p className="text-[12px]" style={{ color: MUTED }}>
               Put these in <b className="text-white">Bcc</b> (never To or Cc) so organizations can't see each other's addresses. Personal templates use "your club" here, since one email goes to several clubs.
             </p>
@@ -1061,7 +1237,7 @@ export function ClubOutreachPanel() {
               <button onClick={() => { setQueue(null); void loadData(); }} aria-label="Close" className="p-1" style={{ color: MUTED }}><X size={18} /></button>
             </div>
             <div className="h-1.5 overflow-hidden rounded-full bg-white/10"><div className="h-full" style={{ width: `${(qi / queue.length) * 100}%`, background: GREEN }} /></div>
-            <TemplatePicker templates={templates} value={templateId} onChange={setTemplateId} compact audience={audience} />
+            <TemplatePicker templates={templates} value={templateId} onChange={setTemplateId} compact audience={audience} lang={lang} />
             <p className="text-xs" style={{ color: MUTED }}>To: <span className="text-white">{current.email}</span></p>
             <p className="text-sm font-bold text-white">{subject}</p>
             <DraftActions draft={{ to: current.email, subject, body }} styled={settings.styled} account={settings.gmail} onOpened={() => setOpened(true)}

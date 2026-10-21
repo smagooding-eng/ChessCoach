@@ -2,7 +2,7 @@ import { Router, type IRouter, type Request, type Response, type NextFunction } 
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { logger } from "../lib/logger";
-import { ensureClubOutreachTables, startDiscovery, isDiscoveryRunning } from "../lib/clubOutreach";
+import { ensureClubOutreachTables, startDiscovery, isDiscoveryRunning, asAudience } from "../lib/clubOutreach";
 import { sendEmail } from "../lib/email";
 import { unsubscribeFooterHtml } from "../lib/emailTheme";
 import { clubUnsubscribeUrl } from "../lib/emailPrefs";
@@ -34,7 +34,7 @@ router.get("/admin/club-outreach", requireAdmin, async (req: Request, res: Respo
     await ready();
     await ensureEmailTracking();
     const status = String(req.query.status ?? "new");
-    const audience = req.query.audience === "influencer" ? "influencer" : "club";
+    const audience = asAudience(req.query.audience);
     const where = status === "all" ? sql`c.audience = ${audience}` : sql`c.status = ${status} AND c.audience = ${audience}`;
     const contacts = rowsOf(await db.execute(sql`
       SELECT c.id, c.email, c.org_name AS "orgName", c.org_type AS "orgType", c.city, c.region, c.country, c.website,
@@ -70,7 +70,7 @@ router.post("/admin/club-outreach/discover", requireAdmin, async (req: Request, 
   try {
     await ready();
     const searches = Math.max(1, Math.min(20, Math.round(Number(req.body?.searches ?? 8))));
-    const audience = req.body?.audience === "influencer" ? "influencer" : "club";
+    const audience = asAudience(req.body?.audience);
     const runId = await startDiscovery({ searches, trigger: "manual", audience });
     if (runId === null) { res.status(409).json({ error: "A search is already running" }); return; }
     res.json({ runId });
@@ -178,7 +178,7 @@ router.post("/admin/club-outreach/contacts", requireAdmin, async (req: Request, 
     const ins = rowsOf(await db.execute(sql`
       INSERT INTO club_contacts (email, org_name, org_type, city, website, source_url, audience, platform, profile_url)
       VALUES (${email}, ${orgName}, ${String(req.body?.orgType ?? "").slice(0, 120) || null}, ${String(req.body?.city ?? "").slice(0, 120) || null},
-        ${String(req.body?.website ?? "").slice(0, 500) || null}, 'added by hand', ${req.body?.audience === "influencer" ? "influencer" : "club"},
+        ${String(req.body?.website ?? "").slice(0, 500) || null}, 'added by hand', ${asAudience(req.body?.audience)},
         ${String(req.body?.platform ?? "").slice(0, 60) || null}, ${String(req.body?.profileUrl ?? "").slice(0, 500) || null})
       ON CONFLICT DO NOTHING RETURNING id`));
     if (!ins.length) { res.status(409).json({ error: "That email is already in the list" }); return; }

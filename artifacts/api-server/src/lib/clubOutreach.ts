@@ -103,7 +103,19 @@ const PLACES = [
   "Ontario, Canada", "British Columbia, Canada", "Alberta, Canada", "Quebec, Canada",
   "London, UK", "Manchester, UK", "Birmingham, UK", "Scotland", "Wales", "Ireland",
   "New South Wales, Australia", "Victoria, Australia", "Queensland, Australia", "New Zealand",
+  // The app speaks 28 languages, so clubs abroad too (added after the
+  // English-speaking list so earlier search progress is kept). Searches here
+  // also look in the local language. Clubs get the matching email language.
+  "Madrid and central Spain", "Barcelona and Catalonia, Spain", "Andalusia and Valencia, Spain", "Mexico", "Argentina", "Colombia", "Chile and Peru",
+  "São Paulo, Brazil", "Rio de Janeiro and Minas Gerais, Brazil", "southern Brazil", "Portugal",
+  "Paris and Île-de-France", "Lyon, Marseille and southern France", "Belgium", "Quebec (French-speaking clubs)",
+  "Berlin and northern Germany", "Bavaria and southern Germany", "western Germany (NRW)", "Austria", "Switzerland",
+  "northern Italy", "central and southern Italy", "the Netherlands", "Poland", "Ukraine", "Turkey", "Romania", "Czech Republic", "Hungary",
+  "Greece", "Sweden", "India (Delhi, Mumbai, Bangalore, Chennai, Kolkata)", "Bangladesh", "Indonesia", "the Philippines", "Vietnam", "Thailand",
+  "Japan", "South Korea", "Taiwan", "United Arab Emirates and Qatar", "Egypt", "Morocco",
 ];
+
+const INTL_PLACES = new Set(PLACES.slice(PLACES.indexOf("Madrid and central Spain")));
 
 /** Every (type, place) pair, in a fixed order the runs walk through. */
 function searchAt(index: number): { type: string; place: string } {
@@ -128,8 +140,8 @@ const CREATOR_MARKETS = [
   "the United States", "the United Kingdom and Ireland", "Canada", "Australia and New Zealand", "India (English or Hindi)",
   "the Philippines", "Nigeria, Kenya and South Africa", "Spain (Spanish language)", "Mexico, Argentina, Colombia and Latin America (Spanish language)",
   "Brazil and Portugal (Portuguese language)", "France (French language)", "Germany, Austria and Switzerland (German language)",
-  "Italy (Italian language)", "the Netherlands and Belgium", "Poland", "Ukraine and Russian-speaking countries", "Turkey",
-  "Greece", "Romania, Czechia and Hungary", "Sweden and the Nordics", "the Arab world (Arabic language)", "Iran (Persian language)",
+  "Italy (Italian language)", "the Netherlands and Belgium", "Poland", "Ukraine", "Turkey",
+  "Greece", "Romania, Czechia and Hungary", "Sweden and the Nordics", "the Arab world (Arabic language)", "Afghanistan, Tajikistan and the Persian-speaking diaspora (Persian language)",
   "Bangladesh (Bengali language)", "Indonesia", "Vietnam", "Thailand", "China and Taiwan (Chinese language)", "Japan", "South Korea",
 ];
 function creatorSearchAt(index: number): { type: string; place: string } {
@@ -138,7 +150,41 @@ function creatorSearchAt(index: number): { type: string; place: string } {
   return { place: CREATOR_MARKETS[Math.floor(i / CREATOR_KINDS.length)], type: CREATOR_KINDS[i % CREATOR_KINDS.length] };
 }
 
-export type Audience = "club" | "influencer";
+// Libraries: public libraries that run chess clubs or kids' chess programs.
+const LIBRARY_KINDS = [
+  "public library that runs a chess club or weekly chess meetup",
+  "public library with kids or teen chess programs",
+  "public library system with game clubs or adult programs that include chess",
+];
+const LIBRARY_PLACES = PLACES.slice(0, PLACES.indexOf("New Zealand") + 1);
+
+// Press: writers of "best chess apps" lists and app reviews.
+const PRESS_KINDS = [
+  "journalist or blogger who published a 'best chess apps' or 'best apps to learn chess' list",
+  "writer who reviewed a chess app or chess website",
+  "parenting or education website that recommends chess apps or learning apps for kids",
+  "technology or Android app website that reviews learning, puzzle or board game apps",
+  "chess news site, chess magazine or chess blog that covers new chess tools",
+];
+const PRESS_MARKETS = [
+  "the United States", "the United Kingdom", "Canada and Australia", "India", "Spanish-language media", "Portuguese-language media (Brazil and Portugal)",
+  "French-language media", "German-language media", "Italian-language media", "Dutch and Polish media", "Turkish media",
+  "Indonesian and Vietnamese media", "Japanese media", "Korean media",
+];
+
+export type Audience = "club" | "influencer" | "library" | "press";
+export const AUDIENCES: Audience[] = ["club", "influencer", "library", "press"];
+export function asAudience(v: unknown): Audience { return (AUDIENCES as string[]).includes(String(v)) ? (v as Audience) : "club"; }
+
+function walk(kinds: string[], places: string[]) {
+  return (index: number): { type: string; place: string } => {
+    const total = kinds.length * places.length;
+    const i = ((index % total) + total) % total;
+    return { place: places[Math.floor(i / kinds.length)], type: kinds[i % kinds.length] };
+  };
+}
+const libraryAt = walk(LIBRARY_KINDS, LIBRARY_PLACES);
+const pressAt = walk(PRESS_KINDS, PRESS_MARKETS);
 
 // ── Web search (names + websites only) ─────────────────────────────────────
 
@@ -160,7 +206,24 @@ Find up to 10 real ones that have their own official website (not a Facebook, In
 Only public or community organizations that adults can join or play in. Do NOT include schools, school districts, school chess teams, colleges, universities, PTAs, or programs only for students.
 Return ONLY JSON in this shape, using websites you actually found in search results:
 {"results":[{"name":"...","type":"${type}","city":"...","region":"...","country":"...","website":"https://...","contactPage":"https://... (their contact or about page if you found it)"}]}
-Do not include email addresses. Do not invent websites.`;
+Do not include email addresses. Do not invent websites.${INTL_PLACES.has(place) ? `
+Search in English and in the local language of ${place}, and include clubs whose websites are in that language.` : ""}`;
+}
+
+function libraryPrompt(type: string, place: string): string {
+  return `Search the web for a ${type} in ${place}.
+Find up to 10 real public libraries (or library branches) that list chess on their events or programs pages, on their own official website.
+Return ONLY JSON in this shape, using websites you actually found in search results:
+{"results":[{"name":"library or branch name","type":"public library","city":"...","region":"...","country":"...","website":"https://... the library's site","contactPage":"https://... the chess program page or the library's contact page"}]}
+Do not include email addresses. Do not invent websites. Leave out school libraries and university libraries.`;
+}
+
+function pressPrompt(type: string, place: string): string {
+  return `Search the web for a ${type}, in ${place}, active in the last two years.
+Find up to 10 real writers or publications. For each, give the article or page you found and the publication's or writer's own contact, tips or author page.
+Return ONLY JSON in this shape, using pages you actually found in search results:
+{"results":[{"name":"writer name, or publication name","type":"${type}","country":"...","website":"https://... the writer's author page, own site, or the publication's contact page","contactPage":"https://... the page that lists an email for tips, reviews or the writer, if different","profileUrl":"https://... the article about chess apps you found"}]}
+Do not include email addresses. Do not invent websites. Leave out Chess.com and Lichess themselves.`;
 }
 
 function creatorPrompt(type: string, place: string): string {
@@ -177,7 +240,10 @@ const LINK_IN_BIO = /(^|\.)(linktr\.ee|beacons\.ai|carrd\.co|stan\.store|bio\.li
 async function searchOrganizations(type: string, place: string, audience: Audience = "club"): Promise<Candidate[]> {
   if (!process.env.OPENAI_API_KEY) throw new Error("OPENAI_API_KEY is not set");
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-  const prompt = audience === "influencer" ? creatorPrompt(type, place) : clubPrompt(type, place);
+  const prompt = audience === "influencer" ? creatorPrompt(type, place)
+    : audience === "library" ? libraryPrompt(type, place)
+    : audience === "press" ? pressPrompt(type, place)
+    : clubPrompt(type, place);
   let lastErr: unknown = null;
   for (const model of SEARCH_MODELS) {
     try {
@@ -200,7 +266,7 @@ async function searchOrganizations(type: string, place: string, audience: Audien
 }
 
 // Schools, colleges and student-only programs (we want public clubs).
-const SCHOOL_NAME = /\b(school|schools|elementary|middle school|high school|junior high|isd|usd|district|k-?12|university|college|campus|students?|scholastic|pta|pto)\b/i;
+const SCHOOL_NAME = /\b(school|schools|elementary|middle school|high school|junior high|isd|usd|district|k-?12|university|college|campus|students?|scholastic|pta|pto|escuela|colegio|universidad|escola|universidade|école|lycée|collège|université|schule|gymnasium|universität|scuola|liceo|università|szkoła|uniwersytet|okulu|üniversitesi|school district)\b/i;
 const SCHOOL_HOST = /(\.edu(\.[a-z]{2})?$|\.k12\.|\.sch\.|\.ac\.(uk|nz|za)$|\.edu\.au$|schools?\b|isd\.|usd\d)/i;
 function isSchool(c: { name: string; type?: string; website: string }, host: string): boolean {
   return SCHOOL_NAME.test(c.name) || SCHOOL_HOST.test(host) || /scholastic|school|college|university/i.test(c.type ?? '');
@@ -211,7 +277,7 @@ function isSchool(c: { name: string; type?: string; website: string }, host: str
 const SOCIAL = /(facebook|instagram|twitter|x\.com|reddit|meetup|linkedin|tiktok|youtube|discord|lichess\.org|chess\.com)\b/i;
 const BAD_LOCAL = /^(no-?reply|donotreply|do-not-reply|abuse|postmaster|privacy|legal|webmaster|hostmaster|root|admin@wix|support@squarespace|example|test|user|name|email|your|you)$/i;
 const BAD_DOMAIN = /(example\.(com|org)|sentry|wixpress|squarespace|godaddy|wordpress\.com|domain\.com|email\.com|yourdomain|sentry\.io|cloudflare|googleusercontent|w3\.org|schema\.org)/i;
-const ROLE_LOCAL = /^(info|contact|hello|club|chess|secretary|president|director|admin|office|events|tournaments?|td|membership|members|coach|team|general|enquiries|inquiries)/i;
+const ROLE_LOCAL = /^(info|contact|hello|club|chess|secretary|president|director|admin|office|events|tournaments?|td|membership|members|coach|team|general|enquiries|inquiries|programs?|library|ask|tips|news|editor|editorial|press|reviews?|contato|contacto|kontakt|contatto|secretaria|secretariat)/i;
 const FREEMAIL = /@(gmail|yahoo|hotmail|outlook|aol|icloud|me|live|msn|protonmail|proton|comcast|verizon|att|sbcglobal|btinternet|bigpond|shaw|rogers|sympatico)\./i;
 
 async function fetchText(url: string): Promise<string | null> {
@@ -302,9 +368,9 @@ export function isDiscoveryRunning(): boolean { return running; }
 export async function startDiscovery(opts: { searches: number; trigger: "manual" | "weekly"; audience?: Audience }): Promise<number | null> {
   if (running) return null;
   running = true;
-  const audience: Audience = opts.audience === "influencer" ? "influencer" : "club";
-  const stateId = audience === "influencer" ? "influencer" : "main";
-  const at = audience === "influencer" ? creatorSearchAt : searchAt;
+  const audience: Audience = asAudience(opts.audience);
+  const stateId = audience === "club" ? "main" : audience;
+  const at = audience === "influencer" ? creatorSearchAt : audience === "library" ? libraryAt : audience === "press" ? pressAt : searchAt;
   try { await ensureClubOutreachTables(); } catch (err) { running = false; throw err; }
   const [run] = rowsOf<{ id: number }>(await db.execute(sql`INSERT INTO club_outreach_runs (trigger, audience) VALUES (${opts.trigger}, ${audience}) RETURNING id`));
   void (async () => {
@@ -358,19 +424,20 @@ export async function startDiscovery(opts: { searches: number; trigger: "manual"
   return run.id;
 }
 
-/** Weekly runs: clubs on Mondays, creators on Thursdays (bigger batches than the manual button). */
+/** Weekly runs, one audience a day (bigger batches than the manual button). */
 export function startClubOutreachSchedule(): void {
   ensureClubOutreachTables().catch((err) => logger.warn({ err }, "[club-outreach] table setup failed"));
   setInterval(async () => {
     const d = new Date();
     if (d.getUTCHours() !== 14) return;
-    const audience: Audience | null = d.getUTCDay() === 1 ? "club" : d.getUTCDay() === 4 ? "influencer" : null;
+    // Clubs Monday, libraries Tuesday, press Wednesday, creators Thursday.
+    const audience: Audience | null = ({ 1: "club", 2: "library", 3: "press", 4: "influencer" } as Record<number, Audience>)[d.getUTCDay()] ?? null;
     if (!audience) return;
     try {
       const [last] = rowsOf<{ started_at: string }>(await db.execute(sql`
         SELECT started_at FROM club_outreach_runs WHERE trigger = 'weekly' AND audience = ${audience} ORDER BY started_at DESC LIMIT 1`));
       if (last && Date.now() - new Date(last.started_at).getTime() < 6 * 86_400_000) return;
-      await startDiscovery({ searches: audience === "club" ? 16 : 12, trigger: "weekly", audience });
+      await startDiscovery({ searches: audience === "club" ? 16 : audience === "press" ? 8 : 12, trigger: "weekly", audience });
     } catch (err) { logger.warn({ err }, "[club-outreach] weekly check failed"); }
   }, 15 * 60_000).unref();
 }

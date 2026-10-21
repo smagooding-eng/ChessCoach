@@ -64,6 +64,12 @@ function match(locale: string): string | null {
 }
 
 function detect(): string {
+  // A link can pick the language (?lang=es), e.g. from a translated outreach email.
+  try {
+    const q = new URLSearchParams(window.location.search).get('lang');
+    const m = q ? match(q) : null;
+    if (m) return m;
+  } catch { /* ignore */ }
   const saved = stored();
   if (saved && byCode.has(saved.toLowerCase())) return byCode.get(saved.toLowerCase())!.code;
   // No choice made yet: follow the browser, so a visitor reading in Spanish
