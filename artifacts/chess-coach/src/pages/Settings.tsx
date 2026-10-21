@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { SocialLinks } from '@/components/SocialLinks';
 import { Link } from 'wouter';
 import { ArrowLeft, Check, Save, Trash2, RotateCcw, Star, Volume2 } from 'lucide-react';
 import { playSound, SOUND_GROUPS } from '@/lib/sounds';
@@ -598,6 +599,9 @@ export default function SettingsPage() {
       </p>
       <p className="text-xs text-center" style={{ color: TEXT_MUTED }}>
         <Link href="/credits" className="underline">Photo credits</Link>
+      </p>
+      <p className="flex items-center justify-center text-xs" style={{ color: TEXT_MUTED }}>
+        <SocialLinks size={18} label="Follow ChessScout" />
       </p>
     </div>
   );

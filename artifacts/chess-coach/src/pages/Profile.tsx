@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { SocialLinks } from '@/components/SocialLinks';
 import { PieceTile } from '@/components/DesignSystem';
 import { useUser } from '@/hooks/use-user';
 import { useChessPlayer } from '@/hooks/use-chess-player';
@@ -1959,6 +1960,9 @@ function ProfileClassic() {
           <p className="text-sm font-bold" style={{ color: '#dc4343' }}>Sign Out</p>
         </button>
       </motion.div>
+      <p className="flex items-center justify-center pt-1 text-xs" style={{ color: '#9e9b98' }}>
+        <SocialLinks size={18} label="Follow ChessScout" />
+      </p>
 
     </motion.div>
   );

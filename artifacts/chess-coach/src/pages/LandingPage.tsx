@@ -1,4 +1,5 @@
 import { axonTrack } from '@/lib/axon';
+import { SocialLinks } from '@/components/SocialLinks';
 import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { useUser } from '@/hooks/use-user';
 import { useLocation, Link } from 'wouter';
@@ -630,6 +631,7 @@ export function LandingPage() {
         <Link href="/privacy" className="mx-1.5 hover:underline">{t('Privacy')}</Link>
         <Link href="/terms" className="mx-1.5 hover:underline">{t('Terms')}</Link>
         <Link href="/credits" className="mx-1.5 hover:underline">{t('Photo credits')}</Link>
+        <SocialLinks size={14} className="mx-1" />
       </footer>
 
       <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} initialMode={authMode} externalError={oauthError} context={authContext} />
