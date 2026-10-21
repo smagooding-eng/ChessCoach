@@ -23,7 +23,7 @@ async function getLandingVisitorBreakdown(since: Date, until: Date, platform: Pl
   const result = await db.execute(sql`
     WITH landing_visitors AS (
       SELECT DISTINCT visitor_id
-      FROM landing_funnel_events
+      FROM lfe_people
       WHERE event_type = 'landing_view' AND platform = ${platform} AND created_at >= ${since} AND created_at <= ${until}
     ),
     visitor_agg AS (
@@ -32,7 +32,7 @@ async function getLandingVisitorBreakdown(since: Date, until: Date, platform: Pl
         COALESCE(COUNT(DISTINCT date_trunc('day', pv.created_at)), 0) AS days_active,
         COALESCE(BOOL_OR(pv.user_id IS NOT NULL), false) AS signed_up
       FROM landing_visitors lv
-      LEFT JOIN page_views pv ON pv.visitor_id = lv.visitor_id
+      LEFT JOIN pv_people pv ON pv.visitor_id = lv.visitor_id
       GROUP BY lv.visitor_id
     )
     SELECT
@@ -123,11 +123,13 @@ router.post("/landing-funnel/track", async (req: Request, res: Response) => {
 // two separate API calls or two separate date pickers.
 async function getFunnelStatsForPlatform(since: Date, until: Date, platform: Platform) {
   const platformFilter = eq(landingFunnelEventsTable.platform, platform);
+  // Leave out the owner's browsers and suspected bots (lib/analyticsExclusions.ts).
+  const notExcluded = sql`${landingFunnelEventsTable.visitorId} NOT IN (SELECT visitor_id FROM analytics_excluded_visitors)`;
 
   const counts = await db
     .select({ eventType: landingFunnelEventsTable.eventType, count: sql<number>`count(distinct ${landingFunnelEventsTable.visitorId})` })
     .from(landingFunnelEventsTable)
-    .where(and(platformFilter, gte(landingFunnelEventsTable.createdAt, since), lte(landingFunnelEventsTable.createdAt, until)))
+    .where(and(platformFilter, gte(landingFunnelEventsTable.createdAt, since), lte(landingFunnelEventsTable.createdAt, until), notExcluded))
     .groupBy(landingFunnelEventsTable.eventType);
 
   const countMap: Record<string, number> = {};
@@ -176,7 +178,7 @@ async function getFunnelStatsForPlatform(since: Date, until: Date, platform: Pla
       event_type,
       PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY elapsed_ms) AS median_elapsed_ms,
       COUNT(*) FILTER (WHERE elapsed_ms IS NOT NULL) AS sample_size
-    FROM landing_funnel_events
+    FROM lfe_people
     WHERE platform = ${platform}
       AND created_at >= ${since} AND created_at <= ${until}
       AND event_type LIKE 'exit_%'
@@ -198,7 +200,7 @@ async function getFunnelStatsForPlatform(since: Date, until: Date, platform: Pla
   const distinctActiveVisitors = await db
     .select({ visitorId: landingFunnelEventsTable.visitorId, eventType: landingFunnelEventsTable.eventType })
     .from(landingFunnelEventsTable)
-    .where(and(platformFilter, gte(landingFunnelEventsTable.createdAt, since), lte(landingFunnelEventsTable.createdAt, until)));
+    .where(and(platformFilter, gte(landingFunnelEventsTable.createdAt, since), lte(landingFunnelEventsTable.createdAt, until), notExcluded));
   // Seeing the page (the view, the hero coming into view, leaving from the
   // hero) isn't an action. This used to count visitors with exactly one
   // event, but every visit logs at least two (page view + hero view), so it

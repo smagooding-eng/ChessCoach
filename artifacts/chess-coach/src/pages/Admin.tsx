@@ -647,6 +647,17 @@ export function Admin() {
         <>
           <TrafficExportPanel />
 
+          {(stats as unknown as { excluded?: { accounts: number; browsers: number; suspectedBotBrowsers: number; emails: string[] } } | null)?.excluded && (() => {
+            const ex = (stats as unknown as { excluded: { accounts: number; browsers: number; suspectedBotBrowsers: number; emails: string[] } }).excluded;
+            return (
+              <p className="rounded-lg px-3 py-2 text-[11px]" style={{ background: 'rgba(255,255,255,0.04)', color: TEXT_MUTED }}>
+                Not counted anywhere on this tab: your {ex.accounts} account{ex.accounts === 1 ? '' : 's'} ({ex.emails.join(', ')}) and every browser they've signed in on
+                ({Math.max(0, ex.browsers - ex.suspectedBotBrowsers)} browsers), plus {ex.suspectedBotBrowsers} suspected bot browsers (5+ never-signed-in browsers from one IP in a day).
+                Imported games are still counted.
+              </p>
+            );
+          })()}
+
           {stats && stats.visitorBreakdown && (
             <VisitorBreakdownPanel
               title="Visitors, Site-Wide"

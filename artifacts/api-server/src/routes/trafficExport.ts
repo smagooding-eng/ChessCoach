@@ -3,6 +3,7 @@ import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { parseDateRangeParams } from "./admin";
 import { logger } from "../lib/logger";
+import { exclusionSummary } from "../lib/analyticsExclusions";
 
 // Admin: one JSON file with the traffic and funnel numbers for a date range,
 // for sharing and analysis. Aggregates only -- no IP addresses, emails or
@@ -34,52 +35,52 @@ router.get("/admin/traffic-export", requireAdmin, async (req: Request, res: Resp
         SELECT ${DAY("created_at")} AS day, COUNT(*) AS views, COUNT(DISTINCT visitor_id) AS visitors,
           COUNT(DISTINCT ip_address) AS unique_ips, COUNT(*) FILTER (WHERE user_id IS NOT NULL) AS signed_in_views,
           COUNT(DISTINCT user_id) AS active_users
-        FROM page_views WHERE created_at >= ${since} AND created_at <= ${until}
+        FROM pv_people WHERE created_at >= ${since} AND created_at <= ${until}
         GROUP BY 1 ORDER BY 1`),
       db.execute(sql`
         SELECT ${DAY("created_at")} AS day, COUNT(*) AS signups,
           COUNT(*) FILTER (WHERE referred_by_user_id IS NOT NULL) AS referred_signups,
           COUNT(*) FILTER (WHERE stripe_subscription_id IS NOT NULL) AS now_subscribed
-        FROM users WHERE created_at >= ${since} AND created_at <= ${until}
+        FROM users WHERE created_at >= ${since} AND created_at <= ${until} AND id NOT IN (SELECT id FROM analytics_excluded_users)
         GROUP BY 1 ORDER BY 1`),
       db.execute(sql`
         SELECT ${DAY("created_at")} AS day, platform, event_type, COUNT(DISTINCT visitor_id) AS visitors
-        FROM landing_funnel_events WHERE created_at >= ${since} AND created_at <= ${until}
+        FROM lfe_people WHERE created_at >= ${since} AND created_at <= ${until}
         GROUP BY 1, 2, 3 ORDER BY 1, 2, 3`),
       db.execute(sql`
         SELECT platform, event_type, COUNT(DISTINCT visitor_id) AS visitors, COUNT(*) AS events,
           ROUND(AVG(elapsed_ms)) AS avg_elapsed_ms
-        FROM landing_funnel_events WHERE created_at >= ${since} AND created_at <= ${until}
+        FROM lfe_people WHERE created_at >= ${since} AND created_at <= ${until}
         GROUP BY 1, 2 ORDER BY 1, 3 DESC`),
       db.execute(sql`
         SELECT ${PATH} AS path, COUNT(*) AS views, COUNT(DISTINCT visitor_id) AS visitors,
           COUNT(DISTINCT user_id) AS signed_in_users
-        FROM page_views WHERE created_at >= ${since} AND created_at <= ${until}
+        FROM pv_people WHERE created_at >= ${since} AND created_at <= ${until}
         GROUP BY 1 ORDER BY views DESC LIMIT 80`),
       // First page each visitor saw in the range, and how many of them were ever signed in.
       db.execute(sql`
         WITH firsts AS (
           SELECT DISTINCT ON (visitor_id) visitor_id, ${PATH} AS path
-          FROM page_views WHERE visitor_id IS NOT NULL AND created_at >= ${since} AND created_at <= ${until}
+          FROM pv_people WHERE visitor_id IS NOT NULL AND created_at >= ${since} AND created_at <= ${until}
           ORDER BY visitor_id, created_at
         ), signed AS (
-          SELECT DISTINCT visitor_id FROM page_views WHERE visitor_id IS NOT NULL AND user_id IS NOT NULL
+          SELECT DISTINCT visitor_id FROM pv_people WHERE visitor_id IS NOT NULL AND user_id IS NOT NULL
         )
         SELECT f.path, COUNT(*) AS visitors, COUNT(s.visitor_id) AS became_or_were_signed_in
         FROM firsts f LEFT JOIN signed s ON s.visitor_id = f.visitor_id
         GROUP BY 1 ORDER BY visitors DESC LIMIT 50`),
       // For accounts created in the range: the first page their browser visited.
       db.execute(sql`
-        WITH u AS (SELECT id FROM users WHERE created_at >= ${since} AND created_at <= ${until}),
-        v AS (SELECT DISTINCT pv.user_id, pv.visitor_id FROM page_views pv JOIN u ON pv.user_id = u.id WHERE pv.visitor_id IS NOT NULL),
+        WITH u AS (SELECT id FROM users WHERE created_at >= ${since} AND created_at <= ${until} AND id NOT IN (SELECT id FROM analytics_excluded_users)),
+        v AS (SELECT DISTINCT pv.user_id, pv.visitor_id FROM pv_people pv JOIN u ON pv.user_id = u.id WHERE pv.visitor_id IS NOT NULL),
         firsts AS (
           SELECT DISTINCT ON (v.user_id) v.user_id, regexp_replace(regexp_replace(p.path, '/[0-9]+(?=/|$)', '/:id', 'g'), '/[A-Za-z0-9_-]{20,}(?=/|$)', '/:token', 'g') AS path
-          FROM v JOIN page_views p ON p.visitor_id = v.visitor_id ORDER BY v.user_id, p.created_at
+          FROM v JOIN pv_people p ON p.visitor_id = v.visitor_id ORDER BY v.user_id, p.created_at
         )
         SELECT path, COUNT(*) AS signups FROM firsts GROUP BY 1 ORDER BY signups DESC LIMIT 40`),
       db.execute(sql`
         SELECT ${HOUR("created_at")} AS hour, COUNT(*) AS views, COUNT(DISTINCT visitor_id) AS visitors
-        FROM page_views WHERE created_at >= ${since} AND created_at <= ${until}
+        FROM pv_people WHERE created_at >= ${since} AND created_at <= ${until}
         GROUP BY 1 ORDER BY 1`),
       db.execute(sql`
         SELECT ${DAY("converted_at")} AS day, COUNT(*) AS referral_conversions
@@ -87,18 +88,18 @@ router.get("/admin/traffic-export", requireAdmin, async (req: Request, res: Resp
         GROUP BY 1 ORDER BY 1`),
       db.execute(sql`
         SELECT
-          (SELECT COUNT(*) FROM users) AS total_users,
-          (SELECT COUNT(*) FROM users WHERE stripe_subscription_id IS NOT NULL) AS subscribers_now,
-          (SELECT COUNT(*) FROM users WHERE is_premium_override) AS comped_pro_now,
-          (SELECT COUNT(*) FROM users WHERE created_at >= ${since} AND created_at <= ${until}) AS signups_in_range,
-          (SELECT COUNT(*) FROM page_views WHERE created_at >= ${since} AND created_at <= ${until}) AS views_in_range,
-          (SELECT COUNT(DISTINCT visitor_id) FROM page_views WHERE created_at >= ${since} AND created_at <= ${until}) AS visitors_in_range,
-          (SELECT COUNT(DISTINCT ip_address) FROM page_views WHERE created_at >= ${since} AND created_at <= ${until}) AS unique_ips_in_range`),
+          (SELECT COUNT(*) FROM users WHERE id NOT IN (SELECT id FROM analytics_excluded_users)) AS total_users,
+          (SELECT COUNT(*) FROM users WHERE stripe_subscription_id IS NOT NULL AND id NOT IN (SELECT id FROM analytics_excluded_users)) AS subscribers_now,
+          (SELECT COUNT(*) FROM users WHERE is_premium_override AND id NOT IN (SELECT id FROM analytics_excluded_users)) AS comped_pro_now,
+          (SELECT COUNT(*) FROM users WHERE created_at >= ${since} AND created_at <= ${until} AND id NOT IN (SELECT id FROM analytics_excluded_users)) AS signups_in_range,
+          (SELECT COUNT(*) FROM pv_people WHERE created_at >= ${since} AND created_at <= ${until}) AS views_in_range,
+          (SELECT COUNT(DISTINCT visitor_id) FROM pv_people WHERE created_at >= ${since} AND created_at <= ${until}) AS visitors_in_range,
+          (SELECT COUNT(DISTINCT ip_address) FROM pv_people WHERE created_at >= ${since} AND created_at <= ${until}) AS unique_ips_in_range`),
       // Last page of each visitor's session-day (where people leave).
       db.execute(sql`
         WITH lasts AS (
           SELECT DISTINCT ON (visitor_id, ${DAY("created_at")}) ${PATH} AS path
-          FROM page_views WHERE visitor_id IS NOT NULL AND created_at >= ${since} AND created_at <= ${until}
+          FROM pv_people WHERE visitor_id IS NOT NULL AND created_at >= ${since} AND created_at <= ${until}
           ORDER BY visitor_id, ${DAY("created_at")}, created_at DESC
         )
         SELECT path, COUNT(*) AS exits FROM lasts GROUP BY 1 ORDER BY exits DESC LIMIT 40`),
@@ -106,7 +107,8 @@ router.get("/admin/traffic-export", requireAdmin, async (req: Request, res: Resp
 
     const t = rowsOf<Record<string, unknown>>(totals)[0] ?? {};
     res.json({
-      about: "ChessScout.net traffic and funnel export. Aggregates only (no IPs, emails or user ids). Days are in the admin's local time zone.",
+      about: "ChessScout.net traffic and funnel export. Aggregates only (no IPs, emails or user ids). Days are in the admin's local time zone. The owner's own accounts (and their browsers) and suspected bots are left out.",
+      excluded: await exclusionSummary(),
       generatedAt: new Date().toISOString(),
       range: { since: since.toISOString(), until: until.toISOString(), tzOffsetMinutes: tz },
       totals: {

@@ -1,4 +1,5 @@
 import { Router, type IRouter, type Request, type Response } from "express";
+import { exclusionSummary } from "../lib/analyticsExclusions";
 import { db, usersTable, pageViewsTable, gamesTable, weaknessesTable, coursesTable, lessonsTable, backgroundJobsTable, referralConversionsTable, affiliateAdjustmentsTable, seoArticlesTable, puzzlesTable } from "@workspace/db";
 import { preGenerateExplanations } from "../lib/puzzleSeed";
 import { sql, count, gte, lte, countDistinct, inArray, eq, and, isNotNull, desc } from "drizzle-orm";
@@ -133,9 +134,11 @@ router.get("/admin/game-stats", requireAdmin, async (_req: Request, res: Respons
       count(*) FILTER (WHERE ${col} >= now() - interval '30 days')::int AS d30,
       count(*) FILTER (WHERE ${col} >= now() - interval '90 days')::int AS d90,
       count(*)::int AS "all"`);
-    const live = await db.execute(sql`SELECT ${windows("finished_at")} FROM live_games`);
-    const people = await db.execute(sql`SELECT ${windows("finished_at")} FROM live_games WHERE white_persona_id IS NULL AND black_persona_id IS NULL`);
-    const daily = await db.execute(sql`SELECT ${windows("finished_at")} FROM correspondence_games WHERE status = 'finished' AND finished_at IS NOT NULL`);
+    // The owner's own accounts are left out (lib/analyticsExclusions.ts).
+    const notOwner = sql`COALESCE(white_user_id, '') NOT IN (SELECT id FROM analytics_excluded_users) AND COALESCE(black_user_id, '') NOT IN (SELECT id FROM analytics_excluded_users)`;
+    const live = await db.execute(sql`SELECT ${windows("finished_at")} FROM live_games WHERE ${notOwner}`);
+    const people = await db.execute(sql`SELECT ${windows("finished_at")} FROM live_games WHERE white_persona_id IS NULL AND black_persona_id IS NULL AND ${notOwner}`);
+    const daily = await db.execute(sql`SELECT ${windows("finished_at")} FROM correspondence_games WHERE status = 'finished' AND finished_at IS NOT NULL AND ${notOwner}`);
     const row = (r: { rows: unknown[] }) => (r.rows[0] ?? {}) as Record<string, number>;
     res.json({ live: row(live), livePeople: row(people), daily: row(daily) });
   } catch (err: any) {
@@ -157,7 +160,7 @@ router.get("/admin/live-games", requireAdmin, async (req: Request, res: Response
       d90: `finished_at >= now() - interval '90 days'`,
       all: `true`,
     };
-    const where = sql.raw(cond[w] ?? cond.week);
+    const where = sql`${sql.raw(cond[w] ?? cond.week)} AND COALESCE(white_user_id, '') NOT IN (SELECT id FROM analytics_excluded_users) AND COALESCE(black_user_id, '') NOT IN (SELECT id FROM analytics_excluded_users)`;
     const players = await db.execute(sql`
       SELECT username, user_id,
              count(*)::int AS games,
@@ -196,48 +199,31 @@ router.get("/admin/stats", requireAdmin, async (_req: Request, res: Response) =>
   try {
     const todayStart = startOfTodayEastern();
 
-    const [totalUsersResult] = await db
-      .select({ count: count() })
-      .from(usersTable);
-
-    const [todayUsersResult] = await db
-      .select({ count: count() })
-      .from(usersTable)
-      .where(gte(usersTable.createdAt, todayStart));
-
-    const [totalViewsResult] = await db
-      .select({ count: count() })
-      .from(pageViewsTable);
-
-    const [todayViewsResult] = await db
-      .select({ count: count() })
-      .from(pageViewsTable)
-      .where(gte(pageViewsTable.createdAt, todayStart));
-
-    const [totalUniqueResult] = await db
-      .select({ count: countDistinct(pageViewsTable.visitorId) })
-      .from(pageViewsTable);
-
-    const [todayUniqueResult] = await db
-      .select({ count: countDistinct(pageViewsTable.visitorId) })
-      .from(pageViewsTable)
-      .where(gte(pageViewsTable.createdAt, todayStart));
-
-    // By-IP counterparts to the visitorId-based unique counts above --
-    // visitorId is a per-browser localStorage value, so it double-counts
-    // anyone using multiple browsers/devices or the installed app (which
-    // doesn't share localStorage with the web build). IP is a rougher
-    // but harder-to-inflate proxy. The frontend has expected these two
-    // fields (totalByIp/todayByIp) since the funnel-tracking work, but
-    // this endpoint never actually computed them -- fixing that here.
-    const [totalUniqueByIpResult] = await db
-      .select({ count: countDistinct(pageViewsTable.ipAddress) })
-      .from(pageViewsTable);
-
-    const [todayUniqueByIpResult] = await db
-      .select({ count: countDistinct(pageViewsTable.ipAddress) })
-      .from(pageViewsTable)
-      .where(gte(pageViewsTable.createdAt, todayStart));
+    // People only: pv_people / analytics_excluded_users leave out the owner's
+    // own accounts (and their browsers) and suspected bots (see
+    // lib/analyticsExclusions.ts).
+    const one = async (q: ReturnType<typeof sql>) => {
+      const r = await db.execute(q);
+      return Number(((r.rows[0] ?? {}) as { n?: string | number }).n ?? 0);
+    };
+    const [totalUsersN, todayUsersN, totalViewsN, todayViewsN, totalUniqueN, todayUniqueN, totalByIpN, todayByIpN] = await Promise.all([
+      one(sql`SELECT COUNT(*) AS n FROM users WHERE id NOT IN (SELECT id FROM analytics_excluded_users)`),
+      one(sql`SELECT COUNT(*) AS n FROM users WHERE created_at >= ${todayStart} AND id NOT IN (SELECT id FROM analytics_excluded_users)`),
+      one(sql`SELECT COUNT(*) AS n FROM pv_people`),
+      one(sql`SELECT COUNT(*) AS n FROM pv_people WHERE created_at >= ${todayStart}`),
+      one(sql`SELECT COUNT(DISTINCT visitor_id) AS n FROM pv_people`),
+      one(sql`SELECT COUNT(DISTINCT visitor_id) AS n FROM pv_people WHERE created_at >= ${todayStart}`),
+      one(sql`SELECT COUNT(DISTINCT ip_address) AS n FROM pv_people`),
+      one(sql`SELECT COUNT(DISTINCT ip_address) AS n FROM pv_people WHERE created_at >= ${todayStart}`),
+    ]);
+    const totalUsersResult = { count: totalUsersN };
+    const todayUsersResult = { count: todayUsersN };
+    const totalViewsResult = { count: totalViewsN };
+    const todayViewsResult = { count: todayViewsN };
+    const totalUniqueResult = { count: totalUniqueN };
+    const todayUniqueResult = { count: todayUniqueN };
+    const totalUniqueByIpResult = { count: totalByIpN };
+    const todayUniqueByIpResult = { count: todayByIpN };
 
     // New vs. returning vs. bounced, site-wide, all time. A visitor is
     // "returning" once we've seen them active on more than one distinct
@@ -251,7 +237,7 @@ router.get("/admin/stats", requireAdmin, async (_req: Request, res: Response) =>
           visitor_id,
           COUNT(DISTINCT date_trunc('day', created_at)) AS days_active,
           BOOL_OR(user_id IS NOT NULL) AS signed_up
-        FROM page_views
+        FROM pv_people
         WHERE visitor_id IS NOT NULL
         GROUP BY visitor_id
       )
@@ -277,7 +263,7 @@ router.get("/admin/stats", requireAdmin, async (_req: Request, res: Response) =>
     const todayWhoResult = await db.execute(sql`
       WITH today AS (
         SELECT pv.visitor_id, pv.user_id, COALESCE(u.is_admin, false) AS is_admin
-        FROM page_views pv LEFT JOIN users u ON u.id = pv.user_id
+        FROM pv_people pv LEFT JOIN users u ON u.id = pv.user_id
         WHERE pv.created_at >= ${todayStart}
       ),
       signed_browsers AS (
@@ -346,22 +332,14 @@ router.get("/admin/stats", requireAdmin, async (_req: Request, res: Response) =>
       db.select({ count: count() }).from(gamesTable),
       db.select({ count: count() }).from(gamesTable).where(gte(gamesTable.createdAt, todayStart)),
       db.select({ count: count() }).from(gamesTable).where(eq(gamesTable.analyzed, true)),
-      db.select({ count: count() }).from(backgroundJobsTable).where(eq(backgroundJobsTable.type, 'scout')),
-      db.select({ count: countDistinct(backgroundJobsTable.targetUsername) }).from(backgroundJobsTable).where(eq(backgroundJobsTable.type, 'scout')),
-      db.select({ count: count() }).from(pageViewsTable).where(eq(pageViewsTable.path, '/scan')),
+      db.select({ count: count() }).from(backgroundJobsTable).where(and(eq(backgroundJobsTable.type, 'scout'), sql`${backgroundJobsTable.userId} NOT IN (SELECT id FROM analytics_excluded_users)`)),
+      db.select({ count: countDistinct(backgroundJobsTable.targetUsername) }).from(backgroundJobsTable).where(and(eq(backgroundJobsTable.type, 'scout'), sql`${backgroundJobsTable.userId} NOT IN (SELECT id FROM analytics_excluded_users)`)),
+      db.execute(sql`SELECT COUNT(*) AS count FROM pv_people WHERE path = '/scan'`).then((r) => [{ count: Number(((r.rows[0] ?? {}) as { count?: string }).count ?? 0) }]),
     ]);
 
-    const topPagesRows = await db
-      .select({
-        path: pageViewsTable.path,
-        views: count(),
-        uniqueVisitors: countDistinct(pageViewsTable.visitorId),
-        uniqueByIp: countDistinct(pageViewsTable.ipAddress),
-      })
-      .from(pageViewsTable)
-      .groupBy(pageViewsTable.path)
-      .orderBy(sql`count(*) desc`)
-      .limit(20);
+    const topPagesRows = ((await db.execute(sql`
+      SELECT path, COUNT(*)::int AS "views", COUNT(DISTINCT visitor_id)::int AS "uniqueVisitors", COUNT(DISTINCT ip_address)::int AS "uniqueByIp"
+      FROM pv_people GROUP BY path ORDER BY COUNT(*) DESC LIMIT 20`)).rows as { path: string; views: number; uniqueVisitors: number; uniqueByIp: number }[]);
 
     res.json({
       pageViews: { total: totalViewsResult.count, today: todayViewsResult.count },
@@ -374,6 +352,7 @@ router.get("/admin/stats", requireAdmin, async (_req: Request, res: Response) =>
       visitorBreakdown,
       todayWho,
       bots,
+      excluded: await exclusionSummary(),
       users: { total: totalUsersResult.count, today: todayUsersResult.count },
       subscriptions: subBreakdown,
       games: {
@@ -1726,13 +1705,13 @@ router.get("/admin/user-activity", requireAdmin, async (req: Request, res: Respo
 
     const [allUsers, windowPageViews, activeTodayRows, windowAiUsage] = await Promise.all([
       db.select({ id: usersTable.id, email: usersTable.email, chesscomUsername: usersTable.chesscomUsername, createdAt: usersTable.createdAt })
-        .from(usersTable),
+        .from(usersTable).where(sql`${usersTable.id} NOT IN (SELECT id FROM analytics_excluded_users)`),
       db.select({ userId: pageViewsTable.userId, path: pageViewsTable.path, createdAt: pageViewsTable.createdAt })
         .from(pageViewsTable)
-        .where(and(isNotNull(pageViewsTable.userId), gte(pageViewsTable.createdAt, since), lte(pageViewsTable.createdAt, until))),
+        .where(and(isNotNull(pageViewsTable.userId), gte(pageViewsTable.createdAt, since), lte(pageViewsTable.createdAt, until), sql`${pageViewsTable.userId} NOT IN (SELECT id FROM analytics_excluded_users)`)),
       db.select({ userId: pageViewsTable.userId })
         .from(pageViewsTable)
-        .where(and(isNotNull(pageViewsTable.userId), gte(pageViewsTable.createdAt, todayStart)))
+        .where(and(isNotNull(pageViewsTable.userId), gte(pageViewsTable.createdAt, todayStart), sql`${pageViewsTable.userId} NOT IN (SELECT id FROM analytics_excluded_users)`))
         .groupBy(pageViewsTable.userId),
       db.select({ userId: aiUsageEventsTable.userId, model: aiUsageEventsTable.model, promptTokens: aiUsageEventsTable.promptTokens, completionTokens: aiUsageEventsTable.completionTokens })
         .from(aiUsageEventsTable)

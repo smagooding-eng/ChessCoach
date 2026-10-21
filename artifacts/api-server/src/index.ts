@@ -1,4 +1,5 @@
 import { runMigrations } from 'stripe-replit-sync';
+import { ensureAnalyticsViews } from "./lib/analyticsExclusions";
 import { getStripeSync } from "./lib/stripeClient";
 import app from "./app";
 import { logger } from "./lib/logger";
@@ -279,6 +280,8 @@ async function runSchemaMigrations() {
     await db.execute(sql`ALTER TABLE landing_funnel_events ADD COLUMN IF NOT EXISTS platform VARCHAR NOT NULL DEFAULT 'web'`);
     await db.execute(sql`ALTER TABLE landing_funnel_events ADD COLUMN IF NOT EXISTS elapsed_ms INTEGER`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_landing_funnel_created ON landing_funnel_events(created_at, platform)`);
+    // Reporting views that leave the owner's accounts and suspected bots out of the admin numbers.
+    await ensureAnalyticsViews();
     // Practice-bot results: each player's record against each bot, and how
     // many different players have beaten it.
     await db.execute(sql`CREATE TABLE IF NOT EXISTS bot_results (
