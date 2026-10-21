@@ -29,7 +29,7 @@ export function SocialLinks({ size = 16, className = '', color, label }: { size?
     <span className={`inline-flex items-center gap-2 align-middle ${className}`}>
       {label && <span>{label}</span>}
       {SOCIALS.map((s) => (
-        <a key={s.name} href={s.url} target="_blank" rel="noopener noreferrer" aria-label={`ChessScout on ${s.name}`} title={`ChessScout on ${s.name}`}
+        <a key={s.name} href={s.url} target="_blank" rel="noopener noreferrer" aria-label={`ChessScout.net on ${s.name}`} title={`ChessScout.net on ${s.name}`}
           className="inline-flex rounded-md p-1 transition-opacity hover:opacity-80" style={color ? { color } : undefined}>
           {s.name === 'Instagram' ? (
             <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden="true">

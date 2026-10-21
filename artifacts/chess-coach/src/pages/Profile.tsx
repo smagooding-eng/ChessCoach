@@ -1961,7 +1961,7 @@ function ProfileClassic() {
         </button>
       </motion.div>
       <p className="flex items-center justify-center pt-1 text-xs" style={{ color: '#9e9b98' }}>
-        <SocialLinks size={18} label="Follow ChessScout" />
+        <SocialLinks size={18} label="Follow ChessScout.net" />
       </p>
 
     </motion.div>

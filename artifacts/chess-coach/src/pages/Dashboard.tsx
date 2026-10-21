@@ -533,7 +533,7 @@ export function Dashboard() {
 
         {authUser && <ReferralCard isPremium={isPremium} compact />}
         <footer className="flex items-center justify-center pb-2 pt-1 text-xs" style={{ color: '#9e9b98' }}>
-          <SocialLinks size={18} label="Follow ChessScout" />
+          <SocialLinks size={18} label="Follow ChessScout.net" />
         </footer>
       </div>
     </div>

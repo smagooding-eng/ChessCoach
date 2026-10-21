@@ -601,7 +601,7 @@ export default function SettingsPage() {
         <Link href="/credits" className="underline">Photo credits</Link>
       </p>
       <p className="flex items-center justify-center text-xs" style={{ color: TEXT_MUTED }}>
-        <SocialLinks size={18} label="Follow ChessScout" />
+        <SocialLinks size={18} label="Follow ChessScout.net" />
       </p>
     </div>
   );

@@ -431,7 +431,7 @@ export function DashboardRedesign() {
 
         {authUser && <div className="lg:col-span-2"><ReferralCard isPremium={isPremium} compact /></div>}
         <footer className="flex items-center justify-center pb-2 pt-1 text-xs lg:col-span-2" style={{ color: '#87918E' }}>
-          <SocialLinks size={18} label="Follow ChessScout" />
+          <SocialLinks size={18} label="Follow ChessScout.net" />
         </footer>
 
       </div>
