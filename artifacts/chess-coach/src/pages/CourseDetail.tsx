@@ -132,7 +132,7 @@ function LessonIntroCard({
         onClick={onStart}
         className="w-full mt-4 py-3 rounded-xl text-sm font-black text-white flex items-center justify-center gap-2 transition-transform hover:scale-[1.01]"
         style={redesign
-          ? { background: `linear-gradient(180deg, ${RD.green}, ${RD.greenDark})`, color: '#05100A' }
+          ? { background: `linear-gradient(180deg, ${RD.green}, ${RD.greenDark})`, color: '#FFFFFF' }
           : { background: `linear-gradient(180deg, #95c45a 0%, ${CHESSCOM_GREEN} 100%)` }}
       >
         {redesign ? 'Start Lesson' : 'Start'} <ChevronRight className="w-4 h-4" />
@@ -675,10 +675,10 @@ function LessonBeatPlayer({
             <div className="flex items-center gap-2">
               {beats.length > 1 && (
                 <button onClick={() => setAutoRead((x) => !x)} aria-pressed={autoRead} className="rounded-full px-2.5 py-1 text-[11px] font-extrabold"
-                  style={autoRead ? { background: RD.green, color: '#05100A' } : { background: 'rgba(255,255,255,.08)', color: RD.muted }}>AUTO</button>
+                  style={autoRead ? { background: RD.green, color: '#FFFFFF' } : { background: 'rgba(255,255,255,.08)', color: RD.muted }}>AUTO</button>
               )}
               <button onClick={() => (speaking || loading) ? stopReading() : readAloud(beatText(beat))} className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-bold"
-                style={(speaking || loading) ? { background: RD.green, color: '#05100A' } : { background: 'rgba(255,255,255,.08)', color: RD.text }}>
+                style={(speaking || loading) ? { background: RD.green, color: '#FFFFFF' } : { background: 'rgba(255,255,255,.08)', color: RD.text }}>
                 {loading ? <><Loader className="h-3.5 w-3.5 animate-spin" /> Loading…</> : speaking ? <><VolumeX className="h-3.5 w-3.5" /> Stop</> : <><Volume2 className="h-3.5 w-3.5" /> Listen</>}
               </button>
             </div>
@@ -782,7 +782,7 @@ function LessonBeatPlayer({
                 <ChevronLeft className="h-4 w-4" /> Previous
               </button>
               <button onClick={handleNext} disabled={beat.kind === 'drill' && !drillResult} className="flex h-[52px] flex-[1.4] items-center justify-center gap-2 rounded-[14px] text-[15px] font-extrabold transition-opacity disabled:opacity-40"
-                style={{ background: `linear-gradient(180deg, ${RD.green}, ${RD.greenDark})`, color: '#05100A' }}>
+                style={{ background: `linear-gradient(180deg, ${RD.green}, ${RD.greenDark})`, color: '#FFFFFF' }}>
                 {isLastBeat ? (isLastLesson ? 'Complete Course' : 'Complete & Next') : 'Next'} <ChevronRight className="h-4 w-4" />
               </button>
             </div>

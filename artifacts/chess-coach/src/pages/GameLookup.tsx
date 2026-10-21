@@ -23,7 +23,7 @@ const MISTAKE_RED = REDESIGN_ON ? RD.red : '#dc4343';
 const CARD_SHADOW = REDESIGN_ON ? 'none' : '0 18px 50px -16px rgba(0,0,0,0.6), 0 4px 16px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04)';
 const CARD_BORDER = REDESIGN_ON ? `1px solid ${RD.border}` : '1px solid rgba(129,182,76,0.08)';
 // Text on a green button: dark on the bright enhanced-UI green, white on classic.
-const ON_GREEN = REDESIGN_ON ? '#05100A' : '#fff';
+const ON_GREEN = '#fff';
 const GREEN_SOFT = REDESIGN_ON ? 'rgba(129,182,76,0.14)' : 'rgba(129,182,76,0.25)';
 const CHIP_STYLE: React.CSSProperties = REDESIGN_ON
   ? { background: RD.cardSolid, border: `1px solid ${RD.border}`, color: TEXT_LIGHT }

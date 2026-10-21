@@ -479,7 +479,7 @@ export function OpeningDetail() {
                           key={i}
                           onClick={() => { setLineAuto(false); setStep(i + 1); }}
                           className="rounded-lg px-2 py-1 font-mono text-xs transition-colors"
-                          style={step === i + 1 ? { background: RD.green, color: '#05100A', fontWeight: 700 } : { background: 'rgba(255,255,255,.07)' }}
+                          style={step === i + 1 ? { background: RD.green, color: '#FFFFFF', fontWeight: 700 } : { background: 'rgba(255,255,255,.07)' }}
                         >
                           {m.color === 'white' ? `${m.moveNumber}.` : ''}{m.san}
                         </button>

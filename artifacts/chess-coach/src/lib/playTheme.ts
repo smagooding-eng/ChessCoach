@@ -12,7 +12,7 @@ export const PT = REDESIGN_ON
       text: RD.text,
       muted: RD.muted,
       green: RD.green,
-      onGreen: '#05100A',
+      onGreen: '#FFFFFF',
       greenSoft: 'rgba(129,182,76,.12)',
       greenLine: 'rgba(129,182,76,.35)',
       red: RD.red,

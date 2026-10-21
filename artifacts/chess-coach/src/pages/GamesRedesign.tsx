@@ -153,7 +153,7 @@ export function GamesRedesign() {
           icon={<span className="text-[26px] leading-none">♟</span>}
           right={
             <>
-            <Link href="/import" className="mr-1 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] font-extrabold" style={{ background: RD.green, color: '#05100A' }}>
+            <Link href="/import" className="mr-1 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] font-extrabold" style={{ background: RD.green, color: '#FFFFFF' }}>
               <Download size={15} /> Import
             </Link>
             <button onClick={() => setShowSearch((v) => !v)} aria-label="Search games" aria-expanded={showSearch} className="grid h-9 w-9 place-items-center rounded-full" style={{ color: showSearch ? RD.green : RD.text }}>
@@ -212,7 +212,7 @@ export function GamesRedesign() {
             <div className="flex flex-wrap gap-1.5">
               {RESULT_FILTERS.map((f) => (
                 <button key={f.id} onClick={() => setResultFilter(f.id)} className="rounded-full px-3.5 py-1.5 text-[13px] font-semibold"
-                  style={resultFilter === f.id ? { background: RD.green, color: '#05100A', border: `1px solid ${RD.green}` } : { background: 'transparent', color: RD.muted, border: `1px solid ${RD.border}` }}>
+                  style={resultFilter === f.id ? { background: RD.green, color: '#FFFFFF', border: `1px solid ${RD.green}` } : { background: 'transparent', color: RD.muted, border: `1px solid ${RD.border}` }}>
                   {f.label}
                 </button>
               ))}
@@ -241,7 +241,7 @@ export function GamesRedesign() {
               )}
               {bulkError && <p className="mt-0.5 text-[12px]" style={{ color: RD.red }}>{bulkError}</p>}
             </div>
-            <button onClick={startBulkReview} disabled={!!bulkJobId} className="flex shrink-0 items-center gap-1.5 rounded-[11px] px-3.5 py-2 text-[12.5px] font-extrabold disabled:opacity-60" style={{ background: RD.green, color: '#05100A' }}>
+            <button onClick={startBulkReview} disabled={!!bulkJobId} className="flex shrink-0 items-center gap-1.5 rounded-[11px] px-3.5 py-2 text-[12.5px] font-extrabold disabled:opacity-60" style={{ background: RD.green, color: '#FFFFFF' }}>
               <RefreshCw size={14} className={bulkJobId ? 'animate-spin' : ''} />{bulkJobId ? 'Reviewing…' : 'Review all'}
             </button>
           </div>

@@ -68,7 +68,7 @@ export function CourseOverview({
           <button
             onClick={() => onOpen(allDone ? 0 : Math.max(currentIdx, 0))}
             className="mt-5 flex w-full items-center justify-center gap-2.5 rounded-[14px] py-4 text-[16px] font-extrabold"
-            style={{ background: `linear-gradient(180deg, ${RD.green}, ${RD.greenDark})`, color: '#05100A', boxShadow: '0 14px 30px -14px rgba(129,182,76,.65)' }}
+            style={{ background: `linear-gradient(180deg, ${RD.green}, ${RD.greenDark})`, color: '#FFFFFF', boxShadow: '0 14px 30px -14px rgba(129,182,76,.65)' }}
           >
             {allDone ? 'Review from the start' : `Continue Lesson ${currentIdx + 1}`} <ArrowRight size={18} />
           </button>
@@ -107,7 +107,7 @@ export function CourseOverview({
                     {l.completed ? (
                       <CheckCircle2 size={22} className="shrink-0" style={{ color: RD.green }} aria-label="Completed" />
                     ) : (
-                      <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full" style={isCurrent ? { background: RD.green, color: '#05100A' } : { border: `1.5px solid ${RD.border}`, color: RD.muted }}>
+                      <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full" style={isCurrent ? { background: RD.green, color: '#FFFFFF' } : { border: `1.5px solid ${RD.border}`, color: RD.muted }}>
                         <Play size={12} fill="currentColor" aria-label={isCurrent ? 'Up next' : 'Not started'} />
                       </span>
                     )}

@@ -127,7 +127,7 @@ export function LessonQuizScreen({ quiz, onContinue }: { quiz: QuizMoves; onCont
           onClick={onContinue}
           className="mt-5 flex w-full items-center justify-center gap-2 rounded-[14px] py-3.5 text-[15px] font-extrabold"
           style={picked
-            ? { background: `linear-gradient(180deg, ${RD.green}, ${RD.greenDark})`, color: '#05100A' }
+            ? { background: `linear-gradient(180deg, ${RD.green}, ${RD.greenDark})`, color: '#FFFFFF' }
             : { background: 'transparent', color: RD.muted, border: `1px solid ${RD.border}` }}
         >
           {picked ? 'Continue' : 'Skip'} <ArrowRight size={17} />
@@ -176,13 +176,13 @@ export function LessonCompleteScreen({
           </div>
 
           {hasNext ? (
-            <button onClick={onNext} className="mt-6 flex w-full items-center justify-center gap-2 rounded-[14px] py-3.5 text-[15px] font-extrabold" style={{ background: `linear-gradient(180deg, ${RD.green}, ${RD.greenDark})`, color: '#05100A', boxShadow: '0 12px 28px -12px rgba(129,182,76,.6)' }}>
+            <button onClick={onNext} className="mt-6 flex w-full items-center justify-center gap-2 rounded-[14px] py-3.5 text-[15px] font-extrabold" style={{ background: `linear-gradient(180deg, ${RD.green}, ${RD.greenDark})`, color: '#FFFFFF', boxShadow: '0 12px 28px -12px rgba(129,182,76,.6)' }}>
               Next Lesson <ArrowRight size={17} />
             </button>
           ) : (
             <>
               {onShare && (
-                <button onClick={onShare} className="mt-6 flex w-full items-center justify-center gap-2 rounded-[14px] py-3.5 text-[15px] font-extrabold" style={{ background: `linear-gradient(180deg, ${RD.green}, ${RD.greenDark})`, color: '#05100A' }}>
+                <button onClick={onShare} className="mt-6 flex w-full items-center justify-center gap-2 rounded-[14px] py-3.5 text-[15px] font-extrabold" style={{ background: `linear-gradient(180deg, ${RD.green}, ${RD.greenDark})`, color: '#FFFFFF' }}>
                   Share your progress
                 </button>
               )}
@@ -259,7 +259,7 @@ export function LessonIntroScreen({
         )}
 
         <button onClick={onStart} className="mt-5 flex w-full items-center justify-center gap-2.5 rounded-[14px] py-4 text-[16px] font-extrabold"
-          style={{ background: `linear-gradient(180deg, ${RD.green}, ${RD.greenDark})`, color: '#05100A', boxShadow: '0 14px 30px -14px rgba(129,182,76,.65)' }}>
+          style={{ background: `linear-gradient(180deg, ${RD.green}, ${RD.greenDark})`, color: '#FFFFFF', boxShadow: '0 14px 30px -14px rgba(129,182,76,.65)' }}>
           Start Lesson <ArrowRight size={18} />
         </button>
       </div>

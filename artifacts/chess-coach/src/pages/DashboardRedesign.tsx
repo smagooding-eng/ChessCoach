@@ -398,7 +398,7 @@ export function DashboardRedesign() {
         <Link href="/scan" className="flex items-center gap-4 overflow-hidden rounded-[20px] p-5" style={{ background: CARD, border: '1px solid rgba(129,182,76,.3)' }}>
           <span className="relative shrink-0">
             <FenThumb fen="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1" size={74} />
-            <span className="absolute -bottom-1.5 -right-1.5 grid h-8 w-8 place-items-center rounded-full" style={{ background: `linear-gradient(180deg, ${GREEN}, ${GREEN_DARK})`, color: '#05100A' }}><Camera size={16} /></span>
+            <span className="absolute -bottom-1.5 -right-1.5 grid h-8 w-8 place-items-center rounded-full" style={{ background: `linear-gradient(180deg, ${GREEN}, ${GREEN_DARK})`, color: '#FFFFFF' }}><Camera size={16} /></span>
           </span>
           <span className="min-w-0 flex-1">
             {!freePlan

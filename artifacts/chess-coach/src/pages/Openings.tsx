@@ -156,7 +156,7 @@ export function Openings() {
               <div className="rounded-[20px] px-6 py-12 text-center" style={{ background: RD.card, border: `1px solid ${RD.border}`, color: RD.muted }}>
                 <p className="text-[15px] font-bold" style={{ color: RD.text }}>No games imported yet</p>
                 <p className="mt-1 text-[13px]">Import your games to see how you do in each opening.</p>
-                <Link href="/import" className="mt-4 inline-block rounded-xl px-4 py-2.5 text-[13px] font-extrabold" style={{ background: RD.green, color: '#05100A' }}>Import games</Link>
+                <Link href="/import" className="mt-4 inline-block rounded-xl px-4 py-2.5 text-[13px] font-extrabold" style={{ background: RD.green, color: '#FFFFFF' }}>Import games</Link>
               </div>
             ) : list.length === 0 ? (
               <div className="rounded-[20px] px-6 py-10 text-center text-[13px]" style={{ background: RD.card, border: `1px solid ${RD.border}`, color: RD.muted }}>
@@ -189,7 +189,7 @@ export function Openings() {
           <button
             onClick={() => navigate('/practice?tab=openings')}
             className="mt-4 flex w-full items-center justify-center gap-2 rounded-[16px] py-3.5 text-[14.5px] font-extrabold"
-            style={{ background: `linear-gradient(180deg, ${RD.green}, ${RD.greenDark})`, color: '#05100A', boxShadow: '0 12px 28px -12px rgba(129,182,76,.55)' }}
+            style={{ background: `linear-gradient(180deg, ${RD.green}, ${RD.greenDark})`, color: '#FFFFFF', boxShadow: '0 12px 28px -12px rgba(129,182,76,.55)' }}
           >
             <BookOpen className="h-4 w-4" /> Practice against the Trainer Bot
           </button>

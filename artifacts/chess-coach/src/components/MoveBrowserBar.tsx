@@ -21,7 +21,7 @@ export function MoveBrowserBar({ browser, yourTurn = false, className = '' }: { 
         {browser.viewing ? (
           <button type="button" onClick={browser.toLive}
             className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-[12.5px] font-extrabold ${yourTurn ? 'animate-pulse' : ''}`}
-            style={{ background: '#81B64C', color: '#05100A' }}>
+            style={{ background: '#81B64C', color: '#FFFFFF' }}>
             <Radio size={14} /> {yourTurn ? 'Your move: back to game' : 'Back to game'}
           </button>
         ) : (

@@ -142,7 +142,7 @@ export function CoursesRedesign({
                 Lesson {Math.min(nextCourse.completedLessons + 1, nextCourse.totalLessons)} of {nextCourse.totalLessons}
                 {currentLesson ? <><br />{currentLesson.title}</> : null}
               </p>
-              <Link href={`/courses/${nextCourse.id}`} className="mt-4 inline-flex items-center gap-2.5 rounded-[12px] px-6 py-3.5 text-[15px] font-extrabold" style={{ background: `linear-gradient(180deg, ${RD.green}, ${RD.greenDark})`, color: '#05100A', boxShadow: '0 10px 26px -10px rgba(129,182,76,.6)' }}>
+              <Link href={`/courses/${nextCourse.id}`} className="mt-4 inline-flex items-center gap-2.5 rounded-[12px] px-6 py-3.5 text-[15px] font-extrabold" style={{ background: `linear-gradient(180deg, ${RD.green}, ${RD.greenDark})`, color: '#FFFFFF', boxShadow: '0 10px 26px -10px rgba(129,182,76,.6)' }}>
                 Continue Training <ArrowRight size={17} />
               </Link>
             </div>
@@ -206,7 +206,7 @@ export function CoursesRedesign({
                     <span className="flex items-center gap-2 text-[13px]" style={{ color: 'rgba(245,247,246,.85)' }}>
                       <span className="h-2.5 w-2.5 rounded-full" style={{ background: DIFF_DOT[recommended.difficulty] ?? RD.green }} />{recommended.difficulty} • {recommended.totalLessons} lessons
                     </span>
-                    <span className="grid h-11 w-11 place-items-center rounded-[12px]" style={{ background: RD.green, color: '#05100A' }}><ArrowRight size={20} /></span>
+                    <span className="grid h-11 w-11 place-items-center rounded-[12px]" style={{ background: RD.green, color: '#FFFFFF' }}><ArrowRight size={20} /></span>
                   </div>
                 </div>
               </div>
@@ -221,8 +221,8 @@ export function CoursesRedesign({
               <h2 className="text-[26px] font-extrabold leading-tight">All Courses</h2>
               <p className="text-[14px]" style={{ color: RD.muted }}>Build the skills that matter most.</p>
             </div>
-            <button onClick={onGenerate} disabled={isGenerating} className="flex shrink-0 items-center gap-2 rounded-[12px] px-3.5 py-2.5 text-[12.5px] font-extrabold disabled:opacity-60" style={{ background: RD.green, color: '#05100A' }}>
-              {isGenerating ? <><span className="h-3.5 w-3.5 animate-spin rounded-full border-2" style={{ borderColor: '#05100A', borderTopColor: 'transparent' }} />Building…</> : <><GraduationCap size={15} />New courses</>}
+            <button onClick={onGenerate} disabled={isGenerating} className="flex shrink-0 items-center gap-2 rounded-[12px] px-3.5 py-2.5 text-[12.5px] font-extrabold disabled:opacity-60" style={{ background: RD.green, color: '#FFFFFF' }}>
+              {isGenerating ? <><span className="h-3.5 w-3.5 animate-spin rounded-full border-2" style={{ borderColor: '#FFFFFF', borderTopColor: 'transparent' }} />Building…</> : <><GraduationCap size={15} />New courses</>}
             </button>
           </div>
 
@@ -259,7 +259,7 @@ export function CoursesRedesign({
               <BookOpen className="mx-auto mb-3 h-10 w-10 opacity-40" />
               <b className="text-[17px]">No courses yet</b>
               <p className="mx-auto mt-1 max-w-sm text-[13px]" style={{ color: RD.muted }}>Run a deep analysis and generate courses tailored to your weak spots.</p>
-              <button onClick={onGenerate} className="mt-5 rounded-[12px] px-5 py-3 text-[14px] font-extrabold" style={{ background: RD.green, color: '#05100A' }}>Generate now</button>
+              <button onClick={onGenerate} className="mt-5 rounded-[12px] px-5 py-3 text-[14px] font-extrabold" style={{ background: RD.green, color: '#FFFFFF' }}>Generate now</button>
             </div>
           )}
 
@@ -287,7 +287,7 @@ export function CoursesRedesign({
                     </span>
                   </span>
                   <span className="flex shrink-0 flex-col items-center justify-center gap-1.5 pr-2">
-                    <span className="grid h-9 w-9 place-items-center rounded-full" style={{ background: done ? 'rgba(255,255,255,.08)' : RD.green, color: done ? RD.green : '#05100A' }}>
+                    <span className="grid h-9 w-9 place-items-center rounded-full" style={{ background: done ? 'rgba(255,255,255,.08)' : RD.green, color: done ? RD.green : '#FFFFFF' }}>
                       {done ? <CheckCircle2 size={20} aria-label="Completed" /> : <Play size={16} fill="currentColor" aria-label="Open course" />}
                     </span>
                     <b className="text-[13px]" style={{ color: p > 0 ? RD.green : RD.muted }}>{p}%</b>

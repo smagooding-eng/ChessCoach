@@ -1221,7 +1221,7 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, positionRec
 
                 {isLast && ((tab === 'mistake' && hasFix) || (tab === 'fix' && hasDrill)) && (
                 <button onClick={() => { if (tab === 'mistake' && hasFix) { setTab('fix'); setCurrentStep(0); return; } if (tab === 'fix' && hasDrill) { setTab('drill'); resetDrill(); } }} className="mt-3 flex w-full items-center justify-center gap-2.5 rounded-[14px] py-4 text-[16px] font-extrabold"
-                  style={{ background: `linear-gradient(180deg, ${RD.green}, ${RD.greenDark})`, color: '#05100A', boxShadow: '0 12px 28px -12px rgba(129,182,76,.6)' }}>
+                  style={{ background: `linear-gradient(180deg, ${RD.green}, ${RD.greenDark})`, color: '#FFFFFF', boxShadow: '0 12px 28px -12px rgba(129,182,76,.6)' }}>
                   {tab === 'mistake' ? 'See the Fix' : 'Try the Drill'} <ChevronRight className="h-5 w-5" />
                 </button>
               )}

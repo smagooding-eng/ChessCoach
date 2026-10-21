@@ -69,7 +69,7 @@ function SignupCta() {
     <Card className="text-center">
       <p className="text-[15px] font-extrabold" style={{ color: RD.text }}>Playing someone soon? Scout them the same way.</p>
       <p className="mt-1 text-[13px]" style={{ color: RD.muted }}>ChessScout reads any Chess.com or Lichess player&apos;s games and shows what they play and where they go wrong.</p>
-      <Link href={isAuthenticated ? '/opponents' : '/setup'} className="mt-3 inline-flex items-center gap-2 rounded-[12px] px-5 py-2.5 text-[14px] font-extrabold" style={{ background: RD.green, color: '#05100A' }}>
+      <Link href={isAuthenticated ? '/opponents' : '/setup'} className="mt-3 inline-flex items-center gap-2 rounded-[12px] px-5 py-2.5 text-[14px] font-extrabold" style={{ background: RD.green, color: '#FFFFFF' }}>
         <Search size={16} /> {isAuthenticated ? 'Scout an opponent' : 'Scout a player free'}
       </Link>
     </Card>

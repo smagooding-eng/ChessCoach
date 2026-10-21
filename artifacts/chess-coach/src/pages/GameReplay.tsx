@@ -1330,7 +1330,7 @@ export function GameReplay() {
                   <p className="text-[14px] font-extrabold leading-tight" style={{ color: RD.text }}>Review this game with the coach</p>
                   <p className="mt-0.5 text-[12px] leading-snug" style={{ color: RD.muted }}>Every move graded and explained, with better alternatives.</p>
                 </div>
-                <button onClick={() => handleReview(false)} className="flex shrink-0 items-center gap-1.5 rounded-[12px] px-3.5 py-2.5 text-[13px] font-extrabold" style={{ background: RD.green, color: '#05100A' }}>
+                <button onClick={() => handleReview(false)} className="flex shrink-0 items-center gap-1.5 rounded-[12px] px-3.5 py-2.5 text-[13px] font-extrabold" style={{ background: RD.green, color: '#FFFFFF' }}>
                   <Sparkles className="h-4 w-4" /> Review
                 </button>
               </div>
@@ -1655,7 +1655,7 @@ export function GameReplay() {
                 <div className="px-5 py-8 text-center">
                   <p className="text-[14px] font-bold" style={{ color: RD.text }}>No review yet</p>
                   <p className="mt-1 text-[12.5px]" style={{ color: RD.muted }}>Review this game to see your turning points.</p>
-                  <button onClick={() => handleReview(false)} disabled={reviewing} className="mt-3 rounded-[11px] px-4 py-2.5 text-[13px] font-extrabold disabled:opacity-60" style={{ background: RD.green, color: '#05100A' }}>
+                  <button onClick={() => handleReview(false)} disabled={reviewing} className="mt-3 rounded-[11px] px-4 py-2.5 text-[13px] font-extrabold disabled:opacity-60" style={{ background: RD.green, color: '#FFFFFF' }}>
                     {reviewing ? 'Reviewing…' : 'Review this game'}
                   </button>
                 </div>
@@ -1692,7 +1692,7 @@ export function GameReplay() {
             <div className="order-[-1] xl:order-none rounded-[18px] px-5 py-8 text-center" style={{ background: RD.card, border: `1px solid ${RD.border}` }}>
               <p className="text-[14px] font-bold" style={{ color: RD.text }}>No report yet</p>
               <p className="mt-1 text-[12.5px]" style={{ color: RD.muted }}>Review this game to get your accuracy, rating and summary.</p>
-              <button onClick={() => handleReview(false)} disabled={reviewing} className="mt-3 rounded-[11px] px-4 py-2.5 text-[13px] font-extrabold disabled:opacity-60" style={{ background: RD.green, color: '#05100A' }}>
+              <button onClick={() => handleReview(false)} disabled={reviewing} className="mt-3 rounded-[11px] px-4 py-2.5 text-[13px] font-extrabold disabled:opacity-60" style={{ background: RD.green, color: '#FFFFFF' }}>
                 {reviewing ? 'Reviewing…' : 'Review this game'}
               </button>
             </div>

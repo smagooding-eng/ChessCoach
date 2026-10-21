@@ -236,7 +236,7 @@ export function Endgames() {
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 className="flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-4 py-2.5 text-[13.5px] font-extrabold transition-colors"
-                style={on ? { background: RD.green, color: '#05100A' } : { background: RD.cardSolid, color: RD.muted, border: `1px solid ${RD.border}` }}
+                style={on ? { background: RD.green, color: '#FFFFFF' } : { background: RD.cardSolid, color: RD.muted, border: `1px solid ${RD.border}` }}
               >
                 <tab.icon size={16} /> {tab.label}
               </button>
@@ -258,9 +258,9 @@ export function Endgames() {
             onClick={() => handleGenerate(currentTab.apiType)}
             disabled={!!generatingType}
             className="mt-4 flex w-full items-center justify-center gap-2 rounded-[12px] py-3 text-[14px] font-extrabold transition-transform active:scale-[.98] disabled:opacity-50"
-            style={{ background: RD.green, color: '#05100A' }}
+            style={{ background: RD.green, color: '#FFFFFF' }}
           >
-            {generating ? (<><span className="h-4 w-4 animate-spin rounded-full border-2 border-[#05100A] border-t-transparent" /> Generating…</>) : (<><Sparkles size={16} /> {genLabel}</>)}
+            {generating ? (<><span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" /> Generating…</>) : (<><Sparkles size={16} /> {genLabel}</>)}
           </button>
           {generating && <p className="mt-2 text-center text-[12px] animate-pulse" style={{ color: RD.muted }}>Building your endgame course — this takes 1–2 minutes…</p>}
           {genError && <p className="mt-2 flex items-center gap-1.5 text-[13px]" style={{ color: RD.red }}><AlertCircle size={15} className="shrink-0" /> {genError}</p>}

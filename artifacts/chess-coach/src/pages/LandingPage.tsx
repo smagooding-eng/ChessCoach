@@ -20,7 +20,7 @@ const BG = '#050A0B';
 const CARD = '#0D1516';
 const TEXT = '#F5F7F6';
 const MUTED = '#9AA8A5';
-const ON_G = '#05100A'; // text colour on neon green: dark, for contrast
+const ON_G = '#FFFFFF'; // text colour on green: white, to match the app
 
 const EMAIL_RE = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 function clientValidEmail(email: string): boolean {
