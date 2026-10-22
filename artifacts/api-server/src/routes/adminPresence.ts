@@ -7,6 +7,7 @@ import { listOpenApps, notifyUser } from "../lib/notify";
 import { listTimeControls, isLiveConnected, isInLiveGame } from "../lib/liveServer";
 import { isValidTimeControl, dailyLabel } from "../lib/correspondence";
 import { logger } from "../lib/logger";
+import { declineUrl } from "../lib/challengeInvites";
 
 // Admin: who's on ChessScout.net right now, and sending one of them a
 // challenge that shows up on their dashboard ("You've been challenged"),
@@ -31,6 +32,8 @@ router.get("/admin/online-now", requireAdmin, async (req: Request, res: Response
     const users = rowsOf<{ id: string; email: string | null; scout_username: string | null; chesscom_username: string | null; lichess_username: string | null; first_name: string | null }>(await db.execute(sql`
       SELECT id, email, scout_username, chesscom_username, lichess_username, first_name FROM users
       WHERE id IN (${sql.join(ids.map((i) => sql`${i}`), sql`, `)}) AND id NOT IN (SELECT id FROM analytics_excluded_users)`));
+    const pushOn = new Set(rowsOf<{ user_id: string }>(await db.execute(sql`
+      SELECT DISTINCT user_id FROM push_subscriptions WHERE user_id IN (${sql.join(ids.map((i) => sql`${i}`), sql`, `)})`)).map((r) => r.user_id));
     const openBy = new Map(open.map((o) => [o.userId, o]));
     const recentBy = new Map(recent.map((r) => [r.user_id, r]));
     const list = users.map((u) => {
@@ -42,6 +45,7 @@ router.get("/admin/online-now", requireAdmin, async (req: Request, res: Response
         status: o ? (o.visible ? "online" : "app open in background") : "active in the last few minutes",
         path: o?.path ?? r?.path ?? null,
         lastSeenAt: o?.seenAt ? new Date(o.seenAt).toISOString() : r?.at ? new Date(r.at).toISOString() : null,
+        pushEnabled: pushOn.has(u.id),
         onLivePlay: isLiveConnected(u.id),
         inLiveGame: isInLiveGame(u.id),
       };
@@ -77,7 +81,7 @@ router.post("/admin/challenge-user", requireAdmin, async (req: Request, res: Res
       expiresAt: new Date(Date.now() + (kind === "live" ? 24 : 7 * 24) * 60 * 60 * 1000),
     });
     // Shows on their dashboard and Play screen under "You've been challenged".
-    await db.execute(sql`INSERT INTO challenge_invites (user_id, code) VALUES (${userId}, ${code}) ON CONFLICT (user_id, code) DO NOTHING`);
+    await db.execute(sql`INSERT INTO challenge_invites (user_id, code, invited_by) VALUES (${userId}, ${code}, ${me.id}) ON CONFLICT (user_id, code) DO NOTHING`);
     const tcLabel = kind === "live" ? liveTc!.label : `${dailyLabel(timeControl!)} per move`;
     const extra = typeof note === "string" && note.trim() ? ` "${note.trim().slice(0, 140)}"` : "";
     await notifyUser(userId, {
@@ -85,6 +89,14 @@ router.post("/admin/challenge-user", requireAdmin, async (req: Request, res: Res
       body: `${kind === "live" ? "Live" : "Daily"} game, ${tcLabel}, ${mode === "ranked" ? "ranked" : "casual"}. Tap to play.${extra}`,
       url: `/challenge/${code}`,
       kind: "challenge",
+      tag: `challenge:${code}`,
+      // On the phone: Accept / Decline buttons, stays until answered, buzzes.
+      push: {
+        actions: [{ action: "accept", title: "Accept" }, { action: "decline", title: "Decline" }],
+        requireInteraction: true,
+        vibrate: [200, 100, 200, 100, 400],
+        links: { accept: `/challenge/${code}?accept=1`, decline: declineUrl(userId, code) },
+      },
     }).catch((err) => logger.warn({ err }, "[admin-challenge] notify failed"));
     res.json({ code, url: `/challenge/${code}` });
   } catch (err: any) {

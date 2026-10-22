@@ -117,6 +117,24 @@ export function Challenge() {
     finally { setBusy(false); }
   };
 
+  // Turn it down: gone from your dashboard, and the sender is told.
+  const declineInvite = async () => {
+    if (!ch) return;
+    setBusy(true);
+    await apiFetch(`/api/challenges/${ch.code}/decline-invite`, { method: 'POST', credentials: 'include' }).catch(() => {});
+    setBusy(false);
+    navigate('/');
+  };
+
+  // Tapped Accept on the phone notification: accept straight away.
+  const autoAccepted = React.useRef(false);
+  useEffect(() => {
+    if (autoAccepted.current || !ch || !isAuthenticated || isCreator || ch.open || ch.isRequest || ch.status !== 'open') return;
+    if (new URLSearchParams(window.location.search).get('accept') !== '1') return;
+    autoAccepted.current = true;
+    void accept();
+  }, [ch, isAuthenticated, isCreator]);  // eslint-disable-line react-hooks/exhaustive-deps
+
   const colorLine = (c: ChallengeInfo) =>
     c.color === 'random' ? 'Colours chosen at random'
       : isCreator ? `You play ${c.color}`
@@ -182,7 +200,7 @@ export function Challenge() {
               )
             ) : ch.status !== 'open' ? (
               <p className="text-center text-[13.5px]" style={{ color: PT.muted }}>
-                {ch.status === 'expired' ? 'This challenge has expired.' : ch.status === 'cancelled' ? 'This challenge was cancelled.' : 'This challenge has already been accepted.'}
+                {ch.status === 'expired' ? 'This challenge has expired.' : ch.status === 'cancelled' ? 'This challenge was cancelled.' : ch.status === 'declined' ? 'This challenge was declined.' : 'This challenge has already been accepted.'}
               </p>
             ) : isCreator ? (
               <>
@@ -196,6 +214,11 @@ export function Challenge() {
                   {isAuthenticated ? (busy ? 'Starting…' : 'Accept challenge') : 'Sign in to accept'}
                 </button>
                 {!isAuthenticated && <p className="text-center text-[12px]" style={{ color: PT.muted }}>Free account. You'll come straight back to this challenge.</p>}
+                {isAuthenticated && (
+                  <button onClick={declineInvite} disabled={busy} className="w-full rounded-xl py-2.5 text-[13.5px] font-bold disabled:opacity-60" style={ghostBtn}>
+                    Decline
+                  </button>
+                )}
               </>
             )}
             {error && <p className="text-center text-[13px]" style={{ color: PT.red }}>{error}</p>}

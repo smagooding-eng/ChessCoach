@@ -44,11 +44,15 @@ self.addEventListener('push', (event) => {
       body: data.body,
       icon: data.icon || '/icons/icon-192.png?v=4',
       badge: '/icons/icon-192.png',
-      data: { url },
       // Same tag = replaces the previous notification for that game, so only
       // the latest one stays on the device; renotify still buzzes for it.
       tag: data.tag || undefined,
       renotify: !!data.tag,
+      // Challenges: Accept / Decline buttons, stays until answered, buzzes.
+      actions: Array.isArray(data.actions) ? data.actions.slice(0, 2) : undefined,
+      requireInteraction: !!data.requireInteraction,
+      vibrate: Array.isArray(data.vibrate) ? data.vibrate : undefined,
+      data: { url, links: data.links || {} },
     });
   })());
 });
@@ -58,7 +62,13 @@ self.addEventListener('push', (event) => {
 // data.url in a new tab.
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const targetUrl = event.notification.data?.url || '/';
+  const links = event.notification.data?.links || {};
+  // Decline straight from the notification, without opening the app.
+  if (event.action === 'decline' && links.decline) {
+    event.waitUntil(fetch(links.decline, { method: 'POST', mode: 'no-cors' }).catch(() => {}));
+    return;
+  }
+  const targetUrl = (event.action === 'accept' && links.accept) || event.notification.data?.url || '/';
 
   event.waitUntil(
     (async () => {

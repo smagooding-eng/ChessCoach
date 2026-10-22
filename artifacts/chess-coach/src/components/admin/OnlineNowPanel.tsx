@@ -8,7 +8,7 @@ import { apiFetch } from '@/lib/api';
 
 interface OnlineUser {
   id: string; label: string; email: string | null; scoutUsername: string | null; chesscomUsername: string | null; lichessUsername: string | null;
-  status: string; path: string | null; lastSeenAt: string | null; onLivePlay: boolean; inLiveGame: boolean;
+  status: string; path: string | null; lastSeenAt: string | null; onLivePlay: boolean; inLiveGame: boolean; pushEnabled?: boolean;
 }
 interface Tc { id: string; label: string }
 
@@ -132,6 +132,9 @@ export function OnlineNowPanel({ labelForPath }: { labelForPath: (p: string) => 
                 <p className="text-[10px] text-muted-foreground">
                   {u.status}{u.path ? ` · on ${labelForPath(u.path)}` : ''}{u.lastSeenAt ? ` · ${ago(u.lastSeenAt)}` : ''}
                   {u.inLiveGame ? ' · playing a live game' : u.onLivePlay ? ' · on Live play' : ''}
+                </p>
+                <p className={`text-[10px] font-semibold ${u.pushEnabled ? 'text-primary' : 'text-muted-foreground'}`}>
+                  {u.pushEnabled ? 'Phone notifications on: a challenge reaches them even in the background' : 'Notifications off: they see a challenge only with the app on screen'}
                 </p>
               </div>
               {!u.inLiveGame && <ChallengeUserButton userId={u.id} name={u.label} liveTcs={data.liveTimeControls} />}

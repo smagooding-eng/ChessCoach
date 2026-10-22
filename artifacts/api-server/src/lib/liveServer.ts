@@ -816,6 +816,7 @@ async function acceptLiveChallenge(ws: WebSocket, userId: string, username: stri
   }
   if (new Date(ch.expiresAt).getTime() < Date.now()) return send(ws, { type: 'error', message: 'This challenge has expired' });
   if (ch.status === 'cancelled') return send(ws, { type: 'error', message: 'This challenge was cancelled' });
+  if (ch.status === 'declined') return send(ws, { type: 'error', message: 'You declined this challenge' });
   if (ch.status === 'started' || ch.gameId) return send(ws, { type: 'error', message: 'This challenge has already been played' });
   if (ch.status === 'accepted' && ch.acceptedByUserId !== userId) return send(ws, { type: 'error', message: 'Someone already accepted this challenge' });
   if (userActiveGame.has(userId)) return send(ws, { type: 'error', message: 'Finish your current game first' });

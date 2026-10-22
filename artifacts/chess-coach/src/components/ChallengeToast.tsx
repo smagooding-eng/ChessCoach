@@ -35,7 +35,12 @@ export function ChallengeToast() {
       if (n?.kind === 'challenge' && n.url?.startsWith('/challenge/')) void check();
     };
     window.addEventListener('cs:notification', on);
-    return () => window.removeEventListener('cs:notification', on);
+    // Back from the background (phone unlocked, app switched back): the live
+    // connection was paused, so look for anything that arrived meanwhile.
+    const onVis = () => { if (document.visibilityState === 'visible') void check(); };
+    document.addEventListener('visibilitychange', onVis);
+    window.addEventListener('focus', onVis);
+    return () => { window.removeEventListener('cs:notification', on); document.removeEventListener('visibilitychange', onVis); window.removeEventListener('focus', onVis); };
   }, [isAuthenticated, check]);
 
   // Already on that challenge (or in a game): no need for the card.
@@ -57,13 +62,14 @@ export function ChallengeToast() {
             {ch.kind === 'live' ? 'Live' : 'Daily'} game · {tc} · {ch.mode === 'ranked' ? 'Ranked' : 'Casual'}
           </p>
           <div className="mt-3 flex gap-2">
-            <button onClick={() => { close(); navigate(`/challenge/${ch.code}`); }}
+            <button onClick={() => { close(); navigate(`/challenge/${ch.code}?accept=1`); }}
               className="flex-1 rounded-[10px] px-3 py-2 text-xs font-extrabold" style={{ background: '#81B64C', color: '#FFFFFF' }}>
-              Play
+              Accept
             </button>
-            <button onClick={close} className="flex-1 rounded-[10px] px-3 py-2 text-xs font-bold"
+            <button onClick={() => { close(); void apiFetch(`/api/challenges/${ch.code}/decline-invite`, { method: 'POST', credentials: 'include' }).then(() => window.dispatchEvent(new Event('cs:challenges-changed'))).catch(() => {}); }}
+              className="flex-1 rounded-[10px] px-3 py-2 text-xs font-bold"
               style={{ background: 'rgba(255,255,255,0.06)', color: '#F5F7F6', border: '1px solid rgba(255,255,255,.08)' }}>
-              Later
+              Decline
             </button>
           </div>
         </div>

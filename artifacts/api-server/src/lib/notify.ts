@@ -11,7 +11,7 @@
 import type { Response } from "express";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
-import { sendPushToUser, isPushConfigured } from "./pushNotifications";
+import { sendPushToUser, isPushConfigured, type PushPayload } from "./pushNotifications";
 import { logger } from "./logger";
 
 const streams = new Map<string, Set<Response>>(); // userId -> open SSE responses
@@ -91,7 +91,7 @@ export function emitToUser(userId: string, event: string, data: unknown): void {
   }
 }
 
-export interface NotifyInput { title: string; body: string; url?: string; kind?: string; tag?: string }
+export interface NotifyInput { title: string; body: string; url?: string; kind?: string; tag?: string; /** Extra push options (buttons, stay on screen, vibration). */ push?: Partial<PushPayload> }
 
 export async function notifyUser(userId: string, n: NotifyInput): Promise<void> {
   // Already looking at that game? The board updates by itself -- keep a
@@ -120,7 +120,7 @@ export async function notifyUser(userId: string, n: NotifyInput): Promise<void> 
   if (isPushConfigured()) {
     // Tagged by page (e.g. one tag per daily game) so a newer alert about the
     // same game replaces the older one on the device instead of stacking.
-    sendPushToUser(userId, { title: n.title, body: n.body, url: n.url, tag: n.tag ?? (n.url ? `cs:${n.url}` : undefined) })
+    sendPushToUser(userId, { ...(n.push ?? {}), title: n.title, body: n.body, url: n.url, tag: n.tag ?? (n.url ? `cs:${n.url}` : undefined) })
       .catch((err) => logger.warn({ err, userId }, "[notify] push failed"));
   }
 }

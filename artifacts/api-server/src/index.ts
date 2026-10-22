@@ -307,6 +307,8 @@ async function runSchemaMigrations() {
       dismissed_at TIMESTAMPTZ,
       PRIMARY KEY (user_id, code)
     )`);
+    // Set when the challenge was sent to this person directly (not a link they opened).
+    await db.execute(sql`ALTER TABLE challenge_invites ADD COLUMN IF NOT EXISTS invited_by VARCHAR`);
     // In-app notifications (the bell). Push is a copy of these for when the app is closed.
     await db.execute(sql`CREATE TABLE IF NOT EXISTS notifications (
       id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),

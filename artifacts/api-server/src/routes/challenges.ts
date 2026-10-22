@@ -7,6 +7,7 @@ import { listTimeControls, cancelLiveRequestWaiter } from "../lib/liveServer";
 import { isValidTimeControl, startGame, dailyLabel } from "../lib/correspondence";
 import { notifyUser } from "../lib/notify";
 import { logger } from "../lib/logger";
+import { declineInvite, verifyDecline } from "../lib/challengeInvites";
 
 // "Challenge a friend" links for live and daily games.
 //   POST /challenges            create  -> { code }
@@ -190,7 +191,7 @@ router.post("/challenges/:code/accept", requireAuth, async (req: Request, res: R
     if (ch.kind !== "daily") { res.status(400).json({ error: "Live challenges are accepted from the Live play screen" }); return; }
     if (ch.open || ch.parentCode) { res.status(400).json({ error: "Send a challenge request instead" }); return; }
     if (ch.creatorUserId === req.user!.id) { res.status(400).json({ error: "That's your own challenge — send the link to a friend." }); return; }
-    if (ch.status !== "open") { res.status(409).json({ error: ch.status === "cancelled" ? "This challenge was cancelled" : "Someone already accepted this challenge" }); return; }
+    if (ch.status !== "open") { res.status(409).json({ error: ch.status === "cancelled" ? "This challenge was cancelled" : ch.status === "declined" ? "This challenge was declined" : "Someone already accepted this challenge" }); return; }
     if (new Date(ch.expiresAt).getTime() < Date.now()) { res.status(410).json({ error: "This challenge has expired" }); return; }
     if (!isValidTimeControl(ch.timeControl)) { res.status(400).json({ error: "Invalid challenge" }); return; }
 
@@ -241,6 +242,30 @@ router.post("/challenges/:code/dismiss", requireAuth, async (req: Request, res: 
     res.json({ success: true });
   } catch (err: any) {
     res.status(500).json({ error: "Failed", details: err.cause?.message ?? err.message });
+  }
+});
+
+// Turn down a challenge you were sent (removes it from your dashboard; a
+// challenge sent to you directly is closed and the sender is told).
+router.post("/challenges/:code/decline-invite", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const ok = await declineInvite(req.user!.id, String(req.params.code), displayName(req));
+    res.json({ success: ok });
+  } catch (err: any) {
+    res.status(500).json({ error: "Could not decline", details: err.cause?.message ?? err.message });
+  }
+});
+
+// The Decline button on the phone notification (no login session there; signed link).
+router.all("/challenges/:code/decline-signed", async (req: Request, res: Response) => {
+  try {
+    const userId = String(req.query.u ?? ""), code = String(req.params.code ?? ""), t = String(req.query.t ?? "");
+    if (!verifyDecline(userId, code, t)) { res.status(403).json({ error: "Invalid link" }); return; }
+    const ok = await declineInvite(userId, code);
+    if (req.method === "GET") { res.type("text/plain").send(ok ? "Challenge declined." : "Nothing to decline."); return; }
+    res.json({ success: ok });
+  } catch (err: any) {
+    res.status(500).json({ error: "Could not decline", details: err.cause?.message ?? err.message });
   }
 });
 

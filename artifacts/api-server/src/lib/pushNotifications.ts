@@ -38,6 +38,13 @@ export interface PushPayload {
   /** Notifications with the same tag replace each other on the device
    *  (e.g. one per daily game: only the latest "your move" stays). */
   tag?: string;
+  /** Buttons on the notification (Android/desktop), e.g. Accept / Decline. */
+  actions?: { action: string; title: string }[];
+  /** Stays on screen until the person acts on it. */
+  requireInteraction?: boolean;
+  vibrate?: number[];
+  /** Extra links the service worker uses for the buttons. */
+  links?: Record<string, string>;
 }
 
 // Segment filters for the admin "send to a targeted group" tool. Every
