@@ -74,36 +74,6 @@ function splitText(t: string): { top: string; rest: string } {
   return { top, rest: parts.slice(k).join(' ') };
 }
 
-const PVAL: Record<string, number> = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
-const PNAME: Record<string, string> = { p: 'pawn', n: 'knight', b: 'bishop', r: 'rook', q: 'queen', k: 'king' };
-/** What the side to move in `fen` could do next: a mate in one, or the best material grab. */
-function threatsIn(fen: string): { mate: string | null; win: { san: string; type: string; sq: string } | null } {
-  try {
-    const c = new Chess(normalizeFen(fen));
-    if (c.isGameOver()) return { mate: null, win: null };
-    const ms = c.moves({ verbose: true });
-    const mate = ms.find((m) => m.san.includes('#'))?.san ?? null;
-    let win: { san: string; type: string; sq: string } | null = null; let best = 0;
-    for (const m of ms) {
-      if (!m.captured) continue;
-      const t = new Chess(c.fen()); t.move(m.san);
-      const defended = t.attackers(m.to, t.turn()).length > 0;
-      const gain = defended ? PVAL[m.captured] - PVAL[m.piece] : PVAL[m.captured];
-      if (gain >= 1 && gain > best) { best = gain; win = { san: m.san, type: m.captured, sq: m.to }; }
-    }
-    return { mate, win };
-  } catch { return { mate: null, win: null }; }
-}
-/** The same position with the other side to move (null when that isn't legal, e.g. in check). */
-function flipFen(fen: string): string | null {
-  try {
-    const c = new Chess(normalizeFen(fen));
-    if (c.isCheck()) return null;
-    const f = c.fen().split(' '); f[1] = f[1] === 'w' ? 'b' : 'w'; f[3] = '-';
-    new Chess(f.join(' '));
-    return f.join(' ');
-  } catch { return null; }
-}
 function standing(cp: number | null | undefined): string {
   if (cp == null) return '';
   const side = cp > 0 ? 'White' : 'Black';
@@ -378,28 +348,6 @@ export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flippe
   } else if (rev && move) {
     const t = splitText(rev.explanation);
     const ev = evalLabel(rev.evalAfterCp);
-    const before = ply > 1 ? byIndex.get(ply - 2)?.evalAfterCp : 20;
-    const evBefore = evalLabel(before ?? null);
-    // What each side can do from here (read off the board, not repeated from the coach).
-    const fenNow = fenAt(ply);
-    const oppName = isWhiteMove ? 'Black' : 'White';
-    const meName = isWhiteMove ? 'White' : 'Black';
-    const opp = threatsIn(fenNow);
-    const flipped0 = flipFen(fenNow);
-    const mine = flipped0 ? threatsIn(flipped0) : { mate: null, win: null };
-    const threatRows: { who: 'them' | 'me'; text: React.ReactNode }[] = [];
-    // Skip what the coach already said (the same square or move).
-    const said = (x: { san: string; sq?: string } | null) => !!x && (rev.explanation.includes(x.san) || (!!x.sq && rev.explanation.includes(x.sq)));
-    if (said(opp.win ? { san: opp.win.san, sq: opp.win.sq } : null)) opp.win = null;
-    if (opp.mate && rev.explanation.includes(opp.mate)) opp.mate = null;
-    if (mine.win && said({ san: mine.win.san, sq: mine.win.sq })) mine.win = null;
-    if (mine.mate && rev.explanation.includes(mine.mate)) mine.mate = null;
-    if (opp.mate) threatRows.push({ who: 'them', text: <>{oppName} has mate with <b className="text-[#F5F7F6]">{figurine(opp.mate, !isWhiteMove)}</b></> });
-    else if (opp.win) threatRows.push({ who: 'them', text: <>{oppName} can win the {PNAME[opp.win.type]} on {opp.win.sq} with <b className="text-[#F5F7F6]">{figurine(opp.win.san, !isWhiteMove)}</b></> });
-    if (mine.mate) threatRows.push({ who: 'me', text: <>{meName} threatens mate with <b className="text-[#F5F7F6]">{figurine(mine.mate, isWhiteMove)}</b></> });
-    else if (mine.win) threatRows.push({ who: 'me', text: <>{meName} threatens <b className="text-[#F5F7F6]">{figurine(mine.win.san, isWhiteMove)}</b>, winning the {PNAME[mine.win.type]}</> });
-    const swing = before != null && rev.evalAfterCp != null && Math.abs(before) < 9000 && Math.abs(rev.evalAfterCp) < 9000
-      ? (isWhiteMove ? 1 : -1) * (rev.evalAfterCp - before) : null;
     top = (
       <>
         <div className="flex items-center gap-2">
@@ -407,54 +355,9 @@ export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flippe
           <p className={`min-w-0 flex-1 truncate ${H}`}>{figurine(move.san, isWhiteMove)} {CLS[rev.classification].phrase}</p>
           {ev && <span className="shrink-0 rounded-md bg-white/10 px-2 py-0.5 text-[13px] font-extrabold tabular-nums text-[#F5F7F6]">{ev}</span>}
         </div>
-        {t.top && <p className={`mt-1 line-clamp-2 ${P}`}>{t.top}</p>}
-      </>
-    );
-    const hasRest = !!t.rest;
-    detail = (
-      <>
-        {hasRest && <p className={P}>{t.rest}</p>}
-        {bad && rev.betterMove && !(hasRest && bestLine.length > 1 && t.rest.includes(rev.betterMove)) && (
-          <div className={`flex items-center justify-between gap-2 ${hasRest ? 'mt-2' : ''}`}>
-            <p className={P}>Better was <b className="text-[#F5F7F6]">{figurine(rev.betterMove, isWhiteMove)}</b></p>
-            <button onClick={() => { setAutoPlay(true); soundFor(bestLine[0]?.san ?? rev.betterMove!); setMode({ kind: 'best', step: 0 }); }}
-              className="shrink-0 rounded-lg px-2.5 py-1 text-[12px] font-bold text-white" style={{ background: GREEN }}>Show me</button>
-          </div>
-        )}
-        {bad && lineChips}
-        {!!rev.pros?.length && (
-          <ul className="mt-2 space-y-0.5">{rev.pros.map((x, i) => <li key={i} className={`flex gap-1.5 ${P}`}><span className="text-[#81B64C]">+</span>{x}</li>)}</ul>
-        )}
-        {!!rev.cons?.length && (
-          <ul className="mt-1.5 space-y-0.5">{rev.cons.map((x, i) => <li key={i} className={`flex gap-1.5 ${P}`}><span className="text-[#F0605D]">−</span>{x}</li>)}</ul>
-        )}
-        <div className={`${hasRest || bad || rev.pros?.length || rev.cons?.length ? 'mt-2.5 border-t border-white/5 pt-2.5' : ''} space-y-2`}>
-          {ev && (
-            <div className="flex items-center justify-between gap-2">
-              <p className={L}>Position</p>
-              <p className="text-right text-[12.5px] text-[#C9CFCD]">
-                {standing(rev.evalAfterCp)}
-                {evBefore && swing != null && Math.abs(swing) >= 30 && (
-                  <span className="tabular-nums" style={{ color: swing > 0 ? '#81B64C' : '#F0605D' }}>{' · '}{evBefore} → {ev}</span>
-                )}
-              </p>
-            </div>
-          )}
-          {threatRows.length > 0 && (
-            <div>
-              <p className={L}>Threats now</p>
-              {threatRows.map((r, i) => (
-                <p key={i} className={`mt-0.5 flex gap-1.5 ${P}`}><span style={{ color: r.who === 'them' ? '#F0605D' : '#81B64C' }}>●</span><span>{r.text}</span></p>
-              ))}
-            </div>
-          )}
-          {replyLine.length >= 2 && (
-            <div>
-              <p className={L}>{bad ? 'How it gets punished' : 'Engine expects next'}</p>
-              {chipsFor('reply', replyLine, fenNow, 2)}
-            </div>
-          )}
-        </div>
+        {expanded
+          ? <p className={`mt-1 ${P}`}>{rev.explanation}</p>
+          : (t.top || t.rest) && <p className={`mt-1 line-clamp-2 ${P}`}>{t.top || t.rest}{t.top && t.rest && <span className="ml-1 font-bold text-[#81B64C]">More</span>}</p>}
       </>
     );
   } else if (move) {
@@ -464,6 +367,7 @@ export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flippe
   const animKey = `${ply}-${mode.kind}-${mode.kind === 'retry' ? mode.state : ''}`;
 
   const atEnd = ply >= max && mode.kind === 'main';
+  const canExpand = mode.kind === 'main' && !!rev && ply > 0 && !!splitText(rev.explanation).rest;
 
   // ── Move strip ─────────────────────────────────────────────────────────
   const stripRef = useRef<HTMLDivElement | null>(null);
@@ -515,8 +419,10 @@ export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flippe
 
       <div className="mx-auto flex w-full max-w-[560px] min-h-0 flex-1 flex-col">
         {/* Top card: fixed height so the board never shifts */}
-        <div className="shrink-0 px-3 pb-2 pt-1">
-          <div className="h-[84px] overflow-hidden rounded-[14px] px-3.5 py-2.5"
+        <div className="relative z-20 h-[92px] shrink-0 px-3 pb-2 pt-1">
+          {/* Tap to read the whole explanation; it opens over the board, so nothing moves. */}
+          <div onClick={canExpand ? () => setExpanded((v) => !v) : undefined}
+            className={`absolute inset-x-3 top-1 overflow-hidden rounded-[14px] px-3.5 py-2.5 ${expanded ? 'min-h-[84px] shadow-2xl' : 'h-[84px]'} ${canExpand ? 'cursor-pointer' : ''}`}
             style={{ background: '#162022', border: '1px solid rgba(255,255,255,.07)', borderLeft: `4px solid ${accent}` }}>
             <AnimatePresence mode="wait" initial={false}>
               <motion.div key={animKey} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.16 }}>
@@ -569,11 +475,38 @@ export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flippe
           </div>
         )}
 
+        {/* The whole game at a glance, the same on every move */}
+        {ply > 0 && mode.kind === 'main' && reviewMoves.length > 0 && (() => {
+          const keys = (['brilliant', 'great', 'best', 'inaccuracy', 'mistake', 'missed_win', 'blunder'] as Classification[])
+            .filter((k) => counts.white[k] || counts.black[k] || k === 'best' || k === 'mistake' || k === 'blunder');
+          const row = (name: string, acc: number | null, side: 'white' | 'black') => (
+            <div className="flex items-center gap-2">
+              <span className="w-[72px] truncate text-[12.5px] font-bold text-white">{name}</span>
+              <span className="w-[34px] text-[17px] font-black tabular-nums text-white">{acc != null ? Math.round(acc) : '–'}</span>
+              <div className="flex flex-1 items-center justify-end gap-2.5">
+                {keys.map((k) => (
+                  <span key={k} className="flex w-[30px] items-center justify-end gap-1 text-[12.5px] font-bold tabular-nums" style={{ color: counts[side][k] ? (CLS[k].textColor ?? '#E7ECEA') : '#55605D' }}>
+                    {counts[side][k]}<Badge cls={k} size={14} />
+                  </span>
+                ))}
+              </div>
+            </div>
+          );
+          return (
+            <div className="mx-3 mt-2 rounded-[14px] px-3 py-2.5" style={{ background: '#162022', border: '1px solid rgba(255,255,255,.07)' }}>
+              <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-[#87918E]">Game rating · accuracy</p>
+              <div className="space-y-1.5">
+                {row(whiteName, accuracy?.white ?? null, 'white')}
+                {row(blackName, accuracy?.black ?? null, 'black')}
+              </div>
+            </div>
+          );
+        })()}
+
         {/* End of game summary */}
         {atEnd && (
           <div className="mx-3 mt-2 rounded-[16px] p-3" style={{ background: '#162022', border: '1px solid rgba(255,255,255,.08)' }}>
             <p className="text-[15px] font-extrabold text-white">{resultLine ?? 'Game over'}</p>
-            {accuracy && <p className="mt-0.5 text-[12.5px] text-[#C9CFCD]">Accuracy: {whiteName} {Math.round(accuracy.white)} · {blackName} {Math.round(accuracy.black)}</p>}
             <div className="mt-2 flex flex-wrap gap-2">
               <button onClick={() => setPly(0)} className="rounded-lg px-3 py-1.5 text-[12.5px] font-bold text-white" style={{ background: 'rgba(255,255,255,.08)' }}>Start over</button>
               <button onClick={() => { const i = reviewMoves.filter((m) => BAD.has(m.classification)).sort((a, b) => a.moveIndex - b.moveIndex)[0]; if (i) setPly(i.moveIndex + 1); }}
