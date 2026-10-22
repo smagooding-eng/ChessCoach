@@ -792,6 +792,8 @@ function mergeReviewWithEngine(
         return basicExplanation({
           fenBefore, fenAfter: fenAfterMove ?? fenBefore, san: om.san, classification, playerColor, moveIndex: idx,
           cpBefore, cpAfter, bestMoveSan: betterMove ?? evalBefore.bestMoveSan ?? null, replySan: evalAfter.bestMoveSan ?? null, inBook: stillInBook,
+          prevClassification: results[results.length - 1]?.classification ?? null,
+          prevSan: idx > 0 ? originalMoves[idx - 1]?.san ?? null : null,
         }) || buildFallbackExplanation(facts, om.san);
       } catch { return buildFallbackExplanation(facts, om.san); }
     };

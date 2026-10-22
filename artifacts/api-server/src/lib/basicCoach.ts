@@ -30,6 +30,10 @@ export interface BasicCoachInput {
   /** Engine's best reply for the other side after the move (SAN). */
   replySan: string | null;
   inBook: boolean;
+  /** The previous move's classification (the opponent's move), to spot punishing it or missing the chance. */
+  prevClassification?: string | null;
+  /** The previous move (SAN), to tell a recapture from winning material. */
+  prevSan?: string | null;
 }
 
 // ── Board helpers ─────────────────────────────────────────────────────────
@@ -139,31 +143,137 @@ function pick(seed: string, options: string[]): string {
 }
 
 /** What a move does that's worth saying (used for the played move and for the better one). */
-function motifs(fenBefore: string, san: string, me: Color): { lead: string | null; tags: string[] } {
+function motifs(fenBefore: string, san: string, me: Color, prevSan?: string | null): { lead: string | null; tags: string[] } {
   const r = apply(fenBefore, san);
   const before = load(fenBefore);
   if (!r || !before) return { lead: null, tags: [] };
   const { c, m } = r;
   const tags: string[] = [];
   if (c.isCheckmate()) return { lead: "checkmate", tags: ["mate"] };
-  const t = targets(c, m.to as Square).filter((x) => x.type !== "p");
+  // A piece that can just be taken back isn't really forking or pinning anything.
+  const safe = !hanging(c, me).some((h) => h.sq === m.to);
+  const t = safe ? targets(c, m.to as Square).filter((x) => x.type !== "p") : [];
   if (t.length >= 2) tags.push(`forking the ${list(t.slice(0, 2).map((x) => NAME[x.type]))}`);
-  for (const l of lines(c, m.to as Square)) {
+  for (const l of safe ? lines(c, m.to as Square) : []) {
     tags.push(l.kind === "pin" ? `pinning the ${NAME[l.front.type]} to the ${NAME[l.back.type]}` : `skewering the ${NAME[l.front.type]} and the ${NAME[l.back.type]}`);
   }
   // Discovered: a piece behind the one that moved now gives check or hits something.
   if (c.isCheck() && !c.attackers(c.board().flat().find((p) => p?.type === "k" && p.color !== me)!.square, me).includes(m.to as Square)) tags.push("with a discovered check");
   if (m.captured) {
-    const diffBefore = material(before, me) - material(before, other(me));
-    const diffAfter = material(c, me) - material(c, other(me));
-    const recapture = diffBefore < 0 && Math.abs(diffAfter) <= 1;
+    // Recapture: the opponent just took something on this square.
+    const prevTo = prevSan && prevSan.includes("x") ? (prevSan.replace(/[+#=QRBN]*$/, "").match(/([a-h][1-8])$/)?.[1] ?? null) : null;
+    const recapture = prevTo === m.to;
     const free = !recapture && hanging(before, other(me)).some((h) => h.sq === m.to);
     tags.unshift(recapture ? `recapturing the ${NAME[m.captured]}` : free ? `winning the ${NAME[m.captured]}` : `taking the ${NAME[m.captured]}`);
   }
   if (c.isCheck() && !tags.some((x) => x.includes("check"))) tags.push("with check");
   const myLoose = hanging(before, me).filter((h) => VAL[h.type] >= 3);
-  if (myLoose.length && !hanging(c, me).some((h) => h.sq === myLoose[0].sq)) tags.push(myLoose[0].sq === m.from ? `getting the ${NAME[myLoose[0].type]} to safety` : `protecting the ${NAME[myLoose[0].type]} on ${myLoose[0].sq}`);
+  if (!m.captured && myLoose.length && !hanging(c, me).some((h) => h.sq === myLoose[0].sq)) tags.push(myLoose[0].sq === m.from ? `getting the ${NAME[myLoose[0].type]} to safety` : `protecting the ${NAME[myLoose[0].type]} on ${myLoose[0].sq}`);
   return { lead: tags[0] ?? null, tags };
+}
+
+// ── Positional ideas for quiet moves ─────────────────────────────────────
+const rel = (sqr: string, color: Color) => (color === "w" ? parseInt(sqr[1]) : 9 - parseInt(sqr[1]));
+const pawnsOn = (c: Chess, color: Color, fileIdx: number) => pieces(c).filter((p) => p.color === color && p.type === "p" && FILES.indexOf(p.square[0]) === fileIdx);
+function isPassed(c: Chess, square: string, color: Color): boolean {
+  const f = FILES.indexOf(square[0]);
+  return !pieces(c).some((p) => p.color !== color && p.type === "p" && Math.abs(FILES.indexOf(p.square[0]) - f) <= 1 && rel(p.square, color) > rel(square, color));
+}
+function canCastle(c: Chess, color: Color): boolean {
+  const f = c.turn() === color ? c : flipTurn(c);
+  if (!f) return false;
+  try { return f.moves().some((x) => x === "O-O" || x === "O-O-O"); } catch { return false; }
+}
+function rooksConnected(c: Chess, color: Color): boolean {
+  const back = color === "w" ? 0 : 7;
+  const rooks = pieces(c).filter((p) => p.color === color && p.type === "r" && parseInt(p.square[1]) - 1 === back).map((p) => FILES.indexOf(p.square[0])).sort();
+  if (rooks.length < 2) return false;
+  for (let f = rooks[0] + 1; f < rooks[1]; f++) if (c.get(sq(f, back))) return false;
+  return true;
+}
+
+/** Plain reasons a quiet move is useful, most important first. */
+function quietIdeas(before: Chess, after: Chess, m: { piece: string; from: string; to: string; captured?: string }, me: Color, opening: boolean, endgame: boolean, seed: string): string[] {
+  const them = other(me);
+  const out: string[] = [];
+  const to = m.to as Square;
+  // Attacks something (with tempo).
+  const hits = targets(after, to).filter((t) => t.type !== "k");
+  if (hits.length === 1) {
+    const t = hits[0];
+    out.push(m.piece === "p" ? `Kicks the ${NAME[t.type]} on ${t.sq} with the pawn.` : pick(seed, [`Attacks the ${NAME[t.type]} on ${t.sq}, gaining time.`, `Goes after the ${NAME[t.type]} on ${t.sq}.`]));
+  } else if (hits.length >= 2) {
+    out.push(`Puts pressure on ${hits[0].sq} and ${hits[1].sq} at the same time.`);
+  }
+  // Defends a piece that was under attack.
+  const defended = pieces(after).find((p) => p.color === me && p.type !== "k" && p.square !== to && after.attackers(p.square, them).length > 0
+    && after.attackers(p.square, me).includes(to) && !before.attackers(p.square, me).includes(m.from as Square));
+  if (defended) out.push(`Defends the ${NAME[defended.type]} on ${defended.square}.`);
+  // Passed pawn.
+  const myPawns = (c: Chess) => pieces(c).filter((p) => p.color === me && p.type === "p");
+  const newPassed = myPawns(after).find((p) => isPassed(after, p.square, me) && !myPawns(before).some((q) => q.square === p.square && isPassed(before, q.square, me)) && p.square !== to)
+    ?? (m.piece === "p" && isPassed(after, to, me) && !isPassed(before, m.from, me) ? { square: to } : null);
+  if (newPassed) out.push(`Creates a passed pawn on ${newPassed.square}.`);
+  else if (m.piece === "p" && isPassed(after, to, me) && rel(to, me) >= 5) out.push("Pushes the passed pawn closer to promotion.");
+  // Castling prep and connected rooks.
+  if (!canCastle(before, me) && canCastle(after, me)) out.push("Clears the way to castle.");
+  if (!rooksConnected(before, me) && rooksConnected(after, me)) out.push("Connects the rooks.");
+  // Files and batteries.
+  if (m.piece === "r" || m.piece === "q") {
+    const f = FILES.indexOf(to[0]);
+    const mine = pawnsOn(after, me, f).length, theirs = pawnsOn(after, them, f).length;
+    const partner = pieces(after).find((p) => p.color === me && p.square !== to && (p.type === "r" || p.type === "q") && p.square[0] === to[0]);
+    if (partner && (m.piece === "r" || partner.type === "r")) out.push(`Doubles up on the ${to[0]}-file.`);
+    else if (m.piece === "r" && mine === 0 && theirs === 0) out.push(`Takes the open ${to[0]}-file.`);
+    else if (m.piece === "r" && mine === 0) out.push(`Puts the rook on the half-open ${to[0]}-file.`);
+    else if (m.piece === "r" && rel(to, me) === 7) out.push("Puts the rook on the seventh rank.");
+  }
+  // Outposts, long diagonals, centralizing.
+  if (m.piece === "n" && rel(to, me) >= 4 && rel(to, me) <= 6 && after.attackers(to, me).some((s) => after.get(s)?.type === "p")
+    && !pieces(after).some((p) => p.color === them && p.type === "p" && Math.abs(FILES.indexOf(p.square[0]) - FILES.indexOf(to[0])) === 1 && rel(p.square, me) > rel(to, me))) {
+    out.push(`Plants the knight on a strong outpost on ${to}.`);
+  } else if (m.piece === "b" && ["b2", "g2", "b7", "g7"].includes(to)) out.push("Puts the bishop on the long diagonal.");
+  else if ((m.piece === "n" || m.piece === "q") && ["d4", "e4", "d5", "e5"].includes(to) && !endgame) out.push(`Centralizes the ${NAME[m.piece]}.`);
+  // Pawn ideas.
+  if (m.piece === "p" && !opening && !endgame) {
+    const kingSide = pieces(after).find((p) => p.color === me && p.type === "k");
+    if (kingSide && ["h3", "h6", "g3", "g6", "a3", "a6"].includes(to) && Math.abs(FILES.indexOf(kingSide.square[0]) - FILES.indexOf(to[0])) <= 1 && rel(kingSide.square, me) === 1)
+      out.push("Gives the king some breathing room against back-rank checks.");
+    const enemyMinors = pieces(before).filter((p) => p.color === them && (p.type === "n" || p.type === "b"));
+    const flip = flipTurn(before);
+    const covered = flip ? flip.moves({ verbose: true }).filter((x) => enemyMinors.some((e) => e.square === x.from) && after.attackers(x.to as Square, me).includes(to)) : [];
+    if (covered.length && ["a3", "h3", "a6", "h6"].includes(to)) out.push(`Takes the ${covered[0].to} square away from the ${NAME[covered[0].piece]}.`);
+    if (rel(to, me) === 5 && ["c", "d", "e", "f"].includes(to[0])) out.push("Gains space.");
+  }
+  // A pawn move that frees a bishop or the queen.
+  if (m.piece === "p" && out.length === 0) {
+    const mob = (c: Chess) => {
+      const f = c.turn() === me ? c : flipTurn(c);
+      if (!f) return { b: 0, q: 0 };
+      const ms = f.moves({ verbose: true });
+      return { b: ms.filter((x) => x.piece === "b").length, q: ms.filter((x) => x.piece === "q").length };
+    };
+    const a = mob(before), b = mob(after);
+    if (b.b - a.b >= 2) out.push("Opens a line for the bishop.");
+    else if (b.q - a.q >= 2) out.push("Opens a path for the queen.");
+  }
+  if (endgame && m.piece === "k" && rel(to, me) >= 3) out.push(pick(seed, ["Brings the king into the game, which matters a lot in the endgame.", "An active king is a strength in the endgame."]));
+  return out;
+}
+
+/** Long-term costs of a move that isn't a tactical blunder. */
+function weaknesses(before: Chess, after: Chess, m: { piece: string; from: string; to: string; captured?: string; flags: string }, me: Color, opening: boolean): string[] {
+  const out: string[] = [];
+  const files = [...new Set([FILES.indexOf(m.to[0]), FILES.indexOf(m.from[0])])];
+  for (const f of files) if (pawnsOn(after, me, f).length >= 2 && pawnsOn(before, me, f).length < 2) out.push(`This leaves doubled pawns on the ${FILES[f]}-file.`);
+  const iso = pieces(after).find((p) => p.color === me && p.type === "p" && pawnsOn(after, me, FILES.indexOf(p.square[0]) - 1).length === 0 && pawnsOn(after, me, FILES.indexOf(p.square[0]) + 1).length === 0
+    && !(pawnsOn(before, me, FILES.indexOf(p.square[0]) - 1).length === 0 && pawnsOn(before, me, FILES.indexOf(p.square[0]) + 1).length === 0));
+  if (iso) out.push(`This leaves an isolated pawn on ${iso.square}.`);
+  if (m.piece === "n" && /[ah]/.test(m.to[0]) && !m.captured) out.push("A knight on the edge of the board controls fewer squares.");
+  if (opening && m.piece === "p" && /[ah]/.test(m.to[0]) && !m.captured) out.push("Edge pawn moves in the opening don't help development or the center.");
+  if (!opening && ["n", "b", "q"].includes(m.piece) && rel(m.to, me) === 1 && rel(m.from, me) > 1 && !m.captured) out.push(`Retreats the ${NAME[m.piece]} to a passive square.`);
+  if (m.captured && m.piece === "b" && m.captured === "n" && opening) out.push("Gives up the bishop pair.");
+  return out;
 }
 
 function openingLine(m: { piece: string; from: string; to: string; san: string; flags: string }, seed: string): string {
@@ -230,6 +340,10 @@ export function basicExplanation(i: BasicCoachInput): string {
         out.push(`The ${NAME[theirThreat.wins.type]} on ${theirThreat.wins.sq} was under attack and still is.`);
       } else if (bestWins && i.bestMoveSan) {
         out.push(`${i.bestMoveSan} would have won the ${NAME[bestWins.type]} on ${bestWins.sq} for free.`);
+      } else if (reply?.m.captured && i.replySan && (reply.m.captured === "p" || (reply.m.captured === "r" && VAL[reply.m.piece] === 3))) {
+        out.push(reply.m.captured === "p" ? `It lets ${i.replySan} win a pawn.` : `It lets ${i.replySan} win the exchange (a rook for a minor piece).`);
+      } else if (i.prevClassification && ["mistake", "blunder", "missed_win"].includes(i.prevClassification) && i.bestMoveSan) {
+        out.push(`The opponent had just slipped, and this misses the chance to punish it.`);
       } else if (opening && m.piece === "q" && !m.captured && i.moveIndex < 14) {
         out.push("Bringing the queen out this early lets the opponent gain time by attacking it.");
       } else if (opening && m.piece === "k" && !(m.flags.includes("k") || m.flags.includes("q")) && /[KQkq]/.test(i.fenBefore.split(" ")[2])) {
@@ -238,6 +352,8 @@ export function basicExplanation(i: BasicCoachInput): string {
         out.push("Moving the same piece again while others are still undeveloped loses time.");
       } else if (m.piece === "p" && ["f", "g", "h"].includes(m.from[0]) && pieces(before).some((p) => p.color === me && p.type === "k" && ["g", "h"].includes(p.square[0]))) {
         out.push("Pushing a pawn in front of the castled king weakens its shelter.");
+      } else if (weaknesses(before, after, m, me, opening).length) {
+        out.push(weaknesses(before, after, m, me, opening)[0]);
       } else if (pov(i.cpBefore) >= 150 && pov(i.cpAfter) < 80) {
         out.push(pick(seed, ["This lets most of the advantage slip away.", "A winning position becomes level again."]));
       } else if (pov(i.cpBefore) > -80 && pov(i.cpAfter) <= -150) {
@@ -254,7 +370,7 @@ export function basicExplanation(i: BasicCoachInput): string {
   }
 
   // ── Good moves ───────────────────────────────────────────────────────────
-  const mo = motifs(i.fenBefore, i.san, me);
+  const mo = motifs(i.fenBefore, i.san, me, i.prevSan);
   const myNext = flipTurn(after);
   const threat = myNext ? threats(myNext) : null;
 
@@ -278,10 +394,23 @@ export function basicExplanation(i: BasicCoachInput): string {
   } else if (threat?.wins && !out.length) {
     out.push(`Threatens to win the ${NAME[threat.wins.type]} on ${threat.wins.sq}.`);
   }
+  if (out.length && i.prevClassification && ["mistake", "blunder", "missed_win"].includes(i.prevClassification) && (m.captured || mo.tags.length)) {
+    out[0] = `Punishes the mistake. ${out[0]}`;
+  }
   if (m.promotion) out.push(`Promotes to a ${NAME[m.promotion]}.`);
   if (m.flags.includes("k") || m.flags.includes("q")) out.push("Castles, getting the king safe and connecting the rooks.");
   if (m.captured && VAL[m.captured] === VAL[m.piece] && pov(i.cpAfter) >= 200 && out.length < 2) out.push("Trading pieces when ahead brings the win closer.");
 
+  if (out.length < 2 && !m.captured) {
+    const castled = m.flags.includes("k") || m.flags.includes("q");
+    for (const idea of quietIdeas(before, after, m, me, opening, endgame, seed)) {
+      if (out.length >= 2) break;
+      if (castled && /rooks|castle/.test(idea)) continue;
+      const sqs = idea.match(/[a-h][1-8]/g) ?? [];
+      if (out.includes(idea) || sqs.some((x) => out.join(" ").includes(x))) continue;
+      out.push(idea);
+    }
+  }
   if (!out.length && endgame) {
     if (m.piece === "k") out.push(pick(seed, ["Brings the king into the game, which matters a lot in the endgame.", "An active king is a strength in the endgame."]));
     else if (m.piece === "p") {
@@ -332,6 +461,8 @@ export function refreshBasicReview(moves: unknown, aiCoach: boolean): unknown {
         moveIndex: typeof m.moveIndex === "number" ? m.moveIndex : i,
         cpBefore: i === 0 ? 20 : typeof prev?.evalAfterCp === "number" ? prev.evalAfterCp : m.evalAfterCp,
         cpAfter: m.evalAfterCp, bestMoveSan: clean(m.betterMove), replySan, inBook: m.classification === "book",
+        prevClassification: prev?.classification ?? null,
+        prevSan: prev?.san ?? null,
       });
       return text ? { ...m, explanation: text, pros: [], cons: [] } : m;
     } catch { return m; }
