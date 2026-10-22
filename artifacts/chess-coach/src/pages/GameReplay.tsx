@@ -878,6 +878,17 @@ export function GameReplay() {
   // analysis view is for Pro members (who can switch between the two).
   const canFullAnalysis = !!isPremium;
   const showGuided = !canFullAnalysis || guided;
+  // Full analysis always comes with the AI coach: a Pro member opening it on a
+  // game that only has the engine review (e.g. reviewed before they went Pro)
+  // gets the AI review run for it.
+  const aiUpgradeFor = useRef<number | null>(null);
+  useEffect(() => {
+    if (!game || showGuided || !canFullAnalysis || reviewing || loadingSavedReview || reviewAi !== false) return;
+    if (aiUpgradeFor.current === game.id) return;
+    aiUpgradeFor.current = game.id;
+    void handleReview(true);
+  }, [game, showGuided, canFullAnalysis, reviewing, loadingSavedReview, reviewAi, handleReview]);
+
   // Open a game that hasn't been reviewed yet: start the review straight away.
   const autoReviewFor = useRef<number | null>(null);
   useEffect(() => {
@@ -1036,6 +1047,7 @@ export function GameReplay() {
         errorText={reviewError}
         onRetryReview={() => { setReviewError(null); void handleReview(true); }}
         canFullAnalysis={canFullAnalysis}
+        onUpgrade={() => navigate('/subscription?from=full-analysis')}
         moves={moves as any}
         startFen={gameStartFen}
         reviewMoves={reviewMoves}

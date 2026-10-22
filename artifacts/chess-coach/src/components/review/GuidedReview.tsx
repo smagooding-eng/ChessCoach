@@ -111,11 +111,16 @@ export interface GuidedReviewProps {
   onRetryReview?: () => void;
   /** Pro: the full in-depth analysis view is available. */
   canFullAnalysis?: boolean;
+  /** Not Pro: where "Full analysis (Pro)" goes (the Pro page). */
+  onUpgrade?: () => void;
 }
 
 type Mode = { kind: 'main' } | { kind: 'best'; step: number } | { kind: 'retry'; state: 'trying' | 'right' | 'wrong' };
 
-export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flipped, onFlip, whiteName, blackName, accuracy, result, onExit, onBack, status = 'ready', progress, errorText, onRetryReview, canFullAnalysis = true }: GuidedReviewProps) {
+export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flipped, onFlip, whiteName, blackName, accuracy, result, onExit, onBack, status = 'ready', progress, errorText, onRetryReview, canFullAnalysis = true, onUpgrade }: GuidedReviewProps) {
+  // Full analysis (with the AI coach) is Pro: members go there, others to the Pro page.
+  const openFull = canFullAnalysis ? onExit : (onUpgrade ?? onExit);
+  const ProTag = () => <span className="ml-1 rounded px-1 py-px text-[9.5px] font-black tracking-wide" style={{ background: '#E8B447', color: '#1C1C1C' }}>PRO</span>;
   const max = moves.length;
   const [mode, setMode] = useState<Mode>({ kind: 'main' });
   const [expanded, setExpanded] = useState(false);
@@ -380,9 +385,10 @@ export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flippe
         <button onClick={onBack} aria-label="Back" className="grid h-10 w-10 place-items-center rounded-xl text-white active:scale-95"><ArrowLeft size={22} /></button>
         <p className="flex-1 text-center text-[18px] font-black text-white">Game Review</p>
         <button onClick={onFlip} aria-label="Flip board" className="grid h-10 w-10 place-items-center rounded-xl text-[#C9CFCD] active:scale-95"><FlipVertical2 size={20} /></button>
-        {canFullAnalysis
-          ? <button onClick={onExit} aria-label="Full analysis" title="Full analysis" className="grid h-10 w-10 place-items-center rounded-xl text-[#C9CFCD] active:scale-95"><ListTree size={20} /></button>
-          : <span className="h-10 w-10" />}
+        <button onClick={openFull} aria-label="Full analysis (Pro)" title="Full analysis (Pro)" className="relative grid h-10 w-10 place-items-center rounded-xl text-[#C9CFCD] active:scale-95">
+          <ListTree size={20} />
+          {!canFullAnalysis && <span className="absolute -right-0.5 top-0.5 rounded px-0.5 text-[8px] font-black" style={{ background: '#E8B447', color: '#1C1C1C' }}>PRO</span>}
+        </button>
       </div>
 
       <div className="mx-auto flex w-full max-w-[560px] min-h-0 flex-1 flex-col">
@@ -450,7 +456,7 @@ export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flippe
               <button onClick={() => setPly(0)} className="rounded-lg px-3 py-1.5 text-[12.5px] font-bold text-white" style={{ background: 'rgba(255,255,255,.08)' }}>Start over</button>
               <button onClick={() => { const i = reviewMoves.filter((m) => BAD.has(m.classification)).sort((a, b) => a.moveIndex - b.moveIndex)[0]; if (i) setPly(i.moveIndex + 1); }}
                 className="rounded-lg px-3 py-1.5 text-[12.5px] font-bold text-white" style={{ background: 'rgba(255,255,255,.08)' }}>First mistake</button>
-              {canFullAnalysis && <button onClick={onExit} className="rounded-lg px-3 py-1.5 text-[12.5px] font-bold text-white" style={{ background: GREEN }}>Full analysis</button>}
+
             </div>
           </div>
         )}
@@ -509,10 +515,10 @@ export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flippe
         <div className="flex shrink-0 items-center gap-1 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-1">
           {tool('Best', <Star size={21} />, mode.kind === 'best', canBest, () => { if (mode.kind === 'best') setMode({ kind: 'main' }); else { setAutoPlay(true); soundFor(bestLine[0].san); setMode({ kind: 'best', step: 0 }); } })}
           {tool('Retry', <RotateCcw size={21} />, mode.kind === 'retry', canRetry, () => setMode(mode.kind === 'retry' ? { kind: 'main' } : { kind: 'retry', state: 'trying' }))}
-          <button onClick={atEnd ? (canFullAnalysis ? onExit : () => setPly(0)) : next}
+          <button onClick={atEnd ? openFull : next}
             className="ml-auto flex h-[52px] flex-1 items-center justify-center gap-1.5 rounded-[14px] text-[18px] font-black text-white transition-transform active:scale-[0.98]"
             style={{ background: `linear-gradient(180deg, #8FC25A, ${GREEN})`, boxShadow: '0 4px 0 #5F8F36' }}>
-            {mode.kind !== 'main' ? <><X size={18} /> Back to game</> : ply === 0 ? (status === 'ready' ? 'Start review' : 'Next') : atEnd ? (canFullAnalysis ? 'Finish' : 'Start over') : 'Next'}
+            {mode.kind !== 'main' ? <><X size={18} /> Back to game</> : ply === 0 ? (status === 'ready' ? 'Start review' : 'Next') : atEnd ? <>Full analysis<ProTag /></> : 'Next'}
           </button>
         </div>
       </div>
