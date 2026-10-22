@@ -26,7 +26,7 @@ import { BackgroundJobsWatcher } from "@/components/BackgroundJobsWatcher";
 import { AudioAutoplayUnlock } from "@/components/AudioAutoplayUnlock";
 import { Layout } from "@/components/Layout";
 import { useUser } from "@/hooks/use-user";
-import React, { useEffect, Component, Suspense, lazy, type ReactNode } from "react";
+import React, { useEffect, useRef, Component, Suspense, lazy, type ReactNode } from "react";
 import { PageLoader } from "@/components/PageLoader";
 import { PublicShell } from "@/components/PublicShell";
 import { apiFetch } from "@/lib/api";
@@ -379,8 +379,29 @@ function visitSource(): { utmSource?: string; utmCampaign?: string; referrerHost
   } catch { return {}; }
 }
 
+// Where this visitor is (country, city, time zone), looked up once per visit
+// from chessscout.net/api/geo and sent with the next page view.
+let geoPromise: Promise<Record<string, string | null> | null> | null = null;
+// Sent again after signing in, so it lands on the new account too.
+let geoSentFor: string | null = null;
+function visitGeo(who: string): Promise<Record<string, string | null> | null> {
+  if (geoSentFor === who) return Promise.resolve(null);
+  if (!geoPromise) {
+    let tz: string | null = null;
+    try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone || null; } catch { /* ignore */ }
+    geoPromise = fetch(`${import.meta.env.BASE_URL}api/geo`, { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : {}))
+      .catch(() => ({}))
+      .then((g: Record<string, string | null>) => ({ country: g.country ?? null, region: g.region ?? null, city: g.city ?? null, timezone: tz || g.timezone || null }));
+  }
+  return geoPromise.then((g) => { geoSentFor = who; return g; });
+}
+
 function PageTracker() {
   const [location] = useLocation();
+  const { authUser } = useUser();
+  const who = authUser?.id ?? 'visitor';
+  const whoRef = useRef(who);
   // AppLovin Axon: a page view on every screen change (never for kids pages).
   useEffect(() => { if (!isKidsPath(location)) axonTrack('page_view'); }, [location]);
   // A referral code on any shared link (?ref=CODE) is kept for signup.
@@ -391,15 +412,24 @@ function PageTracker() {
     } catch { /* ignore */ }
   }, [location]);
   useEffect(() => {
-    apiFetch('/api/track', {
+    const source = visitSource();
+    void visitGeo(whoRef.current).catch(() => null).then((geo) => apiFetch('/api/track', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
       // automated: the browser says it's driven by a script (headless/test tools)
       // ownTool: our own screenshot tools add ?cs_shot=1 (Share Kit, store and link-preview shots)
-      body: JSON.stringify({ path: location, visitorId: getVisitorId(), automated: navigator.webdriver === true, ownTool: new URLSearchParams(window.location.search).has('cs_shot'), ...visitSource() }),
-    }).catch(() => {});
+      body: JSON.stringify({ path: location, visitorId: getVisitorId(), automated: navigator.webdriver === true, ownTool: new URLSearchParams(window.location.search).has('cs_shot'), ...source, ...(geo ? { geo } : {}) }),
+    })).catch(() => {});
   }, [location]);
+  // Signed in after the first page: put the location on the account too.
+  useEffect(() => {
+    whoRef.current = who;
+    if (who === 'visitor') return;
+    void visitGeo(who).then((geo) => {
+      if (geo) return apiFetch('/api/track/geo', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ geo }) });
+    }).catch(() => {});
+  }, [who]);
   return null;
 }
 

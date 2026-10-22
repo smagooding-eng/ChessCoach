@@ -81,6 +81,28 @@ router.use(appConfigRouter);
 router.use(socialRouter);
 router.use(tournamentsRouter);
 
+function readGeo(body: unknown): { country: string | null; region: string | null; city: string | null; tz: string | null } | null {
+  const g = (body as { geo?: Record<string, unknown> } | undefined)?.geo;
+  if (!g || typeof g !== "object") return null;
+  const gs = (v: unknown, n = 80) => (typeof v === "string" && v.trim() ? v.trim().slice(0, n) : null);
+  const country = gs(g.country, 2)?.toUpperCase() ?? null;
+  const raw = gs(g.timezone, 64);
+  let tz: string | null = null;
+  if (raw) { try { new Intl.DateTimeFormat("en-US", { timeZone: raw }); tz = raw; } catch { tz = null; } }
+  return country || tz ? { country, region: gs(g.region), city: gs(g.city), tz } : null;
+}
+function saveUserGeo(userId: string, g: NonNullable<ReturnType<typeof readGeo>>) {
+  void db.execute(sql`UPDATE users SET country = COALESCE(${g.country}, country), region = COALESCE(${g.region}, region),
+    city = COALESCE(${g.city}, city), timezone = COALESCE(${g.tz}, timezone), geo_updated_at = now() WHERE id = ${userId}`).catch(() => {});
+}
+
+// Location after signing in (the first page view was sent as a visitor).
+router.post("/track/geo", async (req: Request, res: Response) => {
+  const g = readGeo(req.body);
+  if (req.user?.id && g) saveUserGeo(req.user.id, g);
+  res.json({ ok: true });
+});
+
 router.post("/track", async (req: Request, res: Response) => {
   try {
     const { path, visitorId, automated, ownTool } = req.body;
@@ -95,13 +117,20 @@ router.post("/track", async (req: Request, res: Response) => {
       return;
     }
     if (req.user?.id) touchLastActive(req.user.id);
+    // Location, sent once per visit: kept on the member's account (Admin > User Activity).
+    const geo = readGeo(req.body);
+    if (geo && req.user?.id) saveUserGeo(req.user.id, geo);
+    const country = geo?.country ?? null, validTz = geo?.tz ?? null;
     const clean = (v: unknown, n = 80) => (typeof v === "string" && v.trim() ? v.trim().toLowerCase().replace(/[^a-z0-9_.\-]/g, "").slice(0, n) || null : null);
     const { utmSource, utmCampaign, referrerHost } = req.body ?? {};
     const src = clean(utmSource), camp = clean(utmCampaign, 120), refHost = clean(referrerHost, 120);
     if (src || camp || refHost) {
       // Only the first page of a visit from a link carries these.
-      await db.execute(sql`INSERT INTO page_views (path, user_id, visitor_id, ip_address, utm_source, utm_campaign, referrer_host)
-        VALUES (${path}, ${req.user?.id ?? null}, ${visitorId || `ip_${ip}`}, ${ip}, ${src}, ${camp}, ${refHost})`);
+      await db.execute(sql`INSERT INTO page_views (path, user_id, visitor_id, ip_address, utm_source, utm_campaign, referrer_host, country, timezone)
+        VALUES (${path}, ${req.user?.id ?? null}, ${visitorId || `ip_${ip}`}, ${ip}, ${src}, ${camp}, ${refHost}, ${country}, ${validTz})`);
+    } else if (country || validTz) {
+      await db.execute(sql`INSERT INTO page_views (path, user_id, visitor_id, ip_address, country, timezone)
+        VALUES (${path}, ${req.user?.id ?? null}, ${visitorId || `ip_${ip}`}, ${ip}, ${country}, ${validTz})`);
     } else {
       await db.insert(pageViewsTable).values({
         path,

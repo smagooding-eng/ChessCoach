@@ -3101,11 +3101,16 @@ function UserActivityPanel() {
       name?: string | null; scoutUsername?: string | null; chesscomUsername?: string | null; lichessUsername?: string | null; authProvider?: string;
       allFeatures?: { path: string; count: number }[]; pageViewLog?: { path: string; at: string }[]; activities?: { label: string; count: number }[];
       pushDevices?: { device: string; since: string; lastDelivered: string | null }[];
+      country?: string | null; region?: string | null; city?: string | null; timezone?: string | null;
+      activeHoursTheirs?: number[] | null; activeHoursYours?: number[];
+      usualTimeTheirs?: { start: number; end: number } | null; usualTimeYours?: { start: number; end: number } | null;
     }[];
   } | null>(null);
   const [q, setQ] = useState('');
   const [openLog, setOpenLog] = useState<Record<string, boolean>>({});
   const [pushFilter, setPushFilter] = useState<'all' | 'on' | 'off'>('all');
+  const [tzFilter, setTzFilter] = useState('');
+  const [countryFilter, setCountryFilter] = useState('');
   const [loading, setLoading] = useState(true);
   const [range, setRange] = useState<DateRange>({ startDate: '', endDate: '' });
   const [expanded, setExpanded] = useState(false);
@@ -3128,10 +3133,23 @@ function UserActivityPanel() {
   };
   const hasPush = (u: { pushDevices?: unknown[] }) => (u.pushDevices?.length ?? 0) > 0;
   const pushOnCount = (data?.users ?? []).filter(hasPush).length;
+  const countryName = (c?: string | null) => {
+    if (!c) return '';
+    try { return new Intl.DisplayNames(undefined, { type: 'region' }).of(c) ?? c; } catch { return c; }
+  };
+  const flag = (c?: string | null) => (c && /^[A-Z]{2}$/.test(c) ? String.fromCodePoint(...[...c].map((ch) => 0x1f1a5 + ch.charCodeAt(0))) : '');
+  const hourLabel = (h: number) => `${((h + 11) % 12) + 1}${h < 12 ? 'am' : 'pm'}`;
+  const windowLabel = (w?: { start: number; end: number } | null) => (w ? `${hourLabel(w.start)}–${hourLabel(w.end)}` : '');
+  const theirNow = (tz?: string | null) => { if (!tz) return ''; try { return new Date().toLocaleTimeString(undefined, { timeZone: tz, hour: 'numeric', minute: '2-digit' }); } catch { return ''; } };
+  const tzOptions = [...new Set((data?.users ?? []).map((u) => u.timezone).filter((t): t is string => !!t))].sort();
+  const countryOptions = [...new Set((data?.users ?? []).map((u) => u.country).filter((c): c is string => !!c))].sort((a, b) => countryName(a).localeCompare(countryName(b)));
   const matching = (data?.users ?? [])
     .filter((u) => pushFilter === 'all' || (pushFilter === 'on') === hasPush(u))
+    .filter((u) => !tzFilter || (tzFilter === '__none' ? !u.timezone : u.timezone === tzFilter))
+    .filter((u) => !countryFilter || (countryFilter === '__none' ? !u.country : u.country === countryFilter))
     .filter((u) => !q || [u.label, u.email, u.name, u.scoutUsername, u.chesscomUsername, u.lichessUsername].some((v) => v && v.toLowerCase().includes(q.toLowerCase())));
-  const visibleUsers = expanded || q || pushFilter !== 'all' ? matching : matching.slice(0, 15);
+  const filtering = !!q || pushFilter !== 'all' || !!tzFilter || !!countryFilter;
+  const visibleUsers = expanded || filtering ? matching : matching.slice(0, 15);
   const fmtTime = (iso: string) => new Date(iso).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 
   return (
@@ -3170,6 +3188,19 @@ function UserActivityPanel() {
               </button>
             ))}
           </div>
+          <div className="mb-2 flex flex-wrap gap-1.5 text-[10.5px]">
+            <select value={countryFilter} onChange={(e) => setCountryFilter(e.target.value)} className="rounded-md border border-white/10 bg-white/5 px-2 py-1">
+              <option value="">All countries</option>
+              {countryOptions.map((c) => <option key={c} value={c}>{flag(c)} {countryName(c)} ({(data.users ?? []).filter((u) => u.country === c).length})</option>)}
+              <option value="__none">Not known yet</option>
+            </select>
+            <select value={tzFilter} onChange={(e) => setTzFilter(e.target.value)} className="rounded-md border border-white/10 bg-white/5 px-2 py-1">
+              <option value="">All time zones</option>
+              {tzOptions.map((t) => <option key={t} value={t}>{t.replace(/_/g, ' ')} ({(data.users ?? []).filter((u) => u.timezone === t).length})</option>)}
+              <option value="__none">Not known yet</option>
+            </select>
+            {filtering && <span className="self-center font-bold">{matching.length} match{matching.length === 1 ? '' : 'es'}</span>}
+          </div>
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Find by email, name or username"
             className="mb-2 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs outline-none" />
           <div className="space-y-2">
@@ -3200,6 +3231,27 @@ function UserActivityPanel() {
                   <span>{u.totalPageViews} page views</span>
                   {u.aiCalls > 0 && <span className="text-foreground font-bold">{u.aiCalls} AI calls (${u.aiCostUsd.toFixed(2)})</span>}
                 </div>
+                <p className="mb-0.5 text-[10.5px]">
+                  {u.country || u.timezone ? (
+                    <>
+                      {flag(u.country)} {[countryName(u.country), u.region, u.city].filter(Boolean).join(' · ')}
+                      {u.timezone && <span className="text-muted-foreground"> · {u.timezone.replace(/_/g, ' ')}{theirNow(u.timezone) ? ` (${theirNow(u.timezone)} there now)` : ''}</span>}
+                    </>
+                  ) : <span className="text-muted-foreground">Location not known yet (shows after their next visit)</span>}
+                </p>
+                {u.usualTimeYours && (
+                  <div className="mb-1 flex items-center gap-2">
+                    <span className="text-[10px] text-muted-foreground">
+                      Usually on {u.usualTimeTheirs ? `${windowLabel(u.usualTimeTheirs)} their time · ` : ''}{windowLabel(u.usualTimeYours)} your time
+                    </span>
+                    <span className="flex h-4 items-end gap-px" title="Page views by hour of day (your time)">
+                      {(u.activeHoursYours ?? []).map((n, h) => {
+                        const max = Math.max(1, ...(u.activeHoursYours ?? [1]));
+                        return <span key={h} className="w-[3px] rounded-sm bg-primary/80" style={{ height: `${Math.max(n ? 15 : 4, (n / max) * 100)}%`, opacity: n ? 1 : 0.25 }} />;
+                      })}
+                    </span>
+                  </div>
+                )}
                 <p className={cn('mb-1.5 text-[10px] font-semibold', hasPush(u) ? 'text-primary' : 'text-muted-foreground')}>
                   {hasPush(u)
                     ? `Notifications on · ${u.pushDevices!.map((d) => d.device).join(', ')}${u.pushDevices!.some((d) => d.lastDelivered) ? ` · last delivered ${fmtDate(u.pushDevices!.map((d) => d.lastDelivered).filter(Boolean).sort().pop() ?? null)}` : ''}`

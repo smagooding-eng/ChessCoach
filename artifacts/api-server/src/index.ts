@@ -285,6 +285,14 @@ async function runSchemaMigrations() {
     await db.execute(sql`ALTER TABLE page_views ADD COLUMN IF NOT EXISTS utm_source VARCHAR`);
     await db.execute(sql`ALTER TABLE page_views ADD COLUMN IF NOT EXISTS utm_campaign VARCHAR`);
     await db.execute(sql`ALTER TABLE page_views ADD COLUMN IF NOT EXISTS referrer_host VARCHAR`);
+    // Where visitors and members are (from chessscout.net/api/geo, once per visit).
+    await db.execute(sql`ALTER TABLE page_views ADD COLUMN IF NOT EXISTS country VARCHAR(2)`);
+    await db.execute(sql`ALTER TABLE page_views ADD COLUMN IF NOT EXISTS timezone VARCHAR`);
+    await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS country VARCHAR(2)`);
+    await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS region VARCHAR`);
+    await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS city VARCHAR`);
+    await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS timezone VARCHAR`);
+    await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS geo_updated_at TIMESTAMPTZ`);
     // Reporting views that leave the owner's accounts and suspected bots out of the admin numbers.
     await ensureAnalyticsViews();
     // Practice-bot results: each player's record against each bot, and how

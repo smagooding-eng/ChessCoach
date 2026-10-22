@@ -1736,6 +1736,24 @@ router.get("/admin/user-activity", requireAdmin, async (req: Request, res: Respo
       chesscom: 'Chess.com games imported', lichess: 'Lichess games imported', chessscout: 'Games played on ChessScout',
       live: 'Live games', daily: 'Daily games started', puzzles_solved: 'Puzzles solved', puzzles_missed: 'Puzzles missed', scans: 'Positions scanned',
     };
+    // Where each member is, and when they're usually on.
+    const geoRows = await db.execute(sql`SELECT id, country, region, city, timezone FROM users`).then(rowsOf).catch(() => [] as Record<string, unknown>[]);
+    const geoBy = new Map(geoRows.map((r) => [String(r.id), { country: (r.country as string | null) ?? null, region: (r.region as string | null) ?? null, city: (r.city as string | null) ?? null, timezone: (r.timezone as string | null) ?? null }]));
+    const adminOffsetMin = (() => { const t = parseInt(String(req.query.tz ?? "0"), 10); return Number.isFinite(t) ? Math.max(-840, Math.min(840, t)) : 0; })();
+    const hourFmt = new Map<string, Intl.DateTimeFormat>();
+    const hourIn = (d: Date, tz: string | null): number => {
+      if (!tz) return new Date(d.getTime() - adminOffsetMin * 60_000).getUTCHours();
+      let f = hourFmt.get(tz);
+      if (!f) { try { f = new Intl.DateTimeFormat("en-US", { timeZone: tz, hour: "numeric", hourCycle: "h23" }); } catch { return new Date(d.getTime() - adminOffsetMin * 60_000).getUTCHours(); } hourFmt.set(tz, f); }
+      return parseInt(f.format(d), 10) % 24;
+    };
+    const busiestWindow = (h: number[]): { start: number; end: number } | null => {
+      if (!h.some(Boolean)) return null;
+      let best = 0, bestSum = -1;
+      for (let i = 0; i < 24; i++) { const sum = h[i] + h[(i + 1) % 24] + h[(i + 2) % 24]; if (sum > bestSum) { bestSum = sum; best = i; } }
+      return { start: best, end: (best + 3) % 24 };
+    };
+
     // Who has phone/browser notifications switched on (and on which devices).
     const pushRows = await db.execute(sql`SELECT user_id, user_agent, created_at, last_success_at FROM push_subscriptions`).then(rowsOf).catch(() => [] as Record<string, unknown>[]);
     const pushByUser = new Map<string, { device: string; since: string; lastDelivered: string | null }[]>();
@@ -1826,6 +1844,20 @@ router.get("/admin/user-activity", requireAdmin, async (req: Request, res: Respo
           pageViewLog: agg ? agg.views.sort((a, b) => b.at.getTime() - a.at.getTime()).slice(0, 500).map((v) => ({ path: v.path, at: v.at.toISOString() })) : [],
           activities: (activitiesByUser.get(u.id) ?? []).sort((a, b) => b.count - a.count),
           pushDevices: pushByUser.get(u.id) ?? [],
+          ...(() => {
+            const g = geoBy.get(u.id) ?? { country: null, region: null, city: null, timezone: null };
+            const theirs = new Array(24).fill(0) as number[];
+            const yours = new Array(24).fill(0) as number[];
+            for (const v of agg?.views ?? []) { theirs[hourIn(v.at, g.timezone)]++; yours[hourIn(v.at, null)]++; }
+            return {
+              country: g.country, region: g.region, city: g.city, timezone: g.timezone,
+              // Page views by hour of day: in their own time zone (if known) and in yours.
+              activeHoursTheirs: g.timezone ? theirs : null,
+              activeHoursYours: yours,
+              usualTimeTheirs: g.timezone ? busiestWindow(theirs) : null,
+              usualTimeYours: busiestWindow(yours),
+            };
+          })(),
           signedUpAt: u.createdAt.toISOString(),
           isNew: u.createdAt >= todayStart,
           activeToday: activeTodayIds.has(u.id),
