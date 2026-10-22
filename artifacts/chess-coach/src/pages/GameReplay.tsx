@@ -874,6 +874,19 @@ export function GameReplay() {
     }
   }, [game, reviewing, reviewMoves.length, pollReviewStatus]);
 
+  // Step-by-step review is the main review for everyone; the full in-depth
+  // analysis view is for Pro members (who can switch between the two).
+  const canFullAnalysis = !!isPremium;
+  const showGuided = !canFullAnalysis || guided;
+  // Open a game that hasn't been reviewed yet: start the review straight away.
+  const autoReviewFor = useRef<number | null>(null);
+  useEffect(() => {
+    if (!game || !showGuided || loadingSavedReview || reviewing || reviewError || reviewMoves.length > 0) return;
+    if (autoReviewFor.current === game.id) return;
+    autoReviewFor.current = game.id;
+    void handleReview(false);
+  }, [game, showGuided, loadingSavedReview, reviewing, reviewError, reviewMoves.length, handleReview]);
+
   const DEFAULT_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
   const gameStartFen = game?.startFen || DEFAULT_FEN;
 
@@ -1015,9 +1028,14 @@ export function GameReplay() {
   const cfg = currentReview ? CLASS_CFG[currentReview.classification] : null;
   const isBad = currentReview && ['inaccuracy', 'mistake', 'blunder', 'missed_win'].includes(currentReview.classification);
 
-  if (guided && reviewMoves.length > 0 && !reviewing) {
+  if (showGuided) {
     return (
       <GuidedReview
+        status={reviewMoves.length > 0 && !reviewing ? 'ready' : reviewError ? 'error' : loadingSavedReview && !reviewing ? 'loading' : 'preparing'}
+        progress={reviewProgress}
+        errorText={reviewError}
+        onRetryReview={() => { setReviewError(null); void handleReview(true); }}
+        canFullAnalysis={canFullAnalysis}
         moves={moves as any}
         startFen={gameStartFen}
         reviewMoves={reviewMoves}
