@@ -18,6 +18,8 @@ export type Classification = MoveQuality;
 export interface GuidedReviewMove {
   moveIndex: number; san: string; color: 'white' | 'black'; classification: Classification;
   explanation: string; betterMove: string | null; evalAfterCp?: number; bestLineSan?: string[];
+  /** The engine's expected continuation after this move (both sides). */
+  replyLineSan?: string[];
   pros?: string[]; cons?: string[];
 }
 interface PlyMove { san: string; fen: string; from?: string | null; to?: string | null; fenBefore?: string | null }
@@ -59,15 +61,57 @@ function sanToSquares(fen: string, san: string): { from: string; to: string; fen
 function soundFor(san: string) {
   playMoveSound(san.includes('#') || san.includes('+') ? 'check' : san.startsWith('O-O') ? 'castle' : san.includes('=') ? 'promote' : san.includes('x') ? 'capture' : 'move');
 }
-/** First sentence or two, so the bubble stays short; the rest on tap. */
-function shortText(t: string): { short: string; more: boolean } {
+/** Splits the coach's text: what fits the top card (about two lines), and the rest for below. */
+function splitText(t: string): { top: string; rest: string } {
   const clean = (t || '').replace(/\s+/g, ' ').trim();
-  if (clean.length <= 170) return { short: clean, more: false };
-  const parts = clean.match(/[^.!?]+[.!?]+/g) ?? [clean];
-  let out = '';
-  for (const p of parts) { if ((out + p).length > 170 && out) break; out += p; }
-  return { short: out.trim() || clean.slice(0, 167) + '…', more: true };
+  // Sentence breaks are a stop followed by a space and a capital, so move numbers ("8...Bxc6 9.Bxc6") stay whole.
+  const parts = clean.split(/(?<=[.!?])\s+(?=[A-Z"(])/).map((x) => x.trim()).filter(Boolean);
+  if (!parts.length) return { top: '', rest: '' };
+  // One long sentence: it can't fit on top, so it all goes below.
+  if (parts[0].length > 110) return { top: '', rest: clean };
+  let top = parts[0]; let k = 1;
+  while (k < parts.length && (top + ' ' + parts[k]).length <= 100) { top += ' ' + parts[k]; k++; }
+  return { top, rest: parts.slice(k).join(' ') };
 }
+
+const PVAL: Record<string, number> = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
+const PNAME: Record<string, string> = { p: 'pawn', n: 'knight', b: 'bishop', r: 'rook', q: 'queen', k: 'king' };
+/** What the side to move in `fen` could do next: a mate in one, or the best material grab. */
+function threatsIn(fen: string): { mate: string | null; win: { san: string; type: string; sq: string } | null } {
+  try {
+    const c = new Chess(normalizeFen(fen));
+    if (c.isGameOver()) return { mate: null, win: null };
+    const ms = c.moves({ verbose: true });
+    const mate = ms.find((m) => m.san.includes('#'))?.san ?? null;
+    let win: { san: string; type: string; sq: string } | null = null; let best = 0;
+    for (const m of ms) {
+      if (!m.captured) continue;
+      const t = new Chess(c.fen()); t.move(m.san);
+      const defended = t.attackers(m.to, t.turn()).length > 0;
+      const gain = defended ? PVAL[m.captured] - PVAL[m.piece] : PVAL[m.captured];
+      if (gain >= 1 && gain > best) { best = gain; win = { san: m.san, type: m.captured, sq: m.to }; }
+    }
+    return { mate, win };
+  } catch { return { mate: null, win: null }; }
+}
+/** The same position with the other side to move (null when that isn't legal, e.g. in check). */
+function flipFen(fen: string): string | null {
+  try {
+    const c = new Chess(normalizeFen(fen));
+    if (c.isCheck()) return null;
+    const f = c.fen().split(' '); f[1] = f[1] === 'w' ? 'b' : 'w'; f[3] = '-';
+    new Chess(f.join(' '));
+    return f.join(' ');
+  } catch { return null; }
+}
+function standing(cp: number | null | undefined): string {
+  if (cp == null) return '';
+  const side = cp > 0 ? 'White' : 'Black';
+  if (Math.abs(cp) >= 9000) return `${side} has a forced mate`;
+  const a = Math.abs(cp);
+  return a < 50 ? 'About equal' : a < 150 ? `${side} is slightly better` : a < 400 ? `${side} is better` : `${side} is winning`;
+}
+
 
 function Badge({ cls, size = 22 }: { cls: Classification; size?: number }) {
   const c = CLS[cls];
@@ -115,7 +159,7 @@ export interface GuidedReviewProps {
   onUpgrade?: () => void;
 }
 
-type Mode = { kind: 'main' } | { kind: 'best'; step: number } | { kind: 'retry'; state: 'trying' | 'right' | 'wrong' };
+type Mode = { kind: 'main' } | { kind: 'best'; step: number } | { kind: 'reply'; step: number } | { kind: 'retry'; state: 'trying' | 'right' | 'wrong' };
 
 export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flipped, onFlip, whiteName, blackName, accuracy, result, onExit, onBack, status = 'ready', progress, errorText, onRetryReview, canFullAnalysis = true, onUpgrade }: GuidedReviewProps) {
   // Full analysis (with the AI coach) is Pro: members go there, others to the Pro page.
@@ -184,6 +228,15 @@ export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flippe
     return bestApplied && rev?.betterMove ? [{ san: rev.betterMove, ...bestApplied }] : [];
   }, [line, bestApplied, rev?.betterMove]);
 
+  // What the engine expects next, from the position after this move.
+  const replyLine = useMemo(() => {
+    const out: { san: string; from: string; to: string; fen: string }[] = [];
+    if (ply <= 0) return out;
+    let f = fenAt(ply);
+    for (const san of rev?.replyLineSan ?? []) { const r = sanToSquares(f, san); if (!r) break; out.push({ san, ...r }); f = r.fen; }
+    return out;
+  }, [ply, fenAt, rev?.replyLineSan]);
+
   // The reply this move allows (the engine's choice for the other side next).
   const replyArrow = useMemo(() => {
     if (!rev || !bad || ply >= max) return null;
@@ -205,6 +258,9 @@ export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flippe
   } else if (mode.kind === 'best' && bestLine.length) {
     const step = Math.min(mode.step, bestLine.length - 1);
     boardFen = bestLine[step].fen; lastMove = { from: bestLine[step].from, to: bestLine[step].to }; quality = step === 0 ? 'best' : null; arrows = [];
+  } else if (mode.kind === 'reply' && replyLine.length) {
+    const step = Math.min(mode.step, replyLine.length - 1);
+    boardFen = replyLine[step].fen; lastMove = { from: replyLine[step].from, to: replyLine[step].to }; quality = null; arrows = [];
   } else if (mode.kind === 'retry') {
     boardFen = fenBefore; lastMove = ply > 1 ? lastMoveOf(ply - 1) : null; quality = null; arrows = [];
   }
@@ -213,11 +269,13 @@ export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flippe
   // Best: play the line through, one move at a time (tap a move to jump to it).
   const [autoPlay, setAutoPlay] = useState(true);
   useEffect(() => {
-    if (mode.kind !== 'best' || !autoPlay) return;
-    if (mode.step >= bestLine.length - 1) return;
-    const t = setTimeout(() => { soundFor(bestLine[mode.step + 1].san); setMode({ kind: 'best', step: mode.step + 1 }); }, 1100);
+    if ((mode.kind !== 'best' && mode.kind !== 'reply') || !autoPlay) return;
+    const l = mode.kind === 'best' ? bestLine : replyLine;
+    if (mode.step >= l.length - 1) return;
+    const kind = mode.kind;
+    const t = setTimeout(() => { soundFor(l[mode.step + 1].san); setMode({ kind, step: mode.step + 1 }); }, 1100);
     return () => clearTimeout(t);
-  }, [mode, bestLine, autoPlay]);
+  }, [mode, bestLine, replyLine, autoPlay]);
 
   // ── The coach's bubble ─────────────────────────────────────────────────
   const counts = useMemo(() => {
@@ -231,21 +289,25 @@ export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flippe
   const H = 'text-[15px] font-extrabold text-[#F5F7F6]';
   const P = 'text-[13.5px] leading-snug text-[#C9CFCD]';
   const pieceName: Record<string, string> = { K: 'king', Q: 'queen', R: 'rook', B: 'bishop', N: 'knight' };
-  const lineChips = bestLine.length > 1 && (
+  const chipsFor = (kind: 'best' | 'reply', l: { san: string; fen: string }[], start: string, minLen: number) => l.length >= minLen && (
     <div className="mt-1.5 flex flex-wrap items-center gap-x-1 gap-y-1 text-[13.5px] text-[#C9CFCD]">
-      {bestLine.map((m, i) => {
-        const w = new Chess(normalizeFen(i === 0 ? fenBefore : bestLine[i - 1].fen)).turn() === 'w';
-        const on = mode.kind === 'best' && i === mode.step;
+      {l.map((m, i) => {
+        const w = new Chess(normalizeFen(i === 0 ? start : l[i - 1].fen)).turn() === 'w';
+        const on = mode.kind === kind && i === mode.step;
         return (
-          <button key={i} onClick={() => { setAutoPlay(false); setMode({ kind: 'best', step: i }); }}
+          <button key={i} onClick={() => { setAutoPlay(false); if (mode.kind !== kind) soundFor(m.san); setMode({ kind, step: i }); }}
             className={`rounded px-1.5 py-0.5 ${on ? 'bg-[#81B64C]/25 font-bold text-[#F5F7F6]' : 'bg-white/5'}`}>
             {figurine(m.san, w)}
           </button>
         );
       })}
-      {mode.kind === 'best' && <button onClick={() => { setAutoPlay(true); setMode({ kind: 'best', step: 0 }); }} className="ml-1 text-[12px] font-bold text-[#81B64C]">Replay</button>}
+      {mode.kind === kind
+        ? <button onClick={() => { setAutoPlay(true); soundFor(l[0].san); setMode({ kind, step: 0 }); }} className="ml-1 text-[12px] font-bold text-[#81B64C]">Replay</button>
+        : <button onClick={() => { setAutoPlay(true); soundFor(l[0].san); setMode({ kind, step: 0 }); }} className="ml-1 text-[12px] font-bold text-[#81B64C]">Play</button>}
     </div>
   );
+  const lineChips = chipsFor('best', bestLine, fenBefore, 2);
+  const L = 'text-[11.5px] font-bold uppercase tracking-wide text-[#87918E]';
 
   let top: React.ReactNode = null;
   let detail: React.ReactNode = null;
@@ -286,6 +348,20 @@ export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flippe
         <p className={`mt-2 ${P}`}>{rev.explanation}</p>
       </>
     );
+  } else if (mode.kind === 'reply' && rev && move) {
+    top = (
+      <>
+        <p className={`truncate ${H}`}>{bad ? 'How this gets punished' : 'What the engine expects next'}</p>
+        <p className={`mt-1 line-clamp-2 ${P}`}>The engine's main line after {figurine(move.san, isWhiteMove)}. Tap a move to stop on it.</p>
+      </>
+    );
+    detail = (
+      <>
+        <p className={L}>Engine line</p>
+        {chipsFor('reply', replyLine, fenAt(ply), 1)}
+        <p className={`mt-2 text-[12.5px] ${P}`}>{standing(rev.evalAfterCp)}</p>
+      </>
+    );
   } else if (mode.kind === 'retry') {
     top = mode.state === 'right' ? (
       <>
@@ -300,12 +376,30 @@ export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flippe
       <p className={P}><b className="text-[#F5F7F6]">Hint:</b> it's a {pieceName[p0] ?? 'pawn'} move{rev?.betterMove?.includes('x') ? ' that captures' : ''}{rev?.betterMove?.includes('+') ? ', with check' : ''}.</p>
     );
   } else if (rev && move) {
-    const t = shortText(rev.explanation);
+    const t = splitText(rev.explanation);
     const ev = evalLabel(rev.evalAfterCp);
     const before = ply > 1 ? byIndex.get(ply - 2)?.evalAfterCp : 20;
     const evBefore = evalLabel(before ?? null);
-    // The top card fits about two lines; anything longer is shown in full below.
-    const full = t.more || (rev.explanation || '').length > 90;
+    // What each side can do from here (read off the board, not repeated from the coach).
+    const fenNow = fenAt(ply);
+    const oppName = isWhiteMove ? 'Black' : 'White';
+    const meName = isWhiteMove ? 'White' : 'Black';
+    const opp = threatsIn(fenNow);
+    const flipped0 = flipFen(fenNow);
+    const mine = flipped0 ? threatsIn(flipped0) : { mate: null, win: null };
+    const threatRows: { who: 'them' | 'me'; text: React.ReactNode }[] = [];
+    // Skip what the coach already said (the same square or move).
+    const said = (x: { san: string; sq?: string } | null) => !!x && (rev.explanation.includes(x.san) || (!!x.sq && rev.explanation.includes(x.sq)));
+    if (said(opp.win ? { san: opp.win.san, sq: opp.win.sq } : null)) opp.win = null;
+    if (opp.mate && rev.explanation.includes(opp.mate)) opp.mate = null;
+    if (mine.win && said({ san: mine.win.san, sq: mine.win.sq })) mine.win = null;
+    if (mine.mate && rev.explanation.includes(mine.mate)) mine.mate = null;
+    if (opp.mate) threatRows.push({ who: 'them', text: <>{oppName} has mate with <b className="text-[#F5F7F6]">{figurine(opp.mate, !isWhiteMove)}</b></> });
+    else if (opp.win) threatRows.push({ who: 'them', text: <>{oppName} can win the {PNAME[opp.win.type]} on {opp.win.sq} with <b className="text-[#F5F7F6]">{figurine(opp.win.san, !isWhiteMove)}</b></> });
+    if (mine.mate) threatRows.push({ who: 'me', text: <>{meName} threatens mate with <b className="text-[#F5F7F6]">{figurine(mine.mate, isWhiteMove)}</b></> });
+    else if (mine.win) threatRows.push({ who: 'me', text: <>{meName} threatens <b className="text-[#F5F7F6]">{figurine(mine.win.san, isWhiteMove)}</b>, winning the {PNAME[mine.win.type]}</> });
+    const swing = before != null && rev.evalAfterCp != null && Math.abs(before) < 9000 && Math.abs(rev.evalAfterCp) < 9000
+      ? (isWhiteMove ? 1 : -1) * (rev.evalAfterCp - before) : null;
     top = (
       <>
         <div className="flex items-center gap-2">
@@ -313,14 +407,15 @@ export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flippe
           <p className={`min-w-0 flex-1 truncate ${H}`}>{figurine(move.san, isWhiteMove)} {CLS[rev.classification].phrase}</p>
           {ev && <span className="shrink-0 rounded-md bg-white/10 px-2 py-0.5 text-[13px] font-extrabold tabular-nums text-[#F5F7F6]">{ev}</span>}
         </div>
-        {t.short && <p className={`mt-1 line-clamp-2 ${P}`}>{t.short}</p>}
+        {t.top && <p className={`mt-1 line-clamp-2 ${P}`}>{t.top}</p>}
       </>
     );
+    const hasRest = !!t.rest;
     detail = (
       <>
-        {full && <p className={P}>{rev.explanation}</p>}
-        {bad && rev.betterMove && (
-          <div className={`flex items-center justify-between gap-2 ${full ? 'mt-2' : ''}`}>
+        {hasRest && <p className={P}>{t.rest}</p>}
+        {bad && rev.betterMove && !(hasRest && bestLine.length > 1 && t.rest.includes(rev.betterMove)) && (
+          <div className={`flex items-center justify-between gap-2 ${hasRest ? 'mt-2' : ''}`}>
             <p className={P}>Better was <b className="text-[#F5F7F6]">{figurine(rev.betterMove, isWhiteMove)}</b></p>
             <button onClick={() => { setAutoPlay(true); soundFor(bestLine[0]?.san ?? rev.betterMove!); setMode({ kind: 'best', step: 0 }); }}
               className="shrink-0 rounded-lg px-2.5 py-1 text-[12px] font-bold text-white" style={{ background: GREEN }}>Show me</button>
@@ -333,12 +428,39 @@ export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flippe
         {!!rev.cons?.length && (
           <ul className="mt-1.5 space-y-0.5">{rev.cons.map((x, i) => <li key={i} className={`flex gap-1.5 ${P}`}><span className="text-[#F0605D]">−</span>{x}</li>)}</ul>
         )}
+        <div className={`${hasRest || bad || rev.pros?.length || rev.cons?.length ? 'mt-2.5 border-t border-white/5 pt-2.5' : ''} space-y-2`}>
+          {ev && (
+            <div className="flex items-center justify-between gap-2">
+              <p className={L}>Position</p>
+              <p className="text-right text-[12.5px] text-[#C9CFCD]">
+                {standing(rev.evalAfterCp)}
+                {evBefore && swing != null && Math.abs(swing) >= 30 && (
+                  <span className="tabular-nums" style={{ color: swing > 0 ? '#81B64C' : '#F0605D' }}>{' · '}{evBefore} → {ev}</span>
+                )}
+              </p>
+            </div>
+          )}
+          {threatRows.length > 0 && (
+            <div>
+              <p className={L}>Threats now</p>
+              {threatRows.map((r, i) => (
+                <p key={i} className={`mt-0.5 flex gap-1.5 ${P}`}><span style={{ color: r.who === 'them' ? '#F0605D' : '#81B64C' }}>●</span><span>{r.text}</span></p>
+              ))}
+            </div>
+          )}
+          {replyLine.length >= 2 && (
+            <div>
+              <p className={L}>{bad ? 'How it gets punished' : 'Engine expects next'}</p>
+              {chipsFor('reply', replyLine, fenNow, 2)}
+            </div>
+          )}
+        </div>
       </>
     );
   } else if (move) {
     top = <p className={H}>{figurine(move.san, isWhiteMove)}</p>;
   }
-  const accent = mode.kind === 'best' || (mode.kind === 'retry' && mode.state === 'right') ? CLS.best.color : rev && mode.kind === 'main' ? CLS[rev.classification].color : GREEN;
+  const accent = mode.kind === 'reply' ? '#4299E1' : mode.kind === 'best' || (mode.kind === 'retry' && mode.state === 'right') ? CLS.best.color : rev && mode.kind === 'main' ? CLS[rev.classification].color : GREEN;
   const animKey = `${ply}-${mode.kind}-${mode.kind === 'retry' ? mode.state : ''}`;
 
   const atEnd = ply >= max && mode.kind === 'main';
