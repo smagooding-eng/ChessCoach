@@ -18,6 +18,7 @@ export type Classification = MoveQuality;
 export interface GuidedReviewMove {
   moveIndex: number; san: string; color: 'white' | 'black'; classification: Classification;
   explanation: string; betterMove: string | null; evalAfterCp?: number; bestLineSan?: string[];
+  pros?: string[]; cons?: string[];
 }
 interface PlyMove { san: string; fen: string; from?: string | null; to?: string | null; fenBefore?: string | null }
 
@@ -213,68 +214,100 @@ export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flippe
     return { keys, white: c('white'), black: c('black') };
   }, [reviewMoves]);
 
-  let bubble: React.ReactNode;
+  // Top card: short, fixed height (so the board never moves). Under the
+  // board: the fuller explanation and extras for the same move.
+  const H = 'text-[15px] font-extrabold text-[#F5F7F6]';
+  const P = 'text-[13.5px] leading-snug text-[#C9CFCD]';
+  const pieceName: Record<string, string> = { K: 'king', Q: 'queen', R: 'rook', B: 'bishop', N: 'knight' };
+  const lineChips = bestLine.length > 1 && (
+    <div className="mt-1.5 flex flex-wrap items-center gap-x-1 gap-y-1 text-[13.5px] text-[#C9CFCD]">
+      {bestLine.map((m, i) => {
+        const w = new Chess(normalizeFen(i === 0 ? fenBefore : bestLine[i - 1].fen)).turn() === 'w';
+        const on = mode.kind === 'best' && i === mode.step;
+        return (
+          <button key={i} onClick={() => { setAutoPlay(false); setMode({ kind: 'best', step: i }); }}
+            className={`rounded px-1.5 py-0.5 ${on ? 'bg-[#81B64C]/25 font-bold text-[#F5F7F6]' : 'bg-white/5'}`}>
+            {figurine(m.san, w)}
+          </button>
+        );
+      })}
+      {mode.kind === 'best' && <button onClick={() => { setAutoPlay(true); setMode({ kind: 'best', step: 0 }); }} className="ml-1 text-[12px] font-bold text-[#81B64C]">Replay</button>}
+    </div>
+  );
+
+  let top: React.ReactNode = null;
+  let detail: React.ReactNode = null;
   if (ply === 0 && mode.kind === 'main') {
-    bubble = (
+    top = (<><p className={H}>Let's review your game</p><p className={`mt-0.5 ${P}`}>Move by move. Tap Next, or swipe the board.</p></>);
+  } else if (mode.kind === 'best' && rev?.betterMove) {
+    top = (
       <>
-        <p className="text-[15px] font-extrabold text-[#F5F7F6]">Let's review your game</p>
-        <p className="mt-0.5 text-[13.5px] leading-snug text-[#C9CFCD]">I'll take you through it move by move. Tap Next, or swipe the board.</p>
+        <div className="flex items-center gap-2"><Badge cls="best" /><p className={`flex-1 truncate ${H}`}>{figurine(rev.betterMove, isWhiteMove)} was best</p></div>
+        <p className={`mt-1 line-clamp-2 ${P}`}>Instead of {figurine(rev.san, isWhiteMove)}. Watch the engine's line play out.</p>
       </>
     );
-  } else if (mode.kind === 'best' && rev?.betterMove) {
-    bubble = (
+    detail = (
       <>
-        <div className="flex items-center gap-2"><Badge cls="best" /><p className="flex-1 text-[15px] font-extrabold text-[#F5F7F6]">{figurine(rev.betterMove, isWhiteMove)} was best</p></div>
-        <p className="mt-1 text-[12.5px] text-[#C9CFCD]">Instead of {figurine(rev.san, isWhiteMove)}.{bestLine.length > 1 ? ' The engine line:' : ''}</p>
-        {bestLine.length > 1 && (
-          <div className="mt-1 flex flex-wrap items-center gap-x-1 gap-y-1 text-[13.5px] leading-snug text-[#C9CFCD]">
-            {bestLine.map((m, i) => {
-              const w = new Chess(normalizeFen(i === 0 ? fenBefore : bestLine[i - 1].fen)).turn() === 'w';
-              return (
-                <button key={i} onClick={() => { setAutoPlay(false); setMode({ kind: 'best', step: i }); }}
-                  className={`rounded px-1 py-0.5 ${i === mode.step ? 'bg-[#81B64C]/25 font-bold text-[#F5F7F6]' : ''}`}>
-                  {figurine(m.san, w)}
-                </button>
-              );
-            })}
-            <button onClick={() => { setAutoPlay(true); setMode({ kind: 'best', step: 0 }); }} className="ml-1 text-[12px] font-bold text-[#81B64C]">Replay</button>
-          </div>
-        )}
+        <p className="text-[12px] font-bold uppercase tracking-wide text-[#87918E]">Engine line</p>
+        {lineChips || <p className={`mt-1 ${P}`}>{figurine(rev.betterMove, isWhiteMove)}</p>}
+        <p className={`mt-2 ${P}`}>{rev.explanation}</p>
       </>
     );
   } else if (mode.kind === 'retry') {
-    bubble = mode.state === 'right' ? (
+    top = mode.state === 'right' ? (
       <>
-        <div className="flex items-center gap-2"><Badge cls="best" /><p className="text-[15px] font-extrabold text-[#F5F7F6]">That's it!</p></div>
-        <p className="mt-1 text-[13.5px] text-[#C9CFCD]">{rev?.betterMove ? `${figurine(rev.betterMove, isWhiteMove)} is the best move here.` : 'Well found.'}</p>
+        <div className="flex items-center gap-2"><Badge cls="best" /><p className={H}>That's it!</p></div>
+        <p className={`mt-1 line-clamp-2 ${P}`}>{rev?.betterMove ? `${figurine(rev.betterMove, isWhiteMove)} is the best move here.` : 'Well found.'}</p>
       </>
     ) : (
-      <>
-        <p className="text-[15px] font-extrabold text-[#F5F7F6]">{mode.state === 'wrong' ? 'Not quite. Try again' : 'Find a better move'}</p>
-        <p className="mt-0.5 text-[13.5px] text-[#C9CFCD]">{isWhiteMove ? 'White' : 'Black'} to move. Drag a piece to try.</p>
-      </>
+      <><p className={H}>{mode.state === 'wrong' ? 'Not quite. Try again' : 'Find a better move'}</p><p className={`mt-0.5 ${P}`}>{isWhiteMove ? 'White' : 'Black'} to move. Drag a piece to try.</p></>
+    );
+    const p0 = rev?.betterMove?.[0] ?? '';
+    detail = mode.state === 'right' ? (rev ? <p className={P}>{rev.explanation}</p> : null) : (
+      <p className={P}><b className="text-[#F5F7F6]">Hint:</b> it's a {pieceName[p0] ?? 'pawn'} move{rev?.betterMove?.includes('x') ? ' that captures' : ''}{rev?.betterMove?.includes('+') ? ', with check' : ''}.</p>
     );
   } else if (rev && move) {
     const t = shortText(rev.explanation);
     const ev = evalLabel(rev.evalAfterCp);
-    bubble = (
+    const before = ply > 1 ? byIndex.get(ply - 2)?.evalAfterCp : 20;
+    const evBefore = evalLabel(before ?? null);
+    // The top card fits about two lines; anything longer is shown in full below.
+    const full = t.more || (rev.explanation || '').length > 90;
+    top = (
       <>
         <div className="flex items-center gap-2">
           <Badge cls={rev.classification} />
-          <p className="min-w-0 flex-1 truncate text-[15px] font-extrabold text-[#F5F7F6]">{figurine(move.san, isWhiteMove)} {CLS[rev.classification].phrase}</p>
+          <p className={`min-w-0 flex-1 truncate ${H}`}>{figurine(move.san, isWhiteMove)} {CLS[rev.classification].phrase}</p>
           {ev && <span className="shrink-0 rounded-md bg-white/10 px-2 py-0.5 text-[13px] font-extrabold tabular-nums text-[#F5F7F6]">{ev}</span>}
         </div>
-        {t.short && (
-          <p className="mt-1 text-[13.5px] leading-snug text-[#C9CFCD]">
-            {expanded ? rev.explanation : t.short}
-            {t.more && <button onClick={() => setExpanded((v) => !v)} className="ml-1 font-bold text-[#81B64C]">{expanded ? 'less' : 'more'}</button>}
-          </p>
+        {t.short && <p className={`mt-1 line-clamp-2 ${P}`}>{t.short}</p>}
+      </>
+    );
+    detail = (
+      <>
+        {full && <p className={P}>{rev.explanation}</p>}
+        {bad && rev.betterMove && (
+          <div className={`flex items-center justify-between gap-2 ${full ? 'mt-2' : ''}`}>
+            <p className={P}>Better was <b className="text-[#F5F7F6]">{figurine(rev.betterMove, isWhiteMove)}</b></p>
+            <button onClick={() => { setAutoPlay(true); soundFor(bestLine[0]?.san ?? rev.betterMove!); setMode({ kind: 'best', step: 0 }); }}
+              className="shrink-0 rounded-lg px-2.5 py-1 text-[12px] font-bold text-white" style={{ background: GREEN }}>Show me</button>
+          </div>
         )}
+        {bad && lineChips}
+        {!!rev.pros?.length && (
+          <ul className="mt-2 space-y-0.5">{rev.pros.map((x, i) => <li key={i} className={`flex gap-1.5 ${P}`}><span className="text-[#81B64C]">+</span>{x}</li>)}</ul>
+        )}
+        {!!rev.cons?.length && (
+          <ul className="mt-1.5 space-y-0.5">{rev.cons.map((x, i) => <li key={i} className={`flex gap-1.5 ${P}`}><span className="text-[#F0605D]">−</span>{x}</li>)}</ul>
+        )}
+        {ev && evBefore && <p className="mt-2 text-[12px] text-[#87918E]">Evaluation {evBefore} → {ev}</p>}
       </>
     );
   } else if (move) {
-    bubble = <p className="text-[15px] font-extrabold text-[#F5F7F6]">{figurine(move.san, isWhiteMove)}</p>;
+    top = <p className={H}>{figurine(move.san, isWhiteMove)}</p>;
   }
+  const accent = mode.kind === 'best' || (mode.kind === 'retry' && mode.state === 'right') ? CLS.best.color : rev && mode.kind === 'main' ? CLS[rev.classification].color : GREEN;
+  const animKey = `${ply}-${mode.kind}-${mode.kind === 'retry' ? mode.state : ''}`;
 
   const atEnd = ply >= max && mode.kind === 'main';
 
@@ -324,7 +357,17 @@ export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flippe
       </div>
 
       <div className="mx-auto flex w-full max-w-[560px] min-h-0 flex-1 flex-col">
-        <div className="h-1 shrink-0" />
+        {/* Top card: fixed height so the board never shifts */}
+        <div className="shrink-0 px-3 pb-2 pt-1">
+          <div className="h-[84px] overflow-hidden rounded-[14px] px-3.5 py-2.5"
+            style={{ background: '#162022', border: '1px solid rgba(255,255,255,.07)', borderLeft: `4px solid ${accent}` }}>
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.div key={animKey} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.16 }}>
+                {top}
+              </motion.div>
+            </AnimatePresence>
+          </div>
+        </div>
         {/* Board with eval bar */}
         <div className="shrink-0 px-1.5" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
           <div className="min-w-0">
@@ -357,17 +400,17 @@ export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flippe
 
         {/* Between the board and the move strip: the start and end summaries (scrolls if tall). */}
         <div className="hide-scrollbar min-h-0 flex-1 overflow-y-auto pb-1">
-        {/* Coach card: under the board, so its height never moves the board */}
-        <div className="px-3 pt-2">
-          <div className="min-h-[76px] rounded-[14px] px-3.5 py-2.5"
-            style={{ background: '#162022', border: '1px solid rgba(255,255,255,.07)', borderLeft: `4px solid ${mode.kind === 'best' || (mode.kind === 'retry' && mode.state === 'right') ? CLS.best.color : rev && mode.kind === 'main' ? CLS[rev.classification].color : GREEN}` }}>
+        {/* More from the coach about this move */}
+        {detail && (
+          <div className="px-3 pt-2">
             <AnimatePresence mode="wait" initial={false}>
-              <motion.div key={`${ply}-${mode.kind}-${mode.kind === 'retry' ? mode.state : ''}`} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.16 }}>
-                {bubble}
+              <motion.div key={animKey} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.16 }}
+                className="rounded-[14px] px-3.5 py-3" style={{ background: '#162022', border: '1px solid rgba(255,255,255,.07)' }}>
+                {detail}
               </motion.div>
             </AnimatePresence>
           </div>
-        </div>
+        )}
 
         {/* End of game summary */}
         {atEnd && (
