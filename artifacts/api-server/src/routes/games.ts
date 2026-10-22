@@ -800,14 +800,14 @@ router.get("/games/review-status/:jobId", async (req, res): Promise<void> => {
 
   if (job.status === "done") {
     const gameId = parseInt(job.targetUsername ?? "0", 10);
-    const [game] = await db.select({ reviewData: gamesTable.reviewData }).from(gamesTable).where(eq(gamesTable.id, gameId));
+    const [game] = await db.select({ reviewData: gamesTable.reviewData, opening: gamesTable.opening }).from(gamesTable).where(eq(gamesTable.id, gameId));
     if (game?.reviewData) {
       const cached = game.reviewData as Record<string, unknown>;
       const moves = cached.moves ?? cached;
       const gameSummary = cached.gameSummary ?? null;
       const whiteAccuracy = cached.whiteAccuracy ?? null;
       const blackAccuracy = cached.blackAccuracy ?? null;
-      res.json({ status: "done", reviewData: { moves: refreshBasicReview(moves, cached.aiCoach === undefined ? true : cached.aiCoach === true), gameSummary, whiteAccuracy, blackAccuracy, aiCoach: cached.aiCoach === undefined ? true : cached.aiCoach === true } });
+      res.json({ status: "done", reviewData: { moves: refreshBasicReview(moves, cached.aiCoach === undefined ? true : cached.aiCoach === true, (game as { opening?: string | null }).opening ?? null), gameSummary, whiteAccuracy, blackAccuracy, aiCoach: cached.aiCoach === undefined ? true : cached.aiCoach === true } });
       return;
     }
   }
@@ -1612,7 +1612,7 @@ router.get("/games/:id/review", async (req, res): Promise<void> => {
   }
 
   const [game] = await db
-    .select({ reviewData: gamesTable.reviewData })
+    .select({ reviewData: gamesTable.reviewData, opening: gamesTable.opening })
     .from(gamesTable)
     .where(eq(gamesTable.id, params.data.id));
 
@@ -1633,7 +1633,7 @@ router.get("/games/:id/review", async (req, res): Promise<void> => {
         return rest;
       });
     }
-    res.json({ status: "done", reviewData: { moves: refreshBasicReview(moves, cached.aiCoach === undefined ? true : cached.aiCoach === true), gameSummary, whiteAccuracy, blackAccuracy, aiCoach: cached.aiCoach === undefined ? true : cached.aiCoach === true } });
+    res.json({ status: "done", reviewData: { moves: refreshBasicReview(moves, cached.aiCoach === undefined ? true : cached.aiCoach === true, (game as { opening?: string | null }).opening ?? null), gameSummary, whiteAccuracy, blackAccuracy, aiCoach: cached.aiCoach === undefined ? true : cached.aiCoach === true } });
     return;
   }
 
@@ -1690,7 +1690,7 @@ router.post("/games/:id/review", async (req, res): Promise<void> => {
         return rest;
       });
     }
-    res.json({ status: "done", reviewData: { moves: refreshBasicReview(moves, cached.aiCoach === undefined ? true : cached.aiCoach === true), gameSummary, whiteAccuracy, blackAccuracy, aiCoach: cached.aiCoach === undefined ? true : cached.aiCoach === true } });
+    res.json({ status: "done", reviewData: { moves: refreshBasicReview(moves, cached.aiCoach === undefined ? true : cached.aiCoach === true, (game as { opening?: string | null }).opening ?? null), gameSummary, whiteAccuracy, blackAccuracy, aiCoach: cached.aiCoach === undefined ? true : cached.aiCoach === true } });
     return;
   }
 

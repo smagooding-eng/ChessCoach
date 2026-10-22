@@ -638,6 +638,7 @@ function mergeReviewWithEngine(
   evals: PositionEval[],
   uciMoves: Array<{ from: string; to: string } | null>,
   ecoBookFens: Set<string> = new Set(),
+  openingName: string | null = null,
 ): MoveReview[] {
   const Chess = require("chess.js").Chess;
 
@@ -794,6 +795,7 @@ function mergeReviewWithEngine(
           cpBefore, cpAfter, bestMoveSan: betterMove ?? evalBefore.bestMoveSan ?? null, replySan: evalAfter.bestMoveSan ?? null, inBook: stillInBook,
           prevClassification: results[results.length - 1]?.classification ?? null,
           prevSan: idx > 0 ? originalMoves[idx - 1]?.san ?? null : null,
+          bestLine: evalBefore.bestLineSan ?? null, replyLine: evalAfter.bestLineSan ?? null, openingName,
         }) || buildFallbackExplanation(facts, om.san);
       } catch { return buildFallbackExplanation(facts, om.san); }
     };
@@ -840,6 +842,9 @@ function mergeReviewWithEngine(
       evalAfterCp: Math.round(cpAfter),
       coachStatus,
       bestLineSan,
+      // The opponent's best reply line after a bad move (the punishment), for the review.
+      // Kept for every move so the free coach reads the same lines when a saved review is reopened.
+      ...(evalAfter.bestLineSan?.length ? { replyLineSan: evalAfter.bestLineSan.slice(0, 6) } : {}),
     });
   }
   return results;
@@ -872,6 +877,8 @@ export interface MoveReview {
   /** Engine principal variation (in SAN) starting from the position BEFORE the player's move.
    *  Only populated for inaccuracy/mistake/blunder/missed_win moves. Up to 6 plies. */
   bestLineSan?: string[];
+  /** Engine line for the opponent after a bad move (what the mistake allows). */
+  replyLineSan?: string[];
 }
 
 export interface GameReviewSummary {
@@ -1116,7 +1123,7 @@ JSON format:
       cons: Array.isArray(m.cons) ? m.cons : [],
     }));
 
-    const reviewMoves = mergeReviewWithEngine(rawMoves, moves, fens, evals, uciMoves, ecoBookFens);
+    const reviewMoves = mergeReviewWithEngine(rawMoves, moves, fens, evals, uciMoves, ecoBookFens, input.opening ?? null);
 
     const gameSummary: GameReviewSummary | null = gameSummaryRaw ? {
       overview: gameSummaryRaw.overview ?? "",
