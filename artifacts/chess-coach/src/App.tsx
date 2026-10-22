@@ -427,7 +427,8 @@ function PageTracker() {
     whoRef.current = who;
     if (who === 'visitor') return;
     void visitGeo(who).then((geo) => {
-      if (geo) return apiFetch('/api/track/geo', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ geo }) });
+      if (!geo) return;
+      void apiFetch('/api/track/geo', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ geo }) }).catch(() => {});
     }).catch(() => {});
   }, [who]);
   return null;
