@@ -663,9 +663,11 @@ export function GameReplay() {
   const [flipped, setFlipped]         = useState(false);
   const [practiceMode, setPracticeMode] = useState(false);
   // Step-by-step review (coach above the board, Next to go on) or the full
-  // analysis view. Remembers the last choice.
-  const [guided, setGuidedState] = useState(() => { try { return localStorage.getItem('cs_review_view') !== 'classic'; } catch { return true; } });
-  const setGuided = (v: boolean) => { setGuidedState(v); try { localStorage.setItem('cs_review_view', v ? 'guided' : 'classic'); } catch { /* ignore */ } };
+  // analysis view.
+  // Every game opens in the step-by-step review (Pro included); Full analysis
+  // is only for this visit, when chosen.
+  const [guided, setGuided] = useState(true);
+  useEffect(() => { setGuided(true); }, [id]);
   // Phones: the coach card under the move buttons stretches down to the bottom
   // bar, using the space that used to hold the opening name and a back link.
   const gridRef = useRef<HTMLDivElement | null>(null);
