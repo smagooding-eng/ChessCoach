@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Chess } from 'chess.js';
-import { ArrowLeft, ChevronLeft, ChevronRight, FlipVertical2, ListTree, Star, RotateCcw, Route, X } from 'lucide-react';
+import { ArrowLeft, ChevronLeft, ChevronRight, FlipVertical2, ListTree, Star, RotateCcw, X } from 'lucide-react';
+import { MaterialStrip } from '@/components/GameStatusStrip';
 import { ChessBoard, type MoveQuality } from '@/components/ChessBoard';
 import { normalizeFen } from '@/lib/utils';
 import { playMoveSound } from '@/context/SettingsContext';
@@ -77,11 +78,14 @@ function Badge({ cls, size = 22 }: { cls: Classification; size?: number }) {
   );
 }
 
-function EvalBarV({ cp, flipped }: { cp: number | null; flipped: boolean }) {
+function EvalBarH({ cp }: { cp: number | null }) {
   const white = cp == null ? 50 : Math.abs(cp) >= 9000 ? (cp > 0 ? 100 : 0) : Math.max(4, Math.min(96, 50 + 50 * (2 / (1 + Math.exp(-cp / 400)) - 1)));
+  const label = evalLabel(cp);
   return (
-    <div className="relative w-[10px] shrink-0 overflow-hidden rounded-[3px] sm:w-3" style={{ background: '#3A3A38' }} aria-label="Evaluation">
-      <div className="absolute inset-x-0 transition-[height] duration-500 ease-out" style={{ background: '#F2F2EE', height: `${white}%`, ...(flipped ? { top: 0 } : { bottom: 0 }) }} />
+    <div className="relative h-[14px] w-full overflow-hidden rounded-[4px]" style={{ background: '#3A3A38' }} aria-label={`Evaluation ${label ?? ''}`}>
+      <div className="absolute inset-y-0 left-0 transition-[width] duration-500 ease-out" style={{ background: '#F2F2EE', width: `${white}%` }} />
+      {label && <span className="absolute inset-y-0 flex items-center px-1.5 text-[10px] font-black tabular-nums"
+        style={white >= 50 ? { left: 0, color: '#1C1C1C' } : { right: 0, color: '#F2F2EE' }}>{label}</span>}
     </div>
   );
 }
@@ -101,7 +105,7 @@ export interface GuidedReviewProps {
   onBack: () => void;
 }
 
-type Mode = { kind: 'main' } | { kind: 'best' } | { kind: 'line'; step: number } | { kind: 'retry'; state: 'trying' | 'right' | 'wrong' };
+type Mode = { kind: 'main' } | { kind: 'best'; step: number } | { kind: 'retry'; state: 'trying' | 'right' | 'wrong' };
 
 export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flipped, onFlip, whiteName, blackName, accuracy, result, onExit, onBack }: GuidedReviewProps) {
   const max = moves.length;
@@ -161,6 +165,12 @@ export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flippe
     return out;
   }, [fenBefore, rev?.bestLineSan]);
 
+  // Best: the better move and the engine's next few moves after it.
+  const bestLine = useMemo(() => {
+    if (line.length && (!rev?.betterMove || line[0].san === rev.betterMove)) return line;
+    return bestApplied && rev?.betterMove ? [{ san: rev.betterMove, ...bestApplied }] : [];
+  }, [line, bestApplied, rev?.betterMove]);
+
   // The reply this move allows (the engine's choice for the other side next).
   const replyArrow = useMemo(() => {
     if (!rev || !bad || ply >= max) return null;
@@ -179,23 +189,22 @@ export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flippe
   if (mode.kind === 'main') {
     if (bad && bestApplied) arrows.push({ from: bestApplied.from, to: bestApplied.to, color: 'rgba(129,182,76,0.9)' });
     if (replyArrow) arrows.push(replyArrow);
-  } else if (mode.kind === 'best' && bestApplied) {
-    boardFen = bestApplied.fen; lastMove = { from: bestApplied.from, to: bestApplied.to }; quality = 'best'; arrows = [];
-  } else if (mode.kind === 'line' && line.length) {
-    const step = Math.min(mode.step, line.length - 1);
-    boardFen = line[step].fen; lastMove = { from: line[step].from, to: line[step].to }; quality = null; arrows = [];
+  } else if (mode.kind === 'best' && bestLine.length) {
+    const step = Math.min(mode.step, bestLine.length - 1);
+    boardFen = bestLine[step].fen; lastMove = { from: bestLine[step].from, to: bestLine[step].to }; quality = step === 0 ? 'best' : null; arrows = [];
   } else if (mode.kind === 'retry') {
     boardFen = fenBefore; lastMove = ply > 1 ? lastMoveOf(ply - 1) : null; quality = null; arrows = [];
   }
   const cpNow = mode.kind === 'main' ? (ply === 0 ? 20 : rev?.evalAfterCp ?? null) : rev?.evalAfterCp ?? null;
 
-  // Show: play the engine's best line through, one move at a time.
+  // Best: play the line through, one move at a time (tap a move to jump to it).
+  const [autoPlay, setAutoPlay] = useState(true);
   useEffect(() => {
-    if (mode.kind !== 'line') return;
-    if (mode.step >= line.length - 1) return;
-    const t = setTimeout(() => { soundFor(line[mode.step + 1].san); setMode({ kind: 'line', step: mode.step + 1 }); }, 900);
+    if (mode.kind !== 'best' || !autoPlay) return;
+    if (mode.step >= bestLine.length - 1) return;
+    const t = setTimeout(() => { soundFor(bestLine[mode.step + 1].san); setMode({ kind: 'best', step: mode.step + 1 }); }, 1100);
     return () => clearTimeout(t);
-  }, [mode, line]);
+  }, [mode, bestLine, autoPlay]);
 
   // ── The coach's bubble ─────────────────────────────────────────────────
   const counts = useMemo(() => {
@@ -208,39 +217,41 @@ export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flippe
   if (ply === 0 && mode.kind === 'main') {
     bubble = (
       <>
-        <p className="text-[15px] font-extrabold text-[#1C1C1C]">Let's review your game</p>
-        <p className="mt-0.5 text-[13.5px] leading-snug text-[#3A3A3A]">I'll take you through it move by move. Tap Next, or swipe the board.</p>
+        <p className="text-[15px] font-extrabold text-[#F5F7F6]">Let's review your game</p>
+        <p className="mt-0.5 text-[13.5px] leading-snug text-[#C9CFCD]">I'll take you through it move by move. Tap Next, or swipe the board.</p>
       </>
     );
   } else if (mode.kind === 'best' && rev?.betterMove) {
     bubble = (
       <>
-        <div className="flex items-center gap-2"><Badge cls="best" /><p className="flex-1 text-[15px] font-extrabold text-[#1C1C1C]">{figurine(rev.betterMove, isWhiteMove)} was best</p></div>
-        <p className="mt-1 text-[13.5px] leading-snug text-[#3A3A3A]">This is what the engine wanted instead of {figurine(rev.san, isWhiteMove)}.</p>
-      </>
-    );
-  } else if (mode.kind === 'line') {
-    bubble = (
-      <>
-        <p className="text-[15px] font-extrabold text-[#1C1C1C]">The better line</p>
-        <p className="mt-1 flex flex-wrap gap-x-1.5 text-[13.5px] leading-snug text-[#3A3A3A]">
-          {line.map((m, i) => {
-            const w = new Chess(normalizeFen(i === 0 ? fenBefore : line[i - 1].fen)).turn() === 'w';
-            return <span key={i} className={i === mode.step ? 'rounded bg-[#E6F0DA] px-1 font-bold text-[#1C1C1C]' : ''}>{figurine(m.san, w)}</span>;
-          })}
-        </p>
+        <div className="flex items-center gap-2"><Badge cls="best" /><p className="flex-1 text-[15px] font-extrabold text-[#F5F7F6]">{figurine(rev.betterMove, isWhiteMove)} was best</p></div>
+        <p className="mt-1 text-[12.5px] text-[#C9CFCD]">Instead of {figurine(rev.san, isWhiteMove)}.{bestLine.length > 1 ? ' The engine line:' : ''}</p>
+        {bestLine.length > 1 && (
+          <div className="mt-1 flex flex-wrap items-center gap-x-1 gap-y-1 text-[13.5px] leading-snug text-[#C9CFCD]">
+            {bestLine.map((m, i) => {
+              const w = new Chess(normalizeFen(i === 0 ? fenBefore : bestLine[i - 1].fen)).turn() === 'w';
+              return (
+                <button key={i} onClick={() => { setAutoPlay(false); setMode({ kind: 'best', step: i }); }}
+                  className={`rounded px-1 py-0.5 ${i === mode.step ? 'bg-[#81B64C]/25 font-bold text-[#F5F7F6]' : ''}`}>
+                  {figurine(m.san, w)}
+                </button>
+              );
+            })}
+            <button onClick={() => { setAutoPlay(true); setMode({ kind: 'best', step: 0 }); }} className="ml-1 text-[12px] font-bold text-[#81B64C]">Replay</button>
+          </div>
+        )}
       </>
     );
   } else if (mode.kind === 'retry') {
     bubble = mode.state === 'right' ? (
       <>
-        <div className="flex items-center gap-2"><Badge cls="best" /><p className="text-[15px] font-extrabold text-[#1C1C1C]">That's it!</p></div>
-        <p className="mt-1 text-[13.5px] text-[#3A3A3A]">{rev?.betterMove ? `${figurine(rev.betterMove, isWhiteMove)} is the best move here.` : 'Well found.'}</p>
+        <div className="flex items-center gap-2"><Badge cls="best" /><p className="text-[15px] font-extrabold text-[#F5F7F6]">That's it!</p></div>
+        <p className="mt-1 text-[13.5px] text-[#C9CFCD]">{rev?.betterMove ? `${figurine(rev.betterMove, isWhiteMove)} is the best move here.` : 'Well found.'}</p>
       </>
     ) : (
       <>
-        <p className="text-[15px] font-extrabold text-[#1C1C1C]">{mode.state === 'wrong' ? 'Not quite. Try again' : 'Find a better move'}</p>
-        <p className="mt-0.5 text-[13.5px] text-[#3A3A3A]">{isWhiteMove ? 'White' : 'Black'} to move. Drag a piece to try.</p>
+        <p className="text-[15px] font-extrabold text-[#F5F7F6]">{mode.state === 'wrong' ? 'Not quite. Try again' : 'Find a better move'}</p>
+        <p className="mt-0.5 text-[13.5px] text-[#C9CFCD]">{isWhiteMove ? 'White' : 'Black'} to move. Drag a piece to try.</p>
       </>
     );
   } else if (rev && move) {
@@ -250,19 +261,19 @@ export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flippe
       <>
         <div className="flex items-center gap-2">
           <Badge cls={rev.classification} />
-          <p className="min-w-0 flex-1 truncate text-[15px] font-extrabold text-[#1C1C1C]">{figurine(move.san, isWhiteMove)} {CLS[rev.classification].phrase}</p>
-          {ev && <span className="shrink-0 rounded-md bg-[#ECECEA] px-2 py-0.5 text-[13px] font-extrabold tabular-nums text-[#1C1C1C]">{ev}</span>}
+          <p className="min-w-0 flex-1 truncate text-[15px] font-extrabold text-[#F5F7F6]">{figurine(move.san, isWhiteMove)} {CLS[rev.classification].phrase}</p>
+          {ev && <span className="shrink-0 rounded-md bg-white/10 px-2 py-0.5 text-[13px] font-extrabold tabular-nums text-[#F5F7F6]">{ev}</span>}
         </div>
         {t.short && (
-          <p className="mt-1 text-[13.5px] leading-snug text-[#3A3A3A]">
+          <p className="mt-1 text-[13.5px] leading-snug text-[#C9CFCD]">
             {expanded ? rev.explanation : t.short}
-            {t.more && <button onClick={() => setExpanded((v) => !v)} className="ml-1 font-bold text-[#4B7A2B]">{expanded ? 'less' : 'more'}</button>}
+            {t.more && <button onClick={() => setExpanded((v) => !v)} className="ml-1 font-bold text-[#81B64C]">{expanded ? 'less' : 'more'}</button>}
           </p>
         )}
       </>
     );
   } else if (move) {
-    bubble = <p className="text-[15px] font-extrabold text-[#1C1C1C]">{figurine(move.san, isWhiteMove)}</p>;
+    bubble = <p className="text-[15px] font-extrabold text-[#F5F7F6]">{figurine(move.san, isWhiteMove)}</p>;
   }
 
   const atEnd = ply >= max && mode.kind === 'main';
@@ -280,8 +291,7 @@ export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flippe
   const startNo = parseInt(startFen.split(' ')[5] || '1', 10) || 1;
 
   // ── Buttons ─────────────────────────────────────────────────────────────
-  const canBest = bad && !!bestApplied;
-  const canLine = bad && line.length > 1;
+  const canBest = bad && bestLine.length > 0;
   const canRetry = bad && !!rev?.betterMove;
   const next = () => {
     if (mode.kind !== 'main') { setMode({ kind: 'main' }); return; }
@@ -314,13 +324,10 @@ export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flippe
       </div>
 
       <div className="mx-auto flex w-full max-w-[560px] min-h-0 flex-1 flex-col">
-        {/* Coach + bubble */}
-        <div className="flex shrink-0 items-end gap-2 px-3 pb-2 pt-1">
-          <div className="h-[58px] w-[58px] shrink-0 overflow-hidden rounded-full ring-2 ring-[#81B64C]/60" style={{ background: 'radial-gradient(circle at 50% 40%, #1F3A27, #0D1A13)' }}>
-            <img src={`${import.meta.env.BASE_URL}chessscout/scout-knight.webp`} alt="Coach" className="cs-keep-img h-full w-full object-cover object-[70%_20%]" />
-          </div>
-          <div className="relative min-h-[76px] flex-1 rounded-[16px] bg-white px-3.5 py-2.5 shadow-lg">
-            <span aria-hidden className="absolute -left-[7px] bottom-4 h-0 w-0 border-y-[7px] border-r-[8px] border-y-transparent border-r-white" />
+        {/* Coach card */}
+        <div className="shrink-0 px-3 pb-2 pt-1">
+          <div className="min-h-[76px] rounded-[14px] px-3.5 py-2.5"
+            style={{ background: '#162022', border: '1px solid rgba(255,255,255,.07)', borderLeft: `4px solid ${mode.kind === 'best' || (mode.kind === 'retry' && mode.state === 'right') ? CLS.best.color : rev && mode.kind === 'main' ? CLS[rev.classification].color : GREEN}` }}>
             <AnimatePresence mode="wait" initial={false}>
               <motion.div key={`${ply}-${mode.kind}-${mode.kind === 'retry' ? mode.state : ''}`} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.16 }}>
                 {bubble}
@@ -330,9 +337,8 @@ export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flippe
         </div>
 
         {/* Board with eval bar */}
-        <div className="flex shrink-0 items-stretch gap-1 px-1.5" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
-          <EvalBarV cp={cpNow} flipped={flipped} />
-          <div className="min-w-0 flex-1">
+        <div className="shrink-0 px-1.5" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
+          <div className="min-w-0">
             <ChessBoard
               key={mode.kind === 'retry' ? `retry-${retryKey}` : 'review'}
               fen={boardFen}
@@ -351,6 +357,12 @@ export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flippe
                 else { setMode({ kind: 'retry', state: 'wrong' }); setTimeout(() => setRetryKey((k) => k + 1), 900); }
               }}
             />
+          </div>
+          {/* Evaluation bar, then the material each side has won */}
+          <div className="mt-1.5 px-0.5"><EvalBarH cp={cpNow} /></div>
+          <div className="mt-1 flex items-center justify-between gap-2 px-1 text-[11.5px] text-[#C9CFCD]">
+            <span className="flex min-w-0 items-center gap-1.5"><span className="truncate font-bold">{whiteName}</span><MaterialStrip fen={boardFen} color="w" /></span>
+            <span className="flex min-w-0 items-center justify-end gap-1.5"><MaterialStrip fen={boardFen} color="b" /><span className="truncate font-bold">{blackName}</span></span>
           </div>
         </div>
 
@@ -422,9 +434,8 @@ export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flippe
 
         {/* Bottom bar */}
         <div className="flex shrink-0 items-center gap-1 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-1">
-          {tool('Best', <Star size={21} />, mode.kind === 'best', canBest, () => setMode(mode.kind === 'best' ? { kind: 'main' } : { kind: 'best' }))}
+          {tool('Best', <Star size={21} />, mode.kind === 'best', canBest, () => { if (mode.kind === 'best') setMode({ kind: 'main' }); else { setAutoPlay(true); soundFor(bestLine[0].san); setMode({ kind: 'best', step: 0 }); } })}
           {tool('Retry', <RotateCcw size={21} />, mode.kind === 'retry', canRetry, () => setMode(mode.kind === 'retry' ? { kind: 'main' } : { kind: 'retry', state: 'trying' }))}
-          {tool('Show', <Route size={21} />, mode.kind === 'line', canLine, () => { if (mode.kind === 'line') setMode({ kind: 'main' }); else { soundFor(line[0].san); setMode({ kind: 'line', step: 0 }); } })}
           <button onClick={atEnd ? onExit : next}
             className="ml-auto flex h-[52px] flex-1 items-center justify-center gap-1.5 rounded-[14px] text-[18px] font-black text-white transition-transform active:scale-[0.98]"
             style={{ background: `linear-gradient(180deg, #8FC25A, ${GREEN})`, boxShadow: '0 4px 0 #5F8F36' }}>
