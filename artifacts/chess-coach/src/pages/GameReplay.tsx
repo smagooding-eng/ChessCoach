@@ -25,6 +25,7 @@ import { WaitTipCarousel } from '@/components/WaitTipCarousel';
 import { AICoachCard, type AICoachTone } from '@/components/AICoachCard';
 import { ProUpsell } from '@/components/ProUpsell';
 import { MistakeFixView } from '@/components/MistakeFixView';
+import { GuidedReview } from '@/components/review/GuidedReview';
 import { AnimatePresence, motion } from 'framer-motion';
 import { NEUTRAL_CHIP } from '@/lib/redesignTheme';
 
@@ -661,6 +662,10 @@ export function GameReplay() {
   const [isPlaying, setIsPlaying]     = useState(false);
   const [flipped, setFlipped]         = useState(false);
   const [practiceMode, setPracticeMode] = useState(false);
+  // Step-by-step review (coach above the board, Next to go on) or the full
+  // analysis view. Remembers the last choice.
+  const [guided, setGuidedState] = useState(() => { try { return localStorage.getItem('cs_review_view') !== 'classic'; } catch { return true; } });
+  const setGuided = (v: boolean) => { setGuidedState(v); try { localStorage.setItem('cs_review_view', v ? 'guided' : 'classic'); } catch { /* ignore */ } };
   // Phones: the coach card under the move buttons stretches down to the bottom
   // bar, using the space that used to hold the opening name and a back link.
   const gridRef = useRef<HTMLDivElement | null>(null);
@@ -1010,6 +1015,26 @@ export function GameReplay() {
   const cfg = currentReview ? CLASS_CFG[currentReview.classification] : null;
   const isBad = currentReview && ['inaccuracy', 'mistake', 'blunder', 'missed_win'].includes(currentReview.classification);
 
+  if (guided && reviewMoves.length > 0 && !reviewing) {
+    return (
+      <GuidedReview
+        moves={moves as any}
+        startFen={gameStartFen}
+        reviewMoves={reviewMoves}
+        ply={currentMove}
+        setPly={(n) => { setIsPlaying(false); setPracticeMode(false); setCurrentMove(n); }}
+        flipped={flipped}
+        onFlip={() => setFlipped((f) => !f)}
+        whiteName={game.whiteUsername}
+        blackName={game.blackUsername}
+        accuracy={gameAccuracy}
+        result={game.result ?? null}
+        onExit={() => setGuided(false)}
+        onBack={() => { if (window.history.length > 1) window.history.back(); else navigate('/games'); }}
+      />
+    );
+  }
+
   return (
     <div className={`gap-2 md:gap-3 px-3 ${redesign ? 'pt-0' : 'pt-3'} md:px-0 md:pt-0 pb-2 md:pb-0 ${redesign ? 'h-[calc(100dvh-5.75rem)]' : 'h-[calc(100dvh-8rem)]'} md:h-[calc(100vh-3.5rem)] xl:h-[calc(100vh-3rem)] flex flex-col overflow-hidden`}>
       {redesign && (
@@ -1042,6 +1067,14 @@ export function GameReplay() {
 
         {/* ── Left col: board + controls ── */}
         <div className="flex flex-col gap-2 md:gap-4 xl:min-h-0 xl:overflow-y-auto xl:pr-2 hide-scrollbar">
+
+          {reviewMoves.length > 0 && !reviewing && (
+            <button onClick={() => setGuided(true)}
+              className="flex w-full items-center justify-center gap-2 rounded-[12px] py-2.5 text-[14px] font-extrabold text-white transition-transform active:scale-[0.99]"
+              style={{ background: 'linear-gradient(180deg, #8FC25A, #81B64C)' }}>
+              <Play className="h-4 w-4" fill="currentColor" /> Step-by-step review
+            </button>
+          )}
 
           {redesign && (() => {
             const names = [username, authUser?.chesscomUsername, authUser?.lichessUsername].filter(Boolean).map((n) => String(n).toLowerCase());

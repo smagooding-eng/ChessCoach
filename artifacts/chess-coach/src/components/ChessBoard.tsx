@@ -136,6 +136,8 @@ interface ChessBoardProps {
    *  left for game messages (draw offers etc.). Phones keep the normal layout. */
   /** Shown on top of the board (e.g. the game-over card). */
   boardOverlay?: React.ReactNode;
+  /** Piece slide time in ms (default 150). */
+  animationMs?: number;
   sidePanel?: {
     left?: React.ReactNode;
     clocks?: { top: ClockFace; bottom: ClockFace };
@@ -163,6 +165,7 @@ export function ChessBoard({
   suppressConfirmMoves = false,
   reserveConfirmSpace = false,
   boardOverlay,
+  animationMs,
   sidePanel,
 }: ChessBoardProps) {
   const { confirmMoves, boardColors, boardTextureCss, showCoordinates, showLegalMoves, pieceColors, pieceShape, pieceStyle, soundEnabled, promotionChoice, boardMaxWidth: settingsMaxWidth } = useSettings();
@@ -592,7 +595,7 @@ export function ChessBoard({
             lightSquareStyle: skin.lightSquareStyle,
             darkSquareStyle: skin.darkSquareStyle,
             pieces: tintedPieces,
-            animationDurationInMs: 150,
+            animationDurationInMs: animationMs ?? 150,
           }}
         />
       </BoardErrorBoundary>
