@@ -324,18 +324,7 @@ export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flippe
       </div>
 
       <div className="mx-auto flex w-full max-w-[560px] min-h-0 flex-1 flex-col">
-        {/* Coach card */}
-        <div className="shrink-0 px-3 pb-2 pt-1">
-          <div className="min-h-[76px] rounded-[14px] px-3.5 py-2.5"
-            style={{ background: '#162022', border: '1px solid rgba(255,255,255,.07)', borderLeft: `4px solid ${mode.kind === 'best' || (mode.kind === 'retry' && mode.state === 'right') ? CLS.best.color : rev && mode.kind === 'main' ? CLS[rev.classification].color : GREEN}` }}>
-            <AnimatePresence mode="wait" initial={false}>
-              <motion.div key={`${ply}-${mode.kind}-${mode.kind === 'retry' ? mode.state : ''}`} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.16 }}>
-                {bubble}
-              </motion.div>
-            </AnimatePresence>
-          </div>
-        </div>
-
+        <div className="h-1 shrink-0" />
         {/* Board with eval bar */}
         <div className="shrink-0 px-1.5" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
           <div className="min-w-0">
@@ -368,6 +357,18 @@ export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flippe
 
         {/* Between the board and the move strip: the start and end summaries (scrolls if tall). */}
         <div className="hide-scrollbar min-h-0 flex-1 overflow-y-auto pb-1">
+        {/* Coach card: under the board, so its height never moves the board */}
+        <div className="px-3 pt-2">
+          <div className="min-h-[76px] rounded-[14px] px-3.5 py-2.5"
+            style={{ background: '#162022', border: '1px solid rgba(255,255,255,.07)', borderLeft: `4px solid ${mode.kind === 'best' || (mode.kind === 'retry' && mode.state === 'right') ? CLS.best.color : rev && mode.kind === 'main' ? CLS[rev.classification].color : GREEN}` }}>
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.div key={`${ply}-${mode.kind}-${mode.kind === 'retry' ? mode.state : ''}`} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.16 }}>
+                {bubble}
+              </motion.div>
+            </AnimatePresence>
+          </div>
+        </div>
+
         {/* End of game summary */}
         {atEnd && (
           <div className="mx-3 mt-2 rounded-[16px] p-3" style={{ background: '#162022', border: '1px solid rgba(255,255,255,.08)' }}>
