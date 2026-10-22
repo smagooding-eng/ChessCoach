@@ -3100,10 +3100,12 @@ function UserActivityPanel() {
       topFeatures: { path: string; count: number }[]; aiCostUsd: number; aiCalls: number;
       name?: string | null; scoutUsername?: string | null; chesscomUsername?: string | null; lichessUsername?: string | null; authProvider?: string;
       allFeatures?: { path: string; count: number }[]; pageViewLog?: { path: string; at: string }[]; activities?: { label: string; count: number }[];
+      pushDevices?: { device: string; since: string; lastDelivered: string | null }[];
     }[];
   } | null>(null);
   const [q, setQ] = useState('');
   const [openLog, setOpenLog] = useState<Record<string, boolean>>({});
+  const [pushFilter, setPushFilter] = useState<'all' | 'on' | 'off'>('all');
   const [loading, setLoading] = useState(true);
   const [range, setRange] = useState<DateRange>({ startDate: '', endDate: '' });
   const [expanded, setExpanded] = useState(false);
@@ -3124,8 +3126,12 @@ function UserActivityPanel() {
     if (d.toDateString() === today.toDateString()) return 'today';
     return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
   };
-  const matching = (data?.users ?? []).filter((u) => !q || [u.label, u.email, u.name, u.scoutUsername, u.chesscomUsername, u.lichessUsername].some((v) => v && v.toLowerCase().includes(q.toLowerCase())));
-  const visibleUsers = expanded || q ? matching : matching.slice(0, 15);
+  const hasPush = (u: { pushDevices?: unknown[] }) => (u.pushDevices?.length ?? 0) > 0;
+  const pushOnCount = (data?.users ?? []).filter(hasPush).length;
+  const matching = (data?.users ?? [])
+    .filter((u) => pushFilter === 'all' || (pushFilter === 'on') === hasPush(u))
+    .filter((u) => !q || [u.label, u.email, u.name, u.scoutUsername, u.chesscomUsername, u.lichessUsername].some((v) => v && v.toLowerCase().includes(q.toLowerCase())));
+  const visibleUsers = expanded || q || pushFilter !== 'all' ? matching : matching.slice(0, 15);
   const fmtTime = (iso: string) => new Date(iso).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 
   return (
@@ -3155,6 +3161,15 @@ function UserActivityPanel() {
           </div>
 
           <p className="text-xs font-bold text-muted-foreground mb-2">Per user, sorted by last active — {data.users.length} total accounts</p>
+          <div className="mb-2 flex flex-wrap items-center gap-1.5 text-[10.5px]">
+            <span className="font-bold">Notifications on: {pushOnCount} of {data.users.length}</span>
+            {(['all', 'on', 'off'] as const).map((f) => (
+              <button key={f} onClick={() => setPushFilter(f)}
+                className={cn('rounded-md px-2 py-0.5 font-bold', pushFilter === f ? 'bg-primary text-white' : 'bg-white/5 text-muted-foreground')}>
+                {f === 'all' ? 'Everyone' : f === 'on' ? 'Notifications on' : 'Notifications off'}
+              </button>
+            ))}
+          </div>
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Find by email, name or username"
             className="mb-2 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs outline-none" />
           <div className="space-y-2">
@@ -3185,6 +3200,11 @@ function UserActivityPanel() {
                   <span>{u.totalPageViews} page views</span>
                   {u.aiCalls > 0 && <span className="text-foreground font-bold">{u.aiCalls} AI calls (${u.aiCostUsd.toFixed(2)})</span>}
                 </div>
+                <p className={cn('mb-1.5 text-[10px] font-semibold', hasPush(u) ? 'text-primary' : 'text-muted-foreground')}>
+                  {hasPush(u)
+                    ? `Notifications on · ${u.pushDevices!.map((d) => d.device).join(', ')}${u.pushDevices!.some((d) => d.lastDelivered) ? ` · last delivered ${fmtDate(u.pushDevices!.map((d) => d.lastDelivered).filter(Boolean).sort().pop() ?? null)}` : ''}`
+                    : 'Notifications off'}
+                </p>
                 <div className="mb-1.5"><ChallengeUserButton userId={u.id} name={u.label} /></div>
                 {(u.activities?.length ?? 0) > 0 && (
                   <div className="mb-1 flex flex-wrap gap-1">

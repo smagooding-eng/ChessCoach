@@ -1736,6 +1736,16 @@ router.get("/admin/user-activity", requireAdmin, async (req: Request, res: Respo
       chesscom: 'Chess.com games imported', lichess: 'Lichess games imported', chessscout: 'Games played on ChessScout',
       live: 'Live games', daily: 'Daily games started', puzzles_solved: 'Puzzles solved', puzzles_missed: 'Puzzles missed', scans: 'Positions scanned',
     };
+    // Who has phone/browser notifications switched on (and on which devices).
+    const pushRows = await db.execute(sql`SELECT user_id, user_agent, created_at, last_success_at FROM push_subscriptions`).then(rowsOf).catch(() => [] as Record<string, unknown>[]);
+    const pushByUser = new Map<string, { device: string; since: string; lastDelivered: string | null }[]>();
+    for (const r of pushRows) {
+      const uid = String(r.user_id ?? '');
+      if (!uid) continue;
+      const list = pushByUser.get(uid) ?? [];
+      list.push({ device: String(r.user_agent ?? 'Unknown device'), since: new Date(String(r.created_at)).toISOString(), lastDelivered: r.last_success_at ? new Date(String(r.last_success_at)).toISOString() : null });
+      pushByUser.set(uid, list);
+    }
     const activitiesByUser = new Map<string, { label: string; count: number }[]>();
     for (const r of actRows.flat()) {
       const uid = String(r.user_id ?? ''); const k = String(r.k ?? ''); const n = Number(r.n ?? 0);
@@ -1815,6 +1825,7 @@ router.get("/admin/user-activity", requireAdmin, async (req: Request, res: Respo
           // Every page view in the range, newest first.
           pageViewLog: agg ? agg.views.sort((a, b) => b.at.getTime() - a.at.getTime()).slice(0, 500).map((v) => ({ path: v.path, at: v.at.toISOString() })) : [],
           activities: (activitiesByUser.get(u.id) ?? []).sort((a, b) => b.count - a.count),
+          pushDevices: pushByUser.get(u.id) ?? [],
           signedUpAt: u.createdAt.toISOString(),
           isNew: u.createdAt >= todayStart,
           activeToday: activeTodayIds.has(u.id),
