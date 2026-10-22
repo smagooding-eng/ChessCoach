@@ -68,6 +68,8 @@ export function RealtimeBridge() {
       window.dispatchEvent(new CustomEvent('cs:notification', { detail: n }));
       // Don't pop a banner for something about the game you're already looking at.
       if (n.url && window.location.pathname === n.url) return;
+      // New challenges get their own card at the bottom (ChallengeToast).
+      if (n.kind === 'challenge' && n.url?.startsWith('/challenge/')) return;
       setBanner(n);
       if (hideTimer.current) clearTimeout(hideTimer.current);
       hideTimer.current = setTimeout(() => setBanner(null), 7000);
