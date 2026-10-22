@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import { basicExplanation } from "./basicCoach";
 import { logger } from "./logger";
 import { evaluateAllPositions, classifyFromWinPctLoss, isSacrificialMove, uciToSan, winPct, accuracyFromAvgLoss, estimatedLossForMove, type PositionEval } from "./engineAnalysis";
 import { extractStartFen, normalizeFen } from "./chesscom";
@@ -783,16 +784,28 @@ function mergeReviewWithEngine(
 
     let coachStatus: CoachStatus = "engine-aligned";
 
+    // The free coach: plain-language explanation worked out from the position
+    // (hanging pieces, forks, mates, captures, development). Used when there's
+    // no AI text, and when the AI's text doesn't match the engine.
+    const basic = () => {
+      try {
+        return basicExplanation({
+          fenBefore, fenAfter: fenAfterMove ?? fenBefore, san: om.san, classification, playerColor, moveIndex: idx,
+          cpBefore, cpAfter, bestMoveSan: betterMove ?? evalBefore.bestMoveSan ?? null, replySan: evalAfter.bestMoveSan ?? null, inBook: stillInBook,
+        }) || buildFallbackExplanation(facts, om.san);
+      } catch { return buildFallbackExplanation(facts, om.san); }
+    };
+
     // Validate explanation; if invalid, fall back to deterministic template
     if (explanation && explanation.trim()) {
       const check = reconcileExplanation(explanation, facts);
       if (!check.ok) {
         logger.debug({ moveIndex: idx, san: om.san, classification, reasons: check.reasons }, "coach explanation reconciliation failed");
-        explanation = buildFallbackExplanation(facts, om.san);
+        explanation = basic();
         coachStatus = "fallback";
       }
     } else {
-      explanation = buildFallbackExplanation(facts, om.san);
+      explanation = basic();
       coachStatus = "fallback";
     }
 
@@ -803,7 +816,10 @@ function mergeReviewWithEngine(
     if (cleanPros.length !== pros.length || cleanCons.length !== cons.length) {
       coachStatus = "fallback";
     }
-    if (cleanPros.length === 0 && cleanCons.length === 0) {
+    if (!gpt) {
+      pros = [];
+      cons = [];
+    } else if (cleanPros.length === 0 && cleanCons.length === 0) {
       const fb = buildFallbackProsCons(facts);
       pros = fb.pros;
       cons = fb.cons;

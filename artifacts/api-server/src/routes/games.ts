@@ -1,4 +1,5 @@
 import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
+import { refreshBasicReview } from "../lib/basicCoach";
 import { notifyUser } from "../lib/notify";
 import { logger as appLogger } from "../lib/logger";
 import { db, gamesTable, backgroundJobsTable, usersTable } from "@workspace/db";
@@ -806,7 +807,7 @@ router.get("/games/review-status/:jobId", async (req, res): Promise<void> => {
       const gameSummary = cached.gameSummary ?? null;
       const whiteAccuracy = cached.whiteAccuracy ?? null;
       const blackAccuracy = cached.blackAccuracy ?? null;
-      res.json({ status: "done", reviewData: { moves, gameSummary, whiteAccuracy, blackAccuracy, aiCoach: cached.aiCoach === undefined ? true : cached.aiCoach === true } });
+      res.json({ status: "done", reviewData: { moves: refreshBasicReview(moves, cached.aiCoach === undefined ? true : cached.aiCoach === true), gameSummary, whiteAccuracy, blackAccuracy, aiCoach: cached.aiCoach === undefined ? true : cached.aiCoach === true } });
       return;
     }
   }
@@ -1632,7 +1633,7 @@ router.get("/games/:id/review", async (req, res): Promise<void> => {
         return rest;
       });
     }
-    res.json({ status: "done", reviewData: { moves, gameSummary, whiteAccuracy, blackAccuracy, aiCoach: cached.aiCoach === undefined ? true : cached.aiCoach === true } });
+    res.json({ status: "done", reviewData: { moves: refreshBasicReview(moves, cached.aiCoach === undefined ? true : cached.aiCoach === true), gameSummary, whiteAccuracy, blackAccuracy, aiCoach: cached.aiCoach === undefined ? true : cached.aiCoach === true } });
     return;
   }
 
@@ -1689,7 +1690,7 @@ router.post("/games/:id/review", async (req, res): Promise<void> => {
         return rest;
       });
     }
-    res.json({ status: "done", reviewData: { moves, gameSummary, whiteAccuracy, blackAccuracy, aiCoach: cached.aiCoach === undefined ? true : cached.aiCoach === true } });
+    res.json({ status: "done", reviewData: { moves: refreshBasicReview(moves, cached.aiCoach === undefined ? true : cached.aiCoach === true), gameSummary, whiteAccuracy, blackAccuracy, aiCoach: cached.aiCoach === undefined ? true : cached.aiCoach === true } });
     return;
   }
 
