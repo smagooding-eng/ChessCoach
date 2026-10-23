@@ -163,6 +163,7 @@ const fr: Record<string, string> = {
   // Site stats
   'games reviewed': 'parties analysées',
   'games analyzed': 'parties étudiées',
+  'games imported': 'parties importées',
   'puzzles solved': 'problèmes résolus',
   'games played on ChessScout': 'parties jouées sur ChessScout',
   'players': 'joueurs',

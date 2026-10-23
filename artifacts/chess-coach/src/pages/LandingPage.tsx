@@ -660,7 +660,7 @@ export function LandingPage() {
             <span className="flex items-center gap-1.5"><Check className="h-3.5 w-3.5" style={{ color: G }} /> {t('No credit card required')}</span>
             <span className="flex items-center gap-1.5"><Check className="h-3.5 w-3.5" style={{ color: G }} /> {t('Cancel anytime')}</span>
           </div>
-          <SiteStatsLine className="mt-2 text-[12px] sm:text-[13px]" style={{ color: 'rgba(245,247,246,0.72)' }} />
+          <SiteStatsLine className="mt-2 text-[12px] sm:text-[13px]" style={{ color: 'rgba(245,247,246,0.72)' }} max={2} />
           <HappeningNow className="mt-2" />
           <GooglePlayBadge height={44} className="mt-3" />
         </motion.div>

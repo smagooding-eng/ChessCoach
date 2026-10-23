@@ -162,6 +162,7 @@ const es: Record<string, string> = {
   // Site stats
   'games reviewed': 'partidas revisadas',
   'games analyzed': 'partidas analizadas',
+  'games imported': 'partidas importadas',
   'puzzles solved': 'problemas resueltos',
   'games played on ChessScout': 'partidas jugadas en ChessScout',
   'players': 'jugadores',

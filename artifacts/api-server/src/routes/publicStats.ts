@@ -18,12 +18,15 @@ router.get("/public/site-stats", async (_req: Request, res: Response) => {
         SELECT
           (SELECT COUNT(*) FROM games) AS games_imported,
           (SELECT COUNT(*) FROM games WHERE review_data IS NOT NULL) AS games_reviewed,
+          (SELECT COUNT(*) FROM games WHERE analyzed = true) AS games_analyzed,
           (SELECT COUNT(*) FROM puzzle_attempts WHERE solved) AS puzzles_solved,
           (SELECT COUNT(*) FROM live_games) + (SELECT COUNT(*) FROM correspondence_games WHERE status <> 'active') + (SELECT COUNT(*) FROM bot_results) AS games_played,
           (SELECT COUNT(*) FROM users) AS players`));
       const all = [
+        // The same two totals Admin shows: games imported, and games analyzed.
+        { key: "games_imported", label: "games imported", value: Number(r?.games_imported ?? 0) },
+        { key: "games_analyzed", label: "games analyzed", value: Number(r?.games_analyzed ?? 0) },
         { key: "games_reviewed", label: "games reviewed", value: Number(r?.games_reviewed ?? 0) },
-        { key: "games_imported", label: "games analyzed", value: Number(r?.games_imported ?? 0) },
         { key: "puzzles_solved", label: "puzzles solved", value: Number(r?.puzzles_solved ?? 0) },
         { key: "games_played", label: "games played on ChessScout", value: Number(r?.games_played ?? 0) },
         { key: "players", label: "players", value: Number(r?.players ?? 0) },
