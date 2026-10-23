@@ -14,6 +14,16 @@ import { eq } from "drizzle-orm";
 
 const app: Express = express();
 
+// No client of ours ever sends a compressed request body (browsers don't,
+// and Stripe's webhooks don't), so refuse them before any body parser runs.
+// Express 5 would otherwise decompress Brotli/gzip bodies, which is how the
+// Node.js Brotli flaw (CVE-2026-111497) is reached from the outside.
+app.use((req, res, next) => {
+  const enc = String(req.headers["content-encoding"] ?? "").trim().toLowerCase();
+  if (enc && enc !== "identity") { res.status(415).json({ error: "Compressed request bodies are not accepted" }); return; }
+  next();
+});
+
 analytics.init({ projectKey: "hck_pk_SAR07dB6bnpluTvimEswcyXYddoGhbx8" });
 
 // Best-effort HeyCatch business event for a new paid subscription. This is

@@ -25,6 +25,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN ln -s /usr/games/stockfish /usr/local/bin/stockfish
 RUN command -v stockfish
 
+# Refuse to build on a Node release without the October 2026 security fixes
+# (CVE-2026-111497, Brotli remote code execution): 24.22.1 or newer.
+RUN node -e "const [a,b,c]=process.versions.node.split('.').map(Number); if (a<24||(a===24&&(b<22||(b===22&&c<1)))) { console.error('Node '+process.version+' is missing the Oct 2026 security fixes; need 24.22.1+'); process.exit(1) } console.log('Node', process.version)"
+
 RUN corepack enable
 
 WORKDIR /repo
