@@ -118,9 +118,18 @@ jobs:
             -keypass "$BUBBLEWRAP_KEY_PASSWORD" -sigalg SHA256withRSA -digestalg SHA-256 \
             app-release-bundle.aab "$KS_ALIAS"
 
+      # Shows which key signed the bundle, to compare with Play Console >
+      # Test and release > App integrity > Upload key certificate.
+      - name: Show signing certificate
+        run: |
+          cd android
+          keytool -printcert -jarfile app-release-bundle.aab | grep -E "SHA1|SHA256|Owner" > cert.txt || true
+          cat cert.txt
+          while read -r l; do echo "::notice title=Upload key used::$l"; done < cert.txt
+
       - uses: actions/upload-artifact@v4
         with:
-          name: chessscout-android${{ steps.key.outputs.release == 'true' && '' || '-TEST-KEY' }}
+          name: chessscout-android${{ steps.key.outputs.release != 'true' && '-TEST-KEY' || '' }}
           path: |
             android/app-release-bundle.aab
             android/app-release-signed.apk
