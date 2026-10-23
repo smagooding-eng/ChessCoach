@@ -105,7 +105,7 @@ function SidebarLink({ item, isActive }: { item: typeof ALL_NAV[0]; isActive: bo
   return (
     <Link href={item.href} className="block">
       <div className={cn(
-        "relative flex items-center gap-2.5 px-3 py-2 [@media(max-height:860px)]:py-1.5 [@media(max-height:740px)]:py-1 rounded-xl transition-all duration-150 cursor-pointer text-[13px] font-semibold",
+        "cs-side-link relative flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all duration-150 cursor-pointer text-[13px] font-semibold",
       )} style={{
         background: isActive ? 'rgba(255,255,255,0.07)' : 'transparent',
         color: isActive ? TEXT_LIGHT : TEXT_MUTED,
@@ -356,13 +356,13 @@ export function Layout({ children, fullscreen }: { children: React.ReactNode; fu
           {PRIMARY_NAV.map(item => (
             <SidebarLink key={item.href} item={item} isActive={location === item.href} />
           ))}
-          <p className="text-[9px] font-black uppercase tracking-widest px-3 mt-3 mb-1.5 [@media(max-height:740px)]:mt-2 [@media(max-height:740px)]:mb-1" style={{ color: 'rgba(158,155,152,0.5)' }}>Tools</p>
+          <p className="text-[9px] font-black uppercase tracking-widest px-3 mt-3 mb-1.5" data-side-label style={{ color: 'rgba(158,155,152,0.5)' }}>Tools</p>
           {SECONDARY_NAV.map(item => (
             <SidebarLink key={item.href} item={item} isActive={location === item.href} />
           ))}
           {authUser?.isAdmin && (
             <>
-              <p className="text-[9px] font-black uppercase tracking-widest px-3 mt-3 mb-1.5 [@media(max-height:740px)]:mt-2 [@media(max-height:740px)]:mb-1" style={{ color: 'rgba(158,155,152,0.5)' }}>Admin</p>
+              <p className="text-[9px] font-black uppercase tracking-widest px-3 mt-3 mb-1.5" data-side-label style={{ color: 'rgba(158,155,152,0.5)' }}>Admin</p>
               {ADMIN_NAV.map(item => (
                 <SidebarLink key={item.href} item={item} isActive={location === item.href} />
               ))}

@@ -763,7 +763,7 @@ export function Puzzles() {
                   </span>
                 </div>
 
-                <div className="cs-board-fit relative w-full mx-auto mb-4" style={{ maxWidth: boardMaxWidth, ['--board-max' as string]: typeof boardMaxWidth === 'number' ? `${boardMaxWidth}px` : boardMaxWidth }}>
+                <div className="cs-board-fit cs-board-tall relative w-full mx-auto mb-4" style={{ maxWidth: boardMaxWidth, ['--board-max' as string]: typeof boardMaxWidth === 'number' ? `${boardMaxWidth}px` : boardMaxWidth }}>
                   <PieceGradientDefs />
                   <MaterialStrip fen={game?.fen() ?? ''} color={boardOrientation === 'white' ? 'b' : 'w'} className="px-1 mb-1.5" />
                   <div className="relative">

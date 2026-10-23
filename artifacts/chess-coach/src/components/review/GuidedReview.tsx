@@ -417,9 +417,10 @@ export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flippe
         </button>
       </div>
 
-      <div className="mx-auto flex w-full max-w-[560px] min-h-0 flex-1 flex-col">
+      {/* Phones: one column. Wide desktop (lg): board on the left, the coach, summary, moves and buttons on the right. */}
+      <div className="mx-auto flex w-full max-w-[560px] min-h-0 flex-1 flex-col lg:grid lg:max-w-[1180px] lg:grid-cols-[minmax(0,1fr)_400px] lg:grid-rows-[auto_minmax(0,1fr)_auto_auto] lg:gap-x-6 lg:px-6 lg:pb-4">
         {/* Top card: fixed height so the board never shifts */}
-        <div className="relative z-20 h-[92px] shrink-0 px-3 pb-2 pt-1">
+        <div className="relative z-20 h-[92px] shrink-0 px-3 pb-2 pt-1 lg:col-start-2 lg:row-start-1 lg:px-0">
           {/* Tap to read the whole explanation; it opens over the board, so nothing moves. */}
           <div onClick={canExpand ? () => setExpanded((v) => !v) : undefined}
             className={`absolute inset-x-3 top-1 overflow-hidden rounded-[14px] px-3.5 py-2.5 ${expanded ? 'min-h-[84px] shadow-2xl' : 'h-[84px]'} ${canExpand ? 'cursor-pointer' : ''}`}
@@ -433,7 +434,7 @@ export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flippe
         </div>
         {/* Board with eval bar */}
         {/* Desktop: board, eval bar and material keep one width that fits the window height. */}
-        <div className="shrink-0 px-1.5 md:mx-auto md:w-full md:max-w-[max(300px,calc(100dvh-350px))]" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
+        <div className="cs-review-board shrink-0 px-1.5 lg:col-start-1 lg:row-span-4 lg:row-start-1 lg:self-start lg:pt-1" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
           <div className="min-w-0">
             <ChessBoard
               key={mode.kind === 'retry' ? `retry-${retryKey}` : 'review'}
@@ -463,7 +464,7 @@ export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flippe
         </div>
 
         {/* Between the board and the move strip: the start and end summaries (scrolls if tall). */}
-        <div className="hide-scrollbar min-h-0 flex-1 overflow-y-auto pb-1">
+        <div className="hide-scrollbar min-h-0 flex-1 overflow-y-auto pb-1 lg:col-start-2 lg:row-start-2 lg:[&>div]:mx-0">
         {/* More from the coach about this move */}
         {detail && (
           <div className="px-3 pt-2">
@@ -542,7 +543,7 @@ export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flippe
         </div>
 
         {/* Move strip */}
-        <div className="flex shrink-0 items-center gap-1 px-1 py-2">
+        <div className="flex shrink-0 items-center gap-1 px-1 py-2 lg:col-start-2 lg:row-start-3 lg:min-w-0">
           <button onClick={() => go(ply - 1)} disabled={ply <= 0} aria-label="Previous move" className="grid h-10 w-9 shrink-0 place-items-center text-[#C9CFCD] disabled:opacity-25"><ChevronLeft size={26} /></button>
           <div ref={stripRef} className="hide-scrollbar flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto scroll-smooth">
             {moves.map((m, i) => {
@@ -568,7 +569,7 @@ export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flippe
         </div>
 
         {/* Bottom bar */}
-        <div className="flex shrink-0 items-center gap-1 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-1">
+        <div className="flex shrink-0 items-center gap-1 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-1 lg:col-start-2 lg:row-start-4 lg:px-0">
           {tool('Best', <Star size={21} />, mode.kind === 'best', canBest, () => { if (mode.kind === 'best') setMode({ kind: 'main' }); else { setAutoPlay(true); soundFor(bestLine[0].san); setMode({ kind: 'best', step: 0 }); } })}
           {tool('Retry', <RotateCcw size={21} />, mode.kind === 'retry', canRetry, () => setMode(mode.kind === 'retry' ? { kind: 'main' } : { kind: 'retry', state: 'trying' }))}
           <button onClick={atEnd ? openFull : next}

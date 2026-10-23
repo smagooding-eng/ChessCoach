@@ -168,7 +168,7 @@ export function GamesRedesign() {
             const on = source === s.id;
             return (
               <button key={s.id} role="tab" aria-selected={on} onClick={() => pickSource(s.id)}
-                className="shrink-0 rounded-full px-3.5 py-1.5 text-[13px] font-bold transition-colors"
+                className={`shrink-0 rounded-full px-3.5 py-1.5 text-[13px] font-bold transition-colors ${on ? '' : 'cs-chip-off'}`}
                 style={on ? { background: RD.green, color: '#FFFFFF', border: `1px solid ${RD.green}` } : { background: 'rgba(255,255,255,.04)', color: RD.muted, border: `1px solid ${RD.border}` }}>
                 {s.label}
               </button>

@@ -632,9 +632,35 @@ html.cs-photo :not(.cs-photo-backdrop-img):not(.cs-keep-img):is([style*="chesssc
    the whole board (and its controls) fits on short laptop screens. */
 @media (min-width: 768px) {
   .cs-board-fit { max-width: min(var(--board-max, 100%), max(300px, calc(100dvh - 300px))) !important; }
+  /* Pages with a lot above the board (puzzles). */
+  .cs-board-fit.cs-board-tall { max-width: min(var(--board-max, 100%), max(300px, calc(100dvh - 370px))) !important; }
   .cs-board-fit.cs-board-side { max-width: min(var(--board-max, 100%), max(320px, calc(100dvh - 190px))) !important; }
   /* Wide screens show more of the photo, so it's shaded a little more and
      text sitting on it gets a soft shadow to stay readable. */
   html.cs-photo .cs-photo-backdrop-shade { background: rgba(5,10,11, calc(var(--photo-shade, .5) + .18)); }
   html.cs-photo body { text-shadow: 0 1px 2px rgba(0,0,0,.55); }
+}
+
+/* Desktop sidebar: tighter rows on short screens so every link fits. */
+@media (min-width: 768px) and (max-height: 880px) {
+  .cs-side-link { padding-top: 6px !important; padding-bottom: 6px !important; }
+}
+@media (min-width: 768px) and (max-height: 760px) {
+  .cs-side-link { padding-top: 4px !important; padding-bottom: 4px !important; }
+  [data-side-label] { margin-top: 6px !important; margin-bottom: 3px !important; }
+}
+@media (min-width: 768px) {
+  /* Unselected filter chips sit on the photo: give them a solid backing. */
+  html.cs-photo .cs-chip-off { background: rgb(13 21 22 / .82) !important; color: #C9CFCD !important; }
+}
+
+/* Desktop game review: board, eval bar and material share one width that
+   fits the window height. Wide screens (lg) put the board on the left with
+   everything else in a column on the right, so the board can be bigger. */
+@media (min-width: 768px) {
+  .cs-review-board { margin-left: auto; margin-right: auto; width: 100%; max-width: max(300px, calc(100dvh - 350px)); }
+}
+@media (min-width: 1024px) {
+  .cs-review-board { max-width: max(320px, calc(100dvh - 150px)); justify-self: center; }
+  .cs-review-board .cs-board-fit { max-width: 100% !important; }
 }
