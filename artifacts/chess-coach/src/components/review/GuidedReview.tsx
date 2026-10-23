@@ -360,6 +360,23 @@ export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flippe
           : (t.top || t.rest) && <p className={`mt-1 line-clamp-2 ${P}`}>{t.top || t.rest}{t.top && t.rest && <span className="ml-1 font-bold text-[#81B64C]">More</span>}</p>}
       </>
     );
+    // AI-coached reviews (Pro): the coach's full explanation and its pros and
+    // cons go in a card under the board, as before. Free reviews have neither.
+    const aiCoached = !!(rev.pros?.length || rev.cons?.length);
+    if (aiCoached) {
+      detail = (
+        <>
+          <p className="mb-1 text-[11.5px] font-bold uppercase tracking-wide text-[#87918E]">AI coach</p>
+          {t.rest && <p className={P}>{t.rest}</p>}
+          {!!rev.pros?.length && (
+            <ul className={`${t.rest ? 'mt-2' : ''} space-y-0.5`}>{rev.pros.map((x, i) => <li key={i} className={`flex gap-1.5 ${P}`}><span className="text-[#81B64C]">+</span>{x}</li>)}</ul>
+          )}
+          {!!rev.cons?.length && (
+            <ul className="mt-1.5 space-y-0.5">{rev.cons.map((x, i) => <li key={i} className={`flex gap-1.5 ${P}`}><span className="text-[#F0605D]">−</span>{x}</li>)}</ul>
+          )}
+        </>
+      );
+    }
   } else if (move) {
     top = <p className={H}>{figurine(move.san, isWhiteMove)}</p>;
   }

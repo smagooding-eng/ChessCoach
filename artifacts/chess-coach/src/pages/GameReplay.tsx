@@ -836,12 +836,14 @@ export function GameReplay() {
 
   useEffect(() => () => stopPolling(), [stopPolling]);
 
-  const handleReview = useCallback(async (force = false) => {
+  // keepVisible: re-run in the background and swap the new review in when it's
+  // done, instead of clearing the board (used to add the AI coach for Pro).
+  const handleReview = useCallback(async (force = false, keepVisible = false) => {
     if (!game || reviewing) return;
     if (!force && reviewMoves.length > 0) return;
     setReviewing(true);
     setReviewError(null);
-    if (force) {
+    if (force && !keepVisible) {
       setReviewMoves([]);
       setGameSummary(null);
       setGameAccuracy(null);
@@ -885,11 +887,13 @@ export function GameReplay() {
   // gets the AI review run for it.
   const aiUpgradeFor = useRef<number | null>(null);
   useEffect(() => {
-    if (!game || showGuided || !canFullAnalysis || reviewing || loadingSavedReview || reviewAi !== false) return;
+    // In both views: Pro reviews always come with the AI coach. The engine-only
+    // review stays on screen while the AI version is made.
+    if (!game || !canFullAnalysis || reviewing || loadingSavedReview || reviewAi !== false) return;
     if (aiUpgradeFor.current === game.id) return;
     aiUpgradeFor.current = game.id;
-    void handleReview(true);
-  }, [game, showGuided, canFullAnalysis, reviewing, loadingSavedReview, reviewAi, handleReview]);
+    void handleReview(true, true);
+  }, [game, canFullAnalysis, reviewing, loadingSavedReview, reviewAi, handleReview]);
 
   // Open a game that hasn't been reviewed yet: start the review straight away.
   const autoReviewFor = useRef<number | null>(null);
