@@ -1,0 +1,43 @@
+name: Desktop screenshots
+
+# Desktop screenshots of the live site (1280 and 1920 wide) for layout
+# checks. Encrypted with scripts/desktop-shots.pub.pem and pushed to the
+# desktop-shots branch, so signed-in pages never sit in the public repo
+# in readable form. Run on demand from the Actions tab.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  shots:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install Playwright
+        run: |
+          mkdir -p /tmp/pw && cd /tmp/pw && npm init -y >/dev/null && npm i playwright@1.47.2 >/dev/null
+          npx playwright install --with-deps chromium
+      - name: Take screenshots
+        env:
+          DESKTOP_SHOT_TOKEN: ${{ secrets.DESKTOP_SHOT_TOKEN }}
+        run: |
+          cp scripts/desktop-shots.mjs /tmp/pw/desktop-shots.mjs
+          cd /tmp/pw && OUT=/tmp/shots node desktop-shots.mjs
+      - name: Encrypt and push
+        run: |
+          cd /tmp
+          tar czf shots.tgz shots
+          openssl rand -hex 32 > k.txt
+          openssl enc -aes-256-cbc -pbkdf2 -salt -in shots.tgz -out shots.tgz.enc -pass file:k.txt
+          openssl pkeyutl -encrypt -pubin -inkey "$GITHUB_WORKSPACE/scripts/desktop-shots.pub.pem" -in k.txt -out k.enc
+          rm k.txt
+          mkdir out && cp shots.tgz.enc k.enc out/
+          cd out && git init -q && git checkout -q -b desktop-shots
+          git config user.name "desktop-shots-bot" && git config user.email "desktop-shots-bot@users.noreply.github.com"
+          git add . && git commit -q -m "Desktop screenshots (encrypted)"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" desktop-shots
