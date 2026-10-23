@@ -22,4 +22,8 @@ Allow: /
 User-agent: Applebot-Extended
 Allow: /
 
+# Marketing/SEO scrapers that crawl thousands of pages a day and send no visitors.
+User-agent: QlyzeBot
+Disallow: /
+
 Sitemap: https://chessscout.net/sitemap.xml
