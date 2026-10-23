@@ -432,7 +432,8 @@ export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flippe
           </div>
         </div>
         {/* Board with eval bar */}
-        <div className="shrink-0 px-1.5" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
+        {/* Desktop: board, eval bar and material keep one width that fits the window height. */}
+        <div className="shrink-0 px-1.5 md:mx-auto md:w-full md:max-w-[max(300px,calc(100dvh-350px))]" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
           <div className="min-w-0">
             <ChessBoard
               key={mode.kind === 'retry' ? `retry-${retryKey}` : 'review'}

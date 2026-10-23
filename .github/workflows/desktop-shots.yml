@@ -11,6 +11,10 @@ on:
         description: 'Skip the public pages'
         required: false
         default: ''
+      only_pages:
+        description: 'Comma-separated signed-in page names (blank = all)'
+        required: false
+        default: ''
 
 permissions:
   contents: write
@@ -31,6 +35,7 @@ jobs:
         env:
           DESKTOP_SHOT_TOKEN: ${{ secrets.DESKTOP_SHOT_TOKEN }}
           SIGNED_IN_ONLY: ${{ github.event.inputs.signed_in_only }}
+          ONLY_PAGES: ${{ github.event.inputs.only_pages }}
         run: |
           cp scripts/desktop-shots.mjs /tmp/pw/desktop-shots.mjs
           cd /tmp/pw && OUT=/tmp/shots node desktop-shots.mjs

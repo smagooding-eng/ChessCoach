@@ -625,3 +625,16 @@ html.cs-photo :not(.cs-photo-backdrop-img):not(.cs-keep-img):is([style*="chesssc
   unicode-bidi: plaintext;
 }
 .cs-rtl :is(input, textarea) { unicode-bidi: plaintext; }
+
+
+/* ═══ Desktop fit (md and up only; phones are untouched) ═══════════════
+   Boards never grow taller than the window minus the page around them, so
+   the whole board (and its controls) fits on short laptop screens. */
+@media (min-width: 768px) {
+  .cs-board-fit { max-width: min(var(--board-max, 100%), max(300px, calc(100dvh - 300px))) !important; }
+  .cs-board-fit.cs-board-side { max-width: min(var(--board-max, 100%), max(320px, calc(100dvh - 190px))) !important; }
+  /* Wide screens show more of the photo, so it's shaded a little more and
+     text sitting on it gets a soft shadow to stay readable. */
+  html.cs-photo .cs-photo-backdrop-shade { background: rgba(5,10,11, calc(var(--photo-shade, .5) + .18)); }
+  html.cs-photo body { text-shadow: 0 1px 2px rgba(0,0,0,.55); }
+}

@@ -27,7 +27,8 @@ const SIZES = [
 ];
 const browser = await chromium.launch();
 const report = [];
-async function run(list, signedIn) {
+async function run(list0, signedIn) {
+  let list = list0;
   for (const s of SIZES) {
     mkdirSync(`${OUT}/${s.id}`, { recursive: true });
     const ctx = await browser.newContext({ viewport: s.viewport, deviceScaleFactor: 1, locale: 'en-US',
@@ -36,6 +37,15 @@ async function run(list, signedIn) {
     const page = await ctx.newPage();
     const errors = [];
     page.on('pageerror', (e) => errors.push(String(e?.message ?? e).slice(0, 200)));
+    // A real game for the review page: the first one on /games.
+    if (signedIn && !list.some(([n]) => n === 'review')) {
+      try {
+        await page.goto(`${SITE}/games?cs_shot=1`, { waitUntil: 'load', timeout: 45_000 });
+        await page.waitForTimeout(5000);
+        const href = await page.evaluate(() => [...document.querySelectorAll('a[href]')].map((a) => a.getAttribute('href')).find((h) => /^\/games\/\d+/.test(h || '')));
+        if (href) list = [...list, ['review', href]];
+      } catch {}
+    }
     for (const [name, path] of list) {
       errors.length = 0;
       try {
@@ -64,6 +74,7 @@ async function run(list, signedIn) {
   }
 }
 if (!process.env.SIGNED_IN_ONLY) await run(PUBLIC, false);
-if (TOKEN) await run(SIGNED_IN, true);
+const only = (process.env.ONLY_PAGES || '').split(',').filter(Boolean);
+if (TOKEN) await run(only.length ? SIGNED_IN.filter(([n]) => only.includes(n)).concat(only.includes('review') ? [] : []) : SIGNED_IN, true);
 await browser.close();
 writeFileSync(`${OUT}/report.json`, JSON.stringify(report, null, 1));
