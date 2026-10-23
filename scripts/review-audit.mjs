@@ -23,10 +23,10 @@ for (const g of games) {
 }
 // Run one fresh review (the newest unreviewed game with moves) to see what a
 // review made today looks like.
-const fresh = games.find((g) => out.find((o) => o.id === g.id && o.status === 'none'));
+const fresh = process.env.FRESH_ID ? { id: Number(process.env.FRESH_ID) } : games.find((g) => out.find((o) => o.id === g.id && o.status === 'none'));
 if (fresh) {
   const post = async (p) => { const r = await fetch(API + p, { method: 'POST', headers: { Authorization: `Bearer ${TOKEN}` } }); return r.ok ? r.json() : { error: r.status, body: (await r.text()).slice(0, 300) }; };
-  let r = await post(`/api/games/${fresh.id}/review`);
+  let r = await post(`/api/games/${fresh.id}/review${process.env.FRESH_ID ? '?force=true' : ''}`);
   const t0 = Date.now();
   while (r?.status === 'pending' && r.jobId && Date.now() - t0 < 6 * 60_000) {
     await new Promise((res) => setTimeout(res, 5000));

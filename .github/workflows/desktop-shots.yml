@@ -42,7 +42,7 @@ jobs:
           ONLY_PAGES: ${{ github.event.inputs.only_pages }}
         run: |
           if [ -n "${{ github.event.inputs.audit_reviews }}" ]; then
-            OUT=/tmp/shots node scripts/review-audit.mjs
+            OUT=/tmp/shots FRESH_ID=41117 node scripts/review-audit.mjs
           else
             cp scripts/desktop-shots.mjs /tmp/pw/desktop-shots.mjs
             cd /tmp/pw && OUT=/tmp/shots node desktop-shots.mjs
