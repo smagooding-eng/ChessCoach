@@ -1198,6 +1198,19 @@ const CAMPAIGN_THEMES: Record<string, string> = {
   "ELO Improvement": "Target players who want to gain rating points. Emphasize how personalized training and weakness detection leads to measurable improvement.",
 };
 
+// Is the AI coach reachable? A tiny request with the same key and model the
+// game review uses; returns the error OpenAI gives when it isn't.
+router.get("/admin/ai-health", requireAdmin, async (_req: Request, res: Response): Promise<void> => {
+  const started = Date.now();
+  try {
+    const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    const r = await client.chat.completions.create({ model: "gpt-5.6-luna", max_completion_tokens: 16, messages: [{ role: "user", content: "Reply with OK." }] });
+    res.json({ ok: true, keySet: !!process.env.OPENAI_API_KEY, model: r.model, ms: Date.now() - started });
+  } catch (err: any) {
+    res.json({ ok: false, keySet: !!process.env.OPENAI_API_KEY, status: err?.status ?? null, code: err?.code ?? err?.error?.code ?? null, message: String(err?.message ?? err).slice(0, 400), ms: Date.now() - started });
+  }
+});
+
 router.post("/admin/marketing/generate", requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
     const { theme, customNote } = req.body as { theme: string; customNote?: string };

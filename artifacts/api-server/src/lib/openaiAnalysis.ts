@@ -1155,7 +1155,10 @@ JSON format:
       gameSummary,
       whiteAccuracy: accuracyFor("white"),
       blackAccuracy: accuracyFor("black"),
-      aiCoach,
+      // Only call it an AI review if the AI actually answered. When every
+      // OpenAI call failed, it's saved as an engine review, so Pro gets the
+      // AI version made again next time the game is opened.
+      aiCoach: aiCoach && allParsedMoves.length > 0,
     };
   } catch (err) {
     logger.error({ err }, "Failed to review full game with OpenAI");
