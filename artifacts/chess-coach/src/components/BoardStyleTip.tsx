@@ -48,7 +48,7 @@ export function BoardStyleTipHost() {
   useEffect(() => { if (location.startsWith('/settings')) setOpen(false); }, [location]);
   if (!open || typeof document === 'undefined') return null;
   return createPortal(
-    <div role="status" className="fixed inset-x-3 z-[70] mx-auto flex max-w-[460px] items-center gap-3 rounded-2xl px-3.5 py-3 shadow-2xl md:bottom-6"
+    <div role="status" className="cs-board-tip fixed inset-x-3 z-[70] mx-auto flex max-w-[460px] items-center gap-3 rounded-2xl px-3.5 py-3 shadow-2xl"
       style={{ bottom: 'calc(5.25rem + env(safe-area-inset-bottom))', background: '#0D1516', border: '1px solid rgba(129,182,76,.45)', color: '#F5F7F6', animation: 'cs-tip-in .35s ease-out' }}>
       <style>{'@keyframes cs-tip-in{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}'}</style>
       <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl" style={{ background: '#81B64C' }}><Palette size={18} color="#FFFFFF" /></span>
