@@ -6,6 +6,11 @@ name: Desktop screenshots
 # in readable form. Run on demand from the Actions tab.
 on:
   workflow_dispatch:
+    inputs:
+      signed_in_only:
+        description: 'Skip the public pages'
+        required: false
+        default: ''
 
 permissions:
   contents: write
@@ -25,6 +30,7 @@ jobs:
       - name: Take screenshots
         env:
           DESKTOP_SHOT_TOKEN: ${{ secrets.DESKTOP_SHOT_TOKEN }}
+          SIGNED_IN_ONLY: ${{ github.event.inputs.signed_in_only }}
         run: |
           cp scripts/desktop-shots.mjs /tmp/pw/desktop-shots.mjs
           cd /tmp/pw && OUT=/tmp/shots node desktop-shots.mjs

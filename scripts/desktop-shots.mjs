@@ -39,8 +39,9 @@ async function run(list, signedIn) {
     for (const [name, path] of list) {
       errors.length = 0;
       try {
-        await page.goto(`${SITE}${path}${path.includes('?') ? '&' : '?'}cs_shot=1`, { waitUntil: 'networkidle', timeout: 60_000 });
-        await page.waitForTimeout(3500);
+        await page.goto(`${SITE}${path}${path.includes('?') ? '&' : '?'}cs_shot=1`, { waitUntil: 'load', timeout: 45_000 });
+        // Live pages keep sockets open, so wait a fixed time instead of for network idle.
+        await page.waitForTimeout(6000);
         // Layout facts: horizontal overflow, elements cut off at the right edge, page height.
         const facts = await page.evaluate(() => {
           const W = document.documentElement.clientWidth;
@@ -62,7 +63,7 @@ async function run(list, signedIn) {
     await ctx.close();
   }
 }
-await run(PUBLIC, false);
+if (!process.env.SIGNED_IN_ONLY) await run(PUBLIC, false);
 if (TOKEN) await run(SIGNED_IN, true);
 await browser.close();
 writeFileSync(`${OUT}/report.json`, JSON.stringify(report, null, 1));
