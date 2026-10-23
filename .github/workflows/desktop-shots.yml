@@ -11,6 +11,10 @@ on:
         description: 'Skip the public pages'
         required: false
         default: ''
+      audit_reviews:
+        description: 'Only audit recent reviews (no screenshots)'
+        required: false
+        default: ''
       only_pages:
         description: 'Comma-separated signed-in page names (blank = all)'
         required: false
@@ -37,8 +41,12 @@ jobs:
           SIGNED_IN_ONLY: ${{ github.event.inputs.signed_in_only }}
           ONLY_PAGES: ${{ github.event.inputs.only_pages }}
         run: |
-          cp scripts/desktop-shots.mjs /tmp/pw/desktop-shots.mjs
-          cd /tmp/pw && OUT=/tmp/shots node desktop-shots.mjs
+          if [ -n "${{ github.event.inputs.audit_reviews }}" ]; then
+            OUT=/tmp/shots node scripts/review-audit.mjs
+          else
+            cp scripts/desktop-shots.mjs /tmp/pw/desktop-shots.mjs
+            cd /tmp/pw && OUT=/tmp/shots node desktop-shots.mjs
+          fi
       - name: Encrypt and push
         run: |
           cd /tmp
