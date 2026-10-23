@@ -495,7 +495,8 @@ export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flippe
         )}
 
         {/* The whole game at a glance, the same on every move */}
-        {ply > 0 && mode.kind === 'main' && reviewMoves.length > 0 && (() => {
+        {/* Free only: Pro gets the AI coach card here instead. */}
+        {!canFullAnalysis && ply > 0 && mode.kind === 'main' && reviewMoves.length > 0 && (() => {
           const keys = (['brilliant', 'great', 'best', 'inaccuracy', 'mistake', 'missed_win', 'blunder'] as Classification[])
             .filter((k) => counts.white[k] || counts.black[k] || k === 'best' || k === 'mistake' || k === 'blunder');
           const row = (name: string, acc: number | null, side: 'white' | 'black') => (
