@@ -7,6 +7,7 @@ import { LookOverride, randomLook, lookLabel, playMoveSound, BOARD_THEMES, type 
 import { apiFetch } from '@/lib/api';
 import { normalizeFen } from '@/lib/utils';
 import { StudioBadge, Medallion, Rays, CountdownRing, EvalSwing, rankColor, shade } from './StudioBadge';
+import { StudioSplash } from './StudioSplash';
 import { StudioMusic, MUSIC_STYLES, bpmOf, type MusicStyle } from './studioMusic';
 
 // Content Studio player: a game moment or a trap lesson as a 9:16 clip for
@@ -88,6 +89,8 @@ type Frame =
   | { kind: 'lessonText'; fen: string; text: string }
   | { kind: 'lessonBoard'; fen: string; text: string; highlights: string[]; last: { from: string; to: string } | null; celebrate?: boolean }
   | { kind: 'scanPhoto'; fen: string }
+  /** The app's splash animation, after the end card. */
+  | { kind: 'splash'; fen: string }
   | { kind: 'promoCard'; fen: string; last: { from: string; to: string } | null; card: 'vs' | 'switch' | 'live' | 'daily' | 'link'; upTo?: number }
   /** A beat on the starting position once the title / hook clears, so the first move is never hidden. */
   | { kind: 'hold'; fen: string; last: { from: string; to: string } | null }
@@ -137,7 +140,7 @@ const DEFAULT_PREFS = {
   bg: 'green', betterLine: true, guessRating: false, outro: true, progress: true, intro: true, safeArea: true, showNames: false,
   handle: '@chessscout.net3', outroLine: 'Review your games free',
   split: true, voice: false, voiceName: 'onyx', compTitle: 'Top moments this week',
-  music: 'off' as MusicStyle, musicVol: 0.5, beatSync: true, musicFx: true, subs: true, pieceFx: true, trapBefore: 99, countdownSecs: 3, choices: false, zoom: false, reviewMode: 'highlights' as 'highlights' | 'full',
+  music: 'off' as MusicStyle, musicVol: 0.5, beatSync: true, musicFx: true, subs: true, pieceFx: true, trapBefore: 99, countdownSecs: 3, choices: false, zoom: false, splash: true, reviewMode: 'highlights' as 'highlights' | 'full',
 };
 type Prefs = typeof DEFAULT_PREFS;
 function loadPrefs(): Prefs {
@@ -556,7 +559,9 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
   const frames = useMemo<Frame[]>(() => {
     if (!clip || (!clip.plies.length && !clip.isLesson && !clip.isScout)) return [];
     const { plies, key } = clip;
-    const withInserts = (base: Frame[]): Frame[] => {
+    const withInserts = (base0: Frame[]): Frame[] => {
+      // Every clip (the last one of a compilation) ends with the splash, after the end card.
+      const base = prefs.splash && isLast && base0.length ? [...base0, { kind: 'splash' as const, fen: START_FEN }] : base0;
       if (!Object.keys(inserts).length) return base;
       const ids = assignIds(base, loadedKey);
       const fenOf = (f: Frame) => (f.kind === 'move' ? (f.ply > 0 ? plies[f.ply - 1].fen : plies[0].fenBefore) : f.kind === 'split' ? f.played.fen : f.fen);
@@ -688,7 +693,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
     if (prefs.guessRating && !clip.isTrap && (clip.ratings.w || clip.ratings.b)) out.push({ kind: 'reveal', fen: lastFen });
     if (prefs.outro && isLast) out.push({ kind: 'outro', fen: lastFen });
     return withInserts(out);
-  }, [clip, prefs.before, prefs.trapBefore, prefs.after, prefs.intro, prefs.guess, prefs.betterLine, prefs.guessRating, prefs.outro, prefs.split, prefs.reviewMode, prefs.countdownSecs, inserts, loadedKey, isComp, isFirst, isLast]);
+  }, [clip, prefs.before, prefs.trapBefore, prefs.after, prefs.intro, prefs.guess, prefs.betterLine, prefs.guessRating, prefs.outro, prefs.split, prefs.reviewMode, prefs.countdownSecs, prefs.splash, inserts, loadedKey, isComp, isFirst, isLast]);
 
   // ── Keyframes: a stable id per frame (so pauses and sticker in/out points survive setting changes) ─
   const frameIds = useMemo(() => assignIds(frames, loadedKey), [frames]);
@@ -736,6 +741,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
       case 'lessonText': return Math.max(2600, f.text.split(/\s+/).length * 340);
       case 'lessonBoard': return f.celebrate ? 2400 : Math.max(3000, f.text.split(/\s+/).length * 340);
       case 'scanPhoto': return 3200;
+      case 'splash': return 2800;
       case 'promoCard': return f.card === 'vs' ? 1500 : 3600;
       case 'outro': return 2800;
       default: {
@@ -824,6 +830,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
       if (frame.kind === 'title' || frame.kind === 'outro' || frame.kind === 'split' || frame.kind === 'intro' || frame.kind === 'card' || frame.kind === 'scoutCard' || frame.kind === 'lessonText') m.accent('whoosh');
       if (frame.kind === 'lessonBoard' && frame.celebrate) m.accent('chime');
       if (frame.kind === 'scanPhoto') m.accent('riser');
+      if (frame.kind === 'splash') { m.accent('whoosh'); setTimeout(() => music.current?.accent('impact'), 680); }
       if (frame.kind === 'promoCard') m.accent(frame.card === 'vs' ? 'tick' : 'whoosh');
       if (isKey && cur) {
         m.accent('impact');
@@ -1439,6 +1446,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
                 </motion.div>
               )}
             </AnimatePresence>
+            {frame?.kind === 'splash' && <StudioSplash key={`splash${i}`} />}
             {/* Text card inserted on the timeline */}
             <AnimatePresence>
               {frame?.kind === 'card' && (
@@ -1624,7 +1632,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
               const m = f.kind === 'move' ? plies[f.ply - 1] : null;
               const c = m ? (m.san.includes('#') ? 'checkmate' : m.review?.classification) : null;
               const tone = c && LABEL[c] && !['best', 'excellent', 'good', 'book'].includes(c) ? LABEL[c].color : null;
-              const label = f.kind === 'move' ? (m ? figurine(m.san, m.color === 'w') : 'Start') : f.kind === 'countdown' ? (f.anchor ? `⏱${f.n}` : String(f.n)) : f.kind === 'card' ? 'Card' : f.kind === 'scoutCard' ? ({ profile: 'Profile', openings: 'Openings', weak: 'Weak spots' } as Record<string, string>)[f.card] : f.kind === 'lessonText' ? 'Coach' : f.kind === 'lessonBoard' ? (f.celebrate ? '✓' : 'Board') : f.kind === 'scanPhoto' ? 'Photo' : f.kind === 'promoCard' ? (f.card === 'vs' ? `Row ${f.upTo}` : f.card[0].toUpperCase() + f.card.slice(1))
+              const label = f.kind === 'move' ? (m ? figurine(m.san, m.color === 'w') : 'Start') : f.kind === 'countdown' ? (f.anchor ? `⏱${f.n}` : String(f.n)) : f.kind === 'card' ? 'Card' : f.kind === 'scoutCard' ? ({ profile: 'Profile', openings: 'Openings', weak: 'Weak spots' } as Record<string, string>)[f.card] : f.kind === 'lessonText' ? 'Coach' : f.kind === 'lessonBoard' ? (f.celebrate ? '✓' : 'Board') : f.kind === 'scanPhoto' ? 'Photo' : f.kind === 'splash' ? 'Splash' : f.kind === 'promoCard' ? (f.card === 'vs' ? `Row ${f.upTo}` : f.card[0].toUpperCase() + f.card.slice(1))
                 : ({ title: 'Title', intro: 'Hook', hold: 'Start', better: 'Line', split: 'Split', reveal: 'Rating', summary: 'Summary', outro: 'End' } as Record<string, string>)[f.kind] ?? f.kind;
               const starts = stickers.filter((st) => st.from === id).length, ends = stickers.filter((st) => st.to === id).length;
               return (
@@ -1794,6 +1802,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
             {toggle('split', 'Played vs better (side by side)')}
             {!clip.isTrap && toggle('guessRating', 'Guess the rating')}
             {toggle('outro', 'End card')}
+            {toggle('splash', 'Splash screen at the end')}
           </div>
           <p className="mb-1 text-[11px] font-bold uppercase tracking-wide text-white/50">Look</p>
           <div className="mb-3 flex flex-wrap gap-1.5">
