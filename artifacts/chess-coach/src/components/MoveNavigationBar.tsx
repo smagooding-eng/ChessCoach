@@ -1,4 +1,5 @@
 import React from 'react';
+import { useHoldRepeat } from '@/hooks/use-hold-repeat';
 import { ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight, Play, Pause } from 'lucide-react';
 
 const GREEN = '#81b64c';
@@ -35,28 +36,32 @@ export function MoveNavigationBar({
   isPlaying, onFirst, onPrev, onPlayPause, onNext, onLast,
   canGoBack = true, canGoForward = true, extra, variant,
 }: MoveNavigationBarProps) {
+  // Hold the back / forward arrow to speed through the moves.
+  const holdPrev = useHoldRepeat(() => { if (!canGoBack) return false; onPrev(); });
+  const holdNext = useHoldRepeat(() => { if (!canGoForward) return false; onNext(); });
   if (variant === 'redesign') {
     // Five wide rounded buttons across the row (redesign mockup)
-    const wide = (onClick: () => void, disabled: boolean, icon: React.ReactNode, label: string) => (
-      <button onClick={onClick} disabled={disabled} aria-label={label}
+    const wide = (onClick: () => void, disabled: boolean, icon: React.ReactNode, label: string, hold?: ReturnType<typeof useHoldRepeat>) => (
+      <button onClick={onClick} {...(hold ?? {})} disabled={disabled} aria-label={label}
         className="flex h-[46px] items-center justify-center rounded-[13px] transition-transform active:scale-95 disabled:opacity-30"
-        style={{ background: 'var(--cs-bg-card, #0D1516)', border: '1px solid var(--cs-border, rgba(255,255,255,.08))', color: TEXT_LIGHT }}>
+        style={{ background: 'var(--cs-bg-card, #0D1516)', border: '1px solid var(--cs-border, rgba(255,255,255,.08))', color: TEXT_LIGHT, ...(hold?.style ?? {}) }}>
         {icon}
       </button>
     );
     return (
       <div className="grid w-full grid-cols-5 gap-2.5">
         {wide(onFirst, !canGoBack, <ChevronsLeft className="h-[22px] w-[22px]" />, 'Go to start')}
-        {wide(onPrev, !canGoBack, <ChevronLeft className="h-[22px] w-[22px]" />, 'Previous move')}
+        {wide(onPrev, !canGoBack, <ChevronLeft className="h-[22px] w-[22px]" />, 'Previous move', holdPrev)}
         {wide(onPlayPause, false, isPlaying ? <Pause className="h-6 w-6" fill="currentColor" style={{ color: GREEN }} /> : <Play className="h-6 w-6" fill="currentColor" style={{ color: GREEN }} />, isPlaying ? 'Pause' : 'Play')}
-        {wide(onNext, !canGoForward, <ChevronRight className="h-[22px] w-[22px]" />, 'Next move')}
+        {wide(onNext, !canGoForward, <ChevronRight className="h-[22px] w-[22px]" />, 'Next move', holdNext)}
         {wide(onLast, !canGoForward, <ChevronsRight className="h-[22px] w-[22px]" />, 'Go to end')}
       </div>
     );
   }
-  const navBtn = (onClick: () => void, disabled: boolean, icon: React.ReactNode, label: string) => (
+  const navBtn = (onClick: () => void, disabled: boolean, icon: React.ReactNode, label: string, hold?: ReturnType<typeof useHoldRepeat>) => (
     <button
       onClick={onClick}
+      {...(hold ?? {})}
       disabled={disabled}
       aria-label={label}
       className="w-10 h-10 flex items-center justify-center rounded-full transition-all duration-150 active:scale-90 disabled:opacity-30 disabled:pointer-events-none"
@@ -75,7 +80,7 @@ export function MoveNavigationBar({
         style={{ background: 'rgba(0,0,0,0.22)', border: '1px solid rgba(255,255,255,0.07)' }}
       >
         {navBtn(onFirst, !canGoBack, <ChevronsLeft className="w-[18px] h-[18px]" />, 'Go to start')}
-        {navBtn(onPrev, !canGoBack, <ChevronLeft className="w-[18px] h-[18px]" />, 'Previous move')}
+        {navBtn(onPrev, !canGoBack, <ChevronLeft className="w-[18px] h-[18px]" />, 'Previous move', holdPrev)}
         <button
           onClick={onPlayPause}
           aria-label={isPlaying ? 'Pause' : 'Play'}
@@ -88,7 +93,7 @@ export function MoveNavigationBar({
         >
           {isPlaying ? <Pause className="w-5 h-5" fill="currentColor" /> : <Play className="w-5 h-5 ml-0.5" fill="currentColor" />}
         </button>
-        {navBtn(onNext, !canGoForward, <ChevronRight className="w-[18px] h-[18px]" />, 'Next move')}
+        {navBtn(onNext, !canGoForward, <ChevronRight className="w-[18px] h-[18px]" />, 'Next move', holdNext)}
         {navBtn(onLast, !canGoForward, <ChevronsRight className="w-[18px] h-[18px]" />, 'Go to end')}
       </div>
       {extra && (

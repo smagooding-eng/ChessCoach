@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Chess } from 'chess.js';
+import { useHoldRepeat } from '@/hooks/use-hold-repeat';
 import { ArrowLeft, ChevronLeft, ChevronRight, FlipVertical2, ListTree, Star, RotateCcw, X, Sparkles } from 'lucide-react';
 import { MaterialStrip } from '@/components/GameStatusStrip';
 import { ChessBoard, type MoveQuality } from '@/components/ChessBoard';
@@ -163,6 +164,17 @@ export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flippe
     if (next === ply + 1 && moves[next - 1]?.san) soundFor(moves[next - 1].san);
     setPly(next);
   }, [max, ply, moves, setPly]);
+
+  // Hold an arrow to speed through the moves (quietly: only a single step plays the move sound).
+  const plyRef = useRef(ply);
+  plyRef.current = ply;
+  const holdStep = (d: 1 | -1) => (repeat: boolean) => {
+    const target = Math.max(0, Math.min(max, plyRef.current + d));
+    if (target === plyRef.current) return false;
+    if (repeat) { plyRef.current = target; setPly(target); } else go(target);
+  };
+  const holdPrev = useHoldRepeat(holdStep(-1));
+  const holdNext = useHoldRepeat(holdStep(1));
 
   // Keyboard and swipe.
   useEffect(() => {
@@ -579,7 +591,7 @@ export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flippe
 
         {/* Move strip */}
         <div className="flex shrink-0 items-center gap-1 px-1 py-2 lg:col-start-2 lg:row-start-3 lg:min-w-0">
-          <button onClick={() => go(ply - 1)} disabled={ply <= 0} aria-label="Previous move" className="grid h-10 w-9 shrink-0 place-items-center text-[#C9CFCD] disabled:opacity-25"><ChevronLeft size={26} /></button>
+          <button {...holdPrev} disabled={ply <= 0} aria-label="Previous move" className="grid h-10 w-9 shrink-0 place-items-center text-[#C9CFCD] disabled:opacity-25"><ChevronLeft size={26} /></button>
           <div ref={stripRef} className="hide-scrollbar flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto scroll-smooth">
             {moves.map((m, i) => {
               const r = byIndex.get(i);
@@ -600,7 +612,7 @@ export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flippe
               );
             })}
           </div>
-          <button onClick={() => go(ply + 1)} disabled={ply >= max} aria-label="Next move" className="grid h-10 w-9 shrink-0 place-items-center text-[#C9CFCD] disabled:opacity-25"><ChevronRight size={26} /></button>
+          <button {...holdNext} disabled={ply >= max} aria-label="Next move" className="grid h-10 w-9 shrink-0 place-items-center text-[#C9CFCD] disabled:opacity-25"><ChevronRight size={26} /></button>
         </div>
 
         {/* Bottom bar */}
