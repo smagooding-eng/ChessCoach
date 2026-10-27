@@ -27,15 +27,27 @@ export interface StudioTrap {
   id: number; name: string; category: string; difficulty: string; trapSide: string; summary: string;
   startingFen: string; moves: string[]; notes: string[]; critical: number;
 }
-export type StudioSource = { kind: 'game'; moment: StudioMoment } | { kind: 'trap'; trap: StudioTrap };
+export interface StudioPuzzle { id: number; fen: string; moves: string; rating: number; themes: string | null; explanation: string | null; source: string; gameId: number | null }
+export interface StudioReview {
+  id: number; opening: string | null; white: string | null; black: string | null; whiteRating: number | null; blackRating: number | null;
+  result: string | null; platform: string | null; playedAt: string | null; whiteAccuracy: number | null; blackAccuracy: number | null;
+  moments: number; brilliant: number; blunders: number; mate: number; lastFen: string | null;
+}
+export type StudioSource =
+  | { kind: 'game'; moment: StudioMoment } | { kind: 'trap'; trap: StudioTrap }
+  | { kind: 'puzzle'; puzzle: StudioPuzzle } | { kind: 'review'; review: StudioReview };
 
 interface ReviewMove { moveIndex?: number; san: string; color?: 'white' | 'black'; classification?: string; explanation?: string; betterMove?: string | null; evalAfterCp?: number; fen?: string; bestLineSan?: string[] }
-interface StudioGame { id: number; pgn: string; opening: string | null; white: string; black: string; whiteRating: number | null; blackRating: number | null; moves: ReviewMove[] }
+interface StudioGame { id: number; pgn: string; opening: string | null; white: string; black: string; whiteRating: number | null; blackRating: number | null; moves: ReviewMove[]; whiteAccuracy?: number | null; blackAccuracy?: number | null; overview?: string | null; result?: string | null }
 interface Ply { san: string; from: string; to: string; fen: string; fenBefore: string; color: 'w' | 'b'; review?: ReviewMove }
 interface Sticker { id: number; text: string; x: number; y: number; size: number; kind: 'emoji' | 'text' | 'badge'; tone?: number }
 interface Clip {
   plies: Ply[]; key: number; tags: string[]; hook: string; sub: string; names: { w: string | null; b: string | null };
   ratings: { w: number | null; b: number | null }; fileBase: string; label: string; isTrap: boolean; opening: string | null;
+  /** A puzzle: the opponent's move, then the solution (played to the end). */
+  isPuzzle?: boolean; puzzleRating?: number;
+  /** A whole game review: every move (or the highlights) and a summary card. */
+  isReview?: boolean; accuracy?: { w: number | null; b: number | null }; overview?: string | null; result?: string | null;
 }
 type Frame =
   | { kind: 'intro'; fen: string }
@@ -45,6 +57,7 @@ type Frame =
   | { kind: 'reveal'; fen: string }
   | { kind: 'split'; played: { fen: string; last: { from: string; to: string } }; better: { fen: string; last: { from: string; to: string } }; playedSan: string; betterSan: string }
   | { kind: 'title'; fen: string }
+  | { kind: 'summary'; fen: string }
   | { kind: 'outro'; fen: string };
 
 const LABEL: Record<string, { text: string; color: string; glyph: string }> = {
@@ -77,7 +90,7 @@ const DEFAULT_PREFS = {
   bg: 'green', betterLine: true, guessRating: false, outro: true, progress: true, intro: true, safeArea: true, showNames: false,
   handle: '@chessscout.net3', outroLine: 'Review your games free',
   split: true, voice: false, voiceName: 'onyx', compTitle: 'Top moments this week',
-  music: 'off' as MusicStyle, musicVol: 0.5, beatSync: true, musicFx: true, subs: true, pieceFx: true,
+  music: 'off' as MusicStyle, musicVol: 0.5, beatSync: true, musicFx: true, subs: true, pieceFx: true, reviewMode: 'highlights' as 'highlights' | 'full',
 };
 type Prefs = typeof DEFAULT_PREFS;
 function loadPrefs(): Prefs {
@@ -139,6 +152,60 @@ function trapClip(t: StudioTrap): Clip {
   };
 }
 
+const THEME_LABEL: Record<string, string> = {
+  fork: 'Fork', pin: 'Pin', skewer: 'Skewer', discoveredAttack: 'Discovered attack', sacrifice: 'Sacrifice', mate: 'Checkmate', mateIn1: 'Mate in 1', mateIn2: 'Mate in 2',
+  mateIn3: 'Mate in 3', mateIn4: 'Mate in 4', backRankMate: 'Back-rank mate', smotheredMate: 'Smothered mate', endgame: 'Endgame', middlegame: 'Middlegame', opening: 'Opening',
+  hangingPiece: 'Hanging piece', trappedPiece: 'Trapped piece', promotion: 'Promotion', deflection: 'Deflection', attraction: 'Attraction', zugzwang: 'Zugzwang',
+  crushing: 'Crushing', advantage: 'Winning', equality: 'Save the game', defensiveMove: 'Defend', quietMove: 'Quiet move', xRayAttack: 'X-ray', clearance: 'Clearance',
+  interference: 'Interference', intermezzo: 'In-between move', doubleCheck: 'Double check', kingsideAttack: 'Kingside attack', queensideAttack: 'Queenside attack',
+};
+export const themeLabel = (t: string) => THEME_LABEL[t] ?? t.replace(/([A-Z])/g, ' $1').replace(/^./, (c) => c.toUpperCase());
+
+function puzzleClip(p: StudioPuzzle): Clip {
+  const themes = (p.themes ?? '').split(' ').filter(Boolean);
+  const c = new Chess(p.fen);
+  const plies: Ply[] = [];
+  for (const [k, u] of p.moves.split(' ').filter(Boolean).entries()) {
+    const fenBefore = c.fen();
+    let mv;
+    try { mv = c.move({ from: u.slice(0, 2), to: u.slice(2, 4), promotion: u[4] }); } catch { break; }
+    if (!mv) break;
+    // Move 0 is the opponent's move that sets the puzzle; the solver's moves are all best.
+    const review: ReviewMove | undefined = k % 2 === 1 ? { san: mv.san, classification: k === 1 && themes.some((t) => ['sacrifice', 'quietMove', 'clearance', 'deflection'].includes(t)) ? 'brilliant' : 'best', explanation: k === 1 ? p.explanation ?? undefined : undefined } : undefined;
+    plies.push({ san: mv.san, from: mv.from, to: mv.to, fen: c.fen(), fenBefore, color: mv.color as 'w' | 'b', review });
+  }
+  const mateIn = themes.find((t) => /^mateIn\d$/.test(t));
+  const tactic = themes.find((t) => ['fork', 'pin', 'skewer', 'discoveredAttack', 'sacrifice', 'smotheredMate', 'backRankMate', 'deflection', 'doubleCheck', 'zugzwang'].includes(t));
+  const side = plies[1]?.color === 'b' ? 'Black' : 'White';
+  const hook = mateIn ? `${side} to move: ${themeLabel(mateIn)} 🧩` : tactic ? `Find the ${themeLabel(tactic).toLowerCase()} 🧩` : themes.includes('equality') ? `${side} to move and save it 🧩` : `${side} to move. Can you solve it? 🧩`;
+  const tags = ['puzzle', ...(themes.some((t) => t.startsWith('mate')) ? ['checkmate'] : []), ...(themes.some((t) => ['fork', 'pin', 'skewer', 'discoveredAttack', 'sacrifice'].includes(t)) ? ['fork'] : []), ...(themes.includes('endgame') ? ['endgame'] : [])];
+  return {
+    plies, key: Math.min(1, plies.length - 1), tags, hook, sub: `Puzzle rated ${p.rating}${tactic && mateIn ? ` · ${themeLabel(tactic)}` : ''}`,
+    names: { w: null, b: null }, ratings: { w: null, b: null }, fileBase: `chessscout-puzzle-${p.id}`, label: `Puzzle #${p.id} · ${p.rating}`,
+    isTrap: false, opening: null, isPuzzle: true, puzzleRating: p.rating,
+  };
+}
+
+const NOTABLE = new Set(['brilliant', 'great', 'blunder', 'mistake', 'missed_win']);
+function reviewClip(g: StudioGame): Clip {
+  const base = gameClip(g, { gameId: g.id, moveIndex: 0, tags: [], classification: null, san: '', trapName: null, opening: g.opening, white: g.white, black: g.black, whiteRating: g.whiteRating, blackRating: g.blackRating, platform: null });
+  const plies = base.plies;
+  const count = (c: string) => plies.filter((p) => p.review?.classification === c).length;
+  const bril = count('brilliant'), blun = count('blunder') + count('missed_win'), great = count('great');
+  const mated = plies[plies.length - 1]?.san.includes('#');
+  // The cover / key move: the first brilliant move, else the biggest blunder, else the last move.
+  let key = plies.findIndex((p) => p.review?.classification === 'brilliant');
+  if (key < 0) key = plies.findIndex((p) => p.review?.classification === 'great');
+  if (key < 0) key = plies.findIndex((p) => p.review?.classification === 'blunder' || p.review?.classification === 'missed_win');
+  if (key < 0) key = Math.max(0, plies.length - 1);
+  const hook = bril ? `${bril} brilliant move${bril > 1 ? 's' : ''} in one game 🔥` : blun >= 3 ? `${blun} blunders in one game 💀` : great ? 'The full game review 📊' : mated ? 'Every move, all the way to mate ♟️' : 'Full game review 📊';
+  const tags = ['review', ...(bril ? ['brilliant'] : []), ...(blun ? ['blunder'] : []), ...(mated ? ['checkmate'] : [])];
+  return {
+    ...base, key, tags, hook, sub: g.opening ?? '', fileBase: `chessscout-review-${g.id}`, label: `Game review #${g.id} · ${plies.length} plies`,
+    isReview: true, accuracy: { w: g.whiteAccuracy ?? null, b: g.blackAccuracy ?? null }, overview: g.overview ?? null, result: g.result ?? null,
+  };
+}
+
 function figurine(san: string, white: boolean): string {
   const map: Record<string, string> = white ? { K: '♔', Q: '♕', R: '♖', B: '♗', N: '♘' } : { K: '♚', Q: '♛', R: '♜', B: '♝', N: '♞' };
   return san.replace(/^[KQRBN]/, (p) => map[p] ?? p);
@@ -153,6 +220,8 @@ function hashtagsFor(clip: Clip): string {
   if (clip.tags.some((x) => ['fork', 'pin', 'skewer', 'discovered', 'sacrifice'].includes(x))) t.add('#chesstactics');
   if (clip.tags.includes('blunder') || clip.tags.includes('missed_win')) t.add('#chessblunder');
   if (clip.tags.includes('endgame')) t.add('#chessendgame');
+  if (clip.isPuzzle) { t.add('#chesspuzzle'); t.add('#puzzle'); }
+  if (clip.isReview) { t.add('#gamereview'); t.add('#chessanalysis'); }
   const op = (clip.opening ?? '').split(/[:,]/)[0].replace(/[^A-Za-z ]/g, '').trim();
   if (op) t.add('#' + op.replace(/\s+/g, '').toLowerCase());
   t.add('#chessgame');
@@ -297,11 +366,20 @@ export function StudioPlayer({ source, queue, title, onClose, onNext, onPrev }: 
   useEffect(() => {
     setErr(null);
     const slot = q;
-    if (current.kind === 'trap') { setClip(trapClip(current.trap)); setClipQ(slot); return; }
-    const m = current.moment;
-    getGame(m.gameId).then((g) => { setClip(gameClip(g, m)); setClipQ(slot); }).catch((e) => setErr(String(e?.message ?? e)));
     const nx = isComp ? queue![slot + 1] : undefined;
     if (nx?.kind === 'game') void getGame(nx.moment.gameId).catch(() => {});
+    if (nx?.kind === 'review') void getGame(nx.review.id).catch(() => {});
+    if (current.kind === 'trap') { setClip(trapClip(current.trap)); setClipQ(slot); return; }
+    if (current.kind === 'puzzle') {
+      try { setClip(puzzleClip(current.puzzle)); setClipQ(slot); } catch { setErr("This puzzle doesn't load."); }
+      return;
+    }
+    if (current.kind === 'review') {
+      getGame(current.review.id).then((g) => { setClip(reviewClip(g)); setClipQ(slot); }).catch((e) => setErr(String(e?.message ?? e)));
+      return;
+    }
+    const m = current.moment;
+    getGame(m.gameId).then((g) => { setClip(gameClip(g, m)); setClipQ(slot); }).catch((e) => setErr(String(e?.message ?? e)));
   }, [current]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Settings (remembered between clips) ─────────────────────────────────
@@ -351,10 +429,26 @@ export function StudioPlayer({ source, queue, title, onClose, onNext, onPrev }: 
     const { plies, key } = clip;
     const keyPly = key + 1;
     const startPly = Math.max(0, keyPly - 1 - prefs.before);
-    const endPly = Math.min(plies.length, keyPly + prefs.after);
+    const endPly = clip.isPuzzle ? plies.length : Math.min(plies.length, keyPly + prefs.after);
     const fenAt = (p: number) => (p <= 0 ? plies[0].fenBefore : plies[p - 1].fen);
     const lastAt = (p: number) => (p <= 0 ? null : { from: plies[p - 1].from, to: plies[p - 1].to });
     const out: Frame[] = [];
+    if (clip.isReview) {
+      if (isComp && isFirst) out.push({ kind: 'title', fen: fenAt(0) });
+      if (prefs.intro) out.push({ kind: 'intro', fen: fenAt(0) });
+      const notable = (p: number) => { const m = plies[p - 1]; return !!m && (m.san.includes('#') || NOTABLE.has(m.review?.classification ?? '')); };
+      let list: number[];
+      if (prefs.reviewMode === 'highlights') {
+        const set = new Set<number>();
+        for (let p = 1; p <= plies.length; p++) if (notable(p)) for (let q = Math.max(1, p - 2); q <= p; q++) set.add(q);
+        set.add(plies.length);
+        list = [...set].sort((a, b) => a - b);
+      } else list = plies.map((_, k) => k + 1);
+      for (const p of list) out.push({ kind: 'move', ply: p });
+      out.push({ kind: 'summary', fen: fenAt(plies.length) });
+      if (prefs.outro && isLast) out.push({ kind: 'outro', fen: fenAt(plies.length) });
+      return out;
+    }
     if (isComp && isFirst) out.push({ kind: 'title', fen: fenAt(startPly) });
     if (prefs.intro) out.push({ kind: 'intro', fen: fenAt(startPly) });
     else out.push({ kind: 'move', ply: startPly });
@@ -389,7 +483,7 @@ export function StudioPlayer({ source, queue, title, onClose, onNext, onPrev }: 
     if (prefs.guessRating && !clip.isTrap && (clip.ratings.w || clip.ratings.b)) out.push({ kind: 'reveal', fen: lastFen });
     if (prefs.outro && isLast) out.push({ kind: 'outro', fen: lastFen });
     return out;
-  }, [clip, prefs.before, prefs.after, prefs.intro, prefs.guess, prefs.betterLine, prefs.guessRating, prefs.outro, prefs.split, isComp, isFirst, isLast]);
+  }, [clip, prefs.before, prefs.after, prefs.intro, prefs.guess, prefs.betterLine, prefs.guessRating, prefs.outro, prefs.split, prefs.reviewMode, isComp, isFirst, isLast]);
 
   const dur = (f: Frame) => {
     const base = baseDur(f);
@@ -410,8 +504,15 @@ export function StudioPlayer({ source, queue, title, onClose, onNext, onPrev }: 
       case 'reveal': return 2400;
       case 'split': return 3200;
       case 'title': return 2200;
+      case 'summary': return 4200;
       case 'outro': return 2800;
-      default: return clip && f.ply === clip.key + 1 ? Math.max(s, 2400) : s;
+      default: {
+        if (clip?.isReview) {
+          const m = clip.plies[f.ply - 1];
+          return m && (m.san.includes('#') || NOTABLE.has(m.review?.classification ?? '')) ? Math.max(s, 2200) : Math.max(220, s * 0.55);
+        }
+        return clip && f.ply === clip.key + 1 ? Math.max(s, 2400) : s;
+      }
     }
   };
 
@@ -454,7 +555,7 @@ export function StudioPlayer({ source, queue, title, onClose, onNext, onPrev }: 
     setPop(null);
     if (frame.kind === 'move' && cur && i > 0) {
       if (prefs.sound) playMoveSound(cur.san.includes('#') || cur.san.includes('+') ? 'check' : cur.san.startsWith('O-O') ? 'castle' : cur.san.includes('=') ? 'promote' : cur.san.includes('x') ? 'capture' : 'move');
-      if (prefs.effects && cls && (isKey || ['brilliant', 'great', 'blunder', 'missed_win', 'checkmate'].includes(cls))) {
+      if (prefs.effects && cls && (isKey || ['brilliant', 'great', 'blunder', 'missed_win', 'checkmate', ...(clip?.isReview ? ['mistake'] : [])].includes(cls))) {
         setPop({ cls, at: Date.now() });
         if (cls === 'brilliant' || cls === 'great' || cls === 'checkmate') setConfetti(Date.now());
         if (cls === 'blunder' || cls === 'missed_win') setShake(Date.now());
@@ -518,6 +619,11 @@ export function StudioPlayer({ source, queue, title, onClose, onNext, onPrev }: 
       case 'intro': return stripEmoji(hook.replace(/^#\d+ · /, ''));
       case 'countdown': return f.n === 3 ? (clip.isTrap ? 'Can you spot the winning move?' : 'Can you find the move?') : null;
       case 'move': {
+        if (clip.isReview) {
+          const r = clip.plies[f.ply - 1]; const rc = r?.san.includes('#') ? 'checkmate' : r?.review?.classification;
+          if (!r || !rc || !(NOTABLE.has(rc) || rc === 'checkmate')) return null;
+          return `${rc !== 'checkmate' ? `${LABEL[rc].text.toLowerCase()}! ` : ''}${spokenSan(r.san)}.`;
+        }
         if (f.ply !== clip.key + 1) return null;
         const m = clip.plies[clip.key]; const c = m.san.includes('#') ? 'checkmate' : m.review?.classification;
         const word = c && LABEL[c] && c !== 'checkmate' ? `${LABEL[c].text.toLowerCase()}! ` : '';
@@ -527,6 +633,11 @@ export function StudioPlayer({ source, queue, title, onClose, onNext, onPrev }: 
       case 'split': return `${spokenSan(f.playedSan)} was played. ${spokenSan(f.betterSan)} was better.`;
       case 'better': return f.arrow ? `Better was ${spokenSan(f.text.replace(/^Better was /, ''))}.` : null;
       case 'reveal': return clip.ratings.w && clip.ratings.b ? `They were rated ${clip.ratings.w} and ${clip.ratings.b}.` : null;
+      case 'summary': {
+        const a = clip.accuracy;
+        const acc = a?.w != null && a?.b != null ? `White played with ${Math.round(a.w)} percent accuracy, Black with ${Math.round(a.b)}.` : 'Here is how both sides did.';
+        return `${acc}${clip.overview ? ` ${clip.overview.split(/(?<=[.!?])\s/)[0]}` : ''}`.slice(0, 300);
+      }
       case 'outro': return `${stripEmoji(prefs.outroLine)}. Follow for more.`;
       default: return null;
     }
@@ -675,7 +786,7 @@ export function StudioPlayer({ source, queue, title, onClose, onNext, onPrev }: 
   };
 
   // ── Post kit ────────────────────────────────────────────────────────────
-  const postText = clip ? `${isComp ? stripEmoji(compTitle) : hook}\n\n${clip.isTrap ? 'Would you fall for it? 👇' : 'Would you have found it? Comment your move 👇'}\nReview your own games free at chessscout.net\n\n${hashtagsFor(clip)}` : '';
+  const postText = clip ? `${isComp ? stripEmoji(compTitle) : hook}\n\n${clip.isTrap ? 'Would you fall for it? 👇' : clip.isPuzzle ? 'Did you solve it? Drop the first move in the comments 👇' : clip.isReview ? 'Which move would you have played differently? 👇' : 'Would you have found it? Comment your move 👇'}\nReview your own games free at chessscout.net\n\n${hashtagsFor(clip)}` : '';
   const [copied, setCopied] = useState(false);
   const copyPost = () => { navigator.clipboard?.writeText(postText).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); }).catch(() => {}); };
 
@@ -692,7 +803,7 @@ export function StudioPlayer({ source, queue, title, onClose, onNext, onPrev }: 
     return `${who}${rating}`;
   };
   const top = flipped ? 'w' : 'b';
-  const moveNo = cur ? `${Math.floor((view.ply - 1) / 2) + 1}${cur.color === 'w' ? '.' : '...'}` : '';
+  const moveNo = cur ? `${Number(cur.fenBefore.split(' ')[5]) || Math.floor((view.ply - 1) / 2) + 1}${cur.color === 'w' ? '.' : '...'}` : '';
   const label = cls ? LABEL[cls] : null;
   // Arrows: the better move on a mistake (key frame), the engine line's first move, nothing otherwise.
   const arrows: { from: string; to: string; color?: string }[] = [];
@@ -836,6 +947,47 @@ export function StudioPlayer({ source, queue, title, onClose, onNext, onPrev }: 
                 </motion.div>
               )}
             </AnimatePresence>
+            {/* Game review summary: accuracy and how many of each kind of move, both sides */}
+            <AnimatePresence>
+              {frame?.kind === 'summary' && (() => {
+                const rows = ['brilliant', 'great', 'best', 'excellent', 'good', 'book', 'inaccuracy', 'mistake', 'blunder', 'missed_win']
+                  .map((c) => ({ c, w: plies.filter((p) => p.color === 'w' && p.review?.classification === c).length, b: plies.filter((p) => p.color === 'b' && p.review?.classification === c).length }))
+                  .filter((r) => r.w || r.b);
+                const acc = clip.accuracy ?? { w: null, b: null };
+                const who = (side: 'w' | 'b') => (prefs.showNames && clip.names[side] ? clip.names[side]! : side === 'w' ? 'White' : 'Black');
+                return (
+                  <motion.div initial={{ opacity: 0, y: 30, scale: 0.92 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0 }} transition={{ type: 'spring', stiffness: 260, damping: 20 }}
+                    className="absolute inset-x-[5%] top-[21%] z-30 rounded-[3cqh] bg-[#0B1112]/92 p-[2.4cqh] text-white shadow-2xl ring-2 ring-white/70 backdrop-blur" style={{ fontSize: 'clamp(11px,1.9cqh,20px)' }}>
+                    <p className="text-center font-black uppercase tracking-wide text-[#B8E08C]" style={{ fontSize: '1.15em' }}>Game review{clip.result ? ` · ${clip.result}` : ''}</p>
+                    <div className="mt-[1.4cqh] grid grid-cols-[1fr_auto_auto] items-center gap-x-[1.6cqh] gap-y-[0.9cqh]">
+                      <span />
+                      {(['w', 'b'] as const).map((side) => (
+                        <div key={side} className="min-w-[4.6em] text-center">
+                          <p className="truncate font-bold text-white/70" style={{ fontSize: '0.8em' }}>{who(side)}{clip.ratings[side] ? ` (${clip.ratings[side]})` : ''}</p>
+                          <motion.p initial={{ scale: 0.4 }} animate={{ scale: 1 }} transition={{ delay: 0.25, type: 'spring', stiffness: 380, damping: 14 }}
+                            className="mt-[0.3em] rounded-[0.4em] px-[0.4em] py-[0.15em] font-black tabular-nums"
+                            style={{ fontSize: '1.7em', background: side === 'w' ? '#F2F2F2' : '#2B2B2B', color: side === 'w' ? '#141414' : '#fff', border: '2px solid rgba(255,255,255,.6)' }}>
+                            {acc[side] != null ? acc[side]!.toFixed(1) : '—'}
+                          </motion.p>
+                        </div>
+                      ))}
+                      {rows.map((r, k) => (
+                        <React.Fragment key={r.c}>
+                          <motion.div initial={{ opacity: 0, x: -14 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.45 + k * 0.08 }} className="flex items-center gap-[0.55em] font-bold">
+                            <span style={{ fontSize: '0.62em' }}><Medallion glyph={LABEL[r.c].glyph} color={LABEL[r.c].color} size={2.2} /></span>
+                            <span style={{ color: shade(LABEL[r.c].color, 0.35) }}>{LABEL[r.c].text.charAt(0) + LABEL[r.c].text.slice(1).toLowerCase()}</span>
+                          </motion.div>
+                          {(['w', 'b'] as const).map((side) => (
+                            <motion.span key={side} initial={{ opacity: 0, scale: 0.5 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.5 + k * 0.08 }}
+                              className="text-center font-black tabular-nums" style={{ color: r[side] ? '#fff' : 'rgba(255,255,255,.3)', fontSize: '1.1em' }}>{r[side]}</motion.span>
+                          ))}
+                        </React.Fragment>
+                      ))}
+                    </div>
+                  </motion.div>
+                );
+              })()}
+            </AnimatePresence>
             {/* Compilation title */}
             <AnimatePresence>
               {frame?.kind === 'title' && (
@@ -978,6 +1130,17 @@ export function StudioPlayer({ source, queue, title, onClose, onNext, onPrev }: 
             <label className="text-white/60">Sec / move<input type="number" min={0.4} max={4} step={0.1} value={prefs.speed} onChange={(e) => set('speed', Number(e.target.value))} className="mt-0.5 w-full rounded bg-white/5 px-2 py-1 text-white" /></label>
           </div>
 
+          {clip.isReview && (
+            <div className="mb-3">
+              <p className="mb-1 text-[11px] font-bold uppercase tracking-wide text-white/50">Game review</p>
+              <div className="inline-flex rounded-lg bg-white/5 p-0.5">
+                {([['highlights', 'Highlights'], ['full', 'Every move']] as const).map(([k, t]) => (
+                  <button key={k} onClick={() => set('reviewMode', k)} className="rounded-md px-3 py-1 text-[12px] font-bold" style={{ background: prefs.reviewMode === k ? '#81B64C' : 'transparent', color: prefs.reviewMode === k ? '#fff' : '#C9CFCD' }}>{t}</button>
+                ))}
+              </div>
+              <p className="mt-1 text-[11.5px] text-white/45">Highlights plays the two moves before each brilliant, great, mistake and blunder, then the summary card.</p>
+            </div>
+          )}
           <p className="mb-1 text-[11px] font-bold uppercase tracking-wide text-white/50">Story</p>
           <div className="mb-3 flex flex-wrap gap-1.5">
             {toggle('intro', 'Hook intro')}

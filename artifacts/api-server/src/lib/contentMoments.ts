@@ -173,11 +173,15 @@ export async function studioGame(id: number) {
   const r = await db.execute(sql`SELECT id, pgn, review_data, opening, white_username, black_username, white_rating, black_rating, result, platform, played_at FROM games WHERE id = ${id}`);
   const g = rowsOf(r)[0];
   if (!g) return null;
-  const rd = g.review_data as { moves?: unknown[] } | unknown[] | null;
+  const rd = g.review_data as { moves?: unknown[]; whiteAccuracy?: number; blackAccuracy?: number; gameSummary?: { overview?: string } | null } | unknown[] | null;
+  const obj = rd && !Array.isArray(rd) ? rd : null;
   return {
     id: g.id, pgn: g.pgn, opening: g.opening, white: g.white_username, black: g.black_username,
     whiteRating: g.white_rating, blackRating: g.black_rating, result: g.result, platform: g.platform, playedAt: g.played_at,
     moves: Array.isArray(rd) ? rd : rd?.moves ?? [],
+    whiteAccuracy: typeof obj?.whiteAccuracy === "number" ? obj.whiteAccuracy : null,
+    blackAccuracy: typeof obj?.blackAccuracy === "number" ? obj.blackAccuracy : null,
+    overview: typeof obj?.gameSummary?.overview === "string" ? obj.gameSummary.overview : null,
   };
 }
 
@@ -188,4 +192,54 @@ export async function studioTraps() {
     id: t.id, name: t.name, category: t.category, difficulty: t.difficulty, trapSide: t.trapSide, summary: t.summary,
     startingFen: t.startingFen, moves: (t.trapLineSan ?? []) as string[], notes: (t.moveNotes ?? []) as string[], critical: t.criticalMoveIndex,
   }));
+}
+
+// ── Puzzles: the app's puzzle library as Studio clips ─────────────────────
+export interface PuzzleQuery { theme?: string; minRating?: number; maxRating?: number; sort?: "random" | "hard" | "easy" | "new"; limit?: number; offset?: number; source?: string }
+export async function studioPuzzles(q: PuzzleQuery) {
+  const conds = [sql`archived = false`];
+  if (q.theme) conds.push(sql`(' ' || COALESCE(themes,'') || ' ') ILIKE ${"% " + q.theme + " %"}`);
+  if (q.minRating) conds.push(sql`rating >= ${q.minRating}`);
+  if (q.maxRating) conds.push(sql`rating <= ${q.maxRating}`);
+  if (q.source) conds.push(sql`source = ${q.source}`);
+  const order = q.sort === "hard" ? sql`rating DESC, id DESC` : q.sort === "easy" ? sql`rating ASC, id DESC` : q.sort === "new" ? sql`id DESC` : sql`random()`;
+  const limit = Math.min(120, Math.max(1, q.limit ?? 48));
+  return rowsOf(await db.execute(sql`SELECT id, fen, moves, rating, themes, explanation, source, game_id AS "gameId"
+    FROM puzzles WHERE ${sql.join(conds, sql` AND `)} ORDER BY ${order} LIMIT ${limit} OFFSET ${Math.max(0, q.offset ?? 0)}`));
+}
+
+let themeCache: { at: number; list: { theme: string; n: number }[] } | null = null;
+export async function puzzleThemes() {
+  if (themeCache && Date.now() - themeCache.at < 6 * 60 * 60 * 1000) return themeCache.list;
+  const rows = rowsOf<{ theme: string; n: string }>(await db.execute(sql`SELECT t AS theme, COUNT(*) AS n
+    FROM (SELECT unnest(string_to_array(themes, ' ')) AS t FROM puzzles WHERE archived = false AND themes IS NOT NULL) x
+    WHERE t <> '' GROUP BY t ORDER BY COUNT(*) DESC LIMIT 40`));
+  themeCache = { at: Date.now(), list: rows.map((r) => ({ theme: r.theme, n: Number(r.n) })) };
+  return themeCache.list;
+}
+
+// ── Game reviews: whole reviewed games, ranked by how much happened ─────
+export interface ReviewQuery { q?: string; minRating?: number; platform?: string; sort?: "drama" | "new" | "accuracy"; limit?: number; offset?: number; sinceDays?: number }
+export async function studioReviews(q: ReviewQuery) {
+  const conds = [sql`g.review_data IS NOT NULL`, sql`g.platform IS DISTINCT FROM 'bot'`];
+  if (q.q) conds.push(sql`(g.opening ILIKE ${"%" + q.q + "%"} OR g.white_username ILIKE ${"%" + q.q + "%"} OR g.black_username ILIKE ${"%" + q.q + "%"})`);
+  if (q.minRating) conds.push(sql`GREATEST(COALESCE(g.white_rating,0), COALESCE(g.black_rating,0)) >= ${q.minRating}`);
+  if (q.platform) conds.push(sql`g.platform = ${q.platform}`);
+  if (q.sinceDays) conds.push(sql`g.played_at >= now() - make_interval(days => ${Math.round(q.sinceDays)})`);
+  const order = q.sort === "new" ? sql`g.played_at DESC NULLS LAST, g.id DESC`
+    : q.sort === "accuracy" ? sql`GREATEST(COALESCE((g.review_data->>'whiteAccuracy')::float,0), COALESCE((g.review_data->>'blackAccuracy')::float,0)) DESC, g.id DESC`
+    : sql`COALESCE(m.score, 0) DESC, g.id DESC`;
+  const limit = Math.min(120, Math.max(1, q.limit ?? 48));
+  return rowsOf(await db.execute(sql`SELECT g.id, g.opening, g.white_username AS white, g.black_username AS black, g.white_rating AS "whiteRating", g.black_rating AS "blackRating",
+      g.result, g.platform, g.played_at AS "playedAt",
+      CASE WHEN jsonb_typeof(g.review_data) = 'object' THEN (g.review_data->>'whiteAccuracy')::float END AS "whiteAccuracy",
+      CASE WHEN jsonb_typeof(g.review_data) = 'object' THEN (g.review_data->>'blackAccuracy')::float END AS "blackAccuracy",
+      COALESCE(m.n, 0)::int AS moments, COALESCE(m.brilliant, 0)::int AS brilliant, COALESCE(m.blunder, 0)::int AS blunders, COALESCE(m.mate, 0)::int AS mate,
+      m.last_fen AS "lastFen"
+    FROM games g
+    LEFT JOIN (SELECT game_id, COUNT(*) AS n, SUM(score) AS score,
+        COUNT(*) FILTER (WHERE 'brilliant' = ANY(tags)) AS brilliant, COUNT(*) FILTER (WHERE 'blunder' = ANY(tags)) AS blunder,
+        COUNT(*) FILTER (WHERE 'checkmate' = ANY(tags)) AS mate, (array_agg(fen_before ORDER BY move_index DESC))[1] AS last_fen
+      FROM content_moments GROUP BY game_id) m ON m.game_id = g.id
+    WHERE ${sql.join(conds, sql` AND `)} ORDER BY ${order} LIMIT ${limit} OFFSET ${Math.max(0, q.offset ?? 0)}`));
 }

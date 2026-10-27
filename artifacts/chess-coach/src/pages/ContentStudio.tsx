@@ -4,7 +4,7 @@ import { ArrowLeft, Loader2, RefreshCw, Search, Clapperboard, Shuffle } from 'lu
 import { apiFetch } from '@/lib/api';
 import { MiniBoard } from '@/components/MiniBoard';
 import { useUser } from '@/hooks/use-user';
-import { StudioPlayer, type StudioMoment, type StudioTrap, type StudioSource } from '@/components/studio/StudioPlayer';
+import { StudioPlayer, themeLabel, type StudioMoment, type StudioTrap, type StudioSource, type StudioPuzzle, type StudioReview } from '@/components/studio/StudioPlayer';
 import { Chess } from 'chess.js';
 
 // Admin > Content Studio: notable moments from every reviewed game on the
@@ -41,6 +41,7 @@ export function ContentStudio() {
   const [opening, setOpening] = useState('');
   const [minRating, setMinRating] = useState(0);
   const [platform, setPlatform] = useState('');
+  const [since, setSince] = useState(0);
   const [sort, setSort] = useState<'best' | 'new' | 'random'>('best');
   const [moments, setMoments] = useState<Moment[] | null>(null);
   const [more, setMore] = useState(true);
@@ -54,6 +55,19 @@ export function ContentStudio() {
   const [compTitle, setCompTitle] = useState<string | undefined>(undefined);
   const [autoBusy, setAutoBusy] = useState<string | null>(null);
   const [autoNote, setAutoNote] = useState<string | null>(null);
+  // Puzzle compilations: five puzzles of a kind, easiest first, so the clip gets harder as it goes.
+  const autoPuzzles = async (key: string, theme: string, title: string, range: [number, number]) => {
+    setAutoBusy(key); setAutoNote(null);
+    try {
+      const q = new URLSearchParams({ sort: 'random', limit: '5', minRating: String(range[0]), maxRating: String(range[1]) });
+      if (theme) q.set('theme', theme);
+      const list = await apiFetch(`/api/admin/studio/puzzles?${q}`, { credentials: 'include' }).then((r) => (r.ok ? r.json() : { puzzles: [] })).then((d) => (d.puzzles ?? []) as StudioPuzzle[]);
+      if (list.length < 2) { setAutoNote('Not enough puzzles of that kind yet.'); return; }
+      // Played first-to-last as #5 … #1, so the hardest is #1.
+      setCompTitle(title.replace('5', String(list.length)));
+      setComp([...list].sort((a, b) => a.rating - b.rating).map((p) => ({ kind: 'puzzle', puzzle: p })));
+    } finally { setAutoBusy(null); }
+  };
   const autoTop5 = async (a: (typeof AUTO)[number]) => {
     setAutoBusy(a.tag); setAutoNote(null);
     try {
@@ -71,12 +85,46 @@ export function ContentStudio() {
       setComp(top.reverse().map((m) => ({ kind: 'game', moment: m })));
     } finally { setAutoBusy(null); }
   };
-  const keyOf = (x: StudioSource) => (x.kind === 'trap' ? `t${x.trap.id}` : `g${x.moment.gameId}-${x.moment.moveIndex}`);
+  const keyOf = (x: StudioSource) => (x.kind === 'trap' ? `t${x.trap.id}` : x.kind === 'puzzle' ? `p${x.puzzle.id}` : x.kind === 'review' ? `r${x.review.id}` : `g${x.moment.gameId}-${x.moment.moveIndex}`);
   const togglePick = (x: StudioSource) => setPicked((cur) => (cur.some((c) => keyOf(c) === keyOf(x)) ? cur.filter((c) => keyOf(c) !== keyOf(x)) : [...cur, x]));
   const isPicked = (x: StudioSource) => picked.some((c) => keyOf(c) === keyOf(x));
   const choose = (x: StudioSource) => (picking ? togglePick(x) : setOpen(x));
-  const [view, setView] = useState<'moments' | 'traps'>('moments');
-  const [since, setSince] = useState(0);
+  const [view, setView] = useState<'moments' | 'traps' | 'puzzles' | 'reviews'>('moments');
+  // Puzzles
+  const [puzzles, setPuzzles] = useState<StudioPuzzle[] | null>(null);
+  const [themes, setThemes] = useState<{ theme: string; n: number }[]>([]);
+  const [pTheme, setPTheme] = useState('');
+  const [pRating, setPRating] = useState('');
+  const [pSort, setPSort] = useState<'random' | 'hard' | 'easy' | 'new'>('random');
+  const [pTick, setPTick] = useState(0);
+  const loadPuzzles = useCallback((offset: number) => {
+    const [lo, hi] = pRating ? pRating.split('-') : ['', ''];
+    const q = new URLSearchParams({ sort: pSort, limit: '48', offset: String(offset) });
+    if (pTheme) q.set('theme', pTheme); if (lo) q.set('minRating', lo); if (hi) q.set('maxRating', hi);
+    return apiFetch(`/api/admin/studio/puzzles?${q}`, { credentials: 'include' }).then((r) => (r.ok ? r.json() : { puzzles: [] })).then((d) => (d.puzzles ?? []) as StudioPuzzle[]);
+  }, [pTheme, pRating, pSort]);
+  useEffect(() => {
+    if (view !== 'puzzles') return;
+    let live = true; setPuzzles(null);
+    loadPuzzles(0).then((p) => live && setPuzzles(p)).catch(() => live && setPuzzles([]));
+    if (!themes.length) apiFetch('/api/admin/studio/puzzle-themes', { credentials: 'include' }).then((r) => (r.ok ? r.json() : { themes: [] })).then((d) => live && setThemes(d.themes ?? [])).catch(() => {});
+    return () => { live = false; };
+  }, [view, loadPuzzles, pTick]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Game reviews
+  const [reviews, setReviews] = useState<StudioReview[] | null>(null);
+  const [rQ, setRQ] = useState('');
+  const [rSort, setRSort] = useState<'drama' | 'new' | 'accuracy'>('drama');
+  const loadReviews = useCallback((offset: number) => {
+    const q = new URLSearchParams({ sort: rSort, limit: '48', offset: String(offset) });
+    if (rQ.trim()) q.set('q', rQ.trim()); if (minRating) q.set('minRating', String(minRating)); if (platform) q.set('platform', platform); if (since) q.set('sinceDays', String(since));
+    return apiFetch(`/api/admin/studio/reviews?${q}`, { credentials: 'include' }).then((r) => (r.ok ? r.json() : { reviews: [] })).then((d) => (d.reviews ?? []) as StudioReview[]);
+  }, [rQ, rSort, minRating, platform, since]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (view !== 'reviews') return;
+    let live = true; setReviews(null);
+    const t = setTimeout(() => { loadReviews(0).then((r) => live && setReviews(r)).catch(() => live && setReviews([])); }, 250);
+    return () => { live = false; clearTimeout(t); };
+  }, [view, loadReviews]);
   const [traps, setTraps] = useState<StudioTrap[] | null>(null);
   useEffect(() => {
     if (view !== 'traps' || traps) return;
@@ -86,8 +134,13 @@ export function ContentStudio() {
   const openAt = (k: number) => {
     if (view === 'traps' && traps?.[k]) setOpen({ kind: 'trap', trap: traps[k] });
     if (view === 'moments' && moments?.[k]) setOpen({ kind: 'game', moment: moments[k] });
+    if (view === 'puzzles' && puzzles?.[k]) setOpen({ kind: 'puzzle', puzzle: puzzles[k] });
+    if (view === 'reviews' && reviews?.[k]) setOpen({ kind: 'review', review: reviews[k] });
   };
-  const openIndex = !open ? -1 : open.kind === 'trap' ? (traps ?? []).findIndex((t) => t.id === open.trap.id) : (moments ?? []).findIndex((m) => m === open.moment);
+  const openIndex = !open ? -1 : open.kind === 'trap' ? (traps ?? []).findIndex((t) => t.id === open.trap.id)
+    : open.kind === 'puzzle' ? (puzzles ?? []).findIndex((p) => p.id === open.puzzle.id)
+    : open.kind === 'review' ? (reviews ?? []).findIndex((r) => r.id === open.review.id)
+    : (moments ?? []).findIndex((m) => m === open.moment);
 
   const query = useCallback((offset: number) => {
     const p = new URLSearchParams({ tags: tags.join(','), sort, limit: '48', offset: String(offset) });
@@ -138,8 +191,8 @@ export function ContentStudio() {
         style={{ background: picking ? '#E8B447' : 'rgba(255,255,255,.06)', color: picking ? '#1A1205' : '#C9CFCD' }}>
         {picking ? 'Cancel compilation' : '🎬 Make a compilation'}
       </button>
-      <div className="order-1 inline-flex rounded-xl bg-white/5 p-1">
-        {([['moments', 'Game moments'], ['traps', 'Trap lessons']] as const).map(([k, t]) => (
+      <div className="order-1 inline-flex flex-wrap rounded-xl bg-white/5 p-1">
+        {([['moments', 'Game moments'], ['reviews', 'Game reviews'], ['puzzles', 'Puzzles'], ['traps', 'Trap lessons']] as const).map(([k, t]) => (
           <button key={k} onClick={() => setView(k)} className="rounded-lg px-3.5 py-1.5 text-[13px] font-black" style={{ background: view === k ? '#81B64C' : 'transparent', color: view === k ? '#fff' : '#C9CFCD' }}>{t}</button>
         ))}
       </div>
@@ -153,11 +206,111 @@ export function ContentStudio() {
             </button>
           ))}
         </div>
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {([['pz-m1', 'mateIn1', 'Mate in 1 speed round ⚡', [600, 1800], 'Mate in 1 round'], ['pz-m2', 'mateIn2', 'Can you solve all 5? Mate in 2 🧩', [900, 2200], 'Mate in 2 challenge'],
+             ['pz-fork', 'fork', '5 forks, getting harder 🍴', [800, 2400], 'Fork ladder'], ['pz-ladder', '', '5 puzzles: 800 to 2500 🧗', [800, 2500], 'Puzzle ladder'],
+             ['pz-end', 'endgame', '5 endgame puzzles 👑', [1000, 2300], 'Endgames']] as const).map(([k, th, title, range, label]) => (
+            <button key={k} onClick={() => void autoPuzzles(k, th, title, range as unknown as [number, number])} disabled={!!autoBusy} className="flex items-center gap-1 rounded-full bg-[#2B2A3A] px-3 py-1.5 text-[12.5px] font-bold text-white hover:bg-[#363548] disabled:opacity-60">
+              {autoBusy === k && <Loader2 size={12} className="animate-spin" />}🧩 {label}
+            </button>
+          ))}
+        </div>
         {autoNote && <p className="mt-2 text-[12px] text-white/60">{autoNote}</p>}
       </div>
-      {picking && <p className="mb-3 text-[12.5px] text-[#E8B447]">Tap moments or traps in the order you want them (they count down #{Math.max(picked.length, 1)} to #1), then play them as one clip.</p>}
+      {picking && <p className="mb-3 text-[12.5px] text-[#E8B447]">Tap moments, reviews, puzzles or traps (you can mix tabs) in the order you want them (they count down #{Math.max(picked.length, 1)} to #1), then play them as one clip.</p>}
 
-      {view === 'traps' ? (
+      {view === 'puzzles' ? (<>
+        <div className="mb-2 flex flex-wrap gap-1.5">
+          <button onClick={() => setPTheme('')} className="rounded-full px-3 py-1.5 text-[12.5px] font-bold" style={{ background: !pTheme ? '#81B64C' : 'rgba(255,255,255,.06)', color: !pTheme ? '#fff' : '#C9CFCD' }}>All themes</button>
+          {themes.map((t) => (
+            <button key={t.theme} onClick={() => setPTheme(pTheme === t.theme ? '' : t.theme)} className="rounded-full px-3 py-1.5 text-[12.5px] font-bold"
+              style={{ background: pTheme === t.theme ? '#81B64C' : 'rgba(255,255,255,.06)', color: pTheme === t.theme ? '#fff' : '#C9CFCD', border: `1px solid ${pTheme === t.theme ? '#81B64C' : 'rgba(255,255,255,.1)'}` }}>
+              {themeLabel(t.theme)}<span className="ml-1 opacity-60">{t.n.toLocaleString()}</span>
+            </button>
+          ))}
+        </div>
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          <select value={pRating} onChange={(e) => setPRating(e.target.value)} className="rounded-lg bg-white/5 px-2 py-2 text-[13px] text-white ring-1 ring-white/10">
+            <option value="">Any rating</option><option value="0-1200">Under 1200</option><option value="1200-1600">1200–1600</option><option value="1600-2000">1600–2000</option><option value="2000-2400">2000–2400</option><option value="2400-">2400+</option>
+          </select>
+          <select value={pSort} onChange={(e) => setPSort(e.target.value as typeof pSort)} className="rounded-lg bg-white/5 px-2 py-2 text-[13px] text-white ring-1 ring-white/10">
+            <option value="random">Shuffle</option><option value="hard">Hardest first</option><option value="easy">Easiest first</option><option value="new">Newest</option>
+          </select>
+          {pSort === 'random' && <button onClick={() => setPTick((x) => x + 1)} className="flex items-center gap-1 rounded-lg bg-white/10 px-2.5 py-2 text-[12.5px] font-bold"><Shuffle size={13} />Again</button>}
+        </div>
+        {!puzzles ? <Loader2 className="mx-auto mt-10 animate-spin text-white/60" /> : puzzles.length === 0 ? <p className="mt-10 text-center text-[14px] text-white/60">No puzzles match.</p> : (
+          <>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+              {puzzles.map((pz, k) => {
+                // The solver's position: after the opponent's first move.
+                let fen = pz.fen; let blackToMove = false;
+                try { const c = new Chess(pz.fen); const u = pz.moves.split(' ')[0]; c.move({ from: u.slice(0, 2), to: u.slice(2, 4), promotion: u[4] }); fen = c.fen(); blackToMove = c.turn() === 'b'; } catch { /* show the stored position */ }
+                const src: StudioSource = { kind: 'puzzle', puzzle: pz };
+                const th = (pz.themes ?? '').split(' ').filter((t) => t && !['short', 'long', 'veryLong', 'oneMove', 'master', 'masterVsMaster', 'superGM'].includes(t)).slice(0, 3);
+                return (
+                  <button key={pz.id} onClick={() => (picking ? togglePick(src) : openAt(k))} className="relative overflow-hidden rounded-xl bg-white/5 text-left ring-1 ring-white/10 transition hover:ring-[#81B64C]"
+                    style={isPicked(src) ? { boxShadow: '0 0 0 3px #81B64C' } : undefined}>
+                    {isPicked(src) && <span className="absolute right-2 top-2 z-10 grid h-7 w-7 place-items-center rounded-full bg-[#81B64C] text-[13px] font-black">{picked.findIndex((c) => keyOf(c) === `p${pz.id}`) + 1}</span>}
+                    <div className="aspect-square w-full"><MiniBoard fen={fen} size={400} flipped={blackToMove} /></div>
+                    <div className="p-2.5">
+                      <p className="truncate text-[13.5px] font-black">{blackToMove ? 'Black' : 'White'} to move · {pz.rating}</p>
+                      <div className="mt-1 flex flex-wrap gap-1">{th.map((t) => <span key={t} className="rounded bg-[#81B64C]/20 px-1.5 py-0.5 text-[10px] font-black uppercase text-[#B8E08C]">{themeLabel(t)}</span>)}</div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+            {puzzles.length % 48 === 0 && <button onClick={() => loadPuzzles(puzzles.length).then((m) => setPuzzles((cur) => [...(cur ?? []), ...m]))} className="mx-auto mt-4 block rounded-lg bg-white/10 px-4 py-2 text-[13px] font-bold">Load more</button>}
+          </>
+        )}
+      </>) : view === 'reviews' ? (<>
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          <div className="flex min-w-[220px] flex-1 items-center gap-2 rounded-lg bg-white/5 px-3 py-2 ring-1 ring-white/10">
+            <Search size={15} className="text-white/50" />
+            <input value={rQ} onChange={(e) => setRQ(e.target.value)} placeholder="Opening or player" className="w-full bg-transparent text-[13px] text-white outline-none" />
+          </div>
+          <select value={minRating} onChange={(e) => setMinRating(Number(e.target.value))} className="rounded-lg bg-white/5 px-2 py-2 text-[13px] text-white ring-1 ring-white/10">
+            <option value={0}>Any rating</option><option value={1000}>1000+</option><option value={1500}>1500+</option><option value={2000}>2000+</option><option value={2500}>2500+</option>
+          </select>
+          <select value={platform} onChange={(e) => setPlatform(e.target.value)} className="rounded-lg bg-white/5 px-2 py-2 text-[13px] text-white ring-1 ring-white/10">
+            <option value="">All sites</option><option value="chessscout">ChessScout</option><option value="chesscom">Chess.com</option><option value="lichess">Lichess</option>
+          </select>
+          <select value={since} onChange={(e) => setSince(Number(e.target.value))} className="rounded-lg bg-white/5 px-2 py-2 text-[13px] text-white ring-1 ring-white/10">
+            <option value={0}>All time</option><option value={7}>This week</option><option value={30}>This month</option>
+          </select>
+          <select value={rSort} onChange={(e) => setRSort(e.target.value as typeof rSort)} className="rounded-lg bg-white/5 px-2 py-2 text-[13px] text-white ring-1 ring-white/10">
+            <option value="drama">Most happening</option><option value="new">Newest</option><option value="accuracy">Highest accuracy</option>
+          </select>
+        </div>
+        {!reviews ? <Loader2 className="mx-auto mt-10 animate-spin text-white/60" /> : reviews.length === 0 ? <p className="mt-10 text-center text-[14px] text-white/60">No reviewed games match.</p> : (
+          <>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+              {reviews.map((rv, k) => {
+                const src: StudioSource = { kind: 'review', review: rv };
+                return (
+                  <button key={rv.id} onClick={() => (picking ? togglePick(src) : openAt(k))} className="relative overflow-hidden rounded-xl bg-white/5 text-left ring-1 ring-white/10 transition hover:ring-[#81B64C]"
+                    style={isPicked(src) ? { boxShadow: '0 0 0 3px #81B64C' } : undefined}>
+                    {isPicked(src) && <span className="absolute right-2 top-2 z-10 grid h-7 w-7 place-items-center rounded-full bg-[#81B64C] text-[13px] font-black">{picked.findIndex((c) => keyOf(c) === `r${rv.id}`) + 1}</span>}
+                    <div className="aspect-square w-full"><MiniBoard fen={rv.lastFen ?? new Chess().fen()} size={400} /></div>
+                    <div className="p-2.5">
+                      <p className="truncate text-[13.5px] font-black">{rv.white ?? 'White'} vs {rv.black ?? 'Black'}</p>
+                      <p className="truncate text-[11.5px] text-white/55">{rv.opening ?? 'Unknown opening'}{rv.result ? ` · ${rv.result}` : ''}</p>
+                      <p className="truncate text-[11.5px] tabular-nums text-white/45">{rv.whiteRating ?? '?'} vs {rv.blackRating ?? '?'}{rv.whiteAccuracy != null && rv.blackAccuracy != null ? ` · ${rv.whiteAccuracy.toFixed(0)}% / ${rv.blackAccuracy.toFixed(0)}%` : ''}</p>
+                      <div className="mt-1.5 flex flex-wrap gap-1">
+                        {rv.brilliant > 0 && <span className="rounded bg-[#1BACA6]/20 px-1.5 py-0.5 text-[10px] font-black uppercase text-[#1BACA6]">{rv.brilliant} brilliant</span>}
+                        {rv.blunders > 0 && <span className="rounded bg-[#CA3431]/20 px-1.5 py-0.5 text-[10px] font-black uppercase text-[#F0605D]">{rv.blunders} blunder{rv.blunders > 1 ? 's' : ''}</span>}
+                        {rv.mate > 0 && <span className="rounded bg-[#E8B447]/20 px-1.5 py-0.5 text-[10px] font-black uppercase text-[#E8B447]">mate</span>}
+                        {rv.moments === 0 && <span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-black uppercase text-white/50">not scanned yet</span>}
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+            {reviews.length % 48 === 0 && <button onClick={() => loadReviews(reviews.length).then((m) => setReviews((cur) => [...(cur ?? []), ...m]))} className="mx-auto mt-4 block rounded-lg bg-white/10 px-4 py-2 text-[13px] font-bold">Load more</button>}
+          </>
+        )}
+      </>) : view === 'traps' ? (
         !traps ? <Loader2 className="mx-auto mt-10 animate-spin text-white/60" /> : (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
             {traps.map((t, k) => {
