@@ -47,7 +47,7 @@ type MoveRecord = { san: string; fen: string; fenBefore: string; color: 'w' | 'b
 // Each bot keeps its unfinished game on this device, so closing the app or
 // opening another page doesn't lose it: picking the bot again carries on
 // from the same position. Finished games and "New game" clear the save.
-type SavedBotGame = { v: 1; startFen: string; playerColor: 'w' | 'b'; moves: MoveRecord[]; elapsedSec: number; gameKey: string; savedAt: number };
+type SavedBotGame = { v: 1; startFen: string; playerColor: 'w' | 'b'; moves: MoveRecord[]; elapsedSec: number; gameKey: string; savedAt: number; takebackUsed?: boolean };
 const savedGameKey = (botName: string) => `cs-botgame:${botName}`;
 function loadBotGame(botName: string): SavedBotGame | null {
   try {
@@ -309,6 +309,8 @@ function GameView({ bot, onBack, startFen, startColor, isOnboarding }: { bot: Bo
   const [result, setResult] = useState<GameResult>('playing');
   const [moves, setMoves] = useState<MoveRecord[]>(() => restored?.game.moves ?? []);
   const [thinking, setThinking] = useState(false);
+  // One takeback per game; a game won with it doesn't count toward "beaten by".
+  const [takebackUsed, setTakebackUsed] = useState(() => !!restored?.game.takebackUsed);
   const { isAuthenticated: signedIn } = useUser();
   // One key per game, so a result is saved exactly once.
   const gameKeyRef = useRef(restored?.game.gameKey ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`);
@@ -321,8 +323,8 @@ function GameView({ bot, onBack, startFen, startColor, isOnboarding }: { bot: Bo
     reportedRef.current = gameKeyRef.current;
     let pgn = '';
     try { pgn = chess.pgn(); } catch { /* result is still saved */ }
-    reportBotResult(bot.name, result, moves.length, gameKeyRef.current, pgn ? { pgn, color: playerColor, botRating: bot.rating } : undefined);
-  }, [result, signedIn, startFen, bot.name, moves.length, chess, playerColor, bot.rating]);
+    reportBotResult(bot.name, result, moves.length, gameKeyRef.current, pgn ? { pgn, color: playerColor, botRating: bot.rating } : undefined, takebackUsed);
+  }, [result, signedIn, startFen, bot.name, moves.length, chess, playerColor, bot.rating, takebackUsed]);
   const [, navigate] = useLocation();
   const [seededRating, setSeededRating] = useState<number | null>(null);
   const seedRequestedRef = useRef(false);
@@ -505,10 +507,10 @@ function GameView({ bot, onBack, startFen, startColor, isOnboarding }: { bot: Bo
     if (result !== 'playing' || moves.length === 0) { storeBotGame(bot.name, null); return; }
     storeBotGame(bot.name, {
       v: 1, startFen: moves[0].fenBefore, playerColor, moves,
-      elapsedSec: elapsedRef.current, gameKey: gameKeyRef.current, savedAt: Date.now(),
+      elapsedSec: elapsedRef.current, gameKey: gameKeyRef.current, savedAt: Date.now(), takebackUsed,
     });
   };
-  useEffect(() => { saveNowRef.current(); }, [moves, result, playerColor]);
+  useEffect(() => { saveNowRef.current(); }, [moves, result, playerColor, takebackUsed]);
   // ...and once more on the way out, so the clock is current.
   useEffect(() => {
     const flush = () => saveNowRef.current();
@@ -548,7 +550,8 @@ function GameView({ bot, onBack, startFen, startColor, isOnboarding }: { bot: Bo
   // Take back your last move (and the bot's reply, if it already played).
   const myMovesPlayed = moves.some(m => m.color === playerColor);
   const handleTakeback = () => {
-    if (result !== 'playing' || !myMovesPlayed) return;
+    if (result !== 'playing' || !myMovesPlayed || takebackUsed) return;
+    setTakebackUsed(true);
     gameIdRef.current++;           // drop a bot move that's still being worked out
     clearBotTimeout();
     setThinking(false);
@@ -582,6 +585,7 @@ function GameView({ bot, onBack, startFen, startColor, isOnboarding }: { bot: Bo
     setMoves([]);
     setResult('playing');
     setThinking(false);
+    setTakebackUsed(false);
     setElapsedSec(0);
     setPlayerColor(color);
     setSelectedMoveIdx(null);
@@ -743,10 +747,10 @@ function GameView({ bot, onBack, startFen, startColor, isOnboarding }: { bot: Bo
                 </button>
               )}
               {result === 'playing' && (
-                <button onClick={handleTakeback} disabled={!myMovesPlayed}
-                  title="Take back your last move"
+                <button onClick={handleTakeback} disabled={!myMovesPlayed || takebackUsed}
+                  title={takebackUsed ? 'Takeback used (one per game)' : 'Take back your last move (one per game). A win after a takeback doesn\'t count toward "beaten by".'}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 text-muted-foreground text-xs font-bold hover:bg-white/10 transition-colors disabled:opacity-40">
-                  <Undo2 className="w-3 h-3" /> Take back
+                  <Undo2 className="w-3 h-3" /> {takebackUsed ? 'Takeback used' : 'Take back'}
                 </button>
               )}
               {result === 'playing' && (

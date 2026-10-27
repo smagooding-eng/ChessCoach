@@ -311,6 +311,8 @@ async function runSchemaMigrations() {
       UNIQUE (user_id, game_key)
     )`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_bot_results_bot ON bot_results(bot, result)`);
+    // Won after a takeback: still in your record, but not in "beaten by".
+    await db.execute(sql`ALTER TABLE bot_results ADD COLUMN IF NOT EXISTS takeback BOOLEAN NOT NULL DEFAULT false`);
     await db.execute(sql`CREATE TABLE IF NOT EXISTS challenge_invites (
       user_id VARCHAR NOT NULL,
       code VARCHAR NOT NULL,

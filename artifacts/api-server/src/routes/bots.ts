@@ -71,8 +71,8 @@ async function saveBotGame(req: Request, g: { bot: string; result: string; pgn: 
 }
 
 router.post("/bots/result", requireAuth, async (req: Request, res: Response) => {
-  const { bot, result, moves, gameKey, pgn, color, botRating } = (req.body ?? {}) as {
-    bot?: unknown; result?: unknown; moves?: unknown; gameKey?: unknown; pgn?: unknown; color?: unknown; botRating?: unknown;
+  const { bot, result, moves, gameKey, pgn, color, botRating, takeback } = (req.body ?? {}) as {
+    takeback?: unknown; bot?: unknown; result?: unknown; moves?: unknown; gameKey?: unknown; pgn?: unknown; color?: unknown; botRating?: unknown;
   };
   if (typeof bot !== "string" || !bot || bot.length > 60 || typeof result !== "string" || !BOT_RESULTS.has(result)
     || typeof gameKey !== "string" || !gameKey || gameKey.length > 80) {
@@ -83,8 +83,8 @@ router.post("/bots/result", requireAuth, async (req: Request, res: Response) => 
   if (n < 2) { res.json({ saved: false }); return; }
   try {
     const ins = await db.execute(sql`
-      INSERT INTO bot_results (user_id, bot, result, moves, game_key)
-      VALUES (${req.user!.id}, ${bot}, ${result}, ${n}, ${gameKey})
+      INSERT INTO bot_results (user_id, bot, result, moves, game_key, takeback)
+      VALUES (${req.user!.id}, ${bot}, ${result}, ${n}, ${gameKey}, ${takeback === true})
       ON CONFLICT (user_id, game_key) DO NOTHING RETURNING id
     `);
     const fresh = (Array.isArray(ins) ? ins : ((ins as { rows?: unknown[] })?.rows ?? [])).length > 0;
@@ -106,7 +106,7 @@ router.get("/bots/stats", async (req: Request, res: Response) => {
   const rowsOf = (r: unknown) => (Array.isArray(r) ? r : ((r as { rows?: unknown[] })?.rows ?? [])) as Record<string, unknown>[];
   try {
     const beaten = rowsOf(await db.execute(sql`
-      SELECT bot, COUNT(DISTINCT user_id) AS players FROM bot_results WHERE result = 'win' GROUP BY bot
+      SELECT bot, COUNT(DISTINCT user_id) AS players FROM bot_results WHERE result = 'win' AND NOT takeback GROUP BY bot
     `));
     const beatenBy: Record<string, number> = {};
     for (const r of beaten) beatenBy[String(r.bot)] = Number(r.players ?? 0);

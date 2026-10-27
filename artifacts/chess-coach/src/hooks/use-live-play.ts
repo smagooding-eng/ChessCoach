@@ -43,6 +43,8 @@ export interface LiveGameState {
   rematchFrom?: 'w' | 'b';
   /** Arena tournament this game is part of. */
   tournamentId?: string;
+  /** Bot games: the one takeback has been used. */
+  takebackUsed?: boolean;
 }
 
 export interface OpponentDisconnect { side: 'w' | 'b'; graceMs: number; until: number }

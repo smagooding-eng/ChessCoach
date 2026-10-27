@@ -36,12 +36,12 @@ export function useBotStats(): BotStats | null {
 
 /** Save a finished game against a bot (once per game), then refresh the cards. */
 export function reportBotResult(bot: string, result: 'win' | 'loss' | 'draw', moves: number, gameKey: string,
-  game?: { pgn: string; color: 'w' | 'b'; botRating: number }): void {
+  game?: { pgn: string; color: 'w' | 'b'; botRating: number }, takeback = false): void {
   apiFetch('/api/bots/result', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     // pgn/color/botRating: the game itself is kept too (Games tab > Bots)
-    body: JSON.stringify({ bot, result, moves, gameKey, ...(game ?? {}) }),
+    body: JSON.stringify({ bot, result, moves, gameKey, takeback, ...(game ?? {}) }),
   })
     .then(() => refreshBotStats())
     .catch(() => { /* best effort */ });

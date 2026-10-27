@@ -207,6 +207,8 @@ interface LiveGame {
   leftAfter: { w: boolean; b: boolean };
   // Arena tournament this game belongs to (scored on finish, no rematch).
   tournamentId?: string;
+  // Bot games: the one takeback allowed per game has been used.
+  takebackUsed?: boolean;
 }
 
 interface AwayInfo { deadline: number; reason: 'left' | 'offline' }
@@ -274,6 +276,7 @@ function gamePublicState(g: LiveGame) {
     serverNow: Date.now(),
     rematchFrom: g.status === 'finished' ? g.rematchFrom : undefined,
     tournamentId: g.tournamentId,
+    takebackUsed: !!g.takebackUsed,
   };
 }
 
@@ -1131,7 +1134,7 @@ function handleResign(ws: WebSocket, userId: string, gameId: string) {
   else if (g.black.userId === userId) finishGame(g, 'white', 'resignation');
 }
 
-// Bot games only (always casual): take back your last move, plus the bot's
+// Bot games only (always casual): one takeback per game -- your last move, plus the bot's
 // reply if it already played. Time already used stays used.
 function handleTakeback(ws: WebSocket, userId: string, gameId: string) {
   const g = games.get(gameId);
@@ -1140,6 +1143,7 @@ function handleTakeback(ws: WebSocket, userId: string, gameId: string) {
   if (!mySide) return;
   const opp = mySide === 'w' ? g.black : g.white;
   if (opp.kind !== 'bot') return send(ws, { type: 'error', message: 'Takebacks are only for bot games' });
+  if (g.takebackUsed) return send(ws, { type: 'error', message: 'You get one takeback per game' });
   const hist = g.chess.history({ verbose: true });
   const n = hist.length > 0 && hist[hist.length - 1].color !== mySide ? 2 : 1;
   if (hist.length < n || hist[hist.length - n].color !== mySide) return send(ws, { type: 'error', message: 'No move of yours to take back' });
@@ -1151,6 +1155,7 @@ function handleTakeback(ws: WebSocket, userId: string, gameId: string) {
   else g.blackTimeMs = Math.max(0, g.blackTimeMs - elapsed);
   g.lastTickAt = now;
   for (let i = 0; i < n; i++) { g.chess.undo(); g.sanMoves.pop(); }
+  g.takebackUsed = true;
   g.drawOfferFrom = undefined;
   scheduleExpire(g);
   scheduleBotIfNeeded(g);
