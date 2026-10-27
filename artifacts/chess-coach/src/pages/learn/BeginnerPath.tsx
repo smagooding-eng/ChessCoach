@@ -1,3 +1,4 @@
+import { useState } from 'react';
 // Beginner path -- the course map (/beginner).
 
 import { Link } from 'wouter';
@@ -8,12 +9,14 @@ import { PieceGradientDefs } from '@/components/PieceGradientDefs';
 import { StarRow } from '@/components/kids/KidsArt';
 import { UNITS } from '@/lib/learn/beginner';
 import { useUser } from '@/hooks/use-user';
+import { QuickSignup } from '@/components/QuickSignup';
 import { useLearn, lessonUnlocked, nextLesson, unitProgress, totalLessons } from '@/lib/learn/progress';
 
 export default function BeginnerPath() {
   const { state, update, reset } = useLearn();
   const icon = usePieceIcon();
-  const { authUser } = useUser();
+  const { authUser, isAuthLoading } = useUser();
+  const [signupOpen, setSignupOpen] = useState(false);
   const admin = !!authUser?.isAdmin;
   const next = nextLesson(state);
   const doneCount = Object.values(state.lessons).filter((n) => n > 0).length;
@@ -53,7 +56,15 @@ export default function BeginnerPath() {
           ) : (
             <p className="text-sm font-bold" style={{ color: L.good }}>Path complete. Nice work. Head to Puzzles and Practice Bots to keep sharpening.</p>
           )}
+          {!authUser && !isAuthLoading && (
+            <p className="mt-3 text-[12.5px]" style={{ color: L.muted }}>
+              {doneCount ? 'Your stars are only saved on this device.' : 'Free to try, no account needed.'}{' '}
+              <button type="button" onClick={() => setSignupOpen(true)} className="font-bold underline" style={{ color: L.accent }}>Sign up free</button>{' '}
+              to keep your progress everywhere.
+            </p>
+          )}
         </div>
+        <QuickSignup open={signupOpen} onClose={() => setSignupOpen(false)} title="Keep your progress" subtitle="Free, no credit card. Your stars come with you." />
 
         {/* units */}
         <div className="space-y-3">

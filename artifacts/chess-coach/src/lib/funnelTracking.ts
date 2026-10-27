@@ -1,5 +1,6 @@
 import { apiFetch, apiUrl } from '@/lib/api';
 import { isRunningStandalone } from '@/hooks/use-pwa-install';
+import { isInPlayApp } from '@/lib/playApp';
 import { axonTrack } from '@/lib/axon';
 
 function getVisitorId(): string {
@@ -16,7 +17,11 @@ function getVisitorId(): string {
 // launch), 'web' = a regular browser tab. Computed once per page load --
 // display-mode doesn't change mid-session, so no need to re-check per
 // event.
-const PLATFORM: 'web' | 'app' = isRunningStandalone() ? 'app' : 'web';
+// The Play app counts as 'app' too, including after the Google sign-in round
+// trip (which can come back in a plain browser tab -- see appFlagFromSignin).
+const platform = (): 'web' | 'app' => (isRunningStandalone() || isInPlayApp() ? 'app' : 'web');
+/** For the Google sign-in link: tells the server to hand back "this was the app". */
+export const appSigninParam = (): string => (platform() === 'app' ? 'app=1' : '');
 
 export type LandingSectionId = 'hero' | 'how_it_works' | 'differentiators' | 'features' | 'faq' | 'pricing' | 'final_cta';
 
@@ -34,7 +39,7 @@ export function trackFunnelEvent(eventType: LandingFunnelEvent, elapsedMs?: numb
   apiFetch('/api/landing-funnel/track', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ visitorId: getVisitorId(), eventType, platform: PLATFORM, elapsedMs, automated: typeof navigator !== "undefined" && navigator.webdriver === true }),
+    body: JSON.stringify({ visitorId: getVisitorId(), eventType, platform: platform(), elapsedMs, automated: typeof navigator !== "undefined" && navigator.webdriver === true }),
   }).catch(() => {});
 }
 
@@ -46,7 +51,7 @@ export function trackFunnelEvent(eventType: LandingFunnelEvent, elapsedMs?: numb
 export function trackFunnelEventBeacon(eventType: LandingFunnelEvent, elapsedMs?: number) {
   try {
     const blob = new Blob(
-      [JSON.stringify({ visitorId: getVisitorId(), eventType, platform: PLATFORM, elapsedMs, automated: typeof navigator !== "undefined" && navigator.webdriver === true })],
+      [JSON.stringify({ visitorId: getVisitorId(), eventType, platform: platform(), elapsedMs, automated: typeof navigator !== "undefined" && navigator.webdriver === true })],
       { type: 'application/json' }
     );
     const sent = navigator.sendBeacon(apiUrl('/api/landing-funnel/track'), blob);

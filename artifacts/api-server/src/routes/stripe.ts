@@ -340,6 +340,7 @@ router.post('/stripe/confirm-subscription', async (req: Request, res: Response) 
         cancel_at_period_end = excluded.cancel_at_period_end
     `);
 
+    await storage.updateUserStripeInfo(user.id, { stripeSubscriptionId: subscription.id }).catch(() => {});
     res.json({ confirmed: true, status: subscription.status });
   } catch (err: any) {
     console.error('Confirm subscription error:', err.message);

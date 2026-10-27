@@ -30,7 +30,24 @@ router.get("/admin/traffic-export", requireAdmin, async (req: Request, res: Resp
     const DAY = (col: string) => sql.raw(`to_char((${col} - interval '${tz} minutes'), 'YYYY-MM-DD')`);
     const HOUR = (col: string) => sql.raw(`extract(hour from (${col} - interval '${tz} minutes'))::int`);
 
-    const [daily, signupsDaily, funnelDaily, funnelTotals, paths, entries, signupEntries, hours, convDaily, totals, exits, sources, activation] = await Promise.all([
+    // Paying = an active/trialing subscription in the synced stripe.subscriptions table for the
+    // user's Stripe customer (the same check Pro access uses). users.stripe_subscription_id was
+    // never filled in by checkout, so counting that column alone always showed 0 subscribers.
+    const hasStripe = await db.execute(sql`SELECT to_regclass('stripe.subscriptions') IS NOT NULL AS ok`).then((r) => !!(rowsOf<{ ok: boolean }>(r)[0]?.ok)).catch(() => false);
+    const PAYING = (alias: string) => hasStripe
+      ? sql.raw(`EXISTS (SELECT 1 FROM stripe.subscriptions s WHERE s.customer = ${alias}.stripe_customer_id AND s.status IN ('active','trialing'))`)
+      : sql.raw(`(${alias}.stripe_subscription_id IS NOT NULL)`);
+    const newSubsQuery = hasStripe
+      ? db.execute(sql`
+          SELECT ${DAY("to_timestamp(s.created)")} AS day, COUNT(*) AS new_subscriptions,
+            COUNT(*) FILTER (WHERE s.status IN ('active','trialing')) AS still_active
+          FROM stripe.subscriptions s JOIN users u ON u.stripe_customer_id = s.customer
+          WHERE to_timestamp(s.created) >= ${since} AND to_timestamp(s.created) <= ${until}
+            AND u.id NOT IN (SELECT id FROM analytics_excluded_users) AND s.livemode IS NOT FALSE
+          GROUP BY 1 ORDER BY 1`).catch(() => [])
+      : Promise.resolve([]);
+
+    const [daily, signupsDaily, funnelDaily, funnelTotals, paths, entries, signupEntries, hours, convDaily, totals, exits, sources, activation, newSubs] = await Promise.all([
       db.execute(sql`
         SELECT ${DAY("created_at")} AS day, COUNT(*) AS views, COUNT(DISTINCT visitor_id) AS visitors,
           COUNT(DISTINCT ip_address) AS unique_ips, COUNT(*) FILTER (WHERE user_id IS NOT NULL) AS signed_in_views,
@@ -40,7 +57,7 @@ router.get("/admin/traffic-export", requireAdmin, async (req: Request, res: Resp
       db.execute(sql`
         SELECT ${DAY("created_at")} AS day, COUNT(*) AS signups,
           COUNT(*) FILTER (WHERE referred_by_user_id IS NOT NULL) AS referred_signups,
-          COUNT(*) FILTER (WHERE stripe_subscription_id IS NOT NULL) AS now_subscribed
+          COUNT(*) FILTER (WHERE ${PAYING("users")}) AS now_subscribed
         FROM users WHERE created_at >= ${since} AND created_at <= ${until} AND id NOT IN (SELECT id FROM analytics_excluded_users)
         GROUP BY 1 ORDER BY 1`),
       db.execute(sql`
@@ -89,7 +106,7 @@ router.get("/admin/traffic-export", requireAdmin, async (req: Request, res: Resp
       db.execute(sql`
         SELECT
           (SELECT COUNT(*) FROM users WHERE id NOT IN (SELECT id FROM analytics_excluded_users)) AS total_users,
-          (SELECT COUNT(*) FROM users WHERE stripe_subscription_id IS NOT NULL AND id NOT IN (SELECT id FROM analytics_excluded_users)) AS subscribers_now,
+          (SELECT COUNT(*) FROM users WHERE ${PAYING("users")} AND id NOT IN (SELECT id FROM analytics_excluded_users)) AS subscribers_now,
           (SELECT COUNT(*) FROM users WHERE is_premium_override AND id NOT IN (SELECT id FROM analytics_excluded_users)) AS comped_pro_now,
           (SELECT COUNT(*) FROM users WHERE created_at >= ${since} AND created_at <= ${until} AND id NOT IN (SELECT id FROM analytics_excluded_users)) AS signups_in_range,
           (SELECT COUNT(*) FROM pv_people WHERE created_at >= ${since} AND created_at <= ${until}) AS views_in_range,
@@ -129,6 +146,7 @@ router.get("/admin/traffic-export", requireAdmin, async (req: Request, res: Resp
           COUNT(*) FILTER (WHERE COALESCE(chesscom_username, '') <> '' OR COALESCE(lichess_username, '') <> ''
             OR EXISTS (SELECT 1 FROM games g WHERE g.user_id = u.id)) AS activated
         FROM u`),
+      newSubsQuery,
     ]);
     const act = rowsOf<Record<string, unknown>>(activation)[0] ?? {};
 
@@ -140,6 +158,7 @@ router.get("/admin/traffic-export", requireAdmin, async (req: Request, res: Resp
       range: { since: since.toISOString(), until: until.toISOString(), tzOffsetMinutes: tz },
       totals: {
         totalUsers: num(t.total_users), subscribersNow: num(t.subscribers_now), compedProNow: num(t.comped_pro_now),
+        newSubscriptionsInRange: rowsOf<Record<string, unknown>>(newSubs).reduce((n, r) => n + num(r.new_subscriptions), 0),
         signupsInRange: num(t.signups_in_range), pageViewsInRange: num(t.views_in_range),
         visitorsInRange: num(t.visitors_in_range), uniqueIpsInRange: num(t.unique_ips_in_range),
       },
@@ -150,6 +169,8 @@ router.get("/admin/traffic-export", requireAdmin, async (req: Request, res: Resp
       dailySignups: rowsOf<Record<string, unknown>>(signupsDaily).map((r) => ({
         day: r.day, signups: num(r.signups), referredSignups: num(r.referred_signups), nowSubscribed: num(r.now_subscribed),
       })),
+      // New paid subscriptions started in the range (from Stripe), and whether each is still active.
+      dailyNewSubscriptions: rowsOf<Record<string, unknown>>(newSubs).map((r) => ({ day: r.day, newSubscriptions: num(r.new_subscriptions), stillActive: num(r.still_active) })),
       dailyReferralConversions: rowsOf<Record<string, unknown>>(convDaily).map((r) => ({ day: r.day, conversions: num(r.referral_conversions) })),
       landingFunnelTotals: rowsOf<Record<string, unknown>>(funnelTotals).map((r) => ({
         platform: r.platform, event: r.event_type, visitors: num(r.visitors), events: num(r.events),

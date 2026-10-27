@@ -15,6 +15,8 @@ import { useExercise } from '@/lib/learn/useExercise';
 import { starsFor, playSfxAlways } from '@/lib/kids/progress';
 import type { Level, Occupant } from '@/lib/kids/levels';
 import { moveArrows, type Arrow, type ArrowColor } from '@/lib/learn/explain';
+import { useUser } from '@/hooks/use-user';
+import { QuickSignup } from '@/components/QuickSignup';
 
 export default function BeginnerLessonPlay() {
   const { unit: uid, lesson: lid } = useParams<{ unit: string; lesson: string }>();
@@ -57,6 +59,10 @@ function LessonFlow({ unit, lesson }: { unit: Unit; lesson: Lesson }) {
   const results = useRef<number[]>([]);
   const { award } = useLearn();
   const [, navigate] = useLocation();
+  // Guests: a sign-up offer to keep their stars (on the intro and the lesson-complete card, never a popup).
+  const { isAuthenticated, isAuthLoading } = useUser();
+  const guest = !isAuthLoading && !isAuthenticated;
+  const [signupOpen, setSignupOpen] = useState(false);
   const n = lesson.exercises.length;
   const title = `${unit.title} · ${lesson.title}`;
 
@@ -92,6 +98,14 @@ function LessonFlow({ unit, lesson }: { unit: Unit; lesson: Lesson }) {
             {lesson.intro.map((p, i) => <p key={i} className="text-[15px] leading-relaxed" style={{ color: '#cfccc8' }}>{p}</p>)}
           </div>
           {lesson.diagram && <Diagram {...lesson.diagram} />}
+          {guest && (
+            <p className="mt-4 text-[12.5px]" style={{ color: L.muted }}>
+              Playing as a guest.{' '}
+              <button type="button" onClick={() => setSignupOpen(true)} className="font-bold underline" style={{ color: L.accent }}>Sign up free</button>{' '}
+              to keep your stars on every device.
+            </p>
+          )}
+          <QuickSignup open={signupOpen} onClose={() => setSignupOpen(false)} title="Keep your stars" subtitle="Free, no credit card. Your progress comes with you." />
           <button type="button" onClick={() => setStage({ kind: 'ex', i: 0 })}
             className="mt-6 w-full rounded-xl py-3.5 font-black text-white flex items-center justify-center gap-2" style={{ background: L.accent }}>
             {lesson.game ? 'Start the game' : `Start practice (${n} exercises)`} <ChevronRight className="w-5 h-5" />
@@ -116,6 +130,17 @@ function LessonFlow({ unit, lesson }: { unit: Unit; lesson: Lesson }) {
           <p className="text-sm mb-6" style={{ color: L.muted }}>
             {lesson.game ? (stars === 3 ? 'You won your first game!' : stars === 2 ? 'A draw: not bad at all.' : 'Play again any time. Each game teaches something.') : stars === 3 ? 'Clean run: no mistakes.' : stars === 2 ? 'Solid. A couple of slips along the way.' : 'Done. Run it again to lock it in.'}
           </p>
+          {guest && (
+            <div className="mb-4 rounded-xl p-4 text-left" style={{ background: `${L.accent}1F`, border: `1px solid ${L.accent}66` }}>
+              <p className="font-black">Save your progress</p>
+              <p className="mt-1 text-[13px]" style={{ color: L.muted }}>You're playing as a guest. Create a free account to keep your stars, pick up on any device, and play real games when you're ready.</p>
+              <button type="button" onClick={() => setSignupOpen(true)} className="mt-3 w-full rounded-xl py-3 font-black text-white" style={{ background: L.accent }}>
+                Sign up free
+              </button>
+            </div>
+          )}
+          <QuickSignup open={signupOpen} onClose={() => setSignupOpen(false)} title="Keep your stars"
+            subtitle="Free, no credit card. Your progress comes with you." returnTo={next ? `/beginner/${next.unit.id}/${next.lesson.id}` : '/beginner'} />
           <div className="flex flex-col gap-2">
             {next ? (
               <button type="button" onClick={() => navigate(`/beginner/${next.unit.id}/${next.lesson.id}`)}

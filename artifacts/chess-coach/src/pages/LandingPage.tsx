@@ -3,7 +3,7 @@ import { SocialLinks } from '@/components/SocialLinks';
 import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { useUser } from '@/hooks/use-user';
 import { useLocation, Link } from 'wouter';
-import { trackFunnelEvent } from '@/lib/funnelTracking';
+import { trackFunnelEvent, appSigninParam } from '@/lib/funnelTracking';
 import { useLandingFunnelTracking } from '@/hooks/use-landing-funnel-tracking';
 import { Play as PlayIcon, ArrowRight, Mail, Eye, EyeOff, UserPlus, LogIn, Search, BarChart3, Brain, Check, X, Target, Crosshair, BookOpen, Gamepad2, Flame, Puzzle, Users, Skull, History, GraduationCap, Download as DownloadIcon, Smartphone } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -141,7 +141,7 @@ function AuthModal({ open, onClose, initialMode, externalError, context = 'defau
   const handleGoogleLogin = () => {
     trackFunnelEvent('google_oauth_clicked');
     const ref = localStorage.getItem('chessscout_ref') || '';
-    const url = ref ? apiUrl(`/api/auth/google?ref=${encodeURIComponent(ref)}`) : apiUrl('/api/auth/google');
+    const url = apiUrl(`/api/auth/google?${[ref ? `ref=${encodeURIComponent(ref)}` : '', appSigninParam()].filter(Boolean).join('&')}`);
     window.location.href = url;
   };
 

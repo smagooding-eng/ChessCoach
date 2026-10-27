@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { appFlagFromSignin } from '@/lib/playApp';
 import { analytics } from '@heycatch/sdk';
 import { apiFetch, setAuthToken, getAuthToken } from '@/lib/api';
 import { trackFunnelEvent } from '@/lib/funnelTracking';
@@ -75,6 +76,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       if (typeof window !== 'undefined' && window.location.hash) {
         const hashParams = new URLSearchParams(window.location.hash.slice(1));
         const hashToken = hashParams.get('token');
+        if (hashParams.get('app') === '1') appFlagFromSignin();
         if (hashToken) {
           setAuthToken(hashToken);
           // Only fired for a genuinely brand-new account (see the

@@ -16,6 +16,11 @@ export function rememberPlayAppLaunch(): void {
   } catch { /* storage blocked */ }
 }
 
+/** After Google sign-in the app comes back with #...&app=1 (see /api/auth/google). */
+export function appFlagFromSignin(): void {
+  try { if (/[#&]app=1(&|$)/.test(window.location.hash)) sessionStorage.setItem(KEY, '1'); } catch { /* ignore */ }
+}
+
 export function isInPlayApp(): boolean {
   try {
     if (sessionStorage.getItem(KEY) === '1') return true;

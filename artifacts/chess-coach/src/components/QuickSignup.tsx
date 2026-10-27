@@ -6,7 +6,7 @@
 import { useEffect } from 'react';
 import { X, Mail } from 'lucide-react';
 import { apiUrl } from '@/lib/api';
-import { trackFunnelEvent } from '@/lib/funnelTracking';
+import { trackFunnelEvent, appSigninParam } from '@/lib/funnelTracking';
 
 export const RETURN_TO_KEY = 'cs_return_to';
 
@@ -20,7 +20,7 @@ export function startGoogleSignup() {
   trackFunnelEvent('google_oauth_clicked');
   let ref = '';
   try { ref = localStorage.getItem('chessscout_ref') || ''; } catch { /* ignore */ }
-  window.location.href = ref ? apiUrl(`/api/auth/google?ref=${encodeURIComponent(ref)}`) : apiUrl('/api/auth/google');
+  window.location.href = apiUrl(`/api/auth/google?${[ref ? `ref=${encodeURIComponent(ref)}` : '', appSigninParam()].filter(Boolean).join('&')}`);
 }
 
 export function GoogleMark({ className = 'h-5 w-5' }: { className?: string }) {

@@ -135,6 +135,17 @@ export function Challenge() {
     void accept();
   }, [ch, isAuthenticated, isCreator]);  // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Just signed up from this page: finish what they tapped (accept, challenge through an open
+  // link, or ask the creator for a new game when the link had expired).
+  const resumed = React.useRef(false);
+  useEffect(() => {
+    if (resumed.current || !ch || !isAuthenticated || isCreator || ch.isRequest) return;
+    if (new URLSearchParams(window.location.search).get('resume') !== '1') return;
+    resumed.current = true;
+    window.history.replaceState(null, '', window.location.pathname);
+    if (ch.status === 'open' && !ch.open) void accept(); else void sendRequest();
+  }, [ch, isAuthenticated, isCreator]);  // eslint-disable-line react-hooks/exhaustive-deps
+
   const colorLine = (c: ChallengeInfo) =>
     c.color === 'random' ? 'Colours chosen at random'
       : isCreator ? `You play ${c.color}`
@@ -199,9 +210,26 @@ export function Challenge() {
                 </>
               )
             ) : ch.status !== 'open' ? (
-              <p className="text-center text-[13.5px]" style={{ color: PT.muted }}>
-                {ch.status === 'expired' ? 'This challenge has expired.' : ch.status === 'cancelled' ? 'This challenge was cancelled.' : ch.status === 'declined' ? 'This challenge was declined.' : 'This challenge has already been accepted.'}
-              </p>
+              <>
+                <p className="text-center text-[13.5px]" style={{ color: PT.muted }}>
+                  {ch.status === 'expired' ? 'This challenge has expired.' : ch.status === 'cancelled' ? 'This challenge was cancelled.' : ch.status === 'declined' ? 'This challenge was declined.' : 'This challenge has already been accepted.'}
+                </p>
+                {/* Still came to play: ask the creator for a new game, or play someone now. */}
+                {!isCreator && (
+                  <>
+                    <button onClick={sendRequest} disabled={busy} className="w-full rounded-xl py-3.5 text-[15px] font-extrabold disabled:opacity-60" style={greenBtn}>
+                      {isAuthenticated ? (busy ? 'Sending…' : `Ask ${ch.creatorUsername} for a new game`) : `Sign up free and play ${ch.creatorUsername}`}
+                    </button>
+                    <p className="text-center text-[12px]" style={{ color: PT.muted }}>
+                      {isAuthenticated ? `${ch.creatorUsername} gets a notification and accepts to start.` : `Free, no credit card. ${ch.creatorUsername} gets your challenge as soon as you're in.`}
+                    </p>
+                    <div className="grid grid-cols-2 gap-2 pt-1">
+                      <Link href="/live" className="rounded-xl py-2.5 text-center text-[13px] font-bold" style={ghostBtn}>Play someone live</Link>
+                      <Link href="/practice" className="rounded-xl py-2.5 text-center text-[13px] font-bold" style={ghostBtn}>Play a bot</Link>
+                    </div>
+                  </>
+                )}
+              </>
             ) : isCreator ? (
               <>
                 <p className="text-center text-[13px]" style={{ color: PT.muted }}>Send this link to a friend. {ch.kind === 'live' ? 'Keep Live play open; the game starts when they accept.' : "The game starts when they accept; we'll notify you."}</p>
@@ -222,6 +250,11 @@ export function Challenge() {
               </>
             )}
             {error && <p className="text-center text-[13px]" style={{ color: PT.red }}>{error}</p>}
+          </div>
+        )}
+        {!isAuthenticated && !isAuthLoading && ch && !isCreator && (
+          <div className="px-2 text-center text-[12.5px] leading-relaxed" style={{ color: PT.muted }}>
+            ChessScout.net is free: play live and daily games with friends, get every game reviewed, and solve unlimited puzzles.
           </div>
         )}
         {/* Always a way out of this page */}

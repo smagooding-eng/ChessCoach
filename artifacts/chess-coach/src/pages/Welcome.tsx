@@ -73,7 +73,7 @@ export function Welcome() {
         await refreshAuth();
         if (pendingCode) {
           try { localStorage.removeItem(PENDING_CHALLENGE_KEY); } catch { /* ignore */ }
-          navigate(`/challenge/${pendingCode}`, { replace: true } as never);
+          navigate(`/challenge/${pendingCode}?resume=1`, { replace: true } as never);
         } else {
           navigate('/', { replace: true } as never);
         }
@@ -98,7 +98,7 @@ export function Welcome() {
         await startOnboardingImport(cc || lc, cc ? 'chesscom' : 'lichess');
         await refreshAuth();
         try { localStorage.removeItem(PENDING_CHALLENGE_KEY); } catch { /* ignore */ }
-        navigate(`/challenge/${pendingCode}`, { replace: true } as never);
+        navigate(`/challenge/${pendingCode}?resume=1`, { replace: true } as never);
         return;
       }
       await refreshAuth();

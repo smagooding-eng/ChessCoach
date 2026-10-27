@@ -392,7 +392,8 @@ router.get("/auth/google", (req: Request, res: Response) => {
     scope: "openid email profile",
     access_type: "offline",
     prompt: "select_account",
-    state: refCode ? `ref:${refCode}` : 'none',
+    // ref:CODE and/or app (the Play app), so the return trip can say where it started.
+    state: [refCode ? `ref:${refCode}` : '', req.query.app === '1' ? 'app' : ''].filter(Boolean).join(';') || 'none',
   });
 
   res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params}`);
@@ -433,7 +434,9 @@ router.get("/auth/google/callback", async (req: Request, res: Response) => {
     const origin = callbackOrigin;
     const redirectUri = `${origin}/api/auth/google/callback`;
     const stateParam = (req.query.state as string) || '';
-    const googleRefCode = stateParam.startsWith('ref:') ? stateParam.slice(4) : '';
+    const stateParts = stateParam.split(';');
+    const googleRefCode = stateParts.find((x) => x.startsWith('ref:'))?.slice(4) ?? '';
+    const fromApp = stateParts.includes('app');
 
     const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
       method: "POST",
@@ -545,7 +548,7 @@ router.get("/auth/google/callback", async (req: Request, res: Response) => {
     // corresponding funnel event once, since this redirect is the only
     // place that knows which case just happened.
     const newSignupParam = isNewSignup ? "&newSignup=google" : "";
-    sendClientRedirect(res, frontendOrigin + "/#token=" + sid + newSignupParam);
+    sendClientRedirect(res, frontendOrigin + "/#token=" + sid + newSignupParam + (fromApp ? "&app=1" : ""));
   } catch (err: any) {
     req.log?.error?.({ err }, "Google callback error");
     sendClientRedirect(res, frontendOrigin + "/?error=google_auth_failed");

@@ -54,8 +54,14 @@ function write(next: KidsState, quiet = false) {
 /** Switch to another account's progress (null = signed out, this device). */
 export function scopeKids(id: string | null) {
   if (id === scope) return;
+  const guest = scope === null ? current : null;
   scope = id;
   current = read();
+  // Signing in after playing as a guest: keep the stars (and avatar) earned on this device.
+  if (id && guest && Object.keys(guest.stars ?? {}).length) {
+    current = { ...current, avatar: current.avatar ?? guest.avatar ?? null, stars: maxMap(current.stars, guest.stars), bennyWins: Math.max(current.bennyWins ?? 0, guest.bennyWins ?? 0) };
+    try { localStorage.setItem(storageKey(), JSON.stringify(current)); localStorage.removeItem(KEY); } catch { /* ignore */ }
+  }
   listeners.forEach((l) => l());
 }
 /** Fold in what the server has for this account (best stars win). */

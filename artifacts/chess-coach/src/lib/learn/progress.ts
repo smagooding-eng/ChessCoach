@@ -47,8 +47,15 @@ function write(next: LearnState, quiet = false) {
 /** Switch to another account's progress (null = signed out, this device). */
 export function scopeLearn(id: string | null) {
   if (id === scope) return;
+  const guest = scope === null ? current : null;
   scope = id;
   current = read();
+  // Signing in after playing as a guest: the stars earned on this device come along
+  // (best stars win), then the device copy is cleared so they aren't added twice.
+  if (id && guest && Object.keys(guest.lessons ?? {}).length) {
+    current = { ...current, lessons: maxMap(current.lessons, guest.lessons) };
+    try { localStorage.setItem(storageKey(), JSON.stringify(current)); localStorage.removeItem(KEY); } catch { /* ignore */ }
+  }
   listeners.forEach((l) => l());
 }
 /** Fold in what the server has for this account (best stars win). */

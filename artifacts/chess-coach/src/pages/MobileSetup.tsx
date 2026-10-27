@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { appSigninParam, trackFunnelEvent } from '@/lib/funnelTracking';
 import { useUser } from '@/hooks/use-user';
 import { useLocation } from 'wouter';
 import { Trophy, Mail, Eye, EyeOff } from 'lucide-react';
@@ -123,8 +124,9 @@ export function MobileSetup() {
   };
 
   const handleGoogleLogin = () => {
+    trackFunnelEvent('google_oauth_clicked');
     const ref = referralCode || localStorage.getItem('chessscout_ref') || '';
-    const url = ref ? apiUrl(`/api/auth/google?ref=${encodeURIComponent(ref)}`) : apiUrl('/api/auth/google');
+    const url = apiUrl(`/api/auth/google?${[ref ? `ref=${encodeURIComponent(ref)}` : '', appSigninParam()].filter(Boolean).join('&')}`);
     window.location.href = url;
   };
 

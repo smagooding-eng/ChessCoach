@@ -275,10 +275,18 @@ router.all("/challenges/:code/decline-signed", async (req: Request, res: Respons
 router.post("/challenges/:code/request", requireAuth, async (req: Request, res: Response) => {
   try {
     const [link] = await db.select().from(gameChallengesTable).where(eq(gameChallengesTable.code, String(req.params.code)));
-    if (!link || !link.open) { res.status(404).json({ error: "Challenge link not found" }); return; }
+    if (!link || link.status === "requested" || link.status === "approved" || link.parentCode) { res.status(404).json({ error: "Challenge link not found" }); return; }
     if (link.creatorUserId === req.user!.id) { res.status(400).json({ error: "That's your own link — post it so others can challenge you." }); return; }
-    if (link.status !== "open") { res.status(410).json({ error: `${link.creatorUsername} has turned this link off` }); return; }
-    if (new Date(link.expiresAt).getTime() < Date.now()) { res.status(410).json({ error: "This link has expired" }); return; }
+    const usable = link.status === "open" && new Date(link.expiresAt).getTime() >= Date.now();
+    if (link.open) {
+      if (link.status !== "open") { res.status(410).json({ error: `${link.creatorUsername} has turned this link off` }); return; }
+      if (!usable) { res.status(410).json({ error: "This link has expired" }); return; }
+    } else if (usable) {
+      // A one-off challenge that's still open: just accept it.
+      res.status(400).json({ error: "This challenge is still open. Accept it to play." }); return;
+    }
+    // A one-off challenge that expired or was already taken: asking the creator for a new game
+    // works like an open link's request (they get a notification and accept or decline).
 
     // One pending request per person per link: re-use it.
     const [existing] = await db.select().from(gameChallengesTable).where(and(
