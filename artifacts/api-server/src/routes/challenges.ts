@@ -96,7 +96,9 @@ router.post("/challenges", requireAuth, async (req: Request, res: Response) => {
 const lastDirect = new Map<string, number>();
 router.post("/challenges/direct", requireAuth, async (req: Request, res: Response) => {
   try {
-    const { kind, timeControl, mode, targetUserId } = req.body as { kind?: string; timeControl?: string; mode?: string; targetUserId?: string };
+    const { kind, timeControl: tcRaw, mode, targetUserId } = req.body as { kind?: string; timeControl?: string; mode?: string; targetUserId?: string };
+    // From a "Play anyone" search: challenge them to 10 minutes.
+    const timeControl = kind === "live" && tcRaw === "any" ? "rapid_10_0" : tcRaw;
     const target = String(targetUserId ?? "");
     if (!target || target === req.user!.id) { res.status(400).json({ error: "Pick someone to challenge" }); return; }
     if (kind !== "live" && kind !== "daily") { res.status(400).json({ error: "kind must be 'live' or 'daily'" }); return; }

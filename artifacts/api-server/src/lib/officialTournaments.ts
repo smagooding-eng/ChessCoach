@@ -95,8 +95,45 @@ export async function ensureOfficialTournaments(): Promise<void> {
   }
 }
 
+// Live Hour: about 10 minutes before the Nightly Blitz Arena starts, everyone
+// with notifications on (or the app open) gets one reminder, so the people
+// who want a live game turn up at the same time.
+async function remindLiveHour(): Promise<void> {
+  await db.execute(sql`ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS live_hour_reminded_at TIMESTAMPTZ`);
+  const due = rowsOf<{ id: string; name: string }>(await db.execute(sql`
+    UPDATE tournaments SET live_hour_reminded_at = now()
+    WHERE official_key LIKE 'nightly-blitz:%' AND status = 'scheduled' AND live_hour_reminded_at IS NULL
+      AND starts_at > now() + interval '4 minutes' AND starts_at <= now() + interval '11 minutes'
+    RETURNING id, name`));
+  if (!due.length) return;
+  const t = due[0];
+  const { everyoneReachable } = await import("./seekBroadcast");
+  const { notifyUser } = await import("./notify");
+  const ids = await everyoneReachable();
+  for (const uid of ids) {
+    await db.execute(sql`DELETE FROM notifications WHERE user_id = ${uid} AND kind = 'live_hour'`).catch(() => {});
+    notifyUser(uid, {
+      kind: "live_hour", title: "Live Hour starts in 10 minutes ⚡",
+      body: `${t.name}: 5-minute games for an hour, most points wins. Tap to join.`,
+      url: `/tournaments/${t.id}`, tag: "cs:live-hour",
+    }).catch(() => {});
+  }
+  logger.info({ tournament: t.id, sent: ids.length }, "[official] Live Hour reminder sent");
+}
+
+/** The next (or current) Live Hour, for the "next Live Hour" line on Play / Home. */
+export async function nextLiveHour(): Promise<{ id: string; name: string; startsAt: string; endsAt: string | null; status: string } | null> {
+  const r = rowsOf<{ id: string; name: string; starts_at: string; ends_at: string | null; status: string }>(await db.execute(sql`
+    SELECT id, name, starts_at, ends_at, status FROM tournaments
+    WHERE official_key LIKE 'nightly-blitz:%' AND status IN ('scheduled', 'running') AND (ends_at IS NULL OR ends_at > now())
+    ORDER BY starts_at LIMIT 1`));
+  const t = r[0];
+  return t ? { id: t.id, name: t.name, startsAt: new Date(t.starts_at).toISOString(), endsAt: t.ends_at ? new Date(t.ends_at).toISOString() : null, status: t.status } : null;
+}
+
 export function startOfficialTournaments(): void {
   const run = () => { void ensureOfficialTournaments().catch((err) => logger.warn({ err }, "[official] run failed")); };
   setTimeout(run, 60_000);
   setInterval(run, 6 * 60 * 60_000).unref();
+  setInterval(() => { void remindLiveHour().catch((err) => logger.warn({ err }, "[official] Live Hour reminder failed")); }, 60_000).unref();
 }

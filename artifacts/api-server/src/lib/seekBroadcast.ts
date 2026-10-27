@@ -27,6 +27,15 @@ export function seekUrl(s: Pick<Seek, "kind" | "seekerId" | "seekerName" | "time
   return `/${s.kind === "live" ? "live" : "daily"}?${q.toString()}`;
 }
 
+/** Everyone with notifications on or the app open (minus `exclude`). */
+export async function everyoneReachable(exclude?: string): Promise<string[]> {
+  const subs = await db.selectDistinct({ userId: pushSubscriptionsTable.userId }).from(pushSubscriptionsTable);
+  const ids = new Set<string>(subs.map((r) => r.userId));
+  for (const a of listOpenApps()) ids.add(a.userId);
+  if (exclude) ids.delete(exclude);
+  return [...ids];
+}
+
 export function announceSeek(s: Seek, skip?: (userId: string) => boolean): void {
   const key = `${s.kind}:${s.seekerId}`;
   const prev = lastAnnounced.get(key) ?? 0;

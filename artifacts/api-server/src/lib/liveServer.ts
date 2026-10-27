@@ -233,6 +233,14 @@ function queueKey(tc: TimeControlId, mode: Mode) { return `${tc}:${mode}`; }
 for (const id of Object.keys(TIME_CONTROLS) as TimeControlId[]) {
   for (const m of ['casual', 'ranked'] as Mode[]) queues.set(queueKey(id, m), []);
 }
+// "Play anyone": players happy with any clock wait in `any:<mode>`. They're
+// matched with whoever is searching at the same mode (taking that player's
+// clock), or with each other at 10 minutes. With few people online this
+// keeps everyone in one pool instead of eight.
+const FLEX_DEFAULT_TC: TimeControlId = 'rapid_10_0';
+const flexKey = (mode: Mode) => `any:${mode}`;
+for (const m of ['casual', 'ranked'] as Mode[]) queues.set(flexKey(m), []);
+export const FLEX_LABEL = 'Any clock';
 
 const wsUser = new WeakMap<WebSocket, { userId: string; username: string }>();
 
@@ -676,11 +684,41 @@ async function startHumanMatch(a: WaitingPlayer, b: WaitingPlayer) {
   send(b.ws, { type: 'match_found', state: gamePublicState(game), color: whiteFirst ? 'b' : 'w' });
 }
 
-setInterval(() => {
+// A flexible player takes the longest-waiting player at any clock (same mode,
+// within the rating window); the game uses that player's clock.
+function tryMatchFlex(mode: Mode) {
+  const flex = queues.get(flexKey(mode))!;
+  for (const a of [...flex].sort((x, y) => x.joinedAt - y.joinedAt)) {
+    if (userActiveGame.has(a.userId)) continue;
+    let best: { w: WaitingPlayer; list: WaitingPlayer[] } | null = null;
+    for (const [key, list] of queues) {
+      if (key.startsWith('any:') || !key.endsWith(`:${mode}`)) continue;
+      for (const b of list) {
+        if (b.userId === a.userId || userActiveGame.has(b.userId)) continue;
+        const window = Math.max(matchWindowFor(a.joinedAt), matchWindowFor(b.joinedAt));
+        if (Math.abs(a.rating - b.rating) > window) continue;
+        if (!best || b.joinedAt < best.w.joinedAt) best = { w: b, list };
+      }
+    }
+    if (best) {
+      flex.splice(flex.indexOf(a), 1);
+      best.list.splice(best.list.indexOf(best.w), 1);
+      void startHumanMatch(best.w, a);
+      return;
+    }
+  }
+}
+function tryMatchAll() {
   for (const key of queues.keys()) tryMatchInQueue(key);
-}, WIDEN_INTERVAL_MS).unref();
+  tryMatchFlex('casual');
+  tryMatchFlex('ranked');
+}
 
-async function joinQueue(ws: WebSocket, userId: string, username: string, tcId: TimeControlId, mode: Mode) {
+setInterval(tryMatchAll, WIDEN_INTERVAL_MS).unref();
+
+async function joinQueue(ws: WebSocket, userId: string, username: string, tcIdIn: TimeControlId | 'any', mode: Mode) {
+  const flex = tcIdIn === 'any';
+  const tcId: TimeControlId = flex ? FLEX_DEFAULT_TC : tcIdIn;
   const existing = userActiveGame.get(userId);
   if (existing) {
     const g = games.get(existing);
@@ -698,15 +736,16 @@ async function joinQueue(ws: WebSocket, userId: string, username: string, tcId: 
   const seed = await seedRatingFromImports(userId, tcId);
   const myRating = seed.rating;
 
-  const key = queueKey(tcId, mode);
+  const key = flex ? flexKey(mode) : queueKey(tcId, mode);
   const queue = queues.get(key)!;
   queue.push({ userId, username, rating: myRating, ws, tc, mode, joinedAt: Date.now() });
-  send(ws, { type: 'queued', tcId, mode, botOfferMs: BOT_OFFER_MS });
-  // Try immediate match
+  send(ws, { type: 'queued', tcId: flex ? 'any' : tcId, mode, botOfferMs: BOT_OFFER_MS });
+  // Try immediate match (same clock first, then anyone flexible)
   tryMatchInQueue(key);
+  if (queue.some(w => w.userId === userId)) tryMatchFlex(mode);
   // Still waiting? Tell everyone with notifications on.
   if (queue.some(w => w.userId === userId)) {
-    announceSeek({ kind: 'live', seekerId: userId, seekerName: username, timeControl: tcId, label: tc.label, mode, rating: myRating },
+    announceSeek({ kind: 'live', seekerId: userId, seekerName: username, timeControl: flex ? 'any' : tcId, label: flex ? FLEX_LABEL : tc.label, mode, rating: myRating },
       (uid) => userActiveGame.has(uid));
   }
 }
@@ -752,7 +791,8 @@ const userLastPersona = new Map<string, string>();
 // Player chose "play a bot" (offered after BOT_OFFER_MS in the queue).
 // The bot is labeled as a bot everywhere and the game is always casual, so
 // it never affects anyone's rating.
-async function spawnBotMatch(ws: WebSocket, userId: string, username: string, tcId: TimeControlId) {
+async function spawnBotMatch(ws: WebSocket, userId: string, username: string, tcIdIn: TimeControlId | 'any') {
+  const tcId: TimeControlId = tcIdIn === 'any' ? FLEX_DEFAULT_TC : tcIdIn;
   cancelQueue(userId);
   const tc = TIME_CONTROLS[tcId];
   if (!tc) { send(ws, { type: 'error', message: 'Invalid time control' }); return; }
@@ -1562,6 +1602,13 @@ export function listTimeControls() {
 // ── Presence for friends lists ─────────────────────────────────────────────
 /** Has Live play open right now (any tab/device). */
 export function isLiveConnected(userId: string): boolean { return userSockets.has(userId); }
+
+/** Real counts for "players online": searching for a live game and playing one (people, not bots). */
+export function liveActivity(): { searching: string[]; playing: string[] } {
+  const searching = new Set<string>();
+  for (const list of queues.values()) for (const w of list) if (w.ws.readyState === WebSocket.OPEN) searching.add(w.userId);
+  return { searching: [...searching], playing: [...userActiveGame.keys()] };
+}
 /** In a live game right now. */
 export function isInLiveGame(userId: string): boolean { return userActiveGame.has(userId); }
 

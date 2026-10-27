@@ -2,6 +2,7 @@ import { SocialLinks } from '@/components/SocialLinks';
 import React, { useEffect, useRef, useState } from 'react';
 import { autoImportLinkedAccounts } from '@/lib/autoImport';
 import { Link, useLocation } from 'wouter';
+import { LivePulse } from '@/components/play/LivePulse';
 import { Trophy, Target, Search, ArrowRight, ArrowUpRight, ChevronRight, Play, Puzzle, BookOpen, Crosshair, Crown, Camera, Zap, ShoppingBag, Bot, BarChart3, GraduationCap } from 'lucide-react';
 import { useUser } from '@/hooks/use-user';
 import { useChessPlayer } from '@/hooks/use-chess-player';
@@ -218,6 +219,7 @@ export function DashboardRedesign() {
               <GraduationCap size={17} strokeWidth={2.25} style={{ color: GREEN }} /> Learn
             </Link>
           </div>
+          <LivePulse compact className="mt-3 justify-center" />
           </div>
         </section>
 

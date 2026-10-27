@@ -9,6 +9,7 @@ import { apiFetch } from '@/lib/api';
 import { PT, cardStyle, greenBtn, ghostBtn } from '@/lib/playTheme';
 import { ShareLink } from '@/components/play/ShareLink';
 import { NotifyPrompt } from '@/components/play/NotifyPrompt';
+import { LivePulse } from '@/components/play/LivePulse';
 import { SeekGoneCard, SeekJoiningCard, takeSeekParams, type SeekInfo } from '@/components/play/SeekGoneCard';
 import { TournamentsCard } from '@/components/play/Tournaments';
 import { DailyGames } from '@/pages/DailyGames';
@@ -120,7 +121,7 @@ export function LivePlay({ initialTab }: { initialTab?: OnlineTab } = {}) {
 
   const waitedMs = live.queuedAt ? now - live.queuedAt : 0;
   const showBotOffer = live.status === 'queued' && waitedMs >= live.botOfferMs;
-  const queuedLabel = TC_OPTIONS.find(t => t.id === live.queuedTc)?.label;
+  const queuedLabel = live.queuedTc === 'any' ? 'Any clock' : TC_OPTIONS.find(t => t.id === live.queuedTc)?.label;
   const dailyR = ratingsData?.ratings?.daily;
 
   return (
@@ -252,6 +253,22 @@ export function LivePlay({ initialTab }: { initialTab?: OnlineTab } = {}) {
             <p className="mb-3 text-[12px]" style={{ color: PT.muted }}>
               {mode === 'casual' ? 'Casual: no rating change.' : 'Ranked: your rating for that clock goes up or down.'} Tap a clock to find an opponent.
             </p>
+            <LivePulse className="mb-3" />
+            {/* Play anyone: one pool across every clock, so you're matched as fast as possible. */}
+            <button
+              disabled={live.status === 'connecting' || live.status === 'disconnected'}
+              onClick={() => live.enterQueue('any', mode)}
+              className="mb-2 flex w-full items-center gap-3 rounded-[14px] p-3.5 text-left transition-transform active:scale-[0.99] disabled:opacity-50"
+              style={{ background: 'linear-gradient(180deg, #8FC25A, #81B64C)', boxShadow: '0 3px 0 #5F8F36', color: '#FFFFFF' }}>
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[11px]" style={{ background: 'rgba(255,255,255,.2)' }}>
+                <Swords className="w-5 h-5" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <b className="block text-[17px] font-black leading-tight">Play anyone</b>
+                <span className="block text-[12px] font-semibold opacity-90">Fastest match: any clock from 5 to 15 minutes</span>
+              </span>
+              <ChevronRight className="h-5 w-5 shrink-0" />
+            </button>
             <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
               {TC_OPTIONS.map(opt => {
                 const r = ratingsData?.ratings[opt.id];
