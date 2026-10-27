@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useUser } from '@/hooks/use-user';
-import { usePushNotifications } from '@/hooks/use-push-notifications';
+import { usePushNotifications, ensurePushSubscription } from '@/hooks/use-push-notifications';
 
 const PROMPTED_KEY = 'chessCoachPushPrompted';
 
@@ -21,6 +21,16 @@ export function AutoPushPrompt() {
   const { authUser } = useUser();
   const push = usePushNotifications();
   const attempted = useRef(false);
+
+  // Already allowed: make sure this device is still subscribed (and the server knows it).
+  useEffect(() => {
+    if (!authUser || push.permission !== 'granted') return;
+    void ensurePushSubscription();
+    // The Play app can stay open in the background for days: check again on return.
+    const onShow = () => { if (document.visibilityState === 'visible') void ensurePushSubscription(); };
+    document.addEventListener('visibilitychange', onShow);
+    return () => document.removeEventListener('visibilitychange', onShow);
+  }, [authUser, push.permission]);
 
   useEffect(() => {
     if (attempted.current) return;

@@ -21,6 +21,50 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
 
 export type PushPermissionState = 'unsupported' | 'default' | 'granted' | 'denied';
 
+// Set when the person turns notifications off in the app, so we never turn them back on by ourselves.
+const OFF_KEY = 'cs_push_off';
+
+let ensuredAt = 0;
+/**
+ * Keeps notifications working once someone has allowed them. Android/Chrome can
+ * drop or rotate a device's push subscription (app updates, the push service
+ * refreshing its token, storage cleanup), and the server removes ones the push
+ * service says are gone -- either way notifications silently stop and the app
+ * shows them as off. On every app start, if permission is still granted, this
+ * makes sure the device has a subscription and the server has it too. No prompt
+ * is shown (permission is already granted). At most every 6 hours.
+ */
+export async function ensurePushSubscription(): Promise<void> {
+  if (Date.now() - ensuredAt < 6 * 60 * 60_000) return;
+  if (typeof window === 'undefined' || !('serviceWorker' in navigator) || !('PushManager' in window)) return;
+  if (Notification.permission !== 'granted') return;
+  try { if (localStorage.getItem(OFF_KEY) === '1') return; } catch { /* ignore */ }
+  ensuredAt = Date.now();
+  try {
+    const registration = await Promise.race([
+      navigator.serviceWorker.ready,
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('sw timeout')), 15_000)),
+    ]);
+    let subscription = await registration.pushManager.getSubscription();
+    if (!subscription) {
+      const keyRes = await apiFetch('/api/push/vapid-public-key');
+      if (!keyRes.ok) return;
+      const { publicKey } = await keyRes.json() as { publicKey: string };
+      subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(publicKey) as unknown as BufferSource,
+      });
+    }
+    await apiFetch('/api/push/subscribe', {
+      method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ subscription: subscription.toJSON(), userAgent: navigator.userAgent }),
+    });
+    window.dispatchEvent(new Event('cs:push-changed'));
+  } catch {
+    ensuredAt = 0; // try again next time
+  }
+}
+
 export function usePushNotifications() {
   const [permission, setPermission] = useState<PushPermissionState>('default');
   const [isSubscribed, setIsSubscribed] = useState(false);
@@ -40,11 +84,16 @@ export function usePushNotifications() {
       setPermission('unsupported');
       return;
     }
-    setPermission(Notification.permission as PushPermissionState);
-    navigator.serviceWorker.ready.then(async (registration) => {
-      const existing = await registration.pushManager.getSubscription();
-      setIsSubscribed(!!existing);
-    }).catch(() => {});
+    const read = () => {
+      setPermission(Notification.permission as PushPermissionState);
+      navigator.serviceWorker.ready.then(async (registration) => {
+        const existing = await registration.pushManager.getSubscription();
+        setIsSubscribed(!!existing);
+      }).catch(() => {});
+    };
+    read();
+    window.addEventListener('cs:push-changed', read);
+    return () => window.removeEventListener('cs:push-changed', read);
   }, [supported]);
 
   const subscribe = useCallback(async () => {
@@ -62,7 +111,7 @@ export function usePushNotifications() {
         try { sessionStorage.setItem('cs_push_wanted', '1'); } catch { /* ignore */ }
         return false;
       }
-      try { sessionStorage.removeItem('cs_push_wanted'); } catch { /* ignore */ }
+      try { sessionStorage.removeItem('cs_push_wanted'); localStorage.removeItem(OFF_KEY); } catch { /* ignore */ }
 
       const keyRes = await apiFetch('/api/push/vapid-public-key');
       if (!keyRes.ok) {
@@ -133,6 +182,7 @@ export function usePushNotifications() {
         await subscription.unsubscribe();
       }
       setIsSubscribed(false);
+      try { localStorage.setItem(OFF_KEY, '1'); } catch { /* ignore */ }
     } catch {
       setError('Something went wrong while unsubscribing.');
     } finally {

@@ -57,6 +57,24 @@ self.addEventListener('push', (event) => {
   })());
 });
 
+// The push service replaced this device's subscription (token refresh, etc.):
+// subscribe again with the same key and tell the server which one it replaces,
+// so notifications keep arriving without the person turning them on again.
+self.addEventListener('pushsubscriptionchange', (event) => {
+  event.waitUntil((async () => {
+    try {
+      const old = event.oldSubscription;
+      const key = old && old.options && old.options.applicationServerKey;
+      const fresh = event.newSubscription || (key ? await self.registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key }) : null);
+      if (!fresh || !old) return;
+      await fetch('/push-rotate', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ oldEndpoint: old.endpoint, subscription: fresh.toJSON() }),
+      });
+    } catch (e) { /* the app re-checks its subscription next time it opens */ }
+  })());
+});
+
 // Clicking the notification focuses an existing ChessScout tab if one is
 // open (rather than always opening a new one), falling back to opening
 // data.url in a new tab.

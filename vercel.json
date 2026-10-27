@@ -22,6 +22,10 @@
   ],
   "rewrites": [
     {
+      "source": "/push-rotate",
+      "destination": "https://chesscoach-api-kbf8.onrender.com/api/push/rotate"
+    },
+    {
       "source": "/t/:path*",
       "destination": "https://chesscoach-api-kbf8.onrender.com/api/t/:path*"
     },

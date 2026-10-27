@@ -66,6 +66,25 @@ router.post("/push/subscribe", async (req: Request, res: Response) => {
   }
 });
 
+// From the service worker when the push service rotates a device's
+// subscription: swap the old endpoint for the new one (same person). Knowing
+// the old endpoint (an unguessable URL only this device had) is the proof.
+router.post("/push/rotate", async (req: Request, res: Response) => {
+  try {
+    const { oldEndpoint, subscription } = req.body as { oldEndpoint?: string; subscription?: { endpoint?: string; keys?: { p256dh?: string; auth?: string } } };
+    const endpoint = subscription?.endpoint, p256dh = subscription?.keys?.p256dh, auth = subscription?.keys?.auth;
+    if (!oldEndpoint || !endpoint || !p256dh || !auth) { res.status(400).json({ error: "Invalid" }); return; }
+    const [old] = await db.select().from(pushSubscriptionsTable).where(eq(pushSubscriptionsTable.endpoint, oldEndpoint));
+    if (!old) { res.json({ success: false }); return; }
+    const [taken] = await db.select().from(pushSubscriptionsTable).where(eq(pushSubscriptionsTable.endpoint, endpoint));
+    if (taken) await db.delete(pushSubscriptionsTable).where(eq(pushSubscriptionsTable.id, old.id));
+    else await db.update(pushSubscriptionsTable).set({ endpoint, p256dh, auth }).where(eq(pushSubscriptionsTable.id, old.id));
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed", details: err.cause?.message ?? err.message });
+  }
+});
+
 router.post("/push/unsubscribe", async (req: Request, res: Response) => {
   if (!req.isAuthenticated()) {
     res.status(401).json({ error: "Must be signed in" });
