@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { apiFetch } from '@/lib/api';
+import { isInPlayApp } from '@/lib/playApp';
 
 // Converts the VAPID public key (base64url, no padding -- the format
 // generated for this project and returned by /api/push/vapid-public-key)
@@ -27,6 +28,12 @@ export function usePushNotifications() {
   const [error, setError] = useState('');
 
   const supported = typeof window !== 'undefined' && 'serviceWorker' in navigator && 'PushManager' in window;
+  // In the Google Play app, notifications belong to the app (Android's own switch for
+  // ChessScout), not to a browser site setting.
+  const inApp = typeof window !== 'undefined' && isInPlayApp();
+  const blockedHelp = inApp
+    ? 'Notifications are off for the ChessScout app. Open Android Settings › Apps › ChessScout › Notifications (or long-press the ChessScout icon › App info › Notifications), turn them on, then come back here.'
+    : 'Notifications are blocked for chessscout.net. Allow them in your browser\'s site settings (the icon left of the address bar), then tap again.';
 
   useEffect(() => {
     if (!supported) {
@@ -51,9 +58,11 @@ export function usePushNotifications() {
       const perm = await Notification.requestPermission();
       setPermission(perm as PushPermissionState);
       if (perm !== 'granted') {
-        setError('Notification permission was not granted.');
+        setError(perm === 'denied' ? blockedHelp : 'Notification permission was not granted.');
+        try { sessionStorage.setItem('cs_push_wanted', '1'); } catch { /* ignore */ }
         return false;
       }
+      try { sessionStorage.removeItem('cs_push_wanted'); } catch { /* ignore */ }
 
       const keyRes = await apiFetch('/api/push/vapid-public-key');
       if (!keyRes.ok) {
@@ -89,7 +98,24 @@ export function usePushNotifications() {
     } finally {
       setLoading(false);
     }
-  }, [supported]);
+  }, [supported, blockedHelp]);
+
+  // Coming back from Android / browser settings: pick up the new permission, and finish
+  // turning notifications on if that's what the person was trying to do.
+  useEffect(() => {
+    if (!supported) return;
+    const onShow = () => {
+      if (document.visibilityState !== 'visible') return;
+      const p = Notification.permission as PushPermissionState;
+      setPermission(p);
+      let wanted = false;
+      try { wanted = sessionStorage.getItem('cs_push_wanted') === '1'; } catch { /* ignore */ }
+      if (p === 'granted') { setError(''); if (wanted) { try { sessionStorage.removeItem('cs_push_wanted'); } catch { /* ignore */ } void subscribe(); } }
+    };
+    document.addEventListener('visibilitychange', onShow);
+    window.addEventListener('focus', onShow);
+    return () => { document.removeEventListener('visibilitychange', onShow); window.removeEventListener('focus', onShow); };
+  }, [supported, subscribe]);
 
   const unsubscribe = useCallback(async () => {
     if (!supported) return;
@@ -114,5 +140,5 @@ export function usePushNotifications() {
     }
   }, [supported]);
 
-  return { permission, isSubscribed, loading, error, supported, subscribe, unsubscribe };
+  return { permission, isSubscribed, loading, error, supported, inApp, subscribe, unsubscribe };
 }

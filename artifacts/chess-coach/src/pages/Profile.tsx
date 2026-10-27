@@ -1934,7 +1934,7 @@ function ProfileClassic() {
                 {!push.supported ? 'Not supported in this browser'
                   : push.loading ? 'Working…'
                   : push.isSubscribed ? 'On — tap to turn off'
-                  : push.permission === 'denied' ? 'Blocked — enable in browser settings'
+                  : push.permission === 'denied' ? (push.inApp ? 'Off for this app — tap for how to turn on' : 'Blocked — enable in browser settings')
                   : 'Off — tap to turn on'}
               </p>
             </div>
@@ -2186,7 +2186,7 @@ function ProfileRedesign() {
                 {!push.supported ? 'Not supported in this browser'
                   : push.loading ? 'Working…'
                   : push.isSubscribed ? 'On — tap to turn off'
-                  : push.permission === 'denied' ? 'Blocked — enable in browser settings'
+                  : push.permission === 'denied' ? (push.inApp ? 'Off for this app — tap for how to turn on' : 'Blocked — enable in browser settings')
                   : 'Off — tap to turn on'}
               </span>
             </span>
