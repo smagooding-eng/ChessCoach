@@ -91,6 +91,19 @@ jobs:
       - name: Generate the Android project
         run: cd android && bubblewrap update --skipVersionUpgrade --manifest=./twa-manifest.json
 
+      # Shows how notifications are wired in the generated app, on the run page.
+      - name: Show notification setup
+        run: |
+          cd android
+          M=app/src/main/AndroidManifest.xml
+          for pat in POST_NOTIFICATIONS DelegationService TRUSTED_WEB_ACTIVITY_SERVICE PermissionRequestActivity NotificationPermissionRequestActivity SMALL_ICON targetSdkVersion; do
+            n=$(grep -c "$pat" "$M" app/build.gradle 2>/dev/null | awk -F: '{s+=$2} END {print s+0}')
+            echo "::notice title=$pat::$n match(es)"
+          done
+          grep -h "androidbrowserhelper\|targetSdkVersion\|compileSdkVersion" app/build.gradle | sed 's/^ *//' | while read -r l; do echo "::notice title=gradle::$l"; done
+          grep -n "service\|activity android:name\|uses-permission" "$M" | sed 's/^ *//' | head -30 | while read -r l; do echo "::notice title=manifest::$l"; done
+          ls app/src/main/java/*/*/*/ 2>/dev/null | head -20 | while read -r l; do echo "::notice title=java::$l"; done
+
       # Gradle builds the project Bubblewrap generated, then the SDK's own
       # zipalign/apksigner and the JDK's jarsigner sign it. (bubblewrap build
       # stops on interactive checks on a CI runner.)
