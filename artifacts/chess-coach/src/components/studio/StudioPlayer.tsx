@@ -1253,7 +1253,8 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
             {/* Countdown */}
             <AnimatePresence>
               {frame?.kind === 'countdown' && (
-                <motion.div key={frame.n} initial={{ scale: 0.4, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 1.6, opacity: 0 }} transition={{ duration: 0.35 }}
+                // One overlay for the whole countdown: it stays put and the number ticks down in place (no pop per second).
+                <motion.div key={`cd-${frame.anchor ?? 'key'}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }}
                   className="absolute inset-x-0 top-[6%] z-20 flex h-[15%] flex-col items-center justify-center px-[5%]">
                   <div className="flex items-center justify-center gap-[2.2cqh]">
                     <div style={{ fontSize: 'clamp(36px,7.6cqh,82px)' }}><CountdownRing n={frame.n} seconds={dur(frame) / 1000} color={frame.n === 1 ? '#F0605D' : frame.n === 2 ? '#E8B447' : '#81B64C'} /></div>
