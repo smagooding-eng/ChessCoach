@@ -1,9 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Chess } from 'chess.js';
-import { X, Play, Pause, RotateCcw, ChevronLeft, ChevronRight, Shuffle, Video, Square, Eye, EyeOff, FlipVertical2, Trash2, Copy, SkipForward, SkipBack } from 'lucide-react';
+import { X, Play, Pause, RotateCcw, ChevronLeft, ChevronRight, Shuffle, Video, Square, Eye, EyeOff, FlipVertical2, Trash2, Copy, SkipForward, SkipBack, Mic, Image as ImageIcon } from 'lucide-react';
 import { ChessBoard, type MoveQuality } from '@/components/ChessBoard';
-import { LookOverride, randomLook, lookLabel, playMoveSound, type BoardLook } from '@/context/SettingsContext';
+import { LookOverride, randomLook, lookLabel, playMoveSound, BOARD_THEMES, type BoardLook } from '@/context/SettingsContext';
 import { apiFetch } from '@/lib/api';
 import { normalizeFen } from '@/lib/utils';
 
@@ -41,6 +41,8 @@ type Frame =
   | { kind: 'countdown'; n: number; fen: string; last: { from: string; to: string } | null }
   | { kind: 'better'; fen: string; last: { from: string; to: string } | null; arrow: { from: string; to: string } | null; text: string }
   | { kind: 'reveal'; fen: string }
+  | { kind: 'split'; played: { fen: string; last: { from: string; to: string } }; better: { fen: string; last: { from: string; to: string } }; playedSan: string; betterSan: string }
+  | { kind: 'title'; fen: string }
   | { kind: 'outro'; fen: string };
 
 const LABEL: Record<string, { text: string; color: string; glyph: string }> = {
@@ -70,6 +72,7 @@ const DEFAULT_PREFS = {
   before: 8, after: 5, speed: 1.2, guess: true, remix: true, captions: true, effects: true, arrow: true, sound: true, watermark: true,
   bg: 'green', betterLine: true, guessRating: false, outro: true, progress: true, intro: true, safeArea: true, showNames: false,
   handle: '@chessscout.net3', outroLine: 'Review your games free',
+  split: true, voice: false, voiceName: 'onyx', compTitle: 'Top moments this week',
 };
 type Prefs = typeof DEFAULT_PREFS;
 function loadPrefs(): Prefs {
@@ -151,6 +154,73 @@ function hashtagsFor(clip: Clip): string {
   return [...t].join(' ');
 }
 
+const PIECE_WORD: Record<string, string> = { K: 'King', Q: 'Queen', R: 'Rook', B: 'Bishop', N: 'Knight' };
+/** "Nxe5+" -> "Knight takes e5, check". */
+function spokenSan(san: string): string {
+  if (san.startsWith('O-O-O')) return 'castles queenside';
+  if (san.startsWith('O-O')) return 'castles';
+  const m = san.match(/^([KQRBN])?([a-h])?([1-8])?(x)?([a-h][1-8])(=([QRBN]))?([+#])?/);
+  if (!m) return san;
+  const piece = m[1] ? PIECE_WORD[m[1]] : m[4] && m[2] ? `${m[2]} pawn` : 'Pawn';
+  let out = `${piece} ${m[4] ? 'takes ' : 'to '}${m[5]}`;
+  if (m[7]) out += `, promotes to a ${PIECE_WORD[m[7]].toLowerCase()}`;
+  if (m[8] === '#') out += ', checkmate!'; else if (m[8] === '+') out += ', check';
+  return out;
+}
+const stripEmoji = (t: string) => t.replace(/[\u{1F000}-\u{1FFFF}\u{2600}-\u{27BF}\u{FE0F}]/gu, '').replace(/\s+/g, ' ').trim();
+
+/** A 1080×1920 cover image (board drawn with piece glyphs) for the post's thumbnail. */
+function drawCover(opts: { fen: string; flipped: boolean; hook: string; sub: string; bg: string; badge: { text: string; color: string } | null; colors: { light: string; dark: string } }): string {
+  const W = 1080, H = 1920;
+  const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+  const ctx = cv.getContext('2d')!;
+  const g = ctx.createLinearGradient(0, 0, 0, H);
+  const BG: Record<string, [string, string]> = { green: ['#2E4A1E', '#070B06'], dark: ['#0B1112', '#0B1112'], purple: ['#2A1446', '#0F0A1F'], sunset: ['#4A1E14', '#1A0B10'], ocean: ['#0F3B57', '#06131D'], gold: ['#5A4410', '#0B0903'], screen: ['#00FF00', '#00FF00'] };
+  const [a, b] = BG[opts.bg] ?? BG.green;
+  g.addColorStop(0, a); g.addColorStop(1, b); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  ctx.textAlign = 'center'; ctx.fillStyle = '#fff';
+  ctx.font = '900 92px system-ui, -apple-system, Segoe UI, sans-serif';
+  const words = opts.hook.split(' '); const lines: string[] = []; let cur = '';
+  for (const w of words) { const t = cur ? `${cur} ${w}` : w; if (ctx.measureText(t).width > W - 140 && cur) { lines.push(cur); cur = w; } else cur = t; }
+  if (cur) lines.push(cur);
+  lines.slice(0, 3).forEach((l, k) => { ctx.shadowColor = 'rgba(0,0,0,.6)'; ctx.shadowBlur = 24; ctx.fillText(l, W / 2, 230 + k * 104); });
+  ctx.shadowBlur = 0;
+  if (opts.sub) { ctx.font = '700 44px system-ui, sans-serif'; ctx.fillStyle = 'rgba(255,255,255,.75)'; ctx.fillText(opts.sub.slice(0, 48), W / 2, 230 + Math.min(3, lines.length) * 104 + 20); }
+  const size = 960, x0 = 60, y0 = 640, sq = size / 8;
+  const rows = opts.fen.split(' ')[0].split('/');
+  const GL: Record<string, string> = { k: '♚', q: '♛', r: '♜', b: '♝', n: '♞', p: '♟', K: '♚', Q: '♛', R: '♜', B: '♝', N: '♞', P: '♟' };
+  for (let r = 0; r < 8; r++) for (let f = 0; f < 8; f++) {
+    ctx.fillStyle = (r + f) % 2 === 0 ? opts.colors.light : opts.colors.dark;
+    ctx.fillRect(x0 + f * sq, y0 + r * sq, sq, sq);
+  }
+  ctx.textBaseline = 'middle';
+  rows.forEach((row, ri) => {
+    let fi = 0;
+    for (const ch of row) {
+      if (/\d/.test(ch)) { fi += Number(ch); continue; }
+      const r = opts.flipped ? 7 - ri : ri, f = opts.flipped ? 7 - fi : fi;
+      const white = ch === ch.toUpperCase();
+      ctx.font = `${sq * 0.86}px "Segoe UI Symbol", "Noto Sans Symbols 2", "DejaVu Sans", serif`;
+      ctx.lineWidth = 6; ctx.strokeStyle = white ? '#1a1a1a' : '#f5f5f5';
+      ctx.strokeText(GL[ch], x0 + f * sq + sq / 2, y0 + r * sq + sq / 2 + 4);
+      ctx.fillStyle = white ? '#FAFAFA' : '#151515';
+      ctx.fillText(GL[ch], x0 + f * sq + sq / 2, y0 + r * sq + sq / 2 + 4);
+      fi++;
+    }
+  });
+  if (opts.badge) {
+    ctx.font = '900 84px system-ui, sans-serif';
+    const tw = ctx.measureText(opts.badge.text).width + 80;
+    ctx.save(); ctx.translate(W / 2, y0 + size / 2); ctx.rotate(-0.07);
+    ctx.fillStyle = opts.badge.color; ctx.strokeStyle = '#fff'; ctx.lineWidth = 10;
+    ctx.beginPath(); (ctx as CanvasRenderingContext2D & { roundRect: (x: number, y: number, w: number, h: number, r: number) => void }).roundRect(-tw / 2, -70, tw, 140, 28); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#fff'; ctx.textBaseline = 'middle'; ctx.fillText(opts.badge.text, 0, 6); ctx.restore();
+  }
+  ctx.textBaseline = 'alphabetic'; ctx.font = '900 46px system-ui, sans-serif'; ctx.fillStyle = 'rgba(255,255,255,.8)';
+  ctx.fillText('chessscout.net', W / 2, H - 90);
+  return cv.toDataURL('image/png');
+}
+
 function Confetti({ fire }: { fire: number }) {
   const ref = useRef<HTMLCanvasElement | null>(null);
   useEffect(() => {
@@ -172,18 +242,31 @@ function Confetti({ fire }: { fire: number }) {
   return <canvas ref={ref} className="pointer-events-none absolute inset-0 z-30 h-full w-full" />;
 }
 
-export function StudioPlayer({ source, onClose, onNext, onPrev }: { source: StudioSource; onClose: () => void; onNext?: () => void; onPrev?: () => void }) {
+export function StudioPlayer({ source, queue, onClose, onNext, onPrev }: {
+  source: StudioSource;
+  /** A compilation: these clips play back to back (one recording), with a title card first and the end card last. */
+  queue?: StudioSource[];
+  onClose: () => void; onNext?: () => void; onPrev?: () => void;
+}) {
+  const isComp = !!queue && queue.length > 1;
+  const [q, setQ] = useState(0);
+  const current = isComp ? queue![q] : source;
+  // Which queue slot the loaded clip belongs to (it changes only once that clip has loaded).
+  const [clipQ, setClipQ] = useState(0);
+  const isFirst = !isComp || clipQ === 0, isLast = !isComp || clipQ === queue!.length - 1;
+  const autoNext = useRef(false);
   // ── Load the clip ───────────────────────────────────────────────────────
   const [clip, setClip] = useState<Clip | null>(null);
   const [err, setErr] = useState<string | null>(null);
   useEffect(() => {
-    setClip(null); setErr(null);
-    if (source.kind === 'trap') { setClip(trapClip(source.trap)); return; }
-    const m = source.moment;
+    setErr(null);
+    const slot = q;
+    if (current.kind === 'trap') { setClip(trapClip(current.trap)); setClipQ(slot); return; }
+    const m = current.moment;
     apiFetch(`/api/admin/studio/game/${m.gameId}`, { credentials: 'include' })
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error('Game not found'))))
-      .then((g: StudioGame) => setClip(gameClip(g, m))).catch((e) => setErr(String(e?.message ?? e)));
-  }, [source]);
+      .then((g: StudioGame) => { setClip(gameClip(g, m)); setClipQ(slot); }).catch((e) => setErr(String(e?.message ?? e)));
+  }, [current]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Settings (remembered between clips) ─────────────────────────────────
   const [prefs, setPrefs] = useState<Prefs>(loadPrefs);
@@ -195,9 +278,9 @@ export function StudioPlayer({ source, onClose, onNext, onPrev }: { source: Stud
   const [clean, setClean] = useState(false);
   useEffect(() => {
     if (!clip) return;
-    setHook(clip.hook); setSub(clip.sub);
+    setHook(isComp ? `#${queue!.length - clipQ} · ${stripEmoji(clip.hook)}` : clip.hook); setSub(clip.sub);
     setFlipped(clip.plies[clip.key]?.color === 'b');
-  }, [clip]);
+  }, [clip, clipQ]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── The script ──────────────────────────────────────────────────────────
   const frames = useMemo<Frame[]>(() => {
@@ -209,6 +292,7 @@ export function StudioPlayer({ source, onClose, onNext, onPrev }: { source: Stud
     const fenAt = (p: number) => (p <= 0 ? plies[0].fenBefore : plies[p - 1].fen);
     const lastAt = (p: number) => (p <= 0 ? null : { from: plies[p - 1].from, to: plies[p - 1].to });
     const out: Frame[] = [];
+    if (isComp && isFirst) out.push({ kind: 'title', fen: fenAt(startPly) });
     if (prefs.intro) out.push({ kind: 'intro', fen: fenAt(startPly) });
     else out.push({ kind: 'move', ply: startPly });
     for (let p = startPly + 1; p < keyPly; p++) out.push({ kind: 'move', ply: p });
@@ -216,6 +300,13 @@ export function StudioPlayer({ source, onClose, onNext, onPrev }: { source: Stud
     out.push({ kind: 'move', ply: keyPly });
     // The engine's better line after a mistake.
     const kr = plies[key]?.review;
+    // Side by side: the move played and the better move.
+    if (prefs.split && kr?.classification && BAD.has(kr.classification) && kr.betterMove) {
+      try {
+        const c = new Chess(plies[key].fenBefore); const bm = c.move(kr.betterMove);
+        if (bm) out.push({ kind: 'split', played: { fen: plies[key].fen, last: { from: plies[key].from, to: plies[key].to } }, better: { fen: c.fen(), last: { from: bm.from, to: bm.to } }, playedSan: plies[key].san, betterSan: bm.san });
+      } catch { /* skip */ }
+    }
     if (prefs.betterLine && kr?.classification && BAD.has(kr.classification)) {
       const line = kr.bestLineSan?.length ? kr.bestLineSan : kr.betterMove ? [kr.betterMove] : [];
       if (line.length) {
@@ -233,17 +324,25 @@ export function StudioPlayer({ source, onClose, onNext, onPrev }: { source: Stud
     for (let p = keyPly + 1; p <= endPly; p++) out.push({ kind: 'move', ply: p });
     const lastFen = fenAt(endPly);
     if (prefs.guessRating && !clip.isTrap && (clip.ratings.w || clip.ratings.b)) out.push({ kind: 'reveal', fen: lastFen });
-    if (prefs.outro) out.push({ kind: 'outro', fen: lastFen });
+    if (prefs.outro && isLast) out.push({ kind: 'outro', fen: lastFen });
     return out;
-  }, [clip, prefs.before, prefs.after, prefs.intro, prefs.guess, prefs.betterLine, prefs.guessRating, prefs.outro]);
+  }, [clip, prefs.before, prefs.after, prefs.intro, prefs.guess, prefs.betterLine, prefs.guessRating, prefs.outro, prefs.split, isComp, isFirst, isLast]);
 
   const dur = (f: Frame) => {
+    const base = baseDur(f);
+    const said = prefs.voice ? narration(f) : null;
+    const len = said ? voiceLen.current.get(said) : undefined;
+    return len ? Math.max(base, len * 1000 + 300) : base;
+  };
+  const baseDur = (f: Frame) => {
     const s = prefs.speed * 1000;
     switch (f.kind) {
       case 'intro': return 1600;
       case 'countdown': return 1000;
       case 'better': return Math.max(s, 1300);
       case 'reveal': return 2400;
+      case 'split': return 3200;
+      case 'title': return 2200;
       case 'outro': return 2800;
       default: return clip && f.ply === clip.key + 1 ? Math.max(s, 2400) : s;
     }
@@ -255,7 +354,7 @@ export function StudioPlayer({ source, onClose, onNext, onPrev }: { source: Stud
   const [confetti, setConfetti] = useState(0);
   const [shake, setShake] = useState(0);
   const looks = useRef(new Map<number, BoardLook>());
-  useEffect(() => { setI(0); setPlaying(false); looks.current.clear(); }, [frames]);
+  useEffect(() => { setI(0); looks.current.clear(); if (autoNext.current) { autoNext.current = false; setPlaying(true); } else setPlaying(false); }, [frames]);
 
   const frame: Frame | undefined = frames[i];
   const plies = clip?.plies ?? [];
@@ -267,6 +366,7 @@ export function StudioPlayer({ source, onClose, onNext, onPrev }: { source: Stud
       const p = frame.ply; const m = p > 0 ? plies[p - 1] : null;
       return { fen: m ? m.fen : plies[0].fenBefore, last: m ? { from: m.from, to: m.to } : null, ply: p, move: m };
     }
+    if (frame.kind === 'split') return { fen: frame.played.fen, last: frame.played.last, ply: -3, move: null as Ply | null };
     const fen = frame.fen;
     const last = frame.kind === 'countdown' || frame.kind === 'better' ? frame.last : null;
     const ply = frame.kind === 'countdown' ? keyPly - 1 : frame.kind === 'intro' ? -1 : -2;
@@ -299,12 +399,72 @@ export function StudioPlayer({ source, onClose, onNext, onPrev }: { source: Stud
 
   useEffect(() => {
     if (!playing || !frame) return;
-    if (i >= frames.length - 1) { const t = setTimeout(() => setPlaying(false), dur(frame)); return () => clearTimeout(t); }
+    if (i >= frames.length - 1) {
+      const t = setTimeout(() => {
+        if (isComp && !isLast) { autoNext.current = true; setQ((x) => x + 1); } else setPlaying(false);
+      }, dur(frame));
+      return () => clearTimeout(t);
+    }
     const t = setTimeout(() => setI((x) => x + 1), dur(frame));
     return () => clearTimeout(t);
   }, [playing, i, frames.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const restart = () => { looks.current.clear(); setI(0); setPlaying(true); };
+  // ── Voiceover: the coach voice reads the hook, the key move and the end card ─
+  const voiceLen = useRef(new Map<string, number>());
+  const voiceUrl = useRef(new Map<string, string>());
+  const [voiceNote, setVoiceNote] = useState<string | null>(null);
+  const [, setVoiceTick] = useState(0);
+  const narration = (f: Frame | undefined): string | null => {
+    if (!f || !clip) return null;
+    switch (f.kind) {
+      case 'title': return stripEmoji(prefs.compTitle);
+      case 'intro': return stripEmoji(hook.replace(/^#\d+ · /, ''));
+      case 'countdown': return f.n === 3 ? (clip.isTrap ? 'Can you spot the winning move?' : 'Can you find the move?') : null;
+      case 'move': {
+        if (f.ply !== clip.key + 1) return null;
+        const m = clip.plies[clip.key]; const c = m.san.includes('#') ? 'checkmate' : m.review?.classification;
+        const word = c && LABEL[c] && c !== 'checkmate' ? `${LABEL[c].text.toLowerCase()}! ` : '';
+        const cap = prefs.captions && m.review?.explanation ? ` ${m.review.explanation}` : '';
+        return `${word}${spokenSan(m.san)}.${cap}`.slice(0, 400);
+      }
+      case 'split': return `${spokenSan(f.playedSan)} was played. ${spokenSan(f.betterSan)} was better.`;
+      case 'better': return f.arrow ? `Better was ${spokenSan(f.text.replace(/^Better was /, ''))}.` : null;
+      case 'reveal': return clip.ratings.w && clip.ratings.b ? `They were rated ${clip.ratings.w} and ${clip.ratings.b}.` : null;
+      case 'outro': return `${stripEmoji(prefs.outroLine)}. Follow for more.`;
+      default: return null;
+    }
+  };
+  // Fetch every line of the script once, ahead of playback.
+  useEffect(() => {
+    if (!prefs.voice || !frames.length) return;
+    let live = true;
+    const lines = [...new Set(frames.map(narration).filter((x): x is string => !!x))];
+    Promise.all(lines.filter((t) => !voiceUrl.current.has(t)).map(async (t) => {
+      const r = await apiFetch('/api/tts/speak', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: t, voice: prefs.voiceName }) });
+      if (!r.ok) throw new Error('tts');
+      const url = URL.createObjectURL(await r.blob());
+      voiceUrl.current.set(t, url);
+      await new Promise<void>((res) => { const a = new Audio(url); a.onloadedmetadata = () => { voiceLen.current.set(t, a.duration || 0); res(); }; a.onerror = () => res(); });
+    })).then(() => { if (live) { setVoiceNote(null); setVoiceTick((x) => x + 1); } })
+      .catch(() => { if (live) setVoiceNote("The coach voice isn't available right now (it uses OpenAI). Previews use your browser's voice, which won't be in the recording."); });
+    return () => { live = false; };
+  }, [prefs.voice, prefs.voiceName, frames, hook, prefs.outroLine, prefs.compTitle, prefs.captions]); // eslint-disable-line react-hooks/exhaustive-deps
+  const voiceAudio = useRef<HTMLAudioElement | null>(null);
+  useEffect(() => {
+    if (!prefs.voice || !playing) return;
+    const said = narration(frame);
+    if (!said) return;
+    voiceAudio.current?.pause();
+    const url = voiceUrl.current.get(said);
+    if (url) { const a = new Audio(url); voiceAudio.current = a; a.play().catch(() => {}); }
+    else if ('speechSynthesis' in window) { window.speechSynthesis.cancel(); window.speechSynthesis.speak(new SpeechSynthesisUtterance(said)); }
+  }, [i, playing]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const restart = () => {
+    looks.current.clear();
+    if (isComp && q !== 0) { autoNext.current = true; setQ(0); return; }
+    setI(0); setPlaying(true);
+  };
 
   // ── Stickers ────────────────────────────────────────────────────────────
   const [stickers, setStickers] = useState<Sticker[]>([]);
@@ -362,7 +522,7 @@ export function StudioPlayer({ source, onClose, onNext, onPrev }: { source: Stud
   };
   // Stop a recording when the clip ends.
   useEffect(() => {
-    if (!recording || playing || i < frames.length - 1) return;
+    if (!recording || playing || i < frames.length - 1 || !isLast) return;
     const t = setTimeout(() => recRef.current?.state === 'recording' && recRef.current.stop(), 400);
     return () => clearTimeout(t);
   }, [recording, playing, i, frames.length]);
@@ -382,6 +542,26 @@ export function StudioPlayer({ source, onClose, onNext, onPrev }: { source: Stud
     window.addEventListener('keydown', h);
     return () => window.removeEventListener('keydown', h);
   }, [clean, onClose, onNext, onPrev, frames.length, selected]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Presets ─────────────────────────────────────────────────────────────
+  const PRESETS: { label: string; v: Partial<Prefs> }[] = [
+    { label: 'Find the move', v: { before: 6, after: 3, speed: 1.1, guess: true, betterLine: true, split: false, intro: true, captions: true } },
+    { label: 'Blunder fail', v: { before: 5, after: 2, speed: 1.0, guess: false, betterLine: true, split: true, effects: true, intro: true } },
+    { label: 'Trap tutorial', v: { before: 30, after: 4, speed: 1.6, guess: true, captions: true, betterLine: false, split: false, intro: true } },
+    { label: 'Speedrun', v: { before: 400, after: 400, speed: 0.35, guess: false, captions: false, betterLine: false, split: false, intro: true } },
+    { label: 'Guess the rating', v: { before: 10, after: 6, speed: 0.9, guess: false, guessRating: true, captions: false } },
+  ];
+  const applyPreset = (v: Partial<Prefs>) => setPrefs((p) => { const n = { ...p, ...v }; try { localStorage.setItem(PREF_KEY, JSON.stringify(n)); } catch { /* ignore */ } return n; });
+  const saveCover = () => {
+    if (!clip) return;
+    const kp = clip.plies[clip.key];
+    const c = kp ? (kp.san.includes('#') ? 'checkmate' : kp.review?.classification) : null;
+    // The position before the key move (the puzzle), unless it's a trap lesson's final position.
+    const fen = kp ? kp.fenBefore : clip.plies[0]?.fenBefore;
+    const colors = look ? (BOARD_THEMES[look.boardTheme] ?? { light: '#EEEED2', dark: '#769656' }) : { light: '#EEEED2', dark: '#769656' };
+    const url = drawCover({ fen, flipped, hook: stripEmoji(hook) || hook, sub, bg: prefs.bg, badge: prefs.guess ? { text: '?? FIND IT', color: '#81B64C' } : c && LABEL[c] ? { text: `${LABEL[c].glyph} ${LABEL[c].text}`, color: LABEL[c].color } : null, colors });
+    const a = document.createElement('a'); a.href = url; a.download = `${clip.fileBase}-cover.png`; a.click();
+  };
 
   // ── Post kit ────────────────────────────────────────────────────────────
   const postText = clip ? `${hook}\n\n${clip.isTrap ? 'Would you fall for it? 👇' : 'Would you have found it? Comment your move 👇'}\nReview your own games free at chessscout.net\n\n${hashtagsFor(clip)}` : '';
@@ -442,8 +622,21 @@ export function StudioPlayer({ source, onClose, onNext, onPrev }: { source: Stud
               <p className="mb-1 truncate text-[clamp(11px,1.6cqh,16px)] font-bold text-white/85">{name(top)}</p>
               <motion.div animate={prefs.effects && isKey ? { scale: [1, 1.045, 1] } : { scale: 1 }} transition={{ duration: 0.6 }}>
                 <LookOverride look={look}>
-                  <ChessBoard fen={view.fen} flipped={flipped} lastMove={view.last} moveQuality={frame?.kind === 'move' ? ((cls as MoveQuality) ?? null) : null}
-                    arrows={arrows} maxWidthOverride="100%" animationMs={Math.min(450, prefs.speed * 300)} suppressConfirmMoves />
+                  {frame?.kind === 'split' ? (
+                    <div className="grid grid-cols-2 gap-[3%]">
+                      {([['Played', frame.played, frame.playedSan, '#CA3431'], ['Better', frame.better, frame.betterSan, '#81B64C']] as const).map(([t, b, san, col]) => (
+                        <motion.div key={t} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: t === 'Better' ? 0.5 : 0 }}>
+                          <p className="mb-1 text-center font-black" style={{ color: col, fontSize: 'clamp(12px,2.2cqh,22px)' }}>{t} · {figurine(san, b.fen.split(' ')[1] === 'b')}</p>
+                          <div className="rounded-md p-[3%]" style={{ background: col }}>
+                            <ChessBoard fen={b.fen} flipped={flipped} lastMove={b.last} maxWidthOverride="100%" animationMs={0} suppressConfirmMoves />
+                          </div>
+                        </motion.div>
+                      ))}
+                    </div>
+                  ) : (
+                    <ChessBoard fen={view.fen} flipped={flipped} lastMove={view.last} moveQuality={frame?.kind === 'move' ? ((cls as MoveQuality) ?? null) : null}
+                      arrows={arrows} maxWidthOverride="100%" animationMs={Math.min(450, prefs.speed * 300)} suppressConfirmMoves />
+                  )}
                 </LookOverride>
               </motion.div>
               <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-[#2B2B2B]"><div className="h-full rounded-full bg-[#F2F2F2] transition-all duration-500" style={{ width: `${evPct}%` }} /></div>
@@ -501,6 +694,17 @@ export function StudioPlayer({ source, onClose, onNext, onPrev }: { source: Stud
                   <p className="text-[clamp(13px,2.2cqh,22px)] font-bold text-white/80">Their ratings</p>
                   <p className="mt-1 font-black text-white" style={{ fontSize: 'clamp(22px,4.6cqh,48px)' }}>{clip.ratings.w ?? '?'} <span className="text-white/50">vs</span> {clip.ratings.b ?? '?'}</p>
                   <p className="mt-1 text-[clamp(12px,1.9cqh,19px)] font-bold text-[#B8E08C]">Did you guess right?</p>
+                </motion.div>
+              )}
+            </AnimatePresence>
+            {/* Compilation title */}
+            <AnimatePresence>
+              {frame?.kind === 'title' && (
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 z-30 grid place-items-center bg-black/70 backdrop-blur-sm">
+                  <motion.div initial={{ scale: 0.6, rotate: -4 }} animate={{ scale: 1, rotate: 0 }} transition={{ type: 'spring', stiffness: 260, damping: 14 }} className="px-[8%] text-center">
+                    <p className="font-black leading-[1.05] text-white" style={{ fontSize: 'clamp(28px,6.6cqh,66px)', textShadow: '0 4px 20px rgba(0,0,0,.6)' }}>{prefs.compTitle}</p>
+                    <p className="mt-3 inline-block rounded-full bg-[#81B64C] px-4 py-1 font-black text-white" style={{ fontSize: 'clamp(13px,2.2cqh,22px)' }}>{queue?.length} moments</p>
+                  </motion.div>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -563,7 +767,28 @@ export function StudioPlayer({ source, onClose, onNext, onPrev }: { source: Stud
               {recording ? <Square size={14} /> : <Video size={14} />}{recording ? 'Stop recording' : 'Record clip'}
             </button>
             <button onClick={() => setClean(true)} className={ctl}><EyeOff size={14} className="mr-1 inline" />Clean view</button>
+            <button onClick={saveCover} className={ctl} title="Download a cover image for the post"><ImageIcon size={14} className="mr-1 inline" />Cover image</button>
           </div>
+          {isComp && (
+            <div className="mb-3">
+              <label className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-white/50">Compilation title · clip {clipQ + 1} of {queue!.length}</label>
+              <input value={prefs.compTitle} onChange={(e) => set('compTitle', e.target.value)} className="w-full rounded-lg bg-white/5 px-3 py-2 text-[14px] font-bold text-white outline-none ring-1 ring-white/10 focus:ring-[#81B64C]" />
+            </div>
+          )}
+          <p className="mb-1 text-[11px] font-bold uppercase tracking-wide text-white/50">Presets</p>
+          <div className="mb-3 flex flex-wrap gap-1.5">
+            {PRESETS.map((p) => <button key={p.label} onClick={() => applyPreset(p.v)} className="rounded-full bg-[#2A3335] px-2.5 py-1 text-[12px] font-bold text-white hover:bg-[#34403F]">{p.label}</button>)}
+          </div>
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            {toggle('voice', 'Coach voiceover')}
+            {prefs.voice && (
+              <select value={prefs.voiceName} onChange={(e) => set('voiceName', e.target.value)} className="rounded-lg bg-white/5 px-2 py-1 text-[12px] text-white ring-1 ring-white/10">
+                {['onyx', 'nova', 'echo', 'fable', 'alloy', 'shimmer', 'coral', 'sage'].map((v) => <option key={v} value={v}>{v[0].toUpperCase() + v.slice(1)}</option>)}
+              </select>
+            )}
+            {prefs.voice && <Mic size={14} className="text-[#B8E08C]" />}
+          </div>
+          {prefs.voice && voiceNote && <p className="-mt-1 mb-3 text-[12px] text-[#E8B447]">{voiceNote}</p>}
           {recNote && <p className="mb-3 text-[12px] text-[#E8B447]">{recNote}</p>}
 
           <label className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-white/50">Hook</label>
@@ -582,6 +807,7 @@ export function StudioPlayer({ source, onClose, onNext, onPrev }: { source: Stud
             {toggle('intro', 'Hook intro')}
             {toggle('guess', 'Find-the-move countdown')}
             {toggle('betterLine', 'Show the better line')}
+            {toggle('split', 'Played vs better (side by side)')}
             {!clip.isTrap && toggle('guessRating', 'Guess the rating')}
             {toggle('outro', 'End card')}
           </div>

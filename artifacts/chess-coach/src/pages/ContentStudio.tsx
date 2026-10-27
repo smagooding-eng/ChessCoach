@@ -36,6 +36,14 @@ export function ContentStudio() {
   const [summary, setSummary] = useState<{ counts: Record<string, number>; progress: { scanned: number; reviewed: number; moments: number } } | null>(null);
   const [scanning, setScanning] = useState(false);
   const [open, setOpen] = useState<StudioSource | null>(null);
+  // Compilation: pick several moments (or traps) and play them back to back as one clip.
+  const [picking, setPicking] = useState(false);
+  const [picked, setPicked] = useState<StudioSource[]>([]);
+  const [comp, setComp] = useState<StudioSource[] | null>(null);
+  const keyOf = (x: StudioSource) => (x.kind === 'trap' ? `t${x.trap.id}` : `g${x.moment.gameId}-${x.moment.moveIndex}`);
+  const togglePick = (x: StudioSource) => setPicked((cur) => (cur.some((c) => keyOf(c) === keyOf(x)) ? cur.filter((c) => keyOf(c) !== keyOf(x)) : [...cur, x]));
+  const isPicked = (x: StudioSource) => picked.some((c) => keyOf(c) === keyOf(x));
+  const choose = (x: StudioSource) => (picking ? togglePick(x) : setOpen(x));
   const [view, setView] = useState<'moments' | 'traps'>('moments');
   const [since, setSince] = useState(0);
   const [traps, setTraps] = useState<StudioTrap[] | null>(null);
@@ -94,11 +102,18 @@ export function ContentStudio() {
         </button>
       </div>
 
-      <div className="mb-3 inline-flex rounded-xl bg-white/5 p-1">
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+      <button onClick={() => { setPicking((v) => !v); if (picking) setPicked([]); }} className="order-2 rounded-xl px-3.5 py-2 text-[13px] font-black"
+        style={{ background: picking ? '#E8B447' : 'rgba(255,255,255,.06)', color: picking ? '#1A1205' : '#C9CFCD' }}>
+        {picking ? 'Cancel compilation' : '🎬 Make a compilation'}
+      </button>
+      <div className="order-1 inline-flex rounded-xl bg-white/5 p-1">
         {([['moments', 'Game moments'], ['traps', 'Trap lessons']] as const).map(([k, t]) => (
           <button key={k} onClick={() => setView(k)} className="rounded-lg px-3.5 py-1.5 text-[13px] font-black" style={{ background: view === k ? '#81B64C' : 'transparent', color: view === k ? '#fff' : '#C9CFCD' }}>{t}</button>
         ))}
       </div>
+      </div>
+      {picking && <p className="mb-3 text-[12.5px] text-[#E8B447]">Tap moments or traps in the order you want them (they count down #{Math.max(picked.length, 1)} to #1), then play them as one clip.</p>}
 
       {view === 'traps' ? (
         !traps ? <Loader2 className="mx-auto mt-10 animate-spin text-white/60" /> : (
@@ -107,7 +122,9 @@ export function ContentStudio() {
               let fen = t.startingFen && t.startingFen !== 'startpos' ? t.startingFen : undefined;
               try { const c = fen ? new Chess(fen) : new Chess(); for (const san of t.moves) c.move(san); fen = c.fen(); } catch { /* show the start */ }
               return (
-                <button key={t.id} onClick={() => openAt(k)} className="overflow-hidden rounded-xl bg-white/5 text-left ring-1 ring-white/10 transition hover:ring-[#E8B447]">
+                <button key={t.id} onClick={() => (picking ? togglePick({ kind: 'trap', trap: t }) : openAt(k))} className="relative overflow-hidden rounded-xl bg-white/5 text-left ring-1 ring-white/10 transition hover:ring-[#E8B447]"
+                  style={isPicked({ kind: 'trap', trap: t }) ? { boxShadow: '0 0 0 3px #81B64C' } : undefined}>
+                  {isPicked({ kind: 'trap', trap: t }) && <span className="absolute right-2 top-2 z-10 grid h-7 w-7 place-items-center rounded-full bg-[#81B64C] text-[13px] font-black">{picked.findIndex((c) => keyOf(c) === `t${t.id}`) + 1}</span>}
                   <div className="aspect-square w-full"><MiniBoard fen={fen ?? new Chess().fen()} size={400} flipped={t.trapSide === 'black'} /></div>
                   <div className="p-2.5">
                     <p className="truncate text-[13.5px] font-black">{t.name}</p>
@@ -162,7 +179,9 @@ export function ContentStudio() {
               const white = m.moveIndex % 2 === 0;
               const no = `${Math.floor(m.moveIndex / 2) + 1}${white ? '.' : '...'}`;
               return (
-                <button key={m.id} onClick={() => setOpen({ kind: 'game', moment: m })} className="overflow-hidden rounded-xl bg-white/5 text-left ring-1 ring-white/10 transition hover:ring-[#81B64C]">
+                <button key={m.id} onClick={() => choose({ kind: 'game', moment: m })} className="relative overflow-hidden rounded-xl bg-white/5 text-left ring-1 ring-white/10 transition hover:ring-[#81B64C]"
+                  style={isPicked({ kind: 'game', moment: m }) ? { boxShadow: '0 0 0 3px #81B64C' } : undefined}>
+                  {isPicked({ kind: 'game', moment: m }) && <span className="absolute right-2 top-2 z-10 grid h-7 w-7 place-items-center rounded-full bg-[#81B64C] text-[13px] font-black">{picked.findIndex((c) => keyOf(c) === `g${m.gameId}-${m.moveIndex}`) + 1}</span>}
                   <div className="aspect-square w-full"><MiniBoard fen={afterFen(m.fenBefore, m.san)} size={400} flipped={!white} /></div>
                   <div className="p-2.5">
                     <p className="truncate text-[13.5px] font-black">{no}{m.san}{m.trapName ? <span className="font-bold text-[#E8B447]"> · {m.trapName}</span> : null}</p>
@@ -185,6 +204,14 @@ export function ContentStudio() {
         </>
       )}
       </>)}
+      {picking && picked.length > 0 && (
+        <div className="fixed inset-x-0 bottom-20 z-[70] mx-auto flex w-fit items-center gap-3 rounded-2xl bg-[#0B1112] px-4 py-3 shadow-2xl ring-1 ring-[#81B64C] md:bottom-6">
+          <span className="text-[13px] font-bold">{picked.length} picked</span>
+          <button onClick={() => setPicked([])} className="text-[12.5px] font-bold text-white/60">Clear</button>
+          <button onClick={() => setComp(picked)} className="rounded-lg bg-[#81B64C] px-3 py-1.5 text-[13px] font-black text-white">Play as one clip</button>
+        </div>
+      )}
+      {comp && <StudioPlayer source={comp[0]} queue={comp} onClose={() => setComp(null)} />}
       {open && (
         <StudioPlayer source={open} onClose={() => setOpen(null)}
           onNext={openIndex >= 0 ? () => openAt(openIndex + 1) : undefined}
