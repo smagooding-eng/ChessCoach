@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Chess } from 'chess.js';
-import { X, Play, Pause, RotateCcw, ChevronLeft, ChevronRight, Shuffle, Video, Square, Eye, EyeOff, FlipVertical2, Trash2, Copy, SkipForward, SkipBack, Mic, Image as ImageIcon, Music } from 'lucide-react';
+import { X, Play, Pause, RotateCcw, ChevronLeft, ChevronRight, Shuffle, Video, Square, Eye, EyeOff, FlipVertical2, Trash2, Copy, SkipForward, SkipBack, Mic, Image as ImageIcon, Music, ArrowUp, ArrowDown } from 'lucide-react';
 import { ChessBoard, type MoveQuality } from '@/components/ChessBoard';
 import { LookOverride, randomLook, lookLabel, playMoveSound, BOARD_THEMES, type BoardLook } from '@/context/SettingsContext';
 import { apiFetch } from '@/lib/api';
@@ -336,7 +336,12 @@ function Confetti({ fire }: { fire: number }) {
   return <canvas ref={ref} className="pointer-events-none absolute inset-0 z-30 h-full w-full" />;
 }
 
-export function StudioPlayer({ source, queue, title, onClose, onNext, onPrev }: {
+const srcKey = (x: StudioSource) => (x.kind === 'trap' ? `t${x.trap.id}` : x.kind === 'puzzle' ? `p${x.puzzle.id}` : x.kind === 'review' ? `r${x.review.id}` : `g${x.moment.gameId}-${x.moment.moveIndex}`);
+const srcLabel = (x: StudioSource) => (x.kind === 'trap' ? x.trap.name : x.kind === 'puzzle' ? `Puzzle · ${x.puzzle.rating}${x.puzzle.themes?.match(/mateIn\d/) ? ` · ${themeLabel(x.puzzle.themes.match(/mateIn\d/)![0])}` : ''}`
+  : x.kind === 'review' ? `Review · ${x.review.white ?? 'White'} vs ${x.review.black ?? 'Black'}` : `${x.moment.san} · ${x.moment.opening ?? `game ${x.moment.gameId}`}`);
+type ClipLook = BoardLook | 'remix' | 'mine';
+
+export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNext, onPrev }: {
   source: StudioSource;
   /** A ready-made compilation title (auto Top 5); otherwise the remembered one. */
   title?: string;
@@ -344,9 +349,12 @@ export function StudioPlayer({ source, queue, title, onClose, onNext, onPrev }: 
   queue?: StudioSource[];
   onClose: () => void; onNext?: () => void; onPrev?: () => void;
 }) {
+  // The compilation's clips: removable and reorderable from the player.
+  const [queue, setQueue] = useState<StudioSource[] | undefined>(initialQueue);
   const isComp = !!queue && queue.length > 1;
   const [q, setQ] = useState(0);
-  const current = isComp ? queue![q] : source;
+  const current = queue && queue.length ? queue[Math.min(q, queue.length - 1)] : source;
+  const [loadedKey, setLoadedKey] = useState('');
   // Which queue slot the loaded clip belongs to (it changes only once that clip has loaded).
   const [clipQ, setClipQ] = useState(0);
   const isFirst = !isComp || clipQ === 0, isLast = !isComp || clipQ === queue!.length - 1;
@@ -367,21 +375,22 @@ export function StudioPlayer({ source, queue, title, onClose, onNext, onPrev }: 
   };
   useEffect(() => {
     setErr(null);
-    const slot = q;
+    const slot = Math.min(q, (queue?.length ?? 1) - 1);
+    const key = srcKey(current);
     const nx = isComp ? queue![slot + 1] : undefined;
     if (nx?.kind === 'game') void getGame(nx.moment.gameId).catch(() => {});
     if (nx?.kind === 'review') void getGame(nx.review.id).catch(() => {});
-    if (current.kind === 'trap') { setClip(trapClip(current.trap)); setClipQ(slot); return; }
+    if (current.kind === 'trap') { setClip(trapClip(current.trap)); setClipQ(slot); setLoadedKey(key); return; }
     if (current.kind === 'puzzle') {
-      try { setClip(puzzleClip(current.puzzle)); setClipQ(slot); } catch { setErr("This puzzle doesn't load."); }
+      try { setClip(puzzleClip(current.puzzle)); setClipQ(slot); setLoadedKey(key); } catch { setErr("This puzzle doesn't load."); }
       return;
     }
     if (current.kind === 'review') {
-      getGame(current.review.id).then((g) => { setClip(reviewClip(g)); setClipQ(slot); }).catch((e) => setErr(String(e?.message ?? e)));
+      getGame(current.review.id).then((g) => { setClip(reviewClip(g)); setClipQ(slot); setLoadedKey(key); }).catch((e) => setErr(String(e?.message ?? e)));
       return;
     }
     const m = current.moment;
-    getGame(m.gameId).then((g) => { setClip(gameClip(g, m)); setClipQ(slot); }).catch((e) => setErr(String(e?.message ?? e)));
+    getGame(m.gameId).then((g) => { setClip(gameClip(g, m)); setClipQ(slot); setLoadedKey(key); }).catch((e) => setErr(String(e?.message ?? e)));
   }, [current]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Settings (remembered between clips) ─────────────────────────────────
@@ -423,7 +432,7 @@ export function StudioPlayer({ source, queue, title, onClose, onNext, onPrev }: 
     if (!clip) return;
     setHook(isComp ? `#${queue!.length - clipQ} · ${stripEmoji(clip.hook)}` : clip.hook); setSub(clip.sub);
     setFlipped(clip.plies[clip.key]?.color === 'b');
-  }, [clip, clipQ]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [clip, clipQ, queue?.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── The script ──────────────────────────────────────────────────────────
   const frames = useMemo<Frame[]>(() => {
@@ -495,7 +504,7 @@ export function StudioPlayer({ source, queue, title, onClose, onNext, onPrev }: 
     return frames.map((f) => {
       const k = f.kind === 'move' ? `m${f.ply}` : f.kind === 'countdown' ? `c${f.n}` : f.kind;
       seen[k] = (seen[k] ?? 0) + 1;
-      return `${clipQ}:${k}${seen[k] > 1 ? `.${seen[k]}` : ''}`;
+      return `${loadedKey}:${k}${seen[k] > 1 ? `.${seen[k]}` : ''}`;
     });
   }, [frames]); // eslint-disable-line react-hooks/exhaustive-deps
   const idOf = useMemo(() => new Map(frames.map((f, k) => [f, frameIds[k]])), [frames, frameIds]);
@@ -557,7 +566,11 @@ export function StudioPlayer({ source, queue, title, onClose, onNext, onPrev }: 
     return { fen, last, ply, move: null as Ply | null };
   }, [frame, plies, keyPly]);
 
-  const look: BoardLook | null = prefs.remix ? (looks.current.get(i) ?? (() => { const l = randomLook(); looks.current.set(i, l); return l; })()) : fixedLook;
+  // Board and pieces: a compilation clip can have its own look; otherwise the global setting.
+  const [clipLooks, setClipLooks] = useState<Record<string, ClipLook>>({});
+  const perFrame = () => looks.current.get(i) ?? (() => { const l = randomLook(); looks.current.set(i, l); return l; })();
+  const cl = isComp ? clipLooks[loadedKey] : undefined;
+  const look: BoardLook | null = cl === 'remix' ? perFrame() : cl === 'mine' ? null : cl ? cl : prefs.remix ? perFrame() : fixedLook;
   const cur = view?.move ?? null;
   const rev = cur?.review;
   const cls = cur ? ((cur.san.includes('#') ? 'checkmate' : rev?.classification) ?? null) : null;
@@ -701,6 +714,28 @@ export function StudioPlayer({ source, queue, title, onClose, onNext, onPrev }: 
     if (isComp && q !== 0) { autoNext.current = true; setQ(0); return; }
     setI(0); setPlaying(true);
   };
+
+  // ── Compilation clips: remove, reorder, jump, per-clip look ────────────
+  const removeClip = (k: number) => {
+    if (!queue || queue.length <= 1) return;
+    const n = queue.length;
+    setQueue(queue.filter((_, j) => j !== k));
+    // "Top 5 …" becomes "Top 4 …".
+    const t = compTitle.replace(new RegExp(`(^|\\D)${n}(?=\\D|$)`), `$1${n - 1}`);
+    if (t !== compTitle) setCompTitle(t);
+    if (k < q) { setQ(q - 1); setClipQ((c) => c - 1); }
+    else if (k === q) { setPlaying(false); setQ(Math.min(q, n - 2)); }
+  };
+  const moveClip = (k: number, dir: -1 | 1) => {
+    if (!queue) return;
+    const j = k + dir;
+    if (j < 0 || j >= queue.length) return;
+    const nl = [...queue]; [nl[k], nl[j]] = [nl[j], nl[k]];
+    setQueue(nl);
+    if (q === k) { setQ(j); setClipQ(j); } else if (q === j) { setQ(k); setClipQ(k); }
+  };
+  const goClip = (k: number) => { if (k !== q) { setPlaying(false); setQ(k); } };
+  const setClipLook = (key: string, v: ClipLook | undefined) => { looks.current.clear(); setClipLooks((c) => { const n = { ...c }; if (v === undefined) delete n[key]; else n[key] = v; return n; }); };
 
   // ── Stickers ────────────────────────────────────────────────────────────
   const [stickers, setStickers] = useState<Sticker[]>([]);
@@ -1144,6 +1179,36 @@ export function StudioPlayer({ source, queue, title, onClose, onNext, onPrev }: 
             <div className="mb-3">
               <label className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-white/50">Compilation title · clip {clipQ + 1} of {queue!.length}</label>
               <input value={compTitle} onChange={(e) => setCompTitle(e.target.value)} className="w-full rounded-lg bg-white/5 px-3 py-2 text-[14px] font-bold text-white outline-none ring-1 ring-white/10 focus:ring-[#81B64C]" />
+              <div className="mt-2 flex items-center justify-between">
+                <p className="text-[11px] font-bold uppercase tracking-wide text-white/50">Clips · board &amp; pieces per clip</p>
+                <div className="flex gap-1">
+                  <button onClick={() => { looks.current.clear(); setClipLooks(Object.fromEntries(queue!.map((x) => [srcKey(x), randomLook()]))); }} className="rounded-md bg-white/10 px-2 py-0.5 text-[11.5px] font-bold"><Shuffle size={11} className="mr-1 inline" />New look each</button>
+                  {Object.keys(clipLooks).length > 0 && <button onClick={() => { looks.current.clear(); setClipLooks({}); }} className="rounded-md bg-white/10 px-2 py-0.5 text-[11.5px] font-bold text-white/70">Reset</button>}
+                </div>
+              </div>
+              <div className="mt-1.5 space-y-1">
+                {queue!.map((x, k) => {
+                  const key = srcKey(x); const v = clipLooks[key]; const n = queue!.length - k;
+                  return (
+                    <div key={key} className="flex items-center gap-1.5 rounded-lg px-1.5 py-1" style={{ background: k === clipQ ? 'rgba(129,182,76,.16)' : 'rgba(255,255,255,.04)', boxShadow: k === clipQ ? 'inset 0 0 0 1px rgba(129,182,76,.5)' : undefined }}>
+                      <button onClick={() => goClip(k)} title="Go to this clip" className="shrink-0" style={{ fontSize: 9 }}><Medallion glyph={`#${n}`} color={rankColor(n)} size={2.4} /></button>
+                      <button onClick={() => goClip(k)} className="min-w-0 flex-1 text-left">
+                        <p className="truncate text-[12.5px] font-bold text-white">{srcLabel(x)}</p>
+                        <p className="truncate text-[10.5px] text-white/45">{v === 'remix' ? 'New look every move' : v === 'mine' ? 'Your board' : v ? lookLabel(v) : prefs.remix ? 'New look every move (default)' : 'Default look'}</p>
+                      </button>
+                      <select value={v === undefined ? 'default' : typeof v === 'string' ? v : 'fixed'} title="Board and pieces for this clip"
+                        onChange={(e) => { const m = e.target.value; setClipLook(key, m === 'default' ? undefined : m === 'fixed' ? randomLook() : (m as ClipLook)); }}
+                        className="w-[5.6rem] shrink-0 rounded-md bg-white/5 px-1 py-1 text-[11px] text-white ring-1 ring-white/10">
+                        <option value="default">Default</option><option value="fixed">One look</option><option value="remix">Every move</option><option value="mine">My board</option>
+                      </select>
+                      <button onClick={() => setClipLook(key, randomLook())} title="Another random board and pieces" className="rounded p-1 text-white/70 hover:bg-white/10"><Shuffle size={13} /></button>
+                      <button onClick={() => moveClip(k, -1)} disabled={k === 0} title="Earlier" className="rounded p-1 text-white/60 hover:bg-white/10 disabled:opacity-25"><ArrowUp size={13} /></button>
+                      <button onClick={() => moveClip(k, 1)} disabled={k === queue!.length - 1} title="Later" className="rounded p-1 text-white/60 hover:bg-white/10 disabled:opacity-25"><ArrowDown size={13} /></button>
+                      <button onClick={() => removeClip(k)} title="Remove from the compilation" className="rounded p-1 text-[#F59B98] hover:bg-white/10"><X size={14} /></button>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
           <p className="mb-1 text-[11px] font-bold uppercase tracking-wide text-white/50">Presets</p>
