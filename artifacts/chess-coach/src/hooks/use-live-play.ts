@@ -84,6 +84,9 @@ export function useLivePlay() {
   const pendingAcceptRef = useRef<string | null>(null);
   // Owner accepting a request made through their open link.
   const pendingApproveRef = useRef<string | null>(null);
+  // Joining someone's search from a "looking for a game" alert.
+  const pendingSeekRef = useRef<string | null>(null);
+  const [seekGone, setSeekGone] = useState<string | null>(null);
   // What the "waiting" screen is about: you accepted a link, you sent a
   // request and they haven't answered yet, or you accepted a request.
   const [waitingKind, setWaitingKind] = useState<'accepted' | 'request' | 'approving'>('accepted');
@@ -151,6 +154,10 @@ export function useLivePlay() {
         ws.send(JSON.stringify({ type: 'approve_request', code: pendingApproveRef.current }));
         return;
       }
+      if (pendingSeekRef.current && !(g && g.status === 'active')) {
+        ws.send(JSON.stringify({ type: 'join_seek', seekerId: pendingSeekRef.current }));
+        return;
+      }
       if (pendingAcceptRef.current && !(g && g.status === 'active')) {
         ws.send(JSON.stringify({ type: 'accept_challenge', code: pendingAcceptRef.current }));
         return;
@@ -199,7 +206,13 @@ export function useLivePlay() {
           setTournamentWaiting(null);
           setTournamentOver(msg.tournamentId);
           break;
+        case 'seek_gone':
+          pendingSeekRef.current = null;
+          setSeekGone(String(msg.seekerId ?? ''));
+          break;
         case 'match_found':
+          pendingSeekRef.current = null;
+          setSeekGone(null);
           setTournamentWaiting(null);
           pendingApproveRef.current = null;
           if (typeof msg.state?.serverNow === 'number') setServerOffset(msg.state.serverNow - Date.now());
@@ -312,6 +325,15 @@ export function useLivePlay() {
     const ws = wsRef.current;
     if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'accept_challenge', code }));
   }, []);
+  // Tapped "<name> is looking for a game": play them if they're still searching.
+  const joinSeek = useCallback((seekerId: string) => {
+    setError(null);
+    setSeekGone(null);
+    pendingSeekRef.current = seekerId;
+    const ws = wsRef.current;
+    if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'join_seek', seekerId }));
+  }, []);
+  const clearSeekGone = useCallback(() => setSeekGone(null), []);
   // Accept a request someone made through your open challenge link.
   const approveRequest = useCallback((code: string) => {
     setError(null);
@@ -360,7 +382,7 @@ export function useLivePlay() {
 
   return {
     status, error, game, color, queuedTc, queuedMode, opponentDisconnect, premove, setPremove,
-    queuedAt, botOfferMs, waitingFor, waitingKind, serverOffset, notice, approveRequest, connected,
+    queuedAt, botOfferMs, waitingFor, waitingKind, serverOffset, notice, approveRequest, connected, joinSeek, seekGone, clearSeekGone,
     enterQueue, offerRematch, declineRematch, cancel, playBot, acceptChallenge, move, resign, offerDraw, acceptDraw, declineDraw,
     reset, tournamentWaiting, tournamentOver, tournamentReady, tournamentPause,
   };

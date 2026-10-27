@@ -89,6 +89,45 @@ router.post("/challenges", requireAuth, async (req: Request, res: Response) => {
   }
 });
 
+// "Challenge them?": a direct challenge to one player (e.g. someone whose
+// "looking for a game" alert you tapped after they'd already found one).
+// They get a notification that opens the challenge; it also sits in their
+// invites on Play Online.
+const lastDirect = new Map<string, number>();
+router.post("/challenges/direct", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const { kind, timeControl, mode, targetUserId } = req.body as { kind?: string; timeControl?: string; mode?: string; targetUserId?: string };
+    const target = String(targetUserId ?? "");
+    if (!target || target === req.user!.id) { res.status(400).json({ error: "Pick someone to challenge" }); return; }
+    if (kind !== "live" && kind !== "daily") { res.status(400).json({ error: "kind must be 'live' or 'daily'" }); return; }
+    if (!timeControl || (kind === "live" ? !liveLabel(timeControl) : !isValidTimeControl(timeControl))) { res.status(400).json({ error: "Invalid time control" }); return; }
+    const key = `${req.user!.id}:${target}`;
+    if (Date.now() - (lastDirect.get(key) ?? 0) < 60_000) { res.status(429).json({ error: "You just challenged them — give them a minute." }); return; }
+    lastDirect.set(key, Date.now());
+    const [ch] = await db.insert(gameChallengesTable).values({
+      code: newCode(),
+      creatorUserId: req.user!.id,
+      creatorUsername: displayName(req),
+      kind,
+      timeControl,
+      mode: mode === "ranked" ? "ranked" : "casual",
+      color: "random",
+      open: false,
+      expiresAt: new Date(Date.now() + (kind === "live" ? LIVE_TTL_MS : DAILY_TTL_MS)),
+    }).returning();
+    await db.execute(sql`
+      INSERT INTO challenge_invites (user_id, code) VALUES (${target}, ${ch.code})
+      ON CONFLICT (user_id, code) DO NOTHING
+    `).catch(() => {});
+    const label = kind === "live" ? `${liveLabel(timeControl)} live game` : `daily game (${dailyLabel(timeControl)} per move)`;
+    notifyUser(target, { kind: "challenge", title: `${displayName(req)} challenged you`, body: `${label[0].toUpperCase()}${label.slice(1)}. Tap to accept.`, url: `/challenge/${ch.code}` })
+      .catch((err) => logger.warn({ err }, "[challenges] direct notify failed"));
+    res.json({ challenge: publicChallenge(ch) });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to send challenge", details: err.cause?.message ?? err.message });
+  }
+});
+
 router.get("/challenges/mine", requireAuth, async (req: Request, res: Response) => {
   try {
     const rows = await db.select().from(gameChallengesTable)

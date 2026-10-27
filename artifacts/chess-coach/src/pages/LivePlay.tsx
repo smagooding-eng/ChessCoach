@@ -9,6 +9,7 @@ import { apiFetch } from '@/lib/api';
 import { PT, cardStyle, greenBtn, ghostBtn } from '@/lib/playTheme';
 import { ShareLink } from '@/components/play/ShareLink';
 import { NotifyPrompt } from '@/components/play/NotifyPrompt';
+import { SeekGoneCard, SeekJoiningCard, takeSeekParams, type SeekInfo } from '@/components/play/SeekGoneCard';
 import { TournamentsCard } from '@/components/play/Tournaments';
 import { DailyGames } from '@/pages/DailyGames';
 import { useSocialUnread } from '@/lib/social';
@@ -55,6 +56,15 @@ export function LivePlay({ initialTab }: { initialTab?: OnlineTab } = {}) {
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
   }, [live.status]);
+
+  // /live?seek=USER -- tapped "<name> is looking for a game".
+  const [seek, setSeek] = useState<SeekInfo | null>(null);
+  useEffect(() => {
+    if (tab !== 'live') return;
+    const s = takeSeekParams();
+    if (s) { setSeek(s); live.joinSeek(s.seekerId); }
+  }, [live.joinSeek, tab]);
+  const closeSeek = () => { setSeek(null); live.clearSeekGone(); };
 
   // /live?challenge=CODE -- coming from a friend's challenge link.
   const acceptedRef = useRef(false);
@@ -136,6 +146,10 @@ export function LivePlay({ initialTab }: { initialTab?: OnlineTab } = {}) {
         </div>
       </div>
 
+      {seek && tab === 'live' && (live.seekGone === seek.seekerId
+        ? <SeekGoneCard seek={seek} kind="live" onClose={closeSeek} />
+        : live.status !== 'queued' && <SeekJoiningCard seek={seek} />)}
+
       {live.status === 'queued' ? (
         <div className="space-y-3">
           <div className="p-6 text-center space-y-4" style={cardStyle}>
@@ -145,6 +159,7 @@ export function LivePlay({ initialTab }: { initialTab?: OnlineTab } = {}) {
               <p className="text-sm mt-1" style={{ color: PT.muted }}>
                 {queuedLabel} · {live.queuedMode === 'ranked' ? 'Ranked' : 'Casual'} · {Math.floor(waitedMs / 1000)}s
               </p>
+              <p className="text-[12px] mt-1" style={{ color: PT.muted }}>We've let players with notifications on know you're looking.</p>
             </div>
             <button onClick={live.cancel} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm" style={ghostBtn}>
               <X className="w-4 h-4" /> Cancel

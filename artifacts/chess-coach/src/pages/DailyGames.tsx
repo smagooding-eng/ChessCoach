@@ -7,6 +7,7 @@ import { useUser } from '@/hooks/use-user';
 import { PT, cardStyle, greenBtn, ghostBtn, formatLeft } from '@/lib/playTheme';
 import { ShareLink } from '@/components/play/ShareLink';
 import { NotifyPrompt } from '@/components/play/NotifyPrompt';
+import { SeekGoneCard, SeekJoiningCard, takeSeekParams, type SeekInfo } from '@/components/play/SeekGoneCard';
 import { useChallengeInbox, ChallengeRequestsCard, ChallengeInvitesCard, SentRequestsCard, OpenLinksCard, createOpenLink } from '@/components/play/OpenChallenges';
 
 export const DAILY_TC = [
@@ -90,6 +91,26 @@ export function DailyGames({ embedded = false }: { embedded?: boolean } = {}) {
     window.addEventListener('cs:daily-update', on);
     return () => { clearInterval(id); window.removeEventListener('cs:daily-update', on); };
   }, [load]);
+
+  // /daily?seek=USER -- tapped "<name> is looking for a daily game".
+  const [seek, setSeek] = useState<SeekInfo | null>(null);
+  const [seekGone, setSeekGone] = useState(false);
+  useEffect(() => {
+    const s = takeSeekParams();
+    if (!s) return;
+    setSeek(s); setSeekGone(false);
+    void (async () => {
+      try {
+        const r = await apiFetch('/api/correspondence/join-seek', {
+          method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ seekerId: s.seekerId, timeControl: s.tc }),
+        });
+        const d = await r.json().catch(() => ({}));
+        if (r.ok && d.status === 'matched' && d.game) { navigate(`/daily/${d.game.id}`); return; }
+        setSeekGone(true);
+      } catch { setSeekGone(true); }
+    })();
+  }, [navigate]);
 
   const findOpponent = async () => {
     setBusy(true); setError('');
@@ -179,6 +200,9 @@ export function DailyGames({ embedded = false }: { embedded?: boolean } = {}) {
 
   return (
     <div className={embedded ? 'space-y-4' : 'mx-auto max-w-[760px] space-y-4 p-4 md:p-0 pb-24'}>
+      {seek && (seekGone
+        ? <SeekGoneCard seek={seek} kind="daily" onClose={() => setSeek(null)} />
+        : <SeekJoiningCard seek={seek} />)}
       <div className="flex items-start justify-between gap-3">
         <div>
           {!embedded && <h1 className="text-2xl md:text-3xl font-black" style={{ color: PT.text, letterSpacing: '-0.02em' }}>Daily Games</h1>}
@@ -247,7 +271,7 @@ export function DailyGames({ embedded = false }: { embedded?: boolean } = {}) {
               <Loader2 size={16} className="animate-spin shrink-0" style={{ color: PT.green }} />
               <span className="min-w-0 flex-1 text-[13.5px]" style={{ color: PT.text }}>
                 {dailyTcLabel(q.timeControl)} · {q.mode === 'ranked' ? 'Ranked' : 'Casual'}
-                <span className="block text-[11.5px]" style={{ color: PT.muted }}>Waiting since {new Date(q.joinedAt).toLocaleString()} · we'll notify you when matched</span>
+                <span className="block text-[11.5px]" style={{ color: PT.muted }}>Waiting since {new Date(q.joinedAt).toLocaleString()} · we've told players with notifications on, and we'll notify you when matched</span>
               </span>
               <button onClick={() => leave(q)} className="shrink-0 rounded-lg p-2" style={ghostBtn} aria-label="Stop searching"><X size={15} /></button>
             </div>

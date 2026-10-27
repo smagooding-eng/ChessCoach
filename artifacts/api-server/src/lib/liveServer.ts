@@ -17,6 +17,7 @@ import { fetchLichessProfile } from './lichess';
 import { usersTable, gameChallengesTable } from '@workspace/db';
 import { eq, and } from 'drizzle-orm';
 import { notifyUser } from './notify';
+import { announceSeek } from './seekBroadcast';
 
 export type TimeControlId = 'blitz_5_0' | 'blitz_5_3' | 'rapid_10_0' | 'rapid_15_0';
 export type Mode = 'casual' | 'ranked';
@@ -700,6 +701,39 @@ async function joinQueue(ws: WebSocket, userId: string, username: string, tcId: 
   send(ws, { type: 'queued', tcId, mode, botOfferMs: BOT_OFFER_MS });
   // Try immediate match
   tryMatchInQueue(key);
+  // Still waiting? Tell everyone with notifications on.
+  if (queue.some(w => w.userId === userId)) {
+    announceSeek({ kind: 'live', seekerId: userId, seekerName: username, timeControl: tcId, label: tc.label, mode, rating: myRating },
+      (uid) => userActiveGame.has(uid));
+  }
+}
+
+// Someone tapped a "<name> is looking for a game" alert. If that player is
+// still searching, they play each other right away; otherwise the tapper is
+// told it's gone (and the app offers to challenge them instead).
+async function joinSeek(ws: WebSocket, userId: string, username: string, seekerId: string) {
+  if (!seekerId || seekerId === userId) { send(ws, { type: 'seek_gone', seekerId, self: true }); return; }
+  if (userActiveGame.has(userId)) {
+    const g = games.get(userActiveGame.get(userId)!);
+    if (g) { subscribeWs(ws, g.id); send(ws, { type: 'match_found', state: gamePublicState(g), color: g.white.userId === userId ? 'w' : 'b' }); return; }
+  }
+  let seeker: WaitingPlayer | undefined;
+  let list: WaitingPlayer[] | undefined;
+  for (const l of queues.values()) {
+    const w = l.find(x => x.userId === seekerId);
+    if (w) { seeker = w; list = l; break; }
+  }
+  if (!seeker || !list || seeker.ws.readyState !== WebSocket.OPEN || userActiveGame.has(seekerId)) {
+    send(ws, { type: 'seek_gone', seekerId });
+    return;
+  }
+  // Claim them before any await so a second tapper can't get them too.
+  list.splice(list.indexOf(seeker), 1);
+  cancelQueue(userId);
+  const seed = await seedRatingFromImports(userId, seeker.tc.id);
+  const me: WaitingPlayer = { userId, username, rating: seed.rating, ws, tc: seeker.tc, mode: seeker.mode, joinedAt: Date.now() };
+  if (seeker.ws.readyState !== WebSocket.OPEN || userActiveGame.has(seekerId)) { send(ws, { type: 'seek_gone', seekerId }); return; }
+  await startHumanMatch(seeker, me);
 }
 
 function cancelQueue(userId: string) {
@@ -1307,6 +1341,9 @@ export function attachLiveServer(server: HttpServer) {
             cancelQueue(info.userId);
             dropPendingForSocket(ws);
             send(ws, { type: 'queue_cancelled' });
+            break;
+          case 'join_seek':
+            await joinSeek(ws, info.userId, info.username, String(msg.seekerId ?? ''));
             break;
           case 'play_bot':
             await spawnBotMatch(ws, info.userId, info.username, msg.timeControl);

@@ -2,7 +2,7 @@ import { Router, type IRouter, type Request, type Response } from "express";
 import { requireAuth } from "../middlewares/authMiddleware";
 import {
   listCorrespondenceTimeControls, createOrJoinCorrespondenceGame, leaveQueue, listQueueForUser,
-  listGamesForUser, getGame, makeMove, resignGame, offerDraw, respondDraw, getDailyRating,
+  listGamesForUser, getGame, joinDailySeek, makeMove, resignGame, offerDraw, respondDraw, getDailyRating,
 } from "../lib/correspondence";
 
 // Daily games (1 / 3 / 7 days per move). Kept on the /correspondence/*
@@ -24,6 +24,16 @@ router.post("/correspondence/create", requireAuth, async (req: Request, res: Res
     res.json(result);
   } catch (err: any) {
     res.status(400).json({ error: err.message ?? "Failed to create or join a daily game" });
+  }
+});
+
+router.post("/correspondence/join-seek", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const { seekerId, timeControl } = req.body as { seekerId?: string; timeControl?: string };
+    const result = await joinDailySeek(req.user!.id, displayName(req), String(seekerId ?? ""), timeControl);
+    res.json(result);
+  } catch (err: any) {
+    res.status(400).json({ error: err.message ?? "Could not join that game" });
   }
 });
 

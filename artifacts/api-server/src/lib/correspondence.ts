@@ -20,6 +20,7 @@ import { notifyUser, emitToUser } from "./notify";
 import { logger } from "./logger";
 import { updateRating } from "./glicko2";
 import { loadUserRating, saveUserRating, seedRatingFromImports } from "./liveServer";
+import { announceSeek } from "./seekBroadcast";
 
 export type CorrespondenceTimeControlId = "corr_1d" | "corr_3d" | "corr_7d";
 export type DailyMode = "casual" | "ranked";
@@ -118,8 +119,24 @@ export async function createOrJoinCorrespondenceGame(userId: string, username: s
     )).limit(1);
   if (own.length === 0) {
     await db.insert(correspondenceQueueTable).values({ userId, username, timeControl: timeControlId, mode, rating: myRating });
+    announceSeek({ kind: "daily", seekerId: userId, seekerName: username, timeControl: timeControlId, label: TIME_CONTROLS[timeControlId].label, mode, rating: myRating });
   }
   return { status: "queued" };
+}
+
+/** Tapped a "<name> is looking for a daily game" alert: play them if they're still waiting. */
+export async function joinDailySeek(userId: string, username: string, seekerId: string, timeControlId?: string): Promise<CreateGameResult & { gone?: boolean }> {
+  if (!seekerId || seekerId === userId) return { status: "queued", gone: true };
+  const rows = await db.select().from(correspondenceQueueTable)
+    .where(eq(correspondenceQueueTable.userId, seekerId))
+    .orderBy(correspondenceQueueTable.joinedAt);
+  const pick = rows.find((r) => r.timeControl === timeControlId) ?? rows[0];
+  if (!pick || !isValidTimeControl(pick.timeControl)) return { status: "queued", gone: true };
+  const claimed = await db.delete(correspondenceQueueTable).where(eq(correspondenceQueueTable.id, pick.id)).returning({ id: correspondenceQueueTable.id });
+  if (claimed.length === 0) return { status: "queued", gone: true };
+  await leaveQueue(userId, pick.timeControl, pick.mode);
+  const game = await pairPlayers({ userId, username }, { userId: seekerId, username: pick.username }, pick.timeControl, pick.mode === "ranked" ? "ranked" : "casual", "first");
+  return { status: "matched", game, color: game.whiteUserId === userId ? "white" : "black" };
 }
 
 // Starts a game between two players and notifies them. `notify` says who
@@ -137,7 +154,8 @@ async function pairPlayers(
     : await startGame(b.userId, b.username, a.userId, a.username, timeControlId, mode);
   const tell = (who: { userId: string }, opp: string) => {
     const white = game.whiteUserId === who.userId;
-    push(who.userId, "Daily game found", `You're playing ${opp} (${dailyLabel(timeControlId)} per move). You have ${white ? "White — your move!" : "Black."}`, gameUrl(game.id));
+    notifyUser(who.userId, { title: "Daily game found", body: `You're playing ${opp} (${dailyLabel(timeControlId)} per move). You have ${white ? "White — your move!" : "Black."}`, url: gameUrl(game.id), kind: "daily", open: true })
+      .catch((err) => logger.warn({ err }, "[daily] notify failed"));
   };
   tell(b, a.username);
   if (notify === "both") tell(a, b.username);
