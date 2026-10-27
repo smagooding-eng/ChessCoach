@@ -42,7 +42,7 @@ export type StudioSource =
 interface ReviewMove { moveIndex?: number; san: string; color?: 'white' | 'black'; classification?: string; explanation?: string; betterMove?: string | null; evalAfterCp?: number; fen?: string; bestLineSan?: string[] }
 interface StudioGame { id: number; pgn: string; opening: string | null; white: string; black: string; whiteRating: number | null; blackRating: number | null; moves: ReviewMove[]; whiteAccuracy?: number | null; blackAccuracy?: number | null; overview?: string | null; result?: string | null }
 interface Ply { san: string; from: string; to: string; fen: string; fenBefore: string; color: 'w' | 'b'; review?: ReviewMove }
-interface Sticker { id: number; text: string; x: number; y: number; size: number; kind: 'emoji' | 'text' | 'badge'; tone?: number; /** Keyframes: shown from this frame to that one (frame ids); unset = the whole clip. */ from?: string; to?: string }
+interface Sticker { id: number; text: string; x: number; y: number; size: number; kind: 'emoji' | 'text' | 'badge' | 'caption' | 'reply'; tone?: number; /** Keyframes: shown from this frame to that one (frame ids); unset = the whole clip. */ from?: string; to?: string }
 interface Clip {
   plies: Ply[]; key: number; tags: string[]; hook: string; sub: string; names: { w: string | null; b: string | null };
   ratings: { w: number | null; b: number | null }; fileBase: string; label: string; isTrap: boolean; opening: string | null;
@@ -54,7 +54,9 @@ interface Clip {
 type Frame =
   | { kind: 'intro'; fen: string }
   | { kind: 'move'; ply: number }
-  | { kind: 'countdown'; n: number; fen: string; last: { from: string; to: string } | null }
+  | { kind: 'countdown'; n: number; fen: string; last: { from: string; to: string } | null; total?: number; text?: string; /** Inserted on the timeline before this frame id. */ anchor?: string }
+  /** A full-screen line of text inserted on the timeline (quotes, "Part 2", a question). */
+  | { kind: 'card'; fen: string; text: string; secs: number; anchor: string }
   | { kind: 'better'; fen: string; last: { from: string; to: string } | null; arrow: { from: string; to: string } | null; text: string }
   | { kind: 'reveal'; fen: string }
   | { kind: 'split'; played: { fen: string; last: { from: string; to: string } }; better: { fen: string; last: { from: string; to: string } }; playedSan: string; betterSan: string }
@@ -85,6 +87,18 @@ const BACKGROUNDS: Record<string, { label: string; css: React.CSSProperties }> =
 const EMOJIS = ['🔥', '😱', '🤯', '🧠', '👀', '💀', '🏆', '♟️', '⚡', '🎯', '😂', '🤔', '🍿', '😤', '👑', '💥'];
 const TONES = [{ bg: '#F0605D', fg: '#fff' }, { bg: '#FFD84D', fg: '#141414' }, { bg: '#81B64C', fg: '#fff' }, { bg: '#FFFFFF', fg: '#141414' }, { bg: '#141414', fg: '#fff' }, { bg: '#1BACA6', fg: '#fff' }];
 const BADGE_STICKERS = ['brilliant', 'great', 'best', 'excellent', 'book', 'inaccuracy', 'mistake', 'blunder', 'missed_win', 'checkmate'];
+const MEME_CAPTIONS = ['BRO THOUGHT IT WAS FREE', "HE DIDN'T SEE IT COMING", '1 IN A MILLION MOVE', 'WAIT FOR IT…', '800 ELO BEHAVIOR', 'THE AUDACITY', 'HOW DID HE MISS THIS', 'GRANDMASTER MOVE'];
+interface Insert { timer?: { secs: number; text: string }; card?: { secs: number; text: string } }
+function frameKey(f: Frame): string {
+  if (f.kind === 'move') return `m${f.ply}`;
+  if (f.kind === 'countdown') return f.anchor ? `x${f.n}` : `c${f.n}`;
+  return f.kind;
+}
+/** Stable ids for frames (pauses, sticker in/out points and inserts hang off these). */
+function assignIds(frames: Frame[], prefix: string): string[] {
+  const seen: Record<string, number> = {};
+  return frames.map((f) => { const k = frameKey(f); seen[k] = (seen[k] ?? 0) + 1; return `${prefix}:${k}${seen[k] > 1 ? `.${seen[k]}` : ''}`; });
+}
 const TEXT_STICKERS = ['BRILLIANT!!', 'BLUNDER??', 'WAIT FOR IT…', 'NO WAY', 'GG', 'FIND THE MOVE', 'TRAP!', 'MATE', 'PAUSE NOW', 'COMMENT YOUR MOVE'];
 
 // ── Preferences that carry over between clips (this browser only) ─────────
@@ -94,7 +108,7 @@ const DEFAULT_PREFS = {
   bg: 'green', betterLine: true, guessRating: false, outro: true, progress: true, intro: true, safeArea: true, showNames: false,
   handle: '@chessscout.net3', outroLine: 'Review your games free',
   split: true, voice: false, voiceName: 'onyx', compTitle: 'Top moments this week',
-  music: 'off' as MusicStyle, musicVol: 0.5, beatSync: true, musicFx: true, subs: true, pieceFx: true, trapBefore: 99, reviewMode: 'highlights' as 'highlights' | 'full',
+  music: 'off' as MusicStyle, musicVol: 0.5, beatSync: true, musicFx: true, subs: true, pieceFx: true, trapBefore: 99, countdownSecs: 3, choices: false, zoom: false, reviewMode: 'highlights' as 'highlights' | 'full',
 };
 type Prefs = typeof DEFAULT_PREFS;
 function loadPrefs(): Prefs {
@@ -441,9 +455,29 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
   }, [clip, clipQ, queue?.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── The script ──────────────────────────────────────────────────────────
+  // Countdowns and text cards inserted on the timeline, keyed by the frame they come before.
+  const [inserts, setInserts] = useState<Record<string, Insert>>({});
   const frames = useMemo<Frame[]>(() => {
     if (!clip || !clip.plies.length) return [];
     const { plies, key } = clip;
+    const withInserts = (base: Frame[]): Frame[] => {
+      if (!Object.keys(inserts).length) return base;
+      const ids = assignIds(base, loadedKey);
+      const fenOf = (f: Frame) => (f.kind === 'move' ? (f.ply > 0 ? plies[f.ply - 1].fen : plies[0].fenBefore) : f.kind === 'split' ? f.played.fen : f.fen);
+      const res: Frame[] = [];
+      base.forEach((f, k) => {
+        const ins = inserts[ids[k]];
+        if (ins) {
+          const prev = res[res.length - 1] ?? f;
+          const fen = fenOf(prev);
+          const last = prev.kind === 'move' && prev.ply > 0 ? { from: plies[prev.ply - 1].from, to: plies[prev.ply - 1].to } : null;
+          if (ins.card) res.push({ kind: 'card', fen, text: ins.card.text, secs: ins.card.secs, anchor: ids[k] });
+          if (ins.timer) for (let n = ins.timer.secs; n >= 1; n--) res.push({ kind: 'countdown', n, fen, last, total: ins.timer.secs, text: ins.timer.text, anchor: ids[k] });
+        }
+        res.push(f);
+      });
+      return res;
+    };
     const keyPly = key + 1;
     // Traps play their whole line by default (trapBefore 99); puzzles always play the setup move and the full solution.
     const startPly = Math.max(0, keyPly - 1 - (clip.isTrap ? prefs.trapBefore : prefs.before));
@@ -466,14 +500,14 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
       for (const p of list) out.push({ kind: 'move', ply: p });
       out.push({ kind: 'summary', fen: fenAt(plies.length) });
       if (prefs.outro && isLast) out.push({ kind: 'outro', fen: fenAt(plies.length) });
-      return out;
+      return withInserts(out);
     }
     if (isComp && isFirst) out.push({ kind: 'title', fen: fenAt(startPly) });
     if (prefs.intro) out.push({ kind: 'intro', fen: fenAt(startPly) });
     if (prefs.intro || (isComp && isFirst)) out.push({ kind: 'hold', fen: fenAt(startPly), last: lastAt(startPly) });
     else out.push({ kind: 'move', ply: startPly });
     for (let p = startPly + 1; p < keyPly; p++) out.push({ kind: 'move', ply: p });
-    if (prefs.guess) for (const n of [3, 2, 1]) out.push({ kind: 'countdown', n, fen: fenAt(keyPly - 1), last: lastAt(keyPly - 1) });
+    if (prefs.guess) for (let n = prefs.countdownSecs; n >= 1; n--) out.push({ kind: 'countdown', n, fen: fenAt(keyPly - 1), last: lastAt(keyPly - 1), total: prefs.countdownSecs });
     out.push({ kind: 'move', ply: keyPly });
     // The engine's better line after a mistake.
     const kr = plies[key]?.review;
@@ -502,18 +536,27 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
     const lastFen = fenAt(endPly);
     if (prefs.guessRating && !clip.isTrap && (clip.ratings.w || clip.ratings.b)) out.push({ kind: 'reveal', fen: lastFen });
     if (prefs.outro && isLast) out.push({ kind: 'outro', fen: lastFen });
-    return out;
-  }, [clip, prefs.before, prefs.trapBefore, prefs.after, prefs.intro, prefs.guess, prefs.betterLine, prefs.guessRating, prefs.outro, prefs.split, prefs.reviewMode, isComp, isFirst, isLast]);
+    return withInserts(out);
+  }, [clip, prefs.before, prefs.trapBefore, prefs.after, prefs.intro, prefs.guess, prefs.betterLine, prefs.guessRating, prefs.outro, prefs.split, prefs.reviewMode, prefs.countdownSecs, inserts, loadedKey, isComp, isFirst, isLast]);
 
   // ── Keyframes: a stable id per frame (so pauses and sticker in/out points survive setting changes) ─
-  const frameIds = useMemo(() => {
-    const seen: Record<string, number> = {};
-    return frames.map((f) => {
-      const k = f.kind === 'move' ? `m${f.ply}` : f.kind === 'countdown' ? `c${f.n}` : f.kind;
-      seen[k] = (seen[k] ?? 0) + 1;
-      return `${loadedKey}:${k}${seen[k] > 1 ? `.${seen[k]}` : ''}`;
-    });
-  }, [frames]); // eslint-disable-line react-hooks/exhaustive-deps
+  const frameIds = useMemo(() => assignIds(frames, loadedKey), [frames]);
+  // A / B / C: the key move and two believable alternatives (checks and captures first), in a fixed shuffled order.
+  const choices = useMemo(() => {
+    if (!clip || !prefs.choices) return null;
+    const kp = clip.plies[clip.key];
+    if (!kp) return null;
+    try {
+      const hash = (t: string) => [...t].reduce((h, ch) => (Math.imul(h, 31) + ch.charCodeAt(0)) >>> 0, 7);
+      const c = new Chess(kp.fenBefore);
+      const weight = (m: { san: string; captured?: string; piece: string }) => (m.san.includes('+') ? 3 : 0) + (m.captured ? 2 : 0) + (m.piece !== 'p' ? 1 : 0);
+      const pool = c.moves({ verbose: true }).filter((m) => m.san !== kp.san).sort((a, b) => weight(b) - weight(a) || hash(a.san) - hash(b.san)).slice(0, 6);
+      if (pool.length < 2) return null;
+      const second = pool[1 + (hash(kp.fenBefore) % Math.max(1, pool.length - 1))] ?? pool[1];
+      const opts = [kp.san, pool[0].san, second.san === pool[0].san ? pool[1].san : second.san];
+      return { options: opts.map((x) => ({ x, h: hash(x + kp.fenBefore) })).sort((a, b) => a.h - b.h).map((o) => o.x), correct: kp.san, white: kp.color === 'w' };
+    } catch { return null; }
+  }, [clip, prefs.choices]); // eslint-disable-line react-hooks/exhaustive-deps
   const idOf = useMemo(() => new Map(frames.map((f, k) => [f, frameIds[k]])), [frames, frameIds]);
   const [holds, setHolds] = useState<Record<string, number>>({});
   const dur = (f: Frame) => {
@@ -532,6 +575,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
       case 'intro': return 1600;
       case 'hold': return 800;
       case 'countdown': return 1000;
+      case 'card': return f.secs * 1000;
       case 'better': return Math.max(s, 1300);
       case 'reveal': return 2400;
       case 'split': return 3200;
@@ -554,7 +598,20 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
   const [confetti, setConfetti] = useState(0);
   const [shake, setShake] = useState(0);
   const looks = useRef(new Map<number, BoardLook>());
-  useEffect(() => { setI(0); looks.current.clear(); if (autoNext.current) { autoNext.current = false; setPlaying(true); } else setPlaying(false); }, [frames]);
+  // A new clip starts from the top; edits to the same clip (inserts, settings) stay on the frame you were on.
+  const shownClip = useRef<Clip | null>(null);
+  const curId = useRef<string | null>(null);
+  useEffect(() => {
+    if (shownClip.current === clip && clip) {
+      const k = curId.current ? frameIds.indexOf(curId.current) : -1;
+      setI((x) => (k >= 0 ? k : Math.min(x, Math.max(0, frames.length - 1))));
+      return;
+    }
+    shownClip.current = clip;
+    setI(0); looks.current.clear(); if (autoNext.current) { autoNext.current = false; setPlaying(true); } else setPlaying(false);
+  }, [frames]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Remembers the frame on screen (after the effect above has used the previous one).
+  useEffect(() => { curId.current = frameIds[i] ?? null; });
 
   const frame: Frame | undefined = frames[i];
   const plies = clip?.plies ?? [];
@@ -569,7 +626,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
     if (frame.kind === 'split') return { fen: frame.played.fen, last: frame.played.last, ply: -3, move: null as Ply | null };
     const fen = frame.fen;
     const last = frame.kind === 'countdown' || frame.kind === 'better' || frame.kind === 'hold' ? frame.last : null;
-    const ply = frame.kind === 'countdown' ? keyPly - 1 : frame.kind === 'intro' ? -1 : -2;
+    const ply = frame.kind === 'countdown' && !frame.anchor ? keyPly - 1 : frame.kind === 'intro' ? -1 : -2;
     return { fen, last, ply, move: null as Ply | null };
   }, [frame, plies, keyPly]);
 
@@ -598,13 +655,13 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
       }
     }
     if (frame.kind === 'better' && frame.last && prefs.sound) playMoveSound('move');
-    if (frame.kind === 'countdown' && prefs.sound && frame.n === 3) playMoveSound('check');
+    if (frame.kind === 'countdown' && prefs.sound && frame.n === Math.min(3, frame.total ?? 3)) playMoveSound('check');
     // Sound design on top of the music.
     if (prefs.musicFx && playing) {
       const m = mus();
-      if (frame.kind === 'countdown' && frame.n === 3) m.accent('riser');
+      if (frame.kind === 'countdown' && frame.n === Math.min(3, frame.total ?? 3)) m.accent('riser');
       if (frame.kind === 'countdown') m.accent('tick');
-      if (frame.kind === 'title' || frame.kind === 'outro' || frame.kind === 'split' || frame.kind === 'intro') m.accent('whoosh');
+      if (frame.kind === 'title' || frame.kind === 'outro' || frame.kind === 'split' || frame.kind === 'intro' || frame.kind === 'card') m.accent('whoosh');
       if (isKey && cur) {
         m.accent('impact');
         if (cls === 'brilliant' || cls === 'great' || cls === 'checkmate') m.accent('chime');
@@ -653,7 +710,8 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
     switch (f.kind) {
       case 'title': return stripEmoji(compTitle);
       case 'intro': return stripEmoji(hook.replace(/^#\d+ · /, ''));
-      case 'countdown': return f.n === 3 ? (clip.isTrap ? 'Can you spot the winning move?' : 'Can you find the move?') : null;
+      case 'countdown': return f.n === (f.total ?? 3) ? (f.text ? stripEmoji(f.text) : clip.isTrap ? 'Can you spot the winning move?' : 'Can you find the move?') : null;
+      case 'card': return stripEmoji(f.text);
       case 'move': {
         if (clip.isReview) {
           const r = clip.plies[f.ply - 1]; const rc = r?.san.includes('#') ? 'checkmate' : r?.review?.classification;
@@ -754,11 +812,13 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
     if (box && el) box.scrollTo({ left: el.offsetLeft - box.clientWidth / 2 + el.offsetWidth / 2, behavior: 'smooth' });
   }, [i]);
   const [customText, setCustomText] = useState('');
+  const [textStyle, setTextStyle] = useState<'text' | 'caption' | 'reply'>('text');
+  const [insText, setInsText] = useState('');
   const frameRef = useRef<HTMLDivElement | null>(null);
   const drag = useRef<{ id: number; dx: number; dy: number } | null>(null);
   const addSticker = (text: string, kind: Sticker['kind'], tone?: number) => {
     const id = Date.now();
-    setStickers((s) => [...s, { id, text, kind, tone, x: 50, y: kind === 'emoji' ? 30 : 22, size: kind === 'emoji' ? 12 : kind === 'badge' ? 7 : 6, from: stickerFromHere && i > 0 ? frameIds[i] : undefined }]);
+    setStickers((s) => [...s, { id, text, kind, tone, x: 50, y: kind === 'emoji' ? 30 : kind === 'caption' ? 13 : kind === 'reply' ? 30 : 22, size: kind === 'emoji' ? 12 : kind === 'badge' ? 7 : kind === 'caption' ? 8 : 6, from: stickerFromHere && i > 0 ? frameIds[i] : undefined }]);
     setSelected(id);
   };
   const onPointerMove = (e: React.PointerEvent) => {
@@ -836,6 +896,9 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
     { label: 'Blunder fail', v: { before: 5, after: 2, speed: 1.0, guess: false, betterLine: true, split: true, effects: true, intro: true } },
     { label: 'Trap tutorial', v: { before: 30, trapBefore: 99, after: 4, speed: 1.6, guess: true, captions: true, betterLine: false, split: false, intro: true } },
     { label: 'Speedrun', v: { before: 400, after: 400, speed: 0.35, guess: false, captions: false, betterLine: false, split: false, intro: true } },
+    { label: 'Quiz A/B/C', v: { guess: true, choices: true, countdownSecs: 5, betterLine: false, split: false, intro: true, before: 4, after: 2 } },
+    { label: 'Meme edit', v: { zoom: true, effects: true, music: 'hype' as MusicStyle, guess: false, captions: false, intro: false, before: 4, after: 2, speed: 0.8 } },
+    { label: '10-second challenge', v: { guess: true, countdownSecs: 10, choices: false, intro: true, before: 3, after: 3 } },
     { label: 'Guess the rating', v: { before: 10, after: 6, speed: 0.9, guess: false, guessRating: true, captions: false } },
   ];
   const applyPreset = (v: Partial<Prefs>) => setPrefs((p) => { const n = { ...p, ...v }; try { localStorage.setItem(PREF_KEY, JSON.stringify(n)); } catch { /* ignore */ } return n; });
@@ -885,6 +948,13 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
     const c0 = Math.floor(k / 4) * 4;
     subWords = { words: words.slice(c0, c0 + 4), hi: k - c0 };
   }
+  const zoomOrigin = (() => {
+    if (!prefs.zoom || !clip) return null;
+    const sq = clip.plies[clip.key]?.to; if (!sq) return null;
+    const f = sq.charCodeAt(0) - 97, r = Number(sq[1]);
+    const col = flipped ? 7 - f : f, row = flipped ? r - 1 : 8 - r;
+    return `${(col + 0.5) * 12.5}% ${(row + 0.5) * 12.5}%`;
+  })();
   const caption = frame?.kind === 'better' ? frame.text : prefs.captions && cur && !subWords ? rev?.explanation : null;
   const showBottomMove = frame?.kind === 'move' && cur;
 
@@ -908,7 +978,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
             {prefs.progress && <div className="absolute inset-x-0 top-0 z-20 h-[0.6cqh] bg-white/15"><div className="h-full bg-[#81B64C] transition-all duration-300" style={{ width: `${progress * 100}%` }} /></div>}
             {/* Hook: pops in big on the intro, then sits at the top */}
             <motion.div key={frame?.kind === 'intro' ? 'intro' : 'top'} initial={frame?.kind === 'intro' ? { scale: 0.6, opacity: 0, y: '18cqh' } : false}
-              animate={{ scale: 1, opacity: pop || frame?.kind === 'countdown' ? 0 : 1, y: frame?.kind === 'intro' ? '18cqh' : 0 }} transition={{ type: 'spring', stiffness: 260, damping: 18 }}
+              animate={{ scale: 1, opacity: pop || frame?.kind === 'countdown' || frame?.kind === 'card' ? 0 : 1, y: frame?.kind === 'intro' ? '18cqh' : 0 }} transition={{ type: 'spring', stiffness: 260, damping: 18 }}
               className="absolute inset-x-0 top-[6.5%] z-10 px-[6%] text-center">
               {isComp && frame?.kind === 'intro' && (
                 <motion.div key={`rank${clipQ}`} initial={{ scale: 3, opacity: 0, rotate: -20 }} animate={{ scale: 1, opacity: 1, rotate: 0 }} transition={{ type: 'spring', stiffness: 300, damping: 15, delay: 0.15 }}
@@ -922,7 +992,10 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
             {/* Board block */}
             <div className="absolute inset-x-[4%] top-[22%]" style={{ opacity: frame?.kind === 'intro' ? 0.35 : 1, transition: 'opacity .4s' }}>
               <p className="mb-1 truncate text-[clamp(11px,1.6cqh,16px)] font-bold text-white/85">{name(top)}</p>
-              <motion.div animate={prefs.effects && isKey ? { scale: [1, 1.045, 1] } : { scale: 1 }} transition={{ duration: 0.6 }}>
+              <div className={prefs.zoom ? 'overflow-hidden rounded-[10px]' : undefined}>
+              <motion.div style={zoomOrigin && frame?.kind !== 'split' ? { transformOrigin: zoomOrigin } : undefined}
+                animate={zoomOrigin && isKey ? { scale: [1, 1.75, 1.75, 1] } : prefs.effects && isKey ? { scale: [1, 1.045, 1] } : { scale: 1 }}
+                transition={zoomOrigin && isKey ? { duration: Math.max(1.2, (frame ? dur(frame) : 2000) / 1000), times: [0, 0.22, 0.8, 1], ease: 'easeInOut' } : { duration: 0.6 }}>
                 <LookOverride look={look}>
                   {frame?.kind === 'split' ? (
                     <div className="grid grid-cols-2 gap-[3%]">
@@ -942,11 +1015,12 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
                   )}
                 </LookOverride>
               </motion.div>
+              </div>
               <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-[#2B2B2B]"><div className="h-full rounded-full bg-[#F2F2F2] transition-all duration-500" style={{ width: `${evPct}%` }} /></div>
               <p className="mt-1 truncate text-[clamp(11px,1.6cqh,16px)] font-bold text-white/85">{name(top === 'w' ? 'b' : 'w')}</p>
             </div>
             {/* Move + caption */}
-            {(showBottomMove || caption) && !subWords && frame?.kind !== 'outro' && frame?.kind !== 'reveal' && (
+            {(showBottomMove || caption) && !subWords && !(choices && isKey) && frame?.kind !== 'outro' && frame?.kind !== 'reveal' && (
               <div className="absolute inset-x-[5%] bottom-[9%] z-10">
                 {showBottomMove && cur && (
                   <div className="flex items-center gap-2">
@@ -973,9 +1047,42 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
             <AnimatePresence>
               {frame?.kind === 'countdown' && (
                 <motion.div key={frame.n} initial={{ scale: 0.4, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 1.6, opacity: 0 }} transition={{ duration: 0.35 }}
-                  className="absolute inset-x-0 top-[6%] z-20 flex h-[15%] items-center justify-center gap-[2.2cqh] px-[5%]">
-                  <div style={{ fontSize: 'clamp(36px,7.6cqh,82px)' }}><CountdownRing n={frame.n} seconds={dur(frame) / 1000} color={frame.n === 1 ? '#F0605D' : frame.n === 2 ? '#E8B447' : '#81B64C'} /></div>
-                  <p className="rounded-full bg-[#81B64C] px-[1em] py-[0.35em] font-black uppercase leading-tight text-white shadow-xl ring-2 ring-white" style={{ fontSize: 'clamp(14px,2.6cqh,28px)', textShadow: '0 1px 0 #3E6420' }}>{clip.isTrap ? 'Spot the winning move' : 'Can you find it?'}</p>
+                  className="absolute inset-x-0 top-[6%] z-20 flex h-[15%] flex-col items-center justify-center px-[5%]">
+                  <div className="flex items-center justify-center gap-[2.2cqh]">
+                    <div style={{ fontSize: 'clamp(36px,7.6cqh,82px)' }}><CountdownRing n={frame.n} seconds={dur(frame) / 1000} color={frame.n === 1 ? '#F0605D' : frame.n === 2 ? '#E8B447' : '#81B64C'} /></div>
+                    <p className="max-w-[60cqw] rounded-[1em] bg-[#81B64C] px-[1em] py-[0.35em] font-black uppercase leading-tight text-white shadow-xl ring-2 ring-white" style={{ fontSize: 'clamp(14px,2.6cqh,28px)', textShadow: '0 1px 0 #3E6420' }}>{frame.text ?? (clip.isTrap ? 'Spot the winning move' : 'Can you find it?')}</p>
+                  </div>
+                  {(frame.total ?? 3) > 3 && (
+                    <div className="mt-[1.2cqh] h-[0.8cqh] w-[70%] overflow-hidden rounded-full bg-white/20">
+                      <motion.div className="h-full rounded-full" style={{ background: frame.n <= 3 ? '#F0605D' : '#81B64C' }}
+                        initial={{ width: `${(((frame.total ?? 3) - frame.n) / (frame.total ?? 3)) * 100}%` }} animate={{ width: `${(((frame.total ?? 3) - frame.n + 1) / (frame.total ?? 3)) * 100}%` }} transition={{ duration: dur(frame) / 1000, ease: 'linear' }} />
+                    </div>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
+            {/* A / B / C: three moves to pick from during the countdown, the right one lights up on the reveal */}
+            {choices && ((frame?.kind === 'countdown' && !frame.anchor) || isKey) && (
+              <div className="pointer-events-none absolute inset-x-[5%] bottom-[9.5%] z-20 grid grid-cols-3 gap-[1.2cqh]">
+                {choices.options.map((san, k) => {
+                  const right = san === choices.correct; const reveal = isKey;
+                  return (
+                    <motion.div key={san} initial={{ y: 24, opacity: 0 }} animate={{ y: 0, opacity: reveal && !right ? 0.45 : 1, scale: reveal && right ? 1.08 : 1 }} transition={{ delay: frame?.kind === 'countdown' ? k * 0.12 : 0, type: 'spring', stiffness: 320, damping: 18 }}
+                      className="flex items-center gap-[0.5em] rounded-[0.6em] px-[0.6em] py-[0.45em] font-black text-white shadow-xl"
+                      style={{ fontSize: 'clamp(13px,2.4cqh,26px)', background: reveal ? (right ? '#5FA83A' : '#7A2C2A') : 'rgba(10,14,12,.86)', border: `2px solid ${reveal && right ? '#fff' : 'rgba(255,255,255,.45)'}` }}>
+                      <span className="grid h-[1.5em] w-[1.5em] shrink-0 place-items-center rounded-full text-[0.8em]" style={{ background: reveal && right ? '#fff' : '#81B64C', color: reveal && right ? '#3E6420' : '#fff' }}>{'ABC'[k]}</span>
+                      <span className="truncate">{figurine(san, choices.white)}</span>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            )}
+            {/* Text card inserted on the timeline */}
+            <AnimatePresence>
+              {frame?.kind === 'card' && (
+                <motion.div key={`card${i}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 z-30 grid place-items-center bg-black/80 backdrop-blur-sm px-[8%]">
+                  <motion.p initial={{ scale: 0.7, y: 20 }} animate={{ scale: 1, y: 0 }} transition={{ type: 'spring', stiffness: 260, damping: 16 }}
+                    className="whitespace-pre-line text-center font-black leading-[1.15] text-white" style={{ fontSize: 'clamp(22px,5cqh,54px)', textShadow: '0 4px 20px rgba(0,0,0,.6)' }}>{frame.text}</motion.p>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -1097,6 +1204,15 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
                 style={{ left: `${st.x}%`, top: `${st.y}%`, outline: selected === st.id && !clean && !recording ? '2px dashed rgba(255,255,255,.7)' : 'none', outlineOffset: 4 }}>
                 {st.kind === 'emoji'
                   ? <motion.span initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 400, damping: 12 }} className="block" style={{ fontSize: `${st.size * 0.5}cqh`, lineHeight: 1 }}>{st.text}</motion.span>
+                  : st.kind === 'caption'
+                  ? <motion.p initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 400, damping: 14 }} className="text-center font-black uppercase leading-[1.04]"
+                      style={{ fontSize: `${st.size * 0.55}cqh`, width: '88cqw', fontFamily: 'Impact, Anton, "Arial Black", system-ui, sans-serif', color: '#fff', WebkitTextStroke: '0.07em #000', paintOrder: 'stroke fill', textShadow: '0 0.08em 0 #000, 0 0 0.25em rgba(0,0,0,.55)', letterSpacing: '0.01em' }}>{st.text}</motion.p>
+                  : st.kind === 'reply'
+                  ? <motion.div initial={{ scale: 0, rotate: -3 }} animate={{ scale: 1, rotate: -2 }} transition={{ type: 'spring', stiffness: 380, damping: 16 }}
+                      className="max-w-[78cqw] rounded-[0.6em] bg-white px-[0.8em] py-[0.55em] text-left shadow-2xl" style={{ fontSize: `${st.size * 0.42}cqh` }}>
+                      <p className="flex items-center gap-[0.4em] font-bold text-[#6B6B6B]" style={{ fontSize: '0.62em' }}><span className="inline-block h-[1.3em] w-[1.3em] rounded-full" style={{ background: 'linear-gradient(135deg,#81B64C,#1BACA6)' }} />Reply to a comment</p>
+                      <p className="mt-[0.15em] font-black leading-snug text-[#141414]">{st.text}</p>
+                    </motion.div>
                   : st.kind === 'badge' && LABEL[st.text]
                   ? <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 400, damping: 12 }} style={{ fontSize: `${st.size * 0.45}cqh`, transform: 'rotate(-4deg)' }}><StudioBadge {...LABEL[st.text]} /></motion.div>
                   : <motion.span initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 400, damping: 12 }} className="block whitespace-nowrap font-black"
@@ -1146,7 +1262,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
               const m = f.kind === 'move' ? plies[f.ply - 1] : null;
               const c = m ? (m.san.includes('#') ? 'checkmate' : m.review?.classification) : null;
               const tone = c && LABEL[c] && !['best', 'excellent', 'good', 'book'].includes(c) ? LABEL[c].color : null;
-              const label = f.kind === 'move' ? (m ? figurine(m.san, m.color === 'w') : 'Start') : f.kind === 'countdown' ? String(f.n)
+              const label = f.kind === 'move' ? (m ? figurine(m.san, m.color === 'w') : 'Start') : f.kind === 'countdown' ? (f.anchor ? `⏱${f.n}` : String(f.n)) : f.kind === 'card' ? 'Card'
                 : ({ title: 'Title', intro: 'Hook', hold: 'Start', better: 'Line', split: 'Split', reveal: 'Rating', summary: 'Summary', outro: 'End' } as Record<string, string>)[f.kind] ?? f.kind;
               const starts = stickers.filter((st) => st.from === id).length, ends = stickers.filter((st) => st.to === id).length;
               return (
@@ -1175,6 +1291,28 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
               {Object.keys(holds).length > 0 && <button onClick={() => setHolds({})} className="text-[11.5px] font-bold text-white/45 underline">Clear all pauses</button>}
             </div>
           )}
+          {frameIds[i] && frame && (() => {
+            const anchor = (frame.kind === 'countdown' || frame.kind === 'card') && frame.anchor ? frame.anchor : frameIds[i];
+            const ins = inserts[anchor];
+            const put = (kind: 'timer' | 'card', secs: number) => setInserts((m) => ({ ...m, [anchor]: { ...m[anchor], [kind]: { secs, text: insText.trim() || (kind === 'timer' ? 'Pause and find the move' : 'Part 2') } } }));
+            const drop = (kind: 'timer' | 'card') => setInserts((m) => { const n = { ...m }; const v = { ...n[anchor] }; delete v[kind]; if (!v.timer && !v.card) delete n[anchor]; else n[anchor] = v; return n; });
+            return (
+              <div className="mb-3 rounded-lg bg-white/5 p-2 text-[12px] text-white/70">
+                <p className="mb-1.5 font-bold text-white/80">Insert before this frame</p>
+                <input value={insText} onChange={(e) => setInsText(e.target.value)} maxLength={120} placeholder="Text (e.g. Pause and find the move · Part 2 · a quote)" className="mb-1.5 w-full rounded-md bg-white/5 px-2 py-1 text-[12.5px] text-white outline-none ring-1 ring-white/10 focus:ring-[#81B64C]" />
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="font-bold">⏱ Countdown</span>
+                  {[3, 5, 10, 15, 30].map((sec) => <button key={sec} onClick={() => put('timer', sec)} className="rounded-full px-2 py-0.5 text-[11.5px] font-bold" style={{ background: ins?.timer?.secs === sec ? '#81B64C' : 'rgba(255,255,255,.08)', color: '#fff' }}>{sec}s</button>)}
+                  {ins?.timer && <button onClick={() => drop('timer')} className="text-[11.5px] font-bold text-[#F59B98] underline">Remove</button>}
+                </div>
+                <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                  <span className="font-bold">📝 Text card</span>
+                  {[2, 3, 5].map((sec) => <button key={sec} onClick={() => put('card', sec)} className="rounded-full px-2 py-0.5 text-[11.5px] font-bold" style={{ background: ins?.card?.secs === sec ? '#81B64C' : 'rgba(255,255,255,.08)', color: '#fff' }}>{sec}s</button>)}
+                  {ins?.card && <button onClick={() => drop('card')} className="text-[11.5px] font-bold text-[#F59B98] underline">Remove</button>}
+                </div>
+              </div>
+            );
+          })()}
           <div className="mb-3 flex flex-wrap gap-1.5">
             <button onClick={record} className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[13px] font-black text-white" style={{ background: recording ? '#CA3431' : '#2A3335' }}>
               {recording ? <Square size={14} /> : <Video size={14} />}{recording ? 'Stop recording' : 'Record clip'}
@@ -1286,6 +1424,10 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
           <div className="mb-3 flex flex-wrap gap-1.5">
             {toggle('intro', 'Hook intro')}
             {toggle('guess', 'Find-the-move countdown')}
+            {prefs.guess && [3, 5, 10].map((sec) => (
+              <button key={sec} onClick={() => set('countdownSecs', sec)} className="rounded-full px-2 py-1 text-[12px] font-bold" style={{ background: prefs.countdownSecs === sec ? 'rgba(129,182,76,.25)' : 'rgba(255,255,255,.06)', color: prefs.countdownSecs === sec ? '#B8E08C' : '#C9CFCD' }}>{sec}s</button>
+            ))}
+            {prefs.guess && toggle('choices', 'A / B / C choices')}
             {toggle('betterLine', 'Show the better line')}
             {toggle('split', 'Played vs better (side by side)')}
             {!clip.isTrap && toggle('guessRating', 'Guess the rating')}
@@ -1295,6 +1437,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
           <div className="mb-3 flex flex-wrap gap-1.5">
             {toggle('remix', 'Remix board every move')}
             {toggle('pieceFx', 'Animated pieces')}
+            {toggle('zoom', 'Zoom on the key move')}
             {toggle('effects', 'Pop, confetti, shake')}
             {toggle('captions', 'Coach caption')}
             {toggle('arrow', 'Best-move arrow')}
@@ -1335,10 +1478,16 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
           <div className="mb-2 flex flex-wrap gap-1">
             {TEXT_STICKERS.map((t, k) => <button key={t} onClick={() => addSticker(t, 'text', k % TONES.length)} className="rounded-md px-2 py-1 text-[11px] font-black ring-1 ring-white/30" style={{ background: TONES[k % TONES.length].bg, color: TONES[k % TONES.length].fg }}>{t}</button>)}
           </div>
-          <form onSubmit={(e) => { e.preventDefault(); if (customText.trim()) { addSticker(customText.trim().slice(0, 40), 'text', stickers.length % TONES.length); setCustomText(''); } }} className="mb-2 flex gap-1.5">
-            <input value={customText} onChange={(e) => setCustomText(e.target.value)} placeholder="Your own text…" maxLength={40} className="min-w-0 flex-1 rounded-lg bg-white/5 px-3 py-1.5 text-[13px] text-white outline-none ring-1 ring-white/10 focus:ring-[#81B64C]" />
+          <form onSubmit={(e) => { e.preventDefault(); if (customText.trim()) { addSticker(customText.trim().slice(0, textStyle === 'text' ? 40 : 120), textStyle, stickers.length % TONES.length); setCustomText(''); } }} className="mb-2 flex gap-1.5">
+            <select value={textStyle} onChange={(e) => setTextStyle(e.target.value as typeof textStyle)} className="shrink-0 rounded-lg bg-white/5 px-1.5 text-[12px] text-white ring-1 ring-white/10">
+              <option value="text">Sticker</option><option value="caption">Meme caption</option><option value="reply">Comment reply</option>
+            </select>
+            <input value={customText} onChange={(e) => setCustomText(e.target.value)} placeholder={textStyle === 'reply' ? 'The comment you are answering…' : textStyle === 'caption' ? 'Big top caption…' : 'Your own text…'} maxLength={textStyle === 'text' ? 40 : 120} className="min-w-0 flex-1 rounded-lg bg-white/5 px-3 py-1.5 text-[13px] text-white outline-none ring-1 ring-white/10 focus:ring-[#81B64C]" />
             <button type="submit" className="rounded-lg bg-[#81B64C] px-3 py-1.5 text-[12.5px] font-black text-white">Add</button>
           </form>
+          <div className="mb-2 flex flex-wrap gap-1">
+            {MEME_CAPTIONS.map((t) => <button key={t} onClick={() => addSticker(t, 'caption')} className="rounded-md bg-black px-2 py-1 text-[11px] font-black uppercase text-white ring-1 ring-white/40" style={{ fontFamily: 'Impact, Anton, "Arial Black", sans-serif', letterSpacing: '.02em' }}>{t}</button>)}
+          </div>
           <div className="mb-2 flex flex-wrap gap-1.5">
             {BADGE_STICKERS.map((c) => <button key={c} onClick={() => addSticker(c, 'badge')} className="rounded-lg bg-white/5 px-1.5 py-1 hover:bg-white/10" style={{ fontSize: 9 }} title={LABEL[c].text}><StudioBadge {...LABEL[c]} /></button>)}
           </div>
