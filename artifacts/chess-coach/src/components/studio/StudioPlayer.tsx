@@ -291,6 +291,31 @@ export function StudioPlayer({ source, queue, title, onClose, onNext, onPrev }: 
   const [fixedLook, setFixedLook] = useState<BoardLook | null>(null);
   const [flipped, setFlipped] = useState(false);
   const [clean, setClean] = useState(false);
+  // Clean view: an Exit button shows for a few seconds on entering and whenever the screen is tapped;
+  // the phone's back button (or Esc) also just leaves clean view, never the Studio.
+  const [exitHint, setExitHint] = useState(0);
+  const showExit = () => setExitHint(Date.now());
+  useEffect(() => { if (!exitHint) return; const t = setTimeout(() => setExitHint(0), 3500); return () => clearTimeout(t); }, [exitHint]);
+  const enterClean = () => { setClean(true); showExit(); try { window.history.pushState({ csClean: 1 }, ''); } catch { /* ignore */ } };
+  const exitClean = () => { setClean(false); setExitHint(0); try { if (window.history.state?.csClean) { ignorePop.current = true; window.history.back(); } } catch { /* ignore */ } };
+  // Back button: leaves clean view if it's on, otherwise closes the player (back to the Studio list, picks kept).
+  const cleanRef = useRef(false); cleanRef.current = clean;
+  const ignorePop = useRef(false);
+  const closeRef = useRef(onClose); closeRef.current = onClose;
+  useEffect(() => {
+    try { window.history.pushState({ csPlayer: 1 }, ''); } catch { /* ignore */ }
+    const h = () => {
+      if (ignorePop.current) { ignorePop.current = false; return; }
+      if (cleanRef.current) { setClean(false); setExitHint(0); return; }
+      closeRef.current();
+    };
+    window.addEventListener('popstate', h);
+    return () => window.removeEventListener('popstate', h);
+  }, []);
+  const close = () => {
+    try { if (window.history.state?.csPlayer || window.history.state?.csClean) { ignorePop.current = true; window.history.go(window.history.state?.csClean ? -2 : -1); } } catch { /* ignore */ }
+    onClose();
+  };
   const [compTitle, setCompTitleState] = useState(() => title ?? loadPrefs().compTitle);
   const setCompTitle = (v: string) => { setCompTitleState(v); if (!title) set('compTitle', v); };
   useEffect(() => {
@@ -595,7 +620,7 @@ export function StudioPlayer({ source, queue, title, onClose, onNext, onPrev }: 
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-      if (e.key === 'Escape') { if (clean) setClean(false); else onClose(); }
+      if (e.key === 'Escape') { if (clean) exitClean(); else close(); }
       if (e.key === ' ') { e.preventDefault(); setPlaying((p) => !p); }
       if (e.key === 'ArrowRight') setI((x) => Math.min(frames.length - 1, x + 1));
       if (e.key === 'ArrowLeft') setI((x) => Math.max(0, x - 1));
@@ -633,7 +658,7 @@ export function StudioPlayer({ source, queue, title, onClose, onNext, onPrev }: 
   const [copied, setCopied] = useState(false);
   const copyPost = () => { navigator.clipboard?.writeText(postText).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); }).catch(() => {}); };
 
-  if (err) return <div className="fixed inset-0 z-[90] grid place-items-center bg-black/85 p-6 text-white" onClick={onClose}><p>{err}</p></div>;
+  if (err) return <div className="fixed inset-0 z-[90] grid place-items-center bg-black/85 p-6 text-white" onClick={close}><p>{err}</p></div>;
   if (!clip || !view) return <div className="fixed inset-0 z-[90] grid place-items-center bg-black/85 text-white/70">Loading clip…</div>;
 
   const evCp = cur?.review?.evalAfterCp ?? (view.ply === -1 || view.ply === -2 ? null : null);
@@ -679,7 +704,7 @@ export function StudioPlayer({ source, queue, title, onClose, onNext, onPrev }: 
   return (
     <div className="fixed inset-0 z-[90] flex flex-col bg-[#05080A] text-white lg:flex-row" onPointerMove={onPointerMove} onPointerUp={() => { drag.current = null; }}>
       {/* ── The 9:16 frame ── */}
-      <div className={`flex min-h-0 flex-1 items-center justify-center ${clean ? 'p-0' : 'p-3'}`} onClick={() => setSelected(null)}>
+      <div className={`flex min-h-0 flex-1 items-center justify-center ${clean ? 'p-0' : 'p-3'}`} onClick={() => { setSelected(null); if (clean) showExit(); }}>
         <div ref={frameRef} className="relative overflow-hidden"
           style={{ aspectRatio: '9 / 16', height: clean ? '100dvh' : 'min(100%, 92dvh)', maxWidth: '100%', containerType: 'size', ...BACKGROUNDS[prefs.bg]?.css } as React.CSSProperties}>
           <motion.div key={shake} animate={shake ? { x: [0, -14, 12, -8, 6, 0] } : {}} transition={{ duration: 0.45 }} className="absolute inset-0">
@@ -824,7 +849,13 @@ export function StudioPlayer({ source, queue, title, onClose, onNext, onPrev }: 
               <div className="absolute inset-x-0 top-0 h-[6%] border-b-2 border-dashed border-white/35 bg-white/5" />
             </div>
           )}
-          {clean && <button onClick={() => setClean(false)} aria-label="Show controls" className="absolute left-0 top-0 z-50 h-16 w-16 opacity-0" />}
+          {clean && (
+            <button onClick={(e) => { e.stopPropagation(); exitClean(); }} aria-label="Exit clean view"
+              className="absolute left-3 top-3 z-[60] flex items-center gap-1.5 rounded-full bg-black/75 px-3.5 py-2 text-[13px] font-black text-white ring-1 ring-white/30 transition-opacity duration-300"
+              style={{ opacity: exitHint ? 1 : 0 }}>
+              <X size={15} />Exit clean view
+            </button>
+          )}
         </div>
       </div>
 
@@ -835,7 +866,7 @@ export function StudioPlayer({ source, queue, title, onClose, onNext, onPrev }: 
             <p className="flex-1 truncate text-[15px] font-black">{clip.label}</p>
             {onPrev && <button onClick={onPrev} className={ctl} title="Previous moment (P)"><SkipBack size={14} /></button>}
             {onNext && <button onClick={onNext} className={ctl} title="Next moment (N)"><SkipForward size={14} /></button>}
-            <button onClick={onClose} aria-label="Close" className="rounded-lg p-1.5 text-white/70 hover:bg-white/10"><X size={18} /></button>
+            <button onClick={close} aria-label="Close" className="rounded-lg p-1.5 text-white/70 hover:bg-white/10"><X size={18} /></button>
           </div>
           <div className="mb-3 flex flex-wrap items-center gap-1.5">
             <button onClick={() => (i >= frames.length - 1 ? restart() : setPlaying((p) => !p))} className="flex items-center gap-1.5 rounded-lg bg-[#81B64C] px-3 py-1.5 text-[13px] font-black text-white">{playing ? <Pause size={15} /> : <Play size={15} />}{playing ? 'Pause' : 'Play'}</button>
@@ -849,7 +880,7 @@ export function StudioPlayer({ source, queue, title, onClose, onNext, onPrev }: 
             <button onClick={record} className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[13px] font-black text-white" style={{ background: recording ? '#CA3431' : '#2A3335' }}>
               {recording ? <Square size={14} /> : <Video size={14} />}{recording ? 'Stop recording' : 'Record clip'}
             </button>
-            <button onClick={() => setClean(true)} className={ctl}><EyeOff size={14} className="mr-1 inline" />Clean view</button>
+            <button onClick={enterClean} className={ctl}><EyeOff size={14} className="mr-1 inline" />Clean view</button>
             <button onClick={saveCover} className={ctl} title="Download a cover image for the post"><ImageIcon size={14} className="mr-1 inline" />Cover image</button>
           </div>
           {isComp && (
@@ -972,7 +1003,7 @@ export function StudioPlayer({ source, queue, title, onClose, onNext, onPrev }: 
 
           <p className="mt-3 text-[11.5px] leading-snug text-white/45">
             Music is made live in the browser (original, no copyright claims); it starts on the beat when you press Play. Space plays, arrows step, R restarts, N / P next and previous moment, Esc leaves clean view. "Record clip" saves just the frame (Chrome on a computer: pick this tab and turn on tab audio for move sounds).
-            On a phone, open Clean view and use the screen recorder; tap the top-left corner to bring the controls back. Settings are remembered for the next clip.
+            On a phone, open Clean view and use the screen recorder; tap the screen (or press back) to get the Exit button. Settings are remembered for the next clip.
           </p>
           <p className="mt-2 text-[11px] text-white/35"><Eye size={12} className="mr-1 inline" />{clip.label}</p>
         </div>
