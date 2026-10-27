@@ -37,12 +37,12 @@ export function MoveNavigationBar({
   canGoBack = true, canGoForward = true, extra, variant,
 }: MoveNavigationBarProps) {
   // Hold the back / forward arrow to speed through the moves.
-  const holdPrev = useHoldRepeat(() => { if (!canGoBack) return false; onPrev(); });
-  const holdNext = useHoldRepeat(() => { if (!canGoForward) return false; onNext(); });
+  const holdPrev = useHoldRepeat(() => { if (!canGoBack) return false; onPrev(); return true; });
+  const holdNext = useHoldRepeat(() => { if (!canGoForward) return false; onNext(); return true; });
   if (variant === 'redesign') {
     // Five wide rounded buttons across the row (redesign mockup)
     const wide = (onClick: () => void, disabled: boolean, icon: React.ReactNode, label: string, hold?: ReturnType<typeof useHoldRepeat>) => (
-      <button onClick={onClick} {...(hold ?? {})} disabled={disabled} aria-label={label}
+      <button {...(hold ?? { onClick })} disabled={disabled} aria-label={label}
         className="flex h-[46px] items-center justify-center rounded-[13px] transition-transform active:scale-95 disabled:opacity-30"
         style={{ background: 'var(--cs-bg-card, #0D1516)', border: '1px solid var(--cs-border, rgba(255,255,255,.08))', color: TEXT_LIGHT, ...(hold?.style ?? {}) }}>
         {icon}
@@ -60,8 +60,7 @@ export function MoveNavigationBar({
   }
   const navBtn = (onClick: () => void, disabled: boolean, icon: React.ReactNode, label: string, hold?: ReturnType<typeof useHoldRepeat>) => (
     <button
-      onClick={onClick}
-      {...(hold ?? {})}
+      {...(hold ?? { onClick })}
       disabled={disabled}
       aria-label={label}
       className="w-10 h-10 flex items-center justify-center rounded-full transition-all duration-150 active:scale-90 disabled:opacity-30 disabled:pointer-events-none"

@@ -172,6 +172,7 @@ export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flippe
     const target = Math.max(0, Math.min(max, plyRef.current + d));
     if (target === plyRef.current) return false;
     if (repeat) { plyRef.current = target; setPly(target); } else go(target);
+    return true;
   };
   const holdPrev = useHoldRepeat(holdStep(-1));
   const holdNext = useHoldRepeat(holdStep(1));
