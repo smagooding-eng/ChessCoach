@@ -31,10 +31,10 @@ jobs:
           TOKEN: ${{ secrets.DESKTOP_SHOT_TOKEN }}
         run: |
           mkdir -p /tmp/export
-          url="https://chessscout.net/api/admin/traffic-export?startDate=${{ github.event.inputs.start_date }}&endDate=${{ github.event.inputs.end_date }}&tz=${{ github.event.inputs.tz }}"
+          url="https://chesscoach-api-kbf8.onrender.com/api/admin/traffic-export?startDate=${{ github.event.inputs.start_date }}&endDate=${{ github.event.inputs.end_date }}&tz=${{ github.event.inputs.tz }}"
           code=$(curl -sS -o /tmp/export/export.json -w '%{http_code}' -H "Authorization: Bearer $TOKEN" "$url")
           echo "HTTP $code"
-          [ "$code" = "200" ] || { head -c 300 /tmp/export/export.json; exit 1; }
+          [ "$code" = "200" ] && head -c 1 /tmp/export/export.json | grep -q "{" || { echo "Not a JSON export"; exit 1; }
       - name: Encrypt and push
         run: |
           cd /tmp
