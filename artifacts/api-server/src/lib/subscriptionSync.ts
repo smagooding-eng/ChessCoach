@@ -10,7 +10,7 @@ import { logger } from "./logger";
 
 export async function syncUserSubscriptions(): Promise<{ set: number; cleared: number }> {
   const ok = await db.execute(sql`SELECT to_regclass('stripe.subscriptions') IS NOT NULL AS ok`)
-    .then((r) => !!((Array.isArray(r) ? r : (r as { rows?: { ok: boolean }[] }).rows ?? [])[0] as { ok?: boolean } | undefined)?.ok)
+    .then((r) => !!((r as unknown as { rows?: { ok?: boolean }[] }).rows?.[0]?.ok))
     .catch(() => false);
   if (!ok) return { set: 0, cleared: 0 };
   const set = await db.execute(sql`
