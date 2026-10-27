@@ -9,6 +9,9 @@ import { db, chessTrapsTable } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { logger } from "./logger";
 import { contentTags } from "./basicCoach";
+import { isBookPosition } from "./openingBook";
+import { OPENING_POSITIONS } from "./openingPositions";
+import { Chess } from "chess.js";
 
 export const MOMENT_TAGS = [
   "brilliant", "great", "blunder", "missed_win", "checkmate", "sacrifice", "fork", "pin", "skewer", "discovered", "promotion", "trap", "endgame", "opening",
@@ -185,20 +188,99 @@ export async function studioGame(id: number) {
   };
 }
 
-/** The app's trap lessons, as Studio clips (moves, a note per move, the critical move). */
+// Most trap lessons start from a position a few moves into the opening. For the
+// Studio, find the opening moves that lead there (through known book positions),
+// so a clip can show the whole game from move 1.
+const leadInCache = new Map<string, string[] | null>();
+let warming = false;
+let named: Set<string> | null = null;
+function findLeadIn(target: string): string[] | null {
+  const parts = target.trim().split(/\s+/);
+  if (parts.length < 2) return null;
+  const fullmove = Number(parts[5]) || 0;
+  const plies = fullmove ? (fullmove - 1) * 2 + (parts[1] === "b" ? 1 : 0) : 0;
+  if (plies <= 0 || plies > 24) return null;
+  // Board as 64 chars, to count how many squares still differ from the target.
+  const grid = (fen: string) => fen.split(" ")[0].replace(/\d/g, (n) => ".".repeat(Number(n))).replace(/\//g, "");
+  const goal = grid(target), goalTurn = parts[1];
+  const diff = (fen: string) => { const g = grid(fen); let d = 0; for (let i = 0; i < 64; i++) if (g[i] !== goal[i]) d++; return d; };
+  const key4 = (fen: string) => fen.split(" ").slice(0, 4).join(" ");
+  // The most natural move order: through named opening lines where possible, then pawn moves early
+  // and knights before bishops (1.e4 e5 2.Nf3 Nc6 3.Bc4).
+  named ??= new Set(OPENING_POSITIONS.split("\n"));
+  const cost = (san: string, i: number, fen: string) => (named!.has(key4(fen)) ? -10 : 0) + (/^[a-h]/.test(san) ? i : 0) + (san.startsWith("N") ? i * 0.1 : 0);
+  type Node = { fen: string; path: string[]; score: number };
+  let frontier: Node[] = [{ fen: new Chess().fen(), path: [], score: 0 }];
+  const seen = new Set<string>([key4(frontier[0].fen)]);
+  const found: Node[] = [];
+  for (let d = 0; d < plies; d++) {
+    const left = plies - d - 1;
+    const next: Node[] = [];
+    const atLevel = new Map<string, number>();
+    for (const node of frontier) {
+      const c = new Chess(node.fen);
+      for (const m of c.moves({ verbose: true })) {
+        c.move(m);
+        const f = c.fen();
+        c.undo();
+        const dd = diff(f);
+        const score = node.score + cost(m.san, d, f);
+        if (left === 0) { if (dd === 0 && f.split(" ")[1] === goalTurn) found.push({ fen: f, path: [...node.path, m.san], score }); continue; }
+        // A move changes at most two squares (castling four): prune what can't reach the target in time.
+        if (dd > 2 * left + 2) continue;
+        const k = key4(f);
+        // Reached again this level by a more natural order: keep that one.
+        const at = atLevel.get(k);
+        if (at !== undefined) { if (score < next[at].score) next[at] = { fen: f, path: [...node.path, m.san], score }; continue; }
+        if (seen.has(k) || !isBookPosition(f)) continue;
+        seen.add(k);
+        atLevel.set(k, next.length);
+        next.push({ fen: f, path: [...node.path, m.san], score });
+      }
+    }
+    if (left === 0) break;
+    if (!next.length || next.length > 30000) return null;
+    frontier = next;
+  }
+  if (!found.length) return null;
+  return found.sort((a, b) => a.score - b.score)[0].path;
+}
+
+/** The app's trap lessons, as Studio clips (opening lead-in, moves, a note per move, the critical move). */
 export async function studioTraps() {
-  const rows = await db.select().from(chessTrapsTable);
-  return rows.filter((t) => !t.archived).map((t) => ({
-    id: t.id, name: t.name, category: t.category, difficulty: t.difficulty, trapSide: t.trapSide, summary: t.summary,
-    startingFen: t.startingFen, moves: (t.trapLineSan ?? []) as string[], notes: (t.moveNotes ?? []) as string[], critical: t.criticalMoveIndex,
-  }));
+  const rows = (await db.select().from(chessTrapsTable)).filter((r) => !r.archived);
+  const fenOf = (t: { startingFen: string }) => (t.startingFen && t.startingFen !== "startpos" ? t.startingFen : "");
+  const solve = async (fen: string) => {
+    if (!fen || leadInCache.has(fen)) return;
+    try { leadInCache.set(fen, findLeadIn(fen)); } catch { leadInCache.set(fen, null); }
+    await new Promise((res) => setImmediate(res));
+  };
+  // A few seconds now; anything left is worked out in the background for the next visit.
+  const started = Date.now();
+  for (const t of rows) { if (Date.now() - started > 3000) break; await solve(fenOf(t)); }
+  if (rows.some((t) => fenOf(t) && !leadInCache.has(fenOf(t))) && !warming) {
+    warming = true;
+    void (async () => { try { for (const t of rows) await solve(fenOf(t)); } finally { warming = false; } })();
+  }
+  const out = [];
+  for (const t of rows) {
+    const fen = fenOf(t);
+    const leadIn: string[] = fen ? leadInCache.get(fen) ?? [] : [];
+    out.push({
+      id: t.id, name: t.name, category: t.category, difficulty: t.difficulty, trapSide: t.trapSide, summary: t.summary,
+      startingFen: t.startingFen, moves: (t.trapLineSan ?? []) as string[], notes: (t.moveNotes ?? []) as string[], critical: t.criticalMoveIndex,
+      leadIn,
+    });
+  }
+  return out;
 }
 
 // ── Puzzles: the app's puzzle library as Studio clips ─────────────────────
 export interface PuzzleQuery { theme?: string; minRating?: number; maxRating?: number; sort?: "random" | "hard" | "easy" | "new"; limit?: number; offset?: number; source?: string }
 export async function studioPuzzles(q: PuzzleQuery) {
   const conds = [sql`archived = false`];
-  if (q.theme) conds.push(sql`(' ' || COALESCE(themes,'') || ' ') ILIKE ${"% " + q.theme + " %"}`);
+  // Themes are stored space- or comma-separated (Lichess imports vs. our own puzzles).
+  if (q.theme) conds.push(sql`COALESCE(themes,'') ~* ${"(^|[ ,])" + q.theme + "([ ,]|$)"}`);
   if (q.minRating) conds.push(sql`rating >= ${q.minRating}`);
   if (q.maxRating) conds.push(sql`rating <= ${q.maxRating}`);
   if (q.source) conds.push(sql`source = ${q.source}`);
@@ -212,7 +294,7 @@ let themeCache: { at: number; list: { theme: string; n: number }[] } | null = nu
 export async function puzzleThemes() {
   if (themeCache && Date.now() - themeCache.at < 6 * 60 * 60 * 1000) return themeCache.list;
   const rows = rowsOf<{ theme: string; n: string }>(await db.execute(sql`SELECT t AS theme, COUNT(*) AS n
-    FROM (SELECT unnest(string_to_array(themes, ' ')) AS t FROM puzzles WHERE archived = false AND themes IS NOT NULL) x
+    FROM (SELECT regexp_split_to_table(themes, '[ ,]+') AS t FROM puzzles WHERE archived = false AND themes IS NOT NULL) x
     WHERE t <> '' GROUP BY t ORDER BY COUNT(*) DESC LIMIT 40`));
   themeCache = { at: Date.now(), list: rows.map((r) => ({ theme: r.theme, n: Number(r.n) })) };
   return themeCache.list;

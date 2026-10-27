@@ -247,7 +247,7 @@ export function ContentStudio() {
                 let fen = pz.fen; let blackToMove = false;
                 try { const c = new Chess(pz.fen); const u = pz.moves.split(' ')[0]; c.move({ from: u.slice(0, 2), to: u.slice(2, 4), promotion: u[4] }); fen = c.fen(); blackToMove = c.turn() === 'b'; } catch { /* show the stored position */ }
                 const src: StudioSource = { kind: 'puzzle', puzzle: pz };
-                const th = (pz.themes ?? '').split(' ').filter((t) => t && !['short', 'long', 'veryLong', 'oneMove', 'master', 'masterVsMaster', 'superGM'].includes(t)).slice(0, 3);
+                const th = (pz.themes ?? '').split(/[ ,]+/).filter((t) => t && !['short', 'long', 'veryLong', 'oneMove', 'master', 'masterVsMaster', 'superGM'].includes(t)).slice(0, 3);
                 return (
                   <button key={pz.id} onClick={() => (picking ? togglePick(src) : openAt(k))} className="relative overflow-hidden rounded-xl bg-white/5 text-left ring-1 ring-white/10 transition hover:ring-[#81B64C]"
                     style={isPicked(src) ? { boxShadow: '0 0 0 3px #81B64C' } : undefined}>

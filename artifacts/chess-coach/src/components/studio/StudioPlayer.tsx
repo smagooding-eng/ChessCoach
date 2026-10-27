@@ -26,6 +26,8 @@ export interface StudioMoment {
 export interface StudioTrap {
   id: number; name: string; category: string; difficulty: string; trapSide: string; summary: string;
   startingFen: string; moves: string[]; notes: string[]; critical: number;
+  /** Opening moves from move 1 to startingFen, when the trap starts mid-opening (found by the server). */
+  leadIn?: string[];
 }
 export interface StudioPuzzle { id: number; fen: string; moves: string; rating: number; themes: string | null; explanation: string | null; source: string; gameId: number | null }
 export interface StudioReview {
@@ -92,7 +94,7 @@ const DEFAULT_PREFS = {
   bg: 'green', betterLine: true, guessRating: false, outro: true, progress: true, intro: true, safeArea: true, showNames: false,
   handle: '@chessscout.net3', outroLine: 'Review your games free',
   split: true, voice: false, voiceName: 'onyx', compTitle: 'Top moments this week',
-  music: 'off' as MusicStyle, musicVol: 0.5, beatSync: true, musicFx: true, subs: true, pieceFx: true, reviewMode: 'highlights' as 'highlights' | 'full',
+  music: 'off' as MusicStyle, musicVol: 0.5, beatSync: true, musicFx: true, subs: true, pieceFx: true, trapBefore: 99, reviewMode: 'highlights' as 'highlights' | 'full',
 };
 type Prefs = typeof DEFAULT_PREFS;
 function loadPrefs(): Prefs {
@@ -141,14 +143,18 @@ function gameClip(g: StudioGame, m: StudioMoment): Clip {
 
 function trapClip(t: StudioTrap): Clip {
   // The punishing move after the victim's mistake is the one to find.
-  const key = Math.min(t.moves.length - 1, t.critical + 1);
+  const key0 = Math.min(t.moves.length - 1, t.critical + 1);
   const reviews: ReviewMove[] = t.moves.map((san, i) => ({
     san, explanation: t.notes[i] ?? '',
-    classification: san.includes('#') ? 'checkmate' : i === t.critical ? 'blunder' : i === key ? 'great' : i < t.critical ? 'book' : 'best',
+    classification: san.includes('#') ? 'checkmate' : i === t.critical ? 'blunder' : i === key0 ? 'great' : i < t.critical ? 'book' : 'best',
   }));
-  const start = t.startingFen && t.startingFen !== 'startpos' ? t.startingFen : undefined;
+  // When the trap starts mid-opening, play the opening moves that lead there first.
+  const lead = t.leadIn ?? [];
+  let plies = lead.length ? playSans(undefined, [...lead, ...t.moves], [...lead.map((san) => ({ san, classification: 'book', explanation: '' })), ...reviews]) : [];
+  if (plies.length !== lead.length + t.moves.length) plies = playSans(t.startingFen && t.startingFen !== 'startpos' ? t.startingFen : undefined, t.moves, reviews);
+  const key = key0 + (plies.length > t.moves.length ? lead.length : 0);
   return {
-    plies: playSans(start, t.moves, reviews), key, tags: ['trap', ...(t.moves.some((s) => s.includes('#')) ? ['checkmate'] : [])],
+    plies, key, tags: ['trap', ...(t.moves.some((s) => s.includes('#')) ? ['checkmate'] : [])],
     hook: `The ${t.name} 🪤`, sub: t.summary, names: { w: null, b: null }, ratings: { w: null, b: null },
     fileBase: `chessscout-trap-${t.id}`, label: `Trap lesson · ${t.name}`, isTrap: true, opening: t.category,
   };
@@ -164,7 +170,7 @@ const THEME_LABEL: Record<string, string> = {
 export const themeLabel = (t: string) => THEME_LABEL[t] ?? t.replace(/([A-Z])/g, ' $1').replace(/^./, (c) => c.toUpperCase());
 
 function puzzleClip(p: StudioPuzzle): Clip {
-  const themes = (p.themes ?? '').split(' ').filter(Boolean);
+  const themes = (p.themes ?? '').split(/[ ,]+/).filter(Boolean);
   const c = new Chess(p.fen);
   const plies: Ply[] = [];
   for (const [k, u] of p.moves.split(' ').filter(Boolean).entries()) {
@@ -439,8 +445,9 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
     if (!clip || !clip.plies.length) return [];
     const { plies, key } = clip;
     const keyPly = key + 1;
-    const startPly = Math.max(0, keyPly - 1 - prefs.before);
-    const endPly = clip.isPuzzle ? plies.length : Math.min(plies.length, keyPly + prefs.after);
+    // Traps play their whole line by default (trapBefore 99); puzzles always play the setup move and the full solution.
+    const startPly = Math.max(0, keyPly - 1 - (clip.isTrap ? prefs.trapBefore : prefs.before));
+    const endPly = clip.isPuzzle || clip.isTrap ? plies.length : Math.min(plies.length, keyPly + prefs.after);
     const fenAt = (p: number) => (p <= 0 ? plies[0].fenBefore : plies[p - 1].fen);
     const lastAt = (p: number) => (p <= 0 ? null : { from: plies[p - 1].from, to: plies[p - 1].to });
     const out: Frame[] = [];
@@ -496,7 +503,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
     if (prefs.guessRating && !clip.isTrap && (clip.ratings.w || clip.ratings.b)) out.push({ kind: 'reveal', fen: lastFen });
     if (prefs.outro && isLast) out.push({ kind: 'outro', fen: lastFen });
     return out;
-  }, [clip, prefs.before, prefs.after, prefs.intro, prefs.guess, prefs.betterLine, prefs.guessRating, prefs.outro, prefs.split, prefs.reviewMode, isComp, isFirst, isLast]);
+  }, [clip, prefs.before, prefs.trapBefore, prefs.after, prefs.intro, prefs.guess, prefs.betterLine, prefs.guessRating, prefs.outro, prefs.split, prefs.reviewMode, isComp, isFirst, isLast]);
 
   // ── Keyframes: a stable id per frame (so pauses and sticker in/out points survive setting changes) ─
   const frameIds = useMemo(() => {
@@ -827,7 +834,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
   const PRESETS: { label: string; v: Partial<Prefs> }[] = [
     { label: 'Find the move', v: { before: 6, after: 3, speed: 1.1, guess: true, betterLine: true, split: false, intro: true, captions: true } },
     { label: 'Blunder fail', v: { before: 5, after: 2, speed: 1.0, guess: false, betterLine: true, split: true, effects: true, intro: true } },
-    { label: 'Trap tutorial', v: { before: 30, after: 4, speed: 1.6, guess: true, captions: true, betterLine: false, split: false, intro: true } },
+    { label: 'Trap tutorial', v: { before: 30, trapBefore: 99, after: 4, speed: 1.6, guess: true, captions: true, betterLine: false, split: false, intro: true } },
     { label: 'Speedrun', v: { before: 400, after: 400, speed: 0.35, guess: false, captions: false, betterLine: false, split: false, intro: true } },
     { label: 'Guess the rating', v: { before: 10, after: 6, speed: 0.9, guess: false, guessRating: true, captions: false } },
   ];
@@ -1253,8 +1260,14 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
           <input value={sub} onChange={(e) => setSub(e.target.value)} className="mb-3 w-full rounded-lg bg-white/5 px-3 py-2 text-[13px] text-white outline-none ring-1 ring-white/10 focus:ring-[#81B64C]" />
 
           <div className="mb-3 grid grid-cols-3 gap-2 text-[12px]">
-            <label className="text-white/60">Moves before<input type="number" min={0} max={30} value={prefs.before} onChange={(e) => set('before', Number(e.target.value))} className="mt-0.5 w-full rounded bg-white/5 px-2 py-1 text-white" /></label>
-            <label className="text-white/60">Moves after<input type="number" min={0} max={30} value={prefs.after} onChange={(e) => set('after', Number(e.target.value))} className="mt-0.5 w-full rounded bg-white/5 px-2 py-1 text-white" /></label>
+            {clip.isTrap ? (
+              <label className="text-white/60">Moves before<input type="number" min={0} max={60} value={Math.min(prefs.trapBefore, clip.key)} onChange={(e) => set('trapBefore', Number(e.target.value))} className="mt-0.5 w-full rounded bg-white/5 px-2 py-1 text-white" /></label>
+            ) : (
+              <label className="text-white/60">Moves before<input type="number" min={0} max={60} value={prefs.before} disabled={clip.isPuzzle || clip.isReview} onChange={(e) => set('before', Number(e.target.value))} className="mt-0.5 w-full rounded bg-white/5 px-2 py-1 text-white disabled:opacity-40" /></label>
+            )}
+            <label className="text-white/60">Moves after{clip.isTrap || clip.isPuzzle || clip.isReview
+              ? <input disabled value="To the end" className="mt-0.5 w-full rounded bg-white/5 px-2 py-1 text-white/50" />
+              : <input type="number" min={0} max={60} value={prefs.after} onChange={(e) => set('after', Number(e.target.value))} className="mt-0.5 w-full rounded bg-white/5 px-2 py-1 text-white" />}</label>
             <label className="text-white/60">Sec / move<input type="number" min={0.4} max={4} step={0.1} value={prefs.speed} onChange={(e) => set('speed', Number(e.target.value))} className="mt-0.5 w-full rounded bg-white/5 px-2 py-1 text-white" /></label>
           </div>
 
