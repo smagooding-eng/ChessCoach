@@ -1054,6 +1054,7 @@ export function GameReplay() {
         onRetryReview={() => { setReviewError(null); void handleReview(true); }}
         canFullAnalysis={canFullAnalysis}
         onUpgrade={() => navigate('/subscription?from=full-analysis')}
+        canRemix={!!authUser?.isAdmin}
         moves={moves as any}
         startFen={gameStartFen}
         reviewMoves={reviewMoves}

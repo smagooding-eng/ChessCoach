@@ -738,3 +738,41 @@ export function moveFeedback(kind: SoundEvent = 'move') {
 export function usePhotoLook(): boolean {
   return useSettings().uiStyle === 'photo';
 }
+
+// ── Board looks for content (admin remix / Content Studio) ────────────────
+export interface BoardLook { boardTheme: Exclude<BoardTheme, 'custom'>; boardTexture: BoardTexture; pieceStyle: Exclude<PieceStyle, 'custom'>; pieceShape: PieceShape }
+
+const pickOne = <T,>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
+/** A random board + pieces: either a photographic board, or a classic colour with one of the classic textures. */
+export function randomLook(): BoardLook {
+  const textures = Object.keys(BOARD_TEXTURES) as BoardTexture[];
+  const photo = textures.filter((t) => isPhotoBoard(t));
+  const classic = textures.filter((t) => !isPhotoBoard(t));
+  const shapes = (Object.keys(PIECE_SHAPES) as PieceShape[]).filter((k) => !PIECE_SHAPES[k].hidden);
+  const styles = (Object.keys(PIECE_STYLES) as Exclude<PieceStyle, 'custom'>[]);
+  return {
+    boardTheme: pickOne(Object.keys(BOARD_THEMES) as Exclude<BoardTheme, 'custom'>[]),
+    boardTexture: Math.random() < 0.5 ? pickOne(photo) : pickOne(classic),
+    pieceStyle: pickOne(styles),
+    pieceShape: pickOne(shapes),
+  };
+}
+export function lookLabel(l: BoardLook): string {
+  const tex = BOARD_TEXTURES[l.boardTexture];
+  const board = isPhotoBoard(l.boardTexture) ? tex.label : `${BOARD_THEMES[l.boardTheme].label}${l.boardTexture !== 'flat' ? ` · ${tex.label}` : ''}`;
+  return `${board} · ${PIECE_SHAPES[l.pieceShape].label} pieces`;
+}
+
+/** Boards inside use this look instead of the person's own settings (nothing is saved). */
+export function LookOverride({ look, children }: { look: BoardLook | null; children: React.ReactNode }) {
+  const base = useContext(SettingsContext);
+  if (!base || !look) return <>{children}</>;
+  const value: SettingsContextValue = {
+    ...base,
+    ...look,
+    boardColors: BOARD_THEMES[look.boardTheme] ?? base.boardColors,
+    boardTextureCss: BOARD_TEXTURES[look.boardTexture] ?? base.boardTextureCss,
+    pieceColors: PIECE_STYLES[look.pieceStyle] ? { ...PIECE_STYLES[look.pieceStyle] } : base.pieceColors,
+  };
+  return <SettingsContext.Provider value={value}>{children}</SettingsContext.Provider>;
+}

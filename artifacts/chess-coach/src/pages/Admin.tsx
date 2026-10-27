@@ -748,6 +748,11 @@ export function Admin() {
 
       {activeTab === 'growth' && (
         <>
+          <Link href="/admin/studio" className="mb-4 flex items-center gap-3 rounded-2xl p-4" style={{ background: 'linear-gradient(135deg, rgba(129,182,76,.18), rgba(129,182,76,.05))', border: '1px solid rgba(129,182,76,.35)' }}>
+            <span className="text-2xl" aria-hidden>🎬</span>
+            <span className="flex-1"><span className="block text-[15px] font-black text-white">Content Studio</span><span className="block text-[12.5px] text-white/70">Find brilliant moves, traps, forks and mates in every reviewed game and turn them into vertical clips.</span></span>
+            <span className="text-[13px] font-bold text-[#B8E08C]">Open →</span>
+          </Link>
           <ReferralCodesPanel />
           <ReferralSignupsPanel />
           <AffiliatesPanel />

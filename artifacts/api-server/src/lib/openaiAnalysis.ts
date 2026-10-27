@@ -171,9 +171,10 @@ function stripFenCounters(fen: string): string {
 }
 
 function isInBookForGame(fen: string, ecoBookFens: Set<string>): boolean {
+  // Any known opening position counts, not only the game's own ECO line
+  // (that alone stopped the book after a move or two, e.g. 2.exd5 Qxd5).
   const key = stripFenCounters(fen);
-  if (ecoBookFens.size > 0) return ecoBookFens.has(key);
-  return isBookPosition(fen);
+  return ecoBookFens.has(key) || isBookPosition(fen);
 }
 
 export async function analyzeMoves(input: AnalyzeMovesInput): Promise<MoveClassification[]> {

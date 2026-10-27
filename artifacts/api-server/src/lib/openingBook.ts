@@ -1,4 +1,5 @@
 import { Chess } from "chess.js";
+import { OPENING_POSITIONS } from "./openingPositions";
 
 const ECO_LINES: Record<string, string> = {
   "A00": "1.g4",
@@ -505,9 +506,22 @@ export function getBookDepthForEco(eco: string | null | undefined): number {
   return fens ? fens.size : 0;
 }
 
+// The full opening collection (every named line's positions) plus positions
+// that are common in real games (see popularBook.ts). A move is a book move
+// when the position it reaches is in here and every move before it was too.
+let namedPositions: Set<string> | null = null;
+const popularPositions = new Set<string>();
+/** Positions reached in many real games' openings (filled by popularBook.ts). */
+export function setPopularBookPositions(keys: Iterable<string>): void {
+  popularPositions.clear();
+  for (const k of keys) popularPositions.add(k);
+}
+
 export function isBookPosition(fen: string): boolean {
   if (!allBookFens) buildEcoBook();
-  return allBookFens!.has(stripFenCounters(fen));
+  if (!namedPositions) namedPositions = new Set(OPENING_POSITIONS.split("\n"));
+  const key = stripFenCounters(fen);
+  return allBookFens!.has(key) || namedPositions.has(key) || popularPositions.has(key);
 }
 
 export function getBookFensForEco(eco: string | null | undefined): Set<string> {

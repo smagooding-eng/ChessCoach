@@ -475,6 +475,8 @@ startDailySweep();
 startTournamentEngine();
 // Official scheduled tournaments (nightly blitz, weekend knockout, weekly daily).
 import("./lib/officialTournaments").then(({ startOfficialTournaments }) => startOfficialTournaments()).catch((err) => logger.warn({ err }, "official tournaments start failed"));
+import("./lib/popularBook").then(({ startPopularBook }) => startPopularBook()).catch((err) => logger.warn({ err }, "popular book start failed"));
+import("./lib/contentMoments").then(({ startContentScanner }) => startContentScanner()).catch((err) => logger.warn({ err }, "content scanner start failed"));
 httpServer.listen(port, (err?: Error) => {
   if (err) {
     logger.error({ err }, "Error listening on port");

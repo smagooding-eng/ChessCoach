@@ -1,11 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Chess } from 'chess.js';
-import { ArrowLeft, ChevronLeft, ChevronRight, FlipVertical2, ListTree, Star, RotateCcw, X } from 'lucide-react';
+import { ArrowLeft, ChevronLeft, ChevronRight, FlipVertical2, ListTree, Star, RotateCcw, X, Sparkles } from 'lucide-react';
 import { MaterialStrip } from '@/components/GameStatusStrip';
 import { ChessBoard, type MoveQuality } from '@/components/ChessBoard';
 import { normalizeFen } from '@/lib/utils';
-import { playMoveSound } from '@/context/SettingsContext';
+import { playMoveSound, LookOverride, randomLook, type BoardLook } from '@/context/SettingsContext';
 
 // Step-by-step game review: the coach talks you through the game one move
 // at a time, above a full-width board that shows each move's quality
@@ -127,11 +127,16 @@ export interface GuidedReviewProps {
   canFullAnalysis?: boolean;
   /** Not Pro: where "Full analysis (Pro)" goes (the Pro page). */
   onUpgrade?: () => void;
+  /** Admin: show the Remix button (a random board and pieces on every move, for content). */
+  canRemix?: boolean;
 }
 
 type Mode = { kind: 'main' } | { kind: 'best'; step: number } | { kind: 'reply'; step: number } | { kind: 'retry'; state: 'trying' | 'right' | 'wrong' };
 
-export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flipped, onFlip, whiteName, blackName, accuracy, result, onExit, onBack, status = 'ready', progress, errorText, onRetryReview, canFullAnalysis = true, onUpgrade }: GuidedReviewProps) {
+export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flipped, onFlip, whiteName, blackName, accuracy, result, onExit, onBack, status = 'ready', progress, errorText, onRetryReview, canFullAnalysis = true, onUpgrade, canRemix = false }: GuidedReviewProps) {
+  // Remix (admin, for content): a new random board and piece set on every move.
+  const [remixOn, setRemixOn] = useState(false);
+  const remixLooks = useRef(new Map<number, BoardLook>());
   // Full analysis (with the AI coach) is Pro: members go there, others to the Pro page.
   const openFull = canFullAnalysis ? onExit : (onUpgrade ?? onExit);
   const ProTag = () => <span className="ml-1 rounded px-1 py-px text-[9.5px] font-black tracking-wide" style={{ background: '#E8B447', color: '#1C1C1C' }}>PRO</span>;
@@ -384,6 +389,8 @@ export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flippe
   const animKey = `${ply}-${mode.kind}-${mode.kind === 'retry' ? mode.state : ''}`;
 
   const atEnd = ply >= max && mode.kind === 'main';
+  let look: BoardLook | null = null;
+  if (remixOn) { look = remixLooks.current.get(ply) ?? randomLook(); remixLooks.current.set(ply, look); }
   const canExpand = mode.kind === 'main' && !!rev && ply > 0 && !!splitText(rev.explanation).rest;
 
   // ── Move strip ─────────────────────────────────────────────────────────
@@ -427,6 +434,12 @@ export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flippe
       <div className="flex shrink-0 items-center gap-2 px-3 pb-1 pt-[max(0.5rem,env(safe-area-inset-top))]">
         <button onClick={onBack} aria-label="Back" className="grid h-10 w-10 place-items-center rounded-xl text-white active:scale-95"><ArrowLeft size={22} /></button>
         <p className="flex-1 text-center text-[18px] font-black text-white">Game Review</p>
+        {canRemix && (
+          <button onClick={() => { remixLooks.current.clear(); setRemixOn((v) => !v); }} aria-label="Remix board and pieces" title="Remix: a random board and pieces on every move"
+            className="grid h-10 w-10 place-items-center rounded-xl active:scale-95" style={{ color: remixOn ? GREEN : '#C9CFCD', background: remixOn ? 'rgba(129,182,76,.15)' : 'transparent' }}>
+            <Sparkles size={20} />
+          </button>
+        )}
         <button onClick={onFlip} aria-label="Flip board" className="grid h-10 w-10 place-items-center rounded-xl text-[#C9CFCD] active:scale-95"><FlipVertical2 size={20} /></button>
         <button onClick={openFull} aria-label="Full analysis (Pro)" title="Full analysis (Pro)" className="relative grid h-10 w-10 place-items-center rounded-xl text-[#C9CFCD] active:scale-95">
           <ListTree size={20} />
@@ -453,6 +466,7 @@ export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flippe
         {/* Desktop: board, eval bar and material keep one width that fits the window height. */}
         <div className="cs-review-board shrink-0 px-1.5 lg:col-start-1 lg:row-span-4 lg:row-start-1 lg:self-start lg:pt-1" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
           <div className="min-w-0">
+            <LookOverride look={look}>
             <ChessBoard
               key={mode.kind === 'retry' ? `retry-${retryKey}` : 'review'}
               fen={boardFen}
@@ -471,6 +485,7 @@ export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flippe
                 else { setMode({ kind: 'retry', state: 'wrong' }); setTimeout(() => setRetryKey((k) => k + 1), 900); }
               }}
             />
+            </LookOverride>
           </div>
           {/* Evaluation bar, then the material each side has won */}
           <div className="mt-1.5 px-0.5"><EvalBarH cp={cpNow} /></div>

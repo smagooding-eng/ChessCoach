@@ -1,5 +1,5 @@
 import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
-import { refreshBasicReview } from "../lib/basicCoach";
+import { refreshBasicReview, markBookMoves } from "../lib/basicCoach";
 import { notifyUser } from "../lib/notify";
 import { logger as appLogger } from "../lib/logger";
 import { db, gamesTable, backgroundJobsTable, usersTable } from "@workspace/db";
@@ -809,7 +809,7 @@ router.get("/games/review-status/:jobId", async (req, res): Promise<void> => {
       const gameSummary = cached.gameSummary ?? null;
       const whiteAccuracy = cached.whiteAccuracy ?? null;
       const blackAccuracy = cached.blackAccuracy ?? null;
-      res.json({ status: "done", reviewData: { moves: refreshBasicReview(moves, aiFlag(cached), (game as { opening?: string | null }).opening ?? null), gameSummary, whiteAccuracy, blackAccuracy, aiCoach: aiFlag(cached) } });
+      res.json({ status: "done", reviewData: { moves: refreshBasicReview(markBookMoves(moves), aiFlag(cached), (game as { opening?: string | null }).opening ?? null), gameSummary, whiteAccuracy, blackAccuracy, aiCoach: aiFlag(cached) } });
       return;
     }
   }
@@ -1666,7 +1666,7 @@ router.get("/games/:id/review", async (req, res): Promise<void> => {
         return rest;
       });
     }
-    res.json({ status: "done", reviewData: { moves: refreshBasicReview(moves, aiFlag(cached), (game as { opening?: string | null }).opening ?? null), gameSummary, whiteAccuracy, blackAccuracy, aiCoach: aiFlag(cached) } });
+    res.json({ status: "done", reviewData: { moves: refreshBasicReview(markBookMoves(moves), aiFlag(cached), (game as { opening?: string | null }).opening ?? null), gameSummary, whiteAccuracy, blackAccuracy, aiCoach: aiFlag(cached) } });
     return;
   }
 
@@ -1723,7 +1723,7 @@ router.post("/games/:id/review", async (req, res): Promise<void> => {
         return rest;
       });
     }
-    res.json({ status: "done", reviewData: { moves: refreshBasicReview(moves, aiFlag(cached), (game as { opening?: string | null }).opening ?? null), gameSummary, whiteAccuracy, blackAccuracy, aiCoach: aiFlag(cached) } });
+    res.json({ status: "done", reviewData: { moves: refreshBasicReview(markBookMoves(moves), aiFlag(cached), (game as { opening?: string | null }).opening ?? null), gameSummary, whiteAccuracy, blackAccuracy, aiCoach: aiFlag(cached) } });
     return;
   }
 

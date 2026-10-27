@@ -7,6 +7,7 @@
 // both players read the same review. Pro reviews use the AI coach; this is
 // also its fallback.
 
+import { isBookPosition } from "./openingBook";
 import { Chess, type Square } from "chess.js";
 
 const VAL: Record<string, number> = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 100 };
@@ -681,6 +682,28 @@ export function basicExplanation(i: BasicCoachInput): string {
  * coach when the review is read, so games reviewed before it existed get the
  * same plain-language text. AI-coached reviews are returned untouched.
  */
+/**
+ * Saved reviews: mark the opening moves that are in the opening book as
+ * "book" (reviews made before the book was widened stopped it after a move
+ * or two). Only from the first move, only while every move so far is book,
+ * and never over a real mistake.
+ */
+export function markBookMoves(moves: unknown): unknown {
+  if (!Array.isArray(moves)) return moves;
+  const BAD = new Set(["inaccuracy", "mistake", "blunder", "missed_win"]);
+  let inBook = true;
+  return (moves as { fen?: string; san?: string; classification?: string }[]).map((m) => {
+    if (!inBook || !m?.fen || !m.san) { inBook = false; return m; }
+    try {
+      const c = new Chess(m.fen);
+      c.move(m.san);
+      if (!isBookPosition(c.fen())) { inBook = false; return m; }
+      if (m.classification && BAD.has(m.classification)) { inBook = false; return m; }
+      return m.classification === "book" ? m : { ...m, classification: "book" };
+    } catch { inBook = false; return m; }
+  });
+}
+
 export function refreshBasicReview(moves: unknown, aiCoach: boolean, openingName: string | null = null): unknown {
   if (aiCoach || !Array.isArray(moves)) return moves;
   type M = { fen?: string; san?: string; color?: "white" | "black"; classification?: string; evalAfterCp?: number; betterMove?: string | null; explanation?: string; pros?: string[]; cons?: string[]; moveIndex?: number; bestLineSan?: string[]; replyLineSan?: string[] };
@@ -708,4 +731,31 @@ export function refreshBasicReview(moves: unknown, aiCoach: boolean, openingName
       return text ? { ...m, explanation: text, pros: [], cons: [] } : m;
     } catch { return m; }
   });
+}
+
+/**
+ * Content tags for one move (for the admin Content Studio): the tactic it
+ * plays (fork, pin, skewer, discovered attack), a sacrifice, check, mate,
+ * promotion, and the phase. Purely from the board, no engine.
+ */
+export function contentTags(fenBefore: string, san: string, color: "white" | "black", prevSan: string | null = null): string[] {
+  const me: Color = color === "white" ? "w" : "b";
+  const r = apply(fenBefore, san);
+  if (!r) return [];
+  const { c, m } = r;
+  const out = new Set<string>();
+  if (c.isCheckmate()) out.add("checkmate");
+  else if (c.isCheck()) out.add("check");
+  if (m.promotion) out.add("promotion");
+  const mo = motifs(fenBefore, san, me, prevSan);
+  for (const t of mo.tags) {
+    if (t.startsWith("forking")) out.add("fork");
+    else if (t.startsWith("pinning")) out.add("pin");
+    else if (t.startsWith("skewering")) out.add("skewer");
+    else if (t.includes("discovered")) out.add("discovered");
+  }
+  // A sacrifice: a piece (not a pawn) left where it can be taken for less than it's worth.
+  if (VAL[m.piece] >= 3 && hanging(c, me).some((h) => h.sq === m.to) && (!m.captured || VAL[m.captured] < VAL[m.piece])) out.add("sacrifice");
+  if (nonPawnMaterial(c) <= 14) out.add("endgame");
+  return [...out];
 }
