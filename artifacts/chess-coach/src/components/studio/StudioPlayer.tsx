@@ -40,7 +40,7 @@ export type StudioSource =
 interface ReviewMove { moveIndex?: number; san: string; color?: 'white' | 'black'; classification?: string; explanation?: string; betterMove?: string | null; evalAfterCp?: number; fen?: string; bestLineSan?: string[] }
 interface StudioGame { id: number; pgn: string; opening: string | null; white: string; black: string; whiteRating: number | null; blackRating: number | null; moves: ReviewMove[]; whiteAccuracy?: number | null; blackAccuracy?: number | null; overview?: string | null; result?: string | null }
 interface Ply { san: string; from: string; to: string; fen: string; fenBefore: string; color: 'w' | 'b'; review?: ReviewMove }
-interface Sticker { id: number; text: string; x: number; y: number; size: number; kind: 'emoji' | 'text' | 'badge'; tone?: number }
+interface Sticker { id: number; text: string; x: number; y: number; size: number; kind: 'emoji' | 'text' | 'badge'; tone?: number; /** Keyframes: shown from this frame to that one (frame ids); unset = the whole clip. */ from?: string; to?: string }
 interface Clip {
   plies: Ply[]; key: number; tags: string[]; hook: string; sub: string; names: { w: string | null; b: string | null };
   ratings: { w: number | null; b: number | null }; fileBase: string; label: string; isTrap: boolean; opening: string | null;
@@ -58,6 +58,8 @@ type Frame =
   | { kind: 'split'; played: { fen: string; last: { from: string; to: string } }; better: { fen: string; last: { from: string; to: string } }; playedSan: string; betterSan: string }
   | { kind: 'title'; fen: string }
   | { kind: 'summary'; fen: string }
+  /** A beat on the starting position once the title / hook clears, so the first move is never hidden. */
+  | { kind: 'hold'; fen: string; last: { from: string; to: string } | null }
   | { kind: 'outro'; fen: string };
 
 const LABEL: Record<string, { text: string; color: string; glyph: string }> = {
@@ -436,6 +438,7 @@ export function StudioPlayer({ source, queue, title, onClose, onNext, onPrev }: 
     if (clip.isReview) {
       if (isComp && isFirst) out.push({ kind: 'title', fen: fenAt(0) });
       if (prefs.intro) out.push({ kind: 'intro', fen: fenAt(0) });
+      if (prefs.intro || (isComp && isFirst)) out.push({ kind: 'hold', fen: fenAt(0), last: null });
       const notable = (p: number) => { const m = plies[p - 1]; return !!m && (m.san.includes('#') || NOTABLE.has(m.review?.classification ?? '')); };
       let list: number[];
       if (prefs.reviewMode === 'highlights') {
@@ -451,6 +454,7 @@ export function StudioPlayer({ source, queue, title, onClose, onNext, onPrev }: 
     }
     if (isComp && isFirst) out.push({ kind: 'title', fen: fenAt(startPly) });
     if (prefs.intro) out.push({ kind: 'intro', fen: fenAt(startPly) });
+    if (prefs.intro || (isComp && isFirst)) out.push({ kind: 'hold', fen: fenAt(startPly), last: lastAt(startPly) });
     else out.push({ kind: 'move', ply: startPly });
     for (let p = startPly + 1; p < keyPly; p++) out.push({ kind: 'move', ply: p });
     if (prefs.guess) for (const n of [3, 2, 1]) out.push({ kind: 'countdown', n, fen: fenAt(keyPly - 1), last: lastAt(keyPly - 1) });
@@ -485,8 +489,19 @@ export function StudioPlayer({ source, queue, title, onClose, onNext, onPrev }: 
     return out;
   }, [clip, prefs.before, prefs.after, prefs.intro, prefs.guess, prefs.betterLine, prefs.guessRating, prefs.outro, prefs.split, prefs.reviewMode, isComp, isFirst, isLast]);
 
+  // ── Keyframes: a stable id per frame (so pauses and sticker in/out points survive setting changes) ─
+  const frameIds = useMemo(() => {
+    const seen: Record<string, number> = {};
+    return frames.map((f) => {
+      const k = f.kind === 'move' ? `m${f.ply}` : f.kind === 'countdown' ? `c${f.n}` : f.kind;
+      seen[k] = (seen[k] ?? 0) + 1;
+      return `${clipQ}:${k}${seen[k] > 1 ? `.${seen[k]}` : ''}`;
+    });
+  }, [frames]); // eslint-disable-line react-hooks/exhaustive-deps
+  const idOf = useMemo(() => new Map(frames.map((f, k) => [f, frameIds[k]])), [frames, frameIds]);
+  const [holds, setHolds] = useState<Record<string, number>>({});
   const dur = (f: Frame) => {
-    const base = baseDur(f);
+    const base = baseDur(f) + (holds[idOf.get(f) ?? ''] ?? 0);
     const said = prefs.voice ? narration(f) : null;
     const len = said ? voiceLen.current.get(said) : undefined;
     const d = len ? Math.max(base, len * 1000 + 300) : base;
@@ -499,6 +514,7 @@ export function StudioPlayer({ source, queue, title, onClose, onNext, onPrev }: 
     const s = prefs.speed * 1000;
     switch (f.kind) {
       case 'intro': return 1600;
+      case 'hold': return 800;
       case 'countdown': return 1000;
       case 'better': return Math.max(s, 1300);
       case 'reveal': return 2400;
@@ -536,7 +552,7 @@ export function StudioPlayer({ source, queue, title, onClose, onNext, onPrev }: 
     }
     if (frame.kind === 'split') return { fen: frame.played.fen, last: frame.played.last, ply: -3, move: null as Ply | null };
     const fen = frame.fen;
-    const last = frame.kind === 'countdown' || frame.kind === 'better' ? frame.last : null;
+    const last = frame.kind === 'countdown' || frame.kind === 'better' || frame.kind === 'hold' ? frame.last : null;
     const ply = frame.kind === 'countdown' ? keyPly - 1 : frame.kind === 'intro' ? -1 : -2;
     return { fen, last, ply, move: null as Ply | null };
   }, [frame, plies, keyPly]);
@@ -689,11 +705,18 @@ export function StudioPlayer({ source, queue, title, onClose, onNext, onPrev }: 
   // ── Stickers ────────────────────────────────────────────────────────────
   const [stickers, setStickers] = useState<Sticker[]>([]);
   const [selected, setSelected] = useState<number | null>(null);
+  const [stickerFromHere, setStickerFromHere] = useState(true);
+  const timelineRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const box = timelineRef.current; const el = box?.querySelector<HTMLElement>(`[data-tl="${i}"]`);
+    if (box && el) box.scrollTo({ left: el.offsetLeft - box.clientWidth / 2 + el.offsetWidth / 2, behavior: 'smooth' });
+  }, [i]);
+  const [customText, setCustomText] = useState('');
   const frameRef = useRef<HTMLDivElement | null>(null);
   const drag = useRef<{ id: number; dx: number; dy: number } | null>(null);
   const addSticker = (text: string, kind: Sticker['kind'], tone?: number) => {
     const id = Date.now();
-    setStickers((s) => [...s, { id, text, kind, tone, x: 50, y: kind === 'emoji' ? 30 : 22, size: kind === 'emoji' ? 12 : kind === 'badge' ? 7 : 6 }]);
+    setStickers((s) => [...s, { id, text, kind, tone, x: 50, y: kind === 'emoji' ? 30 : 22, size: kind === 'emoji' ? 12 : kind === 'badge' ? 7 : 6, from: stickerFromHere && i > 0 ? frameIds[i] : undefined }]);
     setSelected(id);
   };
   const onPointerMove = (e: React.PointerEvent) => {
@@ -1021,7 +1044,11 @@ export function StudioPlayer({ source, queue, title, onClose, onNext, onPrev }: 
             </AnimatePresence>
             {prefs.effects && <Confetti fire={confetti} />}
             {/* Stickers */}
-            {stickers.map((st) => (
+            {stickers.filter((st) => {
+              if (!st.from && !st.to) return true;
+              const a = st.from ? frameIds.indexOf(st.from) : 0, b = st.to ? frameIds.indexOf(st.to) : frameIds.length - 1;
+              return a >= 0 && b >= 0 && i >= a && i <= b;
+            }).map((st) => (
               <div key={st.id} onPointerDown={(e) => { e.stopPropagation(); const fr = frameRef.current!.getBoundingClientRect(); drag.current = { id: st.id, dx: ((e.clientX - fr.left) / fr.width) * 100 - st.x, dy: ((e.clientY - fr.top) / fr.height) * 100 - st.y }; setSelected(st.id); }}
                 onDoubleClick={() => setStickers((s) => s.filter((x) => x.id !== st.id))}
                 className="absolute z-40 -translate-x-1/2 -translate-y-1/2 cursor-grab select-none touch-none"
@@ -1070,6 +1097,42 @@ export function StudioPlayer({ source, queue, title, onClose, onNext, onPrev }: 
             <button onClick={() => setFlipped((f) => !f)} className={ctl} aria-label="Flip"><FlipVertical2 size={14} /></button>
             <span className="text-[11.5px] tabular-nums text-white/45">{i + 1}/{frames.length} · ~{Math.round(frames.reduce((s, f) => s + dur(f), 0) / 1000)}s</span>
           </div>
+          {/* ── Timeline: every frame; tap to jump, then add a pause or set stickers to start / end there ── */}
+          <div ref={timelineRef} className="mb-1.5 flex gap-1 overflow-x-auto pb-2 pr-1 pt-2" style={{ scrollbarWidth: 'thin' }}>
+            {frames.map((f, k) => {
+              const id = frameIds[k];
+              const m = f.kind === 'move' ? plies[f.ply - 1] : null;
+              const c = m ? (m.san.includes('#') ? 'checkmate' : m.review?.classification) : null;
+              const tone = c && LABEL[c] && !['best', 'excellent', 'good', 'book'].includes(c) ? LABEL[c].color : null;
+              const label = f.kind === 'move' ? (m ? figurine(m.san, m.color === 'w') : 'Start') : f.kind === 'countdown' ? String(f.n)
+                : ({ title: 'Title', intro: 'Hook', hold: 'Start', better: 'Line', split: 'Split', reveal: 'Rating', summary: 'Summary', outro: 'End' } as Record<string, string>)[f.kind] ?? f.kind;
+              const starts = stickers.filter((st) => st.from === id).length, ends = stickers.filter((st) => st.to === id).length;
+              return (
+                <button key={id} data-tl={k} onClick={() => setI(k)} title={id}
+                  className="relative shrink-0 rounded-md px-2 pb-1 pt-1.5 text-[11.5px] font-black tabular-nums"
+                  style={{ background: k === i ? '#81B64C' : 'rgba(255,255,255,.06)', color: k === i ? '#fff' : f.kind === 'move' ? '#E6E9E8' : '#9FB0AA', boxShadow: tone ? `inset 0 -3px 0 ${tone}` : undefined }}>
+                  {label}
+                  {holds[id] ? <span className="absolute -right-1 -top-1.5 rounded bg-[#E8B447] px-1 text-[9px] text-[#1A1205]">⏸{(holds[id] / 1000).toFixed(holds[id] % 1000 ? 1 : 0)}s</span> : null}
+                  {(starts > 0 || ends > 0) && <span className="absolute -bottom-1 left-1/2 flex -translate-x-1/2 gap-0.5">{starts > 0 && <span className="h-1.5 w-1.5 rounded-full bg-[#4FD1C5]" />}{ends > 0 && <span className="h-1.5 w-1.5 rounded-full bg-[#F0605D]" />}</span>}
+                </button>
+              );
+            })}
+          </div>
+          {frameIds[i] && (
+            <div className="mb-3 flex flex-wrap items-center gap-1.5 text-[12px] text-white/60">
+              <span className="font-bold text-white/80">Pause on this frame</span>
+              {[0, 500, 1000, 2000, 3000, 5000].map((ms) => {
+                const on = (holds[frameIds[i]] ?? 0) === ms;
+                return (
+                  <button key={ms} onClick={() => setHolds((h) => { const n = { ...h }; if (ms) n[frameIds[i]] = ms; else delete n[frameIds[i]]; return n; })}
+                    className="rounded-full px-2 py-0.5 text-[11.5px] font-bold" style={{ background: on ? '#E8B447' : 'rgba(255,255,255,.06)', color: on ? '#1A1205' : '#C9CFCD' }}>
+                    {ms ? `+${ms / 1000}s` : 'None'}
+                  </button>
+                );
+              })}
+              {Object.keys(holds).length > 0 && <button onClick={() => setHolds({})} className="text-[11.5px] font-bold text-white/45 underline">Clear all pauses</button>}
+            </div>
+          )}
           <div className="mb-3 flex flex-wrap gap-1.5">
             <button onClick={record} className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[13px] font-black text-white" style={{ background: recording ? '#CA3431' : '#2A3335' }}>
               {recording ? <Square size={14} /> : <Video size={14} />}{recording ? 'Stop recording' : 'Record clip'}
@@ -1187,16 +1250,52 @@ export function StudioPlayer({ source, queue, title, onClose, onNext, onPrev }: 
             </div>
           )}
 
-          <p className="mb-1 text-[11px] font-bold uppercase tracking-wide text-white/50">Stickers <span className="normal-case text-white/40">· drag to move, double-click to remove</span></p>
+          <p className="mb-1 text-[11px] font-bold uppercase tracking-wide text-white/50">Stickers <span className="normal-case text-white/40">· drag to move, double-click to remove, pick one to set when it shows</span></p>
           <div className="mb-2 flex flex-wrap gap-1">
             {EMOJIS.map((e) => <button key={e} onClick={() => addSticker(e, 'emoji')} className="grid h-9 w-9 place-items-center rounded-lg bg-white/5 text-[20px] hover:bg-white/10">{e}</button>)}
           </div>
           <div className="mb-2 flex flex-wrap gap-1">
             {TEXT_STICKERS.map((t, k) => <button key={t} onClick={() => addSticker(t, 'text', k % TONES.length)} className="rounded-md px-2 py-1 text-[11px] font-black ring-1 ring-white/30" style={{ background: TONES[k % TONES.length].bg, color: TONES[k % TONES.length].fg }}>{t}</button>)}
           </div>
+          <form onSubmit={(e) => { e.preventDefault(); if (customText.trim()) { addSticker(customText.trim().slice(0, 40), 'text', stickers.length % TONES.length); setCustomText(''); } }} className="mb-2 flex gap-1.5">
+            <input value={customText} onChange={(e) => setCustomText(e.target.value)} placeholder="Your own text…" maxLength={40} className="min-w-0 flex-1 rounded-lg bg-white/5 px-3 py-1.5 text-[13px] text-white outline-none ring-1 ring-white/10 focus:ring-[#81B64C]" />
+            <button type="submit" className="rounded-lg bg-[#81B64C] px-3 py-1.5 text-[12.5px] font-black text-white">Add</button>
+          </form>
           <div className="mb-2 flex flex-wrap gap-1.5">
             {BADGE_STICKERS.map((c) => <button key={c} onClick={() => addSticker(c, 'badge')} className="rounded-lg bg-white/5 px-1.5 py-1 hover:bg-white/10" style={{ fontSize: 9 }} title={LABEL[c].text}><StudioBadge {...LABEL[c]} /></button>)}
           </div>
+          {stickers.length > 0 && (
+            <div className="mb-2 flex flex-wrap gap-1">
+              <span className="self-center text-[11px] font-bold uppercase text-white/40">On this clip</span>
+              {stickers.map((st) => (
+                <button key={st.id} onClick={() => { setSelected(st.id); const k = st.from ? frameIds.indexOf(st.from) : -1; if (k >= 0 && (i < k || (st.to && i > frameIds.indexOf(st.to)))) setI(k); }}
+                  className="max-w-[9rem] truncate rounded-md px-2 py-0.5 text-[11.5px] font-bold"
+                  style={{ background: selected === st.id ? '#81B64C' : 'rgba(255,255,255,.08)', color: '#fff' }}>
+                  {st.kind === 'badge' ? (LABEL[st.text]?.text ?? st.text) : st.text}{st.from || st.to ? ' ⏱' : ''}
+                </button>
+              ))}
+            </div>
+          )}
+          <label className="mb-2 flex items-center gap-2 text-[12px] text-white/60">
+            <input type="checkbox" checked={stickerFromHere} onChange={(e) => setStickerFromHere(e.target.checked)} className="accent-[#81B64C]" />
+            New stickers appear from the frame you're on (off: whole clip)
+          </label>
+          {selected && stickers.some((s) => s.id === selected) && (() => {
+            const st = stickers.find((s) => s.id === selected)!;
+            const name = (id?: string) => { const k = id ? frameIds.indexOf(id) : -1; return k < 0 ? null : `frame ${k + 1}`; };
+            const upd = (v: Partial<Sticker>) => setStickers((s) => s.map((x) => (x.id === selected ? { ...x, ...v } : x)));
+            return (
+              <div className="mb-2 rounded-lg bg-white/5 p-2 text-[12px] text-white/70">
+                <p className="mb-1.5">Shows {st.from ? `from ${name(st.from) ?? 'another clip'}` : 'from the start'} {st.to ? `to ${name(st.to) ?? 'another clip'}` : 'to the end'}</p>
+                <div className="flex flex-wrap gap-1.5">
+                  <button onClick={() => upd({ from: frameIds[i] })} className="rounded-full bg-[#4FD1C5]/20 px-2.5 py-1 font-bold text-[#7FE3D9]">Start here</button>
+                  <button onClick={() => upd({ to: frameIds[i] })} className="rounded-full bg-[#F0605D]/20 px-2.5 py-1 font-bold text-[#F59B98]">End here</button>
+                  <button onClick={() => upd({ from: undefined, to: undefined })} className="rounded-full bg-white/10 px-2.5 py-1 font-bold text-white/80">Whole clip</button>
+                  {st.from && <button onClick={() => { const k = frameIds.indexOf(st.from!); if (k >= 0) setI(k); }} className="rounded-full bg-white/10 px-2.5 py-1 font-bold text-white/80">Go to start</button>}
+                </div>
+              </div>
+            );
+          })()}
           {selected && stickers.some((s) => s.id === selected) && (
             <div className="mb-3 flex items-center gap-2 text-[12px] text-white/70">
               Size
