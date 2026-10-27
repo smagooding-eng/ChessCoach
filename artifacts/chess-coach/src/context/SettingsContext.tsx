@@ -723,8 +723,15 @@ export const hapticsSupported = (): boolean => typeof navigator !== 'undefined' 
 const HAPTIC: Record<SoundEvent, number | number[]> = {
   move: 12, castle: [12, 40, 12], capture: 28, check: [22, 50, 22], promote: [15, 40, 30], gameEnd: [40, 70, 60, 70, 90], illegal: [8, 30, 8],
 };
+// One buzz per move: when two parts of the app ask for the same move a few ms
+// apart (e.g. holding the forward arrow and the board both react), the second
+// call would cancel the first before the motor spins up, and nothing is felt.
+let lastVibeAt = 0;
 export function vibrateFor(kind: SoundEvent = 'move') {
   if (!activeHaptics || !hapticsSupported()) return;
+  const now = Date.now();
+  if (now - lastVibeAt < 50) return;
+  lastVibeAt = now;
   try { navigator.vibrate(HAPTIC[kind] ?? 12); } catch { /* not allowed right now */ }
 }
 
