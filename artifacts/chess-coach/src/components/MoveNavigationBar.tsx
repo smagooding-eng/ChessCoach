@@ -1,5 +1,6 @@
 import React from 'react';
 import { useHoldRepeat } from '@/hooks/use-hold-repeat';
+import { vibrateFor } from '@/context/SettingsContext';
 import { ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight, Play, Pause } from 'lucide-react';
 
 const GREEN = '#81b64c';
@@ -37,8 +38,9 @@ export function MoveNavigationBar({
   canGoBack = true, canGoForward = true, extra, variant,
 }: MoveNavigationBarProps) {
   // Hold the back / forward arrow to speed through the moves.
-  const holdPrev = useHoldRepeat(() => { if (!canGoBack) return false; onPrev(); return true; });
-  const holdNext = useHoldRepeat(() => { if (!canGoForward) return false; onNext(); return true; });
+  // Every step buzzes, forwards or back (a single step forward already buzzes from the board).
+  const holdPrev = useHoldRepeat(() => { if (!canGoBack) return false; vibrateFor('move'); onPrev(); return true; });
+  const holdNext = useHoldRepeat((repeat) => { if (!canGoForward) return false; if (repeat) vibrateFor('move'); onNext(); return true; });
   if (variant === 'redesign') {
     // Five wide rounded buttons across the row (redesign mockup)
     const wide = (onClick: () => void, disabled: boolean, icon: React.ReactNode, label: string, hold?: ReturnType<typeof useHoldRepeat>) => (

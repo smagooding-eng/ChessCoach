@@ -6,7 +6,7 @@ import { ArrowLeft, ChevronLeft, ChevronRight, FlipVertical2, ListTree, Star, Ro
 import { MaterialStrip } from '@/components/GameStatusStrip';
 import { ChessBoard, type MoveQuality } from '@/components/ChessBoard';
 import { normalizeFen } from '@/lib/utils';
-import { playMoveSound, LookOverride, randomLook, type BoardLook } from '@/context/SettingsContext';
+import { playMoveSound, vibrateFor, LookOverride, randomLook, type BoardLook } from '@/context/SettingsContext';
 
 // Step-by-step game review: the coach talks you through the game one move
 // at a time, above a full-width board that shows each move's quality
@@ -171,6 +171,10 @@ export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flippe
   const holdStep = (d: 1 | -1) => (repeat: boolean) => {
     const target = Math.max(0, Math.min(max, plyRef.current + d));
     if (target === plyRef.current) return false;
+    // A buzz for every move the pieces make, forwards or back, held or tapped
+    // (a single step forward already buzzes from the board itself).
+    const san = moves[(d === 1 ? target : plyRef.current) - 1]?.san ?? '';
+    if (repeat || d === -1) vibrateFor(san.includes('+') || san.includes('#') ? 'check' : san.includes('x') ? 'capture' : 'move');
     if (repeat) { plyRef.current = target; setPly(target); } else go(target);
     return true;
   };
