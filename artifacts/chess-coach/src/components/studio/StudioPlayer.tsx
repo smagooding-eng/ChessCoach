@@ -1,29 +1,47 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Chess } from 'chess.js';
-import { X, Play, Pause, RotateCcw, ChevronLeft, ChevronRight, Shuffle, Video, Square, Eye, EyeOff, FlipVertical2, Trash2 } from 'lucide-react';
+import { X, Play, Pause, RotateCcw, ChevronLeft, ChevronRight, Shuffle, Video, Square, Eye, EyeOff, FlipVertical2, Trash2, Copy, SkipForward, SkipBack } from 'lucide-react';
 import { ChessBoard, type MoveQuality } from '@/components/ChessBoard';
 import { LookOverride, randomLook, lookLabel, playMoveSound, type BoardLook } from '@/context/SettingsContext';
 import { apiFetch } from '@/lib/api';
 import { normalizeFen } from '@/lib/utils';
 
-// Content Studio player: one game moment in a 9:16 frame made for TikTok,
-// Reels and Shorts. Autoplays from a few moves before the key move, can stop
-// for "can you find it?" with a countdown, pops the move's badge, throws
-// confetti on brilliant moves and mates, shakes on blunders, and can put a
-// new random board and piece set on every move. Stickers drag anywhere in the
-// frame. "Record clip" captures just the frame (Chrome on a computer); on a
-// phone, "Clean view" hides everything but the frame for the screen recorder.
+// Content Studio player: a game moment or a trap lesson as a 9:16 clip for
+// TikTok, Reels and Shorts. The clip is a script of frames: an intro with the
+// hook, the moves leading up, a "can you find it?" countdown, the key move
+// (badge pop, eval swing, confetti or shake), optionally the engine's better
+// line, the moves after, a rating reveal and an end card. Every frame can get
+// a new random board and piece set. Stickers drag anywhere. "Record clip"
+// captures just the frame (Chrome on a computer); on a phone, "Clean view"
+// hides everything but the frame for the screen recorder.
 
 export interface StudioMoment {
   gameId: number; moveIndex: number; tags: string[]; classification: string | null; san: string;
   trapName: string | null; opening: string | null; white: string | null; black: string | null;
   whiteRating: number | null; blackRating: number | null; platform: string | null;
 }
-interface ReviewMove { moveIndex: number; san: string; color: 'white' | 'black'; classification?: string; explanation?: string; betterMove?: string | null; evalAfterCp?: number; fen?: string }
+export interface StudioTrap {
+  id: number; name: string; category: string; difficulty: string; trapSide: string; summary: string;
+  startingFen: string; moves: string[]; notes: string[]; critical: number;
+}
+export type StudioSource = { kind: 'game'; moment: StudioMoment } | { kind: 'trap'; trap: StudioTrap };
+
+interface ReviewMove { moveIndex?: number; san: string; color?: 'white' | 'black'; classification?: string; explanation?: string; betterMove?: string | null; evalAfterCp?: number; fen?: string; bestLineSan?: string[] }
 interface StudioGame { id: number; pgn: string; opening: string | null; white: string; black: string; whiteRating: number | null; blackRating: number | null; moves: ReviewMove[] }
 interface Ply { san: string; from: string; to: string; fen: string; fenBefore: string; color: 'w' | 'b'; review?: ReviewMove }
 interface Sticker { id: number; text: string; x: number; y: number; size: number; kind: 'emoji' | 'text' }
+interface Clip {
+  plies: Ply[]; key: number; tags: string[]; hook: string; sub: string; names: { w: string | null; b: string | null };
+  ratings: { w: number | null; b: number | null }; fileBase: string; label: string; isTrap: boolean; opening: string | null;
+}
+type Frame =
+  | { kind: 'intro'; fen: string }
+  | { kind: 'move'; ply: number }
+  | { kind: 'countdown'; n: number; fen: string; last: { from: string; to: string } | null }
+  | { kind: 'better'; fen: string; last: { from: string; to: string } | null; arrow: { from: string; to: string } | null; text: string }
+  | { kind: 'reveal'; fen: string }
+  | { kind: 'outro'; fen: string };
 
 const LABEL: Record<string, { text: string; color: string; glyph: string }> = {
   brilliant: { text: 'BRILLIANT', color: '#1BACA6', glyph: '!!' }, great: { text: 'GREAT MOVE', color: '#4A8BD6', glyph: '!' },
@@ -33,52 +51,104 @@ const LABEL: Record<string, { text: string; color: string; glyph: string }> = {
   blunder: { text: 'BLUNDER', color: '#CA3431', glyph: '??' }, missed_win: { text: 'MISSED WIN', color: '#B8343E', glyph: '✗' },
   checkmate: { text: 'CHECKMATE', color: '#E8B447', glyph: '#' },
 };
+const BAD = new Set(['inaccuracy', 'mistake', 'blunder', 'missed_win']);
 const BACKGROUNDS: Record<string, { label: string; css: React.CSSProperties }> = {
-  dark: { label: 'Dark', css: { background: '#0B1112' } },
   green: { label: 'ChessScout', css: { background: 'radial-gradient(120% 80% at 50% 0%, #2E4A1E 0%, #0E1A0C 60%, #070B06 100%)' } },
+  dark: { label: 'Dark', css: { background: '#0B1112' } },
   purple: { label: 'Purple', css: { background: 'linear-gradient(160deg, #2A1446 0%, #0F0A1F 100%)' } },
   sunset: { label: 'Sunset', css: { background: 'linear-gradient(170deg, #4A1E14 0%, #1A0B10 70%)' } },
+  ocean: { label: 'Ocean', css: { background: 'linear-gradient(170deg, #0F3B57 0%, #06131D 75%)' } },
+  gold: { label: 'Gold', css: { background: 'radial-gradient(120% 80% at 50% 0%, #5A4410 0%, #1A1406 65%, #0B0903 100%)' } },
   screen: { label: 'Green screen', css: { background: '#00FF00' } },
 };
-const EMOJIS = ['🔥', '😱', '🤯', '🧠', '👀', '💀', '🏆', '♟️', '⚡', '🎯', '😂', '🤔'];
-const TEXT_STICKERS = ['BRILLIANT!!', 'BLUNDER??', 'WAIT FOR IT…', 'NO WAY', 'GG', 'FIND THE MOVE', 'TRAP!', 'MATE'];
+const EMOJIS = ['🔥', '😱', '🤯', '🧠', '👀', '💀', '🏆', '♟️', '⚡', '🎯', '😂', '🤔', '🍿', '😤', '👑', '💥'];
+const TEXT_STICKERS = ['BRILLIANT!!', 'BLUNDER??', 'WAIT FOR IT…', 'NO WAY', 'GG', 'FIND THE MOVE', 'TRAP!', 'MATE', 'PAUSE NOW', 'COMMENT YOUR MOVE'];
 
-function hookFor(m: StudioMoment): string {
-  if (m.tags.includes('trap') && m.trapName) return `The ${m.trapName} 🪤`;
-  if (m.tags.includes('brilliant')) return 'Find the brilliant move 🔥';
-  if (m.tags.includes('checkmate')) return 'How fast can you see the mate? ♟️';
-  if (m.tags.includes('sacrifice')) return 'Would you give this up? 😳';
-  if (m.tags.includes('fork')) return 'The fork nobody saw coming 🍴';
-  if (m.tags.includes('skewer') || m.tags.includes('pin')) return 'Pinned and punished 📌';
-  if (m.tags.includes('missed_win')) return 'One move from winning… 😩';
-  if (m.tags.includes('blunder')) return 'One move ruined everything 😱';
+// ── Preferences that carry over between clips (this browser only) ─────────
+const PREF_KEY = 'cs_studio_prefs_v1';
+const DEFAULT_PREFS = {
+  before: 8, after: 5, speed: 1.2, guess: true, remix: true, captions: true, effects: true, arrow: true, sound: true, watermark: true,
+  bg: 'green', betterLine: true, guessRating: false, outro: true, progress: true, intro: true, safeArea: true, showNames: false,
+  handle: '@chessscout.net3', outroLine: 'Review your games free',
+};
+type Prefs = typeof DEFAULT_PREFS;
+function loadPrefs(): Prefs {
+  try { return { ...DEFAULT_PREFS, ...JSON.parse(localStorage.getItem(PREF_KEY) || '{}') }; } catch { return DEFAULT_PREFS; }
+}
+
+function hookForTags(tags: string[], trapName: string | null): string {
+  if (tags.includes('trap') && trapName) return `The ${trapName} 🪤`;
+  if (tags.includes('brilliant')) return 'Find the brilliant move 🔥';
+  if (tags.includes('checkmate')) return 'How fast can you see the mate? ♟️';
+  if (tags.includes('sacrifice')) return 'Would you give this up? 😳';
+  if (tags.includes('fork')) return 'The fork nobody saw coming 🍴';
+  if (tags.includes('skewer') || tags.includes('pin')) return 'Pinned and punished 📌';
+  if (tags.includes('missed_win')) return 'One move from winning… 😩';
+  if (tags.includes('blunder')) return 'One move ruined everything 😱';
   return 'Watch this 👀';
 }
 
-function buildPlies(g: StudioGame): Ply[] {
+function playSans(startFen: string | undefined, sans: string[], reviews: (ReviewMove | undefined)[]): Ply[] {
   const out: Ply[] = [];
-  const fenTag = g.pgn?.match(/\[FEN "([^"]+)"\]/)?.[1];
-  const startFen = g.moves[0]?.fen ?? (fenTag ? normalizeFen(fenTag) : undefined);
-  // The review's own move list, or the PGN's moves when there's no review.
-  const sans = g.moves.length
-    ? g.moves.map((m) => m.san)
-    : (g.pgn ?? '').replace(/\[[^\]]*\]/g, ' ').replace(/\{[^}]*\}/g, ' ').split(/\s+/)
-        .map((t) => t.replace(/^\d+\.+/, '')).filter((t) => t && !/^(1-0|0-1|1\/2-1\/2|\*)$/.test(t));
   try {
     const c = startFen ? new Chess(startFen) : new Chess();
     sans.forEach((san, i) => {
       const fenBefore = c.fen();
       const m = c.move(san);
       if (!m) throw new Error('bad move');
-      out.push({ san: m.san, from: m.from, to: m.to, fen: c.fen(), fenBefore, color: m.color as 'w' | 'b', review: g.moves[i] });
+      out.push({ san: m.san, from: m.from, to: m.to, fen: c.fen(), fenBefore, color: m.color as 'w' | 'b', review: reviews[i] });
     });
   } catch { /* keep the moves that played */ }
   return out;
 }
 
+function gameClip(g: StudioGame, m: StudioMoment): Clip {
+  const fenTag = g.pgn?.match(/\[FEN "([^"]+)"\]/)?.[1];
+  const startFen = g.moves[0]?.fen ?? (fenTag ? normalizeFen(fenTag) : undefined);
+  const sans = g.moves.length
+    ? g.moves.map((x) => x.san)
+    : (g.pgn ?? '').replace(/\[[^\]]*\]/g, ' ').replace(/\{[^}]*\}/g, ' ').split(/\s+/)
+        .map((t) => t.replace(/^\d+\.+/, '')).filter((t) => t && !/^(1-0|0-1|1\/2-1\/2|\*)$/.test(t));
+  return {
+    plies: playSans(startFen, sans, g.moves), key: m.moveIndex, tags: m.tags, hook: hookForTags(m.tags, m.trapName), sub: m.opening ?? '',
+    names: { w: m.white, b: m.black }, ratings: { w: m.whiteRating, b: m.blackRating }, fileBase: `chessscout-${m.gameId}-${m.moveIndex}`,
+    label: `Game #${m.gameId} · move ${m.moveIndex + 1}`, isTrap: false, opening: m.opening,
+  };
+}
+
+function trapClip(t: StudioTrap): Clip {
+  // The punishing move after the victim's mistake is the one to find.
+  const key = Math.min(t.moves.length - 1, t.critical + 1);
+  const reviews: ReviewMove[] = t.moves.map((san, i) => ({
+    san, explanation: t.notes[i] ?? '',
+    classification: san.includes('#') ? 'checkmate' : i === t.critical ? 'blunder' : i === key ? 'great' : i < t.critical ? 'book' : 'best',
+  }));
+  const start = t.startingFen && t.startingFen !== 'startpos' ? t.startingFen : undefined;
+  return {
+    plies: playSans(start, t.moves, reviews), key, tags: ['trap', ...(t.moves.some((s) => s.includes('#')) ? ['checkmate'] : [])],
+    hook: `The ${t.name} 🪤`, sub: t.summary, names: { w: null, b: null }, ratings: { w: null, b: null },
+    fileBase: `chessscout-trap-${t.id}`, label: `Trap lesson · ${t.name}`, isTrap: true, opening: t.category,
+  };
+}
+
 function figurine(san: string, white: boolean): string {
   const map: Record<string, string> = white ? { K: '♔', Q: '♕', R: '♖', B: '♗', N: '♘' } : { K: '♚', Q: '♛', R: '♜', B: '♝', N: '♞' };
   return san.replace(/^[KQRBN]/, (p) => map[p] ?? p);
+}
+const fmtEval = (cp: number | null | undefined) => cp == null ? '' : Math.abs(cp) >= 9000 ? `${cp > 0 ? '+' : '−'}M${Math.max(1, 10000 - Math.abs(cp))}` : `${cp >= 0 ? '+' : '−'}${Math.abs(cp / 100).toFixed(1)}`;
+
+function hashtagsFor(clip: Clip): string {
+  const t = new Set(['#chess', '#chesstok', '#chessscout']);
+  if (clip.tags.includes('brilliant')) { t.add('#brilliantmove'); t.add('#chesspuzzle'); }
+  if (clip.tags.includes('trap')) { t.add('#chesstrap'); t.add('#chessopenings'); }
+  if (clip.tags.includes('checkmate')) t.add('#checkmate');
+  if (clip.tags.some((x) => ['fork', 'pin', 'skewer', 'discovered', 'sacrifice'].includes(x))) t.add('#chesstactics');
+  if (clip.tags.includes('blunder') || clip.tags.includes('missed_win')) t.add('#chessblunder');
+  if (clip.tags.includes('endgame')) t.add('#chessendgame');
+  const op = (clip.opening ?? '').split(/[:,]/)[0].replace(/[^A-Za-z ]/g, '').trim();
+  if (op) t.add('#' + op.replace(/\s+/g, '').toLowerCase());
+  t.add('#chessgame');
+  return [...t].join(' ');
 }
 
 function Confetti({ fire }: { fire: number }) {
@@ -89,7 +159,7 @@ function Confetti({ fire }: { fire: number }) {
     const ctx = cv.getContext('2d'); if (!ctx) return;
     const W = (cv.width = cv.offsetWidth * 2), H = (cv.height = cv.offsetHeight * 2);
     const colors = ['#81B64C', '#E8B447', '#1BACA6', '#FFFFFF', '#F0605D', '#4A8BD6'];
-    const parts = Array.from({ length: 160 }, () => ({ x: W / 2 + (Math.random() - 0.5) * W * 0.3, y: H * 0.45, vx: (Math.random() - 0.5) * 26, vy: -Math.random() * 30 - 10, r: Math.random() * 10 + 6, c: colors[Math.floor(Math.random() * colors.length)], a: Math.random() * 6 }));
+    const parts = Array.from({ length: 170 }, () => ({ x: W / 2 + (Math.random() - 0.5) * W * 0.3, y: H * 0.45, vx: (Math.random() - 0.5) * 26, vy: -Math.random() * 30 - 10, r: Math.random() * 10 + 6, c: colors[Math.floor(Math.random() * colors.length)], a: Math.random() * 6 }));
     let raf = 0; const t0 = performance.now();
     const step = (t: number) => {
       ctx.clearRect(0, 0, W, H);
@@ -102,88 +172,139 @@ function Confetti({ fire }: { fire: number }) {
   return <canvas ref={ref} className="pointer-events-none absolute inset-0 z-30 h-full w-full" />;
 }
 
-export function StudioPlayer({ moment, onClose }: { moment: StudioMoment; onClose: () => void }) {
-  const [game, setGame] = useState<StudioGame | null>(null);
+export function StudioPlayer({ source, onClose, onNext, onPrev }: { source: StudioSource; onClose: () => void; onNext?: () => void; onPrev?: () => void }) {
+  // ── Load the clip ───────────────────────────────────────────────────────
+  const [clip, setClip] = useState<Clip | null>(null);
   const [err, setErr] = useState<string | null>(null);
   useEffect(() => {
-    apiFetch(`/api/admin/studio/game/${moment.gameId}`, { credentials: 'include' })
+    setClip(null); setErr(null);
+    if (source.kind === 'trap') { setClip(trapClip(source.trap)); return; }
+    const m = source.moment;
+    apiFetch(`/api/admin/studio/game/${m.gameId}`, { credentials: 'include' })
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error('Game not found'))))
-      .then(setGame).catch((e) => setErr(String(e?.message ?? e)));
-  }, [moment.gameId]);
-  const plies = useMemo(() => (game ? buildPlies(game) : []), [game]);
-  const keyPly = moment.moveIndex + 1; // the position after the key move
+      .then((g: StudioGame) => setClip(gameClip(g, m))).catch((e) => setErr(String(e?.message ?? e)));
+  }, [source]);
 
-  // ── Clip settings ───────────────────────────────────────────────────────
-  const [hook, setHook] = useState(() => hookFor(moment));
-  const [sub, setSub] = useState(() => moment.opening ?? '');
-  const [before, setBefore] = useState(8);
-  const [after, setAfter] = useState(5);
-  const [speed, setSpeed] = useState(1.2);
-  const [guess, setGuess] = useState(true);
-  const [remix, setRemix] = useState(true);
+  // ── Settings (remembered between clips) ─────────────────────────────────
+  const [prefs, setPrefs] = useState<Prefs>(loadPrefs);
+  const set = <K extends keyof Prefs>(k: K, v: Prefs[K]) => setPrefs((p) => { const n = { ...p, [k]: v }; try { localStorage.setItem(PREF_KEY, JSON.stringify(n)); } catch { /* ignore */ } return n; });
+  const [hook, setHook] = useState('');
+  const [sub, setSub] = useState('');
   const [fixedLook, setFixedLook] = useState<BoardLook | null>(null);
-  const [showNames, setShowNames] = useState(false);
-  const [captions, setCaptions] = useState(true);
-  const [effects, setEffects] = useState(true);
-  const [arrow, setArrow] = useState(true);
-  const [sound, setSound] = useState(true);
-  const [watermark, setWatermark] = useState(true);
-  const [bg, setBg] = useState<keyof typeof BACKGROUNDS>('green');
-  const [flipped, setFlipped] = useState(() => (moment.moveIndex % 2 === 1));
+  const [flipped, setFlipped] = useState(false);
   const [clean, setClean] = useState(false);
+  useEffect(() => {
+    if (!clip) return;
+    setHook(clip.hook); setSub(clip.sub);
+    setFlipped(clip.plies[clip.key]?.color === 'b');
+  }, [clip]);
 
-  const startPly = Math.max(0, keyPly - 1 - before);
-  const endPly = Math.min(plies.length, keyPly + after);
-  const [ply, setPly] = useState(0);
+  // ── The script ──────────────────────────────────────────────────────────
+  const frames = useMemo<Frame[]>(() => {
+    if (!clip || !clip.plies.length) return [];
+    const { plies, key } = clip;
+    const keyPly = key + 1;
+    const startPly = Math.max(0, keyPly - 1 - prefs.before);
+    const endPly = Math.min(plies.length, keyPly + prefs.after);
+    const fenAt = (p: number) => (p <= 0 ? plies[0].fenBefore : plies[p - 1].fen);
+    const lastAt = (p: number) => (p <= 0 ? null : { from: plies[p - 1].from, to: plies[p - 1].to });
+    const out: Frame[] = [];
+    if (prefs.intro) out.push({ kind: 'intro', fen: fenAt(startPly) });
+    else out.push({ kind: 'move', ply: startPly });
+    for (let p = startPly + 1; p < keyPly; p++) out.push({ kind: 'move', ply: p });
+    if (prefs.guess) for (const n of [3, 2, 1]) out.push({ kind: 'countdown', n, fen: fenAt(keyPly - 1), last: lastAt(keyPly - 1) });
+    out.push({ kind: 'move', ply: keyPly });
+    // The engine's better line after a mistake.
+    const kr = plies[key]?.review;
+    if (prefs.betterLine && kr?.classification && BAD.has(kr.classification)) {
+      const line = kr.bestLineSan?.length ? kr.bestLineSan : kr.betterMove ? [kr.betterMove] : [];
+      if (line.length) {
+        try {
+          const c = new Chess(plies[key].fenBefore);
+          const first = new Chess(plies[key].fenBefore).move(line[0]);
+          out.push({ kind: 'better', fen: c.fen(), last: null, arrow: first ? { from: first.from, to: first.to } : null, text: `Better was ${line[0]}` });
+          for (const san of line.slice(0, 4)) {
+            const mv = c.move(san); if (!mv) break;
+            out.push({ kind: 'better', fen: c.fen(), last: { from: mv.from, to: mv.to }, arrow: null, text: `Engine line · ${san}` });
+          }
+        } catch { /* skip a line that doesn't play */ }
+      }
+    }
+    for (let p = keyPly + 1; p <= endPly; p++) out.push({ kind: 'move', ply: p });
+    const lastFen = fenAt(endPly);
+    if (prefs.guessRating && !clip.isTrap && (clip.ratings.w || clip.ratings.b)) out.push({ kind: 'reveal', fen: lastFen });
+    if (prefs.outro) out.push({ kind: 'outro', fen: lastFen });
+    return out;
+  }, [clip, prefs.before, prefs.after, prefs.intro, prefs.guess, prefs.betterLine, prefs.guessRating, prefs.outro]);
+
+  const dur = (f: Frame) => {
+    const s = prefs.speed * 1000;
+    switch (f.kind) {
+      case 'intro': return 1600;
+      case 'countdown': return 1000;
+      case 'better': return Math.max(s, 1300);
+      case 'reveal': return 2400;
+      case 'outro': return 2800;
+      default: return clip && f.ply === clip.key + 1 ? Math.max(s, 2400) : s;
+    }
+  };
+
+  const [i, setI] = useState(0);
   const [playing, setPlaying] = useState(false);
-  const [countdown, setCountdown] = useState<number | null>(null);
   const [pop, setPop] = useState<{ cls: string; at: number } | null>(null);
   const [confetti, setConfetti] = useState(0);
   const [shake, setShake] = useState(0);
   const looks = useRef(new Map<number, BoardLook>());
-  useEffect(() => { if (plies.length) setPly(startPly); }, [plies.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { setI(0); setPlaying(false); looks.current.clear(); }, [frames]);
 
-  const look: BoardLook | null = remix ? (looks.current.get(ply) ?? (() => { const l = randomLook(); looks.current.set(ply, l); return l; })()) : fixedLook;
-
-  const cur = ply > 0 ? plies[ply - 1] : null;
-  const rev = cur?.review;
-  const cls = (cur?.san.includes('#') ? 'checkmate' : rev?.classification) ?? null;
-  const isKey = ply === keyPly;
-
-  // Effects when a move lands.
-  const land = useCallback((p: number) => {
-    const m = p > 0 ? plies[p - 1] : null;
-    if (!m) return;
-    if (sound) playMoveSound(m.san.includes('#') || m.san.includes('+') ? 'check' : m.san.startsWith('O-O') ? 'castle' : m.san.includes('=') ? 'promote' : m.san.includes('x') ? 'capture' : 'move');
-    if (!effects) return;
-    const c = m.san.includes('#') ? 'checkmate' : m.review?.classification;
-    if (p === keyPly || (c && ['brilliant', 'great', 'blunder', 'missed_win', 'checkmate'].includes(c))) {
-      if (c) setPop({ cls: c, at: Date.now() });
-      if (c === 'brilliant' || c === 'great' || c === 'checkmate') setConfetti(Date.now());
-      if (c === 'blunder' || c === 'missed_win') setShake(Date.now());
+  const frame: Frame | undefined = frames[i];
+  const plies = clip?.plies ?? [];
+  const keyPly = (clip?.key ?? 0) + 1;
+  // What the board shows for this frame.
+  const view = useMemo(() => {
+    if (!frame || !plies.length) return null;
+    if (frame.kind === 'move') {
+      const p = frame.ply; const m = p > 0 ? plies[p - 1] : null;
+      return { fen: m ? m.fen : plies[0].fenBefore, last: m ? { from: m.from, to: m.to } : null, ply: p, move: m };
     }
-  }, [plies, sound, effects, keyPly]);
+    const fen = frame.fen;
+    const last = frame.kind === 'countdown' || frame.kind === 'better' ? frame.last : null;
+    const ply = frame.kind === 'countdown' ? keyPly - 1 : frame.kind === 'intro' ? -1 : -2;
+    return { fen, last, ply, move: null as Ply | null };
+  }, [frame, plies, keyPly]);
 
-  const goTo = useCallback((p: number) => { const n = Math.max(0, Math.min(plies.length, p)); setPly(n); if (n > 0) land(n); }, [plies.length, land]);
+  const look: BoardLook | null = prefs.remix ? (looks.current.get(i) ?? (() => { const l = randomLook(); looks.current.set(i, l); return l; })()) : fixedLook;
+  const cur = view?.move ?? null;
+  const rev = cur?.review;
+  const cls = cur ? ((cur.san.includes('#') ? 'checkmate' : rev?.classification) ?? null) : null;
+  const isKey = frame?.kind === 'move' && frame.ply === keyPly;
+  const prevEval = isKey && keyPly >= 2 ? plies[keyPly - 2]?.review?.evalAfterCp : null;
 
-  // Autoplay, with the guess-the-move stop before the key move.
+  // Effects when a frame starts.
   useEffect(() => {
-    if (!playing || countdown !== null) return;
-    if (ply >= endPly) { setPlaying(false); return; }
-    const t = setTimeout(() => {
-      if (guess && ply === keyPly - 1) { setCountdown(3); return; }
-      goTo(ply + 1);
-    }, ply === startPly ? 900 : speed * 1000);
-    return () => clearTimeout(t);
-  }, [playing, ply, endPly, keyPly, startPly, speed, guess, countdown, goTo]);
-  useEffect(() => {
-    if (countdown === null) return;
-    if (countdown === 0) { setCountdown(null); goTo(keyPly); return; }
-    const t = setTimeout(() => setCountdown(countdown - 1), 1000);
-    return () => clearTimeout(t);
-  }, [countdown, goTo, keyPly]);
+    if (!frame) return;
+    // A badge only stays up for its own move.
+    setPop(null);
+    if (frame.kind === 'move' && cur && i > 0) {
+      if (prefs.sound) playMoveSound(cur.san.includes('#') || cur.san.includes('+') ? 'check' : cur.san.startsWith('O-O') ? 'castle' : cur.san.includes('=') ? 'promote' : cur.san.includes('x') ? 'capture' : 'move');
+      if (prefs.effects && cls && (isKey || ['brilliant', 'great', 'blunder', 'missed_win', 'checkmate'].includes(cls))) {
+        setPop({ cls, at: Date.now() });
+        if (cls === 'brilliant' || cls === 'great' || cls === 'checkmate') setConfetti(Date.now());
+        if (cls === 'blunder' || cls === 'missed_win') setShake(Date.now());
+      }
+    }
+    if (frame.kind === 'better' && frame.last && prefs.sound) playMoveSound('move');
+    if (frame.kind === 'countdown' && prefs.sound && frame.n === 3) playMoveSound('check');
+  }, [i]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const restart = () => { looks.current.clear(); setCountdown(null); setPly(startPly); setPlaying(true); };
+  useEffect(() => {
+    if (!playing || !frame) return;
+    if (i >= frames.length - 1) { const t = setTimeout(() => setPlaying(false), dur(frame)); return () => clearTimeout(t); }
+    const t = setTimeout(() => setI((x) => x + 1), dur(frame));
+    return () => clearTimeout(t);
+  }, [playing, i, frames.length]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const restart = () => { looks.current.clear(); setI(0); setPlaying(true); };
 
   // ── Stickers ────────────────────────────────────────────────────────────
   const [stickers, setStickers] = useState<Sticker[]>([]);
@@ -216,7 +337,7 @@ export function StudioPlayer({ moment, onClose }: { moment: StudioMoment; onClos
       if (CT && frameRef.current && 'cropTo' in track) await (track as unknown as { cropTo: (t: unknown) => Promise<void> }).cropTo(await CT.fromElement(frameRef.current));
       else setRecNote('This browser records the whole tab; crop to the frame when you edit.');
       const type = ['video/mp4;codecs=avc1', 'video/mp4', 'video/webm;codecs=vp9', 'video/webm'].find((t) => MediaRecorder.isTypeSupported(t)) ?? '';
-      const rec = new MediaRecorder(stream, type ? { mimeType: type, videoBitsPerSecond: 10_000_000 } : undefined);
+      const rec = new MediaRecorder(stream, type ? { mimeType: type, videoBitsPerSecond: 12_000_000 } : undefined);
       const chunks: Blob[] = [];
       rec.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
       rec.onstop = () => {
@@ -225,12 +346,13 @@ export function StudioPlayer({ moment, onClose }: { moment: StudioMoment; onClos
         const blob = new Blob(chunks, { type: type || 'video/webm' });
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
-        a.download = `chessscout-${moment.gameId}-${moment.moveIndex}.${type.includes('mp4') ? 'mp4' : 'webm'}`;
+        a.download = `${clip?.fileBase ?? 'chessscout-clip'}.${type.includes('mp4') ? 'mp4' : 'webm'}`;
         a.click();
         setTimeout(() => URL.revokeObjectURL(a.href), 10_000);
       };
       track.addEventListener('ended', () => { if (rec.state !== 'inactive') rec.stop(); });
       recRef.current = rec;
+      setSelected(null);
       rec.start(250);
       setRecording(true);
       setTimeout(restart, 600);
@@ -238,141 +360,203 @@ export function StudioPlayer({ moment, onClose }: { moment: StudioMoment; onClos
       setRecNote('Recording needs Chrome on a computer. On a phone, use "Clean view" and your screen recorder.');
     }
   };
-  // Stop a recording a moment after the clip ends.
+  // Stop a recording when the clip ends.
   useEffect(() => {
-    if (!recording || playing || ply < endPly) return;
-    const t = setTimeout(() => recRef.current?.state === 'recording' && recRef.current.stop(), 1500);
+    if (!recording || playing || i < frames.length - 1) return;
+    const t = setTimeout(() => recRef.current?.state === 'recording' && recRef.current.stop(), 400);
     return () => clearTimeout(t);
-  }, [recording, playing, ply, endPly]);
+  }, [recording, playing, i, frames.length]);
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
       if (e.key === 'Escape') { if (clean) setClean(false); else onClose(); }
       if (e.key === ' ') { e.preventDefault(); setPlaying((p) => !p); }
-      if (e.key === 'ArrowRight') goTo(ply + 1);
-      if (e.key === 'ArrowLeft') setPly(Math.max(0, ply - 1));
+      if (e.key === 'ArrowRight') setI((x) => Math.min(frames.length - 1, x + 1));
+      if (e.key === 'ArrowLeft') setI((x) => Math.max(0, x - 1));
+      if (e.key.toLowerCase() === 'n' && onNext) onNext();
+      if (e.key.toLowerCase() === 'p' && onPrev) onPrev();
+      if (e.key.toLowerCase() === 'r') restart();
       if ((e.key === 'Delete' || e.key === 'Backspace') && selected) setStickers((s) => s.filter((x) => x.id !== selected));
     };
     window.addEventListener('keydown', h);
     return () => window.removeEventListener('keydown', h);
-  }, [clean, onClose, goTo, ply, selected]);
+  }, [clean, onClose, onNext, onPrev, frames.length, selected]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (err) return (
-    <div className="fixed inset-0 z-[90] grid place-items-center bg-black/80 p-6 text-white" onClick={onClose}><p>{err}</p></div>
-  );
+  // ── Post kit ────────────────────────────────────────────────────────────
+  const postText = clip ? `${hook}\n\n${clip.isTrap ? 'Would you fall for it? 👇' : 'Would you have found it? Comment your move 👇'}\nReview your own games free at chessscout.net\n\n${hashtagsFor(clip)}` : '';
+  const [copied, setCopied] = useState(false);
+  const copyPost = () => { navigator.clipboard?.writeText(postText).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); }).catch(() => {}); };
 
-  const fen = cur ? cur.fen : plies[0]?.fenBefore ?? new Chess().fen();
-  // Best move arrow on the key position after the reveal, when the key move wasn't the best.
-  const arrows = arrow && isKey && rev?.betterMove && cls && ['blunder', 'mistake', 'missed_win', 'inaccuracy'].includes(cls)
-    ? (() => { try { const c = new Chess(plies[keyPly - 1].fenBefore); const m = c.move(rev.betterMove!); return m ? [{ from: m.from, to: m.to, color: 'rgba(129,182,76,0.9)' }] : []; } catch { return []; } })()
-    : [];
-  const ev = rev?.evalAfterCp;
-  const evPct = ev == null ? 50 : Math.abs(ev) >= 9000 ? (ev > 0 ? 100 : 0) : Math.max(4, Math.min(96, 50 + 50 * (2 / (1 + Math.exp(-ev / 400)) - 1)));
+  if (err) return <div className="fixed inset-0 z-[90] grid place-items-center bg-black/85 p-6 text-white" onClick={onClose}><p>{err}</p></div>;
+  if (!clip || !view) return <div className="fixed inset-0 z-[90] grid place-items-center bg-black/85 text-white/70">Loading clip…</div>;
+
+  const evCp = cur?.review?.evalAfterCp ?? (view.ply === -1 || view.ply === -2 ? null : null);
+  const evPct = evCp == null ? 50 : Math.abs(evCp) >= 9000 ? (evCp > 0 ? 100 : 0) : Math.max(4, Math.min(96, 50 + 50 * (2 / (1 + Math.exp(-evCp / 400)) - 1)));
+  const revealed = frame?.kind === 'reveal' || frame?.kind === 'outro';
   const name = (side: 'w' | 'b') => {
-    const n = side === 'w' ? moment.white : moment.black; const r = side === 'w' ? moment.whiteRating : moment.blackRating;
-    return `${showNames && n ? n : side === 'w' ? 'White' : 'Black'}${r ? ` (${r})` : ''}`;
+    const n = clip.names[side]; const r = clip.ratings[side];
+    const who = clip.isTrap ? (side === 'w' ? 'White' : 'Black') : prefs.showNames && n ? n : side === 'w' ? 'White' : 'Black';
+    const rating = r ? (prefs.guessRating && !revealed ? ' (???)' : ` (${r})`) : '';
+    return `${who}${rating}`;
   };
   const top = flipped ? 'w' : 'b';
-  const moveNo = cur ? `${Math.floor((ply - 1) / 2) + 1}${cur.color === 'w' ? '.' : '...'}` : '';
-  const caption = captions && cur ? rev?.explanation : null;
+  const moveNo = cur ? `${Math.floor((view.ply - 1) / 2) + 1}${cur.color === 'w' ? '.' : '...'}` : '';
   const label = cls ? LABEL[cls] : null;
+  // Arrows: the better move on a mistake (key frame), the engine line's first move, nothing otherwise.
+  const arrows: { from: string; to: string; color?: string }[] = [];
+  if (frame?.kind === 'better' && frame.arrow) arrows.push({ ...frame.arrow, color: 'rgba(129,182,76,0.95)' });
+  if (prefs.arrow && isKey && rev?.betterMove && cls && BAD.has(cls)) {
+    try { const c = new Chess(plies[keyPly - 1].fenBefore); const mv = c.move(rev.betterMove); if (mv) arrows.push({ from: mv.from, to: mv.to, color: 'rgba(129,182,76,0.9)' }); } catch { /* ignore */ }
+  }
+  const caption = frame?.kind === 'better' ? frame.text : prefs.captions && cur ? rev?.explanation : null;
+  const showBottomMove = frame?.kind === 'move' && cur;
 
   const ctl = 'rounded-lg bg-white/10 px-2.5 py-1.5 text-[12.5px] font-bold text-white hover:bg-white/15';
-  const toggle = (on: boolean, set: (v: boolean) => void, text: string) => (
-    <button onClick={() => set(!on)} className="rounded-full px-2.5 py-1 text-[12px] font-bold" style={{ background: on ? 'rgba(129,182,76,.25)' : 'rgba(255,255,255,.06)', color: on ? '#B8E08C' : '#C9CFCD', border: `1px solid ${on ? 'rgba(129,182,76,.5)' : 'rgba(255,255,255,.1)'}` }}>{text}</button>
-  );
+  const toggle = (k: keyof Prefs, text: string) => {
+    const on = !!prefs[k];
+    return (
+      <button key={k} onClick={() => { if (k === 'remix') looks.current.clear(); set(k, !on as never); }} className="rounded-full px-2.5 py-1 text-[12px] font-bold"
+        style={{ background: on ? 'rgba(129,182,76,.25)' : 'rgba(255,255,255,.06)', color: on ? '#B8E08C' : '#C9CFCD', border: `1px solid ${on ? 'rgba(129,182,76,.5)' : 'rgba(255,255,255,.1)'}` }}>{text}</button>
+    );
+  };
+  const progress = frames.length > 1 ? i / (frames.length - 1) : 0;
 
   return (
     <div className="fixed inset-0 z-[90] flex flex-col bg-[#05080A] text-white lg:flex-row" onPointerMove={onPointerMove} onPointerUp={() => { drag.current = null; }}>
       {/* ── The 9:16 frame ── */}
       <div className={`flex min-h-0 flex-1 items-center justify-center ${clean ? 'p-0' : 'p-3'}`} onClick={() => setSelected(null)}>
         <div ref={frameRef} className="relative overflow-hidden"
-          style={{ aspectRatio: '9 / 16', height: clean ? '100dvh' : 'min(100%, 92dvh)', maxWidth: '100%', containerType: 'size', ...BACKGROUNDS[bg].css } as React.CSSProperties}>
-        <motion.div key={shake} animate={shake ? { x: [0, -14, 12, -8, 6, 0] } : {}} transition={{ duration: 0.45 }} className="absolute inset-0">
-          {/* Hook */}
-          <div className="absolute inset-x-0 top-[7%] z-10 px-[6%] text-center">
-            <p className="font-black leading-[1.08] text-white" style={{ fontSize: 'clamp(18px, 4.6cqh, 44px)', textShadow: '0 3px 14px rgba(0,0,0,.6)' }}>{hook}</p>
-            {sub && <p className="mt-1.5 text-[clamp(11px,1.8cqh,18px)] font-bold text-white/70">{sub}</p>}
-          </div>
-          {/* Board block */}
-          <div className="absolute inset-x-[4%] top-[22%]">
-            <p className="mb-1 truncate text-[clamp(11px,1.6cqh,16px)] font-bold text-white/85">{name(top)}</p>
-            <motion.div animate={effects && isKey ? { scale: [1, 1.04, 1] } : { scale: 1 }} transition={{ duration: 0.6 }}>
-              <LookOverride look={look}>
-                <ChessBoard fen={fen} flipped={flipped} lastMove={cur ? { from: cur.from, to: cur.to } : null} moveQuality={(cls as MoveQuality) ?? null}
-                  arrows={arrows} maxWidthOverride="100%" animationMs={Math.min(450, speed * 300)} suppressConfirmMoves />
-              </LookOverride>
+          style={{ aspectRatio: '9 / 16', height: clean ? '100dvh' : 'min(100%, 92dvh)', maxWidth: '100%', containerType: 'size', ...BACKGROUNDS[prefs.bg]?.css } as React.CSSProperties}>
+          <motion.div key={shake} animate={shake ? { x: [0, -14, 12, -8, 6, 0] } : {}} transition={{ duration: 0.45 }} className="absolute inset-0">
+            {prefs.progress && <div className="absolute inset-x-0 top-0 z-20 h-[0.6cqh] bg-white/15"><div className="h-full bg-[#81B64C] transition-all duration-300" style={{ width: `${progress * 100}%` }} /></div>}
+            {/* Hook: pops in big on the intro, then sits at the top */}
+            <motion.div key={frame?.kind === 'intro' ? 'intro' : 'top'} initial={frame?.kind === 'intro' ? { scale: 0.6, opacity: 0, y: '18cqh' } : false}
+              animate={{ scale: 1, opacity: 1, y: frame?.kind === 'intro' ? '18cqh' : 0 }} transition={{ type: 'spring', stiffness: 260, damping: 18 }}
+              className="absolute inset-x-0 top-[6.5%] z-10 px-[6%] text-center">
+              <p className="font-black leading-[1.08] text-white" style={{ fontSize: frame?.kind === 'intro' ? 'clamp(24px, 6.4cqh, 64px)' : 'clamp(18px, 4.4cqh, 44px)', textShadow: '0 3px 14px rgba(0,0,0,.6)' }}>{hook}</p>
+              {sub && <p className="mt-1.5 line-clamp-2 text-[clamp(11px,1.8cqh,18px)] font-bold text-white/70">{sub}</p>}
             </motion.div>
-            <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-[#2B2B2B]"><div className="h-full rounded-full bg-[#F2F2F2] transition-all duration-500" style={{ width: `${evPct}%` }} /></div>
-            <p className="mt-1 truncate text-[clamp(11px,1.6cqh,16px)] font-bold text-white/85">{name(top === 'w' ? 'b' : 'w')}</p>
-          </div>
-          {/* Move caption */}
-          {cur && (
-            <div className="absolute inset-x-[5%] bottom-[9%] z-10">
-              <div className="flex items-center gap-2">
-                {label && <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-[13px] font-black text-white" style={{ background: label.color }}>{label.glyph}</span>}
-                <p className="truncate text-[clamp(14px,2.4cqh,24px)] font-black text-white" style={{ textShadow: '0 2px 8px rgba(0,0,0,.6)' }}>
-                  {moveNo}{figurine(cur.san, cur.color === 'w')}{label && cls !== 'book' && cls !== 'good' ? <span style={{ color: label.color }}> {label.text.toLowerCase()}</span> : null}
-                </p>
+            {/* Board block */}
+            <div className="absolute inset-x-[4%] top-[22%]" style={{ opacity: frame?.kind === 'intro' ? 0.35 : 1, transition: 'opacity .4s' }}>
+              <p className="mb-1 truncate text-[clamp(11px,1.6cqh,16px)] font-bold text-white/85">{name(top)}</p>
+              <motion.div animate={prefs.effects && isKey ? { scale: [1, 1.045, 1] } : { scale: 1 }} transition={{ duration: 0.6 }}>
+                <LookOverride look={look}>
+                  <ChessBoard fen={view.fen} flipped={flipped} lastMove={view.last} moveQuality={frame?.kind === 'move' ? ((cls as MoveQuality) ?? null) : null}
+                    arrows={arrows} maxWidthOverride="100%" animationMs={Math.min(450, prefs.speed * 300)} suppressConfirmMoves />
+                </LookOverride>
+              </motion.div>
+              <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-[#2B2B2B]"><div className="h-full rounded-full bg-[#F2F2F2] transition-all duration-500" style={{ width: `${evPct}%` }} /></div>
+              <p className="mt-1 truncate text-[clamp(11px,1.6cqh,16px)] font-bold text-white/85">{name(top === 'w' ? 'b' : 'w')}</p>
+            </div>
+            {/* Move + caption */}
+            {(showBottomMove || caption) && frame?.kind !== 'outro' && frame?.kind !== 'reveal' && (
+              <div className="absolute inset-x-[5%] bottom-[9%] z-10">
+                {showBottomMove && cur && (
+                  <div className="flex items-center gap-2">
+                    {label && <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-[13px] font-black text-white" style={{ background: label.color }}>{label.glyph}</span>}
+                    <p className="truncate text-[clamp(14px,2.4cqh,24px)] font-black text-white" style={{ textShadow: '0 2px 8px rgba(0,0,0,.6)' }}>
+                      {moveNo}{figurine(cur.san, cur.color === 'w')}{label && cls !== 'book' && cls !== 'good' ? <span style={{ color: label.color }}> {label.text.toLowerCase()}</span> : null}
+                    </p>
+                  </div>
+                )}
+                {caption && <p className={`mt-1 line-clamp-3 text-[clamp(12px,1.9cqh,19px)] font-semibold leading-snug ${frame?.kind === 'better' ? 'text-[#B8E08C]' : 'text-white/90'}`} style={{ textShadow: '0 2px 8px rgba(0,0,0,.6)' }}>{caption}</p>}
               </div>
-              {caption && <p className="mt-1 line-clamp-3 text-[clamp(12px,1.9cqh,19px)] font-semibold leading-snug text-white/90" style={{ textShadow: '0 2px 8px rgba(0,0,0,.6)' }}>{caption}</p>}
+            )}
+            {prefs.watermark && frame?.kind !== 'outro' && <p className="absolute inset-x-0 bottom-[3%] z-10 text-center text-[clamp(10px,1.5cqh,15px)] font-black tracking-wide text-white/75">chessscout.net</p>}
+            {/* Countdown */}
+            <AnimatePresence>
+              {frame?.kind === 'countdown' && (
+                <motion.div key={frame.n} initial={{ scale: 0.4, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 1.6, opacity: 0 }} transition={{ duration: 0.35 }}
+                  className="absolute inset-0 z-20 grid place-items-center">
+                  <div className="text-center">
+                    <p className="text-[clamp(16px,2.8cqh,28px)] font-black text-white" style={{ textShadow: '0 2px 10px rgba(0,0,0,.7)' }}>{clip.isTrap ? 'Spot the winning move' : 'Can you find it?'}</p>
+                    <p className="font-black text-white" style={{ fontSize: 'clamp(60px,14cqh,150px)', textShadow: '0 4px 20px rgba(0,0,0,.7)' }}>{frame.n}</p>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+            {/* Badge pop + eval swing */}
+            <AnimatePresence>
+              {pop && LABEL[pop.cls] && (
+                <motion.div key={pop.at} initial={{ scale: 0, rotate: -12, opacity: 0 }} animate={{ scale: 1, rotate: -4, opacity: 1 }} exit={{ scale: 1.3, opacity: 0 }}
+                  transition={{ type: 'spring', stiffness: 380, damping: 14 }} onAnimationComplete={() => setTimeout(() => setPop((p) => (p && p.at === pop.at ? null : p)), 1100)}
+                  className="pointer-events-none absolute left-1/2 top-[44%] z-20 -translate-x-1/2 -translate-y-1/2 text-center">
+                  <div className="rounded-2xl px-5 py-2.5 font-black text-white shadow-2xl" style={{ background: LABEL[pop.cls].color, fontSize: 'clamp(22px,4.4cqh,46px)', border: '3px solid rgba(255,255,255,.9)' }}>
+                    {LABEL[pop.cls].glyph} {LABEL[pop.cls].text}
+                  </div>
+                  {isKey && prevEval != null && rev?.evalAfterCp != null && Math.abs(rev.evalAfterCp - prevEval) >= 150 && (
+                    <div className="mx-auto mt-2 w-fit rounded-full bg-black/70 px-3 py-1 text-[clamp(13px,2.2cqh,22px)] font-black tabular-nums text-white">
+                      {fmtEval(prevEval)} → <span style={{ color: LABEL[pop.cls].color }}>{fmtEval(rev.evalAfterCp)}</span>
+                    </div>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
+            {/* Rating reveal */}
+            <AnimatePresence>
+              {frame?.kind === 'reveal' && (
+                <motion.div initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ opacity: 0 }} transition={{ type: 'spring', stiffness: 300, damping: 16 }}
+                  className="absolute inset-x-[8%] top-[40%] z-20 rounded-2xl bg-black/80 p-4 text-center ring-2 ring-white/80">
+                  <p className="text-[clamp(13px,2.2cqh,22px)] font-bold text-white/80">Their ratings</p>
+                  <p className="mt-1 font-black text-white" style={{ fontSize: 'clamp(22px,4.6cqh,48px)' }}>{clip.ratings.w ?? '?'} <span className="text-white/50">vs</span> {clip.ratings.b ?? '?'}</p>
+                  <p className="mt-1 text-[clamp(12px,1.9cqh,19px)] font-bold text-[#B8E08C]">Did you guess right?</p>
+                </motion.div>
+              )}
+            </AnimatePresence>
+            {/* End card */}
+            <AnimatePresence>
+              {frame?.kind === 'outro' && (
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 z-30 grid place-items-center bg-black/75 backdrop-blur-sm">
+                  <motion.div initial={{ scale: 0.7, y: 30 }} animate={{ scale: 1, y: 0 }} transition={{ type: 'spring', stiffness: 240, damping: 16 }} className="px-[8%] text-center">
+                    <p className="font-black text-white" style={{ fontSize: 'clamp(26px,6cqh,60px)' }}>Chess<span className="text-[#81B64C]">Scout</span><span className="text-white/70">.net</span></p>
+                    <p className="mt-2 font-bold text-white/90" style={{ fontSize: 'clamp(15px,2.8cqh,28px)' }}>{prefs.outroLine}</p>
+                    {prefs.handle && <p className="mt-4 inline-block rounded-full bg-[#81B64C] px-4 py-1.5 font-black text-white" style={{ fontSize: 'clamp(14px,2.4cqh,24px)' }}>Follow {prefs.handle}</p>}
+                  </motion.div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+            {prefs.effects && <Confetti fire={confetti} />}
+            {/* Stickers */}
+            {stickers.map((st) => (
+              <div key={st.id} onPointerDown={(e) => { e.stopPropagation(); const fr = frameRef.current!.getBoundingClientRect(); drag.current = { id: st.id, dx: ((e.clientX - fr.left) / fr.width) * 100 - st.x, dy: ((e.clientY - fr.top) / fr.height) * 100 - st.y }; setSelected(st.id); }}
+                onDoubleClick={() => setStickers((s) => s.filter((x) => x.id !== st.id))}
+                className="absolute z-40 -translate-x-1/2 -translate-y-1/2 cursor-grab select-none touch-none"
+                style={{ left: `${st.x}%`, top: `${st.y}%`, outline: selected === st.id && !clean && !recording ? '2px dashed rgba(255,255,255,.7)' : 'none', outlineOffset: 4 }}>
+                {st.kind === 'emoji'
+                  ? <motion.span initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 400, damping: 12 }} className="block" style={{ fontSize: `${st.size * 0.5}cqh`, lineHeight: 1 }}>{st.text}</motion.span>
+                  : <motion.span initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 400, damping: 12 }} className="block whitespace-nowrap rounded-xl px-3 py-1 font-black text-white" style={{ fontSize: `${st.size * 0.4}cqh`, background: '#F0605D', border: '3px solid #fff', transform: 'rotate(-6deg)', boxShadow: '0 6px 20px rgba(0,0,0,.4)' }}>{st.text}</motion.span>}
+              </div>
+            ))}
+          </motion.div>
+          {/* Where TikTok / Reels put their buttons and caption (never recorded) */}
+          {prefs.safeArea && !clean && !recording && (
+            <div className="pointer-events-none absolute inset-0 z-50">
+              <div className="absolute right-0 top-[38%] h-[45%] w-[15%] border-2 border-dashed border-white/35 bg-white/5" />
+              <div className="absolute inset-x-0 bottom-0 h-[16%] border-t-2 border-dashed border-white/35 bg-white/5" />
+              <div className="absolute inset-x-0 top-0 h-[6%] border-b-2 border-dashed border-white/35 bg-white/5" />
             </div>
           )}
-          {watermark && <p className="absolute inset-x-0 bottom-[3%] z-10 text-center text-[clamp(10px,1.5cqh,15px)] font-black tracking-wide text-white/75">chessscout.net</p>}
-          {/* Countdown */}
-          <AnimatePresence>
-            {countdown !== null && countdown > 0 && (
-              <motion.div key={countdown} initial={{ scale: 0.4, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 1.6, opacity: 0 }} transition={{ duration: 0.35 }}
-                className="absolute inset-0 z-20 grid place-items-center">
-                <div className="text-center">
-                  <p className="text-[clamp(16px,2.6cqh,26px)] font-black text-white" style={{ textShadow: '0 2px 10px rgba(0,0,0,.7)' }}>Can you find it?</p>
-                  <p className="font-black text-white" style={{ fontSize: 'clamp(60px,14cqh,150px)', textShadow: '0 4px 20px rgba(0,0,0,.7)' }}>{countdown}</p>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-          {/* Badge pop */}
-          <AnimatePresence>
-            {pop && LABEL[pop.cls] && Date.now() - pop.at < 1800 && (
-              <motion.div key={pop.at} initial={{ scale: 0, rotate: -12, opacity: 0 }} animate={{ scale: 1, rotate: -4, opacity: 1 }} exit={{ scale: 1.3, opacity: 0 }}
-                transition={{ type: 'spring', stiffness: 380, damping: 14 }} onAnimationComplete={() => setTimeout(() => setPop(null), 1100)}
-                className="pointer-events-none absolute left-1/2 top-[44%] z-20 -translate-x-1/2 -translate-y-1/2 rounded-2xl px-5 py-2.5 text-center font-black text-white shadow-2xl"
-                style={{ background: LABEL[pop.cls].color, fontSize: 'clamp(22px,4.4cqh,46px)', border: '3px solid rgba(255,255,255,.9)' }}>
-                {LABEL[pop.cls].glyph} {LABEL[pop.cls].text}
-              </motion.div>
-            )}
-          </AnimatePresence>
-          {effects && <Confetti fire={confetti} />}
-          {/* Stickers */}
-          {stickers.map((st) => (
-            <div key={st.id} onPointerDown={(e) => { e.stopPropagation(); const fr = frameRef.current!.getBoundingClientRect(); drag.current = { id: st.id, dx: ((e.clientX - fr.left) / fr.width) * 100 - st.x, dy: ((e.clientY - fr.top) / fr.height) * 100 - st.y }; setSelected(st.id); }}
-              onDoubleClick={() => setStickers((s) => s.filter((x) => x.id !== st.id))}
-              className="absolute z-40 -translate-x-1/2 -translate-y-1/2 cursor-grab select-none touch-none"
-              style={{ left: `${st.x}%`, top: `${st.y}%`, outline: selected === st.id && !clean ? '2px dashed rgba(255,255,255,.7)' : 'none', outlineOffset: 4 }}>
-              {st.kind === 'emoji'
-                ? <span style={{ fontSize: `${st.size * 0.5}cqh`, lineHeight: 1 }}>{st.text}</span>
-                : <span className="block whitespace-nowrap rounded-xl px-3 py-1 font-black text-white" style={{ fontSize: `${st.size * 0.4}cqh`, background: '#F0605D', border: '3px solid #fff', transform: 'rotate(-6deg)', boxShadow: '0 6px 20px rgba(0,0,0,.4)' }}>{st.text}</span>}
-            </div>
-          ))}
-        </motion.div>
           {clean && <button onClick={() => setClean(false)} aria-label="Show controls" className="absolute left-0 top-0 z-50 h-16 w-16 opacity-0" />}
         </div>
       </div>
 
       {/* ── Controls ── */}
       {!clean && (
-        <div className="max-h-[46dvh] w-full shrink-0 overflow-y-auto border-t border-white/10 bg-[#0B1112] p-4 lg:max-h-none lg:w-[380px] lg:border-l lg:border-t-0">
-          <div className="mb-3 flex items-center justify-between">
-            <p className="text-[15px] font-black">Clip</p>
+        <div className="max-h-[46dvh] w-full shrink-0 overflow-y-auto border-t border-white/10 bg-[#0B1112] p-4 lg:max-h-none lg:w-[400px] lg:border-l lg:border-t-0">
+          <div className="mb-3 flex items-center gap-1.5">
+            <p className="flex-1 truncate text-[15px] font-black">{clip.label}</p>
+            {onPrev && <button onClick={onPrev} className={ctl} title="Previous moment (P)"><SkipBack size={14} /></button>}
+            {onNext && <button onClick={onNext} className={ctl} title="Next moment (N)"><SkipForward size={14} /></button>}
             <button onClick={onClose} aria-label="Close" className="rounded-lg p-1.5 text-white/70 hover:bg-white/10"><X size={18} /></button>
           </div>
           <div className="mb-3 flex flex-wrap items-center gap-1.5">
-            <button onClick={() => setPlaying((p) => !p)} className="flex items-center gap-1.5 rounded-lg bg-[#81B64C] px-3 py-1.5 text-[13px] font-black text-white">{playing ? <Pause size={15} /> : <Play size={15} />}{playing ? 'Pause' : 'Play'}</button>
+            <button onClick={() => (i >= frames.length - 1 ? restart() : setPlaying((p) => !p))} className="flex items-center gap-1.5 rounded-lg bg-[#81B64C] px-3 py-1.5 text-[13px] font-black text-white">{playing ? <Pause size={15} /> : <Play size={15} />}{playing ? 'Pause' : 'Play'}</button>
             <button onClick={restart} className={ctl}><RotateCcw size={14} className="mr-1 inline" />From start</button>
-            <button onClick={() => setPly(Math.max(0, ply - 1))} className={ctl} aria-label="Back"><ChevronLeft size={15} /></button>
-            <button onClick={() => goTo(ply + 1)} className={ctl} aria-label="Forward"><ChevronRight size={15} /></button>
+            <button onClick={() => setI((x) => Math.max(0, x - 1))} className={ctl} aria-label="Back"><ChevronLeft size={15} /></button>
+            <button onClick={() => setI((x) => Math.min(frames.length - 1, x + 1))} className={ctl} aria-label="Forward"><ChevronRight size={15} /></button>
             <button onClick={() => setFlipped((f) => !f)} className={ctl} aria-label="Flip"><FlipVertical2 size={14} /></button>
+            <span className="text-[11.5px] tabular-nums text-white/45">{i + 1}/{frames.length} · ~{Math.round(frames.reduce((s, f) => s + dur(f), 0) / 1000)}s</span>
           </div>
           <div className="mb-3 flex flex-wrap gap-1.5">
             <button onClick={record} className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[13px] font-black text-white" style={{ background: recording ? '#CA3431' : '#2A3335' }}>
@@ -388,22 +572,32 @@ export function StudioPlayer({ moment, onClose }: { moment: StudioMoment; onClos
           <input value={sub} onChange={(e) => setSub(e.target.value)} className="mb-3 w-full rounded-lg bg-white/5 px-3 py-2 text-[13px] text-white outline-none ring-1 ring-white/10 focus:ring-[#81B64C]" />
 
           <div className="mb-3 grid grid-cols-3 gap-2 text-[12px]">
-            <label className="text-white/60">Moves before<input type="number" min={0} max={30} value={before} onChange={(e) => setBefore(Number(e.target.value))} className="mt-0.5 w-full rounded bg-white/5 px-2 py-1 text-white" /></label>
-            <label className="text-white/60">Moves after<input type="number" min={0} max={30} value={after} onChange={(e) => setAfter(Number(e.target.value))} className="mt-0.5 w-full rounded bg-white/5 px-2 py-1 text-white" /></label>
-            <label className="text-white/60">Sec / move<input type="number" min={0.4} max={4} step={0.1} value={speed} onChange={(e) => setSpeed(Number(e.target.value))} className="mt-0.5 w-full rounded bg-white/5 px-2 py-1 text-white" /></label>
+            <label className="text-white/60">Moves before<input type="number" min={0} max={30} value={prefs.before} onChange={(e) => set('before', Number(e.target.value))} className="mt-0.5 w-full rounded bg-white/5 px-2 py-1 text-white" /></label>
+            <label className="text-white/60">Moves after<input type="number" min={0} max={30} value={prefs.after} onChange={(e) => set('after', Number(e.target.value))} className="mt-0.5 w-full rounded bg-white/5 px-2 py-1 text-white" /></label>
+            <label className="text-white/60">Sec / move<input type="number" min={0.4} max={4} step={0.1} value={prefs.speed} onChange={(e) => set('speed', Number(e.target.value))} className="mt-0.5 w-full rounded bg-white/5 px-2 py-1 text-white" /></label>
           </div>
 
+          <p className="mb-1 text-[11px] font-bold uppercase tracking-wide text-white/50">Story</p>
           <div className="mb-3 flex flex-wrap gap-1.5">
-            {toggle(remix, (v) => { looks.current.clear(); setRemix(v); }, 'Remix board every move')}
-            {toggle(guess, setGuess, 'Pause: find the move')}
-            {toggle(effects, setEffects, 'Pop, confetti, shake')}
-            {toggle(captions, setCaptions, 'Coach caption')}
-            {toggle(arrow, setArrow, 'Best-move arrow')}
-            {toggle(showNames, setShowNames, 'Player names')}
-            {toggle(sound, setSound, 'Move sounds')}
-            {toggle(watermark, setWatermark, 'Watermark')}
+            {toggle('intro', 'Hook intro')}
+            {toggle('guess', 'Find-the-move countdown')}
+            {toggle('betterLine', 'Show the better line')}
+            {!clip.isTrap && toggle('guessRating', 'Guess the rating')}
+            {toggle('outro', 'End card')}
           </div>
-          {!remix && (
+          <p className="mb-1 text-[11px] font-bold uppercase tracking-wide text-white/50">Look</p>
+          <div className="mb-3 flex flex-wrap gap-1.5">
+            {toggle('remix', 'Remix board every move')}
+            {toggle('effects', 'Pop, confetti, shake')}
+            {toggle('captions', 'Coach caption')}
+            {toggle('arrow', 'Best-move arrow')}
+            {toggle('progress', 'Progress bar')}
+            {!clip.isTrap && toggle('showNames', 'Player names')}
+            {toggle('sound', 'Move sounds')}
+            {toggle('watermark', 'Watermark')}
+            {toggle('safeArea', 'App safe zones')}
+          </div>
+          {!prefs.remix && (
             <div className="mb-3 flex items-center gap-2">
               <button onClick={() => setFixedLook(randomLook())} className={ctl}><Shuffle size={14} className="mr-1 inline" />Random look</button>
               <button onClick={() => setFixedLook(null)} className={ctl}>My board</button>
@@ -413,12 +607,19 @@ export function StudioPlayer({ moment, onClose }: { moment: StudioMoment; onClos
 
           <p className="mb-1 text-[11px] font-bold uppercase tracking-wide text-white/50">Background</p>
           <div className="mb-3 flex flex-wrap gap-1.5">
-            {(Object.keys(BACKGROUNDS) as (keyof typeof BACKGROUNDS)[]).map((k) => (
-              <button key={k} onClick={() => setBg(k)} className="flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] font-bold" style={{ border: `1px solid ${bg === k ? '#81B64C' : 'rgba(255,255,255,.12)'}`, color: bg === k ? '#fff' : '#C9CFCD' }}>
+            {Object.keys(BACKGROUNDS).map((k) => (
+              <button key={k} onClick={() => set('bg', k)} className="flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] font-bold" style={{ border: `1px solid ${prefs.bg === k ? '#81B64C' : 'rgba(255,255,255,.12)'}`, color: prefs.bg === k ? '#fff' : '#C9CFCD' }}>
                 <span className="h-3.5 w-3.5 rounded-full" style={BACKGROUNDS[k].css} />{BACKGROUNDS[k].label}
               </button>
             ))}
           </div>
+
+          {prefs.outro && (
+            <div className="mb-3 grid grid-cols-2 gap-2 text-[12px]">
+              <label className="text-white/60">End card line<input value={prefs.outroLine} onChange={(e) => set('outroLine', e.target.value)} className="mt-0.5 w-full rounded bg-white/5 px-2 py-1 text-white" /></label>
+              <label className="text-white/60">Handle<input value={prefs.handle} onChange={(e) => set('handle', e.target.value)} className="mt-0.5 w-full rounded bg-white/5 px-2 py-1 text-white" /></label>
+            </div>
+          )}
 
           <p className="mb-1 text-[11px] font-bold uppercase tracking-wide text-white/50">Stickers <span className="normal-case text-white/40">· drag to move, double-click to remove</span></p>
           <div className="mb-2 flex flex-wrap gap-1">
@@ -435,11 +636,16 @@ export function StudioPlayer({ moment, onClose }: { moment: StudioMoment; onClos
               <button onClick={() => setStickers((s) => s.filter((x) => x.id !== selected))} className="rounded p-1 text-white/70 hover:bg-white/10" aria-label="Remove sticker"><Trash2 size={15} /></button>
             </div>
           )}
-          <p className="mt-2 text-[11.5px] leading-snug text-white/45">
-            Space plays and pauses, arrows step, Esc leaves clean view. "Record clip" saves just the frame (Chrome on a computer: pick this tab, turn on tab audio for move sounds).
-            On a phone, open Clean view and use the screen recorder; tap the top-left corner to bring the controls back.
+
+          <p className="mb-1 mt-3 text-[11px] font-bold uppercase tracking-wide text-white/50">Post caption</p>
+          <textarea readOnly value={postText} rows={6} className="w-full resize-none rounded-lg bg-white/5 p-2.5 text-[12.5px] text-white/85 ring-1 ring-white/10" />
+          <button onClick={copyPost} className="mt-1.5 flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-[12.5px] font-bold"><Copy size={13} />{copied ? 'Copied' : 'Copy caption'}</button>
+
+          <p className="mt-3 text-[11.5px] leading-snug text-white/45">
+            Space plays, arrows step, R restarts, N / P next and previous moment, Esc leaves clean view. "Record clip" saves just the frame (Chrome on a computer: pick this tab and turn on tab audio for move sounds).
+            On a phone, open Clean view and use the screen recorder; tap the top-left corner to bring the controls back. Settings are remembered for the next clip.
           </p>
-          <p className="mt-2 text-[11px] text-white/35"><Eye size={12} className="mr-1 inline" />Game #{moment.gameId} · move {moment.moveIndex + 1}</p>
+          <p className="mt-2 text-[11px] text-white/35"><Eye size={12} className="mr-1 inline" />{clip.label}</p>
         </div>
       )}
     </div>

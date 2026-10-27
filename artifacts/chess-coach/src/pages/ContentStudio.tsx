@@ -4,7 +4,7 @@ import { ArrowLeft, Loader2, RefreshCw, Search, Clapperboard, Shuffle } from 'lu
 import { apiFetch } from '@/lib/api';
 import { MiniBoard } from '@/components/MiniBoard';
 import { useUser } from '@/hooks/use-user';
-import { StudioPlayer, type StudioMoment } from '@/components/studio/StudioPlayer';
+import { StudioPlayer, type StudioMoment, type StudioTrap, type StudioSource } from '@/components/studio/StudioPlayer';
 import { Chess } from 'chess.js';
 
 // Admin > Content Studio: notable moments from every reviewed game on the
@@ -35,15 +35,29 @@ export function ContentStudio() {
   const [more, setMore] = useState(true);
   const [summary, setSummary] = useState<{ counts: Record<string, number>; progress: { scanned: number; reviewed: number; moments: number } } | null>(null);
   const [scanning, setScanning] = useState(false);
-  const [open, setOpen] = useState<Moment | null>(null);
+  const [open, setOpen] = useState<StudioSource | null>(null);
+  const [view, setView] = useState<'moments' | 'traps'>('moments');
+  const [since, setSince] = useState(0);
+  const [traps, setTraps] = useState<StudioTrap[] | null>(null);
+  useEffect(() => {
+    if (view !== 'traps' || traps) return;
+    apiFetch('/api/admin/studio/traps', { credentials: 'include' }).then((r) => (r.ok ? r.json() : { traps: [] })).then((d) => setTraps(d.traps ?? [])).catch(() => setTraps([]));
+  }, [view, traps]);
+  // Step through the list from inside the player (N / P).
+  const openAt = (k: number) => {
+    if (view === 'traps' && traps?.[k]) setOpen({ kind: 'trap', trap: traps[k] });
+    if (view === 'moments' && moments?.[k]) setOpen({ kind: 'game', moment: moments[k] });
+  };
+  const openIndex = !open ? -1 : open.kind === 'trap' ? (traps ?? []).findIndex((t) => t.id === open.trap.id) : (moments ?? []).findIndex((m) => m === open.moment);
 
   const query = useCallback((offset: number) => {
     const p = new URLSearchParams({ tags: tags.join(','), sort, limit: '48', offset: String(offset) });
     if (opening.trim()) p.set('opening', opening.trim());
     if (minRating) p.set('minRating', String(minRating));
     if (platform) p.set('platform', platform);
+    if (since) p.set('sinceDays', String(since));
     return apiFetch(`/api/admin/studio/moments?${p}`, { credentials: 'include' }).then((r) => (r.ok ? r.json() : { moments: [] })).then((d) => (d.moments ?? []) as Moment[]);
-  }, [tags, opening, minRating, platform, sort]);
+  }, [tags, opening, minRating, platform, sort, since]);
 
   useEffect(() => {
     let live = true;
@@ -80,6 +94,32 @@ export function ContentStudio() {
         </button>
       </div>
 
+      <div className="mb-3 inline-flex rounded-xl bg-white/5 p-1">
+        {([['moments', 'Game moments'], ['traps', 'Trap lessons']] as const).map(([k, t]) => (
+          <button key={k} onClick={() => setView(k)} className="rounded-lg px-3.5 py-1.5 text-[13px] font-black" style={{ background: view === k ? '#81B64C' : 'transparent', color: view === k ? '#fff' : '#C9CFCD' }}>{t}</button>
+        ))}
+      </div>
+
+      {view === 'traps' ? (
+        !traps ? <Loader2 className="mx-auto mt-10 animate-spin text-white/60" /> : (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+            {traps.map((t, k) => {
+              let fen = t.startingFen && t.startingFen !== 'startpos' ? t.startingFen : undefined;
+              try { const c = fen ? new Chess(fen) : new Chess(); for (const san of t.moves) c.move(san); fen = c.fen(); } catch { /* show the start */ }
+              return (
+                <button key={t.id} onClick={() => openAt(k)} className="overflow-hidden rounded-xl bg-white/5 text-left ring-1 ring-white/10 transition hover:ring-[#E8B447]">
+                  <div className="aspect-square w-full"><MiniBoard fen={fen ?? new Chess().fen()} size={400} flipped={t.trapSide === 'black'} /></div>
+                  <div className="p-2.5">
+                    <p className="truncate text-[13.5px] font-black">{t.name}</p>
+                    <p className="line-clamp-2 text-[11.5px] text-white/55">{t.summary}</p>
+                    <p className="mt-1 text-[10.5px] font-black uppercase text-[#E8B447]">{t.difficulty} · {t.moves.length} moves</p>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )
+      ) : (<>
       <div className="mb-2 flex flex-wrap gap-1.5">
         {TAGS.map((t) => {
           const on = tags.includes(t.id);
@@ -104,6 +144,9 @@ export function ContentStudio() {
         <select value={platform} onChange={(e) => setPlatform(e.target.value)} className="rounded-lg bg-white/5 px-2 py-2 text-[13px] text-white ring-1 ring-white/10">
           <option value="">All sites</option><option value="chessscout">ChessScout</option><option value="chesscom">Chess.com</option><option value="lichess">Lichess</option>
         </select>
+        <select value={since} onChange={(e) => setSince(Number(e.target.value))} className="rounded-lg bg-white/5 px-2 py-2 text-[13px] text-white ring-1 ring-white/10">
+          <option value={0}>All time</option><option value={7}>This week</option><option value={30}>This month</option>
+        </select>
         <select value={sort} onChange={(e) => setSort(e.target.value as typeof sort)} className="rounded-lg bg-white/5 px-2 py-2 text-[13px] text-white ring-1 ring-white/10">
           <option value="best">Best first</option><option value="new">Newest</option><option value="random">Shuffle</option>
         </select>
@@ -119,7 +162,7 @@ export function ContentStudio() {
               const white = m.moveIndex % 2 === 0;
               const no = `${Math.floor(m.moveIndex / 2) + 1}${white ? '.' : '...'}`;
               return (
-                <button key={m.id} onClick={() => setOpen(m)} className="overflow-hidden rounded-xl bg-white/5 text-left ring-1 ring-white/10 transition hover:ring-[#81B64C]">
+                <button key={m.id} onClick={() => setOpen({ kind: 'game', moment: m })} className="overflow-hidden rounded-xl bg-white/5 text-left ring-1 ring-white/10 transition hover:ring-[#81B64C]">
                   <div className="aspect-square w-full"><MiniBoard fen={afterFen(m.fenBefore, m.san)} size={400} flipped={!white} /></div>
                   <div className="p-2.5">
                     <p className="truncate text-[13.5px] font-black">{no}{m.san}{m.trapName ? <span className="font-bold text-[#E8B447]"> · {m.trapName}</span> : null}</p>
@@ -141,7 +184,12 @@ export function ContentStudio() {
           )}
         </>
       )}
-      {open && <StudioPlayer moment={open} onClose={() => setOpen(null)} />}
+      </>)}
+      {open && (
+        <StudioPlayer source={open} onClose={() => setOpen(null)}
+          onNext={openIndex >= 0 ? () => openAt(openIndex + 1) : undefined}
+          onPrev={openIndex > 0 ? () => openAt(openIndex - 1) : undefined} />
+      )}
     </div>
   );
 }

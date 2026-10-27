@@ -144,7 +144,7 @@ export function startContentScanner(): void {
   setTimeout(tick, next).unref?.();
 }
 
-export interface MomentQuery { tags?: string[]; opening?: string; minRating?: number; platform?: string; limit?: number; offset?: number; sort?: "best" | "new" | "random" }
+export interface MomentQuery { tags?: string[]; opening?: string; minRating?: number; platform?: string; limit?: number; offset?: number; sort?: "best" | "new" | "random"; sinceDays?: number }
 
 export async function listMoments(q: MomentQuery) {
   const conds = [sql`TRUE`];
@@ -153,6 +153,7 @@ export async function listMoments(q: MomentQuery) {
   if (q.opening) conds.push(sql`opening ILIKE ${"%" + q.opening + "%"}`);
   if (q.minRating) conds.push(sql`GREATEST(COALESCE(white_rating,0), COALESCE(black_rating,0)) >= ${q.minRating}`);
   if (q.platform) conds.push(sql`platform = ${q.platform}`);
+  if (q.sinceDays) conds.push(sql`played_at >= now() - make_interval(days => ${Math.round(q.sinceDays)})`);
   const where = sql.join(conds, sql` AND `);
   const order = q.sort === "new" ? sql`played_at DESC NULLS LAST, id DESC` : q.sort === "random" ? sql`random()` : sql`score DESC, played_at DESC NULLS LAST`;
   const limit = Math.min(120, Math.max(1, q.limit ?? 48));
@@ -178,4 +179,13 @@ export async function studioGame(id: number) {
     whiteRating: g.white_rating, blackRating: g.black_rating, result: g.result, platform: g.platform, playedAt: g.played_at,
     moves: Array.isArray(rd) ? rd : rd?.moves ?? [],
   };
+}
+
+/** The app's trap lessons, as Studio clips (moves, a note per move, the critical move). */
+export async function studioTraps() {
+  const rows = await db.select().from(chessTrapsTable);
+  return rows.filter((t) => !t.archived).map((t) => ({
+    id: t.id, name: t.name, category: t.category, difficulty: t.difficulty, trapSide: t.trapSide, summary: t.summary,
+    startingFen: t.startingFen, moves: (t.trapLineSan ?? []) as string[], notes: (t.moveNotes ?? []) as string[], critical: t.criticalMoveIndex,
+  }));
 }

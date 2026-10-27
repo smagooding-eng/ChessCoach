@@ -1,7 +1,7 @@
 // Content Studio (admin only): find notable moments in any reviewed game and
 // open them in the Studio player. See lib/contentMoments.ts.
 import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
-import { listMoments, tagCounts, contentScanProgress, scanContentBatch, studioGame, ensureContentTables } from "../lib/contentMoments";
+import { listMoments, tagCounts, contentScanProgress, scanContentBatch, studioGame, ensureContentTables, studioTraps } from "../lib/contentMoments";
 
 const router: IRouter = Router();
 
@@ -22,6 +22,7 @@ router.get("/admin/studio/moments", requireAdmin, async (req: Request, res: Resp
       sort: q.sort === "new" || q.sort === "random" ? q.sort : "best",
       limit: q.limit ? Number(q.limit) : 48,
       offset: q.offset ? Number(q.offset) : 0,
+      sinceDays: q.sinceDays ? Number(q.sinceDays) || undefined : undefined,
     });
     res.json({ moments });
   } catch (err) {
@@ -51,6 +52,10 @@ router.get("/admin/studio/game/:id", requireAdmin, async (req: Request, res: Res
   const g = await studioGame(Number(req.params.id));
   if (!g) { res.status(404).json({ error: "Game not found" }); return; }
   res.json(g);
+});
+
+router.get("/admin/studio/traps", requireAdmin, async (_req: Request, res: Response) => {
+  res.json({ traps: await studioTraps() });
 });
 
 export default router;
