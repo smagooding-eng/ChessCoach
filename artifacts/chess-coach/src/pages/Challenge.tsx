@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { announceChallengeSent } from '@/lib/challengeSent';
 import { Link, useLocation, useParams } from 'wouter';
 import { Loader2, Swords, CalendarDays, Zap } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
@@ -85,6 +86,7 @@ export function Challenge() {
     }
     const d = await post('request');
     if (!d?.request) return;
+    announceChallengeSent(ch.creatorUsername);
     try { sessionStorage.setItem(`cs_sent_request_${d.request.code}`, '1'); } catch { /* ignore */ }
     if (d.request.kind === 'live') navigate(`/live?challenge=${d.request.code}`);
     else navigate(`/challenge/${d.request.code}`);

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { announceChallengeSent } from '@/lib/challengeSent';
 import { useLocation } from 'wouter';
 import { Link2, Check, X, Inbox, Swords, CalendarDays, ChevronRight } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
@@ -33,6 +34,7 @@ export async function createOpenLink(kind: 'live' | 'daily', timeControl: string
   const d = await r.json();
   if (!r.ok) throw new Error(d.error || 'Could not create the link');
   window.dispatchEvent(new Event(CHANGED));
+  announceChallengeSent();
   return d.challenge as ChallengeRow;
 }
 

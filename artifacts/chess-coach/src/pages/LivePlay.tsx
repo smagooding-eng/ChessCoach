@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { announceChallengeSent } from '@/lib/challengeSent';
 import { useLivePlay, type LiveMode } from '@/hooks/use-live-play';
 import { useLiveRatings } from '@/hooks/use-live-ratings';
 import { LiveGame } from '@/pages/LiveGame';
@@ -91,6 +92,7 @@ export function LivePlay({ initialTab }: { initialTab?: OnlineTab } = {}) {
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || 'Could not create the link');
       setHosted({ code: d.challenge.code, url: `${window.location.origin}/challenge/${d.challenge.code}`, label: d.challenge.timeControlLabel });
+      announceChallengeSent();
     } catch (e) {
       alert(e instanceof Error ? e.message : 'Could not create the link');
     } finally { setCreating(false); }

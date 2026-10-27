@@ -1,6 +1,7 @@
 import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
 import { pathLang } from "@/lib/i18n";
 import { ChallengeToast } from '@/components/ChallengeToast';
+import { ChallengeNotifyPrompt } from '@/components/ChallengeNotifyPrompt';
 import { rememberReturnTo } from '@/components/QuickSignup';
 import { BoardStyleTipHost } from '@/components/BoardStyleTip';
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -639,6 +640,7 @@ function App() {
                   <NotInKidMode>
                     <ImportStatusWatcher />
                     <ChallengeToast />
+                    <ChallengeNotifyPrompt />
                     <BackgroundJobsWatcher />
                     <AutoPushPrompt />
                     <RealtimeBridge />

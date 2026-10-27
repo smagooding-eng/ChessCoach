@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { announceChallengeSent } from '@/lib/challengeSent';
 import { Link, useLocation } from 'wouter';
 import { CalendarDays, Loader2, Users, X, ChevronRight, Sparkles, Award, Trophy } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
@@ -115,6 +116,7 @@ export function DailyGames({ embedded = false }: { embedded?: boolean } = {}) {
       const d = await res.json();
       if (!res.ok) throw new Error(d.error || 'Could not create the link');
       setLink({ code: d.challenge.code, url: `${window.location.origin}/challenge/${d.challenge.code}` });
+      announceChallengeSent();
     } catch (e) { setError(e instanceof Error ? e.message : 'Could not create the link'); }
     finally { setBusy(false); }
   };

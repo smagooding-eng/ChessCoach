@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { announceChallengeSent } from '@/lib/challengeSent';
 import { apiFetch } from '@/lib/api';
 
 // Friends & messages: shared types, API calls and the unread badge.
@@ -55,7 +56,9 @@ export const socialApi = {
   /** Live challenge sent straight into the chat (friend gets a notification). */
   challenge: async (userId: string, timeControl: string, mode: 'casual' | 'ranked') => {
     const ch = await json<{ challenge: { code: string } }>(await post('/api/challenges', { kind: 'live', timeControl, mode, color: 'random' }));
-    return socialApi.send(userId, { challengeCode: ch.challenge.code });
+    const sent = await socialApi.send(userId, { challengeCode: ch.challenge.code });
+    announceChallengeSent();
+    return sent;
   },
 };
 
