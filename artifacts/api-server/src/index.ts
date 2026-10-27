@@ -235,6 +235,9 @@ async function runSchemaMigrations() {
     await db.execute(sql`UPDATE correspondence_games SET status = 'finished', termination = 'aborted', finished_at = now()
       WHERE status = 'active' AND (white_is_bot = 1 OR black_is_bot = 1)`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_correspondence_black_user ON correspondence_games(black_user_id, status)`);
+    // Older games against bots were saved before bots had their own tab: file them under Bots.
+    await db.execute(sql`UPDATE games SET platform = 'bot' WHERE platform IS DISTINCT FROM 'bot'
+      AND (white_username ILIKE 'ChessScout Bot%' OR black_username ILIKE 'ChessScout Bot%' OR white_username ILIKE '% (Bot)' OR black_username ILIKE '% (Bot)')`);
     await db.execute(sql`CREATE TABLE IF NOT EXISTS correspondence_queue (
       id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
       user_id VARCHAR NOT NULL,

@@ -435,13 +435,15 @@ router.get("/games", requireAuth, async (req, res): Promise<void> => {
   // Without one, games against bots stay out (they have their own tab).
   const source = typeof req.query.source === "string" ? req.query.source : "";
   if (source === "bots") {
-    conditions.push(eq(gamesTable.platform, "bot"));
+    conditions.push(sql`(${gamesTable.platform} = 'bot' OR ${gamesTable.whiteUsername} ILIKE 'ChessScout Bot%' OR ${gamesTable.blackUsername} ILIKE 'ChessScout Bot%' OR ${gamesTable.whiteUsername} ILIKE '% (Bot)' OR ${gamesTable.blackUsername} ILIKE '% (Bot)')`);
   } else if (source === "chesscom" || source === "lichess" || source === "chessscout") {
     conditions.push(eq(gamesTable.platform, source));
   } else if (platform && (platform === "chesscom" || platform === "lichess" || platform === "chessscout")) {
     conditions.push(eq(gamesTable.platform, platform));
   } else {
+    // All games: no bot games, including older ones saved before bots had their own tab.
     conditions.push(sql`${gamesTable.platform} <> 'bot'`);
+    conditions.push(sql`NOT (${gamesTable.whiteUsername} ILIKE 'ChessScout Bot%' OR ${gamesTable.blackUsername} ILIKE 'ChessScout Bot%' OR ${gamesTable.whiteUsername} ILIKE '% (Bot)' OR ${gamesTable.blackUsername} ILIKE '% (Bot)')`);
   }
   if (opponent) {
     conditions.push(
@@ -807,7 +809,7 @@ router.get("/games/review-status/:jobId", async (req, res): Promise<void> => {
       const gameSummary = cached.gameSummary ?? null;
       const whiteAccuracy = cached.whiteAccuracy ?? null;
       const blackAccuracy = cached.blackAccuracy ?? null;
-      res.json({ status: "done", reviewData: { moves: refreshBasicReview(moves, cached.aiCoach === undefined ? true : cached.aiCoach === true, (game as { opening?: string | null }).opening ?? null), gameSummary, whiteAccuracy, blackAccuracy, aiCoach: cached.aiCoach === undefined ? true : cached.aiCoach === true } });
+      res.json({ status: "done", reviewData: { moves: refreshBasicReview(moves, aiFlag(cached), (game as { opening?: string | null }).opening ?? null), gameSummary, whiteAccuracy, blackAccuracy, aiCoach: aiFlag(cached) } });
       return;
     }
   }
@@ -1198,6 +1200,39 @@ async function runAnalyzePgnJob(pgn: string, jobId: string, log: Logger): Promis
 // OWNER is Pro / admin / complimentary Pro -- whoever happens to trigger the
 // review (bulk job, stale re-review, a page view). Everyone else gets the
 // Stockfish-only review. Never throws: on any lookup error it says "no AI".
+/** Does a saved review hold the AI coach's work (per-move pros/cons or a game summary)? */
+function hasAiText(rd: unknown): boolean {
+  if (!rd || typeof rd !== "object") return false;
+  const r = rd as { aiCoach?: boolean; gameSummary?: unknown; moves?: unknown };
+  if (r.aiCoach === false) return false;
+  const moves = Array.isArray(r.moves) ? r.moves : Array.isArray(rd) ? (rd as unknown[]) : [];
+  return !!r.gameSummary || moves.some((m) => {
+    const x = m as { pros?: unknown[]; cons?: unknown[] };
+    return (Array.isArray(x?.pros) && x.pros.length > 0) || (Array.isArray(x?.cons) && x.cons.length > 0);
+  });
+}
+/** What a saved review tells the app about the AI coach: only true when its text is really there. */
+function aiFlag(cached: Record<string, unknown>): boolean {
+  return cached.aiCoach !== false && hasAiText(cached);
+}
+
+/**
+ * Saves a review, but never replaces one that has the AI coach's text with one
+ * that doesn't (a re-review while OpenAI is failing would otherwise wipe it).
+ * Reviews are kept permanently; this is the only place they're written.
+ */
+async function saveReview(gameId: number, reviewResult: unknown): Promise<"saved" | "kept"> {
+  const [cur] = await db.select({ reviewData: gamesTable.reviewData }).from(gamesTable).where(eq(gamesTable.id, gameId));
+  if (cur?.reviewData && hasAiText(cur.reviewData) && !hasAiText(reviewResult)) {
+    await db.update(gamesTable).set({ analyzed: true }).where(eq(gamesTable.id, gameId));
+    return "kept";
+  }
+  await db.update(gamesTable)
+    .set({ reviewData: { ...(reviewResult as Record<string, unknown>), _v2: true } as unknown as Record<string, unknown>, analyzed: true })
+    .where(eq(gamesTable.id, gameId));
+  return "saved";
+}
+
 async function aiCoachForOwner(ownerId: string | null | undefined): Promise<boolean> {
   if (!ownerId) return false;
   try { return await isUserPremium(ownerId); } catch { return false; }
@@ -1228,9 +1263,7 @@ async function reviewOneGame(
     aiCoach: aiCoachOverride ?? await aiCoachForOwner(game.userId),
   });
 
-  await db.update(gamesTable)
-    .set({ reviewData: { ...reviewResult, _v2: true } as unknown as Record<string, unknown>, analyzed: true })
-    .where(eq(gamesTable.id, game.id));
+  await saveReview(game.id, reviewResult);
 }
 
 // Bulk review processes games strictly one at a time — the Stockfish engine
@@ -1493,9 +1526,7 @@ async function runReviewJob(gameId: number, jobId: string, log: Logger): Promise
       aiCoach: await aiCoachForOwner(game.userId),
     });
 
-    await db.update(gamesTable)
-      .set({ reviewData: { ...reviewResult, _v2: true } as unknown as Record<string, unknown>, analyzed: true })
-      .where(eq(gamesTable.id, gameId));
+    await saveReview(gameId, reviewResult);
 
     await db.update(backgroundJobsTable).set({
       status: "done",
@@ -1556,6 +1587,8 @@ async function triggerBackgroundReReviewForStaleReviews(userId: string, log: Log
         sql`${gamesTable.reviewData} IS NOT NULL`,
         STALE_REVIEW_BAD_FILTER,
         STALE_REVIEW_NO_BEST_LINE_FILTER,
+        // Only engine reviews get redone in the background; AI reviews are kept as they are.
+        sql`COALESCE(${gamesTable.reviewData}->>'aiCoach', 'true') = 'false'`,
       ))
       .orderBy(asc(gamesTable.playedAt))
       .limit(RE_REVIEW_PER_TRIGGER);
@@ -1633,7 +1666,7 @@ router.get("/games/:id/review", async (req, res): Promise<void> => {
         return rest;
       });
     }
-    res.json({ status: "done", reviewData: { moves: refreshBasicReview(moves, cached.aiCoach === undefined ? true : cached.aiCoach === true, (game as { opening?: string | null }).opening ?? null), gameSummary, whiteAccuracy, blackAccuracy, aiCoach: cached.aiCoach === undefined ? true : cached.aiCoach === true } });
+    res.json({ status: "done", reviewData: { moves: refreshBasicReview(moves, aiFlag(cached), (game as { opening?: string | null }).opening ?? null), gameSummary, whiteAccuracy, blackAccuracy, aiCoach: aiFlag(cached) } });
     return;
   }
 
@@ -1690,7 +1723,7 @@ router.post("/games/:id/review", async (req, res): Promise<void> => {
         return rest;
       });
     }
-    res.json({ status: "done", reviewData: { moves: refreshBasicReview(moves, cached.aiCoach === undefined ? true : cached.aiCoach === true, (game as { opening?: string | null }).opening ?? null), gameSummary, whiteAccuracy, blackAccuracy, aiCoach: cached.aiCoach === undefined ? true : cached.aiCoach === true } });
+    res.json({ status: "done", reviewData: { moves: refreshBasicReview(moves, aiFlag(cached), (game as { opening?: string | null }).opening ?? null), gameSummary, whiteAccuracy, blackAccuracy, aiCoach: aiFlag(cached) } });
     return;
   }
 
