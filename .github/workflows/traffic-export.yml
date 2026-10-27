@@ -1,0 +1,50 @@
+name: Traffic export (for analysis)
+
+# Pulls the admin traffic/funnel export (aggregates only) for a date range,
+# encrypted with the same key as the desktop screenshots, to the
+# traffic-export branch. Uses the DESKTOP_SHOT_TOKEN admin session token.
+
+on:
+  workflow_dispatch:
+    inputs:
+      start_date:
+        description: 'First day (YYYY-MM-DD)'
+        required: true
+      end_date:
+        description: 'Last day (YYYY-MM-DD)'
+        required: true
+      tz:
+        description: 'Time zone offset in minutes (240 = US Eastern summer time)'
+        required: false
+        default: '240'
+
+permissions:
+  contents: write
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch export
+        env:
+          TOKEN: ${{ secrets.DESKTOP_SHOT_TOKEN }}
+        run: |
+          mkdir -p /tmp/export
+          url="https://chessscout.net/api/admin/traffic-export?startDate=${{ github.event.inputs.start_date }}&endDate=${{ github.event.inputs.end_date }}&tz=${{ github.event.inputs.tz }}"
+          code=$(curl -sS -o /tmp/export/export.json -w '%{http_code}' -H "Authorization: Bearer $TOKEN" "$url")
+          echo "HTTP $code"
+          [ "$code" = "200" ] || { head -c 300 /tmp/export/export.json; exit 1; }
+      - name: Encrypt and push
+        run: |
+          cd /tmp
+          tar czf export.tgz export
+          openssl rand -hex 32 > k.txt
+          openssl enc -aes-256-cbc -pbkdf2 -salt -in export.tgz -out export.tgz.enc -pass file:k.txt
+          openssl pkeyutl -encrypt -pubin -inkey "$GITHUB_WORKSPACE/scripts/desktop-shots.pub.pem" -in k.txt -out k.enc
+          rm k.txt
+          mkdir out && cp export.tgz.enc k.enc out/
+          cd out && git init -q && git checkout -q -b traffic-export
+          git config user.name "traffic-export-bot" && git config user.email "traffic-export-bot@users.noreply.github.com"
+          git add . && git commit -q -m "Traffic export (encrypted)"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" traffic-export
