@@ -6,6 +6,7 @@ import { ChessBoard, type MoveQuality } from '@/components/ChessBoard';
 import { LookOverride, randomLook, lookLabel, playMoveSound, BOARD_THEMES, type BoardLook } from '@/context/SettingsContext';
 import { apiFetch } from '@/lib/api';
 import { normalizeFen } from '@/lib/utils';
+import { StudioBadge, Medallion, Rays, CountdownRing, EvalSwing, rankColor, shade } from './StudioBadge';
 import { StudioMusic, MUSIC_STYLES, bpmOf, type MusicStyle } from './studioMusic';
 
 // Content Studio player: a game moment or a trap lesson as a 9:16 clip for
@@ -31,7 +32,7 @@ export type StudioSource = { kind: 'game'; moment: StudioMoment } | { kind: 'tra
 interface ReviewMove { moveIndex?: number; san: string; color?: 'white' | 'black'; classification?: string; explanation?: string; betterMove?: string | null; evalAfterCp?: number; fen?: string; bestLineSan?: string[] }
 interface StudioGame { id: number; pgn: string; opening: string | null; white: string; black: string; whiteRating: number | null; blackRating: number | null; moves: ReviewMove[] }
 interface Ply { san: string; from: string; to: string; fen: string; fenBefore: string; color: 'w' | 'b'; review?: ReviewMove }
-interface Sticker { id: number; text: string; x: number; y: number; size: number; kind: 'emoji' | 'text' }
+interface Sticker { id: number; text: string; x: number; y: number; size: number; kind: 'emoji' | 'text' | 'badge'; tone?: number }
 interface Clip {
   plies: Ply[]; key: number; tags: string[]; hook: string; sub: string; names: { w: string | null; b: string | null };
   ratings: { w: number | null; b: number | null }; fileBase: string; label: string; isTrap: boolean; opening: string | null;
@@ -65,6 +66,8 @@ const BACKGROUNDS: Record<string, { label: string; css: React.CSSProperties }> =
   screen: { label: 'Green screen', css: { background: '#00FF00' } },
 };
 const EMOJIS = ['🔥', '😱', '🤯', '🧠', '👀', '💀', '🏆', '♟️', '⚡', '🎯', '😂', '🤔', '🍿', '😤', '👑', '💥'];
+const TONES = [{ bg: '#F0605D', fg: '#fff' }, { bg: '#FFD84D', fg: '#141414' }, { bg: '#81B64C', fg: '#fff' }, { bg: '#FFFFFF', fg: '#141414' }, { bg: '#141414', fg: '#fff' }, { bg: '#1BACA6', fg: '#fff' }];
+const BADGE_STICKERS = ['brilliant', 'great', 'best', 'excellent', 'book', 'inaccuracy', 'mistake', 'blunder', 'missed_win', 'checkmate'];
 const TEXT_STICKERS = ['BRILLIANT!!', 'BLUNDER??', 'WAIT FOR IT…', 'NO WAY', 'GG', 'FIND THE MOVE', 'TRAP!', 'MATE', 'PAUSE NOW', 'COMMENT YOUR MOVE'];
 
 // ── Preferences that carry over between clips (this browser only) ─────────
@@ -172,7 +175,7 @@ function spokenSan(san: string): string {
 const stripEmoji = (t: string) => t.replace(/[\u{1F000}-\u{1FFFF}\u{2600}-\u{27BF}\u{FE0F}]/gu, '').replace(/\s+/g, ' ').trim();
 
 /** A 1080×1920 cover image (board drawn with piece glyphs) for the post's thumbnail. */
-function drawCover(opts: { fen: string; flipped: boolean; hook: string; sub: string; bg: string; badge: { text: string; color: string } | null; colors: { light: string; dark: string } }): string {
+function drawCover(opts: { fen: string; flipped: boolean; hook: string; sub: string; bg: string; badge: { glyph: string; text: string; color: string } | null; colors: { light: string; dark: string } }): string {
   const W = 1080, H = 1920;
   const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
   const ctx = cv.getContext('2d')!;
@@ -211,12 +214,30 @@ function drawCover(opts: { fen: string; flipped: boolean; hook: string; sub: str
     }
   });
   if (opts.badge) {
-    ctx.font = '900 84px system-ui, sans-serif';
-    const tw = ctx.measureText(opts.badge.text).width + 80;
-    ctx.save(); ctx.translate(W / 2, y0 + size / 2); ctx.rotate(-0.07);
-    ctx.fillStyle = opts.badge.color; ctx.strokeStyle = '#fff'; ctx.lineWidth = 10;
-    ctx.beginPath(); (ctx as CanvasRenderingContext2D & { roundRect: (x: number, y: number, w: number, h: number, r: number) => void }).roundRect(-tw / 2, -70, tw, 140, 28); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = '#fff'; ctx.textBaseline = 'middle'; ctx.fillText(opts.badge.text, 0, 6); ctx.restore();
+    // The Studio badge: a glossy medallion with the glyph and a ribbon with the word.
+    const { glyph, text, color } = opts.badge;
+    const light = shade(color, 0.32), dark = shade(color, -0.4);
+    ctx.font = '900 76px system-ui, sans-serif';
+    const R = 100, ribH = 128, tw = ctx.measureText(text.toUpperCase()).width;
+    const ribW = tw + 215, total = R * 2 + ribW - 70;
+    ctx.save(); ctx.translate(W / 2 - total / 2, y0 + size / 2); ctx.rotate(-0.06);
+    ctx.shadowColor = 'rgba(0,0,0,.55)'; ctx.shadowBlur = 40; ctx.shadowOffsetY = 16;
+    const rg = ctx.createLinearGradient(0, -ribH / 2, 0, ribH / 2); rg.addColorStop(0, light); rg.addColorStop(0.52, color); rg.addColorStop(1, dark);
+    ctx.fillStyle = rg; ctx.strokeStyle = '#fff'; ctx.lineWidth = 12;
+    ctx.beginPath(); (ctx as CanvasRenderingContext2D & { roundRect: (x: number, y: number, w: number, h: number, r: number[]) => void }).roundRect(R * 2 - 90, -ribH / 2, ribW, ribH, [0, 34, 34, 0]); ctx.fill(); ctx.stroke();
+    ctx.shadowColor = 'transparent';
+    ctx.fillStyle = '#fff'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = dark; ctx.fillText(text.toUpperCase(), R * 2 + 38, 9);
+    ctx.fillStyle = '#fff'; ctx.fillText(text.toUpperCase(), R * 2 + 38, 4);
+    ctx.shadowColor = 'rgba(0,0,0,.5)'; ctx.shadowBlur = 30; ctx.shadowOffsetY = 12;
+    const mg = ctx.createRadialGradient(R * 0.7, -R * 0.45, 8, R, 0, R * 1.05); mg.addColorStop(0, light); mg.addColorStop(0.55, color); mg.addColorStop(1, dark);
+    ctx.fillStyle = mg; ctx.beginPath(); ctx.arc(R, 0, R, 0, Math.PI * 2); ctx.fill();
+    ctx.shadowColor = 'transparent'; ctx.lineWidth = 13; ctx.strokeStyle = '#fff'; ctx.stroke();
+    const hg = ctx.createLinearGradient(0, -R, 0, 0); hg.addColorStop(0, 'rgba(255,255,255,.4)'); hg.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = hg; ctx.beginPath(); ctx.arc(R, 0, R * 0.84, Math.PI, 0); ctx.fill();
+    ctx.textAlign = 'center'; ctx.font = '900 92px system-ui, sans-serif';
+    ctx.fillStyle = dark; ctx.fillText(glyph, R, 10); ctx.fillStyle = '#fff'; ctx.fillText(glyph, R, 4);
+    ctx.restore(); ctx.textAlign = 'center';
   }
   ctx.textBaseline = 'alphabetic'; ctx.font = '900 46px system-ui, sans-serif'; ctx.fillStyle = 'rgba(255,255,255,.8)';
   ctx.fillText('chessscout.net', W / 2, H - 90);
@@ -559,9 +580,9 @@ export function StudioPlayer({ source, queue, title, onClose, onNext, onPrev }: 
   const [selected, setSelected] = useState<number | null>(null);
   const frameRef = useRef<HTMLDivElement | null>(null);
   const drag = useRef<{ id: number; dx: number; dy: number } | null>(null);
-  const addSticker = (text: string, kind: Sticker['kind']) => {
+  const addSticker = (text: string, kind: Sticker['kind'], tone?: number) => {
     const id = Date.now();
-    setStickers((s) => [...s, { id, text, kind, x: 50, y: kind === 'emoji' ? 30 : 22, size: kind === 'emoji' ? 12 : 6 }]);
+    setStickers((s) => [...s, { id, text, kind, tone, x: 50, y: kind === 'emoji' ? 30 : 22, size: kind === 'emoji' ? 12 : kind === 'badge' ? 7 : 6 }]);
     setSelected(id);
   };
   const onPointerMove = (e: React.PointerEvent) => {
@@ -649,7 +670,7 @@ export function StudioPlayer({ source, queue, title, onClose, onNext, onPrev }: 
     // The position before the key move (the puzzle), unless it's a trap lesson's final position.
     const fen = kp ? kp.fenBefore : clip.plies[0]?.fenBefore;
     const colors = look ? (BOARD_THEMES[look.boardTheme] ?? { light: '#EEEED2', dark: '#769656' }) : { light: '#EEEED2', dark: '#769656' };
-    const url = drawCover({ fen, flipped, hook: stripEmoji(hook) || hook, sub, bg: prefs.bg, badge: prefs.guess ? { text: '?? FIND IT', color: '#81B64C' } : c && LABEL[c] ? { text: `${LABEL[c].glyph} ${LABEL[c].text}`, color: LABEL[c].color } : null, colors });
+    const url = drawCover({ fen, flipped, hook: stripEmoji(hook) || hook, sub, bg: prefs.bg, badge: prefs.guess ? { glyph: '?', text: 'Find it', color: '#81B64C' } : c && LABEL[c] ? LABEL[c] : null, colors });
     const a = document.createElement('a'); a.href = url; a.download = `${clip.fileBase}-cover.png`; a.click();
   };
 
@@ -713,6 +734,12 @@ export function StudioPlayer({ source, queue, title, onClose, onNext, onPrev }: 
             <motion.div key={frame?.kind === 'intro' ? 'intro' : 'top'} initial={frame?.kind === 'intro' ? { scale: 0.6, opacity: 0, y: '18cqh' } : false}
               animate={{ scale: 1, opacity: 1, y: frame?.kind === 'intro' ? '18cqh' : 0 }} transition={{ type: 'spring', stiffness: 260, damping: 18 }}
               className="absolute inset-x-0 top-[6.5%] z-10 px-[6%] text-center">
+              {isComp && frame?.kind === 'intro' && (
+                <motion.div key={`rank${clipQ}`} initial={{ scale: 3, opacity: 0, rotate: -20 }} animate={{ scale: 1, opacity: 1, rotate: 0 }} transition={{ type: 'spring', stiffness: 300, damping: 15, delay: 0.15 }}
+                  className="relative mx-auto mb-[1.5cqh] w-fit" style={{ fontSize: 'clamp(28px,5cqh,54px)' }}>
+                  <Rays color={rankColor(queue!.length - clipQ)} size={5} /><Medallion glyph={`#${queue!.length - clipQ}`} color={rankColor(queue!.length - clipQ)} size={2} />
+                </motion.div>
+              )}
               <p className="font-black leading-[1.08] text-white" style={{ fontSize: frame?.kind === 'intro' ? 'clamp(24px, 6.4cqh, 64px)' : 'clamp(18px, 4.4cqh, 44px)', textShadow: '0 3px 14px rgba(0,0,0,.6)' }}>{hook}</p>
               {sub && <p className="mt-1.5 line-clamp-2 text-[clamp(11px,1.8cqh,18px)] font-bold text-white/70">{sub}</p>}
             </motion.div>
@@ -746,7 +773,7 @@ export function StudioPlayer({ source, queue, title, onClose, onNext, onPrev }: 
               <div className="absolute inset-x-[5%] bottom-[9%] z-10">
                 {showBottomMove && cur && (
                   <div className="flex items-center gap-2">
-                    {label && <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-[13px] font-black text-white" style={{ background: label.color }}>{label.glyph}</span>}
+                    {label && <span className="shrink-0" style={{ fontSize: 'clamp(11px,1.45cqh,15px)' }}><Medallion glyph={label.glyph} color={label.color} size={2.1} /></span>}
                     <p className="truncate text-[clamp(14px,2.4cqh,24px)] font-black text-white" style={{ textShadow: '0 2px 8px rgba(0,0,0,.6)' }}>
                       {moveNo}{figurine(cur.san, cur.color === 'w')}{label && cls !== 'book' && cls !== 'good' ? <span style={{ color: label.color }}> {label.text.toLowerCase()}</span> : null}
                     </p>
@@ -764,17 +791,24 @@ export function StudioPlayer({ source, queue, title, onClose, onNext, onPrev }: 
                 </p>
               </div>
             )}
-            {prefs.watermark && frame?.kind !== 'outro' && <p className="absolute inset-x-0 bottom-[3%] z-10 text-center text-[clamp(10px,1.5cqh,15px)] font-black tracking-wide text-white/75">chessscout.net</p>}
+            {prefs.watermark && frame?.kind !== 'outro' && <p className="absolute inset-x-0 bottom-[3%] z-10 flex items-center justify-center gap-[0.4em] text-[clamp(10px,1.5cqh,15px)] font-black tracking-wide text-white/80"><img src={`${import.meta.env.BASE_URL}images/logo.svg`} alt="" style={{ width: '1.5em', height: '1.5em' }} />chessscout.net</p>}
             {/* Countdown */}
             <AnimatePresence>
               {frame?.kind === 'countdown' && (
                 <motion.div key={frame.n} initial={{ scale: 0.4, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 1.6, opacity: 0 }} transition={{ duration: 0.35 }}
                   className="absolute inset-0 z-20 grid place-items-center">
-                  <div className="text-center">
-                    <p className="text-[clamp(16px,2.8cqh,28px)] font-black text-white" style={{ textShadow: '0 2px 10px rgba(0,0,0,.7)' }}>{clip.isTrap ? 'Spot the winning move' : 'Can you find it?'}</p>
-                    <p className="font-black text-white" style={{ fontSize: 'clamp(60px,14cqh,150px)', textShadow: '0 4px 20px rgba(0,0,0,.7)' }}>{frame.n}</p>
+                  <div className="flex flex-col items-center">
+                    <p className="mb-[1.2cqh] rounded-full bg-[#81B64C] px-[1em] py-[0.3em] font-black uppercase text-white shadow-xl ring-2 ring-white" style={{ fontSize: 'clamp(14px,2.4cqh,26px)', textShadow: '0 1px 0 #3E6420' }}>{clip.isTrap ? 'Spot the winning move' : 'Can you find it?'}</p>
+                    <div style={{ fontSize: 'clamp(70px,15cqh,160px)' }}><CountdownRing n={frame.n} seconds={dur(frame) / 1000} color={frame.n === 1 ? '#F0605D' : frame.n === 2 ? '#E8B447' : '#81B64C'} /></div>
                   </div>
                 </motion.div>
+              )}
+            </AnimatePresence>
+            {/* Edge flash in the badge's colour */}
+            <AnimatePresence>
+              {pop && LABEL[pop.cls] && prefs.effects && (
+                <motion.div key={`f${pop.at}`} initial={{ opacity: 0.95 }} animate={{ opacity: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.9, ease: 'easeOut' }}
+                  className="pointer-events-none absolute inset-0 z-[19]" style={{ boxShadow: `inset 0 0 14cqh ${LABEL[pop.cls].color}` }} />
               )}
             </AnimatePresence>
             {/* Badge pop + eval swing */}
@@ -783,13 +817,11 @@ export function StudioPlayer({ source, queue, title, onClose, onNext, onPrev }: 
                 <motion.div key={pop.at} initial={{ scale: 0, rotate: -12, opacity: 0 }} animate={{ scale: 1, rotate: -4, opacity: 1 }} exit={{ scale: 1.3, opacity: 0 }}
                   transition={{ type: 'spring', stiffness: 380, damping: 14 }} onAnimationComplete={() => setTimeout(() => setPop((p) => (p && p.at === pop.at ? null : p)), 1100)}
                   className="pointer-events-none absolute left-1/2 top-[44%] z-20 -translate-x-1/2 -translate-y-1/2 text-center">
-                  <div className="rounded-2xl px-5 py-2.5 font-black text-white shadow-2xl" style={{ background: LABEL[pop.cls].color, fontSize: 'clamp(22px,4.4cqh,46px)', border: '3px solid rgba(255,255,255,.9)' }}>
-                    {LABEL[pop.cls].glyph} {LABEL[pop.cls].text}
+                  <div style={{ fontSize: 'clamp(20px,4cqh,42px)' }}>
+                    <StudioBadge {...LABEL[pop.cls]} rays={['brilliant', 'great', 'checkmate'].includes(pop.cls)} />
                   </div>
                   {isKey && prevEval != null && rev?.evalAfterCp != null && Math.abs(rev.evalAfterCp - prevEval) >= 150 && (
-                    <div className="mx-auto mt-2 w-fit rounded-full bg-black/70 px-3 py-1 text-[clamp(13px,2.2cqh,22px)] font-black tabular-nums text-white">
-                      {fmtEval(prevEval)} → <span style={{ color: LABEL[pop.cls].color }}>{fmtEval(rev.evalAfterCp)}</span>
-                    </div>
+                    <div style={{ fontSize: 'clamp(13px,2.3cqh,24px)' }}><EvalSwing from={fmtEval(prevEval)} to={fmtEval(rev.evalAfterCp)} color={LABEL[pop.cls].color} /></div>
                   )}
                 </motion.div>
               )}
@@ -811,7 +843,13 @@ export function StudioPlayer({ source, queue, title, onClose, onNext, onPrev }: 
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 z-30 grid place-items-center bg-black/70 backdrop-blur-sm">
                   <motion.div initial={{ scale: 0.6, rotate: -4 }} animate={{ scale: 1, rotate: 0 }} transition={{ type: 'spring', stiffness: 260, damping: 14 }} className="px-[8%] text-center">
                     <p className="font-black leading-[1.05] text-white" style={{ fontSize: 'clamp(28px,6.6cqh,66px)', textShadow: '0 4px 20px rgba(0,0,0,.6)' }}>{compTitle}</p>
-                    <p className="mt-3 inline-block rounded-full bg-[#81B64C] px-4 py-1 font-black text-white" style={{ fontSize: 'clamp(13px,2.2cqh,22px)' }}>{queue?.length} moments</p>
+                    <div className="mt-[3cqh] flex flex-wrap justify-center gap-[1.4cqh]" style={{ fontSize: 'clamp(18px,3.4cqh,36px)' }}>
+                      {Array.from({ length: queue?.length ?? 0 }, (_, k) => (queue?.length ?? 0) - k).map((n, k) => (
+                        <motion.div key={n} initial={{ y: 30, opacity: 0, scale: 0.5 }} animate={{ y: 0, opacity: 1, scale: 1 }} transition={{ delay: 0.35 + k * 0.12, type: 'spring', stiffness: 380, damping: 14 }}>
+                          <Medallion glyph={`#${n}`} color={rankColor(n)} size={2.2} />
+                        </motion.div>
+                      ))}
+                    </div>
                   </motion.div>
                 </motion.div>
               )}
@@ -821,9 +859,11 @@ export function StudioPlayer({ source, queue, title, onClose, onNext, onPrev }: 
               {frame?.kind === 'outro' && (
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 z-30 grid place-items-center bg-black/75 backdrop-blur-sm">
                   <motion.div initial={{ scale: 0.7, y: 30 }} animate={{ scale: 1, y: 0 }} transition={{ type: 'spring', stiffness: 240, damping: 16 }} className="px-[8%] text-center">
+                    <motion.img src={`${import.meta.env.BASE_URL}images/logo.svg`} alt="" initial={{ rotate: -25, scale: 0.4 }} animate={{ rotate: 0, scale: 1 }} transition={{ type: 'spring', stiffness: 260, damping: 12, delay: 0.1 }}
+                      className="mx-auto mb-[2cqh] drop-shadow-2xl" style={{ width: '16cqh', height: '16cqh' }} />
                     <p className="font-black text-white" style={{ fontSize: 'clamp(26px,6cqh,60px)' }}>Chess<span className="text-[#81B64C]">Scout</span><span className="text-white/70">.net</span></p>
                     <p className="mt-2 font-bold text-white/90" style={{ fontSize: 'clamp(15px,2.8cqh,28px)' }}>{prefs.outroLine}</p>
-                    {prefs.handle && <p className="mt-4 inline-block rounded-full bg-[#81B64C] px-4 py-1.5 font-black text-white" style={{ fontSize: 'clamp(14px,2.4cqh,24px)' }}>Follow {prefs.handle}</p>}
+                    {prefs.handle && <motion.p animate={{ scale: [1, 1.07, 1] }} transition={{ duration: 1.1, repeat: Infinity, delay: 0.6 }} className="mt-4 inline-block rounded-full px-[1.1em] py-[0.4em] font-black text-white ring-2 ring-white" style={{ fontSize: 'clamp(14px,2.4cqh,24px)', background: 'linear-gradient(180deg,#9BCB62,#81B64C 55%,#5F8F36)', boxShadow: '0 0.2em 0 #3E6420, 0 0.5em 1.4em rgba(0,0,0,.45)' }}>Follow {prefs.handle}</motion.p>}
                   </motion.div>
                 </motion.div>
               )}
@@ -837,7 +877,10 @@ export function StudioPlayer({ source, queue, title, onClose, onNext, onPrev }: 
                 style={{ left: `${st.x}%`, top: `${st.y}%`, outline: selected === st.id && !clean && !recording ? '2px dashed rgba(255,255,255,.7)' : 'none', outlineOffset: 4 }}>
                 {st.kind === 'emoji'
                   ? <motion.span initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 400, damping: 12 }} className="block" style={{ fontSize: `${st.size * 0.5}cqh`, lineHeight: 1 }}>{st.text}</motion.span>
-                  : <motion.span initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 400, damping: 12 }} className="block whitespace-nowrap rounded-xl px-3 py-1 font-black text-white" style={{ fontSize: `${st.size * 0.4}cqh`, background: '#F0605D', border: '3px solid #fff', transform: 'rotate(-6deg)', boxShadow: '0 6px 20px rgba(0,0,0,.4)' }}>{st.text}</motion.span>}
+                  : st.kind === 'badge' && LABEL[st.text]
+                  ? <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 400, damping: 12 }} style={{ fontSize: `${st.size * 0.45}cqh`, transform: 'rotate(-4deg)' }}><StudioBadge {...LABEL[st.text]} /></motion.div>
+                  : <motion.span initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 400, damping: 12 }} className="block whitespace-nowrap font-black"
+                      style={{ fontSize: `${st.size * 0.4}cqh`, padding: '0.2em 0.6em', borderRadius: '0.45em', background: `linear-gradient(180deg, ${shade(TONES[st.tone ?? 0].bg, 0.18)}, ${TONES[st.tone ?? 0].bg} 55%, ${shade(TONES[st.tone ?? 0].bg, -0.15)})`, color: TONES[st.tone ?? 0].fg, border: '0.14em solid #fff', transform: 'rotate(-6deg)', boxShadow: '0 0.18em 0 rgba(0,0,0,.35), 0 0.35em 1em rgba(0,0,0,.4)', letterSpacing: '0.01em' }}>{st.text}</motion.span>}
               </div>
             ))}
           </motion.div>
@@ -986,7 +1029,10 @@ export function StudioPlayer({ source, queue, title, onClose, onNext, onPrev }: 
             {EMOJIS.map((e) => <button key={e} onClick={() => addSticker(e, 'emoji')} className="grid h-9 w-9 place-items-center rounded-lg bg-white/5 text-[20px] hover:bg-white/10">{e}</button>)}
           </div>
           <div className="mb-2 flex flex-wrap gap-1">
-            {TEXT_STICKERS.map((t) => <button key={t} onClick={() => addSticker(t, 'text')} className="rounded-md bg-[#F0605D] px-2 py-1 text-[11px] font-black text-white">{t}</button>)}
+            {TEXT_STICKERS.map((t, k) => <button key={t} onClick={() => addSticker(t, 'text', k % TONES.length)} className="rounded-md px-2 py-1 text-[11px] font-black ring-1 ring-white/30" style={{ background: TONES[k % TONES.length].bg, color: TONES[k % TONES.length].fg }}>{t}</button>)}
+          </div>
+          <div className="mb-2 flex flex-wrap gap-1.5">
+            {BADGE_STICKERS.map((c) => <button key={c} onClick={() => addSticker(c, 'badge')} className="rounded-lg bg-white/5 px-1.5 py-1 hover:bg-white/10" style={{ fontSize: 9 }} title={LABEL[c].text}><StudioBadge {...LABEL[c]} /></button>)}
           </div>
           {selected && stickers.some((s) => s.id === selected) && (
             <div className="mb-3 flex items-center gap-2 text-[12px] text-white/70">
