@@ -26,6 +26,7 @@ import { AICoachCard, type AICoachTone } from '@/components/AICoachCard';
 import { ProUpsell } from '@/components/ProUpsell';
 import { MistakeFixView } from '@/components/MistakeFixView';
 import { GuidedReview } from '@/components/review/GuidedReview';
+import { ProAnalysis } from '@/components/review/ProAnalysis';
 import { AnimatePresence, motion } from 'framer-motion';
 import { NEUTRAL_CHIP } from '@/lib/redesignTheme';
 
@@ -1068,9 +1069,45 @@ export function GameReplay() {
         blackName={game.blackUsername}
         accuracy={gameAccuracy}
         result={game.result ?? null}
-        onExit={() => setGuided(false)}
+        onExit={() => { setGtab('analysis'); setGuided(false); }}
         onReport={openReport}
         onBack={() => { if (window.history.length > 1) window.history.back(); else navigate('/games'); }}
+      />
+    );
+  }
+
+  // Pro: the redesigned full analysis (Report + Board). ?classic=1 shows the
+  // previous layout.
+  const classic = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('classic') === '1';
+  if (canFullAnalysis && !classic) {
+    const names = [username, authUser?.chesscomUsername, authUser?.lichessUsername].filter(Boolean).map((n) => String(n).toLowerCase());
+    const meColor: 'w' | 'b' | null = names.includes((game.whiteUsername ?? '').toLowerCase()) ? 'w' : names.includes((game.blackUsername ?? '').toLowerCase()) ? 'b' : null;
+    return (
+      <ProAnalysis
+        game={game}
+        moves={moves as any}
+        startFen={gameStartFen}
+        reviewMoves={reviewMoves}
+        summary={gameSummary}
+        accuracy={gameAccuracy}
+        reviewing={reviewing}
+        progress={reviewProgress}
+        reviewError={reviewError}
+        meColor={meColor}
+        whiteAvatar={whitePlayer?.avatar}
+        blackAvatar={blackPlayer?.avatar}
+        ply={currentMove}
+        setPly={(n) => { setIsPlaying(false); setPracticeMode(false); setCurrentMove(Math.max(0, Math.min(maxMoves, n))); }}
+        flipped={flipped}
+        onFlip={() => setFlipped((f) => !f)}
+        onReview={(force) => { setReviewError(null); void handleReview(force); }}
+        onStepByStep={() => setGuided(true)}
+        onJumpIn={(fenBefore) => {
+          const isBlack = meColor === 'b';
+          const oppRating = (isBlack ? game.whiteRating : game.blackRating) || 1200;
+          navigate(`/practice?fen=${encodeURIComponent(fenBefore)}&rating=${oppRating}&color=${isBlack ? 'b' : 'w'}`);
+        }}
+        initialTab={gtab === 'report' ? 'report' : 'board'}
       />
     );
   }
