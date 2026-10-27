@@ -4,7 +4,7 @@ import { ArrowLeft, Loader2, RefreshCw, Search, Clapperboard, Shuffle } from 'lu
 import { apiFetch } from '@/lib/api';
 import { MiniBoard } from '@/components/MiniBoard';
 import { useUser } from '@/hooks/use-user';
-import { StudioPlayer, themeLabel, type StudioMoment, type StudioTrap, type StudioSource, type StudioPuzzle, type StudioReview } from '@/components/studio/StudioPlayer';
+import { StudioPlayer, themeLabel, type StudioMoment, type StudioTrap, type StudioSource, type StudioPuzzle, type StudioReview, type StudioScout, type StudioLesson, type StudioPromo } from '@/components/studio/StudioPlayer';
 import { Chess } from 'chess.js';
 
 // Admin > Content Studio: notable moments from every reviewed game on the
@@ -85,11 +85,93 @@ export function ContentStudio() {
       setComp(top.reverse().map((m) => ({ kind: 'game', moment: m })));
     } finally { setAutoBusy(null); }
   };
-  const keyOf = (x: StudioSource) => (x.kind === 'trap' ? `t${x.trap.id}` : x.kind === 'puzzle' ? `p${x.puzzle.id}` : x.kind === 'review' ? `r${x.review.id}` : `g${x.moment.gameId}-${x.moment.moveIndex}`);
+  const keyOf = (x: StudioSource): string => (x.kind === 'trap' ? `t${x.trap.id}` : x.kind === 'puzzle' ? `p${x.puzzle.id}` : x.kind === 'review' ? `r${x.review.id}`
+    : x.kind === 'scout' ? `s${x.scout.id}` : x.kind === 'lesson' ? `l${x.lesson.id}` : x.kind === 'scan' ? `x${x.fen}` : x.kind === 'promo' ? `promo-${x.promo.template}-${x.promo.hook}` : `g${x.moment.gameId}-${x.moment.moveIndex}`);
   const togglePick = (x: StudioSource) => setPicked((cur) => (cur.some((c) => keyOf(c) === keyOf(x)) ? cur.filter((c) => keyOf(c) !== keyOf(x)) : [...cur, x]));
   const isPicked = (x: StudioSource) => picked.some((c) => keyOf(c) === keyOf(x));
   const choose = (x: StudioSource) => (picking ? togglePick(x) : setOpen(x));
-  const [view, setView] = useState<'moments' | 'traps' | 'puzzles' | 'reviews'>('moments');
+  const [view, setView] = useState<'moments' | 'traps' | 'puzzles' | 'reviews' | 'kids' | 'scout' | 'scan' | 'promo'>('moments');
+  // Kids & beginners: the Beginner Path / Chess for Kids lessons
+  const [courses, setCourses] = useState<{ id: number; title: string; description: string; icon: string; lessons: StudioLesson[] }[] | null>(null);
+  useEffect(() => {
+    if (view !== 'kids' || courses) return;
+    apiFetch('/api/admin/studio/lessons', { credentials: 'include' }).then((r) => (r.ok ? r.json() : { courses: [] })).then((d) => setCourses(d.courses ?? [])).catch(() => setCourses([]));
+  }, [view, courses]);
+  // Opponent scout
+  const [scouts, setScouts] = useState<StudioScout[] | null>(null);
+  const [scoutQ, setScoutQ] = useState('');
+  const [scoutName, setScoutName] = useState('');
+  const [scoutBusy, setScoutBusy] = useState<string | null>(null);
+  const [topPlayers, setTopPlayers] = useState<{ username: string; rating: number }[]>([]);
+  const loadScouts = useCallback(() => apiFetch(`/api/admin/studio/scouts${scoutQ.trim() ? `?q=${encodeURIComponent(scoutQ.trim())}` : ''}`, { credentials: 'include' })
+    .then((r) => (r.ok ? r.json() : { scouts: [] })).then((d) => setScouts(d.scouts ?? [])).catch(() => setScouts([])), [scoutQ]);
+  useEffect(() => {
+    if (view !== 'scout') return;
+    const t = setTimeout(() => void loadScouts(), 250);
+    if (!topPlayers.length) apiFetch('/api/opponents/top-players').then((r) => (r.ok ? r.json() : { players: [] })).then((d) => setTopPlayers((d.players ?? []).slice(0, 12))).catch(() => {});
+    return () => clearTimeout(t);
+  }, [view, loadScouts]); // eslint-disable-line react-hooks/exhaustive-deps
+  const runScout = async (username: string) => {
+    const u = username.trim(); if (!u) return;
+    setScoutBusy(`Scouting ${u}…`);
+    try {
+      const r = await apiFetch('/api/opponents/start', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: u }) });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok || !d.jobId) { setScoutBusy(d.error || "Couldn't start the scout."); return; }
+      for (let k = 0; k < 60; k++) {
+        await new Promise((res) => setTimeout(res, 3000));
+        const st = await apiFetch(`/api/opponents/status/${d.jobId}`, { credentials: 'include' }).then((x) => x.json()).catch(() => null);
+        if (st?.status === 'done') {
+          setScoutBusy(null); setScoutName('');
+          await loadScouts();
+          setOpen({ kind: 'scout', scout: { id: d.jobId, username: u.toLowerCase(), result: st.result } });
+          return;
+        }
+        if (st?.status === 'error') { setScoutBusy(st.error || 'The scout failed.'); return; }
+      }
+      setScoutBusy('Still working on it. Check back in a minute.');
+    } catch { setScoutBusy("Couldn't start the scout."); }
+  };
+  // Scan position
+  const [scans, setScans] = useState<{ id: number; fen: string; label: string | null }[] | null>(null);
+  const [scanBusy, setScanBusy] = useState<string | null>(null);
+  const [fenInput, setFenInput] = useState('');
+  useEffect(() => {
+    if (view !== 'scan' || scans) return;
+    apiFetch('/api/admin/studio/scans', { credentials: 'include' }).then((r) => (r.ok ? r.json() : { scans: [] })).then((d) => setScans(d.scans ?? [])).catch(() => setScans([]));
+  }, [view, scans]);
+  const scanPhoto = async (file: File) => {
+    setScanBusy('Reading the board…');
+    try {
+      // Shrink big phone photos before sending (the scanner reads them fine at this size).
+      const url = await new Promise<string>((res, rej) => {
+        const img = new Image();
+        img.onload = () => { const k = Math.min(1, 1600 / Math.max(img.width, img.height)); const c = document.createElement('canvas'); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k); c.getContext('2d')!.drawImage(img, 0, 0, c.width, c.height); res(c.toDataURL('image/jpeg', 0.88)); };
+        img.onerror = () => rej(new Error('bad image'));
+        img.src = URL.createObjectURL(file);
+      });
+      const r = await apiFetch('/api/analysis/scan-position', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ image: url }) });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok || !d.fen) { setScanBusy(d.error || d.message || "Couldn't read a chess position in that photo."); return; }
+      setScanBusy(null);
+      setOpen({ kind: 'scan', fen: d.fen, photo: url });
+    } catch { setScanBusy("Couldn't read that photo."); }
+  };
+  // Promos
+  const [promoT, setPromoT] = useState<'versus' | 'challenge'>('versus');
+  const [promo, setPromo] = useState<StudioPromo>({
+    template: 'versus', hook: 'Stop paying to review your chess games 🛑', rival: 'Chess.com',
+    rows: [
+      { label: 'Full game reviews', us: 'Free, unlimited', them: '1 free a day' },
+      { label: 'Puzzles', us: 'Free, unlimited', them: 'Limited free' },
+      { label: 'Scout any opponent', us: 'Free', them: '—' },
+      { label: 'Live + daily games', us: 'Free', them: 'Free' },
+      { label: 'Chess for Kids path', us: 'Free', them: '—' },
+    ],
+    closer: 'Switch in 30 seconds at chessscout.net',
+  });
+  const challengePromo: StudioPromo = { template: 'challenge', hook: 'Your friend thinks they are better than you 😤', rival: '', rows: [], closer: 'Settle it on chessscout.net' };
+  const [challenge, setChallenge] = useState<StudioPromo>(challengePromo);
   // Puzzles
   const [puzzles, setPuzzles] = useState<StudioPuzzle[] | null>(null);
   const [themes, setThemes] = useState<{ theme: string; n: number }[]>([]);
@@ -140,7 +222,7 @@ export function ContentStudio() {
   const openIndex = !open ? -1 : open.kind === 'trap' ? (traps ?? []).findIndex((t) => t.id === open.trap.id)
     : open.kind === 'puzzle' ? (puzzles ?? []).findIndex((p) => p.id === open.puzzle.id)
     : open.kind === 'review' ? (reviews ?? []).findIndex((r) => r.id === open.review.id)
-    : (moments ?? []).findIndex((m) => m === open.moment);
+    : open.kind === 'game' ? (moments ?? []).findIndex((m) => m === open.moment) : -1;
 
   const query = useCallback((offset: number) => {
     const p = new URLSearchParams({ tags: tags.join(','), sort, limit: '48', offset: String(offset) });
@@ -192,7 +274,7 @@ export function ContentStudio() {
         {picking ? 'Cancel compilation' : '🎬 Make a compilation'}
       </button>
       <div className="order-1 inline-flex flex-wrap rounded-xl bg-white/5 p-1">
-        {([['moments', 'Game moments'], ['reviews', 'Game reviews'], ['puzzles', 'Puzzles'], ['traps', 'Trap lessons']] as const).map(([k, t]) => (
+        {([['moments', 'Game moments'], ['reviews', 'Game reviews'], ['puzzles', 'Puzzles'], ['traps', 'Trap lessons'], ['kids', 'Kids & beginners'], ['scout', 'Opponent scout'], ['scan', 'Scan position'], ['promo', 'Promos']] as const).map(([k, t]) => (
           <button key={k} onClick={() => setView(k)} className="rounded-lg px-3.5 py-1.5 text-[13px] font-black" style={{ background: view === k ? '#81B64C' : 'transparent', color: view === k ? '#fff' : '#C9CFCD' }}>{t}</button>
         ))}
       </div>
@@ -220,7 +302,138 @@ export function ContentStudio() {
       </div>
       {picking && <p className="mb-3 text-[12.5px] text-[#E8B447]">Tap moments, reviews, puzzles or traps (you can mix tabs) in the order you want them (they count down #{Math.max(picked.length, 1)} to #1), then play them as one clip.</p>}
 
-      {view === 'puzzles' ? (<>
+      {view === 'kids' ? (<>
+        <div className="mb-3 flex flex-wrap gap-1.5">
+          <button onClick={() => void autoPuzzles('kid-m1', 'mateIn1', 'Can your kid find mate in 1? 🧒', [400, 1000])} disabled={!!autoBusy} className="rounded-full bg-[#FF6FA8] px-3 py-1.5 text-[12.5px] font-black text-white disabled:opacity-60">🧒 Easy mate in 1 (kids)</button>
+          <button onClick={() => void autoPuzzles('beg-ladder', '', '5 puzzles for beginners 🌱', [400, 1200])} disabled={!!autoBusy} className="rounded-full bg-[#7C5CFF] px-3 py-1.5 text-[12.5px] font-black text-white disabled:opacity-60">🌱 Beginner puzzle ladder</button>
+          <button onClick={() => setView('traps')} className="rounded-full bg-white/10 px-3 py-1.5 text-[12.5px] font-bold text-white">🪤 Beginner traps</button>
+        </div>
+        <p className="mb-3 text-[12.5px] text-white/55">Tip: open a lesson and tap the <b>Kids</b> preset (bright background, playful music, friendly coach voice, subtitles).</p>
+        {!courses ? <Loader2 className="mx-auto mt-10 animate-spin text-white/60" /> : courses.length === 0 ? <p className="mt-10 text-center text-[14px] text-white/60">No lessons yet.</p> : courses.map((c) => (
+          <div key={c.id} className="mb-5">
+            <p className="mb-2 text-[15px] font-black">{c.icon} {c.title} <span className="text-[12px] font-bold text-white/45">· {c.lessons.length} lessons</span></p>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+              {c.lessons.map((l) => {
+                const src: StudioSource = { kind: 'lesson', lesson: { ...l, course: { title: c.title, icon: c.icon } } };
+                const fen = l.steps.find((st) => st.fen)?.fen;
+                const ok = fen && fen.split(' ')[0].split('/').length === 8 ? fen : undefined;
+                return (
+                  <button key={l.id} onClick={() => choose(src)} className="relative overflow-hidden rounded-xl bg-white/5 text-left ring-1 ring-white/10 transition hover:ring-[#FF6FA8]"
+                    style={isPicked(src) ? { boxShadow: '0 0 0 3px #81B64C' } : undefined}>
+                    {isPicked(src) && <span className="absolute right-2 top-2 z-10 grid h-7 w-7 place-items-center rounded-full bg-[#81B64C] text-[13px] font-black">{picked.findIndex((x) => keyOf(x) === keyOf(src)) + 1}</span>}
+                    <div className="aspect-square w-full"><MiniBoard fen={ok ?? new Chess().fen()} size={400} /></div>
+                    <div className="p-2.5">
+                      <p className="truncate text-[13.5px] font-black">{l.title}</p>
+                      <p className="line-clamp-2 text-[11.5px] text-white/55">{l.summary}</p>
+                      <p className="mt-1 text-[10.5px] font-black uppercase text-[#FF9BC4]">{l.steps.length} steps · {l.steps.filter((st) => st.type === 'practice').length} to try</p>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </>) : view === 'scout' ? (<>
+        <form onSubmit={(e) => { e.preventDefault(); void runScout(scoutName); }} className="mb-2 flex flex-wrap gap-2">
+          <input value={scoutName} onChange={(e) => setScoutName(e.target.value)} placeholder="Chess.com username to scout" className="min-w-[220px] flex-1 rounded-lg bg-white/5 px-3 py-2 text-[13px] text-white outline-none ring-1 ring-white/10 focus:ring-[#81B64C]" />
+          <button type="submit" disabled={!!scoutBusy && scoutBusy.endsWith('…')} className="rounded-lg bg-[#81B64C] px-4 py-2 text-[13px] font-black text-white disabled:opacity-60">🔍 Scout</button>
+        </form>
+        {scoutBusy && <p className="mb-2 flex items-center gap-2 text-[12.5px] text-[#E8B447]">{scoutBusy.endsWith('…') && <Loader2 size={13} className="animate-spin" />}{scoutBusy}</p>}
+        {topPlayers.length > 0 && (
+          <div className="mb-3 flex flex-wrap items-center gap-1.5">
+            <span className="text-[11px] font-bold uppercase text-white/45">Top players</span>
+            {topPlayers.map((p) => <button key={p.username} onClick={() => void runScout(p.username)} disabled={!!scoutBusy && scoutBusy.endsWith('…')} className="rounded-full bg-white/[.07] px-2.5 py-1 text-[12px] font-bold text-white hover:bg-white/15 disabled:opacity-50">{p.username} <span className="text-white/45">{p.rating}</span></button>)}
+          </div>
+        )}
+        <div className="mb-3 flex items-center gap-2 rounded-lg bg-white/5 px-3 py-2 ring-1 ring-white/10"><Search size={15} className="text-white/50" /><input value={scoutQ} onChange={(e) => setScoutQ(e.target.value)} placeholder="Search scouted players" className="w-full bg-transparent text-[13px] text-white outline-none" /></div>
+        {!scouts ? <Loader2 className="mx-auto mt-10 animate-spin text-white/60" /> : scouts.length === 0 ? <p className="mt-10 text-center text-[14px] text-white/60">No scouts yet. Scout someone above.</p> : (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+            {scouts.map((sc) => {
+              const d = sc.result; const src: StudioSource = { kind: 'scout', scout: sc };
+              return (
+                <button key={sc.id} onClick={() => choose(src)} className="relative rounded-xl bg-white/5 p-3 text-left ring-1 ring-white/10 transition hover:ring-[#81B64C]" style={isPicked(src) ? { boxShadow: '0 0 0 3px #81B64C' } : undefined}>
+                  {isPicked(src) && <span className="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-full bg-[#81B64C] text-[13px] font-black">{picked.findIndex((x) => keyOf(x) === keyOf(src)) + 1}</span>}
+                  <div className="flex items-center gap-2">
+                    {d.profile?.avatar ? <img src={d.profile.avatar} alt="" className="h-9 w-9 rounded-full object-cover" /> : <span className="grid h-9 w-9 place-items-center rounded-full bg-white/10">🔍</span>}
+                    <div className="min-w-0"><p className="truncate text-[13.5px] font-black">{d.profile?.title ? `${d.profile.title} ` : ''}{d.profile?.name || sc.username}</p><p className="truncate text-[11px] text-white/50">@{sc.username}</p></div>
+                  </div>
+                  <p className="mt-2 text-[12px] font-bold tabular-nums"><span className="text-[#81B64C]">{d.wins}W</span> · <span className="text-white/60">{d.draws}D</span> · <span className="text-[#F0605D]">{d.losses}L</span> <span className="text-white/45">in {d.gamesAnalyzed}</span></p>
+                  {d.topOpenings?.[0] && <p className="mt-1 truncate text-[11.5px] text-white/55">Plays the {d.topOpenings[0].opening}</p>}
+                  <p className="mt-1 text-[10.5px] font-black uppercase text-[#E8B447]">{d.weaknesses?.length ? `${d.weaknesses.length} weak spots` : 'Stats only'}</p>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </>) : view === 'scan' ? (<>
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <label className="cursor-pointer rounded-lg bg-[#81B64C] px-4 py-2 text-[13px] font-black text-white">
+            📸 Scan a photo
+            <input type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) void scanPhoto(f); e.currentTarget.value = ''; }} />
+          </label>
+          <form onSubmit={(e) => { e.preventDefault(); const f = fenInput.trim(); try { new Chess(f); setOpen({ kind: 'scan', fen: f }); } catch { setScanBusy("That FEN isn't a legal position."); } }} className="flex min-w-[260px] flex-1 gap-2">
+            <input value={fenInput} onChange={(e) => setFenInput(e.target.value)} placeholder="…or paste a FEN" className="min-w-0 flex-1 rounded-lg bg-white/5 px-3 py-2 text-[13px] text-white outline-none ring-1 ring-white/10 focus:ring-[#81B64C]" />
+            <button type="submit" className="rounded-lg bg-white/10 px-3 py-2 text-[13px] font-bold">Open</button>
+          </form>
+        </div>
+        {scanBusy && <p className="mb-2 flex items-center gap-2 text-[12.5px] text-[#E8B447]">{scanBusy.endsWith('…') && <Loader2 size={13} className="animate-spin" />}{scanBusy}</p>}
+        <p className="mb-2 text-[12.5px] text-white/55">The clip shows your photo being scanned, then the engine's best move and line. Recent scans from the app (positions only, no photos):</p>
+        {!scans ? <Loader2 className="mx-auto mt-10 animate-spin text-white/60" /> : scans.length === 0 ? <p className="mt-6 text-center text-[14px] text-white/60">No saved scans yet.</p> : (
+          <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-6">
+            {scans.map((sc) => {
+              let ok = true; try { new Chess(sc.fen); } catch { ok = false; }
+              if (!ok) return null;
+              const src: StudioSource = { kind: 'scan', fen: sc.fen, label: sc.label ?? undefined };
+              return (
+                <button key={sc.id} onClick={() => choose(src)} className="relative overflow-hidden rounded-xl bg-white/5 text-left ring-1 ring-white/10 hover:ring-[#81B64C]" style={isPicked(src) ? { boxShadow: '0 0 0 3px #81B64C' } : undefined}>
+                  <div className="aspect-square w-full"><MiniBoard fen={sc.fen} size={300} flipped={sc.fen.split(' ')[1] === 'b'} /></div>
+                  <p className="truncate p-2 text-[11.5px] font-bold text-white/70">{sc.label || (sc.fen.split(' ')[1] === 'b' ? 'Black to move' : 'White to move')}</p>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </>) : view === 'promo' ? (<>
+        <div className="mb-3 inline-flex rounded-xl bg-white/5 p-1">
+          {([['versus', 'ChessScout vs …'], ['challenge', 'Challenge your friends']] as const).map(([k, t]) => (
+            <button key={k} onClick={() => setPromoT(k)} className="rounded-lg px-3.5 py-1.5 text-[13px] font-black" style={{ background: promoT === k ? '#81B64C' : 'transparent', color: promoT === k ? '#fff' : '#C9CFCD' }}>{t}</button>
+          ))}
+        </div>
+        {promoT === 'versus' ? (
+          <div className="max-w-2xl space-y-2 rounded-xl bg-white/5 p-3 ring-1 ring-white/10">
+            <div className="flex flex-wrap gap-1.5">
+              {['Stop paying to review your chess games 🛑', 'Chess.com is dead? 💀', 'Why I stopped using Chess.com', 'The free Chess.com alternative nobody talks about'].map((h) => (
+                <button key={h} onClick={() => setPromo((p) => ({ ...p, hook: h }))} className="rounded-full bg-white/[.07] px-2.5 py-1 text-[12px] font-bold text-white hover:bg-white/15">{h}</button>
+              ))}
+            </div>
+            <label className="block text-[12px] text-white/60">Hook<input value={promo.hook} onChange={(e) => setPromo({ ...promo, hook: e.target.value })} className="mt-0.5 w-full rounded-lg bg-white/5 px-3 py-2 text-[14px] font-bold text-white ring-1 ring-white/10" /></label>
+            <label className="block text-[12px] text-white/60">Compared with<input value={promo.rival} onChange={(e) => setPromo({ ...promo, rival: e.target.value })} className="mt-0.5 w-full rounded-lg bg-white/5 px-3 py-2 text-[13px] text-white ring-1 ring-white/10" /></label>
+            <p className="pt-1 text-[11px] font-bold uppercase text-white/50">Rows · feature / ChessScout / {promo.rival || 'them'}</p>
+            {promo.rows.map((r, k) => (
+              <div key={k} className="grid grid-cols-[1.3fr_1fr_1fr_auto] gap-1.5">
+                {(['label', 'us', 'them'] as const).map((f) => <input key={f} value={r[f]} onChange={(e) => setPromo({ ...promo, rows: promo.rows.map((x, j) => (j === k ? { ...x, [f]: e.target.value } : x)) })} className="min-w-0 rounded-md bg-white/5 px-2 py-1.5 text-[12.5px] text-white ring-1 ring-white/10" />)}
+                <button onClick={() => setPromo({ ...promo, rows: promo.rows.filter((_, j) => j !== k) })} className="px-1.5 text-[#F59B98]" aria-label="Remove row">✕</button>
+              </div>
+            ))}
+            {promo.rows.length < 7 && <button onClick={() => setPromo({ ...promo, rows: [...promo.rows, { label: '', us: '', them: '' }] })} className="rounded-md bg-white/10 px-2.5 py-1 text-[12px] font-bold">+ Row</button>}
+            <label className="block text-[12px] text-white/60">Closing line<input value={promo.closer} onChange={(e) => setPromo({ ...promo, closer: e.target.value })} className="mt-0.5 w-full rounded-lg bg-white/5 px-3 py-2 text-[13px] text-white ring-1 ring-white/10" /></label>
+            <p className="text-[11.5px] leading-snug text-[#E8B447]">Every claim about {promo.rival || 'the other site'} needs to be true on the day you post. Check their current free plan and edit these rows. The ChessScout column matches what's free on our site today. Text only, no logos.</p>
+            <button onClick={() => setOpen({ kind: 'promo', promo: { ...promo, rows: promo.rows.filter((r) => r.label.trim()) } })} className="rounded-lg bg-[#81B64C] px-4 py-2 text-[13px] font-black text-white">🎬 Make the clip</button>
+          </div>
+        ) : (
+          <div className="max-w-2xl space-y-2 rounded-xl bg-white/5 p-3 ring-1 ring-white/10">
+            <div className="flex flex-wrap gap-1.5">
+              {['Your friend thinks they are better than you 😤', 'Settle it over a game of chess ♟️', 'Send this to the friend who always says "rematch"', 'One move a day. No excuses. 📅'].map((h) => (
+                <button key={h} onClick={() => setChallenge((p) => ({ ...p, hook: h }))} className="rounded-full bg-white/[.07] px-2.5 py-1 text-[12px] font-bold text-white hover:bg-white/15">{h}</button>
+              ))}
+            </div>
+            <label className="block text-[12px] text-white/60">Hook<input value={challenge.hook} onChange={(e) => setChallenge({ ...challenge, hook: e.target.value })} className="mt-0.5 w-full rounded-lg bg-white/5 px-3 py-2 text-[14px] font-bold text-white ring-1 ring-white/10" /></label>
+            <label className="block text-[12px] text-white/60">Closing line<input value={challenge.closer} onChange={(e) => setChallenge({ ...challenge, closer: e.target.value })} className="mt-0.5 w-full rounded-lg bg-white/5 px-3 py-2 text-[13px] text-white ring-1 ring-white/10" /></label>
+            <p className="text-[12px] text-white/55">The clip plays a classic game with ticking clocks, then shows live games (5 min, 5|3, 10 min, 15 min), daily games (1, 3 or 7 days a move) and a challenge link.</p>
+            <button onClick={() => setOpen({ kind: 'promo', promo: challenge })} className="rounded-lg bg-[#81B64C] px-4 py-2 text-[13px] font-black text-white">🎬 Make the clip</button>
+          </div>
+        )}
+      </>) : view === 'puzzles' ? (<>
         <div className="mb-2 flex flex-wrap gap-1.5">
           <button onClick={() => setPTheme('')} className="rounded-full px-3 py-1.5 text-[12.5px] font-bold" style={{ background: !pTheme ? '#81B64C' : 'rgba(255,255,255,.06)', color: !pTheme ? '#fff' : '#C9CFCD' }}>All themes</button>
           {[...['mateIn1', 'mateIn2', 'mateIn3', 'mateIn4'].map((m) => themes.find((t) => t.theme === m) ?? { theme: m, n: -1 }), ...themes.filter((t) => !/^mateIn[1-4]$/.test(t.theme))].map((t) => (

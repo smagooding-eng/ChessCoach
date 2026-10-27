@@ -1,7 +1,7 @@
 // Content Studio (admin only): find notable moments in any reviewed game and
 // open them in the Studio player. See lib/contentMoments.ts.
 import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
-import { listMoments, tagCounts, contentScanProgress, scanContentBatch, studioGame, ensureContentTables, studioTraps, studioPuzzles, puzzleThemes, studioReviews } from "../lib/contentMoments";
+import { listMoments, tagCounts, contentScanProgress, scanContentBatch, studioGame, ensureContentTables, studioTraps, studioPuzzles, puzzleThemes, studioReviews, studioScouts, studioScout, studioLessons, studioScans } from "../lib/contentMoments";
 
 const router: IRouter = Router();
 
@@ -96,6 +96,38 @@ router.get("/admin/studio/reviews", requireAdmin, async (req: Request, res: Resp
   } catch (err) {
     req.log.error({ err }, "[studio] reviews failed");
     res.status(500).json({ error: "Couldn't load reviews" });
+  }
+});
+
+router.get("/admin/studio/scouts", requireAdmin, async (req: Request, res: Response) => {
+  try { res.json({ scouts: await studioScouts(typeof req.query.q === "string" ? req.query.q.slice(0, 40) : undefined) }); }
+  catch (err) { req.log.error({ err }, "[studio] scouts failed"); res.json({ scouts: [] }); }
+});
+router.get("/admin/studio/scout/:id", requireAdmin, async (req: Request, res: Response) => {
+  const s = await studioScout(String(req.params.id));
+  if (!s) { res.status(404).json({ error: "Scout not found" }); return; }
+  res.json(s);
+});
+router.get("/admin/studio/lessons", requireAdmin, async (req: Request, res: Response) => {
+  try { res.json({ courses: await studioLessons() }); } catch (err) { req.log.error({ err }, "[studio] lessons failed"); res.json({ courses: [] }); }
+});
+router.get("/admin/studio/scans", requireAdmin, async (req: Request, res: Response) => {
+  try { res.json({ scans: await studioScans() }); } catch (err) { req.log.error({ err }, "[studio] scans failed"); res.json({ scans: [] }); }
+});
+/** The engine's best move and line for any position (scanned boards, lesson positions). */
+router.post("/admin/studio/best-line", requireAdmin, async (req: Request, res: Response) => {
+  const fen = typeof req.body?.fen === "string" ? req.body.fen.trim() : "";
+  try {
+    const { Chess } = await import("chess.js");
+    new Chess(fen);
+  } catch { res.status(400).json({ error: "That isn't a legal position." }); return; }
+  try {
+    const { evaluateAllPositions } = await import("../lib/engineAnalysis");
+    const [ev] = await evaluateAllPositions([fen], 18);
+    res.json({ bestLineSan: ev?.bestLineSan ?? [], bestMoveSan: ev?.bestMoveSan ?? null, cpWhite: ev?.cpWhite ?? 0 });
+  } catch (err) {
+    req.log.error({ err }, "[studio] best line failed");
+    res.status(500).json({ error: "The engine couldn't look at this position right now." });
   }
 });
 

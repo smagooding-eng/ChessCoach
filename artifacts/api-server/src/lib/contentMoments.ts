@@ -325,3 +325,34 @@ export async function studioReviews(q: ReviewQuery) {
       FROM content_moments GROUP BY game_id) m ON m.game_id = g.id
     WHERE ${sql.join(conds, sql` AND `)} ORDER BY ${order} LIMIT ${limit} OFFSET ${Math.max(0, q.offset ?? 0)}`));
 }
+
+// ── Opponent Scout reports, as Studio clips ─────────────────────────────
+/** Latest finished scout per player (newest first), without the game PGNs. */
+export async function studioScouts(q?: string) {
+  const cond = q ? sql`AND lower(target_username) LIKE ${"%" + q.toLowerCase() + "%"}` : sql``;
+  const rows = rowsOf(await db.execute(sql`SELECT DISTINCT ON (lower(target_username)) id, target_username AS "username", completed_at AS "completedAt",
+      result - 'gamePgns' AS result
+    FROM background_jobs WHERE type = 'scout' AND status = 'done' AND result IS NOT NULL ${cond}
+    ORDER BY lower(target_username), completed_at DESC NULLS LAST LIMIT 200`));
+  return rows.sort((a, b) => new Date(String(b.completedAt ?? 0)).getTime() - new Date(String(a.completedAt ?? 0)).getTime()).slice(0, 60);
+}
+/** One scout with a few of the player's games (to play their favourite opening behind the stats). */
+export async function studioScout(id: string) {
+  const r = rowsOf(await db.execute(sql`SELECT id, target_username AS "username", result FROM background_jobs WHERE id = ${id} AND type = 'scout' AND status = 'done'`))[0];
+  if (!r) return null;
+  const result = (r.result ?? {}) as Record<string, unknown>;
+  const pgns = Array.isArray(result.gamePgns) ? (result.gamePgns as string[]).slice(0, 40) : [];
+  return { id: r.id, username: r.username, result: { ...result, gamePgns: pgns } };
+}
+
+// ── Beginner and kids lessons ───────────────────────────────────────────
+export async function studioLessons() {
+  const courses = rowsOf(await db.execute(sql`SELECT id, title, description, icon_emoji AS "icon" FROM beginner_courses WHERE archived = false ORDER BY order_index, id`));
+  const lessons = rowsOf(await db.execute(sql`SELECT id, course_id AS "courseId", title, summary, steps FROM beginner_lessons WHERE archived = false ORDER BY course_id, order_index, id`));
+  return courses.map((c) => ({ ...c, lessons: lessons.filter((l) => l.courseId === c.id) }));
+}
+
+// ── Scanned positions (FEN only, no photos or owners) ───────────────────
+export async function studioScans() {
+  return rowsOf(await db.execute(sql`SELECT id, fen, label, created_at AS "createdAt" FROM scanned_positions ORDER BY id DESC LIMIT 60`));
+}

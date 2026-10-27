@@ -6,7 +6,7 @@
 // under the coach voice. Everything also feeds `stream`, so a recording can
 // carry the music and voice even when the browser doesn't share tab audio.
 
-export type MusicStyle = 'off' | 'lofi' | 'hype' | 'suspense' | 'epic';
+export type MusicStyle = 'off' | 'lofi' | 'hype' | 'suspense' | 'epic' | 'playful';
 
 interface Style {
   label: string; bpm: number; swing: number;
@@ -34,6 +34,12 @@ const STYLES: Record<Exclude<MusicStyle, 'off'>, Style> = {
     kick: [0, 8], snare: [], hat: [0, 4, 8, 12], hatVol: 0.07,
     bass: [0, 2, 4, 6, 8, 10, 12, 14], chords: [[45, 52, 57, 60], [45, 52, 57, 60], [46, 53, 58, 61], [44, 51, 56, 59]],
     wave: 'sine', lowpass: 1600,
+  },
+  playful: {
+    label: 'Playful', bpm: 112, swing: 0.1,
+    kick: [0, 8, 11], snare: [4, 12], hat: [2, 6, 10, 14], hatVol: 0.06,
+    bass: [0, 6, 8, 14], chords: [[60, 64, 67, 72], [55, 59, 62, 67], [57, 60, 64, 69], [53, 57, 60, 65]],
+    wave: 'triangle', lowpass: 4600,
   },
   epic: {
     label: 'Epic', bpm: 110, swing: 0,

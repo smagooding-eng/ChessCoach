@@ -35,9 +35,24 @@ export interface StudioReview {
   result: string | null; platform: string | null; playedAt: string | null; whiteAccuracy: number | null; blackAccuracy: number | null;
   moments: number; brilliant: number; blunders: number; mate: number; lastFen: string | null;
 }
+export interface ScoutData {
+  username: string; gamesAnalyzed: number; wins: number; losses: number; draws: number;
+  profile?: { name?: string; title?: string; avatar?: string; country?: string; ratings?: { bullet?: number; blitz?: number; rapid?: number } } | null;
+  topOpenings?: { opening: string; games: number; winRate: number }[];
+  weaknesses?: { category: string; severity: string; description: string }[];
+  gamePgns?: string[];
+}
+export interface StudioScout { id: string; username: string; completedAt?: string | null; result: ScoutData }
+export interface LessonStep { type: 'text' | 'board' | 'practice' | 'drill'; text: string; fen?: string; highlightSquares?: string[]; expectedMoveSan?: string }
+export interface StudioLesson { id: number; courseId: number; title: string; summary: string; steps: LessonStep[]; course?: { title: string; icon: string } }
 export type StudioSource =
   | { kind: 'game'; moment: StudioMoment } | { kind: 'trap'; trap: StudioTrap }
-  | { kind: 'puzzle'; puzzle: StudioPuzzle } | { kind: 'review'; review: StudioReview };
+  | { kind: 'puzzle'; puzzle: StudioPuzzle } | { kind: 'review'; review: StudioReview }
+  | { kind: 'scout'; scout: StudioScout } | { kind: 'lesson'; lesson: StudioLesson }
+  | { kind: 'scan'; fen: string; photo?: string; label?: string }
+  | { kind: 'promo'; promo: StudioPromo };
+/** Promo clips: ChessScout vs another site (your rows, your words), or "challenge your friends". */
+export interface StudioPromo { template: 'versus' | 'challenge'; hook: string; rival: string; rows: { label: string; us: string; them: string }[]; closer: string }
 
 interface ReviewMove { moveIndex?: number; san: string; color?: 'white' | 'black'; classification?: string; explanation?: string; betterMove?: string | null; evalAfterCp?: number; fen?: string; bestLineSan?: string[] }
 interface StudioGame { id: number; pgn: string; opening: string | null; white: string; black: string; whiteRating: number | null; blackRating: number | null; moves: ReviewMove[]; whiteAccuracy?: number | null; blackAccuracy?: number | null; overview?: string | null; result?: string | null }
@@ -50,6 +65,13 @@ interface Clip {
   isPuzzle?: boolean; puzzleRating?: number;
   /** A whole game review: every move (or the highlights) and a summary card. */
   isReview?: boolean; accuracy?: { w: number | null; b: number | null }; overview?: string | null; result?: string | null;
+  /** An Opponent Scout report: their favourite opening plays behind stat cards. */
+  isScout?: boolean; scout?: ScoutData;
+  /** A kids / beginner lesson: the coach explains, you try the move. */
+  isLesson?: boolean; lesson?: StudioLesson;
+  /** A scanned board: (the photo,) then the engine's best line. */
+  isScan?: boolean; photo?: string;
+  isPromo?: boolean; promo?: StudioPromo;
 }
 type Frame =
   | { kind: 'intro'; fen: string }
@@ -62,6 +84,11 @@ type Frame =
   | { kind: 'split'; played: { fen: string; last: { from: string; to: string } }; better: { fen: string; last: { from: string; to: string } }; playedSan: string; betterSan: string }
   | { kind: 'title'; fen: string }
   | { kind: 'summary'; fen: string }
+  | { kind: 'scoutCard'; fen: string; last: { from: string; to: string } | null; card: 'profile' | 'openings' | 'weak' }
+  | { kind: 'lessonText'; fen: string; text: string }
+  | { kind: 'lessonBoard'; fen: string; text: string; highlights: string[]; last: { from: string; to: string } | null; celebrate?: boolean }
+  | { kind: 'scanPhoto'; fen: string }
+  | { kind: 'promoCard'; fen: string; last: { from: string; to: string } | null; card: 'vs' | 'switch' | 'live' | 'daily' | 'link'; upTo?: number }
   /** A beat on the starting position once the title / hook clears, so the first move is never hidden. */
   | { kind: 'hold'; fen: string; last: { from: string; to: string } | null }
   | { kind: 'outro'; fen: string };
@@ -81,6 +108,8 @@ const BACKGROUNDS: Record<string, { label: string; css: React.CSSProperties }> =
   purple: { label: 'Purple', css: { background: 'linear-gradient(160deg, #2A1446 0%, #0F0A1F 100%)' } },
   sunset: { label: 'Sunset', css: { background: 'linear-gradient(170deg, #4A1E14 0%, #1A0B10 70%)' } },
   ocean: { label: 'Ocean', css: { background: 'linear-gradient(170deg, #0F3B57 0%, #06131D 75%)' } },
+  kids: { label: 'Kids', css: { background: 'linear-gradient(165deg, #FFB547 0%, #FF6FA8 48%, #7C5CFF 100%)' } },
+  sky: { label: 'Sky', css: { background: 'linear-gradient(170deg, #5BC0FF 0%, #2E7BEA 55%, #1B3FA8 100%)' } },
   gold: { label: 'Gold', css: { background: 'radial-gradient(120% 80% at 50% 0%, #5A4410 0%, #1A1406 65%, #0B0903 100%)' } },
   screen: { label: 'Green screen', css: { background: '#00FF00' } },
 };
@@ -208,6 +237,52 @@ function puzzleClip(p: StudioPuzzle): Clip {
   };
 }
 
+const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+/** SAN moves from a PGN (headers, comments, variations and move numbers stripped). */
+function pgnSans(pgn: string): string[] {
+  return pgn.replace(/\[[^\]]*\]/g, ' ').replace(/\{[^}]*\}/g, ' ').replace(/\([^)]*\)/g, ' ').replace(/\$\d+/g, ' ').split(/\s+/)
+    .map((t) => t.replace(/^\d+\.+/, '')).filter((t) => t && !/^(1-0|0-1|1\/2-1\/2|\*)$/.test(t));
+}
+function scoutClip(s: StudioScout): Clip {
+  const d = s.result;
+  const top = d.topOpenings?.[0]?.opening ?? '';
+  const words = top.toLowerCase().split(/[^a-z]+/).filter((w) => w.length > 3);
+  // A game of theirs in their favourite opening, to play behind the stats.
+  const pgn = (d.gamePgns ?? []).find((g) => { const h = (g.match(/\[(Opening|ECOUrl) "([^"]+)"\]/g) ?? []).join(' ').toLowerCase(); return words.length > 0 && words.every((w) => h.includes(w)); }) ?? d.gamePgns?.[0] ?? '';
+  const plies = pgn ? playSans(undefined, pgnSans(pgn).slice(0, 14), []) : [];
+  const name = d.profile?.name || s.username;
+  return {
+    plies, key: Math.max(0, plies.length - 1), tags: ['scout'], hook: `Scouting ${name} 🔍`, sub: `${d.gamesAnalyzed} games scouted${top ? ` · plays the ${top}` : ''}`,
+    names: { w: null, b: null }, ratings: { w: null, b: null }, fileBase: `chessscout-scout-${s.username}`, label: `Opponent scout · ${s.username}`,
+    isTrap: false, opening: top || null, isScout: true, scout: d,
+  };
+}
+function lessonClip(l: StudioLesson): Clip {
+  return {
+    plies: [], key: 0, tags: ['lesson'], hook: `${l.course?.icon ?? '♟️'} ${l.title}`, sub: l.summary,
+    names: { w: null, b: null }, ratings: { w: null, b: null }, fileBase: `chessscout-lesson-${l.id}`, label: `Lesson · ${l.title}`,
+    isTrap: false, opening: null, isLesson: true, lesson: l,
+  };
+}
+function scanClip(fen: string, line: string[], photo?: string): Clip {
+  const plies = playSans(fen, line.slice(0, 6), line.map((san, k) => (k === 0 ? { san, classification: 'best' } : undefined)));
+  const side = fen.split(' ')[1] === 'b' ? 'Black' : 'White';
+  return {
+    plies, key: 0, tags: ['scan'], hook: photo ? 'I scanned this board. Best move? 📸' : `${side} to move. Best move? 📸`, sub: 'Scan any board with ChessScout',
+    names: { w: null, b: null }, ratings: { w: null, b: null }, fileBase: 'chessscout-scan', label: 'Scanned position',
+    isTrap: false, opening: null, isScan: true, photo,
+  };
+}
+// The Opera Game (Morphy, Paris 1858): the classic short game, played behind promo cards.
+const OPERA = 'e4 e5 Nf3 d6 d4 Bg4 dxe5 Bxf3 Qxf3 dxe5 Bc4 Nf6 Qb3 Qe7 Nc3 c6 Bg5 b5 Nxb5 cxb5 Bxb5+ Nbd7 O-O-O Rd8 Rxd7 Rxd7 Rd1 Qe6 Bxd7+ Nxd7 Qb8+ Nxb8 Rd8#'.split(' ');
+function promoClip(p: StudioPromo): Clip {
+  const plies = playSans(undefined, OPERA, OPERA.map((san) => (san.includes('#') ? { san, classification: 'checkmate' } : undefined)));
+  return {
+    plies, key: plies.length - 1, tags: ['promo'], hook: p.hook, sub: p.template === 'versus' ? `ChessScout vs ${p.rival}` : 'Live and daily games on ChessScout',
+    names: { w: null, b: null }, ratings: { w: null, b: null }, fileBase: `chessscout-promo-${p.template}`, label: p.template === 'versus' ? `Promo · vs ${p.rival}` : 'Promo · challenge your friends',
+    isTrap: false, opening: null, isPromo: true, promo: p,
+  };
+}
 const NOTABLE = new Set(['brilliant', 'great', 'blunder', 'mistake', 'missed_win']);
 function reviewClip(g: StudioGame): Clip {
   const base = gameClip(g, { gameId: g.id, moveIndex: 0, tags: [], classification: null, san: '', trapName: null, opening: g.opening, white: g.white, black: g.black, whiteRating: g.whiteRating, blackRating: g.blackRating, platform: null });
@@ -244,6 +319,10 @@ function hashtagsFor(clip: Clip): string {
   if (clip.tags.includes('endgame')) t.add('#chessendgame');
   if (clip.isPuzzle) { t.add('#chesspuzzle'); t.add('#puzzle'); }
   if (clip.isReview) { t.add('#gamereview'); t.add('#chessanalysis'); }
+  if (clip.isLesson) { t.add('#chessforkids'); t.add('#learnchess'); t.add('#chessforbeginners'); }
+  if (clip.isScout) { t.add('#chessprep'); t.add('#chessopponent'); }
+  if (clip.isScan) { t.add('#chessapp'); t.add('#chesstips'); }
+  if (clip.isPromo) { t.add('#chessapp'); t.add(clip.promo?.template === 'versus' ? '#chesscom' : '#playchess'); t.add('#chessfriends'); }
   const op = (clip.opening ?? '').split(/[:,]/)[0].replace(/[^A-Za-z ]/g, '').trim();
   if (op) t.add('#' + op.replace(/\s+/g, '').toLowerCase());
   t.add('#chessgame');
@@ -356,8 +435,8 @@ function Confetti({ fire }: { fire: number }) {
   return <canvas ref={ref} className="pointer-events-none absolute inset-0 z-30 h-full w-full" />;
 }
 
-const srcKey = (x: StudioSource) => (x.kind === 'trap' ? `t${x.trap.id}` : x.kind === 'puzzle' ? `p${x.puzzle.id}` : x.kind === 'review' ? `r${x.review.id}` : `g${x.moment.gameId}-${x.moment.moveIndex}`);
-const srcLabel = (x: StudioSource) => (x.kind === 'trap' ? x.trap.name : x.kind === 'puzzle' ? `Puzzle · ${x.puzzle.rating}${x.puzzle.themes?.match(/mateIn\d/) ? ` · ${themeLabel(x.puzzle.themes.match(/mateIn\d/)![0])}` : ''}`
+const srcKey = (x: StudioSource): string => (x.kind === 'promo' ? `promo-${x.promo.template}-${x.promo.hook}` : x.kind === 'scout' ? `s${x.scout.id}` : x.kind === 'lesson' ? `l${x.lesson.id}` : x.kind === 'scan' ? `x${x.fen}` : x.kind === 'trap' ? `t${x.trap.id}` : x.kind === 'puzzle' ? `p${x.puzzle.id}` : x.kind === 'review' ? `r${x.review.id}` : `g${x.moment.gameId}-${x.moment.moveIndex}`);
+const srcLabel = (x: StudioSource): string => (x.kind === 'promo' ? (x.promo.template === 'versus' ? `Promo · vs ${x.promo.rival}` : 'Promo · challenge friends') : x.kind === 'scout' ? `Scout · ${x.scout.username}` : x.kind === 'lesson' ? `Lesson · ${x.lesson.title}` : x.kind === 'scan' ? (x.label ? `Scan · ${x.label}` : 'Scanned position') : x.kind === 'trap' ? x.trap.name : x.kind === 'puzzle' ? `Puzzle · ${x.puzzle.rating}${x.puzzle.themes?.match(/mateIn\d/) ? ` · ${themeLabel(x.puzzle.themes.match(/mateIn\d/)![0])}` : ''}`
   : x.kind === 'review' ? `Review · ${x.review.white ?? 'White'} vs ${x.review.black ?? 'Black'}` : `${x.moment.san} · ${x.moment.opening ?? `game ${x.moment.gameId}`}`);
 type ClipLook = BoardLook | 'remix' | 'mine';
 
@@ -401,6 +480,23 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
     if (nx?.kind === 'game') void getGame(nx.moment.gameId).catch(() => {});
     if (nx?.kind === 'review') void getGame(nx.review.id).catch(() => {});
     if (current.kind === 'trap') { setClip(trapClip(current.trap)); setClipQ(slot); setLoadedKey(key); return; }
+    if (current.kind === 'promo') { setClip(promoClip(current.promo)); setClipQ(slot); setLoadedKey(key); return; }
+    if (current.kind === 'lesson') { setClip(lessonClip(current.lesson)); setClipQ(slot); setLoadedKey(key); return; }
+    if (current.kind === 'scout') {
+      const sc = current.scout;
+      apiFetch(`/api/admin/studio/scout/${encodeURIComponent(sc.id)}`, { credentials: 'include' }).then((r) => (r.ok ? r.json() : Promise.reject(new Error('Scout not found'))))
+        .then((full: StudioScout) => { setClip(scoutClip({ ...sc, result: { ...sc.result, ...full.result } })); setClipQ(slot); setLoadedKey(key); })
+        .catch(() => { setClip(scoutClip(sc)); setClipQ(slot); setLoadedKey(key); });
+      return;
+    }
+    if (current.kind === 'scan') {
+      const sc = current;
+      apiFetch('/api/admin/studio/best-line', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fen: sc.fen }) })
+        .then(async (r) => { const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.error || "The engine couldn't look at this position."); return d as { bestLineSan: string[] }; })
+        .then((d) => { if (!d.bestLineSan?.length) throw new Error('No legal moves in this position.'); setClip(scanClip(sc.fen, d.bestLineSan, sc.photo)); setClipQ(slot); setLoadedKey(key); })
+        .catch((e) => setErr(String(e?.message ?? e)));
+      return;
+    }
     if (current.kind === 'puzzle') {
       try { setClip(puzzleClip(current.puzzle)); setClipQ(slot); setLoadedKey(key); } catch { setErr("This puzzle doesn't load."); }
       return;
@@ -458,7 +554,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
   // Countdowns and text cards inserted on the timeline, keyed by the frame they come before.
   const [inserts, setInserts] = useState<Record<string, Insert>>({});
   const frames = useMemo<Frame[]>(() => {
-    if (!clip || !clip.plies.length) return [];
+    if (!clip || (!clip.plies.length && !clip.isLesson && !clip.isScout)) return [];
     const { plies, key } = clip;
     const withInserts = (base: Frame[]): Frame[] => {
       if (!Object.keys(inserts).length) return base;
@@ -481,10 +577,64 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
     const keyPly = key + 1;
     // Traps play their whole line by default (trapBefore 99); puzzles always play the setup move and the full solution.
     const startPly = Math.max(0, keyPly - 1 - (clip.isTrap ? prefs.trapBefore : prefs.before));
-    const endPly = clip.isPuzzle || clip.isTrap ? plies.length : Math.min(plies.length, keyPly + prefs.after);
-    const fenAt = (p: number) => (p <= 0 ? plies[0].fenBefore : plies[p - 1].fen);
+    const endPly = clip.isPuzzle || clip.isTrap || clip.isScan ? plies.length : Math.min(plies.length, keyPly + prefs.after);
+    const fenAt = (p: number) => (!plies.length ? START_FEN : p <= 0 ? plies[0].fenBefore : plies[p - 1].fen);
     const lastAt = (p: number) => (p <= 0 ? null : { from: plies[p - 1].from, to: plies[p - 1].to });
     const out: Frame[] = [];
+    if (clip.isPromo && clip.promo) {
+      const pr = clip.promo;
+      if (isComp && isFirst) out.push({ kind: 'title', fen: fenAt(0) });
+      if (prefs.intro) out.push({ kind: 'intro', fen: fenAt(0) });
+      out.push({ kind: 'hold', fen: fenAt(0), last: null });
+      // Moves play between the cards; the game finishes with mate before the end card.
+      const cards: Frame[] = pr.template === 'versus'
+        ? [...pr.rows.map((_, k) => ({ kind: 'promoCard' as const, fen: '', last: null, card: 'vs' as const, upTo: k + 1 })), { kind: 'promoCard', fen: '', last: null, card: 'switch' }]
+        : [{ kind: 'promoCard', fen: '', last: null, card: 'live' }, { kind: 'promoCard', fen: '', last: null, card: 'daily' }, { kind: 'promoCard', fen: '', last: null, card: 'link' }];
+      const per = Math.max(1, Math.floor(plies.length / (cards.length + 1)));
+      let p = 0;
+      for (const c of cards) {
+        for (let k = 0; k < per && p < plies.length; k++) out.push({ kind: 'move', ply: ++p });
+        out.push({ ...(c as Extract<Frame, { kind: 'promoCard' }>), fen: fenAt(p), last: lastAt(p) });
+      }
+      while (p < plies.length) out.push({ kind: 'move', ply: ++p });
+      if (prefs.outro && isLast) out.push({ kind: 'outro', fen: fenAt(plies.length) });
+      return withInserts(out);
+    }
+    if (clip.isScout) {
+      if (isComp && isFirst) out.push({ kind: 'title', fen: fenAt(0) });
+      if (prefs.intro) out.push({ kind: 'intro', fen: fenAt(0) });
+      out.push({ kind: 'hold', fen: fenAt(0), last: null });
+      const a = Math.min(plies.length, 6), b = Math.min(plies.length, 12);
+      for (let p = 1; p <= a; p++) out.push({ kind: 'move', ply: p });
+      out.push({ kind: 'scoutCard', fen: fenAt(a), last: lastAt(a), card: 'profile' });
+      for (let p = a + 1; p <= b; p++) out.push({ kind: 'move', ply: p });
+      if (clip.scout?.topOpenings?.length) out.push({ kind: 'scoutCard', fen: fenAt(b), last: lastAt(b), card: 'openings' });
+      if (clip.scout?.weaknesses?.length) out.push({ kind: 'scoutCard', fen: fenAt(b), last: lastAt(b), card: 'weak' });
+      if (prefs.outro && isLast) out.push({ kind: 'outro', fen: fenAt(b) });
+      return withInserts(out);
+    }
+    if (clip.isLesson && clip.lesson) {
+      // Lesson boards can be kingless demos (a lone knight), so only the board layout is checked.
+      const legal = (f?: string) => (f && f.trim().split(/\s+/)[0].split('/').length === 8 ? f.trim() : null);
+      let at = legal(clip.lesson.steps.find((st) => st.fen)?.fen) ?? START_FEN;
+      if (isComp && isFirst) out.push({ kind: 'title', fen: at });
+      if (prefs.intro) out.push({ kind: 'intro', fen: at });
+      for (const st of clip.lesson.steps) {
+        const f = legal(st.fen);
+        if (f) at = f;
+        if (st.type === 'board' && f) out.push({ kind: 'lessonBoard', fen: f, text: st.text, highlights: st.highlightSquares ?? [], last: null });
+        else if (st.type === 'practice' && f && st.expectedMoveSan) {
+          out.push({ kind: 'lessonBoard', fen: f, text: st.text, highlights: st.highlightSquares ?? [], last: null });
+          for (let n = 3; n >= 1; n--) out.push({ kind: 'countdown', n, fen: f, last: null, total: 3, text: 'Your turn!', anchor: 'lesson' });
+          try {
+            const c = new Chess(f, { skipValidation: true }); const mv = c.move(st.expectedMoveSan);
+            if (mv) { at = c.fen(); out.push({ kind: 'lessonBoard', fen: at, text: `✓ ${mv.san}! Great job!`, highlights: [], last: { from: mv.from, to: mv.to }, celebrate: true }); }
+          } catch { /* skip a move that doesn't play */ }
+        } else out.push({ kind: 'lessonText', fen: at, text: st.text });
+      }
+      if (prefs.outro && isLast) out.push({ kind: 'outro', fen: at });
+      return withInserts(out);
+    }
     if (clip.isReview) {
       if (isComp && isFirst) out.push({ kind: 'title', fen: fenAt(0) });
       if (prefs.intro) out.push({ kind: 'intro', fen: fenAt(0) });
@@ -504,7 +654,8 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
     }
     if (isComp && isFirst) out.push({ kind: 'title', fen: fenAt(startPly) });
     if (prefs.intro) out.push({ kind: 'intro', fen: fenAt(startPly) });
-    if (prefs.intro || (isComp && isFirst)) out.push({ kind: 'hold', fen: fenAt(startPly), last: lastAt(startPly) });
+    if (clip.isScan && clip.photo) out.push({ kind: 'scanPhoto', fen: fenAt(startPly) });
+    if (prefs.intro || (isComp && isFirst) || (clip.isScan && clip.photo)) out.push({ kind: 'hold', fen: fenAt(startPly), last: lastAt(startPly) });
     else out.push({ kind: 'move', ply: startPly });
     for (let p = startPly + 1; p < keyPly; p++) out.push({ kind: 'move', ply: p });
     if (prefs.guess) for (let n = prefs.countdownSecs; n >= 1; n--) out.push({ kind: 'countdown', n, fen: fenAt(keyPly - 1), last: lastAt(keyPly - 1), total: prefs.countdownSecs });
@@ -581,8 +732,14 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
       case 'split': return 3200;
       case 'title': return 2200;
       case 'summary': return 4200;
+      case 'scoutCard': return f.card === 'profile' ? 3800 : f.card === 'openings' ? 4800 : 5600;
+      case 'lessonText': return Math.max(2600, f.text.split(/\s+/).length * 340);
+      case 'lessonBoard': return f.celebrate ? 2400 : Math.max(3000, f.text.split(/\s+/).length * 340);
+      case 'scanPhoto': return 3200;
+      case 'promoCard': return f.card === 'vs' ? 1500 : 3600;
       case 'outro': return 2800;
       default: {
+        if (clip?.isPromo) return clip.plies[f.ply - 1]?.san.includes('#') ? 2400 : Math.max(300, s * 0.5);
         if (clip?.isReview) {
           const m = clip.plies[f.ply - 1];
           return m && (m.san.includes('#') || NOTABLE.has(m.review?.classification ?? '')) ? Math.max(s, 2200) : Math.max(220, s * 0.55);
@@ -618,14 +775,15 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
   const keyPly = (clip?.key ?? 0) + 1;
   // What the board shows for this frame.
   const view = useMemo(() => {
-    if (!frame || !plies.length) return null;
+    if (!frame) return null;
     if (frame.kind === 'move') {
+      if (!plies.length) return null;
       const p = frame.ply; const m = p > 0 ? plies[p - 1] : null;
       return { fen: m ? m.fen : plies[0].fenBefore, last: m ? { from: m.from, to: m.to } : null, ply: p, move: m };
     }
     if (frame.kind === 'split') return { fen: frame.played.fen, last: frame.played.last, ply: -3, move: null as Ply | null };
     const fen = frame.fen;
-    const last = frame.kind === 'countdown' || frame.kind === 'better' || frame.kind === 'hold' ? frame.last : null;
+    const last = frame.kind === 'countdown' || frame.kind === 'better' || frame.kind === 'hold' || frame.kind === 'scoutCard' || frame.kind === 'lessonBoard' || frame.kind === 'promoCard' ? frame.last : null;
     const ply = frame.kind === 'countdown' && !frame.anchor ? keyPly - 1 : frame.kind === 'intro' ? -1 : -2;
     return { fen, last, ply, move: null as Ply | null };
   }, [frame, plies, keyPly]);
@@ -655,13 +813,18 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
       }
     }
     if (frame.kind === 'better' && frame.last && prefs.sound) playMoveSound('move');
+    if (frame.kind === 'lessonBoard' && frame.last && prefs.sound) playMoveSound('move');
+    if (frame.kind === 'lessonBoard' && frame.celebrate && prefs.effects) setConfetti(Date.now());
     if (frame.kind === 'countdown' && prefs.sound && frame.n === Math.min(3, frame.total ?? 3)) playMoveSound('check');
     // Sound design on top of the music.
     if (prefs.musicFx && playing) {
       const m = mus();
       if (frame.kind === 'countdown' && frame.n === Math.min(3, frame.total ?? 3)) m.accent('riser');
       if (frame.kind === 'countdown') m.accent('tick');
-      if (frame.kind === 'title' || frame.kind === 'outro' || frame.kind === 'split' || frame.kind === 'intro' || frame.kind === 'card') m.accent('whoosh');
+      if (frame.kind === 'title' || frame.kind === 'outro' || frame.kind === 'split' || frame.kind === 'intro' || frame.kind === 'card' || frame.kind === 'scoutCard' || frame.kind === 'lessonText') m.accent('whoosh');
+      if (frame.kind === 'lessonBoard' && frame.celebrate) m.accent('chime');
+      if (frame.kind === 'scanPhoto') m.accent('riser');
+      if (frame.kind === 'promoCard') m.accent(frame.card === 'vs' ? 'tick' : 'whoosh');
       if (isKey && cur) {
         m.accent('impact');
         if (cls === 'brilliant' || cls === 'great' || cls === 'checkmate') m.accent('chime');
@@ -727,6 +890,23 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
       case 'split': return `${spokenSan(f.playedSan)} was played. ${spokenSan(f.betterSan)} was better.`;
       case 'better': return f.arrow ? `Better was ${spokenSan(f.text.replace(/^Better was /, ''))}.` : null;
       case 'reveal': return clip.ratings.w && clip.ratings.b ? `They were rated ${clip.ratings.w} and ${clip.ratings.b}.` : null;
+      case 'scoutCard': {
+        const d = clip.scout; if (!d) return null;
+        const name = d.profile?.name || d.username;
+        if (f.card === 'profile') return `${name}. ${d.wins} wins, ${d.losses} losses and ${d.draws} draws in their last ${d.gamesAnalyzed} games.`;
+        if (f.card === 'openings') { const o = d.topOpenings?.[0]; return o ? `Their favourite opening is the ${o.opening}, and they win ${o.winRate} percent of the time.` : null; }
+        const w = d.weaknesses?.[0]; return w ? `Their biggest weakness: ${w.category}. ${w.description.split(/(?<=[.!?])\s/)[0]}` : null;
+      }
+      case 'lessonText': case 'lessonBoard': return stripEmoji(f.text.replace(/^✓\s*/, '')).slice(0, 400);
+      case 'scanPhoto': return 'Snap a photo of any chess board.';
+      case 'promoCard': {
+        const pr = clip.promo; if (!pr) return null;
+        if (f.card === 'vs') { const r = pr.rows[(f.upTo ?? 1) - 1]; return r ? `${r.label}. ChessScout: ${r.us}. ${pr.rival}: ${r.them}.` : null; }
+        if (f.card === 'switch') return stripEmoji(pr.closer);
+        if (f.card === 'live') return 'Play live games: five, ten or fifteen minutes.';
+        if (f.card === 'daily') return 'Or daily games: one move a day, from your phone.';
+        return `Send a friend a challenge link. ${stripEmoji(pr.closer)}`;
+      }
       case 'summary': {
         const a = clip.accuracy;
         const acc = a?.w != null && a?.b != null ? `White played with ${Math.round(a.w)} percent accuracy, Black with ${Math.round(a.b)}.` : 'Here is how both sides did.';
@@ -899,6 +1079,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
     { label: 'Quiz A/B/C', v: { guess: true, choices: true, countdownSecs: 5, betterLine: false, split: false, intro: true, before: 4, after: 2 } },
     { label: 'Meme edit', v: { zoom: true, effects: true, music: 'hype' as MusicStyle, guess: false, captions: false, intro: false, before: 4, after: 2, speed: 0.8 } },
     { label: '10-second challenge', v: { guess: true, countdownSecs: 10, choices: false, intro: true, before: 3, after: 3 } },
+    { label: 'Kids', v: { bg: 'kids', music: 'playful' as MusicStyle, voice: true, voiceName: 'nova', subs: true, captions: true, pieceFx: true, effects: true, speed: 1.4, intro: true, outroLine: 'Learn chess free at chessscout.net' } },
     { label: 'Guess the rating', v: { before: 10, after: 6, speed: 0.9, guess: false, guessRating: true, captions: false } },
   ];
   const applyPreset = (v: Partial<Prefs>) => setPrefs((p) => { const n = { ...p, ...v }; try { localStorage.setItem(PREF_KEY, JSON.stringify(n)); } catch { /* ignore */ } return n; });
@@ -907,14 +1088,14 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
     const kp = clip.plies[clip.key];
     const c = kp ? (kp.san.includes('#') ? 'checkmate' : kp.review?.classification) : null;
     // The position before the key move (the puzzle), unless it's a trap lesson's final position.
-    const fen = kp ? kp.fenBefore : clip.plies[0]?.fenBefore;
+    const fen = kp ? kp.fenBefore : clip.plies[0]?.fenBefore ?? view?.fen ?? START_FEN;
     const colors = look ? (BOARD_THEMES[look.boardTheme] ?? { light: '#EEEED2', dark: '#769656' }) : { light: '#EEEED2', dark: '#769656' };
     const url = drawCover({ fen, flipped, hook: stripEmoji(hook) || hook, sub, bg: prefs.bg, badge: prefs.guess ? { glyph: '?', text: 'Find it', color: '#81B64C' } : c && LABEL[c] ? LABEL[c] : null, colors });
     const a = document.createElement('a'); a.href = url; a.download = `${clip.fileBase}-cover.png`; a.click();
   };
 
   // ── Post kit ────────────────────────────────────────────────────────────
-  const postText = clip ? `${isComp ? stripEmoji(compTitle) : hook}\n\n${clip.isTrap ? 'Would you fall for it? 👇' : clip.isPuzzle ? 'Did you solve it? Drop the first move in the comments 👇' : clip.isReview ? 'Which move would you have played differently? 👇' : 'Would you have found it? Comment your move 👇'}\nReview your own games free at chessscout.net\n\n${hashtagsFor(clip)}` : '';
+  const postText = clip ? `${isComp ? stripEmoji(compTitle) : hook}\n\n${clip.isTrap ? 'Would you fall for it? 👇' : clip.isPuzzle ? 'Did you solve it? Drop the first move in the comments 👇' : clip.isReview ? 'Which move would you have played differently? 👇' : clip.isLesson ? 'Learning chess? Save this one and share it with a friend 👇' : clip.isScout ? 'Who should I scout next? Drop a username 👇' : clip.isScan ? 'Want me to scan your board? Drop a photo in the comments 👇' : clip.isPromo ? (clip.promo?.template === 'versus' ? 'Would you switch? 👇' : 'Tag the friend you want to beat 👇') : 'Would you have found it? Comment your move 👇'}\nReview your own games free at chessscout.net\n\n${hashtagsFor(clip)}` : '';
   const [copied, setCopied] = useState(false);
   const copyPost = () => { navigator.clipboard?.writeText(postText).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); }).catch(() => {}); };
 
@@ -931,6 +1112,15 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
     return `${who}${rating}`;
   };
   const top = flipped ? 'w' : 'b';
+  // Challenge promo: 10-minute clocks that tick down with each move (the side to move is lit).
+  const clockChip = (side: 'w' | 'b') => {
+    if (!clip.isPromo || clip.promo?.template !== 'challenge') return null;
+    const shown = frame?.kind === 'move' ? frame.ply : frame?.kind === 'promoCard' ? plies.findIndex((m) => m.fen === frame.fen) + 1 : 0;
+    let left = 600;
+    for (let p = 0; p < shown; p++) if (plies[p]?.color === side) left -= 3 + ((p * 7 + 3) % 11);
+    const toMove = (shown % 2 === 0 ? 'w' : 'b') === side;
+    return <span className="rounded-[0.4em] px-[0.5em] py-[0.1em] font-black tabular-nums" style={{ fontSize: 'clamp(12px,1.9cqh,20px)', background: toMove ? '#F2F2F2' : 'rgba(0,0,0,.55)', color: toMove ? '#141414' : '#fff' }}>{Math.floor(left / 60)}:{String(left % 60).padStart(2, '0')}</span>;
+  };
   const moveNo = cur ? `${Number(cur.fenBefore.split(' ')[5]) || Math.floor((view.ply - 1) / 2) + 1}${cur.color === 'w' ? '.' : '...'}` : '';
   const label = cls ? LABEL[cls] : null;
   // Arrows: the better move on a mistake (key frame), the engine line's first move, nothing otherwise.
@@ -978,7 +1168,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
             {prefs.progress && <div className="absolute inset-x-0 top-0 z-20 h-[0.6cqh] bg-white/15"><div className="h-full bg-[#81B64C] transition-all duration-300" style={{ width: `${progress * 100}%` }} /></div>}
             {/* Hook: pops in big on the intro, then sits at the top */}
             <motion.div key={frame?.kind === 'intro' ? 'intro' : 'top'} initial={frame?.kind === 'intro' ? { scale: 0.6, opacity: 0, y: '18cqh' } : false}
-              animate={{ scale: 1, opacity: pop || frame?.kind === 'countdown' || frame?.kind === 'card' ? 0 : 1, y: frame?.kind === 'intro' ? '18cqh' : 0 }} transition={{ type: 'spring', stiffness: 260, damping: 18 }}
+              animate={{ scale: 1, opacity: pop || frame?.kind === 'countdown' || frame?.kind === 'card' || frame?.kind === 'scanPhoto' ? 0 : 1, y: frame?.kind === 'intro' ? '18cqh' : 0 }} transition={{ type: 'spring', stiffness: 260, damping: 18 }}
               className="absolute inset-x-0 top-[6.5%] z-10 px-[6%] text-center">
               {isComp && frame?.kind === 'intro' && (
                 <motion.div key={`rank${clipQ}`} initial={{ scale: 3, opacity: 0, rotate: -20 }} animate={{ scale: 1, opacity: 1, rotate: 0 }} transition={{ type: 'spring', stiffness: 300, damping: 15, delay: 0.15 }}
@@ -990,10 +1180,10 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
               {sub && <p className="mt-1.5 line-clamp-2 text-[clamp(11px,1.8cqh,18px)] font-bold text-white/70">{sub}</p>}
             </motion.div>
             {/* Board block */}
-            <div className="absolute inset-x-[4%] top-[22%]" style={{ opacity: frame?.kind === 'intro' ? 0.35 : 1, transition: 'opacity .4s' }}>
-              <p className="mb-1 truncate text-[clamp(11px,1.6cqh,16px)] font-bold text-white/85">{name(top)}</p>
+            <div className="absolute inset-x-[4%] top-[22%]" style={{ opacity: frame?.kind === 'intro' ? 0.35 : frame?.kind === 'lessonText' ? 0.4 : 1, transition: 'opacity .4s' }}>
+              <div className="mb-1 flex items-center justify-between gap-2"><p className="truncate text-[clamp(11px,1.6cqh,16px)] font-bold text-white/85">{name(top)}</p>{clockChip(top)}</div>
               <div className={prefs.zoom ? 'overflow-hidden rounded-[10px]' : undefined}>
-              <motion.div style={zoomOrigin && frame?.kind !== 'split' ? { transformOrigin: zoomOrigin } : undefined}
+              <motion.div className="relative" style={zoomOrigin && frame?.kind !== 'split' ? { transformOrigin: zoomOrigin } : undefined}
                 animate={zoomOrigin && isKey ? { scale: [1, 1.75, 1.75, 1] } : prefs.effects && isKey ? { scale: [1, 1.045, 1] } : { scale: 1 }}
                 transition={zoomOrigin && isKey ? { duration: Math.max(1.2, (frame ? dur(frame) : 2000) / 1000), times: [0, 0.22, 0.8, 1], ease: 'easeInOut' } : { duration: 0.6 }}>
                 <LookOverride look={look}>
@@ -1014,10 +1204,20 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
                       moveFx={prefs.pieceFx ? Math.round(Math.max(260, Math.min(560, prefs.speed * 450))) : undefined} />
                   )}
                 </LookOverride>
+                {frame?.kind === 'lessonBoard' && frame.highlights.length > 0 && (
+                  <div className="pointer-events-none absolute inset-x-0 top-0 aspect-square">
+                    {frame.highlights.map((sq) => {
+                      const f = sq.charCodeAt(0) - 97, r = Number(sq[1]); if (f < 0 || f > 7 || !(r >= 1 && r <= 8)) return null;
+                      const col = flipped ? 7 - f : f, row = flipped ? r - 1 : 8 - r;
+                      return <motion.div key={sq} initial={{ opacity: 0, scale: 0.6 }} animate={{ opacity: [0.55, 1, 0.55], scale: 1 }} transition={{ opacity: { duration: 1.4, repeat: Infinity }, scale: { duration: 0.3 } }}
+                        className="absolute rounded-[12%]" style={{ left: `${col * 12.5}%`, top: `${row * 12.5}%`, width: '12.5%', height: '12.5%', background: 'rgba(255,214,10,.42)', boxShadow: 'inset 0 0 0 3px rgba(255,214,10,.95)' }} />;
+                    })}
+                  </div>
+                )}
               </motion.div>
               </div>
               <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-[#2B2B2B]"><div className="h-full rounded-full bg-[#F2F2F2] transition-all duration-500" style={{ width: `${evPct}%` }} /></div>
-              <p className="mt-1 truncate text-[clamp(11px,1.6cqh,16px)] font-bold text-white/85">{name(top === 'w' ? 'b' : 'w')}</p>
+              <div className="mt-1 flex items-center justify-between gap-2"><p className="truncate text-[clamp(11px,1.6cqh,16px)] font-bold text-white/85">{name(top === 'w' ? 'b' : 'w')}</p>{clockChip(top === 'w' ? 'b' : 'w')}</div>
             </div>
             {/* Move + caption */}
             {(showBottomMove || caption) && !subWords && !(choices && isKey) && frame?.kind !== 'outro' && frame?.kind !== 'reveal' && (
@@ -1077,6 +1277,168 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
                 })}
               </div>
             )}
+            {/* Promo cards */}
+            <AnimatePresence>
+              {frame?.kind === 'promoCard' && clip.promo && (() => {
+                const pr = clip.promo;
+                const box = 'absolute inset-x-[5%] top-[23%] z-30 rounded-[3cqh] bg-[#0B1112]/93 p-[2.4cqh] text-white shadow-2xl ring-2 ring-white/70';
+                if (frame.card === 'vs') return (
+                  <motion.div key="vs" initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className={box} style={{ fontSize: 'clamp(11px,1.9cqh,20px)' }}>
+                    <div className="mb-[1.2cqh] grid grid-cols-[1.25fr_1fr_1fr] items-end gap-[1cqh] text-center font-black">
+                      <span />
+                      <span className="rounded-[0.5em] bg-[#81B64C] px-[0.3em] py-[0.25em]">ChessScout</span>
+                      <span className="rounded-[0.5em] bg-white/15 px-[0.3em] py-[0.25em] text-white/80">{pr.rival}</span>
+                    </div>
+                    <div className="space-y-[0.9cqh]">
+                      {pr.rows.slice(0, frame.upTo ?? 1).map((r, k) => (
+                        <motion.div key={k} initial={k === (frame.upTo ?? 1) - 1 ? { opacity: 0, x: -18, scale: 0.96 } : false} animate={{ opacity: 1, x: 0, scale: 1 }} transition={{ type: 'spring', stiffness: 320, damping: 20 }}
+                          className="grid grid-cols-[1.25fr_1fr_1fr] items-center gap-[1cqh] rounded-[0.5em] bg-white/[.06] px-[0.5em] py-[0.45em]">
+                          <span className="font-black leading-tight">{r.label}</span>
+                          <span className="text-center font-black leading-tight text-[#B8E08C]">{r.us}</span>
+                          <span className="text-center font-bold leading-tight text-white/60">{r.them}</span>
+                        </motion.div>
+                      ))}
+                    </div>
+                  </motion.div>
+                );
+                if (frame.card === 'switch') return (
+                  <motion.div key="sw" initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} transition={{ type: 'spring', stiffness: 260, damping: 16 }} className={`${box} text-center`} style={{ fontSize: 'clamp(13px,2.4cqh,26px)' }}>
+                    <p className="font-black leading-tight" style={{ fontSize: '1.35em' }}>{pr.closer}</p>
+                    <p className="mt-[1.2cqh] font-bold text-white/75">Import your {pr.rival} games in one tap. Your history comes with you.</p>
+                  </motion.div>
+                );
+                if (frame.card === 'live') return (
+                  <motion.div key="live" initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className={`${box} text-center`} style={{ fontSize: 'clamp(13px,2.3cqh,24px)' }}>
+                    <p className="font-black" style={{ fontSize: '1.4em' }}>⚡ Play live</p>
+                    <div className="mt-[1.4cqh] grid grid-cols-2 gap-[1cqh]">
+                      {[['5 min', 'Blitz'], ['5 | 3', 'Blitz'], ['10 min', 'Rapid'], ['15 min', 'Rapid']].map(([t, k], n) => (
+                        <motion.div key={t} initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ delay: 0.2 + n * 0.1, type: 'spring', stiffness: 380, damping: 16 }} className="rounded-[0.6em] bg-[#81B64C] py-[0.5em] font-black">
+                          {t}<span className="block text-[0.7em] font-bold text-white/80">{k}</span>
+                        </motion.div>
+                      ))}
+                    </div>
+                  </motion.div>
+                );
+                if (frame.card === 'daily') return (
+                  <motion.div key="daily" initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className={`${box} text-center`} style={{ fontSize: 'clamp(13px,2.3cqh,24px)' }}>
+                    <p className="font-black" style={{ fontSize: '1.4em' }}>📅 Daily games</p>
+                    <p className="mt-[0.6cqh] font-bold text-white/75">One move a day, from your phone</p>
+                    <div className="mt-[1.4cqh] flex justify-center gap-[1cqh]">
+                      {['1 day', '3 days', '7 days'].map((t, n) => (
+                        <motion.span key={t} initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ delay: 0.2 + n * 0.12, type: 'spring', stiffness: 380, damping: 16 }} className="rounded-[0.6em] bg-[#4A8BD6] px-[0.8em] py-[0.45em] font-black">{t}</motion.span>
+                      ))}
+                    </div>
+                    <p className="mt-[0.8cqh] text-[0.8em] font-bold text-white/55">per move</p>
+                  </motion.div>
+                );
+                return (
+                  <motion.div key="link" initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} transition={{ type: 'spring', stiffness: 260, damping: 16 }} className={`${box} text-center`} style={{ fontSize: 'clamp(13px,2.3cqh,24px)' }}>
+                    <p className="font-black" style={{ fontSize: '1.4em' }}>🤝 Challenge a friend</p>
+                    <div className="mx-auto mt-[1.4cqh] rounded-[0.8em] bg-white px-[0.8em] py-[0.6em] text-left text-[#141414] shadow-xl">
+                      <p className="text-[0.75em] font-bold text-[#6B6B6B]">You've been challenged ♟️</p>
+                      <p className="font-black">10 min · Rapid</p>
+                      <p className="mt-[0.4em] truncate rounded-[0.4em] bg-[#F1F4EF] px-[0.5em] py-[0.25em] text-[0.8em] font-bold text-[#3E6420]">chessscout.net/challenge/…</p>
+                      <motion.p animate={{ scale: [1, 1.05, 1] }} transition={{ duration: 1, repeat: Infinity }} className="mt-[0.5em] rounded-[0.5em] bg-[#81B64C] py-[0.35em] text-center font-black text-white">Accept</motion.p>
+                    </div>
+                    <p className="mt-[1.2cqh] font-bold text-white/80">{pr.closer}</p>
+                  </motion.div>
+                );
+              })()}
+            </AnimatePresence>
+            {/* Opponent Scout report cards */}
+            <AnimatePresence>
+              {frame?.kind === 'scoutCard' && clip.scout && (() => {
+                const d = clip.scout; const name = d.profile?.name || d.username;
+                const total = Math.max(1, d.wins + d.losses + d.draws);
+                const SEVC: Record<string, string> = { Critical: '#F0605D', High: '#F0605D', Medium: '#E8B447', Low: '#81B64C' };
+                return (
+                  <motion.div key={frame.card} initial={{ opacity: 0, y: 30, scale: 0.92 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -20 }} transition={{ type: 'spring', stiffness: 260, damping: 20 }}
+                    className="absolute inset-x-[5%] top-[23%] z-30 rounded-[3cqh] bg-[#0B1112]/93 p-[2.4cqh] text-white shadow-2xl ring-2 ring-white/70" style={{ fontSize: 'clamp(11px,1.9cqh,20px)' }}>
+                    <p className="mb-[1.2cqh] text-center font-black uppercase tracking-wide text-[#B8E08C]" style={{ fontSize: '0.95em' }}>🔍 Opponent scout</p>
+                    {frame.card === 'profile' && (
+                      <div className="text-center">
+                        {d.profile?.avatar && <img src={d.profile.avatar} alt="" className="mx-auto mb-[1cqh] rounded-full ring-2 ring-white" style={{ width: '9cqh', height: '9cqh', objectFit: 'cover' }} />}
+                        <p className="font-black" style={{ fontSize: '1.8em' }}>{d.profile?.title && <span className="mr-[0.3em] rounded bg-[#CA3431] px-[0.25em] text-[0.7em]">{d.profile.title}</span>}{name}</p>
+                        {d.profile?.ratings && (
+                          <div className="mt-[1cqh] flex justify-center gap-[1.5cqh] tabular-nums">
+                            {(['bullet', 'blitz', 'rapid'] as const).filter((k) => d.profile?.ratings?.[k]).map((k) => (
+                              <div key={k} className="rounded-[0.5em] bg-white/10 px-[0.6em] py-[0.2em]"><p className="text-[0.7em] uppercase text-white/60">{k}</p><p className="font-black" style={{ fontSize: '1.3em' }}>{d.profile!.ratings![k]}</p></div>
+                            ))}
+                          </div>
+                        )}
+                        <p className="mt-[1.4cqh] font-bold text-white/70">Last {d.gamesAnalyzed} games</p>
+                        <div className="mx-auto mt-[0.6cqh] flex h-[2.4cqh] w-full overflow-hidden rounded-full font-black" style={{ fontSize: '0.8em' }}>
+                          {[['W', d.wins, '#5FA83A'], ['D', d.draws, '#7A8580'], ['L', d.losses, '#CA3431']].map(([t, n, c]) => (n as number) > 0 && (
+                            <motion.div key={t as string} initial={{ width: 0 }} animate={{ width: `${((n as number) / total) * 100}%` }} transition={{ duration: 0.8, delay: 0.3 }} className="grid place-items-center overflow-hidden" style={{ background: c as string }}>{t}{n}</motion.div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {frame.card === 'openings' && (
+                      <div className="space-y-[1cqh]">
+                        <p className="text-center font-black" style={{ fontSize: '1.25em' }}>What {name} plays</p>
+                        {(d.topOpenings ?? []).slice(0, 4).map((o, k) => (
+                          <motion.div key={o.opening} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.25 + k * 0.15 }}>
+                            <div className="flex items-baseline justify-between gap-2 font-bold"><span className="truncate">{k + 1}. {o.opening}</span><span className="shrink-0 tabular-nums text-white/60">{o.games} games</span></div>
+                            <div className="mt-[0.3em] h-[1.4cqh] overflow-hidden rounded-full bg-white/10"><motion.div initial={{ width: 0 }} animate={{ width: `${o.winRate}%` }} transition={{ duration: 0.7, delay: 0.4 + k * 0.15 }} className="h-full rounded-full" style={{ background: o.winRate >= 55 ? '#5FA83A' : o.winRate >= 45 ? '#E8B447' : '#CA3431' }} /></div>
+                            <p className="mt-[0.15em] text-right text-[0.8em] font-black tabular-nums text-white/75">wins {o.winRate}%</p>
+                          </motion.div>
+                        ))}
+                      </div>
+                    )}
+                    {frame.card === 'weak' && (
+                      <div className="space-y-[1cqh]">
+                        <p className="text-center font-black" style={{ fontSize: '1.25em' }}>How to beat {name}</p>
+                        {(d.weaknesses ?? []).slice(0, 3).map((w, k) => (
+                          <motion.div key={k} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 + k * 0.2 }} className="rounded-[0.6em] bg-white/[.07] p-[0.6em]">
+                            <p className="flex items-center gap-[0.4em] font-black"><span className="rounded px-[0.35em] text-[0.7em] uppercase" style={{ background: SEVC[w.severity] ?? '#7A8580' }}>{w.severity}</span>{w.category}</p>
+                            <p className="mt-[0.2em] line-clamp-2 text-[0.85em] text-white/80">{w.description}</p>
+                          </motion.div>
+                        ))}
+                      </div>
+                    )}
+                  </motion.div>
+                );
+              })()}
+            </AnimatePresence>
+            {/* Kids / beginner lessons: the coach explains in a speech bubble */}
+            <AnimatePresence>
+              {(frame?.kind === 'lessonText' || (frame?.kind === 'lessonBoard' && !frame.celebrate)) && (
+                <motion.div key={`ls${i}`} initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ type: 'spring', stiffness: 260, damping: 20 }}
+                  className={`pointer-events-none absolute inset-x-[4%] z-30 flex items-end gap-[1.2cqh] ${frame.kind === 'lessonText' ? 'top-[34%]' : 'bottom-[7.5%]'}`}>
+                  <motion.div animate={{ y: [0, -6, 0], rotate: [0, -4, 0] }} transition={{ duration: 1.6, repeat: Infinity }} className="shrink-0" style={{ fontSize: frame.kind === 'lessonText' ? 'clamp(26px,5.6cqh,60px)' : 'clamp(18px,3.6cqh,40px)' }}>
+                    <Medallion glyph="♞" color="#81B64C" size={2.2} />
+                  </motion.div>
+                  <div className="relative flex-1 rounded-[2.2cqh] bg-white px-[2cqh] py-[1.4cqh] font-black leading-snug text-[#1A1A1A] shadow-2xl" style={{ fontSize: frame.kind === 'lessonText' ? 'clamp(15px,3cqh,32px)' : 'clamp(13px,2.3cqh,24px)' }}>
+                    <span className="absolute -left-[1.2cqh] bottom-[2cqh] h-[2.4cqh] w-[2.4cqh] rotate-45 bg-white" />
+                    <span className="relative">{frame.text}</span>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+            {frame?.kind === 'lessonBoard' && frame.celebrate && (
+              <motion.div key={`ok${i}`} initial={{ scale: 0, rotate: -8 }} animate={{ scale: 1, rotate: -3 }} transition={{ type: 'spring', stiffness: 380, damping: 12 }}
+                className="pointer-events-none absolute left-1/2 top-[11%] z-30 -translate-x-1/2 whitespace-nowrap" style={{ fontSize: 'clamp(20px,4cqh,42px)' }}>
+                <StudioBadge glyph="✓" text="Great job!" color="#5FA83A" rays />
+                {frame.last && <p className="mx-auto mt-[0.4em] w-fit rounded-full bg-black/75 px-[0.7em] py-[0.15em] font-black text-white" style={{ fontSize: '0.75em' }}>{frame.text.replace(/^✓\s*/, '').replace(/! Great job!$/, '')}</p>}
+              </motion.div>
+            )}
+            {/* Scan Position: the photo, scanned */}
+            <AnimatePresence>
+              {frame?.kind === 'scanPhoto' && clip.photo && (
+                <motion.div key="scan" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, scale: 0.9 }} transition={{ duration: 0.4 }} className="absolute inset-0 z-30 grid place-items-center bg-black/70 px-[7%]">
+                  <div className="relative w-full overflow-hidden rounded-[2.4cqh] ring-4 ring-white/90 shadow-2xl" style={{ aspectRatio: '1 / 1' }}>
+                    <img src={clip.photo} alt="" className="h-full w-full object-cover" />
+                    <motion.div className="absolute inset-x-0 h-[18%]" initial={{ top: '-18%' }} animate={{ top: ['-18%', '100%', '-18%'] }} transition={{ duration: 2.4, ease: 'easeInOut' }}
+                      style={{ background: 'linear-gradient(180deg, rgba(129,182,76,0) 0%, rgba(129,182,76,.55) 85%, #B8E08C 100%)' }} />
+                    {[['left-[4%] top-[4%]', 'border-l-4 border-t-4'], ['right-[4%] top-[4%]', 'border-r-4 border-t-4'], ['left-[4%] bottom-[4%]', 'border-b-4 border-l-4'], ['right-[4%] bottom-[4%]', 'border-b-4 border-r-4']].map(([pos, b]) => (
+                      <span key={pos} className={`absolute h-[14%] w-[14%] rounded-[0.6cqh] border-[#B8E08C] ${pos} ${b}`} />
+                    ))}
+                  </div>
+                  <motion.p animate={{ opacity: [1, 0.4, 1] }} transition={{ duration: 0.9, repeat: Infinity }} className="absolute bottom-[16%] rounded-full bg-[#81B64C] px-[1em] py-[0.35em] font-black uppercase text-white ring-2 ring-white" style={{ fontSize: 'clamp(14px,2.6cqh,28px)' }}>📸 Scanning the board…</motion.p>
+                </motion.div>
+              )}
+            </AnimatePresence>
             {/* Text card inserted on the timeline */}
             <AnimatePresence>
               {frame?.kind === 'card' && (
@@ -1262,7 +1624,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
               const m = f.kind === 'move' ? plies[f.ply - 1] : null;
               const c = m ? (m.san.includes('#') ? 'checkmate' : m.review?.classification) : null;
               const tone = c && LABEL[c] && !['best', 'excellent', 'good', 'book'].includes(c) ? LABEL[c].color : null;
-              const label = f.kind === 'move' ? (m ? figurine(m.san, m.color === 'w') : 'Start') : f.kind === 'countdown' ? (f.anchor ? `⏱${f.n}` : String(f.n)) : f.kind === 'card' ? 'Card'
+              const label = f.kind === 'move' ? (m ? figurine(m.san, m.color === 'w') : 'Start') : f.kind === 'countdown' ? (f.anchor ? `⏱${f.n}` : String(f.n)) : f.kind === 'card' ? 'Card' : f.kind === 'scoutCard' ? ({ profile: 'Profile', openings: 'Openings', weak: 'Weak spots' } as Record<string, string>)[f.card] : f.kind === 'lessonText' ? 'Coach' : f.kind === 'lessonBoard' ? (f.celebrate ? '✓' : 'Board') : f.kind === 'scanPhoto' ? 'Photo' : f.kind === 'promoCard' ? (f.card === 'vs' ? `Row ${f.upTo}` : f.card[0].toUpperCase() + f.card.slice(1))
                 : ({ title: 'Title', intro: 'Hook', hold: 'Start', better: 'Line', split: 'Split', reveal: 'Rating', summary: 'Summary', outro: 'End' } as Record<string, string>)[f.kind] ?? f.kind;
               const starts = stickers.filter((st) => st.from === id).length, ends = stickers.filter((st) => st.to === id).length;
               return (
