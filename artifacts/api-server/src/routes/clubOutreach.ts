@@ -44,7 +44,7 @@ router.get("/admin/club-outreach", requireAdmin, async (req: Request, res: Respo
       FROM club_contacts c
       LEFT JOIN LATERAL (
         SELECT opened_at, open_count, clicked_at, click_count FROM email_tracking t
-        WHERE t.contact_id = c.id ORDER BY t.sent_at DESC LIMIT 1
+        WHERE t.contact_id = c.id AND NOT t.pending ORDER BY t.sent_at DESC LIMIT 1
       ) tr ON true
       WHERE ${where} AND NOT EXISTS (SELECT 1 FROM club_contact_dnc d WHERE LOWER(d.email) = LOWER(c.email))
       ORDER BY c.found_at DESC LIMIT 1000`));

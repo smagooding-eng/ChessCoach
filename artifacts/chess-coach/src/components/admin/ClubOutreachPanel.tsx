@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Building2, Users, Library, Newspaper, Loader2, Search, Mail, ExternalLink, X, Check, Plus, RotateCcw, ChevronRight, Ban, Copy } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { LOCAL_INTROS } from './outreachLocal';
@@ -809,22 +809,34 @@ function DraftActions({ draft, styled, account, onOpened, track }: {
   const [copiedStyled, setCopiedStyled] = useState(false);
   const plainHtml = useMemo(() => styledEmailHtml(draft.body), [draft.body]);
   // Fetch a tracked copy ahead of time so Copy stays instant (clipboard needs the tap).
+  // The tracked copy starts "pending" on the server; it only counts as sent
+  // once it's copied or a draft is opened with it (so re-renders and
+  // previews don't add rows).
   const [trackedHtml, setTrackedHtml] = useState<string | null>(null);
+  const tokenRef = useRef<string | null>(null);
+  const sentRef = useRef<string | null>(null);
+  const markSent = () => {
+    const t = tokenRef.current;
+    if (!t || sentRef.current === t) return;
+    sentRef.current = t;
+    void apiFetch(`/api/admin/email-tracking/${encodeURIComponent(t)}/sent`, { method: 'POST', credentials: 'include' }).catch(() => {});
+  };
   const trackKey = track ? `${track.template}:${track.contacts.map((c) => c.id).join(',')}:${draft.body.length}` : '';
   useEffect(() => {
     setTrackedHtml(null);
+    tokenRef.current = null;
     if (!styled || !track || !track.contacts.length) return;
     let alive = true;
     apiFetch('/api/admin/club-outreach/tracked-html', {
       method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ html: plainHtml, contacts: track.contacts, template: track.template, subject: draft.subject }),
-    }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (alive && d?.html) setTrackedHtml(d.html); }).catch(() => {});
+    }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (alive && d?.html) { setTrackedHtml(d.html); tokenRef.current = d.token ?? null; } }).catch(() => {});
     return () => { alive = false; };
   }, [trackKey, styled, plainHtml]);  // eslint-disable-line react-hooks/exhaustive-deps
   const html = trackedHtml ?? plainHtml;
   // Styled: open the draft without a body and paste the copied email into it.
   const open: Draft = styled ? { ...draft, body: '' } : draft;
-  const copyStyled = () => { void copyRich(html, draft.body).then((ok) => { if (ok) { setCopiedStyled(true); setTimeout(() => setCopiedStyled(false), 2500); } }); };
+  const copyStyled = () => { void copyRich(html, draft.body).then((ok) => { if (ok) { markSent(); setCopiedStyled(true); setTimeout(() => setCopiedStyled(false), 2500); } }); };
   const onLink = () => { if (styled) copyStyled(); onOpened(); };
   const btn = 'inline-flex items-center justify-center gap-1.5 rounded-xl py-3 text-sm font-bold';
   const links = [
@@ -836,7 +848,7 @@ function DraftActions({ draft, styled, account, onOpened, track }: {
   return (
     <div className="space-y-2">
       {styled ? (
-        <iframe title="Email preview" srcDoc={`<!doctype html><html><body style="margin:0;background:${T.bg}">${html}</body></html>`} className="h-[340px] w-full rounded-lg border-0" />
+        <iframe title="Email preview" srcDoc={`<!doctype html><html><body style="margin:0;background:${T.bg}">${plainHtml}</body></html>`} className="h-[340px] w-full rounded-lg border-0" />
       ) : (
         <pre className="max-h-[320px] overflow-y-auto whitespace-pre-wrap rounded-lg p-3 text-[12.5px] text-white/85" style={{ background: 'rgba(0,0,0,.3)', fontFamily: 'inherit' }}>{draft.body}</pre>
       )}
