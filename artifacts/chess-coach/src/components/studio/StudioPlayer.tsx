@@ -77,7 +77,7 @@ const DEFAULT_PREFS = {
   bg: 'green', betterLine: true, guessRating: false, outro: true, progress: true, intro: true, safeArea: true, showNames: false,
   handle: '@chessscout.net3', outroLine: 'Review your games free',
   split: true, voice: false, voiceName: 'onyx', compTitle: 'Top moments this week',
-  music: 'off' as MusicStyle, musicVol: 0.5, beatSync: true, musicFx: true, subs: true,
+  music: 'off' as MusicStyle, musicVol: 0.5, beatSync: true, musicFx: true, subs: true, pieceFx: true,
 };
 type Prefs = typeof DEFAULT_PREFS;
 function loadPrefs(): Prefs {
@@ -732,7 +732,7 @@ export function StudioPlayer({ source, queue, title, onClose, onNext, onPrev }: 
             {prefs.progress && <div className="absolute inset-x-0 top-0 z-20 h-[0.6cqh] bg-white/15"><div className="h-full bg-[#81B64C] transition-all duration-300" style={{ width: `${progress * 100}%` }} /></div>}
             {/* Hook: pops in big on the intro, then sits at the top */}
             <motion.div key={frame?.kind === 'intro' ? 'intro' : 'top'} initial={frame?.kind === 'intro' ? { scale: 0.6, opacity: 0, y: '18cqh' } : false}
-              animate={{ scale: 1, opacity: 1, y: frame?.kind === 'intro' ? '18cqh' : 0 }} transition={{ type: 'spring', stiffness: 260, damping: 18 }}
+              animate={{ scale: 1, opacity: pop || frame?.kind === 'countdown' ? 0 : 1, y: frame?.kind === 'intro' ? '18cqh' : 0 }} transition={{ type: 'spring', stiffness: 260, damping: 18 }}
               className="absolute inset-x-0 top-[6.5%] z-10 px-[6%] text-center">
               {isComp && frame?.kind === 'intro' && (
                 <motion.div key={`rank${clipQ}`} initial={{ scale: 3, opacity: 0, rotate: -20 }} animate={{ scale: 1, opacity: 1, rotate: 0 }} transition={{ type: 'spring', stiffness: 300, damping: 15, delay: 0.15 }}
@@ -761,7 +761,8 @@ export function StudioPlayer({ source, queue, title, onClose, onNext, onPrev }: 
                     </div>
                   ) : (
                     <ChessBoard fen={view.fen} flipped={flipped} lastMove={view.last} moveQuality={frame?.kind === 'move' ? ((cls as MoveQuality) ?? null) : null}
-                      arrows={arrows} maxWidthOverride="100%" animationMs={Math.min(450, prefs.speed * 300)} suppressConfirmMoves />
+                      arrows={arrows} maxWidthOverride="100%" animationMs={Math.min(450, prefs.speed * 300)} suppressConfirmMoves
+                      moveFx={prefs.pieceFx ? Math.round(Math.max(260, Math.min(560, prefs.speed * 450))) : undefined} />
                   )}
                 </LookOverride>
               </motion.div>
@@ -769,7 +770,7 @@ export function StudioPlayer({ source, queue, title, onClose, onNext, onPrev }: 
               <p className="mt-1 truncate text-[clamp(11px,1.6cqh,16px)] font-bold text-white/85">{name(top === 'w' ? 'b' : 'w')}</p>
             </div>
             {/* Move + caption */}
-            {(showBottomMove || caption) && frame?.kind !== 'outro' && frame?.kind !== 'reveal' && (
+            {(showBottomMove || caption) && !subWords && frame?.kind !== 'outro' && frame?.kind !== 'reveal' && (
               <div className="absolute inset-x-[5%] bottom-[9%] z-10">
                 {showBottomMove && cur && (
                   <div className="flex items-center gap-2">
@@ -783,8 +784,8 @@ export function StudioPlayer({ source, queue, title, onClose, onNext, onPrev }: 
               </div>
             )}
             {subWords && (
-              <div className="pointer-events-none absolute inset-x-[5%] top-[61%] z-[25] text-center">
-                <p className="font-black uppercase leading-[1.1]" style={{ fontSize: 'clamp(20px,4.4cqh,46px)', textShadow: '0 0 4px #000, 0 0 10px #000, 0 4px 0 #000', WebkitTextStroke: '1.5px #000' }}>
+              <div className="pointer-events-none absolute inset-x-[5%] bottom-[12.5%] z-[25] text-center">
+                <p className="font-black uppercase leading-[1.1]" style={{ fontSize: 'clamp(16px,3.3cqh,34px)', textShadow: '0 0 4px #000, 0 0 10px #000, 0 4px 0 #000', WebkitTextStroke: '1.5px #000' }}>
                   {subWords.words.map((w, k) => (
                     <motion.span key={`${w}-${k}`} initial={k === subWords!.hi ? { scale: 1.25 } : false} animate={{ scale: 1 }} className="inline-block" style={{ color: k === subWords!.hi ? '#FFD84D' : '#fff', marginRight: '0.28em' }}>{w}</motion.span>
                   ))}
@@ -796,11 +797,9 @@ export function StudioPlayer({ source, queue, title, onClose, onNext, onPrev }: 
             <AnimatePresence>
               {frame?.kind === 'countdown' && (
                 <motion.div key={frame.n} initial={{ scale: 0.4, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 1.6, opacity: 0 }} transition={{ duration: 0.35 }}
-                  className="absolute inset-0 z-20 grid place-items-center">
-                  <div className="flex flex-col items-center">
-                    <p className="mb-[1.2cqh] rounded-full bg-[#81B64C] px-[1em] py-[0.3em] font-black uppercase text-white shadow-xl ring-2 ring-white" style={{ fontSize: 'clamp(14px,2.4cqh,26px)', textShadow: '0 1px 0 #3E6420' }}>{clip.isTrap ? 'Spot the winning move' : 'Can you find it?'}</p>
-                    <div style={{ fontSize: 'clamp(70px,15cqh,160px)' }}><CountdownRing n={frame.n} seconds={dur(frame) / 1000} color={frame.n === 1 ? '#F0605D' : frame.n === 2 ? '#E8B447' : '#81B64C'} /></div>
-                  </div>
+                  className="absolute inset-x-0 top-[6%] z-20 flex h-[15%] items-center justify-center gap-[2.2cqh] px-[5%]">
+                  <div style={{ fontSize: 'clamp(36px,7.6cqh,82px)' }}><CountdownRing n={frame.n} seconds={dur(frame) / 1000} color={frame.n === 1 ? '#F0605D' : frame.n === 2 ? '#E8B447' : '#81B64C'} /></div>
+                  <p className="rounded-full bg-[#81B64C] px-[1em] py-[0.35em] font-black uppercase leading-tight text-white shadow-xl ring-2 ring-white" style={{ fontSize: 'clamp(14px,2.6cqh,28px)', textShadow: '0 1px 0 #3E6420' }}>{clip.isTrap ? 'Spot the winning move' : 'Can you find it?'}</p>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -816,7 +815,7 @@ export function StudioPlayer({ source, queue, title, onClose, onNext, onPrev }: 
               {pop && LABEL[pop.cls] && (
                 <motion.div key={pop.at} initial={{ scale: 0, rotate: -12, opacity: 0 }} animate={{ scale: 1, rotate: -4, opacity: 1 }} exit={{ scale: 1.3, opacity: 0 }}
                   transition={{ type: 'spring', stiffness: 380, damping: 14 }} onAnimationComplete={() => setTimeout(() => setPop((p) => (p && p.at === pop.at ? null : p)), 1100)}
-                  className="pointer-events-none absolute left-1/2 top-[44%] z-20 -translate-x-1/2 -translate-y-1/2 text-center">
+                  className="pointer-events-none absolute left-1/2 top-[13.5%] z-20 -translate-x-1/2 -translate-y-1/2 whitespace-nowrap text-center">
                   <div style={{ fontSize: 'clamp(20px,4cqh,42px)' }}>
                     <StudioBadge {...LABEL[pop.cls]} rays={['brilliant', 'great', 'checkmate'].includes(pop.cls)} />
                   </div>
@@ -991,6 +990,7 @@ export function StudioPlayer({ source, queue, title, onClose, onNext, onPrev }: 
           <p className="mb-1 text-[11px] font-bold uppercase tracking-wide text-white/50">Look</p>
           <div className="mb-3 flex flex-wrap gap-1.5">
             {toggle('remix', 'Remix board every move')}
+            {toggle('pieceFx', 'Animated pieces')}
             {toggle('effects', 'Pop, confetti, shake')}
             {toggle('captions', 'Coach caption')}
             {toggle('arrow', 'Best-move arrow')}

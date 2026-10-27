@@ -51,7 +51,7 @@ export function StudioBadge({ glyph, text, color, rays = false }: { glyph: strin
   const light = shade(color, 0.3), dark = shade(color, -0.38);
   return (
     <div className="relative inline-flex items-center" style={{ filter: 'drop-shadow(0 0.22em 0.45em rgba(0,0,0,.55))' }}>
-      {rays && <Rays color={color} />}
+      {rays && <Rays color={color} size={6} />}
       <Medallion glyph={glyph} color={color} spin />
       <motion.div initial={{ scaleX: 0, opacity: 0 }} animate={{ scaleX: 1, opacity: 1 }} transition={{ delay: 0.12, duration: 0.32, ease: 'backOut' }}
         className="relative overflow-hidden whitespace-nowrap font-black uppercase text-white"

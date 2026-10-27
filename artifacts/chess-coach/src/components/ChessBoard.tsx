@@ -10,6 +10,7 @@ import { eventForMove, detectSingleMove } from '@/lib/sounds';
 import { SquareBadge } from './SquareBadge';
 import { CheckmateOverlay } from './CheckmateOverlay';
 import { useBoardStyleTip } from './BoardStyleTip';
+import { planMoveFx, MoveFxLayer, type MoveFxPlan } from './MoveFx';
 
 class BoardErrorBoundary extends Component<
   { children: ReactNode; position: string; renderKey: number },
@@ -138,6 +139,8 @@ interface ChessBoardProps {
   boardOverlay?: React.ReactNode;
   /** Piece slide time in ms (default 150). */
   animationMs?: number;
+  /** Animated pieces (Content Studio): a one-move change plays as a hop with a capture spin, over this many ms. */
+  moveFx?: number;
   sidePanel?: {
     left?: React.ReactNode;
     clocks?: { top: ClockFace; bottom: ClockFace };
@@ -166,6 +169,7 @@ export function ChessBoard({
   reserveConfirmSpace = false,
   boardOverlay,
   animationMs,
+  moveFx,
   sidePanel,
 }: ChessBoardProps) {
   const { confirmMoves, boardColors, boardTextureCss, showCoordinates, showLegalMoves, pieceColors, pieceShape, pieceStyle, soundEnabled, promotionChoice, boardMaxWidth: settingsMaxWidth } = useSettings();
@@ -282,6 +286,18 @@ export function ChessBoard({
   useEffect(() => {
     return () => { if (feedbackTimerRef.current) clearTimeout(feedbackTimerRef.current); };
   }, []);
+
+  // Animated pieces: planned in render, so the moving piece is never drawn on its new square first.
+  const [fxState, setFxState] = useState<{ pos: string; plan: MoveFxPlan | null }>({ pos: position, plan: null });
+  if (fxState.pos !== position) setFxState({ pos: position, plan: moveFx ? planMoveFx(fxState.pos, position) : null });
+  const fxPlan = fxState.pos === position ? fxState.plan : null;
+  const [fxDone, setFxDone] = useState(0);
+  useEffect(() => {
+    if (!fxPlan) return;
+    const t = setTimeout(() => setFxDone(fxPlan.id), (moveFx ?? 0) + 30);
+    return () => clearTimeout(t);
+  }, [fxPlan, moveFx]);
+  const fxLive = fxPlan && fxDone !== fxPlan.id ? fxPlan : null;
 
   const [prevPosition, setPrevPosition] = useState(position);
   if (position !== prevPosition) {
@@ -570,7 +586,7 @@ export function ChessBoard({
       <BoardErrorBoundary position={position} renderKey={boardKeyRef.current}>
         <Chessboard
           options={{
-            position: pendingMove ? pendingMove.tempFen : position,
+            position: pendingMove ? pendingMove.tempFen : fxLive ? fxLive.hiddenFen : position,
             boardOrientation: flipped ? 'black' : 'white',
             allowDragging: (practiceMode || premoveMode) && !pendingMove && !promotionPending,
             dragActivationDistance: 8,
@@ -596,10 +612,11 @@ export function ChessBoard({
             lightSquareStyle: skin.lightSquareStyle,
             darkSquareStyle: skin.darkSquareStyle,
             pieces: tintedPieces,
-            animationDurationInMs: animationMs ?? 150,
+            animationDurationInMs: moveFx ? 0 : animationMs ?? 150,
           }}
         />
       </BoardErrorBoundary>
+      {fxLive && moveFx && <MoveFxLayer plan={fxLive} pieces={tintedPieces as unknown as Parameters<typeof MoveFxLayer>[0]['pieces']} flipped={flipped} ms={moveFx} />}
 
       {/* Checkmate indicator directly on the board -- gold crown on the winning
           king, crimson mark on the mated king, and a brief ribbon. */}
