@@ -208,6 +208,7 @@ export function ContentStudio() {
         </div>
         <div className="mt-2 flex flex-wrap gap-1.5">
           {([['pz-m1', 'mateIn1', 'Mate in 1 speed round ⚡', [600, 1800], 'Mate in 1 round'], ['pz-m2', 'mateIn2', 'Can you solve all 5? Mate in 2 🧩', [900, 2200], 'Mate in 2 challenge'],
+             ['pz-m3', 'mateIn3', 'Mate in 3: how many can you find? 🧠', [1000, 2600], 'Mate in 3 challenge'], ['pz-m4', 'mateIn4', 'Only geniuses solve all 5: Mate in 4 🤯', [1100, 2900], 'Mate in 4 challenge'],
              ['pz-fork', 'fork', '5 forks, getting harder 🍴', [800, 2400], 'Fork ladder'], ['pz-ladder', '', '5 puzzles: 800 to 2500 🧗', [800, 2500], 'Puzzle ladder'],
              ['pz-end', 'endgame', '5 endgame puzzles 👑', [1000, 2300], 'Endgames']] as const).map(([k, th, title, range, label]) => (
             <button key={k} onClick={() => void autoPuzzles(k, th, title, range as unknown as [number, number])} disabled={!!autoBusy} className="flex items-center gap-1 rounded-full bg-[#2B2A3A] px-3 py-1.5 text-[12.5px] font-bold text-white hover:bg-[#363548] disabled:opacity-60">
@@ -222,10 +223,10 @@ export function ContentStudio() {
       {view === 'puzzles' ? (<>
         <div className="mb-2 flex flex-wrap gap-1.5">
           <button onClick={() => setPTheme('')} className="rounded-full px-3 py-1.5 text-[12.5px] font-bold" style={{ background: !pTheme ? '#81B64C' : 'rgba(255,255,255,.06)', color: !pTheme ? '#fff' : '#C9CFCD' }}>All themes</button>
-          {themes.map((t) => (
+          {[...['mateIn1', 'mateIn2', 'mateIn3', 'mateIn4'].map((m) => themes.find((t) => t.theme === m) ?? { theme: m, n: -1 }), ...themes.filter((t) => !/^mateIn[1-4]$/.test(t.theme))].map((t) => (
             <button key={t.theme} onClick={() => setPTheme(pTheme === t.theme ? '' : t.theme)} className="rounded-full px-3 py-1.5 text-[12.5px] font-bold"
               style={{ background: pTheme === t.theme ? '#81B64C' : 'rgba(255,255,255,.06)', color: pTheme === t.theme ? '#fff' : '#C9CFCD', border: `1px solid ${pTheme === t.theme ? '#81B64C' : 'rgba(255,255,255,.1)'}` }}>
-              {themeLabel(t.theme)}<span className="ml-1 opacity-60">{t.n.toLocaleString()}</span>
+              {themeLabel(t.theme)}{t.n >= 0 && <span className="ml-1 opacity-60">{t.n.toLocaleString()}</span>}
             </button>
           ))}
         </div>
