@@ -22,6 +22,17 @@ const TAGS: { id: string; label: string }[] = [
 ];
 const TAG_COLOR: Record<string, string> = { brilliant: '#1BACA6', great: '#4A8BD6', trap: '#E8B447', checkmate: '#E8B447', blunder: '#CA3431', missed_win: '#B8343E' };
 
+// One tap: the five best moments of a kind from the last week (or month, if the week is thin), counting down to #1.
+const AUTO: { tag: string; label: string; title: (when: string) => string }[] = [
+  { tag: 'brilliant', label: 'Brilliant moves', title: (w) => `Top 5 brilliant moves ${w}` },
+  { tag: 'blunder', label: 'Blunders', title: (w) => `Top 5 blunders ${w} 💀` },
+  { tag: 'checkmate', label: 'Checkmates', title: (w) => `Top 5 checkmates ${w}` },
+  { tag: 'sacrifice', label: 'Sacrifices', title: (w) => `Top 5 sacrifices ${w}` },
+  { tag: 'trap', label: 'Traps', title: (w) => `Top 5 traps people fell for ${w}` },
+  { tag: 'missed_win', label: 'Missed wins', title: (w) => `5 wins thrown away ${w}` },
+  { tag: 'fork', label: 'Forks', title: (w) => `Top 5 forks ${w}` },
+];
+
 const afterFen = (fen: string, san: string) => { try { const c = new Chess(fen); c.move(san); return c.fen(); } catch { return fen; } };
 
 export function ContentStudio() {
@@ -40,6 +51,26 @@ export function ContentStudio() {
   const [picking, setPicking] = useState(false);
   const [picked, setPicked] = useState<StudioSource[]>([]);
   const [comp, setComp] = useState<StudioSource[] | null>(null);
+  const [compTitle, setCompTitle] = useState<string | undefined>(undefined);
+  const [autoBusy, setAutoBusy] = useState<string | null>(null);
+  const [autoNote, setAutoNote] = useState<string | null>(null);
+  const autoTop5 = async (a: (typeof AUTO)[number]) => {
+    setAutoBusy(a.tag); setAutoNote(null);
+    try {
+      const get = (days: number) => apiFetch(`/api/admin/studio/moments?${new URLSearchParams({ tags: a.tag, sort: 'best', limit: '60', sinceDays: String(days) })}`, { credentials: 'include' })
+        .then((r) => (r.ok ? r.json() : { moments: [] })).then((d) => (d.moments ?? []) as Moment[]);
+      let when = 'this week';
+      let list = await get(7);
+      if (new Set(list.map((m) => m.gameId)).size < 5) { list = await get(30); when = 'this month'; }
+      if (new Set(list.map((m) => m.gameId)).size < 3) { list = await get(3650); when = 'ever'; }
+      // One moment per game, best five, played worst-to-best so the best is #1.
+      const seen = new Set<number>(); const top: Moment[] = [];
+      for (const m of list) { if (seen.has(m.gameId)) continue; seen.add(m.gameId); top.push(m); if (top.length === 5) break; }
+      if (top.length < 2) { setAutoNote(`Not enough ${a.label.toLowerCase()} yet.`); return; }
+      setCompTitle(a.title(when).replace('Top 5', `Top ${top.length}`).replace(/^5 /, `${top.length} `));
+      setComp(top.reverse().map((m) => ({ kind: 'game', moment: m })));
+    } finally { setAutoBusy(null); }
+  };
   const keyOf = (x: StudioSource) => (x.kind === 'trap' ? `t${x.trap.id}` : `g${x.moment.gameId}-${x.moment.moveIndex}`);
   const togglePick = (x: StudioSource) => setPicked((cur) => (cur.some((c) => keyOf(c) === keyOf(x)) ? cur.filter((c) => keyOf(c) !== keyOf(x)) : [...cur, x]));
   const isPicked = (x: StudioSource) => picked.some((c) => keyOf(c) === keyOf(x));
@@ -112,6 +143,17 @@ export function ContentStudio() {
           <button key={k} onClick={() => setView(k)} className="rounded-lg px-3.5 py-1.5 text-[13px] font-black" style={{ background: view === k ? '#81B64C' : 'transparent', color: view === k ? '#fff' : '#C9CFCD' }}>{t}</button>
         ))}
       </div>
+      </div>
+      <div className="mb-3 rounded-xl bg-white/5 p-3 ring-1 ring-white/10">
+        <p className="mb-2 text-[12px] font-black uppercase tracking-wide text-[#E8B447]">⚡ Auto Top 5 · one tap, ready to record</p>
+        <div className="flex flex-wrap gap-1.5">
+          {AUTO.map((a) => (
+            <button key={a.tag} onClick={() => void autoTop5(a)} disabled={!!autoBusy} className="flex items-center gap-1 rounded-full bg-[#2A3335] px-3 py-1.5 text-[12.5px] font-bold text-white hover:bg-[#34403F] disabled:opacity-60">
+              {autoBusy === a.tag && <Loader2 size={12} className="animate-spin" />}{a.label}
+            </button>
+          ))}
+        </div>
+        {autoNote && <p className="mt-2 text-[12px] text-white/60">{autoNote}</p>}
       </div>
       {picking && <p className="mb-3 text-[12.5px] text-[#E8B447]">Tap moments or traps in the order you want them (they count down #{Math.max(picked.length, 1)} to #1), then play them as one clip.</p>}
 
@@ -208,10 +250,10 @@ export function ContentStudio() {
         <div className="fixed inset-x-0 bottom-20 z-[70] mx-auto flex w-fit items-center gap-3 rounded-2xl bg-[#0B1112] px-4 py-3 shadow-2xl ring-1 ring-[#81B64C] md:bottom-6">
           <span className="text-[13px] font-bold">{picked.length} picked</span>
           <button onClick={() => setPicked([])} className="text-[12.5px] font-bold text-white/60">Clear</button>
-          <button onClick={() => setComp(picked)} className="rounded-lg bg-[#81B64C] px-3 py-1.5 text-[13px] font-black text-white">Play as one clip</button>
+          <button onClick={() => { setCompTitle(undefined); setComp(picked); }} className="rounded-lg bg-[#81B64C] px-3 py-1.5 text-[13px] font-black text-white">Play as one clip</button>
         </div>
       )}
-      {comp && <StudioPlayer source={comp[0]} queue={comp} onClose={() => setComp(null)} />}
+      {comp && <StudioPlayer source={comp[0]} queue={comp} title={compTitle} onClose={() => setComp(null)} />}
       {open && (
         <StudioPlayer source={open} onClose={() => setOpen(null)}
           onNext={openIndex >= 0 ? () => openAt(openIndex + 1) : undefined}

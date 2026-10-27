@@ -1,11 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Chess } from 'chess.js';
-import { X, Play, Pause, RotateCcw, ChevronLeft, ChevronRight, Shuffle, Video, Square, Eye, EyeOff, FlipVertical2, Trash2, Copy, SkipForward, SkipBack, Mic, Image as ImageIcon } from 'lucide-react';
+import { X, Play, Pause, RotateCcw, ChevronLeft, ChevronRight, Shuffle, Video, Square, Eye, EyeOff, FlipVertical2, Trash2, Copy, SkipForward, SkipBack, Mic, Image as ImageIcon, Music } from 'lucide-react';
 import { ChessBoard, type MoveQuality } from '@/components/ChessBoard';
 import { LookOverride, randomLook, lookLabel, playMoveSound, BOARD_THEMES, type BoardLook } from '@/context/SettingsContext';
 import { apiFetch } from '@/lib/api';
 import { normalizeFen } from '@/lib/utils';
+import { StudioMusic, MUSIC_STYLES, bpmOf, type MusicStyle } from './studioMusic';
 
 // Content Studio player: a game moment or a trap lesson as a 9:16 clip for
 // TikTok, Reels and Shorts. The clip is a script of frames: an intro with the
@@ -73,6 +74,7 @@ const DEFAULT_PREFS = {
   bg: 'green', betterLine: true, guessRating: false, outro: true, progress: true, intro: true, safeArea: true, showNames: false,
   handle: '@chessscout.net3', outroLine: 'Review your games free',
   split: true, voice: false, voiceName: 'onyx', compTitle: 'Top moments this week',
+  music: 'off' as MusicStyle, musicVol: 0.5, beatSync: true, musicFx: true, subs: true,
 };
 type Prefs = typeof DEFAULT_PREFS;
 function loadPrefs(): Prefs {
@@ -242,8 +244,10 @@ function Confetti({ fire }: { fire: number }) {
   return <canvas ref={ref} className="pointer-events-none absolute inset-0 z-30 h-full w-full" />;
 }
 
-export function StudioPlayer({ source, queue, onClose, onNext, onPrev }: {
+export function StudioPlayer({ source, queue, title, onClose, onNext, onPrev }: {
   source: StudioSource;
+  /** A ready-made compilation title (auto Top 5); otherwise the remembered one. */
+  title?: string;
   /** A compilation: these clips play back to back (one recording), with a title card first and the end card last. */
   queue?: StudioSource[];
   onClose: () => void; onNext?: () => void; onPrev?: () => void;
@@ -258,14 +262,25 @@ export function StudioPlayer({ source, queue, onClose, onNext, onPrev }: {
   // ── Load the clip ───────────────────────────────────────────────────────
   const [clip, setClip] = useState<Clip | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  // Games are fetched once; in a compilation the next one is fetched while this one plays, so clips run on without a gap.
+  const games = useRef(new Map<number, Promise<StudioGame>>());
+  const getGame = (id: number) => {
+    let p = games.current.get(id);
+    if (!p) {
+      p = apiFetch(`/api/admin/studio/game/${id}`, { credentials: 'include' }).then((r) => (r.ok ? r.json() : Promise.reject(new Error('Game not found'))));
+      p.catch(() => games.current.delete(id));
+      games.current.set(id, p);
+    }
+    return p;
+  };
   useEffect(() => {
     setErr(null);
     const slot = q;
     if (current.kind === 'trap') { setClip(trapClip(current.trap)); setClipQ(slot); return; }
     const m = current.moment;
-    apiFetch(`/api/admin/studio/game/${m.gameId}`, { credentials: 'include' })
-      .then((r) => (r.ok ? r.json() : Promise.reject(new Error('Game not found'))))
-      .then((g: StudioGame) => { setClip(gameClip(g, m)); setClipQ(slot); }).catch((e) => setErr(String(e?.message ?? e)));
+    getGame(m.gameId).then((g) => { setClip(gameClip(g, m)); setClipQ(slot); }).catch((e) => setErr(String(e?.message ?? e)));
+    const nx = isComp ? queue![slot + 1] : undefined;
+    if (nx?.kind === 'game') void getGame(nx.moment.gameId).catch(() => {});
   }, [current]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Settings (remembered between clips) ─────────────────────────────────
@@ -276,6 +291,8 @@ export function StudioPlayer({ source, queue, onClose, onNext, onPrev }: {
   const [fixedLook, setFixedLook] = useState<BoardLook | null>(null);
   const [flipped, setFlipped] = useState(false);
   const [clean, setClean] = useState(false);
+  const [compTitle, setCompTitleState] = useState(() => title ?? loadPrefs().compTitle);
+  const setCompTitle = (v: string) => { setCompTitleState(v); if (!title) set('compTitle', v); };
   useEffect(() => {
     if (!clip) return;
     setHook(isComp ? `#${queue!.length - clipQ} · ${stripEmoji(clip.hook)}` : clip.hook); setSub(clip.sub);
@@ -332,7 +349,11 @@ export function StudioPlayer({ source, queue, onClose, onNext, onPrev }: {
     const base = baseDur(f);
     const said = prefs.voice ? narration(f) : null;
     const len = said ? voiceLen.current.get(said) : undefined;
-    return len ? Math.max(base, len * 1000 + 300) : base;
+    const d = len ? Math.max(base, len * 1000 + 300) : base;
+    // On the beat: every frame lasts a whole number of beats, so moves land on the music.
+    const bpm = bpmOf(prefs.music);
+    if (bpm && prefs.beatSync) { const beat = 60000 / bpm; return Math.max(1, Math.round(d / beat)) * beat; }
+    return d;
   };
   const baseDur = (f: Frame) => {
     const s = prefs.speed * 1000;
@@ -395,19 +416,49 @@ export function StudioPlayer({ source, queue, onClose, onNext, onPrev }: {
     }
     if (frame.kind === 'better' && frame.last && prefs.sound) playMoveSound('move');
     if (frame.kind === 'countdown' && prefs.sound && frame.n === 3) playMoveSound('check');
+    // Sound design on top of the music.
+    if (prefs.musicFx && playing) {
+      const m = mus();
+      if (frame.kind === 'countdown' && frame.n === 3) m.accent('riser');
+      if (frame.kind === 'countdown') m.accent('tick');
+      if (frame.kind === 'title' || frame.kind === 'outro' || frame.kind === 'split' || frame.kind === 'intro') m.accent('whoosh');
+      if (isKey && cur) {
+        m.accent('impact');
+        if (cls === 'brilliant' || cls === 'great' || cls === 'checkmate') m.accent('chime');
+      }
+    }
   }, [i]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Frames are timed from when the previous one was due (not when its timer fired), so a long clip doesn't drift off the beat.
+  const dueAt = useRef<number | null>(null);
+  const nextClipAt = useRef<number | null>(null);
+  const [frameStart, setFrameStart] = useState(0);
   useEffect(() => {
-    if (!playing || !frame) return;
-    if (i >= frames.length - 1) {
-      const t = setTimeout(() => {
-        if (isComp && !isLast) { autoNext.current = true; setQ((x) => x + 1); } else setPlaying(false);
-      }, dur(frame));
-      return () => clearTimeout(t);
-    }
-    const t = setTimeout(() => setI((x) => x + 1), dur(frame));
+    if (!playing || !frame) { dueAt.current = null; nextClipAt.current = null; return; }
+    // Wait for the next clip of a compilation to reset to its first frame.
+    if (nextClipAt.current != null && i !== 0) return;
+    const now = performance.now();
+    const start = nextClipAt.current ?? dueAt.current ?? now;
+    nextClipAt.current = null; dueAt.current = null;
+    setFrameStart(start);
+    const end = start + dur(frame);
+    const t = setTimeout(() => {
+      if (i >= frames.length - 1) {
+        if (isComp && !isLast) { nextClipAt.current = end; autoNext.current = true; setQ((x) => x + 1); } else setPlaying(false);
+      } else { dueAt.current = end; setI((x) => x + 1); }
+    }, Math.max(0, end - now));
     return () => clearTimeout(t);
   }, [playing, i, frames.length]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Music ───────────────────────────────────────────────────────────────
+  const music = useRef<StudioMusic | null>(null);
+  const mus = () => (music.current ??= new StudioMusic());
+  useEffect(() => () => music.current?.dispose(), []);
+  useEffect(() => { music.current?.setVolume(prefs.musicVol); }, [prefs.musicVol]);
+  useEffect(() => {
+    if (playing && prefs.music !== 'off') { const m = mus(); m.setVolume(prefs.musicVol); m.start(prefs.music); }
+    else music.current?.stop();
+  }, [playing, prefs.music]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Voiceover: the coach voice reads the hook, the key move and the end card ─
   const voiceLen = useRef(new Map<string, number>());
@@ -417,7 +468,7 @@ export function StudioPlayer({ source, queue, onClose, onNext, onPrev }: {
   const narration = (f: Frame | undefined): string | null => {
     if (!f || !clip) return null;
     switch (f.kind) {
-      case 'title': return stripEmoji(prefs.compTitle);
+      case 'title': return stripEmoji(compTitle);
       case 'intro': return stripEmoji(hook.replace(/^#\d+ · /, ''));
       case 'countdown': return f.n === 3 ? (clip.isTrap ? 'Can you spot the winning move?' : 'Can you find the move?') : null;
       case 'move': {
@@ -448,20 +499,32 @@ export function StudioPlayer({ source, queue, onClose, onNext, onPrev }: {
     })).then(() => { if (live) { setVoiceNote(null); setVoiceTick((x) => x + 1); } })
       .catch(() => { if (live) setVoiceNote("The coach voice isn't available right now (it uses OpenAI). Previews use your browser's voice, which won't be in the recording."); });
     return () => { live = false; };
-  }, [prefs.voice, prefs.voiceName, frames, hook, prefs.outroLine, prefs.compTitle, prefs.captions]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [prefs.voice, prefs.voiceName, frames, hook, prefs.outroLine, compTitle, prefs.captions]); // eslint-disable-line react-hooks/exhaustive-deps
   const voiceAudio = useRef<HTMLAudioElement | null>(null);
+  useEffect(() => { if (!playing) { voiceAudio.current?.pause(); if ('speechSynthesis' in window) window.speechSynthesis.cancel(); } }, [playing]);
   useEffect(() => {
     if (!prefs.voice || !playing) return;
     const said = narration(frame);
     if (!said) return;
     voiceAudio.current?.pause();
     const url = voiceUrl.current.get(said);
-    if (url) { const a = new Audio(url); voiceAudio.current = a; a.play().catch(() => {}); }
+    if (url) voiceAudio.current = mus().playVoice(url);
     else if ('speechSynthesis' in window) { window.speechSynthesis.cancel(); window.speechSynthesis.speak(new SpeechSynthesisUtterance(said)); }
   }, [i, playing]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ── Word-by-word subtitles of the voiceover (burned into the frame, so they're in the recording) ─
+  const [, setSubTick] = useState(0);
+  const subsOn = prefs.voice && prefs.subs && playing;
+  useEffect(() => {
+    if (!subsOn) return;
+    const t = setInterval(() => setSubTick((x) => x + 1), 70);
+    return () => clearInterval(t);
+  }, [subsOn]);
+
   const restart = () => {
     looks.current.clear();
+    dueAt.current = null; nextClipAt.current = null;
+    if (playing && prefs.music !== 'off') mus().start(prefs.music);
     if (isComp && q !== 0) { autoNext.current = true; setQ(0); return; }
     setI(0); setPlaying(true);
   };
@@ -493,6 +556,8 @@ export function StudioPlayer({ source, queue, onClose, onNext, onPrev }: {
     try {
       const stream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 60 }, audio: true, preferCurrentTab: true, selfBrowserSurface: 'include' } as DisplayMediaStreamOptions);
       const [track] = stream.getVideoTracks();
+      // No tab audio shared: record the music and voice straight from the mix.
+      if (!stream.getAudioTracks().length && (prefs.music !== 'off' || prefs.voice || prefs.musicFx)) mus().stream.getAudioTracks().forEach((t) => stream.addTrack(t.clone()));
       const CT = (window as unknown as { CropTarget?: { fromElement: (el: Element) => Promise<unknown> } }).CropTarget;
       if (CT && frameRef.current && 'cropTo' in track) await (track as unknown as { cropTo: (t: unknown) => Promise<void> }).cropTo(await CT.fromElement(frameRef.current));
       else setRecNote('This browser records the whole tab; crop to the frame when you edit.');
@@ -564,7 +629,7 @@ export function StudioPlayer({ source, queue, onClose, onNext, onPrev }: {
   };
 
   // ── Post kit ────────────────────────────────────────────────────────────
-  const postText = clip ? `${hook}\n\n${clip.isTrap ? 'Would you fall for it? 👇' : 'Would you have found it? Comment your move 👇'}\nReview your own games free at chessscout.net\n\n${hashtagsFor(clip)}` : '';
+  const postText = clip ? `${isComp ? stripEmoji(compTitle) : hook}\n\n${clip.isTrap ? 'Would you fall for it? 👇' : 'Would you have found it? Comment your move 👇'}\nReview your own games free at chessscout.net\n\n${hashtagsFor(clip)}` : '';
   const [copied, setCopied] = useState(false);
   const copyPost = () => { navigator.clipboard?.writeText(postText).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); }).catch(() => {}); };
 
@@ -589,7 +654,16 @@ export function StudioPlayer({ source, queue, onClose, onNext, onPrev }: {
   if (prefs.arrow && isKey && rev?.betterMove && cls && BAD.has(cls)) {
     try { const c = new Chess(plies[keyPly - 1].fenBefore); const mv = c.move(rev.betterMove); if (mv) arrows.push({ from: mv.from, to: mv.to, color: 'rgba(129,182,76,0.9)' }); } catch { /* ignore */ }
   }
-  const caption = frame?.kind === 'better' ? frame.text : prefs.captions && cur ? rev?.explanation : null;
+  let subWords: { words: string[]; hi: number } | null = null;
+  const said = subsOn && frame && ['move', 'split', 'better', 'reveal'].includes(frame.kind) ? narration(frame) : null;
+  if (said) {
+    const words = said.split(/\s+/).filter(Boolean);
+    const len = Math.max(400, (voiceLen.current.get(said) ?? words.length * 0.36) * 1000);
+    const k = Math.max(0, Math.min(words.length - 1, Math.floor(((performance.now() - frameStart) / len) * words.length)));
+    const c0 = Math.floor(k / 4) * 4;
+    subWords = { words: words.slice(c0, c0 + 4), hi: k - c0 };
+  }
+  const caption = frame?.kind === 'better' ? frame.text : prefs.captions && cur && !subWords ? rev?.explanation : null;
   const showBottomMove = frame?.kind === 'move' && cur;
 
   const ctl = 'rounded-lg bg-white/10 px-2.5 py-1.5 text-[12.5px] font-bold text-white hover:bg-white/15';
@@ -656,6 +730,15 @@ export function StudioPlayer({ source, queue, onClose, onNext, onPrev }: {
                 {caption && <p className={`mt-1 line-clamp-3 text-[clamp(12px,1.9cqh,19px)] font-semibold leading-snug ${frame?.kind === 'better' ? 'text-[#B8E08C]' : 'text-white/90'}`} style={{ textShadow: '0 2px 8px rgba(0,0,0,.6)' }}>{caption}</p>}
               </div>
             )}
+            {subWords && (
+              <div className="pointer-events-none absolute inset-x-[5%] top-[61%] z-[25] text-center">
+                <p className="font-black uppercase leading-[1.1]" style={{ fontSize: 'clamp(20px,4.4cqh,46px)', textShadow: '0 0 4px #000, 0 0 10px #000, 0 4px 0 #000', WebkitTextStroke: '1.5px #000' }}>
+                  {subWords.words.map((w, k) => (
+                    <motion.span key={`${w}-${k}`} initial={k === subWords!.hi ? { scale: 1.25 } : false} animate={{ scale: 1 }} className="inline-block" style={{ color: k === subWords!.hi ? '#FFD84D' : '#fff', marginRight: '0.28em' }}>{w}</motion.span>
+                  ))}
+                </p>
+              </div>
+            )}
             {prefs.watermark && frame?.kind !== 'outro' && <p className="absolute inset-x-0 bottom-[3%] z-10 text-center text-[clamp(10px,1.5cqh,15px)] font-black tracking-wide text-white/75">chessscout.net</p>}
             {/* Countdown */}
             <AnimatePresence>
@@ -702,7 +785,7 @@ export function StudioPlayer({ source, queue, onClose, onNext, onPrev }: {
               {frame?.kind === 'title' && (
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 z-30 grid place-items-center bg-black/70 backdrop-blur-sm">
                   <motion.div initial={{ scale: 0.6, rotate: -4 }} animate={{ scale: 1, rotate: 0 }} transition={{ type: 'spring', stiffness: 260, damping: 14 }} className="px-[8%] text-center">
-                    <p className="font-black leading-[1.05] text-white" style={{ fontSize: 'clamp(28px,6.6cqh,66px)', textShadow: '0 4px 20px rgba(0,0,0,.6)' }}>{prefs.compTitle}</p>
+                    <p className="font-black leading-[1.05] text-white" style={{ fontSize: 'clamp(28px,6.6cqh,66px)', textShadow: '0 4px 20px rgba(0,0,0,.6)' }}>{compTitle}</p>
                     <p className="mt-3 inline-block rounded-full bg-[#81B64C] px-4 py-1 font-black text-white" style={{ fontSize: 'clamp(13px,2.2cqh,22px)' }}>{queue?.length} moments</p>
                   </motion.div>
                 </motion.div>
@@ -772,7 +855,7 @@ export function StudioPlayer({ source, queue, onClose, onNext, onPrev }: {
           {isComp && (
             <div className="mb-3">
               <label className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-white/50">Compilation title · clip {clipQ + 1} of {queue!.length}</label>
-              <input value={prefs.compTitle} onChange={(e) => set('compTitle', e.target.value)} className="w-full rounded-lg bg-white/5 px-3 py-2 text-[14px] font-bold text-white outline-none ring-1 ring-white/10 focus:ring-[#81B64C]" />
+              <input value={compTitle} onChange={(e) => setCompTitle(e.target.value)} className="w-full rounded-lg bg-white/5 px-3 py-2 text-[14px] font-bold text-white outline-none ring-1 ring-white/10 focus:ring-[#81B64C]" />
             </div>
           )}
           <p className="mb-1 text-[11px] font-bold uppercase tracking-wide text-white/50">Presets</p>
@@ -789,6 +872,26 @@ export function StudioPlayer({ source, queue, onClose, onNext, onPrev }: {
             {prefs.voice && <Mic size={14} className="text-[#B8E08C]" />}
           </div>
           {prefs.voice && voiceNote && <p className="-mt-1 mb-3 text-[12px] text-[#E8B447]">{voiceNote}</p>}
+          <p className="mb-1 text-[11px] font-bold uppercase tracking-wide text-white/50"><Music size={11} className="mr-1 inline" />Music &amp; sound</p>
+          <div className="mb-2 flex flex-wrap gap-1.5">
+            {MUSIC_STYLES.map((m) => (
+              <button key={m.id} onClick={() => set('music', m.id)} className="rounded-full px-2.5 py-1 text-[12px] font-bold"
+                style={{ background: prefs.music === m.id ? 'rgba(129,182,76,.25)' : 'rgba(255,255,255,.06)', color: prefs.music === m.id ? '#B8E08C' : '#C9CFCD', border: `1px solid ${prefs.music === m.id ? 'rgba(129,182,76,.5)' : 'rgba(255,255,255,.1)'}` }}>
+                {m.label}{m.bpm ? <span className="ml-1 opacity-60">{m.bpm}</span> : null}
+              </button>
+            ))}
+          </div>
+          {prefs.music !== 'off' && (
+            <div className="mb-2 flex items-center gap-2 text-[12px] text-white/70">
+              Volume
+              <input type="range" min={0.05} max={1} step={0.05} value={prefs.musicVol} onChange={(e) => set('musicVol', Number(e.target.value))} className="flex-1" />
+              {toggle('beatSync', 'Moves on the beat')}
+            </div>
+          )}
+          <div className="mb-3 flex flex-wrap gap-1.5">
+            {toggle('musicFx', 'Sound effects')}
+            {prefs.voice && toggle('subs', 'Word-by-word subtitles')}
+          </div>
           {recNote && <p className="mb-3 text-[12px] text-[#E8B447]">{recNote}</p>}
 
           <label className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-white/50">Hook</label>
@@ -868,7 +971,7 @@ export function StudioPlayer({ source, queue, onClose, onNext, onPrev }: {
           <button onClick={copyPost} className="mt-1.5 flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-[12.5px] font-bold"><Copy size={13} />{copied ? 'Copied' : 'Copy caption'}</button>
 
           <p className="mt-3 text-[11.5px] leading-snug text-white/45">
-            Space plays, arrows step, R restarts, N / P next and previous moment, Esc leaves clean view. "Record clip" saves just the frame (Chrome on a computer: pick this tab and turn on tab audio for move sounds).
+            Music is made live in the browser (original, no copyright claims); it starts on the beat when you press Play. Space plays, arrows step, R restarts, N / P next and previous moment, Esc leaves clean view. "Record clip" saves just the frame (Chrome on a computer: pick this tab and turn on tab audio for move sounds).
             On a phone, open Clean view and use the screen recorder; tap the top-left corner to bring the controls back. Settings are remembered for the next clip.
           </p>
           <p className="mt-2 text-[11px] text-white/35"><Eye size={12} className="mr-1 inline" />{clip.label}</p>
