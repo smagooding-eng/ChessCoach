@@ -11,7 +11,7 @@ import { BOTS, getBotMove, BotConfig, analyzeMoveQuality, type MoveAnalysisResul
 import { useBotAvatar, useBotName, useBotDescription, useBotTag } from '@/lib/botAvatars';
 import { OPENINGS, type OpeningLine } from '@/lib/openings';
 import { AICoachCard, type AICoachTone } from '@/components/AICoachCard';
-import { ArrowLeft, RotateCcw, Flag, Clock, Trophy, Swords, Zap, ChevronRight, ChevronDown, ChevronUp, BookOpen, Check, X, Lightbulb } from 'lucide-react';
+import { ArrowLeft, RotateCcw, Undo2, Flag, Clock, Trophy, Swords, Zap, ChevronRight, ChevronDown, ChevronUp, BookOpen, Check, X, Lightbulb } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { apiFetch } from '@/lib/api';
@@ -545,6 +545,21 @@ function GameView({ bot, onBack, startFen, startColor, isOnboarding }: { bot: Bo
     }
   }, [chess, checkGameEnd, makeBotMove, clearBotTimeout, deferAnalysis]);
 
+  // Take back your last move (and the bot's reply, if it already played).
+  const myMovesPlayed = moves.some(m => m.color === playerColor);
+  const handleTakeback = () => {
+    if (result !== 'playing' || !myMovesPlayed) return;
+    gameIdRef.current++;           // drop a bot move that's still being worked out
+    clearBotTimeout();
+    setThinking(false);
+    const lastIsBot = moves.length > 0 && moves[moves.length - 1].color !== playerColor;
+    const n = lastIsBot ? 2 : 1;
+    for (let i = 0; i < n; i++) chess.undo();
+    setMoves(prev => prev.slice(0, Math.max(0, prev.length - n)));
+    setSelectedMoveIdx(null);
+    setFen(chess.fen());
+  };
+
   const handleResign = () => {
     if (!window.confirm('Resign this game? This counts as a loss.')) return;
     clearBotTimeout();
@@ -725,6 +740,13 @@ function GameView({ bot, onBack, startFen, startColor, isOnboarding }: { bot: Bo
                   title="Turn the board around (the game carries on)"
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 text-muted-foreground text-xs font-bold hover:bg-white/10 transition-colors">
                   <RotateCcw className="w-3 h-3" /> Switch
+                </button>
+              )}
+              {result === 'playing' && (
+                <button onClick={handleTakeback} disabled={!myMovesPlayed}
+                  title="Take back your last move"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 text-muted-foreground text-xs font-bold hover:bg-white/10 transition-colors disabled:opacity-40">
+                  <Undo2 className="w-3 h-3" /> Take back
                 </button>
               )}
               {result === 'playing' && (

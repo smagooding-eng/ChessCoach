@@ -343,6 +343,8 @@ export function useLivePlay() {
   }, []);
   const move = useCallback((san: string) => { if (game) send({ type: 'move', gameId: game.id, san }); }, [game, send]);
   const resign = useCallback(() => { if (game) send({ type: 'resign', gameId: game.id }); }, [game, send]);
+  // Bot games only: take back your last move (and the bot's reply).
+  const takeback = useCallback(() => { if (game) { setPremove(null); send({ type: 'takeback', gameId: game.id }); } }, [game, send]);
   const offerDraw = useCallback(() => { if (game) send({ type: 'draw_offer', gameId: game.id }); }, [game, send]);
   const acceptDraw = useCallback(() => { if (game) send({ type: 'draw_accept', gameId: game.id }); }, [game, send]);
   const declineDraw = useCallback(() => { if (game) send({ type: 'draw_decline', gameId: game.id }); }, [game, send]);
@@ -383,7 +385,7 @@ export function useLivePlay() {
   return {
     status, error, game, color, queuedTc, queuedMode, opponentDisconnect, premove, setPremove,
     queuedAt, botOfferMs, waitingFor, waitingKind, serverOffset, notice, approveRequest, connected, joinSeek, seekGone, clearSeekGone,
-    enterQueue, offerRematch, declineRematch, cancel, playBot, acceptChallenge, move, resign, offerDraw, acceptDraw, declineDraw,
+    enterQueue, offerRematch, declineRematch, cancel, playBot, acceptChallenge, move, resign, takeback, offerDraw, acceptDraw, declineDraw,
     reset, tournamentWaiting, tournamentOver, tournamentReady, tournamentPause,
   };
 }

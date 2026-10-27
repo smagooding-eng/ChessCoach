@@ -4,7 +4,7 @@ import { ChessBoard } from '@/components/ChessBoard';
 import { EvalBar, MaterialStrip } from '@/components/GameStatusStrip';
 import { Chess } from 'chess.js';
 import type { useLivePlay } from '@/hooks/use-live-play';
-import { Flag, ArrowLeft, Trophy, Clock, Handshake, X, WifiOff, BookOpen, RotateCcw, UserPlus, Check } from 'lucide-react';
+import { Flag, Undo2, ArrowLeft, Trophy, Clock, Handshake, X, WifiOff, BookOpen, RotateCcw, UserPlus, Check } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { useMoveBrowser, positionsFromSan } from '@/hooks/use-move-browser';
 import { MoveBrowserBar } from '@/components/MoveBrowserBar';
@@ -300,6 +300,14 @@ export function LiveGame({ live, onLeave }: { live: ReturnType<typeof useLivePla
       )}
       {game.status === 'active' && (
         <div className="flex gap-2 flex-wrap">
+          {opponentIsBot && (
+            <button onClick={live.takeback} disabled={game.sanMoves.length < (color === 'w' ? 1 : 2)}
+              title="Take back your last move"
+              className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold disabled:opacity-50"
+              style={{ background: 'rgba(255,255,255,0.08)', color: '#FFFFFF', border: '1px solid rgba(255,255,255,0.12)' }}>
+              <Undo2 className="w-3.5 h-3.5" /> Take back
+            </button>
+          )}
           <button onClick={offerDraw} disabled={!!youOfferedDraw || !!opponentOfferedDraw || game.turn !== color}
             title={game.turn !== color ? 'You can only offer a draw on your own turn' : 'Offer your opponent a draw'}
             className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold disabled:opacity-50"

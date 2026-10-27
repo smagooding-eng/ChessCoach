@@ -1131,6 +1131,32 @@ function handleResign(ws: WebSocket, userId: string, gameId: string) {
   else if (g.black.userId === userId) finishGame(g, 'white', 'resignation');
 }
 
+// Bot games only (always casual): take back your last move, plus the bot's
+// reply if it already played. Time already used stays used.
+function handleTakeback(ws: WebSocket, userId: string, gameId: string) {
+  const g = games.get(gameId);
+  if (!g || g.status !== 'active') return;
+  const mySide: 'w' | 'b' | null = g.white.userId === userId ? 'w' : g.black.userId === userId ? 'b' : null;
+  if (!mySide) return;
+  const opp = mySide === 'w' ? g.black : g.white;
+  if (opp.kind !== 'bot') return send(ws, { type: 'error', message: 'Takebacks are only for bot games' });
+  const hist = g.chess.history({ verbose: true });
+  const n = hist.length > 0 && hist[hist.length - 1].color !== mySide ? 2 : 1;
+  if (hist.length < n || hist[hist.length - n].color !== mySide) return send(ws, { type: 'error', message: 'No move of yours to take back' });
+  if (g.botTimer) { clearTimeout(g.botTimer); g.botTimer = undefined; }
+  // Charge the side on move for the time it has used so far, then restart the clock for you.
+  const now = Date.now();
+  const elapsed = now - g.lastTickAt;
+  if (g.chess.turn() === 'w') g.whiteTimeMs = Math.max(0, g.whiteTimeMs - elapsed);
+  else g.blackTimeMs = Math.max(0, g.blackTimeMs - elapsed);
+  g.lastTickAt = now;
+  for (let i = 0; i < n; i++) { g.chess.undo(); g.sanMoves.pop(); }
+  g.drawOfferFrom = undefined;
+  scheduleExpire(g);
+  scheduleBotIfNeeded(g);
+  broadcast(g.id, { type: 'state', state: gamePublicState(g) });
+}
+
 function handleDrawOffer(ws: WebSocket, userId: string, gameId: string) {
   const g = games.get(gameId);
   if (!g || g.status !== 'active') return;
@@ -1359,6 +1385,9 @@ export function attachLiveServer(server: HttpServer) {
             break;
           case 'resign':
             handleResign(ws, info.userId, msg.gameId);
+            break;
+          case 'takeback':
+            handleTakeback(ws, info.userId, msg.gameId);
             break;
           case 'draw_offer':
             handleDrawOffer(ws, info.userId, msg.gameId);
