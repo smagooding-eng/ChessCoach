@@ -641,8 +641,7 @@ export function GameReplay() {
   // Redesign only: Analysis / Key Moments / Report. Classic shows everything
   // in one stack exactly as before (the wrappers below are display:contents).
   const { enabled: redesign } = useDashboardRedesignFlag();
-  // Games open on the Report (Pro): the step-by-step review is a button away.
-  const [gtab, setGtab] = useState<'analysis' | 'moments' | 'report'>('report');
+  const [gtab, setGtab] = useState<'analysis' | 'moments' | 'report'>('analysis');
   // Lifted from MistakeFixView so the existing move-navigation buttons
   // below can drive stepping through the engine's suggested
   // continuation while that tab is active, instead of a separate
@@ -665,11 +664,10 @@ export function GameReplay() {
   const [practiceMode, setPracticeMode] = useState(false);
   // Step-by-step review (coach above the board, Next to go on) or the full
   // analysis view.
-  // Free members get the step-by-step review. Pro members open straight on
-  // the game report (the full analysis already has everything the
-  // step-by-step review shows); "Step-by-step review" is still a tap away.
-  const [guided, setGuided] = useState(false);
-  useEffect(() => { setGuided(false); setGtab('report'); }, [id]);
+  // Every game opens in the step-by-step review (Pro included); Full analysis
+  // is only for this visit, when chosen.
+  const [guided, setGuided] = useState(true);
+  useEffect(() => { setGuided(true); }, [id]);
   // Phones: the coach card under the move buttons stretches down to the bottom
   // bar, using the space that used to hold the opening name and a back link.
   const gridRef = useRef<HTMLDivElement | null>(null);
@@ -884,8 +882,8 @@ export function GameReplay() {
   // analysis view is for Pro members (who can switch between the two).
   const canFullAnalysis = !!isPremium;
   const showGuided = !canFullAnalysis || guided;
-  // Leaving the step-by-step review (its "Full analysis" button) lands on the report too.
-  const exitGuided = useCallback(() => { setGtab('report'); setGuided(false); }, []);
+  // The last step of the step-by-step review: "Continue to Pro report".
+  const openReport = useCallback(() => { setGtab('report'); setGuided(false); }, []);
   // Full analysis always comes with the AI coach: a Pro member opening it on a
   // game that only has the engine review (e.g. reviewed before they went Pro)
   // gets the AI review run for it.
@@ -902,11 +900,11 @@ export function GameReplay() {
   // Open a game that hasn't been reviewed yet: start the review straight away.
   const autoReviewFor = useRef<number | null>(null);
   useEffect(() => {
-    if (!game || loadingSavedReview || reviewing || reviewError || reviewMoves.length > 0) return;
+    if (!game || !showGuided || loadingSavedReview || reviewing || reviewError || reviewMoves.length > 0) return;
     if (autoReviewFor.current === game.id) return;
     autoReviewFor.current = game.id;
     void handleReview(false);
-  }, [game, loadingSavedReview, reviewing, reviewError, reviewMoves.length, handleReview]);
+  }, [game, showGuided, loadingSavedReview, reviewing, reviewError, reviewMoves.length, handleReview]);
 
   const DEFAULT_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
   const gameStartFen = game?.startFen || DEFAULT_FEN;
@@ -1070,7 +1068,8 @@ export function GameReplay() {
         blackName={game.blackUsername}
         accuracy={gameAccuracy}
         result={game.result ?? null}
-        onExit={exitGuided}
+        onExit={() => setGuided(false)}
+        onReport={openReport}
         onBack={() => { if (window.history.length > 1) window.history.back(); else navigate('/games'); }}
       />
     );

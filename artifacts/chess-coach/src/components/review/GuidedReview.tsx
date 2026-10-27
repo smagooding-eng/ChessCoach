@@ -117,6 +117,8 @@ export interface GuidedReviewProps {
   accuracy?: { white: number; black: number } | null;
   result?: string | null;
   onExit: () => void;
+  /** Pro: the last step's "Continue to Pro report" (the full analysis, on its Report tab). */
+  onReport?: () => void;
   onBack: () => void;
   /** 'preparing' while the engine reviews the game; the moves can still be browsed. */
   status?: 'ready' | 'loading' | 'preparing' | 'error';
@@ -133,13 +135,13 @@ export interface GuidedReviewProps {
 
 type Mode = { kind: 'main' } | { kind: 'best'; step: number } | { kind: 'reply'; step: number } | { kind: 'retry'; state: 'trying' | 'right' | 'wrong' };
 
-export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flipped, onFlip, whiteName, blackName, accuracy, result, onExit, onBack, status = 'ready', progress, errorText, onRetryReview, canFullAnalysis = true, onUpgrade, canRemix = false }: GuidedReviewProps) {
+export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flipped, onFlip, whiteName, blackName, accuracy, result, onExit, onReport, onBack, status = 'ready', progress, errorText, onRetryReview, canFullAnalysis = true, onUpgrade, canRemix = false }: GuidedReviewProps) {
   // Remix (admin, for content): a new random board and piece set on every move.
   const [remixOn, setRemixOn] = useState(false);
   const remixLooks = useRef(new Map<number, BoardLook>());
   // Full analysis (with the AI coach) is Pro: members go there, others to the Pro page.
   const openFull = canFullAnalysis ? onExit : (onUpgrade ?? onExit);
-  const ProTag = () => <span className="ml-1 rounded px-1 py-px text-[9.5px] font-black tracking-wide" style={{ background: '#E8B447', color: '#1C1C1C' }}>PRO</span>;
+  const openReport = canFullAnalysis ? (onReport ?? onExit) : (onUpgrade ?? onExit);
   const max = moves.length;
   const [mode, setMode] = useState<Mode>({ kind: 'main' });
   const [expanded, setExpanded] = useState(false);
@@ -605,10 +607,10 @@ export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flippe
         <div className="flex shrink-0 items-center gap-1 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-1 lg:col-start-2 lg:row-start-4 lg:px-0">
           {tool('Best', <Star size={21} />, mode.kind === 'best', canBest, () => { if (mode.kind === 'best') setMode({ kind: 'main' }); else { setAutoPlay(true); soundFor(bestLine[0].san); setMode({ kind: 'best', step: 0 }); } })}
           {tool('Retry', <RotateCcw size={21} />, mode.kind === 'retry', canRetry, () => setMode(mode.kind === 'retry' ? { kind: 'main' } : { kind: 'retry', state: 'trying' }))}
-          <button onClick={atEnd ? openFull : next}
+          <button onClick={atEnd && mode.kind === 'main' ? openReport : next}
             className="ml-auto flex h-[52px] flex-1 items-center justify-center gap-1.5 rounded-[14px] text-[18px] font-black text-white transition-transform active:scale-[0.98]"
             style={{ background: `linear-gradient(180deg, #8FC25A, ${GREEN})`, boxShadow: '0 4px 0 #5F8F36' }}>
-            {mode.kind !== 'main' ? <><X size={18} /> Back to game</> : ply === 0 ? (status === 'ready' ? 'Start review' : 'Next') : atEnd ? <>Full analysis<ProTag /></> : 'Next'}
+            {mode.kind !== 'main' ? <><X size={18} /> Back to game</> : ply === 0 ? (status === 'ready' ? 'Start review' : 'Next') : atEnd ? <span className="text-[clamp(14px,4.4vw,18px)]">Continue to Pro report</span> : 'Next'}
           </button>
         </div>
       </div>
