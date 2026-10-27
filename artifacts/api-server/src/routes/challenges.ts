@@ -213,6 +213,7 @@ router.post("/challenges/:code/accept", requireAuth, async (req: Request, res: R
       title: "Challenge accepted",
       body: `${me.name} accepted your daily challenge (${dailyLabel(ch.timeControl)} per move). You're ${creatorWhite ? "White — your move!" : "Black."}`,
       url: `/daily/${game.id}`,
+      open: true,
     }).catch((err) => logger.warn({ err }, "[challenges] accepted push failed"));
 
     res.json({ gameId: game.id });
@@ -354,6 +355,7 @@ router.post("/challenges/:code/approve", requireAuth, async (req: Request, res: 
       title: "Challenge accepted",
       body: `${ch.creatorUsername} accepted your daily challenge. You're ${ownerWhite ? "Black." : "White — your move!"}`,
       url: `/daily/${game.id}`,
+      open: true,
     }).catch((err) => logger.warn({ err }, "[challenges] approve push failed"));
 
     res.json({ gameId: game.id });

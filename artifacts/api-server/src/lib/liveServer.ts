@@ -836,6 +836,7 @@ async function acceptLiveChallenge(ws: WebSocket, userId: string, username: stri
     title: 'Challenge accepted',
     body: `${username} accepted your ${TIME_CONTROLS[ch.timeControl as TimeControlId]?.label ?? ''} challenge and is waiting. Tap to play.`,
     url: '/live',
+    open: true,
   }).catch(err => logger.warn({ err }, 'challenge accepted push failed'));
 }
 
@@ -863,6 +864,7 @@ async function approveLiveRequest(ws: WebSocket, userId: string, code: string) {
       title: 'Challenge accepted!',
       body: `${ch.creatorUsername} accepted your ${TIME_CONTROLS[ch.timeControl as TimeControlId]?.label ?? ''} challenge and is waiting. Tap to play now.`,
       url: `/live?challenge=${ch.code}`,
+      open: true,
     }).catch(err => logger.warn({ err }, 'request approved push failed'));
   }
 }

@@ -43,13 +43,47 @@ function reportView(keepalive = false, leaving = false) {
   }).catch(() => { /* ignore */ });
 }
 
-interface Incoming { id: string | null; title: string; body: string; url: string | null; kind: string }
+interface Incoming { id: string | null; title: string; body: string; url: string | null; kind: string; open?: boolean }
+
+// A game that just started for you (your challenge was accepted): jump to it if the app is
+// on screen, or as soon as you come back to it (within 15 minutes). Not while you're in a
+// live game or on an admin screen (e.g. recording a clip) -- those get the banner instead.
+const OPEN_WINDOW_MS = 15 * 60_000;
+const opened = new Set<string>();
+const busyHere = (path: string, url: string) => (path.startsWith('/live') && !url.startsWith('/live')) || path.startsWith('/admin');
 
 export function RealtimeBridge() {
   const { isAuthenticated, authUser } = useUser();
   const [location, navigate] = useLocation();
   const [banner, setBanner] = useState<Incoming | null>(null);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingOpen = useRef<{ url: string; at: number } | null>(null);
+  const navRef = useRef(navigate); navRef.current = navigate;
+  // Came back to the app after a game started: open it.
+  useEffect(() => {
+    const go = (url: string, key: string) => {
+      if (opened.has(key) || window.location.pathname + window.location.search === url || busyHere(window.location.pathname, url)) return;
+      opened.add(key);
+      navRef.current(url);
+    };
+    const onVis = () => {
+      if (document.visibilityState !== 'visible') return;
+      const p = pendingOpen.current;
+      pendingOpen.current = null;
+      if (p) { if (Date.now() - p.at < OPEN_WINDOW_MS) go(p.url, p.url + p.at); return; }
+      // The live connection sleeps while the app is in the background, so the alert may
+      // never have arrived: look for a challenge accepted in the last 15 minutes.
+      if (!getAuthToken()) return;
+      apiFetch('/api/notifications').then((r) => (r.ok ? r.json() : null)).then((d: { notifications?: { id: string; title: string; url: string | null; kind: string; read: boolean; createdAt: string }[] } | null) => {
+        const hit = (d?.notifications ?? []).find((x) => !x.read && x.kind === 'challenge' && /^Challenge accepted/.test(x.title)
+          && !!x.url && /^\/(daily\/|live)/.test(x.url) && Date.now() - new Date(x.createdAt).getTime() < OPEN_WINDOW_MS);
+        if (hit?.url) go(hit.url, hit.id);
+      }).catch(() => {});
+    };
+    document.addEventListener('visibilitychange', onVis);
+    window.addEventListener('focus', onVis);
+    return () => { document.removeEventListener('visibilitychange', onVis); window.removeEventListener('focus', onVis); };
+  }, []);
 
   useEffect(() => {
     if (!isAuthenticated || !authUser?.id) return;
@@ -68,6 +102,11 @@ export function RealtimeBridge() {
       window.dispatchEvent(new CustomEvent('cs:notification', { detail: n }));
       // Don't pop a banner for something about the game you're already looking at.
       if (n.url && window.location.pathname === n.url) return;
+      // Your challenge was accepted: straight to the game.
+      if (n.open && n.url && !busyHere(window.location.pathname, n.url)) {
+        if (document.visibilityState === 'visible') { setBanner(null); navRef.current(n.url); return; }
+        pendingOpen.current = { url: n.url, at: Date.now() };
+      }
       // New challenges get their own card at the bottom (ChallengeToast).
       if (n.kind === 'challenge' && n.url?.startsWith('/challenge/')) return;
       setBanner(n);

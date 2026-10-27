@@ -91,7 +91,7 @@ export function emitToUser(userId: string, event: string, data: unknown): void {
   }
 }
 
-export interface NotifyInput { title: string; body: string; url?: string; kind?: string; tag?: string; /** Extra push options (buttons, stay on screen, vibration). */ push?: Partial<PushPayload> }
+export interface NotifyInput { title: string; body: string; url?: string; kind?: string; tag?: string; /** The app opens `url` right away if it's on screen (a game that just started). */ open?: boolean; /** Extra push options (buttons, stay on screen, vibration). */ push?: Partial<PushPayload> }
 
 export async function notifyUser(userId: string, n: NotifyInput): Promise<void> {
   // Already looking at that game? The board updates by itself -- keep a
@@ -116,7 +116,7 @@ export async function notifyUser(userId: string, n: NotifyInput): Promise<void> 
     logger.warn({ err, userId }, "[notify] save failed");
   }
   if (watching) return;
-  emitToUser(userId, "notification", { id, title: n.title, body: n.body, url: n.url ?? null, kind: n.kind ?? "general", createdAt: new Date().toISOString() });
+  emitToUser(userId, "notification", { id, title: n.title, body: n.body, url: n.url ?? null, kind: n.kind ?? "general", open: n.open === true, createdAt: new Date().toISOString() });
   if (isPushConfigured()) {
     // Tagged by page (e.g. one tag per daily game) so a newer alert about the
     // same game replaces the older one on the device instead of stacking.
