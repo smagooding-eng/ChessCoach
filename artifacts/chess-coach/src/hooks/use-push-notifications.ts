@@ -76,7 +76,7 @@ export function usePushNotifications() {
   // ChessScout), not to a browser site setting.
   const inApp = typeof window !== 'undefined' && isInPlayApp();
   const blockedHelp = inApp
-    ? 'Notifications are off for the ChessScout app. Open Android Settings › Apps › ChessScout › Notifications (or long-press the ChessScout icon › App info › Notifications), turn them on, then come back here.'
+    ? 'Notifications are off for the ChessScout app. Open Android Settings › Apps › ChessScout › Notifications and turn them on. If they already show as allowed there, close ChessScout completely (App info › Force stop) and open it again: the app only re-checks on a fresh start. Still off after that? In Chrome: Settings › Site settings › All sites › chessscout.net › Clear & reset, then open ChessScout and sign in again.'
     : 'Notifications are blocked for chessscout.net. Allow them in your browser\'s site settings (the icon left of the address bar), then tap again.';
 
   useEffect(() => {
