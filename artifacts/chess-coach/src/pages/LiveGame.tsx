@@ -333,10 +333,6 @@ export function LiveGame({ live, onLeave }: { live: ReturnType<typeof useLivePla
       <PlayerStrip p={top} ms={topMs} active={topActive} isYou={false} awayMs={oppAwayMs} />
       <MaterialStrip fen={game.fen} color={youAreWhite ? 'b' : 'w'} className="px-1" />
 
-      {/* Engine evaluation only after the game -- showing it during a game
-          against a real person would be an engine aid. */}
-      {game.status === 'finished' && <EvalBar fen={game.fen} />}
-
       <ChessBoard
         fen={browser.viewing && browser.fen ? browser.fen : game.fen}
         flipped={!youAreWhite}
@@ -381,6 +377,9 @@ export function LiveGame({ live, onLeave }: { live: ReturnType<typeof useLivePla
       <MaterialStrip fen={game.fen} color={youAreWhite ? 'w' : 'b'} className="px-1" />
       <PlayerStrip p={bottom} ms={bottomMs} active={bottomActive} isYou={true} awayMs={myAwayMs} />
       <MoveBrowserBar browser={browser} yourTurn={isPlayerTurn} />
+      {/* Engine evaluation only after the game (during a game against a real
+          person it would be an engine aid). Below the board, so it never moves it. */}
+      {game.status === 'finished' && <EvalBar fen={game.fen} />}
 
       <div className="space-y-3 lg:hidden">{messages}</div>
 

@@ -15,7 +15,7 @@ import { Chess } from "chess.js";
 import {
   db, gamesTable, correspondenceGamesTable, correspondenceQueueTable, type CorrespondenceGame,
 } from "@workspace/db";
-import { eq, and, or, ne, desc } from "drizzle-orm";
+import { eq, and, or, ne, desc, sql } from "drizzle-orm";
 import { notifyUser, emitToUser } from "./notify";
 import { logger } from "./logger";
 import { updateRating } from "./glicko2";
@@ -482,8 +482,109 @@ export async function makeMove(gameId: string, userId: string, san: string): Pro
   touched(updated);
 
   const mover = isWhite ? game.whiteUsername : game.blackUsername;
+  // The opponent planned for this (a conditional move or a premove): their reply goes in now.
+  const reply = await plannedReply(gameId, nextTurnUserId, chess, moveResult.san);
+  if (reply) {
+    const next = await makeMove(gameId, nextTurnUserId, reply);
+    if (next.success) {
+      notifyUser(nextTurnUserId, { title: "Your planned move was played", body: `${mover} played ${moveResult.san}, and your ${reply} went in automatically.`, url: gameUrl(gameId), kind: "daily" })
+        .catch((err) => logger.warn({ err }, "[daily] notify failed"));
+      return { success: true, game: next.game ?? updated };
+    }
+  }
   push(nextTurnUserId, "Your move", `${mover} played ${moveResult.san}. You have ${dailyLabel(game.timeControl)} to reply.`, gameUrl(gameId));
   return { success: true, game: updated };
+}
+
+// ── Conditional moves and premoves ──────────────────────────────────────────
+// While it's the opponent's turn a player can plan ahead: conditional lines
+// ("if they play A I reply B; then if C, D…") and/or a premove (one move
+// played after whatever they do, if it's still legal). Plans belong to the
+// position they were made in (base_ply); any other move clears them.
+let plansReady: Promise<void> | null = null;
+function ensurePlans(): Promise<void> {
+  return (plansReady ??= (async () => {
+    await db.execute(sql`CREATE TABLE IF NOT EXISTS correspondence_plans (
+      game_id VARCHAR NOT NULL, user_id VARCHAR NOT NULL, base_ply INTEGER NOT NULL,
+      lines JSONB NOT NULL DEFAULT '[]', premove JSONB, updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      PRIMARY KEY (game_id, user_id))`);
+  })());
+}
+function rowsOfAny<T>(r: unknown): T[] { return Array.isArray(r) ? (r as T[]) : ((r as { rows?: T[] })?.rows ?? []); }
+const bareSan = (s: string) => s.replace(/[+#?!]/g, "");
+export interface DailyPlan { basePly: number; lines: string[][]; premove: { from: string; to: string; promotion?: string } | null }
+
+export async function getPlan(gameId: string, userId: string): Promise<DailyPlan | null> {
+  await ensurePlans();
+  const [r] = rowsOfAny<{ base_ply: number; lines: string[][]; premove: DailyPlan["premove"] }>(await db.execute(sql`SELECT base_ply, lines, premove FROM correspondence_plans WHERE game_id = ${gameId} AND user_id = ${userId}`));
+  return r ? { basePly: r.base_ply, lines: r.lines ?? [], premove: r.premove ?? null } : null;
+}
+
+/** Save a player's plan for the current position (it must be the opponent's turn). */
+export async function savePlan(gameId: string, userId: string, plan: { lines?: unknown; premove?: unknown }): Promise<{ success: boolean; error?: string; plan?: DailyPlan | null }> {
+  await ensurePlans();
+  const [game] = await db.select().from(correspondenceGamesTable).where(eq(correspondenceGamesTable.id, gameId));
+  if (!game || game.status !== "active") return { success: false, error: "Game not active" };
+  if (game.whiteUserId !== userId && game.blackUserId !== userId) return { success: false, error: "Not your game" };
+  if (game.turnUserId === userId) return { success: false, error: "It's your move: just play it" };
+  const chess = new Chess();
+  if (game.pgn) chess.loadPgn(game.pgn);
+  const basePly = chess.history().length;
+  const lines: string[][] = [];
+  for (const raw of (Array.isArray(plan.lines) ? plan.lines : []).slice(0, 30)) {
+    if (!Array.isArray(raw) || raw.length < 2) continue;
+    const c = new Chess(chess.fen());
+    const line: string[] = [];
+    for (const san of raw.slice(0, 20)) {
+      let m; try { m = c.move(String(san)); } catch { m = null; }
+      if (!m) break;
+      line.push(m.san);
+    }
+    if (line.length % 2 === 1) line.pop();      // ends on one of your moves
+    if (line.length >= 2) lines.push(line);
+  }
+  let premove: DailyPlan["premove"] = null;
+  const pm = plan.premove as { from?: string; to?: string; promotion?: string } | null | undefined;
+  if (pm && /^[a-h][1-8]$/.test(pm.from ?? "") && /^[a-h][1-8]$/.test(pm.to ?? "")) premove = { from: pm.from!, to: pm.to!, ...(pm.promotion && /^[qrbn]$/.test(pm.promotion) ? { promotion: pm.promotion } : {}) };
+  if (!lines.length && !premove) {
+    await db.execute(sql`DELETE FROM correspondence_plans WHERE game_id = ${gameId} AND user_id = ${userId}`);
+    return { success: true, plan: null };
+  }
+  await db.execute(sql`
+    INSERT INTO correspondence_plans (game_id, user_id, base_ply, lines, premove, updated_at)
+    VALUES (${gameId}, ${userId}, ${basePly}, ${JSON.stringify(lines)}::jsonb, ${premove ? JSON.stringify(premove) : null}::jsonb, now())
+    ON CONFLICT (game_id, user_id) DO UPDATE SET base_ply = EXCLUDED.base_ply, lines = EXCLUDED.lines, premove = EXCLUDED.premove, updated_at = now()`);
+  return { success: true, plan: { basePly, lines, premove } };
+}
+
+/** After the opponent's move: the planned reply, if any (and the rest of the plan is kept or cleared). */
+async function plannedReply(gameId: string, userId: string, chess: Chess, theirSan: string): Promise<string | null> {
+  let plan: DailyPlan | null = null;
+  try { plan = await getPlan(gameId, userId); } catch { return null; }
+  if (!plan) return null;
+  const ply = chess.history().length;            // after their move
+  const clear = () => db.execute(sql`DELETE FROM correspondence_plans WHERE game_id = ${gameId} AND user_id = ${userId}`).catch(() => {});
+  if (plan.basePly !== ply - 1) { await clear(); return null; }
+  let reply: string | null = null;
+  let rest: string[][] = [];
+  const hits = plan.lines.filter((l) => l.length >= 2 && bareSan(l[0]) === bareSan(theirSan));
+  if (hits.length) {
+    reply = hits[0][1];
+    rest = hits.filter((l) => l[1] === reply && l.length >= 4).map((l) => l.slice(2));
+  } else if (plan.premove) {
+    try {
+      const m = new Chess(chess.fen()).move({ from: plan.premove.from, to: plan.premove.to, promotion: plan.premove.promotion ?? "q" });
+      reply = m?.san ?? null;
+    } catch { reply = null; }
+  }
+  if (!reply) { await clear(); return null; }
+  if (rest.length) {
+    await db.execute(sql`UPDATE correspondence_plans SET base_ply = ${ply + 1}, lines = ${JSON.stringify(rest)}::jsonb, premove = NULL, updated_at = now()
+      WHERE game_id = ${gameId} AND user_id = ${userId}`).catch(() => {});
+  } else {
+    await clear();
+  }
+  return reply;
 }
 
 export async function resignGame(gameId: string, userId: string): Promise<MoveResult> {

@@ -2,7 +2,7 @@ import { Router, type IRouter, type Request, type Response } from "express";
 import { requireAuth } from "../middlewares/authMiddleware";
 import {
   listCorrespondenceTimeControls, createOrJoinCorrespondenceGame, leaveQueue, listQueueForUser,
-  listGamesForUser, getGame, joinDailySeek, makeMove, resignGame, offerDraw, respondDraw, getDailyRating,
+  listGamesForUser, getGame, joinDailySeek, getPlan, savePlan, makeMove, resignGame, offerDraw, respondDraw, getDailyRating,
 } from "../lib/correspondence";
 
 // Daily games (1 / 3 / 7 days per move). Kept on the /correspondence/*
@@ -93,6 +93,19 @@ const action = (fn: (gameId: string, userId: string, req: Request) => Promise<{ 
       res.status(500).json({ error: "Request failed", details: err.cause?.message ?? err.message });
     }
   };
+
+// Conditional moves and premove, planned while it's the opponent's turn.
+router.get("/correspondence/games/:id/plan", requireAuth, async (req: Request, res: Response) => {
+  try { res.json({ plan: await getPlan(String(req.params.id), req.user!.id) }); }
+  catch (err: any) { res.status(500).json({ error: "Failed to load plan", details: err.cause?.message ?? err.message }); }
+});
+router.put("/correspondence/games/:id/plan", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const r = await savePlan(String(req.params.id), req.user!.id, req.body ?? {});
+    if (!r.success) { res.status(400).json({ error: r.error }); return; }
+    res.json({ plan: r.plan });
+  } catch (err: any) { res.status(500).json({ error: "Failed to save plan", details: err.cause?.message ?? err.message }); }
+});
 
 router.post("/correspondence/games/:id/move", requireAuth, action(async (id, uid, req) => {
   const { san } = req.body as { san?: string };

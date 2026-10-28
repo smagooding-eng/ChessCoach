@@ -2,7 +2,9 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { RatePlayCard } from '@/components/RatePlayCard';
 import { Link, useLocation, useParams } from 'wouter';
 import { Chess } from 'chess.js';
-import { ArrowLeft, Flag, Handshake, Loader2, BookOpen, Clock } from 'lucide-react';
+import { ArrowLeft, Flag, Handshake, Loader2, BookOpen, Clock, GitBranch, X, Undo2 } from 'lucide-react';
+import { MoveBrowserBar } from '@/components/MoveBrowserBar';
+import { useMoveBrowser, positionsFromSan } from '@/hooks/use-move-browser';
 import { ChessBoard } from '@/components/ChessBoard';
 import { GameOverOverlay, OverlayButton } from '@/components/GameOverOverlay';
 import { MaterialStrip } from '@/components/GameStatusStrip';
@@ -83,6 +85,36 @@ export function DailyGame() {
     if (!game?.pgn) return [] as string[];
     try { const c = new Chess(); c.loadPgn(game.pgn); return c.history(); } catch { return []; }
   }, [game?.pgn]);
+
+  // Look back through the game.
+  const positions = useMemo(() => positionsFromSan(moveList), [moveList]);
+  const browser = useMoveBrowser(positions, id);
+
+  // Planning ahead while it's the opponent's turn: a premove and conditional lines.
+  type Plan = { basePly: number; lines: string[][]; premove: { from: string; to: string; promotion?: string } | null };
+  const [plan, setPlan] = useState<Plan | null>(null);
+  const [planning, setPlanning] = useState(false);
+  const [draft, setDraft] = useState<string[]>([]);
+  const waiting = !!game && game.status === 'active' && !myTurn;
+  const loadPlan = useCallback(async () => {
+    try { const r = await apiFetch(`/api/correspondence/games/${id}/plan`, { credentials: 'include' }); if (r.ok) setPlan((await r.json()).plan ?? null); } catch { /* ignore */ }
+  }, [id]);
+  useEffect(() => { if (waiting) void loadPlan(); else { setPlan(null); setPlanning(false); setDraft([]); } }, [waiting, game?.pgn, loadPlan]);
+  const savePlan = async (next: { lines: string[][]; premove: Plan['premove'] }) => {
+    setError('');
+    try {
+      const r = await apiFetch(`/api/correspondence/games/${id}/plan`, {
+        method: 'PUT', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(next),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) { setError(d.error || 'Could not save'); return; }
+      setPlan(d.plan ?? null);
+    } catch { setError('Connection problem — try again'); }
+  };
+  const planFen = useMemo(() => {
+    if (!game) return null;
+    try { const c = new Chess(game.fen); for (const s of draft) c.move(s); return c.fen(); } catch { return game.fen; }
+  }, [game?.fen, draft]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const post = async (path: string, body?: object) => {
     setSending(true); setError('');
@@ -204,11 +236,17 @@ export function DailyGame() {
       <MaterialStrip fen={game.fen} color={white ? 'b' : 'w'} className="px-1" />
 
       <ChessBoard
-        fen={game.fen}
+        fen={browser.viewing && browser.fen ? browser.fen : planning && planFen ? planFen : game.fen}
         flipped={!white}
-        practiceMode={myTurn && !sending}
+        practiceMode={!browser.viewing && ((myTurn && !sending) || planning)}
+        suppressConfirmMoves={planning}
+        premoveMode={waiting && !planning && !browser.viewing}
+        premoveColor={white ? 'w' : 'b'}
+        premove={plan?.premove ? { from: plan.premove.from, to: plan.premove.to } : null}
+        onPremoveSet={(p) => { void savePlan({ lines: plan?.lines ?? [], premove: p }); }}
         expectedMoveSan={null}
         onMovePlayed={(san) => {
+          if (planning) { setDraft((d) => [...d, san]); return; }
           // show the move straight away, then confirm with the server
           try {
             const c = new Chess(); if (game.pgn) c.loadPgn(game.pgn);
@@ -216,9 +254,9 @@ export function DailyGame() {
           } catch { /* server will reject */ }
           void post('move', { san });
         }}
-        lastMove={lastMove}
+        lastMove={browser.viewing ? browser.lastMove : planning ? null : lastMove}
         moveQuality={null}
-        boardOverlay={game.status === 'finished' && game.termination !== 'aborted' ? (() => {
+        boardOverlay={game.status === 'finished' && game.termination !== 'aborted' && !browser.viewing ? (() => {
           const won = (game.result === 'white' && white) || (game.result === 'black' && !white);
           const after = white ? game.whiteRatingAfter : game.blackRatingAfter;
           return (
@@ -248,6 +286,52 @@ export function DailyGame() {
 
       <MaterialStrip fen={game.fen} color={white ? 'w' : 'b'} className="px-1" />
       <Strip name={`${you} (you)`} rating={myRating} side={white ? 'white' : 'black'} active={myTurn} />
+      {!planning && <MoveBrowserBar browser={browser} yourTurn={myTurn} />}
+
+      {/* Plan ahead while it's their move: a premove, and conditional moves. */}
+      {waiting && !browser.viewing && (
+        <div className="space-y-2.5 p-3.5" style={cardStyle}>
+          {planning ? (
+            <>
+              <p className="flex items-center gap-2 text-[14px] font-extrabold" style={{ color: PT.text }}><GitBranch size={16} style={{ color: PT.green }} /> New conditional line</p>
+              <p className="text-[12.5px]" style={{ color: PT.muted }}>
+                {draft.length === 0 ? `On the board, play the move you expect from ${opp}.` : draft.length % 2 === 1 ? 'Now play your reply.' : `Saved as: if ${opp} plays these moves, your replies go in automatically. Keep going to plan further, or save.`}
+              </p>
+              <p className="min-h-[20px] text-[13.5px] font-bold" style={{ color: PT.text }}>
+                {draft.map((m, i) => (i % 2 === 0 ? `If ${m} → ` : `${m}${i < draft.length - 1 ? ', then ' : ''}`)).join('')}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <button onClick={() => setDraft((d) => d.slice(0, -1))} disabled={!draft.length} className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-[12.5px] font-bold disabled:opacity-40" style={ghostBtn}><Undo2 size={14} /> Undo</button>
+                <button onClick={() => { void savePlan({ lines: [...(plan?.lines ?? []), draft], premove: plan?.premove ?? null }); setPlanning(false); setDraft([]); }}
+                  disabled={draft.length < 2 || draft.length % 2 === 1} className="rounded-lg px-3.5 py-2 text-[12.5px] font-extrabold disabled:opacity-40" style={greenBtn}>Save line</button>
+                <button onClick={() => { setPlanning(false); setDraft([]); }} className="rounded-lg px-3 py-2 text-[12.5px] font-bold" style={ghostBtn}>Cancel</button>
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="flex items-center gap-2 text-[14px] font-extrabold" style={{ color: PT.text }}><GitBranch size={16} style={{ color: PT.green }} /> Plan ahead</p>
+              <p className="text-[12.5px]" style={{ color: PT.muted }}>
+                Premove: move a piece on the board now and it's played after {opp}'s move (if it's still legal). Conditional moves: "if {opp} plays this, I reply that", played for you automatically.
+              </p>
+              {plan?.premove && (
+                <div className="flex items-center justify-between gap-2 rounded-lg px-3 py-2" style={{ background: 'rgba(255,140,90,.12)', border: '1px solid rgba(255,140,90,.35)' }}>
+                  <span className="text-[13px] font-bold" style={{ color: PT.text }}>Premove: {plan.premove.from} → {plan.premove.to}</span>
+                  <button onClick={() => void savePlan({ lines: plan.lines, premove: null })} aria-label="Cancel premove" className="grid h-7 w-7 place-items-center rounded-md" style={ghostBtn}><X size={14} /></button>
+                </div>
+              )}
+              {(plan?.lines ?? []).map((l, i) => (
+                <div key={i} className="flex items-center justify-between gap-2 rounded-lg px-3 py-2" style={{ background: PT.greenSoft, border: `1px solid ${PT.greenLine}` }}>
+                  <span className="min-w-0 text-[13px] font-bold" style={{ color: PT.text }}>{l.map((m, k) => (k % 2 === 0 ? `If ${m} → ` : `${m}${k < l.length - 1 ? ', then ' : ''}`)).join('')}</span>
+                  <button onClick={() => void savePlan({ lines: plan!.lines.filter((_, k) => k !== i), premove: plan!.premove })} aria-label="Remove line" className="grid h-7 w-7 shrink-0 place-items-center rounded-md" style={ghostBtn}><X size={14} /></button>
+                </div>
+              ))}
+              <button onClick={() => { setPlanning(true); setDraft([]); }} className="inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-[12.5px] font-extrabold" style={greenBtn}>
+                <GitBranch size={14} /> Add a conditional move
+              </button>
+            </>
+          )}
+        </div>
+      )}
 
       {game.status === 'active' && (
         <p className="text-center text-[13px] font-bold" style={{ color: myTurn ? PT.green : PT.muted }}>

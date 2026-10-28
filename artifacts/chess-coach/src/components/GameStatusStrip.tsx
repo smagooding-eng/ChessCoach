@@ -105,12 +105,14 @@ export function MaterialStrip({ fen, color, className, vertical = false }: { fen
     );
   }
 
-  if (pieces.length === 0 && diff <= 0) return <div className={className} style={{ minHeight: 18 }} />;
+  // Always exactly one 20px line (no wrapping, no taller glyphs), so the board
+  // under / over it never moves when a piece is captured.
+  if (pieces.length === 0 && diff <= 0) return <div className={className} style={{ height: 20 }} />;
 
   return (
-    <div className={`flex items-center gap-0.5 flex-wrap ${className ?? ''}`} style={{ minHeight: 18 }}>
+    <div className={`flex items-center gap-0.5 overflow-hidden whitespace-nowrap ${className ?? ''}`} style={{ height: 20 }}>
       {pieces.map((p, i) => (
-        <span key={i} className="text-sm leading-none opacity-80" style={{ color: color === 'w' ? '#e8e0d0' : '#3a3a3a', WebkitTextStroke: color === 'w' ? '0.5px #555' : '0.5px #ccc' }}>
+        <span key={i} className="shrink-0 text-sm leading-none opacity-80" style={{ lineHeight: '16px', color: color === 'w' ? '#e8e0d0' : '#3a3a3a', WebkitTextStroke: color === 'w' ? '0.5px #555' : '0.5px #ccc' }}>
           {PIECE_GLYPHS[p]}
         </span>
       ))}
