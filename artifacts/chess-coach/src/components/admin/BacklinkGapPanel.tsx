@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link2, Loader2, Search, ExternalLink, Mail, Copy, Check, X, Plus, Upload, ChevronDown, Sparkles } from 'lucide-react';
+import { Link2, Loader2, Search, ExternalLink, Mail, Copy, Check, X, Plus, Upload, ChevronDown, Sparkles, Send } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 
 // Admin › Growth › Competitor backlinks ("link gap"): sites that link to
@@ -12,6 +12,7 @@ interface Target {
   id: number; url: string; host: string; title: string | null; kind: string | null; competitors: string[];
   verified: boolean | null; linksUs: boolean; email: string | null; emailSource: string | null;
   status: string; notes: string | null; draftSubject: string | null; draftBody: string | null; source: string; foundAt: string;
+  sentAt?: string | null; sentTo?: string | null; openedAt?: string | null;
 }
 interface RunState { running: boolean; step: string; found: number; checked: number; error: string | null }
 
@@ -37,6 +38,34 @@ export function BacklinkGapPanel() {
   const [impText, setImpText] = useState('');
   const [busy, setBusy] = useState<number | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
+  // Sending with Resend (same daily limit as club outreach).
+  const [toEdit, setToEdit] = useState<Record<number, string>>({});
+  const [replyTo, setReplyToState] = useState(() => { try { return localStorage.getItem('cs_backlink_replyto') || ''; } catch { return ''; } });
+  const setReplyTo = (v: string) => { setReplyToState(v); try { localStorage.setItem('cs_backlink_replyto', v); } catch { /* ignore */ } };
+  const [limit, setLimit] = useState<{ remaining: number; limit: number } | null>(null);
+  const [sendingId, setSendingId] = useState<number | null>(null);
+  const loadLimit = useCallback(async () => {
+    try { const r = await apiFetch('/api/admin/backlinks/send-limit', { credentials: 'include' }); if (r.ok) setLimit(await r.json()); } catch { /* ignore */ }
+  }, []);
+  useEffect(() => { if (open) void loadLimit(); }, [open, loadLimit]);
+  const editDraft = (t: Target, patch: Partial<Pick<Target, 'draftSubject' | 'draftBody'>>) => setTargets((ts) => ts.map((x) => (x.id === t.id ? { ...x, ...patch } : x)));
+  const send = async (t: Target) => {
+    const to = (toEdit[t.id] ?? t.email ?? '').trim();
+    if (!to) { setMsg('Add an email address first (from their contact page).'); return; }
+    if (!confirm(`Send this email to ${to} from ChessScout via Resend?`)) return;
+    setSendingId(t.id); setMsg('');
+    try {
+      const r = await apiFetch(`/api/admin/backlinks/${t.id}/send`, {
+        method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to, subject: t.draftSubject, body: t.draftBody, replyTo: replyTo || undefined }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) { setMsg(d.error || 'Could not send'); return; }
+      setTargets((ts) => ts.map((x) => (x.id === t.id ? { ...x, status: x.status === 'new' ? 'contacted' : x.status, sentAt: new Date().toISOString(), sentTo: d.sentTo } : x)));
+      setMsg(`Sent to ${d.sentTo}.`);
+      void loadLimit();
+    } finally { setSendingId(null); }
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -149,6 +178,11 @@ export function BacklinkGapPanel() {
             </button>
             {loading && <Loader2 size={15} className="animate-spin" color={MUTED} />}
           </div>
+          <div className="flex flex-wrap items-center gap-2 text-[12px]" style={{ color: MUTED }}>
+            <span>Replies go to</span>
+            <input value={replyTo} onChange={(e) => setReplyTo(e.target.value)} placeholder="your email (optional)" className="w-52 rounded-lg bg-black/30 px-2.5 py-1.5 text-[12.5px] text-white placeholder:text-white/35" />
+            {limit && <span>· Resend: {limit.remaining} of {limit.limit} left today (shared with club outreach)</span>}
+          </div>
           {run && (run.running || run.step || run.error) && (
             <p className="text-[12.5px]" style={{ color: run.error ? '#FF7A80' : MUTED }}>{run.error ?? `${run.step}${run.running ? ` (${run.found} found, ${run.checked} checked)` : ''}`}</p>
           )}
@@ -203,22 +237,31 @@ export function BacklinkGapPanel() {
                       {t.verified == null && <span className="rounded px-1.5 py-0.5" style={{ background: 'rgba(255,255,255,.06)', color: MUTED }}>not checked yet</span>}
                       {t.linksUs && <span className="rounded px-1.5 py-0.5" style={{ background: 'rgba(129,182,76,.25)', color: '#fff' }}>Already links to ChessScout</span>}
                       {t.status !== 'new' && <span className="rounded px-1.5 py-0.5" style={{ background: 'rgba(232,180,71,.15)', color: GOLD }}>{STATUS_LABEL[t.status] ?? t.status}</span>}
+                      {t.sentAt && <span className="rounded px-1.5 py-0.5" style={{ background: 'rgba(129,182,76,.15)', color: GREEN }}>Sent {new Date(t.sentAt).toLocaleDateString()}{t.openedAt ? ' · opened' : ''}</span>}
                     </div>
                     <p className="mt-2 text-[12.5px]" style={{ color: t.email ? TEXT : MUTED }}>
                       <Mail size={12} className="mr-1 inline" />{t.email ?? 'No published email found: use the site\'s contact page or form.'}
                     </p>
 
-                    {t.draftBody && (
+                    {t.draftBody != null && (
                       <div className="mt-2 space-y-1.5 rounded-lg p-2.5" style={{ background: 'rgba(0,0,0,.25)' }}>
-                        <p className="text-[12.5px] font-black" style={{ color: TEXT }}>{t.draftSubject}</p>
-                        <p className="whitespace-pre-wrap text-[12.5px] leading-snug" style={{ color: '#D7DDDA' }}>{t.draftBody}</p>
+                        <input value={toEdit[t.id] ?? t.email ?? ''} onChange={(e) => setToEdit((m) => ({ ...m, [t.id]: e.target.value }))} placeholder="To: email address"
+                          className="w-full rounded-md bg-black/30 px-2.5 py-1.5 text-[12.5px] text-white placeholder:text-white/35" />
+                        <input value={t.draftSubject ?? ''} onChange={(e) => editDraft(t, { draftSubject: e.target.value })} placeholder="Subject"
+                          className="w-full rounded-md bg-black/30 px-2.5 py-1.5 text-[12.5px] font-bold text-white placeholder:text-white/35" />
+                        <textarea value={t.draftBody} onChange={(e) => editDraft(t, { draftBody: e.target.value })} rows={8}
+                          className="w-full rounded-md bg-black/30 px-2.5 py-1.5 text-[12.5px] leading-snug text-white" />
                         <div className="flex flex-wrap gap-1.5 pt-1">
+                          <button onClick={() => void send(t)} disabled={sendingId === t.id || !(t.draftSubject ?? '').trim() || !(t.draftBody ?? '').trim()}
+                            className="inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 text-[12px] font-black text-white disabled:opacity-50" style={{ background: GREEN }}>
+                            {sendingId === t.id ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />}{t.sentAt ? 'Send again with Resend' : 'Send with Resend'}
+                          </button>
                           <button onClick={() => void copy(`d${t.id}`, `${t.draftSubject}\n\n${t.draftBody}`)} className="inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 text-[12px] font-bold" style={{ background: 'rgba(255,255,255,.08)', color: TEXT }}>
                             {copied === `d${t.id}` ? <Check size={12} /> : <Copy size={12} />}Copy
                           </button>
                           {t.email && (
                             <a href={gmailUrl(t.email, t.draftSubject ?? '', t.draftBody)} target="_blank" rel="noopener noreferrer" onClick={() => { if (t.status === 'new') void setStatus(t, 'contacted'); }}
-                              className="inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 text-[12px] font-black text-white" style={{ background: GREEN }}>
+                              className="inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 text-[12px] font-bold" style={{ background: 'rgba(255,255,255,.08)', color: TEXT }}>
                               <Mail size={12} />Open in Gmail
                             </a>
                           )}
@@ -227,6 +270,9 @@ export function BacklinkGapPanel() {
                     )}
 
                     <div className="mt-2 flex flex-wrap gap-1.5">
+                      {t.draftBody == null && (
+                        <button onClick={() => editDraft(t, { draftSubject: 'ChessScout.net for your page', draftBody: '' })} className="rounded-md px-2.5 py-1.5 text-[12px] font-bold" style={{ background: 'rgba(255,255,255,.06)', color: MUTED }}>Write my own</button>
+                      )}
                       <button onClick={() => void draft(t)} disabled={busy === t.id} className="inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 text-[12px] font-black disabled:opacity-60" style={{ background: 'rgba(129,182,76,.18)', color: GREEN }}>
                         {busy === t.id ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}{t.draftBody ? 'Redraft' : 'Draft email'}
                       </button>

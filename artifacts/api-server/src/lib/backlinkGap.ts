@@ -17,6 +17,7 @@ import { logger } from "./logger";
 import { askClaude, claudeAvailable } from "./claude";
 import { trackAiUsage, AI_FEATURES, type AiFeature } from "./aiUsageTracker";
 import { fetchText, findContactEmail, parseJsonLoose } from "./clubOutreach";
+import { ensureEmailTracking } from "./emailTracking";
 
 // Claude when ANTHROPIC_API_KEY is set, otherwise OpenAI (same as club outreach).
 const SEARCH_MODELS = [process.env.OUTREACH_SEARCH_MODEL, "gpt-5.6-luna", "gpt-4.1-mini"].filter(Boolean) as string[];
@@ -78,6 +79,8 @@ export function ensureBacklinkTables(): Promise<void> {
       checked_at TIMESTAMPTZ
     )`);
     await db.execute(sql`CREATE TABLE IF NOT EXISTS backlink_settings (id VARCHAR PRIMARY KEY, value TEXT NOT NULL)`);
+    await db.execute(sql`ALTER TABLE backlink_targets ADD COLUMN IF NOT EXISTS sent_at TIMESTAMPTZ`);
+    await db.execute(sql`ALTER TABLE backlink_targets ADD COLUMN IF NOT EXISTS sent_to VARCHAR`);
   })());
 }
 
@@ -221,10 +224,12 @@ export async function importBacklinks(competitor: string, text: string): Promise
 }
 
 export async function listTargets() {
-  await ensureBacklinkTables();
+  await Promise.all([ensureBacklinkTables(), ensureEmailTracking()]);
   return rowsOf(await db.execute(sql`
     SELECT id, url, host, title, kind, competitors, verified, links_us AS "linksUs", email, email_source AS "emailSource",
-      status, notes, draft_subject AS "draftSubject", draft_body AS "draftBody", source, found_at AS "foundAt", checked_at AS "checkedAt"
+      status, notes, draft_subject AS "draftSubject", draft_body AS "draftBody", source, found_at AS "foundAt", checked_at AS "checkedAt",
+      sent_at AS "sentAt", sent_to AS "sentTo",
+      (SELECT opened_at FROM email_tracking t WHERE t.kind = 'outreach' AND t.template = 'backlink' AND LOWER(t.email) = LOWER(COALESCE(sent_to, '')) ORDER BY t.sent_at DESC LIMIT 1) AS "openedAt"
     FROM backlink_targets ORDER BY found_at DESC LIMIT 1000`));
 }
 
