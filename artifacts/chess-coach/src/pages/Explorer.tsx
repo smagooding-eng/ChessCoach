@@ -1,7 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Chess } from 'chess.js';
 import { useLocation } from 'wouter';
-import { ChevronLeft, ChevronRight, Copy, Check, FlipVertical2, RotateCcw, Swords, Cpu, Lightbulb, Camera } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Copy, Check, FlipVertical2, RotateCcw, Swords, Cpu, Lightbulb, Camera, Play, Pause, Clapperboard, Loader2 } from 'lucide-react';
+import { useHoldRepeat } from '@/hooks/use-hold-repeat';
+import { useUser } from '@/hooks/use-user';
+import { vibrateFor } from '@/context/SettingsContext';
 import { ChessBoard } from '@/components/ChessBoard';
 import { RedesignHeader } from '@/components/RedesignHeader';
 import { apiFetch } from '@/lib/api';
@@ -27,6 +30,29 @@ const fmt = (pawns: number) => `${pawns > 0 ? '+' : pawns < 0 ? '−' : ''}${Mat
 const keyOf = (fen: string) => fen.split(' ').slice(0, 4).join(' ');
 const GREEN = '#5FA83A', RED = '#D9443F';
 
+type SideMode = 'you' | 'best' | 'worst';
+const MODE_NAME: Record<SideMode, string> = { you: 'You', best: 'Stockfish (best moves)', worst: 'Worst moves' };
+
+/** A move's grade from how much it gave away (pawns, 0 = the best move). */
+function gradeFor(swing: number, isBest: boolean, bestWasMate: boolean, san: string): string {
+  if (san.includes('#')) return 'checkmate';
+  if (isBest) return 'best';
+  if (bestWasMate && swing < -2) return 'missed_win';
+  if (swing >= -0.2) return 'excellent';
+  if (swing >= -0.5) return 'good';
+  if (swing >= -1) return 'inaccuracy';
+  if (swing >= -2) return 'mistake';
+  return 'blunder';
+}
+
+/** A game made in the explorer, handed to Content Studio (sessionStorage) as a clip. */
+export interface ExplorerLine {
+  startFen: string; title: string; white: string; black: string;
+  moves: { san: string; classification: string; evalAfterCp: number | null; betterMove: string | null; loss?: number }[];
+}
+const winPct = (cp: number) => 50 + 50 * (2 / (1 + Math.exp(-0.00368208 * cp)) - 1);
+export const STUDIO_LINE_KEY = 'cs_studio_line';
+
 function readStart(): { fen: string; fromScan: boolean } {
   try {
     const q = new URLSearchParams(window.location.search);
@@ -44,6 +70,17 @@ export function Explorer() {
   const [flipped, setFlipped] = useState(() => startFen.split(' ')[1] === 'b');
   const [selected, setSelected] = useState<string | null>(null);
   const [show, setShow] = useState<'swing' | 'eval'>('swing');
+  const { authUser } = useUser();
+  const isAdmin = !!authUser?.isAdmin;
+  const forStudio = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('studio') === '1';
+  // Auto-play: Stockfish plays the best (or the worst) move for a side.
+  const [modes, setModes] = useState<{ w: SideMode; b: SideMode }>(() => {
+    const q = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+    const pick = (v: string | null | undefined, d: SideMode): SideMode => (v === 'you' || v === 'best' || v === 'worst' ? v : d);
+    return forStudio ? { w: pick(q?.get('w'), 'best'), b: pick(q?.get('b'), 'worst') } : { w: 'you', b: 'you' };
+  });
+  const [running, setRunning] = useState(false);
+  const [making, setMaking] = useState<string | null>(null);
   const [hint, setHint] = useState(false);
   const [copied, setCopied] = useState(false);
   const cache = useRef(new Map<string, Analysis>());
@@ -147,9 +184,72 @@ export function Explorer() {
     } catch { /* not legal here */ }
   }, [fen, at]);
 
-  const undo = () => setAt(a => Math.max(0, a - 1));
+  const undo = () => { setRunning(false); setAt(a => Math.max(0, a - 1)); };
   const redo = () => setAt(a => Math.min(steps.length - 1, a + 1));
-  const reset = () => { setSteps([{ fen: startFen, san: null }]); setAt(0); };
+  // Hold the arrows to speed through the line (a buzz on every move).
+  const atRef = useRef(at); atRef.current = at;
+  const lenRef = useRef(steps.length); lenRef.current = steps.length;
+  const holdBack = useHoldRepeat(() => { if (atRef.current <= 0) return false; setRunning(false); vibrateFor('move'); atRef.current -= 1; setAt(atRef.current); return true; });
+  const holdFwd = useHoldRepeat((repeat) => { if (atRef.current >= lenRef.current - 1) return false; if (repeat) vibrateFor('move'); atRef.current += 1; setAt(atRef.current); return true; });
+
+  // Auto-play: when it's an engine side's turn and Stockfish has scored the position, play its pick.
+  useEffect(() => {
+    if (!running || over || !analysis || !best) return;
+    const mode = turn === 'w' ? modes.w : modes.b;
+    if (mode === 'you') return;
+    if (steps.length > 400) { setRunning(false); return; }
+    const scored = analysis.moves.filter(m => m.cp != null || m.mate != null);
+    const pick = mode === 'best' ? best : scored.reduce((a, b) => (value(b) < value(a) ? b : a));
+    const t = setTimeout(() => play(pick.san), 450);
+    return () => clearTimeout(t);
+  }, [running, over, analysis, best, turn, modes, play, steps.length]);
+  useEffect(() => { if (over) setRunning(false); }, [over]);
+  const anyEngine = modes.w !== 'you' || modes.b !== 'you';
+
+  // Content Studio: grade every move of the line from Stockfish's scores, then open it as a clip.
+  const makeVideo = async () => {
+    const line = steps.slice(1, at + 1);
+    if (!line.length) return;
+    setRunning(false);
+    const out: ExplorerLine['moves'] = [];
+    try {
+      for (let i = 0; i < line.length; i++) {
+        setMaking(`Grading move ${i + 1} of ${line.length}…`);
+        const before = steps[i].fen;
+        let a = cache.current.get(keyOf(before));
+        if (!a) {
+          const r = await apiFetch('/api/explore/moves', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fen: before }) });
+          if (!r.ok) throw new Error('The engine is busy, try again in a moment.');
+          a = await r.json() as Analysis;
+          cache.current.set(keyOf(before), a);
+        }
+        const scored = a.moves.filter(m => m.cp != null || m.mate != null);
+        const top = scored.length ? scored.reduce((x, y) => (value(y) > value(x) ? y : x)) : null;
+        const mine = a.moves.find(m => m.san === line[i].san);
+        const sideW = a.turn === 'w';
+        if (!mine || !top || (mine.cp == null && mine.mate == null)) { out.push({ san: line[i].san!, classification: 'good', evalAfterCp: null, betterMove: null }); continue; }
+        const swing = (capped(mine) - capped(top)) / 100;
+        const isBest = value(mine) >= value(top);
+        const evalAfterCp = mine.mate != null ? (sideW ? 1 : -1) * (mine.mate > 0 ? 10000 - mine.mate : -10000 - mine.mate) : (sideW ? 1 : -1) * (mine.cp ?? 0);
+        const loss = Math.max(0, winPct(capped(top)) - winPct(capped(mine)));   // win-chance given away, for accuracy
+        out.push({ san: line[i].san!, classification: gradeFor(swing, isBest, top.mate != null && top.mate > 0, line[i].san!), evalAfterCp, betterMove: isBest ? null : top.san, loss });
+      }
+      const w = MODE_NAME[modes.w], b = MODE_NAME[modes.b];
+      const title = modes.w === 'best' && modes.b === 'worst' ? 'Perfect play vs the worst possible moves 😂'
+        : modes.w === 'worst' && modes.b === 'best' ? 'The worst moves vs perfect play 😂'
+        : modes.w === 'worst' && modes.b === 'worst' ? 'The worst chess game ever played 💀'
+        : modes.w === 'best' && modes.b === 'best' ? 'Stockfish vs Stockfish 🤖' : 'Every move graded by Stockfish 📊';
+      const payload: ExplorerLine = { startFen: steps[0].fen, title, white: w, black: b, moves: out };
+      sessionStorage.setItem(STUDIO_LINE_KEY, JSON.stringify(payload));
+      navigate('/admin/studio');
+    } catch (e) {
+      setMaking(e instanceof Error ? e.message : 'Could not make the video.');
+      setTimeout(() => setMaking(null), 3000);
+      return;
+    }
+    setMaking(null);
+  };
+  const reset = () => { setRunning(false); setSteps([{ fen: startFen, san: null }]); setAt(0); };
   const copyFen = async () => { try { await navigator.clipboard.writeText(fen); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch { /* ignore */ } };
 
   useEffect(() => {
@@ -172,7 +272,7 @@ export function Explorer() {
 
   return (
     <div className="mx-auto w-full max-w-[1120px] px-3 pb-28 md:px-0 md:pb-10">
-      <RedesignHeader dense title="Position Explorer" backHref={fromScan ? '/scan' : '/'}
+      <RedesignHeader dense title="Position Explorer" backHref={fromScan ? '/scan' : forStudio ? '/admin/studio' : '/'}
         right={<button onClick={() => setFlipped(f => !f)} aria-label="Flip board" title="Flip board" className="grid h-9 w-9 place-items-center rounded-full"><FlipVertical2 size={19} /></button>} />
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_380px]">
@@ -218,14 +318,43 @@ export function Explorer() {
 
           {/* Controls */}
           <div className="grid grid-cols-4 gap-2">
-            <button onClick={undo} disabled={at === 0} aria-label="Back" className="flex h-[46px] items-center justify-center rounded-[13px] disabled:opacity-30" style={{ ...card, color: RD.text }}><ChevronLeft className="h-6 w-6" /></button>
-            <button onClick={redo} disabled={at >= steps.length - 1} aria-label="Forward" className="flex h-[46px] items-center justify-center rounded-[13px] disabled:opacity-30" style={{ ...card, color: RD.text }}><ChevronRight className="h-6 w-6" /></button>
+            <button {...holdBack} disabled={at === 0} aria-label="Back" className="flex h-[46px] items-center justify-center rounded-[13px] disabled:opacity-30" style={{ ...card, color: RD.text }}><ChevronLeft className="h-6 w-6" /></button>
+            <button {...holdFwd} disabled={at >= steps.length - 1} aria-label="Forward" className="flex h-[46px] items-center justify-center rounded-[13px] disabled:opacity-30" style={{ ...card, color: RD.text }}><ChevronRight className="h-6 w-6" /></button>
             <button onClick={reset} disabled={steps.length === 1} className="flex h-[46px] items-center justify-center gap-1.5 rounded-[13px] text-[13px] font-extrabold disabled:opacity-30" style={{ ...card, color: RD.text }}><RotateCcw className="h-4 w-4" />Reset</button>
             <button onClick={() => navigate(`/practice?fen=${encodeURIComponent(fen)}&rating=1500&color=${turn}`)} disabled={over} className="flex h-[46px] items-center justify-center gap-1.5 rounded-[13px] text-[13px] font-extrabold text-white disabled:opacity-40" style={{ background: RD.green }}><Swords className="h-4 w-4" />Bot</button>
           </div>
         </div>
 
         <div className="space-y-3">
+          {/* Auto-play: who makes the moves */}
+          <div className="rounded-[18px] p-4" style={card}>
+            <p className="text-[14px] font-extrabold" style={{ color: RD.text }}>Who plays each side?</p>
+            <p className="mt-0.5 text-[12.5px]" style={{ color: RD.muted }}>Let Stockfish play the best or the worst move for White or Black, or make the moves yourself.</p>
+            {(['w', 'b'] as const).map(c => (
+              <div key={c} className="mt-2.5 flex items-center gap-2">
+                <span className="w-12 shrink-0 text-[12.5px] font-extrabold" style={{ color: RD.text }}>{c === 'w' ? 'White' : 'Black'}</span>
+                <div className="grid flex-1 grid-cols-3 gap-1 rounded-[11px] p-1" style={{ background: RD.cardSolid, border: `1px solid ${RD.border}` }}>
+                  {(['you', 'best', 'worst'] as const).map(m => (
+                    <button key={m} onClick={() => setModes(x => ({ ...x, [c]: m }))} className="rounded-[8px] py-1.5 text-[12.5px] font-extrabold capitalize"
+                      style={modes[c] === m ? { background: m === 'worst' ? RED : RD.green, color: '#fff' } : { color: RD.muted }}>{m === 'you' ? 'You' : m}</button>
+                  ))}
+                </div>
+              </div>
+            ))}
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <button onClick={() => setRunning(r => !r)} disabled={!anyEngine || over} className="flex items-center justify-center gap-1.5 rounded-[12px] py-2.5 text-[13px] font-extrabold text-white disabled:opacity-40" style={{ background: running ? '#E8B447' : RD.green, color: running ? '#1A1205' : '#fff' }}>
+                {running ? <><Pause className="h-4 w-4" />Pause</> : <><Play className="h-4 w-4" />Play</>}
+              </button>
+              {(isAdmin || forStudio) ? (
+                <button onClick={() => void makeVideo()} disabled={at === 0 || !!making} className="flex items-center justify-center gap-1.5 rounded-[12px] py-2.5 text-[13px] font-extrabold disabled:opacity-40" style={{ background: 'rgba(255,255,255,.06)', border: `1px solid ${RD.border}`, color: RD.text }}>
+                  {making ? <Loader2 className="h-4 w-4 animate-spin" /> : <Clapperboard className="h-4 w-4" />}Make video
+                </button>
+              ) : <span />}
+            </div>
+            {making && <p className="mt-2 text-[12px]" style={{ color: RD.muted }}>{making}</p>}
+            {running && <p className="mt-2 text-[12px]" style={{ color: RD.muted }}>{(turn === 'w' ? modes.w : modes.b) === 'you' ? `Your move as ${turn === 'w' ? 'White' : 'Black'}.` : 'Stockfish is choosing…'}</p>}
+          </div>
+
           {/* How it works + display */}
           <div className="rounded-[18px] p-4" style={card}>
             <p className="text-[14px] font-extrabold" style={{ color: RD.text }}>Tap a piece to see where it can go</p>

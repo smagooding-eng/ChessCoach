@@ -51,7 +51,10 @@ export type StudioSource =
   | { kind: 'puzzle'; puzzle: StudioPuzzle } | { kind: 'review'; review: StudioReview }
   | { kind: 'scout'; scout: StudioScout } | { kind: 'lesson'; lesson: StudioLesson }
   | { kind: 'scan'; fen: string; photo?: string; label?: string }
-  | { kind: 'promo'; promo: StudioPromo };
+  | { kind: 'promo'; promo: StudioPromo }
+  | { kind: 'line'; line: StudioLine };
+/** A game made in the Position Explorer (best / worst moves per side), every move graded by Stockfish. */
+export interface StudioLine { startFen: string; title: string; white: string; black: string; moves: { san: string; classification: string; evalAfterCp: number | null; betterMove: string | null; loss?: number }[] }
 /** Promo clips: ChessScout vs another site (your rows, your words), or "challenge your friends". */
 export interface StudioPromo { template: 'versus' | 'challenge'; hook: string; rival: string; rows: { label: string; us: string; them: string }[]; closer: string }
 
@@ -286,6 +289,28 @@ function promoClip(p: StudioPromo): Clip {
     isTrap: false, opening: null, isPromo: true, promo: p,
   };
 }
+// A game built in the explorer: played like a game review, every move graded.
+function lineClip(l: StudioLine): Clip {
+  const plies = playSans(l.startFen, l.moves.map((m) => m.san), l.moves.map((m, i) => ({ moveIndex: i, san: m.san, classification: m.classification, evalAfterCp: m.evalAfterCp ?? undefined, betterMove: m.betterMove })));
+  const blun = plies.filter((p) => p.review?.classification === 'blunder' || p.review?.classification === 'missed_win').length;
+  let key = plies.findIndex((p) => p.review?.classification === 'blunder');
+  if (key < 0) key = Math.max(0, plies.length - 1);
+  const mated = plies[plies.length - 1]?.san.includes('#');
+  // Accuracy per side from the win-chance each move gave away (same curve as game reviews).
+  const startW = (l.startFen.split(' ')[1] ?? 'w') === 'w';
+  const acc = (white: boolean) => {
+    const ls = l.moves.filter((_, i) => (i % 2 === 0) === (white === startW)).map((m) => m.loss).filter((x): x is number => typeof x === 'number');
+    if (!ls.length) return null;
+    const avg = ls.reduce((a, b) => a + b, 0) / ls.length;
+    return Math.max(0, Math.min(100, 103.1668 * Math.exp(-0.075 * avg) - 3.1668));
+  };
+  return {
+    plies, key, tags: ['review', ...(blun ? ['blunder'] : []), ...(mated ? ['checkmate'] : [])], hook: l.title, sub: `${l.white} vs ${l.black}`,
+    names: { w: l.white, b: l.black }, ratings: { w: null, b: null }, fileBase: 'chessscout-analyzer', label: `Analyzer · ${l.white} vs ${l.black}`,
+    isTrap: false, opening: null, isReview: true, accuracy: { w: acc(true), b: acc(false) }, overview: null,
+    result: mated ? (plies[plies.length - 1].color === 'w' ? '1-0' : '0-1') : null,
+  };
+}
 const NOTABLE = new Set(['brilliant', 'great', 'blunder', 'mistake', 'missed_win']);
 function reviewClip(g: StudioGame): Clip {
   const base = gameClip(g, { gameId: g.id, moveIndex: 0, tags: [], classification: null, san: '', trapName: null, opening: g.opening, white: g.white, black: g.black, whiteRating: g.whiteRating, blackRating: g.blackRating, platform: null });
@@ -438,8 +463,8 @@ function Confetti({ fire }: { fire: number }) {
   return <canvas ref={ref} className="pointer-events-none absolute inset-0 z-30 h-full w-full" />;
 }
 
-const srcKey = (x: StudioSource): string => (x.kind === 'promo' ? `promo-${x.promo.template}-${x.promo.hook}` : x.kind === 'scout' ? `s${x.scout.id}` : x.kind === 'lesson' ? `l${x.lesson.id}` : x.kind === 'scan' ? `x${x.fen}` : x.kind === 'trap' ? `t${x.trap.id}` : x.kind === 'puzzle' ? `p${x.puzzle.id}` : x.kind === 'review' ? `r${x.review.id}` : `g${x.moment.gameId}-${x.moment.moveIndex}`);
-const srcLabel = (x: StudioSource): string => (x.kind === 'promo' ? (x.promo.template === 'versus' ? `Promo · vs ${x.promo.rival}` : 'Promo · challenge friends') : x.kind === 'scout' ? `Scout · ${x.scout.username}` : x.kind === 'lesson' ? `Lesson · ${x.lesson.title}` : x.kind === 'scan' ? (x.label ? `Scan · ${x.label}` : 'Scanned position') : x.kind === 'trap' ? x.trap.name : x.kind === 'puzzle' ? `Puzzle · ${x.puzzle.rating}${x.puzzle.themes?.match(/mateIn\d/) ? ` · ${themeLabel(x.puzzle.themes.match(/mateIn\d/)![0])}` : ''}`
+const srcKey = (x: StudioSource): string => (x.kind === 'line' ? `line-${x.line.startFen}-${x.line.moves.map((m) => m.san).join(' ')}` : x.kind === 'promo' ? `promo-${x.promo.template}-${x.promo.hook}` : x.kind === 'scout' ? `s${x.scout.id}` : x.kind === 'lesson' ? `l${x.lesson.id}` : x.kind === 'scan' ? `x${x.fen}` : x.kind === 'trap' ? `t${x.trap.id}` : x.kind === 'puzzle' ? `p${x.puzzle.id}` : x.kind === 'review' ? `r${x.review.id}` : `g${x.moment.gameId}-${x.moment.moveIndex}`);
+const srcLabel = (x: StudioSource): string => (x.kind === 'line' ? `Analyzer · ${x.line.white} vs ${x.line.black}` : x.kind === 'promo' ? (x.promo.template === 'versus' ? `Promo · vs ${x.promo.rival}` : 'Promo · challenge friends') : x.kind === 'scout' ? `Scout · ${x.scout.username}` : x.kind === 'lesson' ? `Lesson · ${x.lesson.title}` : x.kind === 'scan' ? (x.label ? `Scan · ${x.label}` : 'Scanned position') : x.kind === 'trap' ? x.trap.name : x.kind === 'puzzle' ? `Puzzle · ${x.puzzle.rating}${x.puzzle.themes?.match(/mateIn\d/) ? ` · ${themeLabel(x.puzzle.themes.match(/mateIn\d/)![0])}` : ''}`
   : x.kind === 'review' ? `Review · ${x.review.white ?? 'White'} vs ${x.review.black ?? 'Black'}` : `${x.moment.san} · ${x.moment.opening ?? `game ${x.moment.gameId}`}`);
 type ClipLook = BoardLook | 'remix' | 'mine';
 
@@ -484,6 +509,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
     if (nx?.kind === 'review') void getGame(nx.review.id).catch(() => {});
     if (current.kind === 'trap') { setClip(trapClip(current.trap)); setClipQ(slot); setLoadedKey(key); return; }
     if (current.kind === 'promo') { setClip(promoClip(current.promo)); setClipQ(slot); setLoadedKey(key); return; }
+    if (current.kind === 'line') { setClip(lineClip(current.line)); setClipQ(slot); setLoadedKey(key); return; }
     if (current.kind === 'lesson') { setClip(lessonClip(current.lesson)); setClipQ(slot); setLoadedKey(key); return; }
     if (current.kind === 'scout') {
       const sc = current.scout;

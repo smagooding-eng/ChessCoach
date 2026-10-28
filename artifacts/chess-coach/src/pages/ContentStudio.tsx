@@ -48,6 +48,15 @@ export function ContentStudio() {
   const [summary, setSummary] = useState<{ counts: Record<string, number>; progress: { scanned: number; reviewed: number; moments: number } } | null>(null);
   const [scanning, setScanning] = useState(false);
   const [open, setOpen] = useState<StudioSource | null>(null);
+  // A game made in the Position Explorer ("Make video") opens straight in the player.
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem('cs_studio_line');
+      if (!raw) return;
+      sessionStorage.removeItem('cs_studio_line');
+      setOpen({ kind: 'line', line: JSON.parse(raw) });
+    } catch { /* ignore */ }
+  }, []);
   // Compilation: pick several moments (or traps) and play them back to back as one clip.
   const [picking, setPicking] = useState(false);
   const [picked, setPicked] = useState<StudioSource[]>([]);
@@ -90,7 +99,7 @@ export function ContentStudio() {
   const togglePick = (x: StudioSource) => setPicked((cur) => (cur.some((c) => keyOf(c) === keyOf(x)) ? cur.filter((c) => keyOf(c) !== keyOf(x)) : [...cur, x]));
   const isPicked = (x: StudioSource) => picked.some((c) => keyOf(c) === keyOf(x));
   const choose = (x: StudioSource) => (picking ? togglePick(x) : setOpen(x));
-  const [view, setView] = useState<'moments' | 'traps' | 'puzzles' | 'reviews' | 'kids' | 'scout' | 'scan' | 'promo'>('moments');
+  const [view, setView] = useState<'moments' | 'traps' | 'puzzles' | 'reviews' | 'kids' | 'scout' | 'scan' | 'analyzer' | 'promo'>('moments');
   // Kids & beginners: the Beginner Path / Chess for Kids lessons
   const [courses, setCourses] = useState<{ id: number; title: string; description: string; icon: string; lessons: StudioLesson[] }[] | null>(null);
   useEffect(() => {
@@ -274,7 +283,7 @@ export function ContentStudio() {
         {picking ? 'Cancel compilation' : '🎬 Make a compilation'}
       </button>
       <div className="order-1 inline-flex flex-wrap rounded-xl bg-white/5 p-1">
-        {([['moments', 'Game moments'], ['reviews', 'Game reviews'], ['puzzles', 'Puzzles'], ['traps', 'Trap lessons'], ['kids', 'Kids & beginners'], ['scout', 'Opponent scout'], ['scan', 'Scan position'], ['promo', 'Promos']] as const).map(([k, t]) => (
+        {([['moments', 'Game moments'], ['reviews', 'Game reviews'], ['puzzles', 'Puzzles'], ['traps', 'Trap lessons'], ['kids', 'Kids & beginners'], ['scout', 'Opponent scout'], ['scan', 'Scan position'], ['analyzer', 'Analyzer games'], ['promo', 'Promos']] as const).map(([k, t]) => (
           <button key={k} onClick={() => setView(k)} className="rounded-lg px-3.5 py-1.5 text-[13px] font-black" style={{ background: view === k ? '#81B64C' : 'transparent', color: view === k ? '#fff' : '#C9CFCD' }}>{t}</button>
         ))}
       </div>
@@ -393,6 +402,19 @@ export function ContentStudio() {
             })}
           </div>
         )}
+      </>) : view === 'analyzer' ? (<>
+        <div className="rounded-2xl bg-white/5 p-4 ring-1 ring-white/10">
+          <p className="text-[15px] font-black text-white">Games played by the analyzer</p>
+          <p className="mt-1 text-[13px] text-[#9AA4A1]">
+            Open the Position Explorer, choose who plays each side (Stockfish's <b className="text-white">best</b> moves, the <b className="text-white">worst</b> moves, or you), press Play, then <b className="text-white">Make video</b>.
+            Every move is graded by Stockfish and the game comes back here as a clip, like a game review.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {([['Best vs worst 😂', 'best', 'worst'], ['Worst vs worst 💀', 'worst', 'worst'], ['Stockfish vs Stockfish 🤖', 'best', 'best'], ['You vs Stockfish', 'you', 'best']] as const).map(([t, w, b]) => (
+              <Link key={t} href={`/explore?studio=1&w=${w}&b=${b}`} className="rounded-full bg-[#81B64C] px-3.5 py-2 text-[13px] font-black text-white">{t}</Link>
+            ))}
+          </div>
+        </div>
       </>) : view === 'promo' ? (<>
         <div className="mb-3 inline-flex rounded-xl bg-white/5 p-1">
           {([['versus', 'ChessScout vs …'], ['challenge', 'Challenge your friends']] as const).map(([k, t]) => (
