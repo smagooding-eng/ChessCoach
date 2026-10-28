@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { Link } from 'wouter';
+import { Link, useLocation } from 'wouter';
 import { PieceTile } from '@/components/DesignSystem';
 import { UpgradeNudge } from '@/components/UpgradeNudge';
 import { ProUpsell } from '@/components/ProUpsell';
@@ -161,6 +161,7 @@ function BuilderBoard({
 
 export function ScanPosition() {
   const { isPremium, isSubscriptionLoaded } = useUser();
+  const [, navigate] = useLocation();
   const [state, setState] = useState<ScanState>('idle');
   const [error, setError] = useState('');
   const [fen, setFen] = useState('');
@@ -248,19 +249,16 @@ export function ScanPosition() {
     }
   }, []);
 
+  // Explore opens the Position Explorer at this position (Stockfish's swing on every move).
   const startExplore = useCallback(() => {
     try {
       const chess = new Chess(fen);
-      setSandboxChess(chess);
-      setSandboxFen(chess.fen());
-      setMoveHistory([]);
-      setGameStatus(null);
-      setMode('explore');
+      navigate(`/explore?from=scan&fen=${encodeURIComponent(chess.fen())}`);
     } catch {
       setError('Invalid position — cannot load this FEN.');
       setState('error');
     }
-  }, [fen]);
+  }, [fen, navigate]);
 
   const handleSandboxMove = useCallback((san: string) => {
     if (!sandboxChess) return;
@@ -808,13 +806,8 @@ export function ScanPosition() {
                 try {
                   const chess = new Chess(builderFen);
                   setFen(chess.fen());
-                  setSandboxChess(chess);
-                  setSandboxFen(chess.fen());
-                  setMoveHistory([]);
-                  setGameStatus(null);
-                  setMode('explore');
-                  setState('result');
                   setBuilderError('');
+                  navigate(`/explore?from=scan&fen=${encodeURIComponent(chess.fen())}`);
                 } catch (e) {
                   setBuilderError(`Invalid position — ${(e as Error).message || 'check kings, pawn ranks, and side to move.'}`);
                 }

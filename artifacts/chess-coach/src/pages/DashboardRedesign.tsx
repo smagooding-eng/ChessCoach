@@ -3,7 +3,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { autoImportLinkedAccounts } from '@/lib/autoImport';
 import { Link, useLocation } from 'wouter';
 import { LivePulse } from '@/components/play/LivePulse';
-import { Trophy, Target, Search, ArrowRight, ArrowUpRight, ChevronRight, Play, Puzzle, BookOpen, Crosshair, Crown, Camera, Zap, ShoppingBag, Bot, BarChart3, GraduationCap } from 'lucide-react';
+import { Compass, Trophy, Target, Search, ArrowRight, ArrowUpRight, ChevronRight, Play, Puzzle, BookOpen, Crosshair, Crown, Camera, Zap, ShoppingBag, Bot, BarChart3, GraduationCap } from 'lucide-react';
 import { useUser } from '@/hooks/use-user';
 import { useChessPlayer } from '@/hooks/use-chess-player';
 import { useMultiEloProgress } from '@/hooks/use-elo-progress';
@@ -270,6 +270,18 @@ export function DashboardRedesign() {
             </Link>
           ))}
         </div>
+
+        {/* ── Position Explorer ── */}
+        <Link href="/explore" className="flex items-center gap-3 rounded-[18px] p-3.5 transition-transform active:scale-[.98]" style={{ background: CARD, border: `1px solid ${BORDER}` }}>
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[11px]" style={{ background: `linear-gradient(160deg, ${GREEN}, #5f8f36)`, border: '1px solid rgba(255,255,255,.18)' }}>
+            <Compass size={21} color="#fff" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <b className="block truncate text-[16px] font-extrabold">Position Explorer</b>
+            <span className="block truncate text-[12.5px]" style={{ color: '#C4CCC9' }}>Stockfish rates every move: green good, red bad</span>
+          </span>
+          <ArrowRight size={18} />
+        </Link>
 
 
         {/* ── Scout hero ── */}

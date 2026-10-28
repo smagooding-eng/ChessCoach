@@ -206,6 +206,7 @@ const Puzzles = lazyRetry(() => import("@/pages/Puzzles").then(m => ({ default: 
 const ShopPage = lazyRetry(() => import("@/pages/Shop").then(m => ({ default: m.ShopPage })));
 const SolvedPuzzles = lazyRetry(() => import("@/pages/SolvedPuzzles"));
 const ScanPosition = lazyRetry(() => import("@/pages/ScanPosition").then(m => ({ default: m.ScanPosition })));
+const Explorer = lazyRetry(() => import("@/pages/Explorer").then(m => ({ default: m.Explorer })));
 const Admin = lazyRetry(() => import("@/pages/Admin").then(m => ({ default: m.Admin })));
 const ContentStudio = lazyRetry(() => import("@/pages/ContentStudio").then(m => ({ default: m.ContentStudio })));
 const Welcome = lazyRetry(() => import("@/pages/Welcome").then(m => ({ default: m.Welcome })));
@@ -349,6 +350,7 @@ const PPuzzles       = () => <ProtectedRoute component={Puzzles} />;
 const PShop          = () => <ProtectedRoute component={ShopPage} />;
 const PSolvedPuzzles = () => <ProtectedRoute component={SolvedPuzzles} />;
 const PScanPosition  = () => <ProtectedRoute component={ScanPosition} />;
+const PExplorer      = () => <ProtectedRoute component={Explorer} />;
 const PAdmin         = () => <ProtectedRoute component={Admin} />;
 const PContentStudio = () => <ProtectedRoute component={ContentStudio} />;
 const PWelcome       = () => <ProtectedRoute component={Welcome} skipWelcomeRedirect />;
@@ -577,6 +579,7 @@ function Router() {
       <Route path="/shop"             component={PShop} />
       <Route path="/puzzles/solved"   component={PSolvedPuzzles} />
       <Route path="/scan"             component={PScanPosition} />
+      <Route path="/explore"          component={PExplorer} />
       <Route path="/admin/studio"     component={PContentStudio} />
       <Route path="/admin"            component={PAdmin} />
       <Route path="/subscription"    component={PSubscription} />

@@ -333,6 +333,34 @@ export class StockfishProcess {
     return uci && uci !== "(none)" ? uci : null;
   }
 
+  /** Every legal move scored in one search (MultiPV over all of them), from the
+   *  side to move's point of view. Stops at `depth` or after `movetimeMs`,
+   *  whichever comes first; each move keeps its deepest score. */
+  async scoreAllMoves(fen: string, legalCount: number, depth: number, movetimeMs: number): Promise<{ moves: { uci: string; cp: number | null; mate: number | null; depth: number }[]; depth: number }> {
+    if (!this.proc || this.dead) throw new Error("Stockfish not started or dead");
+    await this.sendAndWait(`setoption name MultiPV value ${Math.max(1, Math.min(250, legalCount))}`, "");
+    await this.sendAndWait(`position fen ${fen}`, "");
+    await this.sendAndWait("isready", "readyok");
+    const lines = await this.sendAndWait(`go depth ${depth} movetime ${Math.round(movetimeMs)}`, "bestmove");
+    const best = new Map<string, { uci: string; cp: number | null; mate: number | null; depth: number }>();
+    let maxDepth = 0;
+    for (const line of lines) {
+      if (!line.startsWith("info") || !line.includes(" score ") || !line.includes(" pv ")) continue;
+      if (line.includes("upperbound") || line.includes("lowerbound")) continue;
+      const d = parseInt(line.match(/\bdepth (\d+)/)?.[1] ?? "0");
+      const uci = line.match(/ pv (\S+)/)?.[1];
+      if (!uci) continue;
+      const cp = line.match(/\bscore cp (-?\d+)/);
+      const mate = line.match(/\bscore mate (-?\d+)/);
+      if (!cp && !mate) continue;
+      const prev = best.get(uci);
+      if (prev && prev.depth > d) continue;
+      best.set(uci, { uci, cp: cp ? parseInt(cp[1]) : null, mate: mate ? parseInt(mate[1]) : null, depth: d });
+      if (d > maxDepth) maxDepth = d;
+    }
+    return { moves: [...best.values()], depth: maxDepth };
+  }
+
   destroy(): void {
     if (this.proc) {
       this.proc.stdin.write("quit\n");
@@ -601,4 +629,70 @@ export function isSacrificialMove(fenBefore: string, san: string): boolean {
   } catch {
     return false;
   }
+}
+
+
+// ── Position explorer ──────────────────────────────────────────────────────
+// Its own engine process and queue, so exploring never waits behind a game
+// review (and a review never waits behind exploring). Results are cached by
+// position, since people step back and forth through the same lines.
+const EXPLORE_DEPTH = parseInt(process.env.EXPLORE_DEPTH || "") || 18;
+const EXPLORE_MOVETIME_MS = parseInt(process.env.EXPLORE_MOVETIME_MS || "") || (IS_PROD ? 2200 : 1500);
+let exploreEngine: StockfishProcess | null = null;
+let exploreInit: Promise<void> | null = null;
+let exploreQueue: Promise<unknown> = Promise.resolve();
+let exploreWaiting = 0;
+const exploreCache = new Map<string, ExploreResult>();
+
+export interface ExploreMove { uci: string; san: string; from: string; to: string; cp: number | null; mate: number | null }
+export interface ExploreResult { fen: string; turn: "w" | "b"; moves: ExploreMove[]; depth: number }
+
+async function getExploreEngine(): Promise<StockfishProcess> {
+  if (exploreEngine && !exploreEngine["dead"]) return exploreEngine;
+  if (exploreEngine?.["dead"]) { exploreEngine = null; exploreInit = null; }
+  if (exploreInit) { await exploreInit; return exploreEngine!; }
+  exploreEngine = new StockfishProcess(() => { exploreEngine = null; exploreInit = null; });
+  exploreInit = exploreEngine.init().catch((err) => {
+    logger.error({ err }, "Failed to initialize explorer Stockfish");
+    exploreEngine = null;
+    exploreInit = null;
+    throw err;
+  });
+  await exploreInit;
+  return exploreEngine!;
+}
+
+export class ExplorerBusyError extends Error {}
+
+/** Stockfish's score for every legal move in a position (side to move's view). */
+export async function exploreAllMoves(fenIn: string): Promise<ExploreResult> {
+  const chess = new Chess(fenIn);
+  const fen = chess.fen();
+  const key = fen.split(" ").slice(0, 4).join(" ");
+  const hit = exploreCache.get(key);
+  if (hit) return { ...hit, fen };
+  const legal = chess.moves({ verbose: true });
+  const turn = chess.turn() as "w" | "b";
+  if (legal.length === 0) return { fen, turn, moves: [], depth: 0 };
+  if (exploreWaiting >= 6) throw new ExplorerBusyError("The engine is busy, try again in a moment.");
+  exploreWaiting++;
+  const run = async () => {
+    try { return await (await getExploreEngine()).scoreAllMoves(fen, legal.length, EXPLORE_DEPTH, EXPLORE_MOVETIME_MS); }
+    finally { exploreWaiting--; }
+  };
+  const p = exploreQueue.then(run, run);
+  exploreQueue = p.then(() => undefined, () => undefined);
+  const scored = await p;
+  const byUci = new Map(scored.moves.map((m) => [m.uci, m]));
+  const moves: ExploreMove[] = legal.map((m) => {
+    const uci = m.from + m.to + (m.promotion ?? "");
+    const s = byUci.get(uci);
+    return { uci, san: m.san, from: m.from, to: m.to, cp: s?.cp ?? null, mate: s?.mate ?? null };
+  });
+  const result: ExploreResult = { fen, turn, moves, depth: scored.depth };
+  if (scored.moves.length >= Math.min(legal.length, 1)) {
+    exploreCache.set(key, result);
+    if (exploreCache.size > 3000) exploreCache.delete(exploreCache.keys().next().value as string);
+  }
+  return result;
 }

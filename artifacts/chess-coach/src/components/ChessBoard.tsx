@@ -141,6 +141,10 @@ interface ChessBoardProps {
   animationMs?: number;
   /** Animated pieces (Content Studio): a one-move change plays as a hop with a capture spin, over this many ms. */
   moveFx?: number;
+  /** Told whenever a piece is picked up or put down (null) -- e.g. the explorer shows that piece's moves. */
+  onSelectSquare?: (square: string | null) => void;
+  /** Labels drawn on squares (the explorer's evaluation swing per move), with a tint. */
+  squareMarks?: Record<string, { text: string; color: string; tint?: string; strong?: boolean }>;
   sidePanel?: {
     left?: React.ReactNode;
     clocks?: { top: ClockFace; bottom: ClockFace };
@@ -171,6 +175,8 @@ export function ChessBoard({
   animationMs,
   moveFx,
   sidePanel,
+  onSelectSquare,
+  squareMarks,
 }: ChessBoardProps) {
   const { confirmMoves, boardColors, boardTextureCss, showCoordinates, showLegalMoves, pieceColors, pieceShape, pieceStyle, soundEnabled, promotionChoice, boardMaxWidth: settingsMaxWidth } = useSettings();
   const boardMaxWidth = maxWidthOverride ?? settingsMaxWidth;
@@ -230,6 +236,9 @@ export function ChessBoard({
   }
 
   const [selectedSquare, setSelectedSquare] = useState<string | null>(null);
+  const onSelectSquareRef = useRef(onSelectSquare);
+  onSelectSquareRef.current = onSelectSquare;
+  useEffect(() => { onSelectSquareRef.current?.(selectedSquare); }, [selectedSquare]);
   const [feedback, setFeedback] = useState<'correct' | 'wrong' | null>(null);
   const feedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onMovePlayedRef = useRef(onMovePlayed);
@@ -538,6 +547,13 @@ export function ChessBoard({
       }
     }
 
+    // Explorer: tint each marked square (its label is drawn on top, below).
+    if (squareMarks) {
+      for (const [sq, m] of Object.entries(squareMarks)) {
+        if (m.tint) styles[sq] = { ...(styles[sq] || {}), background: m.tint, boxShadow: m.strong ? `inset 0 0 0 3px ${m.color}` : undefined };
+      }
+    }
+
     // Practice feedback overrides
     if (feedback === 'correct' && lastMove) {
       styles[lastMove.to] = { background: 'rgba(80, 220, 100, 0.65)' };
@@ -546,7 +562,7 @@ export function ChessBoard({
     }
 
     return styles;
-  }, [lastMove, selectedSquare, legalTargets, legalMoveInfo, feedback, moveQuality, showLegalMoves]);
+  }, [lastMove, selectedSquare, legalTargets, legalMoveInfo, feedback, moveQuality, showLegalMoves, squareMarks]);
 
   const boardKeyRef = useRef(0);
 
@@ -637,6 +653,22 @@ export function ChessBoard({
 
       {boardOverlay && (
         <div className="absolute inset-x-0 top-0 z-20 aspect-square">{boardOverlay}</div>
+      )}
+
+      {squareMarks && Object.keys(squareMarks).length > 0 && (
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-10 aspect-square" style={{ containerType: 'inline-size' }}>
+          {Object.entries(squareMarks).map(([sq, m]) => {
+            const p = squareToPercent(sq);
+            return (
+              <div key={sq} className="absolute grid place-items-end justify-center" style={{ left: p.left, top: p.top, width: '12.5%', height: '12.5%', paddingBottom: '0.6cqw' }}>
+                <span className="rounded-[0.8cqw] font-black leading-none tabular-nums text-white"
+                  style={{ background: m.color, fontSize: 'max(9px, 2.55cqw)', padding: '0.45cqw 0.7cqw', boxShadow: '0 1px 3px rgba(0,0,0,.55)', outline: m.strong ? '1.5px solid #fff' : undefined }}>
+                  {m.text}
+                </span>
+              </div>
+            );
+          })}
+        </div>
       )}
 
       {/* Confirm-move bar -- in normal document flow (not absolutely
