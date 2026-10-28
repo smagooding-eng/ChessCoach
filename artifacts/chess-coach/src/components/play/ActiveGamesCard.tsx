@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link } from 'wouter';
-import { Swords, ChevronRight, CalendarDays } from 'lucide-react';
+import { Swords, ChevronRight } from 'lucide-react';
+import { Chess } from 'chess.js';
+import { ThemedMiniBoard } from '@/components/ThemedMiniBoard';
 import { apiFetch } from '@/lib/api';
 import { useUser } from '@/hooks/use-user';
 import { PT, cardStyle, formatLeft } from '@/lib/playTheme';
@@ -9,8 +11,24 @@ interface DailyRow {
   id: string; timeControl: string; whiteUserId: string; blackUserId: string;
   whiteUsername: string; blackUsername: string; turnUserId: string;
   whiteBankMs: number; blackBankMs: number; lastMoveAt: string; drawOfferFrom: string | null;
+  fen?: string; pgn?: string;
 }
-interface LiveActive { id: string; white: { username: string }; black: { username: string }; timeControl: { label: string }; turn: 'w' | 'b' }
+interface LiveActive { id: string; white: { username: string }; black: { username: string }; timeControl: { label: string }; turn: 'w' | 'b'; fen?: string; sanMoves?: string[] }
+
+/** The moves so far (the latest ones, numbered like a PGN) and the last move's squares. */
+function gameMoves(sans: string[]): { tail: string; last: { from: string; to: string } | null } {
+  if (!sans.length) return { tail: 'No moves yet', last: null };
+  let last: { from: string; to: string } | null = null;
+  try { const c = new Chess(); for (const s of sans) { const m = c.move(s); if (m) last = { from: m.from, to: m.to }; } } catch { /* keep text */ }
+  const from = Math.max(0, sans.length - 6 - (sans.length % 2 === 0 ? 0 : 1));
+  const parts: string[] = [];
+  for (let i = from; i < sans.length; i++) parts.push(i % 2 === 0 ? `${i / 2 + 1}. ${sans[i]}` : sans[i]);
+  return { tail: `${from > 0 ? '… ' : ''}${parts.join(' ')}`, last };
+}
+function sansFromPgn(pgn?: string): string[] {
+  if (!pgn) return [];
+  try { const c = new Chess(); c.loadPgn(pgn); return c.history(); } catch { return []; }
+}
 
 const TC: Record<string, string> = { corr_1d: '1 day', corr_3d: '3 days', corr_7d: '7 days' };
 
@@ -55,30 +73,37 @@ export function ActiveGamesCard() {
         </h2>
         <Link href="/daily" className="text-[12px] font-extrabold uppercase tracking-wider" style={{ color: PT.green }}>All</Link>
       </div>
-      {live && (
+      {live && (() => {
+        const mv = gameMoves(live.game.sanMoves ?? []);
+        return (
         <Link href="/live" className="flex items-center gap-3 px-4 py-3" style={{ borderTop: `1px solid ${PT.border}` }}>
-          <span className="h-2.5 w-2.5 shrink-0 animate-pulse rounded-full" style={{ background: PT.red }} />
+          {live.game.fen ? <ThemedMiniBoard fen={live.game.fen} size={56} flipped={live.color === 'b'} lastMove={mv.last} /> : <span className="h-2.5 w-2.5 shrink-0 animate-pulse rounded-full" style={{ background: PT.red }} />}
           <span className="min-w-0 flex-1">
-            <b className="block truncate text-[14px] font-extrabold" style={{ color: PT.text }}>
+            <b className="flex items-center gap-1.5 truncate text-[14px] font-extrabold" style={{ color: PT.text }}>
+              <span className="h-2 w-2 shrink-0 animate-pulse rounded-full" style={{ background: PT.red }} />
               Live vs {live.color === 'w' ? live.game.black.username : live.game.white.username}
             </b>
             <span className="block text-[12px]" style={{ color: PT.muted }}>{live.game.timeControl.label} · in progress</span>
+            <span className="block truncate font-mono text-[11.5px]" style={{ color: PT.text, opacity: 0.8 }}>{mv.tail}</span>
           </span>
           <span className="shrink-0 text-[12px] font-extrabold" style={{ color: PT.green }}>Resume</span>
           <ChevronRight size={16} style={{ color: PT.muted }} />
         </Link>
-      )}
+        );
+      })()}
       {sorted.slice(0, 4).map(g => {
         const white = g.whiteUserId === me;
         const yours = g.turnUserId === me;
         const bank = g.turnUserId === g.whiteUserId ? g.whiteBankMs : g.blackBankMs;
         const left = bank - (Date.now() + offset - new Date(g.lastMoveAt).getTime());
+        const mv = gameMoves(sansFromPgn(g.pgn));
         return (
           <Link key={g.id} href={`/daily/${g.id}`} className="flex items-center gap-3 px-4 py-3" style={{ borderTop: `1px solid ${PT.border}` }}>
-            <CalendarDays size={16} className="shrink-0" style={{ color: yours ? PT.green : PT.muted }} />
+            {g.fen && <ThemedMiniBoard fen={g.fen} size={56} flipped={!white} lastMove={mv.last} />}
             <span className="min-w-0 flex-1">
               <b className="block truncate text-[14px] font-extrabold" style={{ color: PT.text }}>vs {white ? g.blackUsername : g.whiteUsername}</b>
               <span className="block text-[12px]" style={{ color: PT.muted }}>Daily · {TC[g.timeControl] ?? g.timeControl}{g.drawOfferFrom ? ' · draw offer' : ''}</span>
+              <span className="block truncate font-mono text-[11.5px]" style={{ color: PT.text, opacity: 0.8 }}>{mv.tail}</span>
             </span>
             <span className="shrink-0 text-right">
               <span className="block text-[12px] font-extrabold" style={{ color: yours ? PT.green : PT.muted }}>{yours ? 'Your move' : 'Their move'}</span>
