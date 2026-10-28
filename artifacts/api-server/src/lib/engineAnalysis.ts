@@ -696,3 +696,44 @@ export async function exploreAllMoves(fenIn: string): Promise<ExploreResult> {
   }
   return result;
 }
+
+
+/** Content Studio: a whole game played by the engine in one go -- each side
+ *  plays its best or its worst move -- using quick searches, with every
+ *  position's move scores returned so the app can grade the moves. */
+export async function exploreAutoGame(startFen: string, modes: { w: "best" | "worst"; b: "best" | "worst" }, maxPlies = 80, movetimeMs = 400): Promise<{ sans: string[]; analyses: ExploreResult[] }> {
+  if (exploreWaiting >= 6) throw new ExplorerBusyError("The engine is busy, try again in a moment.");
+  exploreWaiting++;
+  const run = async () => {
+    try {
+      const engine = await getExploreEngine();
+      const chess = new Chess(startFen);
+      const sans: string[] = [];
+      const analyses: ExploreResult[] = [];
+      for (let ply = 0; ply < Math.min(200, maxPlies); ply++) {
+        if (chess.isGameOver()) break;
+        const fen = chess.fen();
+        const legal = chess.moves({ verbose: true });
+        const scored = await engine.scoreAllMoves(fen, legal.length, 14, movetimeMs);
+        const byUci = new Map(scored.moves.map((m) => [m.uci, m]));
+        const moves: ExploreMove[] = legal.map((m) => {
+          const uci = m.from + m.to + (m.promotion ?? "");
+          const sc = byUci.get(uci);
+          return { uci, san: m.san, from: m.from, to: m.to, cp: sc?.cp ?? null, mate: sc?.mate ?? null };
+        });
+        const val = (m: ExploreMove) => (m.mate != null ? (m.mate > 0 ? 100000 - m.mate : -100000 - m.mate) : (m.cp ?? 0));
+        const withScore = moves.filter((m) => m.cp != null || m.mate != null);
+        const pool = withScore.length ? withScore : moves;
+        const mode = chess.turn() === "w" ? modes.w : modes.b;
+        const pick = pool.reduce((a, b) => (mode === "best" ? (val(b) > val(a) ? b : a) : (val(b) < val(a) ? b : a)));
+        analyses.push({ fen, turn: chess.turn() as "w" | "b", moves, depth: scored.depth });
+        chess.move(pick.san);
+        sans.push(pick.san);
+      }
+      return { sans, analyses };
+    } finally { exploreWaiting--; }
+  };
+  const p = exploreQueue.then(run, run);
+  exploreQueue = p.then(() => undefined, () => undefined);
+  return p;
+}

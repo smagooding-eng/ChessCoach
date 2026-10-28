@@ -205,9 +205,47 @@ export function Explorer() {
   }, [running, over, analysis, best, turn, modes, play, steps.length]);
   useEffect(() => { if (over) setRunning(false); }, [over]);
   const anyEngine = modes.w !== 'you' || modes.b !== 'you';
+  const bothEngine = modes.w !== 'you' && modes.b !== 'you';
+  const [genMoves, setGenMoves] = useState(40);
+
+  // Content Studio: the server plays the whole game at once (quick searches), then it opens as a video --
+  // no waiting through it move by move here. Pacing is set in the Studio player.
+  const generateFull = async () => {
+    if (!bothEngine || over) return;
+    setRunning(false);
+    const t0 = Date.now();
+    setMaking('Stockfish is playing the game…');
+    const tick = setInterval(() => setMaking(`Stockfish is playing the game… ${Math.round((Date.now() - t0) / 1000)}s`), 1000);
+    try {
+      const r = await apiFetch('/api/explore/auto-game', {
+        method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fen, white: modes.w, black: modes.b, maxPlies: genMoves * 2 }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error || 'The engine couldn\'t play this game right now.');
+      const analyses = (d.analyses ?? []) as Analysis[];
+      for (const a of analyses) if (!cache.current.has(keyOf(a.fen))) cache.current.set(keyOf(a.fen), a);
+      const next: Step[] = steps.slice(0, at + 1);
+      const c = new Chess(fen);
+      for (const san of (d.sans ?? []) as string[]) {
+        const m = c.move(san);
+        if (!m) break;
+        next.push({ fen: c.fen(), san: m.san, from: m.from, to: m.to });
+      }
+      clearInterval(tick);
+      setSteps(next);
+      setAt(next.length - 1);
+      await makeVideoFrom(next, next.length - 1);
+    } catch (e) {
+      clearInterval(tick);
+      setMaking(e instanceof Error ? e.message : 'Could not make the video.');
+      setTimeout(() => setMaking(null), 3500);
+    }
+  };
 
   // Content Studio: grade every move of the line from Stockfish's scores, then open it as a clip.
-  const makeVideo = async () => {
+  const makeVideo = () => makeVideoFrom(steps, at);
+  const makeVideoFrom = async (steps: Step[], at: number) => {
     const line = steps.slice(1, at + 1);
     if (!line.length) return;
     setRunning(false);
@@ -351,6 +389,22 @@ export function Explorer() {
                 </button>
               ) : <span />}
             </div>
+            {(isAdmin || forStudio) && (
+              <div className="mt-3 rounded-[12px] p-3" style={{ background: RD.cardSolid, border: `1px solid ${RD.border}` }}>
+                <p className="text-[12.5px] font-extrabold" style={{ color: RD.text }}>⚡ Whole game straight to video</p>
+                <p className="mt-0.5 text-[11.5px]" style={{ color: RD.muted }}>Stockfish plays it all at once (from this position), then it opens in Content Studio, where you set the pacing.</p>
+                <div className="mt-2 flex items-center gap-1.5">
+                  {[10, 20, 40, 80].map(n => (
+                    <button key={n} onClick={() => setGenMoves(n)} className="rounded-[8px] px-2.5 py-1.5 text-[12px] font-extrabold" style={genMoves === n ? { background: RD.green, color: '#fff' } : { color: RD.muted, background: 'rgba(255,255,255,.04)' }}>{n}</button>
+                  ))}
+                  <span className="text-[11.5px]" style={{ color: RD.muted }}>moves max</span>
+                </div>
+                <button onClick={() => void generateFull()} disabled={!bothEngine || over || !!making} className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-[11px] py-2.5 text-[13px] font-extrabold text-white disabled:opacity-40" style={{ background: RD.green }}>
+                  {making ? <Loader2 className="h-4 w-4 animate-spin" /> : <Clapperboard className="h-4 w-4" />}Generate game &amp; make video
+                </button>
+                {!bothEngine && <p className="mt-1.5 text-[11.5px]" style={{ color: RD.muted }}>Set both sides to Best or Worst.</p>}
+              </div>
+            )}
             {making && <p className="mt-2 text-[12px]" style={{ color: RD.muted }}>{making}</p>}
             {running && <p className="mt-2 text-[12px]" style={{ color: RD.muted }}>{(turn === 'w' ? modes.w : modes.b) === 'you' ? `Your move as ${turn === 'w' ? 'White' : 'Black'}.` : 'Stockfish is choosing…'}</p>}
           </div>
