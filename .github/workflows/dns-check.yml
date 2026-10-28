@@ -1,0 +1,47 @@
+name: dns-check
+# One-off connectivity check for chessscout.net: DNS records from the main
+# public resolvers and from security-filtering resolvers (the kind routers /
+# ISPs use), DNSSEC, and whether the site answers over IPv4 / IPv6.
+# Results are written as annotations on the run.
+on:
+  workflow_dispatch:
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - run: sudo apt-get install -y -q dnsutils >/dev/null 2>&1 || true
+      - name: DNS records
+        run: |
+          for name in chessscout.net www.chessscout.net; do
+            for t in A AAAA CNAME NS CAA DS HTTPS; do
+              echo "::notice title=$name $t::$(dig +short $t $name @1.1.1.1 | tr '\n' ' ')"
+            done
+          done
+          echo "::notice title=SOA::$(dig +short SOA chessscout.net @8.8.8.8)"
+          echo "::notice title=DNSSEC (8.8.8.8 status/flags)::$(dig +dnssec A chessscout.net @8.8.8.8 | grep -E 'status:|flags:' | tr '\n' ' ')"
+          for ns in $(dig +short NS chessscout.net @1.1.1.1); do
+            echo "::notice title=Authoritative $ns::A=$(dig +short A chessscout.net @$ns | tr '\n' ' ') AAAA=$(dig +short AAAA chessscout.net @$ns | tr '\n' ' ')"
+          done
+      - name: Filtering resolvers
+        run: |
+          check() { r=$(dig +time=4 +tries=1 A $1 @$2 | grep -E 'status:' | sed 's/.*status: \([A-Z]*\).*/\1/'); a=$(dig +time=4 +tries=1 +short A $1 @$2 | tr '\n' ' '); echo "::notice title=$3 ($2) $1::status=$r answer=$a"; }
+          for d in chessscout.net www.chessscout.net chesscoach-api-kbf8.onrender.com; do
+            check $d 8.8.8.8 "Google"
+            check $d 1.1.1.1 "Cloudflare"
+            check $d 9.9.9.9 "Quad9 (malware block)"
+            check $d 1.1.1.2 "Cloudflare malware block"
+            check $d 1.1.1.3 "Cloudflare family"
+            check $d 208.67.222.222 "OpenDNS"
+            check $d 208.67.222.123 "OpenDNS FamilyShield"
+            check $d 94.140.14.14 "AdGuard"
+            check $d 185.228.168.9 "CleanBrowsing security"
+            check $d 76.76.2.1 "ControlD malware"
+          done
+      - name: HTTP over IPv4 and IPv6
+        run: |
+          echo "::notice title=IPv4 https::$(curl -4 -sS -o /dev/null -w '%{http_code} %{remote_ip} %{time_total}s' --max-time 15 https://chessscout.net/ 2>&1)"
+          echo "::notice title=IPv6 https::$(curl -6 -sS -o /dev/null -w '%{http_code} %{remote_ip} %{time_total}s' --max-time 15 https://chessscout.net/ 2>&1 | head -c 200)"
+          echo "::notice title=www https::$(curl -sS -o /dev/null -w '%{http_code} -> %{redirect_url}' --max-time 15 https://www.chessscout.net/ 2>&1)"
+          echo "::notice title=http redirect::$(curl -sS -o /dev/null -w '%{http_code} -> %{redirect_url}' --max-time 15 http://chessscout.net/ 2>&1)"
+          echo "::notice title=TLS cert::$(echo | openssl s_client -connect chessscout.net:443 -servername chessscout.net 2>/dev/null | openssl x509 -noout -issuer -enddate 2>/dev/null | tr '\n' ' ')"
+          echo "::notice title=API health::$(curl -sS -o /dev/null -w '%{http_code} %{time_total}s' --max-time 30 https://chesscoach-api-kbf8.onrender.com/api/health 2>&1)"
