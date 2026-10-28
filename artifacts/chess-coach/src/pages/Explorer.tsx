@@ -73,6 +73,8 @@ export function Explorer() {
   const { authUser } = useUser();
   const isAdmin = !!authUser?.isAdmin;
   const forStudio = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('studio') === '1';
+  // Analyzer-game tools (auto-play, make video) belong to Content Studio: admins arriving from the Studio only.
+  const studioMode = forStudio && isAdmin;
   // Auto-play: Stockfish plays the best (or the worst) move for a side.
   const [modes, setModes] = useState<{ w: SideMode; b: SideMode }>(() => {
     const q = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
@@ -194,7 +196,7 @@ export function Explorer() {
 
   // Auto-play: when it's an engine side's turn and Stockfish has scored the position, play its pick.
   useEffect(() => {
-    if (!running || over || !analysis || !best) return;
+    if (!studioMode || !running || over || !analysis || !best) return;
     const mode = turn === 'w' ? modes.w : modes.b;
     if (mode === 'you') return;
     if (steps.length > 400) { setRunning(false); return; }
@@ -310,7 +312,7 @@ export function Explorer() {
 
   return (
     <div className="mx-auto w-full max-w-[1120px] px-3 pb-28 md:px-0 md:pb-10">
-      <RedesignHeader dense title="Position Explorer" backHref={fromScan ? '/scan' : forStudio ? '/admin/studio' : '/'}
+      <RedesignHeader dense title={studioMode ? 'Analyzer game · Studio' : 'Position Explorer'} backHref={fromScan ? '/scan' : forStudio ? '/admin/studio' : '/'}
         right={<button onClick={() => setFlipped(f => !f)} aria-label="Flip board" title="Flip board" className="grid h-9 w-9 place-items-center rounded-full"><FlipVertical2 size={19} /></button>} />
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_380px]">
@@ -364,8 +366,8 @@ export function Explorer() {
         </div>
 
         <div className="space-y-3">
-          {/* Auto-play: who makes the moves */}
-          <div className="rounded-[18px] p-4" style={card}>
+          {/* Auto-play: who makes the moves -- Content Studio only (opened from the Studio's Analyzer games tab) */}
+          {studioMode && <div className="rounded-[18px] p-4" style={card}>
             <p className="text-[14px] font-extrabold" style={{ color: RD.text }}>Who plays each side?</p>
             <p className="mt-0.5 text-[12.5px]" style={{ color: RD.muted }}>Let Stockfish play the best or the worst move for White or Black, or make the moves yourself.</p>
             {(['w', 'b'] as const).map(c => (
@@ -383,13 +385,13 @@ export function Explorer() {
               <button onClick={() => setRunning(r => !r)} disabled={!anyEngine || over} className="flex items-center justify-center gap-1.5 rounded-[12px] py-2.5 text-[13px] font-extrabold text-white disabled:opacity-40" style={{ background: running ? '#E8B447' : RD.green, color: running ? '#1A1205' : '#fff' }}>
                 {running ? <><Pause className="h-4 w-4" />Pause</> : <><Play className="h-4 w-4" />Play</>}
               </button>
-              {(isAdmin || forStudio) ? (
+              {studioMode ? (
                 <button onClick={() => void makeVideo()} disabled={at === 0 || !!making} className="flex items-center justify-center gap-1.5 rounded-[12px] py-2.5 text-[13px] font-extrabold disabled:opacity-40" style={{ background: 'rgba(255,255,255,.06)', border: `1px solid ${RD.border}`, color: RD.text }}>
                   {making ? <Loader2 className="h-4 w-4 animate-spin" /> : <Clapperboard className="h-4 w-4" />}Make video
                 </button>
               ) : <span />}
             </div>
-            {(isAdmin || forStudio) && (
+            {studioMode && (
               <div className="mt-3 rounded-[12px] p-3" style={{ background: RD.cardSolid, border: `1px solid ${RD.border}` }}>
                 <p className="text-[12.5px] font-extrabold" style={{ color: RD.text }}>⚡ Whole game straight to video</p>
                 <p className="mt-0.5 text-[11.5px]" style={{ color: RD.muted }}>Stockfish plays it all at once (from this position), then it opens in Content Studio, where you set the pacing.</p>
@@ -407,7 +409,7 @@ export function Explorer() {
             )}
             {making && <p className="mt-2 text-[12px]" style={{ color: RD.muted }}>{making}</p>}
             {running && <p className="mt-2 text-[12px]" style={{ color: RD.muted }}>{(turn === 'w' ? modes.w : modes.b) === 'you' ? `Your move as ${turn === 'w' ? 'White' : 'Black'}.` : 'Stockfish is choosing…'}</p>}
-          </div>
+          </div>}
 
           {/* How it works + display */}
           <div className="rounded-[18px] p-4" style={card}>

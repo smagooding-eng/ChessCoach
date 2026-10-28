@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link } from 'wouter';
+import { generateAnalyzerGame, type EngineSide } from '@/lib/analyzerGame';
 import { ArrowLeft, Loader2, RefreshCw, Search, Clapperboard, Shuffle } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { MiniBoard } from '@/components/MiniBoard';
@@ -48,6 +49,21 @@ export function ContentStudio() {
   const [summary, setSummary] = useState<{ counts: Record<string, number>; progress: { scanned: number; reviewed: number; moments: number } } | null>(null);
   const [scanning, setScanning] = useState(false);
   const [open, setOpen] = useState<StudioSource | null>(null);
+  // Analyzer games: Stockfish plays a whole game (best / worst per side) and it opens as a clip.
+  const [ag, setAg] = useState<{ w: EngineSide; b: EngineSide; moves: number; fen: string }>({ w: 'best', b: 'worst', moves: 40, fen: '' });
+  const [agBusy, setAgBusy] = useState<string | null>(null);
+  const [agErr, setAgErr] = useState<string | null>(null);
+  const runAnalyzerGame = async () => {
+    setAgErr(null);
+    let fen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+    if (ag.fen.trim()) { try { fen = new Chess(ag.fen.trim()).fen(); } catch { setAgErr("That FEN isn't a legal position."); return; } }
+    const t0 = Date.now();
+    setAgBusy('Stockfish is playing…');
+    const tick = setInterval(() => setAgBusy(`Stockfish is playing… ${Math.round((Date.now() - t0) / 1000)}s`), 1000);
+    try { setOpen({ kind: 'line', line: await generateAnalyzerGame(fen, ag.w, ag.b, ag.moves) }); }
+    catch (e) { setAgErr(e instanceof Error ? e.message : 'Could not make the game.'); }
+    finally { clearInterval(tick); setAgBusy(null); }
+  };
   // A game made in the Position Explorer ("Make video") opens straight in the player.
   useEffect(() => {
     try {
@@ -405,15 +421,42 @@ export function ContentStudio() {
       </>) : view === 'analyzer' ? (<>
         <div className="rounded-2xl bg-white/5 p-4 ring-1 ring-white/10">
           <p className="text-[15px] font-black text-white">Games played by the analyzer</p>
-          <p className="mt-1 text-[13px] text-[#9AA4A1]">
-            Open the Position Explorer, choose who plays each side (Stockfish's <b className="text-white">best</b> moves, the <b className="text-white">worst</b> moves, or you), press Play, then <b className="text-white">Make video</b>.
-            Every move is graded by Stockfish and the game comes back here as a clip, like a game review.
-          </p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {([['Best vs worst 😂', 'best', 'worst'], ['Worst vs worst 💀', 'worst', 'worst'], ['Stockfish vs Stockfish 🤖', 'best', 'best'], ['You vs Stockfish', 'you', 'best']] as const).map(([t, w, b]) => (
-              <Link key={t} href={`/explore?studio=1&w=${w}&b=${b}`} className="rounded-full bg-[#81B64C] px-3.5 py-2 text-[13px] font-black text-white">{t}</Link>
+          <p className="mt-1 text-[13px] text-[#9AA4A1]">Stockfish plays a whole game, each side making its <b className="text-white">best</b> or its <b className="text-white">worst</b> move. Every move is graded and the game opens here as a clip, like a game review. Set the pacing with Speed in the player.</p>
+          <div className="mt-3 space-y-2">
+            {(['w', 'b'] as const).map((c) => (
+              <div key={c} className="flex items-center gap-2">
+                <span className="w-12 text-[13px] font-black text-white">{c === 'w' ? 'White' : 'Black'}</span>
+                <div className="inline-flex rounded-xl bg-black/30 p-1">
+                  {(['best', 'worst'] as const).map((m) => (
+                    <button key={m} onClick={() => setAg((x) => ({ ...x, [c]: m }))} className="rounded-lg px-3.5 py-1.5 text-[13px] font-black capitalize"
+                      style={{ background: ag[c] === m ? (m === 'worst' ? '#D9443F' : '#81B64C') : 'transparent', color: ag[c] === m ? '#fff' : '#C9CFCD' }}>{m}</button>
+                  ))}
+                </div>
+              </div>
             ))}
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="w-12 text-[13px] font-black text-white">Length</span>
+              {[10, 20, 40, 80].map((n) => (
+                <button key={n} onClick={() => setAg((x) => ({ ...x, moves: n }))} className="rounded-lg px-3 py-1.5 text-[13px] font-black"
+                  style={{ background: ag.moves === n ? '#81B64C' : 'rgba(255,255,255,.06)', color: ag.moves === n ? '#fff' : '#C9CFCD' }}>{n}</button>
+              ))}
+              <span className="text-[12px] text-[#9AA4A1]">moves max (ends early on mate or a draw)</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="w-12 text-[13px] font-black text-white">Start</span>
+              <input value={ag.fen} onChange={(e) => setAg((x) => ({ ...x, fen: e.target.value }))} placeholder="Starting position, or paste a FEN"
+                className="min-w-0 flex-1 rounded-lg bg-black/30 px-3 py-2 text-[13px] text-white placeholder:text-white/40 ring-1 ring-white/10" />
+            </div>
           </div>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <button onClick={() => void runAnalyzerGame()} disabled={!!agBusy} className="flex items-center gap-1.5 rounded-xl bg-[#81B64C] px-4 py-2.5 text-[14px] font-black text-white disabled:opacity-60">
+              {agBusy ? <Loader2 size={15} className="animate-spin" /> : <Clapperboard size={15} />}{agBusy ? agBusy : 'Generate game & open'}
+            </button>
+            <Link href={`/explore?studio=1&w=you&b=${ag.b}${ag.fen.trim() ? `&fen=${encodeURIComponent(ag.fen.trim())}` : ''}`} className="rounded-xl bg-white/5 px-3.5 py-2.5 text-[13px] font-black text-[#C9CFCD] ring-1 ring-white/10">
+              Or play the moves yourself on a board
+            </Link>
+          </div>
+          {agErr && <p className="mt-2 text-[12.5px] text-[#FF7A80]">{agErr}</p>}
         </div>
       </>) : view === 'promo' ? (<>
         <div className="mb-3 inline-flex rounded-xl bg-white/5 p-1">
