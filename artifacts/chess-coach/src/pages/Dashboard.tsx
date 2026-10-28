@@ -5,6 +5,7 @@ import { useMyAnalysisSummary, useMyWeaknesses } from '@/hooks/use-analysis';
 import { useMyCourses } from '@/hooks/use-courses';
 import { useMyGames } from '@/hooks/use-games';
 import { GameThumb } from '@/components/GameThumb';
+import { MiniBoard } from '@/components/MiniBoard';
 import { playedWhite } from '@/lib/gameSide';
 import { Link } from 'wouter';
 import { Swords, Trophy, Target, AlertTriangle, BookOpen, Clock, GraduationCap, TrendingUp, ChevronRight, Search, Play, Bot, Camera, Lock, Crown, Flame, Zap, Award, Activity, Sparkles, ArrowUpRight, Share2, Puzzle, Crosshair, ShoppingBag } from 'lucide-react';
@@ -578,54 +579,12 @@ const ImportIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 
 // Chess-piece illustration tile used at the head of each dashboard section.
 // Chunky green-gradient square with a bold white chess piece silhouette — like a chess.com puzzle/lesson card.
-// Lightweight chess-board thumbnail (starting position) — purely decorative.
-// Mirrors chess.com's home-feed thumbnails: little green-and-cream board with pieces.
+// The starting position in the player's own board theme and piece set.
 function BoardThumb({ size = 56, flip = false }: { size?: number; flip?: boolean }) {
-  const ROWS_W = ['♖','♘','♗','♕','♔','♗','♘','♖'];
-  const PAWNS_W = Array(8).fill('♙');
-  const ROWS_B = ['♜','♞','♝','♛','♚','♝','♞','♜'];
-  const PAWNS_B = Array(8).fill('♟');
-  const ranks = flip
-    ? [ROWS_W, PAWNS_W, [], [], [], [], PAWNS_B, ROWS_B]
-    : [ROWS_B, PAWNS_B, [], [], [], [], PAWNS_W, ROWS_W];
-  const sq = size / 8;
-  const fontSize = Math.round(sq * 0.92);
   return (
-    <div
-      className="relative shrink-0 rounded-md overflow-hidden"
-      style={{
-        width: size,
-        height: size,
-        boxShadow: '0 4px 14px -2px rgba(0,0,0,0.6), 0 0 0 1px rgba(0,0,0,0.5)',
-      }}
-    >
-      <div className="grid h-full w-full" style={{ gridTemplateColumns: 'repeat(8, 1fr)', gridTemplateRows: 'repeat(8, 1fr)' }}>
-        {Array.from({ length: 64 }).map((_, i) => {
-          const r = Math.floor(i / 8);
-          const c = i % 8;
-          const isLight = (r + c) % 2 === 0;
-          const piece = ranks[r]?.[c];
-          const isWhite = piece && '♔♕♖♗♘♙'.includes(piece);
-          return (
-            <div
-              key={i}
-              className="flex items-center justify-center"
-              style={{ background: isLight ? '#eeeed2' : '#769656' }}
-            >
-              {piece && (
-                <span style={{
-                  fontSize,
-                  lineHeight: 1,
-                  color: isWhite ? '#fff' : '#1a1a1a',
-                  textShadow: isWhite
-                    ? '0 1px 1px rgba(0,0,0,0.65), 0 0 1px rgba(0,0,0,0.85)'
-                    : '0 1px 1px rgba(255,255,255,0.18)',
-                }}>{piece}</span>
-              )}
-            </div>
-          );
-        })}
-      </div>
+    <div className="relative shrink-0 rounded-md overflow-hidden"
+      style={{ width: size, height: size, boxShadow: '0 4px 14px -2px rgba(0,0,0,0.6), 0 0 0 1px rgba(0,0,0,0.5)' }}>
+      <MiniBoard fen="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1" size={size} flipped={flip} />
     </div>
   );
 }

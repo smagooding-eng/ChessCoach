@@ -700,6 +700,11 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   return <SettingsContext.Provider value={value}>{children}</SettingsContext.Provider>;
 }
 
+// Same as useSettings, but returns null outside the provider instead of throwing.
+export function useSettingsOptional() {
+  return useContext(SettingsContext);
+}
+
 export function useSettings() {
   const ctx = useContext(SettingsContext);
   if (!ctx) throw new Error('useSettings must be used within SettingsProvider');

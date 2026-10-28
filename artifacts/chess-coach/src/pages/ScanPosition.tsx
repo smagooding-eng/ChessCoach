@@ -6,6 +6,7 @@ import { ProUpsell } from '@/components/ProUpsell';
 import { useUser } from '@/hooks/use-user';
 import { Chess } from 'chess.js';
 import { ChessBoard } from '@/components/ChessBoard';
+import { useBoardTheme } from '@/components/MiniBoard';
 import { apiFetch } from '@/lib/api';
 import { Camera, Upload, RotateCcw, Swords, Compass, AlertCircle, X, FlipVertical, Wand2, Trash2, ArrowLeft, Archive, Check, Loader2 } from 'lucide-react';
 
@@ -47,6 +48,7 @@ function boardToFen(board: (string | null)[][], rest: string): string {
 
 function EditableBoard({ fen, flipped, onFenChange }: { fen: string; flipped: boolean; onFenChange: (fen: string) => void }) {
   const board = fenToBoard(fen);
+  const theme = useBoardTheme();
   const ranks = flipped ? [1, 2, 3, 4, 5, 6, 7, 8] : [8, 7, 6, 5, 4, 3, 2, 1];
   const files = flipped ? ['h','g','f','e','d','c','b','a'] : ['a','b','c','d','e','f','g','h'];
   const restParts = fen.split(' ').slice(1);
@@ -64,17 +66,16 @@ function EditableBoard({ fen, flipped, onFenChange }: { fen: string; flipped: bo
 
   return (
     <div
-      className="grid grid-cols-8 w-full select-none rounded-[10px] overflow-hidden shadow-[0_30px_60px_rgba(0,0,0,0.6)]"
-      style={{ aspectRatio: '1', touchAction: 'manipulation' }}
+      className="relative grid grid-cols-8 w-full select-none rounded-[10px] overflow-hidden shadow-[0_30px_60px_rgba(0,0,0,0.6)]"
+      style={{ aspectRatio: '1', touchAction: 'manipulation', ...theme.skin.boardStyle }}
     >
+      {theme.defs}
       {ranks.map((rank) =>
         files.map((file) => {
           const rowIdx = 8 - rank;
           const colIdx = file.charCodeAt(0) - 97;
           const piece = board[rowIdx][colIdx];
           const isLight = (rowIdx + colIdx) % 2 === 0;
-          const bg = isLight ? '#f0d9b5' : '#b58863';
-          const isWhitePiece = piece && piece === piece.toUpperCase();
           return (
             <button
               key={`${file}${rank}`}
@@ -83,16 +84,13 @@ function EditableBoard({ fen, flipped, onFenChange }: { fen: string; flipped: bo
               disabled={!piece}
               className="relative flex items-center justify-center text-[clamp(22px,6vw,40px)] leading-none p-0 m-0 border-0"
               style={{
-                background: bg,
+                ...(isLight ? theme.skin.lightSquareStyle : theme.skin.darkSquareStyle),
                 cursor: piece ? 'pointer' : 'default',
                 aspectRatio: '1',
-                fontFamily: '"Segoe UI Symbol", "DejaVu Sans", "Apple Color Emoji", sans-serif',
-                color: isWhitePiece ? '#fff' : '#1a1a1a',
-                textShadow: isWhitePiece ? '0 1px 2px rgba(0,0,0,0.6)' : 'none',
               }}
               aria-label={`${file}${rank}${piece ? ` ${piece}` : ''}`}
             >
-              {piece ? PIECE_GLYPH[piece] || piece : ''}
+              {piece ? theme.renderPiece(piece) : null}
             </button>
           );
         })
@@ -118,22 +116,22 @@ function BuilderBoard({
   onSquareTap: (rowIdx: number, colIdx: number) => void;
 }) {
   const board = fenToBoard(fen);
+  const theme = useBoardTheme();
   const ranks = flipped ? [1, 2, 3, 4, 5, 6, 7, 8] : [8, 7, 6, 5, 4, 3, 2, 1];
   const files = flipped ? ['h','g','f','e','d','c','b','a'] : ['a','b','c','d','e','f','g','h'];
 
   return (
     <div
-      className="grid grid-cols-8 w-full select-none rounded-[10px] overflow-hidden shadow-[0_30px_60px_rgba(0,0,0,0.6)]"
-      style={{ aspectRatio: '1', touchAction: 'manipulation' }}
+      className="relative grid grid-cols-8 w-full select-none rounded-[10px] overflow-hidden shadow-[0_30px_60px_rgba(0,0,0,0.6)]"
+      style={{ aspectRatio: '1', touchAction: 'manipulation', ...theme.skin.boardStyle }}
     >
+      {theme.defs}
       {ranks.map((rank) =>
         files.map((file) => {
           const rowIdx = 8 - rank;
           const colIdx = file.charCodeAt(0) - 97;
           const piece = board[rowIdx][colIdx];
           const isLight = (rowIdx + colIdx) % 2 === 0;
-          const bg = isLight ? '#f0d9b5' : '#b58863';
-          const isWhitePiece = piece && piece === piece.toUpperCase();
           return (
             <button
               key={`${file}${rank}`}
@@ -141,16 +139,13 @@ function BuilderBoard({
               onClick={() => onSquareTap(rowIdx, colIdx)}
               className="relative flex items-center justify-center text-[clamp(22px,6vw,40px)] leading-none p-0 m-0 border-0"
               style={{
-                background: bg,
+                ...(isLight ? theme.skin.lightSquareStyle : theme.skin.darkSquareStyle),
                 cursor: selectedPiece || piece ? 'pointer' : 'default',
                 aspectRatio: '1',
-                fontFamily: '"Segoe UI Symbol", "DejaVu Sans", "Apple Color Emoji", sans-serif',
-                color: isWhitePiece ? '#fff' : '#1a1a1a',
-                textShadow: isWhitePiece ? '0 1px 2px rgba(0,0,0,0.6)' : 'none',
               }}
               aria-label={`${file}${rank}${piece ? ` ${piece}` : ''}`}
             >
-              {piece ? PIECE_GLYPH[piece] || piece : ''}
+              {piece ? theme.renderPiece(piece) : null}
             </button>
           );
         })
@@ -160,6 +155,7 @@ function BuilderBoard({
 }
 
 export function ScanPosition() {
+  const pieceTheme = useBoardTheme();
   const { isPremium, isSubscriptionLoaded } = useUser();
   const [, navigate] = useLocation();
   const [state, setState] = useState<ScanState>('idle');
@@ -693,13 +689,10 @@ export function ScanPosition() {
                   style={{
                     background: builderPiece === p ? 'rgba(129,182,76,0.25)' : '#3a3835',
                     border: builderPiece === p ? '2px solid #81b64c' : '2px solid transparent',
-                    color: '#fff',
-                    textShadow: '0 1px 2px rgba(0,0,0,0.6)',
-                    fontFamily: '"Segoe UI Symbol", "DejaVu Sans", sans-serif',
                   }}
                   aria-label={`White ${p}`}
                 >
-                  {PIECE_GLYPH[p]}
+                  <span className="relative block h-[78%] w-[78%]">{pieceTheme.renderPiece(p)}</span>
                 </button>
               ))}
             </div>
@@ -712,12 +705,10 @@ export function ScanPosition() {
                   style={{
                     background: builderPiece === p ? 'rgba(129,182,76,0.25)' : '#3a3835',
                     border: builderPiece === p ? '2px solid #81b64c' : '2px solid transparent',
-                    color: '#1a1a1a',
-                    fontFamily: '"Segoe UI Symbol", "DejaVu Sans", sans-serif',
                   }}
                   aria-label={`Black ${p}`}
                 >
-                  {PIECE_GLYPH[p]}
+                  <span className="relative block h-[78%] w-[78%]">{pieceTheme.renderPiece(p)}</span>
                 </button>
               ))}
             </div>

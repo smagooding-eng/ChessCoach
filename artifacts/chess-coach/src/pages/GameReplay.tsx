@@ -3,6 +3,7 @@ import { MoveTimeline } from '@/components/MoveTimeline';
 import { Search as SearchIcon, Check } from 'lucide-react';
 import { useDashboardRedesignFlag } from '@/hooks/use-app-config';
 import { RD } from '@/lib/redesignTheme';
+import { useBoardTheme } from '@/components/MiniBoard';
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useParams, Link, useLocation } from 'wouter';
 import { useGameViewer } from '@/hooks/use-games';
@@ -344,11 +345,6 @@ function pickBot(playerRating: number): BotConfig {
 
 type SandboxResult = 'playing' | 'win' | 'loss' | 'draw';
 
-const PIECE_GLYPH: Record<string, string> = {
-  K: '♔', Q: '♕', R: '♖', B: '♗', N: '♘', P: '♙',
-  k: '♚', q: '♛', r: '♜', b: '♝', n: '♞', p: '♟',
-};
-
 function fenToBoard(fen: string): (string | null)[][] {
   const board: (string | null)[][] = Array.from({ length: 8 }, () => Array(8).fill(null));
   const placement = fen.split(' ')[0];
@@ -391,11 +387,13 @@ function MiniBoard({
   const ranks = flipped ? [1, 2, 3, 4, 5, 6, 7, 8] : [8, 7, 6, 5, 4, 3, 2, 1];
   const files = flipped ? ['h','g','f','e','d','c','b','a'] : ['a','b','c','d','e','f','g','h'];
   const targetSet = new Set(legalTargets);
+  const theme = useBoardTheme();
   return (
     <div
-      className="grid grid-cols-8 w-full select-none rounded-[10px] overflow-hidden shadow-[0_30px_60px_rgba(0,0,0,0.6)]"
-      style={{ aspectRatio: '1', touchAction: 'manipulation' }}
+      className="relative grid grid-cols-8 w-full select-none rounded-[10px] overflow-hidden shadow-[0_30px_60px_rgba(0,0,0,0.6)]"
+      style={{ aspectRatio: '1', touchAction: 'manipulation', ...theme.skin.boardStyle }}
     >
+      {theme.defs}
       {ranks.map((rank) =>
         files.map((file) => {
           const square = `${file}${rank}`;
@@ -409,9 +407,6 @@ function MiniBoard({
           const isLastMove = lastMove && (lastMove.from === square || lastMove.to === square);
           const isWhitePiece = piece && piece === piece.toUpperCase();
           const canInteract = active && piece && ((isWhitePiece && playerColor === 'w') || (!isWhitePiece && playerColor === 'b'));
-          let bg = isLight ? '#f0d9b5' : '#b58863';
-          if (isLastMove) bg = isLight ? '#f5e57b' : '#cdc169';
-          if (isSelected) bg = '#7fb1ff';
           return (
             <button
               key={square}
@@ -420,16 +415,14 @@ function MiniBoard({
               disabled={!active}
               className="relative flex items-center justify-center text-[clamp(20px,5vw,32px)] leading-none p-0 m-0 border-0"
               style={{
-                background: bg,
+                ...(isLight ? theme.skin.lightSquareStyle : theme.skin.darkSquareStyle),
                 cursor: active ? (canInteract || isTarget || isSelected ? 'pointer' : 'default') : 'default',
                 aspectRatio: '1',
-                fontFamily: '"Segoe UI Symbol", "DejaVu Sans", "Apple Color Emoji", sans-serif',
-                color: piece && piece === piece.toUpperCase() ? '#fff' : '#1a1a1a',
-                textShadow: piece && piece === piece.toUpperCase() ? '0 1px 2px rgba(0,0,0,0.6)' : 'none',
               }}
               aria-label={`${square}${piece ? ` ${piece}` : ''}`}
             >
-              {piece ? PIECE_GLYPH[piece] || piece : ''}
+              {(isLastMove || isSelected) && <span className="pointer-events-none absolute inset-0" style={{ background: isSelected ? 'rgba(80,150,255,0.55)' : 'rgba(255,240,80,0.45)' }} />}
+              {piece ? theme.renderPiece(piece) : null}
               {isTarget && !piece && (
                 <span
                   className="absolute pointer-events-none"
