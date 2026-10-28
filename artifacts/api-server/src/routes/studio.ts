@@ -37,7 +37,7 @@ router.get("/admin/studio/summary", requireAdmin, async (_req: Request, res: Res
     const [counts, progress] = await Promise.all([tagCounts(), contentScanProgress()]);
     res.json({ counts, progress });
   } catch {
-    res.json({ counts: {}, progress: { scanned: 0, reviewed: 0, moments: 0 } });
+    res.json({ counts: {}, progress: { scanned: 0, reviewed: 0, moments: 0, analyzed: 0, unreviewed: 0, reviewer: null } });
   }
 });
 
@@ -46,6 +46,21 @@ router.post("/admin/studio/scan", requireAdmin, async (_req: Request, res: Respo
   await ensureContentTables();
   const done = await scanContentBatch(150);
   res.json({ ...done, progress: await contentScanProgress() });
+});
+
+/** Review more games (engine only, isolated engine) so the scanner can find clips in them. */
+router.post("/admin/studio/review-more", requireAdmin, async (req: Request, res: Response) => {
+  await ensureContentTables();
+  const { startStudioReviews } = await import("../lib/contentMoments");
+  const count = Math.max(1, Math.min(500, Number(req.body?.count) || 50));
+  const r = await startStudioReviews(count);
+  if (!r.started) { res.status(409).json({ error: r.error }); return; }
+  res.json({ ok: true, progress: await contentScanProgress() });
+});
+router.post("/admin/studio/review-more/stop", requireAdmin, async (_req: Request, res: Response) => {
+  const { stopStudioReviews } = await import("../lib/contentMoments");
+  stopStudioReviews();
+  res.json({ ok: true });
 });
 
 router.get("/admin/studio/game/:id", requireAdmin, async (req: Request, res: Response) => {

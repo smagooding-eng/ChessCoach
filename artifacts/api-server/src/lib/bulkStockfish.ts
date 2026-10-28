@@ -32,6 +32,10 @@ export interface BulkMoveReview {
   classification: string;
   cpLoss: number;
   engineAvailable: true;
+  /** Position before the move, Stockfish's eval after it (White's view), and its preferred move. */
+  fen?: string;
+  evalAfterCp?: number;
+  betterMove?: string | null;
 }
 
 // A deliberately simpler classifier than the paid per-user review's
@@ -107,6 +111,9 @@ export async function reviewGameEngineOnly(
       classification: classify(loss),
       cpLoss: Math.round(loss * 100) / 100,
       engineAvailable: true,
+      fen: fens[i],
+      evalAfterCp: after.cpWhite,
+      betterMove: before.bestMoveSan && before.bestMoveSan !== sans[i] ? before.bestMoveSan : null,
     });
   }
 

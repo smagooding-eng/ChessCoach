@@ -46,6 +46,16 @@ export async function ensureContentTables(): Promise<void> {
   await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_content_moments_tags ON content_moments USING GIN (tags)`);
   await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_content_moments_score ON content_moments (score DESC, id DESC)`);
   await db.execute(sql`CREATE TABLE IF NOT EXISTS content_scanned (game_id INTEGER PRIMARY KEY, scanned_at TIMESTAMPTZ NOT NULL DEFAULT now())`);
+  // Engine reviews made just for the Studio (games nobody had reviewed yet). Kept apart from
+  // games.review_data so a player's own game page is never changed by them.
+  await db.execute(sql`CREATE TABLE IF NOT EXISTS content_reviews (game_id INTEGER PRIMARY KEY, review JSONB NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT now())`);
+  await db.execute(sql`CREATE TABLE IF NOT EXISTS content_fixes (id VARCHAR PRIMARY KEY, done_at TIMESTAMPTZ NOT NULL DEFAULT now())`);
+  // Engine-only reviews (bulk job, older reviews) didn't carry each move's position, so the scan
+  // skipped every move of those games. Scan the games that gave no moments again, once.
+  const fixed = rowsOf(await db.execute(sql`INSERT INTO content_fixes (id) VALUES ('rescan_no_fen_v1') ON CONFLICT DO NOTHING RETURNING id`));
+  if (fixed.length) {
+    await db.execute(sql`DELETE FROM content_scanned s WHERE NOT EXISTS (SELECT 1 FROM content_moments m WHERE m.game_id = s.game_id)`);
+  }
 }
 
 let trapCache: { at: number; list: { name: string; line: string[] }[] } | null = null;
@@ -61,8 +71,23 @@ interface ReviewMove { moveIndex?: number; san?: string; color?: "white" | "blac
 /** Tags and stores the notable moves of one reviewed game. */
 async function scanGame(g: Row, trapList: { name: string; line: string[] }[]): Promise<number> {
   const rd = g.review_data as { moves?: ReviewMove[] } | ReviewMove[] | null;
-  const moves: ReviewMove[] = Array.isArray(rd) ? rd : rd?.moves ?? [];
+  const moves: ReviewMove[] = (Array.isArray(rd) ? rd : rd?.moves ?? []).map((m) => ({ ...m }));
   if (!moves.length) return 0;
+  // Reviews without each move's position (engine-only ones): rebuild them from the moves.
+  if (moves.some((m) => !m.fen || !m.color)) {
+    try {
+      const startFen = typeof g.pgn === "string" ? (g.pgn.match(/\[FEN "([^"]+)"\]/)?.[1] ?? undefined) : undefined;
+      const c = startFen ? new Chess(startFen) : new Chess();
+      for (const m of moves) {
+        if (!m.san) break;
+        const before = c.fen();
+        const mv = c.move(m.san);
+        if (!mv) break;
+        m.fen ??= before;
+        m.color ??= mv.color === "w" ? "white" : "black";
+      }
+    } catch { /* keep the moves that played */ }
+  }
   const sans = moves.map((m) => m.san ?? "");
   // A classic trap: the game follows the whole trap line from move one.
   const trapHit = trapList.find((t) => t.line.length <= sans.length && t.line.every((s, i) => s.replace(/[+#]/g, "") === sans[i].replace(/[+#]/g, "")));
@@ -104,9 +129,9 @@ export async function scanContentBatch(limit = 25): Promise<{ games: number; mom
   if (scanning) return { games: 0, moments: 0 };
   scanning = true;
   try {
-    const r = await db.execute(sql`SELECT g.id, g.review_data, g.opening, g.white_username, g.black_username, g.white_rating, g.black_rating, g.platform, g.played_at
-      FROM games g LEFT JOIN content_scanned s ON s.game_id = g.id
-      WHERE g.review_data IS NOT NULL AND s.game_id IS NULL AND g.platform IS DISTINCT FROM 'bot'
+    const r = await db.execute(sql`SELECT g.id, COALESCE(g.review_data, cr.review) AS review_data, g.pgn, g.opening, g.white_username, g.black_username, g.white_rating, g.black_rating, g.platform, g.played_at
+      FROM games g LEFT JOIN content_scanned s ON s.game_id = g.id LEFT JOIN content_reviews cr ON cr.game_id = g.id
+      WHERE (g.review_data IS NOT NULL OR cr.game_id IS NOT NULL) AND s.game_id IS NULL AND g.platform IS DISTINCT FROM 'bot'
       ORDER BY g.id DESC LIMIT ${limit}`);
     const games = rowsOf(r);
     const trapList = await traps();
@@ -122,12 +147,69 @@ export async function scanContentBatch(limit = 25): Promise<{ games: number; mom
   }
 }
 
-export async function contentScanProgress(): Promise<{ scanned: number; reviewed: number; moments: number }> {
+export async function contentScanProgress(): Promise<{ scanned: number; reviewed: number; moments: number; analyzed: number; unreviewed: number; reviewer: ReviewerState }> {
   const [r] = rowsOf<Record<string, string>>(await db.execute(sql`SELECT
     (SELECT COUNT(*) FROM content_scanned) AS scanned,
-    (SELECT COUNT(*) FROM games WHERE review_data IS NOT NULL AND platform IS DISTINCT FROM 'bot') AS reviewed,
+    (SELECT COUNT(*) FROM games g WHERE (g.review_data IS NOT NULL OR EXISTS (SELECT 1 FROM content_reviews cr WHERE cr.game_id = g.id)) AND g.platform IS DISTINCT FROM 'bot') AS reviewed,
+    (SELECT COUNT(*) FROM games WHERE analyzed = true AND platform IS DISTINCT FROM 'bot') AS analyzed,
+    (SELECT COUNT(*) FROM games g WHERE g.review_data IS NULL AND g.pgn IS NOT NULL AND g.platform IS DISTINCT FROM 'bot' AND NOT EXISTS (SELECT 1 FROM content_reviews cr WHERE cr.game_id = g.id)) AS unreviewed,
     (SELECT COUNT(*) FROM content_moments) AS moments`));
-  return { scanned: Number(r?.scanned ?? 0), reviewed: Number(r?.reviewed ?? 0), moments: Number(r?.moments ?? 0) };
+  return {
+    scanned: Number(r?.scanned ?? 0), reviewed: Number(r?.reviewed ?? 0), moments: Number(r?.moments ?? 0),
+    analyzed: Number(r?.analyzed ?? 0), unreviewed: Number(r?.unreviewed ?? 0), reviewer: { ...reviewer },
+  };
+}
+
+// ── Reviewing more games for the Studio ────────────────────────────────────
+// Clips need a move-by-move engine review. Most imported games only have the
+// lighter analysis, so this reviews more of them with the isolated bulk
+// Stockfish (never the engine players' reviews use), newest first, and keeps
+// the result in content_reviews. The scanner then picks them up.
+export interface ReviewerState { running: boolean; target: number; done: number; failed: number; error: string | null }
+const reviewer: ReviewerState = { running: false, target: 0, done: 0, failed: 0, error: null };
+let stopReviewer = false;
+export function stopStudioReviews(): void { stopReviewer = true; }
+export async function startStudioReviews(count: number): Promise<{ started: boolean; error?: string }> {
+  if (reviewer.running) return { started: false, error: "Already reviewing" };
+  const busy = rowsOf(await db.execute(sql`SELECT 1 FROM background_jobs WHERE type = 'bulk_game_crawl' AND status = 'pending' LIMIT 1`));
+  if (busy.length) return { started: false, error: "The bulk review job (Admin › Tools) is running and uses the same engine. Stop it first, or let it finish." };
+  Object.assign(reviewer, { running: true, target: count, done: 0, failed: 0, error: null });
+  stopReviewer = false;
+  void (async () => {
+    const { reviewGameEngineOnly, destroyBulkEngine } = await import("./bulkStockfish");
+    const { parsePgnMoves } = await import("./chesscom");
+    try {
+      while (!stopReviewer && reviewer.done + reviewer.failed < reviewer.target) {
+        const [g] = rowsOf<{ id: number; pgn: string }>(await db.execute(sql`
+          SELECT g.id, g.pgn FROM games g
+          WHERE g.review_data IS NULL AND g.pgn IS NOT NULL AND g.platform IS DISTINCT FROM 'bot'
+            AND NOT EXISTS (SELECT 1 FROM content_reviews cr WHERE cr.game_id = g.id)
+          ORDER BY g.id DESC LIMIT 1`));
+        if (!g) break;
+        try {
+          const moves = parsePgnMoves(g.pgn);
+          if (moves.length < 10) throw new Error("too short");
+          const fens = [moves[0].fenBefore, ...moves.map((m) => m.fen).filter((f): f is string => !!f)];
+          const review = await Promise.race([
+            reviewGameEngineOnly(fens, moves.map((m) => m.color as "white" | "black"), moves.map((m) => m.san), 12, 60),
+            new Promise<never>((_, rej) => setTimeout(() => rej(new Error("timed out")), Math.max(60_000, moves.length * 5000))),
+          ]);
+          await db.execute(sql`INSERT INTO content_reviews (game_id, review) VALUES (${g.id}, ${JSON.stringify(review)}::jsonb) ON CONFLICT (game_id) DO NOTHING`);
+          reviewer.done++;
+        } catch (err) {
+          // Mark it so the next pass doesn't pick it again.
+          await db.execute(sql`INSERT INTO content_reviews (game_id, review) VALUES (${g.id}, '{"moves":[]}'::jsonb) ON CONFLICT (game_id) DO NOTHING`).catch(() => {});
+          reviewer.failed++;
+          if (err instanceof Error && /timed out/.test(err.message)) destroyBulkEngine();
+        }
+      }
+    } catch (err) {
+      reviewer.error = err instanceof Error ? err.message : String(err);
+    } finally {
+      reviewer.running = false;
+    }
+  })();
+  return { started: true };
 }
 
 /** Background: a small batch every 20 seconds while there's work, then every 10 minutes. */
@@ -173,7 +255,7 @@ export async function tagCounts(): Promise<Record<string, number>> {
 
 /** Any game's moves and review, for the Studio player (admins only). */
 export async function studioGame(id: number) {
-  const r = await db.execute(sql`SELECT id, pgn, review_data, opening, white_username, black_username, white_rating, black_rating, result, platform, played_at FROM games WHERE id = ${id}`);
+  const r = await db.execute(sql`SELECT id, pgn, COALESCE(review_data, (SELECT review FROM content_reviews cr WHERE cr.game_id = games.id)) AS review_data, opening, white_username, black_username, white_rating, black_rating, result, platform, played_at FROM games WHERE id = ${id}`);
   const g = rowsOf(r)[0];
   if (!g) return null;
   const rd = g.review_data as { moves?: unknown[]; whiteAccuracy?: number; blackAccuracy?: number; gameSummary?: { overview?: string } | null } | unknown[] | null;

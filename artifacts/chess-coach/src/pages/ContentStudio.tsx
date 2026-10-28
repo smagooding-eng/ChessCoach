@@ -46,7 +46,12 @@ export function ContentStudio() {
   const [sort, setSort] = useState<'best' | 'new' | 'random'>('best');
   const [moments, setMoments] = useState<Moment[] | null>(null);
   const [more, setMore] = useState(true);
-  const [summary, setSummary] = useState<{ counts: Record<string, number>; progress: { scanned: number; reviewed: number; moments: number } } | null>(null);
+  const [summary, setSummary] = useState<{ counts: Record<string, number>; progress: {
+    scanned: number; reviewed: number; moments: number; analyzed?: number; unreviewed?: number;
+    reviewer?: { running: boolean; target: number; done: number; failed: number; error: string | null } | null;
+  } } | null>(null);
+  const [scanNote, setScanNote] = useState<string | null>(null);
+  const [revCount, setRevCount] = useState(50);
   const [scanning, setScanning] = useState(false);
   const [open, setOpen] = useState<StudioSource | null>(null);
   // Analyzer games: Stockfish plays a whole game (best / worst per side) and it opens as a clip.
@@ -268,9 +273,29 @@ export function ContentStudio() {
   useEffect(() => { void loadSummary(); }, []);
 
   const scan = async () => {
-    setScanning(true);
-    try { await apiFetch('/api/admin/studio/scan', { method: 'POST', credentials: 'include' }); await loadSummary(); setSort((s) => s); setTags((t) => [...t]); } finally { setScanning(false); }
+    setScanning(true); setScanNote(null);
+    try {
+      const r = await apiFetch('/api/admin/studio/scan', { method: 'POST', credentials: 'include' });
+      const d = await r.json().catch(() => ({}));
+      setScanNote(d.games ? `Scanned ${d.games} more games: ${d.moments} new moments.` : 'Every reviewed game is already scanned. Review more games below to get more clips.');
+      await loadSummary(); setSort((s) => s); setTags((t) => [...t]);
+    } finally { setScanning(false); }
   };
+  // Reviewing more games (isolated engine) so they can be scanned for clips.
+  const reviewMore = async () => {
+    setScanNote(null);
+    const r = await apiFetch('/api/admin/studio/review-more', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ count: revCount }) });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) { setScanNote(d.error || 'Could not start'); return; }
+    await loadSummary();
+  };
+  const stopReview = async () => { await apiFetch('/api/admin/studio/review-more/stop', { method: 'POST', credentials: 'include' }); await loadSummary(); };
+  const reviewerRunning = !!summary?.progress.reviewer?.running;
+  useEffect(() => {
+    if (!reviewerRunning) return;
+    const t = setInterval(() => { void loadSummary(); }, 10_000);
+    return () => clearInterval(t);
+  }, [reviewerRunning]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!authUser?.isAdmin) return <div className="p-6 text-white">Admins only.</div>;
   const pr = summary?.progress;
@@ -286,11 +311,44 @@ export function ContentStudio() {
         Moments from every reviewed game on ChessScout. Pick one to turn it into a vertical clip with a random board on every move, stickers, a find-the-move countdown and effects. Player names are hidden in clips unless you turn them on.
       </p>
 
-      <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl bg-white/5 px-3 py-2 text-[12.5px] text-white/70">
-        {pr ? <span><b className="text-white">{pr.moments.toLocaleString()}</b> moments from <b className="text-white">{pr.scanned.toLocaleString()}</b> of {pr.reviewed.toLocaleString()} reviewed games scanned{pr.scanned < pr.reviewed ? ' (the rest are scanned in the background)' : ''}</span> : <span>Loading…</span>}
-        <button onClick={scan} disabled={scanning} className="ml-auto flex items-center gap-1.5 rounded-lg bg-white/10 px-2.5 py-1 font-bold text-white disabled:opacity-50">
-          {scanning ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />} Scan more now
-        </button>
+      <div className="mb-3 space-y-2 rounded-xl bg-white/5 px-3 py-2.5 text-[12.5px] text-white/70">
+        <div className="flex flex-wrap items-center gap-2">
+          {pr ? (
+            <span>
+              <b className="text-white">{pr.moments.toLocaleString()}</b> moments from <b className="text-white">{pr.scanned.toLocaleString()}</b> of <b className="text-white">{pr.reviewed.toLocaleString()}</b> games with a move-by-move review
+              {pr.scanned < pr.reviewed ? ' (the rest are scanned in the background)' : ''}.
+            </span>
+          ) : <span>Loading…</span>}
+          <button onClick={scan} disabled={scanning} className="ml-auto flex items-center gap-1.5 rounded-lg bg-white/10 px-2.5 py-1 font-bold text-white disabled:opacity-50">
+            {scanning ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />} Scan more now
+          </button>
+        </div>
+        {pr && typeof pr.unreviewed === 'number' && (
+          <div className="flex flex-wrap items-center gap-2 border-t border-white/10 pt-2">
+            <span>
+              Clips need a move-by-move review. <b className="text-white">{pr.unreviewed.toLocaleString()}</b> imported games don't have one yet
+              {typeof pr.analyzed === 'number' ? ` (the ${pr.analyzed.toLocaleString()} "analyzed" games on the site count the lighter analysis too)` : ''}.
+            </span>
+            {reviewerRunning ? (
+              <span className="ml-auto flex items-center gap-2">
+                <Loader2 size={13} className="animate-spin text-[#81B64C]" />
+                <b className="text-white">Reviewing {pr.reviewer!.done + pr.reviewer!.failed} of {pr.reviewer!.target}…</b>
+                <button onClick={() => void stopReview()} className="rounded-lg bg-white/10 px-2.5 py-1 font-bold text-white">Stop</button>
+              </span>
+            ) : (
+              <span className="ml-auto flex items-center gap-1.5">
+                {[25, 50, 100, 250].map((n) => (
+                  <button key={n} onClick={() => setRevCount(n)} className="rounded-md px-2 py-1 font-bold" style={{ background: revCount === n ? '#81B64C' : 'rgba(255,255,255,.08)', color: '#fff' }}>{n}</button>
+                ))}
+                <button onClick={() => void reviewMore()} disabled={!pr.unreviewed} className="rounded-lg bg-[#81B64C] px-2.5 py-1 font-black text-white disabled:opacity-50">Review more games</button>
+              </span>
+            )}
+          </div>
+        )}
+        {pr?.reviewer && !pr.reviewer.running && pr.reviewer.target > 0 && (
+          <p className="text-white/60">Last run: {pr.reviewer.done} reviewed{pr.reviewer.failed ? `, ${pr.reviewer.failed} skipped` : ''}{pr.reviewer.error ? ` · ${pr.reviewer.error}` : ''}. New clips appear as they're scanned.</p>
+        )}
+        {scanNote && <p className="font-bold text-[#E8B447]">{scanNote}</p>}
       </div>
 
       <div className="mb-3 flex flex-wrap items-center gap-2">
