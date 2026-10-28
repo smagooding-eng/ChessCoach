@@ -4,18 +4,51 @@
 // already link to tools like ChessScout, so they're the best people to ask.
 //
 // A run:
-//   1. Claude (web search) lists such pages for each competitor domain.
+//   1. AI web search (Claude, or OpenAI without a Claude key) lists such pages for each competitor domain.
 //   2. We open each page: is the competitor really linked there (verified)?
 //      Does it already link to chessscout.net? Is there a published contact
 //      email on that site (same rules as club outreach: only what the site
 //      itself prints)?
 // Pages can also be pasted in from an Ahrefs / Semrush export.
+import OpenAI from "openai";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { logger } from "./logger";
 import { askClaude, claudeAvailable } from "./claude";
-import { trackAiUsage, AI_FEATURES } from "./aiUsageTracker";
+import { trackAiUsage, AI_FEATURES, type AiFeature } from "./aiUsageTracker";
 import { fetchText, findContactEmail, parseJsonLoose } from "./clubOutreach";
+
+// Claude when ANTHROPIC_API_KEY is set, otherwise OpenAI (same as club outreach).
+const SEARCH_MODELS = [process.env.OUTREACH_SEARCH_MODEL, "gpt-5.6-luna", "gpt-4.1-mini"].filter(Boolean) as string[];
+async function aiText(prompt: string, opts: { webSearch: boolean; maxTokens: number; feature: AiFeature }): Promise<string> {
+  if (claudeAvailable()) {
+    const r = await askClaude(opts.webSearch ? `${prompt}\n\nUse web search to find them. Your final message must be only the JSON object, with no other text.` : prompt,
+      { webSearch: opts.webSearch, maxSearches: 6, maxTokens: opts.maxTokens });
+    void trackAiUsage({ feature: opts.feature, model: r.model, usage: { prompt_tokens: r.inputTokens, completion_tokens: r.outputTokens, total_tokens: r.inputTokens + r.outputTokens } });
+    return r.text;
+  }
+  if (!process.env.OPENAI_API_KEY) throw new Error("No AI key on the server (set OPENAI_API_KEY or ANTHROPIC_API_KEY)");
+  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  if (!opts.webSearch) {
+    const resp = await openai.chat.completions.create({ model: "gpt-5.6-luna", max_completion_tokens: opts.maxTokens, messages: [{ role: "user", content: prompt }] });
+    void trackAiUsage({ feature: opts.feature, model: "gpt-5.6-luna", usage: resp.usage });
+    return resp.choices[0]?.message?.content ?? "";
+  }
+  let lastErr: unknown = null;
+  for (const model of SEARCH_MODELS) {
+    try {
+      const resp = await openai.responses.create({ model, tools: [{ type: "web_search" }], input: prompt } as never) as unknown as {
+        output_text?: string; usage?: { input_tokens?: number; output_tokens?: number; total_tokens?: number };
+      };
+      void trackAiUsage({ feature: opts.feature, model, usage: { prompt_tokens: resp.usage?.input_tokens, completion_tokens: resp.usage?.output_tokens, total_tokens: resp.usage?.total_tokens } });
+      return resp.output_text ?? "";
+    } catch (err) {
+      lastErr = err;
+      logger.warn({ err: err instanceof Error ? err.message : err, model }, "[backlinks] web search failed, trying next model");
+    }
+  }
+  throw lastErr instanceof Error ? lastErr : new Error("Web search failed");
+}
 
 function rowsOf<T>(r: unknown): T[] { return Array.isArray(r) ? (r as T[]) : ((r as { rows?: T[] })?.rows ?? []); }
 
@@ -119,8 +152,7 @@ function discoveryPrompt(domain: string): string {
   return `Find web pages on OTHER websites that link to or recommend ${domain}, a chess improvement tool.
 We want pages where a similar tool could also be listed: "best chess apps / tools / websites / training sites" articles and listicles, "${domain} alternatives" or comparison posts, reviews of ${domain}, chess resource or link pages of clubs, schools, libraries, federations and coaches, app and tool directories, blog posts, newsletters and podcasts that feature it.
 Exclude ${domain} itself, chess.com, lichess.org, social networks (Reddit, Facebook, X, YouTube, Instagram, TikTok, LinkedIn, Pinterest), app stores, Quora and Wikipedia.
-Return up to 15 pages as JSON: {"results":[{"url":"https://...","title":"page title","kind":"listicle|alternatives|review|resource page|directory|blog|podcast|news|other"}]}
-Use web search to find them. Your final message must be only the JSON object, with no other text.`;
+Return up to 15 pages as JSON: {"results":[{"url":"https://...","title":"page title","kind":"listicle|alternatives|review|resource page|directory|blog|podcast|news|other"}]}`;
 }
 
 // ── Runs ─────────────────────────────────────────────────────────────────────
@@ -143,15 +175,14 @@ export function startBacklinkRun(competitors?: string[]): boolean {
   void (async () => {
     try {
       await ensureBacklinkTables();
-      if (!claudeAvailable()) throw new Error("Set ANTHROPIC_API_KEY on the server to search with Claude");
+      if (!claudeAvailable() && !process.env.OPENAI_API_KEY) throw new Error("No AI key on the server (set OPENAI_API_KEY or ANTHROPIC_API_KEY)");
       const list = competitors?.length ? competitors : await getCompetitors();
       const ids = new Set<number>();
       for (const domain of list) {
         state.step = `Searching for pages that link to ${domain}…`;
         try {
-          const r = await askClaude(discoveryPrompt(domain), { webSearch: true, maxSearches: 6, maxTokens: 4000 });
-          void trackAiUsage({ feature: AI_FEATURES.OUTREACH_DISCOVERY, model: r.model, usage: { prompt_tokens: r.inputTokens, completion_tokens: r.outputTokens, total_tokens: r.inputTokens + r.outputTokens } });
-          const parsed = parseJsonLoose(r.text) as { results?: { url?: string; title?: string; kind?: string }[] } | null;
+          const text = await aiText(discoveryPrompt(domain), { webSearch: true, maxTokens: 4000, feature: AI_FEATURES.OUTREACH_DISCOVERY });
+          const parsed = parseJsonLoose(text) as { results?: { url?: string; title?: string; kind?: string }[] } | null;
           for (const p of parsed?.results ?? []) {
             if (!p?.url) continue;
             const id = await upsertTarget(p.url, domain, { title: p.title, kind: p.kind, source: "search" });
@@ -207,7 +238,6 @@ export async function draftOutreach(id: number, sender: string): Promise<{ subje
   await ensureBacklinkTables();
   const [t] = rowsOf<{ url: string; host: string; title: string | null; kind: string | null; competitors: string[] }>(await db.execute(sql`SELECT url, host, title, kind, competitors FROM backlink_targets WHERE id = ${id}`));
   if (!t) throw new Error("Not found");
-  if (!claudeAvailable()) throw new Error("Set ANTHROPIC_API_KEY on the server to draft with Claude");
   const prompt = `Write a short, friendly outreach email from ${sender}, the founder of ChessScout.net, to the person who runs this page:
 Page: ${t.title ?? t.url}
 URL: ${t.url}
@@ -217,9 +247,7 @@ It currently links to or recommends: ${t.competitors.join(", ")}
 Ask them to consider adding ChessScout.net to the page. ChessScout.net is a chess improvement app: it imports your Chess.com and Lichess games and reviews them with Stockfish plus an AI coach that explains every move in plain English, scouts any opponent's openings and weaknesses before a game, scans a photo or screenshot of any board, and has puzzles, courses, live and daily games. There's a free plan.
 Rules: under 120 words; mention their page specifically and naturally; one clear ask; no flattery, hype, made-up facts or statistics; plain text; sign off with "${sender}" and "ChessScout.net".
 Return only JSON: {"subject":"...","body":"..."}`;
-  const r = await askClaude(prompt, { maxTokens: 800 });
-  void trackAiUsage({ feature: AI_FEATURES.OUTREACH_DRAFT, model: r.model, usage: { prompt_tokens: r.inputTokens, completion_tokens: r.outputTokens, total_tokens: r.inputTokens + r.outputTokens } });
-  const d = parseJsonLoose(r.text) as { subject?: string; body?: string } | null;
+  const d = parseJsonLoose(await aiText(prompt, { webSearch: false, maxTokens: 800, feature: AI_FEATURES.OUTREACH_DRAFT })) as { subject?: string; body?: string } | null;
   if (!d?.subject || !d?.body) throw new Error("Couldn't write a draft, try again.");
   await db.execute(sql`UPDATE backlink_targets SET draft_subject = ${d.subject}, draft_body = ${d.body} WHERE id = ${id}`);
   return { subject: d.subject, body: d.body };
