@@ -1,3 +1,4 @@
+import { BacklinkGapPanel } from '@/components/admin/BacklinkGapPanel';
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { PageHero } from '@/components/DesignSystem';
 import { useLocation } from 'wouter';
@@ -760,6 +761,7 @@ export function Admin() {
           <EmailTrackingPanel />
           <ClubOutreachPanel />
           <DirectoryKitPanel />
+          <BacklinkGapPanel />
           <OutreachStudio />
           <SeoArticlesPanel />
           <FacebookAutoPostPanel />

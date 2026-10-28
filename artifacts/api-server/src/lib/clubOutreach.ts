@@ -193,11 +193,11 @@ const pressAt = walk(PRESS_KINDS, PRESS_MARKETS);
 
 // ── Web search (names + websites only) ─────────────────────────────────────
 
-interface Candidate { name: string; type?: string; city?: string; region?: string; country?: string; website: string; contactPage?: string; platform?: string; profileUrl?: string }
+export interface Candidate { name: string; type?: string; city?: string; region?: string; country?: string; website: string; contactPage?: string; platform?: string; profileUrl?: string }
 
 const SEARCH_MODELS = [process.env.OUTREACH_SEARCH_MODEL, "gpt-5.6-luna", "gpt-4.1-mini"].filter(Boolean) as string[];
 
-function parseJsonLoose(text: string): unknown {
+export function parseJsonLoose(text: string): unknown {
   const cleaned = text.replace(/```json|```/g, "").trim();
   const start = cleaned.indexOf("{");
   const end = cleaned.lastIndexOf("}");
@@ -301,7 +301,7 @@ const BAD_DOMAIN = /(example\.(com|org)|sentry|wixpress|squarespace|godaddy|word
 const ROLE_LOCAL = /^(info|contact|hello|club|chess|secretary|president|director|admin|office|events|tournaments?|td|membership|members|coach|team|general|enquiries|inquiries|programs?|library|ask|tips|news|editor|editorial|press|reviews?|contato|contacto|kontakt|contatto|secretaria|secretariat)/i;
 const FREEMAIL = /@(gmail|yahoo|hotmail|outlook|aol|icloud|me|live|msn|protonmail|proton|comcast|verizon|att|sbcglobal|btinternet|bigpond|shaw|rogers|sympatico)\./i;
 
-async function fetchText(url: string): Promise<string | null> {
+export async function fetchText(url: string): Promise<string | null> {
   try {
     const r = await fetch(url, {
       headers: { "User-Agent": "ChessScoutClubFinder/1.0 (+https://chessscout.net; looking for published club contact details)", Accept: "text/html,*/*" },
@@ -359,7 +359,7 @@ async function acceptsMail(domain: string): Promise<boolean> {
   return ok;
 }
 
-async function findContactEmail(c: Candidate): Promise<{ email: string; sourceUrl: string } | null> {
+export async function findContactEmail(c: Candidate): Promise<{ email: string; sourceUrl: string } | null> {
   if (SOCIAL.test(c.website)) return null;
   const host = hostOf(c.website);
   if (!host) return null;
