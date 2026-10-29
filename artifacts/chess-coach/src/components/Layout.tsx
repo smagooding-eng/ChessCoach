@@ -4,6 +4,7 @@ import { useUser } from '@/hooks/use-user';
 import { useUnreadCount } from '@/components/RealtimeBridge';
 import { useChessPlayer } from '@/hooks/use-chess-player';
 import { useMyAvatar } from '@/components/EditableAvatar';
+import { LiveGameReturn } from '@/components/play/LiveGameReturn';
 import { useMultiEloProgress } from '@/hooks/use-elo-progress';
 import { useDashboardRedesignFlag } from '@/hooks/use-app-config';
 import { GooglePlayBadge, PlayLogo } from '@/components/GooglePlayBadge';
@@ -340,6 +341,7 @@ export function Layout({ children, fullscreen }: { children: React.ReactNode; fu
     // perfectly, not a replacement for it.
     return (
       <div style={{ height: '100dvh', overflowY: 'auto', overflowX: 'hidden', background: BG_DARK }}>
+        <LiveGameReturn />
         {children}
       </div>
     );
@@ -347,6 +349,7 @@ export function Layout({ children, fullscreen }: { children: React.ReactNode; fu
 
   return (
     <div className="min-h-screen flex flex-col md:flex-row" style={{ background: BG_DARK }}>
+      <LiveGameReturn />
       <aside className="hidden md:flex w-52 h-screen sticky top-0 z-40 flex-col" style={{ background: BG_SIDEBAR, borderRight: `1px solid ${BORDER_COLOR}` }}>
         <div className="px-4 pt-4 pb-3 flex items-center gap-2" style={{ borderBottom: `1px solid ${BORDER_COLOR}` }}>
           <img src={`${import.meta.env.BASE_URL}images/logo.svg`} alt="ChessScout.net" className="w-7 h-7 object-contain" />

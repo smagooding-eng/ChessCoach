@@ -47,9 +47,12 @@ export interface LiveGameState {
   takebackUsed?: boolean;
 }
 
+/** A quick message in a live game: an emoji or one of the preset phrases. */
+export interface LiveChat { id: number; from: 'w' | 'b'; text: string; at: number }
+
 export interface OpponentDisconnect { side: 'w' | 'b'; graceMs: number; until: number }
 
-function buildWsUrl(): string {
+export function buildWsUrl(): string {
   // Session token as a query param too: browsers that block cross-site
   // cookies (Safari, some Android webviews) can't authenticate otherwise.
   const t = getAuthToken();
@@ -98,6 +101,13 @@ export function useLivePlay() {
   // Arena tournament: waiting in the pairing pool, or told it has ended.
   const [tournamentWaiting, setTournamentWaiting] = useState<{ id: string; started: boolean } | null>(null);
   const [tournamentOver, setTournamentOver] = useState<string | null>(null);
+  // Backed out to the lobby mid-game: the game keeps going, with a way back.
+  const [minimized, setMinimized] = useState(false);
+  const [chat, setChat] = useState<LiveChat[]>([]);
+  // A move sent but not yet confirmed by the server (re-sent after a reconnect).
+  const pendingMoveRef = useRef<{ san: string; fen: string; at: number } | null>(null);
+  // Last time anything arrived from the server (a silent dead socket is replaced).
+  const lastHeardRef = useRef(Date.now());
 
   const wsRef = useRef<WebSocket | null>(null);
   // Socket up right now? A game stays on screen through a brief drop (phones
@@ -176,7 +186,21 @@ export function useLivePlay() {
     ws.onmessage = (ev) => {
       let msg: any;
       try { msg = JSON.parse(ev.data); } catch { return; }
+      lastHeardRef.current = Date.now();
+      // A sent move is confirmed once the position changes; after a reconnect,
+      // send it again if the server never got it.
+      if ((msg.type === 'state' || msg.type === 'match_found') && msg.state && pendingMoveRef.current) {
+        const pm = pendingMoveRef.current;
+        if (msg.state.fen !== pm.fen || msg.state.status !== 'active') pendingMoveRef.current = null;
+        else if (msg.type === 'match_found' && msg.state.turn === msg.color) { pm.at = Date.now(); ws.send(JSON.stringify({ type: 'move', gameId: msg.state.id, san: pm.san })); }
+      }
       switch (msg.type) {
+        case 'pong':
+          break;
+        case 'chat':
+          if (msg.gameId && gameRef.current && msg.gameId !== gameRef.current.id) break;
+          setChat((c) => [...c.slice(-19), { id: Date.now() + Math.random(), from: msg.from, text: String(msg.text ?? ''), at: Date.now() }]);
+          break;
         case 'queued':
           setQueuedTc(msg.tcId);
           setQueuedMode(msg.mode);
@@ -228,12 +252,13 @@ export function useLivePlay() {
           setQueuedTc(null);
           setQueuedMode(null);
           setOpponentDisconnect(null);
+          if (gameRef.current?.id !== msg.state.id) setChat([]);
           setStatus(msg.state.status === 'finished' ? 'finished' : 'in_game');
           break;
         case 'state':
           if (typeof msg.state?.serverNow === 'number') setServerOffset(msg.state.serverNow - Date.now());
           setGame(msg.state);
-          if (msg.state.status === 'finished') setStatus('finished');
+          if (msg.state.status === 'finished') { setStatus('finished'); setMinimized(false); }
           // Premove is replayed by LiveGame from the new state's `turn` and `fen`.
           break;
         case 'opponent_disconnected':
@@ -263,6 +288,20 @@ export function useLivePlay() {
           // A finished game is dropped from the server after a few minutes;
           // re-subscribing to it then is harmless, so don't show that.
           if (msg.message === 'Game not found' && gameRef.current?.status === 'finished') break;
+          // The game is gone from the server (it restarted mid-game): say so
+          // instead of leaving a board that never moves again.
+          if (msg.message === 'Game not found' && gameRef.current?.status === 'active') {
+            pendingMoveRef.current = null;
+            setGame(null); setColor(null); setPremove(null); setMinimized(false); setStatus('idle');
+            setNotice('That game was interrupted when the server restarted, so it wasn\'t counted. Sorry! Start a new one below.');
+            break;
+          }
+          // A move the server didn't accept: get the real position back.
+          if ((msg.message === 'Illegal move' || msg.message === 'Not your turn') && gameRef.current) {
+            pendingMoveRef.current = null;
+            ws.send(JSON.stringify({ type: 'subscribe', gameId: gameRef.current.id }));
+            break;
+          }
           setError(msg.message);
           if (pendingAcceptRef.current || pendingApproveRef.current) {
             // a failed challenge accept must not be re-sent on reconnect
@@ -343,7 +382,27 @@ export function useLivePlay() {
     const ws = wsRef.current;
     if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'approve_request', code }));
   }, []);
-  const move = useCallback((san: string) => { if (game) send({ type: 'move', gameId: game.id, san }); }, [game, send]);
+  const move = useCallback((san: string) => {
+    if (!game) return;
+    pendingMoveRef.current = { san, fen: game.fen, at: Date.now() };
+    send({ type: 'move', gameId: game.id, san });
+  }, [game, send]);
+  // Emoji / quick phrase to the opponent.
+  const sendChat = useCallback((text: string) => { if (game) send({ type: 'chat', gameId: game.id, text }); }, [game, send]);
+  // Watchdog: ping every 6s; if the server has gone quiet for 15s, or a move
+  // hasn't been confirmed in 6s, the connection is dead even if the phone
+  // says it's open -- drop it and reconnect (the move is re-sent then).
+  useEffect(() => {
+    const t = setInterval(() => {
+      const ws = wsRef.current;
+      if (!ws || ws.readyState !== WebSocket.OPEN) return;
+      ws.send(JSON.stringify({ type: 'ping' }));
+      const quiet = Date.now() - lastHeardRef.current > 15_000;
+      const stuck = !!pendingMoveRef.current && Date.now() - pendingMoveRef.current.at > 6_000;
+      if (quiet || stuck) { lastHeardRef.current = Date.now(); try { ws.close(); } catch { /* ignore */ } }
+    }, 6000);
+    return () => clearInterval(t);
+  }, []);
   const resign = useCallback(() => { if (game) send({ type: 'resign', gameId: game.id }); }, [game, send]);
   // Bot games only: take back your last move (and the bot's reply).
   const takeback = useCallback(() => { if (game) { setPremove(null); send({ type: 'takeback', gameId: game.id }); } }, [game, send]);
@@ -378,6 +437,10 @@ export function useLivePlay() {
 
   const reset = useCallback(() => {
     const g = gameRef.current;
+    // Mid-game: just step back to the lobby; the game (and clock) carries on.
+    if (g && g.status === 'active') { setMinimized(true); return; }
+    setMinimized(false);
+    setChat([]);
     if (g && g.status === 'finished') send({ type: 'leave_game', gameId: g.id });
     setNotice(null);
     setGame(null); setColor(null); setError(null); setStatus('idle');
@@ -389,5 +452,6 @@ export function useLivePlay() {
     queuedAt, botOfferMs, waitingFor, waitingKind, serverOffset, notice, approveRequest, connected, joinSeek, seekGone, clearSeekGone,
     enterQueue, offerRematch, declineRematch, cancel, playBot, acceptChallenge, move, resign, takeback, offerDraw, acceptDraw, declineDraw,
     reset, tournamentWaiting, tournamentOver, tournamentReady, tournamentPause,
+    minimized, restore: () => setMinimized(false), chat, sendChat,
   };
 }

@@ -12,6 +12,7 @@ import { GameOverOverlay, OverlayButton, describeEnding } from '@/components/Gam
 import { useLocation } from 'wouter';
 
 import { PT } from '@/lib/playTheme';
+import { ChatBubble, ChatTray, useChatMuted } from '@/components/play/LiveChat';
 const CHESSCOM_GREEN = PT.green;
 const TEXT_LIGHT = PT.text;
 const TEXT_MUTED = PT.muted;
@@ -78,6 +79,7 @@ export function LiveGame({ live, onLeave }: { live: ReturnType<typeof useLivePla
   const { game, color, move, resign, premove, setPremove, offerDraw, acceptDraw, declineDraw, serverOffset, notice, offerRematch, declineRematch, connected } = live;
   const [, navigate] = useLocation();
   const [tick, setTick] = useState(0);
+  const [chatMuted, setChatMuted] = useChatMuted();
   // "Add as a friend" after a game against a person
   const [friendState, setFriendState] = useState<'idle' | 'sending' | 'sent'>('idle');
   useEffect(() => { setFriendState('idle'); }, [game?.id]);
@@ -331,7 +333,10 @@ export function LiveGame({ live, onLeave }: { live: ReturnType<typeof useLivePla
         <ArrowLeft className="w-4 h-4" /> {game.tournamentId ? 'Tournament' : 'Lobby'}
       </button>
 
-      <PlayerStrip p={top} ms={topMs} active={topActive} isYou={false} awayMs={oppAwayMs} />
+      <div className="relative">
+        <PlayerStrip p={top} ms={topMs} active={topActive} isYou={false} awayMs={oppAwayMs} />
+        <ChatBubble chat={live.chat} side={oppColor} muted={chatMuted} />
+      </div>
       <MaterialStrip fen={game.fen} color={youAreWhite ? 'b' : 'w'} className="px-1" />
 
       <ChessBoard
@@ -376,7 +381,13 @@ export function LiveGame({ live, onLeave }: { live: ReturnType<typeof useLivePla
       />
 
       <MaterialStrip fen={game.fen} color={youAreWhite ? 'w' : 'b'} className="px-1" />
-      <PlayerStrip p={bottom} ms={bottomMs} active={bottomActive} isYou={true} awayMs={myAwayMs} />
+      <div className="relative">
+        <PlayerStrip p={bottom} ms={bottomMs} active={bottomActive} isYou={true} awayMs={myAwayMs} />
+        <ChatBubble chat={live.chat} side={color} />
+      </div>
+      {!opponentIsBot && (
+        <ChatTray onSend={live.sendChat} disabled={!connected} muted={chatMuted} setMuted={setChatMuted} />
+      )}
       <MoveBrowserBar browser={browser} yourTurn={isPlayerTurn} />
       {/* Engine evaluation only after the game (during a game against a real
           person it would be an engine aid). Below the board, so it never moves it. */}

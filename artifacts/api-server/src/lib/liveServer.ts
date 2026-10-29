@@ -462,9 +462,13 @@ function scheduleBotIfNeeded(g: LiveGame) {
   g.botTimer = setTimeout(() => {
     if (g.status !== 'active') return;
     if (g.chess.turn() !== turn) return;
-    const san = getBotMove(g.chess.fen(), player.rating);
-    if (!san) return;
-    applyMoveInternal(g, san);
+    // Never leave a bot game stuck: if the engine has no answer, play any legal move.
+    let san: string | null = null;
+    try { san = getBotMove(g.chess.fen(), player.rating); } catch (err) { logger.warn({ err, gameId: g.id }, 'bot move failed'); }
+    if (!san || !applyMoveInternal(g, san)) {
+      const legal = g.chess.moves();
+      if (legal.length && g.status === 'active' && g.chess.turn() === turn) applyMoveInternal(g, legal[Math.floor(Math.random() * legal.length)]);
+    }
   }, think);
 }
 
@@ -1264,6 +1268,23 @@ function handleDrawDecline(ws: WebSocket, userId: string, gameId: string) {
   broadcast(g.id, { type: 'state', state: gamePublicState(g) });
 }
 
+// ── Quick messages: emojis and a few friendly phrases (nothing typed, so
+// there's nothing to moderate). Bots don't answer.
+export const LIVE_CHAT = ['👋', '👍', '😅', '😮', '🔥', '😂', '🤝', '🙏', '😬', '🤯', '♟️', '💪', 'Good luck!', 'Have fun!', 'Nice move!', 'Oops!', 'Thanks!', 'Good game!', 'Rematch?'];
+const lastChatAt = new Map<string, number>();
+function handleChat(userId: string, gameId: string, text: string) {
+  const g = games.get(gameId);
+  if (!g) return;
+  const side = sideOfUser(g, userId);
+  if (!side || !LIVE_CHAT.includes(text)) return;
+  const key = `${gameId}:${side}`;
+  const now = Date.now();
+  if (now - (lastChatAt.get(key) ?? 0) < 1200) return;
+  lastChatAt.set(key, now);
+  if (lastChatAt.size > 5000) lastChatAt.clear();
+  broadcast(g.id, { type: 'chat', gameId: g.id, from: side, text });
+}
+
 function handleSubscribe(ws: WebSocket, gameId: string) {
   const g = games.get(gameId);
   if (!g) return send(ws, { type: 'error', message: 'Game not found' });
@@ -1450,6 +1471,9 @@ export function attachLiveServer(server: HttpServer) {
             break;
           case 'ping':
             send(ws, { type: 'pong' });
+            break;
+          case 'chat':
+            handleChat(info.userId, String(msg.gameId ?? ''), String(msg.text ?? ''));
             break;
           case 'presence':
             handlePresence(ws, info.userId, msg.gameId, msg.visible !== false);

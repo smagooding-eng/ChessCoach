@@ -669,3 +669,6 @@ html.cs-photo :not(.cs-photo-backdrop-img):not(.cs-keep-img):is([style*="chesssc
 @media (min-width: 768px) {
   .cs-board-tip { bottom: 24px !important; right: 24px !important; left: auto !important; margin: 0 !important; width: 420px; }
 }
+
+/* Live game chat bubble */
+@keyframes pop { 0% { transform: translate(-50%, -50%) scale(.6); opacity: 0 } 100% { transform: translate(-50%, -50%) scale(1); opacity: 1 } }

@@ -89,9 +89,26 @@ export function LivePlay({ initialTab }: { initialTab?: OnlineTab } = {}) {
 
   // Keep the game on screen through a reconnect (status can briefly read
   // connecting/disconnected/idle while the socket comes back).
-  if (live.game && (live.status === 'in_game' || live.status === 'finished' || live.game.status === 'active')) {
+  if (live.game && !live.minimized && (live.status === 'in_game' || live.status === 'finished' || live.game.status === 'active')) {
     return <LiveGame live={live} onLeave={() => live.reset()} />;
   }
+  // Backed out to the lobby mid-game: the game carries on, one tap returns.
+  const g = live.game;
+  const resumeCard = live.minimized && g && g.status === 'active' && live.color ? (() => {
+    const opp = live.color === 'w' ? g.black : g.white;
+    const yours = g.turn === live.color;
+    return (
+      <button onClick={live.restore} className="flex w-full items-center gap-3 rounded-2xl px-4 py-3.5 text-left"
+        style={{ background: 'rgba(229,72,77,0.14)', border: '1px solid rgba(229,72,77,0.55)' }}>
+        <span className="h-2.5 w-2.5 shrink-0 animate-pulse rounded-full" style={{ background: '#E5484D' }} />
+        <span className="min-w-0 flex-1">
+          <b className="block truncate text-[15px] font-extrabold" style={{ color: '#F5F7F6' }}>Game in progress vs {opp.username}</b>
+          <span className="block text-[12.5px]" style={{ color: yours ? '#F2B8BA' : 'rgba(245,247,246,.7)' }}>{yours ? 'Your move — your clock is running' : `${g.timeControl.label} · their move`}</span>
+        </span>
+        <span className="shrink-0 rounded-xl px-3 py-2 text-[13px] font-extrabold" style={{ background: '#F5F7F6', color: '#0B1213' }}>Back to game</span>
+      </button>
+    );
+  })() : null;
 
   const createChallenge = async () => {
     setCreating(true);
@@ -126,6 +143,8 @@ export function LivePlay({ initialTab }: { initialTab?: OnlineTab } = {}) {
 
   return (
     <div className="mx-auto max-w-[760px] space-y-4 p-4 md:p-0 pb-24">
+      {resumeCard}
+      {!live.game && live.notice && <p className="rounded-xl px-4 py-3 text-[13px] font-semibold" style={{ background: 'rgba(232,180,71,0.14)', border: '1px solid rgba(232,180,71,0.5)', color: '#F5F7F6' }}>{live.notice}</p>}
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
           <h1 className="text-2xl md:text-3xl font-black" style={{ color: PT.text, letterSpacing: '-0.02em' }}>Play Online</h1>
