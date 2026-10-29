@@ -162,7 +162,7 @@ export function ActiveGamesCard() {
         </Link>
         );
       })()}
-      {view === 'list' && sorted.slice(0, 4).map(g => {
+      {view === 'list' && sorted.map(g => {
         const white = g.whiteUserId === me;
         const yours = g.turnUserId === me;
         const bank = g.turnUserId === g.whiteUserId ? g.whiteBankMs : g.blackBankMs;
