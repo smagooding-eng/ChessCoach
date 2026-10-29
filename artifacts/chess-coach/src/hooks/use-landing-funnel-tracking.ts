@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { trackFunnelEvent, trackFunnelEventBeacon, type LandingSectionId } from '@/lib/funnelTracking';
 
-const SECTION_IDS: LandingSectionId[] = ['hero', 'how_it_works', 'differentiators', 'features', 'faq', 'pricing', 'final_cta'];
+const SECTION_IDS: LandingSectionId[] = ['hero', 'pillars', 'explore', 'how_it_works', 'differentiators', 'features', 'faq', 'pricing', 'final_cta'];
 const SCROLL_MILESTONES = [25, 50, 75, 100] as const;
 
 // Instruments a landing page for detailed funnel diagnostics beyond the
@@ -33,7 +33,14 @@ export function useLandingFunnelTracking() {
         for (const entry of entries) {
           const id = entry.target.getAttribute('data-track-section');
           if (!id) continue;
-          if (entry.isIntersecting && entry.intersectionRatio >= 0.5) {
+          // "Seen" = half of the section is on screen, or (for sections taller
+          // than the screen, like the explore grid on a phone) it fills at
+          // least half the screen. A plain 50%-of-section rule never fires
+          // for tall sections.
+          const visibleH = entry.intersectionRect.height;
+          const viewportH = entry.rootBounds?.height ?? window.innerHeight;
+          const seen = entry.isIntersecting && (entry.intersectionRatio >= 0.5 || visibleH >= viewportH * 0.5);
+          if (seen) {
             currentSection.current = id;
             if (!viewedSections.current.has(id)) {
               viewedSections.current.add(id);
@@ -42,7 +49,7 @@ export function useLandingFunnelTracking() {
           }
         }
       },
-      { threshold: [0.5] }
+      { threshold: [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1] }
     );
     sectionEls.forEach((el) => observer.observe(el));
 

@@ -46,6 +46,8 @@ export function Challenge() {
         const d = await r.json();
         let sentHere = false;
         try { sentHere = sessionStorage.getItem(`cs_sent_request_${d.challenge?.code}`) === '1'; } catch { /* ignore */ }
+        // A lowercased link resolves to the real code: put that in the address bar.
+        if (d.challenge?.code && d.challenge.code !== code) navigate(`/challenge/${d.challenge.code}${window.location.search}`, { replace: true });
         setCh(d.challenge); setIsCreator(!!d.isCreator); setIsRequester(!!d.isRequester || (sentHere && !d.isCreator));
       })
       .catch(() => setMissing(true));

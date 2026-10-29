@@ -489,7 +489,7 @@ function LandingExplore({ onSignup }: { onSignup: () => void }) {
     { href: '/chess-openings', title: t('Openings & traps'), text: t('What top players play, how they score, and the traps to set and avoid.') },
   ];
   return (
-    <section className="relative z-10 mx-auto w-full max-w-7xl px-4 pb-16 pt-10 sm:px-8">
+    <section data-track-section="explore" className="relative z-10 mx-auto w-full max-w-7xl px-4 pb-16 pt-10 sm:px-8">
       <h2 className="text-[clamp(1.5rem,6vw,2.2rem)] font-black leading-tight" style={{ color: TEXT }}>{t('Everything you need to play and get better')}</h2>
       <p className="mt-2 max-w-2xl text-[14.5px] leading-relaxed" style={{ color: MUTED }}>{t('Free to play, free to learn, in 28 languages, in your browser or on Android.')}</p>
       <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -670,7 +670,7 @@ export function LandingPage() {
         </motion.div>
       </main>
 
-      <div className="relative z-10 mx-auto w-full max-w-7xl shrink-0 px-4 sm:px-8">
+      <div data-track-section="pillars" className="relative z-10 mx-auto w-full max-w-7xl shrink-0 px-4 sm:px-8">
         <div className="grid grid-cols-3 rounded-2xl py-2 sm:py-3 lg:py-4" style={{ background: 'rgba(13,21,22,0.72)', border: '1px solid rgba(255,255,255,0.07)' }}>
           {pillars.map((f, i) => (
             <button key={f.title} onClick={f.onClick} className="flex flex-col items-center px-1.5 text-center transition-colors hover:bg-white/[0.03] sm:px-4"

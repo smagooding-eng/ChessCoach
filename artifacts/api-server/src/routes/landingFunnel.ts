@@ -65,12 +65,12 @@ function requireAdmin(req: Request, res: Response, next: Function) {
 
 const BOT_UA = /bot\b|bot\/|crawl|spider|slurp|headless|lighthouse|pagespeed|facebookexternalhit|embedly|bingpreview|semrush|ahrefs|mj12|google-inspectiontool|phantomjs|puppeteer|playwright|selenium|python-requests|curl\/|wget|go-http-client|node-fetch/i;
 
-const SECTION_IDS = ["hero", "how_it_works", "differentiators", "features", "faq", "pricing", "final_cta"] as const;
+const SECTION_IDS = ["hero", "pillars", "explore", "how_it_works", "differentiators", "features", "faq", "pricing", "final_cta"] as const;
 
 const VALID_EVENTS = new Set([
   "landing_view", "mia_started", "mia_skipped", "signup_clicked", "signup_completed",
   "signup_form_submitted", "signup_error", "opponent_scout_clicked",
-  "google_oauth_clicked", "google_signup_completed", "google_signup_error",
+  "google_oauth_clicked", "google_signup_completed", "google_signup_error", "google_login_completed",
   "scroll_25", "scroll_50", "scroll_75", "scroll_100",
   "engaged_10s",
   ...SECTION_IDS.map((s) => `viewed_${s}`),
@@ -146,6 +146,7 @@ async function getFunnelStatsForPlatform(since: Date, until: Date, platform: Pla
   const googleOauthClicked = countMap["google_oauth_clicked"] ?? 0;
   const googleSignupCompleted = countMap["google_signup_completed"] ?? 0;
   const googleSignupError = countMap["google_signup_error"] ?? 0;
+  const googleLoginCompleted = countMap["google_login_completed"] ?? 0;
 
   // Total "actually signed up" across both paths -- the email form and
   // Google OAuth are tracked as separate funnels above (for good reason,
@@ -228,6 +229,7 @@ async function getFunnelStatsForPlatform(since: Date, until: Date, platform: Pla
     googleOauthClicked,
     googleSignupCompleted,
     googleSignupError,
+    googleLoginCompleted,
     totalSignedUp,
     leftWithoutAction,
     scrollDepth,

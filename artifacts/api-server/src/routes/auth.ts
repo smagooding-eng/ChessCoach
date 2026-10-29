@@ -547,7 +547,9 @@ router.get("/auth/google/callback", async (req: Request, res: Response) => {
     // frontend (UserContext.tsx) reads this off the hash and fires the
     // corresponding funnel event once, since this redirect is the only
     // place that knows which case just happened.
-    const newSignupParam = isNewSignup ? "&newSignup=google" : "";
+    // An existing account signing back in is marked too, so the funnel can
+    // tell "came back signed in" apart from "never came back from Google".
+    const newSignupParam = isNewSignup ? "&newSignup=google" : "&login=google";
     sendClientRedirect(res, frontendOrigin + "/#token=" + sid + newSignupParam + (fromApp ? "&app=1" : ""));
   } catch (err: any) {
     req.log?.error?.({ err }, "Google callback error");

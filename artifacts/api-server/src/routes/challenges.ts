@@ -26,6 +26,23 @@ import { declineInvite, verifyDecline } from "../lib/challengeInvites";
 //   POST /challenges/:code/withdraw   requester takes it back
 const router: IRouter = Router();
 
+// Codes are mixed-case, but links get lowercased on the way (share previews,
+// retyping, some apps). If there's no exact match, use the one challenge whose
+// code matches ignoring case, so every handler below sees the real code.
+router.param("code", async (req, _res, next, value) => {
+  try {
+    const raw = String(value ?? "");
+    if (!raw || raw === "mine" || raw === "requests") return next();
+    const [exact] = await db.select({ code: gameChallengesTable.code }).from(gameChallengesTable).where(eq(gameChallengesTable.code, raw)).limit(1);
+    if (!exact) {
+      const rows = await db.select({ code: gameChallengesTable.code }).from(gameChallengesTable)
+        .where(sql`lower(${gameChallengesTable.code}) = lower(${raw})`).limit(2);
+      if (rows.length === 1) (req.params as Record<string, string>).code = rows[0].code;
+    }
+  } catch { /* fall through to the normal lookup */ }
+  next();
+});
+
 const LIVE_TTL_MS = 24 * 60 * 60 * 1000;
 const DAILY_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const OPEN_TTL_MS = 365 * 24 * 60 * 60 * 1000;      // open links last until turned off

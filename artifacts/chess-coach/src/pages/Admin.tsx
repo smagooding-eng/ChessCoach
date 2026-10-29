@@ -1914,6 +1914,8 @@ function ReferralSignupsPanel() {
 
 const SECTION_LABELS: Record<string, string> = {
   hero: 'Hero',
+  pillars: 'Play / Scout / Improve strip',
+  explore: 'Everything you need (bottom)',
   how_it_works: 'How It Works',
   differentiators: 'Only on ChessScout',
   features: 'Features',
@@ -1934,7 +1936,7 @@ function formatMs(ms: number): string {
 type PlatformFunnelData = {
   landingViews: number; miaStarted: number; miaSkipped: number;
   signupClicked: number; signupFormSubmitted: number; signupError: number; signupCompleted: number;
-  opponentScoutClicked: number; googleOauthClicked: number; googleSignupCompleted: number; googleSignupError: number;
+  opponentScoutClicked: number; googleOauthClicked: number; googleSignupCompleted: number; googleSignupError: number; googleLoginCompleted?: number;
   totalSignedUp: number; leftWithoutAction: number;
   scrollDepth: { scroll25: number; scroll50: number; scroll75: number; scroll100: number };
   engaged10s: number;
@@ -1944,7 +1946,10 @@ type PlatformFunnelData = {
   visitorBreakdown: VisitorBreakdown;
 };
 
-const sectionOrder = ['hero', 'how_it_works', 'differentiators', 'features', 'faq', 'pricing', 'final_cta'];
+// The current landing page's sections always show; old-layout sections only
+// when the chosen range still has data for them.
+const CURRENT_SECTIONS = ['hero', 'pillars', 'explore'];
+const sectionOrder = ['hero', 'pillars', 'explore', 'how_it_works', 'differentiators', 'features', 'faq', 'pricing', 'final_cta'];
 
 // Everything that used to be the single LandingFunnelPanel body, now
 // rendered once per platform (Website / App) under one shared date
@@ -1975,6 +1980,7 @@ function PlatformFunnelSection({ title, data }: { title: string; data: PlatformF
   const googleFunnelRows = [
     { label: 'Clicked "Continue with Google"', value: data.googleOauthClicked, color: 'text-blue-400' },
     { label: 'Completed sign up', value: data.googleSignupCompleted, color: 'text-primary' },
+    { label: 'Signed in to an existing account', value: data.googleLoginCompleted ?? 0, color: 'text-cyan-400' },
     { label: 'Hit an error', value: data.googleSignupError, color: 'text-red-400' },
   ];
 
@@ -2048,7 +2054,7 @@ function PlatformFunnelSection({ title, data }: { title: string; data: PlatformF
         <p className="text-xs font-bold text-muted-foreground mb-2">
           "Continue with Google" funnel — tracked separately from the email form above
         </p>
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           {googleFunnelRows.map((r) => (
             <div key={r.label} className="p-3 rounded-xl bg-white/5 border border-white/5">
               <p className={cn('text-lg font-black', r.color)}>{r.value.toLocaleString()}</p>
@@ -2058,7 +2064,7 @@ function PlatformFunnelSection({ title, data }: { title: string; data: PlatformF
         </div>
         {data.googleOauthClicked > 0 && (
           <p className="text-[10px] text-muted-foreground mt-2">
-            Completion rate: {Math.round((data.googleSignupCompleted / data.googleOauthClicked) * 100)}% — compare against the email form's completion rate above (Completed ÷ Opened) to see whether one path is genuinely underperforming the other, rather than assuming it.
+            Completion rate: {Math.round(((data.googleSignupCompleted + (data.googleLoginCompleted ?? 0)) / data.googleOauthClicked) * 100)}% came back signed in (new accounts plus existing ones; existing sign-ins are counted from Oct 29, 2026) — compare against the email form's completion rate above (Completed ÷ Opened) to see whether one path is genuinely underperforming the other, rather than assuming it.
           </p>
         )}
       </div>
@@ -2104,7 +2110,7 @@ function PlatformFunnelSection({ title, data }: { title: string; data: PlatformF
       <div className="mt-5 pt-4 border-t border-border/20">
         <p className="text-xs font-bold text-muted-foreground mb-2">Section views, exits &amp; timing</p>
         <div className="space-y-1.5">
-          {sectionOrder.map((s) => {
+          {sectionOrder.filter((s) => CURRENT_SECTIONS.includes(s) || (data.sectionViews[s] ?? 0) > 0 || (data.sectionExits[s] ?? 0) > 0).map((s) => {
             const views = data.sectionViews[s] ?? 0;
             const exits = data.sectionExits[s] ?? 0;
             const timing = data.sectionExitTimingMs[s];

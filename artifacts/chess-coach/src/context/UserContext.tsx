@@ -85,6 +85,8 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
           // Google both land here too, but neither is a signup.
           if (hashParams.get('newSignup') === 'google') {
             trackFunnelEvent('google_signup_completed');
+          } else if (hashParams.get('login') === 'google') {
+            trackFunnelEvent('google_login_completed');
           }
           window.history.replaceState(null, '', window.location.pathname + window.location.search);
         }

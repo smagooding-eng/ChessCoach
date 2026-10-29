@@ -23,12 +23,14 @@ const platform = (): 'web' | 'app' => (isRunningStandalone() || isInPlayApp() ? 
 /** For the Google sign-in link: tells the server to hand back "this was the app". */
 export const appSigninParam = (): string => (platform() === 'app' ? 'app=1' : '');
 
-export type LandingSectionId = 'hero' | 'how_it_works' | 'differentiators' | 'features' | 'faq' | 'pricing' | 'final_cta';
+// pillars + explore are the current landing page; the rest are from the older
+// long landing page, kept so past data still reads.
+export type LandingSectionId = 'hero' | 'pillars' | 'explore' | 'how_it_works' | 'differentiators' | 'features' | 'faq' | 'pricing' | 'final_cta';
 
 export type LandingFunnelEvent =
   | 'landing_view' | 'mia_started' | 'mia_skipped' | 'onboarding_finished' | 'signup_clicked' | 'signup_completed'
   | 'signup_form_submitted' | 'signup_error' | 'opponent_scout_clicked'
-  | 'google_oauth_clicked' | 'google_signup_completed' | 'google_signup_error'
+  | 'google_oauth_clicked' | 'google_signup_completed' | 'google_signup_error' | 'google_login_completed'
   | 'scroll_25' | 'scroll_50' | 'scroll_75' | 'scroll_100'
   | 'engaged_10s'
   | `viewed_${LandingSectionId}`
