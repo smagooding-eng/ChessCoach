@@ -88,8 +88,9 @@ router.get("/auth/user", async (req: Request, res: Response) => {
   // The ChessScout username can be set from another device, so read it
   // fresh rather than trusting the copy stored in this session.
   try {
-    const [row] = await db.select({ scoutUsername: usersTable.scoutUsername, emailOptOut: usersTable.emailOptOut }).from(usersTable).where(eq(usersTable.id, req.user!.id)).limit(1);
+    const [row] = await db.select({ scoutUsername: usersTable.scoutUsername, emailOptOut: usersTable.emailOptOut, profileImageUrl: usersTable.profileImageUrl }).from(usersTable).where(eq(usersTable.id, req.user!.id)).limit(1);
     if (row) {
+      (req.user as any).profileImageUrl = row.profileImageUrl ?? null;
       (req.user as any).scoutUsername = row.scoutUsername ?? null;
       (req.user as any).emailOptOut = !!row.emailOptOut;
     }
@@ -486,7 +487,8 @@ router.get("/auth/google/callback", async (req: Request, res: Response) => {
           .set({
             googleId: profile.id,
             authProvider: existingByEmail.authProvider === "local" ? "local+google" : "google",
-            profileImageUrl: profile.picture || existingByEmail.profileImageUrl,
+            // A picture the player uploaded themselves is kept.
+            profileImageUrl: existingByEmail.profileImageUrl?.includes('/api/avatars/') ? existingByEmail.profileImageUrl : (profile.picture || existingByEmail.profileImageUrl),
             firstName: existingByEmail.firstName || profile.given_name,
             lastName: existingByEmail.lastName || profile.family_name,
             lastLoginAt: new Date(),

@@ -22,6 +22,7 @@ import { usePhotoLook } from '@/context/SettingsContext';
 import { scene } from '@/components/PhotoHero';
 import { BOTS } from '@/lib/chess-bot';
 import { ActiveGamesCard } from '@/components/play/ActiveGamesCard';
+import { EditableAvatar } from '@/components/EditableAvatar';
 import { PlayAppCard } from '@/components/GooglePlayBadge';
 import { ChallengeInbox } from '@/components/play/OpenChallenges';
 import { NEUTRAL_CHIP } from '@/lib/redesignTheme';
@@ -181,18 +182,8 @@ export function DashboardRedesign() {
           {!photoLook && <div className="pointer-events-none absolute inset-0" style={{ background: 'linear-gradient(90deg, rgba(11,18,19,.82) 0%, rgba(11,18,19,.5) 50%, rgba(11,18,19,.22) 100%), linear-gradient(0deg, rgba(11,18,19,.55) 0%, rgba(11,18,19,0) 45%)' }} />}
           <div className="relative">
           <div className="flex items-center gap-3">
-            <div className="relative shrink-0">
-              <div
-                className="grid h-[60px] w-[60px] place-items-center overflow-hidden rounded-full"
-                style={{ border: `2px solid ${GREEN}`, background: 'rgba(129,182,76,.10)' }}
-              >
-                {chessPlayer?.avatar ? (
-                  <img src={chessPlayer.avatar} alt="" className="h-full w-full object-cover" />
-                ) : (
-                  <span className="text-xl font-black" style={{ color: GREEN }}>{displayName.charAt(0).toUpperCase()}</span>
-                )}
-              </div>
-            </div>
+            <EditableAvatar size={60} border={`2px solid ${GREEN}`}
+              fallback={<span className="text-xl font-black" style={{ color: GREEN }}>{displayName.charAt(0).toUpperCase()}</span>} />
 
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
@@ -206,10 +197,9 @@ export function DashboardRedesign() {
                   </span>
                 )}
               </div>
-              <p className="mt-0.5 truncate text-[13px]" style={{ color: MUTED }}>
-                {authUser?.chesscomUsername && <>Chess.com {multiElo?.chesscom?.currentRating ?? '—'}</>}
-                {authUser?.chesscomUsername && authUser?.lichessUsername && <span className="mx-2 opacity-50">|</span>}
-                {authUser?.lichessUsername && <>Lichess {multiElo?.lichess?.currentRating ?? '—'}</>}
+              <p className="mt-0.5 flex flex-wrap gap-x-2.5 text-[12.5px] leading-snug" style={{ color: MUTED }}>
+                {authUser?.chesscomUsername && <span className="whitespace-nowrap">Chess.com {multiElo?.chesscom?.currentRating ?? '—'}</span>}
+                {authUser?.lichessUsername && <span className="whitespace-nowrap">Lichess {multiElo?.lichess?.currentRating ?? '—'}</span>}
                 {!authUser?.chesscomUsername && !authUser?.lichessUsername && 'Link an account from Profile'}
               </p>
             </div>
@@ -238,28 +228,26 @@ export function DashboardRedesign() {
         </section>
 
         {/* ── Play and Learn: a card each ── */}
-        <div className="grid grid-cols-2 gap-4 lg:col-span-2">
-          <section className="relative flex flex-col rounded-[20px] p-4" style={{ background: CARD, border: `1px solid ${BORDER}` }}>
-            <Link href="/play" className="flex flex-1 flex-col" aria-label="Play">
-              <span className="grid h-11 w-11 place-items-center rounded-[13px]" style={{ background: `linear-gradient(180deg, ${GREEN}, ${GREEN_DARK})`, color: '#FFFFFF' }}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style={{ marginLeft: 2 }}><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12.5-7.5a1 1 0 0 0 0-1.72L8.5 3.64A1 1 0 0 0 7 4.5z" /></svg>
-              </span>
-              <span className="mt-3 flex items-center justify-between gap-2">
-                <b className="text-[18px] font-extrabold leading-tight">Play</b>
-                <ChevronRight size={18} style={{ color: MUTED }} />
-              </span>
-              <span className="mt-0.5 text-[13px] leading-snug" style={{ color: MUTED }}>Live, daily and bots</span>
-            </Link>
-          </section>
-          <Link href="/learning" className="flex flex-col rounded-[20px] p-4" style={{ background: CARD, border: `1px solid ${BORDER}` }}>
-            <span className="grid h-11 w-11 place-items-center rounded-[13px]" style={{ background: 'rgba(129,182,76,.14)', border: '1px solid rgba(129,182,76,.35)' }}>
-              <GraduationCap size={20} strokeWidth={2.25} style={{ color: GREEN }} />
+        <div className="grid grid-cols-2 gap-3 lg:col-span-2">
+          <Link href="/play" className="flex items-center gap-2.5 rounded-[16px] px-3 py-2.5" style={{ background: CARD, border: `1px solid ${BORDER}` }}>
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[11px]" style={{ background: `linear-gradient(180deg, ${GREEN}, ${GREEN_DARK})`, color: '#FFFFFF' }}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style={{ marginLeft: 2 }}><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12.5-7.5a1 1 0 0 0 0-1.72L8.5 3.64A1 1 0 0 0 7 4.5z" /></svg>
             </span>
-            <span className="mt-3 flex items-center justify-between gap-2">
-              <b className="text-[18px] font-extrabold leading-tight">Learn</b>
-              <ChevronRight size={18} style={{ color: MUTED }} />
+            <span className="min-w-0 flex-1">
+              <b className="block text-[15px] font-extrabold leading-tight">Play</b>
+              <span className="block truncate text-[11.5px]" style={{ color: MUTED }}>Live, daily, bots</span>
             </span>
-            <span className="mt-0.5 text-[13px] leading-snug" style={{ color: MUTED }}>Courses, lessons and drills</span>
+            <ChevronRight size={16} className="shrink-0" style={{ color: MUTED }} />
+          </Link>
+          <Link href="/learning" className="flex items-center gap-2.5 rounded-[16px] px-3 py-2.5" style={{ background: CARD, border: `1px solid ${BORDER}` }}>
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[11px]" style={{ background: 'rgba(129,182,76,.14)', border: '1px solid rgba(129,182,76,.35)' }}>
+              <GraduationCap size={17} strokeWidth={2.25} style={{ color: GREEN }} />
+            </span>
+            <span className="min-w-0 flex-1">
+              <b className="block text-[15px] font-extrabold leading-tight">Learn</b>
+              <span className="block truncate text-[11.5px]" style={{ color: MUTED }}>Courses and drills</span>
+            </span>
+            <ChevronRight size={16} className="shrink-0" style={{ color: MUTED }} />
           </Link>
         </div>
 

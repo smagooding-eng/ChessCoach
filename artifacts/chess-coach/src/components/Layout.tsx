@@ -3,6 +3,7 @@ import { Link, useLocation } from 'wouter';
 import { useUser } from '@/hooks/use-user';
 import { useUnreadCount } from '@/components/RealtimeBridge';
 import { useChessPlayer } from '@/hooks/use-chess-player';
+import { useMyAvatar } from '@/components/EditableAvatar';
 import { useMultiEloProgress } from '@/hooks/use-elo-progress';
 import { useDashboardRedesignFlag } from '@/hooks/use-app-config';
 import { GooglePlayBadge, PlayLogo } from '@/components/GooglePlayBadge';
@@ -178,6 +179,7 @@ export function Layout({ children, fullscreen }: { children: React.ReactNode; fu
   const { username, logout, isAuthenticated, authLogout, isPremium, subscription, authUser, isSubscriptionLoaded } = useUser();
   const freePlan = isSubscriptionLoaded && !!authUser && !isPremium;
   const { player } = useChessPlayer(username ?? undefined);
+  const myAvatar = useMyAvatar();
   const { data: multiElo } = useMultiEloProgress(username ?? undefined);
   const [moreOpen, setMoreOpen] = useState(false);
 
@@ -380,7 +382,7 @@ export function Layout({ children, fullscreen }: { children: React.ReactNode; fu
           )}
           <div className="flex items-center gap-1.5 px-2 py-2 rounded-xl" style={{ background: BG_CARD }}>
             <Link href="/profile" className="flex items-center gap-2 min-w-0 flex-1 hover:opacity-80 transition-opacity">
-              <PlayerAvatar avatar={player?.avatar} username={username ?? ''} size="sm" />
+              <PlayerAvatar avatar={myAvatar ?? undefined} username={username ?? ''} size="sm" />
               <div className="min-w-0 flex-1">
                 <p className="text-xs font-bold truncate leading-tight" style={{ color: TEXT_LIGHT }}>{username}</p>
                 {scoutElo != null && (
@@ -434,7 +436,7 @@ export function Layout({ children, fullscreen }: { children: React.ReactNode; fu
                 )}
               </Link>
               <button onClick={() => setProfileOpen(o => !o)} className="ml-1.5 active:opacity-70 transition-opacity" aria-label="Account menu">
-                <PlayerAvatar avatar={player?.avatar} username={username ?? ''} size="md" />
+                <PlayerAvatar avatar={myAvatar ?? undefined} username={username ?? ''} size="md" />
               </button>
             </div>
           </div>
@@ -460,7 +462,7 @@ export function Layout({ children, fullscreen }: { children: React.ReactNode; fu
                   </div>
                 )}
               </div>
-              <PlayerAvatar avatar={player?.avatar} username={username ?? ''} size="sm" />
+              <PlayerAvatar avatar={myAvatar ?? undefined} username={username ?? ''} size="sm" />
             </button>
           </div>
         </div>
