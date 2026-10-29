@@ -156,6 +156,53 @@ router.get("/admin/traffic-export", requireAdmin, async (req: Request, res: Resp
     ]);
     const act = rowsOf<Record<string, unknown>>(activation)[0] ?? {};
 
+    // One row per new account (no ids or emails): where that person first came
+    // from before signing up. Their pre-signup visits are found through every
+    // browser they later used signed in, plus -- for the Google sign-in round
+    // trip, which can come back in a different browser -- visits from the same
+    // IP in the 24 hours before signup. Our own hosts and the Google/Stripe
+    // sign-in pages aren't counted as sources.
+    const INTERNAL = sql.raw(`(p.referrer_host IS NULL OR p.referrer_host ~* '(^|\\.)(chessscout\\.net|onrender\\.com|vercel\\.app|accounts\\.google\\.com|accounts\\.youtube\\.com|checkout\\.stripe\\.com|localhost)$')`);
+    const perSignup = await db.execute(sql`
+      WITH u AS (
+        SELECT id, created_at, google_id IS NOT NULL AS google, referred_by_user_id IS NOT NULL AS referred
+        FROM users WHERE created_at >= ${since} AND created_at <= ${until} AND id NOT IN (SELECT id FROM analytics_excluded_users)
+      ),
+      browsers AS (SELECT DISTINCT pv.user_id, pv.visitor_id FROM pv_people pv JOIN u ON pv.user_id = u.id WHERE pv.visitor_id IS NOT NULL),
+      ips AS (SELECT DISTINCT pv.user_id, pv.ip_address FROM pv_people pv JOIN u ON pv.user_id = u.id WHERE pv.ip_address IS NOT NULL),
+      touches AS (
+        SELECT b.user_id, p.created_at, p.path, p.utm_source, p.utm_campaign, CASE WHEN ${INTERNAL} THEN NULL ELSE p.referrer_host END AS ref
+        FROM browsers b JOIN pv_people p ON p.visitor_id = b.visitor_id JOIN u ON u.id = b.user_id
+        WHERE p.created_at <= u.created_at + interval '10 minutes'
+        UNION ALL
+        SELECT i.user_id, p.created_at, p.path, p.utm_source, p.utm_campaign, CASE WHEN ${INTERNAL} THEN NULL ELSE p.referrer_host END AS ref
+        FROM ips i JOIN pv_people p ON p.ip_address = i.ip_address JOIN u ON u.id = i.user_id
+        WHERE p.created_at <= u.created_at + interval '10 minutes' AND p.created_at >= u.created_at - interval '24 hours'
+      ),
+      first_page AS (SELECT DISTINCT ON (user_id) user_id, path, created_at FROM touches ORDER BY user_id, created_at),
+      first_src AS (
+        SELECT DISTINCT ON (user_id) user_id, COALESCE(utm_source, ref) AS src, utm_campaign
+        FROM touches WHERE utm_source IS NOT NULL OR ref IS NOT NULL ORDER BY user_id, created_at
+      )
+      SELECT ${DAY("u.created_at")} AS day, ${HOUR("u.created_at")} AS hour, u.google, u.referred,
+        CASE WHEN fp.user_id IS NULL THEN 'no visit recorded before signup' ELSE COALESCE(fs.src, 'direct / untagged') END AS source,
+        fs.utm_campaign AS campaign,
+        regexp_replace(regexp_replace(fp.path, '/[0-9]+(?=/|$)', '/:id', 'g'), '/[A-Za-z0-9_-]{20,}(?=/|$)', '/:token', 'g') AS first_page,
+        round((extract(epoch FROM (u.created_at - fp.created_at)) / 3600.0)::numeric, 1) AS hours_from_first_visit
+      FROM u LEFT JOIN first_page fp ON fp.user_id = u.id LEFT JOIN first_src fs ON fs.user_id = u.id
+      ORDER BY u.created_at`).catch((err) => { logger.warn({ err }, "[traffic-export] per-signup sources failed"); return []; });
+    const signupRows = rowsOf<Record<string, unknown>>(perSignup).map((r) => ({
+      day: r.day, hour: num(r.hour), method: r.google ? 'google' : 'email', referredByMember: !!r.referred,
+      source: r.source, campaign: r.campaign ?? null, firstPage: r.first_page ?? null,
+      hoursFromFirstVisit: r.hours_from_first_visit == null ? null : Number(r.hours_from_first_visit),
+    }));
+    const bySource = new Map<string, { source: string; campaign: string | null; signups: number }>();
+    for (const r of signupRows) {
+      const k = `${r.source}|${r.campaign ?? ''}`;
+      const cur = bySource.get(k) ?? { source: String(r.source), campaign: (r.campaign as string | null) ?? null, signups: 0 };
+      cur.signups++; bySource.set(k, cur);
+    }
+
     const t = rowsOf<Record<string, unknown>>(totals)[0] ?? {};
     res.json({
       about: "ChessScout.net traffic and funnel export. Aggregates only (no IPs, emails or user ids). Days are in the admin's local time zone. The owner's own accounts (and their browsers) and suspected bots are left out.",
@@ -187,6 +234,8 @@ router.get("/admin/traffic-export", requireAdmin, async (req: Request, res: Resp
       landingFunnelDaily: rowsOf<Record<string, unknown>>(funnelDaily).map((r) => ({ day: r.day, platform: r.platform, event: r.event_type, visitors: num(r.visitors) })),
       topPages: rowsOf<Record<string, unknown>>(paths).map((r) => ({ path: r.path, views: num(r.views), visitors: num(r.visitors), signedInUsers: num(r.signed_in_users) })),
       entryPages: rowsOf<Record<string, unknown>>(entries).map((r) => ({ path: r.path, visitors: num(r.visitors), everSignedIn: num(r.became_or_were_signed_in) })),
+      signupsBySource: [...bySource.values()].sort((a, b) => b.signups - a.signups),
+      signups: signupRows,
       signupEntryPages: rowsOf<Record<string, unknown>>(signupEntries).map((r) => ({ path: r.path, signups: num(r.signups) })),
       exitPages: rowsOf<Record<string, unknown>>(exits).map((r) => ({ path: r.path, exits: num(r.exits) })),
       visitSources: rowsOf<Record<string, unknown>>(sources).map((r) => ({
