@@ -35,6 +35,8 @@ export interface StudioReview {
   id: number; opening: string | null; white: string | null; black: string | null; whiteRating: number | null; blackRating: number | null;
   result: string | null; platform: string | null; playedAt: string | null; whiteAccuracy: number | null; blackAccuracy: number | null;
   moments: number; brilliant: number; blunders: number; mate: number; lastFen: string | null;
+  /** False when the game has no move-by-move review yet. */
+  reviewed?: boolean; chesscomGameId?: string | null; url?: string | null;
 }
 export interface ScoutData {
   username: string; gamesAnalyzed: number; wins: number; losses: number; draws: number;

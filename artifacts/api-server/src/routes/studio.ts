@@ -1,7 +1,7 @@
 // Content Studio (admin only): find notable moments in any reviewed game and
 // open them in the Studio player. See lib/contentMoments.ts.
 import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
-import { listMoments, tagCounts, contentScanProgress, scanContentBatch, studioGame, ensureContentTables, studioTraps, studioPuzzles, puzzleThemes, studioReviews, studioScouts, studioScout, studioLessons, studioScans } from "../lib/contentMoments";
+import { listMoments, tagCounts, contentScanProgress, scanContentBatch, studioGame, ensureContentTables, studioTraps, studioPuzzles, puzzleThemes, studioReviews, reviewGameForStudio, studioScouts, studioScout, studioLessons, studioScans } from "../lib/contentMoments";
 
 const router: IRouter = Router();
 
@@ -106,11 +106,28 @@ router.get("/admin/studio/reviews", requireAdmin, async (req: Request, res: Resp
       sort: q.sort === "new" || q.sort === "accuracy" ? q.sort : "drama",
       limit: q.limit ? Number(q.limit) : 48, offset: q.offset ? Number(q.offset) : 0,
       sinceDays: q.sinceDays ? Number(q.sinceDays) || undefined : undefined,
+      player: typeof q.player === "string" && q.player.trim() ? q.player.trim().slice(0, 60) : undefined,
+      gameNo: typeof q.gameNo === "string" && q.gameNo.trim() ? q.gameNo.trim().slice(0, 200) : undefined,
+      bots: q.bots === "1",
+      all: q.all === "1",
     });
     res.json({ reviews });
   } catch (err) {
     req.log.error({ err }, "[studio] reviews failed");
     res.status(500).json({ error: "Couldn't load reviews" });
+  }
+});
+
+// Review one chosen game (any game, bots included) so it can be made into a clip.
+router.post("/admin/studio/review-game/:id", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    await ensureContentTables();
+    const r = await reviewGameForStudio(Number(req.params.id));
+    if (!r.ok) { res.status(409).json({ error: r.error }); return; }
+    res.json({ ok: true });
+  } catch (err) {
+    req.log.error({ err }, "[studio] review-game failed");
+    res.status(500).json({ error: "Could not review that game." });
   }
 });
 

@@ -226,11 +226,36 @@ export function ContentStudio() {
   const [reviews, setReviews] = useState<StudioReview[] | null>(null);
   const [rQ, setRQ] = useState('');
   const [rSort, setRSort] = useState<'drama' | 'new' | 'accuracy'>('drama');
+  // Pick specific games: a player (bots too), a game number / link, and whether
+  // to include bot games and games without a review yet.
+  const [rPlayer, setRPlayer] = useState('');
+  const [rGameNo, setRGameNo] = useState('');
+  const [rBots, setRBots] = useState(false);
+  const [rAll, setRAll] = useState(false);
+  const [reviewing, setReviewing] = useState<{ id: number; error?: string } | null>(null);
   const loadReviews = useCallback((offset: number) => {
     const q = new URLSearchParams({ sort: rSort, limit: '48', offset: String(offset) });
-    if (rQ.trim()) q.set('q', rQ.trim()); if (minRating) q.set('minRating', String(minRating)); if (platform) q.set('platform', platform); if (since) q.set('sinceDays', String(since));
+    if (rQ.trim()) q.set('q', rQ.trim());
+    if (rPlayer.trim()) q.set('player', rPlayer.trim());
+    if (rGameNo.trim()) q.set('gameNo', rGameNo.trim());
+    if (rBots) q.set('bots', '1');
+    if (rAll) q.set('all', '1'); if (minRating) q.set('minRating', String(minRating)); if (platform) q.set('platform', platform); if (since) q.set('sinceDays', String(since));
     return apiFetch(`/api/admin/studio/reviews?${q}`, { credentials: 'include' }).then((r) => (r.ok ? r.json() : { reviews: [] })).then((d) => (d.reviews ?? []) as StudioReview[]);
-  }, [rQ, rSort, minRating, platform, since]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [rQ, rSort, minRating, platform, since, rPlayer, rGameNo, rBots, rAll]); // eslint-disable-line react-hooks/exhaustive-deps
+  // A game without a review yet: review it with the Studio's own engine, then open it.
+  const reviewThenOpen = async (rv: StudioReview) => {
+    setReviewing({ id: rv.id });
+    try {
+      const r = await apiFetch(`/api/admin/studio/review-game/${rv.id}`, { method: 'POST', credentials: 'include' });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) { setReviewing({ id: rv.id, error: d.error || 'Could not review that game.' }); return; }
+      setReviewing(null);
+      setReviews((cur) => (cur ?? []).map((x) => (x.id === rv.id ? { ...x, reviewed: true } : x)));
+      setOpen({ kind: 'review', review: { ...rv, reviewed: true } });
+    } catch {
+      setReviewing({ id: rv.id, error: 'Connection error. Try again.' });
+    }
+  };
   useEffect(() => {
     if (view !== 'reviews') return;
     let live = true; setReviews(null);
@@ -357,7 +382,7 @@ export function ContentStudio() {
         {picking ? 'Cancel compilation' : '🎬 Make a compilation'}
       </button>
       <div className="order-1 inline-flex flex-wrap rounded-xl bg-white/5 p-1">
-        {([['moments', 'Game moments'], ['reviews', 'Game reviews'], ['puzzles', 'Puzzles'], ['traps', 'Trap lessons'], ['kids', 'Kids & beginners'], ['scout', 'Opponent scout'], ['scan', 'Scan position'], ['analyzer', 'Analyzer games'], ['promo', 'Promos']] as const).map(([k, t]) => (
+        {([['moments', 'Game moments'], ['reviews', 'Games'], ['puzzles', 'Puzzles'], ['traps', 'Trap lessons'], ['kids', 'Kids & beginners'], ['scout', 'Opponent scout'], ['scan', 'Scan position'], ['analyzer', 'Analyzer games'], ['promo', 'Promos']] as const).map(([k, t]) => (
           <button key={k} onClick={() => setView(k)} className="rounded-lg px-3.5 py-1.5 text-[13px] font-black" style={{ background: view === k ? '#81B64C' : 'transparent', color: view === k ? '#fff' : '#C9CFCD' }}>{t}</button>
         ))}
       </div>
@@ -606,6 +631,10 @@ export function ContentStudio() {
             <Search size={15} className="text-white/50" />
             <input value={rQ} onChange={(e) => setRQ(e.target.value)} placeholder="Opening or player" className="w-full bg-transparent text-[13px] text-white outline-none" />
           </div>
+          <input value={rPlayer} onChange={(e) => setRPlayer(e.target.value)} placeholder="Username (bots too)" className="min-w-[150px] flex-1 rounded-lg bg-white/5 px-3 py-2 text-[13px] text-white outline-none ring-1 ring-white/10 focus:ring-[#81B64C]" />
+          <input value={rGameNo} onChange={(e) => setRGameNo(e.target.value)} placeholder="Chess.com game # or link" className="min-w-[170px] flex-1 rounded-lg bg-white/5 px-3 py-2 text-[13px] text-white outline-none ring-1 ring-white/10 focus:ring-[#81B64C]" />
+          <label className="flex items-center gap-1.5 rounded-lg bg-white/5 px-2.5 py-2 text-[12.5px] font-bold text-white ring-1 ring-white/10"><input type="checkbox" checked={rBots} onChange={(e) => setRBots(e.target.checked)} className="accent-[#81B64C]" /> Bot games</label>
+          <label className="flex items-center gap-1.5 rounded-lg bg-white/5 px-2.5 py-2 text-[12.5px] font-bold text-white ring-1 ring-white/10"><input type="checkbox" checked={rAll} onChange={(e) => setRAll(e.target.checked)} className="accent-[#81B64C]" /> Not reviewed too</label>
           <select value={minRating} onChange={(e) => setMinRating(Number(e.target.value))} className="rounded-lg bg-white/5 px-2 py-2 text-[13px] text-white ring-1 ring-white/10">
             <option value={0}>Any rating</option><option value={1000}>1000+</option><option value={1500}>1500+</option><option value={2000}>2000+</option><option value={2500}>2500+</option>
           </select>
@@ -619,13 +648,13 @@ export function ContentStudio() {
             <option value="drama">Most happening</option><option value="new">Newest</option><option value="accuracy">Highest accuracy</option>
           </select>
         </div>
-        {!reviews ? <Loader2 className="mx-auto mt-10 animate-spin text-white/60" /> : reviews.length === 0 ? <p className="mt-10 text-center text-[14px] text-white/60">No reviewed games match.</p> : (
+        {!reviews ? <Loader2 className="mx-auto mt-10 animate-spin text-white/60" /> : reviews.length === 0 ? <p className="mt-10 text-center text-[14px] text-white/60">{rGameNo.trim() ? 'No game with that number is in the database. Import it first (Import on the Games page), then search again.' : 'No games match.'}</p> : (
           <>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
               {reviews.map((rv, k) => {
                 const src: StudioSource = { kind: 'review', review: rv };
                 return (
-                  <button key={rv.id} onClick={() => (picking ? togglePick(src) : openAt(k))} className="relative overflow-hidden rounded-xl bg-white/5 text-left ring-1 ring-white/10 transition hover:ring-[#81B64C]"
+                  <button key={rv.id} onClick={() => (rv.reviewed === false ? (reviewing && !reviewing.error ? undefined : void reviewThenOpen(rv)) : picking ? togglePick(src) : openAt(k))} className="relative overflow-hidden rounded-xl bg-white/5 text-left ring-1 ring-white/10 transition hover:ring-[#81B64C]"
                     style={isPicked(src) ? { boxShadow: '0 0 0 3px #81B64C' } : undefined}>
                     {isPicked(src) && <span className="absolute right-2 top-2 z-10 grid h-7 w-7 place-items-center rounded-full bg-[#81B64C] text-[13px] font-black">{picked.findIndex((c) => keyOf(c) === `r${rv.id}`) + 1}</span>}
                     <div className="aspect-square w-full"><MiniBoard fen={rv.lastFen ?? new Chess().fen()} size={400} /></div>
@@ -637,8 +666,13 @@ export function ContentStudio() {
                         {rv.brilliant > 0 && <span className="rounded bg-[#1BACA6]/20 px-1.5 py-0.5 text-[10px] font-black uppercase text-[#1BACA6]">{rv.brilliant} brilliant</span>}
                         {rv.blunders > 0 && <span className="rounded bg-[#CA3431]/20 px-1.5 py-0.5 text-[10px] font-black uppercase text-[#F0605D]">{rv.blunders} blunder{rv.blunders > 1 ? 's' : ''}</span>}
                         {rv.mate > 0 && <span className="rounded bg-[#E8B447]/20 px-1.5 py-0.5 text-[10px] font-black uppercase text-[#E8B447]">mate</span>}
-                        {rv.moments === 0 && <span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-black uppercase text-white/50">not scanned yet</span>}
+                        {rv.platform === 'bot' && <span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-black uppercase text-white/70">bot game</span>}
+                        {rv.reviewed === false
+                          ? <span className="rounded bg-[#E8B447]/20 px-1.5 py-0.5 text-[10px] font-black uppercase text-[#E8B447]">{reviewing?.id === rv.id && !reviewing.error ? 'reviewing… ~1 min' : 'not reviewed · tap to review'}</span>
+                          : rv.moments === 0 && <span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-black uppercase text-white/50">not scanned yet</span>}
+                        {rv.chesscomGameId && <span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-bold tabular-nums text-white/50">#{rv.chesscomGameId}</span>}
                       </div>
+                      {reviewing?.id === rv.id && reviewing.error && <p className="mt-1 text-[11px] font-semibold text-[#F0605D]">{reviewing.error}</p>}
                     </div>
                   </button>
                 );

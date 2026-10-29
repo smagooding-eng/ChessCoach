@@ -383,21 +383,49 @@ export async function puzzleThemes() {
 }
 
 // ── Game reviews: whole reviewed games, ranked by how much happened ─────
-export interface ReviewQuery { q?: string; minRating?: number; platform?: string; sort?: "drama" | "new" | "accuracy"; limit?: number; offset?: number; sinceDays?: number }
+export interface ReviewQuery {
+  q?: string; minRating?: number; platform?: string; sort?: "drama" | "new" | "accuracy"; limit?: number; offset?: number; sinceDays?: number;
+  /** A player's games (white or black), bots included by name. */
+  player?: string;
+  /** A Chess.com / Lichess game number or link, or a ChessScout game id. */
+  gameNo?: string;
+  /** Include games against the practice bots. */
+  bots?: boolean;
+  /** Include games without a move-by-move review yet (they can be reviewed from the Studio). */
+  all?: boolean;
+}
 export async function studioReviews(q: ReviewQuery) {
-  const conds = [sql`g.review_data IS NOT NULL`, sql`g.platform IS DISTINCT FROM 'bot'`];
+  const conds = [];
+  // A game number or player picks specific games, so it shows them reviewed or not, bots or not.
+  const specific = !!(q.gameNo || q.player);
+  if (!q.all && !specific) conds.push(sql`(g.review_data IS NOT NULL OR cr.game_id IS NOT NULL)`);
+  if (!q.bots && !specific) conds.push(sql`g.platform IS DISTINCT FROM 'bot'`);
+  if (q.player) conds.push(sql`(g.white_username ILIKE ${"%" + q.player + "%"} OR g.black_username ILIKE ${"%" + q.player + "%"})`);
+  if (q.gameNo) {
+    const raw = q.gameNo.trim();
+    const num = raw.match(/\/game\/(?:live|daily|computer)\/(\d+)/)?.[1] ?? raw.match(/^#?(\d+)$/)?.[1] ?? raw.match(/(\d{6,})/)?.[1] ?? null;
+    const lichess = raw.match(/lichess\.org\/([A-Za-z0-9]{8})/)?.[1] ?? (/^[A-Za-z0-9]{8}$/.test(raw) && !/^\d+$/.test(raw) ? raw : null);
+    const parts = [];
+    if (num) { parts.push(sql`g.chesscom_game_id = ${num}`, sql`g.url LIKE ${"%/" + num}`); if (num.length < 10) parts.push(sql`g.id = ${Number(num)}`); }
+    if (lichess) parts.push(sql`g.lichess_game_id = ${lichess}`, sql`g.url LIKE ${"%/" + lichess + "%"}`);
+    conds.push(parts.length ? sql`(${sql.join(parts, sql` OR `)})` : sql`FALSE`);
+  }
+  if (!conds.length) conds.push(sql`TRUE`);
   if (q.q) conds.push(sql`(g.opening ILIKE ${"%" + q.q + "%"} OR g.white_username ILIKE ${"%" + q.q + "%"} OR g.black_username ILIKE ${"%" + q.q + "%"})`);
   if (q.minRating) conds.push(sql`GREATEST(COALESCE(g.white_rating,0), COALESCE(g.black_rating,0)) >= ${q.minRating}`);
   if (q.platform) conds.push(sql`g.platform = ${q.platform}`);
   if (q.sinceDays) conds.push(sql`g.played_at >= now() - make_interval(days => ${Math.round(q.sinceDays)})`);
+  const RD = sql`COALESCE(g.review_data, cr.review)`;
   const order = q.sort === "new" ? sql`g.played_at DESC NULLS LAST, g.id DESC`
-    : q.sort === "accuracy" ? sql`GREATEST(COALESCE((g.review_data->>'whiteAccuracy')::float,0), COALESCE((g.review_data->>'blackAccuracy')::float,0)) DESC, g.id DESC`
+    : q.sort === "accuracy" ? sql`GREATEST(COALESCE((CASE WHEN jsonb_typeof(${RD}) = 'object' THEN (${RD}->>'whiteAccuracy') END)::float,0), COALESCE((CASE WHEN jsonb_typeof(${RD}) = 'object' THEN (${RD}->>'blackAccuracy') END)::float,0)) DESC, g.id DESC`
     : sql`COALESCE(m.score, 0) DESC, g.id DESC`;
   const limit = Math.min(120, Math.max(1, q.limit ?? 48));
   return rowsOf(await db.execute(sql`SELECT g.id, g.opening, g.white_username AS white, g.black_username AS black, g.white_rating AS "whiteRating", g.black_rating AS "blackRating",
       g.result, g.platform, g.played_at AS "playedAt",
-      CASE WHEN jsonb_typeof(g.review_data) = 'object' THEN (g.review_data->>'whiteAccuracy')::float END AS "whiteAccuracy",
-      CASE WHEN jsonb_typeof(g.review_data) = 'object' THEN (g.review_data->>'blackAccuracy')::float END AS "blackAccuracy",
+      CASE WHEN jsonb_typeof(${RD}) = 'object' THEN (${RD}->>'whiteAccuracy')::float END AS "whiteAccuracy",
+      CASE WHEN jsonb_typeof(${RD}) = 'object' THEN (${RD}->>'blackAccuracy')::float END AS "blackAccuracy",
+      (g.review_data IS NOT NULL OR (cr.game_id IS NOT NULL AND jsonb_array_length(COALESCE(cr.review->'moves', '[]'::jsonb)) > 0)) AS reviewed,
+      g.chesscom_game_id AS "chesscomGameId", g.url
       COALESCE(m.n, 0)::int AS moments, COALESCE(m.brilliant, 0)::int AS brilliant, COALESCE(m.blunder, 0)::int AS blunders, COALESCE(m.mate, 0)::int AS mate,
       m.last_fen AS "lastFen"
     FROM games g
@@ -405,8 +433,43 @@ export async function studioReviews(q: ReviewQuery) {
         COUNT(*) FILTER (WHERE 'brilliant' = ANY(tags)) AS brilliant, COUNT(*) FILTER (WHERE 'blunder' = ANY(tags)) AS blunder,
         COUNT(*) FILTER (WHERE 'checkmate' = ANY(tags)) AS mate, (array_agg(fen_before ORDER BY move_index DESC))[1] AS last_fen
       FROM content_moments GROUP BY game_id) m ON m.game_id = g.id
+    LEFT JOIN content_reviews cr ON cr.game_id = g.id
     WHERE ${sql.join(conds, sql` AND `)} ORDER BY ${order} LIMIT ${limit} OFFSET ${Math.max(0, q.offset ?? 0)}`));
 }
+
+/** Review one chosen game for the Studio (isolated engine), then find its clip moments. */
+export async function reviewGameForStudio(id: number): Promise<{ ok: boolean; error?: string }> {
+  if (reviewer.running) return { ok: false, error: "The Studio is already reviewing a batch of games. Stop it first, or wait." };
+  const busy = rowsOf(await db.execute(sql`SELECT 1 FROM background_jobs WHERE type = 'bulk_game_crawl' AND status = 'pending' LIMIT 1`));
+  if (busy.length) return { ok: false, error: "The bulk review job (Admin › Tools) is using the engine. Stop it first, or let it finish." };
+  if (singleBusy) return { ok: false, error: "Another game is being reviewed right now. Try again in a minute." };
+  const [g] = rowsOf<{ id: number; pgn: string | null }>(await db.execute(sql`SELECT id, pgn FROM games WHERE id = ${id}`));
+  if (!g?.pgn) return { ok: false, error: "That game has no moves to review." };
+  singleBusy = true;
+  const { reviewGameEngineOnly, destroyBulkEngine } = await import("./bulkStockfish");
+  const { parsePgnMoves } = await import("./chesscom");
+  try {
+    const moves = parsePgnMoves(g.pgn);
+    if (moves.length < 2) return { ok: false, error: "That game is too short to review." };
+    const fens = [moves[0].fenBefore, ...moves.map((m) => m.fen).filter((f): f is string => !!f)];
+    const review = await Promise.race([
+      reviewGameEngineOnly(fens, moves.map((m) => m.color as "white" | "black"), moves.map((m) => m.san), 12, 60),
+      new Promise<never>((_, rej) => setTimeout(() => rej(new Error("timed out")), Math.max(90_000, moves.length * 5000))),
+    ]);
+    await db.execute(sql`INSERT INTO content_reviews (game_id, review) VALUES (${g.id}, ${JSON.stringify(review)}::jsonb)
+      ON CONFLICT (game_id) DO UPDATE SET review = EXCLUDED.review, created_at = now()`);
+    // Let the scanner look at it again so its moments show up under Game moments.
+    await db.execute(sql`DELETE FROM content_scanned WHERE game_id = ${g.id}`).catch(() => {});
+    void scanContentBatch(5).catch(() => {});
+    return { ok: true };
+  } catch (err) {
+    if (err instanceof Error && /timed out/.test(err.message)) destroyBulkEngine();
+    return { ok: false, error: err instanceof Error && /timed out/.test(err.message) ? "The review took too long. Try again." : "Could not review that game." };
+  } finally {
+    singleBusy = false;
+  }
+}
+let singleBusy = false;
 
 // ── Opponent Scout reports, as Studio clips ─────────────────────────────
 /** Latest finished scout per player (newest first), without the game PGNs. */
