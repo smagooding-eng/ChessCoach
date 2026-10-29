@@ -137,7 +137,8 @@ async function resolveHumanProfile(userId: string, username: string): Promise<Hu
     const resolved: HumanProfileData = {
       country: country ?? fallback.country,
       title: title ?? fallback.title,
-      avatar: avatar ?? fallback.avatar,
+      // A picture the player uploaded themselves wins over their Chess.com avatar.
+      avatar: (fallback.avatar && fallback.avatar.includes('/api/avatars/')) ? fallback.avatar : (avatar ?? fallback.avatar),
       memberSinceYear: fallback.memberSinceYear,
     };
     humanProfileCache.set(userId, resolved);
