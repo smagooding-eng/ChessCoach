@@ -1,6 +1,7 @@
 // Live Play server: WebSocket transport, matchmaking, game state machine, bot fallback.
 // Supports two modes: 'casual' (no rating change) and 'ranked' (Glicko-2 update).
 
+import { openingFromMoves } from "./openingName";
 import type { Server as HttpServer, IncomingMessage } from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
 import { Chess } from 'chess.js';
@@ -618,8 +619,8 @@ async function persistFinishedGame(g: LiveGame) {
         blackRating: Math.round(g.black.rating),
         result: resultStr,
         timeControl: tcLabel,
-        opening: null,
-        eco: null,
+        opening: openingFromMoves(pgn)?.name ?? null,
+        eco: openingFromMoves(pgn)?.eco ?? null,
         playedAt: playedAtIso,
         url: null,
         // A game against a bot is listed under Bots, not ChessScout games.

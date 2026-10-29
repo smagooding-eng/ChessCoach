@@ -660,7 +660,7 @@ export function ContentStudio() {
                     <div className="aspect-square w-full"><MiniBoard fen={rv.lastFen ?? new Chess().fen()} size={400} /></div>
                     <div className="p-2.5">
                       <p className="truncate text-[13.5px] font-black">{rv.white ?? 'White'} vs {rv.black ?? 'Black'}</p>
-                      <p className="truncate text-[11.5px] text-white/55">{rv.opening ?? 'Unknown opening'}{rv.result ? ` · ${rv.result}` : ''}</p>
+                      <p className="truncate text-[11.5px] text-white/55">{rv.opening || 'Unknown opening'}{rv.result ? ` · ${rv.result}` : ''}</p>
                       <p className="truncate text-[11.5px] tabular-nums text-white/45">{rv.whiteRating ?? '?'} vs {rv.blackRating ?? '?'}{rv.whiteAccuracy != null && rv.blackAccuracy != null ? ` · ${rv.whiteAccuracy.toFixed(0)}% / ${rv.blackAccuracy.toFixed(0)}%` : ''}</p>
                       <div className="mt-1.5 flex flex-wrap gap-1">
                         {rv.brilliant > 0 && <span className="rounded bg-[#1BACA6]/20 px-1.5 py-0.5 text-[10px] font-black uppercase text-[#1BACA6]">{rv.brilliant} brilliant</span>}
@@ -751,7 +751,7 @@ export function ContentStudio() {
                   <div className="aspect-square w-full"><MiniBoard fen={afterFen(m.fenBefore, m.san)} size={400} flipped={!white} /></div>
                   <div className="p-2.5">
                     <p className="truncate text-[13.5px] font-black">{no}{m.san}{m.trapName ? <span className="font-bold text-[#E8B447]"> · {m.trapName}</span> : null}</p>
-                    <p className="truncate text-[11.5px] text-white/55">{m.opening ?? 'Unknown opening'}</p>
+                    <p className="truncate text-[11.5px] text-white/55">{m.opening || 'Unknown opening'}</p>
                     <p className="truncate text-[11.5px] text-white/45">{m.whiteRating ?? '?'} vs {m.blackRating ?? '?'} · {m.platform === 'chesscom' ? 'Chess.com' : m.platform === 'lichess' ? 'Lichess' : 'ChessScout'}</p>
                     <div className="mt-1.5 flex flex-wrap gap-1">
                       {m.tags.filter((t) => t !== 'opening').slice(0, 4).map((t) => (

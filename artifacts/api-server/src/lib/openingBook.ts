@@ -1,7 +1,7 @@
 import { Chess } from "chess.js";
 import { OPENING_POSITIONS } from "./openingPositions";
 
-const ECO_LINES: Record<string, string> = {
+export const ECO_LINES: Record<string, string> = {
   "A00": "1.g4",
   "A01": "1.b3",
   "A02": "1.f4",

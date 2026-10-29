@@ -502,6 +502,8 @@ runSchemaMigrations().then(() => {
   void seedBotPersonas().catch((err) => logger.warn({ err }, 'seedBotPersonas failed'));
   // "Review all": resume jobs cut off by a restart; Coach review after upgrading.
   import("./routes/games").then(({ startReviewServices }) => startReviewServices()).catch((err) => logger.warn({ err }, 'review services start failed'));
+  // Name the openings of ChessScout / bot games saved without one.
+  import("./lib/openingName").then(({ backfillChessScoutOpenings }) => backfillChessScoutOpenings()).catch((err) => logger.warn({ err }, 'opening backfill failed'));
   import("./lib/growthScheduler").then(({ startGrowthScheduler }) => {
     startGrowthScheduler();
   }).catch((err) => {

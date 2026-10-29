@@ -42,7 +42,7 @@ function PlayerStrip({ p, ms, active, isYou, awayMs }: { p: { username: string; 
   const flag = countryToFlag(p.country);
   return (
     <div className="flex items-center justify-between p-2.5 rounded-xl"
-      style={{ background: active ? PT.greenSoft : 'rgba(255,255,255,0.04)', border: active ? `1px solid ${CHESSCOM_GREEN}` : '1px solid rgba(255,255,255,0.06)' }}>
+      style={{ background: active ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.04)', border: active ? '1px solid rgba(255,255,255,0.22)' : '1px solid rgba(255,255,255,0.06)' }}>
       <div className="flex items-center gap-2 min-w-0">
         {p.avatar
           ? <img src={p.avatar} alt={p.username} className="w-9 h-9 rounded-full object-cover bg-white/10" style={{ border: '1px solid rgba(255,255,255,0.15)' }} />
@@ -66,7 +66,8 @@ function PlayerStrip({ p, ms, active, isYou, awayMs }: { p: { username: string; 
         </span>
       )}
       <div className="flex lg:hidden items-center gap-1.5 px-3 py-2 rounded-lg font-mono font-black tabular-nums text-lg"
-        style={{ background: active ? 'rgba(0,0,0,0.4)' : 'rgba(0,0,0,0.2)', color: ms < 10_000 ? '#ec6b6b' : TEXT_LIGHT }}>
+        // Whose turn it is shows on the clock: a light clock is the one running.
+        style={active ? { background: ms < 10_000 ? '#E5484D' : '#F5F7F6', color: ms < 10_000 ? '#FFFFFF' : '#0B1213' } : { background: 'rgba(0,0,0,0.25)', color: 'rgba(245,247,246,0.75)' }}>
         <Clock className="w-3.5 h-3.5" /> {fmtClock(ms)}
       </div>
     </div>

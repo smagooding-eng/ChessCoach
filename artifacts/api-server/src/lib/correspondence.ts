@@ -11,6 +11,7 @@
 // the main games table for both players, so it shows in Games and feeds
 // Analysis like an imported game.
 
+import { openingFromMoves } from "./openingName";
 import { Chess } from "chess.js";
 import {
   db, gamesTable, correspondenceGamesTable, correspondenceQueueTable, type CorrespondenceGame,
@@ -341,8 +342,8 @@ async function finishGame(game: CorrespondenceGame, result: Result, termination:
         blackRating: bElo,
         result: won ? "win" : lost ? "loss" : "draw",
         timeControl: tc?.pgn ?? claimed.timeControl,
-        opening: null,
-        eco: null,
+        opening: openingFromMoves(fullPgn)?.name ?? null,
+        eco: openingFromMoves(fullPgn)?.eco ?? null,
         playedAt: new Date(claimed.startedAt),
         url: null,
         platform: "chessscout",

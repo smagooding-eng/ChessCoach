@@ -152,7 +152,7 @@ export function DailyGame() {
   const reviewId = white ? game.whiteGamesId : game.blackGamesId;
 
   const Strip = ({ name, rating, side, active }: { name: string; rating: number | null; side: 'white' | 'black'; active: boolean }) => (
-    <div className="flex items-center justify-between rounded-xl px-3 py-2.5" style={{ background: active ? PT.greenSoft : 'rgba(255,255,255,.04)', border: `1px solid ${active ? PT.green : PT.border}` }}>
+    <div className="flex items-center justify-between rounded-xl px-3 py-2.5" style={{ background: active ? 'rgba(255,255,255,.08)' : 'rgba(255,255,255,.04)', border: `1px solid ${active ? 'rgba(255,255,255,.22)' : PT.border}` }}>
       <div className="flex min-w-0 items-center gap-2.5">
         <span className="h-4 w-4 shrink-0 rounded-full" style={{ background: side === 'white' ? '#f0ede8' : '#1b1b1b', border: '1px solid rgba(255,255,255,.35)' }} />
         <span className="min-w-0">

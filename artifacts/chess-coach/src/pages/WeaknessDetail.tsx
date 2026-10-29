@@ -485,7 +485,7 @@ export function WeaknessDetail() {
                             <span className="text-muted-foreground font-normal text-xs ml-1">({oppRating})</span>
                           </div>
                           <div className="text-xs text-muted-foreground mt-1 leading-relaxed line-clamp-2">
-                            {game.opening ?? 'Unknown opening'}
+                            {game.opening || 'Unknown opening'}
                           </div>
                           <div className="flex items-center gap-2 mt-1.5 text-xs text-muted-foreground">
                             <span>{game.timeControl}</span>
