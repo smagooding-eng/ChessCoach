@@ -189,11 +189,19 @@ async function pairWaiting(): Promise<void> {
   }
 }
 
+/** Never show an email address as a player name: keep only the part before "@". */
+export function safePlayerName(name: string | null | undefined): string {
+  const n = String(name ?? '').trim();
+  return (n.includes('@') ? n.split('@')[0] : n) || 'Player';
+}
+
 export async function startGame(
   whiteUserId: string, whiteUsername: string,
   blackUserId: string, blackUsername: string,
   timeControlId: CorrespondenceTimeControlId, mode: DailyMode,
 ): Promise<CorrespondenceGame> {
+  whiteUsername = safePlayerName(whiteUsername);
+  blackUsername = safePlayerName(blackUsername);
   const chess = new Chess();
   const bankMs = TIME_CONTROLS[timeControlId].ms;
   let whiteRatingBefore: number | null = null;

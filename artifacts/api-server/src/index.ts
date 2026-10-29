@@ -229,6 +229,9 @@ async function runSchemaMigrations() {
       sql`ALTER TABLE correspondence_games ADD COLUMN IF NOT EXISTS draw_offer_from VARCHAR`,
       sql`ALTER TABLE correspondence_games ADD COLUMN IF NOT EXISTS low_time_notified_at TIMESTAMPTZ`,
     ]) await db.execute(col);
+    // Player names are shown to opponents: never an email address.
+    await db.execute(sql`UPDATE correspondence_games SET white_username = split_part(white_username, '@', 1) WHERE white_username LIKE '%@%'`);
+    await db.execute(sql`UPDATE correspondence_games SET black_username = split_part(black_username, '@', 1) WHERE black_username LIKE '%@%'`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_correspondence_white_user ON correspondence_games(white_user_id, status)`);
     // Daily games are people-only now: close any still-running games against
     // the old automatic daily bot (it never actually moved).
