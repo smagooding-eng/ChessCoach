@@ -156,6 +156,26 @@ router.get("/admin/traffic-export", requireAdmin, async (req: Request, res: Resp
     ]);
     const act = rowsOf<Record<string, unknown>>(activation)[0] ?? {};
 
+    // Per day (last 14 days of the range): where each day's new visitors came
+    // in and from, and how many of them ever signed in -- so one day's
+    // numbers can be explained on their own.
+    const perDay = await db.execute(sql`
+      WITH firsts AS (
+        SELECT DISTINCT ON (visitor_id, ${DAY("created_at")}) visitor_id, ${DAY("created_at")} AS day, ${PATH} AS path,
+          COALESCE(utm_source, referrer_host, 'direct / untagged') AS source, utm_campaign AS campaign
+        FROM pv_people WHERE visitor_id IS NOT NULL AND created_at >= GREATEST(${since}::timestamptz, ${until}::timestamptz - interval '14 days') AND created_at <= ${until}
+        ORDER BY visitor_id, ${DAY("created_at")}, created_at
+      ), signed AS (SELECT DISTINCT visitor_id FROM pv_people WHERE visitor_id IS NOT NULL AND user_id IS NOT NULL)
+      SELECT f.day, f.path, f.source, f.campaign, COUNT(*) AS visitors, COUNT(s.visitor_id) AS signed_in
+      FROM firsts f LEFT JOIN signed s ON s.visitor_id = f.visitor_id
+      GROUP BY 1, 2, 3, 4 ORDER BY 1 DESC, visitors DESC`).catch((err) => { logger.warn({ err }, "[traffic-export] per-day entries failed"); return []; });
+    const dailyEntries: Record<string, { path: unknown; source: unknown; campaign: unknown; visitors: number; signedIn: number }[]> = {};
+    for (const r of rowsOf<Record<string, unknown>>(perDay)) {
+      const d = String(r.day);
+      (dailyEntries[d] ??= []);
+      if (dailyEntries[d].length < 25) dailyEntries[d].push({ path: r.path, source: r.source, campaign: r.campaign ?? null, visitors: num(r.visitors), signedIn: num(r.signed_in) });
+    }
+
     // One row per new account (no ids or emails): where that person first came
     // from before signing up. Their pre-signup visits are found through every
     // browser they later used signed in, plus -- for the Google sign-in round
@@ -233,6 +253,7 @@ router.get("/admin/traffic-export", requireAdmin, async (req: Request, res: Resp
       })),
       landingFunnelDaily: rowsOf<Record<string, unknown>>(funnelDaily).map((r) => ({ day: r.day, platform: r.platform, event: r.event_type, visitors: num(r.visitors) })),
       topPages: rowsOf<Record<string, unknown>>(paths).map((r) => ({ path: r.path, views: num(r.views), visitors: num(r.visitors), signedInUsers: num(r.signed_in_users) })),
+      dailyEntries,
       entryPages: rowsOf<Record<string, unknown>>(entries).map((r) => ({ path: r.path, visitors: num(r.visitors), everSignedIn: num(r.became_or_were_signed_in) })),
       signupsBySource: [...bySource.values()].sort((a, b) => b.signups - a.signups),
       signups: signupRows,
