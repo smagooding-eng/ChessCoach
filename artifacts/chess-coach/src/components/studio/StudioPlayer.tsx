@@ -98,7 +98,7 @@ type Frame =
   | { kind: 'split'; played: { fen: string; last: { from: string; to: string } }; better: { fen: string; last: { from: string; to: string } }; playedSan: string; betterSan: string }
   | { kind: 'title'; fen: string }
   | { kind: 'summary'; fen: string }
-  | { kind: 'scoutCard'; fen: string; last: { from: string; to: string } | null; card: 'profile' | 'colors' | 'openings' | 'habits' | 'weak' }
+  | { kind: 'scoutCard'; fen: string; last: { from: string; to: string } | null; card: 'profile' | 'colors' | 'openings' | 'habits' | 'weak'; idx?: number }
   | { kind: 'lessonText'; fen: string; text: string }
   | { kind: 'lessonBoard'; fen: string; text: string; highlights: string[]; last: { from: string; to: string } | null; celebrate?: boolean }
   | { kind: 'scanPhoto'; fen: string }
@@ -259,8 +259,10 @@ function pgnSans(pgn: string): string[] {
   return pgn.replace(/\[[^\]]*\]/g, ' ').replace(/\{[^}]*\}/g, ' ').replace(/\([^)]*\)/g, ' ').replace(/\$\d+/g, ' ').split(/\s+/)
     .map((t) => t.replace(/^\d+\.+/, '')).filter((t) => t && !/^(1-0|0-1|1\/2-1\/2|\*)$/.test(t));
 }
+/** Opening names a site couldn't work out ("Undefined", "Unknown") aren't shown. */
+const realOpening = (o: string) => !!o && !/^(undefined|unknown|null|-|\?)$/i.test(o.trim());
 function scoutClip(s: StudioScout): Clip {
-  const d = s.result;
+  const d = { ...s.result, topOpenings: (s.result.topOpenings ?? []).filter((o) => realOpening(o.opening)) };
   const top = d.topOpenings?.[0]?.opening ?? '';
   const words = top.toLowerCase().split(/[^a-z]+/).filter((w) => w.length > 3);
   // A game of theirs in their favourite opening, to play behind the stats.
@@ -653,7 +655,8 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
       if (st && st.asWhite.games + st.asBlack.games > 0) out.push({ kind: 'scoutCard', fen: fenAt(b), last: lastAt(b), card: 'colors' });
       if (clip.scout?.topOpenings?.length) out.push({ kind: 'scoutCard', fen: fenAt(b), last: lastAt(b), card: 'openings' });
       if (st) out.push({ kind: 'scoutCard', fen: fenAt(b), last: lastAt(b), card: 'habits' });
-      if (clip.scout?.weaknesses?.length) out.push({ kind: 'scoutCard', fen: fenAt(b), last: lastAt(b), card: 'weak' });
+      // One card per weakness, so each is shown in full.
+      (clip.scout?.weaknesses ?? []).slice(0, 3).forEach((_, idx) => out.push({ kind: 'scoutCard', fen: fenAt(b), last: lastAt(b), card: 'weak', idx }));
       if (prefs.outro && isLast) out.push({ kind: 'outro', fen: fenAt(b) });
       return withInserts(out);
     }
@@ -776,7 +779,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
       case 'split': return 3200;
       case 'title': return 2200;
       case 'summary': return 4200;
-      case 'scoutCard': return f.card === 'profile' ? 4200 : f.card === 'weak' ? 5600 : 4800;
+      case 'scoutCard': return f.card === 'profile' ? 4200 : f.card === 'weak' ? 5200 : 4800;
       case 'lessonText': return Math.max(2600, f.text.split(/\s+/).length * 340);
       case 'lessonBoard': return f.celebrate ? 2400 : Math.max(3000, f.text.split(/\s+/).length * 340);
       case 'scanPhoto': return 3200;
@@ -952,7 +955,8 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
           const parts = [st.timeControl ? `They mostly play ${st.timeControl} games` : '', st.avgMoves ? `that last about ${st.avgMoves} moves` : ''].filter(Boolean).join(' ');
           return `${parts ? `${parts}.` : ''}${lostTotal && lostTime ? ` ${Math.round((lostTime / lostTotal) * 100)} percent of their losses are on time.` : ''}`.trim() || null;
         }
-        const w = d.weaknesses?.[0]; return w ? `Their biggest weakness: ${w.category}. ${w.description.split(/(?<=[.!?])\s/)[0]}` : null;
+        const i = f.idx ?? 0; const w = d.weaknesses?.[i];
+        return w ? `${i === 0 ? 'Their biggest weakness' : i === 1 ? 'Next' : 'And'}: ${w.category}. ${w.description.split(/(?<=[.!?])\s/)[0]}` : null;
       }
       case 'lessonText': case 'lessonBoard': return stripEmoji(f.text.replace(/^✓\s*/, '')).slice(0, 400);
       case 'scanPhoto': return 'Snap a photo of any chess board.';
@@ -1410,7 +1414,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
                 const total = Math.max(1, d.wins + d.losses + d.draws);
                 const SEVC: Record<string, string> = { Critical: '#F0605D', High: '#F0605D', Medium: '#E8B447', Low: '#81B64C' };
                 return (
-                  <motion.div key={frame.card} initial={{ opacity: 0, y: 30, scale: 0.92 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -20 }} transition={{ type: 'spring', stiffness: 260, damping: 20 }}
+                  <motion.div key={`${frame.card}${frame.idx ?? ''}`} initial={{ opacity: 0, y: 30, scale: 0.92 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -20 }} transition={{ type: 'spring', stiffness: 260, damping: 20 }}
                     className="absolute inset-x-[5%] top-[23%] z-30 rounded-[3cqh] bg-[#0B1112]/93 p-[2.4cqh] text-white shadow-2xl ring-2 ring-white/70" style={{ fontSize: 'clamp(11px,1.9cqh,20px)' }}>
                     <p className="mb-[1.2cqh] text-center font-black uppercase tracking-wide text-[#B8E08C]" style={{ fontSize: '0.95em' }}>🔍 Opponent scout</p>
                     {frame.card === 'profile' && (
@@ -1505,24 +1509,26 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
                         <p className="text-center font-black" style={{ fontSize: '1.25em' }}>What {name} plays</p>
                         {(d.topOpenings ?? []).slice(0, 4).map((o, k) => (
                           <motion.div key={o.opening} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.25 + k * 0.15 }}>
-                            <div className="flex items-baseline justify-between gap-2 font-bold"><span className="truncate">{k + 1}. {o.opening}</span><span className="shrink-0 tabular-nums text-white/60">{o.games} games</span></div>
+                            <div className="flex items-baseline justify-between gap-2 font-bold"><span className="line-clamp-2">{k + 1}. {o.opening}</span><span className="shrink-0 tabular-nums text-white/60">{o.games} games</span></div>
                             <div className="mt-[0.3em] h-[1.4cqh] overflow-hidden rounded-full bg-white/10"><motion.div initial={{ width: 0 }} animate={{ width: `${o.winRate}%` }} transition={{ duration: 0.7, delay: 0.4 + k * 0.15 }} className="h-full rounded-full" style={{ background: o.winRate >= 55 ? '#5FA83A' : o.winRate >= 45 ? '#E8B447' : '#CA3431' }} /></div>
                             <p className="mt-[0.15em] text-right text-[0.8em] font-black tabular-nums text-white/75">wins {o.winRate}%</p>
                           </motion.div>
                         ))}
                       </div>
                     )}
-                    {frame.card === 'weak' && (
-                      <div className="space-y-[1cqh]">
-                        <p className="text-center font-black" style={{ fontSize: '1.25em' }}>How to beat {name}</p>
-                        {(d.weaknesses ?? []).slice(0, 3).map((w, k) => (
-                          <motion.div key={k} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 + k * 0.2 }} className="rounded-[0.6em] bg-white/[.07] p-[0.6em]">
-                            <p className="flex items-center gap-[0.4em] font-black"><span className="rounded px-[0.35em] text-[0.7em] uppercase" style={{ background: SEVC[w.severity] ?? '#7A8580' }}>{w.severity}</span>{w.category}</p>
-                            <p className="mt-[0.2em] line-clamp-2 text-[0.85em] text-white/80">{w.description}</p>
+                    {frame.card === 'weak' && (() => {
+                      const all = d.weaknesses ?? []; const i = frame.idx ?? 0; const w = all[i]; if (!w) return null;
+                      return (
+                        <div>
+                          <p className="text-center font-black" style={{ fontSize: '1.25em' }}>How to beat {name}</p>
+                          <p className="mt-[0.2em] text-center text-[0.8em] font-bold text-white/55">{i + 1} of {Math.min(3, all.length)}</p>
+                          <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="mt-[1cqh] rounded-[0.6em] bg-white/[.07] p-[0.8em]">
+                            <p className="flex flex-wrap items-center gap-[0.4em] font-black" style={{ fontSize: '1.2em' }}><span className="rounded px-[0.35em] text-[0.6em] uppercase" style={{ background: SEVC[w.severity] ?? '#7A8580' }}>{w.severity}</span>{w.category}</p>
+                            <p className="mt-[0.5em] leading-snug text-white/90">{w.description}</p>
                           </motion.div>
-                        ))}
-                      </div>
-                    )}
+                        </div>
+                      );
+                    })()}
                   </motion.div>
                 );
               })()}
@@ -1751,7 +1757,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
               const m = f.kind === 'move' ? plies[f.ply - 1] : null;
               const c = m ? (m.san.includes('#') ? 'checkmate' : m.review?.classification) : null;
               const tone = c && LABEL[c] && !['best', 'excellent', 'good', 'book'].includes(c) ? LABEL[c].color : null;
-              const label = f.kind === 'move' ? (m ? figurine(m.san, m.color === 'w') : 'Start') : f.kind === 'countdown' ? (f.anchor ? `⏱${f.n}` : String(f.n)) : f.kind === 'card' ? 'Card' : f.kind === 'scoutCard' ? ({ profile: 'Profile', colors: 'Colours', openings: 'Openings', habits: 'Habits', weak: 'Weak spots' } as Record<string, string>)[f.card] : f.kind === 'lessonText' ? 'Coach' : f.kind === 'lessonBoard' ? (f.celebrate ? '✓' : 'Board') : f.kind === 'scanPhoto' ? 'Photo' : f.kind === 'splash' ? 'Splash' : f.kind === 'promoCard' ? (f.card === 'vs' ? `Row ${f.upTo}` : f.card[0].toUpperCase() + f.card.slice(1))
+              const label = f.kind === 'move' ? (m ? figurine(m.san, m.color === 'w') : 'Start') : f.kind === 'countdown' ? (f.anchor ? `⏱${f.n}` : String(f.n)) : f.kind === 'card' ? 'Card' : f.kind === 'scoutCard' ? (f.card === 'weak' ? `Weak ${(f.idx ?? 0) + 1}` : ({ profile: 'Profile', colors: 'Colours', openings: 'Openings', habits: 'Habits' } as Record<string, string>)[f.card]) : f.kind === 'lessonText' ? 'Coach' : f.kind === 'lessonBoard' ? (f.celebrate ? '✓' : 'Board') : f.kind === 'scanPhoto' ? 'Photo' : f.kind === 'splash' ? 'Splash' : f.kind === 'promoCard' ? (f.card === 'vs' ? `Row ${f.upTo}` : f.card[0].toUpperCase() + f.card.slice(1))
                 : ({ title: 'Title', intro: 'Hook', hold: 'Start', better: 'Line', split: 'Split', reveal: 'Rating', summary: 'Summary', outro: 'End' } as Record<string, string>)[f.kind] ?? f.kind;
               const starts = stickers.filter((st) => st.from === id).length, ends = stickers.filter((st) => st.to === id).length;
               return (
