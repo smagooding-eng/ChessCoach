@@ -1,0 +1,13 @@
+name: api-check
+# One-off check that the API answers, and whether Google sign-in is configured.
+on:
+  workflow_dispatch:
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          for u in https://chesscoach-api-kbf8.onrender.com/api/auth/google/status https://chesscoach-api-kbf8.onrender.com/api/healthz https://chessscout.net/api/auth/google/status; do
+            out=$(curl -s -m 60 -w ' [HTTP %{http_code}]' "$u" | head -c 400 | tr '\n' ' ')
+            echo "::notice title=$u::$out"
+          done
