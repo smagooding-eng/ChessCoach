@@ -39,8 +39,14 @@ router.get("/admin/traffic-export", requireAdmin, async (req: Request, res: Resp
       : sql.raw(`(${alias}.stripe_subscription_id IS NOT NULL)`);
     const newSubsQuery = hasStripe
       ? db.execute(sql`
-          SELECT ${DAY("to_timestamp(s.created)")} AS day, COUNT(*) AS new_subscriptions,
-            COUNT(*) FILTER (WHERE s.status IN ('active','trialing')) AS still_active
+          SELECT ${DAY("to_timestamp(s.created)")} AS day,
+            -- The in-page checkout creates an "incomplete" subscription as soon as
+            -- the payment form opens; it only becomes real once a card is paid.
+            -- So unpaid ones are checkouts opened, not subscriptions.
+            COUNT(*) FILTER (WHERE s.status NOT IN ('incomplete','incomplete_expired')) AS new_subscriptions,
+            COUNT(*) FILTER (WHERE s.status IN ('active','trialing')) AS still_active,
+            COUNT(*) AS checkouts_opened,
+            COUNT(*) FILTER (WHERE s.status IN ('incomplete','incomplete_expired')) AS unpaid_checkouts
           FROM stripe.subscriptions s JOIN users u ON u.stripe_customer_id = s.customer
           WHERE to_timestamp(s.created) >= ${since} AND to_timestamp(s.created) <= ${until}
             AND u.id NOT IN (SELECT id FROM analytics_excluded_users) AND s.livemode IS NOT FALSE
@@ -159,6 +165,8 @@ router.get("/admin/traffic-export", requireAdmin, async (req: Request, res: Resp
       totals: {
         totalUsers: num(t.total_users), subscribersNow: num(t.subscribers_now), compedProNow: num(t.comped_pro_now),
         newSubscriptionsInRange: rowsOf<Record<string, unknown>>(newSubs).reduce((n, r) => n + num(r.new_subscriptions), 0),
+        checkoutsOpenedInRange: rowsOf<Record<string, unknown>>(newSubs).reduce((n, r) => n + num(r.checkouts_opened), 0),
+        unpaidCheckoutsInRange: rowsOf<Record<string, unknown>>(newSubs).reduce((n, r) => n + num(r.unpaid_checkouts), 0),
         signupsInRange: num(t.signups_in_range), pageViewsInRange: num(t.views_in_range),
         visitorsInRange: num(t.visitors_in_range), uniqueIpsInRange: num(t.unique_ips_in_range),
       },
@@ -170,7 +178,7 @@ router.get("/admin/traffic-export", requireAdmin, async (req: Request, res: Resp
         day: r.day, signups: num(r.signups), referredSignups: num(r.referred_signups), nowSubscribed: num(r.now_subscribed),
       })),
       // New paid subscriptions started in the range (from Stripe), and whether each is still active.
-      dailyNewSubscriptions: rowsOf<Record<string, unknown>>(newSubs).map((r) => ({ day: r.day, newSubscriptions: num(r.new_subscriptions), stillActive: num(r.still_active) })),
+      dailyNewSubscriptions: rowsOf<Record<string, unknown>>(newSubs).map((r) => ({ day: r.day, newSubscriptions: num(r.new_subscriptions), stillActive: num(r.still_active), checkoutsOpened: num(r.checkouts_opened), unpaidCheckouts: num(r.unpaid_checkouts) })),
       dailyReferralConversions: rowsOf<Record<string, unknown>>(convDaily).map((r) => ({ day: r.day, conversions: num(r.referral_conversions) })),
       landingFunnelTotals: rowsOf<Record<string, unknown>>(funnelTotals).map((r) => ({
         platform: r.platform, event: r.event_type, visitors: num(r.visitors), events: num(r.events),

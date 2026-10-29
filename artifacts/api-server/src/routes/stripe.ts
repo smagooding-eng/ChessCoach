@@ -214,6 +214,23 @@ router.post('/stripe/checkout-embedded', async (req: Request, res: Response) => 
     }
 
     const stripe = await getUncachableStripeClient();
+
+    // Reopening the payment form reuses the person's still-unpaid checkout for
+    // the same plan instead of leaving another "incomplete" subscription in
+    // Stripe each time.
+    try {
+      const open = await stripe.subscriptions.list({ customer: customerId, status: 'incomplete', limit: 10, expand: ['data.latest_invoice.payment_intent', 'data.latest_invoice.confirmation_secret'] });
+      const same = open.data.find((s) => s.items.data.some((it) => it.price?.id === priceId));
+      if (same) {
+        const inv: any = same.latest_invoice;
+        const secret = inv?.confirmation_secret?.client_secret ?? inv?.payment_intent?.client_secret;
+        if (secret) {
+          res.json({ subscriptionId: same.id, clientSecret: secret });
+          return;
+        }
+      }
+    } catch { /* fall through and start a fresh checkout */ }
+
     const subscription = await stripe.subscriptions.create({
       customer: customerId,
       items: [{ price: priceId }],
