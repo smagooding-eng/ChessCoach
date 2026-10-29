@@ -211,17 +211,35 @@ export function DashboardRedesign() {
             )}
           </div>
 
-          <div className="mt-5 grid grid-cols-2 gap-3">
-            <Link href="/play" className="flex items-center justify-center gap-2 rounded-[13px] py-3 text-[14px] font-extrabold" style={{ background: `linear-gradient(180deg, ${GREEN}, ${GREEN_DARK})`, color: '#FFFFFF' }}>
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style={{ marginLeft: 1 }}><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12.5-7.5a1 1 0 0 0 0-1.72L8.5 3.64A1 1 0 0 0 7 4.5z" /></svg> Play
-            </Link>
-            <Link href="/learning" className="flex items-center justify-center gap-2 rounded-[13px] py-3 text-[14px] font-bold" style={{ background: 'rgba(255,255,255,.06)', border: `1px solid ${BORDER}` }}>
-              <GraduationCap size={17} strokeWidth={2.25} style={{ color: GREEN }} /> Learn
-            </Link>
-          </div>
-          <LivePulse compact className="mt-3 justify-center" />
           </div>
         </section>
+
+        {/* ── Play and Learn: a card each ── */}
+        <div className="grid grid-cols-2 gap-4 lg:col-span-2">
+          <section className="relative flex flex-col rounded-[20px] p-4" style={{ background: CARD, border: `1px solid ${BORDER}` }}>
+            <Link href="/play" className="flex flex-1 flex-col" aria-label="Play">
+              <span className="grid h-11 w-11 place-items-center rounded-[13px]" style={{ background: `linear-gradient(180deg, ${GREEN}, ${GREEN_DARK})`, color: '#FFFFFF' }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style={{ marginLeft: 2 }}><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12.5-7.5a1 1 0 0 0 0-1.72L8.5 3.64A1 1 0 0 0 7 4.5z" /></svg>
+              </span>
+              <span className="mt-3 flex items-center justify-between gap-2">
+                <b className="text-[18px] font-extrabold leading-tight">Play</b>
+                <ChevronRight size={18} style={{ color: MUTED }} />
+              </span>
+              <span className="mt-0.5 text-[13px] leading-snug" style={{ color: MUTED }}>Live, daily and bots</span>
+            </Link>
+            <LivePulse compact className="mt-2.5 flex-wrap" />
+          </section>
+          <Link href="/learning" className="flex flex-col rounded-[20px] p-4" style={{ background: CARD, border: `1px solid ${BORDER}` }}>
+            <span className="grid h-11 w-11 place-items-center rounded-[13px]" style={{ background: 'rgba(129,182,76,.14)', border: '1px solid rgba(129,182,76,.35)' }}>
+              <GraduationCap size={20} strokeWidth={2.25} style={{ color: GREEN }} />
+            </span>
+            <span className="mt-3 flex items-center justify-between gap-2">
+              <b className="text-[18px] font-extrabold leading-tight">Learn</b>
+              <ChevronRight size={18} style={{ color: MUTED }} />
+            </span>
+            <span className="mt-0.5 text-[13px] leading-snug" style={{ color: MUTED }}>Courses, lessons and drills</span>
+          </Link>
+        </div>
 
         {/* ── Your live / daily games (hidden when none) ── */}
         <ChallengeInbox className="lg:col-span-2" />
