@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { PieceTile } from '@/components/DesignSystem';
 import { useUser } from '@/hooks/use-user';
 import { useLocation } from 'wouter';
@@ -85,6 +85,48 @@ export function Subscription() {
       })
       .catch(() => setLoading(false));
   }, []);
+
+  // From the "finish going Pro" email: ?price=<id> opens that plan's payment form.
+  const linkedPrice = searchParams?.get('price') ?? null;
+  const linkedPriceUsed = useRef(false);
+  useEffect(() => {
+    if (linkedPriceUsed.current || !linkedPrice || !isAuthenticated || isPremium || !products.length) return;
+    if (products[0]?.prices?.some((p: PriceInfo) => p.id === linkedPrice)) {
+      linkedPriceUsed.current = true;
+      setSelectedPriceId(linkedPrice);
+      setShowManualCard(false);
+    }
+  }, [linkedPrice, isAuthenticated, isPremium, products]);
+
+  // The "N days of Pro free" offer (sent to people who didn't finish checkout).
+  const [trialOffer, setTrialOffer] = useState<{ eligible: boolean; days: number } | null>(null);
+  const [trialLoading, setTrialLoading] = useState(false);
+  const [trialError, setTrialError] = useState('');
+  const isTrialStart = searchParams?.get('trial') === '1';
+  useEffect(() => {
+    if (!isAuthenticated || isPremium) { setTrialOffer(null); return; }
+    apiFetch('/api/stripe/trial-offer', { credentials: 'include' })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => setTrialOffer(d?.eligible ? { eligible: true, days: Number(d.days) || 3 } : null))
+      .catch(() => {});
+  }, [isAuthenticated, isPremium]);
+  const startTrial = async (priceId: string) => {
+    setTrialLoading(true);
+    setTrialError('');
+    try {
+      const res = await apiFetch('/api/stripe/checkout-trial', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+        body: JSON.stringify({ priceId }),
+      });
+      const data = await res.json();
+      if (data.url) window.location.href = data.url;
+      else setTrialError(data.error || 'Could not start the free trial. Please try again.');
+    } catch {
+      setTrialError('Connection error. Please try again.');
+    } finally {
+      setTrialLoading(false);
+    }
+  };
 
   const [portalError, setPortalError] = useState('');
   const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
@@ -179,7 +221,9 @@ export function Subscription() {
           className="mb-6 p-4 rounded-xl bg-green-500/10 border border-green-500/30 text-green-400 text-center"
         >
           <Check className="w-5 h-5 inline-block mr-2" />
-          Welcome to ChessScout.net Pro! Your subscription is now active.
+          {isTrialStart
+            ? 'Your free Pro trial has started. Enjoy every Pro feature!'
+            : 'Welcome to ChessScout.net Pro! Your subscription is now active.'}
         </motion.div>
       )}
       {isCanceled && (
@@ -259,6 +303,20 @@ export function Subscription() {
         </div>
       ) : (
         <div className="max-w-3xl mx-auto">
+          {trialOffer?.eligible && monthlyPrice && (
+            <div className="mb-6 rounded-xl p-5 text-left" style={{ background: 'rgba(129,182,76,0.10)', border: '2px solid rgba(129,182,76,0.55)' }}>
+              <p className="text-[11px] font-extrabold uppercase tracking-[0.16em] text-primary">Your offer</p>
+              <h3 className="mt-1 text-xl font-black">Try Pro free for {trialOffer.days} days</h3>
+              <p className="mt-1.5 text-sm text-muted-foreground">
+                Add a card to start. You won't be charged during the {trialOffer.days} days. After that, Pro continues at ${(monthlyPrice.unit_amount / 100).toFixed(0)}/month and your card is billed automatically, unless you cancel before the trial ends.
+              </p>
+              <button onClick={() => startTrial(monthlyPrice.id)} disabled={trialLoading}
+                className="mt-4 w-full sm:w-auto inline-flex items-center justify-center gap-2 btn-primary text-sm py-3 px-6 disabled:opacity-60">
+                {trialLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Crown className="w-4 h-4" /> Start my {trialOffer.days} free days</>}
+              </button>
+              {trialError && <p className="mt-2 text-xs text-red-400">{trialError}</p>}
+            </div>
+          )}
           <div className="grid md:grid-cols-2 gap-6 mb-8">
             <div className="glass-panel rounded-xl p-6 border-2 border-border/60">
               <h3 className="text-lg font-bold mb-1">Free Plan</h3>

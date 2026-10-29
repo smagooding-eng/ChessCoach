@@ -371,6 +371,70 @@ router.post('/stripe/confirm-subscription', async (req: Request, res: Response) 
   }
 });
 
+// The "3 days of Pro free" offer from the unfinished-checkout emails
+// (lib/checkoutRecovery.ts). Only people who were sent that offer, within the
+// last two weeks, and have never paid, can start it. Stripe's hosted checkout
+// collects the card; the subscription starts in "trialing" and is billed
+// automatically when the trial ends unless it's canceled first.
+router.get('/stripe/trial-offer', async (req: Request, res: Response) => {
+  if (!req.isAuthenticated()) { res.json({ eligible: false }); return; }
+  try {
+    const { trialOfferEligible, TRIAL_DAYS } = await import('../lib/checkoutRecovery');
+    res.json({ eligible: await trialOfferEligible(req.user.id), days: TRIAL_DAYS });
+  } catch {
+    res.json({ eligible: false });
+  }
+});
+
+router.post('/stripe/checkout-trial', async (req: Request, res: Response) => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: 'Not authenticated' }); return; }
+  const { priceId } = req.body ?? {};
+  if (!priceId || typeof priceId !== 'string' || !priceId.startsWith('price_')) {
+    res.status(400).json({ error: 'Valid priceId is required' });
+    return;
+  }
+  try {
+    const { trialOfferEligible, TRIAL_DAYS } = await import('../lib/checkoutRecovery');
+    if (!(await trialOfferEligible(req.user.id))) {
+      res.status(403).json({ error: 'This free trial offer is not available on your account.' });
+      return;
+    }
+    const stripe = await getUncachableStripeClient();
+    const price = await stripe.prices.retrieve(priceId);
+    if (!price.active || !price.recurring) {
+      res.status(400).json({ error: 'That plan is not available.' });
+      return;
+    }
+    const user = await storage.getUser(req.user.id);
+    let customerId = user?.stripeCustomerId;
+    if (!customerId) {
+      const customer = await stripeService.createCustomer(user?.email || `${req.user.id}@chess-coach.app`, req.user.id);
+      await storage.updateUserStripeInfo(req.user.id, { stripeCustomerId: customer.id });
+      customerId = customer.id;
+    }
+    const frontendUrl = process.env.CORS_ORIGIN;
+    const origin = frontendUrl || getOrigin(req);
+    const basePath = frontendUrl ? '' : '/chess-coach';
+    const session = await stripe.checkout.sessions.create({
+      customer: customerId,
+      mode: 'subscription',
+      line_items: [{ price: priceId, quantity: 1 }],
+      payment_method_collection: 'always',
+      subscription_data: {
+        trial_period_days: TRIAL_DAYS,
+        trial_settings: { end_behavior: { missing_payment_method: 'cancel' } },
+        metadata: { offer: 'checkout_recovery_trial' },
+      },
+      success_url: `${origin}${basePath}/subscription?success=true&trial=1`,
+      cancel_url: `${origin}${basePath}/subscription?offer=trial`,
+    });
+    res.json({ url: session.url });
+  } catch (err: any) {
+    console.error('Trial checkout error:', err?.message);
+    res.status(500).json({ error: 'Could not start the free trial. Please try again.' });
+  }
+});
+
 router.post('/stripe/portal', async (req: Request, res: Response) => {
   if (!req.isAuthenticated()) {
     res.status(401).json({ error: 'Not authenticated' });
