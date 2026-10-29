@@ -423,8 +423,71 @@ export async function studioScout(id: string) {
   const r = rowsOf(await db.execute(sql`SELECT id, target_username AS "username", result FROM background_jobs WHERE id = ${id} AND type = 'scout' AND status = 'done'`))[0];
   if (!r) return null;
   const result = (r.result ?? {}) as Record<string, unknown>;
-  const pgns = Array.isArray(result.gamePgns) ? (result.gamePgns as string[]).slice(0, 40) : [];
-  return { id: r.id, username: r.username, result: { ...result, gamePgns: pgns } };
+  const all = Array.isArray(result.gamePgns) ? (result.gamePgns as string[]) : [];
+  const stats = scoutStats(all, String(r.username ?? ''));
+  return { id: r.id, username: r.username, result: { ...result, gamePgns: all.slice(0, 20), stats } };
+}
+
+/** Extra numbers for a Studio scout clip, worked out from the player's game PGNs. */
+export interface ScoutStats {
+  asWhite: { games: number; wins: number; draws: number; losses: number };
+  asBlack: { games: number; wins: number; draws: number; losses: number };
+  firstMove: { san: string; pct: number }[];
+  vsE4: { san: string; pct: number } | null;
+  vsD4: { san: string; pct: number } | null;
+  winsBy: { checkmate: number; resignation: number; time: number; other: number };
+  lossesBy: { checkmate: number; resignation: number; time: number; other: number };
+  avgMoves: number | null;
+  timeControl: string | null;
+  rating: { start: number; end: number; peak: number } | null;
+}
+export function scoutStats(pgns: string[], username: string): ScoutStats {
+  const me = username.toLowerCase();
+  const tag = (pgn: string, t: string) => pgn.match(new RegExp(`\\[${t} "([^"]*)"\\]`))?.[1] ?? '';
+  const sans = (pgn: string) => pgn.replace(/\[[^\]]*\]/g, ' ').replace(/\{[^}]*\}/g, ' ').replace(/\([^)]*\)/g, ' ').replace(/\$\d+/g, ' ')
+    .split(/\s+/).map((t) => t.replace(/^\d+\.+/, '')).filter((t) => t && !/^(1-0|0-1|1\/2-1\/2|\*)$/.test(t));
+  const rec = () => ({ games: 0, wins: 0, draws: 0, losses: 0 });
+  const by = () => ({ checkmate: 0, resignation: 0, time: 0, other: 0 });
+  const out: ScoutStats = { asWhite: rec(), asBlack: rec(), firstMove: [], vsE4: null, vsD4: null, winsBy: by(), lossesBy: by(), avgMoves: null, timeControl: null, rating: null };
+  const first = new Map<string, number>(), e4 = new Map<string, number>(), d4 = new Map<string, number>(), tcs = new Map<string, number>();
+  const ratings: { t: string; r: number }[] = [];
+  let moveSum = 0, moveN = 0;
+  for (const pgn of pgns) {
+    const white = tag(pgn, 'White').toLowerCase() === me;
+    const black = tag(pgn, 'Black').toLowerCase() === me;
+    if (!white && !black) continue;
+    const res = tag(pgn, 'Result');
+    const outcome = res === '1/2-1/2' ? 'draw' : (res === '1-0') === white ? 'win' : res === '1-0' || res === '0-1' ? 'loss' : 'draw';
+    const side = white ? out.asWhite : out.asBlack;
+    side.games++; if (outcome === 'win') side.wins++; else if (outcome === 'loss') side.losses++; else side.draws++;
+    const term = (tag(pgn, 'Termination') + ' ' + tag(pgn, 'TerminationDetails')).toLowerCase();
+    const how = /checkmate/.test(term) ? 'checkmate' : /resign/.test(term) ? 'resignation' : /time|timeout|forfeit/.test(term) ? 'time' : 'other';
+    if (outcome === 'win') out.winsBy[how]++; else if (outcome === 'loss') out.lossesBy[how]++;
+    const mv = sans(pgn);
+    if (mv.length) { moveSum += Math.ceil(mv.length / 2); moveN++; }
+    if (white && mv[0]) first.set(mv[0], (first.get(mv[0]) ?? 0) + 1);
+    if (black && mv[0] === 'e4' && mv[1]) e4.set(mv[1], (e4.get(mv[1]) ?? 0) + 1);
+    if (black && mv[0] === 'd4' && mv[1]) d4.set(mv[1], (d4.get(mv[1]) ?? 0) + 1);
+    const tc = tag(pgn, 'TimeControl'); if (tc) tcs.set(tc, (tcs.get(tc) ?? 0) + 1);
+    const r = Number(tag(pgn, white ? 'WhiteElo' : 'BlackElo'));
+    const when = `${tag(pgn, 'UTCDate') || tag(pgn, 'Date')} ${tag(pgn, 'UTCTime') || tag(pgn, 'EndTime') || tag(pgn, 'StartTime')}`;
+    if (Number.isFinite(r) && r > 0) ratings.push({ t: when, r });
+  }
+  const top = (m: Map<string, number>) => { const total = [...m.values()].reduce((a, b) => a + b, 0); return [...m.entries()].sort((a, b) => b[1] - a[1]).map(([san, n]) => ({ san, pct: Math.round((n / Math.max(1, total)) * 100) })); };
+  out.firstMove = top(first).slice(0, 2);
+  out.vsE4 = top(e4)[0] ?? null;
+  out.vsD4 = top(d4)[0] ?? null;
+  out.avgMoves = moveN ? Math.round(moveSum / moveN) : null;
+  const tc = [...tcs.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+  if (tc) {
+    if (tc.includes('/')) out.timeControl = 'Daily';
+    else { const [base, inc] = tc.split('+').map(Number); const min = Math.round((base || 0) / 60); out.timeControl = `${min >= 1 ? `${min} min` : `${base} sec`}${inc ? ` + ${inc}s` : ''}`; }
+  }
+  if (ratings.length >= 2) {
+    ratings.sort((a, b) => a.t.localeCompare(b.t));
+    out.rating = { start: ratings[0].r, end: ratings[ratings.length - 1].r, peak: Math.max(...ratings.map((x) => x.r)) };
+  }
+  return out;
 }
 
 // ── Beginner and kids lessons ───────────────────────────────────────────

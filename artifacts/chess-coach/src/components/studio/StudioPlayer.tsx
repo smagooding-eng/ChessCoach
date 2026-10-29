@@ -42,6 +42,16 @@ export interface ScoutData {
   topOpenings?: { opening: string; games: number; winRate: number }[];
   weaknesses?: { category: string; severity: string; description: string }[];
   gamePgns?: string[];
+  /** Worked out from their games (Studio only): colours, first moves, how games end, rating. */
+  stats?: ScoutStats | null;
+}
+type Rec = { games: number; wins: number; draws: number; losses: number };
+type EndBy = { checkmate: number; resignation: number; time: number; other: number };
+export interface ScoutStats {
+  asWhite: Rec; asBlack: Rec; firstMove: { san: string; pct: number }[];
+  vsE4: { san: string; pct: number } | null; vsD4: { san: string; pct: number } | null;
+  winsBy: EndBy; lossesBy: EndBy; avgMoves: number | null; timeControl: string | null;
+  rating: { start: number; end: number; peak: number } | null;
 }
 export interface StudioScout { id: string; username: string; completedAt?: string | null; result: ScoutData }
 export interface LessonStep { type: 'text' | 'board' | 'practice' | 'drill'; text: string; fen?: string; highlightSquares?: string[]; expectedMoveSan?: string }
@@ -88,7 +98,7 @@ type Frame =
   | { kind: 'split'; played: { fen: string; last: { from: string; to: string } }; better: { fen: string; last: { from: string; to: string } }; playedSan: string; betterSan: string }
   | { kind: 'title'; fen: string }
   | { kind: 'summary'; fen: string }
-  | { kind: 'scoutCard'; fen: string; last: { from: string; to: string } | null; card: 'profile' | 'openings' | 'weak' }
+  | { kind: 'scoutCard'; fen: string; last: { from: string; to: string } | null; card: 'profile' | 'colors' | 'openings' | 'habits' | 'weak' }
   | { kind: 'lessonText'; fen: string; text: string }
   | { kind: 'lessonBoard'; fen: string; text: string; highlights: string[]; last: { from: string; to: string } | null; celebrate?: boolean }
   | { kind: 'scanPhoto'; fen: string }
@@ -255,7 +265,7 @@ function scoutClip(s: StudioScout): Clip {
   const words = top.toLowerCase().split(/[^a-z]+/).filter((w) => w.length > 3);
   // A game of theirs in their favourite opening, to play behind the stats.
   const pgn = (d.gamePgns ?? []).find((g) => { const h = (g.match(/\[(Opening|ECOUrl) "([^"]+)"\]/g) ?? []).join(' ').toLowerCase(); return words.length > 0 && words.every((w) => h.includes(w)); }) ?? d.gamePgns?.[0] ?? '';
-  const plies = pgn ? playSans(undefined, pgnSans(pgn).slice(0, 14), []) : [];
+  const plies = pgn ? playSans(undefined, pgnSans(pgn).slice(0, 6), []) : [];
   const name = d.profile?.name || s.username;
   return {
     plies, key: Math.max(0, plies.length - 1), tags: ['scout'], hook: `Scouting ${name} 🔍`, sub: `${d.gamesAnalyzed} games scouted${top ? ` · plays the ${top}` : ''}`,
@@ -634,12 +644,15 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
     if (clip.isScout) {
       if (isComp && isFirst) out.push({ kind: 'title', fen: fenAt(0) });
       if (prefs.intro) out.push({ kind: 'intro', fen: fenAt(0) });
+      // A few opening moves of theirs behind the cards; the cards carry the clip.
       out.push({ kind: 'hold', fen: fenAt(0), last: null });
-      const a = Math.min(plies.length, 6), b = Math.min(plies.length, 12);
-      for (let p = 1; p <= a; p++) out.push({ kind: 'move', ply: p });
-      out.push({ kind: 'scoutCard', fen: fenAt(a), last: lastAt(a), card: 'profile' });
-      for (let p = a + 1; p <= b; p++) out.push({ kind: 'move', ply: p });
+      const b = plies.length;
+      for (let p = 1; p <= b; p++) out.push({ kind: 'move', ply: p });
+      const st = clip.scout?.stats;
+      out.push({ kind: 'scoutCard', fen: fenAt(b), last: lastAt(b), card: 'profile' });
+      if (st && st.asWhite.games + st.asBlack.games > 0) out.push({ kind: 'scoutCard', fen: fenAt(b), last: lastAt(b), card: 'colors' });
       if (clip.scout?.topOpenings?.length) out.push({ kind: 'scoutCard', fen: fenAt(b), last: lastAt(b), card: 'openings' });
+      if (st) out.push({ kind: 'scoutCard', fen: fenAt(b), last: lastAt(b), card: 'habits' });
       if (clip.scout?.weaknesses?.length) out.push({ kind: 'scoutCard', fen: fenAt(b), last: lastAt(b), card: 'weak' });
       if (prefs.outro && isLast) out.push({ kind: 'outro', fen: fenAt(b) });
       return withInserts(out);
@@ -763,7 +776,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
       case 'split': return 3200;
       case 'title': return 2200;
       case 'summary': return 4200;
-      case 'scoutCard': return f.card === 'profile' ? 3800 : f.card === 'openings' ? 4800 : 5600;
+      case 'scoutCard': return f.card === 'profile' ? 4200 : f.card === 'weak' ? 5600 : 4800;
       case 'lessonText': return Math.max(2600, f.text.split(/\s+/).length * 340);
       case 'lessonBoard': return f.celebrate ? 2400 : Math.max(3000, f.text.split(/\s+/).length * 340);
       case 'scanPhoto': return 3200;
@@ -928,6 +941,17 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
         const name = d.profile?.name || d.username;
         if (f.card === 'profile') return `${name}. ${d.wins} wins, ${d.losses} losses and ${d.draws} draws in their last ${d.gamesAnalyzed} games.`;
         if (f.card === 'openings') { const o = d.topOpenings?.[0]; return o ? `Their favourite opening is the ${o.opening}, and they win ${o.winRate} percent of the time.` : null; }
+        const st = d.stats;
+        if (f.card === 'colors' && st) {
+          const pct = (r: Rec) => (r.games ? Math.round((r.wins / r.games) * 100) : 0);
+          const fm = st.firstMove[0];
+          return `As White they win ${pct(st.asWhite)} percent, as Black ${pct(st.asBlack)} percent.${fm ? ` They open with ${spokenSan(fm.san)} ${fm.pct} percent of the time.` : ''}${st.vsE4 ? ` Against e4 they play ${spokenSan(st.vsE4.san)}.` : ''}`;
+        }
+        if (f.card === 'habits' && st) {
+          const lostTime = st.lossesBy.time, lostTotal = st.lossesBy.checkmate + st.lossesBy.resignation + st.lossesBy.time + st.lossesBy.other;
+          const parts = [st.timeControl ? `They mostly play ${st.timeControl} games` : '', st.avgMoves ? `that last about ${st.avgMoves} moves` : ''].filter(Boolean).join(' ');
+          return `${parts ? `${parts}.` : ''}${lostTotal && lostTime ? ` ${Math.round((lostTime / lostTotal) * 100)} percent of their losses are on time.` : ''}`.trim() || null;
+        }
         const w = d.weaknesses?.[0]; return w ? `Their biggest weakness: ${w.category}. ${w.description.split(/(?<=[.!?])\s/)[0]}` : null;
       }
       case 'lessonText': case 'lessonBoard': return stripEmoji(f.text.replace(/^✓\s*/, '')).slice(0, 400);
@@ -1408,6 +1432,74 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
                         </div>
                       </div>
                     )}
+                    {frame.card === 'colors' && d.stats && (() => {
+                      const st = d.stats;
+                      const row = (label: string, piece: string, r: Rec) => {
+                        const t = Math.max(1, r.games);
+                        return (
+                          <div className="rounded-[0.6em] bg-white/[.07] p-[0.6em]">
+                            <div className="flex items-baseline justify-between font-black"><span>{piece} As {label}</span><span className="tabular-nums" style={{ fontSize: '1.3em' }}>{r.games ? Math.round((r.wins / r.games) * 100) : 0}%<span className="ml-[0.2em] text-[0.55em] text-white/60">wins</span></span></div>
+                            <div className="mt-[0.4em] flex h-[1.6cqh] overflow-hidden rounded-full">
+                              {([[r.wins, '#5FA83A'], [r.draws, '#7A8580'], [r.losses, '#CA3431']] as const).map(([n, c], k) => n > 0 && <motion.div key={k} initial={{ width: 0 }} animate={{ width: `${(n / t) * 100}%` }} transition={{ duration: 0.7, delay: 0.3 }} style={{ background: c }} />)}
+                            </div>
+                            <p className="mt-[0.2em] text-right text-[0.75em] font-bold tabular-nums text-white/60">{r.wins}W · {r.draws}D · {r.losses}L</p>
+                          </div>
+                        );
+                      };
+                      return (
+                        <div className="space-y-[1cqh]">
+                          <p className="text-center font-black" style={{ fontSize: '1.25em' }}>White or Black?</p>
+                          {row('White', '♔', st.asWhite)}
+                          {row('Black', '♚', st.asBlack)}
+                          <div className="grid grid-cols-3 gap-[0.5em] text-center">
+                            {[['Opens with', st.firstMove[0] ? `1.${st.firstMove[0].san}` : '—', st.firstMove[0] ? `${st.firstMove[0].pct}%` : ''], ['vs 1.e4', st.vsE4 ? `1…${st.vsE4.san}` : '—', st.vsE4 ? `${st.vsE4.pct}%` : ''], ['vs 1.d4', st.vsD4 ? `1…${st.vsD4.san}` : '—', st.vsD4 ? `${st.vsD4.pct}%` : '']].map(([k, v, pc]) => (
+                              <motion.div key={k} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }} className="rounded-[0.6em] bg-white/[.07] px-[0.3em] py-[0.45em]">
+                                <p className="text-[0.68em] font-bold uppercase text-white/55">{k}</p>
+                                <p className="font-black" style={{ fontSize: '1.15em' }}>{v}</p>
+                                <p className="text-[0.7em] font-bold text-[#B8E08C]">{pc}</p>
+                              </motion.div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })()}
+                    {frame.card === 'habits' && d.stats && (() => {
+                      const st = d.stats;
+                      const sum = (e: EndBy) => e.checkmate + e.resignation + e.time + e.other;
+                      const lt = sum(st.lossesBy), wt = sum(st.winsBy);
+                      const pct = (n: number, t: number) => (t ? Math.round((n / t) * 100) : 0);
+                      const tiles: [string, string][] = [
+                        ['Plays', st.timeControl ?? '—'],
+                        ['Game length', st.avgMoves ? `${st.avgMoves} moves` : '—'],
+                        ['Rating', st.rating ? `${st.rating.end}${st.rating.end !== st.rating.start ? ` (${st.rating.end > st.rating.start ? '+' : ''}${st.rating.end - st.rating.start})` : ''}` : '—'],
+                        ['Peak', st.rating ? String(st.rating.peak) : '—'],
+                      ];
+                      const bars: [string, number, string][] = [
+                        ['Loses on time', pct(st.lossesBy.time, lt), '#E8B447'],
+                        ['Resigns', pct(st.lossesBy.resignation, lt), '#CA3431'],
+                        ['Gets mated', pct(st.lossesBy.checkmate, lt), '#F0605D'],
+                        ['Wins by mate', pct(st.winsBy.checkmate, wt), '#5FA83A'],
+                      ];
+                      return (
+                        <div className="space-y-[1cqh]">
+                          <p className="text-center font-black" style={{ fontSize: '1.25em' }}>{name}'s habits</p>
+                          <div className="grid grid-cols-2 gap-[0.5em]">
+                            {tiles.map(([k, v], i) => (
+                              <motion.div key={k} initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.2 + i * 0.1 }} className="rounded-[0.6em] bg-white/[.07] px-[0.5em] py-[0.45em] text-center">
+                                <p className="text-[0.68em] font-bold uppercase text-white/55">{k}</p>
+                                <p className="font-black tabular-nums" style={{ fontSize: '1.15em' }}>{v}</p>
+                              </motion.div>
+                            ))}
+                          </div>
+                          {bars.map(([k, v, c], i) => (
+                            <div key={k}>
+                              <div className="flex justify-between text-[0.85em] font-bold"><span>{k}</span><span className="tabular-nums">{v}%</span></div>
+                              <div className="mt-[0.2em] h-[1.2cqh] overflow-hidden rounded-full bg-white/10"><motion.div initial={{ width: 0 }} animate={{ width: `${v}%` }} transition={{ duration: 0.7, delay: 0.4 + i * 0.12 }} className="h-full rounded-full" style={{ background: c }} /></div>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })()}
                     {frame.card === 'openings' && (
                       <div className="space-y-[1cqh]">
                         <p className="text-center font-black" style={{ fontSize: '1.25em' }}>What {name} plays</p>
@@ -1659,7 +1751,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
               const m = f.kind === 'move' ? plies[f.ply - 1] : null;
               const c = m ? (m.san.includes('#') ? 'checkmate' : m.review?.classification) : null;
               const tone = c && LABEL[c] && !['best', 'excellent', 'good', 'book'].includes(c) ? LABEL[c].color : null;
-              const label = f.kind === 'move' ? (m ? figurine(m.san, m.color === 'w') : 'Start') : f.kind === 'countdown' ? (f.anchor ? `⏱${f.n}` : String(f.n)) : f.kind === 'card' ? 'Card' : f.kind === 'scoutCard' ? ({ profile: 'Profile', openings: 'Openings', weak: 'Weak spots' } as Record<string, string>)[f.card] : f.kind === 'lessonText' ? 'Coach' : f.kind === 'lessonBoard' ? (f.celebrate ? '✓' : 'Board') : f.kind === 'scanPhoto' ? 'Photo' : f.kind === 'splash' ? 'Splash' : f.kind === 'promoCard' ? (f.card === 'vs' ? `Row ${f.upTo}` : f.card[0].toUpperCase() + f.card.slice(1))
+              const label = f.kind === 'move' ? (m ? figurine(m.san, m.color === 'w') : 'Start') : f.kind === 'countdown' ? (f.anchor ? `⏱${f.n}` : String(f.n)) : f.kind === 'card' ? 'Card' : f.kind === 'scoutCard' ? ({ profile: 'Profile', colors: 'Colours', openings: 'Openings', habits: 'Habits', weak: 'Weak spots' } as Record<string, string>)[f.card] : f.kind === 'lessonText' ? 'Coach' : f.kind === 'lessonBoard' ? (f.celebrate ? '✓' : 'Board') : f.kind === 'scanPhoto' ? 'Photo' : f.kind === 'splash' ? 'Splash' : f.kind === 'promoCard' ? (f.card === 'vs' ? `Row ${f.upTo}` : f.card[0].toUpperCase() + f.card.slice(1))
                 : ({ title: 'Title', intro: 'Hook', hold: 'Start', better: 'Line', split: 'Split', reveal: 'Rating', summary: 'Summary', outro: 'End' } as Record<string, string>)[f.kind] ?? f.kind;
               const starts = stickers.filter((st) => st.from === id).length, ends = stickers.filter((st) => st.to === id).length;
               return (
