@@ -82,13 +82,13 @@ export function DashboardRedesign() {
   // Only once the plan is known, so Pro members never see an upsell flash.
   const freePlan = isSubscriptionLoaded && !!authUser && !isPremium;
   const { player: chessPlayer } = useChessPlayer(username ?? authUser?.chesscomUsername ?? undefined);
-  const { data: multiElo } = useMultiEloProgress(username ?? undefined);
+  const { data: multiElo, loading: eloLoading } = useMultiEloProgress(username ?? undefined);
   const { data: summary } = useMyAnalysisSummary();
   const { data: gamesData } = useMyGames(3);
   const [opponent, setOpponent] = useState('');
   const [, navigate] = useLocation();
   const { data: weaknessesData } = useMyWeaknesses();
-  const { data: liveRatingsData } = useLiveRatings();
+  const { data: liveRatingsData, isFetched: liveRatingsFetched } = useLiveRatings();
   const liveBest = bestLiveRating(liveRatingsData?.ratings);
 
   // Same behaviour as the classic home: quietly fetch any new games (last month)
@@ -121,6 +121,23 @@ export function DashboardRedesign() {
       : (chessPlayer?.rating ?? null);
   const scoutDelta = multiElo?.combined?.delta ?? null;
 
+  // The Scout rating comes from several requests that finish at different
+  // times. Until they all have, show the last rating this device saw (so it's
+  // there the moment Home opens and doesn't change mid-load), or a placeholder
+  // of the same size on the very first visit.
+  const scoutKey = authUser?.id ? `cs_scout_elo_${authUser.id}` : null;
+  const scoutSettled = liveRatingsFetched && !eloLoading;
+  const [cachedScout] = useState<{ elo: number; delta: number | null } | null>(() => {
+    try { const v = scoutKey && localStorage.getItem(scoutKey); return v ? JSON.parse(v) : null; } catch { return null; }
+  });
+  useEffect(() => {
+    if (!scoutKey || !scoutSettled || scoutElo == null) return;
+    try { localStorage.setItem(scoutKey, JSON.stringify({ elo: scoutElo, delta: scoutDelta })); } catch { /* ignore */ }
+  }, [scoutKey, scoutSettled, scoutElo, scoutDelta]);
+  const shownScout = scoutSettled
+    ? (scoutElo != null ? { elo: scoutElo, delta: scoutDelta } : null)
+    : (cachedScout ?? null);
+
   const statsLoading = summary === undefined;
   const games = summary?.totalGames ?? 0;
   const wins = summary?.wins ?? 0;
@@ -138,9 +155,10 @@ export function DashboardRedesign() {
 
   // Tapping the Scout rating shares a milestone card (same as the classic home)
   const shareScout = async () => {
-    if (scoutElo == null) return;
-    const url = `${window.location.origin}/share/${encodeCard({ type: 'milestone', username: username ?? 'A ChessScout.net user', newRating: scoutElo })}`;
-    const shareData = { title: `My Scout ELO is ${scoutElo}`, url };
+    const elo = shownScout?.elo;
+    if (elo == null) return;
+    const url = `${window.location.origin}/share/${encodeCard({ type: 'milestone', username: username ?? 'A ChessScout.net user', newRating: elo })}`;
+    const shareData = { title: `My Scout ELO is ${elo}`, url };
     if (navigator.share) { try { await navigator.share(shareData); return; } catch { /* fall through to clipboard */ } }
     try { await navigator.clipboard.writeText(url); } catch { /* nothing more we can do */ }
   };
@@ -196,21 +214,26 @@ export function DashboardRedesign() {
               </p>
             </div>
 
-            {scoutElo != null && (
+            {shownScout ? (
               <button onClick={shareScout} aria-label="Share your Scout rating" className="shrink-0 text-right">
                 <p className="text-[10px] font-bold uppercase tracking-[.14em]" style={{ color: MUTED }}>Scout Rating</p>
                 <div className="flex items-baseline justify-end gap-1.5">
-                  <span className="text-[26px] font-black leading-none">{scoutElo}</span>
-                  {scoutDelta != null && scoutDelta !== 0 && (
-                    <span className="text-[12px] font-extrabold" style={{ color: scoutDelta > 0 ? GREEN : RED }}>
-                      {scoutDelta > 0 ? '▲' : '▼'} {scoutDelta > 0 ? '+' : '-'}{Math.abs(scoutDelta)}
+                  <span className="text-[26px] font-black leading-none">{shownScout.elo}</span>
+                  {shownScout.delta != null && shownScout.delta !== 0 && (
+                    <span className="text-[12px] font-extrabold" style={{ color: shownScout.delta > 0 ? GREEN : RED }}>
+                      {shownScout.delta > 0 ? '▲' : '▼'} {shownScout.delta > 0 ? '+' : '-'}{Math.abs(shownScout.delta)}
                     </span>
                   )}
                 </div>
               </button>
-            )}
+            ) : !scoutSettled ? (
+              <div className="shrink-0 text-right" aria-hidden="true">
+                <p className="text-[10px] font-bold uppercase tracking-[.14em]" style={{ color: MUTED }}>Scout Rating</p>
+                <span className="mt-1 ml-auto block h-[26px] w-[70px] animate-pulse rounded-md" style={{ background: 'rgba(255,255,255,.08)' }} />
+              </div>
+            ) : null}
           </div>
-
+          <LivePulse compact className="mt-3 justify-center" />
           </div>
         </section>
 
@@ -227,7 +250,6 @@ export function DashboardRedesign() {
               </span>
               <span className="mt-0.5 text-[13px] leading-snug" style={{ color: MUTED }}>Live, daily and bots</span>
             </Link>
-            <LivePulse compact className="mt-2.5 flex-wrap" />
           </section>
           <Link href="/learning" className="flex flex-col rounded-[20px] p-4" style={{ background: CARD, border: `1px solid ${BORDER}` }}>
             <span className="grid h-11 w-11 place-items-center rounded-[13px]" style={{ background: 'rgba(129,182,76,.14)', border: '1px solid rgba(129,182,76,.35)' }}>

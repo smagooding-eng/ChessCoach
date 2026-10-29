@@ -46,9 +46,15 @@ const TC: Record<string, string> = { corr_1d: '1 day', corr_3d: '3 days', corr_7
 export function ActiveGamesCard() {
   const { authUser } = useUser();
   const me = authUser?.id;
-  const [daily, setDaily] = useState<DailyRow[]>([]);
-  const [offset, setOffset] = useState(0);
-  const [live, setLive] = useState<{ game: LiveActive; color: 'w' | 'b' } | null>(null);
+  // Shown straight away from what this device saw last time, then refreshed,
+  // so the card is there when Home opens instead of popping in late.
+  const cacheKey = me ? `cs_your_games_${me}` : null;
+  const [cached] = useState<{ daily: DailyRow[]; live: { game: LiveActive; color: 'w' | 'b' } | null; offset: number } | null>(() => {
+    try { const v = cacheKey && localStorage.getItem(cacheKey); return v ? JSON.parse(v) : null; } catch { return null; }
+  });
+  const [daily, setDaily] = useState<DailyRow[]>(cached?.daily ?? []);
+  const [offset, setOffset] = useState(cached?.offset ?? 0);
+  const [live, setLive] = useState<{ game: LiveActive; color: 'w' | 'b' } | null>(cached?.live ?? null);
   // List rows or a row of bigger boards you swipe through; remembered per device.
   const [view, setView] = useState<View>(readView);
   const chooseView = (v: View) => { setView(v); try { localStorage.setItem(VIEW_KEY, v); } catch { /* ignore */ } };
@@ -58,9 +64,14 @@ export function ActiveGamesCard() {
       apiFetch('/api/correspondence/games').then(r => r.ok ? r.json() : null).catch(() => null),
       apiFetch('/api/live/active-game').then(r => r.ok ? r.json() : null).catch(() => null),
     ]);
-    if (d) { setDaily(d.games ?? []); if (typeof d.now === 'number') setOffset(d.now - Date.now()); }
-    setLive(l?.game && l.game.status === 'active' ? { game: l.game, color: l.color } : null);
-  }, []);
+    const nextLive = l?.game && l.game.status === 'active' ? { game: l.game as LiveActive, color: l.color as 'w' | 'b' } : null;
+    const nextOffset = d && typeof d.now === 'number' ? d.now - Date.now() : null;
+    if (d) { setDaily(d.games ?? []); if (nextOffset != null) setOffset(nextOffset); }
+    setLive(nextLive);
+    if (d && cacheKey) {
+      try { localStorage.setItem(cacheKey, JSON.stringify({ daily: d.games ?? [], live: nextLive, offset: nextOffset ?? 0 })); } catch { /* full or blocked */ }
+    }
+  }, [cacheKey]);
 
   useEffect(() => {
     if (!me) return;
