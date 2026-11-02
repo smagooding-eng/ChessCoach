@@ -565,8 +565,25 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
   const [exitHint, setExitHint] = useState(0);
   const showExit = () => setExitHint(Date.now());
   useEffect(() => { if (!exitHint) return; const t = setTimeout(() => setExitHint(0), 3500); return () => clearTimeout(t); }, [exitHint]);
-  const enterClean = () => { setClean(true); showExit(); try { window.history.pushState({ csClean: 1 }, ''); } catch { /* ignore */ } };
-  const exitClean = () => { setClean(false); setExitHint(0); try { if (window.history.state?.csClean) { ignorePop.current = true; window.history.back(); } } catch { /* ignore */ } };
+  // Clean view for screen recording: 5 seconds of a blank screen (time to start
+  // the recorder), then the clip plays from the start with nothing else on
+  // screen. Double-tap brings up Replay / Exit; back or Esc also leaves.
+  const [blank, setBlank] = useState(false);
+  const blankTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const startBlank = () => {
+    setExitHint(0); setPlaying(false); setBlank(true);
+    if (blankTimer.current) clearTimeout(blankTimer.current);
+    blankTimer.current = setTimeout(() => { blankTimer.current = null; setBlank(false); restartRef.current(); }, 5000);
+  };
+  useEffect(() => () => { if (blankTimer.current) clearTimeout(blankTimer.current); }, []);
+  const lastTap = useRef(0);
+  const cleanTap = () => { const now = Date.now(); if (now - lastTap.current < 350) { lastTap.current = 0; showExit(); } else lastTap.current = now; };
+  const enterClean = () => {
+    // Unlock sound now (this tap), so music can start when the clip does.
+    if (prefs.music !== 'off') { try { void (mus() as unknown as { ensure: () => AudioContext }).ensure().resume(); } catch { /* ignore */ } }
+    setClean(true); startBlank(); try { window.history.pushState({ csClean: 1 }, ''); } catch { /* ignore */ }
+  };
+  const exitClean = () => { setClean(false); setExitHint(0); setBlank(false); if (blankTimer.current) { clearTimeout(blankTimer.current); blankTimer.current = null; } try { if (window.history.state?.csClean) { ignorePop.current = true; window.history.back(); } } catch { /* ignore */ } };
   // Back button: leaves clean view if it's on, otherwise closes the player (back to the Studio list, picks kept).
   const cleanRef = useRef(false); cleanRef.current = clean;
   const ignorePop = useRef(false);
@@ -575,7 +592,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
     try { window.history.pushState({ csPlayer: 1 }, ''); } catch { /* ignore */ }
     const h = () => {
       if (ignorePop.current) { ignorePop.current = false; return; }
-      if (cleanRef.current) { setClean(false); setExitHint(0); return; }
+      if (cleanRef.current) { setClean(false); setExitHint(0); setBlank(false); if (blankTimer.current) { clearTimeout(blankTimer.current); blankTimer.current = null; } return; }
       closeRef.current();
     };
     window.addEventListener('popstate', h);
@@ -1022,6 +1039,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
     if (isComp && q !== 0) { autoNext.current = true; setQ(0); return; }
     setI(0); setPlaying(true);
   };
+  const restartRef = useRef(restart); restartRef.current = restart;
 
   // ── Compilation clips: remove, reorder, jump, per-clip look ────────────
   const removeClip = (k: number) => {
@@ -1224,7 +1242,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
   return (
     <div className="fixed inset-0 z-[90] flex flex-col bg-[#05080A] text-white lg:flex-row" onPointerMove={onPointerMove} onPointerUp={() => { drag.current = null; }}>
       {/* ── The 9:16 frame ── */}
-      <div className={`flex min-h-0 flex-1 items-center justify-center ${clean ? 'p-0' : 'p-3'}`} onClick={() => { setSelected(null); if (clean) showExit(); }}>
+      <div className={`flex min-h-0 flex-1 items-center justify-center ${clean ? 'p-0' : 'p-3'}`} onClick={() => { setSelected(null); if (clean) cleanTap(); }}>
         <div ref={frameRef} className="relative overflow-hidden"
           style={{ aspectRatio: '9 / 16', height: clean ? '100dvh' : 'min(100%, 92dvh)', maxWidth: '100%', containerType: 'size', ...BACKGROUNDS[prefs.bg]?.css } as React.CSSProperties}>
           <motion.div key={shake} animate={shake ? { x: [0, -14, 12, -8, 6, 0] } : {}} transition={{ duration: 0.45 }} className="absolute inset-0">
@@ -1725,12 +1743,18 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
               <div className="absolute inset-x-0 top-0 h-[6%] border-b-2 border-dashed border-white/35 bg-white/5" />
             </div>
           )}
-          {clean && (
-            <button onClick={(e) => { e.stopPropagation(); exitClean(); }} aria-label="Exit clean view"
-              className="absolute left-3 top-3 z-[60] flex items-center gap-1.5 rounded-full bg-black/75 px-3.5 py-2 text-[13px] font-black text-white ring-1 ring-white/30 transition-opacity duration-300"
-              style={{ opacity: exitHint ? 1 : 0 }}>
-              <X size={15} />Exit clean view
-            </button>
+          {clean && blank && <div className="absolute inset-0 z-[70] bg-black" />}
+          {clean && exitHint > 0 && (
+            <div className="absolute inset-x-0 top-3 z-[80] flex justify-center gap-2" onClick={(e) => e.stopPropagation()}>
+              <button onClick={startBlank} aria-label="Replay from the start"
+                className="flex items-center gap-1.5 rounded-full bg-[#81B64C] px-3.5 py-2 text-[13px] font-black text-white">
+                <RotateCcw size={15} />Replay
+              </button>
+              <button onClick={exitClean} aria-label="Exit clean view"
+                className="flex items-center gap-1.5 rounded-full bg-black/75 px-3.5 py-2 text-[13px] font-black text-white ring-1 ring-white/30">
+                <X size={15} />Exit clean view
+              </button>
+            </div>
           )}
         </div>
       </div>
@@ -2036,7 +2060,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
 
           <p className="mt-3 text-[11.5px] leading-snug text-white/45">
             Music is made live in the browser (original, no copyright claims); it starts on the beat when you press Play. Space plays, arrows step, R restarts, N / P next and previous moment, Esc leaves clean view. "Record clip" saves just the frame (Chrome on a computer: pick this tab and turn on tab audio for move sounds).
-            On a phone, open Clean view and use the screen recorder; tap the screen (or press back) to get the Exit button. Settings are remembered for the next clip.
+            On a phone, tap Clean view and start your screen recorder: the screen stays black for 5 seconds, then the clip plays from the start with nothing else on screen. Double-tap for Replay or Exit (back also exits). Settings are remembered for the next clip.
           </p>
           <p className="mt-2 text-[11px] text-white/35"><Eye size={12} className="mr-1 inline" />{clip.label}</p>
         </div>
