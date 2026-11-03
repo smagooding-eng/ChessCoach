@@ -39,6 +39,9 @@ const TIME_CONTROLS: Record<TimeControlId, TimeControlSpec> = {
 // No automatic bot: after this long in the queue the client offers a clearly
 // labeled bot game (casual only) that the player can choose to start.
 const BOT_OFFER_MS = 20 * 1000;
+// Until there are enough real players around, a search with no one to play
+// starts a bot game on its own after this long.
+const AUTO_BOT_MS = parseInt(process.env.LIVE_AUTO_BOT_MS || "") || 12 * 1000;
 const DISCONNECT_GRACE_MS = 30 * 1000;    // opponent disconnect → 30s to reconnect
 const WIDEN_INTERVAL_MS = 2_000;          // periodic match scanner
 const HUMAN_COUNTRIES = [
@@ -744,8 +747,17 @@ async function joinQueue(ws: WebSocket, userId: string, username: string, tcIdIn
 
   const key = flex ? flexKey(mode) : queueKey(tcId, mode);
   const queue = queues.get(key)!;
-  queue.push({ userId, username, rating: myRating, ws, tc, mode, joinedAt: Date.now() });
-  send(ws, { type: 'queued', tcId: flex ? 'any' : tcId, mode, botOfferMs: BOT_OFFER_MS });
+  const joinedAt0 = Date.now();
+  queue.push({ userId, username, rating: myRating, ws, tc, mode, joinedAt: joinedAt0 });
+  send(ws, { type: 'queued', tcId: flex ? 'any' : tcId, mode, botOfferMs: BOT_OFFER_MS, autoBotMs: AUTO_BOT_MS });
+  // Nobody to play after a short wait: start a game against a bot opponent.
+  const joinedAt = joinedAt0;
+  setTimeout(() => {
+    if (userActiveGame.has(userId)) return;
+    const still = (queues.get(key) ?? []).find((w) => w.userId === userId && w.joinedAt === joinedAt);
+    if (!still || still.ws.readyState !== WebSocket.OPEN) return;
+    void spawnBotMatch(still.ws, userId, username, flex ? 'any' : tcId).catch(() => {});
+  }, AUTO_BOT_MS);
   // Try immediate match (same clock first, then anyone flexible)
   tryMatchInQueue(key);
   if (queue.some(w => w.userId === userId)) tryMatchFlex(mode);
@@ -793,10 +805,40 @@ function cancelQueue(userId: string) {
 
 // Track the last bot persona served per user so they don't see the same one twice in a row.
 const userLastPersona = new Map<string, string>();
+// Which bot opponents each player has already met, so they never get the same
+// one twice (kept in the database so a restart doesn't forget; once they've met
+// them all, it starts over).
+const metPersonas = new Map<string, Set<string>>();
+let metTableReady: Promise<void> | null = null;
+function ensureMetTable(): Promise<void> {
+  metTableReady ??= db.execute(sql`CREATE TABLE IF NOT EXISTS live_bot_opponents (user_id VARCHAR NOT NULL, persona_id VARCHAR NOT NULL, met_at TIMESTAMPTZ NOT NULL DEFAULT now(), PRIMARY KEY (user_id, persona_id))`).then(() => undefined).catch(() => { metTableReady = null; });
+  return metTableReady;
+}
+async function personasMet(userId: string): Promise<Set<string>> {
+  const hit = metPersonas.get(userId);
+  if (hit) return hit;
+  const set = new Set<string>();
+  try {
+    await ensureMetTable();
+    const r: any = await db.execute(sql`SELECT persona_id FROM live_bot_opponents WHERE user_id = ${userId}`);
+    for (const row of (Array.isArray(r) ? r : r?.rows ?? []) as { persona_id: string }[]) set.add(row.persona_id);
+  } catch { /* start fresh */ }
+  metPersonas.set(userId, set);
+  return set;
+}
+function rememberMet(userId: string, personaId: string) {
+  metPersonas.get(userId)?.add(personaId);
+  void ensureMetTable().then(() => db.execute(sql`INSERT INTO live_bot_opponents (user_id, persona_id) VALUES (${userId}, ${personaId}) ON CONFLICT DO NOTHING`)).catch(() => {});
+}
+async function forgetMet(userId: string) {
+  metPersonas.set(userId, new Set());
+  try { await db.execute(sql`DELETE FROM live_bot_opponents WHERE user_id = ${userId}`); } catch { /* ignore */ }
+}
 
-// Player chose "play a bot" (offered after BOT_OFFER_MS in the queue).
-// The bot is labeled as a bot everywhere and the game is always casual, so
-// it never affects anyone's rating.
+// No one free to play: a bot opponent with an ordinary name and avatar, a
+// rating close to the player's (different every time) and never one they've
+// met before. It still carries a small "Bot" tag (isBot) and the game is
+// always casual, so it never affects anyone's rating.
 async function spawnBotMatch(ws: WebSocket, userId: string, username: string, tcIdIn: TimeControlId | 'any') {
   const tcId: TimeControlId = tcIdIn === 'any' ? FLEX_DEFAULT_TC : tcIdIn;
   cancelQueue(userId);
@@ -805,20 +847,21 @@ async function spawnBotMatch(ws: WebSocket, userId: string, username: string, tc
   if (userActiveGame.has(userId)) return;
   const seed = await seedRatingFromImports(userId, tcId);
   const userRating = seed.rating;
-  const targetRating = Math.max(600, Math.min(2200, userRating + (Math.random() * 200 - 100)));
-  const exclude = new Set<string>();
+  const botRating = Math.round(Math.max(400, Math.min(2600, userRating + (Math.random() * 240 - 120))));
+  let exclude = await personasMet(userId);
+  if (exclude.size >= getAllPersonas().length - 1) { await forgetMet(userId); exclude = new Set(); }
   const last = userLastPersona.get(userId);
-  if (last) exclude.add(last);
-  const persona: Persona = findPersonaForRating(targetRating, exclude);
+  if (last) exclude = new Set([...exclude, last]);
+  const persona: Persona = findPersonaForRating(botRating, exclude);
   userLastPersona.set(userId, persona.id);
+  rememberMet(userId, persona.id);
   const userProfile = await resolveHumanProfile(userId, username);
   const userPlayer: Player = { kind: 'human', userId, username, rating: userRating, ...userProfile };
-  const botRating = Math.round(persona.rating);
   const botPlayer: Player = {
-    kind: 'bot', username: `ChessScout Bot (${botRating})`, rating: botRating,
-    country: '', title: null,
-    avatar: `https://api.dicebear.com/7.x/bottts-neutral/svg?seed=${encodeURIComponent(persona.id)}`,
-    memberSinceYear: new Date().getFullYear(), personaId: persona.id,
+    kind: 'bot', username: persona.username, rating: botRating,
+    country: persona.country, title: null,
+    avatar: persona.avatar,
+    memberSinceYear: persona.memberSinceYear, personaId: persona.id,
   };
   const userIsWhite = Math.random() < 0.5;
   const game = await createGame(userIsWhite ? userPlayer : botPlayer, userIsWhite ? botPlayer : userPlayer, tc, 'casual');

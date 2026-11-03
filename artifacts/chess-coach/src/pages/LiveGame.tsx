@@ -45,13 +45,16 @@ function PlayerStrip({ p, ms, active, isYou, awayMs }: { p: { username: string; 
     <div className="flex items-center justify-between p-2.5 rounded-xl"
       style={{ background: active ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.04)', border: active ? '1px solid rgba(255,255,255,0.22)' : '1px solid rgba(255,255,255,0.06)' }}>
       <div className="flex items-center gap-2 min-w-0">
-        {p.avatar
-          ? <img src={p.avatar} alt={p.username} className="w-9 h-9 rounded-full object-cover bg-white/10" style={{ border: '1px solid rgba(255,255,255,0.15)' }} />
-          : <div className="w-9 h-9 rounded-full flex items-center justify-center font-black text-sm" style={{ background: '#81B64C', color: '#FFFFFF' }}>{p.username[0]?.toUpperCase()}</div>}
+        <span className="relative shrink-0">
+          {p.avatar
+            ? <img src={p.avatar} alt={p.username} className="w-9 h-9 rounded-full object-cover bg-white/10" style={{ border: '1px solid rgba(255,255,255,0.15)' }} />
+            : <div className="w-9 h-9 rounded-full flex items-center justify-center font-black text-sm" style={{ background: '#81B64C', color: '#FFFFFF' }}>{p.username[0]?.toUpperCase()}</div>}
+          {/* Bot opponents: a small tag on the avatar */}
+          {p.isBot && <span className="absolute -bottom-1 -right-1.5 rounded px-[3px] text-[7px] font-black uppercase leading-[11px] tracking-wide" style={{ background: 'rgba(11,18,19,0.92)', color: 'rgba(245,247,246,0.8)', border: '1px solid rgba(255,255,255,0.18)' }}>Bot</span>}
+        </span>
         <div className="min-w-0">
           <div className="flex items-center gap-1.5">
             {p.title && <span className="text-[10px] font-black px-1 py-0.5 rounded text-black" style={{ background: 'linear-gradient(135deg,#f5c460,#e5a631)' }}>{p.title}</span>}
-            {p.isBot && <span className="text-[9px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider" style={{ background: 'rgba(255,255,255,0.12)', color: TEXT_LIGHT }}>Bot</span>}
             {flag && <span className="text-sm leading-none" title={p.country ?? undefined} aria-label={p.country ?? undefined}>{flag}</span>}
             {p.country && <span className="text-[10px] uppercase tracking-wider" style={{ color: TEXT_MUTED }}>{p.country}</span>}
             {isYou && <span className="text-[9px] font-black uppercase tracking-[0.14em]" style={{ color: CHESSCOM_GREEN }}>You</span>}
