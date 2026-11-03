@@ -181,6 +181,8 @@ const DEFAULT_PREFS = {
   openTeaser: true, openCut: 'full' as 'full' | 'quick',
   /** Clean view's 5-second lead-in: the first scene, still (so an untrimmed video never opens on black), or black. */
   leadIn: 'scene' as 'scene' | 'black',
+  /** How the voiceover talks: Creator (punchy, reacts to the moves) or Teacher (the original, explains everything). */
+  tone: 'creator' as 'creator' | 'teacher',
   split: true, voice: false, voiceName: 'ash', compTitle: 'Top moments this week',
   music: 'off' as MusicStyle, musicVol: 0.5, beatSync: true, musicFx: true, subs: true, pieceFx: true, trapBefore: 99, countdownSecs: 3, choices: false, zoom: false, splash: true, reviewMode: 'highlights' as 'highlights' | 'full',
 };
@@ -650,6 +652,8 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
   const [prefs, setPrefs] = useState<Prefs>(loadPrefs);
   // What the closing splash says: the call to action, then (optionally) the ChessScout.net line.
   const ctaText = [prefs.ctaLine.trim(), prefs.ctaSite ? prefs.siteLine.trim() : ''].filter(Boolean).join(' ');
+  // Voiceover clips are kept per voice and tone (the Creator tone is delivered with more energy).
+  const voiceKey = `${prefs.voiceName}:${prefs.tone === 'teacher' ? 'teacher' : 'creator'}`;
   const set = <K extends keyof Prefs>(k: K, v: Prefs[K]) => setPrefs((p) => { const n = { ...p, [k]: v }; try { localStorage.setItem(PREF_KEY, JSON.stringify(n)); } catch { /* ignore */ } return n; });
   const [hook, setHook] = useState('');
   const [sub, setSub] = useState('');
@@ -963,7 +967,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
   const dur = (f: Frame) => {
     const base = baseDur(f) + (holds[idOf.get(f) ?? ''] ?? 0);
     const said = prefs.voice ? narration(f) : null;
-    const len = said ? voiceLen.current.get(`${prefs.voiceName}|${said}`) : undefined;
+    const len = said ? voiceLen.current.get(`${voiceKey}|${said}`) : undefined;
     // A frame always lasts until its line has been said in full, plus a breath.
     const d = len ? Math.max(base, len * 1000 + 450) : base;
     // On the beat: every frame lasts a whole number of beats, so moves land on the music
@@ -1143,7 +1147,95 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
   const voiceUrl = useRef(new Map<string, string>());
   const [voiceNote, setVoiceNote] = useState<string | null>(null);
   const [, setVoiceTick] = useState(0);
+  // Creator tone: the same facts, said like a chess creator talks, not a lecture. Lines
+  // vary from clip to clip (picked from the clip and frame, so the voiceover cache still works).
+  // undefined = use the Teacher line; null = say nothing.
+  const pickOf = (seed: string) => <T,>(xs: T[]): T => xs[[...seed].reduce((h, ch) => (Math.imul(h, 31) + ch.charCodeAt(0)) >>> 0, 11) % xs.length];
+  const firstSentence = (t: string) => t.split(/(?<=[.!?])\s/)[0];
+  const reactTo = (cls: string | undefined, san: string, pick: <T,>(xs: T[]) => T): string => {
+    const m = spokenSan(san);
+    switch (cls) {
+      case 'brilliant': return pick([`Oh, that's gorgeous. ${m}!`, `Wait for it... ${m}! Brilliant.`, `${m}! Are you kidding me?`]);
+      case 'great': return pick([`${m}! Great find.`, `Ooh, ${m}. Nice.`, `${m}! That's the one.`]);
+      case 'checkmate': return pick([`${m}. And that's mate!`, `${m}. Game over.`, `${m}. Checkmate. Goodnight.`]);
+      case 'blunder': return pick([`Nooo. ${m}. Huge blunder.`, `And... ${m}. That's a blunder.`, `Oof. ${m}. That one hurts.`]);
+      case 'mistake': return pick([`${m}? That's a mistake.`, `Hmm, ${m}. Not good.`]);
+      case 'missed_win': return pick([`${m}... and they just missed a win.`, `${m}? There was a win right there!`]);
+      case 'inaccuracy': return pick([`${m}. Not quite the best.`, `${m}. Close, but not the move.`]);
+      default: return `${m}.`;
+    }
+  };
+  const creatorLine = (f: Frame): string | null | undefined => {
+    if (!clip) return undefined;
+    const pick = pickOf(`${clip.label}|${frameKey(f)}|${f.kind === 'scoutCard' || f.kind === 'openCard' ? `${f.card}${f.idx ?? ''}` : ''}`);
+    switch (f.kind) {
+      case 'countdown': {
+        if (f.n !== (f.total ?? 3)) return null;
+        if (f.text) return undefined;
+        return clip.isTrap ? pick(['One move wins here. See it?', "There's a trap. Can you spring it?", 'Pause it. What wins?']) : pick(["Pause it. What's the move?", 'Find it before I show you.', `You've got ${f.total ?? 3} seconds. Go.`]);
+      }
+      case 'move': {
+        if (clip.isReview) {
+          const r = clip.plies[f.ply - 1]; const rc = r?.san.includes('#') ? 'checkmate' : r?.review?.classification;
+          if (!r || !rc || !(NOTABLE.has(rc) || rc === 'checkmate')) return null;
+          return reactTo(rc, r.san, pick);
+        }
+        if (clip.isOpening) return undefined;
+        if (f.ply !== clip.key + 1) return null;
+        const m = clip.plies[clip.key]; const c = m.san.includes('#') ? 'checkmate' : m.review?.classification;
+        const cap = prefs.captions && m.review?.explanation ? ` ${firstSentence(m.review.explanation)}` : '';
+        return `${reactTo(c, m.san, pick)}${cap}`.slice(0, 300);
+      }
+      case 'split': return pick([`They played ${spokenSan(f.playedSan)}. But ${spokenSan(f.betterSan)} was right there.`, `${spokenSan(f.playedSan)} on the board... ${spokenSan(f.betterSan)} was the move.`]);
+      case 'better': return f.arrow ? pick([`The engine wanted ${spokenSan(f.text.replace(/^Better was /, ''))}.`, `Should've played ${spokenSan(f.text.replace(/^Better was /, ''))}.`]) : null;
+      case 'reveal': return clip.ratings.w && clip.ratings.b ? `They were rated ${clip.ratings.w} and ${clip.ratings.b}. Did you guess it?` : null;
+      case 'scoutCard': {
+        const d = clip.scout; if (!d) return undefined;
+        const name = d.profile?.name || d.username;
+        if (f.card === 'profile') return `Meet ${name}. ${d.wins} wins, ${d.losses} losses in their last ${d.gamesAnalyzed}. Let's find the weak spot.`;
+        if (f.card === 'openings') { const o = d.topOpenings?.[0]; return o ? pick([`Their go-to? The ${o.opening}. They win ${o.winRate} percent with it.`, `Expect the ${o.opening}. They win ${o.winRate} percent with it.`]) : null; }
+        const st = d.stats;
+        if (f.card === 'colors' && st) {
+          const pct = (r: Rec) => (r.games ? Math.round((r.wins / r.games) * 100) : 0);
+          const fm = st.firstMove[0];
+          return `With White they win ${pct(st.asWhite)} percent. With Black, ${pct(st.asBlack)}.${fm ? ` First move? ${spokenSan(fm.san)}, ${fm.pct} percent of the time.` : ''}${st.vsE4 ? ` Play e4 and they answer ${spokenSan(st.vsE4.san)}.` : ''}`;
+        }
+        if (f.card === 'habits' && st) {
+          const lostTime = st.lossesBy.time, lostTotal = st.lossesBy.checkmate + st.lossesBy.resignation + st.lossesBy.time + st.lossesBy.other;
+          const share = lostTotal && lostTime ? Math.round((lostTime / lostTotal) * 100) : 0;
+          const a = st.timeControl ? `Mostly ${st.timeControl}${st.avgMoves ? `, games around ${st.avgMoves} moves` : ''}.` : '';
+          return `${a}${share ? ` And ${share} percent of their losses? On the clock.` : ''}`.trim() || null;
+        }
+        const i = f.idx ?? 0; const w = d.weaknesses?.[i];
+        return w ? `${i === 0 ? "Here's how you beat them" : i === 1 ? 'Weak spot number two' : 'And one more'}: ${w.category}. ${firstSentence(w.description)}` : null;
+      }
+      case 'openCard': {
+        const o = clip.openingData; if (!o) return undefined;
+        if (f.card === 'ideas') return `${pick(['The whole point?', "Here's the idea.", 'Why it works:'])} ${o.ideas.slice(0, prefs.openCut === 'quick' ? 1 : 2).join('. ')}.`;
+        if (f.card === 'stats' && o.results) return `${o.games} real games. White scores ${o.results.white} percent, Black ${o.results.black}.`;
+        if (f.card === 'options') {
+          const [a, b, c] = o.options;
+          if (!a) return null;
+          return `${a.pct != null ? `Most people play ${spokenSan(a.san)}.` : `The big one is ${spokenSan(a.san)}.`}${b ? ` ${spokenSan(b.san)}${c ? ` and ${spokenSan(c.san)} are` : ' is'} the other big ${c ? 'ones' : 'one'}.` : ''}`;
+        }
+        if (f.card === 'line') { const k = f.idx ?? 0; const l = o.lines[k]; return l ? (k === 0 ? `First up: the ${l.name}.` : k === 1 ? `Now, the ${l.name}.` : k === 2 ? `Or try the ${l.name}.` : `And the ${l.name}.`) : null; }
+        if (f.card === 'trap' && o.trap) return pick([`Now the fun part. The ${o.trap.name}.`, `Okay, the trap. The ${o.trap.name}. Don't fall for it.`]);
+        return undefined;
+      }
+      case 'summary': {
+        const a = clip.accuracy;
+        if (a?.w == null || a?.b == null) return undefined;
+        return `Final verdict: White ${Math.round(a.w)} percent accuracy, Black ${Math.round(a.b)}.${clip.overview ? ` ${firstSentence(clip.overview)}` : ''}`.slice(0, 260);
+      }
+      default: return undefined;
+    }
+  };
   const narration = (f: Frame | undefined): string | null => {
+    if (!f || !clip) return null;
+    if (prefs.tone !== 'teacher' && !clip.isLesson) { const c = creatorLine(f); if (c !== undefined) return c; }
+    return teacherLine(f);
+  };
+  const teacherLine = (f: Frame | undefined): string | null => {
     if (!f || !clip) return null;
     switch (f.kind) {
       case 'title': return stripEmoji(compTitle);
@@ -1223,7 +1315,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
   useEffect(() => {
     if (!prefs.voice || !frames.length) { setVoicePrep(null); return; }
     let live = true;
-    const vkey = (t: string) => `${prefs.voiceName}|${t}`;
+    const vkey = (t: string) => `${voiceKey}|${t}`;
     const lines = [...new Set(frames.map(narration).filter((x): x is string => !!x))];
     const todo = lines.filter((t) => !voiceUrl.current.has(vkey(t)));
     let done = lines.length - todo.length, failed = 0;
@@ -1231,7 +1323,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
     const one = async (t: string) => {
       for (let attempt = 0; attempt < 3 && live; attempt++) {
         try {
-          const r = await apiFetch('/api/tts/speak', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: t, voice: prefs.voiceName, style: 'studio' }) });
+          const r = await apiFetch('/api/tts/speak', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: t, voice: prefs.voiceName, style: prefs.tone === 'teacher' || clip?.isLesson ? 'studio' : 'creator' }) });
           if (!r.ok) throw new Error('tts');
           const url = URL.createObjectURL(await r.blob());
           await new Promise<void>((res) => { const a = new Audio(url); a.onloadedmetadata = () => { voiceLen.current.set(vkey(t), a.duration || 0); res(); }; a.onerror = () => res(); });
@@ -1251,7 +1343,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
       setVoiceNote(failed ? `${failed} line${failed > 1 ? 's' : ''} of the voiceover couldn't be made (it uses OpenAI), so ${failed > 1 ? 'they play' : 'it plays'} silently. Try again in a moment.` : null);
     })();
     return () => { live = false; };
-  }, [prefs.voice, prefs.voiceName, frames, hook, prefs.outroLine, compTitle, prefs.captions, prefs.splashCta, ctaText, prefs.openCut]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [prefs.voice, prefs.voiceName, frames, hook, prefs.outroLine, compTitle, prefs.captions, prefs.splashCta, ctaText, prefs.openCut, prefs.tone]); // eslint-disable-line react-hooks/exhaustive-deps
   const voiceReady = !prefs.voice || !voicePrep || voicePrep.done >= voicePrep.total;
   useEffect(() => { if (blank && playing && blankDone.current) setBlank(false); }, [blank, playing]);
   // The premium narrator (ElevenLabs) when the server has it; it becomes the default once.
@@ -1281,7 +1373,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
     if (!said) return;
     voiceAudio.current?.pause();
     // Only the chosen voice ever plays (no browser-voice fallback).
-    const url = voiceUrl.current.get(`${prefs.voiceName}|${said}`);
+    const url = voiceUrl.current.get(`${voiceKey}|${said}`);
     if (url) voiceAudio.current = mus().playVoice(url);
   }, [i, playing]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -1508,7 +1600,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
   const said = subsOn && frame && ['move', 'split', 'better', 'reveal'].includes(frame.kind) ? narration(frame) : null;
   if (said) {
     const words = said.split(/\s+/).filter(Boolean);
-    const len = Math.max(400, (voiceLen.current.get(`${prefs.voiceName}|${said}`) ?? words.length * 0.36) * 1000);
+    const len = Math.max(400, (voiceLen.current.get(`${voiceKey}|${said}`) ?? words.length * 0.36) * 1000);
     const k = Math.max(0, Math.min(words.length - 1, Math.floor(((performance.now() - frameStart) / len) * words.length)));
     const c0 = Math.floor(k / 4) * 4;
     subWords = { words: words.slice(c0, c0 + 4), hi: k - c0 };
@@ -1821,7 +1913,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
                     })()}
                     {frame.card === 'openings' && (
                       <div className="space-y-[1cqh]">
-                        <p className="text-center font-black" style={{ fontSize: '1.25em' }}>What {name} plays</p>
+                        <p className="text-center font-black" style={{ fontSize: '1.25em' }}>{prefs.tone !== 'teacher' ? `${name}'s go-to openings` : `What ${name} plays`}</p>
                         {(d.topOpenings ?? []).slice(0, 4).map((o, k) => (
                           <motion.div key={o.opening} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.25 + k * 0.15 }}>
                             <div className="flex items-baseline justify-between gap-2 font-bold"><span className="line-clamp-2">{k + 1}. {o.opening}</span><span className="shrink-0 tabular-nums text-white/60">{o.games} games</span></div>
@@ -1835,7 +1927,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
                       const all = d.weaknesses ?? []; const i = frame.idx ?? 0; const w = all[i]; if (!w) return null;
                       return (
                         <div>
-                          <p className="text-center font-black" style={{ fontSize: '1.25em' }}>How to beat {name}</p>
+                          <p className="text-center font-black" style={{ fontSize: '1.25em' }}>{prefs.tone !== 'teacher' ? `How to beat ${name} 🎯` : `How to beat ${name}`}</p>
                           <p className="mt-[0.2em] text-center text-[0.8em] font-bold text-white/55">{i + 1} of {Math.min(3, all.length)}</p>
                           <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="mt-[1cqh] rounded-[0.6em] bg-white/[.07] p-[0.8em]">
                             <p className="flex flex-wrap items-center gap-[0.4em] font-black" style={{ fontSize: '1.2em' }}><span className="rounded px-[0.35em] text-[0.6em] uppercase" style={{ background: SEVC[w.severity] ?? '#7A8580' }}>{w.severity}</span>{w.category}</p>
@@ -1906,8 +1998,8 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
                     <p className="mb-[1.2cqh] text-center font-black uppercase tracking-wide text-[#B8E08C]" style={{ fontSize: '0.95em' }}>♟️ {o.name}</p>
                     {frame.card === 'ideas' && (
                       <div className="space-y-[1cqh]">
-                        <p className="text-center font-black" style={{ fontSize: '1.3em' }}>The ideas</p>
-                        {o.ideas.map((t, k) => (
+                        <p className="text-center font-black" style={{ fontSize: '1.3em' }}>{prefs.tone !== 'teacher' ? 'Why it works 💡' : 'The ideas'}</p>
+                        {(prefs.tone !== 'teacher' ? o.ideas.slice(0, prefs.openCut === 'quick' ? 1 : 2) : o.ideas).map((t, k) => (
                           <motion.div key={k} initial={{ opacity: 0, x: -24 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.3 + k * 0.45 }} className="flex items-start gap-[0.6em] rounded-[0.6em] bg-white/[.07] p-[0.6em]">
                             <span className="grid h-[1.6em] w-[1.6em] shrink-0 place-items-center rounded-full font-black text-[#0B1112]" style={{ background: COL[k % 4] }}>{k + 1}</span>
                             <span className="font-bold leading-snug">{t}</span>
@@ -1917,7 +2009,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
                     )}
                     {frame.card === 'stats' && o.results && (
                       <div className="text-center">
-                        <p className="font-black" style={{ fontSize: '1.3em' }}>Who wins?</p>
+                        <p className="font-black" style={{ fontSize: '1.3em' }}>{prefs.tone !== 'teacher' ? 'Who actually wins? 👀' : 'Who wins?'}</p>
                         <p className="mt-[0.3em] font-bold text-white/65">{o.games.toLocaleString()} real games by ChessScout players</p>
                         <div className="mt-[1.2cqh] flex h-[4cqh] overflow-hidden rounded-[0.6em] font-black">
                           {([['White', o.results.white, '#F2F2F2', '#141414'], ['Draw', o.results.draw, '#7A8580', '#fff'], ['Black', o.results.black, '#1C1C1C', '#fff']] as const).map(([t, n, bg, fg], k) => n > 0 && (
@@ -1928,8 +2020,8 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
                     )}
                     {frame.card === 'options' && (
                       <div className="space-y-[0.9cqh]">
-                        <p className="text-center font-black" style={{ fontSize: '1.25em' }}>{mover}'s options</p>
-                        <p className="-mt-[0.6cqh] text-center text-[0.72em] font-bold text-white/55">Engine eval after the move (+ = better for White) · how often it's played · how it scores for {mover}</p>
+                        <p className="text-center font-black" style={{ fontSize: '1.25em' }}>{prefs.tone !== 'teacher' ? `What would you play? 🤔` : `${mover}'s options`}</p>
+                        {prefs.tone === 'teacher' && <p className="-mt-[0.6cqh] text-center text-[0.72em] font-bold text-white/55">Engine eval after the move (+ = better for White) · how often it's played · how it scores for {mover}</p>}
                         {o.options.map((x, k) => (
                           <motion.div key={x.san} initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.25 + k * 0.3 }} className="rounded-[0.6em] bg-white/[.07] p-[0.55em]" style={{ borderLeft: `0.35em solid ${x.lines?.length ? COL[x.lines[0] % 4] : '#7A8580'}` }}>
                             <div className="flex items-center justify-between gap-[0.5em]">
@@ -2015,7 +2107,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
             {frame?.kind === 'splash' && prefs.splashCta && ctaText && (() => {
               const line = ctaText;
               const words = line.split(/\s+/).filter(Boolean);
-              const len = Math.max(1200, (voiceLen.current.get(`${prefs.voiceName}|${stripEmoji(line)}`) ?? words.length * 0.36) * 1000);
+              const len = Math.max(1200, (voiceLen.current.get(`${voiceKey}|${stripEmoji(line)}`) ?? words.length * 0.36) * 1000);
               const k = playing ? Math.max(0, Math.min(words.length - 1, Math.floor(((performance.now() - frameStart) / len) * words.length))) : 0;
               const c0 = Math.floor(k / 4) * 4;
               return (
@@ -2066,6 +2158,17 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
                   )}
                 </motion.div>
               )}
+            </AnimatePresence>
+            {/* Creator tone: a big reaction emoji with the badge */}
+            <AnimatePresence>
+              {pop && LABEL[pop.cls] && prefs.effects && prefs.tone !== 'teacher' && (() => {
+                const R: Record<string, string> = { brilliant: '🤯', great: '🔥', best: '👌', blunder: '😱', mistake: '😬', missed_win: '🤦', checkmate: '💀', inaccuracy: '🤨' };
+                const e = R[pop.cls]; if (!e) return null;
+                return (
+                  <motion.div key={`r${pop.at}`} initial={{ scale: 0, y: 30, rotate: -20, opacity: 0 }} animate={{ scale: [0, 1.4, 1], y: 0, rotate: 8, opacity: 1 }} exit={{ scale: 0.6, y: -40, opacity: 0 }} transition={{ duration: 0.55 }}
+                    className="pointer-events-none absolute right-[6%] top-[19%] z-20" style={{ fontSize: 'clamp(34px,7cqh,76px)', filter: 'drop-shadow(0 6px 10px rgba(0,0,0,.5))' }}>{e}</motion.div>
+                );
+              })()}
             </AnimatePresence>
             {/* Rating reveal */}
             <AnimatePresence>
@@ -2340,7 +2443,13 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
               </select>
             )}
             {prefs.voice && <Mic size={14} className="text-[#B8E08C]" />}
+            <div className="inline-flex rounded-lg bg-white/5 p-0.5" title="How the voiceover and cards talk">
+              {([['creator', 'Creator tone'], ['teacher', 'Teacher tone']] as const).map(([k, t]) => (
+                <button key={k} onClick={() => set('tone', k)} className="rounded-md px-2.5 py-1 text-[12px] font-bold" style={{ background: (prefs.tone === 'teacher' ? 'teacher' : 'creator') === k ? '#81B64C' : 'transparent', color: (prefs.tone === 'teacher' ? 'teacher' : 'creator') === k ? '#fff' : '#C9CFCD' }}>{t}</button>
+              ))}
+            </div>
           </div>
+          <p className="-mt-2 mb-3 text-[11.5px] text-white/45">Creator reacts to the moves and talks like a chess creator, with reaction emojis. Teacher explains everything, like a lesson.</p>
           {prefs.voice && voicePrep && voicePrep.done < voicePrep.total && <p className="-mt-1 mb-3 flex items-center gap-1.5 text-[12px] text-[#B8E08C]"><Mic size={12} />{waitVoice ? 'Starts as soon as the voiceover is ready' : 'Preparing the voiceover'} · {voicePrep.done}/{voicePrep.total}</p>}
           {prefs.voice && voiceNote && <p className="-mt-1 mb-3 text-[12px] text-[#E8B447]">{voiceNote}</p>}
           <p className="mb-1 text-[11px] font-bold uppercase tracking-wide text-white/50"><Music size={11} className="mr-1 inline" />Music &amp; sound</p>

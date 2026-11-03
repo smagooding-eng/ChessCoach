@@ -27,14 +27,18 @@ const KIDS_STYLE =
 const STUDIO_STYLE =
   "You are a charismatic chess content creator narrating a short vertical video. Confident, upbeat and natural, like a top chess YouTuber: clear diction, real energy on exciting moments, a quick but never rushed pace, no sing-song, never robotic. Say chess moves crisply (for example 'knight f3', 'bishop takes c6').";
 
+// The Studio's Creator tone: more personality, reacts out loud.
+const CREATOR_STYLE =
+  "You are a fun, high-energy chess creator on TikTok and Reels, talking straight to the viewer like a friend, not a teacher. Expressive and reactive: genuine excitement on great moves, a groan on blunders, a little playful drama and suspense before reveals, a punchy, quick pace with natural pauses at ellipses. Never lecture, never monotone, never robotic. Say chess moves crisply (for example 'knight f3', 'bishop takes c6').";
+
 // Premium voice (ElevenLabs) when a key is set on the server; otherwise OpenAI.
 const ELEVEN_KEY = process.env.ELEVENLABS_API_KEY || "";
 const ELEVEN_VOICE = process.env.ELEVENLABS_VOICE_ID || "pNInz6obpgDQGcFmaJgB";
-async function speakEleven(text: string): Promise<Buffer> {
+async function speakEleven(text: string, lively = false): Promise<Buffer> {
   const r = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(ELEVEN_VOICE)}?output_format=mp3_44100_128`, {
     method: "POST",
     headers: { "xi-api-key": ELEVEN_KEY, "Content-Type": "application/json", Accept: "audio/mpeg" },
-    body: JSON.stringify({ text, model_id: process.env.ELEVENLABS_MODEL || "eleven_multilingual_v2", voice_settings: { stability: 0.45, similarity_boost: 0.8, style: 0.35, use_speaker_boost: true } }),
+    body: JSON.stringify({ text, model_id: process.env.ELEVENLABS_MODEL || "eleven_multilingual_v2", voice_settings: lively ? { stability: 0.32, similarity_boost: 0.8, style: 0.6, use_speaker_boost: true } : { stability: 0.45, similarity_boost: 0.8, style: 0.35, use_speaker_boost: true } }),
   });
   if (!r.ok) throw new Error(`ElevenLabs ${r.status}`);
   return Buffer.from(await r.arrayBuffer());
@@ -99,7 +103,8 @@ router.post("/tts/speak", async (req, res): Promise<void> => {
   try {
     const { text, voice, style } = req.body as { text?: string; voice?: string; style?: string };
     const kids = style === "kids";
-    const studio = style === "studio";
+    const creator = style === "creator";
+    const studio = style === "studio" || creator;
 
     if (!text || text.trim().length === 0) {
       res.status(400).json({ error: "text is required" });
@@ -113,14 +118,14 @@ router.post("/tts/speak", async (req, res): Promise<void> => {
     // "premium" without a premium key: OpenAI's best narrator.
     const selectedVoice: Voice = validVoices.includes(voice as Voice) ? (voice as Voice) : (studio || voice === "premium") ? "ash" : "nova";
 
-    const key = createHash("sha1").update(`${premium ? "eleven:" + ELEVEN_VOICE : selectedVoice}\u0000${kids ? "kids" : studio ? "studio" : ""}\u0000${trimmed}`).digest("hex");
+    const key = createHash("sha1").update(`${premium ? "eleven:" + ELEVEN_VOICE : selectedVoice}\u0000${kids ? "kids" : creator ? "creator" : studio ? "studio" : ""}\u0000${trimmed}`).digest("hex");
     let buffer = cacheGet(key);
     if (!buffer) {
       try {
         if (premium) {
-          try { buffer = await speakEleven(trimmed); }
-          catch (err) { logger.warn({ err }, "Premium TTS failed, using OpenAI"); buffer = await speakFast(trimmed, "ash", STUDIO_STYLE); }
-        } else buffer = await speakFast(trimmed, selectedVoice, kids ? KIDS_STYLE : studio ? STUDIO_STYLE : NARRATION_STYLE);
+          try { buffer = await speakEleven(trimmed, creator); }
+          catch (err) { logger.warn({ err }, "Premium TTS failed, using OpenAI"); buffer = await speakFast(trimmed, "ash", creator ? CREATOR_STYLE : STUDIO_STYLE); }
+        } else buffer = await speakFast(trimmed, selectedVoice, kids ? KIDS_STYLE : creator ? CREATOR_STYLE : studio ? STUDIO_STYLE : NARRATION_STYLE);
       } catch (err) {
         logger.warn({ err }, "Fast TTS failed, falling back to gpt-audio");
         buffer = await speakLegacy(trimmed, selectedVoice);
