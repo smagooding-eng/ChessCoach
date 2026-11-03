@@ -116,11 +116,17 @@ export function ContentStudio() {
     } finally { setAutoBusy(null); }
   };
   const keyOf = (x: StudioSource): string => (x.kind === 'trap' ? `t${x.trap.id}` : x.kind === 'puzzle' ? `p${x.puzzle.id}` : x.kind === 'review' ? `r${x.review.id}`
-    : x.kind === 'scout' ? `s${x.scout.id}` : x.kind === 'lesson' ? `l${x.lesson.id}` : x.kind === 'scan' ? `x${x.fen}` : x.kind === 'promo' ? `promo-${x.promo.template}-${x.promo.hook}` : x.kind === 'line' ? `line-${x.line.moves.map((m) => m.san).join(' ')}` : `g${x.moment.gameId}-${x.moment.moveIndex}`);
+    : x.kind === 'scout' ? `s${x.scout.id}` : x.kind === 'lesson' ? `l${x.lesson.id}` : x.kind === 'scan' ? `x${x.fen}` : x.kind === 'promo' ? `promo-${x.promo.template}-${x.promo.hook}` : x.kind === 'line' ? `line-${x.line.moves.map((m) => m.san).join(' ')}` : x.kind === 'opening' ? `o-${x.opening.id}` : `g${x.moment.gameId}-${x.moment.moveIndex}`);
   const togglePick = (x: StudioSource) => setPicked((cur) => (cur.some((c) => keyOf(c) === keyOf(x)) ? cur.filter((c) => keyOf(c) !== keyOf(x)) : [...cur, x]));
   const isPicked = (x: StudioSource) => picked.some((c) => keyOf(c) === keyOf(x));
   const choose = (x: StudioSource) => (picking ? togglePick(x) : setOpen(x));
-  const [view, setView] = useState<'moments' | 'traps' | 'puzzles' | 'reviews' | 'kids' | 'scout' | 'scan' | 'analyzer' | 'promo'>('moments');
+  const [view, setView] = useState<'moments' | 'traps' | 'puzzles' | 'reviews' | 'kids' | 'scout' | 'scan' | 'analyzer' | 'promo' | 'openings'>('moments');
+  // Openings: main line, ideas, replies and variations, with real-game numbers and Stockfish.
+  const [openings, setOpenings] = useState<{ id: string; name: string; side: 'white' | 'black'; line: string[]; lines: string[] }[] | null>(null);
+  useEffect(() => {
+    if (view !== 'openings' || openings) return;
+    apiFetch('/api/admin/studio/openings', { credentials: 'include' }).then((r) => (r.ok ? r.json() : { openings: [] })).then((d) => setOpenings(d.openings ?? [])).catch(() => setOpenings([]));
+  }, [view, openings]);
   // Kids & beginners: the Beginner Path / Chess for Kids lessons
   const [courses, setCourses] = useState<{ id: number; title: string; description: string; icon: string; lessons: StudioLesson[] }[] | null>(null);
   useEffect(() => {
@@ -382,7 +388,7 @@ export function ContentStudio() {
         {picking ? 'Cancel compilation' : '🎬 Make a compilation'}
       </button>
       <div className="order-1 inline-flex flex-wrap rounded-xl bg-white/5 p-1">
-        {([['moments', 'Game moments'], ['reviews', 'Games'], ['puzzles', 'Puzzles'], ['traps', 'Trap lessons'], ['kids', 'Kids & beginners'], ['scout', 'Opponent scout'], ['scan', 'Scan position'], ['analyzer', 'Analyzer games'], ['promo', 'Promos']] as const).map(([k, t]) => (
+        {([['moments', 'Game moments'], ['reviews', 'Games'], ['puzzles', 'Puzzles'], ['traps', 'Trap lessons'], ['kids', 'Kids & beginners'], ['scout', 'Opponent scout'], ['scan', 'Scan position'], ['analyzer', 'Analyzer games'], ['openings', 'Openings'], ['promo', 'Promos']] as const).map(([k, t]) => (
           <button key={k} onClick={() => setView(k)} className="rounded-lg px-3.5 py-1.5 text-[13px] font-black" style={{ background: view === k ? '#81B64C' : 'transparent', color: view === k ? '#fff' : '#C9CFCD' }}>{t}</button>
         ))}
       </div>
@@ -541,6 +547,29 @@ export function ContentStudio() {
           </div>
           {agErr && <p className="mt-2 text-[12.5px] text-[#FF7A80]">{agErr}</p>}
         </div>
+      </>) : view === 'openings' ? (<>
+        <p className="mb-3 max-w-2xl text-[13px] text-white/65">Each clip plays the opening, explains the ideas, shows who wins in real games, asks "what would you play?", reveals the replies with how often they're played and Stockfish's verdict, then plays every main line (and a trap, when there's one). The first open of each opening takes a few seconds while Stockfish looks at it.</p>
+        {!openings ? <Loader2 className="mx-auto mt-10 animate-spin text-white/60" /> : (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+            {openings.map((o) => {
+              const src: StudioSource = { kind: 'opening', opening: { id: o.id, name: o.name } };
+              let fen = new Chess().fen();
+              try { const c = new Chess(); o.line.forEach((m) => c.move(m)); fen = c.fen(); } catch { /* start position */ }
+              return (
+                <button key={o.id} onClick={() => choose(src)} className="relative overflow-hidden rounded-xl bg-white/5 text-left ring-1 ring-white/10 transition hover:ring-[#81B64C]"
+                  style={isPicked(src) ? { boxShadow: '0 0 0 3px #81B64C' } : undefined}>
+                  {isPicked(src) && <span className="absolute right-2 top-2 z-10 grid h-7 w-7 place-items-center rounded-full bg-[#81B64C] text-[13px] font-black">{picked.findIndex((c) => keyOf(c) === `o-${o.id}`) + 1}</span>}
+                  <div className="aspect-square w-full"><MiniBoard fen={fen} size={400} flipped={o.side === 'black'} /></div>
+                  <div className="p-2.5">
+                    <p className="truncate text-[13.5px] font-black">{o.name}</p>
+                    <p className="truncate text-[11.5px] text-white/55">For {o.side === 'white' ? 'White' : 'Black'} · {o.lines.length} lines</p>
+                    <p className="mt-0.5 line-clamp-2 text-[11px] text-white/45">{o.lines.join(' · ')}</p>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
       </>) : view === 'promo' ? (<>
         <div className="mb-3 inline-flex rounded-xl bg-white/5 p-1">
           {([['versus', 'ChessScout vs …'], ['challenge', 'Challenge your friends']] as const).map(([k, t]) => (

@@ -131,6 +131,23 @@ router.post("/admin/studio/review-game/:id", requireAdmin, async (req: Request, 
   }
 });
 
+// Opening clips: the list, then one opening with its lines, real-game numbers and Stockfish.
+router.get("/admin/studio/openings", requireAdmin, async (_req: Request, res: Response) => {
+  const { studioOpeningList } = await import("../lib/studioOpenings");
+  res.json({ openings: studioOpeningList() });
+});
+router.get("/admin/studio/opening/:id", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const { studioOpening } = await import("../lib/studioOpenings");
+    const o = await studioOpening(String(req.params.id));
+    if (!o) { res.status(404).json({ error: "Unknown opening" }); return; }
+    res.json(o);
+  } catch (err) {
+    req.log.error({ err }, "[studio] opening failed");
+    res.status(500).json({ error: "Couldn't build that opening" });
+  }
+});
+
 router.get("/admin/studio/scouts", requireAdmin, async (req: Request, res: Response) => {
   try { res.json({ scouts: await studioScouts(typeof req.query.q === "string" ? req.query.q.slice(0, 40) : undefined) }); }
   catch (err) { req.log.error({ err }, "[studio] scouts failed"); res.json({ scouts: [] }); }

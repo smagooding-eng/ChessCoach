@@ -64,7 +64,16 @@ export type StudioSource =
   | { kind: 'scout'; scout: StudioScout } | { kind: 'lesson'; lesson: StudioLesson }
   | { kind: 'scan'; fen: string; photo?: string; label?: string }
   | { kind: 'promo'; promo: StudioPromo }
-  | { kind: 'line'; line: StudioLine };
+  | { kind: 'line'; line: StudioLine }
+  | { kind: 'opening'; opening: { id: string; name: string } };
+/** An opening clip: the main line, the ideas, the replies (with real-game and engine numbers) and each main variation. */
+export interface StudioOpening {
+  id: string; name: string; side: 'white' | 'black'; hook: string; ideas: string[]; line: string[];
+  games: number; results: { white: number; draw: number; black: number } | null;
+  options: { san: string; pct: number | null; games: number; scorePct: number | null; eval: number | null; name: string | null }[];
+  lines: { name: string; moves: string[]; note: string; pct: number | null; eval: number | null }[];
+  trap: { name: string; moves: string[]; notes: string[]; critical: number; summary: string } | null;
+}
 /** A game made in the Position Explorer (best / worst moves per side), every move graded by Stockfish. */
 export interface StudioLine { startFen: string; title: string; white: string; black: string; moves: { san: string; classification: string; evalAfterCp: number | null; betterMove: string | null; loss?: number }[] }
 /** Promo clips: ChessScout vs another site (your rows, your words), or "challenge your friends". */
@@ -88,6 +97,8 @@ interface Clip {
   /** A scanned board: (the photo,) then the engine's best line. */
   isScan?: boolean; photo?: string;
   isPromo?: boolean; promo?: StudioPromo;
+  /** Opening clips: where the main line, each variation and the trap sit in plies (1-based, inclusive). */
+  isOpening?: boolean; openingData?: StudioOpening; ranges?: { main: [number, number]; lines: [number, number][]; trap: [number, number] | null };
 }
 type Frame =
   | { kind: 'intro'; fen: string }
@@ -107,6 +118,8 @@ type Frame =
   /** The app's splash animation, after the end card. */
   | { kind: 'splash'; fen: string }
   | { kind: 'promoCard'; fen: string; last: { from: string; to: string } | null; card: 'vs' | 'switch' | 'live' | 'daily' | 'link'; upTo?: number }
+  /** Opening clips: the ideas, real-game results, the replies, a variation's title, the trap's title. */
+  | { kind: 'openCard'; fen: string; last: { from: string; to: string } | null; card: 'ideas' | 'stats' | 'options' | 'line' | 'trap'; idx?: number }
   /** A beat on the starting position once the title / hook clears, so the first move is never hidden. */
   | { kind: 'hold'; fen: string; last: { from: string; to: string } | null }
   | { kind: 'outro'; fen: string };
@@ -303,6 +316,31 @@ function promoClip(p: StudioPromo): Clip {
     isTrap: false, opening: null, isPromo: true, promo: p,
   };
 }
+const evalText = (e: number | null | undefined) => (e == null ? '' : Math.abs(e) >= 90 ? (e > 0 ? 'White mates' : 'Black mates') : `${e > 0 ? '+' : ''}${e.toFixed(1)}`);
+function openingClip(o: StudioOpening): Clip {
+  const book = (san: string, note = ''): ReviewMove => ({ san, classification: 'book', explanation: note });
+  const main = playSans(undefined, o.line, o.line.map((san, i) => book(san, i === o.line.length - 1 ? `The ${o.name}` : '')));
+  const keyFen = main.length ? main[main.length - 1].fen : START_FEN;
+  const plies: Ply[] = [...main];
+  const lines: [number, number][] = [];
+  for (const l of o.lines) {
+    const ps = playSans(keyFen, l.moves, l.moves.map((san, i) => book(san, i === l.moves.length - 1 ? l.note : '')));
+    if (!ps.length) continue;
+    lines.push([plies.length + 1, plies.length + ps.length]);
+    plies.push(...ps);
+  }
+  let trap: [number, number] | null = null;
+  if (o.trap) {
+    const t = o.trap;
+    const ps = playSans(undefined, t.moves, t.moves.map((san, i) => ({ san, explanation: t.notes[i] ?? '', classification: san.includes('#') ? 'checkmate' : i === t.critical ? 'blunder' : i === t.critical + 1 ? 'great' : i < t.critical ? 'book' : 'best' })));
+    if (ps.length === t.moves.length) { trap = [plies.length + 1, plies.length + ps.length]; plies.push(...ps); }
+  }
+  return {
+    plies, key: Math.max(0, main.length - 1), tags: ['opening', ...(trap ? ['trap'] : [])], hook: `${o.hook} ♟️`, sub: `${o.lines.length} lines · counter moves · ${o.trap ? 'plus a trap' : 'what to play'}`,
+    names: { w: null, b: null }, ratings: { w: null, b: null }, fileBase: `chessscout-opening-${o.id}`, label: `Opening · ${o.name}`,
+    isTrap: false, opening: o.name, isOpening: true, openingData: o, ranges: { main: [1, main.length], lines, trap },
+  };
+}
 // A game built in the explorer: played like a game review, every move graded.
 function lineClip(l: StudioLine): Clip {
   const plies = playSans(l.startFen, l.moves.map((m) => m.san), l.moves.map((m, i) => ({ moveIndex: i, san: m.san, classification: m.classification, evalAfterCp: m.evalAfterCp ?? undefined, betterMove: m.betterMove })));
@@ -363,6 +401,7 @@ function hashtagsFor(clip: Clip): string {
   if (clip.isReview) { t.add('#gamereview'); t.add('#chessanalysis'); }
   if (clip.isLesson) { t.add('#chessforkids'); t.add('#learnchess'); t.add('#chessforbeginners'); }
   if (clip.isScout) { t.add('#chessprep'); t.add('#chessopponent'); }
+  if (clip.isOpening) { t.add('#chessopenings'); t.add('#chesstheory'); t.add('#learnchess'); }
   if (clip.isScan) { t.add('#chessapp'); t.add('#chesstips'); }
   if (clip.isPromo) { t.add('#chessapp'); t.add(clip.promo?.template === 'versus' ? '#chesscom' : '#playchess'); t.add('#chessfriends'); }
   const op = (clip.opening ?? '').split(/[:,]/)[0].replace(/[^A-Za-z ]/g, '').trim();
@@ -477,8 +516,8 @@ function Confetti({ fire }: { fire: number }) {
   return <canvas ref={ref} className="pointer-events-none absolute inset-0 z-30 h-full w-full" />;
 }
 
-const srcKey = (x: StudioSource): string => (x.kind === 'line' ? `line-${x.line.startFen}-${x.line.moves.map((m) => m.san).join(' ')}` : x.kind === 'promo' ? `promo-${x.promo.template}-${x.promo.hook}` : x.kind === 'scout' ? `s${x.scout.id}` : x.kind === 'lesson' ? `l${x.lesson.id}` : x.kind === 'scan' ? `x${x.fen}` : x.kind === 'trap' ? `t${x.trap.id}` : x.kind === 'puzzle' ? `p${x.puzzle.id}` : x.kind === 'review' ? `r${x.review.id}` : `g${x.moment.gameId}-${x.moment.moveIndex}`);
-const srcLabel = (x: StudioSource): string => (x.kind === 'line' ? `Analyzer · ${x.line.white} vs ${x.line.black}` : x.kind === 'promo' ? (x.promo.template === 'versus' ? `Promo · vs ${x.promo.rival}` : 'Promo · challenge friends') : x.kind === 'scout' ? `Scout · ${x.scout.username}` : x.kind === 'lesson' ? `Lesson · ${x.lesson.title}` : x.kind === 'scan' ? (x.label ? `Scan · ${x.label}` : 'Scanned position') : x.kind === 'trap' ? x.trap.name : x.kind === 'puzzle' ? `Puzzle · ${x.puzzle.rating}${x.puzzle.themes?.match(/mateIn\d/) ? ` · ${themeLabel(x.puzzle.themes.match(/mateIn\d/)![0])}` : ''}`
+const srcKey = (x: StudioSource): string => (x.kind === 'opening' ? `o-${x.opening.id}` : x.kind === 'line' ? `line-${x.line.startFen}-${x.line.moves.map((m) => m.san).join(' ')}` : x.kind === 'promo' ? `promo-${x.promo.template}-${x.promo.hook}` : x.kind === 'scout' ? `s${x.scout.id}` : x.kind === 'lesson' ? `l${x.lesson.id}` : x.kind === 'scan' ? `x${x.fen}` : x.kind === 'trap' ? `t${x.trap.id}` : x.kind === 'puzzle' ? `p${x.puzzle.id}` : x.kind === 'review' ? `r${x.review.id}` : `g${x.moment.gameId}-${x.moment.moveIndex}`);
+const srcLabel = (x: StudioSource): string => (x.kind === 'opening' ? `Opening · ${x.opening.name}` : x.kind === 'line' ? `Analyzer · ${x.line.white} vs ${x.line.black}` : x.kind === 'promo' ? (x.promo.template === 'versus' ? `Promo · vs ${x.promo.rival}` : 'Promo · challenge friends') : x.kind === 'scout' ? `Scout · ${x.scout.username}` : x.kind === 'lesson' ? `Lesson · ${x.lesson.title}` : x.kind === 'scan' ? (x.label ? `Scan · ${x.label}` : 'Scanned position') : x.kind === 'trap' ? x.trap.name : x.kind === 'puzzle' ? `Puzzle · ${x.puzzle.rating}${x.puzzle.themes?.match(/mateIn\d/) ? ` · ${themeLabel(x.puzzle.themes.match(/mateIn\d/)![0])}` : ''}`
   : x.kind === 'review' ? `Review · ${x.review.white ?? 'White'} vs ${x.review.black ?? 'Black'}` : `${x.moment.san} · ${x.moment.opening ?? `game ${x.moment.gameId}`}`);
 type ClipLook = BoardLook | 'remix' | 'mine';
 
@@ -524,6 +563,13 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
     if (current.kind === 'trap') { setClip(trapClip(current.trap)); setClipQ(slot); setLoadedKey(key); return; }
     if (current.kind === 'promo') { setClip(promoClip(current.promo)); setClipQ(slot); setLoadedKey(key); return; }
     if (current.kind === 'line') { setClip(lineClip(current.line)); setClipQ(slot); setLoadedKey(key); return; }
+    if (current.kind === 'opening') {
+      apiFetch(`/api/admin/studio/opening/${encodeURIComponent(current.opening.id)}`, { credentials: 'include' })
+        .then(async (r) => { const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.error || "Couldn't load that opening."); return d as StudioOpening; })
+        .then((o) => { setClip(openingClip(o)); setClipQ(slot); setLoadedKey(key); })
+        .catch((e) => setErr(String(e?.message ?? e)));
+      return;
+    }
     if (current.kind === 'lesson') { setClip(lessonClip(current.lesson)); setClipQ(slot); setLoadedKey(key); return; }
     if (current.kind === 'scout') {
       const sc = current.scout;
@@ -660,6 +706,37 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
       }
       while (p < plies.length) out.push({ kind: 'move', ply: ++p });
       if (prefs.outro && isLast) out.push({ kind: 'outro', fen: fenAt(plies.length) });
+      return withInserts(out);
+    }
+    if (clip.isOpening && clip.openingData && clip.ranges) {
+      const o = clip.openingData; const R = clip.ranges;
+      const [, m] = R.main;
+      if (isComp && isFirst) out.push({ kind: 'title', fen: fenAt(0) });
+      if (prefs.intro) out.push({ kind: 'intro', fen: fenAt(0) });
+      out.push({ kind: 'hold', fen: fenAt(0), last: null });
+      for (let p = 1; p <= m; p++) out.push({ kind: 'move', ply: p });
+      const keyFen = fenAt(m), keyLast = lastAt(m);
+      out.push({ kind: 'openCard', fen: keyFen, last: keyLast, card: 'ideas' });
+      if (o.results && o.games >= 10) out.push({ kind: 'openCard', fen: keyFen, last: keyLast, card: 'stats' });
+      // "What would you play?" then the replies with how often they're played and what Stockfish thinks.
+      if (o.options.length) {
+        const mover = keyFen.split(' ')[1] === 'w' ? 'White' : 'Black';
+        for (let n = 3; n >= 1; n--) out.push({ kind: 'countdown', n, fen: keyFen, last: keyLast, total: 3, text: `What should ${mover} play here?`, anchor: 'opening' });
+        out.push({ kind: 'openCard', fen: keyFen, last: keyLast, card: 'options' });
+      }
+      // Each variation: its title on the key position, its moves, then back to the key position.
+      R.lines.forEach(([a, b], idx) => {
+        out.push({ kind: 'openCard', fen: keyFen, last: keyLast, card: 'line', idx });
+        for (let p = a; p <= b; p++) out.push({ kind: 'move', ply: p });
+        out.push({ kind: 'hold', fen: fenAt(b), last: lastAt(b) });
+      });
+      if (R.trap) {
+        const [a, b] = R.trap;
+        out.push({ kind: 'openCard', fen: START_FEN, last: null, card: 'trap' });
+        for (let p = a; p <= b; p++) out.push({ kind: 'move', ply: p });
+        out.push({ kind: 'hold', fen: fenAt(b), last: lastAt(b) });
+      }
+      if (prefs.outro && isLast) out.push({ kind: 'outro', fen: R.trap ? fenAt(R.trap[1]) : keyFen });
       return withInserts(out);
     }
     if (clip.isScout) {
@@ -804,9 +881,18 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
       case 'scanPhoto': return 3200;
       case 'splash': return 2800;
       case 'promoCard': return f.card === 'vs' ? 1500 : 3600;
+      case 'openCard': return f.card === 'line' ? 2600 : f.card === 'options' ? 5600 : f.card === 'trap' ? 2600 : 4600;
       case 'outro': return 2800;
       default: {
         if (clip?.isPromo) return clip.plies[f.ply - 1]?.san.includes('#') ? 2400 : Math.max(300, s * 0.5);
+        if (clip?.isOpening && clip.ranges) {
+          // Brisk through the moves; a beat on the last move of each line (its note shows) and on the trap's key moves.
+          const R = clip.ranges; const p = f.ply;
+          const ends = [R.main[1], ...R.lines.map(([, b]) => b), ...(R.trap ? [R.trap[1]] : [])];
+          const tr = clip.plies[p - 1]?.review?.classification;
+          if (ends.includes(p) || tr === 'blunder' || tr === 'great' || tr === 'checkmate') return Math.max(s, 2200);
+          return Math.max(450, s * 0.7);
+        }
         if (clip?.isReview) {
           const m = clip.plies[f.ply - 1];
           return m && (m.san.includes('#') || NOTABLE.has(m.review?.classification ?? '')) ? Math.max(s, 2200) : Math.max(220, s * 0.55);
@@ -850,7 +936,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
     }
     if (frame.kind === 'split') return { fen: frame.played.fen, last: frame.played.last, ply: -3, move: null as Ply | null };
     const fen = frame.fen;
-    const last = frame.kind === 'countdown' || frame.kind === 'better' || frame.kind === 'hold' || frame.kind === 'scoutCard' || frame.kind === 'lessonBoard' || frame.kind === 'promoCard' ? frame.last : null;
+    const last = frame.kind === 'countdown' || frame.kind === 'better' || frame.kind === 'hold' || frame.kind === 'scoutCard' || frame.kind === 'lessonBoard' || frame.kind === 'promoCard' || frame.kind === 'openCard' ? frame.last : null;
     const ply = frame.kind === 'countdown' && !frame.anchor ? keyPly - 1 : frame.kind === 'intro' ? -1 : -2;
     return { fen, last, ply, move: null as Ply | null };
   }, [frame, plies, keyPly]);
@@ -888,7 +974,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
       const m = mus();
       if (frame.kind === 'countdown' && frame.n === Math.min(3, frame.total ?? 3)) m.accent('riser');
       if (frame.kind === 'countdown') m.accent('tick');
-      if (frame.kind === 'title' || frame.kind === 'outro' || frame.kind === 'split' || frame.kind === 'intro' || frame.kind === 'card' || frame.kind === 'scoutCard' || frame.kind === 'lessonText') m.accent('whoosh');
+      if (frame.kind === 'title' || frame.kind === 'outro' || frame.kind === 'split' || frame.kind === 'intro' || frame.kind === 'card' || frame.kind === 'scoutCard' || frame.kind === 'openCard' || frame.kind === 'lessonText') m.accent('whoosh');
       if (frame.kind === 'lessonBoard' && frame.celebrate) m.accent('chime');
       if (frame.kind === 'scanPhoto') m.accent('riser');
       if (frame.kind === 'splash') { m.accent('whoosh'); setTimeout(() => music.current?.accent('impact'), 680); }
@@ -976,6 +1062,15 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
         }
         const i = f.idx ?? 0; const w = d.weaknesses?.[i];
         return w ? `${i === 0 ? 'Their biggest weakness' : i === 1 ? 'Next' : 'And'}: ${w.category}. ${w.description.split(/(?<=[.!?])\s/)[0]}` : null;
+      }
+      case 'openCard': {
+        const o = clip.openingData; if (!o) return null;
+        if (f.card === 'ideas') return `The ${o.name}. ${o.ideas.join('. ')}.`;
+        if (f.card === 'stats' && o.results) return `In ${o.games} real games, White wins ${o.results.white} percent, Black ${o.results.black} percent.`;
+        if (f.card === 'options') { const top = o.options.slice(0, 3).map((x) => spokenSan(x.san)); return `The main choices: ${top.join(', ')}.`; }
+        if (f.card === 'line') { const l = o.lines[f.idx ?? 0]; return l ? `Line ${(f.idx ?? 0) + 1}: the ${l.name}.` : null; }
+        if (f.card === 'trap' && o.trap) return `And watch out for the ${o.trap.name}.`;
+        return null;
       }
       case 'lessonText': case 'lessonBoard': return stripEmoji(f.text.replace(/^✓\s*/, '')).slice(0, 400);
       case 'scanPhoto': return 'Snap a photo of any chess board.';
@@ -1176,7 +1271,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
   };
 
   // ── Post kit ────────────────────────────────────────────────────────────
-  const postText = clip ? `${isComp ? stripEmoji(compTitle) : hook}\n\n${clip.isTrap ? 'Would you fall for it? 👇' : clip.isPuzzle ? 'Did you solve it? Drop the first move in the comments 👇' : clip.isReview ? 'Which move would you have played differently? 👇' : clip.isLesson ? 'Learning chess? Save this one and share it with a friend 👇' : clip.isScout ? 'Who should I scout next? Drop a username 👇' : clip.isScan ? 'Want me to scan your board? Drop a photo in the comments 👇' : clip.isPromo ? (clip.promo?.template === 'versus' ? 'Would you switch? 👇' : 'Tag the friend you want to beat 👇') : 'Would you have found it? Comment your move 👇'}\nReview your own games free at chessscout.net\n\n${hashtagsFor(clip)}` : '';
+  const postText = clip ? `${isComp ? stripEmoji(compTitle) : hook}\n\n${clip.isTrap ? 'Would you fall for it? 👇' : clip.isPuzzle ? 'Did you solve it? Drop the first move in the comments 👇' : clip.isReview ? 'Which move would you have played differently? 👇' : clip.isLesson ? 'Learning chess? Save this one and share it with a friend 👇' : clip.isOpening ? 'Which line do you play? Drop it in the comments 👇' : clip.isScout ? 'Who should I scout next? Drop a username 👇' : clip.isScan ? 'Want me to scan your board? Drop a photo in the comments 👇' : clip.isPromo ? (clip.promo?.template === 'versus' ? 'Would you switch? 👇' : 'Tag the friend you want to beat 👇') : 'Would you have found it? Comment your move 👇'}\nReview your own games free at chessscout.net\n\n${hashtagsFor(clip)}` : '';
   const [copied, setCopied] = useState(false);
   const copyPost = () => { navigator.clipboard?.writeText(postText).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); }).catch(() => {}); };
 
@@ -1207,6 +1302,13 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
   // Arrows: the better move on a mistake (key frame), the engine line's first move, nothing otherwise.
   const arrows: { from: string; to: string; color?: string }[] = [];
   if (frame?.kind === 'better' && frame.arrow) arrows.push({ ...frame.arrow, color: 'rgba(129,182,76,0.95)' });
+  // Opening clips: every reply on the options card, the line's first move on its title card.
+  if (frame?.kind === 'openCard' && clip.openingData && (frame.card === 'options' || frame.card === 'line')) {
+    const o = clip.openingData;
+    const sans = frame.card === 'options' ? o.options.map((x) => x.san) : [o.lines[frame.idx ?? 0]?.moves[0]].filter(Boolean) as string[];
+    const COLORS = ['rgba(129,182,76,0.95)', 'rgba(74,139,214,0.92)', 'rgba(232,180,71,0.92)', 'rgba(202,52,49,0.9)'];
+    sans.forEach((san, k) => { try { const c = new Chess(frame.fen); const mv = c.move(san); if (mv) arrows.push({ from: mv.from, to: mv.to, color: frame.card === 'line' ? COLORS[(frame.idx ?? 0) % 4] : COLORS[k % 4] }); } catch { /* ignore */ } });
+  }
   if (prefs.arrow && isKey && rev?.betterMove && cls && BAD.has(cls)) {
     try { const c = new Chess(plies[keyPly - 1].fenBefore); const mv = c.move(rev.betterMove); if (mv) arrows.push({ from: mv.from, to: mv.to, color: 'rgba(129,182,76,0.9)' }); } catch { /* ignore */ }
   }
@@ -1226,7 +1328,8 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
     const col = flipped ? 7 - f : f, row = flipped ? r - 1 : 8 - r;
     return `${(col + 0.5) * 12.5}% ${(row + 0.5) * 12.5}%`;
   })();
-  const caption = frame?.kind === 'better' ? frame.text : prefs.captions && cur && !subWords ? rev?.explanation : null;
+  // Opening clips always show their line notes; other clips follow the Captions setting.
+  const caption = frame?.kind === 'better' ? frame.text : (prefs.captions || clip.isOpening) && cur && !subWords ? rev?.explanation : null;
   const showBottomMove = frame?.kind === 'move' && cur;
 
   const ctl = 'rounded-lg bg-white/10 px-2.5 py-1.5 text-[12.5px] font-bold text-white hover:bg-white/15';
@@ -1553,6 +1656,87 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
                 );
               })()}
             </AnimatePresence>
+            {/* Opening clips: ideas, real-game results, replies, variation titles, trap */}
+            <AnimatePresence>
+              {frame?.kind === 'openCard' && clip.openingData && (() => {
+                const o = clip.openingData;
+                const COL = ['#81B64C', '#4A8BD6', '#E8B447', '#CA3431'];
+                const mover = frame.fen.split(' ')[1] === 'w' ? 'White' : 'Black';
+                const evChip = (e: number | null) => e == null ? null : (
+                  <span className="rounded-[0.35em] px-[0.4em] py-[0.05em] text-[0.8em] font-black tabular-nums" style={{ background: Math.abs(e) < 0.4 ? 'rgba(255,255,255,.14)' : e > 0 ? '#F2F2F2' : '#1C1C1C', color: Math.abs(e) < 0.4 ? '#fff' : e > 0 ? '#141414' : '#fff', boxShadow: e < -0.4 ? 'inset 0 0 0 1px rgba(255,255,255,.35)' : undefined }}>{evalText(e)}</span>
+                );
+                // Variation titles sit as a banner above the board; the other cards are big panels.
+                if (frame.card === 'line') {
+                  const l = o.lines[frame.idx ?? 0]; if (!l) return null;
+                  return (
+                    <motion.div key={`line${frame.idx}`} initial={{ opacity: 0, y: -20, scale: 0.9 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -12 }} transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+                      className="absolute inset-x-[6%] top-[13%] z-30 rounded-[2.4cqh] p-[1.6cqh] text-center text-white shadow-2xl" style={{ background: 'rgba(11,17,18,.92)', border: `3px solid ${COL[(frame.idx ?? 0) % 4]}`, fontSize: 'clamp(11px,1.9cqh,20px)' }}>
+                      <p className="font-black uppercase tracking-wide" style={{ color: COL[(frame.idx ?? 0) % 4], fontSize: '0.85em' }}>Line {(frame.idx ?? 0) + 1} of {o.lines.length}</p>
+                      <p className="font-black leading-tight" style={{ fontSize: '1.7em' }}>{l.name}</p>
+                      <div className="mt-[0.4em] flex items-center justify-center gap-[0.6em] text-[0.85em] font-bold text-white/75">
+                        <span>{figurine(l.moves[0], mover === 'White')}…</span>
+                        {l.pct != null && l.pct > 0 && <span>{l.pct}% of games</span>}
+                        {evChip(l.eval)}
+                      </div>
+                    </motion.div>
+                  );
+                }
+                return (
+                  <motion.div key={frame.card} initial={{ opacity: 0, y: 30, scale: 0.92 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -20 }} transition={{ type: 'spring', stiffness: 260, damping: 20 }}
+                    className="absolute inset-x-[5%] top-[22%] z-30 rounded-[3cqh] bg-[#0B1112]/93 p-[2.4cqh] text-white shadow-2xl ring-2 ring-white/70" style={{ fontSize: 'clamp(11px,1.9cqh,20px)' }}>
+                    <p className="mb-[1.2cqh] text-center font-black uppercase tracking-wide text-[#B8E08C]" style={{ fontSize: '0.95em' }}>♟️ {o.name}</p>
+                    {frame.card === 'ideas' && (
+                      <div className="space-y-[1cqh]">
+                        <p className="text-center font-black" style={{ fontSize: '1.3em' }}>The ideas</p>
+                        {o.ideas.map((t, k) => (
+                          <motion.div key={k} initial={{ opacity: 0, x: -24 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.3 + k * 0.45 }} className="flex items-start gap-[0.6em] rounded-[0.6em] bg-white/[.07] p-[0.6em]">
+                            <span className="grid h-[1.6em] w-[1.6em] shrink-0 place-items-center rounded-full font-black text-[#0B1112]" style={{ background: COL[k % 4] }}>{k + 1}</span>
+                            <span className="font-bold leading-snug">{t}</span>
+                          </motion.div>
+                        ))}
+                      </div>
+                    )}
+                    {frame.card === 'stats' && o.results && (
+                      <div className="text-center">
+                        <p className="font-black" style={{ fontSize: '1.3em' }}>Who wins?</p>
+                        <p className="mt-[0.3em] font-bold text-white/65">{o.games.toLocaleString()} real games on ChessScout</p>
+                        <div className="mt-[1.2cqh] flex h-[4cqh] overflow-hidden rounded-[0.6em] font-black">
+                          {([['White', o.results.white, '#F2F2F2', '#141414'], ['Draw', o.results.draw, '#7A8580', '#fff'], ['Black', o.results.black, '#1C1C1C', '#fff']] as const).map(([t, n, bg, fg], k) => n > 0 && (
+                            <motion.div key={t} initial={{ width: 0 }} animate={{ width: `${n}%` }} transition={{ duration: 0.9, delay: 0.3 + k * 0.1 }} className="grid place-items-center overflow-hidden whitespace-nowrap" style={{ background: bg, color: fg, fontSize: '0.85em' }}>{n >= 12 ? `${t} ${n}%` : `${n}%`}</motion.div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {frame.card === 'options' && (
+                      <div className="space-y-[0.9cqh]">
+                        <p className="text-center font-black" style={{ fontSize: '1.25em' }}>{mover}'s options</p>
+                        {o.options.map((x, k) => (
+                          <motion.div key={x.san} initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.25 + k * 0.3 }} className="rounded-[0.6em] bg-white/[.07] p-[0.55em]" style={{ borderLeft: `0.35em solid ${COL[k % 4]}` }}>
+                            <div className="flex items-center justify-between gap-[0.5em]">
+                              <span className="min-w-0 truncate font-black" style={{ fontSize: '1.15em' }}>{figurine(x.san, mover === 'White')}{x.name && <span className="ml-[0.4em] text-[0.7em] font-bold text-white/65">{x.name}</span>}</span>
+                              {evChip(x.eval)}
+                            </div>
+                            {x.pct != null && x.games > 0 && (
+                              <div className="mt-[0.35em] flex items-center gap-[0.5em]">
+                                <div className="h-[1.1cqh] flex-1 overflow-hidden rounded-full bg-white/10"><motion.div initial={{ width: 0 }} animate={{ width: `${Math.max(3, x.pct)}%` }} transition={{ duration: 0.7, delay: 0.4 + k * 0.3 }} className="h-full rounded-full" style={{ background: COL[k % 4] }} /></div>
+                                <span className="shrink-0 text-[0.75em] font-bold tabular-nums text-white/70">{x.pct}% played{x.scorePct != null ? ` · scores ${x.scorePct}%` : ''}</span>
+                              </div>
+                            )}
+                          </motion.div>
+                        ))}
+                      </div>
+                    )}
+                    {frame.card === 'trap' && o.trap && (
+                      <div className="text-center">
+                        <motion.p initial={{ scale: 0.6 }} animate={{ scale: [0.6, 1.15, 1] }} transition={{ duration: 0.5 }} className="font-black text-[#F0605D]" style={{ fontSize: '1.6em' }}>🪤 Trap alert!</motion.p>
+                        <p className="mt-[0.3em] font-black" style={{ fontSize: '1.25em' }}>{o.trap.name}</p>
+                        {o.trap.summary && <p className="mt-[0.4em] line-clamp-3 text-[0.9em] text-white/75">{o.trap.summary}</p>}
+                      </div>
+                    )}
+                  </motion.div>
+                );
+              })()}
+            </AnimatePresence>
             {/* Kids / beginner lessons: the coach explains in a speech bubble */}
             <AnimatePresence>
               {(frame?.kind === 'lessonText' || (frame?.kind === 'lessonBoard' && !frame.celebrate)) && (
@@ -1783,7 +1967,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
               const m = f.kind === 'move' ? plies[f.ply - 1] : null;
               const c = m ? (m.san.includes('#') ? 'checkmate' : m.review?.classification) : null;
               const tone = c && LABEL[c] && !['best', 'excellent', 'good', 'book'].includes(c) ? LABEL[c].color : null;
-              const label = f.kind === 'move' ? (m ? figurine(m.san, m.color === 'w') : 'Start') : f.kind === 'countdown' ? (f.anchor ? `⏱${f.n}` : String(f.n)) : f.kind === 'card' ? 'Card' : f.kind === 'scoutCard' ? (f.card === 'weak' ? `Weak ${(f.idx ?? 0) + 1}` : ({ profile: 'Profile', colors: 'Colours', openings: 'Openings', habits: 'Habits' } as Record<string, string>)[f.card]) : f.kind === 'lessonText' ? 'Coach' : f.kind === 'lessonBoard' ? (f.celebrate ? '✓' : 'Board') : f.kind === 'scanPhoto' ? 'Photo' : f.kind === 'splash' ? 'Splash' : f.kind === 'promoCard' ? (f.card === 'vs' ? `Row ${f.upTo}` : f.card[0].toUpperCase() + f.card.slice(1))
+              const label = f.kind === 'move' ? (m ? figurine(m.san, m.color === 'w') : 'Start') : f.kind === 'countdown' ? (f.anchor ? `⏱${f.n}` : String(f.n)) : f.kind === 'card' ? 'Card' : f.kind === 'openCard' ? (f.card === 'line' ? `Line ${(f.idx ?? 0) + 1}` : ({ ideas: 'Ideas', stats: 'Results', options: 'Replies', trap: 'Trap' } as Record<string, string>)[f.card]) : f.kind === 'scoutCard' ? (f.card === 'weak' ? `Weak ${(f.idx ?? 0) + 1}` : ({ profile: 'Profile', colors: 'Colours', openings: 'Openings', habits: 'Habits' } as Record<string, string>)[f.card]) : f.kind === 'lessonText' ? 'Coach' : f.kind === 'lessonBoard' ? (f.celebrate ? '✓' : 'Board') : f.kind === 'scanPhoto' ? 'Photo' : f.kind === 'splash' ? 'Splash' : f.kind === 'promoCard' ? (f.card === 'vs' ? `Row ${f.upTo}` : f.card[0].toUpperCase() + f.card.slice(1))
                 : ({ title: 'Title', intro: 'Hook', hold: 'Start', better: 'Line', split: 'Split', reveal: 'Rating', summary: 'Summary', outro: 'End' } as Record<string, string>)[f.kind] ?? f.kind;
               const starts = stickers.filter((st) => st.from === id).length, ends = stickers.filter((st) => st.to === id).length;
               return (
