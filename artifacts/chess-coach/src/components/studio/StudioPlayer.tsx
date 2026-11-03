@@ -120,6 +120,8 @@ type Frame =
   | { kind: 'promoCard'; fen: string; last: { from: string; to: string } | null; card: 'vs' | 'switch' | 'live' | 'daily' | 'link'; upTo?: number }
   /** Opening clips: the ideas, real-game results, the replies, a variation's title, the trap's title. */
   | { kind: 'openCard'; fen: string; last: { from: string; to: string } | null; card: 'ideas' | 'stats' | 'options' | 'line' | 'trap'; idx?: number }
+  /** Opening clips: the board winding back to the branch point after a line. */
+  | { kind: 'rewind'; fen: string; last: { from: string; to: string } | null; idx: number }
   /** A beat on the starting position once the title / hook clears, so the first move is never hidden. */
   | { kind: 'hold'; fen: string; last: { from: string; to: string } | null }
   | { kind: 'outro'; fen: string };
@@ -167,12 +169,17 @@ const DEFAULT_PREFS = {
   before: 8, after: 5, speed: 1.2, guess: true, remix: true, captions: true, effects: true, arrow: true, sound: true, watermark: true,
   bg: 'green', betterLine: true, guessRating: false, outro: true, progress: true, intro: true, safeArea: true, showNames: false,
   handle: '@chessscout.net3', outroLine: 'Review your games free',
-  split: true, voice: false, voiceName: 'onyx', compTitle: 'Top moments this week',
+  split: true, voice: false, voiceName: 'ash', compTitle: 'Top moments this week',
   music: 'off' as MusicStyle, musicVol: 0.5, beatSync: true, musicFx: true, subs: true, pieceFx: true, trapBefore: 99, countdownSecs: 3, choices: false, zoom: false, splash: true, reviewMode: 'highlights' as 'highlights' | 'full',
 };
 type Prefs = typeof DEFAULT_PREFS;
 function loadPrefs(): Prefs {
-  try { return { ...DEFAULT_PREFS, ...JSON.parse(localStorage.getItem(PREF_KEY) || '{}') }; } catch { return DEFAULT_PREFS; }
+  try {
+    const saved = JSON.parse(localStorage.getItem(PREF_KEY) || '{}');
+    // Once: the old default voices (onyx, and nova from the Kids preset) move to the new narrator.
+    if (!saved.voiceV2) { if (!saved.voiceName || saved.voiceName === 'onyx' || saved.voiceName === 'nova') saved.voiceName = 'ash'; saved.voiceV2 = 1; }
+    return { ...DEFAULT_PREFS, ...saved };
+  } catch { return DEFAULT_PREFS; }
 }
 
 function hookForTags(tags: string[], trapName: string | null): string {
@@ -617,10 +624,13 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
   const [blank, setBlank] = useState(false);
   const blankTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const startBlank = () => {
-    setExitHint(0); setPlaying(false); setBlank(true);
+    setExitHint(0); setPlaying(false); setBlank(true); blankDone.current = false;
     if (blankTimer.current) clearTimeout(blankTimer.current);
-    blankTimer.current = setTimeout(() => { blankTimer.current = null; setBlank(false); restartRef.current(); }, 5000);
+    // After 5s the clip starts; the screen stays black until it's actually playing
+    // (e.g. while the voiceover finishes preparing).
+    blankTimer.current = setTimeout(() => { blankTimer.current = null; blankDone.current = true; restartRef.current(); }, 5000);
   };
+  const blankDone = useRef(false);
   useEffect(() => () => { if (blankTimer.current) clearTimeout(blankTimer.current); }, []);
   const lastTap = useRef(0);
   const cleanTap = () => { const now = Date.now(); if (now - lastTap.current < 350) { lastTap.current = 0; showExit(); } else lastTap.current = now; };
@@ -724,11 +734,12 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
         for (let n = 3; n >= 1; n--) out.push({ kind: 'countdown', n, fen: keyFen, last: keyLast, total: 3, text: `What should ${mover} play here?`, anchor: 'opening' });
         out.push({ kind: 'openCard', fen: keyFen, last: keyLast, card: 'options' });
       }
-      // Each variation: its title on the key position, its moves, then back to the key position.
+      // Each variation: it lights up on the line map, plays out, then the board
+      // rewinds move by move to the branch point for the next one.
       R.lines.forEach(([a, b], idx) => {
         out.push({ kind: 'openCard', fen: keyFen, last: keyLast, card: 'line', idx });
         for (let p = a; p <= b; p++) out.push({ kind: 'move', ply: p });
-        out.push({ kind: 'hold', fen: fenAt(b), last: lastAt(b) });
+        if (idx < R.lines.length - 1 || !R.trap) for (let p = b - 1; p >= a - 1; p--) out.push({ kind: 'rewind', fen: p >= a ? fenAt(p) : keyFen, last: p >= a ? lastAt(p) : keyLast, idx });
       });
       if (R.trap) {
         const [a, b] = R.trap;
@@ -856,11 +867,14 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
   const dur = (f: Frame) => {
     const base = baseDur(f) + (holds[idOf.get(f) ?? ''] ?? 0);
     const said = prefs.voice ? narration(f) : null;
-    const len = said ? voiceLen.current.get(said) : undefined;
-    const d = len ? Math.max(base, len * 1000 + 300) : base;
-    // On the beat: every frame lasts a whole number of beats, so moves land on the music.
+    const len = said ? voiceLen.current.get(`${prefs.voiceName}|${said}`) : undefined;
+    // A frame always lasts until its line has been said in full, plus a breath.
+    const d = len ? Math.max(base, len * 1000 + 450) : base;
+    // On the beat: every frame lasts a whole number of beats, so moves land on the music
+    // (rounded up when there's a voice line, so it's never cut short).
     const bpm = bpmOf(prefs.music);
-    if (bpm && prefs.beatSync) { const beat = 60000 / bpm; return Math.max(1, Math.round(d / beat)) * beat; }
+    if (f.kind === 'rewind') return d; // a quick wind-back, not on the beat
+    if (bpm && prefs.beatSync) { const beat = 60000 / bpm; return Math.max(1, (len ? Math.ceil : Math.round)(d / beat)) * beat; }
     return d;
   };
   const baseDur = (f: Frame) => {
@@ -881,7 +895,8 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
       case 'scanPhoto': return 3200;
       case 'splash': return 2800;
       case 'promoCard': return f.card === 'vs' ? 1500 : 3600;
-      case 'openCard': return f.card === 'line' ? 2600 : f.card === 'options' ? 5600 : f.card === 'trap' ? 2600 : 4600;
+      case 'openCard': return f.card === 'line' ? 1900 : f.card === 'options' ? 5600 : f.card === 'trap' ? 2600 : 4600;
+      case 'rewind': return 150;
       case 'outro': return 2800;
       default: {
         if (clip?.isPromo) return clip.plies[f.ply - 1]?.san.includes('#') ? 2400 : Math.max(300, s * 0.5);
@@ -936,7 +951,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
     }
     if (frame.kind === 'split') return { fen: frame.played.fen, last: frame.played.last, ply: -3, move: null as Ply | null };
     const fen = frame.fen;
-    const last = frame.kind === 'countdown' || frame.kind === 'better' || frame.kind === 'hold' || frame.kind === 'scoutCard' || frame.kind === 'lessonBoard' || frame.kind === 'promoCard' || frame.kind === 'openCard' ? frame.last : null;
+    const last = frame.kind === 'countdown' || frame.kind === 'better' || frame.kind === 'hold' || frame.kind === 'scoutCard' || frame.kind === 'lessonBoard' || frame.kind === 'promoCard' || frame.kind === 'openCard' || frame.kind === 'rewind' ? frame.last : null;
     const ply = frame.kind === 'countdown' && !frame.anchor ? keyPly - 1 : frame.kind === 'intro' ? -1 : -2;
     return { fen, last, ply, move: null as Ply | null };
   }, [frame, plies, keyPly]);
@@ -975,6 +990,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
       if (frame.kind === 'countdown' && frame.n === Math.min(3, frame.total ?? 3)) m.accent('riser');
       if (frame.kind === 'countdown') m.accent('tick');
       if (frame.kind === 'title' || frame.kind === 'outro' || frame.kind === 'split' || frame.kind === 'intro' || frame.kind === 'card' || frame.kind === 'scoutCard' || frame.kind === 'openCard' || frame.kind === 'lessonText') m.accent('whoosh');
+      if (frame.kind === 'rewind') m.accent('tick');
       if (frame.kind === 'lessonBoard' && frame.celebrate) m.accent('chime');
       if (frame.kind === 'scanPhoto') m.accent('riser');
       if (frame.kind === 'splash') { m.accent('whoosh'); setTimeout(() => music.current?.accent('impact'), 680); }
@@ -1091,21 +1107,64 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
       default: return null;
     }
   };
-  // Fetch every line of the script once, ahead of playback.
+  // Fetch every line of the script once, ahead of playback: a few at a time
+  // (firing them all at once got some refused, which used to fall back to a
+  // second, robotic browser voice), retried, all in the one chosen voice.
+  // Playback waits until the whole script is ready, so nothing gets cut off.
+  const [voicePrep, setVoicePrep] = useState<{ done: number; total: number } | null>(null);
   useEffect(() => {
-    if (!prefs.voice || !frames.length) return;
+    if (!prefs.voice || !frames.length) { setVoicePrep(null); return; }
     let live = true;
+    const vkey = (t: string) => `${prefs.voiceName}|${t}`;
     const lines = [...new Set(frames.map(narration).filter((x): x is string => !!x))];
-    Promise.all(lines.filter((t) => !voiceUrl.current.has(t)).map(async (t) => {
-      const r = await apiFetch('/api/tts/speak', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: t, voice: prefs.voiceName }) });
-      if (!r.ok) throw new Error('tts');
-      const url = URL.createObjectURL(await r.blob());
-      voiceUrl.current.set(t, url);
-      await new Promise<void>((res) => { const a = new Audio(url); a.onloadedmetadata = () => { voiceLen.current.set(t, a.duration || 0); res(); }; a.onerror = () => res(); });
-    })).then(() => { if (live) { setVoiceNote(null); setVoiceTick((x) => x + 1); } })
-      .catch(() => { if (live) setVoiceNote("The coach voice isn't available right now (it uses OpenAI). Previews use your browser's voice, which won't be in the recording."); });
+    const todo = lines.filter((t) => !voiceUrl.current.has(vkey(t)));
+    let done = lines.length - todo.length, failed = 0;
+    setVoicePrep({ done, total: lines.length });
+    const one = async (t: string) => {
+      for (let attempt = 0; attempt < 3 && live; attempt++) {
+        try {
+          const r = await apiFetch('/api/tts/speak', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: t, voice: prefs.voiceName, style: 'studio' }) });
+          if (!r.ok) throw new Error('tts');
+          const url = URL.createObjectURL(await r.blob());
+          await new Promise<void>((res) => { const a = new Audio(url); a.onloadedmetadata = () => { voiceLen.current.set(vkey(t), a.duration || 0); res(); }; a.onerror = () => res(); });
+          voiceUrl.current.set(vkey(t), url);
+          return;
+        } catch { await new Promise((res) => setTimeout(res, 700 * (attempt + 1))); }
+      }
+      failed++;
+    };
+    void (async () => {
+      const queue = [...todo];
+      await Promise.all(Array.from({ length: 3 }, async () => {
+        while (live && queue.length) { await one(queue.shift()!); done++; if (live) setVoicePrep({ done, total: lines.length }); }
+      }));
+      if (!live) return;
+      setVoiceTick((x) => x + 1);
+      setVoiceNote(failed ? `${failed} line${failed > 1 ? 's' : ''} of the voiceover couldn't be made (it uses OpenAI), so ${failed > 1 ? 'they play' : 'it plays'} silently. Try again in a moment.` : null);
+    })();
     return () => { live = false; };
   }, [prefs.voice, prefs.voiceName, frames, hook, prefs.outroLine, compTitle, prefs.captions]); // eslint-disable-line react-hooks/exhaustive-deps
+  const voiceReady = !prefs.voice || !voicePrep || voicePrep.done >= voicePrep.total;
+  useEffect(() => { if (blank && playing && blankDone.current) setBlank(false); }, [blank, playing]);
+  // The premium narrator (ElevenLabs) when the server has it; it becomes the default once.
+  const [premiumVoice, setPremiumVoice] = useState(false);
+  useEffect(() => {
+    apiFetch('/api/tts/voices').then((r) => (r.ok ? r.json() : null)).then((d) => {
+      if (!d?.premium) return;
+      setPremiumVoice(true);
+      setPrefs((p) => {
+        const cur = p as Prefs & { voiceV3?: number };
+        if (cur.voiceV3) return p;
+        const n = { ...cur, voiceV3: 1, voiceName: cur.voiceName === 'ash' ? 'premium' : cur.voiceName };
+        try { localStorage.setItem(PREF_KEY, JSON.stringify(n)); } catch { /* ignore */ }
+        return n;
+      });
+    }).catch(() => {});
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // Pressing play before the voiceover is ready waits for it, then starts.
+  const [waitVoice, setWaitVoice] = useState(false);
+  useEffect(() => { if (playing && !voiceReady) { setPlaying(false); setWaitVoice(true); } }, [playing, voiceReady]);
+  useEffect(() => { if (waitVoice && voiceReady) { setWaitVoice(false); setPlaying(true); } }, [waitVoice, voiceReady]);
   const voiceAudio = useRef<HTMLAudioElement | null>(null);
   useEffect(() => { if (!playing) { voiceAudio.current?.pause(); if ('speechSynthesis' in window) window.speechSynthesis.cancel(); } }, [playing]);
   useEffect(() => {
@@ -1113,9 +1172,9 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
     const said = narration(frame);
     if (!said) return;
     voiceAudio.current?.pause();
-    const url = voiceUrl.current.get(said);
+    // Only the chosen voice ever plays (no browser-voice fallback).
+    const url = voiceUrl.current.get(`${prefs.voiceName}|${said}`);
     if (url) voiceAudio.current = mus().playVoice(url);
-    else if ('speechSynthesis' in window) { window.speechSynthesis.cancel(); window.speechSynthesis.speak(new SpeechSynthesisUtterance(said)); }
   }, [i, playing]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Word-by-word subtitles of the voiceover (burned into the frame, so they're in the recording) ─
@@ -1255,7 +1314,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
     { label: 'Quiz A/B/C', v: { guess: true, choices: true, countdownSecs: 5, betterLine: false, split: false, intro: true, before: 4, after: 2 } },
     { label: 'Meme edit', v: { zoom: true, effects: true, music: 'hype' as MusicStyle, guess: false, captions: false, intro: false, before: 4, after: 2, speed: 0.8 } },
     { label: '10-second challenge', v: { guess: true, countdownSecs: 10, choices: false, intro: true, before: 3, after: 3 } },
-    { label: 'Kids', v: { bg: 'kids', music: 'playful' as MusicStyle, voice: true, voiceName: 'nova', subs: true, captions: true, pieceFx: true, effects: true, speed: 1.4, intro: true, outroLine: 'Learn chess free at chessscout.net' } },
+    { label: 'Kids', v: { bg: 'kids', music: 'playful' as MusicStyle, voice: true, subs: true, captions: true, pieceFx: true, effects: true, speed: 1.4, intro: true, outroLine: 'Learn chess free at chessscout.net' } },
     { label: 'Guess the rating', v: { before: 10, after: 6, speed: 0.9, guess: false, guessRating: true, captions: false } },
   ];
   const applyPreset = (v: Partial<Prefs>) => setPrefs((p) => { const n = { ...p, ...v }; try { localStorage.setItem(PREF_KEY, JSON.stringify(n)); } catch { /* ignore */ } return n; });
@@ -1316,7 +1375,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
   const said = subsOn && frame && ['move', 'split', 'better', 'reveal'].includes(frame.kind) ? narration(frame) : null;
   if (said) {
     const words = said.split(/\s+/).filter(Boolean);
-    const len = Math.max(400, (voiceLen.current.get(said) ?? words.length * 0.36) * 1000);
+    const len = Math.max(400, (voiceLen.current.get(`${prefs.voiceName}|${said}`) ?? words.length * 0.36) * 1000);
     const k = Math.max(0, Math.min(words.length - 1, Math.floor(((performance.now() - frameStart) / len) * words.length)));
     const c0 = Math.floor(k / 4) * 4;
     subWords = { words: words.slice(c0, c0 + 4), hi: k - c0 };
@@ -1656,6 +1715,50 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
                 );
               })()}
             </AnimatePresence>
+            {/* Opening clips: the line map. All the variations as one strip; the one playing
+                glows in its colour, the ones done get a tick, and its moves tick along under it. */}
+            {clip.isOpening && clip.openingData && clip.ranges && (() => {
+              const o = clip.openingData; const R = clip.ranges;
+              const COL = ['#81B64C', '#4A8BD6', '#E8B447', '#CA3431'];
+              let active: number | null = null;
+              if (frame?.kind === 'openCard' && frame.card === 'line') active = frame.idx ?? 0;
+              else if (frame?.kind === 'rewind') active = frame.idx;
+              else if (frame?.kind === 'move') { const k = R.lines.findIndex(([a, b]) => frame.ply >= a && frame.ply <= b); if (k >= 0) active = k; }
+              if (active == null) return null;
+              const [a, b] = R.lines[active];
+              const shown = frame?.kind === 'move' ? frame.ply - a + 1 : frame?.kind === 'rewind' ? 0 : 0;
+              const l = o.lines[active];
+              const mover = clip.plies[a - 1]?.color === 'w';
+              return (
+                <div className="pointer-events-none absolute inset-x-[4%] top-[12.5%] z-30" style={{ fontSize: 'clamp(10px,1.7cqh,18px)' }}>
+                  <div className="flex gap-[0.4em]">
+                    {o.lines.map((ln, k) => {
+                      const on = k === active, done = k < active;
+                      return (
+                        <motion.div key={k} layout animate={{ flexGrow: on ? 2.4 : 1, opacity: on ? 1 : done ? 0.75 : 0.45 }} transition={{ type: 'spring', stiffness: 260, damping: 24 }}
+                          className="relative min-w-0 basis-0 overflow-hidden rounded-[0.6em] px-[0.5em] py-[0.35em]"
+                          style={{ background: on ? COL[k % 4] : 'rgba(11,17,18,.78)', color: on ? '#0B1112' : '#fff', border: `2px solid ${COL[k % 4]}`, boxShadow: on ? `0 0 1.2em ${COL[k % 4]}` : undefined }}>
+                          <p className="truncate font-black leading-tight" style={{ fontSize: on ? '1em' : '0.78em' }}>{done ? '✓ ' : ''}{on ? ln.name : ln.name.split(/[ ·]/)[0]}</p>
+                          {on && <p className="truncate text-[0.75em] font-bold opacity-80">{[ln.pct ? `${ln.pct}% of games` : null, ln.eval != null ? evalText(ln.eval) : null].filter(Boolean).join(' · ') || `Line ${k + 1}`}</p>}
+                        </motion.div>
+                      );
+                    })}
+                  </div>
+                  {/* The line's moves, filling in as they're played */}
+                  <div className="mt-[0.45em] flex flex-wrap items-center gap-[0.3em]">
+                    {frame?.kind === 'rewind' && <motion.span initial={{ scale: 0.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="rounded-full bg-white/90 px-[0.6em] py-[0.1em] font-black text-[#0B1112]">⏪ Rewind</motion.span>}
+                    {l && frame?.kind !== 'rewind' && l.moves.map((san, k) => (
+                      <motion.span key={`${active}-${k}`} initial={false} animate={{ opacity: k < shown ? 1 : 0.28, scale: k === shown - 1 ? 1.12 : 1 }}
+                        className="rounded-[0.4em] px-[0.4em] py-[0.05em] font-black tabular-nums" style={{ background: k < shown ? 'rgba(255,255,255,.92)' : 'rgba(255,255,255,.12)', color: k < shown ? '#0B1112' : '#fff' }}>
+                        {figurine(san, (k % 2 === 0) === mover)}
+                      </motion.span>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
+            {/* VHS-style tint while the board rewinds */}
+            {frame?.kind === 'rewind' && <div className="pointer-events-none absolute inset-0 z-[25]" style={{ background: 'linear-gradient(180deg, rgba(74,139,214,.10), rgba(0,0,0,.18))', mixBlendMode: 'screen' }} />}
             {/* Opening clips: ideas, real-game results, replies, variation titles, trap */}
             <AnimatePresence>
               {frame?.kind === 'openCard' && clip.openingData && (() => {
@@ -1665,22 +1768,8 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
                 const evChip = (e: number | null) => e == null ? null : (
                   <span className="rounded-[0.35em] px-[0.4em] py-[0.05em] text-[0.8em] font-black tabular-nums" style={{ background: Math.abs(e) < 0.4 ? 'rgba(255,255,255,.14)' : e > 0 ? '#F2F2F2' : '#1C1C1C', color: Math.abs(e) < 0.4 ? '#fff' : e > 0 ? '#141414' : '#fff', boxShadow: e < -0.4 ? 'inset 0 0 0 1px rgba(255,255,255,.35)' : undefined }}>{evalText(e)}</span>
                 );
-                // Variation titles sit as a banner above the board; the other cards are big panels.
-                if (frame.card === 'line') {
-                  const l = o.lines[frame.idx ?? 0]; if (!l) return null;
-                  return (
-                    <motion.div key={`line${frame.idx}`} initial={{ opacity: 0, y: -20, scale: 0.9 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -12 }} transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-                      className="absolute inset-x-[6%] top-[13%] z-30 rounded-[2.4cqh] p-[1.6cqh] text-center text-white shadow-2xl" style={{ background: 'rgba(11,17,18,.92)', border: `3px solid ${COL[(frame.idx ?? 0) % 4]}`, fontSize: 'clamp(11px,1.9cqh,20px)' }}>
-                      <p className="font-black uppercase tracking-wide" style={{ color: COL[(frame.idx ?? 0) % 4], fontSize: '0.85em' }}>Line {(frame.idx ?? 0) + 1} of {o.lines.length}</p>
-                      <p className="font-black leading-tight" style={{ fontSize: '1.7em' }}>{l.name}</p>
-                      <div className="mt-[0.4em] flex items-center justify-center gap-[0.6em] text-[0.85em] font-bold text-white/75">
-                        <span>{figurine(l.moves[0], mover === 'White')}…</span>
-                        {l.pct != null && l.pct > 0 && <span>{l.pct}% of games</span>}
-                        {evChip(l.eval)}
-                      </div>
-                    </motion.div>
-                  );
-                }
+                // Variations don't get a pop-up: they light up on the line map instead.
+                if (frame.card === 'line') return null;
                 return (
                   <motion.div key={frame.card} initial={{ opacity: 0, y: 30, scale: 0.92 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -20 }} transition={{ type: 'spring', stiffness: 260, damping: 20 }}
                     className="absolute inset-x-[5%] top-[22%] z-30 rounded-[3cqh] bg-[#0B1112]/93 p-[2.4cqh] text-white shadow-2xl ring-2 ring-white/70" style={{ fontSize: 'clamp(11px,1.9cqh,20px)' }}>
@@ -1967,7 +2056,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
               const m = f.kind === 'move' ? plies[f.ply - 1] : null;
               const c = m ? (m.san.includes('#') ? 'checkmate' : m.review?.classification) : null;
               const tone = c && LABEL[c] && !['best', 'excellent', 'good', 'book'].includes(c) ? LABEL[c].color : null;
-              const label = f.kind === 'move' ? (m ? figurine(m.san, m.color === 'w') : 'Start') : f.kind === 'countdown' ? (f.anchor ? `⏱${f.n}` : String(f.n)) : f.kind === 'card' ? 'Card' : f.kind === 'openCard' ? (f.card === 'line' ? `Line ${(f.idx ?? 0) + 1}` : ({ ideas: 'Ideas', stats: 'Results', options: 'Replies', trap: 'Trap' } as Record<string, string>)[f.card]) : f.kind === 'scoutCard' ? (f.card === 'weak' ? `Weak ${(f.idx ?? 0) + 1}` : ({ profile: 'Profile', colors: 'Colours', openings: 'Openings', habits: 'Habits' } as Record<string, string>)[f.card]) : f.kind === 'lessonText' ? 'Coach' : f.kind === 'lessonBoard' ? (f.celebrate ? '✓' : 'Board') : f.kind === 'scanPhoto' ? 'Photo' : f.kind === 'splash' ? 'Splash' : f.kind === 'promoCard' ? (f.card === 'vs' ? `Row ${f.upTo}` : f.card[0].toUpperCase() + f.card.slice(1))
+              const label = f.kind === 'move' ? (m ? figurine(m.san, m.color === 'w') : 'Start') : f.kind === 'countdown' ? (f.anchor ? `⏱${f.n}` : String(f.n)) : f.kind === 'card' ? 'Card' : f.kind === 'rewind' ? '⏪' : f.kind === 'openCard' ? (f.card === 'line' ? `Line ${(f.idx ?? 0) + 1}` : ({ ideas: 'Ideas', stats: 'Results', options: 'Replies', trap: 'Trap' } as Record<string, string>)[f.card]) : f.kind === 'scoutCard' ? (f.card === 'weak' ? `Weak ${(f.idx ?? 0) + 1}` : ({ profile: 'Profile', colors: 'Colours', openings: 'Openings', habits: 'Habits' } as Record<string, string>)[f.card]) : f.kind === 'lessonText' ? 'Coach' : f.kind === 'lessonBoard' ? (f.celebrate ? '✓' : 'Board') : f.kind === 'scanPhoto' ? 'Photo' : f.kind === 'splash' ? 'Splash' : f.kind === 'promoCard' ? (f.card === 'vs' ? `Row ${f.upTo}` : f.card[0].toUpperCase() + f.card.slice(1))
                 : ({ title: 'Title', intro: 'Hook', hold: 'Start', better: 'Line', split: 'Split', reveal: 'Rating', summary: 'Summary', outro: 'End' } as Record<string, string>)[f.kind] ?? f.kind;
               const starts = stickers.filter((st) => st.from === id).length, ends = stickers.filter((st) => st.to === id).length;
               return (
@@ -2069,11 +2158,13 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
             {toggle('voice', 'Coach voiceover')}
             {prefs.voice && (
               <select value={prefs.voiceName} onChange={(e) => set('voiceName', e.target.value)} className="rounded-lg bg-white/5 px-2 py-1 text-[12px] text-white ring-1 ring-white/10">
-                {['onyx', 'nova', 'echo', 'fable', 'alloy', 'shimmer', 'coral', 'sage'].map((v) => <option key={v} value={v}>{v[0].toUpperCase() + v.slice(1)}</option>)}
+                {premiumVoice && <option value="premium">Premium narrator</option>}
+                {['ash', 'ballad', 'verse', 'coral', 'sage', 'onyx', 'nova', 'echo', 'fable', 'alloy', 'shimmer'].map((v) => <option key={v} value={v}>{v[0].toUpperCase() + v.slice(1)}{v === 'ash' ? ' (recommended)' : ''}</option>)}
               </select>
             )}
             {prefs.voice && <Mic size={14} className="text-[#B8E08C]" />}
           </div>
+          {prefs.voice && voicePrep && voicePrep.done < voicePrep.total && <p className="-mt-1 mb-3 flex items-center gap-1.5 text-[12px] text-[#B8E08C]"><Mic size={12} />{waitVoice ? 'Starts as soon as the voiceover is ready' : 'Preparing the voiceover'} · {voicePrep.done}/{voicePrep.total}</p>}
           {prefs.voice && voiceNote && <p className="-mt-1 mb-3 text-[12px] text-[#E8B447]">{voiceNote}</p>}
           <p className="mb-1 text-[11px] font-bold uppercase tracking-wide text-white/50"><Music size={11} className="mr-1 inline" />Music &amp; sound</p>
           <div className="mb-2 flex flex-wrap gap-1.5">

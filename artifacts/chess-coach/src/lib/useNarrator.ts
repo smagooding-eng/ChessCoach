@@ -15,7 +15,8 @@ import { apiFetch } from '@/lib/api';
 // belonging to an older generation is dropped, so the voice always moves to
 // whatever page is on screen.
 
-const VOICE = 'nova';
+// The premium narrator when the server has one (ElevenLabs), otherwise OpenAI's best voice.
+const VOICE = 'premium';
 const cache = new Map<string, Promise<string>>(); // chunk text -> object URL
 const CACHE_LIMIT = 60;
 

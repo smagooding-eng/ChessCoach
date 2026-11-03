@@ -23,6 +23,27 @@ const NARRATION_STYLE =
 const KIDS_STYLE =
   "You are a warm, gentle, playful friend talking to a child aged 5 to 8. Speak a little slowly and very clearly, with a smile in your voice. Sound natural and human: friendly and encouraging, lively on exciting words like 'Wow' or 'Checkmate', soft and kind when something goes wrong. Never sound robotic or rushed.";
 
+// Content Studio voiceovers: one confident, energetic narrator for short videos.
+const STUDIO_STYLE =
+  "You are a charismatic chess content creator narrating a short vertical video. Confident, upbeat and natural, like a top chess YouTuber: clear diction, real energy on exciting moments, a quick but never rushed pace, no sing-song, never robotic. Say chess moves crisply (for example 'knight f3', 'bishop takes c6').";
+
+// Premium voice (ElevenLabs) when a key is set on the server; otherwise OpenAI.
+const ELEVEN_KEY = process.env.ELEVENLABS_API_KEY || "";
+const ELEVEN_VOICE = process.env.ELEVENLABS_VOICE_ID || "pNInz6obpgDQGcFmaJgB";
+async function speakEleven(text: string): Promise<Buffer> {
+  const r = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(ELEVEN_VOICE)}?output_format=mp3_44100_128`, {
+    method: "POST",
+    headers: { "xi-api-key": ELEVEN_KEY, "Content-Type": "application/json", Accept: "audio/mpeg" },
+    body: JSON.stringify({ text, model_id: process.env.ELEVENLABS_MODEL || "eleven_multilingual_v2", voice_settings: { stability: 0.45, similarity_boost: 0.8, style: 0.35, use_speaker_boost: true } }),
+  });
+  if (!r.ok) throw new Error(`ElevenLabs ${r.status}`);
+  return Buffer.from(await r.arrayBuffer());
+}
+
+router.get("/tts/voices", (_req, res) => {
+  res.json({ premium: !!ELEVEN_KEY, best: ELEVEN_KEY ? "premium" : "ash" });
+});
+
 const CACHE_MAX_ENTRIES = 400;
 const CACHE_MAX_BYTES = 80 * 1024 * 1024;
 const audioCache = new Map<string, Buffer>();
@@ -78,6 +99,7 @@ router.post("/tts/speak", async (req, res): Promise<void> => {
   try {
     const { text, voice, style } = req.body as { text?: string; voice?: string; style?: string };
     const kids = style === "kids";
+    const studio = style === "studio";
 
     if (!text || text.trim().length === 0) {
       res.status(400).json({ error: "text is required" });
@@ -85,15 +107,20 @@ router.post("/tts/speak", async (req, res): Promise<void> => {
     }
 
     const trimmed = text.slice(0, 4096);
-    const validVoices = ["alloy", "echo", "fable", "nova", "onyx", "shimmer", "coral", "sage"] as const;
+    const validVoices = ["alloy", "ash", "ballad", "coral", "echo", "fable", "nova", "onyx", "sage", "shimmer", "verse"] as const;
     type Voice = typeof validVoices[number];
-    const selectedVoice: Voice = validVoices.includes(voice as Voice) ? (voice as Voice) : "nova";
+    const premium = voice === "premium" && !!ELEVEN_KEY;
+    // "premium" without a premium key: OpenAI's best narrator.
+    const selectedVoice: Voice = validVoices.includes(voice as Voice) ? (voice as Voice) : (studio || voice === "premium") ? "ash" : "nova";
 
-    const key = createHash("sha1").update(`${selectedVoice}\u0000${kids ? "kids" : ""}\u0000${trimmed}`).digest("hex");
+    const key = createHash("sha1").update(`${premium ? "eleven:" + ELEVEN_VOICE : selectedVoice}\u0000${kids ? "kids" : studio ? "studio" : ""}\u0000${trimmed}`).digest("hex");
     let buffer = cacheGet(key);
     if (!buffer) {
       try {
-        buffer = await speakFast(trimmed, selectedVoice, kids ? KIDS_STYLE : NARRATION_STYLE);
+        if (premium) {
+          try { buffer = await speakEleven(trimmed); }
+          catch (err) { logger.warn({ err }, "Premium TTS failed, using OpenAI"); buffer = await speakFast(trimmed, "ash", STUDIO_STYLE); }
+        } else buffer = await speakFast(trimmed, selectedVoice, kids ? KIDS_STYLE : studio ? STUDIO_STYLE : NARRATION_STYLE);
       } catch (err) {
         logger.warn({ err }, "Fast TTS failed, falling back to gpt-audio");
         buffer = await speakLegacy(trimmed, selectedVoice);
