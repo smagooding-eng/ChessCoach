@@ -130,7 +130,7 @@ type Frame =
   /** A beat on the starting position once the title / hook clears, so the first move is never hidden. */
   | { kind: 'hold'; fen: string; last: { from: string; to: string } | null }
   /** Opening clips: the hook scene, first thing on screen (the trap's final position, or the big question). */
-  | { kind: 'teaser'; fen: string; last: { from: string; to: string } | null; text: string; sub: string; said: string; mate: boolean }
+  | { kind: 'teaser'; fen: string; last: { from: string; to: string } | null; text: string; sub: string; said: string; mate: boolean; /** Shows like / follow / share chips (the line says so). */ cta?: boolean }
   | { kind: 'outro'; fen: string };
 
 const LABEL: Record<string, { text: string; color: string; glyph: string }> = {
@@ -180,6 +180,8 @@ const DEFAULT_PREFS = {
   splashCta: true, ctaLine: 'Follow for more chess, and share this with a friend who needs to see it!',
   /** Adds a ChessScout.net line after the call to action (spoken and subtitled). */
   ctaSite: true, siteLine: 'Scout your next opponent free at ChessScout.net.',
+  /** One-line opening videos: said near the start, right after what's about to be explained. */
+  lineCtaLine: "Don't forget to like, follow and share for the other lines of this opening, and more openings!",
   /** Openings: a hook scene first; Full (every line) or Quick (one line plus the trap, under a minute). */
   openTeaser: true, openCut: 'full' as 'full' | 'quick',
   /** Clean view's 5-second lead-in: the first scene, still (so an untrimmed video never opens on black), or black. */
@@ -929,11 +931,12 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
       const [, m] = clip.ranges.main;
       const keyFen = fenAt(m), keyLast = lastAt(m), endFen = fenAt(b), endLast = lastAt(b);
       if (isComp && isFirst) out.push({ kind: 'title', fen: fenAt(0) });
+      const early = stripEmoji(prefs.lineCtaLine.trim());
       if (prefs.openTeaser && (!isComp || isFirst)) {
         const nw = ['one', 'two', 'three', 'four', 'five', 'six'][clip.lineMode.no - 1] ?? String(clip.lineMode.no);
         out.push({ kind: 'teaser', fen: endFen, last: endLast, mate: false,
           text: `${o.name} · Line ${clip.lineMode.no} 🔥`, sub: `The ${l.name}, every move explained`,
-          said: `The ${o.name}, line ${nw}: the ${l.name}. Every move, and why it works.` });
+          said: `The ${o.name}, line ${nw}: the ${l.name}. Every move, and why it works.${early ? ` ${early}` : ''}`, cta: !!early });
       } else if (prefs.intro) out.push({ kind: 'intro', fen: fenAt(0) });
       out.push({ kind: 'hold', fen: fenAt(0), last: null });
       for (let p = 1; p <= m; p++) out.push({ kind: 'move', ply: p });
@@ -1094,7 +1097,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
     if (prefs.guessRating && !clip.isTrap && (clip.ratings.w || clip.ratings.b)) out.push({ kind: 'reveal', fen: lastFen });
     if (prefs.outro && isLast) out.push({ kind: 'outro', fen: lastFen });
     return withInserts(out);
-  }, [clip, prefs.before, prefs.trapBefore, prefs.after, prefs.intro, prefs.guess, prefs.betterLine, prefs.guessRating, prefs.outro, prefs.split, prefs.reviewMode, prefs.countdownSecs, prefs.splash, prefs.openTeaser, prefs.openCut, inserts, loadedKey, isComp, isFirst, isLast]);
+  }, [clip, prefs.before, prefs.trapBefore, prefs.after, prefs.intro, prefs.guess, prefs.betterLine, prefs.guessRating, prefs.outro, prefs.split, prefs.reviewMode, prefs.countdownSecs, prefs.splash, prefs.openTeaser, prefs.openCut, prefs.lineCtaLine, inserts, loadedKey, isComp, isFirst, isLast]);
 
   // ── Keyframes: a stable id per frame (so pauses and sticker in/out points survive setting changes) ─
   const frameIds = useMemo(() => assignIds(frames, loadedKey), [frames]);
@@ -1133,7 +1136,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
     const s = prefs.speed * 1000;
     switch (f.kind) {
       case 'intro': return frames[0]?.kind === 'teaser' ? 1300 : 1600;
-      case 'teaser': return 2600;
+      case 'teaser': return f.cta ? 4400 : 2600;
       case 'hold': return 800;
       case 'countdown': return 1000;
       case 'card': return f.secs * 1000;
@@ -1395,7 +1398,10 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
     const o = clip.openingData; const l = o.lines[0]; const [a, b] = clip.ranges.lines[0] ?? [0, -1];
     const creator = prefs.tone !== 'teacher';
     if (f.kind === 'move') {
-      if (f.ply === clip.ranges.main[1]) return `That's the ${o.name}. Now the ${l.name}.`;
+      if (f.ply === clip.ranges.main[1]) {
+        const early = !prefs.openTeaser && prefs.lineCtaLine.trim() ? ` ${stripEmoji(prefs.lineCtaLine.trim())}` : '';
+        return `That's the ${o.name}.${early} Now the ${l.name}.`;
+      }
       if (f.ply < a || f.ply > b) return null;
       const pl = clip.plies[f.ply - 1];
       return pl ? `${spokenSan(pl.san)}. ${pl.review?.explanation ?? ''}`.trim().slice(0, 320) : null;
@@ -2339,6 +2345,16 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
                   className="font-black leading-[1.05]" style={{ fontSize: 'clamp(24px,5.8cqh,60px)', color: frame.mate ? '#FFD84D' : '#fff', textShadow: '0 0 4px #000, 0 4px 0 #000, 0 6px 22px rgba(0,0,0,.7)', WebkitTextStroke: '1.5px #000' }}>{frame.text}</motion.p>
                 <motion.p initial={{ y: 14, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.45 }}
                   className="mx-auto mt-[1cqh] w-fit rounded-full bg-black/60 px-[1em] py-[0.3em] font-black text-white" style={{ fontSize: 'clamp(11px,2cqh,20px)' }}>{frame.sub} 👀</motion.p>
+                {frame.cta && (
+                  <div className="mt-[1.2cqh] flex justify-center gap-[1cqh]" style={{ fontSize: 'clamp(11px,1.9cqh,20px)' }}>
+                    {[['👍', 'Like'], ['＋', 'Follow'], ['↗', 'Share']].map(([g, t], n) => (
+                      <motion.span key={t} initial={{ y: 16, opacity: 0 }} animate={{ y: 0, opacity: 1, scale: [1, 1.08, 1] }} transition={{ delay: 1.4 + n * 0.25, scale: { delay: 2 + n * 0.25, duration: 0.6, repeat: Infinity, repeatDelay: 1.4 } }}
+                        className="inline-flex items-center gap-[0.35em] rounded-full px-[0.9em] py-[0.3em] font-black text-white" style={{ background: n === 1 ? '#81B64C' : 'rgba(0,0,0,.55)', border: '1.5px solid rgba(255,255,255,.55)' }}>
+                        <span>{g}</span>{t}
+                      </motion.span>
+                    ))}
+                  </div>
+                )}
               </motion.div>
             )}
             {frame?.kind === 'teaser' && frame.mate && <motion.div key={`tflash${playing ? 1 : 0}`} className="pointer-events-none absolute inset-0 z-20" initial={{ opacity: 0.7 }} animate={{ opacity: 0 }} transition={{ duration: 0.6 }} style={{ background: 'radial-gradient(circle at 50% 50%, rgba(255,216,77,.55), transparent 70%)' }} />}
@@ -2754,6 +2770,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
                 </div>
                 {toggle('openTeaser', 'Hook scene first')}
               </div>
+              {clip.lineMode && <label className="mt-2 block text-[12px] text-white/60">Like / follow / share line (said at the start, after the intro; empty = none)<input value={prefs.lineCtaLine} onChange={(e) => set('lineCtaLine', e.target.value)} className="mt-0.5 w-full rounded bg-white/5 px-2 py-1 text-white" /></label>}
               <p className="mt-1 text-[11.5px] text-white/45">Quick keeps the ideas, the replies, the most played line and the trap. The hook scene opens on the trap's final position (or the big question) so the first second grabs people.</p>
             </div>
           )}
