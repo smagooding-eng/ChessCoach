@@ -355,7 +355,7 @@ const building = new Map<string, Promise<StudioOpeningData | null>>();
 const ENGINE_BUDGET_MS = 18_000;
 const withTimeout = <T,>(p: Promise<T>, ms: number, fallback: T) =>
   Promise.race([p, new Promise<T>((res) => setTimeout(() => res(fallback), ms))]);
-const NO_EVAL = { best: null, moves: new Map<string, number>() };
+const NO_EVAL: { best: number | null; bestSan?: string; moves: Map<string, number> } = { best: null, moves: new Map<string, number>() };
 
 export async function studioOpening(id: string): Promise<StudioOpeningData | null> {
   const def = STUDIO_OPENINGS.find((o) => o.id === id);
