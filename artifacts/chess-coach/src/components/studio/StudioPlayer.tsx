@@ -4,6 +4,7 @@ import { Chess } from 'chess.js';
 import { X, Play, Pause, RotateCcw, ChevronLeft, ChevronRight, Shuffle, Video, Square, Eye, EyeOff, FlipVertical2, Trash2, Copy, SkipForward, SkipBack, Mic, Image as ImageIcon, Music, ArrowUp, ArrowDown } from 'lucide-react';
 import { ChessBoard, type MoveQuality } from '@/components/ChessBoard';
 import { LookOverride, randomLook, lookLabel, playMoveSound, BOARD_THEMES, type BoardLook } from '@/context/SettingsContext';
+import { routeSoundsTo } from '@/lib/sounds';
 import { apiFetch } from '@/lib/api';
 import { normalizeFen } from '@/lib/utils';
 import { StudioBadge, Medallion, Rays, CountdownRing, EvalSwing, rankColor, shade } from './StudioBadge';
@@ -639,7 +640,31 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
   // screen. Double-tap brings up Replay / Exit; back or Esc also leaves.
   const [blank, setBlank] = useState(false);
   const blankTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // While in clean view the exact soundtrack (music, voice, move sounds) is
+  // recorded too, starting with the black screen, so it lines up with a screen
+  // recording made at the same time and can be added to it in any editor.
+  const trackRec = useRef<MediaRecorder | null>(null);
+  const [soundtrack, setSoundtrack] = useState<{ url: string; ext: string } | null>(null);
+  const startSoundtrack = () => {
+    try {
+      if (trackRec.current?.state === 'recording') trackRec.current.stop();
+      const m = mus(); routeSoundsTo(m.unlock(), m.sfx);
+      const type = ['audio/mp4', 'audio/webm;codecs=opus', 'audio/webm'].find((t) => typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(t)) ?? '';
+      const rec = new MediaRecorder(m.stream, type ? { mimeType: type, audioBitsPerSecond: 192_000 } : undefined);
+      const chunks: Blob[] = [];
+      rec.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
+      rec.onstop = () => {
+        if (!chunks.length) return;
+        const blob = new Blob(chunks, { type: type || 'audio/webm' });
+        setSoundtrack((old) => { if (old) URL.revokeObjectURL(old.url); return { url: URL.createObjectURL(blob), ext: type.includes('mp4') ? 'm4a' : 'webm' }; });
+      };
+      rec.start(500);
+      trackRec.current = rec;
+    } catch { /* recording audio isn't supported here */ }
+  };
+  const stopSoundtrack = () => { if (trackRec.current?.state === 'recording') trackRec.current.stop(); trackRec.current = null; };
   const startBlank = () => {
+    startSoundtrack();
     setExitHint(0); setPlaying(false); setBlank(true); blankDone.current = false;
     if (blankTimer.current) clearTimeout(blankTimer.current);
     // After 5s the clip starts; the screen stays black until it's actually playing
@@ -652,10 +677,10 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
   const cleanTap = () => { const now = Date.now(); if (now - lastTap.current < 350) { lastTap.current = 0; showExit(); } else lastTap.current = now; };
   const enterClean = () => {
     // Unlock sound now (this tap), so music can start when the clip does.
-    if (prefs.music !== 'off') { try { void (mus() as unknown as { ensure: () => AudioContext }).ensure().resume(); } catch { /* ignore */ } }
+    try { const m = mus(); routeSoundsTo(m.unlock(), m.sfx); } catch { /* ignore */ }
     setClean(true); startBlank(); try { window.history.pushState({ csClean: 1 }, ''); } catch { /* ignore */ }
   };
-  const exitClean = () => { setClean(false); setExitHint(0); setBlank(false); if (blankTimer.current) { clearTimeout(blankTimer.current); blankTimer.current = null; } try { if (window.history.state?.csClean) { ignorePop.current = true; window.history.back(); } } catch { /* ignore */ } };
+  const exitClean = () => { stopSoundtrack(); setClean(false); setExitHint(0); setBlank(false); if (blankTimer.current) { clearTimeout(blankTimer.current); blankTimer.current = null; } try { if (window.history.state?.csClean) { ignorePop.current = true; window.history.back(); } } catch { /* ignore */ } };
   // Back button: leaves clean view if it's on, otherwise closes the player (back to the Studio list, picks kept).
   const cleanRef = useRef(false); cleanRef.current = clean;
   const ignorePop = useRef(false);
@@ -664,7 +689,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
     try { window.history.pushState({ csPlayer: 1 }, ''); } catch { /* ignore */ }
     const h = () => {
       if (ignorePop.current) { ignorePop.current = false; return; }
-      if (cleanRef.current) { setClean(false); setExitHint(0); setBlank(false); if (blankTimer.current) { clearTimeout(blankTimer.current); blankTimer.current = null; } return; }
+      if (cleanRef.current) { stopSoundtrack(); setClean(false); setExitHint(0); setBlank(false); if (blankTimer.current) { clearTimeout(blankTimer.current); blankTimer.current = null; } return; }
       closeRef.current();
     };
     window.addEventListener('popstate', h);
@@ -1042,7 +1067,13 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
   // ── Music ───────────────────────────────────────────────────────────────
   const music = useRef<StudioMusic | null>(null);
   const mus = () => (music.current ??= new StudioMusic());
-  useEffect(() => () => music.current?.dispose(), []);
+  // Move sounds play through the Studio's mix, so they're in the soundtrack too.
+  // (Set up on the first Play, which counts as a tap, so phones allow the sound.)
+  useEffect(() => () => { routeSoundsTo(null, null); music.current?.dispose(); }, []);
+  useEffect(() => {
+    if (!playing) return;
+    try { const m = mus(); routeSoundsTo(m.unlock(), m.sfx); } catch { /* ignore */ }
+  }, [playing]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { music.current?.setVolume(prefs.musicVol); }, [prefs.musicVol]);
   useEffect(() => {
     if (playing && prefs.music !== 'off') { const m = mus(); m.setVolume(prefs.musicVol); m.start(prefs.music); }
@@ -1298,6 +1329,12 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
       setRecNote('Recording needs Chrome on a computer. On a phone, use "Clean view" and your screen recorder.');
     }
   };
+  // The clean-view soundtrack stops a moment after the clip ends.
+  useEffect(() => {
+    if (!clean || blank || playing || i < frames.length - 1 || !isLast || trackRec.current?.state !== 'recording') return;
+    const t = setTimeout(stopSoundtrack, 1200);
+    return () => clearTimeout(t);
+  }, [clean, blank, playing, i, frames.length]); // eslint-disable-line react-hooks/exhaustive-deps
   // Stop a recording when the clip ends.
   useEffect(() => {
     if (!recording || playing || i < frames.length - 1 || !isLast) return;
@@ -2141,6 +2178,11 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
               {recording ? <Square size={14} /> : <Video size={14} />}{recording ? 'Stop recording' : 'Record clip'}
             </button>
             <button onClick={enterClean} className={ctl}><EyeOff size={14} className="mr-1 inline" />Clean view</button>
+            {soundtrack && (
+              <a href={soundtrack.url} download={`${clip?.fileBase ?? 'chessscout-clip'}-soundtrack.${soundtrack.ext}`} className={ctl} style={{ background: '#81B64C' }}>
+                <Music size={14} className="mr-1 inline" />Download soundtrack
+              </a>
+            )}
             <button onClick={saveCover} className={ctl} title="Download a cover image for the post"><ImageIcon size={14} className="mr-1 inline" />Cover image</button>
           </div>
           {isComp && (
@@ -2364,7 +2406,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
 
           <p className="mt-3 text-[11.5px] leading-snug text-white/45">
             Music is made live in the browser (original, no copyright claims); it starts on the beat when you press Play. Space plays, arrows step, R restarts, N / P next and previous moment, Esc leaves clean view. "Record clip" saves just the frame (Chrome on a computer: pick this tab and turn on tab audio for move sounds).
-            On a phone, tap Clean view and start your screen recorder: the screen stays black for 5 seconds, then the clip plays from the start with nothing else on screen. Double-tap for Replay or Exit (back also exits). Settings are remembered for the next clip.
+            On a phone, tap Clean view and start your screen recorder: the screen stays black for 5 seconds, then the clip plays from the start with nothing else on screen. Double-tap for Replay or Exit (back also exits). If your recording has no sound, use Download soundtrack afterwards: it's the clip's exact audio, starting with the black screen, so in CapCut or TikTok you drop it under the recording at the very start. Settings are remembered for the next clip.
           </p>
           <p className="mt-2 text-[11px] text-white/35"><Eye size={12} className="mr-1 inline" />{clip.label}</p>
         </div>

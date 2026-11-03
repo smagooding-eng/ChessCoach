@@ -63,6 +63,9 @@ export class StudioMusic {
   private fx!: GainNode;          // accents (not ducked)
   private voiceBus!: GainNode;
   private dest!: MediaStreamAudioDestinationNode;
+  private mediaOut: HTMLAudioElement | null = null;
+  /** Move sounds come in here (see routeSoundsTo in lib/sounds). */
+  sfx!: GainNode;
   private noise!: AudioBuffer;
   private style: Style | null = null;
   private step = 0;
@@ -78,7 +81,17 @@ export class StudioMusic {
     this.ctx = ctx;
     this.dest = ctx.createMediaStreamDestination();
     const out = ctx.createGain(); out.gain.value = 1;
-    out.connect(ctx.destination); out.connect(this.dest);
+    out.connect(this.dest);
+    // On Android, play the mix through a media element instead of straight to
+    // the speaker: the phone's screen recorder only picks up "media" audio,
+    // and Web Audio output often isn't counted as that.
+    if (/Android/i.test(navigator.userAgent)) {
+      try {
+        const el = new Audio(); el.srcObject = this.dest.stream; el.setAttribute('playsinline', ''); void el.play().catch(() => out.connect(ctx.destination));
+        this.mediaOut = el;
+      } catch { out.connect(ctx.destination); }
+    } else out.connect(ctx.destination);
+    this.sfx = ctx.createGain(); this.sfx.gain.value = 1; this.sfx.connect(out);
     this.master = ctx.createGain(); this.master.gain.value = this.volume; this.master.connect(out);
     this.fx = ctx.createGain(); this.fx.gain.value = Math.min(1, this.volume * 1.4); this.fx.connect(out);
     this.voiceBus = ctx.createGain(); this.voiceBus.gain.value = 1; this.voiceBus.connect(out);
@@ -87,6 +100,9 @@ export class StudioMusic {
     for (let k = 0; k < d.length; k++) d[k] = Math.random() * 2 - 1;
     return ctx;
   }
+
+  /** Make sure sound is on (call from a tap). */
+  unlock() { const c = this.ensure(); void c.resume(); void this.mediaOut?.play().catch(() => {}); return c; }
 
   /** The mixed music + voice, for a recording. */
   get stream(): MediaStream { this.ensure(); return this.dest.stream; }
@@ -228,6 +244,7 @@ export class StudioMusic {
 
   dispose() {
     this.stop();
+    try { this.mediaOut?.pause(); if (this.mediaOut) this.mediaOut.srcObject = null; } catch { /* ignore */ }
     const c = this.ctx; this.ctx = null;
     if (c) setTimeout(() => void c.close().catch(() => {}), 400);
   }

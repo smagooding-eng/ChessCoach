@@ -30,7 +30,14 @@ export const SOUND_PACKS: Record<SoundPack, { label: string; blurb: string; grou
 let ctx: AudioContext | null = null;
 let noiseBuf: AudioBuffer | null = null;
 
+// The Content Studio routes move sounds into its own mix (with the music and
+// voice), so they're in the soundtrack and the video it records.
+let studioRoute: { ctx: AudioContext; node: AudioNode } | null = null;
+export function routeSoundsTo(ac: AudioContext | null, node: AudioNode | null) { studioRoute = ac && node ? { ctx: ac, node } : null; }
+const outOf = (ac: AudioContext): AudioNode => (studioRoute && studioRoute.ctx === ac ? studioRoute.node : ac.destination);
+
 function audio(): AudioContext | null {
+  if (studioRoute) { if (studioRoute.ctx.state === 'suspended') studioRoute.ctx.resume().catch(() => {}); return studioRoute.ctx; }
   try {
     if (!ctx) ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
     if (ctx.state === 'suspended') ctx.resume().catch(() => {});
@@ -58,7 +65,7 @@ function click(ac: AudioContext, t: number, freq: number, q: number, decay: numb
   g.gain.setValueAtTime(0.0001, t);
   g.gain.exponentialRampToValueAtTime(vol, t + 0.002);
   g.gain.exponentialRampToValueAtTime(0.0001, t + decay);
-  src.connect(bp); bp.connect(g); g.connect(ac.destination);
+  src.connect(bp); bp.connect(g); g.connect(outOf(ac));
   src.start(t); src.stop(t + decay + 0.02);
 }
 
@@ -72,7 +79,7 @@ function tone(ac: AudioContext, t: number, freq: number, decay: number, vol: num
   g.gain.setValueAtTime(0.0001, t);
   g.gain.exponentialRampToValueAtTime(vol, t + 0.004);
   g.gain.exponentialRampToValueAtTime(0.0001, t + decay);
-  o.connect(g); g.connect(ac.destination);
+  o.connect(g); g.connect(outOf(ac));
   o.start(t); o.stop(t + decay + 0.02);
 }
 
@@ -105,7 +112,7 @@ function bus(ac: AudioContext, roomSize: number, room: number): { dry: GainNode;
   const key = `${roomSize}:${room}`;
   const hit = buses.get(key);
   if (hit && hit.dry.context === ac) return hit;
-  const dry = ac.createGain(); dry.gain.value = 1; dry.connect(ac.destination);
+  const dry = ac.createGain(); dry.gain.value = 1; dry.connect(outOf(ac));
   const wet = ac.createGain(); wet.gain.value = room;
   const conv = ac.createConvolver();
   // Small room: decaying stereo noise with a soft high cut.
@@ -121,7 +128,7 @@ function bus(ac: AudioContext, roomSize: number, room: number): { dry: GainNode;
     }
   }
   conv.buffer = ir;
-  wet.connect(conv); conv.connect(ac.destination);
+  wet.connect(conv); conv.connect(outOf(ac));
   const b = { dry, wet };
   buses.set(key, b);
   return b;
