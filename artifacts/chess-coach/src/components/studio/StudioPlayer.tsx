@@ -171,6 +171,8 @@ const DEFAULT_PREFS = {
   before: 8, after: 5, speed: 1.2, guess: true, remix: true, captions: true, effects: true, arrow: true, sound: true, watermark: true,
   bg: 'green', betterLine: true, guessRating: false, outro: true, progress: true, intro: true, safeArea: true, showNames: false,
   handle: '@chessscout.net3', outroLine: 'Review your games free',
+  /** Call to action on the closing splash: spoken (with the voiceover on) and shown as big subtitles. */
+  splashCta: true, ctaLine: 'Follow for more chess, and share this with a friend who needs to see it!',
   split: true, voice: false, voiceName: 'ash', compTitle: 'Top moments this week',
   music: 'off' as MusicStyle, musicVol: 0.5, beatSync: true, musicFx: true, subs: true, pieceFx: true, trapBefore: 99, countdownSecs: 3, choices: false, zoom: false, splash: true, reviewMode: 'highlights' as 'highlights' | 'full',
 };
@@ -934,7 +936,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
       case 'lessonText': return Math.max(2600, f.text.split(/\s+/).length * 340);
       case 'lessonBoard': return f.celebrate ? 2400 : Math.max(3000, f.text.split(/\s+/).length * 340);
       case 'scanPhoto': return 3200;
-      case 'splash': return 2800;
+      case 'splash': return prefs.splashCta ? 3600 : 2800;
       case 'promoCard': return f.card === 'vs' ? 1500 : 3600;
       case 'openCard': return f.card === 'line' ? 1900 : f.card === 'options' ? 5600 : f.card === 'trap' ? 2600 : 4600;
       case 'rewind': return 150;
@@ -1150,7 +1152,9 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
         const acc = a?.w != null && a?.b != null ? `White played with ${Math.round(a.w)} percent accuracy, Black with ${Math.round(a.b)}.` : 'Here is how both sides did.';
         return `${acc}${clip.overview ? ` ${clip.overview.split(/(?<=[.!?])\s/)[0]}` : ''}`.slice(0, 300);
       }
-      case 'outro': return `${stripEmoji(prefs.outroLine)}. Follow for more.`;
+      // The closing splash says the follow / share line, so the end card doesn't repeat it.
+      case 'outro': return prefs.splash && prefs.splashCta && isLast ? `${stripEmoji(prefs.outroLine)}.` : `${stripEmoji(prefs.outroLine)}. Follow for more.`;
+      case 'splash': return prefs.splashCta && prefs.ctaLine.trim() ? stripEmoji(prefs.ctaLine) : null;
       default: return null;
     }
   };
@@ -1190,7 +1194,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
       setVoiceNote(failed ? `${failed} line${failed > 1 ? 's' : ''} of the voiceover couldn't be made (it uses OpenAI), so ${failed > 1 ? 'they play' : 'it plays'} silently. Try again in a moment.` : null);
     })();
     return () => { live = false; };
-  }, [prefs.voice, prefs.voiceName, frames, hook, prefs.outroLine, compTitle, prefs.captions]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [prefs.voice, prefs.voiceName, frames, hook, prefs.outroLine, compTitle, prefs.captions, prefs.splashCta, prefs.ctaLine]); // eslint-disable-line react-hooks/exhaustive-deps
   const voiceReady = !prefs.voice || !voicePrep || voicePrep.done >= voicePrep.total;
   useEffect(() => { if (blank && playing && blankDone.current) setBlank(false); }, [blank, playing]);
   // The premium narrator (ElevenLabs) when the server has it; it becomes the default once.
@@ -1227,11 +1231,12 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
   // ── Word-by-word subtitles of the voiceover (burned into the frame, so they're in the recording) ─
   const [, setSubTick] = useState(0);
   const subsOn = prefs.voice && prefs.subs && playing;
+  const ctaOn = prefs.splashCta && playing && frames[i]?.kind === 'splash';
   useEffect(() => {
-    if (!subsOn) return;
+    if (!subsOn && !ctaOn) return;
     const t = setInterval(() => setSubTick((x) => x + 1), 70);
     return () => clearInterval(t);
-  }, [subsOn]);
+  }, [subsOn, ctaOn]);
 
   const restart = () => {
     looks.current.clear();
@@ -1931,6 +1936,32 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
               )}
             </AnimatePresence>
             {frame?.kind === 'splash' && <StudioSplash key={`splash${i}`} />}
+            {/* Call to action over the splash: big word-by-word subtitles (always, so it reads
+                with the sound off too) and follow / share / save chips. */}
+            {frame?.kind === 'splash' && prefs.splashCta && prefs.ctaLine.trim() && (() => {
+              const line = prefs.ctaLine.trim();
+              const words = line.split(/\s+/).filter(Boolean);
+              const len = Math.max(1200, (voiceLen.current.get(`${prefs.voiceName}|${stripEmoji(line)}`) ?? words.length * 0.36) * 1000);
+              const k = playing ? Math.max(0, Math.min(words.length - 1, Math.floor(((performance.now() - frameStart) / len) * words.length))) : 0;
+              const c0 = Math.floor(k / 4) * 4;
+              return (
+                <div className="pointer-events-none absolute inset-x-[5%] bottom-[11%] z-[50] text-center">
+                  <p className="font-black uppercase leading-[1.1]" style={{ fontSize: 'clamp(16px,3.3cqh,34px)', textShadow: '0 0 4px #000, 0 0 10px #000, 0 4px 0 #000', WebkitTextStroke: '1.5px #000' }}>
+                    {words.slice(c0, c0 + 4).map((w, n) => (
+                      <motion.span key={`${c0}-${w}-${n}`} initial={n === k - c0 ? { scale: 1.25 } : false} animate={{ scale: 1 }} className="inline-block" style={{ color: n === k - c0 ? '#FFD84D' : '#fff', marginRight: '0.28em' }}>{w}</motion.span>
+                    ))}
+                  </p>
+                  <div className="mt-[1.4cqh] flex justify-center gap-[1.2cqh]" style={{ fontSize: 'clamp(12px,2.1cqh,22px)' }}>
+                    {[['＋', 'Follow'], ['↗', 'Share'], ['🔖', 'Save']].map(([g, t], n) => (
+                      <motion.span key={t} initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1, scale: [1, 1.08, 1] }} transition={{ delay: 0.6 + n * 0.25, scale: { delay: 1.2 + n * 0.25, duration: 0.6, repeat: Infinity, repeatDelay: 1.4 } }}
+                        className="inline-flex items-center gap-[0.35em] rounded-full px-[0.9em] py-[0.35em] font-black text-white" style={{ background: n === 0 ? '#81B64C' : 'rgba(255,255,255,.14)', border: '1.5px solid rgba(255,255,255,.55)' }}>
+                        <span>{g}</span>{t}
+                      </motion.span>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
             {/* Text card inserted on the timeline */}
             <AnimatePresence>
               {frame?.kind === 'card' && (
@@ -2336,6 +2367,12 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
             <div className="mb-3 grid grid-cols-2 gap-2 text-[12px]">
               <label className="text-white/60">End card line<input value={prefs.outroLine} onChange={(e) => set('outroLine', e.target.value)} className="mt-0.5 w-full rounded bg-white/5 px-2 py-1 text-white" /></label>
               <label className="text-white/60">Handle<input value={prefs.handle} onChange={(e) => set('handle', e.target.value)} className="mt-0.5 w-full rounded bg-white/5 px-2 py-1 text-white" /></label>
+            </div>
+          )}
+          {prefs.splash && (
+            <div className="mb-3 text-[12px]">
+              <div className="mb-1 flex items-center gap-2">{toggle('splashCta', 'Follow / share call to action on the splash')}</div>
+              {prefs.splashCta && <label className="block text-white/60">Call to action (spoken with the voiceover, and shown as subtitles)<input value={prefs.ctaLine} onChange={(e) => set('ctaLine', e.target.value)} className="mt-0.5 w-full rounded bg-white/5 px-2 py-1 text-white" /></label>}
             </div>
           )}
 
