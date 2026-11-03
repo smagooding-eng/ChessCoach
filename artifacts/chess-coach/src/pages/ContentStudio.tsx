@@ -116,7 +116,7 @@ export function ContentStudio() {
     } finally { setAutoBusy(null); }
   };
   const keyOf = (x: StudioSource): string => (x.kind === 'trap' ? `t${x.trap.id}` : x.kind === 'puzzle' ? `p${x.puzzle.id}` : x.kind === 'review' ? `r${x.review.id}`
-    : x.kind === 'scout' ? `s${x.scout.id}` : x.kind === 'lesson' ? `l${x.lesson.id}` : x.kind === 'scan' ? `x${x.fen}` : x.kind === 'promo' ? `promo-${x.promo.template}-${x.promo.hook}` : x.kind === 'line' ? `line-${x.line.moves.map((m) => m.san).join(' ')}` : x.kind === 'opening' ? `o-${x.opening.id}` : `g${x.moment.gameId}-${x.moment.moveIndex}`);
+    : x.kind === 'scout' ? `s${x.scout.id}` : x.kind === 'lesson' ? `l${x.lesson.id}` : x.kind === 'scan' ? `x${x.fen}` : x.kind === 'promo' ? `promo-${x.promo.template}-${x.promo.hook}` : x.kind === 'line' ? `line-${x.line.moves.map((m) => m.san).join(' ')}` : x.kind === 'opening' ? `o-${x.opening.id}${x.opening.line ? `-${x.opening.line}` : ''}` : `g${x.moment.gameId}-${x.moment.moveIndex}`);
   const togglePick = (x: StudioSource) => setPicked((cur) => (cur.some((c) => keyOf(c) === keyOf(x)) ? cur.filter((c) => keyOf(c) !== keyOf(x)) : [...cur, x]));
   const isPicked = (x: StudioSource) => picked.some((c) => keyOf(c) === keyOf(x));
   const choose = (x: StudioSource) => (picking ? togglePick(x) : setOpen(x));
@@ -548,7 +548,7 @@ export function ContentStudio() {
           {agErr && <p className="mt-2 text-[12.5px] text-[#FF7A80]">{agErr}</p>}
         </div>
       </>) : view === 'openings' ? (<>
-        <p className="mb-3 max-w-2xl text-[13px] text-white/65">Each clip plays the opening, explains the ideas, shows who wins in real games, asks "what would you play?", reveals the replies with how often they're played and Stockfish's verdict, then plays every main line (and a trap, when there's one). The first open of each opening takes a few seconds while Stockfish looks at it.</p>
+        <p className="mb-3 max-w-2xl text-[13px] text-white/65">Tap an opening for the full clip: the ideas, who wins in real games, "what would you play?", the replies with how often they're played and Stockfish's verdict, every main line and a trap when there's one. Or tap one of its lines underneath for a video on just that line: every move explained, why it works, its real-game numbers and Stockfish's best next move. The first open of each opening takes a few seconds while Stockfish looks at it.</p>
         {!openings ? <Loader2 className="mx-auto mt-10 animate-spin text-white/60" /> : (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
             {openings.map((o) => {
@@ -556,16 +556,31 @@ export function ContentStudio() {
               let fen = new Chess().fen();
               try { const c = new Chess(); o.line.forEach((m) => c.move(m)); fen = c.fen(); } catch { /* start position */ }
               return (
-                <button key={o.id} onClick={() => choose(src)} className="relative overflow-hidden rounded-xl bg-white/5 text-left ring-1 ring-white/10 transition hover:ring-[#81B64C]"
-                  style={isPicked(src) ? { boxShadow: '0 0 0 3px #81B64C' } : undefined}>
-                  {isPicked(src) && <span className="absolute right-2 top-2 z-10 grid h-7 w-7 place-items-center rounded-full bg-[#81B64C] text-[13px] font-black">{picked.findIndex((c) => keyOf(c) === `o-${o.id}`) + 1}</span>}
-                  <div className="aspect-square w-full"><MiniBoard fen={fen} size={400} flipped={o.side === 'black'} /></div>
-                  <div className="p-2.5">
-                    <p className="truncate text-[13.5px] font-black">{o.name}</p>
-                    <p className="truncate text-[11.5px] text-white/55">For {o.side === 'white' ? 'White' : 'Black'} · {o.lines.length} lines</p>
-                    <p className="mt-0.5 line-clamp-2 text-[11px] text-white/45">{o.lines.join(' · ')}</p>
+                <div key={o.id} className="relative overflow-hidden rounded-xl bg-white/5 ring-1 ring-white/10" style={isPicked(src) ? { boxShadow: '0 0 0 3px #81B64C' } : undefined}>
+                  <button onClick={() => choose(src)} className="block w-full text-left transition hover:opacity-90">
+                    {isPicked(src) && <span className="absolute right-2 top-2 z-10 grid h-7 w-7 place-items-center rounded-full bg-[#81B64C] text-[13px] font-black">{picked.findIndex((c) => keyOf(c) === `o-${o.id}`) + 1}</span>}
+                    <div className="aspect-square w-full"><MiniBoard fen={fen} size={400} flipped={o.side === 'black'} /></div>
+                    <div className="px-2.5 pt-2.5">
+                      <p className="truncate text-[13.5px] font-black">{o.name}</p>
+                      <p className="truncate text-[11.5px] text-white/55">For {o.side === 'white' ? 'White' : 'Black'} · full clip, all {o.lines.length} lines</p>
+                    </div>
+                  </button>
+                  <div className="p-2.5 pt-1.5">
+                    <p className="mb-1 text-[10.5px] font-bold uppercase tracking-wide text-white/40">One video per line</p>
+                    <div className="flex flex-wrap gap-1">
+                      {o.lines.map((ln, k) => {
+                        const ls: StudioSource = { kind: 'opening', opening: { id: o.id, name: o.name, line: ln } };
+                        const on = isPicked(ls);
+                        return (
+                          <button key={ln} onClick={() => choose(ls)} className="rounded-full px-2 py-0.5 text-[11px] font-bold"
+                            style={{ background: on ? '#81B64C' : 'rgba(255,255,255,.08)', color: on ? '#fff' : '#C9CFCD' }}>
+                            {on ? `${picked.findIndex((c) => keyOf(c) === keyOf(ls)) + 1} · ` : `${k + 1}. `}{ln}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
-                </button>
+                </div>
               );
             })}
           </div>

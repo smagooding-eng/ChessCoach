@@ -66,14 +66,15 @@ export type StudioSource =
   | { kind: 'scan'; fen: string; photo?: string; label?: string }
   | { kind: 'promo'; promo: StudioPromo }
   | { kind: 'line'; line: StudioLine }
-  | { kind: 'opening'; opening: { id: string; name: string } };
+  /** line: one variation's name for a one-line deep-dive video (unset = the whole opening). */
+  | { kind: 'opening'; opening: { id: string; name: string; line?: string } };
 /** An opening clip: the main line, the ideas, the replies (with real-game and engine numbers) and each main variation. */
 export interface StudioOpening {
   id: string; name: string; side: 'white' | 'black'; hook: string; ideas: string[]; line: string[];
   games: number; results: { white: number; draw: number; black: number } | null;
   /** lines: which variations (by index) start with this move. */
   options: { san: string; pct: number | null; games: number; scorePct: number | null; eval: number | null; lines?: number[] }[];
-  lines: { name: string; short?: string; moves: string[]; note: string; pct: number | null; eval: number | null }[];
+  lines: { name: string; short?: string; moves: string[]; note: string; pct: number | null; eval: number | null; why?: string[]; games?: number; whiteScore?: number | null; next?: { san: string; eval: number | null } | null }[];
   trap: { name: string; moves: string[]; notes: string[]; critical: number; summary: string } | null;
 }
 /** A game made in the Position Explorer (best / worst moves per side), every move graded by Stockfish. */
@@ -101,6 +102,8 @@ interface Clip {
   isPromo?: boolean; promo?: StudioPromo;
   /** Opening clips: where the main line, each variation and the trap sit in plies (1-based, inclusive). */
   isOpening?: boolean; openingData?: StudioOpening; ranges?: { main: [number, number]; lines: [number, number][]; trap: [number, number] | null };
+  /** One-line deep dive: which line it is (1-based) out of how many the opening has. */
+  lineMode?: { no: number; of: number };
 }
 type Frame =
   | { kind: 'intro'; fen: string }
@@ -121,7 +124,7 @@ type Frame =
   | { kind: 'splash'; fen: string }
   | { kind: 'promoCard'; fen: string; last: { from: string; to: string } | null; card: 'vs' | 'switch' | 'live' | 'daily' | 'link'; upTo?: number }
   /** Opening clips: the ideas, real-game results, the replies, a variation's title, the trap's title. */
-  | { kind: 'openCard'; fen: string; last: { from: string; to: string } | null; card: 'ideas' | 'stats' | 'options' | 'line' | 'trap'; idx?: number }
+  | { kind: 'openCard'; fen: string; last: { from: string; to: string } | null; card: 'ideas' | 'stats' | 'options' | 'line' | 'trap' | 'why' | 'lineStats' | 'next'; idx?: number }
   /** Opening clips: the board winding back to the branch point after a line. */
   | { kind: 'rewind'; fen: string; last: { from: string; to: string } | null; idx: number }
   /** A beat on the starting position once the title / hook clears, so the first move is never hidden. */
@@ -338,7 +341,58 @@ function promoClip(p: StudioPromo): Clip {
   };
 }
 const evalText = (e: number | null | undefined) => (e == null ? '' : Math.abs(e) >= 90 ? (e > 0 ? 'White mates' : 'Black mates') : `${e > 0 ? '+' : ''}${e.toFixed(1)}`);
-function openingClip(o0: StudioOpening): Clip {
+// What a move does, worked out from the position (never invented): castling, captures,
+// checks, development, central pawns, fianchettos and which enemy pieces it now hits.
+const PIECE_NAME: Record<string, string> = { p: 'pawn', n: 'knight', b: 'bishop', r: 'rook', q: 'queen', k: 'king' };
+function moveNote(fenBefore: string, san: string): string {
+  try {
+    const c = new Chess(fenBefore); const mv = c.move(san); if (!mv) return '';
+    const P = PIECE_NAME[mv.piece]; const cap = (t: string) => t[0].toUpperCase() + t.slice(1);
+    const check = mv.san.includes('#') ? ' Checkmate!' : mv.san.includes('+') ? ' Check!' : '';
+    if (mv.san.startsWith('O-O')) return `${mv.san === 'O-O-O' ? 'Castles queenside' : 'Castles'}: king safe, rook into the game.${check}`;
+    // Enemy pieces (not pawns) the moved piece now attacks.
+    let hits: string[] = []; let mateOn = '';
+    try {
+      const parts = c.fen().split(' '); parts[1] = mv.color; parts[3] = '-';
+      const t = new Chess(parts.join(' '));
+      hits = t.moves({ square: mv.to, verbose: true }).filter((m) => m.captured && m.captured !== 'p').map((m) => `the ${PIECE_NAME[m.captured!]} on ${m.to}`);
+      // If the other side did nothing, could this side mate next move?
+      mateOn = t.moves({ verbose: true }).find((m) => m.san.includes('#'))?.to ?? '';
+    } catch { /* side to move in check: skip */ }
+    const hit = mateOn ? ` It threatens mate on ${mateOn}!` : hits.length ? ` It hits ${hits.slice(0, 2).join(' and ')}.` : '';
+    if (mv.captured) return `${cap(P)} takes the ${PIECE_NAME[mv.captured]} on ${mv.to}.${check || hit}`;
+    const back = mv.color === 'w' ? '1' : '8';
+    if ((mv.piece === 'n' || mv.piece === 'b') && mv.from[1] === back) {
+      const long = mv.piece === 'b' && ['g2', 'b2', 'g7', 'b7'].includes(mv.to);
+      return `${cap(P)} comes out to ${mv.to}${long ? ', on the long diagonal' : ''}.${check || hit}`;
+    }
+    if (mv.piece === 'p') {
+      if (['d4', 'e4', 'd5', 'e5', 'c4', 'c5', 'f4', 'f5'].includes(mv.to)) return `Pawn to ${mv.to}, fighting for the center.${check || hit}`;
+      if (['g3', 'b3', 'g6', 'b6'].includes(mv.to)) return `Pawn to ${mv.to}, making room for the bishop.${check || hit}`;
+      return `Pawn to ${mv.to}.${check || hit}`;
+    }
+    return `${cap(P)} to ${mv.to}.${check || hit}`;
+  } catch { return ''; }
+}
+function openingClip(o0: StudioOpening, lineName?: string): Clip {
+  // One-line deep dive: just that variation (with every move explained), no trap.
+  if (lineName) {
+    const k = o0.lines.findIndex((l) => l.name === lineName);
+    if (k >= 0) {
+      const l = o0.lines[k];
+      const c = new Chess(); o0.line.forEach((m) => { try { c.move(m); } catch { /* checked below */ } });
+      const notes = playSans(c.fen(), l.moves, []).map((p, i) => { const n = moveNote(p.fenBefore, p.san); return i === l.moves.length - 1 ? `${n} ${l.note}`.trim() : n; });
+      const base = openingClip({ ...o0, lines: [l], trap: null, options: o0.options.filter((x) => x.lines?.includes(k)).map((x) => ({ ...x, lines: [0] })) });
+      if (base.ranges?.lines.length) {
+        const [a] = base.ranges.lines[0];
+        notes.forEach((n, i) => { const p = base.plies[a - 1 + i]; if (p) p.review = { ...(p.review ?? { san: p.san }), classification: 'book', explanation: n }; });
+        return {
+          ...base, hook: `${o0.name}: the ${l.name} ♟️`, sub: 'Every move explained', fileBase: `chessscout-opening-${o0.id}-line${k + 1}`,
+          label: `Opening · ${o0.name} · ${l.short ?? l.name}`, tags: ['opening'], lineMode: { no: k + 1, of: o0.lines.length },
+        };
+      }
+    }
+  }
   // Only lines whose every move is legal from the branch point are shown, and
   // options keep pointing at the right line numbers after any is dropped.
   let o = o0;
@@ -552,8 +606,8 @@ function Confetti({ fire }: { fire: number }) {
   return <canvas ref={ref} className="pointer-events-none absolute inset-0 z-30 h-full w-full" />;
 }
 
-const srcKey = (x: StudioSource): string => (x.kind === 'opening' ? `o-${x.opening.id}` : x.kind === 'line' ? `line-${x.line.startFen}-${x.line.moves.map((m) => m.san).join(' ')}` : x.kind === 'promo' ? `promo-${x.promo.template}-${x.promo.hook}` : x.kind === 'scout' ? `s${x.scout.id}` : x.kind === 'lesson' ? `l${x.lesson.id}` : x.kind === 'scan' ? `x${x.fen}` : x.kind === 'trap' ? `t${x.trap.id}` : x.kind === 'puzzle' ? `p${x.puzzle.id}` : x.kind === 'review' ? `r${x.review.id}` : `g${x.moment.gameId}-${x.moment.moveIndex}`);
-const srcLabel = (x: StudioSource): string => (x.kind === 'opening' ? `Opening · ${x.opening.name}` : x.kind === 'line' ? `Analyzer · ${x.line.white} vs ${x.line.black}` : x.kind === 'promo' ? (x.promo.template === 'versus' ? `Promo · vs ${x.promo.rival}` : 'Promo · challenge friends') : x.kind === 'scout' ? `Scout · ${x.scout.username}` : x.kind === 'lesson' ? `Lesson · ${x.lesson.title}` : x.kind === 'scan' ? (x.label ? `Scan · ${x.label}` : 'Scanned position') : x.kind === 'trap' ? x.trap.name : x.kind === 'puzzle' ? `Puzzle · ${x.puzzle.rating}${x.puzzle.themes?.match(/mateIn\d/) ? ` · ${themeLabel(x.puzzle.themes.match(/mateIn\d/)![0])}` : ''}`
+const srcKey = (x: StudioSource): string => (x.kind === 'opening' ? `o-${x.opening.id}${x.opening.line ? `-${x.opening.line}` : ''}` : x.kind === 'line' ? `line-${x.line.startFen}-${x.line.moves.map((m) => m.san).join(' ')}` : x.kind === 'promo' ? `promo-${x.promo.template}-${x.promo.hook}` : x.kind === 'scout' ? `s${x.scout.id}` : x.kind === 'lesson' ? `l${x.lesson.id}` : x.kind === 'scan' ? `x${x.fen}` : x.kind === 'trap' ? `t${x.trap.id}` : x.kind === 'puzzle' ? `p${x.puzzle.id}` : x.kind === 'review' ? `r${x.review.id}` : `g${x.moment.gameId}-${x.moment.moveIndex}`);
+const srcLabel = (x: StudioSource): string => (x.kind === 'opening' ? `Opening · ${x.opening.name}${x.opening.line ? ` · ${x.opening.line}` : ''}` : x.kind === 'line' ? `Analyzer · ${x.line.white} vs ${x.line.black}` : x.kind === 'promo' ? (x.promo.template === 'versus' ? `Promo · vs ${x.promo.rival}` : 'Promo · challenge friends') : x.kind === 'scout' ? `Scout · ${x.scout.username}` : x.kind === 'lesson' ? `Lesson · ${x.lesson.title}` : x.kind === 'scan' ? (x.label ? `Scan · ${x.label}` : 'Scanned position') : x.kind === 'trap' ? x.trap.name : x.kind === 'puzzle' ? `Puzzle · ${x.puzzle.rating}${x.puzzle.themes?.match(/mateIn\d/) ? ` · ${themeLabel(x.puzzle.themes.match(/mateIn\d/)![0])}` : ''}`
   : x.kind === 'review' ? `Review · ${x.review.white ?? 'White'} vs ${x.review.black ?? 'Black'}` : `${x.moment.san} · ${x.moment.opening ?? `game ${x.moment.gameId}`}`);
 type ClipLook = BoardLook | 'remix' | 'mine';
 
@@ -616,7 +670,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
         }
       };
       load()
-        .then((o) => { setClip(openingClip(o)); setClipQ(slot); setLoadedKey(key); })
+        .then((o) => { setClip(openingClip(o, current.kind === 'opening' ? current.opening.line : undefined)); setClipQ(slot); setLoadedKey(key); })
         .catch((e) => setErr(String(e?.message ?? e)));
       return;
     }
@@ -738,7 +792,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
     setHook(isComp ? `#${queue!.length - clipQ} · ${stripEmoji(clip.hook)}` : clip.hook);
     // Quick openings show fewer lines, so the subtitle says how many are really in it.
     const o = clip.openingData;
-    if (clip.isOpening && o && prefs.openCut === 'quick') {
+    if (clip.isOpening && o && prefs.openCut === 'quick' && !clip.lineMode) {
       const n = Math.min(o.lines.length, o.trap ? 1 : 2);
       setSub(`${n === 1 ? 'The main line' : `${n} lines`} · counter moves · ${o.trap ? 'plus a trap' : 'what to play'}`);
     } else setSub(clip.sub);
@@ -795,6 +849,32 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
       }
       while (p < plies.length) out.push({ kind: 'move', ply: ++p });
       if (prefs.outro && isLast) out.push({ kind: 'outro', fen: fenAt(plies.length) });
+      return withInserts(out);
+    }
+    if (clip.isOpening && clip.openingData && clip.ranges && clip.lineMode && clip.ranges.lines.length) {
+      // One line, in depth: the hook, the opening's moves, then the line move by move
+      // (each explained), why it works, real-game numbers, and "what's best next?".
+      const o = clip.openingData; const l = o.lines[0]; const [a, b] = clip.ranges.lines[0];
+      const [, m] = clip.ranges.main;
+      const keyFen = fenAt(m), keyLast = lastAt(m), endFen = fenAt(b), endLast = lastAt(b);
+      if (isComp && isFirst) out.push({ kind: 'title', fen: fenAt(0) });
+      if (prefs.openTeaser && (!isComp || isFirst)) {
+        out.push({ kind: 'teaser', fen: endFen, last: endLast, mate: false,
+          text: `The ${l.name}, explained 🔥`, sub: `${o.name} · line ${clip.lineMode.no} of ${clip.lineMode.of}`,
+          said: `The ${l.name}. Here's how it goes, move by move, and why it works.` });
+      } else if (prefs.intro) out.push({ kind: 'intro', fen: fenAt(0) });
+      out.push({ kind: 'hold', fen: fenAt(0), last: null });
+      for (let p = 1; p <= m; p++) out.push({ kind: 'move', ply: p });
+      out.push({ kind: 'openCard', fen: keyFen, last: keyLast, card: 'line', idx: 0 });
+      for (let p = a; p <= b; p++) out.push({ kind: 'move', ply: p });
+      if (l.why?.length) out.push({ kind: 'openCard', fen: endFen, last: endLast, card: 'why', idx: 0 });
+      if (l.pct != null || l.whiteScore != null || l.eval != null) out.push({ kind: 'openCard', fen: endFen, last: endLast, card: 'lineStats', idx: 0 });
+      if (l.next) {
+        const mover = endFen.split(' ')[1] === 'w' ? 'White' : 'Black';
+        for (let n = 3; n >= 1; n--) out.push({ kind: 'countdown', n, fen: endFen, last: endLast, total: 3, text: `What's ${mover}'s best move here?`, anchor: 'opening' });
+        out.push({ kind: 'openCard', fen: endFen, last: endLast, card: 'next', idx: 0 });
+      }
+      if (prefs.outro && isLast) out.push({ kind: 'outro', fen: endFen });
       return withInserts(out);
     }
     if (clip.isOpening && clip.openingData && clip.ranges) {
@@ -997,11 +1077,17 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
       // Long enough for the subtitles to finish without the voiceover (it stretches to fit the voice anyway).
       case 'splash': return prefs.splashCta ? Math.max(3600, ctaText.split(/\s+/).filter(Boolean).length * 360 + 900) : 2800;
       case 'promoCard': return f.card === 'vs' ? 1500 : 3600;
-      case 'openCard': return f.card === 'line' ? 1900 : f.card === 'options' ? 5600 : f.card === 'trap' ? 2600 : 4600;
+      case 'openCard': return f.card === 'line' ? 1900 : f.card === 'options' ? 5600 : f.card === 'trap' ? 2600 : f.card === 'why' ? 6400 : f.card === 'lineStats' ? 4400 : f.card === 'next' ? 3400 : 4600;
       case 'rewind': return 150;
       case 'outro': return 2800;
       default: {
         if (clip?.isPromo) return clip.plies[f.ply - 1]?.san.includes('#') ? 2400 : Math.max(300, s * 0.5);
+        if (clip?.isOpening && clip.ranges && clip.lineMode && clip.ranges.lines.length) {
+          // Deep dive: the line's moves get time for their explanation; the opening's own moves are brisk.
+          const [a, b] = clip.ranges.lines[0]; const p = f.ply;
+          if (p >= a && p <= b) return Math.max(s, 2600);
+          return p === clip.ranges.main[1] ? Math.max(s, 1600) : Math.max(450, s * 0.7);
+        }
         if (clip?.isOpening && clip.ranges) {
           // Brisk through the moves; a beat on the last move of each line (its note shows) and on the trap's key moves.
           const R = clip.ranges; const p = f.ply;
@@ -1230,8 +1316,36 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
       default: return undefined;
     }
   };
+  // One-line opening videos: the same script in either tone (it's all facts from the board and the data).
+  const evalWords = (e: number | null | undefined) => (e == null ? null : Math.abs(e) >= 90 ? `${e > 0 ? 'White' : 'Black'} has a forced mate` : Math.abs(e) < 0.4 ? 'about equal' : `${e > 0 ? 'White' : 'Black'} is ${Math.abs(e) < 1.2 ? 'slightly' : 'clearly'} better`);
+  const lineScript = (f: Frame): string | null | undefined => {
+    if (!clip?.lineMode || !clip.ranges || !clip.openingData) return undefined;
+    const o = clip.openingData; const l = o.lines[0]; const [a, b] = clip.ranges.lines[0] ?? [0, -1];
+    const creator = prefs.tone !== 'teacher';
+    if (f.kind === 'move') {
+      if (f.ply === clip.ranges.main[1]) return `The ${o.name}.`;
+      if (f.ply < a || f.ply > b) return null;
+      const pl = clip.plies[f.ply - 1];
+      return pl ? `${spokenSan(pl.san)}. ${pl.review?.explanation ?? ''}`.trim().slice(0, 320) : null;
+    }
+    if (f.kind === 'openCard') {
+      if (f.card === 'line') return creator ? `Now here's the ${l.name}.` : `The ${l.name}.`;
+      if (f.card === 'why') return l.why?.length ? `${creator ? 'So why does it work?' : 'Why it works.'} ${l.why.join('. ')}.` : null;
+      if (f.card === 'lineStats') {
+        const bits = [
+          l.pct != null && (l.games ?? 0) > 0 ? `${l.pct} percent of games in the ${o.name} go into this line` : '',
+          l.whiteScore != null ? `White scores ${l.whiteScore} percent in them` : '',
+          evalWords(l.eval) ? `Stockfish says ${evalWords(l.eval)}` : '',
+        ].filter(Boolean);
+        return bits.length ? `${creator ? 'The numbers: ' : ''}${bits.join('. ')}.` : null;
+      }
+      if (f.card === 'next') return l.next ? (creator ? `Stockfish's pick? ${spokenSan(l.next.san)}.` : `Stockfish's best move here is ${spokenSan(l.next.san)}.`) : null;
+    }
+    return undefined;
+  };
   const narration = (f: Frame | undefined): string | null => {
     if (!f || !clip) return null;
+    { const x = lineScript(f); if (x !== undefined) return x; }
     if (prefs.tone !== 'teacher' && !clip.isLesson) { const c = creatorLine(f); if (c !== undefined) return c; }
     return teacherLine(f);
   };
@@ -1587,7 +1701,10 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
       try { const c = new Chess(frame.fen); const mv = c.move(san); if (mv) arrows.push({ from: mv.from, to: mv.to, color: ln >= 0 ? COLORS[ln % 4] : 'rgba(150,160,158,0.85)' }); } catch { /* ignore */ }
     });
   }
-  if (frame?.kind === 'teaser' && !frame.mate && clip.openingData && !clip.ranges?.trap) {
+  if (frame?.kind === 'openCard' && frame.card === 'next' && clip.openingData?.lines[0]?.next) {
+    try { const c = new Chess(frame.fen); const mv = c.move(clip.openingData.lines[0].next!.san); if (mv) arrows.push({ from: mv.from, to: mv.to, color: 'rgba(129,182,76,0.95)' }); } catch { /* ignore */ }
+  }
+  if (frame?.kind === 'teaser' && !frame.mate && clip.openingData && !clip.ranges?.trap && !clip.lineMode) {
     const COLORS = ['rgba(129,182,76,0.95)', 'rgba(74,139,214,0.92)', 'rgba(232,180,71,0.92)', 'rgba(202,52,49,0.9)'];
     clip.openingData.options.slice(0, 4).forEach((x, k) => {
       try { const c = new Chess(frame.fen); const mv = c.move(x.san); if (mv) arrows.push({ from: mv.from, to: mv.to, color: COLORS[k % 4] }); } catch { /* ignore */ }
@@ -1994,7 +2111,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
                 if (frame.card === 'line') return null;
                 return (
                   <motion.div key={frame.card} initial={{ opacity: 0, y: 30, scale: 0.92 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -20 }} transition={{ type: 'spring', stiffness: 260, damping: 20 }}
-                    className="absolute inset-x-[5%] top-[22%] z-30 rounded-[3cqh] bg-[#0B1112]/93 p-[2.4cqh] text-white shadow-2xl ring-2 ring-white/70" style={{ fontSize: 'clamp(11px,1.9cqh,20px)' }}>
+                    className={`absolute inset-x-[5%] ${frame.card === 'next' ? 'bottom-[15%]' : 'top-[22%]'} z-30 rounded-[3cqh] bg-[#0B1112]/93 p-[2.4cqh] text-white shadow-2xl ring-2 ring-white/70`} style={{ fontSize: 'clamp(11px,1.9cqh,20px)' }}>
                     <p className="mb-[1.2cqh] text-center font-black uppercase tracking-wide text-[#B8E08C]" style={{ fontSize: '0.95em' }}>♟️ {o.name}</p>
                     {frame.card === 'ideas' && (
                       <div className="space-y-[1cqh]">
@@ -2041,6 +2158,49 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
                         ))}
                       </div>
                     )}
+                    {frame.card === 'why' && (o.lines[0]?.why?.length ?? 0) > 0 && (
+                      <div className="space-y-[1cqh]">
+                        <p className="text-center font-black" style={{ fontSize: '1.3em' }}>{prefs.tone !== 'teacher' ? 'Why it works 💡' : 'Why it works'}</p>
+                        <p className="-mt-[0.6cqh] text-center text-[0.8em] font-bold text-white/55">{o.lines[0].name}</p>
+                        {(o.lines[0].why ?? []).map((t, k) => (
+                          <motion.div key={k} initial={{ opacity: 0, x: -24 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.3 + k * 0.6 }} className="flex items-start gap-[0.6em] rounded-[0.6em] bg-white/[.07] p-[0.6em]">
+                            <span className="grid h-[1.6em] w-[1.6em] shrink-0 place-items-center rounded-full font-black text-[#0B1112]" style={{ background: COL[k % 4] }}>{k + 1}</span>
+                            <span className="font-bold leading-snug">{t}</span>
+                          </motion.div>
+                        ))}
+                      </div>
+                    )}
+                    {frame.card === 'lineStats' && o.lines[0] && (() => {
+                      const l = o.lines[0];
+                      const tiles: [string, string, string?][] = [
+                        ...(l.pct != null && (l.games ?? 0) > 0 ? [[`${l.pct}%`, `of ${o.name} games go into this line`] as [string, string]] : []),
+                        ...(l.whiteScore != null ? [[`${l.whiteScore}%`, `White's score in those ${l.games} games`] as [string, string]] : []),
+                        ...(l.eval != null ? [[evalText(l.eval), `Stockfish: ${evalWords(l.eval)}`] as [string, string]] : []),
+                      ];
+                      return (
+                        <div className="text-center">
+                          <p className="font-black" style={{ fontSize: '1.3em' }}>{prefs.tone !== 'teacher' ? 'The numbers 📊' : 'In real games'}</p>
+                          <div className="mt-[1.2cqh] grid gap-[1cqh]">
+                            {tiles.map(([big, small], k) => (
+                              <motion.div key={k} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 + k * 0.35 }} className="rounded-[0.6em] bg-white/[.07] p-[0.6em]">
+                                <p className="font-black tabular-nums" style={{ fontSize: '1.9em', color: COL[k % 4] }}>{big}</p>
+                                <p className="font-bold text-white/70">{small}</p>
+                              </motion.div>
+                            ))}
+                          </div>
+                          {l.pct != null && (l.games ?? 0) > 0 && <p className="mt-[0.8cqh] text-[0.75em] font-bold text-white/45">From games played on ChessScout</p>}
+                        </div>
+                      );
+                    })()}
+                    {frame.card === 'next' && o.lines[0]?.next && (() => { const nx = o.lines[0].next!; return (
+                      <div className="text-center">
+                        <p className="font-black" style={{ fontSize: '1.2em' }}>{prefs.tone !== 'teacher' ? "Stockfish's pick 🤖" : "Stockfish's best move"}</p>
+                        <motion.p initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: 'spring', stiffness: 300, damping: 14, delay: 0.2 }} className="mt-[0.4em] font-black text-[#B8E08C]" style={{ fontSize: '2.4em' }}>
+                          {figurine(nx.san, frame.fen.split(' ')[1] === 'w')}
+                        </motion.p>
+                        {nx.eval != null && <p className="mt-[0.2em] font-bold text-white/70">{evalText(nx.eval)} · {evalWords(nx.eval)}</p>}
+                      </div>
+                    ); })()}
                     {frame.card === 'trap' && o.trap && (
                       <div className="text-center">
                         <motion.p initial={{ scale: 0.6 }} animate={{ scale: [0.6, 1.15, 1] }} transition={{ duration: 0.5 }} className="font-black text-[#F0605D]" style={{ fontSize: '1.6em' }}>🪤 Trap alert!</motion.p>
