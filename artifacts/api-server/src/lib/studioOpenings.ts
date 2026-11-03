@@ -205,9 +205,9 @@ function sanTokens(pgn: string): string[] {
 const posKey = (fen: string) => fen.split(" ").slice(0, 4).join(" ");
 const rowsOf = <T,>(r: unknown): T[] => (Array.isArray(r) ? r : ((r as { rows?: T[] })?.rows ?? [])) as T[];
 
-interface Tally { games: number; white: number; draw: number; black: number; next: Map<string, { games: number; white: number; draw: number; black: number }> }
+interface Tally { games: number; white: number; draw: number; black: number; next: Map<string, { games: number; white: number; draw: number; black: number }>; conts: string[][] }
 async function tallyAt(def: OpeningDef, keyFen: string): Promise<Tally> {
-  const t: Tally = { games: 0, white: 0, draw: 0, black: 0, next: new Map() };
+  const t: Tally = { games: 0, white: 0, draw: 0, black: 0, next: new Map(), conts: [] };
   const cond = sql.join(def.match.map((m) => sql`g.opening ILIKE ${m}`), sql` OR `);
   const rows = rowsOf<{ pgn: string }>(await db.execute(sql`
     SELECT g.pgn FROM games g WHERE (${cond}) AND g.pgn IS NOT NULL AND g.pgn NOT LIKE '%[FEN %' AND g.platform IS DISTINCT FROM 'bot'
@@ -226,6 +226,10 @@ async function tallyAt(def: OpeningDef, keyFen: string): Promise<Tally> {
           t.games++; t[out]++;
           const nx = mv[i] ? c.move(mv[i])?.san : null;
           if (nx) { const e = t.next.get(nx) ?? { games: 0, white: 0, draw: 0, black: 0 }; e.games++; e[out]++; t.next.set(nx, e); }
+          // The next few moves too, to tell lines that start with the same move apart.
+          const cont: string[] = nx ? [nx] : [];
+          for (let j = i + 1; nx && j < Math.min(mv.length, i + 8); j++) { try { const m2 = c.move(mv[j]); if (!m2) break; cont.push(m2.san); } catch { break; } }
+          t.conts.push(cont);
           break;
         }
         c.move(mv[i]);
@@ -290,8 +294,18 @@ export async function studioOpening(id: string): Promise<StudioOpeningData | nul
     for (const s of v.moves) { try { lc.move(s); } catch { ok = false; break; } }
     if (!ok) { logger.warn({ opening: def.id, line: v.name }, "[studio] opening line has an illegal move"); continue; }
     const endEval = await evalOf(lc.fen());
-    const first = tally?.next.get(v.moves[0]);
-    lines.push({ name: v.name, short: v.short, moves: v.moves, note: v.note, pct: tally && tally.games ? Math.round(((first?.games ?? 0) / tally.games) * 100) : null, eval: endEval.best });
+    // Share of games that went into THIS line: the moves up to where it parts
+    // from every other line that starts the same way (so two lines starting
+    // with the same move don't both claim that move's whole share).
+    let depth = 1;
+    for (const o2 of def.lines) {
+      if (o2 === v) continue;
+      let k = 0; while (k < v.moves.length && k < o2.moves.length && v.moves[k] === o2.moves[k]) k++;
+      if (k > 0) depth = Math.max(depth, Math.min(v.moves.length, k + 1));
+    }
+    const pre = v.moves.slice(0, depth);
+    const hits = tally ? tally.conts.filter((c) => pre.every((m, k) => c[k] === m)).length : 0;
+    lines.push({ name: v.name, short: v.short, moves: v.moves, note: v.note, pct: tally && tally.games ? Math.round((hits / tally.games) * 100) : null, eval: endEval.best });
   }
 
   // Replies: the most played in real games, plus every variation's first move.

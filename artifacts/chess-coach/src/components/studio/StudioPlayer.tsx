@@ -1377,6 +1377,14 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
   // Arrows: the better move on a mistake (key frame), the engine line's first move, nothing otherwise.
   const arrows: { from: string; to: string; color?: string }[] = [];
   if (frame?.kind === 'better' && frame.arrow) arrows.push({ ...frame.arrow, color: 'rgba(129,182,76,0.95)' });
+  // Opening clips: which variation is on screen (the line map shows then, and the hook steps aside).
+  const openLine: number | null = (() => {
+    if (!clip.isOpening || !clip.ranges || !frame) return null;
+    if (frame.kind === 'openCard' && frame.card === 'line') return frame.idx ?? 0;
+    if (frame.kind === 'rewind') return frame.idx;
+    if (frame.kind === 'move') { const k = clip.ranges.lines.findIndex(([a, b]) => frame.ply >= a && frame.ply <= b); return k >= 0 ? k : null; }
+    return null;
+  })();
   // Opening clips: every reply on the options card, the line's first move on its title card.
   if (frame?.kind === 'openCard' && clip.openingData && (frame.card === 'options' || frame.card === 'line')) {
     const o = clip.openingData;
@@ -1431,7 +1439,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
             {prefs.progress && <div className="absolute inset-x-0 top-0 z-20 h-[0.6cqh] bg-white/15"><div className="h-full bg-[#81B64C] transition-all duration-300" style={{ width: `${progress * 100}%` }} /></div>}
             {/* Hook: pops in big on the intro, then sits at the top */}
             <motion.div key={frame?.kind === 'intro' ? 'intro' : 'top'} initial={frame?.kind === 'intro' ? { scale: 0.6, opacity: 0, y: '18cqh' } : false}
-              animate={{ scale: 1, opacity: pop || frame?.kind === 'countdown' || frame?.kind === 'card' || frame?.kind === 'scanPhoto' ? 0 : 1, y: frame?.kind === 'intro' ? '18cqh' : 0 }} transition={{ type: 'spring', stiffness: 260, damping: 18 }}
+              animate={{ scale: 1, opacity: pop || openLine != null || frame?.kind === 'countdown' || frame?.kind === 'card' || frame?.kind === 'scanPhoto' ? 0 : 1, y: frame?.kind === 'intro' ? '18cqh' : 0 }} transition={{ type: 'spring', stiffness: 260, damping: 18 }}
               className="absolute inset-x-0 top-[6.5%] z-10 px-[6%] text-center">
               {isComp && frame?.kind === 'intro' && (
                 <motion.div key={`rank${clipQ}`} initial={{ scale: 3, opacity: 0, rotate: -20 }} animate={{ scale: 1, opacity: 1, rotate: 0 }} transition={{ type: 'spring', stiffness: 300, damping: 15, delay: 0.15 }}
@@ -1740,17 +1748,14 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
             {clip.isOpening && clip.openingData && clip.ranges && (() => {
               const o = clip.openingData; const R = clip.ranges;
               const COL = ['#81B64C', '#4A8BD6', '#E8B447', '#CA3431'];
-              let active: number | null = null;
-              if (frame?.kind === 'openCard' && frame.card === 'line') active = frame.idx ?? 0;
-              else if (frame?.kind === 'rewind') active = frame.idx;
-              else if (frame?.kind === 'move') { const k = R.lines.findIndex(([a, b]) => frame.ply >= a && frame.ply <= b); if (k >= 0) active = k; }
+              const active = openLine;
               if (active == null) return null;
               const [a, b] = R.lines[active];
               const shown = frame?.kind === 'move' ? frame.ply - a + 1 : frame?.kind === 'rewind' ? 0 : 0;
               const l = o.lines[active];
               const mover = clip.plies[a - 1]?.color === 'w';
               return (
-                <div className="pointer-events-none absolute inset-x-[4%] top-[12.5%] z-30" style={{ fontSize: 'clamp(10px,1.7cqh,18px)' }}>
+                <div className="pointer-events-none absolute inset-x-[4%] top-[6.5%] z-30" style={{ fontSize: 'clamp(10px,1.7cqh,18px)' }}>
                   <div className="flex gap-[0.4em]">
                     {o.lines.map((ln, k) => {
                       const on = k === active, done = k < active;
@@ -1759,7 +1764,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
                           className="relative min-w-0 basis-0 overflow-hidden rounded-[0.6em] px-[0.5em] py-[0.35em]"
                           style={{ background: on ? COL[k % 4] : 'rgba(11,17,18,.78)', color: on ? '#0B1112' : '#fff', border: `2px solid ${COL[k % 4]}`, boxShadow: on ? `0 0 1.2em ${COL[k % 4]}` : undefined }}>
                           <p className="truncate font-black leading-tight" style={{ fontSize: on ? '1em' : '0.78em' }}>{done ? '✓ ' : ''}{on ? ln.name : (ln.short ?? ln.name)}</p>
-                          {on && <p className="truncate text-[0.75em] font-bold opacity-80">{[ln.pct ? `${ln.pct}% of games` : null, ln.eval != null ? evalText(ln.eval) : null].filter(Boolean).join(' · ') || `Line ${k + 1}`}</p>}
+                          {on && <p className="truncate text-[0.75em] font-bold opacity-80">{[ln.pct ? `${ln.pct}% of games` : null, ln.eval != null ? `${evalText(ln.eval)} at the end` : null].filter(Boolean).join(' · ') || `Line ${k + 1}`}</p>}
                         </motion.div>
                       );
                     })}
@@ -1819,6 +1824,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
                     {frame.card === 'options' && (
                       <div className="space-y-[0.9cqh]">
                         <p className="text-center font-black" style={{ fontSize: '1.25em' }}>{mover}'s options</p>
+                        <p className="-mt-[0.6cqh] text-center text-[0.72em] font-bold text-white/55">Engine eval after the move (+ = better for White) · how often it's played · how it scores for {mover}</p>
                         {o.options.map((x, k) => (
                           <motion.div key={x.san} initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.25 + k * 0.3 }} className="rounded-[0.6em] bg-white/[.07] p-[0.55em]" style={{ borderLeft: `0.35em solid ${x.lines?.length ? COL[x.lines[0] % 4] : '#7A8580'}` }}>
                             <div className="flex items-center justify-between gap-[0.5em]">
