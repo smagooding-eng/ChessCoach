@@ -211,7 +211,7 @@ async function tallyAt(def: OpeningDef, keyFen: string): Promise<Tally> {
   const cond = sql.join(def.match.map((m) => sql`g.opening ILIKE ${m}`), sql` OR `);
   const rows = rowsOf<{ pgn: string }>(await db.execute(sql`
     SELECT g.pgn FROM games g WHERE (${cond}) AND g.pgn IS NOT NULL AND g.pgn NOT LIKE '%[FEN %' AND g.platform IS DISTINCT FROM 'bot'
-    ORDER BY g.id DESC LIMIT 4000`));
+    ORDER BY g.id DESC LIMIT 2500`));
   const want = posKey(keyFen);
   let n = 0;
   for (const r of rows) {
@@ -235,7 +235,9 @@ async function tallyAt(def: OpeningDef, keyFen: string): Promise<Tally> {
         c.move(mv[i]);
       }
     } catch { /* bad pgn */ }
-    if (++n % 200 === 0) await new Promise((res) => setImmediate(res));
+    // Plenty for the percentages; stops early so a popular opening builds fast.
+    if (t.games >= 1500) break;
+    if (++n % 100 === 0) await new Promise((res) => setImmediate(res));
   }
   return t;
 }
@@ -275,16 +277,54 @@ async function evalOf(fen: string): Promise<{ best: number | null; moves: Map<st
   }
 }
 
+const CACHE_MS = 6 * 60 * 60 * 1000;
+/** Openings being built right now: a second request (a retry) waits for the same build. */
+const building = new Map<string, Promise<StudioOpeningData | null>>();
+/** Stockfish gets this long in total per opening; lines after that show without an engine number. */
+const ENGINE_BUDGET_MS = 18_000;
+const withTimeout = <T,>(p: Promise<T>, ms: number, fallback: T) =>
+  Promise.race([p, new Promise<T>((res) => setTimeout(() => res(fallback), ms))]);
+const NO_EVAL = { best: null, moves: new Map<string, number>() };
+
 export async function studioOpening(id: string): Promise<StudioOpeningData | null> {
   const def = STUDIO_OPENINGS.find((o) => o.id === id);
   if (!def) return null;
   const hit = cache.get(id);
-  if (hit && Date.now() - hit.at < 6 * 60 * 60 * 1000) return hit.data;
+  if (hit && Date.now() - hit.at < CACHE_MS) return hit.data;
+  let p = building.get(id);
+  if (!p) {
+    p = buildOpening(def).finally(() => building.delete(id));
+    building.set(id, p);
+  }
+  return p;
+}
 
+/** Builds every opening that isn't cached, one at a time, in the background (so they open instantly in the Studio). */
+let warming = false;
+export function warmStudioOpenings(): void {
+  if (warming) return;
+  warming = true;
+  void (async () => {
+    try {
+      for (const o of STUDIO_OPENINGS) {
+        const hit = cache.get(o.id);
+        if (hit && Date.now() - hit.at < CACHE_MS) continue;
+        try { await studioOpening(o.id); } catch (err) { logger.warn({ err, opening: o.id }, "[studio] opening warm-up failed"); }
+      }
+    } finally { warming = false; }
+  })();
+}
+
+async function buildOpening(def: OpeningDef): Promise<StudioOpeningData | null> {
+  const started = Date.now();
+  const left = () => ENGINE_BUDGET_MS - (Date.now() - started);
   const c = new Chess();
   for (const s of def.line) c.move(s);
   const keyFen = c.fen();
-  const [tally, ev] = await Promise.all([tallyAt(def, keyFen).catch(() => null), evalOf(keyFen)]);
+  const [tally, ev] = await Promise.all([
+    tallyAt(def, keyFen).catch((err) => { logger.warn({ err, opening: def.id }, "[studio] opening game numbers failed"); return null; }),
+    withTimeout(evalOf(keyFen), 9_000, NO_EVAL),
+  ]);
 
   // Each variation's position at its end, for Stockfish's verdict on it.
   const lines: StudioOpeningData["lines"] = [];
@@ -293,7 +333,7 @@ export async function studioOpening(id: string): Promise<StudioOpeningData | nul
     let ok = true;
     for (const s of v.moves) { try { lc.move(s); } catch { ok = false; break; } }
     if (!ok) { logger.warn({ opening: def.id, line: v.name }, "[studio] opening line has an illegal move"); continue; }
-    const endEval = await evalOf(lc.fen());
+    const endEval = left() > 1500 ? await withTimeout(evalOf(lc.fen()), Math.min(6_000, left()), NO_EVAL) : NO_EVAL;
     // Share of games that went into THIS line: the moves up to where it parts
     // from every other line that starts the same way (so two lines starting
     // with the same move don't both claim that move's whole share).
@@ -345,7 +385,7 @@ export async function studioOpening(id: string): Promise<StudioOpeningData | nul
     results: tally && tally.games >= 10 ? { white: Math.round((tally.white / tally.games) * 100), draw: Math.round((tally.draw / tally.games) * 100), black: Math.round((tally.black / tally.games) * 100) } : null,
     options, lines, trap,
   };
-  if (ev.best != null || tally) cache.set(id, { at: Date.now(), data });
+  if (ev.best != null || tally) cache.set(def.id, { at: Date.now(), data });
   return data;
 }
 

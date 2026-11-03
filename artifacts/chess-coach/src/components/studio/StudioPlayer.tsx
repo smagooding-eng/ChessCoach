@@ -598,8 +598,22 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
     if (current.kind === 'promo') { setClip(promoClip(current.promo)); setClipQ(slot); setLoadedKey(key); return; }
     if (current.kind === 'line') { setClip(lineClip(current.line)); setClipQ(slot); setLoadedKey(key); return; }
     if (current.kind === 'opening') {
-      apiFetch(`/api/admin/studio/opening/${encodeURIComponent(current.opening.id)}`, { credentials: 'include' })
-        .then(async (r) => { const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.error || "Couldn't load that opening."); return d as StudioOpening; })
+      // The first build of an opening can take a while on the server (it keeps going if
+      // the request drops), so a failed load is retried a few times before giving up.
+      const id = encodeURIComponent(current.opening.id);
+      const load = async (): Promise<StudioOpening> => {
+        for (let attempt = 0; ; attempt++) {
+          try {
+            const r = await apiFetch(`/api/admin/studio/opening/${id}`, { credentials: 'include' });
+            const d = await r.json().catch(() => null);
+            if (r.ok && d) return d as StudioOpening;
+            if (r.status === 404 || r.status === 401 || r.status === 403) throw Object.assign(new Error(d?.error || "Couldn't load that opening."), { final: true });
+          } catch (e) { if ((e as { final?: boolean }).final) throw e; }
+          if (attempt >= 3) throw new Error('This opening is still being built on the server. Give it a minute, then open it again.');
+          await new Promise((res) => setTimeout(res, 4000 * (attempt + 1)));
+        }
+      };
+      load()
         .then((o) => { setClip(openingClip(o)); setClipQ(slot); setLoadedKey(key); })
         .catch((e) => setErr(String(e?.message ?? e)));
       return;

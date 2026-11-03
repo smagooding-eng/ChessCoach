@@ -133,8 +133,10 @@ router.post("/admin/studio/review-game/:id", requireAdmin, async (req: Request, 
 
 // Opening clips: the list, then one opening with its lines, real-game numbers and Stockfish.
 router.get("/admin/studio/openings", requireAdmin, async (_req: Request, res: Response) => {
-  const { studioOpeningList } = await import("../lib/studioOpenings");
+  const { studioOpeningList, warmStudioOpenings } = await import("../lib/studioOpenings");
   res.json({ openings: studioOpeningList() });
+  // Opening the list starts building every opening, so picking one is instant.
+  warmStudioOpenings();
 });
 router.get("/admin/studio/opening/:id", requireAdmin, async (req: Request, res: Response) => {
   try {
