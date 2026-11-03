@@ -70,8 +70,9 @@ export type StudioSource =
 export interface StudioOpening {
   id: string; name: string; side: 'white' | 'black'; hook: string; ideas: string[]; line: string[];
   games: number; results: { white: number; draw: number; black: number } | null;
-  options: { san: string; pct: number | null; games: number; scorePct: number | null; eval: number | null; name: string | null }[];
-  lines: { name: string; moves: string[]; note: string; pct: number | null; eval: number | null }[];
+  /** lines: which variations (by index) start with this move. */
+  options: { san: string; pct: number | null; games: number; scorePct: number | null; eval: number | null; lines?: number[] }[];
+  lines: { name: string; short?: string; moves: string[]; note: string; pct: number | null; eval: number | null }[];
   trap: { name: string; moves: string[]; notes: string[]; critical: number; summary: string } | null;
 }
 /** A game made in the Position Explorer (best / worst moves per side), every move graded by Stockfish. */
@@ -324,7 +325,22 @@ function promoClip(p: StudioPromo): Clip {
   };
 }
 const evalText = (e: number | null | undefined) => (e == null ? '' : Math.abs(e) >= 90 ? (e > 0 ? 'White mates' : 'Black mates') : `${e > 0 ? '+' : ''}${e.toFixed(1)}`);
-function openingClip(o: StudioOpening): Clip {
+function openingClip(o0: StudioOpening): Clip {
+  // Only lines whose every move is legal from the branch point are shown, and
+  // options keep pointing at the right line numbers after any is dropped.
+  let o = o0;
+  {
+    const c0 = new Chess(); let okMain = true;
+    for (const m of o0.line) { try { c0.move(m); } catch { okMain = false; break; } }
+    if (okMain) {
+      const keep: number[] = [];
+      o0.lines.forEach((l, k) => { const c = new Chess(c0.fen()); try { l.moves.forEach((m) => c.move(m)); keep.push(k); } catch { /* drop it */ } });
+      if (keep.length !== o0.lines.length) {
+        const remap = new Map(keep.map((k, n) => [k, n]));
+        o = { ...o0, lines: keep.map((k) => o0.lines[k]), options: o0.options.map((x) => ({ ...x, lines: (x.lines ?? []).filter((k) => remap.has(k)).map((k) => remap.get(k)!) })) };
+      }
+    }
+  }
   const book = (san: string, note = ''): ReviewMove => ({ san, classification: 'book', explanation: note });
   const main = playSans(undefined, o.line, o.line.map((san, i) => book(san, i === o.line.length - 1 ? `The ${o.name}` : '')));
   const keyFen = main.length ? main[main.length - 1].fen : START_FEN;
@@ -332,7 +348,7 @@ function openingClip(o: StudioOpening): Clip {
   const lines: [number, number][] = [];
   for (const l of o.lines) {
     const ps = playSans(keyFen, l.moves, l.moves.map((san, i) => book(san, i === l.moves.length - 1 ? l.note : '')));
-    if (!ps.length) continue;
+    if (ps.length !== l.moves.length) continue;
     lines.push([plies.length + 1, plies.length + ps.length]);
     plies.push(...ps);
   }
@@ -1366,7 +1382,11 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
     const o = clip.openingData;
     const sans = frame.card === 'options' ? o.options.map((x) => x.san) : [o.lines[frame.idx ?? 0]?.moves[0]].filter(Boolean) as string[];
     const COLORS = ['rgba(129,182,76,0.95)', 'rgba(74,139,214,0.92)', 'rgba(232,180,71,0.92)', 'rgba(202,52,49,0.9)'];
-    sans.forEach((san, k) => { try { const c = new Chess(frame.fen); const mv = c.move(san); if (mv) arrows.push({ from: mv.from, to: mv.to, color: frame.card === 'line' ? COLORS[(frame.idx ?? 0) % 4] : COLORS[k % 4] }); } catch { /* ignore */ } });
+    // Arrow colours match the line each move starts (grey for replies no line covers).
+    sans.forEach((san, k) => {
+      const ln = frame.card === 'line' ? (frame.idx ?? 0) : (o.options[k]?.lines?.[0] ?? -1);
+      try { const c = new Chess(frame.fen); const mv = c.move(san); if (mv) arrows.push({ from: mv.from, to: mv.to, color: ln >= 0 ? COLORS[ln % 4] : 'rgba(150,160,158,0.85)' }); } catch { /* ignore */ }
+    });
   }
   if (prefs.arrow && isKey && rev?.betterMove && cls && BAD.has(cls)) {
     try { const c = new Chess(plies[keyPly - 1].fenBefore); const mv = c.move(rev.betterMove); if (mv) arrows.push({ from: mv.from, to: mv.to, color: 'rgba(129,182,76,0.9)' }); } catch { /* ignore */ }
@@ -1738,7 +1758,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
                         <motion.div key={k} layout animate={{ flexGrow: on ? 2.4 : 1, opacity: on ? 1 : done ? 0.75 : 0.45 }} transition={{ type: 'spring', stiffness: 260, damping: 24 }}
                           className="relative min-w-0 basis-0 overflow-hidden rounded-[0.6em] px-[0.5em] py-[0.35em]"
                           style={{ background: on ? COL[k % 4] : 'rgba(11,17,18,.78)', color: on ? '#0B1112' : '#fff', border: `2px solid ${COL[k % 4]}`, boxShadow: on ? `0 0 1.2em ${COL[k % 4]}` : undefined }}>
-                          <p className="truncate font-black leading-tight" style={{ fontSize: on ? '1em' : '0.78em' }}>{done ? '✓ ' : ''}{on ? ln.name : ln.name.split(/[ ·]/)[0]}</p>
+                          <p className="truncate font-black leading-tight" style={{ fontSize: on ? '1em' : '0.78em' }}>{done ? '✓ ' : ''}{on ? ln.name : (ln.short ?? ln.name)}</p>
                           {on && <p className="truncate text-[0.75em] font-bold opacity-80">{[ln.pct ? `${ln.pct}% of games` : null, ln.eval != null ? evalText(ln.eval) : null].filter(Boolean).join(' · ') || `Line ${k + 1}`}</p>}
                         </motion.div>
                       );
@@ -1788,7 +1808,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
                     {frame.card === 'stats' && o.results && (
                       <div className="text-center">
                         <p className="font-black" style={{ fontSize: '1.3em' }}>Who wins?</p>
-                        <p className="mt-[0.3em] font-bold text-white/65">{o.games.toLocaleString()} real games on ChessScout</p>
+                        <p className="mt-[0.3em] font-bold text-white/65">{o.games.toLocaleString()} real games by ChessScout players</p>
                         <div className="mt-[1.2cqh] flex h-[4cqh] overflow-hidden rounded-[0.6em] font-black">
                           {([['White', o.results.white, '#F2F2F2', '#141414'], ['Draw', o.results.draw, '#7A8580', '#fff'], ['Black', o.results.black, '#1C1C1C', '#fff']] as const).map(([t, n, bg, fg], k) => n > 0 && (
                             <motion.div key={t} initial={{ width: 0 }} animate={{ width: `${n}%` }} transition={{ duration: 0.9, delay: 0.3 + k * 0.1 }} className="grid place-items-center overflow-hidden whitespace-nowrap" style={{ background: bg, color: fg, fontSize: '0.85em' }}>{n >= 12 ? `${t} ${n}%` : `${n}%`}</motion.div>
@@ -1800,14 +1820,17 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
                       <div className="space-y-[0.9cqh]">
                         <p className="text-center font-black" style={{ fontSize: '1.25em' }}>{mover}'s options</p>
                         {o.options.map((x, k) => (
-                          <motion.div key={x.san} initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.25 + k * 0.3 }} className="rounded-[0.6em] bg-white/[.07] p-[0.55em]" style={{ borderLeft: `0.35em solid ${COL[k % 4]}` }}>
+                          <motion.div key={x.san} initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.25 + k * 0.3 }} className="rounded-[0.6em] bg-white/[.07] p-[0.55em]" style={{ borderLeft: `0.35em solid ${x.lines?.length ? COL[x.lines[0] % 4] : '#7A8580'}` }}>
                             <div className="flex items-center justify-between gap-[0.5em]">
-                              <span className="min-w-0 truncate font-black" style={{ fontSize: '1.15em' }}>{figurine(x.san, mover === 'White')}{x.name && <span className="ml-[0.4em] text-[0.7em] font-bold text-white/65">{x.name}</span>}</span>
+                              <span className="flex min-w-0 items-center gap-[0.35em] font-black" style={{ fontSize: '1.15em' }}>
+                                {figurine(x.san, mover === 'White')}
+                                {(x.lines ?? []).map((n) => <span key={n} className="rounded-[0.3em] px-[0.35em] text-[0.6em] font-black text-[#0B1112]" style={{ background: COL[n % 4] }}>Line {n + 1}</span>)}
+                              </span>
                               {evChip(x.eval)}
                             </div>
                             {x.pct != null && x.games > 0 && (
                               <div className="mt-[0.35em] flex items-center gap-[0.5em]">
-                                <div className="h-[1.1cqh] flex-1 overflow-hidden rounded-full bg-white/10"><motion.div initial={{ width: 0 }} animate={{ width: `${Math.max(3, x.pct)}%` }} transition={{ duration: 0.7, delay: 0.4 + k * 0.3 }} className="h-full rounded-full" style={{ background: COL[k % 4] }} /></div>
+                                <div className="h-[1.1cqh] flex-1 overflow-hidden rounded-full bg-white/10"><motion.div initial={{ width: 0 }} animate={{ width: `${Math.max(3, x.pct)}%` }} transition={{ duration: 0.7, delay: 0.4 + k * 0.3 }} className="h-full rounded-full" style={{ background: x.lines?.length ? COL[x.lines[0] % 4] : '#7A8580' }} /></div>
                                 <span className="shrink-0 text-[0.75em] font-bold tabular-nums text-white/70">{x.pct}% played{x.scorePct != null ? ` · scores ${x.scorePct}%` : ''}</span>
                               </div>
                             )}
