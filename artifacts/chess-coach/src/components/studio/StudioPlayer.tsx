@@ -341,37 +341,103 @@ function promoClip(p: StudioPromo): Clip {
   };
 }
 const evalText = (e: number | null | undefined) => (e == null ? '' : Math.abs(e) >= 90 ? (e > 0 ? 'White mates' : 'Black mates') : `${e > 0 ? '+' : ''}${e.toFixed(1)}`);
-// What a move does, worked out from the position (never invented): castling, captures,
-// checks, development, central pawns, fianchettos and which enemy pieces it now hits.
+// What a move does, worked out from the position (never invented). It doesn't
+// repeat the move itself (that's said just before): it says what the move is for.
 const PIECE_NAME: Record<string, string> = { p: 'pawn', n: 'knight', b: 'bishop', r: 'rook', q: 'queen', k: 'king' };
-function moveNote(fenBefore: string, san: string): string {
+const CENTER = ['d4', 'e4', 'd5', 'e5'];
+function moveNote(fenBefore: string, san: string, prev?: { to: string; captured?: boolean }): string {
   try {
+    const before = new Chess(fenBefore);
     const c = new Chess(fenBefore); const mv = c.move(san); if (!mv) return '';
-    const P = PIECE_NAME[mv.piece]; const cap = (t: string) => t[0].toUpperCase() + t.slice(1);
-    const check = mv.san.includes('#') ? ' Checkmate!' : mv.san.includes('+') ? ' Check!' : '';
-    if (mv.san.startsWith('O-O')) return `${mv.san === 'O-O-O' ? 'Castles queenside' : 'Castles'}: king safe, rook into the game.${check}`;
-    // Enemy pieces (not pawns) the moved piece now attacks.
-    let hits: string[] = []; let mateOn = '';
-    try {
-      const parts = c.fen().split(' '); parts[1] = mv.color; parts[3] = '-';
-      const t = new Chess(parts.join(' '));
-      hits = t.moves({ square: mv.to, verbose: true }).filter((m) => m.captured && m.captured !== 'p').map((m) => `the ${PIECE_NAME[m.captured!]} on ${m.to}`);
-      // If the other side did nothing, could this side mate next move?
-      mateOn = t.moves({ verbose: true }).find((m) => m.san.includes('#'))?.to ?? '';
-    } catch { /* side to move in check: skip */ }
-    const hit = mateOn ? ` It threatens mate on ${mateOn}!` : hits.length ? ` It hits ${hits.slice(0, 2).join(' and ')}.` : '';
-    if (mv.captured) return `${cap(P)} takes the ${PIECE_NAME[mv.captured]} on ${mv.to}.${check || hit}`;
-    const back = mv.color === 'w' ? '1' : '8';
-    if ((mv.piece === 'n' || mv.piece === 'b') && mv.from[1] === back) {
-      const long = mv.piece === 'b' && ['g2', 'b2', 'g7', 'b7'].includes(mv.to);
-      return `${cap(P)} comes out to ${mv.to}${long ? ', on the long diagonal' : ''}.${check || hit}`;
+    const me = mv.color as 'w' | 'b', them = (me === 'w' ? 'b' : 'w') as 'w' | 'b';
+    const side = me === 'w' ? 'White' : 'Black';
+    const P = PIECE_NAME[mv.piece];
+    const at = (s: string) => c.get(s as never) as { type: string; color: string } | undefined;
+    const turnTo = (g: Chess, col: 'w' | 'b') => { try { const p = g.fen().split(' '); p[1] = col; p[3] = '-'; return new Chess(p.join(' ')); } catch { return null; } };
+    // The position with the mover to move again: what do they threaten now?
+    const again = turnTo(c, me);
+    const ctl = CENTER.filter((s) => c.attackers(s as never, me).includes(mv.to as never));
+    // 1. What the move is.
+    let head: string;
+    if (mv.san.startsWith('O-O')) {
+      const long = mv.san.startsWith('O-O-O');
+      head = `${long ? 'Castles queenside' : 'Castles'}: the king tucks away and the rook comes to ${long ? 'd' : 'f'}${me === 'w' ? '1' : '8'}`;
+    } else if (mv.captured) head = prev?.captured && prev.to === mv.to ? `Takes back on ${mv.to}` : `Grabs the ${PIECE_NAME[mv.captured]} on ${mv.to}`;
+    else if ((mv.piece === 'n' || mv.piece === 'b') && mv.from[1] === (me === 'w' ? '1' : '8')) head = ['g2', 'b2', 'g7', 'b7'].includes(mv.to) ? 'The bishop goes to the long diagonal' : `Develops the ${P}`;
+    else if (mv.piece === 'p' && CENTER.includes(mv.to)) head = 'Grabs space in the center';
+    else if (mv.piece === 'p' && ['c4', 'c5', 'f4', 'f5'].includes(mv.to)) head = 'Hits the center from the side';
+    else if (mv.piece === 'p' && ['g3', 'b3', 'g6', 'b6'].includes(mv.to)) head = `Makes room for the bishop on ${mv.to[0]}${me === 'w' ? '2' : '7'}`;
+    else if (mv.piece === 'p' && ['a3', 'a6', 'h3', 'h6'].includes(mv.to)) {
+      const kick = (again?.moves({ square: mv.to as never, verbose: true }) ?? []).find((m) => m.captured && m.captured !== 'p' && m.captured !== 'k');
+      head = kick ? `Kicks the ${PIECE_NAME[kick.captured!]} on ${kick.to}` : `Takes the ${mv.to[0] === 'a' ? 'b' : 'g'}${me === 'w' ? '4' : '5'} square away`;
     }
-    if (mv.piece === 'p') {
-      if (['d4', 'e4', 'd5', 'e5', 'c4', 'c5', 'f4', 'f5'].includes(mv.to)) return `Pawn to ${mv.to}, fighting for the center.${check || hit}`;
-      if (['g3', 'b3', 'g6', 'b6'].includes(mv.to)) return `Pawn to ${mv.to}, making room for the bishop.${check || hit}`;
-      return `Pawn to ${mv.to}.${check || hit}`;
+    else if (mv.piece === 'p' && (ctl.length || ['c3', 'c6', 'd3', 'd6', 'e3', 'e6', 'f3', 'f6'].includes(mv.to))) head = 'Supports the center';
+    else if (mv.piece === 'p') head = `Pushes the ${mv.to[0]}-pawn`;
+    else head = `The ${P} goes to ${mv.to}`;
+    if (mv.san.includes('#')) return `${head}. Checkmate!`;
+    const does: string[] = []; const after: string[] = [];
+    if (mv.san.includes('+')) does.push('gives check');
+    // 2. Threats: mate in one, a fork, what it attacks (pawns only when they're short of defenders).
+    let pinned = '';
+    if ('bqr'.includes(mv.piece)) {
+      const dirs = mv.piece === 'b' ? [[1, 1], [1, -1], [-1, 1], [-1, -1]] : mv.piece === 'r' ? [[1, 0], [-1, 0], [0, 1], [0, -1]] : [[1, 1], [1, -1], [-1, 1], [-1, -1], [1, 0], [-1, 0], [0, 1], [0, -1]];
+      for (const [df, dr] of dirs) {
+        let f = mv.to.charCodeAt(0) - 97 + df, r = Number(mv.to[1]) + dr; const seen: { s: string; p: { type: string; color: string } }[] = [];
+        while (f >= 0 && f < 8 && r >= 1 && r <= 8 && seen.length < 2) { const s2 = String.fromCharCode(97 + f) + r; const p = at(s2); if (p) seen.push({ s: s2, p }); f += df; r += dr; }
+        if (seen.length === 2 && seen.every((x) => x.p.color === them) && !'kp'.includes(seen[0].p.type) && (seen[1].p.type === 'k' || (seen[1].p.type === 'q' && seen[0].p.type !== 'q'))) {
+          pinned = seen[0].s; does.push(`pins the ${PIECE_NAME[seen[0].p.type]} on ${seen[0].s} to the ${PIECE_NAME[seen[1].p.type]}`); break;
+        }
+      }
     }
-    return `${cap(P)} to ${mv.to}.${check || hit}`;
+    if (again) {
+      const mate = again.moves({ verbose: true }).find((m) => m.san.includes('#'));
+      if (mate) does.push(`threatens mate on ${mate.to}`);
+      else {
+        const hit = again.moves({ square: mv.to as never, verbose: true }).filter((m) => m.captured && m.captured !== 'k' && m.to !== pinned && !head.startsWith(`Kicks the ${PIECE_NAME[m.captured]} on ${m.to}`)).filter((m) => {
+          if (m.captured !== 'p') return true;
+          return c.attackers(m.to as never, them).length === 0 || c.attackers(m.to as never, me).length > c.attackers(m.to as never, them).length;
+        });
+        const pieces = hit.filter((m) => m.captured !== 'p');
+        if (mv.piece !== 'k' && pieces.length >= 2) does.push(`forks the ${PIECE_NAME[pieces[0].captured!]} and the ${PIECE_NAME[pieces[1].captured!]}`);
+        else if (hit.length) {
+          const h = hit[0]; const n = c.attackers(h.to as never, me).length;
+          if (h.captured === 'p' && n >= 2) after.push(`That's ${n === 2 ? 'two' : n} pieces on the pawn on ${h.to}.`);
+          else does.push(`attacks the ${PIECE_NAME[h.captured!]} on ${h.to}`);
+        }
+      }
+    }
+    // f7 / f2: guarded only by the king, the classic target.
+    const weak = me === 'w' ? 'f7' : 'f2';
+    if (!does.length && !after.length && ('bq'.includes(mv.piece)) && (again?.moves({ square: mv.to as never, verbose: true }) ?? []).some((m) => m.to === weak)) {
+      const def = c.attackers(weak as never, them);
+      if (def.length === 1 && at(def[0])?.type === 'k') does.push(`eyes ${weak}, the weakest square near the king`);
+    }
+    // 3. Defends something that was attacked and unguarded.
+    if (does.length < 2 && !mv.captured) {
+      outer: for (const row of before.board()) for (const p of row) {
+        if (!p || p.color !== me || p.square === mv.from || p.type === 'k') continue;
+        if (before.attackers(p.square, them).length && !before.attackers(p.square, me).length && c.get(p.square)?.color === me && c.attackers(p.square, me).length) {
+          does.push(`defends the ${PIECE_NAME[p.type]} on ${p.square}`); break outer;
+        }
+      }
+    }
+    // 4. Central squares it now controls (knights and pawns).
+    if (does.length < 2 && (mv.piece === 'n' || mv.piece === 'p') && ctl.length) does.push(`controls ${ctl.join(' and ')}`);
+    // 5. Opens a line for a bishop or the queen.
+    if (does.length < 2 && mv.piece === 'p') {
+      const mob = (g: Chess, s: string) => turnTo(g, me)?.moves({ square: s as never }).length ?? 0;
+      outer2: for (const row of c.board()) for (const p of row) {
+        if (!p || p.color !== me || (p.type !== 'b' && p.type !== 'q')) continue;
+        if (mob(c, p.square) - mob(before, p.square) >= 2) { does.push(`opens a line for the ${PIECE_NAME[p.type]}`); break outer2; }
+      }
+    }
+    // 6. Ready to castle now.
+    if (mv.piece !== 'k') {
+      const can = (g: Chess) => turnTo(g, me)?.moves().includes('O-O') ?? false;
+      if (!can(before) && can(c)) after.push(`Now ${side} can castle.`);
+    }
+    const d = does.slice(0, 2);
+    return `${head}.${d.length ? ` It ${d.join(' and ')}.` : ''}${after.length ? ` ${after[0]}` : ''}`;
   } catch { return ''; }
 }
 function openingClip(o0: StudioOpening, lineName?: string): Clip {
@@ -381,7 +447,12 @@ function openingClip(o0: StudioOpening, lineName?: string): Clip {
     if (k >= 0) {
       const l = o0.lines[k];
       const c = new Chess(); o0.line.forEach((m) => { try { c.move(m); } catch { /* checked below */ } });
-      const notes = playSans(c.fen(), l.moves, []).map((p, i) => { const n = moveNote(p.fenBefore, p.san); return i === l.moves.length - 1 ? `${n} ${l.note}`.trim() : n; });
+      const mainPlies = playSans(undefined, o0.line, []); const lastMain = mainPlies[mainPlies.length - 1];
+      let prev: { to: string; captured?: boolean } | undefined = lastMain ? { to: lastMain.to, captured: lastMain.san.includes('x') } : undefined;
+      const notes = playSans(c.fen(), l.moves, []).map((p, i) => {
+        const n = moveNote(p.fenBefore, p.san, prev); prev = { to: p.to, captured: p.san.includes('x') };
+        return i === l.moves.length - 1 ? `${n} ${l.note}`.trim() : n;
+      });
       const base = openingClip({ ...o0, lines: [l], trap: null, options: o0.options.filter((x) => x.lines?.includes(k)).map((x) => ({ ...x, lines: [0] })) });
       if (base.ranges?.lines.length) {
         const [a] = base.ranges.lines[0];
@@ -859,9 +930,10 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
       const keyFen = fenAt(m), keyLast = lastAt(m), endFen = fenAt(b), endLast = lastAt(b);
       if (isComp && isFirst) out.push({ kind: 'title', fen: fenAt(0) });
       if (prefs.openTeaser && (!isComp || isFirst)) {
+        const nw = ['one', 'two', 'three', 'four', 'five', 'six'][clip.lineMode.no - 1] ?? String(clip.lineMode.no);
         out.push({ kind: 'teaser', fen: endFen, last: endLast, mate: false,
-          text: `The ${l.name}, explained 🔥`, sub: `${o.name} · line ${clip.lineMode.no} of ${clip.lineMode.of}`,
-          said: `The ${l.name}. Here's how it goes, move by move, and why it works.` });
+          text: `${o.name} · Line ${clip.lineMode.no} 🔥`, sub: `The ${l.name}, every move explained`,
+          said: `The ${o.name}, line ${nw}: the ${l.name}. Every move, and why it works.` });
       } else if (prefs.intro) out.push({ kind: 'intro', fen: fenAt(0) });
       out.push({ kind: 'hold', fen: fenAt(0), last: null });
       for (let p = 1; p <= m; p++) out.push({ kind: 'move', ply: p });
@@ -1323,13 +1395,13 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
     const o = clip.openingData; const l = o.lines[0]; const [a, b] = clip.ranges.lines[0] ?? [0, -1];
     const creator = prefs.tone !== 'teacher';
     if (f.kind === 'move') {
-      if (f.ply === clip.ranges.main[1]) return `The ${o.name}.`;
+      if (f.ply === clip.ranges.main[1]) return `That's the ${o.name}. Now the ${l.name}.`;
       if (f.ply < a || f.ply > b) return null;
       const pl = clip.plies[f.ply - 1];
       return pl ? `${spokenSan(pl.san)}. ${pl.review?.explanation ?? ''}`.trim().slice(0, 320) : null;
     }
     if (f.kind === 'openCard') {
-      if (f.card === 'line') return creator ? `Now here's the ${l.name}.` : `The ${l.name}.`;
+      if (f.card === 'line') return null;
       if (f.card === 'why') return l.why?.length ? `${creator ? 'So why does it work?' : 'Why it works.'} ${l.why.join('. ')}.` : null;
       if (f.card === 'lineStats') {
         const bits = [
@@ -1458,7 +1530,16 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
     })();
     return () => { live = false; };
   }, [prefs.voice, prefs.voiceName, frames, hook, prefs.outroLine, compTitle, prefs.captions, prefs.splashCta, ctaText, prefs.openCut, prefs.tone]); // eslint-disable-line react-hooks/exhaustive-deps
-  const voiceReady = !prefs.voice || !voicePrep || voicePrep.done >= voicePrep.total;
+  // Playback starts once the first few lines are ready; the rest keep coming in, in script
+  // order, while it plays. If it ever reaches a line that isn't ready yet, it waits for it.
+  const voiceReady = (() => {
+    if (!prefs.voice || !voicePrep || voicePrep.done >= voicePrep.total) return true;
+    const has = (t: string) => voiceUrl.current.has(`${voiceKey}|${t}`);
+    const script = [...new Set(frames.map(narration).filter((x): x is string => !!x))];
+    if (!script.slice(0, 4).every(has)) return false;
+    const now = narration(frames[i]);
+    return !now || has(now);
+  })();
   useEffect(() => { if (blank && playing && blankDone.current) setBlank(false); }, [blank, playing]);
   // The premium narrator (ElevenLabs) when the server has it; it becomes the default once.
   const [premiumVoice, setPremiumVoice] = useState(false);
