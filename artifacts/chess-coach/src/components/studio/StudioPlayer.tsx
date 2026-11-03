@@ -126,6 +126,8 @@ type Frame =
   | { kind: 'rewind'; fen: string; last: { from: string; to: string } | null; idx: number }
   /** A beat on the starting position once the title / hook clears, so the first move is never hidden. */
   | { kind: 'hold'; fen: string; last: { from: string; to: string } | null }
+  /** Opening clips: the hook scene, first thing on screen (the trap's final position, or the big question). */
+  | { kind: 'teaser'; fen: string; last: { from: string; to: string } | null; text: string; sub: string; said: string; mate: boolean }
   | { kind: 'outro'; fen: string };
 
 const LABEL: Record<string, { text: string; color: string; glyph: string }> = {
@@ -173,6 +175,12 @@ const DEFAULT_PREFS = {
   handle: '@chessscout.net3', outroLine: 'Review your games free',
   /** Call to action on the closing splash: spoken (with the voiceover on) and shown as big subtitles. */
   splashCta: true, ctaLine: 'Follow for more chess, and share this with a friend who needs to see it!',
+  /** Adds a ChessScout.net line after the call to action (spoken and subtitled). */
+  ctaSite: true, siteLine: 'Scout your next opponent free at ChessScout.net.',
+  /** Openings: a hook scene first; Full (every line) or Quick (one line plus the trap, under a minute). */
+  openTeaser: true, openCut: 'full' as 'full' | 'quick',
+  /** Clean view's 5-second lead-in: the first scene, still (so an untrimmed video never opens on black), or black. */
+  leadIn: 'scene' as 'scene' | 'black',
   split: true, voice: false, voiceName: 'ash', compTitle: 'Top moments this week',
   music: 'off' as MusicStyle, musicVol: 0.5, beatSync: true, musicFx: true, subs: true, pieceFx: true, trapBefore: 99, countdownSecs: 3, choices: false, zoom: false, splash: true, reviewMode: 'highlights' as 'highlights' | 'full',
 };
@@ -626,6 +634,8 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
 
   // ── Settings (remembered between clips) ─────────────────────────────────
   const [prefs, setPrefs] = useState<Prefs>(loadPrefs);
+  // What the closing splash says: the call to action, then (optionally) the ChessScout.net line.
+  const ctaText = [prefs.ctaLine.trim(), prefs.ctaSite ? prefs.siteLine.trim() : ''].filter(Boolean).join(' ');
   const set = <K extends keyof Prefs>(k: K, v: Prefs[K]) => setPrefs((p) => { const n = { ...p, [k]: v }; try { localStorage.setItem(PREF_KEY, JSON.stringify(n)); } catch { /* ignore */ } return n; });
   const [hook, setHook] = useState('');
   const [sub, setSub] = useState('');
@@ -668,6 +678,8 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
   const startBlank = () => {
     startSoundtrack();
     setExitHint(0); setPlaying(false); setBlank(true); blankDone.current = false;
+    // "Still first scene" lead-in: the opening frame sits there, untouched, until play starts.
+    if (prefs.leadIn === 'scene' && (!isComp || q === 0)) setI(0);
     if (blankTimer.current) clearTimeout(blankTimer.current);
     // After 5s the clip starts; the screen stays black until it's actually playing
     // (e.g. while the voiceover finishes preparing).
@@ -705,9 +717,15 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
   const setCompTitle = (v: string) => { setCompTitleState(v); if (!title) set('compTitle', v); };
   useEffect(() => {
     if (!clip) return;
-    setHook(isComp ? `#${queue!.length - clipQ} · ${stripEmoji(clip.hook)}` : clip.hook); setSub(clip.sub);
+    setHook(isComp ? `#${queue!.length - clipQ} · ${stripEmoji(clip.hook)}` : clip.hook);
+    // Quick openings show fewer lines, so the subtitle says how many are really in it.
+    const o = clip.openingData;
+    if (clip.isOpening && o && prefs.openCut === 'quick') {
+      const n = Math.min(o.lines.length, o.trap ? 1 : 2);
+      setSub(`${n === 1 ? 'The main line' : `${n} lines`} · counter moves · ${o.trap ? 'plus a trap' : 'what to play'}`);
+    } else setSub(clip.sub);
     setFlipped(clip.plies[clip.key]?.color === 'b');
-  }, [clip, clipQ, queue?.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [clip, clipQ, queue?.length, prefs.openCut]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── The script ──────────────────────────────────────────────────────────
   // Countdowns and text cards inserted on the timeline, keyed by the frame they come before.
@@ -764,25 +782,46 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
     if (clip.isOpening && clip.openingData && clip.ranges) {
       const o = clip.openingData; const R = clip.ranges;
       const [, m] = R.main;
-      if (isComp && isFirst) out.push({ kind: 'title', fen: fenAt(0) });
-      if (prefs.intro) out.push({ kind: 'intro', fen: fenAt(0) });
-      out.push({ kind: 'hold', fen: fenAt(0), last: null });
-      for (let p = 1; p <= m; p++) out.push({ kind: 'move', ply: p });
+      const quick = prefs.openCut === 'quick';
       const keyFen = fenAt(m), keyLast = lastAt(m);
+      if (isComp && isFirst) out.push({ kind: 'title', fen: fenAt(0) });
+      // The hook scene: the payoff first. With a trap, its final position ("checkmate in
+      // 4 moves"); without one, the big question over the position with every reply drawn.
+      const teaser = prefs.openTeaser && (!isComp || isFirst);
+      if (teaser) {
+        if (R.trap && o.trap) {
+          const [ta, tb] = R.trap; const n = Math.ceil((tb - ta + 1) / 2);
+          const mate = !!clip.plies[tb - 1]?.san.includes('#');
+          out.push({ kind: 'teaser', fen: fenAt(tb), last: lastAt(tb), mate,
+            text: mate ? `Checkmate in ${n} moves 😱` : `Don't fall for this 🪤`,
+            sub: `The ${o.trap.name} · it's at the end`,
+            said: mate ? `Checkmate in ${n} moves. Here's the ${o.name}, and the trap that ends it.` : `Don't fall for this. Here's the ${o.name}, and the trap hiding in it.` });
+        } else if (o.options.length >= 2) {
+          const n = Math.min(4, o.options.length);
+          out.push({ kind: 'teaser', fen: keyFen, last: keyLast, mate: false,
+            text: `${n} ways to answer the ${o.name}. Which is yours? 🤔`, sub: 'Real-game numbers for each one',
+            said: `There are ${n} main ways to answer the ${o.name}. Which one do you play?` });
+        }
+      }
+      if (prefs.intro) out.push({ kind: 'intro', fen: fenAt(0) });
+      if (!teaser) out.push({ kind: 'hold', fen: fenAt(0), last: null });
+      for (let p = 1; p <= m; p++) out.push({ kind: 'move', ply: p });
       out.push({ kind: 'openCard', fen: keyFen, last: keyLast, card: 'ideas' });
-      if (o.results && o.games >= 10) out.push({ kind: 'openCard', fen: keyFen, last: keyLast, card: 'stats' });
+      if (!quick && o.results && o.games >= 10) out.push({ kind: 'openCard', fen: keyFen, last: keyLast, card: 'stats' });
       // "What would you play?" then the replies with how often they're played and what Stockfish thinks.
       if (o.options.length) {
         const mover = keyFen.split(' ')[1] === 'w' ? 'White' : 'Black';
-        for (let n = 3; n >= 1; n--) out.push({ kind: 'countdown', n, fen: keyFen, last: keyLast, total: 3, text: `What should ${mover} play here?`, anchor: 'opening' });
+        if (!quick) for (let n = 3; n >= 1; n--) out.push({ kind: 'countdown', n, fen: keyFen, last: keyLast, total: 3, text: `What should ${mover} play here?`, anchor: 'opening' });
         out.push({ kind: 'openCard', fen: keyFen, last: keyLast, card: 'options' });
       }
       // Each variation: it lights up on the line map, plays out, then the board
       // rewinds move by move to the branch point for the next one.
-      R.lines.forEach(([a, b], idx) => {
+      // Quick: the most played line only (two when there's no trap).
+      const shown = quick ? R.lines.slice(0, R.trap ? 1 : 2) : R.lines;
+      shown.forEach(([a, b], idx) => {
         out.push({ kind: 'openCard', fen: keyFen, last: keyLast, card: 'line', idx });
         for (let p = a; p <= b; p++) out.push({ kind: 'move', ply: p });
-        if (idx < R.lines.length - 1 || !R.trap) for (let p = b - 1; p >= a - 1; p--) out.push({ kind: 'rewind', fen: p >= a ? fenAt(p) : keyFen, last: p >= a ? lastAt(p) : keyLast, idx });
+        if (idx < shown.length - 1 || !R.trap) for (let p = b - 1; p >= a - 1; p--) out.push({ kind: 'rewind', fen: p >= a ? fenAt(p) : keyFen, last: p >= a ? lastAt(p) : keyLast, idx });
       });
       if (R.trap) {
         const [a, b] = R.trap;
@@ -885,7 +924,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
     if (prefs.guessRating && !clip.isTrap && (clip.ratings.w || clip.ratings.b)) out.push({ kind: 'reveal', fen: lastFen });
     if (prefs.outro && isLast) out.push({ kind: 'outro', fen: lastFen });
     return withInserts(out);
-  }, [clip, prefs.before, prefs.trapBefore, prefs.after, prefs.intro, prefs.guess, prefs.betterLine, prefs.guessRating, prefs.outro, prefs.split, prefs.reviewMode, prefs.countdownSecs, prefs.splash, inserts, loadedKey, isComp, isFirst, isLast]);
+  }, [clip, prefs.before, prefs.trapBefore, prefs.after, prefs.intro, prefs.guess, prefs.betterLine, prefs.guessRating, prefs.outro, prefs.split, prefs.reviewMode, prefs.countdownSecs, prefs.splash, prefs.openTeaser, prefs.openCut, inserts, loadedKey, isComp, isFirst, isLast]);
 
   // ── Keyframes: a stable id per frame (so pauses and sticker in/out points survive setting changes) ─
   const frameIds = useMemo(() => assignIds(frames, loadedKey), [frames]);
@@ -923,7 +962,8 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
   const baseDur = (f: Frame) => {
     const s = prefs.speed * 1000;
     switch (f.kind) {
-      case 'intro': return 1600;
+      case 'intro': return frames[0]?.kind === 'teaser' ? 1300 : 1600;
+      case 'teaser': return 2600;
       case 'hold': return 800;
       case 'countdown': return 1000;
       case 'card': return f.secs * 1000;
@@ -936,7 +976,8 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
       case 'lessonText': return Math.max(2600, f.text.split(/\s+/).length * 340);
       case 'lessonBoard': return f.celebrate ? 2400 : Math.max(3000, f.text.split(/\s+/).length * 340);
       case 'scanPhoto': return 3200;
-      case 'splash': return prefs.splashCta ? 3600 : 2800;
+      // Long enough for the subtitles to finish without the voiceover (it stretches to fit the voice anyway).
+      case 'splash': return prefs.splashCta ? Math.max(3600, ctaText.split(/\s+/).filter(Boolean).length * 360 + 900) : 2800;
       case 'promoCard': return f.card === 'vs' ? 1500 : 3600;
       case 'openCard': return f.card === 'line' ? 1900 : f.card === 'options' ? 5600 : f.card === 'trap' ? 2600 : 4600;
       case 'rewind': return 150;
@@ -994,7 +1035,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
     }
     if (frame.kind === 'split') return { fen: frame.played.fen, last: frame.played.last, ply: -3, move: null as Ply | null };
     const fen = frame.fen;
-    const last = frame.kind === 'countdown' || frame.kind === 'better' || frame.kind === 'hold' || frame.kind === 'scoutCard' || frame.kind === 'lessonBoard' || frame.kind === 'promoCard' || frame.kind === 'openCard' || frame.kind === 'rewind' ? frame.last : null;
+    const last = frame.kind === 'countdown' || frame.kind === 'better' || frame.kind === 'hold' || frame.kind === 'scoutCard' || frame.kind === 'lessonBoard' || frame.kind === 'promoCard' || frame.kind === 'openCard' || frame.kind === 'rewind' || frame.kind === 'teaser' ? frame.last : null;
     const ply = frame.kind === 'countdown' && !frame.anchor ? keyPly - 1 : frame.kind === 'intro' ? -1 : -2;
     return { fen, last, ply, move: null as Ply | null };
   }, [frame, plies, keyPly]);
@@ -1034,6 +1075,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
       if (frame.kind === 'countdown') m.accent('tick');
       if (frame.kind === 'title' || frame.kind === 'outro' || frame.kind === 'split' || frame.kind === 'intro' || frame.kind === 'card' || frame.kind === 'scoutCard' || frame.kind === 'openCard' || frame.kind === 'lessonText') m.accent('whoosh');
       if (frame.kind === 'rewind') m.accent('tick');
+      if (frame.kind === 'teaser') { m.accent('impact'); setTimeout(() => music.current?.accent('riser'), 900); }
       if (frame.kind === 'lessonBoard' && frame.celebrate) m.accent('chime');
       if (frame.kind === 'scanPhoto') m.accent('riser');
       if (frame.kind === 'splash') { m.accent('whoosh'); setTimeout(() => music.current?.accent('impact'), 680); }
@@ -1092,6 +1134,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
     switch (f.kind) {
       case 'title': return stripEmoji(compTitle);
       case 'intro': return stripEmoji(hook.replace(/^#\d+ · /, ''));
+      case 'teaser': return f.said;
       case 'countdown': return f.n === (f.total ?? 3) ? (f.text ? stripEmoji(f.text) : clip.isTrap ? 'Can you spot the winning move?' : 'Can you find the move?') : null;
       case 'card': return stripEmoji(f.text);
       case 'move': {
@@ -1130,7 +1173,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
       }
       case 'openCard': {
         const o = clip.openingData; if (!o) return null;
-        if (f.card === 'ideas') return `The ${o.name}. ${o.ideas.join('. ')}.`;
+        if (f.card === 'ideas') return `The ${o.name}. ${(prefs.openCut === 'quick' ? o.ideas.slice(0, 2) : o.ideas).join('. ')}.`;
         if (f.card === 'stats' && o.results) return `In ${o.games} real games, White wins ${o.results.white} percent, Black ${o.results.black} percent.`;
         if (f.card === 'options') { const top = o.options.slice(0, 3).map((x) => spokenSan(x.san)); return `The main choices: ${top.join(', ')}.`; }
         if (f.card === 'line') { const l = o.lines[f.idx ?? 0]; return l ? `Line ${(f.idx ?? 0) + 1}: the ${l.name}.` : null; }
@@ -1154,7 +1197,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
       }
       // The closing splash says the follow / share line, so the end card doesn't repeat it.
       case 'outro': return prefs.splash && prefs.splashCta && isLast ? `${stripEmoji(prefs.outroLine)}.` : `${stripEmoji(prefs.outroLine)}. Follow for more.`;
-      case 'splash': return prefs.splashCta && prefs.ctaLine.trim() ? stripEmoji(prefs.ctaLine) : null;
+      case 'splash': return prefs.splashCta && ctaText ? stripEmoji(ctaText) : null;
       default: return null;
     }
   };
@@ -1194,7 +1237,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
       setVoiceNote(failed ? `${failed} line${failed > 1 ? 's' : ''} of the voiceover couldn't be made (it uses OpenAI), so ${failed > 1 ? 'they play' : 'it plays'} silently. Try again in a moment.` : null);
     })();
     return () => { live = false; };
-  }, [prefs.voice, prefs.voiceName, frames, hook, prefs.outroLine, compTitle, prefs.captions, prefs.splashCta, prefs.ctaLine]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [prefs.voice, prefs.voiceName, frames, hook, prefs.outroLine, compTitle, prefs.captions, prefs.splashCta, ctaText, prefs.openCut]); // eslint-disable-line react-hooks/exhaustive-deps
   const voiceReady = !prefs.voice || !voicePrep || voicePrep.done >= voicePrep.total;
   useEffect(() => { if (blank && playing && blankDone.current) setBlank(false); }, [blank, playing]);
   // The premium narrator (ElevenLabs) when the server has it; it becomes the default once.
@@ -1438,6 +1481,12 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
       try { const c = new Chess(frame.fen); const mv = c.move(san); if (mv) arrows.push({ from: mv.from, to: mv.to, color: ln >= 0 ? COLORS[ln % 4] : 'rgba(150,160,158,0.85)' }); } catch { /* ignore */ }
     });
   }
+  if (frame?.kind === 'teaser' && !frame.mate && clip.openingData && !clip.ranges?.trap) {
+    const COLORS = ['rgba(129,182,76,0.95)', 'rgba(74,139,214,0.92)', 'rgba(232,180,71,0.92)', 'rgba(202,52,49,0.9)'];
+    clip.openingData.options.slice(0, 4).forEach((x, k) => {
+      try { const c = new Chess(frame.fen); const mv = c.move(x.san); if (mv) arrows.push({ from: mv.from, to: mv.to, color: COLORS[k % 4] }); } catch { /* ignore */ }
+    });
+  }
   if (prefs.arrow && isKey && rev?.betterMove && cls && BAD.has(cls)) {
     try { const c = new Chess(plies[keyPly - 1].fenBefore); const mv = c.move(rev.betterMove); if (mv) arrows.push({ from: mv.from, to: mv.to, color: 'rgba(129,182,76,0.9)' }); } catch { /* ignore */ }
   }
@@ -1480,8 +1529,8 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
           <motion.div key={shake} animate={shake ? { x: [0, -14, 12, -8, 6, 0] } : {}} transition={{ duration: 0.45 }} className="absolute inset-0">
             {prefs.progress && <div className="absolute inset-x-0 top-0 z-20 h-[0.6cqh] bg-white/15"><div className="h-full bg-[#81B64C] transition-all duration-300" style={{ width: `${progress * 100}%` }} /></div>}
             {/* Hook: pops in big on the intro, then sits at the top */}
-            <motion.div key={frame?.kind === 'intro' ? 'intro' : 'top'} initial={frame?.kind === 'intro' ? { scale: 0.6, opacity: 0, y: '18cqh' } : false}
-              animate={{ scale: 1, opacity: pop || openLine != null || frame?.kind === 'countdown' || frame?.kind === 'card' || frame?.kind === 'scanPhoto' ? 0 : 1, y: frame?.kind === 'intro' ? '18cqh' : 0 }} transition={{ type: 'spring', stiffness: 260, damping: 18 }}
+            <motion.div key={frame?.kind === 'intro' ? `intro${playing ? 1 : 0}` : 'top'} initial={frame?.kind === 'intro' ? { scale: 0.6, opacity: 0, y: '18cqh' } : false}
+              animate={{ scale: 1, opacity: pop || openLine != null || frame?.kind === 'teaser' || frame?.kind === 'countdown' || frame?.kind === 'card' || frame?.kind === 'scanPhoto' ? 0 : 1, y: frame?.kind === 'intro' ? '18cqh' : 0 }} transition={{ type: 'spring', stiffness: 260, damping: 18 }}
               className="absolute inset-x-0 top-[6.5%] z-10 px-[6%] text-center">
               {isComp && frame?.kind === 'intro' && (
                 <motion.div key={`rank${clipQ}`} initial={{ scale: 3, opacity: 0, rotate: -20 }} animate={{ scale: 1, opacity: 1, rotate: 0 }} transition={{ type: 'spring', stiffness: 300, damping: 15, delay: 0.15 }}
@@ -1935,11 +1984,22 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
                 </motion.div>
               )}
             </AnimatePresence>
+            {/* Opening clips: the hook scene. Big punchy text over the payoff position; it
+                re-animates when play starts, so a recording opens on the motion. */}
+            {frame?.kind === 'teaser' && (
+              <motion.div key={`teaser${playing ? 1 : 0}`} className="pointer-events-none absolute inset-x-0 top-[5%] z-30 px-[6%] text-center">
+                <motion.p initial={{ scale: 1.8, opacity: 0, rotate: -4 }} animate={{ scale: 1, opacity: 1, rotate: 0 }} transition={{ type: 'spring', stiffness: 320, damping: 14 }}
+                  className="font-black leading-[1.05]" style={{ fontSize: 'clamp(24px,5.8cqh,60px)', color: frame.mate ? '#FFD84D' : '#fff', textShadow: '0 0 4px #000, 0 4px 0 #000, 0 6px 22px rgba(0,0,0,.7)', WebkitTextStroke: '1.5px #000' }}>{frame.text}</motion.p>
+                <motion.p initial={{ y: 14, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.45 }}
+                  className="mx-auto mt-[1cqh] w-fit rounded-full bg-black/60 px-[1em] py-[0.3em] font-black text-white" style={{ fontSize: 'clamp(11px,2cqh,20px)' }}>{frame.sub} 👀</motion.p>
+              </motion.div>
+            )}
+            {frame?.kind === 'teaser' && frame.mate && <motion.div key={`tflash${playing ? 1 : 0}`} className="pointer-events-none absolute inset-0 z-20" initial={{ opacity: 0.7 }} animate={{ opacity: 0 }} transition={{ duration: 0.6 }} style={{ background: 'radial-gradient(circle at 50% 50%, rgba(255,216,77,.55), transparent 70%)' }} />}
             {frame?.kind === 'splash' && <StudioSplash key={`splash${i}`} />}
             {/* Call to action over the splash: big word-by-word subtitles (always, so it reads
                 with the sound off too) and follow / share / save chips. */}
-            {frame?.kind === 'splash' && prefs.splashCta && prefs.ctaLine.trim() && (() => {
-              const line = prefs.ctaLine.trim();
+            {frame?.kind === 'splash' && prefs.splashCta && ctaText && (() => {
+              const line = ctaText;
               const words = line.split(/\s+/).filter(Boolean);
               const len = Math.max(1200, (voiceLen.current.get(`${prefs.voiceName}|${stripEmoji(line)}`) ?? words.length * 0.36) * 1000);
               const k = playing ? Math.max(0, Math.min(words.length - 1, Math.floor(((performance.now() - frameStart) / len) * words.length))) : 0;
@@ -2113,7 +2173,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
               <div className="absolute inset-x-0 top-0 h-[6%] border-b-2 border-dashed border-white/35 bg-white/5" />
             </div>
           )}
-          {clean && blank && <div className="absolute inset-0 z-[70] bg-black" />}
+          {clean && blank && (prefs.leadIn === 'black' || (isComp && q !== 0)) && <div className="absolute inset-0 z-[70] bg-black" />}
           {clean && exitHint > 0 && (
             <div className="absolute inset-x-0 top-3 z-[80] flex justify-center gap-2" onClick={(e) => e.stopPropagation()}>
               <button onClick={startBlank} aria-label="Replay from the start"
@@ -2209,6 +2269,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
               {recording ? <Square size={14} /> : <Video size={14} />}{recording ? 'Stop recording' : 'Record clip'}
             </button>
             <button onClick={enterClean} className={ctl}><EyeOff size={14} className="mr-1 inline" />Clean view</button>
+            <button onClick={() => set('leadIn', prefs.leadIn === 'scene' ? 'black' : 'scene')} className={ctl} title="What shows for the 5 seconds before a clean-view clip starts">Lead-in: {prefs.leadIn === 'scene' ? 'first scene' : 'black'}</button>
             {soundtrack && (
               <a href={soundtrack.url} download={`${clip?.fileBase ?? 'chessscout-clip'}-soundtrack.${soundtrack.ext}`} className={ctl} style={{ background: '#81B64C' }}>
                 <Music size={14} className="mr-1 inline" />Download soundtrack
@@ -2318,6 +2379,20 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
               <p className="mt-1 text-[11.5px] text-white/45">Highlights plays the two moves before each brilliant, great, mistake and blunder, then the summary card.</p>
             </div>
           )}
+          {clip.isOpening && (
+            <div className="mb-3">
+              <p className="mb-1 text-[11px] font-bold uppercase tracking-wide text-white/50">Opening clip</p>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <div className="inline-flex rounded-lg bg-white/5 p-0.5">
+                  {([['full', 'Full'], ['quick', 'Quick (under a minute)']] as const).map(([k, t]) => (
+                    <button key={k} onClick={() => set('openCut', k)} className="rounded-md px-3 py-1 text-[12px] font-bold" style={{ background: prefs.openCut === k ? '#81B64C' : 'transparent', color: prefs.openCut === k ? '#fff' : '#C9CFCD' }}>{t}</button>
+                  ))}
+                </div>
+                {toggle('openTeaser', 'Hook scene first')}
+              </div>
+              <p className="mt-1 text-[11.5px] text-white/45">Quick keeps the ideas, the replies, the most played line and the trap. The hook scene opens on the trap's final position (or the big question) so the first second grabs people.</p>
+            </div>
+          )}
           <p className="mb-1 text-[11px] font-bold uppercase tracking-wide text-white/50">Story</p>
           <div className="mb-3 flex flex-wrap gap-1.5">
             {toggle('intro', 'Hook intro')}
@@ -2373,6 +2448,8 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
             <div className="mb-3 text-[12px]">
               <div className="mb-1 flex items-center gap-2">{toggle('splashCta', 'Follow / share call to action on the splash')}</div>
               {prefs.splashCta && <label className="block text-white/60">Call to action (spoken with the voiceover, and shown as subtitles)<input value={prefs.ctaLine} onChange={(e) => set('ctaLine', e.target.value)} className="mt-0.5 w-full rounded bg-white/5 px-2 py-1 text-white" /></label>}
+              {prefs.splashCta && <div className="mt-1.5 flex items-center gap-2">{toggle('ctaSite', 'Add a ChessScout.net line')}</div>}
+              {prefs.splashCta && prefs.ctaSite && <label className="mt-1 block text-white/60">ChessScout.net line (said after the call to action)<input value={prefs.siteLine} onChange={(e) => set('siteLine', e.target.value)} className="mt-0.5 w-full rounded bg-white/5 px-2 py-1 text-white" /></label>}
             </div>
           )}
 
