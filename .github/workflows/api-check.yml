@@ -1,5 +1,5 @@
 name: api-check
-# One-off check that the API answers, and whether Google sign-in is configured.
+# One-off check that the API answers, and that the voiceover (text to speech) works.
 on:
   workflow_dispatch:
 jobs:
@@ -7,7 +7,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: |
-          for u in https://chesscoach-api-kbf8.onrender.com/api/auth/google/status https://chesscoach-api-kbf8.onrender.com/api/healthz https://chessscout.net/api/auth/google/status; do
-            out=$(curl -s -m 60 -w ' [HTTP %{http_code}]' "$u" | head -c 400 | tr '\n' ' ')
-            echo "::notice title=$u::$out"
+          B=https://chesscoach-api-kbf8.onrender.com
+          echo "::notice title=voices::$(curl -s -m 60 $B/api/tts/voices | head -c 300)"
+          for v in ash premium; do
+            out=$(curl -s -m 90 -o /tmp/a.mp3 -w '%{http_code} %{size_download} %{content_type}' -X POST -H 'Content-Type: application/json' -d "{\"text\":\"Knight to f3. The Italian Game.\",\"voice\":\"$v\",\"style\":\"studio\"}" $B/api/tts/speak)
+            echo "::notice title=tts $v::$out $(head -c 200 /tmp/a.mp3 | tr -cd '[:print:]' | head -c 150)"
           done
