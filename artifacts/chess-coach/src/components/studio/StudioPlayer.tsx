@@ -1788,6 +1788,22 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
       try { const c = new Chess(frame.fen); const mv = c.move(san); if (mv) arrows.push({ from: mv.from, to: mv.to, color: ln >= 0 ? COLORS[ln % 4] : 'rgba(150,160,158,0.85)' }); } catch { /* ignore */ }
     });
   }
+  // One-line opening videos: the squares a move's note talks about light up, with an
+  // arrow from the piece to each square it attacks, defends or controls.
+  const noteMarks: string[] = (() => {
+    if (!clip.lineMode || !clip.ranges || frame?.kind !== 'move') return [];
+    const [a, b] = clip.ranges.lines[0] ?? [0, -1];
+    if (frame.ply < a || frame.ply > b) return [];
+    const pl = clip.plies[frame.ply - 1]; if (!pl) return [];
+    // The move's own note (not the line's closing summary, which can name other squares).
+    const own = moveNote(pl.fenBefore, pl.san);
+    const sqs = [...new Set((own.match(/\b[a-h][1-8]\b/g) ?? []))].filter((q) => q !== pl.to);
+    try {
+      const c = new Chess(pl.fen);
+      for (const q of sqs) if ((c.attackers(q as never, pl.color) as string[]).includes(pl.to)) arrows.push({ from: pl.to, to: q, color: 'rgba(255,214,10,0.9)' });
+    } catch { /* ignore */ }
+    return sqs;
+  })();
   if (frame?.kind === 'openCard' && frame.card === 'next' && clip.openingData?.lines[0]?.next) {
     try { const c = new Chess(frame.fen); const mv = c.move(clip.openingData.lines[0].next!.san); if (mv) arrows.push({ from: mv.from, to: mv.to, color: 'rgba(129,182,76,0.95)' }); } catch { /* ignore */ }
   }
@@ -1876,12 +1892,12 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
                       moveFx={prefs.pieceFx ? Math.round(Math.max(260, Math.min(560, prefs.speed * 450))) : undefined} />
                   )}
                 </LookOverride>
-                {frame?.kind === 'lessonBoard' && frame.highlights.length > 0 && (
-                  <div className="pointer-events-none absolute inset-x-0 top-0 aspect-square">
-                    {frame.highlights.map((sq) => {
+                {((frame?.kind === 'lessonBoard' && frame.highlights.length > 0) || noteMarks.length > 0) && (
+                  <div key={`marks${i}`} className="pointer-events-none absolute inset-x-0 top-0 aspect-square">
+                    {(frame?.kind === 'lessonBoard' ? frame.highlights : noteMarks).map((sq, n) => {
                       const f = sq.charCodeAt(0) - 97, r = Number(sq[1]); if (f < 0 || f > 7 || !(r >= 1 && r <= 8)) return null;
                       const col = flipped ? 7 - f : f, row = flipped ? r - 1 : 8 - r;
-                      return <motion.div key={sq} initial={{ opacity: 0, scale: 0.6 }} animate={{ opacity: [0.55, 1, 0.55], scale: 1 }} transition={{ opacity: { duration: 1.4, repeat: Infinity }, scale: { duration: 0.3 } }}
+                      return <motion.div key={sq} initial={{ opacity: 0, scale: 0.6 }} animate={{ opacity: [0.55, 1, 0.55], scale: 1 }} transition={{ opacity: { duration: 1.4, repeat: Infinity, delay: noteMarks.length ? 0.5 + n * 0.25 : 0 }, scale: { duration: 0.3, delay: noteMarks.length ? 0.5 + n * 0.25 : 0 } }}
                         className="absolute rounded-[12%]" style={{ left: `${col * 12.5}%`, top: `${row * 12.5}%`, width: '12.5%', height: '12.5%', background: 'rgba(255,214,10,.42)', boxShadow: 'inset 0 0 0 3px rgba(255,214,10,.95)' }} />;
                     })}
                   </div>
