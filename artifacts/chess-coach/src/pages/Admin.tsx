@@ -201,6 +201,80 @@ function DateRangeFilter({
   );
 }
 
+// The ChessScout bot on Lichess: games against it, results, and visits from its link.
+interface BotStats {
+  configured: boolean; running: boolean; username: string | null; playingNow: number;
+  profile: { count: Record<string, number> | null; perfs: Record<string, { rating?: number; games?: number }>; url: string } | null;
+  ours: Record<string, string | number | null> | null;
+  recent: { game_id: string; opponent: string | null; opponent_rating: number | null; opponent_title: string | null; speed: string | null; rated: boolean; result: string | null; status: string | null; started_at: string }[];
+  traffic: Record<string, string | number | null> | null;
+}
+function LichessBotCard() {
+  const [d, setD] = useState<BotStats | null>(null);
+  const [err, setErr] = useState(false);
+  useEffect(() => { apiFetch('/api/admin/lichess-bot', { credentials: 'include' }).then((r) => (r.ok ? r.json() : Promise.reject())).then(setD).catch(() => setErr(true)); }, []);
+  const n = (v: unknown) => Number(v ?? 0);
+  const tile = (label: string, value: React.ReactNode, sub?: string) => (
+    <div className="rounded-lg p-2.5" style={{ background: 'rgba(255,255,255,0.04)' }}>
+      <p className="text-[10px] font-black uppercase tracking-wide" style={{ color: TEXT_MUTED }}>{label}</p>
+      <p className="text-xl font-black leading-tight" style={{ color: TEXT_LIGHT }}>{value}</p>
+      {sub && <p className="text-[11px]" style={{ color: TEXT_MUTED }}>{sub}</p>}
+    </div>
+  );
+  return (
+    <div className="rounded-xl p-4 flex flex-col gap-3 sm:col-span-2 lg:col-span-3" style={{ background: BG_CARD, border: '1px solid rgba(255,255,255,0.05)' }}>
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-[10px] font-black uppercase tracking-[0.18em]" style={{ color: TEXT_MUTED }}>♞ Lichess bot</p>
+        {d && <span className="text-[12px] font-bold" style={{ color: d.running ? CHESSCOM_GREEN : TEXT_MUTED }}>
+          {!d.configured ? 'Not set up (LICHESS_BOT_TOKEN)' : d.running ? `Online as ${d.username}${d.playingNow ? ` · playing ${d.playingNow} now` : ''}` : 'Set up, but not running (see the server log)'}
+        </span>}
+      </div>
+      {err ? <p className="text-[12px]" style={{ color: TEXT_MUTED }}>Couldn't load the bot's numbers.</p> : !d ? <p className="text-[12px]" style={{ color: TEXT_MUTED }}>Loading…</p> : (<>
+        {d.profile?.count && (
+          <div>
+            <p className="mb-1.5 text-[11px] font-bold" style={{ color: TEXT_MUTED }}>All time on Lichess {d.profile.url && <a href={d.profile.url} target="_blank" rel="noreferrer" className="underline">(profile)</a>}</p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {tile('Games', fmt(n(d.profile.count.all)), `${fmt(n(d.profile.count.rated))} rated`)}
+              {tile('Bot won', fmt(n(d.profile.count.win)))}
+              {tile('Bot lost', fmt(n(d.profile.count.loss)))}
+              {tile('Draws', fmt(n(d.profile.count.draw)))}
+            </div>
+            {Object.keys(d.profile.perfs).length > 0 && <p className="mt-1.5 text-[11.5px]" style={{ color: TEXT_MUTED }}>Ratings: {Object.entries(d.profile.perfs).map(([k, v]) => `${k} ${v.rating ?? '?'} (${v.games ?? 0} games)`).join(' · ')}</p>}
+          </div>
+        )}
+        {d.ours && n(d.ours.all_games) > 0 ? (
+          <div>
+            <p className="mb-1.5 text-[11px] font-bold" style={{ color: TEXT_MUTED }}>Logged by ChessScout since {new Date(String(d.ours.since)).toLocaleDateString()}</p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {tile('Last 24 h', fmt(n(d.ours.day)))}
+              {tile('Last 7 days', fmt(n(d.ours.week)))}
+              {tile('Last 30 days', fmt(n(d.ours.month)))}
+              {tile('Humans / bots', `${fmt(n(d.ours.vs_humans))} / ${fmt(n(d.ours.vs_bots))}`, `${fmt(n(d.ours.unique_humans))} different people`)}
+            </div>
+          </div>
+        ) : <p className="text-[12px]" style={{ color: TEXT_MUTED }}>No games logged yet. Games are logged from this update on.</p>}
+        {d.traffic && (
+          <div className="grid grid-cols-3 gap-2">
+            {tile('Visits from its link', fmt(n(d.traffic.visitors)), 'all time')}
+            {tile('Visits this week', fmt(n(d.traffic.visitors_week)))}
+            {tile('Signed up after', fmt(n(d.traffic.signups)))}
+          </div>
+        )}
+        {d.recent.length > 0 && (
+          <div className="max-h-56 overflow-y-auto rounded-lg" style={{ background: 'rgba(0,0,0,0.15)' }}>
+            {d.recent.map((g) => (
+              <a key={g.game_id} href={`https://lichess.org/${g.game_id}`} target="_blank" rel="noreferrer" className="flex items-center justify-between gap-2 px-3 py-1.5 text-[12.5px]" style={{ borderTop: '1px solid rgba(255,255,255,0.04)', color: TEXT_LIGHT }}>
+                <span className="truncate">{g.opponent_title && <span className="mr-1 rounded px-1 text-[10px] font-black" style={{ background: g.opponent_title === 'BOT' ? 'rgba(255,255,255,0.12)' : '#CA3431' }}>{g.opponent_title}</span>}{g.opponent ?? '?'} {g.opponent_rating ? <span style={{ color: TEXT_MUTED }}>{g.opponent_rating}</span> : null}</span>
+                <span className="shrink-0" style={{ color: TEXT_MUTED }}>{g.speed ?? ''}{g.rated ? ' · rated' : ''} · <b style={{ color: g.result === 'win' ? CHESSCOM_GREEN : g.result === 'loss' ? '#ec6b6b' : TEXT_MUTED }}>{g.result === 'win' ? 'bot won' : g.result === 'loss' ? 'bot lost' : g.result ?? 'playing'}</b> · {new Date(g.started_at).toLocaleDateString()}</span>
+              </a>
+            ))}
+          </div>
+        )}
+      </>)}
+    </div>
+  );
+}
+
 // PC vs mobile: people (browsers) per device, with members and app use.
 function DevicesCard({ rows }: { rows: NonNullable<AdminStats['devices']> }) {
   const [win, setWin] = useState<'today' | '7d' | '30d'>('7d');
@@ -573,6 +647,7 @@ export function Admin() {
             footnote={`${stats.todayWho ? `Today: ${fmt(stats.todayWho.anonVisitors)} not signed in (could sign up) · ${fmt(stats.todayWho.activeMembers)} existing members. ` : ''}By IP address: ${fmt(stats.uniqueVisitors.totalByIp)} total, ${fmt(stats.uniqueVisitors.todayByIp)} today — often more accurate, since the number above double-counts anyone using multiple browsers or the installed app.`}
           />
           {stats.devices && <DevicesCard rows={stats.devices} />}
+          <LichessBotCard />
           {stats.bots && (
             <StatCard
               icon={BotIcon}

@@ -65,6 +65,50 @@ function computeUserStatus(email: string | null, createdAt: string | Date, strip
   return { tier: 'free' as const, detail: daysSinceCreated };
 }
 
+// The ChessScout bot on Lichess: games it has played (logged by lib/lichessBot.ts), its
+// all-time numbers from Lichess, and visits / signups that came from its link.
+router.get("/admin/lichess-bot", requireAdmin, async (_req: Request, res: Response) => {
+  const { lichessBotInfo } = await import("../lib/lichessBot");
+  const info = lichessBotInfo();
+  const rows = <T,>(r: unknown): T[] => (Array.isArray(r) ? r : ((r as { rows?: T[] })?.rows ?? [])) as T[];
+  let profile: unknown = null;
+  if (info.username) {
+    try {
+      const ac = new AbortController(); const t = setTimeout(() => ac.abort(), 5000);
+      const r = await fetch(`https://lichess.org/api/user/${encodeURIComponent(info.username)}`, { signal: ac.signal }).finally(() => clearTimeout(t));
+      if (r.ok) {
+        const u = await r.json() as { count?: Record<string, number>; perfs?: Record<string, { rating?: number; games?: number }>; createdAt?: number; seenAt?: number; url?: string };
+        profile = { count: u.count ?? null, perfs: Object.fromEntries(Object.entries(u.perfs ?? {}).filter(([k, v]) => ["bullet", "blitz", "rapid", "classical", "correspondence"].includes(k) && (v.games ?? 0) > 0)), createdAt: u.createdAt ?? null, seenAt: u.seenAt ?? null, url: u.url ?? `https://lichess.org/@/${info.username}` };
+      }
+    } catch { /* Lichess unreachable */ }
+  }
+  let ours: unknown = null, recent: unknown[] = [], traffic: unknown = null;
+  try {
+    const [o] = rows<Record<string, string | number | null>>(await db.execute(sql`
+      SELECT COUNT(*) AS all_games,
+        COUNT(*) FILTER (WHERE started_at >= now() - interval '1 day') AS day,
+        COUNT(*) FILTER (WHERE started_at >= now() - interval '7 days') AS week,
+        COUNT(*) FILTER (WHERE started_at >= now() - interval '30 days') AS month,
+        COUNT(*) FILTER (WHERE result = 'win') AS wins, COUNT(*) FILTER (WHERE result = 'loss') AS losses, COUNT(*) FILTER (WHERE result = 'draw') AS draws,
+        COUNT(*) FILTER (WHERE result = 'abort') AS aborted,
+        COUNT(*) FILTER (WHERE opponent_title = 'BOT') AS vs_bots, COUNT(*) FILTER (WHERE COALESCE(opponent_title, '') <> 'BOT') AS vs_humans,
+        COUNT(DISTINCT lower(opponent)) FILTER (WHERE COALESCE(opponent_title, '') <> 'BOT') AS unique_humans,
+        MIN(started_at) AS since
+      FROM lichess_bot_games`));
+    ours = o ?? null;
+    recent = rows(await db.execute(sql`SELECT game_id, opponent, opponent_rating, opponent_title, speed, rated, result, status, started_at FROM lichess_bot_games ORDER BY started_at DESC LIMIT 15`));
+  } catch { /* no games logged yet */ }
+  try {
+    const [t] = rows<Record<string, string | number | null>>(await db.execute(sql`
+      WITH v AS (SELECT visitor_id, MIN(created_at) AS first_at FROM page_views WHERE utm_source = 'lichess_bot' GROUP BY visitor_id)
+      SELECT (SELECT COUNT(*) FROM v) AS visitors,
+        (SELECT COUNT(*) FROM v WHERE first_at >= now() - interval '7 days') AS visitors_week,
+        (SELECT COUNT(DISTINCT u.id) FROM users u JOIN page_views pv ON pv.user_id = u.id JOIN v ON v.visitor_id = pv.visitor_id WHERE u.created_at >= v.first_at) AS signups`));
+    traffic = t ?? null;
+  } catch { /* ignore */ }
+  res.json({ ...info, profile, ours, recent, traffic });
+});
+
 router.get("/admin/puzzle-explanations/status", requireAdmin, async (_req: Request, res: Response) => {
   try {
     const [{ count: remaining }] = await db.select({ count: count() })

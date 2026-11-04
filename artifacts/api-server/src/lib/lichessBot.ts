@@ -11,6 +11,24 @@
 import { Chess } from "chess.js";
 import { stockfishBotMove } from "./engineAnalysis";
 import { logger } from "./logger";
+import { db } from "@workspace/db";
+import { sql } from "drizzle-orm";
+
+// Every game the bot plays, for Admin › Lichess bot.
+let tableReady: Promise<void> | null = null;
+const ensureTable = () => (tableReady ??= db.execute(sql`CREATE TABLE IF NOT EXISTS lichess_bot_games (
+  game_id varchar PRIMARY KEY, opponent varchar, opponent_rating integer, opponent_title varchar,
+  bot_color varchar(5), speed varchar(16), rated boolean, started_at timestamptz NOT NULL DEFAULT now(),
+  ended_at timestamptz, status varchar(24), result varchar(5))`).then(() => undefined).catch((e) => { tableReady = null; throw e; }));
+function logStart(id: string, o: { name?: string; rating?: number; title?: string | null }, color: string, speed?: string, rated?: boolean) {
+  void ensureTable().then(() => db.execute(sql`INSERT INTO lichess_bot_games (game_id, opponent, opponent_rating, opponent_title, bot_color, speed, rated)
+    VALUES (${id}, ${o.name ?? null}, ${typeof o.rating === "number" ? o.rating : null}, ${o.title ?? null}, ${color}, ${speed ?? null}, ${!!rated})
+    ON CONFLICT (game_id) DO NOTHING`)).catch(() => {});
+}
+function logEnd(id: string, status: string, winner: string | undefined, color: string) {
+  const result = status === "aborted" || status === "noStart" ? "abort" : !winner ? "draw" : winner === color ? "win" : "loss";
+  void ensureTable().then(() => db.execute(sql`UPDATE lichess_bot_games SET ended_at = now(), status = ${status}, result = ${result} WHERE game_id = ${id} AND ended_at IS NULL`)).catch(() => {});
+}
 
 const TOKEN = process.env.LICHESS_BOT_TOKEN || "";
 const MAX_GAMES = Math.max(1, parseInt(process.env.LICHESS_BOT_MAX_GAMES || "") || 2);
@@ -23,6 +41,9 @@ const HELLO = `Hi! I'm the ChessScout.net coach bot, playing at about your level
 const GG = `gg! Free review: ${LINK} · Join our team: lichess.org/team/chessscoutnet`;
 
 let botId = "";
+let botName = "";
+/** For Admin: whether the bot is running and its Lichess username. */
+export const lichessBotInfo = () => ({ configured: !!TOKEN, running: !!botId, username: botName || null, playingNow: playing.size });
 
 // ── Games against other bots (opt-in: LICHESS_BOT_CHALLENGE=1) ─────────────
 // When it has no game going, every LICHESS_BOT_CHALLENGE_MINUTES (default 15) it
@@ -91,8 +112,10 @@ function playGame(gameId: string) {
   playing.set(gameId, { abort });
   let color: "white" | "black" = "white";
   let elo = 1500; let initialFen = "startpos"; let greeted = false; let thinkingFor = -1;
-  const onState = async (moves: string, status: string) => {
+  let ended = false;
+  const onState = async (moves: string, status: string, winner?: string) => {
     if (status !== "started") {
+      if (!ended) { ended = true; logEnd(gameId, status, winner, color); }
       if (status !== "aborted" && status !== "noStart") void post(`/api/bot/game/${gameId}/chat`, { room: "player", text: GG });
       abort.abort(); return;
     }
@@ -118,10 +141,11 @@ function playGame(gameId: string) {
       const opp = color === "white" ? x.black : x.white;
       // About the challenger's level (Stockfish's limiter starts at 1350).
       elo = Math.max(1350, Math.min(2600, Number(opp?.rating) || 1500));
+      logStart(gameId, { name: opp?.name ?? opp?.id, rating: opp?.rating, title: opp?.title }, color, x.speed, x.rated);
       if (!greeted) { greeted = true; void post(`/api/bot/game/${gameId}/chat`, { room: "player", text: HELLO }); }
-      void onState(x.state?.moves ?? "", x.state?.status ?? "started");
+      void onState(x.state?.moves ?? "", x.state?.status ?? "started", x.state?.winner);
     } else if (x.type === "gameState") {
-      void onState(x.moves ?? "", x.status ?? "started");
+      void onState(x.moves ?? "", x.status ?? "started", x.winner);
     }
   }, abort.signal).catch(() => {}).finally(() => playing.delete(gameId));
 }
@@ -155,7 +179,7 @@ export async function startLichessBot(): Promise<void> {
       if (!r?.ok) { logger.warn({ status: r?.status }, "[lichess-bot] upgrade to BOT failed (the account must have played no games)"); return; }
       logger.info({ user: acc.username }, "[lichess-bot] upgraded to a BOT account");
     }
-    botId = acc.id;
+    botId = acc.id; botName = acc.username ?? acc.id;
     logger.info({ user: acc.username, challengeBots: CHALLENGE_BOTS }, "[lichess-bot] online");
     if (CHALLENGE_BOTS) {
       // Its own rating at the challenge clock, to pick opponents near it.
