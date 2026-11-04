@@ -10,7 +10,7 @@ import { normalizeFen } from '@/lib/utils';
 import { StudioBadge, Medallion, Rays, CountdownRing, EvalSwing, rankColor, shade } from './StudioBadge';
 import { StudioSplash } from './StudioSplash';
 import { StudioMusic, MUSIC_STYLES, bpmOf, type MusicStyle } from './studioMusic';
-import { OPENING_MAP, type MapEpisode } from './openingMap';
+import { OPENING_MAP, mapTree, type MapEpisode } from './openingMap';
 
 // Content Studio player: a game moment or a trap lesson as a 9:16 clip for
 // TikTok, Reels and Shorts. The clip is a script of frames: an intro with the
@@ -520,8 +520,8 @@ function openingClip(o0: StudioOpening, lineName?: string): Clip {
 function mapClip(no: number): Clip | null {
   const e = OPENING_MAP.find((x) => x.no === no); if (!e) return null;
   return {
-    plies: [], key: 0, tags: ['opening'], hook: `Opening Map · Episode ${e.no}: ${e.title}`, sub: e.family,
-    names: { w: null, b: null }, ratings: { w: null, b: null }, fileBase: `chessscout-opening-map-${e.no}`, label: `Opening Map · Episode ${e.no}: ${e.title}`,
+    plies: [], key: 0, tags: ['opening'], hook: `The ${e.family} family tree 🌳`, sub: e.title,
+    names: { w: null, b: null }, ratings: { w: null, b: null }, fileBase: `chessscout-family-tree-${e.no}`, label: `Family Tree · Part ${e.no}: ${e.title}`,
     isTrap: false, opening: null, isMap: true, map: e,
   };
 }
@@ -531,10 +531,12 @@ function mapPos(ms: string[]): { fen: string; last: { from: string; to: string }
   for (const m of ms) { try { const mv = c.move(m); last = { from: mv.from, to: mv.to }; capture = !!mv.captured; } catch { break; } }
   return { fen: c.fen(), last, capture };
 }
-const mapSay = (st: { caption: string; name?: string }) => {
-  const cap = st.caption.replace(/\*/g, '').trim();
+const mapCount = (e: MapEpisode) => e.steps.filter((x) => x.name).length;
+const mapText = (e: MapEpisode, t: string) => t.replace(/\{n\}/g, String(mapCount(e)));
+const mapSay = (e: MapEpisode, st: { caption: string; name?: string }) => {
+  const cap = mapText(e, st.caption).replace(/\*/g, '').replace(/[👇🤔]/gu, '').trim();
   if (!st.name) return cap;
-  return cap.endsWith(':') ? `${cap} the ${st.name}.` : `${/[.!?…]$/.test(cap) ? cap : `${cap}.`} That's the ${st.name}.`;
+  return `${/[.!?…]$/.test(cap) ? cap : `${cap}.`} The ${st.name}.`;
 };
 // A game built in the explorer: played like a game review, every move graded.
 function lineClip(l: StudioLine): Clip {
@@ -712,7 +714,7 @@ function Confetti({ fire }: { fire: number }) {
 }
 
 const srcKey = (x: StudioSource): string => (x.kind === 'map' ? `map-${x.episode}` : x.kind === 'opening' ? `o-${x.opening.id}${x.opening.line ? `-${x.opening.line}` : ''}` : x.kind === 'line' ? `line-${x.line.startFen}-${x.line.moves.map((m) => m.san).join(' ')}` : x.kind === 'promo' ? `promo-${x.promo.template}-${x.promo.hook}` : x.kind === 'scout' ? `s${x.scout.id}` : x.kind === 'lesson' ? `l${x.lesson.id}` : x.kind === 'scan' ? `x${x.fen}` : x.kind === 'trap' ? `t${x.trap.id}` : x.kind === 'puzzle' ? `p${x.puzzle.id}` : x.kind === 'review' ? `r${x.review.id}` : `g${x.moment.gameId}-${x.moment.moveIndex}`);
-const srcLabel = (x: StudioSource): string => (x.kind === 'map' ? `Opening Map · Episode ${x.episode}` : x.kind === 'opening' ? `Opening · ${x.opening.name}${x.opening.line ? ` · ${x.opening.line}` : ''}` : x.kind === 'line' ? `Analyzer · ${x.line.white} vs ${x.line.black}` : x.kind === 'promo' ? (x.promo.template === 'versus' ? `Promo · vs ${x.promo.rival}` : 'Promo · challenge friends') : x.kind === 'scout' ? `Scout · ${x.scout.username}` : x.kind === 'lesson' ? `Lesson · ${x.lesson.title}` : x.kind === 'scan' ? (x.label ? `Scan · ${x.label}` : 'Scanned position') : x.kind === 'trap' ? x.trap.name : x.kind === 'puzzle' ? `Puzzle · ${x.puzzle.rating}${x.puzzle.themes?.match(/mateIn\d/) ? ` · ${themeLabel(x.puzzle.themes.match(/mateIn\d/)![0])}` : ''}`
+const srcLabel = (x: StudioSource): string => (x.kind === 'map' ? `Family Tree · Part ${x.episode}` : x.kind === 'opening' ? `Opening · ${x.opening.name}${x.opening.line ? ` · ${x.opening.line}` : ''}` : x.kind === 'line' ? `Analyzer · ${x.line.white} vs ${x.line.black}` : x.kind === 'promo' ? (x.promo.template === 'versus' ? `Promo · vs ${x.promo.rival}` : 'Promo · challenge friends') : x.kind === 'scout' ? `Scout · ${x.scout.username}` : x.kind === 'lesson' ? `Lesson · ${x.lesson.title}` : x.kind === 'scan' ? (x.label ? `Scan · ${x.label}` : 'Scanned position') : x.kind === 'trap' ? x.trap.name : x.kind === 'puzzle' ? `Puzzle · ${x.puzzle.rating}${x.puzzle.themes?.match(/mateIn\d/) ? ` · ${themeLabel(x.puzzle.themes.match(/mateIn\d/)![0])}` : ''}`
   : x.kind === 'review' ? `Review · ${x.review.white ?? 'White'} vs ${x.review.black ?? 'Black'}` : `${x.moment.san} · ${x.moment.opening ?? `game ${x.moment.gameId}`}`);
 type ClipLook = BoardLook | 'remix' | 'mine';
 
@@ -971,7 +973,6 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
       });
       const endFen = mapPos(prev).fen;
       out.push({ kind: 'mapEnd', fen: endFen, last: null, card: 'summary' });
-      out.push({ kind: 'mapEnd', fen: endFen, last: null, card: 'next' });
       return withInserts(out);
     }
     if (clip.isOpening && clip.openingData && clip.ranges && clip.lineMode && clip.ranges.lines.length) {
@@ -1188,8 +1189,8 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
       case 'intro': return frames[0]?.kind === 'teaser' ? 1300 : 1600;
       case 'teaser': return f.cta ? 4400 : 2600;
       case 'mapMove': return f.back ? 170 : Math.max(420, s * 0.5);
-      case 'mapStep': return clip?.map?.steps[f.step]?.name ? 2600 : 2200;
-      case 'mapEnd': return f.card === 'summary' ? 4600 : 3600;
+      case 'mapStep': return clip?.map?.steps[f.step]?.name ? 2700 : 2600;
+      case 'mapEnd': return 5200;
       case 'hold': return 800;
       case 'countdown': return 1000;
       case 'card': return f.secs * 1000;
@@ -1481,13 +1482,11 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
     { const x = lineScript(f); if (x !== undefined) return x; }
     if (clip.isMap && clip.map) {
       const e = clip.map;
-      if (f.kind === 'mapStep') return mapSay(e.steps[f.step]);
+      if (f.kind === 'mapStep') return mapSay(e, e.steps[f.step]);
       if (f.kind === 'mapMove') return null;
       if (f.kind === 'mapEnd') {
-        const n = e.steps.filter((x) => x.name).length;
-        if (f.card === 'summary') return `That's ${n} openings to know. Save this so you don't forget them.`;
         const nx = OPENING_MAP.find((x) => x.no === e.no + 1);
-        return nx ? `Next time, episode ${nx.no}: ${nx.title.replace(/^The /, 'the ')}. Follow so you don't miss it.` : "That's the whole map. Follow for more chess.";
+        return `That's the whole tree: ${mapCount(e)} openings. So, how many did you know? Tell me in the comments.${nx ? ` Next up: ${nx.title.replace(/^The /, 'the ')}.` : ''}`;
       }
     }
     if (prefs.tone !== 'teacher' && !clip.isLesson) { const c = creatorLine(f); if (c !== undefined) return c; }
@@ -1934,7 +1933,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
               {sub && <p className="mt-1.5 line-clamp-2 text-[clamp(11px,1.8cqh,18px)] font-bold text-white/70">{sub}</p>}
             </motion.div>
             {/* Board block */}
-            <div className={`absolute ${clip.isMap ? 'inset-x-[11%] top-[20%]' : 'inset-x-[4%] top-[22%]'}`} style={{ opacity: clip.isMap && frame?.kind === 'mapEnd' ? 0.18 : frame?.kind === 'intro' ? 0.35 : frame?.kind === 'lessonText' ? 0.4 : 1, transition: 'opacity .4s' }}>
+            <div className={`absolute ${clip.isMap ? 'inset-x-[17%] top-[15.5%]' : 'inset-x-[4%] top-[22%]'}`} style={{ opacity: clip.isMap && frame?.kind === 'mapEnd' ? 0.18 : frame?.kind === 'intro' ? 0.35 : frame?.kind === 'lessonText' ? 0.4 : 1, transition: 'opacity .4s' }}>
               {!clip.isMap && <div className="mb-1 flex items-center justify-between gap-2"><p className="truncate text-[clamp(11px,1.6cqh,16px)] font-bold text-white/85">{name(top)}</p>{clockChip(top)}</div>}
               <div className={prefs.zoom ? 'overflow-hidden rounded-[10px]' : undefined}
                 style={clip.isMap && prefs.tilt ? { transform: 'perspective(120cqh) rotateX(26deg) scale(1.08)', transformOrigin: '50% 60%' } : undefined}>
@@ -2420,87 +2419,68 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
                 </motion.div>
               )}
             </AnimatePresence>
-            {/* Opening Map: the series header, the caption (or the name card), the collection, the end cards */}
+            {/* The Family Tree: the coach's question bubble, the name stamped on the board,
+                and the family tree growing under it; it ends with the whole tree and "how many did you know?". */}
             {clip.isMap && clip.map && (() => {
               const e = clip.map;
               const step = frame?.kind === 'mapMove' || frame?.kind === 'mapStep' ? frame.step : frame?.kind === 'mapEnd' ? e.steps.length : 0;
               const st = e.steps[Math.min(step, e.steps.length - 1)];
-              const named = frame?.kind === 'mapStep' && st?.name;
-              const all = e.steps.map((x, k) => ({ name: x.name, k })).filter((x): x is { name: string; k: number } => !!x.name);
-              const found = all.filter((x) => x.k < step || (x.k === step && frame?.kind === 'mapStep'));
-              const total = OPENING_MAP.length;
-              const nice = (text: string) => text.split(/(\*[^*]+\*)/).map((t, n) => t.startsWith('*') ? <span key={n} style={{ color: '#9BD35A' }}>{t.slice(1, -1)}</span> : <span key={n}>{t}</span>);
+              const stamping = frame?.kind === 'mapStep' && st?.name;
+              const tree = mapTree(e);
+              const done = frame?.kind === 'mapEnd';
+              const shown = tree.filter((x) => done || x.k < step || (x.k === step && frame?.kind === 'mapStep'));
               const moveList = (path: string) => path.split(' ').filter(Boolean).map((m, n) => (n % 2 === 0 ? `${n / 2 + 1}.${m}` : m)).join(' ');
-              const nx = OPENING_MAP.find((x) => x.no === e.no + 1);
               return (<>
-                <div className="pointer-events-none absolute inset-x-[5%] top-[2.6%] z-30 flex items-center justify-between font-black uppercase tracking-wide" style={{ fontSize: 'clamp(10px,1.6cqh,17px)' }}>
-                  <span className="flex items-center gap-[0.4em] text-white"><span className="h-[0.55em] w-[0.55em] rounded-full bg-[#81B64C]" />Opening Map</span>
-                  <span className="text-white/70">Episode {e.no} / {total}</span>
+                <div className="pointer-events-none absolute inset-x-[5%] top-[2.4%] z-30 flex items-center justify-between font-black" style={{ fontSize: 'clamp(10px,1.65cqh,17px)' }}>
+                  <span className="text-white">🌳 The {e.family} family tree</span>
+                  <span className="rounded-full bg-white/10 px-[0.6em] py-[0.1em] text-white/70">Part {e.no}</span>
                 </div>
-                {frame?.kind !== 'mapEnd' && (
+                {!done && st && (
                   <AnimatePresence mode="wait">
-                    {named ? (
-                      <motion.div key={`card${step}`} initial={{ opacity: 0, y: 14, scale: 0.94 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -10 }} transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-                        className="pointer-events-none absolute inset-x-[5%] top-[6.5%] z-30 rounded-[1.6cqh] border-2 border-[#81B64C] bg-[#0B1112]/90 px-[3%] py-[1.2cqh] shadow-2xl">
-                        <p className="font-black uppercase tracking-wide text-[#9BD35A]" style={{ fontSize: 'clamp(9px,1.4cqh,15px)' }}>Name {found.length} of {all.length}</p>
-                        <p className="font-black uppercase leading-[1.02] text-white" style={{ fontSize: 'clamp(20px,4.4cqh,46px)' }}>{st.name}</p>
-                        <p className="mt-[0.3em] font-bold tabular-nums text-white/75" style={{ fontSize: 'clamp(11px,1.9cqh,20px)' }}>{moveList(st.path)}</p>
-                      </motion.div>
-                    ) : (
-                      <motion.p key={`cap${step}`} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }}
-                        className="pointer-events-none absolute inset-x-[5%] top-[7%] z-30 font-black leading-[1.1] text-white" style={{ fontSize: 'clamp(18px,3.6cqh,38px)', textShadow: '0 3px 12px rgba(0,0,0,.6)' }}>{st ? nice(st.caption) : null}</motion.p>
-                    )}
+                    <motion.div key={`q${step}`} initial={{ opacity: 0, scale: 0.92, y: 8 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.96 }} transition={{ type: 'spring', stiffness: 320, damping: 22 }}
+                      className="pointer-events-none absolute left-[5%] right-[5%] top-[6.2%] z-30 flex items-start gap-[0.55em]" style={{ fontSize: 'clamp(14px,2.7cqh,28px)' }}>
+                      <span className="grid h-[1.9em] w-[1.9em] shrink-0 place-items-center rounded-full bg-[#81B64C] text-[0.9em] shadow-lg">♞</span>
+                      <p className="relative rounded-[0.9em] rounded-tl-[0.2em] bg-white px-[0.75em] py-[0.45em] font-black leading-[1.15] text-[#141A14] shadow-xl">
+                        {mapText(e, st.caption).split(/(\*[^*]+\*)/).map((t, n) => t.startsWith('*') ? <span key={n} className="text-[#4E8A1F]">{t.slice(1, -1)}</span> : <span key={n}>{t}</span>)}
+                      </p>
+                    </motion.div>
                   </AnimatePresence>
                 )}
-                {frame?.kind !== 'mapEnd' && (
-                  <div className="pointer-events-none absolute inset-x-[5%] top-[66.5%] z-20" style={{ fontSize: 'clamp(9px,1.45cqh,15px)' }}>
-                    <div className="mb-[0.5cqh] flex items-center justify-between font-black uppercase tracking-wide">
-                      <span className="text-white/70">{e.family} collection</span>
-                      <span className="tabular-nums text-[#9BD35A]">{found.length} / {all.length} names</span>
-                    </div>
-                    <div className="grid grid-cols-3 gap-[0.6cqh]">
-                      {all.map((x) => {
-                        const got = found.some((f) => f.k === x.k); const now = named && x.k === step;
-                        return (
-                          <motion.div key={x.k} animate={now ? { scale: [1, 1.12, 1] } : { scale: 1 }} transition={{ duration: 0.45 }}
-                            className="truncate rounded-[0.5em] px-[0.5em] py-[0.35em] text-center font-black"
-                            style={{ background: now ? '#81B64C' : got ? 'rgba(129,182,76,.22)' : 'rgba(255,255,255,.07)', color: got ? '#fff' : 'rgba(255,255,255,.35)', border: `1px solid ${got ? 'rgba(129,182,76,.6)' : 'rgba(255,255,255,.1)'}` }}>
-                            {got ? x.name : '?'}
-                          </motion.div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
                 <AnimatePresence>
-                  {frame?.kind === 'mapEnd' && frame.card === 'summary' && (
-                    <motion.div key="msum" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} transition={{ type: 'spring', stiffness: 260, damping: 20 }}
-                      className="pointer-events-none absolute inset-x-[6%] top-[16%] z-30 text-center">
-                      <p className="font-black text-white/80" style={{ fontSize: 'clamp(13px,2.3cqh,24px)' }}>{e.family === 'Everything else' ? 'Everything else' : `Born from ${e.family}`}</p>
-                      <p className="font-black uppercase leading-none text-[#9BD35A]" style={{ fontSize: 'clamp(34px,8cqh,84px)' }}>{all.length} names</p>
-                      <div className="mt-[2cqh] grid grid-cols-2 gap-[0.8cqh]" style={{ fontSize: 'clamp(11px,1.9cqh,20px)' }}>
-                        {all.map((x, n) => (
-                          <motion.div key={x.k} initial={{ opacity: 0, x: n % 2 ? 20 : -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 + n * 0.12 }}
-                            className="truncate rounded-[0.5em] bg-white/[.09] px-[0.6em] py-[0.45em] text-left font-black text-white ring-1 ring-white/15">{x.name}</motion.div>
-                        ))}
+                  {stamping && (
+                    <motion.div key={`stamp${step}`} initial={{ scale: 2.4, opacity: 0, rotate: -16 }} animate={{ scale: 1, opacity: 1, rotate: -7 }} exit={{ opacity: 0, scale: 0.85 }} transition={{ type: 'spring', stiffness: 420, damping: 16 }}
+                      className="pointer-events-none absolute left-1/2 top-[30%] z-30 -translate-x-1/2 text-center" style={{ fontSize: 'clamp(16px,3.5cqh,38px)' }}>
+                      <div className="rounded-[0.35em] px-[0.6em] py-[0.25em]" style={{ border: '0.16em solid #9BD35A', boxShadow: 'inset 0 0 0 0.08em #0B1112, inset 0 0 0 0.16em #9BD35A, 0 0.4em 1.4em rgba(0,0,0,.55)', background: 'rgba(11,17,18,.88)' }}>
+                        <p className="whitespace-nowrap font-black uppercase leading-none tracking-wide text-[#B8E08C]">{st.name}</p>
+                        <p className="mt-[0.25em] whitespace-nowrap font-bold tabular-nums text-white/75" style={{ fontSize: '0.45em' }}>{moveList(st.path)}</p>
                       </div>
                     </motion.div>
                   )}
-                  {frame?.kind === 'mapEnd' && frame.card === 'next' && (
-                    <motion.div key="mnext" initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ type: 'spring', stiffness: 260, damping: 20 }}
-                      className="pointer-events-none absolute inset-x-[6%] top-[30%] z-30 text-center">
-                      {nx ? (<>
-                        <p className="font-black uppercase tracking-wide text-[#9BD35A]" style={{ fontSize: 'clamp(12px,2.2cqh,22px)' }}>Next · Episode {nx.no} / {total}</p>
-                        <p className="mt-[0.2em] font-black uppercase leading-[1.02] text-white" style={{ fontSize: 'clamp(30px,6.6cqh,70px)' }}>{nx.title.replace(/^The /, '')}</p>
-                        <p className="mt-[0.5em] font-bold text-white/65" style={{ fontSize: 'clamp(12px,2cqh,20px)' }}>{nx.steps.filter((x) => x.name).slice(0, 4).map((x) => x.name).join(' · ')}</p>
-                      </>) : (
-                        <p className="font-black uppercase leading-[1.02] text-white" style={{ fontSize: 'clamp(30px,6.6cqh,70px)' }}>That's the whole map 🗺️</p>
-                      )}
-                      <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1, scale: [1, 1.06, 1] }} transition={{ delay: 0.8, scale: { delay: 1.2, duration: 0.7, repeat: Infinity, repeatDelay: 1 } }}
-                        className="mx-auto mt-[2.4cqh] w-fit rounded-full bg-[#81B64C] px-[1.1em] py-[0.4em] font-black text-white" style={{ fontSize: 'clamp(13px,2.3cqh,24px)' }}>＋ Follow so you don't miss it</motion.p>
-                    </motion.div>
-                  )}
                 </AnimatePresence>
+                {done && (
+                  <motion.div key="score" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ type: 'spring', stiffness: 260, damping: 20 }}
+                    className="pointer-events-none absolute inset-x-[6%] top-[12%] z-30 text-center">
+                    <p className="font-black leading-[1.05] text-white" style={{ fontSize: 'clamp(26px,5.6cqh,60px)' }}>How many did<br />you know?</p>
+                    <motion.p initial={{ scale: 0.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ delay: 0.5, type: 'spring', stiffness: 300, damping: 14 }}
+                      className="mx-auto mt-[1.4cqh] w-fit rounded-full bg-[#81B64C] px-[1em] py-[0.3em] font-black text-white" style={{ fontSize: 'clamp(15px,3cqh,32px)' }}>__ / {tree.length}</motion.p>
+                    <p className="mt-[1cqh] font-bold text-white/70" style={{ fontSize: 'clamp(12px,2.1cqh,22px)' }}>Comment your score 👇</p>
+                  </motion.div>
+                )}
+                <div className={`pointer-events-none absolute inset-x-[7%] z-20 ${done ? 'top-[37%]' : 'top-[55%]'}`} style={{ fontSize: `clamp(10px,${tree.length > 10 ? 1.55 : 1.75}cqh,18px)`, transition: 'top .5s' }}>
+                  {shown.map((x) => {
+                    const now = stamping && x.k === step;
+                    return (
+                      <motion.div key={x.k} layout initial={{ opacity: 0, x: -14 }} animate={{ opacity: 1, x: 0 }} transition={{ type: 'spring', stiffness: 300, damping: 24 }}
+                        className="flex items-center" style={{ paddingLeft: `${x.depth * 1.35}em`, height: tree.length > 10 ? '1.5em' : '1.7em' }}>
+                        {x.depth > 0 && <span className="mr-[0.35em] text-white/35">└</span>}
+                        <span className="truncate rounded-[0.4em] px-[0.5em] py-[0.08em] font-black"
+                          style={{ background: now ? '#81B64C' : 'transparent', color: now ? '#fff' : x.depth === 0 ? '#B8E08C' : 'rgba(255,255,255,.88)', boxShadow: now ? '0 0 0 2px rgba(155,211,90,.5), 0 0 18px rgba(129,182,76,.55)' : undefined }}>
+                          {x.name}
+                        </span>
+                      </motion.div>
+                    );
+                  })}
+                </div>
               </>);
             })()}
             {/* Opening clips: the hook scene. Big punchy text over the payoff position; it
