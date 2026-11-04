@@ -1356,7 +1356,7 @@ function readBotParam(): BotConfig | null {
 function readInitialOpeningParam(): OpeningLine | null {
   const eco = new URLSearchParams(window.location.search).get('eco');
   if (!eco) return null;
-  // Only ~9 openings are curated for the trainer, so a user's actual game
+  // Only some openings are curated for the trainer (37 now), so a user's actual game
   // history (which can reference any ECO code) often won't have an exact
   // match here -- that's fine, readInitialTabParam still lands them on
   // the Opening Trainer tab to browse what is available rather than a

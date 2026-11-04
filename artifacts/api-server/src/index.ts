@@ -509,6 +509,7 @@ runSchemaMigrations().then(() => {
   // The ChessScout bot on Lichess (only when LICHESS_BOT_TOKEN is set).
   import("./lib/lichessBot").then(({ startLichessBot }) => startLichessBot()).catch((err) => logger.warn({ err }, 'lichess bot failed to start'));
   import("./routes/lichessConnect").then(({ startLichessDailyWatch }) => startLichessDailyWatch()).catch((err) => logger.warn({ err }, 'lichess daily watch failed to start'));
+  import("./lib/trapSeed").then(({ seedTraps }) => seedTraps()).catch((err) => logger.warn({ err }, 'trap seed failed'));
   // Content Studio openings: built in the background a few minutes after start-up (the cache is in memory, so a deploy empties it).
   setTimeout(() => { import("./lib/studioOpenings").then(({ warmStudioOpenings }) => warmStudioOpenings()).catch(() => {}); }, 3 * 60 * 1000);
   import("./lib/growthScheduler").then(({ startGrowthScheduler }) => {
