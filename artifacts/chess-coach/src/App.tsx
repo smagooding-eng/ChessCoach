@@ -410,6 +410,47 @@ function visitGeo(who: string): Promise<Record<string, string | null> | null> {
   return geoPromise.then((g) => { geoSentFor = who; return g; });
 }
 
+// New releases: an app that stays open (above all the Android app) keeps running the code
+// it opened with. It checks for a new release when it comes back on screen and every 10
+// minutes, then reloads at a safe moment: on the next change of page, or straight away when
+// it comes back on screen. Never while a game could be going on.
+const GAME_PAGE = /^\/(live|lichess|daily|play|practice|play-now|kids)(\/|$)/;
+const bundleOf = (html: string) => html.match(/src="(\/assets\/index-[^"]+\.js)"/)?.[1] ?? null;
+function ReleaseWatcher() {
+  const [location] = useLocation();
+  const stale = useRef(false);
+  const where = useRef(location);
+  where.current = location;
+  const safe = () => !GAME_PAGE.test(where.current);
+  useEffect(() => {
+    const el = document.querySelector('script[type="module"][src*="/assets/index-"]') as HTMLScriptElement | null;
+    const mine = el ? new URL(el.src).pathname : null;
+    if (!mine) return; // development build
+    let last = 0;
+    const check = async (comingBack: boolean) => {
+      if (Date.now() - last < 60_000) { if (comingBack && stale.current && safe()) window.location.reload(); return; }
+      last = Date.now();
+      try {
+        const r = await fetch(`/index.html?release=${Date.now()}`, { cache: 'no-store' });
+        const latest = r.ok ? bundleOf(await r.text()) : null;
+        if (latest && latest !== mine) stale.current = true;
+      } catch { /* offline */ }
+      if (comingBack && stale.current && safe()) window.location.reload();
+    };
+    const onVis = () => { if (document.visibilityState === 'visible') void check(true); };
+    document.addEventListener('visibilitychange', onVis);
+    const t = setInterval(() => void check(false), 10 * 60_000);
+    return () => { document.removeEventListener('visibilitychange', onVis); clearInterval(t); };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // Moving to another page: a good moment to pick up the new release.
+  const first = useRef(true);
+  useEffect(() => {
+    if (first.current) { first.current = false; return; }
+    if (stale.current && safe()) window.location.reload();
+  }, [location]); // eslint-disable-line react-hooks/exhaustive-deps
+  return null;
+}
+
 function PageTracker() {
   const [location] = useLocation();
   const { authUser } = useUser();
@@ -504,9 +545,9 @@ function Router() {
   const [where] = useLocation();
   if (kidMode && !isKidsPath(where)) return <KidModeLock />;
   const pl = pathLang(where);
-  if (pl) return <><ScrollToTop /><PageTracker /><LangRoutes lang={pl.lang} rest={pl.rest} /></>;
+  if (pl) return <><ScrollToTop /><PageTracker /><ReleaseWatcher /><LangRoutes lang={pl.lang} rest={pl.rest} /></>;
   return (
-    <><ScrollToTop /><PageTracker /><BoardStyleTipHost /><Switch>
+    <><ScrollToTop /><PageTracker /><ReleaseWatcher /><BoardStyleTipHost /><Switch>
       <Route path="/setup" component={SetupRouter} />
       {SEO_PATHS.map((k) => <Route key={k} path={`/${k}`}>{() => <SeoLanding pageKey={k} />}</Route>)}
       <Route path="/chess-openings" component={ChessOpeningsIndex} />
