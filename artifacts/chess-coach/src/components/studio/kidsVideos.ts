@@ -71,8 +71,8 @@ function moveItem(items: BoardItem[], id: string, to: string): BoardItem[] {
   return items.filter((x) => x.id === id || x.sq !== to).map((x) => (x.id === id ? { ...x, sq: to, piece: x.piece ? { ...x.piece, sq: to } : x.piece } : x));
 }
 const pauseScenes = (base: KidsScene): KidsScene[] => [
-  { ...base, say: 'Pause the video and try it! Ready?', sfx: 'riser' },
-  ...[3, 2, 1].map((n) => ({ ...base, say: undefined, big: { text: String(n), color: '#FF9F1C' }, sfx: 'tick' as const, ms: 900 })),
+  { ...base, say: 'Pause and try it!', sfx: 'riser' },
+  ...[3, 2, 1].map((n) => ({ ...base, say: undefined, big: { text: String(n), color: '#FF9F1C' }, sfx: 'tick' as const, ms: 700 })),
 ];
 
 // ── One level, as scenes (no title or end card) ─────────────────────────────
@@ -183,7 +183,8 @@ const hookSay = (w: World, l: Level) => l.kind === 'collect' ? `Can your kid hel
 
 function bookends(w: World, hook: string, say: string, sub: string, body: KidsScene[], firstItems: BoardItem[]): KidsScene[] {
   const all: KidsScene[] = [
-    { card: 'title', say, show: hook, items: firstItems, buddy: w.piece, sfx: 'whoosh', ms: 1800 },
+    // No still title card: the board, the buddy and the hook are on screen from the very first frame.
+    { say, show: hook, items: firstItems, buddy: w.piece, bounce: body[0]?.bounce ?? null, sfx: 'whoosh', ms: 1200 },
     ...body,
     { card: 'end', say: SITE_SAY, show: 'Play free at chessscout.net/kids 🎮', items: body[body.length - 1]?.items ?? firstItems, buddy: w.piece, mood: 'wow', sfx: 'chime' },
   ];

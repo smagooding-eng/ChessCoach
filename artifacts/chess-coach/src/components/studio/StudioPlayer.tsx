@@ -204,6 +204,10 @@ const DEFAULT_PREFS = {
   /** Look of every clip: Coach (the coach's speech bubble, stamped badges, a topic header, an early
    *  call to action and a "comment your answer" ending) or Classic (the original look). */
   theme: 'coach' as 'coach' | 'classic',
+  /** Fast start: most viewers decide in the first 3 seconds, so the board moves right away. No
+   *  separate title card before a hook scene, a short hook line, no pause before the first move,
+   *  and the like / follow / share ask comes after the first few moves. Off = the original order. */
+  fastStart: true,
   /** Said near the start of every clip in the Coach look (empty = none). */
   earlyCta: "Like, follow and share for more chess like this!",
   /** The same, for Family Tree parts. */
@@ -947,7 +951,10 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
       // Coach look: the title card (the intro) is the very first thing on screen, so it's
       // also the reel's cover. It goes in front of any hook scene (after a compilation's title).
       let base0 = raw;
-      if (prefs.theme !== 'classic' && prefs.intro && raw.length) {
+      if (prefs.fastStart && raw.some((f) => f.kind === 'teaser')) {
+        // Fast start: the hook scene is the first thing on screen (no still title card before it).
+        base0 = raw.filter((f) => f.kind !== 'intro');
+      } else if (prefs.theme !== 'classic' && prefs.intro && raw.length) {
         const rest = raw.filter((f) => f.kind !== 'intro');
         const at = rest[0]?.kind === 'title' ? 1 : 0;
         const firstBoard = rest.find((f) => f.kind !== 'title');
@@ -1027,7 +1034,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
         const nw = ['one', 'two', 'three', 'four', 'five', 'six'][clip.lineMode.no - 1] ?? String(clip.lineMode.no);
         out.push({ kind: 'teaser', fen: endFen, last: endLast, mate: false,
           text: `${o.name} · Line ${clip.lineMode.no} 🔥`, sub: `The ${l.name}, every move explained`,
-          said: `The ${o.name}, line ${nw}: the ${l.name}. Every move, and why it works.${early ? ` ${early}` : ''}`, cta: !!early });
+          said: prefs.fastStart ? `The ${o.name}, line ${nw}: the ${l.name}.` : `The ${o.name}, line ${nw}: the ${l.name}. Every move, and why it works.${early ? ` ${early}` : ''}`, cta: !prefs.fastStart && !!early });
       } else if (prefs.intro) out.push({ kind: 'intro', fen: fenAt(0) });
       out.push({ kind: 'hold', fen: fenAt(0), last: null });
       for (let p = 1; p <= m; p++) out.push({ kind: 'move', ply: p });
@@ -1230,12 +1237,12 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
   const baseDur = (f: Frame) => {
     const s = prefs.speed * 1000;
     switch (f.kind) {
-      case 'intro': return prefs.theme !== 'classic' ? 2600 : frames[0]?.kind === 'teaser' ? 1300 : 1600;
-      case 'teaser': return f.cta ? 4400 : 2600;
+      case 'intro': return prefs.fastStart ? 1000 : prefs.theme !== 'classic' ? 2600 : frames[0]?.kind === 'teaser' ? 1300 : 1600;
+      case 'teaser': return prefs.fastStart ? 1600 : f.cta ? 4400 : 2600;
       case 'mapMove': return f.back ? 170 : Math.max(420, s * 0.5);
       case 'mapStep': return clip?.map?.steps[f.step]?.name ? 2700 : 2600;
       case 'mapEnd': return 5200;
-      case 'hold': return 800;
+      case 'hold': return prefs.fastStart ? 250 : 800;
       case 'countdown': return 1000;
       case 'card': return f.secs * 1000;
       case 'better': return Math.max(s, 1300);
@@ -1524,12 +1531,25 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
   // Coach look: which frame carries the early call to action, and its text.
   const coachOn = prefs.theme !== 'classic';
   const ctaIdx = (() => {
-    if (!coachOn || !clip || clip.lineMode) return -1;
+    if (!coachOn || !clip) return -1;
+    if (prefs.fastStart) {
+      // After the first few moves: the next card or coach beat, or the sixth move.
+      if (clip.lineMode) return frames.findIndex((f) => f.kind === 'openCard' && f.card === 'line');
+      let moves = 0;
+      for (let k = 0; k < frames.length; k++) {
+        const f = frames[k];
+        if (f.kind === 'move' || (f.kind === 'mapMove' && !f.back)) moves++;
+        else if (moves >= 3 && ['openCard', 'better', 'reveal', 'mapStep', 'scoutCard', 'lessonBoard', 'split', 'summary'].includes(f.kind)) return k;
+        if (moves >= 6 && f.kind === 'move') return k;
+      }
+      return -1;
+    }
+    if (clip.lineMode) return -1;
     const k = clip.isMap ? frames.findIndex((f) => f.kind === 'mapStep' && f.step === 0)
       : frames.findIndex((f) => f.kind === 'teaser') >= 0 ? frames.findIndex((f) => f.kind === 'teaser') : frames.findIndex((f) => f.kind === 'intro');
     return k;
   })();
-  const earlyText = clip?.isMap ? prefs.seriesCta.trim() : prefs.earlyCta.trim();
+  const earlyText = clip?.isMap ? prefs.seriesCta.trim() : prefs.fastStart && clip?.lineMode ? prefs.lineCtaLine.trim() : prefs.earlyCta.trim();
   const commentQ = !clip ? '' : clip.isTrap ? 'Would you fall for it?' : clip.isPuzzle ? 'Did you solve it?' : clip.isReview ? 'Which move would you have played differently?'
     : clip.isLesson ? 'Did you get it right?' : clip.lineMode ? 'Do you play this line?' : clip.isOpening ? 'Which line do you play?' : clip.isScout ? 'Who should I scout next?'
     : clip.isScan ? 'Want me to scan your board?' : clip.isPromo ? (clip.promo?.template === 'versus' ? 'Would you switch?' : 'Who are you challenging first?') : 'Would you have found it?';
@@ -3110,6 +3130,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
           )}
           <p className="mb-1 text-[11px] font-bold uppercase tracking-wide text-white/50">Story</p>
           <div className="mb-3 flex flex-wrap gap-1.5">
+            {toggle('fastStart', 'Fast start (moves in the first second, like/follow ask after the first moves)')}
             {toggle('intro', 'Hook intro')}
             {toggle('guess', 'Find-the-move countdown')}
             {prefs.guess && [3, 5, 10].map((sec) => (
