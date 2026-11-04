@@ -882,6 +882,8 @@ router.post("/games/import-pgn", requireAuth, async (req, res): Promise<void> =>
   }
 
   let imported = 0, duplicates = 0, notYours = 0, invalid = 0, unfinished = 0;
+  // The ids of the games (new or already there), so a single game can be opened right after.
+  const ids: number[] = [];
   for (const g of games) {
     try {
       const white = pgnHeader(g, "White");
@@ -925,7 +927,7 @@ router.post("/games/import-pgn", requireAuth, async (req, res): Promise<void> =>
         : lichessGameId
           ? await db.select({ id: gamesTable.id }).from(gamesTable).where(and(eq(gamesTable.userId, userId), eq(gamesTable.lichessGameId, lichessGameId))).limit(1)
           : await db.select({ id: gamesTable.id }).from(gamesTable).where(and(eq(gamesTable.userId, userId), eq(gamesTable.pgn, g))).limit(1);
-      if (dupe.length > 0) { duplicates++; continue; }
+      if (dupe.length > 0) { duplicates++; ids.push(dupe[0].id); continue; }
 
       const { opening, eco } = extractOpeningFromPgn(g);
       const [row] = await db.insert(gamesTable).values({
@@ -946,14 +948,14 @@ router.post("/games/import-pgn", requireAuth, async (req, res): Promise<void> =>
         lichessGameId,
         platform,
       }).onConflictDoNothing().returning({ id: gamesTable.id });
-      if (row) imported++; else duplicates++;
+      if (row) { imported++; ids.push(row.id); } else duplicates++;
     } catch (err) {
       req.log.warn({ err }, "Failed to import one game from uploaded PGN");
       invalid++;
     }
   }
 
-  res.json({ imported, duplicates, notYours, invalid, unfinished, total: games.length });
+  res.json({ imported, duplicates, notYours, invalid, unfinished, total: games.length, ids: ids.slice(0, 50) });
 });
 
 router.post("/games/analyze-pgn", async (req, res): Promise<void> => {

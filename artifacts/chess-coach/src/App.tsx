@@ -215,6 +215,9 @@ const DailyGame = lazyRetry(() => import("@/pages/DailyGame").then(m => ({ defau
 const NotificationsPage = lazyRetry(() => import("@/pages/Notifications").then(m => ({ default: m.Notifications })));
 const ChallengePage = lazyRetry(() => import("@/pages/Challenge").then(m => ({ default: m.Challenge })));
 const PlayNowPage = lazyRetry(() => import("@/pages/PlayNow").then(m => ({ default: m.PlayNow })));
+const LichessPlayPage = lazyRetry(() => import("@/pages/LichessPlay").then(m => ({ default: m.LichessPlay })));
+const LichessCallbackPage = lazyRetry(() => import("@/pages/LichessPlay").then(m => ({ default: m.LichessCallback })));
+const PLichessPlay = () => <ProtectedRoute component={LichessPlayPage} />;
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -521,6 +524,8 @@ function Router() {
       <Route path="/challenge/:code" component={ChallengePage} />
       {/* Play a bot straight away, no account (for visitors from ads, reels and links) */}
       <Route path="/play-now" component={PlayNowPage} />
+      {/* Lichess sign-in comes back here (Play on Lichess) */}
+      <Route path="/lichess-callback" component={LichessCallbackPage} />
       <Route path="/raffle" component={RafflePage} />
       <Route path="/raffle-rules" component={RaffleRulesPage} />
       <Route path="/affiliate" component={AffiliatePage} />
@@ -550,6 +555,7 @@ function Router() {
       <Route path="/play"            component={PLocalPlay} />
       <Route path="/play/local"      component={PLocalBoard} />
       <Route path="/live"            component={PLivePlay} />
+      <Route path="/lichess"         component={PLichessPlay} />
       <Route path="/friends"         component={PFriends} />
       <Route path="/messages/:userId" component={PMessages} />
       <Route path="/tournaments" component={PTournaments} />

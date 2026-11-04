@@ -725,7 +725,7 @@ function tryMatchAll() {
 
 setInterval(tryMatchAll, WIDEN_INTERVAL_MS).unref();
 
-async function joinQueue(ws: WebSocket, userId: string, username: string, tcIdIn: TimeControlId | 'any', mode: Mode) {
+async function joinQueue(ws: WebSocket, userId: string, username: string, tcIdIn: TimeControlId | 'any', mode: Mode, noAutoBot = false) {
   const flex = tcIdIn === 'any';
   const tcId: TimeControlId = flex ? FLEX_DEFAULT_TC : tcIdIn;
   const existing = userActiveGame.get(userId);
@@ -750,9 +750,10 @@ async function joinQueue(ws: WebSocket, userId: string, username: string, tcIdIn
   const joinedAt0 = Date.now();
   queue.push({ userId, username, rating: myRating, ws, tc, mode, joinedAt: joinedAt0 });
   send(ws, { type: 'queued', tcId: flex ? 'any' : tcId, mode, botOfferMs: BOT_OFFER_MS, autoBotMs: AUTO_BOT_MS });
-  // Nobody to play after a short wait: start a game against a bot opponent.
+  // Nobody to play after a short wait: start a game against a bot opponent
+  // (unless the app is handing them to a real Lichess game instead).
   const joinedAt = joinedAt0;
-  setTimeout(() => {
+  if (!noAutoBot) setTimeout(() => {
     if (userActiveGame.has(userId)) return;
     const still = (queues.get(key) ?? []).find((w) => w.userId === userId && w.joinedAt === joinedAt);
     if (!still || still.ws.readyState !== WebSocket.OPEN) return;
@@ -1464,7 +1465,7 @@ export function attachLiveServer(server: HttpServer) {
       try {
         switch (msg.type) {
           case 'queue':
-            await joinQueue(ws, info.userId, info.username, msg.timeControl, (msg.mode as Mode) || 'casual');
+            await joinQueue(ws, info.userId, info.username, msg.timeControl, (msg.mode as Mode) || 'casual', msg.noAutoBot === true);
             break;
           case 'cancel':
             // Stop waiting on a request made through someone's open link.

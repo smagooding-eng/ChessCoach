@@ -3,7 +3,8 @@ import { announceChallengeSent } from '@/lib/challengeSent';
 import { useLivePlay, type LiveMode } from '@/hooks/use-live-play';
 import { useLiveRatings } from '@/hooks/use-live-ratings';
 import { LiveGame } from '@/pages/LiveGame';
-import { Link } from 'wouter';
+import { Link, useLocation } from 'wouter';
+import { lichessAuth, connectLichess } from '@/lib/lichessBoard';
 import { Loader2, Swords, Zap, Clock, X, Trophy, Sparkles, Award, History, ChevronRight, Users, CalendarDays, Bot } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { PT, cardStyle, greenBtn, ghostBtn } from '@/lib/playTheme';
@@ -25,6 +26,11 @@ const TC_OPTIONS = [
 
 type Hosted = { code: string; url: string; label: string };
 
+// Nobody on ChessScout: the clocks Lichess lets apps play (10 minutes and up), and
+// how long to look here first before handing over to a real Lichess game.
+const LICHESS_CLOCK: Record<string, string> = { rapid_10_0: '10+0', rapid_15_0: '15+0', any: '10+0' };
+const LICHESS_HANDOFF_MS = 8000;
+
 type OnlineTab = 'live' | 'daily';
 const readTab = (): OnlineTab | null => {
   try { const t = new URLSearchParams(window.location.search).get('tab'); return t === 'daily' || t === 'live' ? t : null; } catch { return null; }
@@ -38,6 +44,11 @@ export function LivePlay({ initialTab }: { initialTab?: OnlineTab } = {}) {
     try { const u = new URL(window.location.href); u.searchParams.set('tab', t); window.history.replaceState(null, '', u.pathname + u.search); } catch { /* ignore */ }
   };
   const live = useLivePlay();
+  const [, navigate] = useLocation();
+  const [lichess, setLichess] = useState(lichessAuth);
+  useEffect(() => { const f = () => setLichess(lichessAuth()); window.addEventListener('focus', f); return () => window.removeEventListener('focus', f); }, []);
+  // Start looking here; with Lichess connected (and a clock it allows) the server holds its bot back.
+  const queueFor = (tc: string, m: LiveMode) => live.enterQueue(tc, m, { noAutoBot: !!lichessAuth() && !!LICHESS_CLOCK[tc] });
   const { data: ratingsData, refetch } = useLiveRatings();
   const [mode, setMode] = useState<LiveMode>('casual');
   const [friendTc, setFriendTc] = useState('blitz_5_0');
@@ -57,6 +68,17 @@ export function LivePlay({ initialTab }: { initialTab?: OnlineTab } = {}) {
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
   }, [live.status]);
+  const lichessClock = live.queuedTc ? LICHESS_CLOCK[live.queuedTc] : undefined;
+  // Nobody here after a few seconds: straight into a real Lichess game at the same clock.
+  const handedOff = useRef(false);
+  const waitedSoFar = live.queuedAt ? now - live.queuedAt : 0;
+  useEffect(() => {
+    if (live.status !== 'queued') { handedOff.current = false; return; }
+    if (handedOff.current || !lichess || !lichessClock || waitedSoFar < LICHESS_HANDOFF_MS) return;
+    handedOff.current = true;
+    live.cancel();
+    navigate(`/lichess?seek=${encodeURIComponent(lichessClock)}&rated=${live.queuedMode === 'ranked' ? 1 : 0}&from=live`);
+  }, [live.status, waitedSoFar, lichess, lichessClock]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // /live?seek=USER -- tapped "<name> is looking for a game".
   const [seek, setSeek] = useState<SeekInfo | null>(null);
@@ -179,12 +201,24 @@ export function LivePlay({ initialTab }: { initialTab?: OnlineTab } = {}) {
               <p className="text-sm mt-1" style={{ color: PT.muted }}>
                 {queuedLabel} · {live.queuedMode === 'ranked' ? 'Ranked' : 'Casual'} · {Math.floor(waitedMs / 1000)}s
               </p>
-              <p className="text-[12px] mt-1" style={{ color: PT.muted }}>We've let players with notifications on know you're looking.</p>
+              <p className="text-[12px] mt-1" style={{ color: PT.muted }}>
+                {lichess && lichessClock ? 'Nobody here in a few seconds? We\'ll find you a real opponent on Lichess.' : "We've let players with notifications on know you're looking."}
+              </p>
             </div>
             <button onClick={live.cancel} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm" style={ghostBtn}>
               <X className="w-4 h-4" /> Cancel
             </button>
           </div>
+          {!lichess && lichessClock && (
+            <div className="flex items-center gap-3 p-4" style={cardStyle}>
+              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl" style={{ background: '#81B64C', color: '#FFFFFF' }}><Zap size={22} /></span>
+              <div className="min-w-0 flex-1">
+                <p className="text-[14.5px] font-extrabold" style={{ color: PT.text }}>Get a real opponent in seconds</p>
+                <p className="text-[12.5px]" style={{ color: PT.muted }}>Connect Lichess and, whenever nobody's free here, we'll match you with a Lichess player right on this board.</p>
+              </div>
+              <button onClick={() => { live.cancel(); void connectLichess(`/lichess?seek=${encodeURIComponent(lichessClock)}&rated=${live.queuedMode === 'ranked' ? 1 : 0}&from=live`); }} className="shrink-0 rounded-xl px-3.5 py-2.5 text-[13px] font-extrabold" style={greenBtn}>Connect Lichess</button>
+            </div>
+          )}
           {showBotOffer && live.queuedTc && (
             <div className="flex items-center gap-3 p-4" style={cardStyle}>
               <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl" style={{ background: '#81B64C', color: '#FFFFFF' }}><Bot size={22} /></span>
@@ -276,7 +310,7 @@ export function LivePlay({ initialTab }: { initialTab?: OnlineTab } = {}) {
             {/* Play anyone: one pool across every clock, so you're matched as fast as possible. */}
             <button
               disabled={live.status === 'connecting' || live.status === 'disconnected'}
-              onClick={() => live.enterQueue('any', mode)}
+              onClick={() => queueFor('any', mode)}
               className="mb-2 flex w-full items-center gap-3 rounded-[14px] p-3.5 text-left transition-transform active:scale-[0.99] disabled:opacity-50"
               style={{ background: 'linear-gradient(180deg, #8FC25A, #81B64C)', boxShadow: '0 3px 0 #5F8F36', color: '#FFFFFF' }}>
               <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[11px]" style={{ background: 'rgba(255,255,255,.2)' }}>
@@ -294,7 +328,7 @@ export function LivePlay({ initialTab }: { initialTab?: OnlineTab } = {}) {
                 return (
                   <button key={opt.id}
                     disabled={live.status === 'connecting' || live.status === 'disconnected'}
-                    onClick={() => live.enterQueue(opt.id, mode)}
+                    onClick={() => queueFor(opt.id, mode)}
                     className="flex items-center gap-3 rounded-[14px] p-3 text-left transition-transform active:scale-[0.98] disabled:opacity-50"
                     style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${PT.border}` }}>
                     <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[11px]" style={{ background: '#81B64C', color: '#FFFFFF' }}>

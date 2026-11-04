@@ -346,13 +346,14 @@ export function useLivePlay() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const enterQueue = useCallback((timeControl: string, mode: LiveMode) => {
+  /** noAutoBot: the app will hand them to a Lichess game if nobody's here, so the server skips its automatic bot. */
+  const enterQueue = useCallback((timeControl: string, mode: LiveMode, opts?: { noAutoBot?: boolean }) => {
     setError(null);
     setGame(null);
     setColor(null);
     setOpponentDisconnect(null);
     setPremove(null);
-    send({ type: 'queue', timeControl, mode });
+    send({ type: 'queue', timeControl, mode, ...(opts?.noAutoBot ? { noAutoBot: true } : {}) });
   }, [send]);
 
   const cancel = useCallback(() => { send({ type: 'cancel' }); }, [send]);
