@@ -16,8 +16,10 @@ const TOKEN = process.env.LICHESS_BOT_TOKEN || "";
 const MAX_GAMES = Math.max(1, parseInt(process.env.LICHESS_BOT_MAX_GAMES || "") || 2);
 const API = "https://lichess.org";
 const H = () => ({ Authorization: `Bearer ${TOKEN}` });
-const HELLO = "Hi! I'm the ChessScout.net coach bot, playing at about your level. Good luck! Get this game reviewed free at chessscout.net";
-const GG = "gg! See where it was won or lost: free review at chessscout.net";
+// The links carry utm_source=lichess_bot, so visits from the bot get their own line in the traffic export.
+const LINK = "https://chessscout.net/?utm_source=lichess_bot";
+const HELLO = `Hi! I'm the ChessScout.net coach bot, playing at about your level. Good luck! Get this game reviewed free: ${LINK}`;
+const GG = `gg! See where it was won or lost, free: ${LINK}`;
 
 let botId = "";
 
