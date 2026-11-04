@@ -385,7 +385,8 @@ function scanClip(fen: string, line: string[], photo?: string): Clip {
 const TOUR: { emo: string; title: string; line: string; say: string }[] = [
   { emo: '⚡', title: 'Live games', line: '5 min, 5 | 3, 10 min or 15 min', say: 'Play live: five, ten or fifteen minutes.' },
   { emo: '♞', title: 'Play on Lichess', line: 'Nobody free? Play a real Lichess player, right here', say: 'Nobody free? Play real Lichess players, right inside ChessScout.' },
-  { emo: '📅', title: 'Daily games', line: 'One move a day, from your phone', say: 'Daily games, one move a day.' },
+  { emo: '📅', title: 'Daily games', line: '1, 3 or 7 days a move, with ChessScout or Lichess players', say: 'Daily games, one move a day, with ChessScout or Lichess players.' },
+  { emo: '🔔', title: 'Never miss a move', line: "A notification when it's your turn", say: "And a heads-up whenever it's your move." },
   { emo: '🤖', title: 'Practice bots', line: 'Every level, any time', say: 'Bots at every level, any time.' },
   { emo: '🧠', title: 'Every game reviewed', line: 'Accuracy, mistakes and the better move. Free', say: 'Every game reviewed free: your accuracy, your mistakes, and the better move.' },
   { emo: '🔍', title: 'Opponent Scout', line: 'Scout anyone on Chess.com or Lichess before you play', say: 'Scout your next opponent before you play them.' },
@@ -1735,7 +1736,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
         if (f.card === 'review') return 'And the second it ends, your coach reviews the game. Free. Every mistake, and the better move.';
         if (f.card === 'live' && pr.template === 'live') return `Five, ten or fifteen minutes. ${stripEmoji(pr.closer)}`;
         if (f.card === 'live') return 'Play live games: five, ten or fifteen minutes.';
-        if (f.card === 'daily') return 'Or daily games: one move a day, from your phone.';
+        if (f.card === 'daily') return "Or daily games: one move a day, and we'll tell you when it's your turn.";
         return `Send a friend a challenge link. ${stripEmoji(pr.closer)}`;
       }
       case 'summary': {
@@ -1988,7 +1989,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
   };
 
   // ── Post kit ────────────────────────────────────────────────────────────
-  const postText = clip ? `${isComp ? stripEmoji(compTitle) : hook}\n\n${clip.isTrap ? 'Would you fall for it? 👇' : clip.isPuzzle ? 'Did you solve it? Drop the first move in the comments 👇' : clip.isReview ? 'Which move would you have played differently? 👇' : clip.isLesson ? 'Learning chess? Save this one and share it with a friend 👇' : clip.isMap ? 'Which of these do you play? Drop it in the comments 👇' : clip.isOpening ? 'Which line do you play? Drop it in the comments 👇' : clip.isScout ? 'Who should I scout next? Drop a username 👇' : clip.isScan ? 'Want me to scan your board? Drop a photo in the comments 👇' : clip.isPromo ? (clip.promo?.template === 'versus' ? 'Would you switch? 👇' : clip.promo?.template === 'live' ? 'Blitz or rapid? Tell me below 👇' : clip.promo?.template === 'tour' ? 'Which one are you trying first? 👇' : 'Tag the friend you want to beat 👇') : 'Would you have found it? Comment your move 👇'}\nReview your own games free at chessscout.net\n\n${hashtagsFor(clip)}` : '';
+  const postText = clip ? `${isComp ? stripEmoji(compTitle) : hook}\n\n${clip.isTrap ? 'Would you fall for it? 👇' : clip.isPuzzle ? 'Did you solve it? Drop the first move in the comments 👇' : clip.isReview ? 'Which move would you have played differently? 👇' : clip.isLesson ? 'Learning chess? Save this one and share it with a friend 👇' : clip.isMap ? 'Which of these do you play? Drop it in the comments 👇' : clip.isOpening ? 'Which line do you play? Drop it in the comments 👇' : clip.isScout ? 'Who should I scout next? Drop a username 👇' : clip.isScan ? 'Want me to scan your board? Drop a photo in the comments 👇' : clip.isPromo ? (clip.promo?.template === 'versus' ? 'Would you switch? 👇' : clip.promo?.template === 'live' ? 'Blitz or rapid? Tell me below 👇' : clip.promo?.template === 'tour' ? 'Which one are you trying first? 👇' : 'Tag the friend you want to beat 👇') : 'Would you have found it? Comment your move 👇'}\nReview your own games free at chessscout.net${clip.isPromo ? '\nOn Lichess? Join our team: lichess.org/team/chessscoutnet' : ''}\n\n${hashtagsFor(clip)}` : '';
   const [copied, setCopied] = useState(false);
   const copyPost = () => { navigator.clipboard?.writeText(postText).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); }).catch(() => {}); };
 
@@ -2470,7 +2471,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
                 if (frame.card === 'daily') return (
                   <motion.div key="daily" initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className={`${box} text-center`} style={{ fontSize: 'clamp(13px,2.3cqh,24px)' }}>
                     <p className="font-black" style={{ fontSize: '1.4em' }}>📅 Daily games</p>
-                    <p className="mt-[0.6cqh] font-bold text-white/75">One move a day, from your phone</p>
+                    <p className="mt-[0.6cqh] font-bold text-white/75">One move a day, with a heads-up on your turn</p>
                     <div className="mt-[1.4cqh] flex justify-center gap-[1cqh]">
                       {['1 day', '3 days', '7 days'].map((t, n) => (
                         <motion.span key={t} initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ delay: 0.2 + n * 0.12, type: 'spring', stiffness: 380, damping: 16 }} className="rounded-[0.6em] bg-[#4A8BD6] px-[0.8em] py-[0.45em] font-black">{t}</motion.span>

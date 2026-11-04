@@ -207,6 +207,7 @@ export function ContentStudio() {
       { label: 'Puzzles', us: 'Free, unlimited', them: 'Limited free' },
       { label: 'Scout any opponent', us: 'Free', them: '—' },
       { label: 'Live + daily games', us: 'Free', them: 'Free' },
+      { label: 'Play Lichess players', us: 'Yes, on our board', them: '—' },
       { label: 'Chess for Kids path', us: 'Free', them: '—' },
     ],
     closer: 'Switch in 30 seconds at chessscout.net',
@@ -655,7 +656,7 @@ export function ContentStudio() {
             </div>
             <label className="block text-[12px] text-white/60">Hook<input value={tourPromo.hook} onChange={(e) => setTourPromo({ ...tourPromo, hook: e.target.value })} className="mt-0.5 w-full rounded-lg bg-white/5 px-3 py-2 text-[14px] font-bold text-white ring-1 ring-white/10" /></label>
             <label className="block text-[12px] text-white/60">Closing line<input value={tourPromo.closer} onChange={(e) => setTourPromo({ ...tourPromo, closer: e.target.value })} className="mt-0.5 w-full rounded-lg bg-white/5 px-3 py-2 text-[13px] text-white ring-1 ring-white/10" /></label>
-            <p className="text-[12px] text-white/55">A card for each part of the app (live games, Play on Lichess, daily games, bots, free game reviews, Opponent Scout, puzzles, openings, board scan, Chess for Kids, live broadcasts), with the Opera Game playing between them, then all of them on one end card.</p>
+            <p className="text-[12px] text-white/55">A card for each part of the app (live games, Play on Lichess, daily games with ChessScout or Lichess players, move alerts, bots, free game reviews, Opponent Scout, puzzles, openings, board scan, Chess for Kids, live broadcasts), with the Opera Game playing between them, then all of them on one end card.</p>
             <button onClick={() => setOpen({ kind: 'promo', promo: tourPromo })} className="rounded-lg bg-[#81B64C] px-4 py-2 text-[13px] font-black text-white">🎬 Make the clip</button>
           </div>
         ) : promoT === 'live' ? (
