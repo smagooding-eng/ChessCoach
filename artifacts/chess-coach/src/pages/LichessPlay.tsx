@@ -12,6 +12,9 @@ import { PT, cardStyle, greenBtn, ghostBtn } from '@/lib/playTheme';
 import { apiFetch } from '@/lib/api';
 import { useUser } from '@/hooks/use-user';
 import { playMoveSound } from '@/context/SettingsContext';
+import { MaterialStrip, EvalBar } from '@/components/GameStatusStrip';
+import { MoveBrowserBar } from '@/components/MoveBrowserBar';
+import { useMoveBrowser, positionsFromSan } from '@/hooks/use-move-browser';
 import {
   lichessAuth, connectLichess, disconnectLichess, syncLichessAuth, seek as lichessSeek, streamEvents, streamGame, playMove, resign, abort, draw, claimVictory,
   nowPlaying, exportPgn, isOver, LICHESS_STATUS_TEXT, type LichessGameFull, type LichessState, type LichessPlayer,
@@ -108,14 +111,12 @@ export function LichessPlay() {
   useEffect(() => {
     if (!gameId) return;
     const ac = new AbortController();
-    let lastMoves = '';
     void streamGame(gameId, (x) => {
-      if (x.type === 'gameFull') { setFull(x); setSt(x.state); setStAt(Date.now()); lastMoves = x.state.moves; if (isOver(x.state.status)) setPhase('over'); }
+      if (x.type === 'gameFull') { setFull(x); setSt(x.state); setStAt(Date.now()); if (isOver(x.state.status)) setPhase('over'); }
       else if (x.type === 'gameState') {
-        if (x.moves !== lastMoves && x.moves.length > lastMoves.length) playMoveSound('move');
-        lastMoves = x.moves;
+        // Move sounds come from the board itself (your sound settings, as in ChessScout games).
         setSt(x); setStAt(Date.now());
-        if (isOver(x.status)) setPhase('over');
+        if (isOver(x.status)) { setPhase('over'); playMoveSound('gameEnd'); }
       } else if (x.type === 'opponentGone') setGone(x.gone ? x : null);
     }, ac.signal).catch(() => {});
     return () => ac.abort();
@@ -128,6 +129,12 @@ export function LichessPlay() {
   const myTurn = !!pos && phase === 'playing' && pos.chess.turn() === myColor && st?.status === 'started';
   const [pending, setPending] = useState<{ fen: string; last: { from: string; to: string } } | null>(null);
   useEffect(() => { setPending(null); }, [st?.moves]);
+  // Step back through the moves (as in ChessScout games), and premoves.
+  const sans = useMemo(() => pos?.chess.history() ?? [], [pos]);
+  const startFen = full && full.initialFen !== 'startpos' ? full.initialFen : undefined;
+  const browser = useMoveBrowser(useMemo(() => positionsFromSan(sans, startFen), [sans, startFen]), gameId ?? undefined);
+  const [premove, setPremove] = useState<{ from: string; to: string } | null>(null);
+  useEffect(() => { if (phase !== 'playing') setPremove(null); }, [phase]);
 
   // Clocks tick locally between updates (from the second move on, as on Lichess).
   useEffect(() => { if (phase !== 'playing') return; const t = setInterval(() => setNow(Date.now()), 250); return () => clearInterval(t); }, [phase]);
@@ -141,10 +148,16 @@ export function LichessPlay() {
     let mv; try { mv = c.move(san); } catch { return; }
     const uci = `${mv.from}${mv.to}${mv.promotion ?? ''}`;
     setPending({ fen: c.fen(), last: { from: mv.from, to: mv.to } });
-    playMoveSound(mv.captured ? 'capture' : 'move');
     const r = await playMove(gameId, uci);
     if (!r.ok) { setPending(null); setError(r.error || "Lichess didn't accept that move."); }
   };
+
+  // A premove plays as soon as it's our turn (if it's still legal).
+  useEffect(() => {
+    if (!premove || !myTurn || !pos || pending) return;
+    const pm = premove; setPremove(null);
+    try { const c = new Chess(pos.chess.fen()); const mv = c.move({ from: pm.from, to: pm.to, promotion: 'q' }); if (mv) void onMove(mv.san); } catch { /* no longer legal */ }
+  }, [myTurn, st?.moves]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const oppOffersDraw = st && (myColor === 'w' ? st.bdraw : st.wdraw);
   const iOfferDraw = st && (myColor === 'w' ? st.wdraw : st.bdraw);
@@ -175,12 +188,12 @@ export function LichessPlay() {
 
   const top = myColor === 'w' ? 'b' : 'w';
   const player = (c: 'w' | 'b') => (c === 'w' ? full?.white : full?.black);
-  const clockChip = (c: 'w' | 'b') => (
-    <span className="rounded-lg px-2.5 py-1 font-black tabular-nums" style={{ background: running && turn === c ? '#F2F2F2' : 'rgba(255,255,255,.08)', color: running && turn === c ? '#141414' : PT.text, fontSize: 'clamp(15px,4vw,19px)' }}>{fmt(timeOf(c))}</span>
-  );
+  const clockChip = (c: 'w' | 'b') => { const on = running && turn === c, low = timeOf(c) < 10_000; return (
+    <span className="rounded-lg px-2.5 py-1 font-black tabular-nums lg:hidden" style={{ background: on ? (low ? '#E5484D' : '#F2F2F2') : 'rgba(255,255,255,.08)', color: on ? (low ? '#fff' : '#141414') : low ? '#ec6b6b' : PT.text, fontSize: 'clamp(15px,4vw,19px)' }}>{fmt(timeOf(c))}</span>
+  ); };
   const row = (c: 'w' | 'b') => { const p = player(c); return (
     <div className="flex items-center justify-between gap-2 px-1">
-      <p className="truncate text-[14px] font-bold" style={{ color: PT.text }}>{p?.title && <span className="mr-1 rounded bg-[#CA3431] px-1 text-[11px] text-white">{p.title}</span>}{nameOf(p)}{p?.rating ? <span className="ml-1.5 font-semibold" style={{ color: PT.muted }}>{p.rating}{p.provisional ? '?' : ''}</span> : null}</p>
+      <p className="truncate text-[14px] font-bold" style={{ color: PT.text }}>{p?.title && <span className="mr-1 rounded bg-[#CA3431] px-1 text-[11px] text-white">{p.title}</span>}{nameOf(p)}{p?.rating ? <span className="ml-1.5 font-semibold" style={{ color: PT.muted }}>{p.rating}{p.provisional ? '?' : ''}</span> : null}{c === myColor && <span className="ml-1.5 text-[9px] font-black uppercase tracking-[0.14em]" style={{ color: PT.green }}>You</span>}</p>
       {full?.clock && clockChip(c)}
     </div>
   ); };
@@ -216,8 +229,17 @@ export function LichessPlay() {
           <a href={`https://lichess.org/${full.id}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 underline">On lichess.org <ExternalLink size={12} /></a>
         </div>
         {row(top)}
-        <ChessBoard fen={pending?.fen ?? pos.chess.fen()} flipped={myColor === 'b'} lastMove={pending?.last ?? pos.last}
-          practiceMode={myTurn && !pending} expectedMoveSan={null} onMovePlayed={(san) => void onMove(san)} reserveConfirmSpace
+        <MaterialStrip fen={pending?.fen ?? pos.chess.fen()} color={top} className="px-1" />
+        <ChessBoard fen={browser.viewing && browser.fen ? browser.fen : pending?.fen ?? pos.chess.fen()} flipped={myColor === 'b'} lastMove={browser.viewing ? browser.lastMove : pending?.last ?? pos.last}
+          practiceMode={myTurn && !pending && !browser.viewing} expectedMoveSan={null} onMovePlayed={(san) => void onMove(san)} reserveConfirmSpace
+          premoveMode={!myTurn && phase === 'playing' && !browser.viewing} premoveColor={myColor} premove={premove} onPremoveSet={(p) => setPremove(p)}
+          sidePanel={full.clock ? {
+            clocks: {
+              top: { name: nameOf(player(top)), text: fmt(timeOf(top)), active: running && turn === top, low: timeOf(top) < 10_000, moves: Math.floor((plies + (top === 'w' ? 1 : 0)) / 2) },
+              bottom: { name: 'You', text: fmt(timeOf(myColor)), active: running && turn === myColor, low: timeOf(myColor) < 10_000, moves: Math.floor((plies + (myColor === 'w' ? 1 : 0)) / 2) },
+            },
+            status: phase !== 'playing' ? 'Game over' : myTurn ? 'Your move' : 'Opponent to move',
+          } : undefined}
           boardOverlay={phase === 'over' ? (
             <GameOverOverlay gameKey={full.id} outcome={outcome} yourColor={myColor === 'w' ? 'white' : 'black'} subtitle={LICHESS_STATUS_TEXT[st.status]}
               actions={<>
@@ -225,7 +247,15 @@ export function LichessPlay() {
                 <OverlayButton onClick={() => void startSeek()}><RotateCcw size={15} /> New game</OverlayButton>
               </>} />
           ) : undefined} />
+        <MaterialStrip fen={pending?.fen ?? pos.chess.fen()} color={myColor} className="px-1" />
         {row(myColor)}
+        {premove && !myTurn && phase === 'playing' && (
+          <div className="flex items-center justify-between rounded-lg px-3 py-2 text-xs" style={{ background: 'rgba(255,140,90,0.35)', color: '#fff', border: '1px solid rgba(255,140,90,0.35)' }}>
+            <span>Premove: {premove.from} → {premove.to}</span>
+            <button onClick={() => setPremove(null)} className="inline-flex items-center gap-1 font-bold"><X className="h-3 w-3" /> Cancel</button>
+          </div>
+        )}
+        <MoveBrowserBar browser={browser} yourTurn={myTurn} />
         {gone?.gone && phase === 'playing' && (
           <div className="flex items-center justify-between gap-2 rounded-xl px-3 py-2.5 text-[13px] font-bold" style={{ background: 'rgba(232,180,71,.14)', border: '1px solid rgba(232,180,71,.5)', color: PT.text }}>
             <span>Your opponent left.{gone.claimWinInSeconds ? ` You can claim the win in ${gone.claimWinInSeconds}s.` : ''}</span>
@@ -244,12 +274,14 @@ export function LichessPlay() {
               <button onClick={() => void abort(full.id)} className="flex items-center gap-1.5 rounded-xl px-4 py-2.5 text-[13px] font-bold" style={ghostBtn}><X size={15} /> Abort</button>
             ) : (<>
               <button onClick={() => void draw(full.id, true)} disabled={!!iOfferDraw} className="flex items-center gap-1.5 rounded-xl px-4 py-2.5 text-[13px] font-bold disabled:opacity-50" style={ghostBtn}><Handshake size={15} /> {iOfferDraw ? 'Draw offered' : 'Offer draw'}</button>
-              <button onClick={() => void resign(full.id)} className="flex items-center gap-1.5 rounded-xl px-4 py-2.5 text-[13px] font-bold" style={ghostBtn}><Flag size={15} /> Resign</button>
+              <button onClick={() => { if (confirm('Resign this game?')) void resign(full.id); }} className="flex items-center gap-1.5 rounded-xl px-4 py-2.5 text-[13px] font-bold" style={ghostBtn}><Flag size={15} /> Resign</button>
             </>)}
           </div>
         ) : (
           <div className="space-y-2 p-4 text-center" style={cardStyle}>
             <p className="text-[15px] font-black" style={{ color: PT.text }}>{resultText}</p>
+            {/* The engine's view only once the game is over (never during a game). */}
+            <EvalBar fen={pos.chess.fen()} />
             {saving === 'saving' && <p className="text-[12.5px]" style={{ color: PT.muted }}><Loader2 className="mr-1 inline h-3.5 w-3.5 animate-spin" />Saving it to your games…</p>}
             {saving === 'saved' && <button onClick={() => navigate(savedId ? `/games/${savedId}` : '/games')} className="w-full rounded-xl py-3 text-[14px] font-extrabold" style={greenBtn}>Review this game</button>}
             {saving === 'notyours' && <p className="text-[12.5px]" style={{ color: PT.muted }}>This Lichess account ({auth.username}) isn't the one linked to your ChessScout account, so the game wasn't added. Change your Lichess username in Settings to save these games.</p>}
