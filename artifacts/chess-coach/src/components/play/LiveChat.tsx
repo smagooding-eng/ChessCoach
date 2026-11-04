@@ -5,7 +5,7 @@ import type { LiveChat as Msg } from '@/hooks/use-live-play';
 // Quick messages in a live game: emojis and a few friendly phrases. Nothing is
 // typed, so there's nothing to moderate. Must match LIVE_CHAT on the server.
 const EMOJIS = ['👋', '👍', '😅', '😮', '🔥', '😂', '🤝', '🙏', '😬', '🤯', '♟️', '💪'];
-const PHRASES = ['Good luck!', 'Have fun!', 'Nice move!', 'Oops!', 'Thanks!', 'Good game!', 'Rematch?'];
+const PHRASES = ['Good luck!', 'Have fun!', 'Nice move!', 'Oops!', 'Thanks!', 'Good game!', 'Rematch?', "I'm playing on chessscout.net, you could too!"];
 const MUTE_KEY = 'cs_live_chat_muted';
 
 export function useChatMuted(): [boolean, (v: boolean) => void] {

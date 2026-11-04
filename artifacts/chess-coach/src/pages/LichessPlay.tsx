@@ -112,6 +112,7 @@ export function LichessPlay() {
   // Chat: what the players say (Lichess's own notices, like "Takeback sent", are left out).
   const [chat, setChat] = useState<LiveChat[]>([]);
   const [chatMuted, setChatMuted] = useChatMuted();
+  const promoSent = useRef<string | null>(null);
   const chatId = useRef(0);
   const meRef = useRef('');
   const colorRef = useRef<'w' | 'b'>('w');
@@ -274,7 +275,11 @@ export function LichessPlay() {
         <div className="relative">{row(myColor)}<ChatBubble chat={chat} side={myColor} /></div>
         {!full.white.aiLevel && !full.black.aiLevel && (
           <div className="space-y-1.5">
-            <ChatTray onSend={(t) => void sendChat(full.id, t)} disabled={phase !== 'playing' && phase !== 'over'} muted={chatMuted} setMuted={setChatMuted} />
+            <ChatTray onSend={(t) => {
+              // The ChessScout line goes once a game at most (Lichess doesn't like repeated advertising).
+              if (/chessscout\.net/i.test(t)) { if (promoSent.current === full.id) return; promoSent.current = full.id; }
+              void sendChat(full.id, t);
+            }} disabled={phase !== 'playing' && phase !== 'over'} muted={chatMuted} setMuted={setChatMuted} />
             {chat.length > 0 && (
               <div className="max-h-28 space-y-0.5 overflow-y-auto rounded-lg px-2.5 py-1.5 text-[12.5px]" style={{ background: 'rgba(255,255,255,0.04)' }}>
                 {chat.filter((m) => !chatMuted || m.from === myColor).slice(-6).map((m) => (
