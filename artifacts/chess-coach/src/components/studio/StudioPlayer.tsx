@@ -197,8 +197,8 @@ const DEFAULT_PREFS = {
   leadIn: 'scene' as 'scene' | 'black',
   /** How the voiceover talks: Creator (punchy, reacts to the moves) or Teacher (the original, explains everything). */
   tone: 'creator' as 'creator' | 'teacher',
-  /** Opening Map episodes: the board tilted back in 3D. */
-  tilt: true,
+  /** Opening Map episodes: the board tilted back in 3D (off: the board stays flat). */
+  tilt: false,
   split: true, voice: false, voiceName: 'ash', compTitle: 'Top moments this week',
   music: 'off' as MusicStyle, musicVol: 0.5, beatSync: true, musicFx: true, subs: true, pieceFx: true, trapBefore: 99, countdownSecs: 3, choices: false, zoom: false, splash: true, reviewMode: 'highlights' as 'highlights' | 'full',
 };
@@ -207,6 +207,8 @@ function loadPrefs(): Prefs {
   try {
     const saved = JSON.parse(localStorage.getItem(PREF_KEY) || '{}');
     // Once: the old default voices (onyx, and nova from the Kids preset) move to the new narrator.
+    // Once: the tilted board was briefly the default; it's flat now.
+    if (!saved.tiltV1) { saved.tilt = false; saved.tiltV1 = 1; }
     if (!saved.voiceV2) { if (!saved.voiceName || saved.voiceName === 'onyx' || saved.voiceName === 'nova') saved.voiceName = 'ash'; saved.voiceV2 = 1; }
     return { ...DEFAULT_PREFS, ...saved };
   } catch { return DEFAULT_PREFS; }
