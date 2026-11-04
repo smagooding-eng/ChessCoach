@@ -8,6 +8,9 @@ import { useUser } from '@/hooks/use-user';
 import { OPENING_MAP } from '@/components/studio/openingMap';
 import { StudioPlayer, themeLabel, type StudioMoment, type StudioTrap, type StudioSource, type StudioPuzzle, type StudioReview, type StudioScout, type StudioLesson, type StudioPromo } from '@/components/studio/StudioPlayer';
 import { Chess } from 'chess.js';
+import { KidsStudio } from '@/components/studio/KidsStudio';
+import { KIDS_WORLDS, type KidsVideo } from '@/components/studio/kidsVideos';
+import { KidPiece } from '@/components/kids/KidsArt';
 
 // Admin > Content Studio: notable moments from every reviewed game on the
 // site (not only the admin's), filterable by what happened — brilliant moves,
@@ -129,6 +132,7 @@ export function ContentStudio() {
     apiFetch('/api/admin/studio/openings', { credentials: 'include' }).then((r) => (r.ok ? r.json() : { openings: [] })).then((d) => setOpenings(d.openings ?? [])).catch(() => setOpenings([]));
   }, [view, openings]);
   // Kids & beginners: the Beginner Path / Chess for Kids lessons
+  const [kidsVid, setKidsVid] = useState<KidsVideo | null>(null);
   const [courses, setCourses] = useState<{ id: number; title: string; description: string; icon: string; lessons: StudioLesson[] }[] | null>(null);
   useEffect(() => {
     if (view !== 'kids' || courses) return;
@@ -418,6 +422,37 @@ export function ContentStudio() {
       {picking && <p className="mb-3 text-[12.5px] text-[#E8B447]">Tap moments, reviews, puzzles or traps (you can mix tabs) in the order you want them (they count down #{Math.max(picked.length, 1)} to #1), then play them as one clip.</p>}
 
       {view === 'kids' ? (<>
+        {/* From the kids app: the same worlds, buddies and levels as chessscout.net/kids */}
+        <div className="mb-5 rounded-2xl p-3 ring-1 ring-[#FF6FA8]/40" style={{ background: 'linear-gradient(180deg, rgba(143,208,255,.14), rgba(255,111,168,.10))' }}>
+          <p className="text-[15px] font-black">🧒 From the kids app</p>
+          <p className="mb-3 text-[12.5px] text-white/60">Videos in the Chess for Kids look: the same buddies, board and levels as chessscout.net/kids. Each one is a hook for parents, pause and try, 3-2-1, then the answer.</p>
+          <div className="mb-3 flex flex-wrap gap-1.5">
+            <button onClick={() => setKidsVid({ kind: 'series', world: 'mate' })} className="rounded-full bg-[#E879F9] px-3 py-1.5 text-[12.5px] font-black text-white">🏆 {KIDS_WORLDS.find((w) => w.id === 'mate')?.levels.length} checkmates challenge</button>
+            <button onClick={() => setKidsVid({ kind: 'series', world: 'check' })} className="rounded-full bg-[#FB923C] px-3 py-1.5 text-[12.5px] font-black text-white">👑 {KIDS_WORLDS.find((w) => w.id === 'check')?.levels.length} checks challenge</button>
+            <button onClick={() => setKidsVid({ kind: 'series', world: 'capture' })} className="rounded-full bg-[#22D3EE] px-3 py-1.5 text-[12.5px] font-black text-white">🎯 Capture Cove challenge</button>
+            <button onClick={() => { const pool = KIDS_WORLDS.flatMap((w) => w.levels.map((l) => ({ world: w.id, level: l.id }))); const p = pool[Math.floor(Math.random() * pool.length)]; setKidsVid({ kind: 'level', ...p }); }} className="rounded-full bg-white/10 px-3 py-1.5 text-[12.5px] font-bold text-white">🎲 Random daily challenge</button>
+          </div>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {KIDS_WORLDS.map((w) => (
+              <div key={w.id} className="rounded-xl bg-white/5 p-2.5 ring-1 ring-white/10">
+                <div className="mb-2 flex items-center gap-2">
+                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl" style={{ background: `${w.color}33` }}><KidPiece type={w.piece} side="w" size={34} /></span>
+                  <div className="min-w-0"><p className="truncate text-[14px] font-black">{w.name}</p><p className="truncate text-[11.5px] text-white/55">{w.buddy}</p></div>
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {['rook', 'bishop', 'queen', 'king', 'knight', 'pawn'].includes(w.id) && (
+                    <button onClick={() => setKidsVid({ kind: 'meet', world: w.id })} className="rounded-full px-2.5 py-1 text-[11.5px] font-black text-white" style={{ background: w.color }}>Meet {w.buddy.replace(/ the .*$/, '')}</button>
+                  )}
+                  {w.levels.map((l, n) => (
+                    <button key={l.id} onClick={() => setKidsVid({ kind: 'level', world: w.id, level: l.id })} title={l.say}
+                      className="rounded-full bg-white/10 px-2.5 py-1 text-[11.5px] font-bold text-white hover:bg-white/20">{n + 1}. {l.title}</button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+        <p className="mb-2 text-[13px] font-black text-white/70">Lessons and puzzles</p>
         <div className="mb-3 flex flex-wrap gap-1.5">
           <button onClick={() => void autoPuzzles('kid-m1', 'mateIn1', 'Can your kid find mate in 1? 🧒', [400, 1000])} disabled={!!autoBusy} className="rounded-full bg-[#FF6FA8] px-3 py-1.5 text-[12.5px] font-black text-white disabled:opacity-60">🧒 Easy mate in 1 (kids)</button>
           <button onClick={() => void autoPuzzles('beg-ladder', '', '5 puzzles for beginners 🌱', [400, 1200])} disabled={!!autoBusy} className="rounded-full bg-[#7C5CFF] px-3 py-1.5 text-[12.5px] font-black text-white disabled:opacity-60">🌱 Beginner puzzle ladder</button>
@@ -839,6 +874,7 @@ export function ContentStudio() {
           <button onClick={() => { setCompTitle(undefined); setComp(picked); }} className="rounded-lg bg-[#81B64C] px-3 py-1.5 text-[13px] font-black text-white">Play as one clip</button>
         </div>
       )}
+      {kidsVid && <KidsStudio video={kidsVid} onClose={() => setKidsVid(null)} />}
       {comp && <StudioPlayer source={comp[0]} queue={comp} title={compTitle} onClose={() => setComp(null)} />}
       {open && (
         <StudioPlayer source={open} onClose={() => setOpen(null)}

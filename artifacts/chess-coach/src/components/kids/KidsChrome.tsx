@@ -11,7 +11,7 @@ import { useKids, totalStars, speak, playSfx } from '@/lib/kids/progress';
 export const KID_FONT = "'Baloo 2', 'Nunito', ui-rounded, system-ui, sans-serif";
 export const INK = '#2F2257';
 
-function useKidFont() {
+export function useKidFont() {
   useEffect(() => {
     const id = 'kids-font-baloo';
     if (document.getElementById(id)) return;
