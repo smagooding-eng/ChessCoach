@@ -7,6 +7,7 @@ import { Chess } from "chess.js";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { logger } from "./logger";
+import { explorerLichess, type Explorer } from "./lichessApi";
 
 interface Variation { name: string; short: string; moves: string[]; note: string }
 interface OpeningDef {
@@ -315,6 +316,8 @@ async function tallyAt(def: OpeningDef, keyFen: string): Promise<Tally> {
 export interface StudioOpeningData {
   id: string; name: string; side: "white" | "black"; hook: string; ideas: string[]; line: string[];
   games: number; results: { white: number; draw: number; black: number } | null;
+  /** Where the game numbers come from. */
+  source: "lichess" | "chessscout";
   /** Replies at the key position: how often they're played, how they score, Stockfish (White's view, pawns). */
   /** lines: indexes of the variations that start with this move. */
   options: { san: string; pct: number | null; games: number; scorePct: number | null; eval: number | null; lines: number[] }[];
@@ -392,10 +395,20 @@ async function buildOpening(def: OpeningDef): Promise<StudioOpeningData | null> 
   const c = new Chess();
   for (const s of def.line) c.move(s);
   const keyFen = c.fen();
-  const [tally, ev] = await Promise.all([
+  const [dbTally, ev, exKey] = await Promise.all([
     tallyAt(def, keyFen).catch((err) => { logger.warn({ err, opening: def.id }, "[studio] opening game numbers failed"); return null; }),
     withTimeout(evalOf(keyFen), 9_000, NO_EVAL),
+    explorerLichess(keyFen).catch(() => null),
   ]);
+  // The numbers come from Lichess's opening explorer (millions of games by players
+  // rated 1600+) when it answers, otherwise from games in ChessScout's own database.
+  const exTotal = (e: Explorer | null) => (e ? e.white + e.draws + e.black : 0);
+  const exTally: Tally | null = exKey && exTotal(exKey) >= 200 ? {
+    games: exTotal(exKey), white: exKey.white, draw: exKey.draws, black: exKey.black,
+    next: new Map(exKey.moves.map((m) => [m.san, { games: m.white + m.draws + m.black, white: m.white, draw: m.draws, black: m.black }])), conts: [],
+  } : null;
+  const tally = exTally ?? dbTally;
+  const source: "lichess" | "chessscout" = exTally ? "lichess" : "chessscout";
 
   // Each variation's position at its end, for Stockfish's verdict on it.
   const lines: StudioOpeningData["lines"] = [];
@@ -415,11 +428,26 @@ async function buildOpening(def: OpeningDef): Promise<StudioOpeningData | null> 
       if (k > 0) depth = Math.max(depth, Math.min(v.moves.length, k + 1));
     }
     const pre = v.moves.slice(0, depth);
-    const went = tally ? tally.conts.filter((c) => pre.every((m, k) => c.m[k] === m)) : [];
-    const hits = went.length;
-    const whiteScore = hits >= 10 ? Math.round(((went.filter((c) => c.out === "white").length + went.filter((c) => c.out === "draw").length * 0.5) / hits) * 100) : null;
+    let hits: number; let whiteScore: number | null; let pctOverride: number | null | undefined;
+    if (exTally) {
+      // Share of games along the line's own moves, and how White scores from where it ends.
+      let frac: number | null = 1; const walk = new Chess(keyFen);
+      for (const m of pre) {
+        const e = await explorerLichess(walk.fen()).catch(() => null); const tot = exTotal(e); const mv = e?.moves.find((x) => x.san === m);
+        if (!e || !tot || !mv) { frac = null; break; }
+        frac *= (mv.white + mv.draws + mv.black) / tot;
+        try { walk.move(m); } catch { frac = null; break; }
+      }
+      const end = await explorerLichess(lc.fen()).catch(() => null); const endTot = exTotal(end);
+      hits = endTot; whiteScore = end && endTot >= 10 ? Math.round(((end.white + end.draws * 0.5) / endTot) * 100) : null;
+      pctOverride = frac == null ? null : Math.round(frac * 100);
+    } else {
+      const went = dbTally ? dbTally.conts.filter((c) => pre.every((m, k) => c.m[k] === m)) : [];
+      hits = went.length;
+      whiteScore = hits >= 10 ? Math.round(((went.filter((c) => c.out === "white").length + went.filter((c) => c.out === "draw").length * 0.5) / hits) * 100) : null;
+    }
     lines.push({
-      name: v.name, short: v.short, moves: v.moves, note: v.note, pct: tally && tally.games ? Math.round((hits / tally.games) * 100) : null, eval: endEval.best,
+      name: v.name, short: v.short, moves: v.moves, note: v.note, pct: pctOverride !== undefined ? pctOverride : tally && tally.games ? Math.round((hits / tally.games) * 100) : null, eval: endEval.best,
       why: LINE_WHY[`${def.id}|${v.name}`] ?? [], games: hits, whiteScore,
       next: endEval.bestSan ? { san: endEval.bestSan, eval: endEval.best } : null,
     });
@@ -458,7 +486,7 @@ async function buildOpening(def: OpeningDef): Promise<StudioOpeningData | null> 
 
   const data: StudioOpeningData = {
     id: def.id, name: def.name, side: def.side, hook: def.hook, ideas: def.ideas, line: def.line,
-    games: tally?.games ?? 0,
+    games: tally?.games ?? 0, source,
     results: tally && tally.games >= 10 ? { white: Math.round((tally.white / tally.games) * 100), draw: Math.round((tally.draw / tally.games) * 100), black: Math.round((tally.black / tally.games) * 100) } : null,
     options, lines, trap,
   };

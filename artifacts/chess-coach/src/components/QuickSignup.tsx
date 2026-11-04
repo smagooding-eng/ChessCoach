@@ -6,7 +6,7 @@
 import { useEffect } from 'react';
 import { X, Mail } from 'lucide-react';
 import { trackFunnelEvent } from '@/lib/funnelTracking';
-import { startGoogleSignIn } from '@/lib/googleSignIn';
+import { startGoogleSignIn, startLichessSignIn } from '@/lib/googleSignIn';
 
 export const RETURN_TO_KEY = 'cs_return_to';
 
@@ -19,6 +19,16 @@ export function rememberReturnTo(path: string) {
 export function startGoogleSignup() {
   trackFunnelEvent('google_oauth_clicked');
   void startGoogleSignIn();
+}
+
+export function startLichessSignup() {
+  trackFunnelEvent('lichess_oauth_clicked');
+  startLichessSignIn();
+}
+
+/** A knight, for the "Continue with Lichess" buttons. */
+export function LichessMark({ className = 'h-5 w-5' }: { className?: string }) {
+  return <span aria-hidden="true" className={`inline-grid place-items-center text-[1.25em] leading-none ${className}`}>♞</span>;
 }
 
 export function GoogleMark({ className = 'h-5 w-5' }: { className?: string }) {
@@ -62,6 +72,11 @@ export function QuickSignup({ open, onClose, title, subtitle, returnTo }: {
           className="mt-5 flex w-full items-center justify-center gap-3 rounded-[14px] py-3.5 text-[15px] font-extrabold"
           style={{ background: '#FFFFFF', color: '#1F1F1F', boxShadow: '0 10px 26px -12px rgba(0,0,0,.6)' }}>
           <GoogleMark /> Continue with Google
+        </button>
+        <button type="button" onClick={startLichessSignup}
+          className="mt-3 flex w-full items-center justify-center gap-3 rounded-[14px] py-3.5 text-[15px] font-extrabold"
+          style={{ background: '#262421', color: '#FFFFFF', border: '1px solid rgba(255,255,255,.14)' }}>
+          <LichessMark /> Continue with Lichess
         </button>
         <a href={`${import.meta.env.BASE_URL}setup?signup=email`}
           className="mt-3 flex w-full items-center justify-center gap-2 rounded-[14px] py-3 text-[13.5px] font-bold"

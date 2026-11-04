@@ -504,6 +504,8 @@ runSchemaMigrations().then(() => {
   import("./routes/games").then(({ startReviewServices }) => startReviewServices()).catch((err) => logger.warn({ err }, 'review services start failed'));
   // Name the openings of ChessScout / bot games saved without one.
   import("./lib/openingName").then(({ backfillChessScoutOpenings }) => backfillChessScoutOpenings()).catch((err) => logger.warn({ err }, 'opening backfill failed'));
+  // The ChessScout bot on Lichess (only when LICHESS_BOT_TOKEN is set).
+  import("./lib/lichessBot").then(({ startLichessBot }) => startLichessBot()).catch((err) => logger.warn({ err }, 'lichess bot failed to start'));
   // Content Studio openings: built in the background a few minutes after start-up (the cache is in memory, so a deploy empties it).
   setTimeout(() => { import("./lib/studioOpenings").then(({ warmStudioOpenings }) => warmStudioOpenings()).catch(() => {}); }, 3 * 60 * 1000);
   import("./lib/growthScheduler").then(({ startGrowthScheduler }) => {

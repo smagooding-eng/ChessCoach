@@ -87,6 +87,10 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
             trackFunnelEvent('google_signup_completed');
           } else if (hashParams.get('login') === 'google') {
             trackFunnelEvent('google_login_completed');
+          } else if (hashParams.get('newSignup') === 'lichess') {
+            trackFunnelEvent('lichess_signup_completed');
+          } else if (hashParams.get('login') === 'lichess') {
+            trackFunnelEvent('lichess_login_completed');
           }
           window.history.replaceState(null, '', window.location.pathname + window.location.search);
         }

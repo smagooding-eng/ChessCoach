@@ -1,5 +1,5 @@
 import { axonTrack } from '@/lib/axon';
-import { startGoogleSignIn } from '@/lib/googleSignIn';
+import { startGoogleSignIn, startLichessSignIn } from '@/lib/googleSignIn';
 import { SocialLinks } from '@/components/SocialLinks';
 import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { useUser } from '@/hooks/use-user';
@@ -205,6 +205,11 @@ function AuthModal({ open, onClose, initialMode, externalError, context = 'defau
                   <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
                 </svg>
                 {t('Continue with Google')}
+              </button>
+              <button type="button" onClick={() => { trackFunnelEvent('lichess_oauth_clicked'); startLichessSignIn(); }}
+                className="w-full flex items-center justify-center gap-3 px-4 py-3.5 rounded-xl text-[15px] font-extrabold mb-4 -mt-1"
+                style={{ background: '#262421', color: '#FFFFFF', border: '1px solid rgba(255,255,255,.14)' }}>
+                <span aria-hidden="true" className="text-[1.25em] leading-none">♞</span> Continue with Lichess
               </button>
               {(showEmail || mode === 'login') ? (
                 <div className="flex items-center gap-3 mb-4">

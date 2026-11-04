@@ -218,6 +218,8 @@ const PlayNowPage = lazyRetry(() => import("@/pages/PlayNow").then(m => ({ defau
 const LichessPlayPage = lazyRetry(() => import("@/pages/LichessPlay").then(m => ({ default: m.LichessPlay })));
 const LichessCallbackPage = lazyRetry(() => import("@/pages/LichessPlay").then(m => ({ default: m.LichessCallback })));
 const PLichessPlay = () => <ProtectedRoute component={LichessPlayPage} />;
+const WatchLivePage = lazyRetry(() => import("@/pages/WatchLive").then(m => ({ default: m.WatchLive })));
+const PWatchLive = () => <ProtectedRoute component={WatchLivePage} />;
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -556,6 +558,7 @@ function Router() {
       <Route path="/play/local"      component={PLocalBoard} />
       <Route path="/live"            component={PLivePlay} />
       <Route path="/lichess"         component={PLichessPlay} />
+      <Route path="/watch"           component={PWatchLive} />
       <Route path="/friends"         component={PFriends} />
       <Route path="/messages/:userId" component={PMessages} />
       <Route path="/tournaments" component={PTournaments} />

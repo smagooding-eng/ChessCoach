@@ -1,5 +1,6 @@
 import { Chess } from "chess.js";
 import { logger } from "./logger";
+import { cloudEval } from "./lichessApi";
 import { spawn, ChildProcessWithoutNullStreams } from "child_process";
 
 const IS_PROD = process.env.NODE_ENV === "production";
@@ -12,6 +13,8 @@ const IS_PROD = process.env.NODE_ENV === "production";
 // vCPU — depth grows the time-per-position roughly exponentially, and full
 // game reviews evaluate every ply in the game.
 const ANALYSIS_DEPTH = parseInt(process.env.ENGINE_DEPTH || "") || (IS_PROD ? 18 : 20);
+/** Use Lichess cloud analysis for positions it has (LICHESS_CLOUD_EVAL=0 turns it off). */
+const CLOUD_EVAL = process.env.LICHESS_CLOUD_EVAL !== "0";
 const ENGINE_MULTIPV = parseInt(process.env.ENGINE_MULTIPV || "") || 3;
 const ENGINE_THREADS = parseInt(process.env.ENGINE_THREADS || "") || (IS_PROD ? 1 : 2);
 const ENGINE_HASH_MB = parseInt(process.env.ENGINE_HASH_MB || "") || (IS_PROD ? 64 : 256);
@@ -472,7 +475,24 @@ async function evaluateAllPositionsUnqueued(
     await engine.newGame();
   }
 
+  // Lichess's cloud analysis covers most opening positions at far more depth than we'd
+  // run: use it while it has the positions, and stop asking once the game leaves it.
+  let cloudMisses = 0;
   for (let i = 0; i < fens.length; i++) {
+    if (CLOUD_EVAL && cloudMisses < 2) {
+      const ce = await cloudEval(fens[i]).catch(() => null);
+      const pv = ce?.pvs?.[0];
+      if (ce && pv && ce.depth >= depth && (pv.cp != null || pv.mate != null)) {
+        const uciSeq = pv.moves.split(" ").filter(Boolean);
+        const cpWhite = pv.mate != null ? (pv.mate > 0 ? 10000 - pv.mate : -10000 - pv.mate) : pv.cp!;
+        const bestMoveSan = uciSeq[0] ? uciToSan(fens[i], uciSeq[0]) : null;
+        results.push({ cpWhite, bestMoveUci: uciSeq[0] ?? "", secondBestUci: ce.pvs[1]?.moves.split(" ")[0] ?? "", bestMoveSan, bestLineSan: uciSequenceToSan(fens[i], uciSeq, 6), depth: ce.depth });
+        cloudMisses = 0;
+        if (onProgress && i % 5 === 0) onProgress(i + 1, fens.length);
+        continue;
+      }
+      cloudMisses++;
+    }
     try {
       const ev = await engine.evaluate(fens[i], depth);
       results.push(ev);

@@ -32,13 +32,14 @@ export type LandingFunnelEvent =
   | 'signup_form_submitted' | 'signup_error' | 'opponent_scout_clicked'
   | 'google_oauth_clicked' | 'google_signup_completed' | 'google_signup_error' | 'google_login_completed'
   | 'guest_game_started' | 'guest_game_finished'
+  | 'lichess_oauth_clicked' | 'lichess_signup_completed' | 'lichess_login_completed'
   | 'scroll_25' | 'scroll_50' | 'scroll_75' | 'scroll_100'
   | 'engaged_10s'
   | `viewed_${LandingSectionId}`
   | `exit_${LandingSectionId}`;
 
 export function trackFunnelEvent(eventType: LandingFunnelEvent, elapsedMs?: number) {
-  if (eventType === 'signup_completed' || eventType === 'google_signup_completed') axonTrack('sign_up');
+  if (eventType === 'signup_completed' || eventType === 'google_signup_completed' || eventType === 'lichess_signup_completed') axonTrack('sign_up');
   apiFetch('/api/landing-funnel/track', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

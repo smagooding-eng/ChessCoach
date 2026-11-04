@@ -5,6 +5,7 @@ import { RD } from '@/lib/redesignTheme';
 import { useUser } from '@/hooks/use-user';
 import { ProUpsell } from '@/components/ProUpsell';
 import { NEUTRAL_CHIP } from '@/lib/redesignTheme';
+import { LichessScoutCard } from '@/components/LichessScoutCard';
 
 // Opponent Scout (redesign): header card with search, profile card, tabs,
 // win-rate / vs-you split card and key weaknesses. All values come from the
@@ -217,6 +218,8 @@ export function ScoutRedesign(props: {
                     )}
                   </div>
                 </section>
+
+                <LichessScoutCard opponent={result.username} />
 
                 <section className="rounded-[22px] p-4" style={card}>
                   <div className="mb-3 flex items-center justify-between">

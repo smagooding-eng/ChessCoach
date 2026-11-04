@@ -599,6 +599,88 @@ router.get("/auth/google/callback", async (req: Request, res: Response) => {
   }
 });
 
+// ── Sign in with Lichess ──────────────────────────────────────────────────
+// Lichess's own sign-in (OAuth with PKCE; no app registration needed). Finds the
+// account by Lichess id, then by email (linking it), or creates one with the
+// Lichess username already linked, so their games are ready to import.
+const lichessPending = new Map<string, { verifier: string; ref: string; app: boolean; at: number }>();
+let lichessColumn: Promise<void> | null = null;
+const ensureLichessColumn = () => (lichessColumn ??= db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS lichess_id varchar`).then(() => undefined).catch((err) => { lichessColumn = null; throw err; }));
+const b64url = (b: Buffer) => b.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+
+router.get("/auth/lichess", (req: Request, res: Response) => {
+  for (const [k, v] of lichessPending) if (Date.now() - v.at > 15 * 60_000) lichessPending.delete(k);
+  const verifier = b64url(crypto.randomBytes(32));
+  const challenge = b64url(crypto.createHash("sha256").update(verifier).digest());
+  const state = b64url(crypto.randomBytes(16));
+  lichessPending.set(state, { verifier, ref: String(req.query.ref ?? "").slice(0, 40), app: req.query.app === "1", at: Date.now() });
+  const params = new URLSearchParams({
+    response_type: "code", client_id: "chessscout.net", redirect_uri: `${getOrigin(req)}/api/auth/lichess/callback`,
+    scope: "email:read", code_challenge_method: "S256", code_challenge: challenge, state,
+  });
+  res.redirect(`https://lichess.org/oauth?${params}`);
+});
+
+router.get("/auth/lichess/callback", async (req: Request, res: Response) => {
+  const frontendOrigin = FRONTEND_URL || getOrigin(req);
+  const fail = () => sendClientRedirect(res, frontendOrigin + "/?error=lichess_auth_failed");
+  const state = String(req.query.state ?? ""); const code = String(req.query.code ?? "");
+  const pending = lichessPending.get(state); lichessPending.delete(state);
+  if (!pending || !code) { fail(); return; }
+  try {
+    const tokenRes = await fetch("https://lichess.org/api/token", {
+      method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ grant_type: "authorization_code", code, code_verifier: pending.verifier, redirect_uri: `${getOrigin(req)}/api/auth/lichess/callback`, client_id: "chessscout.net" }),
+    });
+    const tok = await tokenRes.json().catch(() => null) as { access_token?: string } | null;
+    if (!tokenRes.ok || !tok?.access_token) { fail(); return; }
+    const auth = { Authorization: `Bearer ${tok.access_token}` };
+    const acc = await fetch("https://lichess.org/api/account", { headers: auth }).then((r) => (r.ok ? r.json() : null)).catch(() => null) as { id?: string; username?: string; title?: string; profile?: { firstName?: string; lastName?: string } } | null;
+    const em = await fetch("https://lichess.org/api/account/email", { headers: auth }).then((r) => (r.ok ? r.json() : null)).catch(() => null) as { email?: string } | null;
+    // We only needed to read who they are: give the token back to Lichess.
+    void fetch("https://lichess.org/api/token", { method: "DELETE", headers: auth }).catch(() => {});
+    if (!acc?.id || !acc.username || acc.title === "BOT") { fail(); return; }
+    await ensureLichessColumn();
+    const email = em?.email ? em.email.toLowerCase() : null;
+    const rows = (r: any) => (Array.isArray(r) ? r : r?.rows ?? []);
+    let [user] = rows(await db.execute(sql`SELECT * FROM users WHERE lichess_id = ${acc.id} LIMIT 1`)).map((x: any) => x.id) as string[];
+    let isNewSignup = false;
+    if (!user && email) {
+      const [byEmail] = await db.select().from(usersTable).where(eq(usersTable.email, email));
+      if (byEmail) user = byEmail.id;
+    }
+    if (user) {
+      await db.execute(sql`UPDATE users SET lichess_id = ${acc.id}, lichess_username = COALESCE(lichess_username, ${acc.username}), last_login_at = now() WHERE id = ${user}`);
+    } else {
+      isNewSignup = true;
+      let referrer: string | null = null;
+      if (pending.ref) {
+        const [r] = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.inviteCode, pending.ref.toUpperCase().trim()));
+        if (r) referrer = r.id;
+      }
+      const [created] = await db.insert(usersTable).values({
+        email, authProvider: "lichess", lichessUsername: acc.username,
+        firstName: acc.profile?.firstName || null, lastName: acc.profile?.lastName || null,
+        referredByUserId: referrer, lastLoginAt: new Date(),
+      }).returning();
+      user = created.id;
+      await db.execute(sql`UPDATE users SET lichess_id = ${acc.id} WHERE id = ${user}`);
+      if (referrer) await db.insert(referralConversionsTable).values({ referrerUserId: referrer, referredUserId: user, status: "signed_up" });
+      if (email) {
+        sendEmail({ to: email, subject: "Welcome to ChessScout.net: Play. Scout. Improve. ♜", html: welcomeEmailHtml(created.firstName) })
+          .then(() => { db.insert(emailDripLogTable).values({ userId: created.id, dripType: "welcome" }).catch(() => {}); }).catch(() => {});
+      }
+    }
+    const [fresh] = await db.select().from(usersTable).where(eq(usersTable.id, user));
+    const sid = await createSession({ user: toSessionUser(fresh) } as SessionData);
+    setSessionCookie(res, sid);
+    sendClientRedirect(res, frontendOrigin + "/#token=" + sid + (isNewSignup ? "&newSignup=lichess" : "&login=lichess") + (pending.app ? "&app=1" : ""));
+  } catch (err) {
+    req.log?.error?.({ err }, "Lichess sign-in failed");
+    fail();
+  }
+});
+
 router.post("/auth/update-profile", async (req: Request, res: Response) => {
   if (!req.isAuthenticated()) {
     res.status(401).json({ error: "Not authenticated" });

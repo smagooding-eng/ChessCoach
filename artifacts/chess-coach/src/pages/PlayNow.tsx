@@ -1,3 +1,4 @@
+import { startLichessSignIn } from '@/lib/googleSignIn';
 // Play right now, no account: a quick game against a beginner-friendly bot, for
 // people arriving from an ad, a reel or a shared link who aren't ready to sign up
 // yet. The bots here (400–1000) play in the browser, so nothing needs an account.
@@ -168,6 +169,11 @@ export function PlayNow() {
             <p className="text-[13px]" style={{ color: PT.muted }}>A free account reviews your games move by move, finds the mistakes you keep making, and lets you play friends live or one move a day. {moves >= 2 ? 'This game is saved to it.' : ''}</p>
             <button type="button" onClick={signUp} className="flex w-full items-center justify-center gap-3 rounded-[14px] py-3.5 text-[15px] font-extrabold" style={{ background: '#FFFFFF', color: '#1F1F1F' }}>
               <GoogleMark /> Continue with Google
+            </button>
+            <button type="button" onClick={() => { rememberReturnTo('/play-now'); trackFunnelEvent('signup_clicked'); trackFunnelEvent('lichess_oauth_clicked'); startLichessSignIn(); }}
+              className="flex w-full items-center justify-center gap-3 rounded-[14px] py-3.5 text-[15px] font-extrabold"
+              style={{ background: '#262421', color: '#FFFFFF', border: '1px solid rgba(255,255,255,.14)' }}>
+              <span aria-hidden="true" className="text-[1.25em] leading-none">♞</span> Continue with Lichess
             </button>
             <a href={emailHref()} onClick={() => rememberReturnTo('/play-now')} className="flex w-full items-center justify-center gap-2 rounded-[14px] py-3 text-[13.5px] font-bold" style={ghostBtn}>
               <Mail size={15} /> Use email instead

@@ -1,4 +1,5 @@
 import { RedesignHeader } from '@/components/RedesignHeader';
+import { TablebaseBadge } from '@/components/TablebaseBadge';
 import { MoveTimeline } from '@/components/MoveTimeline';
 import { Search as SearchIcon, Check } from 'lucide-react';
 import { useDashboardRedesignFlag } from '@/hooks/use-app-config';
@@ -1496,6 +1497,7 @@ export function GameReplay() {
                   <p className="text-sm text-muted-foreground italic py-1">This move wasn't included in the review.</p>
                 )}
 
+                <TablebaseBadge fen={currentFen} className="mb-1.5" />
                 {currentFen && (
                   <button
                     onClick={() => {

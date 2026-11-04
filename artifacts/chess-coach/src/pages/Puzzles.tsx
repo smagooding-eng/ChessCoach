@@ -164,6 +164,15 @@ export function Puzzles() {
     } catch {}
   }, []);
 
+  // Lichess's puzzle of the day (added to ChessScout's puzzles), shown as a card at the top.
+  const [lichessDaily, setLichessDaily] = useState<{ id: number; rating: number } | null>(null);
+  const wantPuzzle = useRef<number | null>(null);
+  useEffect(() => {
+    let live = true;
+    apiFetch('/api/lichess/daily-puzzle').then((r) => (r.ok ? r.json() : null)).then((d) => { if (live && d?.available && d.id) setLichessDaily({ id: d.id, rating: d.rating }); }).catch(() => {});
+    return () => { live = false; };
+  }, []);
+
   const fetchNextPuzzle = useCallback(async () => {
     setState('loading');
     setFeedback(null);
@@ -190,6 +199,21 @@ export function Puzzles() {
         if (max) params.set('maxRating', max);
       }
       const qs = params.toString() ? `?${params.toString()}` : '';
+      // A specific puzzle asked for (the Lichess puzzle of the day): that one, once.
+      const want = wantPuzzle.current; wantPuzzle.current = null;
+      if (want) {
+        const one = await apiFetch(`/api/puzzles/${want}`).catch(() => null);
+        const p1 = one?.ok ? await one.json().catch(() => null) : null;
+        if (p1?.fen) {
+          setPuzzle(p1);
+          setSolutionMoves(p1.moves ? p1.moves.split(' ') : []);
+          seenPuzzleIds.current.push(p1.id);
+          setGame(new Chess(p1.fen));
+          setState('ready');
+          startTimeRef.current = Date.now();
+          return;
+        }
+      }
       const res = await apiFetch(`/api/puzzles/next${qs}`);
       // The 403/'daily_limit' handling that used to be here is gone --
       // the backend never sends that anymore, puzzles have no usage cap.
@@ -596,6 +620,18 @@ export function Puzzles() {
         </>
         )}
 
+        {lichessDaily && puzzle?.id !== lichessDaily.id && (
+          <button onClick={() => { wantPuzzle.current = lichessDaily.id; void fetchNextPuzzle(); }}
+            className="mb-3 flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-left"
+            style={{ background: 'rgba(129,182,76,.10)', border: '1px solid rgba(129,182,76,.35)' }}>
+            <span className="text-[22px] leading-none">♞</span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[13.5px] font-extrabold" style={{ color: '#F5F7F6' }}>Lichess puzzle of the day</span>
+              <span className="block text-[12px]" style={{ color: TEXT_MUTED }}>Rated {lichessDaily.rating} · the same puzzle every Lichess player gets today</span>
+            </span>
+            <span className="text-[12.5px] font-extrabold" style={{ color: '#9BD35A' }}>Solve</span>
+          </button>
+        )}
         {targetTheme && (
           <div className="flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-xl mb-4"
             style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)' }}>

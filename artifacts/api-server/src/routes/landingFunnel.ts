@@ -72,6 +72,7 @@ const VALID_EVENTS = new Set([
   "signup_form_submitted", "signup_error", "opponent_scout_clicked",
   "google_oauth_clicked", "google_signup_completed", "google_signup_error", "google_login_completed",
   "guest_game_started", "guest_game_finished",
+  "lichess_oauth_clicked", "lichess_signup_completed", "lichess_login_completed",
   "scroll_25", "scroll_50", "scroll_75", "scroll_100",
   "engaged_10s",
   ...SECTION_IDS.map((s) => `viewed_${s}`),

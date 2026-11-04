@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { TablebaseBadge } from '@/components/TablebaseBadge';
 import { Chess } from 'chess.js';
 import { useLocation } from 'wouter';
 import { ChevronLeft, ChevronRight, Copy, Check, FlipVertical2, RotateCcw, Swords, Cpu, Lightbulb, Camera, Play, Pause, Clapperboard, Loader2 } from 'lucide-react';
@@ -355,6 +356,8 @@ export function Explorer() {
               maxWidthOverride="100%"
             />
           </div>
+
+          <TablebaseBadge fen={fen} />
 
           {/* Controls */}
           <div className="grid grid-cols-4 gap-2">

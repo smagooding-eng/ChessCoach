@@ -68,3 +68,10 @@ export async function startGoogleSignIn(refCode?: string): Promise<void> {
     if (n.isNotDisplayed?.() || n.isSkippedMoment?.()) fallback();
   });
 }
+
+/** Sign in (or up) with Lichess: Lichess's own sign-in page, then straight back. */
+export function startLichessSignIn(refCode?: string): void {
+  let ref = refCode ?? '';
+  if (!ref) { try { ref = localStorage.getItem('chessscout_ref') || ''; } catch { /* ignore */ } }
+  window.location.href = apiUrl(`/api/auth/lichess?${[ref ? `ref=${encodeURIComponent(ref)}` : '', appSigninParam()].filter(Boolean).join('&')}`);
+}

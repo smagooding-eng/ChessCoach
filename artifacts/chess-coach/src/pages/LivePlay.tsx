@@ -188,6 +188,16 @@ export function LivePlay({ initialTab }: { initialTab?: OnlineTab } = {}) {
         </div>
       </div>
 
+      {live.status !== 'queued' && (
+        <div className="grid grid-cols-2 gap-2">
+          <Link href="/lichess" className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-[13px] font-extrabold" style={ghostBtn}>
+            <span className="text-[17px] leading-none">♞</span><span className="min-w-0"><span className="block">Play on Lichess</span><span className="block truncate text-[11px] font-semibold" style={{ color: PT.muted }}>{lichess ? `as ${lichess.username}` : 'Real opponents, any time'}</span></span>
+          </Link>
+          <Link href="/watch" className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-[13px] font-extrabold" style={ghostBtn}>
+            <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: '#FF5058' }} /><span className="min-w-0"><span className="block">Watch live</span><span className="block truncate text-[11px] font-semibold" style={{ color: PT.muted }}>Top events, move by move</span></span>
+          </Link>
+        </div>
+      )}
       {seek && tab === 'live' && (live.seekGone === seek.seekerId
         ? <SeekGoneCard seek={seek} kind="live" onClose={closeSeek} />
         : live.status !== 'queued' && <SeekJoiningCard seek={seek} />)}

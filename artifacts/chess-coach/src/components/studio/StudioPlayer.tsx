@@ -75,6 +75,8 @@ export type StudioSource =
 export interface StudioOpening {
   id: string; name: string; side: 'white' | 'black'; hook: string; ideas: string[]; line: string[];
   games: number; results: { white: number; draw: number; black: number } | null;
+  /** Where the numbers come from: Lichess's opening explorer, or ChessScout's own games. */
+  source?: 'lichess' | 'chessscout';
   /** lines: which variations (by index) start with this move. */
   options: { san: string; pct: number | null; games: number; scorePct: number | null; eval: number | null; lines?: number[] }[];
   lines: { name: string; short?: string; moves: string[]; note: string; pct: number | null; eval: number | null; why?: string[]; games?: number; whiteScore?: number | null; next?: { san: string; eval: number | null } | null }[];
@@ -362,6 +364,8 @@ function promoClip(p: StudioPromo): Clip {
     isTrap: false, opening: null, isPromo: true, promo: p,
   };
 }
+/** A game count the voice can say: "2.4 million", "38 thousand", "512". */
+const spokenCount = (n: number) => (n >= 1e6 ? `${(n / 1e6).toFixed(1).replace(/\.0$/, '')} million` : n >= 1e4 ? `${Math.round(n / 1000)} thousand` : String(n));
 const evalText = (e: number | null | undefined) => (e == null ? '' : Math.abs(e) >= 90 ? (e > 0 ? 'White mates' : 'Black mates') : `${e > 0 ? '+' : ''}${e.toFixed(1)}`);
 // What a move does, worked out from the position (never invented). It doesn't
 // repeat the move itself (that's said just before): it says what the move is for.
@@ -1446,7 +1450,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
       case 'openCard': {
         const o = clip.openingData; if (!o) return undefined;
         if (f.card === 'ideas') return `${pick(['The whole point?', "Here's the idea.", 'Why it works:'])} ${o.ideas.slice(0, prefs.openCut === 'quick' ? 1 : 2).join('. ')}.`;
-        if (f.card === 'stats' && o.results) return `${o.games} real games. White scores ${o.results.white} percent, Black ${o.results.black}.`;
+        if (f.card === 'stats' && o.results) return `${spokenCount(o.games)} real games${o.source === 'lichess' ? ' on Lichess' : ''}. White scores ${o.results.white} percent, Black ${o.results.black}.`;
         if (f.card === 'options') {
           const [a, b, c] = o.options;
           if (!a) return null;
@@ -1573,7 +1577,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
       case 'openCard': {
         const o = clip.openingData; if (!o) return null;
         if (f.card === 'ideas') return `The ${o.name}. ${(prefs.openCut === 'quick' ? o.ideas.slice(0, 2) : o.ideas).join('. ')}.`;
-        if (f.card === 'stats' && o.results) return `In ${o.games} real games, White wins ${o.results.white} percent, Black ${o.results.black} percent.`;
+        if (f.card === 'stats' && o.results) return `In ${spokenCount(o.games)} real games${o.source === 'lichess' ? ' on Lichess' : ''}, White wins ${o.results.white} percent, Black ${o.results.black} percent.`;
         if (f.card === 'options') { const top = o.options.slice(0, 3).map((x) => spokenSan(x.san)); return `The main choices: ${top.join(', ')}.`; }
         if (f.card === 'line') { const l = o.lines[f.idx ?? 0]; return l ? `Line ${(f.idx ?? 0) + 1}: the ${l.name}.` : null; }
         if (f.card === 'trap' && o.trap) return `And watch out for the ${o.trap.name}.`;
@@ -2421,7 +2425,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
                     {frame.card === 'stats' && o.results && (
                       <div className="text-center">
                         <p className="font-black" style={{ fontSize: '1.3em' }}>{prefs.tone !== 'teacher' ? 'Who actually wins? 👀' : 'Who wins?'}</p>
-                        <p className="mt-[0.3em] font-bold text-white/65">{o.games.toLocaleString()} real games by ChessScout players</p>
+                        <p className="mt-[0.3em] font-bold text-white/65">{o.games.toLocaleString()} real games {o.source === 'lichess' ? 'on Lichess (players rated 1600+)' : 'by ChessScout players'}</p>
                         <div className="mt-[1.2cqh] flex h-[4cqh] overflow-hidden rounded-[0.6em] font-black">
                           {([['White', o.results.white, '#F2F2F2', '#141414'], ['Draw', o.results.draw, '#7A8580', '#fff'], ['Black', o.results.black, '#1C1C1C', '#fff']] as const).map(([t, n, bg, fg], k) => n > 0 && (
                             <motion.div key={t} initial={{ width: 0 }} animate={{ width: `${n}%` }} transition={{ duration: 0.9, delay: 0.3 + k * 0.1 }} className="grid place-items-center overflow-hidden whitespace-nowrap" style={{ background: bg, color: fg, fontSize: '0.85em' }}>{n >= 12 ? `${t} ${n}%` : `${n}%`}</motion.div>
@@ -2482,7 +2486,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
                               </motion.div>
                             ))}
                           </div>
-                          {l.pct != null && (l.games ?? 0) > 0 && <p className="mt-[0.8cqh] text-[0.75em] font-bold text-white/45">From games played on ChessScout</p>}
+                          {l.pct != null && (l.games ?? 0) > 0 && <p className="mt-[0.8cqh] text-[0.75em] font-bold text-white/45">{o.source === 'lichess' ? 'From games on Lichess (players rated 1600+)' : 'From games played on ChessScout'}</p>}
                         </div>
                       );
                     })()}
