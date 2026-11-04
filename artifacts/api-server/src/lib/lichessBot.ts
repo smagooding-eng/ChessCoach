@@ -20,6 +20,45 @@ const HELLO = "Hi! I'm the ChessScout.net coach bot, playing at about your level
 const GG = "gg! See where it was won or lost: free review at chessscout.net";
 
 let botId = "";
+
+// ── Games against other bots (opt-in: LICHESS_BOT_CHALLENGE=1) ─────────────
+// When it has no game going, every LICHESS_BOT_CHALLENGE_MINUTES (default 15) it
+// challenges one online bot rated near its own: rated blitz 3+2 by default
+// (LICHESS_BOT_CHALLENGE_CLOCK, e.g. "5+3"). It never challenges the same bot twice
+// in a day, and pauses for an hour after three refusals in a row, so it stays a
+// polite, ordinary bot. Humans' challenges always come first.
+const CHALLENGE_BOTS = process.env.LICHESS_BOT_CHALLENGE === "1";
+const CHALLENGE_EVERY_MS = Math.max(5, parseInt(process.env.LICHESS_BOT_CHALLENGE_MINUTES || "") || 15) * 60_000;
+const [CH_MIN, CH_INC] = (process.env.LICHESS_BOT_CHALLENGE_CLOCK || "3+2").split("+").map((x) => parseInt(x, 10));
+const challenged = new Map<string, number>();
+let refusals = 0, pausedUntil = 0, myRating = 1500;
+
+async function readNdjson(path: string): Promise<any[]> {
+  const out: any[] = [];
+  const ac = new AbortController(); const t = setTimeout(() => ac.abort(), 10_000);
+  try { await stream(path, (x) => out.push(x), ac.signal); } catch { /* timed out: use what came */ } finally { clearTimeout(t); }
+  return out;
+}
+
+async function challengeABot() {
+  if (!CHALLENGE_BOTS || playing.size > 0 || Date.now() < pausedUntil) return;
+  const minutes = Number.isFinite(CH_MIN) && CH_MIN > 0 ? CH_MIN : 3, inc = Number.isFinite(CH_INC) && CH_INC >= 0 ? CH_INC : 2;
+  const speed = minutes * 60 + inc * 40 < 180 ? "bullet" : minutes * 60 + inc * 40 < 480 ? "blitz" : "rapid";
+  for (const [k, at] of challenged) if (Date.now() - at > 24 * 3600_000) challenged.delete(k);
+  const bots = await readNdjson("/api/bot/online?nb=60");
+  const pick = bots
+    .filter((b) => b?.id && b.id !== botId && !challenged.has(b.id) && !b.disabled && !b.tosViolation)
+    .map((b) => ({ id: b.id as string, name: b.username as string, rating: Number(b.perfs?.[speed]?.rating) || 0, games: Number(b.perfs?.[speed]?.games) || 0 }))
+    .filter((b) => b.rating > 0 && b.games > 20 && Math.abs(b.rating - myRating) <= 300)
+    .sort((a, b) => Math.abs(a.rating - myRating) - Math.abs(b.rating - myRating))
+    .slice(0, 8);
+  const target = pick[Math.floor(Math.random() * pick.length)];
+  if (!target) return;
+  challenged.set(target.id, Date.now());
+  const r = await post(`/api/challenge/${encodeURIComponent(target.name)}`, { rated: "true", "clock.limit": String(minutes * 60), "clock.increment": String(inc), color: "random", variant: "standard" });
+  if (r?.ok) logger.info({ opponent: target.name, rating: target.rating }, "[lichess-bot] challenged a bot");
+}
+function noteRefusal() { if (++refusals >= 3) { refusals = 0; pausedUntil = Date.now() + 3600_000; } }
 const playing = new Map<string, { abort: AbortController }>();
 
 async function post(path: string, body?: Record<string, string>) {
@@ -95,7 +134,10 @@ async function onEvent(e: any) {
     if (playing.size >= MAX_GAMES) { await post(`/api/challenge/${ch.id}/decline`, { reason: "later" }); return; }
     await post(`/api/challenge/${ch.id}/accept`);
   } else if (e.type === "gameStart" && e.game?.gameId) {
+    refusals = 0;
     playGame(e.game.gameId);
+  } else if (e.type === "challengeDeclined" && e.challenge?.challenger?.id === botId) {
+    noteRefusal();
   }
 }
 
@@ -111,7 +153,17 @@ export async function startLichessBot(): Promise<void> {
       logger.info({ user: acc.username }, "[lichess-bot] upgraded to a BOT account");
     }
     botId = acc.id;
-    logger.info({ user: acc.username }, "[lichess-bot] online");
+    logger.info({ user: acc.username, challengeBots: CHALLENGE_BOTS }, "[lichess-bot] online");
+    if (CHALLENGE_BOTS) {
+      // Its own rating at the challenge clock, to pick opponents near it.
+      const refreshRating = async () => {
+        const me = await fetch(`${API}/api/account`, { headers: H() }).then((r) => (r.ok ? r.json() : null)).catch(() => null) as { perfs?: Record<string, { rating?: number }> } | null;
+        const sp = (CH_MIN || 3) * 60 + (CH_INC || 0) * 40 < 180 ? "bullet" : (CH_MIN || 3) * 60 + (CH_INC || 0) * 40 < 480 ? "blitz" : "rapid";
+        myRating = Number(me?.perfs?.[sp]?.rating) || myRating;
+      };
+      setTimeout(() => { void refreshRating(); void challengeABot().catch(() => {}); }, 60_000);
+      setInterval(() => { void refreshRating().then(() => challengeABot()).catch(() => {}); }, CHALLENGE_EVERY_MS);
+    }
     // The event stream, reconnecting with a growing pause if it drops.
     let wait = 2000;
     for (;;) {
