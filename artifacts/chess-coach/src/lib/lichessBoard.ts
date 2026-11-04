@@ -34,9 +34,24 @@ export async function connectLichess(returnTo = '/lichess'): Promise<void> {
   const verifier = b64url(crypto.getRandomValues(new Uint8Array(32)));
   const challenge = b64url(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier)));
   const state = b64url(crypto.getRandomValues(new Uint8Array(12)));
-  try { sessionStorage.setItem(PKCE_KEY, JSON.stringify({ verifier, state, returnTo })); localStorage.setItem(PKCE_KEY, JSON.stringify({ verifier, state, returnTo })); } catch { /* ignore */ }
+  const resumed = (() => { try { return JSON.parse(localStorage.getItem(PKCE_KEY) || 'null')?.resumed === true; } catch { return false; } })();
+  const pending = JSON.stringify({ verifier, state, returnTo, at: Date.now(), resumed });
+  try { sessionStorage.setItem(PKCE_KEY, pending); localStorage.setItem(PKCE_KEY, pending); } catch { /* ignore */ }
   const p = new URLSearchParams({ response_type: 'code', client_id: CLIENT_ID, redirect_uri: redirectUri(), scope: 'board:play', code_challenge_method: 'S256', code_challenge: challenge, state });
   window.location.href = `${LICHESS}/oauth?${p}`;
+}
+
+/** Came back without finishing (Lichess's own login page sends people to its home
+ *  page and forgets the connection): carry on once, automatically. Now that they're
+ *  signed in to Lichess, it goes straight to Lichess's "Authorize" screen. */
+export function resumeLichessConnect(): boolean {
+  if (lichessAuth()) return false;
+  let p: { returnTo?: string; at?: number; resumed?: boolean } | null = null;
+  try { p = JSON.parse(localStorage.getItem(PKCE_KEY) || 'null'); } catch { /* ignore */ }
+  if (!p?.at || p.resumed || Date.now() - p.at > 10 * 60_000) return false;
+  try { localStorage.setItem(PKCE_KEY, JSON.stringify({ ...p, resumed: true })); } catch { /* ignore */ }
+  void connectLichess(p.returnTo || '/lichess');
+  return true;
 }
 
 /** Finish connecting (on /lichess-callback). Returns where to go next. */

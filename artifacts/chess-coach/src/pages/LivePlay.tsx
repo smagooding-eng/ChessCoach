@@ -4,7 +4,7 @@ import { useLivePlay, type LiveMode } from '@/hooks/use-live-play';
 import { useLiveRatings } from '@/hooks/use-live-ratings';
 import { LiveGame } from '@/pages/LiveGame';
 import { Link, useLocation } from 'wouter';
-import { lichessAuth, connectLichess } from '@/lib/lichessBoard';
+import { lichessAuth, connectLichess, resumeLichessConnect } from '@/lib/lichessBoard';
 import { Loader2, Swords, Zap, Clock, X, Trophy, Sparkles, Award, History, ChevronRight, Users, CalendarDays, Bot } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { PT, cardStyle, greenBtn, ghostBtn } from '@/lib/playTheme';
@@ -46,7 +46,13 @@ export function LivePlay({ initialTab }: { initialTab?: OnlineTab } = {}) {
   const live = useLivePlay();
   const [, navigate] = useLocation();
   const [lichess, setLichess] = useState(lichessAuth);
-  useEffect(() => { const f = () => setLichess(lichessAuth()); window.addEventListener('focus', f); return () => window.removeEventListener('focus', f); }, []);
+  useEffect(() => {
+    const f = () => { const a = lichessAuth(); setLichess(a); if (!a) resumeLichessConnect(); };
+    const v = () => { if (document.visibilityState === 'visible') f(); };
+    f();
+    window.addEventListener('focus', f); document.addEventListener('visibilitychange', v);
+    return () => { window.removeEventListener('focus', f); document.removeEventListener('visibilitychange', v); };
+  }, []);
   // Start looking here; with Lichess connected (and a clock it allows) the server holds its bot back.
   const queueFor = (tc: string, m: LiveMode) => live.enterQueue(tc, m, { noAutoBot: !!lichessAuth() && !!LICHESS_CLOCK[tc] });
   const { data: ratingsData, refetch } = useLiveRatings();

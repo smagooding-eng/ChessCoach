@@ -3,6 +3,7 @@ import { appFlagFromSignin } from '@/lib/playApp';
 import { analytics } from '@heycatch/sdk';
 import { apiFetch, setAuthToken, getAuthToken } from '@/lib/api';
 import { trackFunnelEvent } from '@/lib/funnelTracking';
+import { resumeLichessSignIn, clearLichessSignIn } from '@/lib/googleSignIn';
 
 interface AuthUser {
   id: string;
@@ -100,6 +101,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json() as { user: AuthUser | null };
       setAuthUser(data.user ?? null);
+      if (data.user) clearLichessSignIn();
       if (data.user) {
         // HeyCatch identity -- id is the stable internal user id, never
         // an email/token. Email and name live in properties so the
@@ -138,7 +140,9 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       if (!authUserRef.current && now && now !== seen) { seen = now; void refreshAuth(); }
     };
     const onStorage = (e: StorageEvent) => { if (e.key === null || e.key === 'chess_coach_token') check(); };
-    const onVisible = () => { if (document.visibilityState === 'visible') check(); };
+    // Back from Lichess's login page without having signed in here: carry on once.
+    const resume = () => { if (!authUserRef.current && !getAuthToken()) resumeLichessSignIn(); };
+    const onVisible = () => { if (document.visibilityState === 'visible') { check(); resume(); } };
     window.addEventListener('storage', onStorage);
     window.addEventListener('focus', check);
     document.addEventListener('visibilitychange', onVisible);

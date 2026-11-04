@@ -70,8 +70,22 @@ export async function startGoogleSignIn(refCode?: string): Promise<void> {
 }
 
 /** Sign in (or up) with Lichess: Lichess's own sign-in page, then straight back. */
-export function startLichessSignIn(refCode?: string): void {
+const LICHESS_SIGNIN_KEY = 'cs_lichess_signin';
+export function startLichessSignIn(refCode?: string, resumed = false): void {
+  try { localStorage.setItem(LICHESS_SIGNIN_KEY, JSON.stringify({ at: Date.now(), resumed, ref: refCode ?? '' })); } catch { /* ignore */ }
   let ref = refCode ?? '';
   if (!ref) { try { ref = localStorage.getItem('chessscout_ref') || ''; } catch { /* ignore */ } }
   window.location.href = apiUrl(`/api/auth/lichess?${[ref ? `ref=${encodeURIComponent(ref)}` : '', appSigninParam()].filter(Boolean).join('&')}`);
 }
+
+/** Came back from Lichess still signed out (its login page sends people to its home
+ *  page and forgets the sign-in): carry on once, automatically. */
+export function resumeLichessSignIn(): boolean {
+  let p: { at?: number; resumed?: boolean; ref?: string } | null = null;
+  try { p = JSON.parse(localStorage.getItem(LICHESS_SIGNIN_KEY) || 'null'); } catch { /* ignore */ }
+  if (!p?.at || p.resumed || Date.now() - p.at > 10 * 60_000) return false;
+  startLichessSignIn(p.ref || undefined, true);
+  return true;
+}
+/** Signed in: nothing left to pick up. */
+export function clearLichessSignIn(): void { try { localStorage.removeItem(LICHESS_SIGNIN_KEY); } catch { /* ignore */ } }
