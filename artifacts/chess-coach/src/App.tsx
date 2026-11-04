@@ -1,4 +1,6 @@
 import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
+import { isRunningStandalone } from '@/hooks/use-pwa-install';
+import { isInPlayApp } from '@/lib/playApp';
 import { pathLang } from "@/lib/i18n";
 import { ChallengeToast } from '@/components/ChallengeToast';
 import { ChallengeNotifyPrompt } from '@/components/ChallengeNotifyPrompt';
@@ -430,7 +432,7 @@ function PageTracker() {
       credentials: 'include',
       // automated: the browser says it's driven by a script (headless/test tools)
       // ownTool: our own screenshot tools add ?cs_shot=1 (Share Kit, store and link-preview shots)
-      body: JSON.stringify({ path: location, visitorId: getVisitorId(), automated: navigator.webdriver === true, ownTool: new URLSearchParams(window.location.search).has('cs_shot'), ...source, ...(geo ? { geo } : {}) }),
+      body: JSON.stringify({ path: location, visitorId: getVisitorId(), automated: navigator.webdriver === true, ownTool: new URLSearchParams(window.location.search).has('cs_shot'), touchPoints: navigator.maxTouchPoints ?? 0, appMode: isInPlayApp() ? 'android_app' : isRunningStandalone() ? 'installed' : 'browser', ...source, ...(geo ? { geo } : {}) }),
     })).catch(() => {});
   }, [location]);
   // Signed in after the first page: put the location on the account too.

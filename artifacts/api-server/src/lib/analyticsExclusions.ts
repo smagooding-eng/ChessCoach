@@ -29,6 +29,9 @@ const BOT_BROWSERS_PER_IP_DAY = 5;
 
 export async function ensureAnalyticsViews(): Promise<void> {
   try {
+    // PC vs mobile (see lib/deviceKind.ts). Added before pv_people is rebuilt so the view has them.
+    await db.execute(sql`ALTER TABLE page_views ADD COLUMN IF NOT EXISTS device VARCHAR(10)`);
+    await db.execute(sql`ALTER TABLE page_views ADD COLUMN IF NOT EXISTS app_mode VARCHAR(12)`);
     const list = EXCLUDED_EMAILS.length ? EXCLUDED_EMAILS.map((e) => `'${e}'`).join(", ") : "''";
     await db.execute(sql.raw(`CREATE OR REPLACE VIEW analytics_excluded_users AS
       SELECT id FROM users WHERE lower(email) IN (${list})`));

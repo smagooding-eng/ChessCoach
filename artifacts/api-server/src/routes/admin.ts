@@ -337,12 +337,30 @@ router.get("/admin/stats", requireAdmin, async (_req: Request, res: Response) =>
       db.execute(sql`SELECT COUNT(*) AS count FROM pv_people WHERE path = '/scan'`).then((r) => [{ count: Number(((r.rows[0] ?? {}) as { count?: string }).count ?? 0) }]),
     ]);
 
+    // PC vs mobile: people (browsers) and members by device, today / 7 days / 30 days.
+    // Recorded from Nov 4, 2026; older page views have no device.
+    let devices: { window: string; device: string; visitors: number; members: number; views: number; androidApp: number; installed: number }[] = [];
+    try {
+      const d7 = new Date(Date.now() - 7 * 86400_000), d30 = new Date(Date.now() - 30 * 86400_000);
+      const rows = (await db.execute(sql`
+        SELECT w.win, pv.device,
+          COUNT(DISTINCT pv.visitor_id)::int AS visitors, COUNT(DISTINCT pv.user_id)::int AS members, COUNT(*)::int AS views,
+          COUNT(DISTINCT pv.visitor_id) FILTER (WHERE pv.app_mode = 'android_app')::int AS android_app,
+          COUNT(DISTINCT pv.visitor_id) FILTER (WHERE pv.app_mode = 'installed')::int AS installed
+        FROM pv_people pv
+        JOIN (VALUES ('today', ${todayStart}::timestamptz), ('7d', ${d7}::timestamptz), ('30d', ${d30}::timestamptz)) AS w(win, since) ON pv.created_at >= w.since
+        WHERE pv.device IS NOT NULL
+        GROUP BY 1, 2`)).rows as { win: string; device: string; visitors: number; members: number; views: number; android_app: number; installed: number }[];
+      devices = rows.map((r) => ({ window: r.win, device: r.device, visitors: Number(r.visitors), members: Number(r.members), views: Number(r.views), androidApp: Number(r.android_app), installed: Number(r.installed) }));
+    } catch { /* columns not there yet */ }
+
     const topPagesRows = ((await db.execute(sql`
       SELECT path, COUNT(*)::int AS "views", COUNT(DISTINCT visitor_id)::int AS "uniqueVisitors", COUNT(DISTINCT ip_address)::int AS "uniqueByIp"
       FROM pv_people GROUP BY path ORDER BY COUNT(*) DESC LIMIT 20`)).rows as { path: string; views: number; uniqueVisitors: number; uniqueByIp: number }[]);
 
     res.json({
       pageViews: { total: totalViewsResult.count, today: todayViewsResult.count },
+      devices,
       uniqueVisitors: {
         total: totalUniqueResult.count,
         today: todayUniqueResult.count,

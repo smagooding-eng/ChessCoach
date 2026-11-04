@@ -223,8 +223,31 @@ router.get("/admin/traffic-export", requireAdmin, async (req: Request, res: Resp
       cur.signups++; bySource.set(k, cur);
     }
 
+    // PC vs mobile (recorded from Nov 4, 2026): people per device each day, and new
+    // signups by the device of their first signed-in page view.
+    const devDaily = await db.execute(sql`
+      SELECT ${DAY("created_at")} AS day, device, COUNT(DISTINCT visitor_id) AS visitors, COUNT(DISTINCT user_id) AS members, COUNT(*) AS views,
+        COUNT(DISTINCT visitor_id) FILTER (WHERE app_mode = 'android_app') AS android_app, COUNT(DISTINCT visitor_id) FILTER (WHERE app_mode = 'installed') AS installed_app
+      FROM pv_people WHERE created_at >= ${since} AND created_at <= ${until} AND device IS NOT NULL
+      GROUP BY 1, 2 ORDER BY 1 DESC, 2`).catch(() => []);
+    const devSignups = await db.execute(sql`
+      SELECT f.device, COUNT(*) AS signups FROM users u
+      JOIN LATERAL (SELECT device FROM page_views pv WHERE pv.user_id = u.id AND pv.device IS NOT NULL ORDER BY pv.created_at LIMIT 1) f ON true
+      WHERE u.created_at >= ${since} AND u.created_at <= ${until} AND u.id NOT IN (SELECT id FROM analytics_excluded_users)
+      GROUP BY 1`).catch(() => []);
+    const devTotals = await db.execute(sql`
+      SELECT device, COUNT(DISTINCT visitor_id) AS visitors, COUNT(DISTINCT user_id) AS members, COUNT(*) AS views
+      FROM pv_people WHERE created_at >= ${since} AND created_at <= ${until} AND device IS NOT NULL GROUP BY 1`).catch(() => []);
+    const devices = {
+      note: "desktop = PC/laptop. Visitors are counted once per browser. Recorded from Nov 4, 2026, so earlier days have none.",
+      totals: rowsOf<Record<string, unknown>>(devTotals).map((r) => ({ device: String(r.device), visitors: num(r.visitors), members: num(r.members), views: num(r.views),
+        signups: num(rowsOf<Record<string, unknown>>(devSignups).find((x) => x.device === r.device)?.signups) })),
+      daily: rowsOf<Record<string, unknown>>(devDaily).map((r) => ({ day: String(r.day), device: String(r.device), visitors: num(r.visitors), members: num(r.members), views: num(r.views), androidApp: num(r.android_app), installedApp: num(r.installed_app) })),
+    };
+
     const t = rowsOf<Record<string, unknown>>(totals)[0] ?? {};
     res.json({
+      devices,
       about: "ChessScout.net traffic and funnel export. Aggregates only (no IPs, emails or user ids). Days are in the admin's local time zone. The owner's own accounts (and their browsers) and suspected bots are left out.",
       excluded: await exclusionSummary(),
       generatedAt: new Date().toISOString(),

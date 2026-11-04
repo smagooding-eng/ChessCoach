@@ -1,4 +1,5 @@
 import { Router, type IRouter, type Request, type Response } from "express";
+import { deviceKind, appMode } from "../lib/deviceKind";
 import healthRouter from "./health";
 import gamesRouter from "./games";
 import analysisRouter from "./analysis";
@@ -45,7 +46,7 @@ import socialRouter from "./social";
 import avatarsRouter from "./avatars";
 import tournamentsRouter from "./tournaments";
 import { requirePremium } from "../middlewares/authMiddleware";
-import { db, pageViewsTable } from "@workspace/db";
+import { db } from "@workspace/db";
 import { botKind } from "../lib/botDetect";
 import { sql } from "drizzle-orm";
 
@@ -135,22 +136,12 @@ router.post("/track", async (req: Request, res: Response) => {
     const country = geo?.country ?? null, validTz = geo?.tz ?? null;
     const clean = (v: unknown, n = 80) => (typeof v === "string" && v.trim() ? v.trim().toLowerCase().replace(/[^a-z0-9_.\-]/g, "").slice(0, n) || null : null);
     const { utmSource, utmCampaign, referrerHost } = req.body ?? {};
+    // Only the first page of a visit from a link carries the utm / referrer fields.
     const src = clean(utmSource), camp = clean(utmCampaign, 120), refHost = clean(referrerHost, 120);
-    if (src || camp || refHost) {
-      // Only the first page of a visit from a link carries these.
-      await db.execute(sql`INSERT INTO page_views (path, user_id, visitor_id, ip_address, utm_source, utm_campaign, referrer_host, country, timezone)
-        VALUES (${path}, ${req.user?.id ?? null}, ${visitorId || `ip_${ip}`}, ${ip}, ${src}, ${camp}, ${refHost}, ${country}, ${validTz})`);
-    } else if (country || validTz) {
-      await db.execute(sql`INSERT INTO page_views (path, user_id, visitor_id, ip_address, country, timezone)
-        VALUES (${path}, ${req.user?.id ?? null}, ${visitorId || `ip_${ip}`}, ${ip}, ${country}, ${validTz})`);
-    } else {
-      await db.insert(pageViewsTable).values({
-        path,
-        userId: req.user?.id ?? null,
-        visitorId: visitorId || `ip_${ip}`,
-        ipAddress: ip,
-      });
-    }
+    // PC or mobile (lib/deviceKind.ts), and whether it's the Android app / installed app.
+    const device = deviceKind(ua, req.body?.touchPoints), via = appMode(req.body?.appMode);
+    await db.execute(sql`INSERT INTO page_views (path, user_id, visitor_id, ip_address, utm_source, utm_campaign, referrer_host, country, timezone, device, app_mode)
+      VALUES (${path}, ${req.user?.id ?? null}, ${visitorId || `ip_${ip}`}, ${ip}, ${src}, ${camp}, ${refHost}, ${country}, ${validTz}, ${device}, ${via})`);
     res.json({ ok: true });
   } catch {
     res.status(500).json({ error: "Failed to track" });

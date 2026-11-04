@@ -32,6 +32,7 @@ interface VisitorBreakdown { new: number; returning: number; bounced: number }
 
 interface AdminStats {
   pageViews: { total: number; today: number };
+  devices?: { window: string; device: string; visitors: number; members: number; views: number; androidApp: number; installed: number }[];
   todayWho?: { anonViews: number; memberViews: number; adminViews: number; anonVisitors: number; activeMembers: number };
   bots?: { total: number; today: number; todayKinds: { kind: string; views: number }[]; weekKinds: { kind: string; views: number }[] };
   uniqueVisitors: { total: number; today: number; totalByIp: number; todayByIp: number };
@@ -194,6 +195,52 @@ function DateRangeFilter({
             onChange={(e) => setCustomEnd(e.target.value)}
             className="text-xs bg-background border border-border/40 rounded-lg px-2 py-1"
           />
+        </>
+      )}
+    </div>
+  );
+}
+
+// PC vs mobile: people (browsers) per device, with members and app use.
+function DevicesCard({ rows }: { rows: NonNullable<AdminStats['devices']> }) {
+  const [win, setWin] = useState<'today' | '7d' | '30d'>('7d');
+  const pick = rows.filter((r) => r.window === win);
+  const get = (d: string) => pick.find((r) => r.device === d) ?? { visitors: 0, members: 0, views: 0, androidApp: 0, installed: 0 };
+  const total = pick.reduce((n, r) => n + r.visitors, 0);
+  const items = [
+    { key: 'desktop', label: 'PC / laptop', color: '#4FA3E0' },
+    { key: 'mobile', label: 'Phone', color: CHESSCOM_GREEN },
+    { key: 'tablet', label: 'Tablet', color: '#E8B447' },
+  ];
+  const mob = get('mobile');
+  return (
+    <div className="rounded-xl p-4 flex flex-col gap-3 sm:col-span-2 lg:col-span-3" style={{ background: BG_CARD, border: '1px solid rgba(255,255,255,0.05)' }}>
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-[10px] font-black uppercase tracking-[0.18em]" style={{ color: TEXT_MUTED }}>PC vs mobile</p>
+        <div className="flex gap-1">
+          {(['today', '7d', '30d'] as const).map((w) => (
+            <button key={w} onClick={() => setWin(w)} className="rounded-full px-2.5 py-1 text-[11px] font-bold"
+              style={{ background: win === w ? `${CHESSCOM_GREEN}33` : 'transparent', color: win === w ? TEXT_LIGHT : TEXT_MUTED, border: '1px solid rgba(255,255,255,0.08)' }}>
+              {w === 'today' ? 'Today' : w === '7d' ? '7 days' : '30 days'}
+            </button>
+          ))}
+        </div>
+      </div>
+      {total === 0 ? <p className="text-[12px]" style={{ color: TEXT_MUTED }}>No visits recorded with a device yet.</p> : (
+        <>
+          <div className="flex h-3 w-full overflow-hidden rounded-full" style={{ background: 'rgba(255,255,255,0.06)' }}>
+            {items.map((it) => { const v = get(it.key).visitors; return v ? <div key={it.key} style={{ width: `${(v / total) * 100}%`, background: it.color }} /> : null; })}
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {items.map((it) => { const r = get(it.key); return (
+              <div key={it.key}>
+                <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide" style={{ color: TEXT_MUTED }}><span className="inline-block h-2 w-2 rounded-full" style={{ background: it.color }} />{it.label}</p>
+                <p className="text-2xl font-black leading-none mt-1" style={{ color: TEXT_LIGHT }}>{fmt(r.visitors)} <span className="text-[13px] font-bold" style={{ color: TEXT_MUTED }}>{Math.round((r.visitors / total) * 100)}%</span></p>
+                <p className="text-[11px] mt-1" style={{ color: TEXT_MUTED }}>{fmt(r.members)} signed-in members · {fmt(r.views)} page views</p>
+              </div>
+            ); })}
+          </div>
+          <p className="text-[11px]" style={{ color: TEXT_MUTED }}>People counted once per browser. Of the phone visitors, {fmt(mob.androidApp)} used the Android app and {fmt(mob.installed)} the installed web app. Recording started Nov 4, 2026.</p>
         </>
       )}
     </div>
@@ -525,6 +572,7 @@ export function Admin() {
             secondaryLabel="Today"
             footnote={`${stats.todayWho ? `Today: ${fmt(stats.todayWho.anonVisitors)} not signed in (could sign up) · ${fmt(stats.todayWho.activeMembers)} existing members. ` : ''}By IP address: ${fmt(stats.uniqueVisitors.totalByIp)} total, ${fmt(stats.uniqueVisitors.todayByIp)} today — often more accurate, since the number above double-counts anyone using multiple browsers or the installed app.`}
           />
+          {stats.devices && <DevicesCard rows={stats.devices} />}
           {stats.bots && (
             <StatCard
               icon={BotIcon}
