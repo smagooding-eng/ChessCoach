@@ -85,7 +85,7 @@ export interface StudioOpening {
 /** A game made in the Position Explorer (best / worst moves per side), every move graded by Stockfish. */
 export interface StudioLine { startFen: string; title: string; white: string; black: string; moves: { san: string; classification: string; evalAfterCp: number | null; betterMove: string | null; loss?: number }[] }
 /** Promo clips: ChessScout vs another site (your rows, your words), or "challenge your friends". */
-export interface StudioPromo { template: 'versus' | 'challenge'; hook: string; rival: string; rows: { label: string; us: string; them: string }[]; closer: string }
+export interface StudioPromo { template: 'versus' | 'challenge' | 'live'; hook: string; rival: string; rows: { label: string; us: string; them: string }[]; closer: string }
 
 interface ReviewMove { moveIndex?: number; san: string; color?: 'white' | 'black'; classification?: string; explanation?: string; betterMove?: string | null; evalAfterCp?: number; fen?: string; bestLineSan?: string[] }
 interface StudioGame { id: number; pgn: string; opening: string | null; white: string; black: string; whiteRating: number | null; blackRating: number | null; moves: ReviewMove[]; whiteAccuracy?: number | null; blackAccuracy?: number | null; overview?: string | null; result?: string | null }
@@ -129,7 +129,7 @@ type Frame =
   | { kind: 'scanPhoto'; fen: string }
   /** The app's splash animation, after the end card. */
   | { kind: 'splash'; fen: string }
-  | { kind: 'promoCard'; fen: string; last: { from: string; to: string } | null; card: 'vs' | 'switch' | 'live' | 'daily' | 'link'; upTo?: number }
+  | { kind: 'promoCard'; fen: string; last: { from: string; to: string } | null; card: 'vs' | 'switch' | 'live' | 'daily' | 'link' | 'match' | 'react' | 'review'; upTo?: number }
   /** Opening clips: the ideas, real-game results, the replies, a variation's title, the trap's title. */
   | { kind: 'openCard'; fen: string; last: { from: string; to: string } | null; card: 'ideas' | 'stats' | 'options' | 'line' | 'trap' | 'why' | 'lineStats' | 'next'; idx?: number }
   /** Opening clips: the board winding back to the branch point after a line. */
@@ -383,7 +383,7 @@ function promoClip(p: StudioPromo): Clip {
   const plies = playSans(undefined, OPERA, OPERA.map((san) => (san.includes('#') ? { san, classification: 'checkmate' } : undefined)));
   return {
     plies, key: plies.length - 1, tags: ['promo'], hook: p.hook, sub: p.template === 'versus' ? `ChessScout vs ${p.rival}` : 'Live and daily games on ChessScout',
-    names: { w: null, b: null }, ratings: { w: null, b: null }, fileBase: `chessscout-promo-${p.template}`, label: p.template === 'versus' ? `Promo · vs ${p.rival}` : 'Promo · challenge your friends',
+    names: { w: null, b: null }, ratings: { w: null, b: null }, fileBase: `chessscout-promo-${p.template}`, label: p.template === 'versus' ? `Promo · vs ${p.rival}` : p.template === 'live' ? 'Promo · live play' : 'Promo · challenge your friends',
     isTrap: false, opening: null, isPromo: true, promo: p,
   };
 }
@@ -748,7 +748,7 @@ function Confetti({ fire }: { fire: number }) {
 }
 
 const srcKey = (x: StudioSource): string => (x.kind === 'map' ? `map-${x.episode}` : x.kind === 'opening' ? `o-${x.opening.id}${x.opening.line ? `-${x.opening.line}` : ''}` : x.kind === 'line' ? `line-${x.line.startFen}-${x.line.moves.map((m) => m.san).join(' ')}` : x.kind === 'promo' ? `promo-${x.promo.template}-${x.promo.hook}` : x.kind === 'scout' ? `s${x.scout.id}` : x.kind === 'lesson' ? `l${x.lesson.id}` : x.kind === 'scan' ? `x${x.fen}` : x.kind === 'trap' ? `t${x.trap.id}` : x.kind === 'puzzle' ? `p${x.puzzle.id}` : x.kind === 'review' ? `r${x.review.id}` : `g${x.moment.gameId}-${x.moment.moveIndex}`);
-const srcLabel = (x: StudioSource): string => (x.kind === 'map' ? `Family Tree · Part ${x.episode}` : x.kind === 'opening' ? `Opening · ${x.opening.name}${x.opening.line ? ` · ${x.opening.line}` : ''}` : x.kind === 'line' ? `Analyzer · ${x.line.white} vs ${x.line.black}` : x.kind === 'promo' ? (x.promo.template === 'versus' ? `Promo · vs ${x.promo.rival}` : 'Promo · challenge friends') : x.kind === 'scout' ? `Scout · ${x.scout.username}` : x.kind === 'lesson' ? `Lesson · ${x.lesson.title}` : x.kind === 'scan' ? (x.label ? `Scan · ${x.label}` : 'Scanned position') : x.kind === 'trap' ? x.trap.name : x.kind === 'puzzle' ? `Puzzle · ${x.puzzle.rating}${x.puzzle.themes?.match(/mateIn\d/) ? ` · ${themeLabel(x.puzzle.themes.match(/mateIn\d/)![0])}` : ''}`
+const srcLabel = (x: StudioSource): string => (x.kind === 'map' ? `Family Tree · Part ${x.episode}` : x.kind === 'opening' ? `Opening · ${x.opening.name}${x.opening.line ? ` · ${x.opening.line}` : ''}` : x.kind === 'line' ? `Analyzer · ${x.line.white} vs ${x.line.black}` : x.kind === 'promo' ? (x.promo.template === 'versus' ? `Promo · vs ${x.promo.rival}` : x.promo.template === 'live' ? 'Promo · live play' : 'Promo · challenge friends') : x.kind === 'scout' ? `Scout · ${x.scout.username}` : x.kind === 'lesson' ? `Lesson · ${x.lesson.title}` : x.kind === 'scan' ? (x.label ? `Scan · ${x.label}` : 'Scanned position') : x.kind === 'trap' ? x.trap.name : x.kind === 'puzzle' ? `Puzzle · ${x.puzzle.rating}${x.puzzle.themes?.match(/mateIn\d/) ? ` · ${themeLabel(x.puzzle.themes.match(/mateIn\d/)![0])}` : ''}`
   : x.kind === 'review' ? `Review · ${x.review.white ?? 'White'} vs ${x.review.black ?? 'Black'}` : `${x.moment.san} · ${x.moment.opening ?? `game ${x.moment.gameId}`}`);
 type ClipLook = BoardLook | 'remix' | 'mine';
 
@@ -987,6 +987,21 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
     const fenAt = (p: number) => (!plies.length ? START_FEN : p <= 0 ? plies[0].fenBefore : plies[p - 1].fen);
     const lastAt = (p: number) => (p <= 0 ? null : { from: plies[p - 1].from, to: plies[p - 1].to });
     const out: Frame[] = [];
+    if (clip.isPromo && clip.promo && clip.promo.template === 'live') {
+      // Live play: "game found" first thing, then the Opera Game at blitz speed with draining
+      // clocks and a chat reaction, Morphy's mate, the free review, and the time controls.
+      if (isComp && isFirst) out.push({ kind: 'title', fen: fenAt(0) });
+      if (!prefs.fastStart && prefs.intro) out.push({ kind: 'intro', fen: fenAt(0) });
+      out.push({ kind: 'promoCard', fen: fenAt(0), last: null, card: 'match' });
+      let p = 0;
+      while (p < Math.min(10, plies.length)) out.push({ kind: 'move', ply: ++p });
+      out.push({ kind: 'promoCard', fen: fenAt(p), last: lastAt(p), card: 'react' });
+      while (p < plies.length) out.push({ kind: 'move', ply: ++p });
+      out.push({ kind: 'promoCard', fen: fenAt(p), last: lastAt(p), card: 'review' });
+      out.push({ kind: 'promoCard', fen: fenAt(p), last: lastAt(p), card: 'live' });
+      if (prefs.outro && isLast) out.push({ kind: 'outro', fen: fenAt(plies.length) });
+      return withInserts(out);
+    }
     if (clip.isPromo && clip.promo) {
       const pr = clip.promo;
       if (isComp && isFirst) out.push({ kind: 'title', fen: fenAt(0) });
@@ -1256,12 +1271,12 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
       case 'scanPhoto': return 3200;
       // Long enough for the subtitles to finish without the voiceover (it stretches to fit the voice anyway).
       case 'splash': return prefs.splashCta ? Math.max(3600, ctaText.split(/\s+/).filter(Boolean).length * 360 + 900) : 2800;
-      case 'promoCard': return f.card === 'vs' ? 1500 : 3600;
+      case 'promoCard': return f.card === 'vs' ? 1500 : f.card === 'match' ? 1900 : f.card === 'react' ? 1500 : f.card === 'review' ? 4200 : 3600;
       case 'openCard': return f.card === 'line' ? 1900 : f.card === 'options' ? 5600 : f.card === 'trap' ? 2600 : f.card === 'why' ? 6400 : f.card === 'lineStats' ? 4400 : f.card === 'next' ? 3400 : 4600;
       case 'rewind': return 150;
       case 'outro': return 2800;
       default: {
-        if (clip?.isPromo) return clip.plies[f.ply - 1]?.san.includes('#') ? 2400 : Math.max(300, s * 0.5);
+        if (clip?.isPromo) return clip.plies[f.ply - 1]?.san.includes('#') ? 2400 : clip.promo?.template === 'live' ? Math.max(260, s * 0.4) : Math.max(300, s * 0.5);
         if (clip?.isOpening && clip.ranges && clip.lineMode && clip.ranges.lines.length) {
           // Deep dive: the line's moves get time for their explanation; the opening's own moves are brisk.
           const [a, b] = clip.ranges.lines[0]; const p = f.ply;
@@ -1539,7 +1554,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
       for (let k = 0; k < frames.length; k++) {
         const f = frames[k];
         if (f.kind === 'move' || (f.kind === 'mapMove' && !f.back)) moves++;
-        else if (moves >= 3 && ['openCard', 'better', 'reveal', 'mapStep', 'scoutCard', 'lessonBoard', 'split', 'summary'].includes(f.kind)) return k;
+        else if (moves >= 3 && ['openCard', 'better', 'reveal', 'mapStep', 'scoutCard', 'lessonBoard', 'split', 'summary', 'promoCard'].includes(f.kind)) return k;
         if (moves >= 6 && f.kind === 'move') return k;
       }
       return -1;
@@ -1552,7 +1567,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
   const earlyText = clip?.isMap ? prefs.seriesCta.trim() : prefs.fastStart && clip?.lineMode ? prefs.lineCtaLine.trim() : prefs.earlyCta.trim();
   const commentQ = !clip ? '' : clip.isTrap ? 'Would you fall for it?' : clip.isPuzzle ? 'Did you solve it?' : clip.isReview ? 'Which move would you have played differently?'
     : clip.isLesson ? 'Did you get it right?' : clip.lineMode ? 'Do you play this line?' : clip.isOpening ? 'Which line do you play?' : clip.isScout ? 'Who should I scout next?'
-    : clip.isScan ? 'Want me to scan your board?' : clip.isPromo ? (clip.promo?.template === 'versus' ? 'Would you switch?' : 'Who are you challenging first?') : 'Would you have found it?';
+    : clip.isScan ? 'Want me to scan your board?' : clip.isPromo ? (clip.promo?.template === 'versus' ? 'Would you switch?' : clip.promo?.template === 'live' ? 'Blitz or rapid?' : 'Who are you challenging first?') : 'Would you have found it?';
   const narration = (f: Frame | undefined): string | null => {
     const base = narrationBase(f);
     if (!f || !clip || !coachOn) return base;
@@ -1632,6 +1647,10 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
         const pr = clip.promo; if (!pr) return null;
         if (f.card === 'vs') { const r = pr.rows[(f.upTo ?? 1) - 1]; return r ? `${r.label}. ChessScout: ${r.us}. ${pr.rival}: ${r.them}.` : null; }
         if (f.card === 'switch') return stripEmoji(pr.closer);
+        if (f.card === 'match') return stripEmoji(pr.hook);
+        if (f.card === 'react') return null;
+        if (f.card === 'review') return 'And the second it ends, your coach reviews the game. Free. Every mistake, and the better move.';
+        if (f.card === 'live' && pr.template === 'live') return `Five, ten or fifteen minutes. ${stripEmoji(pr.closer)}`;
         if (f.card === 'live') return 'Play live games: five, ten or fifteen minutes.';
         if (f.card === 'daily') return 'Or daily games: one move a day, from your phone.';
         return `Send a friend a challenge link. ${stripEmoji(pr.closer)}`;
@@ -1886,7 +1905,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
   };
 
   // ── Post kit ────────────────────────────────────────────────────────────
-  const postText = clip ? `${isComp ? stripEmoji(compTitle) : hook}\n\n${clip.isTrap ? 'Would you fall for it? 👇' : clip.isPuzzle ? 'Did you solve it? Drop the first move in the comments 👇' : clip.isReview ? 'Which move would you have played differently? 👇' : clip.isLesson ? 'Learning chess? Save this one and share it with a friend 👇' : clip.isMap ? 'Which of these do you play? Drop it in the comments 👇' : clip.isOpening ? 'Which line do you play? Drop it in the comments 👇' : clip.isScout ? 'Who should I scout next? Drop a username 👇' : clip.isScan ? 'Want me to scan your board? Drop a photo in the comments 👇' : clip.isPromo ? (clip.promo?.template === 'versus' ? 'Would you switch? 👇' : 'Tag the friend you want to beat 👇') : 'Would you have found it? Comment your move 👇'}\nReview your own games free at chessscout.net\n\n${hashtagsFor(clip)}` : '';
+  const postText = clip ? `${isComp ? stripEmoji(compTitle) : hook}\n\n${clip.isTrap ? 'Would you fall for it? 👇' : clip.isPuzzle ? 'Did you solve it? Drop the first move in the comments 👇' : clip.isReview ? 'Which move would you have played differently? 👇' : clip.isLesson ? 'Learning chess? Save this one and share it with a friend 👇' : clip.isMap ? 'Which of these do you play? Drop it in the comments 👇' : clip.isOpening ? 'Which line do you play? Drop it in the comments 👇' : clip.isScout ? 'Who should I scout next? Drop a username 👇' : clip.isScan ? 'Want me to scan your board? Drop a photo in the comments 👇' : clip.isPromo ? (clip.promo?.template === 'versus' ? 'Would you switch? 👇' : clip.promo?.template === 'live' ? 'Blitz or rapid? Tell me below 👇' : 'Tag the friend you want to beat 👇') : 'Would you have found it? Comment your move 👇'}\nReview your own games free at chessscout.net\n\n${hashtagsFor(clip)}` : '';
   const [copied, setCopied] = useState(false);
   const copyPost = () => { navigator.clipboard?.writeText(postText).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); }).catch(() => {}); };
 
@@ -1905,12 +1924,14 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
   const top = flipped ? 'w' : 'b';
   // Challenge promo: 10-minute clocks that tick down with each move (the side to move is lit).
   const clockChip = (side: 'w' | 'b') => {
-    if (!clip.isPromo || clip.promo?.template !== 'challenge') return null;
+    if (!clip.isPromo || (clip.promo?.template !== 'challenge' && clip.promo?.template !== 'live')) return null;
     const shown = frame?.kind === 'move' ? frame.ply : frame?.kind === 'promoCard' ? plies.findIndex((m) => m.fen === frame.fen) + 1 : 0;
-    let left = 600;
-    for (let p = 0; p < shown; p++) if (plies[p]?.color === side) left -= 3 + ((p * 7 + 3) % 11);
+    const blitz = clip.promo?.template === 'live';
+    let left = blitz ? 300 : 600;
+    for (let p = 0; p < shown; p++) if (plies[p]?.color === side) left -= blitz ? 8 + ((p * 7 + 3) % 19) : 3 + ((p * 7 + 3) % 11);
+    left = Math.max(blitz ? 3 : 0, left);
     const toMove = (shown % 2 === 0 ? 'w' : 'b') === side;
-    return <span className="rounded-[0.4em] px-[0.5em] py-[0.1em] font-black tabular-nums" style={{ fontSize: 'clamp(12px,1.9cqh,20px)', background: toMove ? '#F2F2F2' : 'rgba(0,0,0,.55)', color: toMove ? '#141414' : '#fff' }}>{Math.floor(left / 60)}:{String(left % 60).padStart(2, '0')}</span>;
+    return <span className="rounded-[0.4em] px-[0.5em] py-[0.1em] font-black tabular-nums" style={{ fontSize: 'clamp(12px,1.9cqh,20px)', background: toMove ? (left < 20 ? '#E5484D' : '#F2F2F2') : 'rgba(0,0,0,.55)', color: toMove ? (left < 20 ? '#fff' : '#141414') : left < 20 ? '#ff8a8a' : '#fff' }}>{Math.floor(left / 60)}:{String(left % 60).padStart(2, '0')}</span>;
   };
   const moveNo = cur ? `${Number(cur.fenBefore.split(' ')[5]) || Math.floor((view.ply - 1) / 2) + 1}${cur.color === 'w' ? '.' : '...'}` : '';
   const label = cls ? LABEL[cls] : null;
@@ -2234,6 +2255,40 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
                     <p className="mt-[1.2cqh] font-bold text-white/75">Import your {pr.rival} games in one tap. Your history comes with you.</p>
                   </motion.div>
                 );
+                if (frame.card === 'match') return (
+                  <motion.div key="match" initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 1.1 }} transition={{ type: 'spring', stiffness: 320, damping: 18 }} className={`${box} text-center`} style={{ fontSize: 'clamp(13px,2.3cqh,24px)' }}>
+                    <motion.p initial={{ opacity: 1 }} animate={{ opacity: 0, height: 0 }} transition={{ delay: 0.75, duration: 0.2 }} className="font-black text-white/80">
+                      <motion.span className="mr-[0.4em] inline-block" animate={{ rotate: 360 }} transition={{ duration: 0.7, repeat: Infinity, ease: 'linear' }}>⏳</motion.span>Finding a game…
+                    </motion.p>
+                    <motion.div initial={{ opacity: 0, scale: 0.6 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.8, type: 'spring', stiffness: 420, damping: 14 }}>
+                      <p className="font-black text-[#B8E08C]" style={{ fontSize: '1.7em' }}>⚡ Game found!</p>
+                      <div className="mt-[1.2cqh] flex items-center justify-center gap-[1.2cqh] font-black">
+                        <span className="rounded-[0.5em] bg-white px-[0.7em] py-[0.3em] text-[#141414]">You</span>
+                        <span className="text-white/60">vs</span>
+                        <span className="rounded-[0.5em] bg-[#2B2B2B] px-[0.7em] py-[0.3em] ring-1 ring-white/30">Opponent</span>
+                      </div>
+                      <p className="mt-[1cqh] font-bold text-white/70">5 min · Blitz</p>
+                    </motion.div>
+                  </motion.div>
+                );
+                if (frame.card === 'react') return (
+                  <motion.div key="react" initial={{ opacity: 0, y: -10, scale: 0.5 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }} transition={{ type: 'spring', stiffness: 500, damping: 16 }}
+                    className="absolute left-1/2 top-[19%] z-30 -translate-x-1/2 rounded-[2cqh] bg-[#F5F7F6] px-[2cqh] py-[1cqh] font-black text-[#0B1213] shadow-2xl" style={{ fontSize: 'clamp(16px,3.2cqh,34px)' }}>
+                    Nice move! 🔥
+                  </motion.div>
+                );
+                if (frame.card === 'review') return (
+                  <motion.div key="review" initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className={box} style={{ fontSize: 'clamp(13px,2.3cqh,24px)' }}>
+                    <p className="text-center font-black" style={{ fontSize: '1.4em' }}>🧠 Reviewed instantly</p>
+                    <div className="mt-[1.4cqh] space-y-[0.8cqh]">
+                      {['Accuracy for both players', 'Every mistake marked', 'The better move, on the board', 'Free, every game'].map((t, n) => (
+                        <motion.p key={t} initial={{ opacity: 0, x: -16 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.25 + n * 0.35, type: 'spring', stiffness: 380, damping: 20 }} className="flex items-center gap-[0.6em] rounded-[0.5em] bg-white/[.07] px-[0.6em] py-[0.4em] font-black">
+                          <span className="grid h-[1.3em] w-[1.3em] shrink-0 place-items-center rounded-full bg-[#81B64C] text-[0.75em]">✓</span>{t}
+                        </motion.p>
+                      ))}
+                    </div>
+                  </motion.div>
+                );
                 if (frame.card === 'live') return (
                   <motion.div key="live" initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className={`${box} text-center`} style={{ fontSize: 'clamp(13px,2.3cqh,24px)' }}>
                     <p className="font-black" style={{ fontSize: '1.4em' }}>⚡ Play live</p>
@@ -2244,6 +2299,10 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
                         </motion.div>
                       ))}
                     </div>
+                    {pr.template === 'live' && (<>
+                      <p className="mt-[1.4cqh] font-black leading-tight" style={{ fontSize: '1.15em' }}>{pr.closer}</p>
+                      <motion.p animate={{ scale: [1, 1.06, 1] }} transition={{ duration: 1, repeat: Infinity }} className="mx-auto mt-[1cqh] w-fit rounded-full bg-white px-[1em] py-[0.35em] font-black text-[#3E6420]">chessscout.net/live</motion.p>
+                    </>)}
                   </motion.div>
                 );
                 if (frame.card === 'daily') return (

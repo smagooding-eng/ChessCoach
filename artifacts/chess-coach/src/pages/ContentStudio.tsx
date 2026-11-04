@@ -199,7 +199,7 @@ export function ContentStudio() {
     } catch { setScanBusy("Couldn't read that photo."); }
   };
   // Promos
-  const [promoT, setPromoT] = useState<'versus' | 'challenge'>('versus');
+  const [promoT, setPromoT] = useState<'versus' | 'challenge' | 'live'>('live');
   const [promo, setPromo] = useState<StudioPromo>({
     template: 'versus', hook: 'Stop paying to review your chess games 🛑', rival: 'Chess.com',
     rows: [
@@ -213,6 +213,7 @@ export function ContentStudio() {
   });
   const challengePromo: StudioPromo = { template: 'challenge', hook: 'Your friend thinks they are better than you 😤', rival: '', rows: [], closer: 'Settle it on chessscout.net' };
   const [challenge, setChallenge] = useState<StudioPromo>(challengePromo);
+  const [livePromo, setLivePromo] = useState<StudioPromo>({ template: 'live', hook: 'Need a chess game right now? ⚡', rival: '', rows: [], closer: 'Play live chess free. Every game reviewed.' });
   // Puzzles
   const [puzzles, setPuzzles] = useState<StudioPuzzle[] | null>(null);
   const [themes, setThemes] = useState<{ theme: string; n: number }[]>([]);
@@ -640,11 +641,23 @@ export function ContentStudio() {
         )}
       </>) : view === 'promo' ? (<>
         <div className="mb-3 inline-flex rounded-xl bg-white/5 p-1">
-          {([['versus', 'ChessScout vs …'], ['challenge', 'Challenge your friends']] as const).map(([k, t]) => (
+          {([['live', 'Live play ⚡'], ['versus', 'ChessScout vs …'], ['challenge', 'Challenge your friends']] as const).map(([k, t]) => (
             <button key={k} onClick={() => setPromoT(k)} className="rounded-lg px-3.5 py-1.5 text-[13px] font-black" style={{ background: promoT === k ? '#81B64C' : 'transparent', color: promoT === k ? '#fff' : '#C9CFCD' }}>{t}</button>
           ))}
         </div>
-        {promoT === 'versus' ? (
+        {promoT === 'live' ? (
+          <div className="max-w-2xl space-y-2 rounded-xl bg-white/5 p-3 ring-1 ring-white/10">
+            <div className="flex flex-wrap gap-1.5">
+              {['Need a chess game right now? ⚡', 'Bored? Play a real game of chess in seconds ♟️', 'Your next opponent is waiting 👀', '5 minutes. 1 game. Free review after. ⏱️', 'This is what a time scramble feels like 😰'].map((h) => (
+                <button key={h} onClick={() => setLivePromo((p) => ({ ...p, hook: h }))} className="rounded-full bg-white/[.07] px-2.5 py-1 text-[12px] font-bold text-white hover:bg-white/15">{h}</button>
+              ))}
+            </div>
+            <label className="block text-[12px] text-white/60">Hook (said and shown the moment it starts)<input value={livePromo.hook} onChange={(e) => setLivePromo({ ...livePromo, hook: e.target.value })} className="mt-0.5 w-full rounded-lg bg-white/5 px-3 py-2 text-[14px] font-bold text-white ring-1 ring-white/10" /></label>
+            <label className="block text-[12px] text-white/60">Closing line<input value={livePromo.closer} onChange={(e) => setLivePromo({ ...livePromo, closer: e.target.value })} className="mt-0.5 w-full rounded-lg bg-white/5 px-3 py-2 text-[13px] text-white ring-1 ring-white/10" /></label>
+            <p className="text-[12px] text-white/55">Opens on "Finding a game… Game found!", then the Opera Game (Morphy, 1858) at blitz speed with 5-minute clocks draining into a time scramble, a "Nice move! 🔥" reaction, Morphy's checkmate, the instant free review, and the live time controls with chessscout.net/live. Best with Creator tone, Hype music and the voice on.</p>
+            <button onClick={() => setOpen({ kind: 'promo', promo: livePromo })} className="rounded-lg bg-[#81B64C] px-4 py-2 text-[13px] font-black text-white">🎬 Make the clip</button>
+          </div>
+        ) : promoT === 'versus' ? (
           <div className="max-w-2xl space-y-2 rounded-xl bg-white/5 p-3 ring-1 ring-white/10">
             <div className="flex flex-wrap gap-1.5">
               {['Stop paying to review your chess games 🛑', 'Chess.com is dead? 💀', 'Why I stopped using Chess.com', 'The free Chess.com alternative nobody talks about'].map((h) => (
