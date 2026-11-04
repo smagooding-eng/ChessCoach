@@ -246,7 +246,26 @@ function playSans(startFen: string | undefined, sans: string[], reviews: (Review
       out.push({ san: m.san, from: m.from, to: m.to, fen: c.fen(), fenBefore, color: m.color as 'w' | 'b', review: reviews[i] });
     });
   } catch { /* keep the moves that played */ }
-  return out;
+  return gameMateCounts(out);
+}
+
+/** The video shows the moves actually played, so "sets up checkmate in N" counts the
+ *  mating side's moves to the checkmate that happens on screen, not the engine's
+ *  best-defence count (which can be longer when the defender didn't find the checks). */
+function gameMateCounts(plies: Ply[]): Ply[] {
+  const mateAt = plies.findIndex((p) => p.san.includes('#'));
+  if (mateAt < 0) return plies;
+  const side = plies[mateAt].color;
+  return plies.map((p, i) => {
+    const ex = p.review?.explanation;
+    if (!ex || i >= mateAt || !/(Sets up a forced checkmate in \d+|Sets up checkmate next move|This allows a forced checkmate(?!:))/.test(ex)) return p;
+    let n = 0; for (let k = i + 1; k <= mateAt; k++) if (plies[k].color === side) n++;
+    const setsUp = p.color === side;
+    const fixed = ex
+      .replace(/Sets up a forced checkmate in \d+\.|Sets up checkmate next move\./, (m0) => (setsUp ? (n <= 1 ? 'Sets up checkmate next move.' : `Sets up checkmate in ${n}.`) : m0))
+      .replace(/This allows a forced checkmate(?!:)( in \d+)?/, (m0) => (!setsUp ? (n <= 1 ? 'This allows checkmate next move' : `This allows checkmate in ${n}`) : m0));
+    return fixed === ex ? p : { ...p, review: { ...p.review!, explanation: fixed } };
+  });
 }
 
 function gameClip(g: StudioGame, m: StudioMoment): Clip {
