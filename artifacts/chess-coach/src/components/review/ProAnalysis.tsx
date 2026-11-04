@@ -339,7 +339,7 @@ export function ProAnalysis(props: ProAnalysisProps) {
             <div className="min-w-0 flex-1">
               <p className="text-[14px] font-extrabold" style={{ color: RD.text }}>{reviewing ? 'Reviewing your game…' : reviewError ? 'The review didn\'t finish' : 'Review this game'}</p>
               <p className="text-[12.5px]" style={{ color: RD.muted }}>
-                {reviewing ? (progress ? `Move ${progress.done} of ${progress.total}` : 'Starting the engine…') : reviewError ?? 'Accuracy, game rating, every move graded and the coach\'s summary.'}
+                {reviewing ? (progress ? `Move ${Math.ceil(progress.done / 2)} of ${Math.ceil(progress.total / 2)}` : 'Starting the engine…') : reviewError ?? 'Accuracy, game rating, every move graded and the coach\'s summary.'}
               </p>
               {reviewing && progress && progress.total > 0 && (
                 <div className="mt-2 h-1.5 overflow-hidden rounded-full" style={{ background: 'rgba(255,255,255,.08)' }}>

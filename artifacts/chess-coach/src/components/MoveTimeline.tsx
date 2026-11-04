@@ -25,7 +25,7 @@ export function MoveTimeline({ moves, current, onSelect }: { moves: TimelineMove
             <button
               key={m.moveIndex}
               onClick={() => onSelect(m.moveIndex + 1)}
-              aria-label={`Move ${m.moveIndex + 1}: ${m.classification.replace('_', ' ')}`}
+              aria-label={`Move ${Math.floor(m.moveIndex / 2) + 1}${m.moveIndex % 2 ? '…' : ''}: ${m.classification.replace('_', ' ')}`}
               className="relative min-w-[2px] flex-1"
               style={{ background: isCurrent ? 'rgba(255,255,255,.1)' : 'transparent' }}
             >

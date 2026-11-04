@@ -278,7 +278,7 @@ function gameClip(g: StudioGame, m: StudioMoment): Clip {
   return {
     plies: playSans(startFen, sans, g.moves), key: m.moveIndex, tags: m.tags, hook: hookForTags(m.tags, m.trapName), sub: m.opening ?? '',
     names: { w: m.white, b: m.black }, ratings: { w: m.whiteRating, b: m.blackRating }, fileBase: `chessscout-${m.gameId}-${m.moveIndex}`,
-    label: `Game #${m.gameId} · move ${m.moveIndex + 1}`, isTrap: false, opening: m.opening,
+    label: `Game #${m.gameId} · move ${Math.floor(m.moveIndex / 2) + 1}${m.moveIndex % 2 ? '…' : '.'}`, isTrap: false, opening: m.opening,
   };
 }
 

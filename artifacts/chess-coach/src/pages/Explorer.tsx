@@ -255,7 +255,7 @@ export function Explorer() {
     const out: ExplorerLine['moves'] = [];
     try {
       for (let i = 0; i < line.length; i++) {
-        setMaking(`Grading move ${i + 1} of ${line.length}…`);
+        setMaking(`Grading move ${Math.ceil((i + 1) / 2)} of ${Math.ceil(line.length / 2)}…`);
         const before = steps[i].fen;
         let a = cache.current.get(keyOf(before));
         if (!a) {

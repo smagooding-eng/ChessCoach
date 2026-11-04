@@ -203,7 +203,7 @@ export function MistakeFixView({
       lastMove: stepLastMove,
       quality: 'best' as const,
       caption: better
-        ? (bestLineSan.length > 1 ? `Move ${Math.min(engineStep, bestLineSan.length - 1) + 1} of ${bestLineSan.length} in the engine's line` : "Position after engine's move")
+        ? (bestLineSan.length > 1 ? `Move ${Math.ceil((Math.min(engineStep, bestLineSan.length - 1) + 1) / 2)} of ${Math.ceil(bestLineSan.length / 2)} in the engine's line` : "Position after engine's move")
         : 'No alternative available',
       empty: !better,
     },

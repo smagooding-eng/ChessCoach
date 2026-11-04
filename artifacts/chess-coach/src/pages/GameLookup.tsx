@@ -744,7 +744,7 @@ export function GameLookup() {
                     canGoForward={moveIndex < totalMoves}
                   />
                   <span className="text-[10px] ml-2" style={{ color: TEXT_MUTED }}>
-                    {moveIndex}/{totalMoves}
+                    {Math.ceil(moveIndex / 2)}/{Math.ceil(totalMoves / 2)}
                   </span>
                 </div>
 

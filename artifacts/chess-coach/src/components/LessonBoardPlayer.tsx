@@ -1628,7 +1628,7 @@ export function LessonBoardPlayer({ pgn, fixPgn, showFixLine, title, positionRec
                     ) : hasScenario ? (
                       <>
                         <p className="text-sm font-bold text-emerald-400">Correct!</p>
-                        <p className="text-xs text-white/50 mt-0.5">Move {Math.min(scenarioIndex, (scenarioSteps?.length ?? 1))} of {scenarioSteps?.length ?? 1} — watch the reply, then keep going.</p>
+                        <p className="text-xs text-white/50 mt-0.5">Move {Math.ceil(Math.min(scenarioIndex, (scenarioSteps?.length ?? 1)) / 2)} of {Math.ceil((scenarioSteps?.length ?? 1) / 2)} — watch the reply, then keep going.</p>
                       </>
                     ) : (
                       <>

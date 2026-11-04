@@ -757,7 +757,7 @@ export function ContentStudio() {
                   <div className="p-2.5">
                     <p className="truncate text-[13.5px] font-black">{t.name}</p>
                     <p className="line-clamp-2 text-[11.5px] text-white/55">{t.summary}</p>
-                    <p className="mt-1 text-[10.5px] font-black uppercase text-[#E8B447]">{t.difficulty} · {t.moves.length} moves</p>
+                    <p className="mt-1 text-[10.5px] font-black uppercase text-[#E8B447]">{t.difficulty} · {Math.ceil(t.moves.length / 2)} moves</p>
                   </div>
                 </button>
               );

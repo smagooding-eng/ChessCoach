@@ -1334,7 +1334,7 @@ export function GameReplay() {
             />
 
             <div className={`flex items-center gap-0.5 md:gap-2 ${redesign ? 'hidden' : ''}`}>
-              <span className={redesign ? 'mr-auto text-[13px] font-semibold' : 'text-[10px] md:text-xs text-muted-foreground font-mono'} style={redesign ? { color: RD.muted } : undefined}>{redesign ? `Move ${currentMove} / ${maxMoves}` : `${currentMove}/${maxMoves}`}</span>
+              <span className={redesign ? 'mr-auto text-[13px] font-semibold' : 'text-[10px] md:text-xs text-muted-foreground font-mono'} style={redesign ? { color: RD.muted } : undefined}>{redesign ? `Move ${Math.ceil(currentMove / 2)} / ${Math.ceil(maxMoves / 2)}` : `${Math.ceil(currentMove / 2)}/${Math.ceil(maxMoves / 2)}`}</span>
 
               <button onClick={() => setFlipped(f => !f)} title="Flip board"
                 className="p-2.5 md:p-2.5 rounded-xl bg-secondary hover:bg-primary/20 hover:text-primary transition-colors active:scale-90">
@@ -1414,7 +1414,7 @@ export function GameReplay() {
                     <div className="min-w-0 flex-1">
                       <p className="text-[14px] font-extrabold leading-tight" style={{ color: RD.text }}>Reviewing game…</p>
                       <p className="mt-0.5 truncate text-[12px]" style={{ color: RD.muted }}>
-                        {reviewProgress ? `Analyzing move ${reviewProgress.done} of ${reviewProgress.total}` : 'Starting engine analysis…'}
+                        {reviewProgress ? `Analyzing move ${Math.ceil(reviewProgress.done / 2)} of ${Math.ceil(reviewProgress.total / 2)}` : 'Starting engine analysis…'}
                       </p>
                     </div>
                     {reviewProgress && <span className="shrink-0 text-[12px] font-bold tabular-nums" style={{ color: RD.text }}>{pct}%</span>}
@@ -1557,7 +1557,7 @@ export function GameReplay() {
               ? 'Starting engine analysis…'
               : phase === 'Opening' && game.opening
                 ? `Analyzing ${game.opening}… move ${currentSan}`
-                : `${phase} · analyzing move ${reviewProgress.done} of ${reviewProgress.total}${currentSan ? ` (${currentSan})` : ''}`;
+                : `${phase} · analyzing move ${Math.ceil(reviewProgress.done / 2)} of ${Math.ceil(reviewProgress.total / 2)}${currentSan ? ` (${currentSan})` : ''}`;
 
             const myHandle = ((game as any).username || username || '').toLowerCase();
             const playerRating = myHandle

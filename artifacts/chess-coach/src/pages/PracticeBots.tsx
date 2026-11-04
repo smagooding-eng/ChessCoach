@@ -860,7 +860,7 @@ function GameView({ bot, onBack, startFen, startColor, isOnboarding }: { bot: Bo
                 </h3>
                 {result === 'win' && !isOnboarding && <RatePlayCard moment="You beat the bot!" />}
                 <p className="text-xs text-muted-foreground">
-                  vs {botName(bot)} ({bot.rating}) · {moves.length} moves · {formatTime(elapsedSec)}
+                  vs {botName(bot)} ({bot.rating}) · {Math.ceil(moves.length / 2)} moves · {formatTime(elapsedSec)}
                 </p>
                 {isOnboarding ? (
                   <div className="pt-2 space-y-3">
@@ -1032,7 +1032,7 @@ function OpeningTrainerView({ opening, onBack }: { opening: OpeningLine; onBack:
               <div className="min-w-0">
                 <p className="font-bold text-sm truncate">{opening.name}</p>
                 <p className="text-[10px] text-muted-foreground">
-                  {opening.eco} · You play {playerColor === 'w' ? 'White' : 'Black'} · Move {Math.min(stepIdx + 1, totalSteps)}/{totalSteps}
+                  {opening.eco} · You play {playerColor === 'w' ? 'White' : 'Black'} · Move {Math.ceil(Math.min(stepIdx + 1, totalSteps) / 2)}/{Math.ceil(totalSteps / 2)}
                 </p>
               </div>
             </div>

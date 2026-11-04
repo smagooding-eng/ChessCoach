@@ -312,7 +312,7 @@ export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flippe
     top = (
       <>
         <p className={H}>Reviewing your game…</p>
-        <p className={`mt-0.5 ${P}`}>{progress ? `Move ${progress.done} of ${progress.total}` : 'Starting the engine'}. You can look through the moves meanwhile.</p>
+        <p className={`mt-0.5 ${P}`}>{progress ? `Move ${Math.ceil(progress.done / 2)} of ${Math.ceil(progress.total / 2)}` : 'Starting the engine'}. You can look through the moves meanwhile.</p>
         <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full transition-all duration-500" style={{ width: `${Math.max(5, pct)}%`, background: GREEN }} /></div>
       </>
     );

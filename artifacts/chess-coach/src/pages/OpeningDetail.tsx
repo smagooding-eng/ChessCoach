@@ -349,7 +349,7 @@ export function OpeningDetail() {
                 <div className="glass-card rounded-xl py-16 text-center space-y-4">
                   <CheckCircle2 className="w-14 h-14 text-emerald-400 mx-auto" />
                   <h3 className="text-2xl font-bold text-emerald-400">Line Complete!</h3>
-                  <p className="text-muted-foreground">You played all {mainLine.length} moves correctly.</p>
+                  <p className="text-muted-foreground">You played all {Math.ceil(mainLine.length / 2)} moves correctly.</p>
                   <button onClick={resetPractice}
                     className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-primary text-primary-foreground font-bold hover:bg-primary/90 transition-colors">
                     <RotateCcw className="w-4 h-4" /> Practice Again
@@ -379,7 +379,7 @@ export function OpeningDetail() {
                           ${feedback === 'correct' ? 'bg-emerald-500/20 border bg-emerald-500 text-white' : 'bg-amber-500/20 border bg-amber-500 text-white'}`}
                       >
                         {feedback === 'correct'
-                          ? <><CheckCircle2 className="w-4 h-4 shrink-0" /> Correct! Move {practiceStep} of {mainLine.length}</>
+                          ? <><CheckCircle2 className="w-4 h-4 shrink-0" /> Correct! Move {Math.ceil(practiceStep / 2)} of {Math.ceil(mainLine.length / 2)}</>
                           : <><XCircle className="w-4 h-4 shrink-0" /> Not quite — the correct move is <span className="font-mono font-bold ml-1">{expectedMove}</span>. Try again!</>
                         }
                       </motion.div>
@@ -395,7 +395,7 @@ export function OpeningDetail() {
                       </div>
                       <div>
                         <p className="text-sm font-bold">
-                          {isUserTurn ? `Your turn — move ${practiceStep + 1} of ${mainLine.length}` : 'Opponent playing…'}
+                          {isUserTurn ? `Your turn — move ${Math.ceil((practiceStep + 1) / 2)} of ${Math.ceil(mainLine.length / 2)}` : 'Opponent playing…'}
                         </p>
                         <p className="text-xs text-muted-foreground">
                           {mainLine[practiceStep]?.color === 'white' ? 'White' : 'Black'} to move
@@ -449,7 +449,7 @@ export function OpeningDetail() {
                   <div>
                     <span className="font-mono font-bold text-lg text-foreground">{currentMoveData.moveNumber}{currentMoveData.color === 'white' ? '.' : '…'} {currentMoveData.san}</span>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      {currentMoveData.color === 'white' ? 'White' : 'Black'} · Move {step} of {maxStep}
+                      {currentMoveData.color === 'white' ? 'White' : 'Black'} · Move {Math.ceil(step / 2)} of {Math.ceil(maxStep / 2)}
                     </p>
                   </div>
                 ) : (
@@ -472,7 +472,7 @@ export function OpeningDetail() {
                     canGoForward={step < maxStep}
                   />
                   <div className="flex items-center gap-3 px-1">
-                    <span className="shrink-0 text-[13px] font-semibold" style={{ color: RD.muted }}>Move {step} / {maxStep}</span>
+                    <span className="shrink-0 text-[13px] font-semibold" style={{ color: RD.muted }}>Move {Math.ceil(step / 2)} / {Math.ceil(maxStep / 2)}</span>
                     <div className="flex flex-1 flex-wrap justify-end gap-1">
                       {mainLine.map((m, i) => (
                         <button
@@ -508,7 +508,7 @@ export function OpeningDetail() {
                   </button>
                 </div>
 
-                <div className="text-xs text-muted-foreground font-mono">{step}/{maxStep} moves</div>
+                <div className="text-xs text-muted-foreground font-mono">{Math.ceil(step / 2)}/{Math.ceil(maxStep / 2)} moves</div>
 
                 {/* Move list inline */}
                 <div className="flex flex-wrap gap-1 flex-1 justify-end">
