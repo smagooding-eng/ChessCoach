@@ -15,9 +15,11 @@ import { playMoveSound } from '@/context/SettingsContext';
 import { MaterialStrip, EvalBar } from '@/components/GameStatusStrip';
 import { MoveBrowserBar } from '@/components/MoveBrowserBar';
 import { useMoveBrowser, positionsFromSan } from '@/hooks/use-move-browser';
+import { ChatBubble, ChatTray, useChatMuted } from '@/components/play/LiveChat';
+import type { LiveChat } from '@/hooks/use-live-play';
 import {
   lichessAuth, connectLichess, disconnectLichess, syncLichessAuth, seek as lichessSeek, streamEvents, streamGame, playMove, resign, abort, draw, claimVictory,
-  nowPlaying, exportPgn, isOver, LICHESS_STATUS_TEXT, type LichessGameFull, type LichessState, type LichessPlayer,
+  nowPlaying, exportPgn, sendChat, chatHistory, isOver, LICHESS_STATUS_TEXT, type LichessGameFull, type LichessState, type LichessPlayer,
 } from '@/lib/lichessBoard';
 
 const CLOCKS = [
@@ -107,22 +109,43 @@ export function LichessPlay() {
   }, [auth]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => () => { seekAbort.current?.abort(); }, []);
 
+  // Chat: what the players say (Lichess's own notices, like "Takeback sent", are left out).
+  const [chat, setChat] = useState<LiveChat[]>([]);
+  const [chatMuted, setChatMuted] = useChatMuted();
+  const chatId = useRef(0);
+  const meRef = useRef('');
+  const colorRef = useRef<'w' | 'b'>('w');
+  const addChat = (user: string, text: string, at = Date.now()) => {
+    if (!user || user.toLowerCase() === 'lichess' || !text.trim()) return;
+    const mine = user.toLowerCase() === meRef.current;
+    const from: 'w' | 'b' = mine ? colorRef.current : colorRef.current === 'w' ? 'b' : 'w';
+    setChat((c) => [...c.slice(-30), { id: ++chatId.current, from, text: text.slice(0, 140), at }]);
+  };
+  useEffect(() => { setChat([]); }, [gameId]);
+
   // The game itself.
   useEffect(() => {
     if (!gameId) return;
     const ac = new AbortController();
+    let historyLoaded = false;
     void streamGame(gameId, (x) => {
-      if (x.type === 'gameFull') { setFull(x); setSt(x.state); setStAt(Date.now()); if (isOver(x.state.status)) setPhase('over'); }
+      if (x.type === 'gameFull') {
+        // Who's who, for the chat; and what was said before this page opened.
+        colorRef.current = x.black.id === meRef.current ? 'b' : 'w';
+        if (!historyLoaded) { historyLoaded = true; void chatHistory(x.id).then((h) => h.forEach((m) => addChat(m.user, m.text, 0))); }
+        setFull(x); setSt(x.state); setStAt(Date.now()); if (isOver(x.state.status)) setPhase('over'); }
       else if (x.type === 'gameState') {
         // Move sounds come from the board itself (your sound settings, as in ChessScout games).
         setSt(x); setStAt(Date.now());
         if (isOver(x.status)) { setPhase('over'); playMoveSound('gameEnd'); }
       } else if (x.type === 'opponentGone') setGone(x.gone ? x : null);
+      else if (x.type === 'chatLine' && x.room === 'player') addChat(x.username, x.text);
     }, ac.signal).catch(() => {});
     return () => ac.abort();
   }, [gameId]);
 
   const me = auth?.username.toLowerCase() ?? '';
+  meRef.current = me;
   const myColor: 'w' | 'b' = full && full.black.id === me ? 'b' : 'w';
   const pos = useMemo(() => (full && st ? fromUci(full.initialFen, st.moves) : null), [full, st]);
   const plies = st ? st.moves.split(' ').filter(Boolean).length : 0;
@@ -228,7 +251,7 @@ export function LichessPlay() {
           <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-[#81B64C]" />Lichess · {full.clock ? `${full.clock.initial / 60000}+${full.clock.increment / 1000}` : full.speed} · {full.rated ? 'Rated' : 'Casual'}</span>
           <a href={`https://lichess.org/${full.id}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 underline">On lichess.org <ExternalLink size={12} /></a>
         </div>
-        {row(top)}
+        <div className="relative">{row(top)}<ChatBubble chat={chat} side={top} muted={chatMuted} /></div>
         <MaterialStrip fen={pending?.fen ?? pos.chess.fen()} color={top} className="px-1" />
         <ChessBoard fen={browser.viewing && browser.fen ? browser.fen : pending?.fen ?? pos.chess.fen()} flipped={myColor === 'b'} lastMove={browser.viewing ? browser.lastMove : pending?.last ?? pos.last}
           practiceMode={myTurn && !pending && !browser.viewing} expectedMoveSan={null} onMovePlayed={(san) => void onMove(san)} reserveConfirmSpace
@@ -248,7 +271,19 @@ export function LichessPlay() {
               </>} />
           ) : undefined} />
         <MaterialStrip fen={pending?.fen ?? pos.chess.fen()} color={myColor} className="px-1" />
-        {row(myColor)}
+        <div className="relative">{row(myColor)}<ChatBubble chat={chat} side={myColor} /></div>
+        {!full.white.aiLevel && !full.black.aiLevel && (
+          <div className="space-y-1.5">
+            <ChatTray onSend={(t) => void sendChat(full.id, t)} disabled={phase !== 'playing' && phase !== 'over'} muted={chatMuted} setMuted={setChatMuted} />
+            {chat.length > 0 && (
+              <div className="max-h-28 space-y-0.5 overflow-y-auto rounded-lg px-2.5 py-1.5 text-[12.5px]" style={{ background: 'rgba(255,255,255,0.04)' }}>
+                {chat.filter((m) => !chatMuted || m.from === myColor).slice(-6).map((m) => (
+                  <p key={m.id} style={{ color: PT.text }}><span className="font-bold" style={{ color: m.from === myColor ? PT.green : PT.muted }}>{m.from === myColor ? 'You' : nameOf(player(top))}:</span> {m.text}</p>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
         {premove && !myTurn && phase === 'playing' && (
           <div className="flex items-center justify-between rounded-lg px-3 py-2 text-xs" style={{ background: 'rgba(255,140,90,0.35)', color: '#fff', border: '1px solid rgba(255,140,90,0.35)' }}>
             <span>Premove: {premove.from} → {premove.to}</span>

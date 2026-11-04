@@ -153,6 +153,13 @@ export async function playMove(id: string, uci: string, offerDraw = false): Prom
 export const resign = (id: string) => call(`/api/board/game/${id}/resign`, { method: 'POST' });
 export const abort = (id: string) => call(`/api/board/game/${id}/abort`, { method: 'POST' });
 export const draw = (id: string, yes: boolean) => call(`/api/board/game/${id}/draw/${yes ? 'yes' : 'no'}`, { method: 'POST' });
+/** Game chat (the players' room). */
+export const sendChat = (id: string, text: string) => call(`/api/board/game/${id}/chat`, { method: 'POST', body: new URLSearchParams({ room: 'player', text }), headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
+export async function chatHistory(id: string): Promise<{ user: string; text: string }[]> {
+  const r = await call(`/api/board/game/${id}/chat`);
+  if (!r.ok) return [];
+  return ((await r.json().catch(() => [])) as { user: string; text: string }[]) ?? [];
+}
 export const claimVictory = (id: string) => call(`/api/board/game/${id}/claim-victory`, { method: 'POST' });
 
 /** Games this account is in right now (to pick up one already going). */
