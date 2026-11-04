@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { appSigninParam, trackFunnelEvent } from '@/lib/funnelTracking';
+import { startGoogleSignIn } from '@/lib/googleSignIn';
+import { trackFunnelEvent } from '@/lib/funnelTracking';
 import { useUser } from '@/hooks/use-user';
 import { useLocation } from 'wouter';
 import { Trophy, Mail, Eye, EyeOff } from 'lucide-react';
-import { apiFetch, apiUrl, setAuthToken } from '@/lib/api';
+import { apiFetch, setAuthToken } from '@/lib/api';
 
 // Mobile-specific entry screen -- one screen, sign up or log in, nothing
 // else. Desktop keeps the full marketing LandingPage unchanged; this is
@@ -125,9 +126,7 @@ export function MobileSetup() {
 
   const handleGoogleLogin = () => {
     trackFunnelEvent('google_oauth_clicked');
-    const ref = referralCode || localStorage.getItem('chessscout_ref') || '';
-    const url = apiUrl(`/api/auth/google?${[ref ? `ref=${encodeURIComponent(ref)}` : '', appSigninParam()].filter(Boolean).join('&')}`);
-    window.location.href = url;
+    void startGoogleSignIn(referralCode || localStorage.getItem('chessscout_ref') || '');
   };
 
   return (

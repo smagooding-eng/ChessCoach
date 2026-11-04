@@ -214,6 +214,7 @@ const NotFound = lazyRetry(() => import("@/pages/not-found"));
 const DailyGame = lazyRetry(() => import("@/pages/DailyGame").then(m => ({ default: m.DailyGame })));
 const NotificationsPage = lazyRetry(() => import("@/pages/Notifications").then(m => ({ default: m.Notifications })));
 const ChallengePage = lazyRetry(() => import("@/pages/Challenge").then(m => ({ default: m.Challenge })));
+const PlayNowPage = lazyRetry(() => import("@/pages/PlayNow").then(m => ({ default: m.PlayNow })));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -518,6 +519,8 @@ function Router() {
       <Route path="/scan-archive" component={ScanArchivePage} />
       <Route path="/privacy" component={PrivacyPage} />
       <Route path="/challenge/:code" component={ChallengePage} />
+      {/* Play a bot straight away, no account (for visitors from ads, reels and links) */}
+      <Route path="/play-now" component={PlayNowPage} />
       <Route path="/raffle" component={RafflePage} />
       <Route path="/raffle-rules" component={RaffleRulesPage} />
       <Route path="/affiliate" component={AffiliatePage} />

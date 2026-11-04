@@ -31,6 +31,7 @@ export type LandingFunnelEvent =
   | 'landing_view' | 'mia_started' | 'mia_skipped' | 'onboarding_finished' | 'signup_clicked' | 'signup_completed'
   | 'signup_form_submitted' | 'signup_error' | 'opponent_scout_clicked'
   | 'google_oauth_clicked' | 'google_signup_completed' | 'google_signup_error' | 'google_login_completed'
+  | 'guest_game_started' | 'guest_game_finished'
   | 'scroll_25' | 'scroll_50' | 'scroll_75' | 'scroll_100'
   | 'engaged_10s'
   | `viewed_${LandingSectionId}`

@@ -1,13 +1,14 @@
 import { axonTrack } from '@/lib/axon';
+import { startGoogleSignIn } from '@/lib/googleSignIn';
 import { SocialLinks } from '@/components/SocialLinks';
 import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { useUser } from '@/hooks/use-user';
 import { useLocation, Link } from 'wouter';
-import { trackFunnelEvent, appSigninParam } from '@/lib/funnelTracking';
+import { trackFunnelEvent } from '@/lib/funnelTracking';
 import { useLandingFunnelTracking } from '@/hooks/use-landing-funnel-tracking';
 import { Play as PlayIcon, ArrowRight, Mail, Eye, EyeOff, UserPlus, LogIn, Search, BarChart3, Brain, Check, X, Target, Crosshair, BookOpen, Gamepad2, Flame, Puzzle, Users, Skull, History, GraduationCap, Download as DownloadIcon, Smartphone } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { apiFetch, apiUrl, setAuthToken } from '@/lib/api';
+import { apiFetch, setAuthToken } from '@/lib/api';
 import { useSiteImg } from '@/hooks/use-app-config';
 import { GooglePlayBadge } from '@/components/GooglePlayBadge';
 import { SiteStatsLine, HappeningNow } from '@/components/SiteStats';
@@ -140,9 +141,7 @@ function AuthModal({ open, onClose, initialMode, externalError, context = 'defau
 
   const handleGoogleLogin = () => {
     trackFunnelEvent('google_oauth_clicked');
-    const ref = localStorage.getItem('chessscout_ref') || '';
-    const url = apiUrl(`/api/auth/google?${[ref ? `ref=${encodeURIComponent(ref)}` : '', appSigninParam()].filter(Boolean).join('&')}`);
-    window.location.href = url;
+    void startGoogleSignIn(localStorage.getItem('chessscout_ref') || '');
   };
 
   useEffect(() => {
@@ -183,7 +182,7 @@ function AuthModal({ open, onClose, initialMode, externalError, context = 'defau
               {mode === 'login' ? t('Welcome Back') : context === 'opponent_scout' ? t('Scout Any Opponent Free') : t('Create Your Free Account')}
             </h2>
             <p className="text-sm mt-1" style={{ color: MUTED }}>
-              {mode === 'login' ? t('Sign in to your account') : t('Free to start — upgrade to Pro anytime')}
+              {mode === 'login' ? t('Sign in to your account') : t('Play friends and bots, get every game reviewed, scout any opponent')}
             </p>
             {mode === 'register' && (
               <p className="text-xs font-bold mt-1.5 flex items-center justify-center gap-1" style={{ color: G }}>
@@ -221,6 +220,12 @@ function AuthModal({ open, onClose, initialMode, externalError, context = 'defau
                 </button>
               )}
             </>
+          )}
+
+          {mode === 'register' && !showEmail && (
+            <a href={`${import.meta.env.BASE_URL}play-now`} className="mt-4 block text-center text-[13px] font-bold underline-offset-4 hover:underline" style={{ color: G }}>
+              {t('Not ready? Try a game first, no sign-up')}
+            </a>
           )}
 
           {error && (
@@ -654,6 +659,9 @@ export function LandingPage() {
               {t('Scout an Opponent')}
             </button>
           </div>
+          <Link href="/play-now" className="mt-2.5 inline-flex items-center gap-1.5 text-[13px] font-bold underline-offset-4 hover:underline sm:text-[14px]" style={{ color: G }}>
+            {t('Or try a game first, no sign-up')} <ArrowRight className="h-4 w-4" />
+          </Link>
 
           <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11.5px] font-semibold sm:gap-x-5 sm:text-[13px]" style={{ color: 'rgba(245,247,246,0.82)' }}>
             <span className="flex items-center gap-1.5"><Check className="h-3.5 w-3.5" style={{ color: G }} /> {t('Free to start')}</span>

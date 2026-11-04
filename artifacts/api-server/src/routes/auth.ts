@@ -372,7 +372,10 @@ router.post("/auth/login", async (req: Request, res: Response) => {
 });
 
 router.get("/auth/google/status", (_req: Request, res: Response) => {
-  res.json({ available: !!process.env.GOOGLE_CLIENT_ID });
+  // In-page (one-tap) sign-in: on when GOOGLE_ONE_TAP=1 and chessscout.net is an
+  // "Authorized JavaScript origin" on the Google OAuth client.
+  const clientId = process.env.GOOGLE_CLIENT_ID || "";
+  res.json({ available: !!clientId, oneTapClientId: process.env.GOOGLE_ONE_TAP === "1" && clientId ? clientId : null });
 });
 
 router.get("/auth/google", (req: Request, res: Response) => {
@@ -418,6 +421,111 @@ function sendClientRedirect(res: Response, url: string) {
     `</body></html>`
   );
 }
+
+type GoogleProfile = { id: string; email?: string | null; given_name?: string | null; family_name?: string | null; picture?: string | null };
+/** Finds or creates the account for a Google profile (links an existing email account), as the
+ *  redirect sign-in and the in-page (one-tap) sign-in both do. */
+async function signInGoogleProfile(profile: GoogleProfile, refCode: string): Promise<{ user: typeof usersTable.$inferSelect; isNewSignup: boolean }> {
+  let [user] = await db
+    .select()
+    .from(usersTable)
+    .where(eq(usersTable.googleId, profile.id));
+
+  let isNewSignup = false;
+
+  if (!user) {
+    const [existingByEmail] = profile.email
+      ? await db.select().from(usersTable).where(eq(usersTable.email, profile.email))
+      : [null];
+
+    if (existingByEmail) {
+      [user] = await db
+        .update(usersTable)
+        .set({
+          googleId: profile.id,
+          authProvider: existingByEmail.authProvider === "local" ? "local+google" : "google",
+          // A picture the player uploaded themselves is kept.
+          profileImageUrl: existingByEmail.profileImageUrl?.includes('/api/avatars/') ? existingByEmail.profileImageUrl : (profile.picture || existingByEmail.profileImageUrl),
+          firstName: existingByEmail.firstName || profile.given_name,
+          lastName: existingByEmail.lastName || profile.family_name,
+          lastLoginAt: new Date(),
+        })
+        .where(eq(usersTable.id, existingByEmail.id))
+        .returning();
+    } else {
+      isNewSignup = true;
+      let googleReferrerUserId: string | null = null;
+      if (refCode) {
+        const [referrer] = await db.select({ id: usersTable.id })
+          .from(usersTable)
+          .where(eq(usersTable.inviteCode, refCode.toUpperCase().trim()));
+        if (referrer) googleReferrerUserId = referrer.id;
+      }
+      [user] = await db
+        .insert(usersTable)
+        .values({
+          email: profile.email,
+          googleId: profile.id,
+          authProvider: "google",
+          firstName: profile.given_name || null,
+          lastName: profile.family_name || null,
+          profileImageUrl: profile.picture || null,
+          referredByUserId: googleReferrerUserId,
+          lastLoginAt: new Date(),
+        })
+        .returning();
+      if (googleReferrerUserId) {
+        await db.insert(referralConversionsTable).values({
+          referrerUserId: googleReferrerUserId,
+          referredUserId: user.id,
+          status: "signed_up",
+        });
+      }
+
+      if (user.email) {
+        sendEmail({
+          to: user.email,
+          subject: "Welcome to ChessScout.net: Play. Scout. Improve. ♜",
+          html: welcomeEmailHtml(user.firstName),
+        }).then(() => {
+          db.insert(emailDripLogTable).values({ userId: user.id, dripType: 'welcome' }).catch(() => {});
+        }).catch(() => {});
+      }
+    }
+  } else {
+    await db.update(usersTable).set({ lastLoginAt: new Date() }).where(eq(usersTable.id, user.id));
+  }
+  return { user, isNewSignup };
+}
+
+// In-page Google sign-in (one tap): the browser hands us Google's signed ID token,
+// Google checks the signature for us (tokeninfo), and we sign the person in here,
+// without ever leaving the page (matters in the Android app, where the redirect
+// trip out to Google can end up in a separate browser tab).
+router.post("/auth/google/idtoken", async (req: Request, res: Response) => {
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  const credential = String((req.body as { credential?: string })?.credential ?? "");
+  const refCode = String((req.body as { ref?: string })?.ref ?? "").slice(0, 40);
+  if (!clientId || !credential) { res.status(400).json({ error: "Google sign-in isn't available." }); return; }
+  try {
+    const r = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`);
+    const info = await r.json().catch(() => null) as { aud?: string; iss?: string; sub?: string; email?: string; email_verified?: string | boolean; given_name?: string; family_name?: string; picture?: string; exp?: string } | null;
+    const issOk = info?.iss === "accounts.google.com" || info?.iss === "https://accounts.google.com";
+    if (!r.ok || !info || info.aud !== clientId || !issOk || !info.sub || Number(info.exp ?? 0) * 1000 < Date.now()) {
+      res.status(401).json({ error: "Google sign-in didn't go through. Please try again." }); return;
+    }
+    const verified = info.email_verified === true || info.email_verified === "true";
+    const { user, isNewSignup } = await signInGoogleProfile({
+      id: info.sub, email: verified ? info.email ?? null : null, given_name: info.given_name ?? null, family_name: info.family_name ?? null, picture: info.picture ?? null,
+    }, refCode);
+    const sid = await createSession({ user: toSessionUser(user) } as SessionData);
+    setSessionCookie(res, sid);
+    res.json({ token: sid, newSignup: isNewSignup });
+  } catch (err) {
+    req.log?.error?.({ err }, "Google one-tap sign-in failed");
+    res.status(500).json({ error: "Google sign-in didn't go through. Please try again." });
+  }
+});
 
 router.get("/auth/google/callback", async (req: Request, res: Response) => {
   const { code } = req.query;
@@ -469,75 +577,7 @@ router.get("/auth/google/callback", async (req: Request, res: Response) => {
 
     const profile = await userInfoRes.json() as any;
 
-    let [user] = await db
-      .select()
-      .from(usersTable)
-      .where(eq(usersTable.googleId, profile.id));
-
-    let isNewSignup = false;
-
-    if (!user) {
-      const [existingByEmail] = profile.email
-        ? await db.select().from(usersTable).where(eq(usersTable.email, profile.email))
-        : [null];
-
-      if (existingByEmail) {
-        [user] = await db
-          .update(usersTable)
-          .set({
-            googleId: profile.id,
-            authProvider: existingByEmail.authProvider === "local" ? "local+google" : "google",
-            // A picture the player uploaded themselves is kept.
-            profileImageUrl: existingByEmail.profileImageUrl?.includes('/api/avatars/') ? existingByEmail.profileImageUrl : (profile.picture || existingByEmail.profileImageUrl),
-            firstName: existingByEmail.firstName || profile.given_name,
-            lastName: existingByEmail.lastName || profile.family_name,
-            lastLoginAt: new Date(),
-          })
-          .where(eq(usersTable.id, existingByEmail.id))
-          .returning();
-      } else {
-        isNewSignup = true;
-        let googleReferrerUserId: string | null = null;
-        if (googleRefCode) {
-          const [referrer] = await db.select({ id: usersTable.id })
-            .from(usersTable)
-            .where(eq(usersTable.inviteCode, googleRefCode.toUpperCase().trim()));
-          if (referrer) googleReferrerUserId = referrer.id;
-        }
-        [user] = await db
-          .insert(usersTable)
-          .values({
-            email: profile.email,
-            googleId: profile.id,
-            authProvider: "google",
-            firstName: profile.given_name || null,
-            lastName: profile.family_name || null,
-            profileImageUrl: profile.picture || null,
-            referredByUserId: googleReferrerUserId,
-            lastLoginAt: new Date(),
-          })
-          .returning();
-        if (googleReferrerUserId) {
-          await db.insert(referralConversionsTable).values({
-            referrerUserId: googleReferrerUserId,
-            referredUserId: user.id,
-            status: "signed_up",
-          });
-        }
-
-        if (user.email) {
-          sendEmail({
-            to: user.email,
-            subject: "Welcome to ChessScout.net: Play. Scout. Improve. ♜",
-            html: welcomeEmailHtml(user.firstName),
-          }).then(() => {
-            db.insert(emailDripLogTable).values({ userId: user.id, dripType: 'welcome' }).catch(() => {});
-          }).catch(() => {});
-        }
-      }
-    } else {
-      await db.update(usersTable).set({ lastLoginAt: new Date() }).where(eq(usersTable.id, user.id));
-    }
+    const { user, isNewSignup } = await signInGoogleProfile(profile, googleRefCode);
 
     const sessionData: SessionData = { user: toSessionUser(user) };
     const sid = await createSession(sessionData);

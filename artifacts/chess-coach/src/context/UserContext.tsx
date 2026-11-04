@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { appFlagFromSignin } from '@/lib/playApp';
 import { analytics } from '@heycatch/sdk';
 import { apiFetch, setAuthToken, getAuthToken } from '@/lib/api';
@@ -122,6 +122,23 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     refreshAuth();
+  }, [refreshAuth]);
+
+  // A Google sign-in that finished in another tab (in the Android app the trip out to
+  // Google can end in a separate browser tab): coming back here picks it up straight away.
+  const authUserRef = useRef<AuthUser | null>(null); authUserRef.current = authUser;
+  useEffect(() => {
+    let seen = getAuthToken();
+    const check = () => {
+      const now = getAuthToken();
+      if (!authUserRef.current && now && now !== seen) { seen = now; void refreshAuth(); }
+    };
+    const onStorage = (e: StorageEvent) => { if (e.key === null || e.key === 'chess_coach_token') check(); };
+    const onVisible = () => { if (document.visibilityState === 'visible') check(); };
+    window.addEventListener('storage', onStorage);
+    window.addEventListener('focus', check);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => { window.removeEventListener('storage', onStorage); window.removeEventListener('focus', check); document.removeEventListener('visibilitychange', onVisible); };
   }, [refreshAuth]);
 
   const refreshSubscription = useCallback(() => {

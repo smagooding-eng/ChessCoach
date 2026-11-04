@@ -257,6 +257,11 @@ export function Challenge() {
           </div>
         )}
         {!isAuthenticated && !isAuthLoading && ch && !isCreator && (
+          <Link href="/play-now" className="block rounded-xl py-3 text-center text-[14px] font-extrabold" style={ghostBtn}>
+            Or play a bot right now, no account needed
+          </Link>
+        )}
+        {!isAuthenticated && !isAuthLoading && ch && !isCreator && (
           <div className="px-2 text-center text-[12.5px] leading-relaxed" style={{ color: PT.muted }}>
             ChessScout.net is free: play live and daily games with friends, get every game reviewed, and solve unlimited puzzles.
           </div>

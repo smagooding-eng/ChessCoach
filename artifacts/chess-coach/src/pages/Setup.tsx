@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { appSigninParam, trackFunnelEvent } from '@/lib/funnelTracking';
+import { startGoogleSignIn } from '@/lib/googleSignIn';
+import { trackFunnelEvent } from '@/lib/funnelTracking';
 import { useUser } from '@/hooks/use-user';
 import { useLocation } from 'wouter';
 import { ArrowRight, Trophy, Mail, Eye, EyeOff, UserPlus, LogIn } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { apiFetch, apiUrl, setAuthToken } from '@/lib/api';
+import { apiFetch, setAuthToken } from '@/lib/api';
 import { useSiteImg } from '@/hooks/use-app-config';
 
 export function Setup() {
@@ -137,9 +138,7 @@ export function Setup() {
 
   const handleGoogleLogin = () => {
     trackFunnelEvent('google_oauth_clicked');
-    const ref = referralCode || localStorage.getItem('chessscout_ref') || '';
-    const url = apiUrl(`/api/auth/google?${[ref ? `ref=${encodeURIComponent(ref)}` : '', appSigninParam()].filter(Boolean).join('&')}`);
-    window.location.href = url;
+    void startGoogleSignIn(referralCode || localStorage.getItem('chessscout_ref') || '');
   };
 
   return (
