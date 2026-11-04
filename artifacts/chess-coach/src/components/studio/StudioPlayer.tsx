@@ -199,6 +199,13 @@ const DEFAULT_PREFS = {
   tone: 'creator' as 'creator' | 'teacher',
   /** Opening Map episodes: the board tilted back in 3D (off: the board stays flat). */
   tilt: false,
+  /** Look of every clip: Coach (the coach's speech bubble, stamped badges, a topic header, an early
+   *  call to action and a "comment your answer" ending) or Classic (the original look). */
+  theme: 'coach' as 'coach' | 'classic',
+  /** Said near the start of every clip in the Coach look (empty = none). */
+  earlyCta: "Like, follow and share for more chess like this!",
+  /** The same, for Family Tree parts. */
+  seriesCta: "Like and follow so you don't miss the rest of the series!",
   split: true, voice: false, voiceName: 'ash', compTitle: 'Top moments this week',
   music: 'off' as MusicStyle, musicVol: 0.5, beatSync: true, musicFx: true, subs: true, pieceFx: true, trapBefore: 99, countdownSecs: 3, choices: false, zoom: false, splash: true, reviewMode: 'highlights' as 'highlights' | 'full',
 };
@@ -1171,7 +1178,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
   const idOf = useMemo(() => new Map(frames.map((f, k) => [f, frameIds[k]])), [frames, frameIds]);
   const [holds, setHolds] = useState<Record<string, number>>({});
   const dur = (f: Frame) => {
-    const base = baseDur(f) + (holds[idOf.get(f) ?? ''] ?? 0);
+    const base = baseDur(f) + (holds[idOf.get(f) ?? ''] ?? 0) + (ctaIdx >= 0 && earlyText && frames[ctaIdx] === f ? 2200 : 0);
     const said = prefs.voice ? narration(f) : null;
     const len = said ? voiceLen.current.get(`${voiceKey}|${said}`) : undefined;
     // A frame always lasts until its line has been said in full, plus a breath.
@@ -1477,7 +1484,26 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
     }
     return undefined;
   };
+  // Coach look: which frame carries the early call to action, and its text.
+  const coachOn = prefs.theme !== 'classic';
+  const ctaIdx = (() => {
+    if (!coachOn || !clip || clip.lineMode) return -1;
+    const k = clip.isMap ? frames.findIndex((f) => f.kind === 'mapStep' && f.step === 0)
+      : frames.findIndex((f) => f.kind === 'teaser') >= 0 ? frames.findIndex((f) => f.kind === 'teaser') : frames.findIndex((f) => f.kind === 'intro');
+    return k;
+  })();
+  const earlyText = clip?.isMap ? prefs.seriesCta.trim() : prefs.earlyCta.trim();
+  const commentQ = !clip ? '' : clip.isTrap ? 'Would you fall for it?' : clip.isPuzzle ? 'Did you solve it?' : clip.isReview ? 'Which move would you have played differently?'
+    : clip.isLesson ? 'Did you get it right?' : clip.lineMode ? 'Do you play this line?' : clip.isOpening ? 'Which line do you play?' : clip.isScout ? 'Who should I scout next?'
+    : clip.isScan ? 'Want me to scan your board?' : clip.isPromo ? (clip.promo?.template === 'versus' ? 'Would you switch?' : 'Who are you challenging first?') : 'Would you have found it?';
   const narration = (f: Frame | undefined): string | null => {
+    const base = narrationBase(f);
+    if (!f || !clip || !coachOn) return base;
+    if (ctaIdx >= 0 && earlyText && frames[ctaIdx] === f) return `${base ? `${base} ` : ''}${stripEmoji(earlyText)}`;
+    if (f.kind === 'outro') return `${commentQ} Tell me in the comments. ${stripEmoji(prefs.outroLine)}${/[.!?]$/.test(prefs.outroLine.trim()) ? '' : '.'}`;
+    return base;
+  };
+  const narrationBase = (f: Frame | undefined): string | null => {
     if (!f || !clip) return null;
     { const x = lineScript(f); if (x !== undefined) return x; }
     if (clip.isMap && clip.map) {
@@ -1898,6 +1924,20 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
     return `${(col + 0.5) * 12.5}% ${(row + 0.5) * 12.5}%`;
   })();
   // Opening clips always show their line notes; other clips follow the Captions setting.
+  // Coach look: the bubble shows what the coach is saying (the latest line), else the hook.
+  const coachClip = coachOn && !clip.isMap;
+  const bubbleText = (() => {
+    if (!coachClip || !frame) return null;
+    if (frame.kind === 'outro' || frame.kind === 'splash' || frame.kind === 'countdown' || frame.kind === 'card' || frame.kind === 'teaser' || frame.kind === 'title' || frame.kind === 'scanPhoto') return null;
+    for (let k = i; k >= Math.max(0, i - 14); k--) {
+      const t = narrationBase(frames[k]);
+      if (t && frames[k].kind !== 'title') return t;
+      if (frames[k].kind === 'intro' || frames[k].kind === 'teaser') break;
+    }
+    return stripEmoji(hook.replace(/^#\d+ · /, ''));
+  })();
+  const topic = !coachClip ? '' : clip.isTrap ? '🪤 Trap' : clip.isPuzzle ? `🧩 Puzzle${clip.puzzleRating ? ` · ${clip.puzzleRating}` : ''}` : clip.isReview ? '📊 Game review' : clip.isScout ? '🔍 Opponent scout'
+    : clip.isLesson ? '🎓 Lesson' : clip.isOpening ? `♟️ ${clip.openingData?.name ?? 'Opening'}${clip.lineMode ? ` · Line ${clip.lineMode.no}` : ''}` : clip.isScan ? '📷 Scanned board' : clip.isPromo ? '♞ ChessScout' : '⚡ Game moment';
   const caption = frame?.kind === 'better' ? frame.text : (prefs.captions || clip.isOpening) && cur && !subWords ? rev?.explanation : null;
   const showBottomMove = frame?.kind === 'move' && cur;
 
@@ -1921,7 +1961,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
             {prefs.progress && <div className="absolute inset-x-0 top-0 z-20 h-[0.6cqh] bg-white/15"><div className="h-full bg-[#81B64C] transition-all duration-300" style={{ width: `${progress * 100}%` }} /></div>}
             {/* Hook: pops in big on the intro, then sits at the top */}
             <motion.div key={frame?.kind === 'intro' ? `intro${playing ? 1 : 0}` : 'top'} initial={frame?.kind === 'intro' ? { scale: 0.6, opacity: 0, y: '18cqh' } : false}
-              animate={{ scale: 1, opacity: pop || openLine != null || clip.isMap || frame?.kind === 'teaser' || frame?.kind === 'countdown' || frame?.kind === 'card' || frame?.kind === 'scanPhoto' ? 0 : 1, y: frame?.kind === 'intro' ? '18cqh' : 0 }} transition={{ type: 'spring', stiffness: 260, damping: 18 }}
+              animate={{ scale: 1, opacity: pop || openLine != null || clip.isMap || coachClip || frame?.kind === 'teaser' || frame?.kind === 'countdown' || frame?.kind === 'card' || frame?.kind === 'scanPhoto' ? 0 : 1, y: frame?.kind === 'intro' ? '18cqh' : 0 }} transition={{ type: 'spring', stiffness: 260, damping: 18 }}
               className="absolute inset-x-0 top-[6.5%] z-10 px-[6%] text-center">
               {isComp && frame?.kind === 'intro' && (
                 <motion.div key={`rank${clipQ}`} initial={{ scale: 3, opacity: 0, rotate: -20 }} animate={{ scale: 1, opacity: 1, rotate: 0 }} transition={{ type: 'spring', stiffness: 300, damping: 15, delay: 0.15 }}
@@ -1932,8 +1972,34 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
               <p className="font-black leading-[1.08] text-white" style={{ fontSize: frame?.kind === 'intro' ? 'clamp(24px, 6.4cqh, 64px)' : 'clamp(18px, 4.4cqh, 44px)', textShadow: '0 3px 14px rgba(0,0,0,.6)' }}>{hook}</p>
               {sub && <p className="mt-1.5 line-clamp-2 text-[clamp(11px,1.8cqh,18px)] font-bold text-white/70">{sub}</p>}
             </motion.div>
+            {/* Coach look: topic header, the coach's speech bubble (what's being said), early call-to-action chips */}
+            {coachClip && (<>
+              <div className="pointer-events-none absolute inset-x-[5%] top-[2.4%] z-30 flex items-center justify-between font-black" style={{ fontSize: 'clamp(10px,1.65cqh,17px)' }}>
+                <span className="truncate text-white">{topic}</span>
+                {isComp && <span className="rounded-full bg-white/10 px-[0.6em] py-[0.1em] text-white/70">#{queue!.length - clipQ}</span>}
+              </div>
+              <AnimatePresence mode="wait">
+                {bubbleText && !pop && !(openLine != null && !clip.lineMode) && (
+                  <motion.div key={`b-${bubbleText}`} initial={{ opacity: 0, scale: 0.92, y: 8 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.96 }} transition={{ type: 'spring', stiffness: 320, damping: 22 }}
+                    className="pointer-events-none absolute left-[5%] right-[5%] top-[6%] z-30 flex items-start gap-[0.55em]" style={{ fontSize: `clamp(13px,${bubbleText.length > 120 ? 2 : bubbleText.length > 70 ? 2.3 : 2.7}cqh,28px)` }}>
+                    <span className="grid h-[1.9em] w-[1.9em] shrink-0 place-items-center rounded-full bg-[#81B64C] text-[0.9em] shadow-lg">♞</span>
+                    <p className="line-clamp-4 rounded-[0.9em] rounded-tl-[0.2em] bg-white px-[0.75em] py-[0.45em] font-black leading-[1.15] text-[#141A14] shadow-xl">{bubbleText}</p>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </>)}
+            {coachOn && ctaIdx >= 0 && earlyText && frames[ctaIdx] === frame && frame?.kind !== 'teaser' && (
+              <div className={`pointer-events-none absolute inset-x-0 z-30 flex justify-center gap-[1cqh] ${clip.isMap ? 'top-[60%]' : 'top-[16%]'}`} style={{ fontSize: 'clamp(11px,1.9cqh,20px)' }}>
+                {[['👍', 'Like'], ['＋', 'Follow'], ['↗', 'Share']].map(([g, t], n) => (
+                  <motion.span key={`${t}${i}`} initial={{ y: 14, opacity: 0 }} animate={{ y: 0, opacity: 1, scale: [1, 1.08, 1] }} transition={{ delay: 0.9 + n * 0.22, scale: { delay: 1.5 + n * 0.22, duration: 0.6, repeat: Infinity, repeatDelay: 1.4 } }}
+                    className="inline-flex items-center gap-[0.35em] rounded-full px-[0.9em] py-[0.3em] font-black text-white shadow-lg" style={{ background: n === 1 ? '#81B64C' : 'rgba(11,17,18,.85)', border: '1.5px solid rgba(255,255,255,.6)' }}>
+                    <span>{g}</span>{t}
+                  </motion.span>
+                ))}
+              </div>
+            )}
             {/* Board block */}
-            <div className={`absolute ${clip.isMap ? 'inset-x-[17%] top-[15.5%]' : 'inset-x-[4%] top-[22%]'}`} style={{ opacity: clip.isMap && frame?.kind === 'mapEnd' ? 0.18 : frame?.kind === 'intro' ? 0.35 : frame?.kind === 'lessonText' ? 0.4 : 1, transition: 'opacity .4s' }}>
+            <div className={`absolute ${clip.isMap ? 'inset-x-[20%] top-[17%]' : 'inset-x-[4%] top-[22%]'}`} style={{ opacity: clip.isMap && frame?.kind === 'mapEnd' ? 0.18 : frame?.kind === 'intro' ? 0.35 : frame?.kind === 'lessonText' ? 0.4 : 1, transition: 'opacity .4s' }}>
               {!clip.isMap && <div className="mb-1 flex items-center justify-between gap-2"><p className="truncate text-[clamp(11px,1.6cqh,16px)] font-bold text-white/85">{name(top)}</p>{clockChip(top)}</div>}
               <div className={prefs.zoom ? 'overflow-hidden rounded-[10px]' : undefined}
                 style={clip.isMap && prefs.tilt ? { transform: 'perspective(120cqh) rotateX(26deg) scale(1.08)', transformOrigin: '50% 60%' } : undefined}>
@@ -1974,7 +2040,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
               {!clip.isMap && <div className="mt-1 flex items-center justify-between gap-2"><p className="truncate text-[clamp(11px,1.6cqh,16px)] font-bold text-white/85">{name(top === 'w' ? 'b' : 'w')}</p>{clockChip(top === 'w' ? 'b' : 'w')}</div>}
             </div>
             {/* Move + caption */}
-            {(showBottomMove || caption) && !subWords && !(choices && isKey) && frame?.kind !== 'outro' && frame?.kind !== 'reveal' && (
+            {(showBottomMove || (caption && !coachClip)) && !(subWords && !coachClip) && !(choices && isKey) && frame?.kind !== 'outro' && frame?.kind !== 'reveal' && (
               <div className="absolute inset-x-[5%] bottom-[9%] z-10">
                 {showBottomMove && cur && (
                   <div className="flex items-center gap-2">
@@ -1984,10 +2050,10 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
                     </p>
                   </div>
                 )}
-                {caption && <p className={`mt-1 line-clamp-3 text-[clamp(12px,1.9cqh,19px)] font-semibold leading-snug ${frame?.kind === 'better' ? 'text-[#B8E08C]' : 'text-white/90'}`} style={{ textShadow: '0 2px 8px rgba(0,0,0,.6)' }}>{caption}</p>}
+                {caption && !coachClip && <p className={`mt-1 line-clamp-3 text-[clamp(12px,1.9cqh,19px)] font-semibold leading-snug ${frame?.kind === 'better' ? 'text-[#B8E08C]' : 'text-white/90'}`} style={{ textShadow: '0 2px 8px rgba(0,0,0,.6)' }}>{caption}</p>}
               </div>
             )}
-            {subWords && (
+            {subWords && !coachClip && (
               <div className="pointer-events-none absolute inset-x-[5%] bottom-[12.5%] z-[25] text-center">
                 <p className="font-black uppercase leading-[1.1]" style={{ fontSize: 'clamp(16px,3.3cqh,34px)', textShadow: '0 0 4px #000, 0 0 10px #000, 0 4px 0 #000', WebkitTextStroke: '1.5px #000' }}>
                   {subWords.words.map((w, k) => (
@@ -2228,7 +2294,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
             </AnimatePresence>
             {/* Opening clips: the line map. All the variations as one strip; the one playing
                 glows in its colour, the ones done get a tick, and its moves tick along under it. */}
-            {clip.isOpening && clip.openingData && clip.ranges && (() => {
+            {clip.isOpening && clip.openingData && clip.ranges && !(coachClip && clip.lineMode) && (() => {
               const o = clip.openingData; const R = clip.ranges;
               const COL = ['#81B64C', '#4A8BD6', '#E8B447', '#CA3431'];
               const active = openLine;
@@ -2449,7 +2515,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
                 <AnimatePresence>
                   {stamping && (
                     <motion.div key={`stamp${step}`} initial={{ scale: 2.4, opacity: 0, rotate: -16 }} animate={{ scale: 1, opacity: 1, rotate: -7 }} exit={{ opacity: 0, scale: 0.85 }} transition={{ type: 'spring', stiffness: 420, damping: 16 }}
-                      className="pointer-events-none absolute left-1/2 top-[30%] z-30 -translate-x-1/2 text-center" style={{ fontSize: 'clamp(16px,3.5cqh,38px)' }}>
+                      className="pointer-events-none absolute left-1/2 top-[51%] z-30 -translate-x-1/2 text-center" style={{ fontSize: 'clamp(14px,2.9cqh,32px)' }}>
                       <div className="rounded-[0.35em] px-[0.6em] py-[0.25em]" style={{ border: '0.16em solid #9BD35A', boxShadow: 'inset 0 0 0 0.08em #0B1112, inset 0 0 0 0.16em #9BD35A, 0 0.4em 1.4em rgba(0,0,0,.55)', background: 'rgba(11,17,18,.88)' }}>
                         <p className="whitespace-nowrap font-black uppercase leading-none tracking-wide text-[#B8E08C]">{st.name}</p>
                         <p className="mt-[0.25em] whitespace-nowrap font-bold tabular-nums text-white/75" style={{ fontSize: '0.45em' }}>{moveList(st.path)}</p>
@@ -2466,12 +2532,12 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
                     <p className="mt-[1cqh] font-bold text-white/70" style={{ fontSize: 'clamp(12px,2.1cqh,22px)' }}>Comment your score 👇</p>
                   </motion.div>
                 )}
-                <div className={`pointer-events-none absolute inset-x-[7%] z-20 ${done ? 'top-[37%]' : 'top-[55%]'}`} style={{ fontSize: `clamp(10px,${tree.length > 10 ? 1.55 : 1.75}cqh,18px)`, transition: 'top .5s' }}>
+                <div className={`pointer-events-none absolute inset-x-[7%] z-20 ${done ? 'top-[37%]' : 'top-[58%]'}`} style={{ fontSize: `clamp(10px,${tree.length > 10 ? 1.5 : 1.7}cqh,18px)`, transition: 'top .5s' }}>
                   {shown.map((x) => {
                     const now = stamping && x.k === step;
                     return (
                       <motion.div key={x.k} layout initial={{ opacity: 0, x: -14 }} animate={{ opacity: 1, x: 0 }} transition={{ type: 'spring', stiffness: 300, damping: 24 }}
-                        className="flex items-center" style={{ paddingLeft: `${x.depth * 1.35}em`, height: tree.length > 10 ? '1.5em' : '1.7em' }}>
+                        className="flex items-center" style={{ paddingLeft: `${x.depth * 1.35}em`, height: tree.length > 10 ? '1.45em' : '1.65em' }}>
                         {x.depth > 0 && <span className="mr-[0.35em] text-white/35">└</span>}
                         <span className="truncate rounded-[0.4em] px-[0.5em] py-[0.08em] font-black"
                           style={{ background: now ? '#81B64C' : 'transparent', color: now ? '#fff' : x.depth === 0 ? '#B8E08C' : 'rgba(255,255,255,.88)', boxShadow: now ? '0 0 0 2px rgba(155,211,90,.5), 0 0 18px rgba(129,182,76,.55)' : undefined }}>
@@ -2491,7 +2557,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
                   className="font-black leading-[1.05]" style={{ fontSize: 'clamp(24px,5.8cqh,60px)', color: frame.mate ? '#FFD84D' : '#fff', textShadow: '0 0 4px #000, 0 4px 0 #000, 0 6px 22px rgba(0,0,0,.7)', WebkitTextStroke: '1.5px #000' }}>{frame.text}</motion.p>
                 <motion.p initial={{ y: 14, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.45 }}
                   className="mx-auto mt-[1cqh] w-fit rounded-full bg-black/60 px-[1em] py-[0.3em] font-black text-white" style={{ fontSize: 'clamp(11px,2cqh,20px)' }}>{frame.sub} 👀</motion.p>
-                {frame.cta && (
+                {(frame.cta || (coachOn && earlyText && frames[ctaIdx] === frame)) && (
                   <div className="mt-[1.2cqh] flex justify-center gap-[1cqh]" style={{ fontSize: 'clamp(11px,1.9cqh,20px)' }}>
                     {[['👍', 'Like'], ['＋', 'Follow'], ['↗', 'Share']].map(([g, t], n) => (
                       <motion.span key={t} initial={{ y: 16, opacity: 0 }} animate={{ y: 0, opacity: 1, scale: [1, 1.08, 1] }} transition={{ delay: 1.4 + n * 0.25, scale: { delay: 2 + n * 0.25, duration: 0.6, repeat: Infinity, repeatDelay: 1.4 } }}
@@ -2553,9 +2619,15 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
                 <motion.div key={pop.at} initial={{ scale: 0, rotate: -12, opacity: 0 }} animate={{ scale: 1, rotate: -4, opacity: 1 }} exit={{ scale: 1.3, opacity: 0 }}
                   transition={{ type: 'spring', stiffness: 380, damping: 14 }} onAnimationComplete={() => setTimeout(() => setPop((p) => (p && p.at === pop.at ? null : p)), 1100)}
                   className="pointer-events-none absolute left-1/2 top-[13.5%] z-20 -translate-x-1/2 -translate-y-1/2 whitespace-nowrap text-center">
+                  {coachClip ? (
+                    <div className="rounded-[0.35em] px-[0.6em] py-[0.2em]" style={{ fontSize: 'clamp(20px,4cqh,42px)', transform: 'rotate(-4deg)', border: `0.14em solid ${LABEL[pop.cls].color}`, boxShadow: `inset 0 0 0 0.07em #0B1112, inset 0 0 0 0.14em ${LABEL[pop.cls].color}, 0 0.4em 1.4em rgba(0,0,0,.55)`, background: 'rgba(11,17,18,.9)' }}>
+                      <p className="whitespace-nowrap font-black uppercase leading-none tracking-wide" style={{ color: LABEL[pop.cls].color }}>{LABEL[pop.cls].glyph} {LABEL[pop.cls].text}</p>
+                    </div>
+                  ) : (
                   <div style={{ fontSize: 'clamp(20px,4cqh,42px)' }}>
                     <StudioBadge {...LABEL[pop.cls]} rays={['brilliant', 'great', 'checkmate'].includes(pop.cls)} />
                   </div>
+                  )}
                   {isKey && prevEval != null && rev?.evalAfterCp != null && Math.abs(rev.evalAfterCp - prevEval) >= 150 && (
                     <div style={{ fontSize: 'clamp(13px,2.3cqh,24px)' }}><EvalSwing from={fmtEval(prevEval)} to={fmtEval(rev.evalAfterCp)} color={LABEL[pop.cls].color} /></div>
                   )}
@@ -2644,7 +2716,21 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
             </AnimatePresence>
             {/* End card */}
             <AnimatePresence>
-              {frame?.kind === 'outro' && (
+              {frame?.kind === 'outro' && coachClip && (
+                <motion.div key="coachOutro" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 z-30 grid place-items-center bg-black/75 backdrop-blur-sm">
+                  <motion.div initial={{ scale: 0.8, y: 24 }} animate={{ scale: 1, y: 0 }} transition={{ type: 'spring', stiffness: 260, damping: 18 }} className="px-[8%] text-center">
+                    <p className="font-black leading-[1.05] text-white" style={{ fontSize: 'clamp(28px,6cqh,64px)' }}>{commentQ}</p>
+                    <motion.p initial={{ scale: 0.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ delay: 0.45, type: 'spring', stiffness: 300, damping: 14 }}
+                      className="mx-auto mt-[2cqh] w-fit rounded-full bg-[#81B64C] px-[1em] py-[0.35em] font-black text-white" style={{ fontSize: 'clamp(15px,2.8cqh,30px)' }}>Tell me in the comments 👇</motion.p>
+                    <div className="mt-[4cqh] flex items-center justify-center gap-[0.5em] font-black text-white/85" style={{ fontSize: 'clamp(13px,2.2cqh,22px)' }}>
+                      <img src={`${import.meta.env.BASE_URL}images/logo.svg`} alt="" style={{ width: '1.8em', height: '1.8em' }} />
+                      <span>{prefs.outroLine}</span>
+                    </div>
+                    {prefs.handle && <p className="mt-[0.6cqh] font-bold text-white/60" style={{ fontSize: 'clamp(12px,1.9cqh,19px)' }}>{prefs.handle}</p>}
+                  </motion.div>
+                </motion.div>
+              )}
+              {frame?.kind === 'outro' && !coachClip && (
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 z-30 grid place-items-center bg-black/75 backdrop-blur-sm">
                   <motion.div initial={{ scale: 0.7, y: 30 }} animate={{ scale: 1, y: 0 }} transition={{ type: 'spring', stiffness: 240, damping: 16 }} className="px-[8%] text-center">
                     <motion.img src={`${import.meta.env.BASE_URL}images/logo.svg`} alt="" initial={{ rotate: -25, scale: 0.4 }} animate={{ rotate: 0, scale: 1 }} transition={{ type: 'spring', stiffness: 260, damping: 12, delay: 0.1 }}
@@ -2905,6 +2991,20 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
               <p className="mt-1 text-[11.5px] text-white/45">Highlights plays the two moves before each brilliant, great, mistake and blunder, then the summary card.</p>
             </div>
           )}
+          <div className="mb-3">
+            <p className="mb-1 text-[11px] font-bold uppercase tracking-wide text-white/50">Look</p>
+            <div className="inline-flex rounded-lg bg-white/5 p-0.5">
+              {([['coach', 'Coach'], ['classic', 'Classic']] as const).map(([k, t]) => (
+                <button key={k} onClick={() => set('theme', k)} className="rounded-md px-3 py-1 text-[12px] font-bold" style={{ background: (prefs.theme === 'classic' ? 'classic' : 'coach') === k ? '#81B64C' : 'transparent', color: (prefs.theme === 'classic' ? 'classic' : 'coach') === k ? '#fff' : '#C9CFCD' }}>{t}</button>
+              ))}
+            </div>
+            <p className="mt-1 text-[11.5px] text-white/45">Coach: the coach's speech bubble says what's happening, badges are stamped on, a topic header, a like / follow / share line near the start and a "comment your answer" ending. Classic: the original look.</p>
+            {prefs.theme !== 'classic' && !clip.lineMode && (
+              <label className="mt-1.5 block text-[12px] text-white/60">{clip.isMap ? 'Call to action at the start of each part' : 'Call to action near the start'} (empty = none)
+                <input value={clip.isMap ? prefs.seriesCta : prefs.earlyCta} onChange={(e) => set(clip.isMap ? 'seriesCta' : 'earlyCta', e.target.value)} className="mt-0.5 w-full rounded bg-white/5 px-2 py-1 text-white" />
+              </label>
+            )}
+          </div>
           {clip.isMap && <div className="mb-3 flex flex-wrap gap-1.5">{toggle('tilt', '3D tilted board')}</div>}
           {clip.isOpening && (
             <div className="mb-3">
