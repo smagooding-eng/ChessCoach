@@ -436,7 +436,9 @@ router.get("/games", requireAuth, async (req, res): Promise<void> => {
   const source = typeof req.query.source === "string" ? req.query.source : "";
   if (source === "bots") {
     conditions.push(sql`(${gamesTable.platform} = 'bot' OR ${gamesTable.whiteUsername} ILIKE 'ChessScout Bot%' OR ${gamesTable.blackUsername} ILIKE 'ChessScout Bot%' OR ${gamesTable.whiteUsername} ILIKE '% (Bot)' OR ${gamesTable.blackUsername} ILIKE '% (Bot)')`);
-  } else if (source === "chesscom" || source === "lichess" || source === "chessscout") {
+  } else if (source === "chessscout") {
+    conditions.push(sql`(${gamesTable.platform} = 'chessscout' OR via_chessscout = true)`);
+  } else if (source === "chesscom" || source === "lichess") {
     conditions.push(eq(gamesTable.platform, source));
   } else if (platform && (platform === "chesscom" || platform === "lichess" || platform === "chessscout")) {
     conditions.push(eq(gamesTable.platform, platform));
@@ -856,7 +858,7 @@ function pgnPlayedAt(pgn: string): Date {
 }
 
 router.post("/games/import-pgn", requireAuth, async (req, res): Promise<void> => {
-  const { pgn } = req.body as { pgn?: string };
+  const { pgn, viaChessScout } = req.body as { pgn?: string; viaChessScout?: boolean };
   if (!pgn || typeof pgn !== "string" || !pgn.trim()) {
     res.status(400).json({ error: "Choose a PGN file or paste PGN text first." });
     return;
@@ -955,6 +957,10 @@ router.post("/games/import-pgn", requireAuth, async (req, res): Promise<void> =>
     }
   }
 
+  // Played on Lichess from ChessScout's board: it belongs under the ChessScout tab too.
+  if (viaChessScout === true && ids.length) {
+    await db.execute(sql`UPDATE games SET via_chessscout = true WHERE user_id = ${userId} AND id IN (${sql.join(ids.map((x) => sql`${x}`), sql`, `)})`).catch(() => {});
+  }
   res.json({ imported, duplicates, notYours, invalid, unfinished, total: games.length, ids: ids.slice(0, 50) });
 });
 

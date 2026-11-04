@@ -205,7 +205,7 @@ export function LichessPlay() {
       let pgn: string | null = null;
       for (let k = 0; k < 3 && !pgn; k++) { pgn = await exportPgn(gameId); if (!pgn) await new Promise((r) => setTimeout(r, 1500)); }
       if (!pgn) throw new Error('no pgn');
-      const r = await apiFetch('/api/games/import-pgn', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pgn }) });
+      const r = await apiFetch('/api/games/import-pgn', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pgn, viaChessScout: true }) });
       const d = await r.json().catch(() => null) as { ids?: number[]; notYours?: number } | null;
       if (!r.ok) throw new Error('import');
       if (d?.notYours) { setSaving('notyours'); return; }

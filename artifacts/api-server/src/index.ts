@@ -70,6 +70,8 @@ async function runSchemaMigrations() {
   try {
     await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_premium_override BOOLEAN NOT NULL DEFAULT false`);
     await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS scout_username VARCHAR`);
+    // Lichess games played from ChessScout (Play on Lichess): listed under ChessScout and Lichess.
+    await db.execute(sql`ALTER TABLE games ADD COLUMN IF NOT EXISTS via_chessscout BOOLEAN NOT NULL DEFAULT false`);
     await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_active_at TIMESTAMPTZ`);
     await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS email_opt_out BOOLEAN NOT NULL DEFAULT false`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_page_views_user_time ON page_views(user_id, created_at DESC)`);
