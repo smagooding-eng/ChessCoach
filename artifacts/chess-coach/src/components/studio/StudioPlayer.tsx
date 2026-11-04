@@ -212,6 +212,9 @@ const DEFAULT_PREFS = {
    *  separate title card before a hook scene, a short hook line, no pause before the first move,
    *  and the like / follow / share ask comes after the first few moves. Off = the original order. */
   fastStart: true,
+  /** App tour: 'tree' = the Family Tree look (the board always on screen, the coach's line on top,
+   *  each feature stamped on and listed under the board); 'cards' = the original feature cards. */
+  tourStyle: 'tree' as 'tree' | 'cards',
   /** Said near the start of every clip in the Coach look (empty = none). */
   earlyCta: "Like, follow and share for more chess like this!",
   /** The same, for Family Tree parts. */
@@ -1016,7 +1019,8 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
       // App tour: the hook, then each feature as a card with a few moves of the Opera Game between, then the end card.
       if (isComp && isFirst) out.push({ kind: 'title', fen: fenAt(0) });
       if (!prefs.fastStart && prefs.intro) out.push({ kind: 'intro', fen: fenAt(0) });
-      out.push({ kind: 'promoCard', fen: fenAt(0), last: null, card: 'tour', upTo: 0 });
+      if (prefs.tourStyle === 'cards') out.push({ kind: 'promoCard', fen: fenAt(0), last: null, card: 'tour', upTo: 0 });
+      else out.push({ kind: 'teaser', fen: fenAt(0), last: null, mate: false, text: clip.promo.hook, sub: `${TOUR.length} things you can do`, said: stripEmoji(clip.promo.hook) });
       const per = Math.max(1, Math.floor(plies.length / TOUR.length));
       let p = 0;
       TOUR.forEach((_, k) => {
@@ -2087,7 +2091,10 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
   })();
   // Opening clips always show their line notes; other clips follow the Captions setting.
   // Coach look: the bubble shows what the coach is saying (the latest line), else the hook.
-  const coachClip = coachOn && !clip.isMap;
+  // The app tour in the tree look is laid out like the Family Tree (its own bubble, stamp and list).
+  const tourTree = !!clip.isPromo && clip.promo?.template === 'tour' && prefs.tourStyle !== 'cards';
+  const tourK = !tourTree ? 0 : (() => { for (let k = i; k >= 0; k--) { const f = frames[k]; if (f?.kind === 'promoCard' && f.card === 'tour') return f.upTo ?? 0; } return 0; })();
+  const coachClip = coachOn && !clip.isMap && !tourTree;
   const bubbleText = (() => {
     if (!coachClip || !frame) return null;
     if (frame.kind === 'intro' || frame.kind === 'outro' || frame.kind === 'splash' || frame.kind === 'countdown' || frame.kind === 'card' || frame.kind === 'teaser' || frame.kind === 'title' || frame.kind === 'scanPhoto') return null;
@@ -2210,8 +2217,8 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
               </div>
             )}
             {/* Board block */}
-            <div className={`absolute ${clip.isMap ? 'inset-x-[7%] top-[17.5%]' : coachClip ? 'inset-x-[4%] top-[24%]' : 'inset-x-[4%] top-[22%]'}`} style={{ opacity: clip.isMap && frame?.kind === 'mapEnd' ? 0.18 : frame?.kind === 'intro' ? (coachOn ? 0.55 : 0.35) : frame?.kind === 'lessonText' ? 0.4 : 1, transition: 'opacity .4s' }}>
-              {!clip.isMap && <div className="mb-1 flex items-center justify-between gap-2"><p className="truncate text-[clamp(11px,1.6cqh,16px)] font-bold text-white/85">{name(top)}</p>{clockChip(top)}</div>}
+            <div className={`absolute ${clip.isMap || tourTree ? 'inset-x-[7%] top-[17.5%]' : coachClip ? 'inset-x-[4%] top-[24%]' : 'inset-x-[4%] top-[22%]'}`} style={{ opacity: (clip.isMap && frame?.kind === 'mapEnd') || (tourTree && tourK > TOUR.length) ? 0.18 : frame?.kind === 'intro' ? (coachOn ? 0.55 : 0.35) : frame?.kind === 'lessonText' ? 0.4 : 1, transition: 'opacity .4s' }}>
+              {!clip.isMap && !tourTree && <div className="mb-1 flex items-center justify-between gap-2"><p className="truncate text-[clamp(11px,1.6cqh,16px)] font-bold text-white/85">{name(top)}</p>{clockChip(top)}</div>}
               <div className={prefs.zoom ? 'overflow-hidden rounded-[10px]' : undefined}
                 style={clip.isMap && prefs.tilt ? { transform: 'perspective(120cqh) rotateX(26deg) scale(1.08)', transformOrigin: '50% 60%' } : undefined}>
               <motion.div className="relative" style={zoomOrigin && frame?.kind !== 'split' ? { transformOrigin: zoomOrigin } : undefined}
@@ -2358,6 +2365,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
                 const pr = clip.promo;
                 const box = 'absolute inset-x-[5%] top-[23%] z-30 rounded-[3cqh] bg-[#0B1112]/93 p-[2.4cqh] text-white shadow-2xl ring-2 ring-white/70';
                 if (frame.card === 'tour') {
+                  if (tourTree) return null;
                   const k = frame.upTo ?? 0;
                   if (k === 0) return (
                     <motion.div key="t0" initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 1.1 }} transition={{ type: 'spring', stiffness: 320, damping: 16 }} className={`${box} text-center`} style={{ fontSize: 'clamp(14px,2.6cqh,28px)' }}>
@@ -2813,6 +2821,64 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
                 </motion.div>
               )}
             </AnimatePresence>
+            {/* App tour, tree look: the coach's line on top, the feature stamped on the board,
+                and the list of features growing under it; it ends with all of them. */}
+            {tourTree && frame?.kind !== 'teaser' && frame?.kind !== 'intro' && frame?.kind !== 'splash' && (() => {
+              const done = tourK > TOUR.length;
+              const cur = tourK >= 1 && !done ? TOUR[tourK - 1] : null;
+              const stamping = frame?.kind === 'promoCard' && frame.card === 'tour' && !!cur;
+              const shown = TOUR.slice(0, done ? TOUR.length : tourK);
+              return (<>
+                <div className="pointer-events-none absolute inset-x-[5%] top-[2.4%] z-30 flex items-center justify-between font-black" style={{ fontSize: 'clamp(10px,1.65cqh,17px)' }}>
+                  <span className="text-white">♞ Everything on ChessScout</span>
+                  <span className="rounded-full bg-white/10 px-[0.6em] py-[0.1em] text-white/70">{Math.min(tourK, TOUR.length)} / {TOUR.length}</span>
+                </div>
+                {cur && (
+                  <AnimatePresence mode="wait">
+                    <motion.div key={`tq${tourK}`} initial={{ opacity: 0, scale: 0.92, y: 8 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.96 }} transition={{ type: 'spring', stiffness: 320, damping: 22 }}
+                      className="pointer-events-none absolute left-[5%] right-[5%] top-[5.8%] z-30 flex items-start gap-[0.55em]" style={{ fontSize: 'clamp(13px,2.45cqh,26px)' }}>
+                      <span className="grid h-[1.9em] w-[1.9em] shrink-0 place-items-center rounded-full bg-[#81B64C] text-[0.9em] shadow-lg">♞</span>
+                      <p className="relative line-clamp-3 rounded-[0.9em] rounded-tl-[0.2em] bg-white px-[0.75em] py-[0.45em] font-black leading-[1.15] text-[#141A14] shadow-xl">{cur.say}</p>
+                    </motion.div>
+                  </AnimatePresence>
+                )}
+                <AnimatePresence>
+                  {stamping && cur && (
+                    <motion.div key={`tstamp${tourK}`} initial={{ scale: 2.4, opacity: 0, rotate: -16 }} animate={{ scale: 1, opacity: 1, rotate: -7 }} exit={{ opacity: 0, scale: 0.85 }} transition={{ type: 'spring', stiffness: 420, damping: 16 }}
+                      className="pointer-events-none absolute left-1/2 top-[66%] z-30 -translate-x-1/2 text-center" style={{ fontSize: 'clamp(12px,2.4cqh,26px)' }}>
+                      <div className="rounded-[0.35em] px-[0.6em] py-[0.25em]" style={{ border: '0.16em solid #9BD35A', boxShadow: 'inset 0 0 0 0.08em #0B1112, inset 0 0 0 0.16em #9BD35A, 0 0.4em 1.4em rgba(0,0,0,.55)', background: 'rgba(11,17,18,.88)' }}>
+                        <p className="whitespace-nowrap font-black uppercase leading-none tracking-wide text-[#B8E08C]">{cur.emo} {cur.title}</p>
+                        <p className="mt-[0.3em] whitespace-nowrap font-bold text-white/75" style={{ fontSize: '0.45em' }}>{cur.line}</p>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+                {done && (
+                  <motion.div key="tdone" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ type: 'spring', stiffness: 260, damping: 20 }}
+                    className="pointer-events-none absolute inset-x-[6%] top-[9%] z-30 text-center">
+                    <p className="font-black leading-[1.05] text-white" style={{ fontSize: 'clamp(24px,5cqh,54px)' }}>Which one are you<br />trying first?</p>
+                    <motion.p initial={{ scale: 0.6, opacity: 0 }} animate={{ scale: [1, 1.06, 1], opacity: 1 }} transition={{ delay: 0.5, scale: { delay: 1, duration: 1, repeat: Infinity } }}
+                      className="mx-auto mt-[1.2cqh] w-fit rounded-full bg-[#81B64C] px-[1em] py-[0.3em] font-black text-white" style={{ fontSize: 'clamp(14px,2.8cqh,30px)' }}>chessscout.net</motion.p>
+                    <p className="mt-[0.8cqh] font-bold text-white/70" style={{ fontSize: 'clamp(12px,2cqh,21px)' }}>{clip.promo?.closer} Comment yours 👇</p>
+                  </motion.div>
+                )}
+                <div className={`pointer-events-none absolute inset-x-[7%] z-20 ${done ? 'top-[37%]' : 'top-[72.6%]'}`} style={{ fontSize: `clamp(10px,${done ? 1.55 : 1.7}cqh,18px)`, transition: 'top .5s' }}>
+                  <div className={done ? 'grid grid-cols-2 gap-x-[1em]' : ''}>
+                    {(done ? shown : shown.slice(Math.max(0, shown.length - 4))).map((t) => {
+                      const now = stamping && t === cur;
+                      return (
+                        <motion.div key={t.title} layout initial={{ opacity: 0, x: -14 }} animate={{ opacity: 1, x: 0 }} transition={{ type: 'spring', stiffness: 300, damping: 24 }} className="flex items-center" style={{ height: '1.6em' }}>
+                          <span className="truncate rounded-[0.4em] px-[0.5em] py-[0.08em] font-black"
+                            style={{ background: now ? '#81B64C' : 'transparent', color: now ? '#fff' : 'rgba(255,255,255,.88)', boxShadow: now ? '0 0 0 2px rgba(155,211,90,.5), 0 0 18px rgba(129,182,76,.55)' : undefined }}>
+                            {t.emo} {t.title}
+                          </span>
+                        </motion.div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </>);
+            })()}
             {/* The Family Tree: the coach's question bubble, the name stamped on the board,
                 and the family tree growing under it; it ends with the whole tree and "how many did you know?". */}
             {clip.isMap && clip.map && frame?.kind !== 'intro' && (() => {
@@ -3353,6 +3419,13 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
           <p className="mb-1 text-[11px] font-bold uppercase tracking-wide text-white/50">Story</p>
           <div className="mb-3 flex flex-wrap gap-1.5">
             {toggle('fastStart', 'Fast start (moves in the first second, like/follow ask after the first moves)')}
+            {clip.isPromo && clip.promo?.template === 'tour' && (
+              <div className="inline-flex rounded-lg bg-white/5 p-0.5">
+                {([['tree', 'Tour: Family Tree look'], ['cards', 'Tour: feature cards']] as const).map(([k, t]) => (
+                  <button key={k} onClick={() => set('tourStyle', k)} className="rounded-md px-3 py-1 text-[12px] font-bold" style={{ background: prefs.tourStyle === k ? '#81B64C' : 'transparent', color: prefs.tourStyle === k ? '#fff' : '#C9CFCD' }}>{t}</button>
+                ))}
+              </div>
+            )}
             {toggle('intro', 'Hook intro')}
             {toggle('guess', 'Find-the-move countdown')}
             {prefs.guess && [3, 5, 10].map((sec) => (
