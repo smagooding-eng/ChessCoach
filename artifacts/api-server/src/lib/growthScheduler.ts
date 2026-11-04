@@ -127,6 +127,7 @@ async function runEmailDrips() {
     await sendEngagedUpgradeEmails();
     await sendRaffleCountdownEmails();
     await import('./checkoutRecovery').then(({ runCheckoutRecovery }) => runCheckoutRecovery());
+    await import('./firstReviewEmail').then(({ runFirstReviewEmails }) => runFirstReviewEmails());
   } catch (err: unknown) {
     logger.error({ error: err instanceof Error ? err.message : 'Unknown' }, '[growth] Drip error');
   }
