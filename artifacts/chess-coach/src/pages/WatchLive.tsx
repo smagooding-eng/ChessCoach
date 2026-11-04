@@ -6,10 +6,12 @@ import { Loader2, ExternalLink, Radio, ArrowLeft } from 'lucide-react';
 import { ChessBoard } from '@/components/ChessBoard';
 import { MiniBoard } from '@/components/MiniBoard';
 import { apiFetch } from '@/lib/api';
+import { MoveBrowserBar } from '@/components/MoveBrowserBar';
+import { useMoveBrowser, positionsFromSan } from '@/hooks/use-move-browser';
 import { PT, cardStyle, ghostBtn } from '@/lib/playTheme';
 
 interface Bc { id: string; name: string; image: string | null; info: { format?: string; tc?: string; location?: string } | null; round: { id: string; name: string; ongoing: boolean; startsAt: number | null; finished: boolean } | null }
-interface Game { white: string | null; black: string | null; whiteElo: string | null; blackElo: string | null; whiteTitle: string | null; blackTitle: string | null; result: string | null; url: string | null; fen: string; last: { from: string; to: string } | null; moves: number; lastSan: string | null }
+interface Game { white: string | null; black: string | null; whiteElo: string | null; blackElo: string | null; whiteTitle: string | null; blackTitle: string | null; result: string | null; url: string | null; fen: string; last: { from: string; to: string } | null; moves: number; lastSan: string | null; sans?: string[]; startFen?: string | null }
 
 const who = (name: string | null, title: string | null, elo: string | null) => (
   <span className="truncate">{title && <span className="mr-1 rounded bg-[#CA3431] px-1 text-[10px] font-black text-white">{title}</span>}{name ?? '?'}{elo ? <span className="ml-1 font-semibold" style={{ color: PT.muted }}>{elo}</span> : null}</span>
@@ -38,6 +40,9 @@ export function WatchLive() {
   }, [sel]);
 
   const focus = open != null && games ? games[open] : null;
+  // Step back through the open game's moves (it keeps updating while you look back).
+  const positions = useMemo(() => (focus?.sans?.length ? positionsFromSan(focus.sans, focus.startFen || undefined) : []), [focus?.sans?.join(' '), focus?.startFen]); // eslint-disable-line react-hooks/exhaustive-deps
+  const browser = useMoveBrowser(positions, `${sel?.round?.id ?? ''}-${open ?? ''}`);
   const roundLabel = useMemo(() => (sel?.round ? `${sel.round.name}${sel.round.ongoing ? ' · live' : sel.round.finished ? ' · finished' : ''}` : ''), [sel]);
 
   if (sel) {
@@ -51,8 +56,19 @@ export function WatchLive() {
         {!games ? <Loader2 className="mx-auto mt-10 animate-spin" style={{ color: PT.green }} /> : focus ? (
           <div className="mx-auto max-w-[560px] space-y-2">
             <p className="flex justify-between gap-2 text-[14px] font-bold" style={{ color: PT.text }}>{who(focus.black, focus.blackTitle, focus.blackElo)}</p>
-            <ChessBoard fen={focus.fen} lastMove={focus.last} maxWidthOverride="100%" suppressConfirmMoves />
+            <ChessBoard fen={browser.viewing && browser.fen ? browser.fen : focus.fen} lastMove={browser.viewing ? browser.lastMove : focus.last} maxWidthOverride="100%" suppressConfirmMoves />
             <p className="flex justify-between gap-2 text-[14px] font-bold" style={{ color: PT.text }}>{who(focus.white, focus.whiteTitle, focus.whiteElo)}<span style={{ color: PT.muted }}>{focus.result && focus.result !== '*' ? focus.result : `Move ${Math.ceil(focus.moves / 2)}${focus.lastSan ? ` · ${focus.lastSan}` : ''}`}</span></p>
+            {positions.length > 1 && (<>
+              <MoveBrowserBar browser={browser} />
+              <div className="flex max-h-40 flex-wrap gap-x-1 gap-y-0.5 overflow-y-auto rounded-xl p-2 text-[13px] font-semibold" style={{ background: 'rgba(255,255,255,0.04)' }}>
+                {(focus.sans ?? []).map((san, k) => (
+                  <button key={k} onClick={() => browser.goTo(k + 1)} className="rounded px-1 py-0.5"
+                    style={{ background: browser.index === k + 1 ? '#81B64C' : 'transparent', color: browser.index === k + 1 ? '#fff' : PT.text }}>
+                    {k % 2 === 0 && <span style={{ color: PT.muted }}>{k / 2 + 1}.</span>}{san}
+                  </button>
+                ))}
+              </div>
+            </>)}
             {focus.url && /^https:\/\/lichess\.org\//.test(focus.url) && <a href={focus.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[12.5px] font-bold underline" style={{ color: PT.green }}>Open on Lichess <ExternalLink size={12} /></a>}
           </div>
         ) : games.length === 0 ? <p className="text-center text-[13px]" style={{ color: PT.muted }}>No games in this round yet.</p> : (

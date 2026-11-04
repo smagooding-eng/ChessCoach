@@ -78,6 +78,8 @@ router.get("/lichess/broadcast/:roundId", async (req: Request, res: Response) =>
       white: tag(g, "White"), black: tag(g, "Black"), whiteElo: tag(g, "WhiteElo"), blackElo: tag(g, "BlackElo"),
       whiteTitle: tag(g, "WhiteTitle"), blackTitle: tag(g, "BlackTitle"), result: tag(g, "Result"), round: tag(g, "Round"),
       url: tag(g, "GameURL") ?? tag(g, "Site"), fen, last, moves: sans.length, lastSan: sans[sans.length - 1] ?? null, pgn: g,
+      // Every move, so the game can be stepped back through.
+      sans, startFen: tag(g, "FEN"),
     };
   });
   res.json({ games });

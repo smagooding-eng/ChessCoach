@@ -37,6 +37,8 @@ export function useMoveBrowser(positions: BrowsePosition[], resetKey?: string | 
   const forward = useCallback(() => setView((v) => (v === null ? null : v + 1 >= last ? null : v + 1)), [last]);
   const first = useCallback(() => setView(0), []);
   const toLive = useCallback(() => setView(null), []);
+  /** Jump to a position (0 = the start); the latest one is the live game. */
+  const goTo = useCallback((i: number) => setView(i >= last ? null : Math.max(0, i)), [last]);
 
   // Arrow keys on desktop.
   useEffect(() => {
@@ -61,7 +63,7 @@ export function useMoveBrowser(positions: BrowsePosition[], resetKey?: string | 
     lastMove: pos?.lastMove ?? null,
     canBack: index > 0,
     canForward: viewing,
-    back, forward, first, toLive,
+    back, forward, first, toLive, goTo,
   };
 }
 export type MoveBrowser = ReturnType<typeof useMoveBrowser>;
