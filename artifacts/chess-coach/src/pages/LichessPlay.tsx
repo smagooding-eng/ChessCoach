@@ -45,7 +45,10 @@ export function LichessPlay() {
   const fromLive = params.get('from') === 'live';
   const [rated, setRated] = useState(params.get('rated') === '1');
   const [clock, setClock] = useState(() => { const s = params.get('seek'); const m = s?.match(/^(\d+)\+(\d+)$/); return m ? { m: +m[1], i: +m[2] } : { m: 10, i: 0 }; });
-  const [phase, setPhase] = useState<'idle' | 'seeking' | 'playing' | 'over'>('idle');
+  // Sent from Live Play (or any link with ?seek=): straight into the search, no clock picker first.
+  const [phase, setPhase] = useState<'idle' | 'seeking' | 'playing' | 'over'>(() => (params.get('seek') && lichessAuth() ? 'seeking' : 'idle'));
+  // Not connected on this device yet: check the account's saved connection before offering Connect.
+  const [checking, setChecking] = useState(() => !lichessAuth());
   const [error, setError] = useState<string | null>(null);
   const [gameId, setGameId] = useState<string | null>(null);
   const [full, setFull] = useState<LichessGameFull | null>(null);
@@ -63,7 +66,7 @@ export function LichessPlay() {
   // trip back from Lichess finished.
   useEffect(() => {
     const check = () => {
-      void syncLichessAuth().then((a) => { if (a) setAuth((cur) => (cur?.token === a.token ? cur : a)); });
+      void syncLichessAuth().then((a) => { if (a) setAuth((cur) => (cur?.token === a.token ? cur : a)); }).finally(() => setChecking(false));
     };
     check();
     const onVis = () => { if (document.visibilityState === 'visible') check(); };
@@ -80,7 +83,7 @@ export function LichessPlay() {
       if (e.type === 'gameStart') { seekAbort.current?.abort(); seekAbort.current = null; setGameId(e.game.gameId); setPhase('playing'); setError(null); }
     }, ac.signal).catch(() => {});
     // A game already going (came back to the page): pick it up.
-    void nowPlaying().then((g) => { if (g[0]) { setGameId(g[0].gameId); setPhase('playing'); } });
+    void nowPlaying().then((g) => { if (g[0]) { seekAbort.current?.abort(); seekAbort.current = null; setGameId(g[0].gameId); setPhase('playing'); } });
     return () => ac.abort();
   }, [auth]);
 
@@ -104,8 +107,9 @@ export function LichessPlay() {
   useEffect(() => {
     if (!auth || autoStarted.current || !params.get('seek')) return;
     autoStarted.current = true;
-    const t = setTimeout(() => { void nowPlaying().then((g) => { if (!g.length) void startSeek(); }); }, 300);
-    return () => clearTimeout(t);
+    // A game already going is picked up by the event stream, so the search starts right away.
+    void startSeek();
+    return undefined;
   }, [auth]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => () => { seekAbort.current?.abort(); }, []);
 
@@ -222,6 +226,7 @@ export function LichessPlay() {
     </div>
   ); };
 
+  if (!auth && checking) return <div className="grid min-h-[50vh] place-items-center"><Loader2 className="h-8 w-8 animate-spin" style={{ color: PT.green }} /></div>;
   // ── Not connected ──
   if (!auth) {
     return (
