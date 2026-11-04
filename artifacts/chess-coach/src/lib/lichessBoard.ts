@@ -51,9 +51,20 @@ export async function connectLichess(returnTo = '/lichess'): Promise<void> {
 }
 
 /** The connection saved on their ChessScout account (after connecting), kept here too. */
+let uploaded = false;
 export async function syncLichessAuth(): Promise<LichessAuth | null> {
   const local = lichessAuth();
-  if (local) return local;
+  if (local) {
+    // Connected on this device only (before connections were kept on the account):
+    // keep it on the account too, once a session, so daily-game alerts reach them.
+    if (!uploaded) {
+      uploaded = true;
+      void apiFetch('/api/lichess/board/token', { credentials: 'include' }).then((r) => (r.ok ? r.json() : null)).then((d: { connected?: boolean } | null) => {
+        if (d && !d.connected) void apiFetch('/api/lichess/board/token', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: local.token }) }).catch(() => {});
+      }).catch(() => {});
+    }
+    return local;
+  }
   try {
     const r = await apiFetch('/api/lichess/board/token', { credentials: 'include' });
     const d = r.ok ? await r.json().catch(() => null) as { connected?: boolean; token?: string; username?: string } | null : null;
@@ -138,7 +149,7 @@ export function seek(o: { minutes: number; increment: number; rated: boolean }, 
 
 export interface LichessPlayer { id?: string; name?: string; title?: string | null; rating?: number; provisional?: boolean; aiLevel?: number }
 export interface LichessState { type: 'gameState'; moves: string; wtime: number; btime: number; winc: number; binc: number; status: string; winner?: 'white' | 'black'; wdraw?: boolean; bdraw?: boolean; wtakeback?: boolean; btakeback?: boolean }
-export interface LichessGameFull { type: 'gameFull'; id: string; rated: boolean; speed: string; clock?: { initial: number; increment: number } | null; white: LichessPlayer; black: LichessPlayer; initialFen: string; state: LichessState }
+export interface LichessGameFull { type: 'gameFull'; id: string; rated: boolean; speed: string; daysPerTurn?: number; clock?: { initial: number; increment: number } | null; white: LichessPlayer; black: LichessPlayer; initialFen: string; state: LichessState }
 export type LichessGameLine = LichessGameFull | LichessState | { type: 'chatLine'; username: string; text: string; room: string } | { type: 'opponentGone'; gone: boolean; claimWinInSeconds?: number };
 
 export const streamGame = (id: string, onLine: (x: LichessGameLine) => void, signal: AbortSignal) => readStream<LichessGameLine>(`/api/board/game/stream/${id}`, onLine, signal);
@@ -162,12 +173,20 @@ export async function chatHistory(id: string): Promise<{ user: string; text: str
 }
 export const claimVictory = (id: string) => call(`/api/board/game/${id}/claim-victory`, { method: 'POST' });
 
-/** Games this account is in right now (to pick up one already going). */
-export async function nowPlaying(): Promise<{ gameId: string; color: 'white' | 'black'; opponent?: { username?: string } }[]> {
-  const r = await call('/api/account/playing');
+export interface LichessPlaying { gameId: string; color: 'white' | 'black'; opponent?: { username?: string; rating?: number }; speed?: string; isMyTurn?: boolean; secondsLeft?: number | null; lastMove?: string; fen?: string; rated?: boolean }
+/** Games this account is in right now (to pick up one already going; daily games too). */
+export async function nowPlaying(): Promise<LichessPlaying[]> {
+  const r = await call('/api/account/playing?nb=50');
   if (!r.ok) return [];
-  const d = await r.json().catch(() => null) as { nowPlaying?: { gameId: string; color: 'white' | 'black'; opponent?: { username?: string } }[] } | null;
+  const d = await r.json().catch(() => null) as { nowPlaying?: LichessPlaying[] } | null;
   return d?.nowPlaying ?? [];
+}
+export const isDaily = (g: { speed?: string }) => g.speed === 'correspondence';
+
+/** A daily (correspondence) game on Lichess: posted in Lichess's lobby until someone takes it. */
+export async function seekDaily(days: 1 | 2 | 3 | 5 | 7 | 10 | 14, rated: boolean): Promise<{ ok: boolean; status: number }> {
+  const r = await call('/api/board/seek', { method: 'POST', body: new URLSearchParams({ rated: String(rated), days: String(days), variant: 'standard', color: 'random' }), headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
+  return { ok: r.ok, status: r.status };
 }
 
 /** The finished game's PGN, from Lichess. */

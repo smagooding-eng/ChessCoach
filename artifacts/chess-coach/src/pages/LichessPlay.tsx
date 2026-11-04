@@ -19,7 +19,7 @@ import { ChatBubble, ChatTray, useChatMuted } from '@/components/play/LiveChat';
 import type { LiveChat } from '@/hooks/use-live-play';
 import {
   lichessAuth, connectLichess, disconnectLichess, syncLichessAuth, seek as lichessSeek, streamEvents, streamGame, playMove, resign, abort, draw, claimVictory,
-  nowPlaying, exportPgn, sendChat, chatHistory, isOver, LICHESS_STATUS_TEXT, type LichessGameFull, type LichessState, type LichessPlayer,
+  nowPlaying, isDaily, exportPgn, sendChat, chatHistory, isOver, LICHESS_STATUS_TEXT, type LichessGameFull, type LichessState, type LichessPlayer,
 } from '@/lib/lichessBoard';
 
 // ChessScout's team on Lichess.
@@ -61,11 +61,13 @@ export function LichessPlay() {
   const [rated, setRated] = useState(params.get('rated') === '1');
   const [clock, setClock] = useState(() => { const s = params.get('seek'); const m = s?.match(/^(\d+)\+(\d+)$/); return m ? { m: +m[1], i: +m[2] } : { m: 10, i: 0 }; });
   // Sent from Live Play (or any link with ?seek=): straight into the search, no clock picker first.
-  const [phase, setPhase] = useState<'idle' | 'seeking' | 'playing' | 'over'>(() => (params.get('seek') && lichessAuth() ? 'seeking' : 'idle'));
+  // ?game=ID: open that game (a daily game from the Daily tab or a "your move" alert).
+  const gameParam = params.get('game');
+  const [phase, setPhase] = useState<'idle' | 'seeking' | 'playing' | 'over'>(() => (gameParam ? 'playing' : params.get('seek') && lichessAuth() ? 'seeking' : 'idle'));
   // Not connected on this device yet: check the account's saved connection before offering Connect.
   const [checking, setChecking] = useState(() => !lichessAuth());
   const [error, setError] = useState<string | null>(null);
-  const [gameId, setGameId] = useState<string | null>(null);
+  const [gameId, setGameId] = useState<string | null>(() => (gameParam && /^[A-Za-z0-9]{8}$/.test(gameParam) ? gameParam : null));
   const [full, setFull] = useState<LichessGameFull | null>(null);
   const [st, setSt] = useState<LichessState | null>(null);
   const [stAt, setStAt] = useState(0);
@@ -95,10 +97,12 @@ export function LichessPlay() {
     if (!auth) return;
     const ac = new AbortController();
     void streamEvents((e) => {
+      // A daily game starting (someone took a daily seek) doesn't take over this screen.
+      if (e.type === 'gameStart' && isDaily(e.game) && e.game.gameId !== gameParam) return;
       if (e.type === 'gameStart') { seekAbort.current?.abort(); seekAbort.current = null; setGameId(e.game.gameId); setPhase('playing'); setError(null); }
     }, ac.signal).catch(() => {});
     // A game already going (came back to the page): pick it up.
-    void nowPlaying().then((g) => { if (g[0]) { seekAbort.current?.abort(); seekAbort.current = null; setGameId(g[0].gameId); setPhase('playing'); } });
+    if (!gameParam) void nowPlaying().then((all) => { const g = all.filter((x) => !isDaily(x)); if (g[0]) { seekAbort.current?.abort(); seekAbort.current = null; setGameId(g[0].gameId); setPhase('playing'); } });
     return () => ac.abort();
   }, [auth]);
 
@@ -269,9 +273,10 @@ export function LichessPlay() {
     return (
       <div className="mx-auto max-w-[620px] space-y-2.5 p-3 pb-24">
         <div className="flex items-center justify-between text-[12px] font-bold" style={{ color: PT.muted }}>
-          <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-[#81B64C]" />Lichess · {full.clock ? `${full.clock.initial / 60000}+${full.clock.increment / 1000}` : full.speed} · {full.rated ? 'Rated' : 'Casual'}</span>
+          <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-[#81B64C]" />Lichess · {full.clock ? `${full.clock.initial / 60000}+${full.clock.increment / 1000}` : full.daysPerTurn ? `Daily · ${full.daysPerTurn} day${full.daysPerTurn > 1 ? 's' : ''} a move` : full.speed} · {full.rated ? 'Rated' : 'Casual'}</span>
           <a href={`https://lichess.org/${full.id}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 underline">On lichess.org <ExternalLink size={12} /></a>
         </div>
+        {full.speed === 'correspondence' && <Link href="/daily" className="inline-block text-[12.5px] font-bold" style={{ color: PT.muted }}>← Daily games</Link>}
         <div className="relative">{row(top)}<ChatBubble chat={chat} side={top} muted={chatMuted} /></div>
         <MaterialStrip fen={pending?.fen ?? pos.chess.fen()} color={top} className="px-1" />
         <ChessBoard fen={browser.viewing && browser.fen ? browser.fen : pending?.fen ?? pos.chess.fen()} flipped={myColor === 'b'} lastMove={browser.viewing ? browser.lastMove : pending?.last ?? pos.last}
@@ -288,7 +293,9 @@ export function LichessPlay() {
             <GameOverOverlay gameKey={full.id} outcome={outcome} yourColor={myColor === 'w' ? 'white' : 'black'} subtitle={LICHESS_STATUS_TEXT[st.status]}
               actions={<>
                 {saving === 'saved' && <OverlayButton primary onClick={() => navigate(savedId ? `/games/${savedId}` : '/games')}><Sparkles size={15} /> Review this game</OverlayButton>}
-                <OverlayButton onClick={() => void startSeek()}><RotateCcw size={15} /> New game</OverlayButton>
+                {full.speed === 'correspondence'
+                  ? <OverlayButton onClick={() => navigate('/daily')}>Daily games</OverlayButton>
+                  : <OverlayButton onClick={() => void startSeek()}><RotateCcw size={15} /> New game</OverlayButton>}
               </>} />
           ) : undefined} />
         <MaterialStrip fen={pending?.fen ?? pos.chess.fen()} color={myColor} className="px-1" />
@@ -346,7 +353,9 @@ export function LichessPlay() {
             {saving === 'saved' && <button onClick={() => navigate(savedId ? `/games/${savedId}` : '/games')} className="w-full rounded-xl py-3 text-[14px] font-extrabold" style={greenBtn}>Review this game</button>}
             {saving === 'notyours' && <p className="text-[12.5px]" style={{ color: PT.muted }}>This Lichess account ({auth.username}) isn't the one linked to your ChessScout account, so the game wasn't added. Change your Lichess username in Settings to save these games.</p>}
             {saving === 'failed' && <button onClick={() => void saveGame()} className="w-full rounded-xl py-2.5 text-[13px] font-bold" style={ghostBtn}>Couldn't save it to your games. Try again</button>}
-            <button onClick={() => void startSeek()} className="w-full rounded-xl py-3 text-[14px] font-extrabold" style={saving === 'saved' ? ghostBtn : greenBtn}>New game</button>
+            {full.speed === 'correspondence'
+              ? <Link href="/daily" className="block w-full rounded-xl py-3 text-[14px] font-extrabold" style={saving === 'saved' ? ghostBtn : greenBtn}>Daily games</Link>
+              : <button onClick={() => void startSeek()} className="w-full rounded-xl py-3 text-[14px] font-extrabold" style={saving === 'saved' ? ghostBtn : greenBtn}>New game</button>}
             <a href={LICHESS_TEAM_URL} target="_blank" rel="noreferrer" className="block pt-1 text-[12.5px] font-bold underline" style={{ color: PT.green }}>♞ Join the ChessScout team on Lichess</a>
           </div>
         )}

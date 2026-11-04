@@ -8,6 +8,7 @@ import { PT, cardStyle, greenBtn, ghostBtn, formatLeft } from '@/lib/playTheme';
 import { ShareLink } from '@/components/play/ShareLink';
 import { NotifyPrompt } from '@/components/play/NotifyPrompt';
 import { SeekGoneCard, SeekJoiningCard, takeSeekParams, type SeekInfo } from '@/components/play/SeekGoneCard';
+import { lichessAuth, syncLichessAuth, connectLichess, nowPlaying, isDaily, seekDaily, type LichessPlaying } from '@/lib/lichessBoard';
 import { useChallengeInbox, ChallengeRequestsCard, ChallengeInvitesCard, SentRequestsCard, OpenLinksCard, createOpenLink } from '@/components/play/OpenChallenges';
 
 export const DAILY_TC = [
@@ -69,6 +70,29 @@ export function DailyGames({ embedded = false }: { embedded?: boolean } = {}) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [link, setLink] = useState<{ url: string; code: string } | null>(null);
+  // Lichess daily games (when Lichess is connected): the ones going, and posting a new one.
+  const [lichess, setLichess] = useState(lichessAuth);
+  const [liGames, setLiGames] = useState<LichessPlaying[]>([]);
+  const [liNote, setLiNote] = useState<string | null>(null);
+  useEffect(() => { void syncLichessAuth().then((a) => { if (a) setLichess(a); }); }, []);
+  useEffect(() => {
+    if (!lichess) return;
+    const f = () => void nowPlaying().then((g) => setLiGames(g.filter(isDaily))).catch(() => {});
+    f(); const t = setInterval(f, 60_000);
+    return () => clearInterval(t);
+  }, [lichess]);
+  const daysOf = (t: string): 1 | 3 | 7 => (t === 'corr_7d' ? 7 : t === 'corr_3d' ? 3 : 1);
+  const findOnLichess = async (t = tc, m = mode) => {
+    if (!lichessAuth()) { void connectLichess('/daily'); return; }
+    setBusy(true); setError(''); setLiNote(null);
+    try {
+      const r = await seekDaily(daysOf(t), m === 'ranked');
+      if (r.status === 401) { setLichess(null); setError('Your Lichess connection expired. Connect again.'); return; }
+      if (!r.ok) throw new Error(r.status === 429 ? 'Lichess asked us to slow down. Try again in a minute.' : "Lichess couldn't post that game.");
+      setLiNote(`Posted on Lichess (${dailyTcLabel(t)} a move, ${m === 'ranked' ? 'rated' : 'casual'}). The game shows up below as soon as someone takes it, and we'll notify you when it's your move.`);
+    } catch (e) { setError(e instanceof Error ? e.message : "Lichess couldn't post that game."); }
+    finally { setBusy(false); }
+  };
   const inbox = useChallengeInbox();
 
   const load = useCallback(async () => {
@@ -254,6 +278,10 @@ export function DailyGames({ embedded = false }: { embedded?: boolean } = {}) {
         <button onClick={openLink} disabled={busy} className="w-full rounded-xl py-2.5 text-[13px] font-bold disabled:opacity-60" style={ghostBtn}>
           Create an open link (anyone can challenge you)
         </button>
+        <button onClick={() => void findOnLichess()} disabled={busy} className="w-full rounded-xl py-2.5 text-[13px] font-bold disabled:opacity-60" style={ghostBtn}>
+          ♞ {lichess ? `Find a Lichess opponent (as ${lichess.username})` : 'Connect Lichess to play daily games there too'}
+        </button>
+        {liNote && <p className="text-[12.5px]" style={{ color: PT.green }}>{liNote}</p>}
         {link && (
           <div className="space-y-2 rounded-xl p-3" style={{ background: 'rgba(0,0,0,.2)' }}>
             <p className="text-[12.5px]" style={{ color: PT.text }}>Send this link. The game starts as soon as your friend accepts; we'll notify you.</p>
@@ -273,6 +301,12 @@ export function DailyGames({ embedded = false }: { embedded?: boolean } = {}) {
                 {dailyTcLabel(q.timeControl)} · {q.mode === 'ranked' ? 'Ranked' : 'Casual'}
                 <span className="block text-[11.5px]" style={{ color: PT.muted }}>Waiting since {new Date(q.joinedAt).toLocaleString()} · we've told players with notifications on, and we'll notify you when matched</span>
               </span>
+              {Date.now() - new Date(q.joinedAt).getTime() > 60_000 && (
+                <button onClick={() => { void leave(q).then(() => findOnLichess(q.timeControl, q.mode === 'ranked' ? 'ranked' : 'casual')); }} disabled={busy}
+                  className="shrink-0 rounded-lg px-2.5 py-1.5 text-[11.5px] font-extrabold disabled:opacity-60" style={greenBtn} title="Stop waiting here and play a Lichess player instead">
+                  ♞ Lichess player instead
+                </button>
+              )}
               <button onClick={() => leave(q)} className="shrink-0 rounded-lg p-2" style={ghostBtn} aria-label="Stop searching"><X size={15} /></button>
             </div>
           ))}
@@ -283,6 +317,25 @@ export function DailyGames({ embedded = false }: { embedded?: boolean } = {}) {
         <div className="py-10 text-center"><Loader2 className="mx-auto animate-spin" style={{ color: PT.green }} /></div>
       ) : (
         <>
+          {liGames.length > 0 && (
+            <section className="overflow-hidden" style={cardStyle}>
+              <h2 className="px-4 py-3 text-[13px] font-black uppercase tracking-[0.14em]" style={{ color: PT.muted }}>♞ On Lichess · {liGames.length}</h2>
+              {[...liGames].sort((a, b) => Number(!!b.isMyTurn) - Number(!!a.isMyTurn)).map((g) => (
+                <Link key={g.gameId} href={`/lichess?game=${g.gameId}`} className="flex items-center gap-3 px-4 py-3" style={{ borderTop: `1px solid ${PT.border}` }}>
+                  <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: g.color === 'white' ? '#f0ede8' : '#1b1b1b', border: '1px solid rgba(255,255,255,.35)' }} />
+                  <span className="min-w-0 flex-1">
+                    <b className="block truncate text-[14.5px] font-extrabold" style={{ color: PT.text }}>vs {g.opponent?.username ?? 'Opponent'}</b>
+                    <span className="block truncate text-[12px]" style={{ color: PT.muted }}>Lichess daily · {g.rated ? 'Rated' : 'Casual'}</span>
+                  </span>
+                  <span className="shrink-0 text-right">
+                    <span className="block text-[12px] font-extrabold" style={{ color: g.isMyTurn ? PT.green : PT.muted }}>{g.isMyTurn ? 'Your move' : 'Their move'}</span>
+                    {typeof g.secondsLeft === 'number' && <span className="block text-[11px]" style={{ color: g.secondsLeft < 3600 ? PT.red : PT.muted }}>{formatLeft(g.secondsLeft * 1000)} left</span>}
+                  </span>
+                  <ChevronRight size={16} className="shrink-0" style={{ color: PT.muted }} />
+                </Link>
+              ))}
+            </section>
+          )}
           <Section title="Your move" list={myTurn} />
           <Section title="Waiting for opponent" list={theirTurn} />
           <Section title="Recently finished" list={finished} />

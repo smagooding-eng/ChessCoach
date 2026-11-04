@@ -87,6 +87,21 @@ router.get("/lichess/board/token", requireAuth, async (req: Request, res: Respon
   } catch { res.json({ connected: false }); }
 });
 
+// A connection made on this device before connections were kept on the account: keep it
+// on the account too (so daily-game alerts work). Checked with Lichess first.
+router.post("/lichess/board/token", requireAuth, async (req: Request, res: Response) => {
+  const token = typeof req.body?.token === "string" ? req.body.token.trim() : "";
+  if (!/^[A-Za-z0-9_]{10,200}$/.test(token)) { res.status(400).json({ error: "Bad token" }); return; }
+  try {
+    await ensureTable();
+    const acc = await fetch("https://lichess.org/api/account", { headers: { Authorization: `Bearer ${token}` } }).then((x) => (x.ok ? x.json() : null)).catch(() => null) as { username?: string; title?: string } | null;
+    if (!acc?.username || acc.title === "BOT") { res.status(400).json({ error: "Lichess didn't accept that connection" }); return; }
+    await db.execute(sql`INSERT INTO lichess_board_tokens (user_id, token, username, updated_at) VALUES (${req.user!.id}, ${seal(token)}, ${acc.username}, now())
+      ON CONFLICT (user_id) DO UPDATE SET token = EXCLUDED.token, username = EXCLUDED.username, updated_at = now()`);
+    res.json({ ok: true });
+  } catch { res.status(500).json({ error: "Couldn't save it" }); }
+});
+
 router.delete("/lichess/board/token", requireAuth, async (req: Request, res: Response) => {
   try {
     await ensureTable();
@@ -96,5 +111,50 @@ router.delete("/lichess/board/token", requireAuth, async (req: Request, res: Res
   } catch { /* ignore */ }
   res.json({ ok: true });
 });
+
+// ── Lichess daily games: "your move" alerts ────────────────────────────────
+// Every 5 minutes, for each connected account, the games it's playing on Lichess.
+// A daily (correspondence) game where it's their move, and that we haven't told
+// them about for this move yet, gets a notification (inbox + push).
+let watching = false;
+async function checkDailyTurns(): Promise<void> {
+  await ensureTable();
+  await db.execute(sql`CREATE TABLE IF NOT EXISTS lichess_daily_notified (
+    user_id varchar NOT NULL, game_id varchar NOT NULL, last_move varchar NOT NULL DEFAULT '', at timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (user_id, game_id))`);
+  const rows = rowsOf<{ user_id: string; token: string }>(await db.execute(sql`SELECT user_id, token FROM lichess_board_tokens`));
+  const { notifyUser } = await import("../lib/notify");
+  for (const r of rows) {
+    const token = open(r.token);
+    if (!token) continue;
+    try {
+      const res = await fetch("https://lichess.org/api/account/playing?nb=50", { headers: { Authorization: `Bearer ${token}` } });
+      if (res.status === 429) { await new Promise((x) => setTimeout(x, 60_000)); continue; }
+      if (!res.ok) continue;
+      const d = await res.json() as { nowPlaying?: { gameId: string; speed?: string; isMyTurn?: boolean; lastMove?: string; opponent?: { username?: string } }[] };
+      for (const g of d.nowPlaying ?? []) {
+        if (g.speed !== "correspondence" || !g.isMyTurn) continue;
+        const mv = g.lastMove ?? "";
+        const seen = rowsOf<{ last_move: string }>(await db.execute(sql`SELECT last_move FROM lichess_daily_notified WHERE user_id = ${r.user_id} AND game_id = ${g.gameId}`))[0];
+        if (seen && seen.last_move === mv) continue;
+        await db.execute(sql`INSERT INTO lichess_daily_notified (user_id, game_id, last_move) VALUES (${r.user_id}, ${g.gameId}, ${mv})
+          ON CONFLICT (user_id, game_id) DO UPDATE SET last_move = EXCLUDED.last_move, at = now()`);
+        const opp = g.opponent?.username || "your opponent";
+        await notifyUser(r.user_id, { title: "Your move ♞", body: mv ? `${opp} has moved in your Lichess daily game.` : `Your Lichess daily game vs ${opp} has started. You're White.`, url: `/lichess?game=${g.gameId}`, kind: "daily" }).catch(() => {});
+      }
+    } catch { /* try again next time */ }
+    await new Promise((x) => setTimeout(x, 400));
+  }
+  // Old records go after a month.
+  await db.execute(sql`DELETE FROM lichess_daily_notified WHERE at < now() - interval '30 days'`).catch(() => {});
+}
+export function startLichessDailyWatch(): void {
+  if (watching) return;
+  watching = true;
+  let busy = false;
+  const tick = async () => { if (busy) return; busy = true; try { await checkDailyTurns(); } catch (err) { logger.warn({ err }, "[lichess-daily] check failed"); } finally { busy = false; } };
+  setTimeout(() => void tick(), 90_000);
+  setInterval(() => void tick(), 5 * 60_000);
+}
 
 export default router;
