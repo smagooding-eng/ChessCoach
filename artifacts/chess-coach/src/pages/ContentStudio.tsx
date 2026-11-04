@@ -5,6 +5,7 @@ import { ArrowLeft, Loader2, RefreshCw, Search, Clapperboard, Shuffle } from 'lu
 import { apiFetch } from '@/lib/api';
 import { MiniBoard } from '@/components/MiniBoard';
 import { useUser } from '@/hooks/use-user';
+import { OPENING_MAP } from '@/components/studio/openingMap';
 import { StudioPlayer, themeLabel, type StudioMoment, type StudioTrap, type StudioSource, type StudioPuzzle, type StudioReview, type StudioScout, type StudioLesson, type StudioPromo } from '@/components/studio/StudioPlayer';
 import { Chess } from 'chess.js';
 
@@ -115,7 +116,7 @@ export function ContentStudio() {
       setComp(top.reverse().map((m) => ({ kind: 'game', moment: m })));
     } finally { setAutoBusy(null); }
   };
-  const keyOf = (x: StudioSource): string => (x.kind === 'trap' ? `t${x.trap.id}` : x.kind === 'puzzle' ? `p${x.puzzle.id}` : x.kind === 'review' ? `r${x.review.id}`
+  const keyOf = (x: StudioSource): string => (x.kind === 'map' ? `map-${x.episode}` : x.kind === 'trap' ? `t${x.trap.id}` : x.kind === 'puzzle' ? `p${x.puzzle.id}` : x.kind === 'review' ? `r${x.review.id}`
     : x.kind === 'scout' ? `s${x.scout.id}` : x.kind === 'lesson' ? `l${x.lesson.id}` : x.kind === 'scan' ? `x${x.fen}` : x.kind === 'promo' ? `promo-${x.promo.template}-${x.promo.hook}` : x.kind === 'line' ? `line-${x.line.moves.map((m) => m.san).join(' ')}` : x.kind === 'opening' ? `o-${x.opening.id}${x.opening.line ? `-${x.opening.line}` : ''}` : `g${x.moment.gameId}-${x.moment.moveIndex}`);
   const togglePick = (x: StudioSource) => setPicked((cur) => (cur.some((c) => keyOf(c) === keyOf(x)) ? cur.filter((c) => keyOf(c) !== keyOf(x)) : [...cur, x]));
   const isPicked = (x: StudioSource) => picked.some((c) => keyOf(c) === keyOf(x));
@@ -549,6 +550,23 @@ export function ContentStudio() {
         </div>
       </>) : view === 'openings' ? (<>
         <p className="mb-3 max-w-2xl text-[13px] text-white/65">Tap an opening for the full clip: the ideas, who wins in real games, "what would you play?", the replies with how often they're played and Stockfish's verdict, every main line and a trap when there's one. Or tap one of its lines underneath for a video on just that line: every move explained, why it works, its real-game numbers and Stockfish's best next move. The first open of each opening takes a few seconds while Stockfish looks at it.</p>
+        <div className="mb-5">
+          <p className="mb-1 text-[12px] font-black uppercase tracking-wide text-[#B8E08C]">🗺️ Opening Map series</p>
+          <p className="mb-2 max-w-2xl text-[12.5px] text-white/60">Six episodes. Each walks the tree of opening names from one starting position: the board plays out to each branch, names it, and fills in a collection, then ends with all the names and a teaser for the next episode.</p>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            {OPENING_MAP.map((e) => {
+              const src: StudioSource = { kind: 'map', episode: e.no };
+              const on = isPicked(src);
+              return (
+                <button key={e.id} onClick={() => choose(src)} className="rounded-xl bg-white/5 p-3 text-left ring-1 ring-white/10 transition hover:ring-[#81B64C]" style={on ? { boxShadow: '0 0 0 3px #81B64C' } : undefined}>
+                  <p className="text-[11px] font-black uppercase tracking-wide text-[#9BD35A]">{on ? `${picked.findIndex((c) => keyOf(c) === keyOf(src)) + 1} · ` : ''}Episode {e.no} / {OPENING_MAP.length}</p>
+                  <p className="truncate text-[14px] font-black">{e.title}</p>
+                  <p className="truncate text-[11.5px] text-white/55">{e.family} · {e.steps.filter((x) => x.name).length} names</p>
+                </button>
+              );
+            })}
+          </div>
+        </div>
         {!openings ? <Loader2 className="mx-auto mt-10 animate-spin text-white/60" /> : (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
             {openings.map((o) => {
