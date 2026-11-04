@@ -16,6 +16,7 @@ import { MaterialStrip, EvalBar } from '@/components/GameStatusStrip';
 import { MoveBrowserBar } from '@/components/MoveBrowserBar';
 import { useMoveBrowser, positionsFromSan } from '@/hooks/use-move-browser';
 import { ChatBubble, ChatTray, useChatMuted } from '@/components/play/LiveChat';
+import { NotifyPrompt } from '@/components/play/NotifyPrompt';
 import type { LiveChat } from '@/hooks/use-live-play';
 import {
   lichessAuth, connectLichess, disconnectLichess, syncLichessAuth, seek as lichessSeek, streamEvents, streamGame, playMove, resign, abort, draw, claimVictory,
@@ -357,6 +358,7 @@ export function LichessPlay() {
               ? <Link href="/daily" className="block w-full rounded-xl py-3 text-[14px] font-extrabold" style={saving === 'saved' ? ghostBtn : greenBtn}>Daily games</Link>
               : <button onClick={() => void startSeek()} className="w-full rounded-xl py-3 text-[14px] font-extrabold" style={saving === 'saved' ? ghostBtn : greenBtn}>New game</button>}
             <a href={LICHESS_TEAM_URL} target="_blank" rel="noreferrer" className="block pt-1 text-[12.5px] font-bold underline" style={{ color: PT.green }}>♞ Join the ChessScout team on Lichess</a>
+            <NotifyPrompt id="aftergame" reason="Play daily games on Lichess? Turn on notifications and we'll tell you when it's your move." />
           </div>
         )}
         {error && <p className="text-center text-[13px]" style={{ color: PT.red }}>{error}</p>}

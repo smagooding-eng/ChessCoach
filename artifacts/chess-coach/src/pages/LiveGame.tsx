@@ -12,6 +12,7 @@ import { GameOverOverlay, OverlayButton, describeEnding } from '@/components/Gam
 import { useLocation } from 'wouter';
 
 import { PT } from '@/lib/playTheme';
+import { NotifyPrompt } from '@/components/play/NotifyPrompt';
 import { ChatBubble, ChatTray, useChatMuted } from '@/components/play/LiveChat';
 const CHESSCOM_GREEN = PT.green;
 const TEXT_LIGHT = PT.text;
@@ -399,6 +400,7 @@ export function LiveGame({ live, onLeave }: { live: ReturnType<typeof useLivePla
       <div className="space-y-3 lg:hidden">{messages}</div>
 
       {resultBanner}
+      {finished && <NotifyPrompt id="aftergame" reason="Want rematches and challenges even when the app is closed? Turn on notifications." />}
     </div>
   );
 }

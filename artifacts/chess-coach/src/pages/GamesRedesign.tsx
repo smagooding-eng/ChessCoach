@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Link } from 'wouter';
+import { NotifyPrompt } from '@/components/play/NotifyPrompt';
 import { Search, ChevronRight, RefreshCw, Users, Download } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from '@/lib/api';
@@ -231,6 +232,7 @@ export function GamesRedesign() {
           </div>
         )}
 
+        {!!bulkJobId && <NotifyPrompt id="games" className="mb-2.5" reason="Reviews take a few minutes. Turn on notifications and we'll tell you the moment they're ready." />}
         {source === 'all' && (unreviewedCount > 0 || !!bulkJobId) && (
           <div className="mt-3 flex items-center gap-3 rounded-[16px] px-4 py-3" style={{ background: 'rgba(129,182,76,.07)', border: '1px solid rgba(129,182,76,.28)' }}>
             <div className="min-w-0 flex-1 text-[13px]">
