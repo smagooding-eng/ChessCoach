@@ -920,7 +920,17 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
   const frames = useMemo<Frame[]>(() => {
     if (!clip || (!clip.plies.length && !clip.isLesson && !clip.isScout && !clip.isMap)) return [];
     const { plies, key } = clip;
-    const withInserts = (base0: Frame[]): Frame[] => {
+    const withInserts = (raw: Frame[]): Frame[] => {
+      // Coach look: the title card (the intro) is the very first thing on screen, so it's
+      // also the reel's cover. It goes in front of any hook scene (after a compilation's title).
+      let base0 = raw;
+      if (prefs.theme !== 'classic' && prefs.intro && raw.length) {
+        const rest = raw.filter((f) => f.kind !== 'intro');
+        const at = rest[0]?.kind === 'title' ? 1 : 0;
+        const firstBoard = rest.find((f) => f.kind !== 'title');
+        const fen = firstBoard && 'fen' in firstBoard && firstBoard.fen ? firstBoard.fen : START_FEN;
+        base0 = [...rest.slice(0, at), { kind: 'intro', fen }, ...rest.slice(at)];
+      }
       // Every clip (the last one of a compilation) ends with the splash, after the end card.
       const base = prefs.splash && isLast && base0.length ? [...base0, { kind: 'splash' as const, fen: START_FEN }] : base0;
       if (!Object.keys(inserts).length) return base;
@@ -1155,7 +1165,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
     if (prefs.guessRating && !clip.isTrap && (clip.ratings.w || clip.ratings.b)) out.push({ kind: 'reveal', fen: lastFen });
     if (prefs.outro && isLast) out.push({ kind: 'outro', fen: lastFen });
     return withInserts(out);
-  }, [clip, prefs.before, prefs.trapBefore, prefs.after, prefs.intro, prefs.guess, prefs.betterLine, prefs.guessRating, prefs.outro, prefs.split, prefs.reviewMode, prefs.countdownSecs, prefs.splash, prefs.openTeaser, prefs.openCut, prefs.lineCtaLine, inserts, loadedKey, isComp, isFirst, isLast]);
+  }, [clip, prefs.before, prefs.trapBefore, prefs.after, prefs.intro, prefs.guess, prefs.betterLine, prefs.guessRating, prefs.outro, prefs.split, prefs.reviewMode, prefs.countdownSecs, prefs.splash, prefs.openTeaser, prefs.openCut, prefs.lineCtaLine, prefs.theme, inserts, loadedKey, isComp, isFirst, isLast]);
 
   // ── Keyframes: a stable id per frame (so pauses and sticker in/out points survive setting changes) ─
   const frameIds = useMemo(() => assignIds(frames, loadedKey), [frames]);
@@ -1193,7 +1203,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
   const baseDur = (f: Frame) => {
     const s = prefs.speed * 1000;
     switch (f.kind) {
-      case 'intro': return frames[0]?.kind === 'teaser' ? 1300 : 1600;
+      case 'intro': return prefs.theme !== 'classic' ? 2600 : frames[0]?.kind === 'teaser' ? 1300 : 1600;
       case 'teaser': return f.cta ? 4400 : 2600;
       case 'mapMove': return f.back ? 170 : Math.max(420, s * 0.5);
       case 'mapStep': return clip?.map?.steps[f.step]?.name ? 2700 : 2600;
@@ -1522,7 +1532,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
     if (!f || !clip) return null;
     switch (f.kind) {
       case 'title': return stripEmoji(compTitle);
-      case 'intro': return stripEmoji(hook.replace(/^#\d+ · /, ''));
+      case 'intro': return prefs.theme !== 'classic' && (clip.isMap || frames.some((x) => x.kind === 'teaser')) ? null : stripEmoji(hook.replace(/^#\d+ · /, ''));
       case 'teaser': return f.said;
       case 'countdown': return f.n === (f.total ?? 3) ? (f.text ? stripEmoji(f.text) : clip.isTrap ? 'Can you spot the winning move?' : 'Can you find the move?') : null;
       case 'card': return stripEmoji(f.text);
@@ -1928,7 +1938,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
   const coachClip = coachOn && !clip.isMap;
   const bubbleText = (() => {
     if (!coachClip || !frame) return null;
-    if (frame.kind === 'outro' || frame.kind === 'splash' || frame.kind === 'countdown' || frame.kind === 'card' || frame.kind === 'teaser' || frame.kind === 'title' || frame.kind === 'scanPhoto') return null;
+    if (frame.kind === 'intro' || frame.kind === 'outro' || frame.kind === 'splash' || frame.kind === 'countdown' || frame.kind === 'card' || frame.kind === 'teaser' || frame.kind === 'title' || frame.kind === 'scanPhoto') return null;
     for (let k = i; k >= Math.max(0, i - 14); k--) {
       const t = narrationBase(frames[k]);
       if (t && frames[k].kind !== 'title') return t;
@@ -1938,6 +1948,21 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
   })();
   const topic = !coachClip ? '' : clip.isTrap ? '🪤 Trap' : clip.isPuzzle ? `🧩 Puzzle${clip.puzzleRating ? ` · ${clip.puzzleRating}` : ''}` : clip.isReview ? '📊 Game review' : clip.isScout ? '🔍 Opponent scout'
     : clip.isLesson ? '🎓 Lesson' : clip.isOpening ? `♟️ ${clip.openingData?.name ?? 'Opening'}${clip.lineMode ? ` · Line ${clip.lineMode.no}` : ''}` : clip.isScan ? '📷 Scanned board' : clip.isPromo ? '♞ ChessScout' : '⚡ Game moment';
+  // The title card: a kicker, a big title (*word* = highlighted) and a line under it.
+  const titleCard = (() => {
+    const emo = (hook.match(/\p{Extended_Pictographic}/u) ?? [''])[0];
+    const plain = stripEmoji(hook.replace(/^#\d+ · /, '')).trim();
+    const lastWord = (t: string) => t.replace(/(\S+)([.!?]*)$/, '*$1*$2');
+    if (clip.isMap && clip.map) { const n = clip.map.steps.filter((x) => x.name).length; return { kicker: `The Family Tree · Part ${clip.map.no}`, title: `*${n}* openings`, sub: `from ${clip.map.family}. How many do you know?`, emo: '🌳', big: true }; }
+    if (clip.lineMode && clip.openingData) { const l = clip.openingData.lines[0]; return { kicker: `${clip.openingData.name} · Line ${clip.lineMode.no}`, title: lastWord(`The ${l.name}`), sub: 'Every move, explained', emo: '♟️', big: false }; }
+    if (clip.isOpening && clip.openingData) { const o = clip.openingData; const h = stripEmoji(o.hook).split(':'); return { kicker: 'Opening', title: lastWord(o.name), sub: (h[1] ?? h[0]).trim(), emo: '♟️', big: false }; }
+    if (clip.isTrap) return { kicker: 'Trap alert', title: lastWord(plain.replace(/^The /, 'The ')), sub: 'Would you fall for it?', emo: emo || '🪤', big: false };
+    if (clip.isPuzzle) return { kicker: `Puzzle${clip.puzzleRating ? ` · ${clip.puzzleRating}` : ''}`, title: 'Find the *move*', sub: plain, emo: emo || '🧩', big: false };
+    if (clip.isScout && clip.scout) return { kicker: 'Opponent scout', title: lastWord(clip.scout.profile?.name || clip.scout.username), sub: 'Here’s how to beat them', emo: '🔍', big: false };
+    if (clip.isReview) return { kicker: 'Game review', title: lastWord(plain), sub: clip.names.w && clip.names.b ? `${clip.names.w} vs ${clip.names.b}` : sub, emo: emo || '📊', big: false };
+    if (clip.isLesson && clip.lesson) return { kicker: clip.lesson.course?.title ?? 'Lesson', title: lastWord(clip.lesson.title), sub: 'Learn it in a minute', emo: emo || '🎓', big: false };
+    return { kicker: clip.isPromo ? 'ChessScout' : clip.isScan ? 'Scanned board' : 'Game moment', title: lastWord(plain), sub: sub, emo, big: false };
+  })();
   const caption = frame?.kind === 'better' ? frame.text : (prefs.captions || clip.isOpening) && cur && !subWords ? rev?.explanation : null;
   const showBottomMove = frame?.kind === 'move' && cur;
 
@@ -1972,6 +1997,40 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
               <p className="font-black leading-[1.08] text-white" style={{ fontSize: frame?.kind === 'intro' ? 'clamp(24px, 6.4cqh, 64px)' : 'clamp(18px, 4.4cqh, 44px)', textShadow: '0 3px 14px rgba(0,0,0,.6)' }}>{hook}</p>
               {sub && <p className="mt-1.5 line-clamp-2 text-[clamp(11px,1.8cqh,18px)] font-bold text-white/70">{sub}</p>}
             </motion.div>
+            {/* Coach look: the title card (first frame, and the reel's cover) */}
+            <AnimatePresence>
+              {coachOn && frame?.kind === 'intro' && (
+                <motion.div key={`tc${playing ? 1 : 0}${clipQ}`} initial={{ opacity: 1 }} exit={{ opacity: 0, scale: 1.04 }} transition={{ duration: 0.35 }} className="pointer-events-none absolute inset-0 z-40 overflow-hidden">
+                  <div className="absolute inset-0" style={{ background: 'radial-gradient(120% 70% at 50% 38%, rgba(11,17,18,.25) 0%, rgba(11,17,18,.82) 62%, rgba(5,8,6,.96) 100%)' }} />
+                  {/* Light rays behind the title */}
+                  <motion.div className="absolute left-1/2 top-[40%] h-[120cqh] w-[120cqh] -translate-x-1/2 -translate-y-1/2" initial={{ rotate: 0, opacity: 0 }} animate={{ rotate: 40, opacity: 0.5 }} transition={{ duration: 6, ease: 'linear' }}
+                    style={{ background: 'repeating-conic-gradient(from 0deg, rgba(129,182,76,.22) 0deg 7deg, transparent 7deg 22deg)', maskImage: 'radial-gradient(circle, #000 0%, transparent 62%)', WebkitMaskImage: 'radial-gradient(circle, #000 0%, transparent 62%)' }} />
+                  <div className="absolute inset-x-[7%] top-[24%] text-center">
+                    <motion.p initial={{ y: -16, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.1, type: 'spring', stiffness: 300, damping: 20 }}
+                      className="mx-auto w-fit rounded-full bg-[#81B64C] px-[1em] py-[0.3em] font-black uppercase tracking-[0.08em] text-white shadow-lg" style={{ fontSize: 'clamp(11px,2cqh,21px)' }}>{titleCard.kicker}</motion.p>
+                    {titleCard.emo && (
+                      <motion.p initial={{ scale: 0, rotate: -30 }} animate={{ scale: 1, rotate: -8 }} transition={{ delay: 0.55, type: 'spring', stiffness: 380, damping: 12 }}
+                        className="mx-auto mt-[2cqh] w-fit" style={{ fontSize: 'clamp(34px,7.5cqh,80px)', filter: 'drop-shadow(0 0.12em 0.2em rgba(0,0,0,.6))' }}>{titleCard.emo}</motion.p>
+                    )}
+                    <motion.p initial={{ scale: 1.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ delay: 0.25, type: 'spring', stiffness: 260, damping: 15 }}
+                      className="relative mt-[1.4cqh] font-black uppercase leading-[0.95] text-white"
+                      style={{ fontSize: titleCard.big ? 'clamp(44px,10.5cqh,112px)' : `clamp(30px,${titleCard.title.length > 30 ? 5.6 : titleCard.title.length > 18 ? 6.8 : 8.2}cqh,90px)`, letterSpacing: '-0.01em', textShadow: '0 0.06em 0 #0B1112, 0 0.12em 0.5em rgba(0,0,0,.65)' }}>
+                      {titleCard.title.split(/(\*[^*]+\*)/).map((t, n) => t.startsWith('*') ? <span key={n} style={{ color: '#9BD35A' }}>{t.slice(1, -1)}</span> : <span key={n}>{t}</span>)}
+                      {/* Shine sweep */}
+                      <motion.span className="absolute inset-0" initial={{ x: '-120%' }} animate={{ x: '120%' }} transition={{ delay: 0.9, duration: 0.9, ease: 'easeInOut' }}
+                        style={{ background: 'linear-gradient(100deg, transparent 30%, rgba(255,255,255,.55) 50%, transparent 70%)', mixBlendMode: 'overlay' }} />
+                    </motion.p>
+                    {titleCard.sub && (
+                      <motion.p initial={{ y: 14, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.7 }}
+                        className="mx-auto mt-[2cqh] max-w-[90%] font-black leading-snug text-white/85" style={{ fontSize: 'clamp(14px,2.7cqh,28px)' }}>{titleCard.sub}</motion.p>
+                    )}
+                  </div>
+                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1 }} className="absolute inset-x-0 bottom-[19%] flex items-center justify-center gap-[0.45em] font-black text-white/80" style={{ fontSize: 'clamp(12px,2cqh,20px)' }}>
+                    <img src={`${import.meta.env.BASE_URL}images/logo.svg`} alt="" style={{ width: '1.7em', height: '1.7em' }} />chessscout.net
+                  </motion.div>
+                </motion.div>
+              )}
+            </AnimatePresence>
             {/* Coach look: topic header, the coach's speech bubble (what's being said), early call-to-action chips */}
             {coachClip && (<>
               <div className="pointer-events-none absolute inset-x-[5%] top-[2.4%] z-30 flex items-center justify-between font-black" style={{ fontSize: 'clamp(10px,1.65cqh,17px)' }}>
@@ -1989,7 +2048,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
               </AnimatePresence>
             </>)}
             {coachOn && ctaIdx >= 0 && earlyText && frames[ctaIdx] === frame && frame?.kind !== 'teaser' && (
-              <div className={`pointer-events-none absolute inset-x-0 z-30 flex justify-center gap-[1cqh] ${clip.isMap ? 'top-[60%]' : 'top-[16%]'}`} style={{ fontSize: 'clamp(11px,1.9cqh,20px)' }}>
+              <div className={`pointer-events-none absolute inset-x-0 z-30 flex justify-center gap-[1cqh] ${clip.isMap ? 'top-[71%]' : 'top-[16%]'}`} style={{ fontSize: 'clamp(11px,1.9cqh,20px)' }}>
                 {[['👍', 'Like'], ['＋', 'Follow'], ['↗', 'Share']].map(([g, t], n) => (
                   <motion.span key={`${t}${i}`} initial={{ y: 14, opacity: 0 }} animate={{ y: 0, opacity: 1, scale: [1, 1.08, 1] }} transition={{ delay: 0.9 + n * 0.22, scale: { delay: 1.5 + n * 0.22, duration: 0.6, repeat: Infinity, repeatDelay: 1.4 } }}
                     className="inline-flex items-center gap-[0.35em] rounded-full px-[0.9em] py-[0.3em] font-black text-white shadow-lg" style={{ background: n === 1 ? '#81B64C' : 'rgba(11,17,18,.85)', border: '1.5px solid rgba(255,255,255,.6)' }}>
@@ -1999,7 +2058,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
               </div>
             )}
             {/* Board block */}
-            <div className={`absolute ${clip.isMap ? 'inset-x-[20%] top-[17%]' : 'inset-x-[4%] top-[22%]'}`} style={{ opacity: clip.isMap && frame?.kind === 'mapEnd' ? 0.18 : frame?.kind === 'intro' ? 0.35 : frame?.kind === 'lessonText' ? 0.4 : 1, transition: 'opacity .4s' }}>
+            <div className={`absolute ${clip.isMap ? 'inset-x-[7%] top-[15%]' : 'inset-x-[4%] top-[22%]'}`} style={{ opacity: clip.isMap && frame?.kind === 'mapEnd' ? 0.18 : frame?.kind === 'intro' ? (coachOn ? 0.55 : 0.35) : frame?.kind === 'lessonText' ? 0.4 : 1, transition: 'opacity .4s' }}>
               {!clip.isMap && <div className="mb-1 flex items-center justify-between gap-2"><p className="truncate text-[clamp(11px,1.6cqh,16px)] font-bold text-white/85">{name(top)}</p>{clockChip(top)}</div>}
               <div className={prefs.zoom ? 'overflow-hidden rounded-[10px]' : undefined}
                 style={clip.isMap && prefs.tilt ? { transform: 'perspective(120cqh) rotateX(26deg) scale(1.08)', transformOrigin: '50% 60%' } : undefined}>
@@ -2487,7 +2546,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
             </AnimatePresence>
             {/* The Family Tree: the coach's question bubble, the name stamped on the board,
                 and the family tree growing under it; it ends with the whole tree and "how many did you know?". */}
-            {clip.isMap && clip.map && (() => {
+            {clip.isMap && clip.map && frame?.kind !== 'intro' && (() => {
               const e = clip.map;
               const step = frame?.kind === 'mapMove' || frame?.kind === 'mapStep' ? frame.step : frame?.kind === 'mapEnd' ? e.steps.length : 0;
               const st = e.steps[Math.min(step, e.steps.length - 1)];
@@ -2515,7 +2574,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
                 <AnimatePresence>
                   {stamping && (
                     <motion.div key={`stamp${step}`} initial={{ scale: 2.4, opacity: 0, rotate: -16 }} animate={{ scale: 1, opacity: 1, rotate: -7 }} exit={{ opacity: 0, scale: 0.85 }} transition={{ type: 'spring', stiffness: 420, damping: 16 }}
-                      className="pointer-events-none absolute left-1/2 top-[51%] z-30 -translate-x-1/2 text-center" style={{ fontSize: 'clamp(14px,2.9cqh,32px)' }}>
+                      className="pointer-events-none absolute left-1/2 top-[63.4%] z-30 -translate-x-1/2 text-center" style={{ fontSize: 'clamp(13px,2.6cqh,28px)' }}>
                       <div className="rounded-[0.35em] px-[0.6em] py-[0.25em]" style={{ border: '0.16em solid #9BD35A', boxShadow: 'inset 0 0 0 0.08em #0B1112, inset 0 0 0 0.16em #9BD35A, 0 0.4em 1.4em rgba(0,0,0,.55)', background: 'rgba(11,17,18,.88)' }}>
                         <p className="whitespace-nowrap font-black uppercase leading-none tracking-wide text-[#B8E08C]">{st.name}</p>
                         <p className="mt-[0.25em] whitespace-nowrap font-bold tabular-nums text-white/75" style={{ fontSize: '0.45em' }}>{moveList(st.path)}</p>
@@ -2532,12 +2591,13 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
                     <p className="mt-[1cqh] font-bold text-white/70" style={{ fontSize: 'clamp(12px,2.1cqh,22px)' }}>Comment your score 👇</p>
                   </motion.div>
                 )}
-                <div className={`pointer-events-none absolute inset-x-[7%] z-20 ${done ? 'top-[37%]' : 'top-[58%]'}`} style={{ fontSize: `clamp(10px,${tree.length > 10 ? 1.5 : 1.7}cqh,18px)`, transition: 'top .5s' }}>
-                  {shown.map((x) => {
+                <div className={`pointer-events-none absolute inset-x-[7%] z-20 ${done ? 'top-[37%]' : 'top-[70.5%]'}`} style={{ fontSize: `clamp(10px,${done && tree.length > 10 ? 1.5 : 1.65}cqh,18px)`, transition: 'top .5s' }}>
+                  {/* Under the big board there's room for the newest few branches; the whole tree shows at the end. */}
+                  {(done ? shown : shown.slice(Math.max(0, (() => { const c = shown.findIndex((x) => x.k === step); return (c >= 0 ? c : shown.length - 1) - 4; })()), Math.max(5, (() => { const c = shown.findIndex((x) => x.k === step); return (c >= 0 ? c : shown.length - 1) + 1; })()))).map((x) => {
                     const now = stamping && x.k === step;
                     return (
                       <motion.div key={x.k} layout initial={{ opacity: 0, x: -14 }} animate={{ opacity: 1, x: 0 }} transition={{ type: 'spring', stiffness: 300, damping: 24 }}
-                        className="flex items-center" style={{ paddingLeft: `${x.depth * 1.35}em`, height: tree.length > 10 ? '1.45em' : '1.65em' }}>
+                        className="flex items-center" style={{ paddingLeft: `${x.depth * 1.35}em`, height: done && tree.length > 10 ? '1.45em' : '1.6em' }}>
                         {x.depth > 0 && <span className="mr-[0.35em] text-white/35">└</span>}
                         <span className="truncate rounded-[0.4em] px-[0.5em] py-[0.08em] font-black"
                           style={{ background: now ? '#81B64C' : 'transparent', color: now ? '#fff' : x.depth === 0 ? '#B8E08C' : 'rgba(255,255,255,.88)', boxShadow: now ? '0 0 0 2px rgba(155,211,90,.5), 0 0 18px rgba(129,182,76,.55)' : undefined }}>
