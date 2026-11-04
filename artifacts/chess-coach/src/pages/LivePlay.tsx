@@ -4,7 +4,7 @@ import { useLivePlay, type LiveMode } from '@/hooks/use-live-play';
 import { useLiveRatings } from '@/hooks/use-live-ratings';
 import { LiveGame } from '@/pages/LiveGame';
 import { Link, useLocation } from 'wouter';
-import { lichessAuth, connectLichess, resumeLichessConnect } from '@/lib/lichessBoard';
+import { lichessAuth, connectLichess, syncLichessAuth } from '@/lib/lichessBoard';
 import { Loader2, Swords, Zap, Clock, X, Trophy, Sparkles, Award, History, ChevronRight, Users, CalendarDays, Bot } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { PT, cardStyle, greenBtn, ghostBtn } from '@/lib/playTheme';
@@ -47,7 +47,7 @@ export function LivePlay({ initialTab }: { initialTab?: OnlineTab } = {}) {
   const [, navigate] = useLocation();
   const [lichess, setLichess] = useState(lichessAuth);
   useEffect(() => {
-    const f = () => { const a = lichessAuth(); setLichess(a); if (!a) resumeLichessConnect(); };
+    const f = () => { setLichess(lichessAuth()); void syncLichessAuth().then((a) => { if (a) setLichess(a); }); };
     const v = () => { if (document.visibilityState === 'visible') f(); };
     f();
     window.addEventListener('focus', f); document.addEventListener('visibilitychange', v);

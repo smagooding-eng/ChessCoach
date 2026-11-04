@@ -32,7 +32,7 @@ const loadGsi = () => (script ??= new Promise<GoogleId | null>((resolve) => {
 }));
 
 function redirectSignIn(ref: string) {
-  window.location.href = apiUrl(`/api/auth/google?${[ref ? `ref=${encodeURIComponent(ref)}` : '', appSigninParam()].filter(Boolean).join('&')}`);
+  window.location.href = apiUrl(`/api/auth/google?${[ref ? `ref=${encodeURIComponent(ref)}` : '', appSigninParam(), `h=${newHandoff()}`].filter(Boolean).join('&')}`);
 }
 
 /** Start Google sign-in (the caller already logged the click). */
@@ -69,23 +69,24 @@ export async function startGoogleSignIn(refCode?: string): Promise<void> {
   });
 }
 
+// Sign-in hand-off (see the server's lib/authHandoff.ts): a one-time code made before
+// leaving for Google or Lichess, so the app can collect the sign-in when it's back,
+// wherever the sign-in actually finished.
+const HANDOFF_KEY = 'cs_auth_handoff';
+function newHandoff(): string {
+  const code = Array.from(crypto.getRandomValues(new Uint8Array(18)), (b) => b.toString(16).padStart(2, '0')).join('');
+  try { localStorage.setItem(HANDOFF_KEY, JSON.stringify({ code, at: Date.now() })); } catch { /* ignore */ }
+  return code;
+}
+/** A hand-off code still waiting (made in the last 10 minutes). */
+export function pendingHandoff(): string | null {
+  try { const h = JSON.parse(localStorage.getItem(HANDOFF_KEY) || 'null') as { code?: string; at?: number } | null; return h?.code && h.at && Date.now() - h.at < 10 * 60_000 ? h.code : null; } catch { return null; }
+}
+export function clearHandoff(): void { try { localStorage.removeItem(HANDOFF_KEY); } catch { /* ignore */ } }
+
 /** Sign in (or up) with Lichess: Lichess's own sign-in page, then straight back. */
-const LICHESS_SIGNIN_KEY = 'cs_lichess_signin';
-export function startLichessSignIn(refCode?: string, resumed = false): void {
-  try { localStorage.setItem(LICHESS_SIGNIN_KEY, JSON.stringify({ at: Date.now(), resumed, ref: refCode ?? '' })); } catch { /* ignore */ }
+export function startLichessSignIn(refCode?: string): void {
   let ref = refCode ?? '';
   if (!ref) { try { ref = localStorage.getItem('chessscout_ref') || ''; } catch { /* ignore */ } }
-  window.location.href = apiUrl(`/api/auth/lichess?${[ref ? `ref=${encodeURIComponent(ref)}` : '', appSigninParam()].filter(Boolean).join('&')}`);
+  window.location.href = apiUrl(`/api/auth/lichess?${[ref ? `ref=${encodeURIComponent(ref)}` : '', appSigninParam(), `h=${newHandoff()}`].filter(Boolean).join('&')}`);
 }
-
-/** Came back from Lichess still signed out (its login page sends people to its home
- *  page and forgets the sign-in): carry on once, automatically. */
-export function resumeLichessSignIn(): boolean {
-  let p: { at?: number; resumed?: boolean; ref?: string } | null = null;
-  try { p = JSON.parse(localStorage.getItem(LICHESS_SIGNIN_KEY) || 'null'); } catch { /* ignore */ }
-  if (!p?.at || p.resumed || Date.now() - p.at > 10 * 60_000) return false;
-  startLichessSignIn(p.ref || undefined, true);
-  return true;
-}
-/** Signed in: nothing left to pick up. */
-export function clearLichessSignIn(): void { try { localStorage.removeItem(LICHESS_SIGNIN_KEY); } catch { /* ignore */ } }

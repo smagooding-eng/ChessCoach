@@ -13,7 +13,7 @@ import { apiFetch } from '@/lib/api';
 import { useUser } from '@/hooks/use-user';
 import { playMoveSound } from '@/context/SettingsContext';
 import {
-  lichessAuth, connectLichess, disconnectLichess, resumeLichessConnect, seek as lichessSeek, streamEvents, streamGame, playMove, resign, abort, draw, claimVictory,
+  lichessAuth, connectLichess, disconnectLichess, syncLichessAuth, seek as lichessSeek, streamEvents, streamGame, playMove, resign, abort, draw, claimVictory,
   nowPlaying, exportPgn, isOver, LICHESS_STATUS_TEXT, type LichessGameFull, type LichessState, type LichessPlayer,
 } from '@/lib/lichessBoard';
 
@@ -52,15 +52,13 @@ export function LichessPlay() {
   const [savedId, setSavedId] = useState<number | null>(null);
   const seekAbort = useRef<AbortController | null>(null);
   const autoStarted = useRef(false);
-  const [resuming, setResuming] = useState(false);
+  const connectNote = params.get('lichess');
 
-  // Coming back to the app: pick up a connection that finished in another tab, or
-  // carry on one that Lichess's login page interrupted.
+  // Coming back to the app: the connection is kept on their account, wherever the
+  // trip back from Lichess finished.
   useEffect(() => {
     const check = () => {
-      const a = lichessAuth();
-      if (a) { setAuth((cur) => (cur?.token === a.token ? cur : a)); return; }
-      if (resumeLichessConnect()) setResuming(true);
+      void syncLichessAuth().then((a) => { if (a) setAuth((cur) => (cur?.token === a.token ? cur : a)); });
     };
     check();
     const onVis = () => { if (document.visibilityState === 'visible') check(); };
@@ -193,7 +191,9 @@ export function LichessPlay() {
       <div className="mx-auto max-w-[560px] space-y-4 p-4 pb-24">
         <div className="space-y-3 p-6 text-center" style={cardStyle}>
           <span className="mx-auto grid h-14 w-14 place-items-center rounded-2xl" style={{ background: '#81B64C', color: '#fff' }}><Zap size={26} /></span>
-          <p className="text-[20px] font-black" style={{ color: PT.text }}>{resuming ? 'Finishing connecting Lichess…' : fromLive ? 'Nobody free on ChessScout right now' : 'Play on Lichess'}</p>
+          <p className="text-[20px] font-black" style={{ color: PT.text }}>{fromLive ? 'Nobody free on ChessScout right now' : 'Play on Lichess'}</p>
+          {connectNote && connectNote !== 'connected' && <p className="rounded-xl px-3 py-2 text-[13px] font-semibold" style={{ background: 'rgba(232,180,71,0.14)', border: '1px solid rgba(232,180,71,0.5)', color: PT.text }}>{connectNote === 'declined' ? 'You chose not to connect Lichess.' : connectNote === 'expired' ? 'That connection took too long. Tap Connect Lichess again.' : "Lichess didn't finish connecting. Tap Connect Lichess to try again."}</p>}
+          <p className="text-[12px]" style={{ color: PT.muted }}>Tip: if Lichess asks you to log in and then shows its home page, come back here and tap Connect Lichess once more. You'll go straight to Authorize.</p>
           <p className="text-[13.5px]" style={{ color: PT.muted }}>Connect your Lichess account and we'll find you a real opponent from Lichess's players in seconds, right here on ChessScout. Games count on your Lichess rating and get reviewed here afterwards.</p>
           <button onClick={() => void connectLichess(`/lichess${window.location.search}`)} className="w-full rounded-xl py-3.5 text-[15px] font-extrabold" style={greenBtn}>Connect Lichess</button>
           <p className="text-[11.5px]" style={{ color: PT.muted }}>You'll sign in on lichess.org and come straight back. ChessScout can only play games for you; it can't change your account. Free Lichess account? <a href="https://lichess.org/signup" target="_blank" rel="noreferrer" className="font-bold underline" style={{ color: PT.green }}>Make one</a>.</p>

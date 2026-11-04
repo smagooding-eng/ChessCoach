@@ -6,6 +6,7 @@ import { storage } from "../lib/storage";
 import { sendEmail, welcomeEmailHtml } from "../lib/email";
 import { emailLayout, emailP, escapeHtml, EMAIL, EMAIL_FONT } from "../lib/emailTheme";
 import crypto from "crypto";
+import { putHandoff, takeHandoff, validHandoffCode } from "../lib/authHandoff";
 import {
   clearSession,
   getSessionId,
@@ -397,7 +398,7 @@ router.get("/auth/google", (req: Request, res: Response) => {
     access_type: "offline",
     prompt: "select_account",
     // ref:CODE and/or app (the Play app), so the return trip can say where it started.
-    state: [refCode ? `ref:${refCode}` : '', req.query.app === '1' ? 'app' : ''].filter(Boolean).join(';') || 'none',
+    state: [refCode ? `ref:${refCode}` : '', req.query.app === '1' ? 'app' : '', validHandoffCode(req.query.h) ? `h:${req.query.h}` : ''].filter(Boolean).join(';') || 'none',
   });
 
   res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params}`);
@@ -546,6 +547,7 @@ router.get("/auth/google/callback", async (req: Request, res: Response) => {
     const stateParts = stateParam.split(';');
     const googleRefCode = stateParts.find((x) => x.startsWith('ref:'))?.slice(4) ?? '';
     const fromApp = stateParts.includes('app');
+    const handoff = stateParts.find((x) => x.startsWith('h:'))?.slice(2) ?? null;
 
     const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
       method: "POST",
@@ -592,6 +594,7 @@ router.get("/auth/google/callback", async (req: Request, res: Response) => {
     // An existing account signing back in is marked too, so the funnel can
     // tell "came back signed in" apart from "never came back from Google".
     const newSignupParam = isNewSignup ? "&newSignup=google" : "&login=google";
+    putHandoff(handoff, { sid, newSignup: isNewSignup, provider: "google" });
     sendClientRedirect(res, frontendOrigin + "/#token=" + sid + newSignupParam + (fromApp ? "&app=1" : ""));
   } catch (err: any) {
     req.log?.error?.({ err }, "Google callback error");
@@ -603,7 +606,7 @@ router.get("/auth/google/callback", async (req: Request, res: Response) => {
 // Lichess's own sign-in (OAuth with PKCE; no app registration needed). Finds the
 // account by Lichess id, then by email (linking it), or creates one with the
 // Lichess username already linked, so their games are ready to import.
-const lichessPending = new Map<string, { verifier: string; ref: string; app: boolean; at: number }>();
+const lichessPending = new Map<string, { verifier: string; ref: string; app: boolean; at: number; h: string | null }>();
 let lichessColumn: Promise<void> | null = null;
 const ensureLichessColumn = () => (lichessColumn ??= db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS lichess_id varchar`).then(() => undefined).catch((err) => { lichessColumn = null; throw err; }));
 const b64url = (b: Buffer) => b.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
@@ -613,7 +616,7 @@ router.get("/auth/lichess", (req: Request, res: Response) => {
   const verifier = b64url(crypto.randomBytes(32));
   const challenge = b64url(crypto.createHash("sha256").update(verifier).digest());
   const state = b64url(crypto.randomBytes(16));
-  lichessPending.set(state, { verifier, ref: String(req.query.ref ?? "").slice(0, 40), app: req.query.app === "1", at: Date.now() });
+  lichessPending.set(state, { verifier, ref: String(req.query.ref ?? "").slice(0, 40), app: req.query.app === "1", at: Date.now(), h: validHandoffCode(req.query.h) ? String(req.query.h) : null });
   const params = new URLSearchParams({
     response_type: "code", client_id: "chessscout.net", redirect_uri: `${getOrigin(req)}/api/auth/lichess/callback`,
     scope: "email:read", code_challenge_method: "S256", code_challenge: challenge, state,
@@ -674,11 +677,20 @@ router.get("/auth/lichess/callback", async (req: Request, res: Response) => {
     const [fresh] = await db.select().from(usersTable).where(eq(usersTable.id, user));
     const sid = await createSession({ user: toSessionUser(fresh) } as SessionData);
     setSessionCookie(res, sid);
+    putHandoff(pending.h, { sid, newSignup: isNewSignup, provider: "lichess" });
     sendClientRedirect(res, frontendOrigin + "/#token=" + sid + (isNewSignup ? "&newSignup=lichess" : "&login=lichess") + (pending.app ? "&app=1" : ""));
   } catch (err) {
     req.log?.error?.({ err }, "Lichess sign-in failed");
     fail();
   }
+});
+
+// The app, back from signing in elsewhere, collects its sign-in (see lib/authHandoff.ts).
+router.get("/auth/handoff/:code", (req: Request, res: Response) => {
+  const code = String(req.params.code);
+  const h = validHandoffCode(code) ? takeHandoff(code) : null;
+  if (!h) { res.status(404).json({ ready: false }); return; }
+  res.json({ ready: true, token: h.sid, newSignup: h.newSignup, provider: h.provider });
 });
 
 router.post("/auth/update-profile", async (req: Request, res: Response) => {

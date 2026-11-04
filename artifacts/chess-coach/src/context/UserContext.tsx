@@ -3,7 +3,7 @@ import { appFlagFromSignin } from '@/lib/playApp';
 import { analytics } from '@heycatch/sdk';
 import { apiFetch, setAuthToken, getAuthToken } from '@/lib/api';
 import { trackFunnelEvent } from '@/lib/funnelTracking';
-import { resumeLichessSignIn, clearLichessSignIn } from '@/lib/googleSignIn';
+import { pendingHandoff, clearHandoff } from '@/lib/googleSignIn';
 
 interface AuthUser {
   id: string;
@@ -101,7 +101,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json() as { user: AuthUser | null };
       setAuthUser(data.user ?? null);
-      if (data.user) clearLichessSignIn();
+      if (data.user) clearHandoff();
       if (data.user) {
         // HeyCatch identity -- id is the stable internal user id, never
         // an email/token. Email and name live in properties so the
@@ -140,13 +140,31 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       if (!authUserRef.current && now && now !== seen) { seen = now; void refreshAuth(); }
     };
     const onStorage = (e: StorageEvent) => { if (e.key === null || e.key === 'chess_coach_token') check(); };
-    // Back from Lichess's login page without having signed in here: carry on once.
-    const resume = () => { if (!authUserRef.current && !getAuthToken()) resumeLichessSignIn(); };
-    const onVisible = () => { if (document.visibilityState === 'visible') { check(); resume(); } };
+    // Back from signing in with Google or Lichess, but the sign-in finished somewhere
+    // this screen can't see: collect it from the server with the hand-off code.
+    let collecting = false;
+    const resume = async () => {
+      const code = pendingHandoff();
+      if (!code || collecting || authUserRef.current) return;
+      collecting = true;
+      try {
+        const r = await apiFetch(`/api/auth/handoff/${code}`);
+        const d = r.ok ? await r.json().catch(() => null) as { token?: string; newSignup?: boolean; provider?: 'google' | 'lichess' } | null : null;
+        if (d?.token) {
+          clearHandoff(); setAuthToken(d.token); seen = d.token;
+          if (d.provider === 'lichess') trackFunnelEvent(d.newSignup ? 'lichess_signup_completed' : 'lichess_login_completed');
+          else trackFunnelEvent(d.newSignup ? 'google_signup_completed' : 'google_login_completed');
+          void refreshAuth();
+        }
+      } catch { /* not ready yet */ } finally { collecting = false; }
+    };
+    void resume();
+    const onVisible = () => { if (document.visibilityState === 'visible') { check(); void resume(); } };
     window.addEventListener('storage', onStorage);
-    window.addEventListener('focus', check);
+    const onFocus = () => { check(); void resume(); };
+    window.addEventListener('focus', onFocus);
     document.addEventListener('visibilitychange', onVisible);
-    return () => { window.removeEventListener('storage', onStorage); window.removeEventListener('focus', check); document.removeEventListener('visibilitychange', onVisible); };
+    return () => { window.removeEventListener('storage', onStorage); window.removeEventListener('focus', onFocus); document.removeEventListener('visibilitychange', onVisible); };
   }, [refreshAuth]);
 
   const refreshSubscription = useCallback(() => {
