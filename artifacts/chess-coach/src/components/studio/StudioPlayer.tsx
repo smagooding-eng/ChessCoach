@@ -2040,15 +2040,15 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
               <AnimatePresence mode="wait">
                 {bubbleText && !pop && !(openLine != null && !clip.lineMode) && (
                   <motion.div key={`b-${bubbleText}`} initial={{ opacity: 0, scale: 0.92, y: 8 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.96 }} transition={{ type: 'spring', stiffness: 320, damping: 22 }}
-                    className="pointer-events-none absolute left-[5%] right-[5%] top-[6%] z-30 flex items-start gap-[0.55em]" style={{ fontSize: `clamp(13px,${bubbleText.length > 120 ? 2 : bubbleText.length > 70 ? 2.3 : 2.7}cqh,28px)` }}>
+                    className="pointer-events-none absolute left-[5%] right-[5%] top-[6%] z-30 flex items-start gap-[0.55em]" style={{ fontSize: `clamp(12px,${bubbleText.length > 110 ? 1.9 : bubbleText.length > 60 ? 2.2 : 2.5}cqh,26px)` }}>
                     <span className="grid h-[1.9em] w-[1.9em] shrink-0 place-items-center rounded-full bg-[#81B64C] text-[0.9em] shadow-lg">♞</span>
-                    <p className="line-clamp-4 rounded-[0.9em] rounded-tl-[0.2em] bg-white px-[0.75em] py-[0.45em] font-black leading-[1.15] text-[#141A14] shadow-xl">{bubbleText}</p>
+                    <p className="line-clamp-3 rounded-[0.9em] rounded-tl-[0.2em] bg-white px-[0.75em] py-[0.45em] font-black leading-[1.15] text-[#141A14] shadow-xl">{bubbleText}</p>
                   </motion.div>
                 )}
               </AnimatePresence>
             </>)}
             {coachOn && ctaIdx >= 0 && earlyText && frames[ctaIdx] === frame && frame?.kind !== 'teaser' && (
-              <div className={`pointer-events-none absolute inset-x-0 z-30 flex justify-center gap-[1cqh] ${clip.isMap ? 'top-[71%]' : 'top-[16%]'}`} style={{ fontSize: 'clamp(11px,1.9cqh,20px)' }}>
+              <div className={`pointer-events-none absolute inset-x-0 z-30 flex justify-center gap-[1cqh] ${clip.isMap ? 'top-[73%]' : 'top-[18.6%]'}`} style={{ fontSize: 'clamp(11px,1.9cqh,20px)' }}>
                 {[['👍', 'Like'], ['＋', 'Follow'], ['↗', 'Share']].map(([g, t], n) => (
                   <motion.span key={`${t}${i}`} initial={{ y: 14, opacity: 0 }} animate={{ y: 0, opacity: 1, scale: [1, 1.08, 1] }} transition={{ delay: 0.9 + n * 0.22, scale: { delay: 1.5 + n * 0.22, duration: 0.6, repeat: Infinity, repeatDelay: 1.4 } }}
                     className="inline-flex items-center gap-[0.35em] rounded-full px-[0.9em] py-[0.3em] font-black text-white shadow-lg" style={{ background: n === 1 ? '#81B64C' : 'rgba(11,17,18,.85)', border: '1.5px solid rgba(255,255,255,.6)' }}>
@@ -2058,7 +2058,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
               </div>
             )}
             {/* Board block */}
-            <div className={`absolute ${clip.isMap ? 'inset-x-[7%] top-[15%]' : 'inset-x-[4%] top-[22%]'}`} style={{ opacity: clip.isMap && frame?.kind === 'mapEnd' ? 0.18 : frame?.kind === 'intro' ? (coachOn ? 0.55 : 0.35) : frame?.kind === 'lessonText' ? 0.4 : 1, transition: 'opacity .4s' }}>
+            <div className={`absolute ${clip.isMap ? 'inset-x-[7%] top-[17.5%]' : coachClip ? 'inset-x-[4%] top-[24%]' : 'inset-x-[4%] top-[22%]'}`} style={{ opacity: clip.isMap && frame?.kind === 'mapEnd' ? 0.18 : frame?.kind === 'intro' ? (coachOn ? 0.55 : 0.35) : frame?.kind === 'lessonText' ? 0.4 : 1, transition: 'opacity .4s' }}>
               {!clip.isMap && <div className="mb-1 flex items-center justify-between gap-2"><p className="truncate text-[clamp(11px,1.6cqh,16px)] font-bold text-white/85">{name(top)}</p>{clockChip(top)}</div>}
               <div className={prefs.zoom ? 'overflow-hidden rounded-[10px]' : undefined}
                 style={clip.isMap && prefs.tilt ? { transform: 'perspective(120cqh) rotateX(26deg) scale(1.08)', transformOrigin: '50% 60%' } : undefined}>
@@ -2233,7 +2233,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
                 const SEVC: Record<string, string> = { Critical: '#F0605D', High: '#F0605D', Medium: '#E8B447', Low: '#81B64C' };
                 return (
                   <motion.div key={`${frame.card}${frame.idx ?? ''}`} initial={{ opacity: 0, y: 30, scale: 0.92 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -20 }} transition={{ type: 'spring', stiffness: 260, damping: 20 }}
-                    className="absolute inset-x-[5%] top-[23%] z-30 rounded-[3cqh] bg-[#0B1112]/93 p-[2.4cqh] text-white shadow-2xl ring-2 ring-white/70" style={{ fontSize: 'clamp(11px,1.9cqh,20px)' }}>
+                    className={`absolute inset-x-[5%] ${coachClip ? 'top-[24%]' : 'top-[23%]'} z-30 rounded-[3cqh] bg-[#0B1112]/93 p-[2.4cqh] text-white shadow-2xl ring-2 ring-white/70`} style={{ fontSize: 'clamp(11px,1.9cqh,20px)' }}>
                     <p className="mb-[1.2cqh] text-center font-black uppercase tracking-wide text-[#B8E08C]" style={{ fontSize: '0.95em' }}>🔍 Opponent scout</p>
                     {frame.card === 'profile' && (
                       <div className="text-center">
@@ -2405,7 +2405,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
                 if (frame.card === 'line') return null;
                 return (
                   <motion.div key={frame.card} initial={{ opacity: 0, y: 30, scale: 0.92 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -20 }} transition={{ type: 'spring', stiffness: 260, damping: 20 }}
-                    className={`absolute inset-x-[5%] ${frame.card === 'next' ? 'bottom-[15%]' : 'top-[22%]'} z-30 rounded-[3cqh] bg-[#0B1112]/93 p-[2.4cqh] text-white shadow-2xl ring-2 ring-white/70`} style={{ fontSize: 'clamp(11px,1.9cqh,20px)' }}>
+                    className={`absolute inset-x-[5%] ${frame.card === 'next' ? 'bottom-[15%]' : coachClip ? 'top-[24%]' : 'top-[22%]'} z-30 rounded-[3cqh] bg-[#0B1112]/93 p-[2.4cqh] text-white shadow-2xl ring-2 ring-white/70`} style={{ fontSize: 'clamp(11px,1.9cqh,20px)' }}>
                     <p className="mb-[1.2cqh] text-center font-black uppercase tracking-wide text-[#B8E08C]" style={{ fontSize: '0.95em' }}>♟️ {o.name}</p>
                     {frame.card === 'ideas' && (
                       <div className="space-y-[1cqh]">
@@ -2563,9 +2563,9 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
                 {!done && st && (
                   <AnimatePresence mode="wait">
                     <motion.div key={`q${step}`} initial={{ opacity: 0, scale: 0.92, y: 8 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.96 }} transition={{ type: 'spring', stiffness: 320, damping: 22 }}
-                      className="pointer-events-none absolute left-[5%] right-[5%] top-[6.2%] z-30 flex items-start gap-[0.55em]" style={{ fontSize: 'clamp(14px,2.7cqh,28px)' }}>
+                      className="pointer-events-none absolute left-[5%] right-[5%] top-[5.8%] z-30 flex items-start gap-[0.55em]" style={{ fontSize: 'clamp(13px,2.45cqh,26px)' }}>
                       <span className="grid h-[1.9em] w-[1.9em] shrink-0 place-items-center rounded-full bg-[#81B64C] text-[0.9em] shadow-lg">♞</span>
-                      <p className="relative rounded-[0.9em] rounded-tl-[0.2em] bg-white px-[0.75em] py-[0.45em] font-black leading-[1.15] text-[#141A14] shadow-xl">
+                      <p className="relative line-clamp-3 rounded-[0.9em] rounded-tl-[0.2em] bg-white px-[0.75em] py-[0.45em] font-black leading-[1.15] text-[#141A14] shadow-xl">
                         {mapText(e, st.caption).split(/(\*[^*]+\*)/).map((t, n) => t.startsWith('*') ? <span key={n} className="text-[#4E8A1F]">{t.slice(1, -1)}</span> : <span key={n}>{t}</span>)}
                       </p>
                     </motion.div>
@@ -2574,7 +2574,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
                 <AnimatePresence>
                   {stamping && (
                     <motion.div key={`stamp${step}`} initial={{ scale: 2.4, opacity: 0, rotate: -16 }} animate={{ scale: 1, opacity: 1, rotate: -7 }} exit={{ opacity: 0, scale: 0.85 }} transition={{ type: 'spring', stiffness: 420, damping: 16 }}
-                      className="pointer-events-none absolute left-1/2 top-[63.4%] z-30 -translate-x-1/2 text-center" style={{ fontSize: 'clamp(13px,2.6cqh,28px)' }}>
+                      className="pointer-events-none absolute left-1/2 top-[66%] z-30 -translate-x-1/2 text-center" style={{ fontSize: 'clamp(12px,2.4cqh,26px)' }}>
                       <div className="rounded-[0.35em] px-[0.6em] py-[0.25em]" style={{ border: '0.16em solid #9BD35A', boxShadow: 'inset 0 0 0 0.08em #0B1112, inset 0 0 0 0.16em #9BD35A, 0 0.4em 1.4em rgba(0,0,0,.55)', background: 'rgba(11,17,18,.88)' }}>
                         <p className="whitespace-nowrap font-black uppercase leading-none tracking-wide text-[#B8E08C]">{st.name}</p>
                         <p className="mt-[0.25em] whitespace-nowrap font-bold tabular-nums text-white/75" style={{ fontSize: '0.45em' }}>{moveList(st.path)}</p>
@@ -2591,9 +2591,9 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
                     <p className="mt-[1cqh] font-bold text-white/70" style={{ fontSize: 'clamp(12px,2.1cqh,22px)' }}>Comment your score 👇</p>
                   </motion.div>
                 )}
-                <div className={`pointer-events-none absolute inset-x-[7%] z-20 ${done ? 'top-[37%]' : 'top-[70.5%]'}`} style={{ fontSize: `clamp(10px,${done && tree.length > 10 ? 1.5 : 1.65}cqh,18px)`, transition: 'top .5s' }}>
+                <div className={`pointer-events-none absolute inset-x-[7%] z-20 ${done ? 'top-[37%]' : 'top-[72.6%]'}`} style={{ fontSize: `clamp(10px,${done && tree.length > 10 ? 1.5 : 1.65}cqh,18px)`, transition: 'top .5s' }}>
                   {/* Under the big board there's room for the newest few branches; the whole tree shows at the end. */}
-                  {(done ? shown : shown.slice(Math.max(0, (() => { const c = shown.findIndex((x) => x.k === step); return (c >= 0 ? c : shown.length - 1) - 4; })()), Math.max(5, (() => { const c = shown.findIndex((x) => x.k === step); return (c >= 0 ? c : shown.length - 1) + 1; })()))).map((x) => {
+                  {(done ? shown : shown.slice(Math.max(0, (() => { const c = shown.findIndex((x) => x.k === step); return (c >= 0 ? c : shown.length - 1) - 3; })()), Math.max(4, (() => { const c = shown.findIndex((x) => x.k === step); return (c >= 0 ? c : shown.length - 1) + 1; })()))).map((x) => {
                     const now = stamping && x.k === step;
                     return (
                       <motion.div key={x.k} layout initial={{ opacity: 0, x: -14 }} animate={{ opacity: 1, x: 0 }} transition={{ type: 'spring', stiffness: 300, damping: 24 }}
