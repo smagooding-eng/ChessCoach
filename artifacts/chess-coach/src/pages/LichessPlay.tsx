@@ -22,6 +22,21 @@ import {
   nowPlaying, exportPgn, sendChat, chatHistory, isOver, LICHESS_STATUS_TEXT, type LichessGameFull, type LichessState, type LichessPlayer,
 } from '@/lib/lichessBoard';
 
+// ChessScout's team on Lichess.
+export const LICHESS_TEAM_URL = 'https://lichess.org/team/chessscoutnet';
+function TeamCard() {
+  return (
+    <a href={LICHESS_TEAM_URL} target="_blank" rel="noreferrer" className="flex items-center gap-3 p-4" style={cardStyle}>
+      <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl text-[20px]" style={{ background: '#81B64C', color: '#fff' }}>♞</span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-[14.5px] font-extrabold" style={{ color: PT.text }}>Join the ChessScout team on Lichess</span>
+        <span className="block text-[12.5px]" style={{ color: PT.muted }}>Team tournaments and team battles with other ChessScout players.</span>
+      </span>
+      <ExternalLink size={16} style={{ color: PT.muted }} />
+    </a>
+  );
+}
+
 const CLOCKS = [
   { m: 10, i: 0, label: '10 min' }, { m: 10, i: 5, label: '10 | 5' }, { m: 15, i: 10, label: '15 | 10' }, { m: 30, i: 0, label: '30 min' },
 ];
@@ -332,6 +347,7 @@ export function LichessPlay() {
             {saving === 'notyours' && <p className="text-[12.5px]" style={{ color: PT.muted }}>This Lichess account ({auth.username}) isn't the one linked to your ChessScout account, so the game wasn't added. Change your Lichess username in Settings to save these games.</p>}
             {saving === 'failed' && <button onClick={() => void saveGame()} className="w-full rounded-xl py-2.5 text-[13px] font-bold" style={ghostBtn}>Couldn't save it to your games. Try again</button>}
             <button onClick={() => void startSeek()} className="w-full rounded-xl py-3 text-[14px] font-extrabold" style={saving === 'saved' ? ghostBtn : greenBtn}>New game</button>
+            <a href={LICHESS_TEAM_URL} target="_blank" rel="noreferrer" className="block pt-1 text-[12.5px] font-bold underline" style={{ color: PT.green }}>♞ Join the ChessScout team on Lichess</a>
           </div>
         )}
         {error && <p className="text-center text-[13px]" style={{ color: PT.red }}>{error}</p>}
@@ -374,6 +390,7 @@ export function LichessPlay() {
         </div>
       )}
       {error && <p className="text-center text-[13px]" style={{ color: PT.red }}>{error}</p>}
+      <TeamCard />
       <div className="flex justify-center"><Link href="/live" className="rounded-xl px-4 py-2.5 text-[13px] font-bold" style={ghostBtn}>Back to Live Play</Link></div>
     </div>
   );

@@ -19,7 +19,8 @@ const H = () => ({ Authorization: `Bearer ${TOKEN}` });
 // The links carry utm_source=lichess_bot, so visits from the bot get their own line in the traffic export.
 const LINK = "https://chessscout.net/?utm_source=lichess_bot";
 const HELLO = `Hi! I'm the ChessScout.net coach bot, playing at about your level. Good luck! Get this game reviewed free: ${LINK}`;
-const GG = `gg! See where it was won or lost, free: ${LINK}`;
+// Lichess chat lines are capped at 140 characters.
+const GG = `gg! Free review: ${LINK} · Join our team: lichess.org/team/chessscoutnet`;
 
 let botId = "";
 
