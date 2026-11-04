@@ -1035,12 +1035,16 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
       const teaser = prefs.openTeaser && (!isComp || isFirst);
       if (teaser) {
         if (R.trap && o.trap) {
-          const [ta, tb] = R.trap; const n = Math.ceil((tb - ta + 1) / 2);
+          // "Mate in N" the chess way: only the mating side's moves, from the victim's
+          // mistake (the trap's critical move) to checkmate.
+          const [ta, tb] = R.trap;
+          const from = o.trap.critical >= 0 && ta + o.trap.critical < tb ? ta + o.trap.critical + 1 : ta;
+          const n = Math.floor((tb - from) / 2) + 1;
           const mate = !!clip.plies[tb - 1]?.san.includes('#');
           out.push({ kind: 'teaser', fen: fenAt(tb), last: lastAt(tb), mate,
-            text: mate ? `Checkmate in ${n} moves 😱` : `Don't fall for this 🪤`,
+            text: mate ? `Mate in ${n} 😱` : `Don't fall for this 🪤`,
             sub: `The ${o.trap.name} · it's at the end`,
-            said: mate ? `Checkmate in ${n} moves. Here's the ${o.name}, and the trap that ends it.` : `Don't fall for this. Here's the ${o.name}, and the trap hiding in it.` });
+            said: mate ? `Mate in ${n}. Here's the ${o.name}, and the trap that ends it.` : `Don't fall for this. Here's the ${o.name}, and the trap hiding in it.` });
         } else if (o.options.length >= 2) {
           const n = Math.min(4, o.options.length);
           out.push({ kind: 'teaser', fen: keyFen, last: keyLast, mate: false,
